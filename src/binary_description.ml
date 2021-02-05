@@ -111,13 +111,13 @@ let fixup_references uf =
 let z_reference_name = "Z.t"
 
 let z_reference_description =
-  "A variable length sequence of bytes, encoding a Zarith number. Each byte \
-   has a running unary size bit: the most significant bit of each byte tells \
-   is this is the last byte in the sequence (0) or if there is more to read \
-   (1). The second most significant bit of the first byte is reserved for the \
-   sign (positive if zero). Size and sign bits ignored, data is then the \
-   binary representation of the absolute value of the number in little endian \
-   order."
+  "A variable-length sequence of bytes encoding a Zarith integer. Each byte \
+   has a running unary size bit: the most significant bit of each byte \
+   indicates whether this is the last byte in the sequence (0) or whether the \
+   sequence continues (1). The second most significant bit of the first byte \
+   is reserved for the sign (0 for positive, 1 for negative). Size and sign \
+   bits ignored, the data is the binary representation of the absolute value \
+   of the number in little-endian order."
 
 let z_encoding =
   Binary_schema.Obj {fields = [Named_field ("Z.t", `Dynamic, Bytes)]}
@@ -131,11 +131,11 @@ let add_z_reference uf {descriptions} =
 let n_reference_name = "N.t"
 
 let n_reference_description =
-  "A variable length sequence of bytes, encoding a Zarith number. Each byte \
-   has a running unary size bit: the most significant bit of each byte tells \
-   is this is the last byte in the sequence (0) or if there is more to read \
-   (1). Size bits ignored, data is then the binary representation of the \
-   absolute value of the number in little endian order."
+  "A variable-length sequence of bytes encoding a Zarith natural number. Each \
+   byte has a running unary size bit: the most significant bit of each byte \
+   indicates whether this is the last byte in the sequence (0) or whether the \
+   sequence continues (1). Size bits ignored, the data is the binary \
+   representation of the number in little-endian order."
 
 let n_encoding =
   Binary_schema.Obj {fields = [Named_field ("N.t", `Dynamic, Bytes)]}
