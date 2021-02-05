@@ -473,14 +473,6 @@ module P256 : SIGNATURE = struct
 
   let uncompressed_from_raw pk cpk = Hacl.P256.compress_n pk cpk
 
-  let raw_from_compressed buf pk =
-    if not (Hacl.P256.decompress_c buf pk) then
-      failwith "P256.raw_from_compressed: failure"
-
-  let raw_from_uncompressed buf pk =
-    if not (Hacl.P256.decompress_n buf pk) then
-      failwith "P256.raw_from_uncompressed failure"
-
   let compare : type a. a key -> a key -> int =
    fun a b ->
     (* TODO re-group once coverage ppx is updated *)
@@ -506,11 +498,11 @@ module P256 : SIGNATURE = struct
     let pk = Bytes.create pk_size_raw in
     match Bytes.length buf with
     | len when len = pk_size ->
-        raw_from_compressed buf pk ;
-        if valid_pk pk then Some (Pk pk) else None
+        let decompress_ok = Hacl.P256.decompress_c buf pk in
+        if decompress_ok && valid_pk pk then Some (Pk pk) else None
     | len when len = pk_size_uncompressed ->
-        raw_from_uncompressed buf pk ;
-        if valid_pk pk then Some (Pk pk) else None
+        let decompress_ok = Hacl.P256.decompress_n buf pk in
+        if decompress_ok && valid_pk pk then Some (Pk pk) else None
     | _ ->
         None
 
