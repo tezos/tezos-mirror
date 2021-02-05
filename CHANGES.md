@@ -63,7 +63,9 @@ be documented here either.
 ## Codec
 
 - Add `--version` flag
-- Register N and Z
+- Register some ground encodings including arbitrary precision integers, n-bit
+  sized integers, and floating point numbers.
+
 
 ## Docker Images
 
