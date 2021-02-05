@@ -1,21 +1,19 @@
-"""
-This tests the migration from PROTO_A to PROTO_B.
-"""
-
-import datetime
-import json
-import os
 import time
 
 import pytest
 
 from launchers.sandbox import Sandbox
-from tools import paths, utils
+from client.client import Client
+from tools import utils, constants
 from . import protocol
 
-ERROR_PATTERN = r"Uncaught|registered|error"
-BLOCKS_PER_VOTING_PERIOD = 24
+BLOCKS_PER_VOTING_PERIOD = 8
+OFFSET = int(BLOCKS_PER_VOTING_PERIOD / 2)
 POLLING_TIME = 5
+NUM_NODES = 3
+BAKER = "bootstrap1"
+BAKE_ARGS = ['--minimal-timestamp']
+ERROR_PATTERN = r"Uncaught|registered|error"
 
 PROTO_A = protocol.PREV_HASH
 PROTO_A_DAEMON = protocol.PREV_DAEMON
@@ -23,86 +21,75 @@ PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
 PROTO_B = protocol.HASH
 PROTO_B_DAEMON = protocol.DAEMON
 
-PARAMETERS_FILE = (
-    f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/' 'test-parameters.json'
-)
-assert os.path.isfile(PARAMETERS_FILE), (
-    f'{PARAMETERS_FILE}'
-    ' cannot be found; please first run'
-    ' `make` in TEZOS_HOME.'
-)
-with open(PARAMETERS_FILE) as f:
-    PARAMETERS = dict(json.load(f))
-    PARAMETERS["blocks_per_voting_period"] = BLOCKS_PER_VOTING_PERIOD
-
-
-def node_params(threshold=0):
-    return [
-        '--sync-latency',
-        '2',
-        '--synchronisation-threshold',
-        str(threshold),
-        '--connections',
-        '100',
-        '--enable-testchain',
-    ]
-
 
 def client_get_current_period_kind(client) -> dict:
     res = client.get_current_period()
     return res['voting_period']['kind']
 
 
+def bake_n_blocks(client: Client, baker: str, n_blocks: int):
+    for _ in range(n_blocks):
+        client.bake(baker, BAKE_ARGS)
+
+
+def bake_until_next_voting_period(client: Client, baker: str, offset: int = 0):
+    period_info = client.get_current_period()
+    remaining_blocks = period_info["remaining"]
+    # if offset is the constant OFFSET, it will take us to
+    # the middle of the next voting period
+    bake_n_blocks(client, baker, 1 + remaining_blocks + offset)
+
+
+@pytest.mark.timeout(10)
+def wait_until_level(clients, level):
+    for client in clients:
+        while client.get_level() < level:
+            time.sleep(1)
+
+
+def assert_all_clients_in_period(clients, period):
+    for client in clients:
+        assert client_get_current_period_kind(client) == period
+
+
 @pytest.mark.vote
 @pytest.mark.slow
 @pytest.mark.baker
-@pytest.mark.testchain
 @pytest.mark.incremental
 class TestVotingFull:
-    def test_add_tmp_bootstrap_node(self, sandbox: Sandbox):
-        """ launch tmp nodes just to bootstrap all other ones """
-        sandbox.add_node(10, params=node_params(0))
-        sandbox.add_node(11, params=node_params(0))
+    """This tests the migration from PROTO_A to PROTO_B using the voting
+    procedure.  PROTO_A and PROTO_B are the previous and
+    respectively the current protocol as given by the 'protocol'
+    module.
 
-    def test_activate_proto_a(self, sandbox: Sandbox):
-        delay = datetime.timedelta(seconds=0)
-        sandbox.client(10).activate_protocol_json(
-            PROTO_A, PARAMETERS, delay=delay
-        )
+    This test advances through all the periods of the voting procedure
+    until the last one (adoption), by manually baking the right number
+    of blocks. Once the adoption period is reached, a baker takes over
+    to bake the remaining blocks of the period. From there the baker
+    for the next protocol, which was started at the beginning of the
+    test, takes over. (Bakers are used to make the test more
+    realistic. However, to be sure that proposals and ballots are
+    injected at the right moment, manual baking is used instead.)
 
-    def test_add_tmp_bootstrap_baker(self, sandbox: Sandbox):
-        """Launch a temporary baker so that 10 and 11 keep broadcasting
-        heads to the future joining nodes and help them bootstrap"""
-        # note we use 'bootstrap1' for all baking, this avoids the issue
-        # of a delegate becoming inactive. For instance, if we want
-        # to bake with 'bootstrap2' later in the test, it may have became
-        # inactive
-        sandbox.add_baker(10, 'bootstrap1', proto=PROTO_A_DAEMON)
+    This test differs in the following aspects from test_voting.py:
+    - it uses more nodes, not just one
+    - it goes through all voting periods, not just the first two
+    - it uses bakers
+    - it uses already registered protocols, instead of injecting a
+      new dummy protocol
+    """
 
     def test_add_initial_nodes(self, sandbox: Sandbox):
-        """We launch nodes with non-null synchronisation-threshold.
-        This is to test the bootstrap heuristics with the testchain."""
-        sandbox.add_node(0, params=node_params(2))
-        sandbox.add_node(1, params=node_params(2))
-        sandbox.add_node(2, params=node_params(2))
-        sandbox.add_node(3, params=node_params(2))
+        for i in range(NUM_NODES):
+            sandbox.add_node(i, params=constants.NODE_PARAMS)
+        parameters = dict(protocol.PREV_PARAMETERS)
+        parameters["blocks_per_voting_period"] = BLOCKS_PER_VOTING_PERIOD
+        utils.activate_protocol(
+            sandbox.client(0), PROTO_A, parameters, activate_in_the_past=True
+        )
 
-    @pytest.mark.timeout(20)
-    def test_bootstrap(self, sandbox: Sandbox):
-        clients = sandbox.all_clients()
-        for client in clients:
-            print(client.sync_state())
-            client.bootstrapped()
-
-    def test_remove_tmp_bootstrap_nodes(self, sandbox: Sandbox):
-        """These temp noddes are no longer needed"""
-        sandbox.rm_baker(10, proto=PROTO_A_DAEMON)
-        sandbox.rm_node(10)
-        sandbox.rm_node(11)
-
-    def test_add_bakers(self, sandbox: Sandbox):
-        sandbox.add_baker(0, 'bootstrap1', proto=PROTO_A_DAEMON)
-        sandbox.add_baker(0, 'bootstrap1', proto=PROTO_B_DAEMON)
+    def test_add_baker(self, sandbox: Sandbox):
+        sandbox.add_baker(0, BAKER, proto=PROTO_B_DAEMON)
 
     def test_client_knows_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -110,33 +97,28 @@ class TestVotingFull:
         assert PROTO_B in protos
 
     def test_proposal_period(self, sandbox: Sandbox):
-        client = sandbox.client(0)
-        assert client_get_current_period_kind(client) == 'proposal'
+        assert_all_clients_in_period(sandbox.all_clients(), 'proposal')
 
-    def test_submit_proto_b_proposal(self, sandbox, session):
+    def test_submit_proto_b_proposal(self, sandbox):
         client = sandbox.client(0)
-        proposals = client.submit_proposals('bootstrap1', [PROTO_B])
-        session['prop_hash'] = proposals.operation_hash
+        proposals = client.submit_proposals(BAKER, [PROTO_B])
+        # bake a block for the submit proposal to be included
+        bake_n_blocks(client, BAKER, 1)
+        client.wait_for_inclusion(proposals.operation_hash, check_previous=1)
 
-    def test_wait_for_operation_inclusion(self, sandbox, session):
-        client = sandbox.client(0)
-        time.sleep(3 * POLLING_TIME)
-        client.wait_for_inclusion(session['prop_hash'])
-
-    @pytest.mark.timeout(60)
     def test_check_proto_b_proposed(self, sandbox: Sandbox):
-        client = sandbox.client(0)
-        proposals = client.get_proposals()
-        while proposals == []:
-            time.sleep(POLLING_TIME)
-        assert PROTO_B in [proto for (proto, _) in proposals]
+        clients = sandbox.all_clients()
+        wait_until_level(clients, sandbox.client(0).get_level())
+        for client in clients:
+            proposals = client.get_proposals()
+            assert PROTO_B in [proto for (proto, _) in proposals]
 
-    @pytest.mark.timeout(60)
-    def test_wait_for_voting_period(self, sandbox: Sandbox):
+    def test_wait_for_testing_vote_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        while client.get_level() <= BLOCKS_PER_VOTING_PERIOD + 1:
-            time.sleep(POLLING_TIME)
-        assert client_get_current_period_kind(client) == 'testing_vote'
+        bake_until_next_voting_period(client, BAKER, OFFSET)
+        clients = sandbox.all_clients()
+        wait_until_level(clients, client.get_level())
+        assert_all_clients_in_period(clients, 'testing_vote')
 
     def test_delegates_vote_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -145,19 +127,19 @@ class TestVotingFull:
         for listing in listings:
             client.submit_ballot(listing["pkh"], PROTO_B, 'yay')
 
-    @pytest.mark.timeout(60)
     def test_wait_for_cooldown(self, sandbox: Sandbox):
-        for client in sandbox.all_clients():
-            while client.get_level() <= 2 * BLOCKS_PER_VOTING_PERIOD + 1:
-                time.sleep(POLLING_TIME)
-            assert client_get_current_period_kind(client) == 'testing'
-
-    @pytest.mark.timeout(60)
-    def test_wait_for_promotion_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        while client.get_level() <= 3 * BLOCKS_PER_VOTING_PERIOD + 1:
-            time.sleep(POLLING_TIME)
-        assert client_get_current_period_kind(client) == 'promotion_vote'
+        bake_until_next_voting_period(client, BAKER, OFFSET)
+        clients = sandbox.all_clients()
+        wait_until_level(clients, client.get_level())
+        assert_all_clients_in_period(clients, 'testing')
+
+    def test_wait_for_promotion_vote_period(self, sandbox: Sandbox):
+        client = sandbox.client(0)
+        bake_until_next_voting_period(client, BAKER, OFFSET)
+        clients = sandbox.all_clients()
+        wait_until_level(clients, client.get_level())
+        assert_all_clients_in_period(clients, 'promotion_vote')
 
     def test_vote_in_promotion_phase(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -165,29 +147,24 @@ class TestVotingFull:
         for listing in listings:
             client.submit_ballot(listing["pkh"], PROTO_B, 'yay')
 
-    @pytest.mark.timeout(90)
     def test_wait_for_adoption(self, sandbox: Sandbox):
-        client = sandbox.client(1)
-        while client.get_level() <= 4 * BLOCKS_PER_VOTING_PERIOD + 1:
-            time.sleep(POLLING_TIME)
-        assert client_get_current_period_kind(client) == 'adoption'
-
-    @pytest.mark.timeout(90)
-    def test_wait_for_proposal(self, sandbox: Sandbox):
-        client = sandbox.client(1)
-        while client.get_level() <= 5 * BLOCKS_PER_VOTING_PERIOD + 1:
-            time.sleep(POLLING_TIME)
-        assert client_get_current_period_kind(client) == 'proposal'
+        client = sandbox.client(0)
+        bake_until_next_voting_period(client, BAKER)
+        clients = sandbox.all_clients()
+        wait_until_level(clients, client.get_level())
+        assert_all_clients_in_period(clients, 'adoption')
 
     @pytest.mark.timeout(60)
     def test_all_nodes_run_proto_b(self, sandbox: Sandbox):
+        # we let a PROTO_A baker bake the last blocks of PROTO_A
+        sandbox.add_baker(0, BAKER, proto=PROTO_A_DAEMON)
         clients = sandbox.all_clients()
         all_have_proto = False
         while not all_have_proto:
             all_have_proto = all(
                 client.get_protocol() == PROTO_B for client in clients
             )
-            (time).sleep(POLLING_TIME)
+            time.sleep(POLLING_TIME)
 
     def test_new_chain_progress(self, sandbox: Sandbox):
         client = sandbox.client(0)
