@@ -124,6 +124,8 @@ module type TREE = sig
   (** The type for context trees. *)
   type tree
 
+  include VIEW with type t := tree and type tree := tree
+
   (** [empty _] is the empty tree. *)
   val empty : t -> tree
 
@@ -132,15 +134,16 @@ module type TREE = sig
 
   (** [kind t] is [t]'s kind. It's either a tree node or a leaf
       value. *)
-  val kind : tree -> [`Value of bytes | `Tree]
+  val kind : tree -> [`Value | `Tree]
+
+  (** [to_value t] is [Some v] is [t] is a leaf tree and [None] otherwise. *)
+  val to_value : tree -> value option Lwt.t
 
   (** [hash t] is [t]'s Merkle hash. *)
   val hash : tree -> Context_hash.t
 
   (** [equal x y] is true iff [x] and [y] have the same Merkle hash. *)
   val equal : tree -> tree -> bool
-
-  include VIEW with type t := tree and type tree := tree
 
   (** {2 Caches} *)
 

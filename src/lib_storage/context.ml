@@ -668,12 +668,12 @@ module Dumpable_context = struct
   let context_tree ctxt = ctxt.tree
 
   let tree_hash tree =
-    tree |> Store.Tree.destruct
-    |> function
+    let hash = Store.Tree.hash tree in
+    match Store.Tree.destruct tree with
     | `Node _ ->
-        `Node (Store.Tree.hash tree)
-    | `Contents (b, _) ->
-        `Blob (Store.Contents.hash b)
+        `Node hash
+    | `Contents _ ->
+        `Blob hash
 
   type binding = {
     key : string;

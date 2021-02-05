@@ -1072,11 +1072,7 @@ struct
     let fold_keys s root ~init ~f =
       Context.fold s root ~init ~f:(fun k v acc ->
           let k = root @ k in
-          match Tree.kind v with
-          | `Value _ ->
-              f k acc
-          | `Tree ->
-              Lwt.return acc)
+          match Tree.kind v with `Value -> f k acc | `Tree -> Lwt.return acc)
 
     type key_or_dir = [`Key of string list | `Dir of string list]
 
@@ -1084,7 +1080,7 @@ struct
       fold ~depth:(`Eq 1) t root ~init ~f:(fun k v acc ->
           let k = root @ k in
           match Tree.kind v with
-          | `Value _ ->
+          | `Value ->
               f (`Key k) acc
           | `Tree ->
               f (`Dir k) acc)

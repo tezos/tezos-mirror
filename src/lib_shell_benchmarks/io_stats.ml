@@ -92,12 +92,13 @@ let load_tree context key =
     key
     ~init:Io_helpers.Key_map.empty
     ~f:(fun path t tree ->
-      match Context.Tree.kind t with
-      | `Value bytes ->
+      Context.Tree.to_value t
+      >|= function
+      | Some bytes ->
           let len = Bytes.length bytes in
-          Lwt.return (Io_helpers.Key_map.insert path len tree)
-      | `Tree ->
-          Lwt.return tree)
+          Io_helpers.Key_map.insert path len tree
+      | None ->
+          tree)
 
 let context_statistics base_dir context_hash =
   let (context, index) =

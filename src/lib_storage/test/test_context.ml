@@ -256,7 +256,7 @@ let test_replay {idx; genesis; _} =
 let fold_keys s root ~init ~f =
   fold s root ~init ~f:(fun k v acc ->
       match Tree.kind v with
-      | `Value _ ->
+      | `Value ->
           f (root @ k) acc
       | `Tree ->
           Lwt.return acc)
@@ -356,7 +356,7 @@ let test_fold {idx; genesis; _} =
             match Tree.kind t with
             | `Tree ->
                 Lwt.return (cs, path :: ns)
-            | `Value _ ->
+            | `Value ->
                 Lwt.return (path :: cs, ns))
         >>= fun (cs, ns) ->
         Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;
@@ -407,7 +407,7 @@ let test_trees {idx; genesis; _} =
             match Tree.kind t with
             | `Tree ->
                 Lwt.return (cs, path :: ns)
-            | `Value _ ->
+            | `Value ->
                 Lwt.return (path :: cs, ns))
         >>= fun (cs, ns) ->
         Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;

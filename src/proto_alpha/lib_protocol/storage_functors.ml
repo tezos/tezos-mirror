@@ -244,7 +244,7 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX) :
   let fold s ~init ~f =
     C.fold ~depth:(`Eq I.path_length) s [] ~init ~f:(fun file tree acc ->
         match C.Tree.kind tree with
-        | `Value _ -> (
+        | `Value -> (
           match I.of_path file with None -> assert false | Some p -> f p acc )
         | `Tree ->
             Lwt.return acc)
@@ -319,8 +319,9 @@ module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
 
   let fold s ~init ~f =
     C.fold ~depth:(`Eq I.path_length) s [] ~init ~f:(fun file tree acc ->
-        match C.Tree.kind tree with
-        | `Value v -> (
+        C.Tree.to_value tree
+        >>= function
+        | Some v -> (
           match I.of_path file with
           | None ->
               assert false
@@ -331,7 +332,7 @@ module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
                   f path v acc
               | Error _ ->
                   Lwt.return acc ) )
-        | `Tree ->
+        | None ->
             Lwt.return acc)
 
   let fold_keys s ~init ~f = fold s ~init ~f:(fun k _ acc -> f k acc)
@@ -492,7 +493,7 @@ struct
   let fold_keys_unaccounted s ~init ~f =
     C.fold ~depth:(`Eq I.path_length) s [] ~init ~f:(fun file tree acc ->
         match C.Tree.kind tree with
-        | `Value _ -> (
+        | `Value -> (
           match List.rev file with
           | last :: _ when Compare.String.(last = len_name) ->
               Lwt.return acc
@@ -635,7 +636,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
               assert false
           | Some path ->
               f path acc )
-        | `Value _ ->
+        | `Value ->
             Lwt.return acc)
 
   let keys t = fold_keys t ~init:[] ~f:(fun i acc -> Lwt.return (i :: acc))
@@ -655,7 +656,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
   let list t k =
     C.fold ~depth:(`Eq 1) t k ~init:[] ~f:(fun k t acc ->
         match C.Tree.kind t with
-        | `Value _ ->
+        | `Value ->
             Lwt.return (`Key k :: acc)
         | `Tree ->
             Lwt.return (`Dir k :: acc))

@@ -162,6 +162,8 @@ module Context = struct
 
     let kind (Tree {ops = (module Ops); tree; _}) = Ops.Tree.kind tree
 
+    let to_value (Tree {ops = (module Ops); tree; _}) = Ops.Tree.to_value tree
+
     let equal (Tree {ops = (module Ops); tree; equality_witness; _}) (Tree t) =
       match equiv equality_witness t.equality_witness with
       | (Some Refl, Some Refl) ->

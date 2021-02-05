@@ -180,7 +180,7 @@ let test_replay {genesis = ctxt0; _} =
 let fold_keys s root ~init ~f =
   Context.fold s root ~init ~f:(fun k v acc ->
       match Context.Tree.kind v with
-      | `Value _ ->
+      | `Value ->
           f (root @ k) acc
       | `Tree ->
           Lwt.return acc)
@@ -238,7 +238,7 @@ let test_fold {genesis = ctxt; _} =
       []
       ~f:(fun path tree (cs, ns) ->
         match Context.Tree.kind tree with
-        | `Value _ ->
+        | `Value ->
             Lwt.return (path :: cs, ns)
         | `Tree ->
             Lwt.return (cs, path :: ns))
@@ -328,7 +328,7 @@ let test_trees {genesis = ctxt; _} =
       []
       ~f:(fun path tree (cs, ns) ->
         match Context.Tree.kind tree with
-        | `Value _ ->
+        | `Value ->
             Lwt.return (path :: cs, ns)
         | `Tree ->
             Lwt.return (cs, path :: ns))
