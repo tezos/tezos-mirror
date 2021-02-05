@@ -262,10 +262,13 @@ val both_e :
 
 (**/**)
 
-(* boilerplate for interaction with the shell *)
+(* The protocol environment needs to know about shell's tzresult because they are
+   used for in-protocol RPCs. Moreover, some light processing on these results
+   is done in the protocol which requires the type to be concrete.
 
-type shell_error
+   The type is kept private because the environment is sole responsible for
+   wrapping the protocol's errors into the shell's. *)
 
-type 'shell_error shell_trace
+type shell_tztrace
 
-type 'a shell_tzresult = ('a, shell_error shell_trace) result
+type 'a shell_tzresult = ('a, shell_tztrace) result

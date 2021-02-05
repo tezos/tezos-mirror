@@ -77,9 +77,9 @@ module type V2 = sig
        and type RPC_service.meth = RPC_service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
             ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
-       and type Error_monad.shell_error = Error_monad.error
-       and type 'shell_error Error_monad.shell_trace =
-            'shell_error Error_monad.trace
+       and type Error_monad.shell_tztrace = Error_monad.tztrace
+       and type 'a Error_monad.shell_tzresult =
+            ('a, Error_monad.tztrace) result
        and module Sapling = Tezos_sapling.Core.Validator
 
   type error += Ecoproto_error of Error_monad.error
@@ -722,11 +722,9 @@ struct
   end
 
   module Error_monad = struct
-    type 'a shell_tzresult = 'a Error_monad.tzresult
+    type shell_tztrace = Error_monad.tztrace
 
-    type shell_error = Error_monad.error = ..
-
-    type 'shell_error shell_trace = 'shell_error Error_monad.trace
+    type 'a shell_tzresult = ('a, Error_monad.tztrace) result
 
     type error_category = [`Branch | `Temporary | `Permanent]
 
