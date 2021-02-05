@@ -78,25 +78,19 @@ module Protocol_constants_overrides = struct
             c.time_between_blocks,
             c.endorsers_per_block,
             c.hard_gas_limit_per_operation,
-            c.hard_gas_limit_per_block ),
-          ( ( c.proof_of_work_threshold,
-              c.tokens_per_roll,
+            c.hard_gas_limit_per_block,
+            c.proof_of_work_threshold ),
+          ( ( c.tokens_per_roll,
               c.michelson_maximum_type_size,
               c.seed_nonce_revelation_tip,
               c.origination_size,
               c.block_security_deposit,
               c.endorsement_security_deposit,
               c.baking_reward_per_endorsement,
-              c.endorsement_reward ),
-            ( ( c.cost_per_byte,
-                c.hard_storage_limit_per_operation,
-                Some 0L,
-                (* At this position in the encoding we used to have a test
-               chain duration but it is not used anymore and should be
-               removed when this encoding is updated. When the test
-               chain was removed, we did not want to change the
-               encoding for retrocompatibility. *)
-                c.quorum_min,
+              c.endorsement_reward,
+              c.cost_per_byte,
+              c.hard_storage_limit_per_operation ),
+            ( ( c.quorum_min,
                 c.quorum_max,
                 c.min_proposal_quorum,
                 c.initial_endorsers,
@@ -111,20 +105,19 @@ module Protocol_constants_overrides = struct
                time_between_blocks,
                endorsers_per_block,
                hard_gas_limit_per_operation,
-               hard_gas_limit_per_block ),
-             ( ( proof_of_work_threshold,
-                 tokens_per_roll,
+               hard_gas_limit_per_block,
+               proof_of_work_threshold ),
+             ( ( tokens_per_roll,
                  michelson_maximum_type_size,
                  seed_nonce_revelation_tip,
                  origination_size,
                  block_security_deposit,
                  endorsement_security_deposit,
                  baking_reward_per_endorsement,
-                 endorsement_reward ),
-               ( ( cost_per_byte,
-                   hard_storage_limit_per_operation,
-                   _test_chain_duration,
-                   quorum_min,
+                 endorsement_reward,
+                 cost_per_byte,
+                 hard_storage_limit_per_operation ),
+               ( ( quorum_min,
                    quorum_max,
                    min_proposal_quorum,
                    initial_endorsers,
@@ -162,7 +155,7 @@ module Protocol_constants_overrides = struct
           timestamp;
         })
       (merge_objs
-         (obj9
+         (obj10
             (opt "preserved_cycles" uint8)
             (opt "blocks_per_cycle" int32)
             (opt "blocks_per_commitment" int32)
@@ -171,10 +164,10 @@ module Protocol_constants_overrides = struct
             (opt "time_between_blocks" (list Period.encoding))
             (opt "endorsers_per_block" uint16)
             (opt "hard_gas_limit_per_operation" Gas.Arith.z_integral_encoding)
-            (opt "hard_gas_limit_per_block" Gas.Arith.z_integral_encoding))
+            (opt "hard_gas_limit_per_block" Gas.Arith.z_integral_encoding)
+            (opt "proof_of_work_threshold" int64))
          (merge_objs
-            (obj9
-               (opt "proof_of_work_threshold" int64)
+            (obj10
                (opt "tokens_per_roll" Tez.encoding)
                (opt "michelson_maximum_type_size" uint16)
                (opt "seed_nonce_revelation_tip" Tez.encoding)
@@ -182,12 +175,11 @@ module Protocol_constants_overrides = struct
                (opt "block_security_deposit" Tez.encoding)
                (opt "endorsement_security_deposit" Tez.encoding)
                (opt "baking_reward_per_endorsement" (list Tez.encoding))
-               (opt "endorsement_reward" (list Tez.encoding)))
+               (opt "endorsement_reward" (list Tez.encoding))
+               (opt "cost_per_byte" Tez.encoding)
+               (opt "hard_storage_limit_per_operation" z))
             (merge_objs
-               (obj9
-                  (opt "cost_per_byte" Tez.encoding)
-                  (opt "hard_storage_limit_per_operation" z)
-                  (opt "test_chain_duration" int64)
+               (obj6
                   (opt "quorum_min" int32)
                   (opt "quorum_max" int32)
                   (opt "min_proposal_quorum" int32)

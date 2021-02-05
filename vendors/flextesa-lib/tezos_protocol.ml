@@ -160,15 +160,21 @@ let protocol_parameters_json t : Ezjsonm.t =
           [ ( "minimal_block_delay"
             , string (Int.to_string t.minimal_block_delay) ) ]
       | _ -> [] in
+    let legacy_parameters =
+      match subkind with
+      | `Babylon | `Carthage | `Delphi | `Edo | `Florence ->
+         [ ("test_chain_duration", string (Int.to_string 1_966_080)) ]
+      | `Alpha -> []
+    in
     let op_gas_limit, block_gas_limit =
       match subkind with
       | `Babylon -> (800_000, 8_000_000)
-      | `Carthage -> (1_040_000, 10_400_000)
-      | `Delphi | `Edo | `Florence -> (1_040_000, 10_400_000)
+      | `Carthage | `Delphi | `Edo | `Florence -> (1_040_000, 10_400_000)
       | `Alpha -> (1_040_000, 5_200_000) in
     let open Ezjsonm in
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
     alpha_specific_parameters
+    @ legacy_parameters
     @ [ ("blocks_per_commitment", int 4)
       ; ("endorsers_per_block", int 256)
       ; ("hard_gas_limit_per_operation", string (Int.to_string op_gas_limit))
@@ -198,7 +204,6 @@ let protocol_parameters_json t : Ezjsonm.t =
           | `Babylon | `Carthage -> string (Int.to_string 1_000)
           | `Delphi | `Edo | `Florence | `Alpha -> string (Int.to_string 250)
         )
-      ; ("test_chain_duration", string (Int.to_string 1_966_080))
       ; ("quorum_min", int 3_000)
       ; ("quorum_max", int 7_000)
       ; ("min_proposal_quorum", int 500)
