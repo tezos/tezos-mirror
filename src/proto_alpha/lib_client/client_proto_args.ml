@@ -488,8 +488,22 @@ let unparsing_mode_arg ~default =
     ~long:"unparsing-mode"
     ~placeholder:"mode"
     ~doc:
-      "Unparsing mode to use, one of \"Readable\", \"Optimized\", or \
-       \"Optimized_legacy\"."
+      "Unparsing mode to use\n\
+       One of \"Readable\", \"Optimized\", or \"Optimized_legacy\".\n\
+       This option affects the way the values of the following Michelson \
+       types are represented:\n\
+       - timestamp: the Readable representation is a RFC3339 string, the \
+       Optimized and Optimized_legacy representations are the number of \
+       seconds since Epoch\n\
+       - key, signature, key_hash, address, contract, chain_id: the Readable \
+       representation is a Base58Check string, the Optimized and \
+       Optimized_legacy representations are byte sequences\n\
+       - nested pairs: in Readable mode, the Pair constructor is used even \
+       with arity bigger than 2 such as in Pair 0 1 2; in Optimized_legacy \
+       mode, the Pair constructor is always use with arity 2 such as in Pair \
+       0 (Pair 1 2); in Optimized mode, a sequence is used if there are at \
+       least 4 elements and the behavior is the same as in Optimized_legacy \
+       mode otherwise.\n"
     ~default
     unparsing_mode_parameter
 
