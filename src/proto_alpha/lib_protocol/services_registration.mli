@@ -32,6 +32,8 @@ type rpc_context = {
   context : t;
 }
 
+val rpc_init : Updater.rpc_context -> (rpc_context, error trace) result Lwt.t
+
 val register0 :
   ( [< RPC_service.meth],
     Updater.rpc_context,
