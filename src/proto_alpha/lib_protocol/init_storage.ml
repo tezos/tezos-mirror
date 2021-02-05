@@ -142,6 +142,104 @@ let migrate_baker ctxt baker_pkh =
   Storage.Contract.Frozen_rewards_008.clear (ctxt, from_contract)
   >>= fun ctxt -> return (ctxt, (pk, pkh, baker_hash))
 
+let clear_tree ctxt key =
+  Raw_context.get_tree ctxt key
+  >>=? fun tree ->
+  Raw_context.Tree.clear tree;
+  return ctxt
+
+let map_contracts_index ctxt ~init f =
+  let index_key = ["contracts"; "index"] in
+  Raw_context.get_tree ctxt index_key
+  >>=? fun index_tree ->
+  Raw_context.Tree.fold
+    index_tree
+    []
+    ~depth:(`Eq 7)
+    ~init:(0, index_tree, init)
+    ~f:(fun key tree (nmod, index_tree, acc) ->
+        f key tree acc
+        >>= fun (modified, tree, acc) ->
+        ( if modified then Raw_context.Tree.add_tree index_tree key tree
+        else Lwt.return index_tree )
+        >|= fun index_tree ->
+        ((if modified then nmod + 1 else nmod), index_tree, acc))
+  >>= fun (nmod, index_tree, acc) ->
+  Raw_context.update_tree ctxt index_key index_tree
+  >>=? fun ctxt ->
+  clear_tree ctxt index_key
+  >|=? fun ctxt ->
+  (ctxt, nmod, acc)
+
+module Baker_hash_map = Map.Make(Baker_hash)
+
+let build_find_baker_hash_tree ctxt bakers =
+  Lwt_list.fold_left_s (fun map (_,_,bh) ->
+      Raw_context.Tree.add
+        (Raw_context.Tree.empty ctxt)
+        []
+        (Data_encoding.Binary.to_bytes_exn Baker_hash.encoding bh)
+      >|= fun tree ->
+      Baker_hash_map.add bh tree map)
+    Baker_hash_map.empty bakers
+  >|= fun map ->
+  fun bh -> Baker_hash_map.find_opt bh map
+
+let build_find_baker_hash bakers =
+  let module Map = Map.Make (struct
+    type t = Signature.Public_key_hash.t
+    let compare = Signature.Public_key_hash.compare
+  end) in
+  let map =
+    List.fold_left
+      (fun m (_pk, pkh, baker_hash) -> Map.add pkh baker_hash m)
+      Map.empty
+      bakers
+  in
+  fun pkh -> Map.find_opt pkh map
+
+let build_find_baker_hash_by_pkhbytes bakers =
+  let module Map = Map.Make (struct
+    type t = bytes
+    let compare = Compare.Bytes.compare
+  end) in
+  let map =
+    List.fold_left
+      (fun m (_, pkh, baker_hash) ->
+        let pkhbytes =
+          Data_encoding.Binary.to_bytes_exn
+            Signature.Public_key_hash.encoding
+            pkh
+        in
+        Map.add pkhbytes baker_hash m)
+      Map.empty
+      bakers
+  in
+  fun pkhbytes -> Map.find_opt pkhbytes map
+
+let build_find_baker_hash_by_pkbytes bakers =
+  let module Map = Map.Make (struct
+    type t = bytes
+    let compare = Compare.Bytes.compare
+  end) in
+  let map =
+    List.fold_left
+      (fun m (pk, _, baker_hash) ->
+        let pkbytes =
+          Data_encoding.Binary.to_bytes_exn
+            Signature.Public_key.encoding
+            pk
+        in
+        Map.add pkbytes baker_hash m)
+      Map.empty
+      bakers
+  in
+  fun pkbytes -> Map.find_opt pkbytes map
+
+let from_Some = function
+  | Some x -> x
+  | None -> assert false
+
 (* This is the genesis protocol: initialise the state *)
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block ~level ~timestamp ~fitness ctxt
@@ -176,12 +274,6 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Block_priority.init ctxt 0
       >>=? fun ctxt -> Vote_storage.update_listings ctxt
   | Edo_008 ->
-      let clear_tree ctxt key =
-        Raw_context.get_tree ctxt key
-        >>=? fun tree ->
-        Raw_context.Tree.clear tree;
-        return ctxt
-      in
       (* 1. Baker accounts migration *)
       lwt_log_notice "1. Baker accounts migration" >>= fun () ->
       let nonce =
@@ -204,35 +296,11 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>= fun ctxt ->
       (* The number of the bakers are small (< 3000).  We keep them
          in memory to speed up the migration *)
-      (* prepare leaves of baker hashes *)
-      let build_find_baker_hash_tree =
-        let module Map = Map.Make(Baker_hash) in
-        Lwt_list.fold_left_s (fun map (_,_,bh) ->
-            Raw_context.Tree.add
-              (Raw_context.Tree.empty ctxt)
-              []
-              (Data_encoding.Binary.to_bytes_exn Baker_hash.encoding bh)
-            >|= fun tree ->
-            Map.add bh tree map)
-          Map.empty bakers
-        >|= fun map ->
-        fun bh -> Map.find_opt bh map
-      in
-      build_find_baker_hash_tree >>= fun find_baker_hash_tree ->
-      let find_baker_hash =
-        let module Map = Map.Make (struct
-          type t = Signature.Public_key_hash.t
-
-          let compare = Signature.Public_key_hash.compare
-        end) in
-        let map =
-          List.fold_left
-            (fun m (_pk, pkh, baker_hash) -> Map.add pkh baker_hash m)
-            Map.empty
-            bakers
-        in
-        fun pkh -> Map.find_opt pkh map
-      in
+      (* baker_hash -> the tree of baker_hash *)
+      build_find_baker_hash_tree ctxt bakers
+      >>= fun find_baker_hash_tree ->
+      (* public_key_hash -> baker_hash *)
+      let find_baker_hash = build_find_baker_hash bakers in
       let find_baker_hash_result pkh =
         match find_baker_hash pkh with
         | Some x ->
@@ -245,26 +313,10 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
                    @ Signature.Public_key_hash.to_path pkh ["consensus_key_rev"],
                    Get ))
       in
+      (* public_key_hash binary -> baker_hash *)
+      let find_baker_hash_by_pkhbytes = build_find_baker_hash_by_pkhbytes bakers in
       (* public_key binary -> baker_hash *)
-      let find_baker_hash_by_pkhbytes =
-        let module Map = Map.Make (struct
-          type t = bytes
-          let compare = Compare.Bytes.compare
-        end) in
-        let map =
-          List.fold_left
-            (fun m (_, pkh, baker_hash) ->
-              let pkhbytes =
-                Data_encoding.Binary.to_bytes_exn
-                  Signature.Public_key_hash.encoding
-                  pkh
-              in
-              Map.add pkhbytes baker_hash m)
-            Map.empty
-            bakers
-        in
-        fun pkhbytes -> Map.find_opt pkhbytes map
-      in
+      let find_baker_hash_by_pkbytes = build_find_baker_hash_by_pkbytes bakers in
       let current_cycle = Raw_context.(current_level ctxt).cycle in
       (* Take a snapshot of the consensus keys *)
       lwt_log_notice "Take a snapshot of the consensus keys" >>= fun () ->
@@ -278,45 +330,21 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Baker.Consensus_key.snapshot ctxt (Cycle_repr.succ current_cycle)
       >>=? fun ctxt ->
       (* Migrate storages with references to original baker pkhs *)
-      (* Contract.Delegate *)
+      (* Contract.Delegate + Contract.Inactive_delegate + Contract.Delegate_desactivation *)
       lwt_log_notice
         "Contract.Delegate + Contract.Inactive_delegate + \
          Contract.Delegate_desactivation"
       >>= fun () ->
-      let map_contracts_index ctxt ~init f =
-        let index_key = ["contracts"; "index"] in
-        Raw_context.get_tree ctxt index_key
-        >>=? fun index_tree ->
-        Raw_context.Tree.fold
-          index_tree
-          []
-          ~depth:(`Eq 7)
-          ~init:(0, index_tree, init)
-          ~f:(fun key tree (nmod, index_tree, acc) ->
-              f key tree acc
-              >>= fun (modified, tree, acc) ->
-              ( if modified then Raw_context.Tree.add_tree index_tree key tree
-              else Lwt.return index_tree )
-              >|= fun index_tree ->
-              ((if modified then nmod + 1 else nmod), index_tree, acc))
-        >>= fun (nmod, index_tree, acc) ->
-        Raw_context.update_tree ctxt index_key index_tree
-        >>=? fun ctxt ->
-        clear_tree ctxt index_key
-        >|=? fun ctxt ->
-        (ctxt, nmod, acc)
-      in
+      (* Update Contract.Delegate, Contract.Inactive_delegate
+         and Contract.Delegate_desactivation in one folding *)
       map_contracts_index
         ctxt
         ~init:(0, [], [])
         (fun key tree (delegates, inactive_bakers, desactivations) ->
           let get_baker_res () =
             let contract =
-              match Contract_repr.Index.of_path key with
-              | None ->
-                  assert false
-              | Some contract ->
-                  contract
+              (* always succeeds *)
+              from_Some (Contract_repr.Index.of_path key)
             in
             match Contract_repr.is_implicit contract with
             | None ->
@@ -372,74 +400,61 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
                     in
                     let delegate_tree =
                       Option.map (fun bh ->
-                          match find_baker_hash_tree bh with
-                          | None -> assert false (* never fails *)
-                          | Some bht -> bht) delegate
+                          from_Some (find_baker_hash_tree bh) (* never fails *))
+                        delegate
                     in
                     Raw_context.Tree.add_or_remove_tree
                       tree delegate_key delegate_tree
                     >|= fun tree -> (true, tree, delegates + 1))
-          >>= fun (modded, tree, delegates) ->
+          >>= fun (modified, tree, delegates) ->
           (* Contract.Inactive_delegate -> Baker.Inactive *)
           let inactive_delegate_key = ["inactive_delegate"] in
           Raw_context.Tree.find tree inactive_delegate_key
           >>= (function
                 | None ->
-                    Lwt.return (modded, tree, inactive_bakers) (* no update *)
+                    Lwt.return (modified, tree, inactive_bakers) (* no update *)
                 | Some _ (* "inited" *) -> (
                     let baker = get_baker () in
-                    match find_baker_hash baker with
-                    | None ->
-                        assert false
-                    | Some migrated_baker -> (
-                        let inactive_bakers =
-                          migrated_baker :: inactive_bakers
-                        in
-                        Raw_context.Tree.remove_existing
-                          tree
-                          inactive_delegate_key
-                        >>= function
-                        | Error _ ->
-                            assert false
-                        | Ok tree ->
-                            Lwt.return (true, tree, inactive_bakers) ) ))
-          >>= fun (moded, tree, inactive_bakers) ->
+                    let migrated_baker =
+                      from_Some (find_baker_hash baker) (* never fails *)
+                    in
+                    let inactive_bakers =
+                      migrated_baker :: inactive_bakers
+                    in
+                    Raw_context.Tree.remove
+                      tree
+                      inactive_delegate_key
+                    >>= fun tree ->
+                    Lwt.return (true, tree, inactive_bakers)))
+          >>= fun (modified, tree, inactive_bakers) ->
           (* Contract.Delegate_desactivation -> Baker.Inactive *)
           let delegate_desactivation_key = ["delegate_desactivation"] in
           Raw_context.Tree.find tree delegate_desactivation_key
           >>= (function
                 | None ->
-                    Lwt.return (moded, tree, desactivations) (* no update *)
+                    Lwt.return (modified, tree, desactivations) (* no update *)
                 | Some cycle_bytes -> (
                     let cycle =
-                      match
-                        Data_encoding.Binary.of_bytes
-                          Cycle_repr.encoding
-                          cycle_bytes
-                      with
-                      | None ->
-                          assert false
-                      | Some cycle ->
-                          cycle
+                      (* never fails *)
+                      from_Some (Data_encoding.Binary.of_bytes
+                                   Cycle_repr.encoding
+                                   cycle_bytes)
                     in
                     let baker = get_baker () in
-                    match find_baker_hash baker with
-                    | None ->
-                        assert false
-                    | Some migrated_baker -> (
-                        let desactivations =
-                          (migrated_baker, cycle) :: desactivations
-                        in
-                        Raw_context.Tree.remove_existing
-                          tree
-                          delegate_desactivation_key
-                        >>= function
-                        | Error _ ->
-                            assert false
-                        | Ok tree ->
-                            Lwt.return (true, tree, desactivations) ) ))
-          >|= fun (moded, tree, desactivations) ->
-          (moded, tree, (delegates, inactive_bakers, desactivations)))
+                    let migrated_baker =
+                      (* never fails *)
+                      from_Some (find_baker_hash baker)
+                    in
+                    let desactivations =
+                      (migrated_baker, cycle) :: desactivations
+                    in
+                    Raw_context.Tree.remove
+                      tree
+                      delegate_desactivation_key
+                    >>= fun tree ->
+                    Lwt.return (true, tree, desactivations) ) )
+          >|= fun (modified, tree, desactivations) ->
+          (modified, tree, (delegates, inactive_bakers, desactivations)))
       >>=? fun (ctxt, nmod, (delegates, inactive_bakers, desactivations)) ->
       lwt_log_notice "%d contracts updated" nmod
       >>= fun () ->
@@ -510,27 +525,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       in
       migrate_frozen_balance ctxt current_cycle
       >>=? fun ctxt ->
-      (* public_key binary -> baker_hash *)
-      let find_baker_hash_by_pkbytes =
-        let module Map = Map.Make (struct
-          type t = bytes
-
-          let compare = Compare.Bytes.compare
-        end) in
-        let map =
-          List.fold_left
-            (fun m (pk, _, baker_hash) ->
-              let pkbytes =
-                Data_encoding.Binary.to_bytes_exn
-                  Signature.Public_key.encoding
-                  pk
-              in
-              Map.add pkbytes baker_hash m)
-            Map.empty
-            bakers
-        in
-        fun pkbytes -> Map.find_opt pkbytes map
-      in
+      (* replace public_keys by baker_hashes *)
       let rewrite_rolls ctxt key depth =
         Raw_context.get_tree ctxt []
         >>=? fun root_tree ->
@@ -539,25 +534,23 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           key
           ~depth:(`Eq depth)
           ~init:(0,Raw_context.Tree.empty ctxt)
-          ~f:(fun key pkbytes_tree (i,acc) ->
+          ~f:(fun key pkbytes_tree (i,acc_tree) ->
               Raw_context.Tree.to_value pkbytes_tree
               >>= function
               | None -> assert false
               | Some pkbytes ->
-                  match find_baker_hash_by_pkbytes pkbytes with
-                  | None ->
-                      assert false
-                  | Some baker_hash ->
-                      Raw_context.Tree.add_tree
-                        acc
-                        key
-                        (match find_baker_hash_tree baker_hash with
-                         | None -> assert false (* never fails *)
-                         | Some bht -> bht)
-                      >|= fun acc ->
-                      (i+1,acc))
-        >>= fun (i,tree_snapshot) ->
-        Raw_context.update_tree ctxt key tree_snapshot
+                  let baker_hash =
+                    (* never fails *)
+                    from_Some (find_baker_hash_by_pkbytes pkbytes)
+                  in
+                  Raw_context.Tree.add_tree
+                    acc_tree
+                    key
+                    (from_Some (find_baker_hash_tree baker_hash) (* never fails *))
+                  >|= fun acc_tree ->
+                  (i+1,acc_tree))
+        >>= fun (i,acc_tree) ->
+        Raw_context.update_tree ctxt key acc_tree
         >|=? fun ctxt ->
         Raw_context.Tree.clear root_tree;
         (i,ctxt)
@@ -567,10 +560,11 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>= fun () ->
       rewrite_rolls ctxt ["rolls"; "owner"; "current"] 3
       >>=? fun (n,ctxt) ->
-      lwt_log_notice "Roll.Owner: %d" n
+      lwt_log_notice "Roll.Owner: updated %d" n
       >>= fun () ->
       lwt_log_notice "Roll.Owner.Snapshot"
       >>= fun () ->
+      (* We split the folding into 2 to save memory consumption *)
       Raw_context.fold
         ~depth:(`Eq 2)
         ctxt
