@@ -107,12 +107,15 @@ val rpc_path_query_to_string : ?query_string:query_string -> path -> string
 
 (** Use the client to call an RPC.
 
-    Run [tezos-client rpc meth path?query_string with data].
-    Fail the test if the RPC call failed. *)
+    Run [rpc meth path?query_string with data].
+    Fail the test if the RPC call failed.
+    [env] can be used to customize environment variables, e.g.
+    [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")] to enable
+    logging. *)
 val rpc :
-  ?env:string String_map.t ->
   ?node:Node.t ->
   ?hooks:Process.hooks ->
+  ?env:string String_map.t ->
   ?data:JSON.u ->
   ?query_string:query_string ->
   meth ->
@@ -122,7 +125,6 @@ val rpc :
 
 (** Same as [rpc], but do not wait for the process to exit. *)
 val spawn_rpc :
-  ?env:string String_map.t ->
   ?node:Node.t ->
   ?hooks:Process.hooks ->
   ?env:string String_map.t ->

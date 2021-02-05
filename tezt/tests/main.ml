@@ -53,7 +53,7 @@ let register_mockup () =
   List.iter Mockup.register supported_mockup_protocols
 
 let register_proxy () =
-  (* Support for Proxy in Carthage was removed in https://gitlab.com/tezos/tezos/-/merge_requests/2502 *)
+  (* Tests don't pass for Carthage, but this is not a big deal as Carthage support will drop in the near future. *)
   let supported_proxy_protocols =
     Protocol.all_protocols |> List.filter (fun p -> p <> Protocol.Carthage)
   in
@@ -62,7 +62,7 @@ let register_proxy () =
 let () =
   register Alpha ;
   register_mockup () ;
-  Mockup.register_protocol_agnostic () ;
+  Mockup.register_protocol_independent () ;
   register_proxy () ;
   P2p.register Alpha ;
   Bootstrap.register_protocol_independent () ;

@@ -199,12 +199,6 @@ integration:007_multinode_storage_reconstruction:
     - poetry run pytest tests_007/test_multinode_storage_reconstruction.py -s --log-dir=tmp 2>&1 | tee tmp/007_multinode_storage_reconstruction.out | tail
   stage: test
 
-integration:007_proxy:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_proxy.py -s --log-dir=tmp 2>&1 | tee tmp/007_proxy.out | tail
-  stage: test
-
 integration:007_rpc:
   extends: .integration_python_template
   script:
@@ -409,12 +403,6 @@ integration:alpha_perf_endorsement:
     - poetry run pytest tests_alpha/test_perf_endorsement.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_perf_endorsement.out | tail
   stage: test
 
-integration:alpha_proxy:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_alpha/test_proxy.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_proxy.out | tail
-  stage: test
-
 integration:alpha_rpc:
   extends: .integration_python_template
   script:
@@ -435,4 +423,3 @@ integration:examples:
     - PYTHONPATH=./ poetry run pytest examples/test_example.py
   stage: test
 ##END_INTEGRATION_PYTHON##
-

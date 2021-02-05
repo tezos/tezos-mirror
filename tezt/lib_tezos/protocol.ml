@@ -73,7 +73,7 @@ let daemon_name = function
   | Alpha ->
       "alpha"
   | Edo ->
-      "008-PtEdoTez"
+      "008-PtEdo2Zk"
   | Delphi ->
       "007-PsDELPH1"
   | Carthage ->

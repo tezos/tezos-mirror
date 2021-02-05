@@ -52,7 +52,7 @@ let test_rpc_list ~protocol =
 let test_rpc_header_shell ~protocol =
   Test.register
     ~__FILE__
-    ~title:(sf "%s: rpc header/shell (mockup)" (Protocol.name protocol))
+    ~title:(sf "(%s) (Mockup) RPC header/shell" (Protocol.name protocol))
     ~tags:[Protocol.tag protocol; "mockup"; "client"; "rpc"]
   @@ fun () ->
   let* client = Client.init_mockup ~protocol () in
@@ -343,5 +343,6 @@ let register protocol =
   test_transfer ~protocol ;
   test_simple_baking_event ~protocol ;
   test_multiple_baking ~protocol ;
-  test_rpc_header_shell ~protocol ;
-  test_migration_transfer ()
+  test_rpc_header_shell ~protocol
+
+let register_protocol_independent () = test_migration_transfer ()

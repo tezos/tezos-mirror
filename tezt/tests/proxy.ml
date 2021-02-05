@@ -30,9 +30,8 @@
    Subject: Tests of the client's --mode proxy.
   *)
 
-(** [starts_with prefix s] returns [true] iff [prefix] is a prefix of [s]. *)
-let starts_with ~(prefix : string) (s : string) : bool =
-  Re.Str.string_match (Re.Str.regexp ("^" ^ prefix)) s 0
+(** [matches re s] checks if [s] matches [re]. Note in particular that this supports multiline strings. *)
+let matches re s = try Re.Str.search_forward re s 0 >= 0 with _ -> false
 
 (** Returns: a node and a proxy client *)
 let init ~protocol () =
@@ -42,8 +41,96 @@ let init ~protocol () =
   Log.info "Activated protocol." ;
   Client.set_mode (Proxy node) client ;
   let* () = Client.bake_for client in
-  Log.info "Baked 1 block." ;
+  Log.info "Baked 1 block: protocol is now %s" (Protocol.name protocol) ;
   Lwt.return (node, client)
+
+(** Test.
+    This test checks that the proxy client creates its cache for
+    RPC answers at most once for a given (chain, block) pair.
+*)
+let test_cache_at_most_once ?query_string path protocol =
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "(%s) (Proxy) (%s) Cache at most once"
+         (Protocol.name protocol)
+         (Client.rpc_path_query_to_string ?query_string path))
+    ~tags:[Protocol.tag protocol; "proxy"; "rpc"; "get"]
+  @@ fun () ->
+  let* (_, client) = init ~protocol () in
+  let env =
+    [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")]
+    |> List.to_seq |> String_map.of_seq
+  in
+  let* stderr =
+    Client.spawn_rpc ~env ?query_string Client.GET path client
+    |> Process.check_and_read_stderr
+  in
+  let lines = String.split_on_char '\n' stderr in
+  let proxy_cache_regexp =
+    Re.Str.regexp
+      {|^.*proxy_rpc: proxy cache created for chain \([a-zA-Z0-9]*\) and block \([a-zA-Z0-9]*\)|}
+  in
+  let extract_chain_block line =
+    (* Groups are 1-based (0 is for the whole match). *)
+    if Re.Str.string_match proxy_cache_regexp line 0 then
+      [(Re.Str.matched_group 1 line, Re.Str.matched_group 2 line)]
+    else []
+  in
+  let chain_block_list =
+    lines |> List.map extract_chain_block |> List.concat
+  in
+  let rec find_duplicate = function
+    | [] ->
+        None
+    | hd :: tl ->
+        if List.mem hd tl then Some hd else find_duplicate tl
+  in
+  if chain_block_list = [] then
+    Test.fail
+      "Proxy cache should have been created when executing %s"
+      (String.concat "/" path) ;
+  find_duplicate chain_block_list
+  |> Option.iter (fun (chain, block) ->
+         Test.fail
+           "proxy RPC cache for chain %s and block %s created more than once"
+           chain
+           block)
+  |> Lwt.return
+
+let test_cache_at_most_once protocol =
+  let paths =
+    [ (["context"; "constants"], []);
+      (["helpers"; "baking_rights"], []);
+      (["helpers"; "baking_rights"], [("all", "true")]);
+      (["helpers"; "current_level"], []);
+      (["minimal_valid_time"], []);
+      (["context"; "constants"], []);
+      (["context"; "constants"; "errors"], []);
+      (["context"; "delegates"], []);
+      (["context"; "nonces"; "3"], []);
+      (["helpers"; "endorsing_rights"], []);
+      (["helpers"; "levels_in_current_cycle"], []);
+      (["votes"; "ballot_list"], []);
+      (["votes"; "ballots"], []);
+      (["votes"; "current_period_kind"], []);
+      (["votes"; "current_proposal"], []);
+      (["votes"; "current_quorum"], []);
+      (["votes"; "listings"], []);
+      (["votes"; "proposals"], []) ]
+  in
+  List.iter
+    (fun (sub_path, query_string) ->
+      test_cache_at_most_once
+        ~query_string
+        ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
+        protocol)
+    paths
+
+(** [starts_with prefix s] returns [true] iff [prefix] is a prefix of [s]. *)
+let starts_with ~(prefix : string) (s : string) : bool =
+  Re.Str.string_match (Re.Str.regexp ("^" ^ prefix)) s 0
 
 (** Test.
     This test checks that the proxy client never does a useless RPC.
@@ -72,28 +159,16 @@ let init ~protocol () =
     where [P] is [/chains/<main>/blocks/<head>/context/raw/bytes]
  *)
 let test_context_suffix_no_rpc ?query_string path protocol =
-  let pretty_query_param =
-    Option.value ~default:[] query_string
-    |> List.map (fun (k, v) -> k ^ "=" ^ v)
-    |> String.concat "&"
-  in
   Test.register
     ~__FILE__
     ~title:
       (sf
-         "(%s) (Proxy) (%s) (%s) No useless RPC call"
+         "(%s) (Proxy) (%s) No useless RPC call"
          (Protocol.name protocol)
-         (String.concat "/" path)
-         pretty_query_param)
+         (Client.rpc_path_query_to_string ?query_string path))
     ~tags:[Protocol.tag protocol; "proxy"; "rpc"; "get"]
   @@ fun () ->
-  let* node = Node.init [] in
-  let* client = Client.init ~node () in
-  let* () = Client.activate_protocol ~protocol client in
-  Log.info "Activated protocol." ;
-  let* () = Client.bake_for client in
-  Log.info "Baked once: the protocol is now %s." (Protocol.name protocol) ;
-  Client.set_mode (Proxy node) client ;
+  let* (_, client) = init ~protocol () in
   let env =
     [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")]
     |> List.to_seq |> String_map.of_seq
@@ -102,15 +177,15 @@ let test_context_suffix_no_rpc ?query_string path protocol =
     Client.spawn_rpc ~env ?query_string Client.GET path client
     |> Process.check_and_read_stderr
   in
-  Log.info "The stderr of RPC call is:" ;
   let lines = String.split_on_char '\n' stderr in
-  let repexp =
+  let rpc_path_regexp =
     Re.Str.regexp
       {|.*proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/\(.*\)|}
   in
   let extract_rpc_path line =
     (* Groups are 1-based (0 is for the whole match). *)
-    if Re.Str.string_match repexp line 0 then [Re.Str.matched_group 1 line]
+    if Re.Str.string_match rpc_path_regexp line 0 then
+      [Re.Str.matched_group 1 line]
     else []
   in
   let context_queries = lines |> List.map extract_rpc_path |> List.concat in
@@ -167,13 +242,7 @@ let test_wrong_proto protocol =
     ~title:(sf "(%s) (Proxy) Wrong proto" (Protocol.name protocol))
     ~tags:[Protocol.tag protocol; "proxy"; "bake"]
   @@ fun () ->
-  let* node = Node.init [] in
-  let* client = Client.init ~node () in
-  let* () = Client.activate_protocol ~protocol client in
-  Log.info "Activated protocol." ;
-  let* () = Client.bake_for client in
-  Log.info "Baked once: the protocol is now %s." (Protocol.name protocol) ;
-  Client.set_mode (Proxy node) client ;
+  let* (_, client) = init ~protocol () in
   let other_proto = List.find (( <> ) protocol) Protocol.all_protocols in
   let* stderr =
     Client.spawn_bake_for ~protocol:other_proto client
@@ -182,12 +251,12 @@ let test_wrong_proto protocol =
   let regexp =
     Re.Str.regexp
     @@ Format.sprintf
-         "Protocol passed to the proxy (%s) and protocol of the node (%s) \
-          differ"
+         ".*Protocol passed to the proxy (%s) and protocol of the node (%s) \
+          differ."
          (Protocol.hash other_proto)
          (Protocol.hash protocol)
   in
-  if Re.Str.string_match regexp stderr 0 then return ()
+  if matches regexp stderr then return ()
   else Test.fail "Did not fail as expected: %s" stderr
 
 (** Test.
@@ -271,7 +340,7 @@ module Location = struct
   let block_id = "head"
 
   (** [output] is the output of executing [rpc get rpc_path] *)
-  let parse_rpc_exec_location output rpc_path =
+  let parse_rpc_exec_location ?query_string output rpc_path =
     let re prefix suffix =
       let re_str =
         Printf.sprintf
@@ -285,8 +354,8 @@ module Location = struct
     in
     let re_local = re "Done" "locally" in
     let re_http = re "Delegating" "to http" in
-    if Re.Str.string_match re_local output 0 then Local
-    else if Re.Str.string_match re_http output 0 then Distant
+    if matches re_local output then Local
+    else if matches re_http output then Distant
     else Unknown
 
   (** Calls [rpc get] on the given [client] but specifies an alternative
@@ -449,5 +518,6 @@ let register protocol =
   test_transfer protocol ;
   test_wrong_proto protocol ;
   test_context_suffix_no_rpc protocol ;
+  test_cache_at_most_once protocol ;
   Location.test_locations_proxy protocol ;
   Location.test_compare_proxy protocol
