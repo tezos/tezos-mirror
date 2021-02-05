@@ -1,0 +1,3 @@
+(executables
+ (names eval_perf)
+ (libraries data_encoding))
