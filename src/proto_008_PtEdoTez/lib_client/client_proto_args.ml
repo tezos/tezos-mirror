@@ -484,13 +484,14 @@ let unparsing_mode_parameter =
       | _ ->
           failwith "Unknown unparsing mode %s" s)
 
-let unparsing_mode_arg =
-  arg
+let unparsing_mode_arg ~default =
+  default_arg
     ~long:"unparsing-mode"
     ~placeholder:"mode"
     ~doc:
       "Unparsing mode to use, one of \"Readable\", \"Optimized\", or \
        \"Optimized_legacy\"."
+    ~default
     unparsing_mode_parameter
 
 module Daemon = struct
