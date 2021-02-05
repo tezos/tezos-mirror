@@ -679,9 +679,11 @@ class Client:
     def get_proposals(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head/votes/proposals')
 
-    def get_metadata(self, params: List[str] = None) -> dict:
+    def get_metadata(
+        self, params: List[str] = None, chain: str = 'main', block: str = 'head'
+    ) -> dict:
         return self.rpc(
-            'get', '/chains/main/blocks/head/metadata', params=params
+            'get', f'/chains/{chain}/blocks/{block}/metadata', params=params
         )
 
     def get_protocol(self, params: List[str] = None) -> str:
@@ -704,10 +706,12 @@ class Client:
         rpc_res = self.get_current_level(offset=1)
         return rpc_res['voting_period_position']
 
-    def get_level(self, params: List[str] = None, chain: str = 'main') -> int:
+    def get_level(
+        self, params: List[str] = None, chain: str = 'main', block: str = 'head'
+    ) -> int:
         assert chain in {'main', 'test'}
         rpc_res = self.rpc(
-            'get', f'/chains/{chain}/blocks/head/header/shell', params=params
+            'get', f'/chains/{chain}/blocks/{block}/header/shell', params=params
         )
         return int(rpc_res['level'])
 
