@@ -110,6 +110,7 @@ val rpc_path_query_to_string : ?query_string:query_string -> path -> string
     Run [tezos-client rpc meth path?query_string with data].
     Fail the test if the RPC call failed. *)
 val rpc :
+  ?env:string String_map.t ->
   ?node:Node.t ->
   ?hooks:Process.hooks ->
   ?data:JSON.u ->
@@ -121,6 +122,7 @@ val rpc :
 
 (** Same as [rpc], but do not wait for the process to exit. *)
 val spawn_rpc :
+  ?env:string String_map.t ->
   ?node:Node.t ->
   ?hooks:Process.hooks ->
   ?env:string String_map.t ->

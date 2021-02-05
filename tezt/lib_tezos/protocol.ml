@@ -69,6 +69,16 @@ let accuser = function
   | Carthage ->
       "./tezos-accuser-006-PsCARTHA"
 
+let daemon_name = function
+  | Alpha ->
+      "alpha"
+  | Edo ->
+      "008-PtEdoTez"
+  | Delphi ->
+      "007-PsDELPH1"
+  | Carthage ->
+      "006-PsCARTHA"
+
 (** Protocol parameters overrides are pairs of JSON paths and optional values
     that can be used to override or remove (when the value is [None]) the
     default parameters when activating protocol. *)

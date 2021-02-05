@@ -162,9 +162,9 @@ let spawn_rpc ?node ?hooks ?env ?data ?query_string meth path client =
     client
     (["rpc"; string_of_meth meth; full_path] @ data)
 
-let rpc ?node ?hooks ?data ?query_string meth path client =
+let rpc ?env ?node ?hooks ?data ?query_string meth path client =
   let* output =
-    spawn_rpc ?node ?hooks ?data ?query_string meth path client
+    spawn_rpc ?env ?node ?hooks ?data ?query_string meth path client
     |> Process.check_and_read_stdout
   in
   return (JSON.parse ~origin:(string_of_path path ^ " response") output)
