@@ -9,7 +9,7 @@ PROTO_DEMO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
 @pytest.mark.slow
 @pytest.mark.incremental
 class TestForgeBlock:
-    """ Check that a block more than 15 seconds in the future is rejected """
+    """ Check that a block more than 5 seconds in the future is rejected """
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(1, params=constants.NODE_PARAMS)
@@ -21,7 +21,7 @@ class TestForgeBlock:
 
     def test_activate_proto_demo_time_shifted_ok(self, sandbox: Sandbox):
         parameters = {}  # type: dict
-        delta = datetime.timedelta(seconds=10)
+        delta = datetime.timedelta(seconds=5)
         sandbox.client(1).activate_protocol_json(
             PROTO_DEMO,
             parameters,
