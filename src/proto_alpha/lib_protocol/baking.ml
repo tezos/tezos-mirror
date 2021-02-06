@@ -245,12 +245,6 @@ let check_timestamp c ~priority pred_timestamp =
     Timestamp.(timestamp -? minimal_time)
   >>? fun _block_delay -> ok ()
 
-let check_baking_rights c {Block_header.priority; _} pred_timestamp =
-  let level = Level.current c in
-  Roll.baking_rights_owner c level ~priority
-  >>=? fun delegate ->
-  Lwt.return (check_timestamp c priority pred_timestamp >|? fun () -> delegate)
-
 type error += Incorrect_priority (* `Permanent *)
 
 type error += Incorrect_number_of_endorsements (* `Permanent *)

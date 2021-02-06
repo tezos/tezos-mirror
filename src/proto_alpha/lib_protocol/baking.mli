@@ -61,12 +61,9 @@ type error += Invalid_stamp (* `Permanent *)
 val minimal_time :
   Constants.parametric -> priority:int -> Time.t -> Time.t tzresult
 
-(** [check_baking_rights ctxt block pred_timestamp] verifies that:
-    * the contract that owned the roll at cycle start has the block signer 
-      as delegate.
-  * the timestamp is coherent with the announced baking slot. *)
-val check_baking_rights :
-  context -> Block_header.contents -> Time.t -> public_key tzresult Lwt.t
+(** [check_timestamp ctxt priority pred_timestamp] verifies that
+    the timestamp is coherent with the announced baking slot. *)
+val check_timestamp : context -> priority:int -> Time.t -> unit tzresult
 
 (** For a given level computes who has the right to
     include an endorsement in the next block.

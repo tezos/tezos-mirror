@@ -1456,11 +1456,13 @@ let endorsement_rights_of_pred_level ctxt =
       Baking.endorsement_rights ctxt pred_level
 
 let begin_full_construction ctxt pred_timestamp protocol_data =
-  Alpha_context.Global.set_block_priority
-    ctxt
-    protocol_data.Block_header.priority
+  let priority = protocol_data.Block_header.priority in
+  Alpha_context.Global.set_block_priority ctxt priority
   >>=? fun ctxt ->
-  Baking.check_baking_rights ctxt protocol_data pred_timestamp
+  Baking.check_timestamp ctxt ~priority pred_timestamp
+  >>?= fun () ->
+  let level = Level.current ctxt in
+  Roll.baking_rights_owner ctxt level ~priority
   >>=? fun delegate_pk ->
   let ctxt = Fitness.increase ctxt in
   endorsement_rights_of_pred_level ctxt
@@ -1474,19 +1476,17 @@ let begin_partial_construction ctxt =
   >|=? fun rights -> init_endorsements ctxt rights
 
 let begin_application ctxt chain_id block_header pred_timestamp =
-  Alpha_context.Global.set_block_priority
-    ctxt
-    block_header.Block_header.protocol_data.contents.priority
+  let priority = block_header.Block_header.protocol_data.contents.priority in
+  Alpha_context.Global.set_block_priority ctxt priority
   >>=? fun ctxt ->
-  let current_level = Alpha_context.Level.current ctxt in
+  Baking.check_timestamp ctxt ~priority pred_timestamp
+  >>?= fun () ->
   Baking.check_proof_of_work_stamp ctxt block_header
   >>?= fun () ->
   Baking.check_fitness_gap ctxt block_header
   >>?= fun () ->
-  Baking.check_baking_rights
-    ctxt
-    block_header.protocol_data.contents
-    pred_timestamp
+  let current_level = Level.current ctxt in
+  Roll.baking_rights_owner ctxt current_level ~priority
   >>=? fun delegate_pk ->
   Baking.check_signature block_header chain_id delegate_pk
   >>=? fun () ->
