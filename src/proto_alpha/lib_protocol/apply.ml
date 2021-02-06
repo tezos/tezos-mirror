@@ -1425,13 +1425,13 @@ let apply_operation ctxt chain_id mode pred_block baker hash operation =
   (ctxt, {contents = result})
 
 let may_snapshot_roll ctxt =
-  let level = Alpha_context.Level.current ctxt in
+  let level = Level.current ctxt in
   let blocks_per_roll_snapshot = Constants.blocks_per_roll_snapshot ctxt in
   if
     Compare.Int32.equal
       (Int32.rem level.cycle_position blocks_per_roll_snapshot)
       (Int32.pred blocks_per_roll_snapshot)
-  then Alpha_context.Roll.snapshot_rolls ctxt
+  then Roll.snapshot_rolls ctxt
   else return ctxt
 
 let may_start_new_cycle ctxt =
@@ -1457,7 +1457,7 @@ let endorsement_rights_of_pred_level ctxt =
 
 let begin_full_construction ctxt pred_timestamp protocol_data =
   let priority = protocol_data.Block_header.priority in
-  Alpha_context.Global.set_block_priority ctxt priority
+  Global.set_block_priority ctxt priority
   >>=? fun ctxt ->
   Baking.check_timestamp ctxt ~priority pred_timestamp
   >>?= fun () ->
@@ -1477,7 +1477,7 @@ let begin_partial_construction ctxt =
 
 let begin_application ctxt chain_id block_header pred_timestamp =
   let priority = block_header.Block_header.protocol_data.contents.priority in
-  Alpha_context.Global.set_block_priority ctxt priority
+  Global.set_block_priority ctxt priority
   >>=? fun ctxt ->
   Baking.check_timestamp ctxt ~priority pred_timestamp
   >>?= fun () ->
@@ -1581,16 +1581,16 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
   let consumed_gas =
     Gas.Arith.sub
       (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
-      (Alpha_context.Gas.block_level ctxt)
+      (Gas.block_level ctxt)
   in
   (* This value is different than the new [voting_period_info] below for
      compatibility reasons, the field [voting_period_kind] is deprecated and will
      be removed in a future version. *)
-  Alpha_context.Voting_period.get_current_info ctxt
+  Voting_period.get_current_info ctxt
   >>=? fun {voting_period = {kind; _}; _} ->
-  Alpha_context.Voting_period.get_rpc_fixed_current_info ctxt
+  Voting_period.get_rpc_fixed_current_info ctxt
   >|=? fun ({voting_period; position; _} as voting_period_info) ->
-  let level_info = Alpha_context.Level.current ctxt in
+  let level_info = Level.current ctxt in
   let receipt =
     Apply_results.
       {

@@ -233,7 +233,7 @@ let earlier_predecessor_timestamp ctxt level =
 let check_timestamp c ~priority pred_timestamp =
   minimal_time (Constants.parametric c) priority pred_timestamp
   >>? fun minimal_time ->
-  let timestamp = Alpha_context.Timestamp.current c in
+  let timestamp = Timestamp.current c in
   record_trace
     (Timestamp_too_early
        {
