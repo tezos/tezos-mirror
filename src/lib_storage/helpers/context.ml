@@ -58,6 +58,8 @@ module Make_tree (Store : DB) = struct
     | `Node _ ->
         Lwt.return_none
 
+  let of_value _ v = Store.Tree.add Store.Tree.empty [] v
+
   let fold ?depth t k ~init ~f =
     find_tree t k
     >>= function

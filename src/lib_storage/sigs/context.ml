@@ -136,8 +136,14 @@ module type TREE = sig
       value. *)
   val kind : tree -> [`Value | `Tree]
 
-  (** [to_value t] is [Some v] is [t] is a leaf tree and [None] otherwise. *)
+  (** [to_value t] is an Lwt promise that resolves to [Some v] if [t]
+      is a leaf tree and [None] otherwise. It is equivalent to [find t
+      []]. *)
   val to_value : tree -> value option Lwt.t
+
+  (** [of_value _ v] is an Lwt promise that resolves to the leaf tree
+      [v]. Is is equivalent to [add (empty _) [] v]. *)
+  val of_value : t -> value -> tree Lwt.t
 
   (** [hash t] is [t]'s Merkle hash. *)
   val hash : tree -> Context_hash.t

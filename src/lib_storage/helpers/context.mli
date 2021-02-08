@@ -39,13 +39,15 @@ module Make_tree (DB : DB) : sig
   include
     Tezos_storage_sigs.Context.TREE
       with type t := DB.t
-       and type key := string list
-       and type value := bytes
+       and type key := DB.key
+       and type value := DB.contents
        and type tree := DB.tree
 
   val empty : _ -> DB.tree
 
-  type raw = [`Value of bytes | `Tree of raw TzString.Map.t]
+  val of_value : _ -> DB.contents -> DB.tree Lwt.t
+
+  type raw = [`Value of DB.contents | `Tree of raw TzString.Map.t]
 
   val raw_encoding : raw Data_encoding.t
 

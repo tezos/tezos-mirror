@@ -164,6 +164,13 @@ module Context = struct
 
     let to_value (Tree {ops = (module Ops); tree; _}) = Ops.Tree.to_value tree
 
+    let of_value
+        (Context
+          {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) v
+        =
+      Ops.Tree.of_value ctxt v
+      >|= fun tree -> Tree {ops; tree; equality_witness; impl_name}
+
     let equal (Tree {ops = (module Ops); tree; equality_witness; _}) (Tree t) =
       match equiv equality_witness t.equality_witness with
       | (Some Refl, Some Refl) ->

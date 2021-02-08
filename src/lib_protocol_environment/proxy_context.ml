@@ -279,6 +279,10 @@ module C = struct
 
     let to_value t = Local.Tree.to_value t.tree
 
+    let of_value t v =
+      Local.Tree.of_value t.M.local v
+      >|= fun tree -> {proxy = t.proxy; path = []; tree}
+
     let list = raw_list
 
     let clear ?depth t = Local.Tree.clear ?depth t.tree
