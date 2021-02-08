@@ -234,12 +234,20 @@ let () =
       let open P2p_point.Id in
       let len = Data_encoding.Binary.length encoding t in
       let buf = Bytes.create len in
-      match Data_encoding.Binary.write encoding t buf 0 len with
+      let state =
+        Stdlib.Option.get
+        @@ Data_encoding.Binary.make_writer_state
+             buf
+             ~offset:0
+             ~allowed_bytes:len
+      in
+      match Data_encoding.Binary.write encoding t state with
       | Ok len -> (
-        match Data_encoding.Binary.read_opt encoding buf 0 len with
-        | None ->
-            Crowbar.fail "cannot parse encoded  address"
-        | Some (_, t') ->
-            Crowbar.check_eq ~pp t t' )
+          let buf = Bytes.unsafe_to_string buf in
+          match Data_encoding.Binary.read_opt encoding buf 0 len with
+          | None ->
+              Crowbar.fail "cannot parse encoded  address"
+          | Some (_, t') ->
+              Crowbar.check_eq ~pp t t' )
       | Error _ ->
           Crowbar.fail "cannot encode address")

@@ -454,8 +454,10 @@ module Raw = struct
       let open Data_encoding in
       let payload_out_size =
         Binary.(
-          fixed_length_exn DH.esk_encoding
-          + fixed_length_exn DH.epk_encoding
+          ( WithExceptions.Option.get ~loc:__LOC__
+          @@ fixed_length DH.esk_encoding )
+          + ( WithExceptions.Option.get ~loc:__LOC__
+            @@ fixed_length DH.epk_encoding )
           + Crypto_box.tag_length)
       in
       def "sapling.transaction.ciphertext"
@@ -508,9 +510,11 @@ module Raw = struct
          of the variable length field memo. *)
       let size_besides_memo =
         let open Data_encoding in
-        Binary.fixed_length_exn Viewing_key.diversifier_encoding
-        + Binary.fixed_length_exn int64
-        + Binary.fixed_length_exn Rcm.encoding
+        ( WithExceptions.Option.get ~loc:__LOC__
+        @@ Binary.fixed_length Viewing_key.diversifier_encoding )
+        + (WithExceptions.Option.get ~loc:__LOC__ @@ Binary.fixed_length int64)
+        + ( WithExceptions.Option.get ~loc:__LOC__
+          @@ Binary.fixed_length Rcm.encoding )
         + Crypto_box.tag_length + 4
       in
       payload_size - size_besides_memo

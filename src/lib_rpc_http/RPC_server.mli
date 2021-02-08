@@ -34,6 +34,8 @@ type server
 val launch :
   ?host:string ->
   ?cors:cors ->
+  ?agent:string ->
+  ?acl:Resto_acl.Acl.t ->
   media_types:Media_type.t list ->
   Conduit_lwt_unix.server ->
   unit RPC_directory.t ->

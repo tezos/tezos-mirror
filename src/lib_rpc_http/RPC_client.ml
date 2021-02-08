@@ -111,7 +111,10 @@ module type S = sig
 end
 
 module Make (Client : Cohttp_lwt.S.Client) = struct
-  module Client = Resto_cohttp_client.Client.Make (RPC_encoding) (Client)
+  module Client =
+    Resto_cohttp_client.Client.Make
+      (RPC_encoding)
+      (Resto_cohttp_client.Client.OfCohttp (Client))
 
   module type LOGGER = Client.LOGGER
 

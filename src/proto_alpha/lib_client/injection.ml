@@ -590,8 +590,9 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     | Manager_operation c as op -> (
         let size =
           if first then
-            Data_encoding.Binary.fixed_length_exn
-              Tezos_base.Operation.shell_header_encoding
+            ( WithExceptions.Option.get ~loc:__LOC__
+            @@ Data_encoding.Binary.fixed_length
+                 Tezos_base.Operation.shell_header_encoding )
             + Data_encoding.Binary.length
                 Operation.contents_encoding
                 (Contents op)

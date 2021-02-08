@@ -102,7 +102,9 @@ module Message = struct
   let encoding =
     Data_encoding.(tup3 (Fixed.string 10) P2p_peer.Id.encoding int16)
 
-  let length = Data_encoding.Binary.fixed_length_exn encoding
+  let length =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ Data_encoding.Binary.fixed_length encoding
 
   let key = "DISCOMAGIC"
 

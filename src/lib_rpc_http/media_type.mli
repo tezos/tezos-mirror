@@ -28,6 +28,7 @@ type t = Resto_cohttp.Media_type.Make(RPC_encoding).t = {
   q : int option;
   pp : 'a. 'a Data_encoding.t -> Format.formatter -> string -> unit;
   construct : 'a. 'a Data_encoding.t -> 'a -> string;
+  construct_seq : 'a. 'a Data_encoding.t -> 'a -> (Bytes.t * int * int) Seq.t;
   destruct : 'a. 'a Data_encoding.t -> string -> ('a, string) result;
 }
 

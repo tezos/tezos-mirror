@@ -153,9 +153,14 @@ module Connection_message = struct
     >>=? fun () ->
     let len = Crypto.header_length + encoded_message_len in
     let buf = Bytes.create len in
-    match
-      Data_encoding.Binary.write encoding message buf Crypto.header_length len
-    with
+    let state =
+      WithExceptions.Option.get ~loc:__LOC__
+      @@ Data_encoding.Binary.make_writer_state
+           buf
+           ~offset:Crypto.header_length
+           ~allowed_bytes:len
+    in
+    match Data_encoding.Binary.write encoding message state with
     | Error we ->
         fail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
     | Ok last ->
@@ -184,6 +189,7 @@ module Connection_message = struct
     TzEndian.set_int16 buf 0 len ;
     P2p_io_scheduler.read_full ~canceler ~len ~pos fd buf
     >>=? fun () ->
+    let buf = Bytes.unsafe_to_string buf in
     match Data_encoding.Binary.read encoding buf pos len with
     | Error re ->
         fail (P2p_errors.Decoding_error re)
@@ -201,13 +207,18 @@ module Metadata = struct
         message
     in
     let buf = Bytes.create encoded_message_len in
+    let state =
+      WithExceptions.Option.get ~loc:__LOC__
+      @@ Data_encoding.Binary.make_writer_state
+           buf
+           ~offset:0
+           ~allowed_bytes:encoded_message_len
+    in
     match
       Data_encoding.Binary.write
         metadata_config.conn_meta_encoding
         message
-        buf
-        0
-        encoded_message_len
+        state
     with
     | Error we ->
         fail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
@@ -220,7 +231,8 @@ module Metadata = struct
   let read ~canceler metadata_config fd cryptobox_data =
     Crypto.read_chunk ~canceler fd cryptobox_data
     >>=? fun buf ->
-    let length = Bytes.length buf in
+    let buf = Bytes.unsafe_to_string buf in
+    let length = String.length buf in
     let encoding = metadata_config.P2p_params.conn_meta_encoding in
     match Data_encoding.Binary.read encoding buf 0 length with
     | Error re ->
@@ -284,9 +296,14 @@ module Ack = struct
   let write ?canceler fd cryptobox_data message =
     let encoded_message_len = Data_encoding.Binary.length encoding message in
     let buf = Bytes.create encoded_message_len in
-    match
-      Data_encoding.Binary.write encoding message buf 0 encoded_message_len
-    with
+    let state =
+      WithExceptions.Option.get ~loc:__LOC__
+      @@ Data_encoding.Binary.make_writer_state
+           buf
+           ~offset:0
+           ~allowed_bytes:encoded_message_len
+    in
+    match Data_encoding.Binary.write encoding message state with
     | Error we ->
         fail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
     | Ok last ->
@@ -298,7 +315,8 @@ module Ack = struct
   let read ?canceler fd cryptobox_data =
     Crypto.read_chunk ?canceler fd cryptobox_data
     >>=? fun buf ->
-    let length = Bytes.length buf in
+    let buf = Bytes.unsafe_to_string buf in
+    let length = String.length buf in
     match Data_encoding.Binary.read encoding buf 0 length with
     | Error re ->
         fail (P2p_errors.Decoding_error re)
@@ -362,6 +380,10 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
   >>=? fun sent_msg ->
   Connection_message.read ~canceler scheduled_conn
   >>=? fun (msg, recv_msg) ->
+  (* TODO: make the below bytes-to-string copy-conversion unnecessary.
+     This requires making the consumer of the [recv_msg] value
+     ([Crypto_box.generate_nonces]) able to work with strings directly. *)
+  let recv_msg = Bytes.of_string recv_msg in
   let remote_listening_port =
     if incoming then msg.port else Some remote_socket_port
   in

@@ -147,8 +147,9 @@ module Mempool = struct
   let pre_filter config
       (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
     let bytes =
-      Data_encoding.Binary.fixed_length_exn
-        Tezos_base.Operation.shell_header_encoding
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ Data_encoding.Binary.fixed_length
+           Tezos_base.Operation.shell_header_encoding )
       + Data_encoding.Binary.length Operation.protocol_data_encoding op
     in
     match contents with

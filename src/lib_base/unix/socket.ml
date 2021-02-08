@@ -128,14 +128,14 @@ let send fd encoding message =
   (* len is the length of int16 plus the length of the message we want to send *)
   let len = message_len_size + encoded_message_len in
   let buf = Bytes.create len in
-  match
-    Data_encoding.Binary.write
-      encoding
-      message
-      buf
-      message_len_size
-      encoded_message_len
-  with
+  let state =
+    Option.get
+    @@ Data_encoding.Binary.make_writer_state
+         buf
+         ~offset:message_len_size
+         ~allowed_bytes:encoded_message_len
+  in
+  match Data_encoding.Binary.write encoding message state with
   | Error we ->
       fail (Encoding_error we)
   | Ok last ->
@@ -155,6 +155,7 @@ let recv ?timeout fd encoding =
   let buf = Bytes.create len in
   protect (fun () -> Lwt_utils_unix.read_bytes ?timeout ~len fd buf >|= ok)
   >>=? fun () ->
+  let buf = Bytes.unsafe_to_string buf in
   match Data_encoding.Binary.read encoding buf 0 len with
   | Error re ->
       fail (Decoding_error re)
