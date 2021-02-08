@@ -286,10 +286,12 @@ For compiling pre-8.0 releases, you don't need Rust, so you can skip this
 section.
 
 Starting from version 8.0, compiling Tezos requires the Rust compiler,
-version 1.44.0, and the Cargo package manager to be installed. You can use
-`rustup <https://rustup.rs/>`_ to install both. If you do not have ``rustup``,
-please avoid installing it from Snapcraft; you can rather follow the simple
-installation process shown below:
+version 1.44.0, and the Cargo package manager to be installed. If you
+have `rustup <https://rustup.rs/>`_ installed, it should work without
+any additional steps on your side. You can use `rustup
+<https://rustup.rs/>`_ to install both. If you do not have ``rustup``,
+please avoid installing it from Snapcraft; you can rather follow the
+simple installation process shown below:
 
 .. literalinclude:: compile-sources.sh
   :language: shell
