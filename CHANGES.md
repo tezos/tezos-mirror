@@ -20,7 +20,7 @@ v0.5:
 * Documentation
 * Updated dependencies (notably Lwt)
 
-v0.6:
+v0.6/v0.6.1:
 
 * Split path before percentage-decoding chunks to allow slash's encoding to
   appear in chunks
