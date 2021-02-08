@@ -237,6 +237,176 @@ let build_find_baker_hash_by_pkbytes bakers =
 
 let from_Some = function Some x -> x | None -> assert false
 
+(* Stitch contracts that produce more than one operation.
+
+   Those contracts might be affected by the semantic change of switching from
+   BFS to DFS for inter-contract calls. To guarantee they aren't, we enforce
+   that the uncontrolled addresses (from parameters but also the SENDER) are
+   implicit accounts by asserting that they are actually the SOURCE.
+
+   Moreover, we sometimes swap the order of operations when two of them
+   are emmitted to enforce that the uncontrolled address is called last so even
+   if it performs a DFS call it cannot access the contract in a state that was
+   inaccessible in BFS.
+ *)
+
+let update_contract_script (m : ('l, 'p) Micheline.node) :
+    ('l, 'p) Micheline.node =
+  let open Micheline in
+  let open Michelson_v1_primitives in
+  let destruct_seq = function Seq (_location, l) -> l | _ -> assert false in
+  let rec destruct_if_left = function
+    | Prim (_, I_IF_LEFT, [a; b], _) ->
+        destruct_if_left a @ destruct_if_left b
+    | Seq (_, [a]) ->
+        destruct_if_left a
+    | a ->
+        [a]
+  in
+  let prim0 p = Prim (0, p, [], []) in
+  let (parameter, storage, code) =
+    match destruct_seq m with
+    | [parameter; storage; Prim (_, K_code, [Seq (_, s)], _)] ->
+        (parameter, storage, s)
+    | _ ->
+        assert false
+  in
+  let (cast, if_lefts) =
+    match code with
+    | [cast; _; _; _; if_lefts] ->
+        (cast, if_lefts)
+    | _ ->
+        assert false
+  in
+  let (ep_1, ep_2, ep_3, ep_4, ep_5, ep_6, ep_7, ep_8, ep_9, ep_10, ep_11) =
+    match destruct_if_left if_lefts with
+    | [ep_1; ep_2; ep_3; ep_4; ep_5; ep_6; ep_7; ep_8; ep_9; ep_10; ep_11] ->
+        (ep_1, ep_2, ep_3, ep_4, ep_5, ep_6, ep_7, ep_8, ep_9, ep_10, ep_11)
+    | _ ->
+        assert false
+  in
+  let assert_is_source =
+    [ prim0 I_SOURCE;
+      prim0 I_COMPARE;
+      prim0 I_EQ;
+      Prim
+        (0, I_IF, [Seq (0, []); Seq (0, [prim0 I_UNIT; prim0 I_FAILWITH])], [])
+    ]
+  in
+  let sender = prim0 I_SENDER in
+  let dup = prim0 I_DUP in
+  let car = prim0 I_CAR in
+  let cdr = prim0 I_CDR in
+  (* In "NIL operation; DIG 2; CONS; SWAP; CONS", replace "DIG 2" by "SWAP" **)
+  let rec patch_ep_5_tail l =
+    match l with
+    | (Prim (_, I_NIL, _, _) as nil) :: _ :: l ->
+        nil :: prim0 I_SWAP :: l
+    | a :: l ->
+        a :: patch_ep_5_tail l
+    | [] ->
+        assert false
+  in
+  (* Replace "NIL operation; SWAP; CONS; DIP {SWAP}; SWAP; CONS"
+       by "NIL operation; DIG 3; CONS; SWAP; CONS" *)
+  let rec patch_ep_6_tail l =
+    match l with
+    | (Prim (_, I_NIL, _, _) as nil) :: _ :: cons :: _ :: l ->
+        nil :: Prim (0, I_DIG, [Int (0, Z.of_int 3)], []) :: cons :: l
+    | a :: l ->
+        a :: patch_ep_6_tail l
+    | [] ->
+        assert false
+  in
+  let ep_2 =
+    Seq
+      ( 0,
+        (sender :: assert_is_source)
+        @ (dup :: car :: car :: assert_is_source)
+        @ destruct_seq ep_2 )
+  in
+  let ep_3 =
+    Seq
+      ( 0,
+        (sender :: assert_is_source)
+        @ (dup :: car :: car :: assert_is_source)
+        @ (dup :: car :: cdr :: car :: assert_is_source)
+        @ destruct_seq ep_3 )
+  in
+  let ep_4 =
+    Seq
+      ( 0,
+        (sender :: assert_is_source)
+        @ (dup :: car :: assert_is_source)
+        @ destruct_seq ep_4 )
+  in
+  let ep_5 =
+    Seq
+      ( 0,
+        (sender :: assert_is_source)
+        @ (dup :: car :: dup :: car :: assert_is_source)
+        @ (cdr :: assert_is_source)
+        @ patch_ep_5_tail (destruct_seq ep_5) )
+  in
+  let ep_6 =
+    Seq
+      ( 0,
+        (sender :: assert_is_source)
+        @ (dup :: car :: cdr :: cdr :: assert_is_source)
+        @ (dup :: cdr :: car :: assert_is_source)
+        @ patch_ep_6_tail (destruct_seq ep_6) )
+  in
+  let seq_wrap x = match x with Seq _ -> x | x -> Seq (0, [x]) in
+  let if_left a b = Prim (0, I_IF_LEFT, [seq_wrap a; seq_wrap b], []) in
+  Seq
+    ( 0,
+      [ parameter;
+        storage;
+        Prim
+          ( 0,
+            K_code,
+            [ Seq
+                ( 0,
+                  [ cast;
+                    dup;
+                    car;
+                    Prim (0, I_DIP, [Seq (0, [cdr])], []);
+                    if_left
+                      (if_left
+                         (if_left ep_1 ep_2)
+                         (if_left ep_3 (if_left ep_4 ep_5)))
+                      (if_left
+                         (if_left ep_6 (if_left ep_7 ep_8))
+                         (if_left ep_9 (if_left ep_10 ep_11))) ] ) ],
+            [] ) ] )
+
+(* The hash of the script to stitch. *)
+let contract_hash : Script_expr_hash.t =
+  Script_expr_hash.of_bytes_exn @@ Hex.to_bytes
+  @@ `Hex "41ebb2d762dfef4d53b8b4a7277c056d472ee028888c878d8f227787bfffdcae"
+
+let migrate_contract ctxt contract =
+  Contract_storage.get_script ctxt contract
+  >>=? fun (ctxt, script_opt) ->
+  match script_opt with
+  | None ->
+      return ctxt (* Do nothing on implicit accounts *)
+  | Some {Script_repr.code; Script_repr.storage = _storage} ->
+      Script_repr.force_decode code
+      >>?= fun (code, _gas_cost) ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Script_repr.expr_encoding code
+      in
+      let hash = Script_expr_hash.hash_bytes [bytes] in
+      if Script_expr_hash.(hash = contract_hash) then
+        let migrated_code =
+          Script_repr.lazy_expr @@ Micheline.strip_locations
+          @@ update_contract_script @@ Micheline.root code
+        in
+        Storage.Contract.Code.update ctxt contract migrated_code
+        >>=? fun (ctxt, _code_size_diff) -> return ctxt
+      else return ctxt
+
 (* This is the genesis protocol: initialise the state *)
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block ~level ~timestamp ~fitness ctxt
@@ -715,6 +885,12 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Pending_migration_balance_updates.init
         ctxt
         (balance_updates @ baker_balance_updates)
+      >>=? fun ctxt ->
+      (* TODO: stitching time can probably be improved by folding over the
+         contracts only once. *)
+      Storage.Contract.fold ctxt ~init:(Ok ctxt) ~f:(fun contract ctxt ->
+          ctxt >>?= fun ctxt -> migrate_contract ctxt contract)
+      >>=? fun ctxt -> return ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
