@@ -480,6 +480,8 @@ struct
       val hash : t -> public_key_hash_t
 
       val size : t -> int (* in bytes *)
+
+      val of_bytes_without_validation : bytes -> t option
     end
 
     module type SIGNATURE = sig
