@@ -226,4 +226,20 @@ let () =
                  "Address '%s' was parsed successfully but it is not valid."
                  addr)
       in
-      ko_points f)
+      ko_points f) ;
+  Crowbar.add_test
+    ~name:"Base.P2p_point.id.encode-decode"
+    [Crowbar.pair ip Crowbar.uint16]
+    (fun t ->
+      let open P2p_point.Id in
+      let len = Data_encoding.Binary.length encoding t in
+      let buf = Bytes.create len in
+      match Data_encoding.Binary.write encoding t buf 0 len with
+      | Ok len -> (
+        match Data_encoding.Binary.read_opt encoding buf 0 len with
+        | None ->
+            Crowbar.fail "cannot parse encoded  address"
+        | Some (_, t') ->
+            Crowbar.check_eq ~pp t t' )
+      | Error _ ->
+          Crowbar.fail "cannot encode address")
