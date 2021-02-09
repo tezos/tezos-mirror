@@ -103,28 +103,29 @@ following schema for a sequence of two external operations.
 
 Smart contracts called by internal transactions can in turn also emit
 internal operation. The interpretation of the internal operations
-of a given external operation use a queue, as in the following
+of a given external operation uses a stack, as in the following
 example, also with two external operations.
 
 ::
 
    +-----------+---------------+--------------------------+
-   | executing | emissions     | resulting queue          |
+   | executing | emissions     | resulting stack          |
    +-----------+---------------+--------------------------+
    | op 1      | 1a, 1b, 1c    | 1a, 1b, 1c               |
-   | op 1a     | 1ai, 1aj      | 1b, 1c, 1ai, 1aj         |
-   | op 1b     | 1bi           | 1c, 1ai, 1aj, 1bi        |
-   | op 1c     |               | 1ai, 1aj, 1bi            |
-   | op 1ai    |               | 1aj, 1bi                 |
-   | op 1aj    |               | 1bi                      |
-   | op 1bi    |               |                          |
+   | op 1a     | 1ai, 1aj      | 1ai, 1aj, 1b, 1c         |
+   | op 1ai    |               | 1aj, 1b, 1c              |
+   | op 1aj    |               | 1b, 1c                   |
+   | op 1b     | 1bi           | 1bi, 1c                  |
+   | op 1bi    |               | 1c                       |
+   | op 1c     |               |                          |
    | op 2      | 2a, 2b        | 2a, 2b                   |
-   | op 2a     | 2ai           | 2b, 2ai                  |
-   | op 2b     |               | 2ai                      |
-   | op 2ai    | 2ai1          | 2ai1                     |
-   | op 2a1    | 2ai2          | 2ai2                     |
-   | op 2a2    | 2ai3          | 2ai3                     |
-   | op 2a3    |               |                          |
+   | op 2a     | 2ai           | 2ai, 2b                  |
+   | op 2ai    | 2ai1          | 2ai1, 2b                 |
+   | op 2ai1   |               | 2b                       |
+   | op 2b     | 2bi           | 2bi                      |
+   | op 2bi    | 2bi1          | 2bi1                     |
+   | op 2bi1   | 2bi2          | 2bi2                     |
+   | op 2bi2   |               |                          |
    +-----------+---------------+--------------------------+
 
 Failures
