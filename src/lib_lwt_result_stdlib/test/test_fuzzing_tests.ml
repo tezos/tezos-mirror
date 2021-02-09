@@ -155,8 +155,11 @@ struct
       [Fn.arith_es; one; many]
       (fun fn const input ->
         let input = M.of_list input in
-        let fn = MapEPOf.fn_ep const fn in
-        eq_es (M.map_es fn input >|=? M.rev) (M.rev_map_ep fn input))
+        let fn_ep = MapEPOf.fn_ep const fn in
+        eq_ep
+          ~pp:M.pp
+          (M.map_ep fn_ep input >|=? M.rev)
+          (M.rev_map_ep fn_ep input))
 end
 
 module TestIterAgainstStdlibList (M : sig

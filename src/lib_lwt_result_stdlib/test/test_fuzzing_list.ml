@@ -35,6 +35,8 @@ module ListWithBase = struct
   let to_list = Fun.id
 
   let name = "List"
+
+  let pp = Crowbar.(pp_list pp_int)
 end
 
 (* Internal consistency *)

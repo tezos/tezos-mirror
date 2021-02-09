@@ -35,6 +35,8 @@ module type BASE = sig
   val of_list : int list -> int t
 
   val to_list : int t -> int list
+
+  val pp : Format.formatter -> int t -> unit
 end
 
 module type ITER_VANILLA = sig

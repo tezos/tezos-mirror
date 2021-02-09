@@ -51,6 +51,8 @@ module SetWithBase = struct
   let of_list : int list -> _alias_t = of_list
 
   let to_list : _alias_t -> int list = elements
+
+  let pp fmt s = Crowbar.(pp_list pp_int) fmt (to_list s)
 end
 
 module Iterp = TestIterMonotoneAgainstStdlibList (SetWithBase)

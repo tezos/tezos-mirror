@@ -35,6 +35,8 @@ module SeqWithBase = struct
   let to_list = List.of_seq
 
   let name = "Seq"
+
+  let pp fmt s = Crowbar.(pp_list pp_int) fmt (to_list s)
 end
 
 (* Internal consistency *)
