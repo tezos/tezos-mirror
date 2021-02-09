@@ -343,6 +343,163 @@ class TestManager:
         assert balance_bootstrap3 + amount_mutez_3 == new_balance_bootstrap3
 
 
+@pytest.mark.contract
+@pytest.mark.incremental
+class TestExecutionOrdering:
+    def child_input(self, contract_input, c_addr):
+        return ("Pair \"{}\" \"{}\"").format(contract_input[0], c_addr)
+
+    def parent_input(self, contract_input, p_addr, c_addr):
+        return (
+            "Pair {{"
+            + ";".join(
+                map(
+                    self.child_input,
+                    contract_input[0],
+                    itertools.repeat(c_addr),
+                )
+            )
+            + "}}\"{}\""
+        ).format(p_addr)
+
+    def deploy_three_layer_tree(
+        self,
+        client,
+        session,
+        child_contract,
+        parent_contract,
+        grandparent_contract,
+    ):
+        path = f'{CONTRACT_PATH}/opcodes/ordering_concat_string_child.tz'
+        originate(client, session, path, '""', 0, contract_name=child_contract)
+        session[child_contract] = session['contract']
+        client.bake('bootstrap3', ["--minimal-timestamp"])
+
+        path = f'{CONTRACT_PATH}/opcodes/ordering_parent.tz'
+        originate(
+            client, session, path, 'Unit', 0, contract_name=parent_contract
+        )
+        session[parent_contract] = session['contract']
+        client.bake('bootstrap3', ["--minimal-timestamp"])
+
+        path = f'{CONTRACT_PATH}/opcodes/ordering_grandparent.tz'
+        originate(
+            client, session, path, 'Unit', 0, contract_name=grandparent_contract
+        )
+        session[grandparent_contract] = session['contract']
+        client.bake('bootstrap3', ["--minimal-timestamp"])
+
+    ##
+    # This test case uses string concatenation to verify the execution flow
+    # of operations. There are 3 contracts, called Contract Grandparent,
+    # Contract Parent and Contract Child.  It looks like the following:
+    # Notice that if Parent is only one Child, then Grandparent will call that
+    # Child directly.
+    #
+    # Grandparent --> Parent --> Child
+    #            |           |-> Child
+    #            |           |-> Child
+    #            --> Parent  --> Child
+    #            |           |-> Child
+    #            |--> Child
+    #
+    # The `contract_input` is the input of contract grandparent which defines
+    # how parents call its children.
+    #
+    # (* The `flow` is the flow of parent *)
+    # input_of_child = string
+    # input_of_parent = input_of_child
+    # input_of_grandparent = [ input_of_parent ]
+    #
+    # For example:
+    #  contract_input =
+    #    [([("A"), ("B"), ("C")]),
+    #     ([("D")]),
+    #     ([("E"), ("F"), ("G")])],
+    #
+    # Grandparent --> Parent --> Child with "A"
+    #            |           |-> Child with "B"
+    #            |           |-> Child with "C"
+    #            --> Child with "D"
+    #            --> Parent --> Child with "E"
+    #                       |-> Child with "F"
+    #                       |-> Child with "G"
+    ##
+    @pytest.mark.parametrize(
+        "child_contract, parent_contract, grandparent_contract,"
+        + "contract_input,expected",
+        [
+            (
+                "ordering_child1_",
+                "ordering_parent1_",
+                "ordering_grandparent1_",
+                [
+                    (
+                        [
+                            ("A"),
+                            ("B"),
+                            ("C"),
+                        ],
+                    ),
+                    ([("D")]),
+                    (
+                        [
+                            ("E"),
+                            ("F"),
+                            ("G"),
+                        ],
+                    ),
+                ],
+                # before 009, the result should be "DABCEFG".
+                "ABCDEFG",
+            ),
+        ],
+    )
+    def test_ordering(
+        self,
+        client,
+        session,
+        child_contract,
+        parent_contract,
+        grandparent_contract,
+        contract_input,
+        expected,
+    ):
+
+        self.deploy_three_layer_tree(
+            client,
+            session,
+            child_contract,
+            parent_contract,
+            grandparent_contract,
+        )
+
+        c_addr = session[child_contract]
+        p_addr = session[parent_contract]
+
+        m_input = (
+            "{"
+            + ";".join(
+                map(
+                    self.parent_input,
+                    contract_input,
+                    itertools.repeat(p_addr),
+                    itertools.repeat(c_addr),
+                )
+            )
+            + "} "
+        )
+
+        client.transfer(
+            0,
+            'bootstrap2',
+            grandparent_contract,
+            ["--burn-cap", "5", "--arg", m_input],
+        )
+        client.bake('bootstrap3', ["--minimal-timestamp"])
+        assert client.get_storage(child_contract) == "\"{}\"".format(expected)
+
+
 @pytest.mark.slow
 @pytest.mark.contract
 class TestContracts:

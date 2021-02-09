@@ -1,0 +1,49 @@
+# This contract intends to call "opcodes/ordering_concat_string_child.tz".
+#
+# Given a list, each elements of the list present the way to operation "opcodes/ordering_concat_string_child.tz"
+#
+# list (
+#     pair
+#        # the string is the input of ordering_concat_string_child.tz 
+#        # and address is the address of ordering_concat_string_child.tz
+#        (pair string address)
+# )
+
+{ parameter (list (pair string address)) ;
+  storage unit ;
+  code { NIL operation ;
+         SWAP ;
+         CAR ;
+         ITER { SWAP ;
+                PAIR ;
+                DUP ;
+                CDR ;
+                DUP ;
+                CDR ;
+                SWAP ;
+                CAR ;
+                SWAP ;
+                CONTRACT string ;
+                IF_NONE { PUSH string "Not a contract" ; FAILWITH } {} ;
+                DIG 2 ;
+                CAR ;
+                SWAP ;
+                PUSH mutez 0 ;
+                DIG 3 ;
+                TRANSFER_TOKENS ;
+                CONS } ;
+         NIL operation ;
+         SWAP ;
+         PAIR ;
+         LEFT (list operation) ;
+         LOOP_LEFT
+           { DUP ;
+             CDR ;
+             SWAP ;
+             CAR ;
+             IF_CONS
+               { DIG 2 ; SWAP ; CONS ; SWAP ; PAIR ; LEFT (list operation) }
+               { RIGHT (pair (list operation) (list operation)) } } ;
+         PUSH unit Unit ;
+         SWAP ;
+         PAIR } }

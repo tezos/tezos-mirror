@@ -1,0 +1,3 @@
+parameter (string);
+storage (string);
+code { UNPAIR; SWAP; CONCAT; NIL operation; PAIR };
