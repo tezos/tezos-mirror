@@ -775,6 +775,17 @@ let check_and_update_protocol_version ctxt =
   Context.add ctxt version_key (Bytes.of_string version_value)
   >|= fun ctxt -> ok (previous_proto, ctxt)
 
+(* You should ensure that if the type `Constant_repr.parametric` is
+   different from the previous protocol or the value of these
+   constants is modified, is changed from the previous protocol, then
+   you `propagate` these constants to the new protocol by writing them
+   onto the context via the function `add_constants` or
+   `patch_constants`.
+
+   This migration can be achieved also implicitely by modifying the
+   encoding directly in a way which is compatible with the previous
+   protocol. However, by doing so, you do not change the value of
+   these constants inside the context. *)
 let prepare_first_block ~level ~timestamp ~fitness ctxt =
   check_and_update_protocol_version ctxt
   >>=? fun (previous_proto, ctxt) ->

@@ -82,6 +82,13 @@ let fixed =
     max_proposals_per_delegate;
   }
 
+(* The encoded representation of this type is stored in the context as
+   bytes. Changing the encoding, or the value of these constants from
+   the previous protocol may break the context migration, or (even
+   worse) yield an incorrect context after migration.
+
+   If you change this encoding, you should ensure that there is a
+   proper migration of the constants during context migration.  *)
 type parametric = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
