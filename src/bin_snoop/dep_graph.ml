@@ -367,14 +367,16 @@ let to_graph (solved : string Solver.solved list) =
   in
   List.iter
     (fun {Solver.dependencies; meta; _} ->
-      Fv_set.iter
-        (fun dep ->
-          match Fv_map.find dep solved_to_file with
-          | None ->
-              raise (Missing_file_for_free_variable {free_var = dep})
-          | Some (dep_file, _) ->
-              G.add_edge g dep_file meta.data)
-        dependencies)
+      if Fv_set.is_empty dependencies then G.add_vertex g meta.data
+      else
+        Fv_set.iter
+          (fun dep ->
+            match Fv_map.find dep solved_to_file with
+            | None ->
+                raise (Missing_file_for_free_variable {free_var = dep})
+            | Some (dep_file, _) ->
+                G.add_edge g dep_file meta.data)
+          dependencies)
     solved ;
   g
 
