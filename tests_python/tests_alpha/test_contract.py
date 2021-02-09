@@ -737,7 +737,7 @@ class TestMiniScenarios:
 
     def test_replay_transfer_fail(self, client: Client):
         with utils.assert_run_failure("Internal operation replay attempt"):
-            client.transfer(0, "bootstrap1", "replay", [])
+            client.transfer(10, "bootstrap1", "replay", [])
 
     # create_contract.tz related tests
     def test_create_contract_originate(self, client: Client, session: dict):

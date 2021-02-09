@@ -2,6 +2,7 @@
 parameter unit ;
 storage unit ;
 code { CDR ; NIL operation ;
-       SELF ; PUSH mutez 0 ; UNIT ; TRANSFER_TOKENS ;
+       SOURCE ; CONTRACT unit ; ASSERT_SOME ;
+       PUSH mutez 1 ; UNIT ; TRANSFER_TOKENS ;
        DUP ; DIP { CONS } ; CONS ;
        PAIR }
