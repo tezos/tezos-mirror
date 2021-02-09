@@ -154,6 +154,8 @@ module Mempool = struct
     match contents with
     | Single (Endorsement _) ->
         false (* legacy format *)
+    | Single (Failing_noop _) ->
+        false
     | Single (Endorsement_with_slot _) ->
         true
     | Single (Seed_nonce_revelation _) ->
