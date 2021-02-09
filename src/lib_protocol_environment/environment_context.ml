@@ -45,6 +45,8 @@ module Equality_witness : sig
   val make : unit -> 'a t
 
   val eq : 'a t -> 'b t -> ('a, 'b) eq option
+
+  val hash : 'a t -> int
 end = struct
   type (_, _) eq = Refl : ('a, 'a) eq
 
@@ -69,6 +71,8 @@ end = struct
 
   let eq : type a b. a t -> b t -> (a, b) eq option =
    fun (module A) (module B) -> match A.Eq with B.Eq -> Some Refl | _ -> None
+
+  let hash : type a. a t -> int = fun (module A) -> Hashtbl.hash A.Eq
 end
 
 module Context = struct

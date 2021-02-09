@@ -1243,4 +1243,6 @@ struct
           let rpc_context = conv block in
           lookup#call_service s (((rpc_context, a1), a2), a3) q i
     end
+
+  module Equality_witness = Environment_context.Equality_witness
 end

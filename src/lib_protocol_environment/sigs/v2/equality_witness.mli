@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,76 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type CONTEXT = sig
-  (** @inline *)
-  include Environment_context_intf.S
-end
+(**
 
-module type VIEW = sig
-  (** @inline *)
-  include Environment_context_intf.VIEW
-end
+   This module provides support for type equalities and runtime type identifiers.
 
-module type TREE = sig
-  (** @inline *)
-  include Environment_context_intf.TREE
-end
+   For two types [a] and [b], [(a, b) eq] is a witness that [a = b]. This is
+   a standard generalized algebraic datatype on top of which type-level
+   programming techniques can be implemented.
 
-module Equality_witness : sig
-  type (_, _) eq = Refl : ('a, 'a) eq
+   Given a type [a], an inhabitant of [a t] is a dynamic identifier for [a].
+   Identifiers can be compared for equality. They are also equipped with a
+   hash function.
 
-  type 'a t
+   WARNING: the hash function changes at every run. Therefore, the result
+   of the hash function should never be stored.
 
-  val make : unit -> 'a t
+   Notice that dynamic identifiers are not unique: two identifiers for [a]
+   can have distinct hash and can be physically distinct. Hence, only [eq]
+   can decide if two type identifiers correspond to the same type.
 
-  val eq : 'a t -> 'b t -> ('a, 'b) eq option
+*)
 
-  val hash : 'a t -> int
-end
+(** A proof witness that two types are equal. *)
+type (_, _) eq = Refl : ('a, 'a) eq
 
-module Context : sig
-  type ('ctxt, 'tree) ops =
-    (module CONTEXT with type t = 'ctxt and type tree = 'tree)
+(** A dynamic representation for ['a]. *)
+type 'a t
 
-  type _ kind = private ..
+(** [make ()] is a dynamic representation for ['a]. A fresh identifier
+   is returned each time [make ()] is evaluated. *)
+val make : unit -> 'a t
 
-  type ('a, 'b) equality_witness
+(** [eq ida idb] returns a proof that [a = b] if [ida] and [idb]
+   identify the same type. *)
+val eq : 'a t -> 'b t -> ('a, 'b) eq option
 
-  type t =
-    | Context : {
-        kind : 'a kind;
-        impl_name : string;
-        ctxt : 'a;
-        ops : ('a, 'b) ops;
-        equality_witness : ('a, 'b) equality_witness;
-      }
-        -> t
-
-  include CONTEXT with type t := t
-end
-
-module Register (C : CONTEXT) : sig
-  type _ Context.kind += Context : C.t Context.kind
-
-  val equality_witness : (C.t, C.tree) Context.equality_witness
-
-  val ops : (C.t, C.tree) Context.ops
-end
-
-type validation_result = {
-  context : Context.t;
-  fitness : Fitness.t;
-  message : string option;
-  max_operations_ttl : int;
-  last_allowed_fork_level : Int32.t;
-}
-
-type quota = {max_size : int; max_op : int option}
-
-type rpc_context = {
-  block_hash : Block_hash.t;
-  block_header : Block_header.shell_header;
-  context : Context.t;
-}
-
-val err_implementation_mismatch : expected:string -> got:string -> 'a
+(** [hash id] returns a hash for [id]. *)
+val hash : 'a t -> int
