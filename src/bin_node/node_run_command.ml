@@ -505,12 +505,13 @@ module Term = struct
     let open Cmdliner in
     let doc =
       "Run the daemon in sandbox mode. P2P to non-localhost addresses are \
-       disabled, and constants of the economic protocol can be altered with \
-       an optional JSON file which overrides the $(b,genesis_parameters) \
-       field of the network configuration. $(b,IMPORTANT): Using sandbox mode \
-       affects the node state and subsequent runs of Tezos node must also use \
-       sandbox mode. In order to run the node in normal mode afterwards, a \
-       full reset must be performed (by removing the node's data directory)."
+       disabled, and constants of the economic protocol can be altered with a \
+       JSON file which overrides the $(b,genesis_parameters) field of the \
+       network configuration (e.g. scripts/sandbox.json). $(b,IMPORTANT): \
+       Using sandbox mode affects the node state and subsequent runs of Tezos \
+       node must also use sandbox mode. In order to run the node in normal \
+       mode afterwards, a full reset must be performed (by removing the \
+       node's data directory)."
     in
     Arg.(
       value
