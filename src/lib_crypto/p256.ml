@@ -61,6 +61,8 @@ module Public_key = struct
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
+  let of_bytes_without_validation = of_bytes_opt
+
   let size _ = compressed_size
 
   type Base58.data += Data of t

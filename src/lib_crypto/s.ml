@@ -372,6 +372,8 @@ module type SIGNATURE = sig
     val hash : t -> Public_key_hash.t
 
     val size : t -> int (* in bytes *)
+
+    val of_bytes_without_validation : bytes -> t option
   end
 
   module Secret_key : sig

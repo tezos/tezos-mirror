@@ -242,6 +242,12 @@ module type SIGNATURE = sig
 
   val pk_of_bytes : Bytes.t -> public key option
 
+  (** This function does not check that the resulting pk is valid. It is
+      slightly faster than pk_of_bytes but should only be used to
+      deserialize bytes that were serialized from a pk. E.g. the pks in
+      the storage of the protocol. *)
+  val pk_of_bytes_without_validation : Bytes.t -> public key option
+
   (** [neuterize sk] generates the corresponding public key of [sk] *)
   val neuterize : 'a key -> public key
 

@@ -361,6 +361,24 @@ module Public_key = struct
     | P256 pk ->
         P256.Public_key.to_short_b58check pk
 
+  let of_bytes_without_validation b =
+    let tag = Bytes.(get_int8 b 0) in
+    let b = Bytes.(sub b 1 (length b - 1)) in
+    match tag with
+    | 0 ->
+        Option.bind
+          (Ed25519.Public_key.of_bytes_without_validation b)
+          (fun pk -> Some (Ed25519 pk))
+    | 1 ->
+        Option.bind
+          (Secp256k1.Public_key.of_bytes_without_validation b)
+          (fun pk -> Some (Secp256k1 pk))
+    | 2 ->
+        Option.bind (P256.Public_key.of_bytes_without_validation b) (fun pk ->
+            Some (P256 pk))
+    | _ ->
+        None
+
   include Helpers.MakeEncoder (struct
     type nonrec t = t
 

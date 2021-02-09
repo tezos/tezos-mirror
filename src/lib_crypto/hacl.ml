@@ -357,6 +357,8 @@ module type SIGNATURE = sig
 
   val pk_of_bytes : Bytes.t -> public key option
 
+  val pk_of_bytes_without_validation : Bytes.t -> public key option
+
   val neuterize : 'a key -> public key
 
   val keypair : unit -> public key * secret key
@@ -390,6 +392,8 @@ module Ed25519 : SIGNATURE = struct
 
   let pk_of_bytes pk =
     if Bytes.length pk <> pk_size then None else Some (Pk (Bytes.copy pk))
+
+  let pk_of_bytes_without_validation = pk_of_bytes
 
   let blit_to_bytes : type a. a key -> ?pos:int -> Bytes.t -> unit =
    fun key ?(pos = 0) buf ->
@@ -493,18 +497,23 @@ module P256 : SIGNATURE = struct
 
   (* This function accepts a buffer representing a public key in either the
    * compressed or the uncompressed form. *)
-  let pk_of_bytes : Bytes.t -> public key option =
+  let pk_of_bytes_without_validation : Bytes.t -> public key option =
    fun buf ->
     let pk = Bytes.create pk_size_raw in
     match Bytes.length buf with
     | len when len = pk_size ->
         let decompress_ok = Hacl.P256.decompress_c buf pk in
-        if decompress_ok && valid_pk pk then Some (Pk pk) else None
+        if decompress_ok then Some (Pk pk) else None
     | len when len = pk_size_uncompressed ->
         let decompress_ok = Hacl.P256.decompress_n buf pk in
-        if decompress_ok && valid_pk pk then Some (Pk pk) else None
+        if decompress_ok then Some (Pk pk) else None
     | _ ->
         None
+
+  let pk_of_bytes : Bytes.t -> public key option =
+   fun buf ->
+    Option.bind (pk_of_bytes_without_validation buf) (fun (Pk pk) ->
+        if valid_pk pk then Some (Pk pk) else None)
 
   let sk_of_bytes : Bytes.t -> secret key option =
    fun buf ->

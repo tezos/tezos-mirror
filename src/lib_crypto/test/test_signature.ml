@@ -50,6 +50,21 @@ let test_size () =
   in
   assert (Compare.Int.(expected = length))
 
-let size = [("size", `Quick, test_size)]
+let test_of_bytes_without_validation () =
+  List.iter
+    (fun algo ->
+      let (_pkh, pk, _sk) = Signature.generate_key ~algo () in
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding pk
+      in
+      let pk2 = Signature.Public_key.of_bytes_without_validation bytes in
+      assert (Some pk = pk2))
+    [Ed25519; Secp256k1; P256]
 
-let () = Alcotest.run "hacl" [("size", size)]
+let size =
+  [ ("size", `Quick, test_size);
+    ( "test_of_bytes_without_validation",
+      `Quick,
+      test_of_bytes_without_validation ) ]
+
+let () = Alcotest.run "signature" [("size", size)]
