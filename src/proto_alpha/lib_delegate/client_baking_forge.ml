@@ -161,7 +161,7 @@ let compute_endorsing_power cctxt ~chain ~block operations =
   List.fold_left_es
     (fun sum -> function
       | { Alpha_context.protocol_data =
-            Operation_data {contents = Single (Endorsement _); _};
+            Operation_data {contents = Single (Endorsement_with_slot _); _};
           _ } as op -> (
           Delegate_services.Endorsing_power.get
             cctxt
@@ -1036,9 +1036,23 @@ let filter_outdated_endorsements expected_level ops =
   List.filter
     (function
       | { Alpha_context.protocol_data =
-            Operation_data {contents = Single (Endorsement {level; _}); _};
-          _ } ->
-          Raw_level.equal expected_level level
+            Operation_data
+              {contents = Single (Endorsement_with_slot {endorsement; _}); _};
+          _ } -> (
+          let raw_endorsement = Alpha_context.Operation.raw endorsement in
+          let decoded =
+            Data_encoding.Binary.of_bytes
+              Operation.protocol_data_encoding
+              raw_endorsement.proto
+          in
+          match decoded with
+          | Error _ ->
+              false
+          | Ok (Operation_data {contents = Single (Endorsement {level; _}); _})
+            ->
+              Raw_level.equal expected_level level
+          | _ ->
+              assert false )
       | _ ->
           true)
     ops
