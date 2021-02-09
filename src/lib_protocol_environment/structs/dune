@@ -8,5 +8,6 @@
  (flags :standard)
  (libraries tezos-stdlib
             tezos-crypto
-            tezos-lwt-result-stdlib)
+            tezos-lwt-result-stdlib
+            data-encoding)
  (modules "V0" "V1" "V2"))
