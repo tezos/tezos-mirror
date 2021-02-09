@@ -66,6 +66,12 @@ be documented here either.
 
 - Improved the shutdown procedure for external validator process.
 
+- Added command `replay` which takes a list of block levels, hashes or
+  aliases, revalidate those blocks in the context of their
+  predecessor, and check that the result is the same as what is
+  currently stored. This is mostly useful for debugging and
+  benchmarking purposes.
+
 ## Client
 
 ## Baker / Endorser / Accuser

@@ -73,6 +73,7 @@ let description =
     `P "Entry point for initializing, configuring and running a Tezos node.";
     `P Node_identity_command.Manpage.command_description;
     `P Node_run_command.Manpage.command_description;
+    `P Node_replay_command.Manpage.command_description;
     `P Node_config_command.Manpage.command_description;
     `P Node_upgrade_command.Manpage.command_description;
     `P Node_snapshot_command.Manpage.command_description;
@@ -87,6 +88,7 @@ let info =
 
 let commands =
   [ Node_run_command.cmd;
+    Node_replay_command.cmd;
     Node_config_command.cmd;
     Node_identity_command.cmd;
     Node_upgrade_command.cmd;
