@@ -841,7 +841,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
             apply
               ctxt
               (Internal_operation_result (op, Applied result) :: applied)
-              (rest @ emitted) )
+              (emitted @ rest) )
   in
   apply ctxt [] ops
 
