@@ -1196,7 +1196,7 @@ let apply_internal_operations ctxt mode ~payer ~chain_id ~mapped_keys ops =
               ctxt
               ( Internal_manager_operation_result (op, Applied result)
               :: applied )
-              (rest @ emitted)
+              (emitted @ rest)
               mapped_keys )
     | Internal_baker_operation ({baker; operation; nonce} as op) :: rest -> (
         ( if internal_nonce_already_recorded ctxt nonce then
@@ -1217,7 +1217,7 @@ let apply_internal_operations ctxt mode ~payer ~chain_id ~mapped_keys ops =
             apply
               ctxt
               (Internal_baker_operation_result (op, Applied result) :: applied)
-              (rest @ emitted)
+              (emitted @ rest)
               mapped_keys )
   in
   apply ctxt [] ops mapped_keys
