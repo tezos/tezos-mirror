@@ -1,0 +1,23 @@
+(library
+ (name tezos_client_sapling_008_PtEdo2Zk)
+ (public_name tezos-client-sapling-008-PtEdo2Zk)
+ (libraries tezos-base
+            tezos-crypto
+            tezos-client-base
+            tezos-signer-backends
+            tezos-client-008-PtEdo2Zk
+            tezos-client-008-PtEdo2Zk-commands
+            tezos-protocol-008-PtEdo2Zk)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_client_base
+                   -open Tezos_client_008_PtEdo2Zk
+                   -open Tezos_client_008_PtEdo2Zk_commands
+                   -open Tezos_protocol_008_PtEdo2Zk
+                   -open Tezos_protocol_environment_008_PtEdo2Zk)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
