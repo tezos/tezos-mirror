@@ -21,7 +21,7 @@ for PROTO_DIR in $(find tests_python/ -maxdepth 1 -mindepth 1 -iname 'tests_*' |
 integration:${PROTO_DIR_BASE}_fast:
   extends: .integration_python_template
   script:
-    - poetry run pytest ${PROTO_DIR##tests_python/} -k "not slow" -s --log-dir=tmp
+    - poetry run pytest ${PROTO_DIR##tests_python/} -k "not slow" -s --log-dir=tmp 2&>1 | tee tmp/${PROTO_DIR_BASE}_fast.out | tail
   stage: test
 
 EOF
@@ -46,7 +46,7 @@ EOF
 integration:${PROTO_DIR_BASE}_${testname}:
   extends: .integration_python_template
   script:
-    - poetry run pytest ${test} -s --log-dir=tmp
+    - poetry run pytest ${test} -s --log-dir=tmp 2>&1 | tee tmp/${PROTO_DIR_BASE}_${testname}.out | tail
   stage: test
 
 EOF
