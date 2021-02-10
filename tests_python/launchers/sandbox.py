@@ -5,6 +5,7 @@ from typing import Callable, Dict, List, Tuple
 from client.client import Client
 from daemons.baker import Baker
 from daemons.endorser import Endorser
+from daemons.accuser import Accuser
 from daemons.node import Node
 
 NODE = 'tezos-node'
@@ -12,6 +13,7 @@ CLIENT = 'tezos-client'
 CLIENT_ADMIN = 'tezos-admin-client'
 BAKER = 'tezos-baker'
 ENDORSER = 'tezos-endorser'
+ACCUSER = 'tezos-accuser'
 
 
 class Sandbox:
@@ -91,6 +93,7 @@ class Sandbox:
         # bakers for each protocol
         self.bakers = {}  # type: Dict[str, Dict[int, Baker]]
         self.endorsers = {}  # type: Dict[str, Dict[int, Endorser]]
+        self.accusers = {}  # type: Dict[str, Dict[int, Accuser]]
         self.counter = 0
         self.logs = []  # type: List[str]
         self.singleprocess = singleprocess
@@ -479,6 +482,52 @@ class Sandbox:
         assert endorser.poll() is None, 'seems endorser failed at startup'
         self.endorsers[proto][node_id] = endorser
 
+    def add_accuser(
+        self,
+        node_id: int,
+        proto: str,
+        branch: str = "",
+    ) -> None:
+        """
+        Add an accuser associated to a node.
+
+        Args:
+            node_id (int): id of corresponding node
+            proto (str): name of protocol, used to determine the binary to
+                         use. E.g. 'alpha` for `tezos-accuser-alpha`.
+            branch (str): see branch parameter for `add_node()`
+        """
+        assert node_id in self.nodes, f'No node running with id={node_id}'
+        if proto not in self.accusers:
+            self.accusers[proto] = {}
+
+        assert_msg = f'Already an accuser for proto={proto} and id={node_id}'
+        assert node_id not in self.accusers[proto], assert_msg
+        accuser_path = self._wrap_path(ACCUSER, branch, proto)
+        node = self.nodes[node_id]
+        client = self.clients[node_id]
+        rpc_node = node.rpc_port
+
+        log_file = None
+        if self.log_dir:
+            log_file = (
+                f'{self.log_dir}/accuser-{proto}_{node_id}_#'
+                f'{self.counter}.txt'
+            )
+            self.logs.append(log_file)
+            self.counter += 1
+        params = ['run']
+        accuser = Accuser(
+            accuser_path,
+            rpc_node,
+            client.base_dir,
+            params=params,
+            log_file=log_file,
+        )
+        time.sleep(0.1)
+        assert accuser.poll() is None, 'seems accuser failed at startup'
+        self.accusers[proto][node_id] = accuser
+
     def rm_baker(self, node_id: int, proto: str) -> None:
         """Kill baker for given node_id and proto"""
         baker = self.bakers[proto][node_id]
@@ -637,9 +686,19 @@ class SandboxMultiBranch(Sandbox):
         endorsement_delay: int = 0,
         branch: str = "",
     ) -> None:
-        """branchs is overridden by branch_map"""
+        """branch is overridden by branch_map"""
         branch = self._branch_map[node_id]
         super().add_endorser(node_id, account, proto, endorsement_delay, branch)
+
+    def add_accuser(
+        self,
+        node_id: int,
+        proto: str,
+        branch: str = "",
+    ) -> None:
+        """branch is overridden by branch_map"""
+        branch = self._branch_map[node_id]
+        super().add_accuser(node_id, proto, branch)
 
     def add_node(
         self,
