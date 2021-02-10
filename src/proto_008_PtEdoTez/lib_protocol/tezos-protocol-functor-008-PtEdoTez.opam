@@ -19,6 +19,5 @@ build: [
     "008_PtEdoTez"
   ]
   ["dune" "build" "-p" name "-j" jobs]
-  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos/Protocol: economic-protocol definition parameterized by its environment implementation"

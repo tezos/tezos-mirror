@@ -22,7 +22,7 @@ depopts: [
   "tezos-client-005-PsBabyM1"
   "tezos-client-006-PsCARTHA"
   "tezos-client-007-PsDELPH1"
-  "tezos-client-008-PtEdoTez"
+  "tezos-client-008-PtEdo2Zk"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
