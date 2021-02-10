@@ -23,5 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Trace = Tezos_error_monad.Error_monad.TzTrace
-include Traced_structs.Structs.Make (Trace)
+module Bare = Bare_structs.Structs
+module Traced (Trace : Traced_sigs.Trace.S) =
+  Traced_structs.Structs.Make (Trace)
+module TzLwtreslib =
+  Traced_structs.Structs.Make (Tezos_error_monad.Error_monad.TzTrace)
