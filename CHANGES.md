@@ -6,19 +6,21 @@ particular in `docs/protocols/alpha.rst`.
 
 # Development Version
 
-When you make a commit on master, you can add an item in one of the following
-subsections (node, client, ...) to document your commit or the set of related commits.
-This will ensure that this change is not forgotten in the final changelog.
-By having your commits update this file you also make it easy
-to find the commits which are related to your changes using `git blame`.
+When you make a commit on master, you can add an item in one of the
+following subsections (node, client, ...) to document your commit or
+the set of related commits. This will ensure that this change is not
+forgotten in the final changelog.  By having your commits update this
+file you also make it easy to find the commits which are related to
+your changes using `git blame`.
 
 Only describe changes which affect users (bug fixes and new features),
-not refactorings or tests. Changes to the documentation do not need to be documented
-here either.
+not refactorings or tests. Changes to the documentation do not need to
+be documented here either.
 
 ## Node
 
 - Cap the number of expected connections to `100` on the command line
+  interface.
 
 - Fixes a bug that launched the prevalidator when the node was not
   bootstrapped.
@@ -26,8 +28,8 @@ here either.
 - Enforce loading of non-embedded protocols before starting the node
   allowing the prevalidator to start correctly.
 
-- Optimized the I/O and CPU usage by removing an unnecessary access to
-  the context during block validation.
+- Optimize I/O and CPU usage by removing an unnecessary access to the
+  context during block validation.
 
 - Fixes a bug where any event would allocate more memory than needed
   when it were not to be printed.
@@ -66,7 +68,7 @@ here either.
 
 ## Miscellaneous
 
-- Make sure file decriptors are opened with the `O_CLOEXEC` flag.
+- Make sure file descriptors are opened with the `O_CLOEXEC` flag.
 
 # Version 8.2
 
