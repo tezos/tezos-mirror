@@ -427,7 +427,7 @@ class Sandbox:
         node_id: int,
         account: str,
         proto: str,
-        endorsement_delay: float = 0.0,
+        endorsement_delay: int = 0,
         branch: str = "",
     ) -> None:
         """
@@ -634,7 +634,7 @@ class SandboxMultiBranch(Sandbox):
         node_id: int,
         account: str,
         proto: str,
-        endorsement_delay: float = 0.0,
+        endorsement_delay: int = 0,
         branch: str = "",
     ) -> None:
         """branchs is overridden by branch_map"""
