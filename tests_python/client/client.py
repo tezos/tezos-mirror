@@ -640,6 +640,9 @@ class Client:
     def get_block(self, block_hash) -> dict:
         return self.rpc('get', f'/chains/main/blocks/{block_hash}')
 
+    def get_operations(self, block_hash='head') -> dict:
+        return self.rpc('get', f'/chains/main/blocks/{block_hash}/operations')
+
     def get_ballot_list(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head/votes/ballot_list')
 
