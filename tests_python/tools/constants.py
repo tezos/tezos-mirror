@@ -89,9 +89,9 @@ DELPHI = "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo"
 DELPHI_DAEMON = "007-PsDELPH1"
 DELPHI_PARAMETERS = get_parameters("007_PsDELPH1")
 
-EDO = "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq"
-EDO_DAEMON = "008-PtEdoTez"
-EDO_PARAMETERS = get_parameters("008_PtEdoTez")
+EDO = "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
+EDO_DAEMON = "008-PtEdo2Zk"
+EDO_PARAMETERS = get_parameters("008_PtEdo2Zk")
 
 TEZOS_CRT = """
 Certificate:

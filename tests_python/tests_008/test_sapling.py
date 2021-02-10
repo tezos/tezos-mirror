@@ -7,7 +7,7 @@ from tools.utils import assert_run_failure
 from . import contract_paths
 from . import protocol
 
-PROTO = "008_PtEdoTez"
+PROTO = "008_PtEdo2Zk"
 CONTRACT_PATH = path.join(
     paths.TEZOS_HOME, 'src', f'proto_{PROTO}', 'lib_protocol', 'test'
 )

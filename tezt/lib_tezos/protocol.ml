@@ -43,7 +43,7 @@ let hash = function
   | Alpha ->
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Edo ->
-      "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq"
+      "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
   | Delphi ->
       "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo"
   | Carthage ->
@@ -53,7 +53,7 @@ let parameter_file = function
   | Alpha ->
       "src/proto_alpha/parameters/sandbox-parameters.json"
   | Edo ->
-      "src/proto_008_PtEdoTez/parameters/sandbox-parameters.json"
+      "src/proto_008_PtEdo2Zk/parameters/sandbox-parameters.json"
   | Delphi ->
       "src/proto_007_PsDELPH1/parameters/sandbox-parameters.json"
   | Carthage ->
@@ -63,7 +63,7 @@ let accuser = function
   | Alpha ->
       "./tezos-accuser-alpha"
   | Edo ->
-      "./tezos-accuser-008-PtEdoTez"
+      "./tezos-accuser-008-PtEdo2Zk"
   | Delphi ->
       "./tezos-accuser-007-PsDELPH1"
   | Carthage ->
