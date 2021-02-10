@@ -217,8 +217,8 @@ unit:alltest:
     - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_protocol 006_PsCARTHA_lib_protocol
     - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_client 007_PsDELPH1_lib_client
     - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_protocol 007_PsDELPH1_lib_protocol
-    - scripts/test_wrapper.sh src/proto_008_PtEdoTez/lib_client 008_PtEdoTez_lib_client
-    - scripts/test_wrapper.sh src/proto_008_PtEdoTez/lib_protocol 008_PtEdoTez_lib_protocol
+    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
+    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_protocol 008_PtEdo2Zk_lib_protocol
     - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
     - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
     - scripts/test_wrapper.sh src/tooling src_tooling
@@ -748,10 +748,10 @@ opam:tezos-007-PsDELPH1-test-helpers:
   variables:
     package: tezos-007-PsDELPH1-test-helpers
 
-opam:tezos-008-PtEdoTez-test-helpers:
+opam:tezos-008-PtEdo2Zk-test-helpers:
   <<: *opam_definition
   variables:
-    package: tezos-008-PtEdoTez-test-helpers
+    package: tezos-008-PtEdo2Zk-test-helpers
 
 opam:tezos-accuser-006-PsCARTHA:
   <<: *opam_definition
@@ -773,15 +773,15 @@ opam:tezos-accuser-007-PsDELPH1-commands:
   variables:
     package: tezos-accuser-007-PsDELPH1-commands
 
-opam:tezos-accuser-008-PtEdoTez:
+opam:tezos-accuser-008-PtEdo2Zk:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-008-PtEdoTez
+    package: tezos-accuser-008-PtEdo2Zk
 
-opam:tezos-accuser-008-PtEdoTez-commands:
+opam:tezos-accuser-008-PtEdo2Zk-commands:
   <<: *opam_definition
   variables:
-    package: tezos-accuser-008-PtEdoTez-commands
+    package: tezos-accuser-008-PtEdo2Zk-commands
 
 opam:tezos-accuser-alpha:
   <<: *opam_definition
@@ -808,10 +808,10 @@ opam:tezos-baker-007-PsDELPH1:
   variables:
     package: tezos-baker-007-PsDELPH1
 
-opam:tezos-baker-008-PtEdoTez:
+opam:tezos-baker-008-PtEdo2Zk:
   <<: *opam_definition
   variables:
-    package: tezos-baker-008-PtEdoTez
+    package: tezos-baker-008-PtEdo2Zk
 
 opam:tezos-baker-alpha:
   <<: *opam_definition
@@ -838,15 +838,15 @@ opam:tezos-baking-007-PsDELPH1-commands:
   variables:
     package: tezos-baking-007-PsDELPH1-commands
 
-opam:tezos-baking-008-PtEdoTez:
+opam:tezos-baking-008-PtEdo2Zk:
   <<: *opam_definition
   variables:
-    package: tezos-baking-008-PtEdoTez
+    package: tezos-baking-008-PtEdo2Zk
 
-opam:tezos-baking-008-PtEdoTez-commands:
+opam:tezos-baking-008-PtEdo2Zk-commands:
   <<: *opam_definition
   variables:
-    package: tezos-baking-008-PtEdoTez-commands
+    package: tezos-baking-008-PtEdo2Zk-commands
 
 opam:tezos-baking-alpha:
   <<: *opam_definition
@@ -968,20 +968,20 @@ opam:tezos-client-007-PsDELPH1-commands-registration:
   variables:
     package: tezos-client-007-PsDELPH1-commands-registration
 
-opam:tezos-client-008-PtEdoTez:
+opam:tezos-client-008-PtEdo2Zk:
   <<: *opam_definition
   variables:
-    package: tezos-client-008-PtEdoTez
+    package: tezos-client-008-PtEdo2Zk
 
-opam:tezos-client-008-PtEdoTez-commands:
+opam:tezos-client-008-PtEdo2Zk-commands:
   <<: *opam_definition
   variables:
-    package: tezos-client-008-PtEdoTez-commands
+    package: tezos-client-008-PtEdo2Zk-commands
 
-opam:tezos-client-008-PtEdoTez-commands-registration:
+opam:tezos-client-008-PtEdo2Zk-commands-registration:
   <<: *opam_definition
   variables:
-    package: tezos-client-008-PtEdoTez-commands-registration
+    package: tezos-client-008-PtEdo2Zk-commands-registration
 
 opam:tezos-client-alpha:
   <<: *opam_definition
@@ -1028,10 +1028,10 @@ opam:tezos-client-genesis-carthagenet:
   variables:
     package: tezos-client-genesis-carthagenet
 
-opam:tezos-client-sapling-008-PtEdoTez:
+opam:tezos-client-sapling-008-PtEdo2Zk:
   <<: *opam_definition
   variables:
-    package: tezos-client-sapling-008-PtEdoTez
+    package: tezos-client-sapling-008-PtEdo2Zk
 
 opam:tezos-codec:
   <<: *opam_definition
@@ -1088,6 +1088,11 @@ opam:tezos-embedded-protocol-007-PsDELPH1:
   variables:
     package: tezos-embedded-protocol-007-PsDELPH1
 
+opam:tezos-embedded-protocol-008-PtEdo2Zk:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-008-PtEdo2Zk
+
 opam:tezos-embedded-protocol-008-PtEdoTez:
   <<: *opam_definition
   variables:
@@ -1138,15 +1143,15 @@ opam:tezos-endorser-007-PsDELPH1-commands:
   variables:
     package: tezos-endorser-007-PsDELPH1-commands
 
-opam:tezos-endorser-008-PtEdoTez:
+opam:tezos-endorser-008-PtEdo2Zk:
   <<: *opam_definition
   variables:
-    package: tezos-endorser-008-PtEdoTez
+    package: tezos-endorser-008-PtEdo2Zk
 
-opam:tezos-endorser-008-PtEdoTez-commands:
+opam:tezos-endorser-008-PtEdo2Zk-commands:
   <<: *opam_definition
   variables:
-    package: tezos-endorser-008-PtEdoTez-commands
+    package: tezos-endorser-008-PtEdo2Zk-commands
 
 opam:tezos-endorser-alpha:
   <<: *opam_definition
@@ -1288,20 +1293,25 @@ opam:tezos-protocol-007-PsDELPH1-tests:
   variables:
     package: tezos-protocol-007-PsDELPH1-tests
 
+opam:tezos-protocol-008-PtEdo2Zk:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-008-PtEdo2Zk
+
+opam:tezos-protocol-008-PtEdo2Zk-parameters:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-008-PtEdo2Zk-parameters
+
+opam:tezos-protocol-008-PtEdo2Zk-tests:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-008-PtEdo2Zk-tests
+
 opam:tezos-protocol-008-PtEdoTez:
   <<: *opam_definition
   variables:
     package: tezos-protocol-008-PtEdoTez
-
-opam:tezos-protocol-008-PtEdoTez-parameters:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-008-PtEdoTez-parameters
-
-opam:tezos-protocol-008-PtEdoTez-tests:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-008-PtEdoTez-tests
 
 opam:tezos-protocol-alpha:
   <<: *opam_definition
@@ -1398,6 +1408,11 @@ opam:tezos-protocol-functor-007-PsDELPH1:
   variables:
     package: tezos-protocol-functor-007-PsDELPH1
 
+opam:tezos-protocol-functor-008-PtEdo2Zk:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-functor-008-PtEdo2Zk
+
 opam:tezos-protocol-functor-008-PtEdoTez:
   <<: *opam_definition
   variables:
@@ -1448,15 +1463,15 @@ opam:tezos-protocol-plugin-007-PsDELPH1-registerer:
   variables:
     package: tezos-protocol-plugin-007-PsDELPH1-registerer
 
-opam:tezos-protocol-plugin-008-PtEdoTez:
+opam:tezos-protocol-plugin-008-PtEdo2Zk:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-plugin-008-PtEdoTez
+    package: tezos-protocol-plugin-008-PtEdo2Zk
 
-opam:tezos-protocol-plugin-008-PtEdoTez-registerer:
+opam:tezos-protocol-plugin-008-PtEdo2Zk-registerer:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-plugin-008-PtEdoTez-registerer
+    package: tezos-protocol-plugin-008-PtEdo2Zk-registerer
 
 opam:tezos-protocol-updater:
   <<: *opam_definition
