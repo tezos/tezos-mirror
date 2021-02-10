@@ -1,3 +1,24 @@
+# Version 8.2
+
+## Node
+
+- Override PtEdoTez activation by PtEdo2Zk in `mainnet` network.
+
+- Make size limits on p2p messages explicit in low-level encodings.
+
+- Add new RPCs for Edo: `helpers/scripts/normalize_{data,script,type}`
+  and a `XXX/normalized` variant to each protocol RPC `XXX`
+  outputting Michelson expressions.
+
+## Baker / Endorser / Accuser
+
+- Replace PtEdoTez by PtEdo2Zk.
+
+## Miscellaneous
+
+- Update external opam dependencies. In particular, switch to `hacl-star.0.3.0-1`
+  which performs better.
+
 # Version 8.1
 
 ## Node
