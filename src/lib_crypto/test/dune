@@ -20,7 +20,7 @@
             crowbar)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
-                   -open Tezos_lwt_result_stdlib.Lwtreslib
+                   -open Tezos_error_monad.TzLwtreslib
                    -open Data_encoding)))
 
 (rule

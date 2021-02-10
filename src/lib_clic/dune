@@ -3,7 +3,7 @@
  (public_name tezos-clic)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_error_monad
-                   -open Tezos_lwt_result_stdlib.Lwtreslib
+                   -open Tezos_error_monad.TzLwtreslib
                    ))
  (libraries tezos-stdlib
             lwt

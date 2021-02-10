@@ -12,7 +12,6 @@ depends: [
   "tezos-crypto"
   "data-encoding" { >= "0.3" & < "0.4" }
   "tezos-error-monad"
-  "tezos-lwt-result-stdlib"
   "tezos-event-logging"
   "tezos-micheline"
   "tezos-rpc"

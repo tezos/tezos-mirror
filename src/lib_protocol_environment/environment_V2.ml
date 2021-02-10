@@ -138,7 +138,7 @@ struct
   module Int64 = Int64
   module Buffer = Buffer
   module Format = Format
-  module Option = Tezos_lwt_result_stdlib.Lwtreslib.Option
+  module Option = Tezos_error_monad.TzLwtreslib.Option
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest

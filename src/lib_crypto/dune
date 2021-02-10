@@ -4,7 +4,7 @@
  (flags (:standard -open Tezos_stdlib
                    -open Data_encoding
                    -open Tezos_error_monad
-                   -open Tezos_lwt_result_stdlib.Lwtreslib
+                   -open Tezos_error_monad.TzLwtreslib
                    -open Tezos_rpc))
  (libraries data-encoding
             tezos-lwt-result-stdlib

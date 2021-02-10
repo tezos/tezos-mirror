@@ -30,25 +30,18 @@ include Tezos_clic
 include Tezos_crypto
 include Tezos_micheline
 module Data_encoding = Data_encoding
-module Seq = Tezos_lwt_result_stdlib.Lwtreslib.Seq
-module Map = Tezos_lwt_result_stdlib.Lwtreslib.Map
-module Set = Tezos_lwt_result_stdlib.Lwtreslib.Set
-module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl
-module Option = Tezos_lwt_result_stdlib.Lwtreslib.Option
+include Tezos_error_monad.TzLwtreslib
 
 module List = struct
   include Tezos_stdlib.TzList
-  include Tezos_lwt_result_stdlib.Lwtreslib.List
+  include Tezos_error_monad.TzLwtreslib.List
 end
-
-module Result = Tezos_lwt_result_stdlib.Lwtreslib.Result
-module WithExceptions = Tezos_lwt_result_stdlib.Lwtreslib.WithExceptions
 
 module String = struct
   include String
   include Tezos_stdlib.TzString
 
-  module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.MakeSeeded (struct
+  module Hashtbl = Tezos_error_monad.TzLwtreslib.Hashtbl.MakeSeeded (struct
     type t = string
 
     let equal = String.equal

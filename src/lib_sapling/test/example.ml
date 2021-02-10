@@ -21,7 +21,7 @@
  * SOFTWARE. *)
 
 open Tezos_error_monad.Error_monad
-open Tezos_lwt_result_stdlib.Lwtreslib
+open Tezos_error_monad.TzLwtreslib
 
 module Client = struct
   module Core = Core.Client

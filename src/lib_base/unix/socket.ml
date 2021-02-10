@@ -112,7 +112,7 @@ let bind ?(backlog = 10) = function
             Lwt_unix.listen sock backlog ;
             return sock
           in
-          Tezos_lwt_result_stdlib.Lwtreslib.List.map_es do_bind addrs )
+          Tezos_error_monad.TzLwtreslib.List.map_es do_bind addrs )
 
 (* To get the encoding/decoding errors into scope. *)
 open Data_encoding_wrapper

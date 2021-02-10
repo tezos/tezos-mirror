@@ -4,7 +4,7 @@
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_clic
                    -open Tezos_error_monad
-                   -open Tezos_lwt_result_stdlib.Lwtreslib
+                   -open Tezos_error_monad.TzLwtreslib
                    ))
  (libraries tezos-clic
             tezos-stdlib-unix
