@@ -1,0 +1,41 @@
+(executables
+ (names test)
+ (libraries tezos-base
+            tezos-store
+	    tezos-legacy-store
+            tezos-stdlib-unix
+            tezos-embedded-protocol-demo-noops
+            tezos-embedded-protocol-genesis
+            tezos-embedded-protocol-alpha
+            tezos-protocol-alpha-parameters
+            tezos-validation
+            alcotest-lwt)
+ (flags (:standard -open Tezos_base__TzPervasives
+          -open Tezos_store
+          -open Tezos_shell_services
+          -open Tezos_stdlib_unix
+          -open Tezos_validation
+          -open Tezos_protocol_alpha_parameters)))
+
+(rule
+ (alias runtest_store)
+ (action
+  (setenv SLOW_TEST false
+   (run %{exe:test.exe}))))
+
+(rule
+ (alias runtest_store_slow)
+ (action
+  (setenv SLOW_TEST true
+   (run %{exe:test.exe}))))
+
+(alias
+ (name runtest)
+ (package tezos-store)
+ (deps
+  (alias runtest_store)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

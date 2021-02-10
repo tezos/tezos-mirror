@@ -53,7 +53,6 @@ type result = {
   ops_metadata : Bytes.t list list;
   block_metadata_hash : Block_metadata_hash.t option;
   ops_metadata_hashes : Operation_metadata_hash.t list list option;
-  forking_testchain : bool;
 }
 
 let update_testchain_status ctxt predecessor_header timestamp =
@@ -73,11 +72,6 @@ let update_testchain_status ctxt predecessor_header timestamp =
       Context.add_test_chain
         ctxt
         (Running {chain_id; genesis; protocol; expiration})
-
-let is_testchain_forking ctxt =
-  Context.get_test_chain ctxt
-  >>= function
-  | Not_running | Running _ -> Lwt.return_false | Forking _ -> Lwt.return_true
 
 let init_test_chain ctxt forked_header =
   Context.get_test_chain ctxt
@@ -108,37 +102,32 @@ let result_encoding =
            block_metadata;
            ops_metadata;
            block_metadata_hash;
-           ops_metadata_hashes;
-           forking_testchain } ->
+           ops_metadata_hashes } ->
       ( validation_store,
         block_metadata,
         ops_metadata,
         block_metadata_hash,
-        ops_metadata_hashes,
-        forking_testchain ))
+        ops_metadata_hashes ))
     (fun ( validation_store,
            block_metadata,
            ops_metadata,
            block_metadata_hash,
-           ops_metadata_hashes,
-           forking_testchain ) ->
+           ops_metadata_hashes ) ->
       {
         validation_store;
         block_metadata;
         ops_metadata;
         block_metadata_hash;
         ops_metadata_hashes;
-        forking_testchain;
       })
-    (obj6
+    (obj5
        (req "validation_store" validation_store_encoding)
        (req "block_metadata" bytes)
-       (req "ops_metadata" (list @@ list @@ bytes))
+       (req "ops_metadata" (list (list bytes)))
        (opt "block_metadata_hash" Block_metadata_hash.encoding)
        (opt
           "ops_metadata_hashes"
-          (list @@ list @@ Operation_metadata_hash.encoding))
-       (req "forking_testchain" bool))
+          (list @@ list @@ Operation_metadata_hash.encoding)))
 
 let may_force_protocol_upgrade ~user_activated_upgrades ~level
     (validation_result : Tezos_protocol_environment.validation_result) =
@@ -346,15 +335,6 @@ module Make (Proto : Registered_protocol.T) = struct
           | Ok o ->
               return o)
     >>=? fun (validation_result, block_data, ops_metadata) ->
-    (* reset_test_chain
-     *   validation_result.context
-     *   current_block_header
-     *   ~start_testchain >>=? fun forked_genesis_header -> *)
-    let context =
-      Shell_context.unwrap_disk_context validation_result.context
-    in
-    is_testchain_forking context
-    >>= fun forking_testchain ->
     may_patch_protocol
       ~user_activated_upgrades
       ~user_activated_protocol_overrides
@@ -467,7 +447,6 @@ module Make (Proto : Registered_protocol.T) = struct
         ops_metadata;
         block_metadata_hash;
         ops_metadata_hashes;
-        forking_testchain;
       }
 end
 

@@ -59,7 +59,7 @@ let chain_arg =
 type block =
   [ `Genesis
   | `Head of int
-  | `Alias of [`Caboose | `Checkpoint | `Save_point] * int
+  | `Alias of [`Caboose | `Checkpoint | `Savepoint] * int
   | `Hash of Block_hash.t * int
   | `Level of Int32.t ]
 
@@ -100,11 +100,11 @@ let parse_block s =
     | (["checkpoint"; n], '+') ->
         Ok (`Alias (`Checkpoint, -int_of_string n))
     | (["save_point"], _) ->
-        Ok (`Alias (`Save_point, 0))
+        Ok (`Alias (`Savepoint, 0))
     | (["save_point"; n], '~') | (["save_point"; n], '-') ->
-        Ok (`Alias (`Save_point, int_of_string n))
+        Ok (`Alias (`Savepoint, int_of_string n))
     | (["save_point"; n], '+') ->
-        Ok (`Alias (`Save_point, -int_of_string n))
+        Ok (`Alias (`Savepoint, -int_of_string n))
     | (["caboose"], _) ->
         Ok (`Alias (`Caboose, 0))
     | (["caboose"; n], '~') | (["caboose"; n], '-') ->
@@ -131,7 +131,7 @@ let parse_block s =
 let alias_to_string = function
   | `Checkpoint ->
       "checkpoint"
-  | `Save_point ->
+  | `Savepoint ->
       "save_point"
   | `Caboose ->
       "caboose"

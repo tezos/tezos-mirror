@@ -56,7 +56,6 @@ type result = {
   ops_metadata : Bytes.t list list;
   block_metadata_hash : Block_metadata_hash.t option;
   ops_metadata_hashes : Operation_metadata_hash.t list list option;
-  forking_testchain : bool;
 }
 
 val result_encoding : result Data_encoding.t

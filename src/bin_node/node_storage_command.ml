@@ -63,18 +63,24 @@ module Term = struct
         Lwt_unix.file_exists context_dir
         >>= function
         | false ->
-            fail (Node_data_version.Invalid_data_dir context_dir)
+            fail
+              (Node_data_version.Invalid_data_dir
+                 {data_dir = context_dir; msg = None})
         | true -> (
             let pack = context_dir // "store.pack" in
             Lwt_unix.file_exists pack
             >>= function
             | false ->
-                fail (Node_data_version.Invalid_data_dir context_dir)
+                fail
+                  (Node_data_version.Invalid_data_dir
+                     {data_dir = context_dir; msg = None})
             | true ->
                 return_unit ))
       (function
         | Unix.Unix_error _ ->
-            fail (Node_data_version.Invalid_data_dir context_dir)
+            fail
+              (Node_data_version.Invalid_data_dir
+                 {data_dir = context_dir; msg = None})
         | exc ->
             raise exc)
 
@@ -117,32 +123,36 @@ module Term = struct
     return_unit
 
   let to_context_hash chain_store (hash : Block_hash.t) =
-    let block_store = Store.Block.get chain_store in
-    Store.Block.Contents.read (block_store, hash)
-    >>=? fun block_header -> return block_header.context
+    Store.Block.read_block chain_store hash
+    >>=? fun block -> return (Store.Block.context_hash block)
 
   let current_head config_file data_dir block =
     read_config_file config_file
     >>=? fun cfg ->
+    let ({genesis; _} : Node_config_file.blockchain_network) =
+      cfg.blockchain_network
+    in
     let data_dir = Option.value ~default:cfg.data_dir data_dir in
-    let store_root = Node_data_version.store_dir data_dir in
-    Store.init store_root
+    let store_dir = Node_data_version.store_dir data_dir in
+    let context_dir = Node_data_version.context_dir data_dir in
+    Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
     >>=? fun store ->
     let genesis = cfg.blockchain_network.genesis in
     let chain_id = Chain_id.of_block_hash genesis.block in
-    let chain_store = Store.Chain.get store chain_id in
+    Store.get_chain_store store chain_id
+    >>=? fun chain_store ->
     let to_context_hash = to_context_hash chain_store in
     ( match block with
     | Some block ->
         Lwt.return (Block_hash.of_b58check block)
     | None ->
-        let chain_data = Store.Chain_data.get chain_store in
-        Store.Chain_data.Current_head.read chain_data )
+        Store.Chain.current_head chain_store
+        >>= fun head -> return (Store.Block.hash head) )
     >>=? fun block_hash ->
     to_context_hash block_hash
     >>=? fun context_hash ->
-    Store.close store ;
-    return (Context_hash.to_b58check context_hash)
+    Store.close_store store
+    >>= fun () -> return (Context_hash.to_b58check context_hash)
 
   let integrity_check_inodes config_file data_dir block =
     root config_file data_dir
