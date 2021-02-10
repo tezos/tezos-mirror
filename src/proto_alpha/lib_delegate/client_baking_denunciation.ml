@@ -87,14 +87,24 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
       let chain = `Hash chain_id in
       match (protocol_data, receipt) with
       | ( Operation_data
-            ({contents = Single (Endorsement _); _} as protocol_data),
+            { contents =
+                Single
+                  (Endorsement_with_slot
+                    { endorsement =
+                        { protocol_data =
+                            {contents = Single (Endorsement _); _} as
+                            protocol_data;
+                          _ };
+                      _ });
+              _ },
           Some
             Apply_results.(
               Operation_metadata
                 { contents =
                     Single_result
-                      (Endorsement_result {delegate; slots = slot :: _; _}) })
-        ) -> (
+                      (Endorsement_with_slot_result
+                        (Endorsement_result {delegate; slots = slot :: _; _}))
+                }) ) -> (
           let new_endorsement : Kind.endorsement Alpha_context.operation =
             {shell; protocol_data}
           in
