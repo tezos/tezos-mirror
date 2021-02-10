@@ -376,6 +376,11 @@ opam:tezos-codec:
   variables:
     package: tezos-codec
 
+opam:tezos-context:
+  extends: .opam_template
+  variables:
+    package: tezos-context
+
 opam:tezos-crypto:
   extends: .opam_template
   variables:
@@ -505,6 +510,11 @@ opam:tezos-event-logging:
   extends: .opam_template
   variables:
     package: tezos-event-logging
+
+opam:tezos-legacy-store:
+  extends: .opam_template
+  variables:
+    package: tezos-legacy-store
 
 opam:tezos-lmdb:
   extends: .opam_template
@@ -926,10 +936,10 @@ opam:tezos-stdlib-unix:
   variables:
     package: tezos-stdlib-unix
 
-opam:tezos-storage:
+opam:tezos-store:
   extends: .opam_template
   variables:
-    package: tezos-storage
+    package: tezos-store
 
 opam:tezos-test-services:
   extends: .opam_template

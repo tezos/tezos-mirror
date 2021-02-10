@@ -49,6 +49,7 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_clic clic
     - scripts/test_wrapper.sh src/lib_client_base client_base
     - scripts/test_wrapper.sh src/lib_client_base_unix client_base_unix
+    - scripts/test_wrapper.sh src/lib_context context
     - scripts/test_wrapper.sh src/lib_crypto crypto
     - scripts/test_wrapper.sh src/lib_error_monad error_monad
     - scripts/test_wrapper.sh src/lib_lwt_result_stdlib lwt_result_stdlib
@@ -64,7 +65,8 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_signer_backends signer_backends
     - scripts/test_wrapper.sh src/lib_signer_backends/unix signer_backends_unix
     - scripts/test_wrapper.sh src/lib_stdlib stdlib
-    - scripts/test_wrapper.sh src/lib_storage storage
+    - scripts/test_wrapper.sh src/lib_store/legacy_store store_legacy_store
+    - scripts/test_wrapper.sh src/lib_store store
     - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_client 006_PsCARTHA_lib_client
     - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_client 007_PsDELPH1_lib_client
     - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
