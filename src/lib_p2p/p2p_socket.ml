@@ -158,7 +158,7 @@ module Connection_message = struct
       @@ Data_encoding.Binary.make_writer_state
            buf
            ~offset:Crypto.header_length
-           ~allowed_bytes:len
+           ~allowed_bytes:encoded_message_len
     in
     match Data_encoding.Binary.write encoding message state with
     | Error we ->
