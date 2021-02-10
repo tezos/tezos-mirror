@@ -7,6 +7,7 @@
         test_blake2b
         test_pvss
         test_crypto_box
+        test_prop_signature_pk
         test_prop_signature
         test_prop_hacl_hash
         test_deterministic_nonce
