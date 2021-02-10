@@ -185,6 +185,8 @@ module Block : sig
 
   val read : Chain.t -> Block_hash.t -> t tzresult Lwt.t
 
+  val read_contents_opt : t -> Legacy_store.Block.contents option Lwt.t
+
   val read_opt : Chain.t -> Block_hash.t -> t option Lwt.t
 
   (** Will return the full block if the block has never been cleaned

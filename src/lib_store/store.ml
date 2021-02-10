@@ -2847,4 +2847,225 @@ module Unsafe = struct
     let chain_config = {history_mode; genesis; expiration = None} in
     Stored_data.write_file (Naming.chain_config_file chain_dir) chain_config
     >>=? fun () -> return_unit
+
+  let restore_from_legacy_snapshot ?(notify = fun () -> Lwt.return_unit)
+      store_dir ~context_index ~genesis ~genesis_context_hash
+      ~floating_blocks_stream ~new_head_with_metadata ~partial_protocol_levels
+      ~history_mode =
+    let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+    let chain_dir = Naming.chain_dir store_dir chain_id in
+    let genesis_block =
+      Block_repr.create_genesis_block ~genesis genesis_context_hash
+    in
+    let new_head_descr =
+      ( Block_repr.hash new_head_with_metadata,
+        Block_repr.level new_head_with_metadata )
+    in
+    (* Write consistent stored data *)
+    (* We will write protocol levels when we have access to blocks to
+       retrieve necessary infos *)
+    Stored_data.write_file
+      (Naming.current_head_file chain_dir)
+      (Block.descriptor new_head_with_metadata)
+    >>=? fun () ->
+    Stored_data.write_file (Naming.alternate_heads_file chain_dir) []
+    >>=? fun () ->
+    (* Checkpoint is the new head *)
+    Stored_data.write_file (Naming.checkpoint_file chain_dir) new_head_descr
+    >>=? fun () ->
+    (* Cementing highwatermark is the new head *)
+    Stored_data.write_file (Naming.cementing_highwatermark_file chain_dir) None
+    >>=? fun () ->
+    Stored_data.write_file (Naming.target_file chain_dir) None
+    >>=? fun () ->
+    (* Savepoint is the head *)
+    Stored_data.write_file (Naming.savepoint_file chain_dir) new_head_descr
+    >>=? fun () ->
+    (* Depending on the history mode, set the caboose properly *)
+    ( match history_mode with
+    | History_mode.Archive | Full _ ->
+        return genesis_block
+    | Rolling _ -> (
+        Lwt_stream.peek floating_blocks_stream
+        >>= function
+        | None ->
+            (* This should not happen. It is ensured, by construction
+               when exporting a (valid) snapshot. *)
+            assert false
+        | Some caboose ->
+            return caboose ) )
+    >>=? fun caboose ->
+    let caboose_descr = Block.descriptor caboose in
+    Stored_data.write_file (Naming.caboose_file chain_dir) caboose_descr
+    >>=? fun () ->
+    Stored_data.write_file
+      (Naming.invalid_blocks_file chain_dir)
+      Block_hash.Map.empty
+    >>=? fun () ->
+    Stored_data.write_file
+      (Naming.forked_chains_file chain_dir)
+      Chain_id.Map.empty
+    >>=? fun () ->
+    Stored_data.write_file (Naming.genesis_block_file chain_dir) genesis_block
+    >>=? fun () ->
+    (* Load the store (containing the cemented if relevant) *)
+    Block_store.load chain_dir ~genesis_block ~readonly:false
+    >>=? fun block_store ->
+    (* Store the floating *)
+    Lwt_stream.iter_s
+      (fun block ->
+        Block_store.store_block block_store block >>= fun _ -> notify ())
+      floating_blocks_stream
+    >>= fun () ->
+    (* Store the head *)
+    Block_store.store_block block_store new_head_with_metadata
+    >>=? fun () ->
+    notify ()
+    >>= fun () ->
+    (* We also need to store the genesis' protocol transition *)
+    Chain.get_commit_info context_index (Block.header genesis_block)
+    >>=? fun genesis_commit_info ->
+    let initial_protocol_levels =
+      Protocol_levels.(
+        add
+          (Block.proto_level genesis_block)
+          {
+            block = Block.descriptor genesis_block;
+            protocol = genesis.protocol;
+            commit_info = Some genesis_commit_info;
+          }
+          empty)
+    in
+    let new_head_context_hash = Block.context_hash new_head_with_metadata in
+    Context.checkout context_index new_head_context_hash
+    >>= (function
+          | Some ctxt ->
+              return ctxt
+          | None ->
+              fail
+                (Cannot_checkout_context
+                   ( Block_repr.hash new_head_with_metadata,
+                     new_head_context_hash )))
+    >>=? fun context ->
+    Context.get_protocol context
+    >>= fun head_protocol ->
+    (* Compute protocol levels and check their correctness *)
+    List.fold_left_es
+      (fun proto_levels (transition_level, protocol_hash, commit_info_opt) ->
+        let distance =
+          Int32.(
+            to_int
+              (sub (Block_repr.level new_head_with_metadata) transition_level))
+        in
+        Block_store.read_block
+          block_store
+          ~read_metadata:false
+          (Block (Block_repr.hash new_head_with_metadata, distance))
+        >>=? fun block_opt ->
+        match (block_opt, commit_info_opt) with
+        | (None, _) -> (
+          match history_mode with
+          | Rolling _ ->
+              (* Corner-case for when the head protocol's transition
+                 block has been deleted. *)
+              let block =
+                (* Important: we cannot retrieve the protocol
+                   associated to an arbitrary block with a legacy
+                   snapshot, we only know the head's one as it's
+                   written in the context. Therefore, the transition
+                   block is overwritten with either the caboose if
+                   both blocks have the same proto_level or the
+                   current_head otherwise. In the former case, block's
+                   protocol data won't be deserialisable.  *)
+                if
+                  Compare.Int.(
+                    Block.proto_level caboose
+                    = Block.proto_level new_head_with_metadata)
+                then caboose_descr
+                else Block.descriptor new_head_with_metadata
+              in
+              if Protocol_hash.equal protocol_hash head_protocol then
+                return
+                  Protocol_levels.(
+                    add
+                      (Block.proto_level new_head_with_metadata)
+                      {block; protocol = protocol_hash; commit_info = None}
+                      proto_levels)
+              else return proto_levels
+          | _ ->
+              fail
+                (Missing_activation_block_legacy
+                   (transition_level, protocol_hash, history_mode)) )
+        | (Some block, None) ->
+            return
+              Protocol_levels.(
+                add
+                  (Block.proto_level block)
+                  {
+                    block = Block.descriptor block;
+                    protocol = protocol_hash;
+                    commit_info = commit_info_opt;
+                  }
+                  proto_levels)
+        | (Some block, Some commit_info) ->
+            let open Protocol_levels in
+            Context.check_protocol_commit_consistency
+              context_index
+              ~expected_context_hash:(Block.context_hash block)
+              ~given_protocol_hash:protocol_hash
+              ~author:commit_info.author
+              ~message:commit_info.message
+              ~timestamp:(Block.timestamp block)
+              ~test_chain_status:commit_info.test_chain_status
+              ~predecessor_block_metadata_hash:
+                commit_info.predecessor_block_metadata_hash
+              ~predecessor_ops_metadata_hash:
+                commit_info.predecessor_ops_metadata_hash
+              ~data_merkle_root:commit_info.data_merkle_root
+              ~parents_contexts:commit_info.parents_contexts
+            >>= fun is_consistent ->
+            if
+              is_consistent
+              || Compare.Int32.(equal (Block_repr.level block) 0l)
+            then
+              return
+                Protocol_levels.(
+                  add
+                    (Block_repr.proto_level block)
+                    {
+                      block = Block.descriptor block;
+                      protocol = protocol_hash;
+                      commit_info = commit_info_opt;
+                    }
+                    proto_levels)
+            else
+              fail
+                (Inconsistent_protocol_commit_info
+                   (Block.hash block, protocol_hash)))
+      initial_protocol_levels
+      partial_protocol_levels
+    >>=? fun protocol_levels ->
+    Stored_data.write_file
+      (Naming.protocol_levels_file chain_dir)
+      protocol_levels
+    >>=? fun () ->
+    Block_store.close block_store
+    >>= fun () ->
+    let chain_config = {history_mode; genesis; expiration = None} in
+    Stored_data.write_file (Naming.chain_config_file chain_dir) chain_config
+    >>=? fun () -> return_unit
+
+  let restore_from_legacy_upgrade store_dir ~genesis ~alternate_heads
+      ~invalid_blocks ~forked_chains =
+    let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+    let chain_dir = Naming.chain_dir store_dir chain_id in
+    Stored_data.write_file
+      (Naming.alternate_heads_file chain_dir)
+      alternate_heads
+    >>=? fun () ->
+    Stored_data.write_file
+      (Naming.invalid_blocks_file chain_dir)
+      invalid_blocks
+    >>=? fun () ->
+    Stored_data.write_file (Naming.forked_chains_file chain_dir) forked_chains
 end

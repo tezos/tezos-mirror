@@ -48,21 +48,26 @@ let version_file_name = "version.json"
  *  - 0.0.1 : original storage
  *  - 0.0.2 : never released
  *  - 0.0.3 : store upgrade (introducing history mode)
- *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2) *)
-let data_version = "0.0.4"
+ *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2)
+ *  - 0.0.5 : store upgrade (switching from LMDB) *)
+let data_version = "0.0.5"
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
    much, an idea would be to have triples (version, version,
    converter), and to sequence them dynamically instead of
    statically. *)
-let upgradable_data_version = []
+let upgradable_data_version =
+  [ ( "0.0.4",
+      fun ~data_dir genesis ~chain_name ->
+        let patch_context = Patch_context.patch_context genesis None in
+        Legacy.upgrade_0_0_4 ~data_dir ~patch_context ~chain_name genesis ) ]
 
 let version_encoding = Data_encoding.(obj1 (req "version" string))
 
 type error += Invalid_data_dir_version of t * t
 
-type error += Invalid_data_dir of string
+type error += Invalid_data_dir of {data_dir : string; msg : string option}
 
 type error += Could_not_read_data_dir_version of string
 
@@ -73,16 +78,6 @@ type error += Data_dir_needs_upgrade of {expected : t; actual : t}
 let () =
   register_error_kind
     `Permanent
-    ~id:"invalidDataDir"
-    ~title:"Invalid data directory"
-    ~description:"The data directory cannot be accessed or created"
-    ~pp:(fun ppf path ->
-      Format.fprintf ppf "Invalid data directory '%s'." path)
-    Data_encoding.(obj1 (req "datadir_path" string))
-    (function Invalid_data_dir path -> Some path | _ -> None)
-    (fun path -> Invalid_data_dir path) ;
-  register_error_kind
-    `Permanent
     ~id:"main.data_version.invalid_data_dir_version"
     ~title:"Invalid data directory version"
     ~description:"The data directory version was not the one that was expected"
@@ -90,7 +85,8 @@ let () =
       Format.fprintf
         ppf
         "Invalid data directory version '%s' (expected '%s').@,\
-         Your data directory is outdated and cannot be automatically upgraded."
+         Your data directory is incompatible and cannot be automatically \
+         upgraded."
         got
         exp)
     Data_encoding.(
@@ -101,6 +97,22 @@ let () =
       | _ ->
           None)
     (fun (expected, actual) -> Invalid_data_dir_version (expected, actual)) ;
+  register_error_kind
+    `Permanent
+    ~id:"main.data_version.invalid_data_dir"
+    ~title:"Invalid data directory"
+    ~description:"The data directory cannot be accessed or created"
+    ~pp:(fun ppf (dir, msg_opt) ->
+      Format.fprintf
+        ppf
+        "Invalid data directory '%s'%a."
+        dir
+        (Format.pp_print_option (fun fmt msg -> Format.fprintf fmt ": %s" msg))
+        msg_opt)
+    Data_encoding.(obj2 (req "datadir_path" string) (opt "message" string))
+    (function
+      | Invalid_data_dir {data_dir; msg} -> Some (data_dir, msg) | _ -> None)
+    (fun (data_dir, msg) -> Invalid_data_dir {data_dir; msg}) ;
   register_error_kind
     `Permanent
     ~id:"main.data_version.could_not_read_data_dir_version"
@@ -205,6 +217,17 @@ module Events = struct
       ~pp2:Format.pp_print_string
       ("available_version", Data_encoding.string)
 
+  let legacy_store_is_present =
+    declare_1
+      ~section
+      ~level:Notice
+      ~name:"legacy_store_is_present"
+      ~msg:
+        "the former store is present at '{legacy_store_path}' and may be \
+         removed to save disk space if the upgrade process went well"
+      ~pp1:Format.pp_print_string
+      ("legacy_store_path", Data_encoding.string)
+
   let emit = Internal_event.Simple.emit
 end
 
@@ -213,11 +236,15 @@ let version_file data_dir = Filename.concat data_dir version_file_name
 let clean_directory files =
   let to_delete =
     Format.asprintf
-      "@[<v>%a@]"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_cut Format.pp_print_string)
+      "%a"
+      (Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+         Format.pp_print_string)
       files
   in
-  Format.sprintf "Please provide a clean directory by removing:@ %s" to_delete
+  Format.sprintf
+    "Please provide a clean directory by removing the following files: %s"
+    to_delete
 
 let write_version_file data_dir =
   let version_file = version_file data_dir in
@@ -246,7 +273,8 @@ let check_data_dir_version files data_dir =
   Lwt_unix.file_exists version_file
   >>= function
   | false ->
-      fail (Invalid_data_dir (clean_directory files))
+      let msg = Some (clean_directory files) in
+      fail (Invalid_data_dir {data_dir; msg})
   | true -> (
       read_version_file version_file
       >>=? fun version ->
@@ -281,7 +309,8 @@ let ensure_data_dir bare data_dir =
           | [] ->
               write_version ()
           | files when bare ->
-              fail (Invalid_data_dir (clean_directory files))
+              let msg = Some (clean_directory files) in
+              fail (Invalid_data_dir {data_dir; msg})
           | files ->
               check_data_dir_version files data_dir )
       | false ->
@@ -289,21 +318,34 @@ let ensure_data_dir bare data_dir =
           >>= fun () -> write_version ())
     (function
       | Unix.Unix_error _ ->
-          fail (Invalid_data_dir data_dir)
+          fail (Invalid_data_dir {data_dir; msg = None})
       | exc ->
           raise exc)
 
-let upgrade_data_dir data_dir =
+let check_data_dir_legacy_artifact data_dir =
+  let lmdb_store_artifact_path =
+    Legacy.temporary_former_store_path ~data_dir
+  in
+  Lwt_unix.file_exists lmdb_store_artifact_path
+  >>= function
+  | true ->
+      Events.(emit legacy_store_is_present) lmdb_store_artifact_path
+  | false ->
+      Lwt.return_unit
+
+let upgrade_data_dir ~data_dir genesis ~chain_name =
   ensure_data_dir false data_dir
   >>=? function
   | None ->
-      Events.(emit dir_is_up_to_date ()) >>= fun () -> return_unit
+      Events.(emit dir_is_up_to_date ())
+      >>= fun () ->
+      check_data_dir_legacy_artifact data_dir >>= fun () -> return_unit
   | Some (version, upgrade) -> (
       Events.(emit upgrading_node (version, data_version))
       >>= fun () ->
-      upgrade ~data_dir
+      upgrade ~data_dir genesis ~chain_name
       >>= function
-      | Ok () ->
+      | Ok _success_message ->
           write_version_file data_dir
           >>=? fun () ->
           Events.(emit update_success ()) >>= fun () -> return_unit

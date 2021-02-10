@@ -107,7 +107,7 @@ let () =
     ~title:"Block_not_found"
     ~description:"Block not found"
     ~pp:(fun ppf block_hash ->
-      Format.fprintf ppf "@[Cannot find block %a]" Block_hash.pp block_hash)
+      Format.fprintf ppf "@[Cannot find block %a@]" Block_hash.pp block_hash)
     Data_encoding.(obj1 (req "block_not_found" @@ Block_hash.encoding))
     (function Block_not_found block_hash -> Some block_hash | _ -> None)
     (fun block_hash -> Block_not_found block_hash) ;
@@ -119,7 +119,7 @@ let () =
     ~pp:(fun ppf block_hash ->
       Format.fprintf
         ppf
-        "@[Cannot find block contents %a]"
+        "@[Cannot find block contents %a@]"
         Block_hash.pp
         block_hash)
     Data_encoding.(
@@ -972,6 +972,12 @@ module Block = struct
             fail (Block_contents_not_found block.hash)
         | Some contents ->
             return contents)
+
+  let read_contents_opt block =
+    Shared.use block.chain_state.block_store (fun store ->
+        Legacy_store.Block.Contents.read_opt (store, block.hash)
+        >>= function
+        | None -> Lwt.return_none | Some contents -> Lwt.return_some contents)
 
   let header_of_hash chain_state hash =
     Shared.use chain_state.block_store (fun store ->

@@ -29,8 +29,8 @@ type error +=
   | Missing_file_argument
   | Cannot_locate_file of string
   | Data_dir_not_found of {path : string}
+  | Cannot_read_info
 
-(** Main *)
 let () =
   register_error_kind
     `Permanent
@@ -81,7 +81,19 @@ let () =
         path)
     Data_encoding.(obj1 (req "path" string))
     (function Data_dir_not_found {path} -> Some path | _ -> None)
-    (fun path -> Data_dir_not_found {path})
+    (fun path -> Data_dir_not_found {path}) ;
+  register_error_kind
+    `Permanent
+    ~id:"Snapshot.cannot_read_info"
+    ~title:"Cannot read info"
+    ~description:"Failed to read snasphot info"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Failed to read snapshot info: cannot read info of legacy snapshots.")
+    Data_encoding.(obj1 (req "empty" empty))
+    (function Cannot_read_info -> Some () | _ -> None)
+    (fun () -> Cannot_read_info)
 
 (** Main *)
 
@@ -124,14 +136,20 @@ module Term = struct
     let run =
       Internal_event_unix.init ()
       >>= fun () ->
-      Node_shared_arg.read_and_patch_config_file args
-      >>=? fun node_config ->
-      let data_dir = node_config.data_dir in
-      let ({genesis; chain_name; _} : Node_config_file.blockchain_network) =
-        node_config.blockchain_network
-      in
       match subcommand with
       | Export ->
+          Node_shared_arg.read_data_dir args
+          >>=? fun data_dir ->
+          fail_unless
+            (Sys.file_exists data_dir)
+            (Data_dir_not_found {path = data_dir})
+          >>=? fun () ->
+          Node_shared_arg.read_and_patch_config_file args
+          >>=? fun node_config ->
+          let ({genesis; chain_name; _} : Node_config_file.blockchain_network)
+              =
+            node_config.blockchain_network
+          in
           Node_data_version.ensure_data_dir data_dir
           >>=? fun () ->
           let context_dir = Node_data_version.context_dir data_dir in
@@ -263,6 +281,13 @@ module Term = struct
                 "@[<v 2>Snapshot information:@ %a@]@."
                 Snapshots.pp_metadata
                 metadata ;
+              return_unit
+          | Legacy_metadata {version; legacy_history_mode} ->
+              Format.printf
+                "@[<v 2>Snapshot version %s in %a@ @]@."
+                version
+                History_mode.Legacy.pp
+                legacy_history_mode ;
               return_unit )
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
@@ -324,9 +349,9 @@ module Term = struct
   let disable_check =
     let open Cmdliner.Arg in
     let doc =
-      "Setting this flag disable the consistency check after importing a \
+      "Setting this flag disables the consistency check after importing a \
        full-mode snapshot. This improves performances but is strongly \
-       unrecommended as the snapshot could contain a corrupted chain."
+       discouraged because the snapshot could contain a corrupted chain."
     in
     value & flag & info ~doc ["no-check"]
 

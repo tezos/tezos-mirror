@@ -9,6 +9,7 @@
             tezos-validation
             tezos-context
             lwt-watcher)
+ (modules (:standard \ legacy_store_builder))
  (flags (:standard -open Tezos_shell_services
                    -open Tezos_base
                    -open Tezos_base__TzPervasives
@@ -18,7 +19,29 @@
                    -open Tezos_context
                    -open Tezos_protocol_updater)))
 
-(alias
- (name runtest_lint)
+(executable
+ (name legacy_store_builder)
+ (libraries tezos-legacy-store
+            tezos-validation
+            tezos-protocol-updater
+            ; also embed some protocols
+            tezos-embedded-protocol-000-Ps9mPmXa
+            tezos-embedded-protocol-005-PsBabyM1
+            tezos-embedded-protocol-006-PsCARTHA
+            tezos-embedded-protocol-alpha
+            tezos-embedded-protocol-genesis)
+ (modules legacy_store_builder)
+ (flags (:standard -open Tezos_legacy_store
+                   -open Tezos_shell_services
+                   -open Tezos_base
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_stdlib
+                   -open Tezos_validation
+                   -open Tezos_context
+                   -open Tezos_protocol_updater)))
+
+(rule
+ (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
  (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

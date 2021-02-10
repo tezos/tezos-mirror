@@ -1005,4 +1005,30 @@ module Unsafe : sig
     protocol_levels:Protocol_levels.activation_block Protocol_levels.t ->
     history_mode:History_mode.t ->
     unit tzresult Lwt.t
+
+  (** [restore_from_snapshot_legacy ...] same as
+      [restore_from_snapshot] but slightly differs due to some
+      information missing from legacy snapshots. *)
+  val restore_from_legacy_snapshot :
+    ?notify:(unit -> unit Lwt.t) ->
+    [`Store_dir] Naming.directory ->
+    context_index:Context.index ->
+    genesis:Genesis.t ->
+    genesis_context_hash:Context_hash.t ->
+    floating_blocks_stream:Block_repr.block Lwt_stream.t ->
+    new_head_with_metadata:Block_repr.block ->
+    partial_protocol_levels:( int32
+                            * Protocol_hash.t
+                            * Protocol_levels.commit_info option )
+                            list ->
+    history_mode:History_mode.t ->
+    unit tzresult Lwt.t
+
+  val restore_from_legacy_upgrade :
+    [`Store_dir] Naming.directory ->
+    genesis:Genesis.t ->
+    alternate_heads:block_descriptor list ->
+    invalid_blocks:invalid_block Block_hash.Map.t ->
+    forked_chains:Block_hash.t Chain_id.Map.t ->
+    unit tzresult Lwt.t
 end
