@@ -51,4 +51,4 @@ echo "link_protocol.sh src/proto_${version_number}_${short_hash}"
 $script_dir/link_protocol.sh src/proto_${version_number}_${short_hash}
 
 echo "Done. You can now commit everything."
-echo "Don't forget to: git add src/proto_${version_number}_${short_hash}"
+echo "Don't forget to: git add src/proto_${version_number}_${short_hash} docs/${version_number}"
