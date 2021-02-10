@@ -217,7 +217,13 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
           let head_level = head_shell.Block_header.level in
           return Int32.(to_int (sub head_level branch_level))
       | None ->
-          return predecessors )
+          Shell_services.Blocks.Header.shell_header ctxt ~chain ()
+          >>=? fun head_header ->
+          let head_level = Int32.to_int head_header.level in
+          let block_hook = min predecessors (head_level - 1) in
+          (* this assertion ensures that the RPC call right below does not fail *)
+          assert (head_level - (block_hook + 1) >= 0) ;
+          return block_hook )
       >>=? fun block_hook ->
       Block_services.Empty.hash
         ctxt
