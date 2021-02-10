@@ -1,6 +1,6 @@
-# Static Tezos binaries automatic releasing
+# Static Octez binaries automatic releasing
 
-This directory contains scripts required for releasing static Tezos
+This directory contains scripts required for releasing static Octez
 binaries:
 * `binaries.sh` script creates a list of binaries that are going to be published
   this list is later used in other scripts.
