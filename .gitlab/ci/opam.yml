@@ -81,10 +81,10 @@ opam:tezos-007-PsDELPH1-test-helpers:
   variables:
     package: tezos-007-PsDELPH1-test-helpers
 
-opam:tezos-008-PtEdoTez-test-helpers:
+opam:tezos-008-PtEdo2Zk-test-helpers:
   extends: .opam_template
   variables:
-    package: tezos-008-PtEdoTez-test-helpers
+    package: tezos-008-PtEdo2Zk-test-helpers
 
 opam:tezos-accuser-007-PsDELPH1:
   extends: .opam_template
@@ -96,15 +96,15 @@ opam:tezos-accuser-007-PsDELPH1-commands:
   variables:
     package: tezos-accuser-007-PsDELPH1-commands
 
-opam:tezos-accuser-008-PtEdoTez:
+opam:tezos-accuser-008-PtEdo2Zk:
   extends: .opam_template
   variables:
-    package: tezos-accuser-008-PtEdoTez
+    package: tezos-accuser-008-PtEdo2Zk
 
-opam:tezos-accuser-008-PtEdoTez-commands:
+opam:tezos-accuser-008-PtEdo2Zk-commands:
   extends: .opam_template
   variables:
-    package: tezos-accuser-008-PtEdoTez-commands
+    package: tezos-accuser-008-PtEdo2Zk-commands
 
 opam:tezos-accuser-alpha:
   extends: .opam_template
@@ -126,10 +126,10 @@ opam:tezos-baker-007-PsDELPH1:
   variables:
     package: tezos-baker-007-PsDELPH1
 
-opam:tezos-baker-008-PtEdoTez:
+opam:tezos-baker-008-PtEdo2Zk:
   extends: .opam_template
   variables:
-    package: tezos-baker-008-PtEdoTez
+    package: tezos-baker-008-PtEdo2Zk
 
 opam:tezos-baker-alpha:
   extends: .opam_template
@@ -146,15 +146,15 @@ opam:tezos-baking-007-PsDELPH1-commands:
   variables:
     package: tezos-baking-007-PsDELPH1-commands
 
-opam:tezos-baking-008-PtEdoTez:
+opam:tezos-baking-008-PtEdo2Zk:
   extends: .opam_template
   variables:
-    package: tezos-baking-008-PtEdoTez
+    package: tezos-baking-008-PtEdo2Zk
 
-opam:tezos-baking-008-PtEdoTez-commands:
+opam:tezos-baking-008-PtEdo2Zk-commands:
   extends: .opam_template
   variables:
-    package: tezos-baking-008-PtEdoTez-commands
+    package: tezos-baking-008-PtEdo2Zk-commands
 
 opam:tezos-baking-alpha:
   extends: .opam_template
@@ -276,20 +276,20 @@ opam:tezos-client-007-PsDELPH1-commands-registration:
   variables:
     package: tezos-client-007-PsDELPH1-commands-registration
 
-opam:tezos-client-008-PtEdoTez:
+opam:tezos-client-008-PtEdo2Zk:
   extends: .opam_template
   variables:
-    package: tezos-client-008-PtEdoTez
+    package: tezos-client-008-PtEdo2Zk
 
-opam:tezos-client-008-PtEdoTez-commands:
+opam:tezos-client-008-PtEdo2Zk-commands:
   extends: .opam_template
   variables:
-    package: tezos-client-008-PtEdoTez-commands
+    package: tezos-client-008-PtEdo2Zk-commands
 
-opam:tezos-client-008-PtEdoTez-commands-registration:
+opam:tezos-client-008-PtEdo2Zk-commands-registration:
   extends: .opam_template
   variables:
-    package: tezos-client-008-PtEdoTez-commands-registration
+    package: tezos-client-008-PtEdo2Zk-commands-registration
 
 opam:tezos-client-alpha:
   extends: .opam_template
@@ -336,10 +336,10 @@ opam:tezos-client-genesis-carthagenet:
   variables:
     package: tezos-client-genesis-carthagenet
 
-opam:tezos-client-sapling-008-PtEdoTez:
+opam:tezos-client-sapling-008-PtEdo2Zk:
   extends: .opam_template
   variables:
-    package: tezos-client-sapling-008-PtEdoTez
+    package: tezos-client-sapling-008-PtEdo2Zk
 
 opam:tezos-client-sapling-alpha:
   extends: .opam_template
@@ -401,6 +401,11 @@ opam:tezos-embedded-protocol-007-PsDELPH1:
   variables:
     package: tezos-embedded-protocol-007-PsDELPH1
 
+opam:tezos-embedded-protocol-008-PtEdo2Zk:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-008-PtEdo2Zk
+
 opam:tezos-embedded-protocol-008-PtEdoTez:
   extends: .opam_template
   variables:
@@ -441,15 +446,15 @@ opam:tezos-endorser-007-PsDELPH1-commands:
   variables:
     package: tezos-endorser-007-PsDELPH1-commands
 
-opam:tezos-endorser-008-PtEdoTez:
+opam:tezos-endorser-008-PtEdo2Zk:
   extends: .opam_template
   variables:
-    package: tezos-endorser-008-PtEdoTez
+    package: tezos-endorser-008-PtEdo2Zk
 
-opam:tezos-endorser-008-PtEdoTez-commands:
+opam:tezos-endorser-008-PtEdo2Zk-commands:
   extends: .opam_template
   variables:
-    package: tezos-endorser-008-PtEdoTez-commands
+    package: tezos-endorser-008-PtEdo2Zk-commands
 
 opam:tezos-endorser-alpha:
   extends: .opam_template
@@ -586,20 +591,25 @@ opam:tezos-protocol-007-PsDELPH1-tests:
   variables:
     package: tezos-protocol-007-PsDELPH1-tests
 
+opam:tezos-protocol-008-PtEdo2Zk:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-008-PtEdo2Zk
+
+opam:tezos-protocol-008-PtEdo2Zk-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-008-PtEdo2Zk-parameters
+
+opam:tezos-protocol-008-PtEdo2Zk-tests:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-008-PtEdo2Zk-tests
+
 opam:tezos-protocol-008-PtEdoTez:
   extends: .opam_template
   variables:
     package: tezos-protocol-008-PtEdoTez
-
-opam:tezos-protocol-008-PtEdoTez-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-008-PtEdoTez-parameters
-
-opam:tezos-protocol-008-PtEdoTez-tests:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-008-PtEdoTez-tests
 
 opam:tezos-protocol-alpha:
   extends: .opam_template
@@ -696,6 +706,11 @@ opam:tezos-protocol-functor-007-PsDELPH1:
   variables:
     package: tezos-protocol-functor-007-PsDELPH1
 
+opam:tezos-protocol-functor-008-PtEdo2Zk:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-008-PtEdo2Zk
+
 opam:tezos-protocol-functor-008-PtEdoTez:
   extends: .opam_template
   variables:
@@ -746,15 +761,15 @@ opam:tezos-protocol-plugin-007-PsDELPH1-registerer:
   variables:
     package: tezos-protocol-plugin-007-PsDELPH1-registerer
 
-opam:tezos-protocol-plugin-008-PtEdoTez:
+opam:tezos-protocol-plugin-008-PtEdo2Zk:
   extends: .opam_template
   variables:
-    package: tezos-protocol-plugin-008-PtEdoTez
+    package: tezos-protocol-plugin-008-PtEdo2Zk
 
-opam:tezos-protocol-plugin-008-PtEdoTez-registerer:
+opam:tezos-protocol-plugin-008-PtEdo2Zk-registerer:
   extends: .opam_template
   variables:
-    package: tezos-protocol-plugin-008-PtEdoTez-registerer
+    package: tezos-protocol-plugin-008-PtEdo2Zk-registerer
 
 opam:tezos-protocol-plugin-alpha:
   extends: .opam_template
