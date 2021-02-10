@@ -1,6 +1,6 @@
 .. _version-8:
 
-Version 8.1
+Version 8.2
 ===========
 
 Version 8.0 contains a new version (V1) of the protocol
@@ -20,6 +20,11 @@ Version 8.1 fixes a performance regression related to operations
 involving ``tz3`` addresses and several compilation problems in
 some contexts.
 
+Version 8.2 replaces `PtEdoTez` by `PtEdo2Zk` and provides RPCs to
+"normalize" Michelson expressions returned by the Edo protocol along
+with constraining the size of p2p messages at low level and updating
+some external dependencies.
+
 Update Instructions
 -------------------
 
@@ -30,12 +35,37 @@ See :ref:`instructions to set up Rust<setup_rust>`.
 To update from sources::
 
   git fetch
-  git checkout v8.1
+  git checkout v8.2
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v8.1`` Docker images of Tezos.
+If you are using Docker instead, use the ``v8.2`` Docker images of Tezos.
+
+Changelog — Version 8.2
+-----------------------
+
+Node
+~~~~
+
+- Override `PtEdoTez` activation by `PtEdo2Zk` in mainnet network.
+
+- Make size limits on p2p messages explicit in low-level encodings.
+
+- Add new RPCs for Edo: `helpers/scripts/normalize_{data,script,type}`
+  and a `XXX/normalized` variant to each protocol RPC `XXX`
+  outputting Michelson expressions.
+
+Baker / Endorser / Accuser
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Replace `PtEdoTez` by `PtEdo2Zk`.
+
+Miscellaneous
+~~~~~~~~~~~~~
+
+- Update external opam dependencies. In particular, switch to
+  `hacl-star.0.3.0-1` which performs better.
 
 Changelog — Version 8.1
 -----------------------
