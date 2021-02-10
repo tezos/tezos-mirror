@@ -10,11 +10,11 @@ DOCERRORDIR   = $(DOCGENDIR)/errors
 DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
 ALPHA_LONG   = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-EDO_LONG     = PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq
+EDO_LONG     = PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
 DELPHI_LONG  = PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
 
 ALPHA_SHORT  = alpha
-EDO_SHORT    = 008-PtEdoTez
+EDO_SHORT    = 008-PtEdo2Zk
 DELPHI_SHORT = 007-PsDELPH1
 
 SCRIPTSDIR		= scripts

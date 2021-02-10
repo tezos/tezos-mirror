@@ -46,7 +46,7 @@ be the following (ignore the Warning if there is any):
 ::
 
     ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-    PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq
+    PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
     PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
 
 To create the mockup client state, issue the following command:

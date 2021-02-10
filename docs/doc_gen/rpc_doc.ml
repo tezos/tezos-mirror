@@ -34,7 +34,7 @@ let protocols =
     ( "008",
       "008 Edo",
       Some "/include/rpc_introduction.rst.inc",
-      "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq" );
+      "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA" );
     ( "",
       "007 Delphi",
       Some "/include/rpc_introduction.rst.inc",

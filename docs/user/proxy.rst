@@ -29,7 +29,7 @@ the following protocols:
 * ``ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im``
 * ``PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb``
 * ``PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb``
-* ``PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq``
+* ``PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA``
 * ``ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK``
 
 If ``--protocol`` is omitted when calling the proxy client, it
