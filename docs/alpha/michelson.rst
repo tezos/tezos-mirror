@@ -825,6 +825,7 @@ branches.
 -  ``NEVER``: Close a forbidden branch.
 
 ::
+
     :: never : 'A  ->  'B
 
 - ``COMPARE``: Trivial comparison on type ``never``
