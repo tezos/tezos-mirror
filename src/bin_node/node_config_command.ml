@@ -29,10 +29,8 @@
 let show (args : Node_shared_arg.t) =
   if not @@ Sys.file_exists args.config_file then
     Format.eprintf
-      "\n\
-       Warning: no config file at %s,\n\
-      \         displaying the default configuration.\n\
-       @."
+      "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
+       displaying the default configuration@]@]@."
       args.config_file ;
   Node_shared_arg.read_and_patch_config_file args
   >>=? fun cfg ->
@@ -51,7 +49,9 @@ let reset (args : Node_shared_arg.t) =
 
 let init (args : Node_shared_arg.t) =
   if Sys.file_exists args.config_file then
-    failwith "Pre-existing config file at %s, use `reset`." args.config_file
+    failwith
+      "Pre-existing configuration file at %s, use `reset`."
+      args.config_file
   else
     Node_shared_arg.read_and_patch_config_file ~may_override_network:true args
     >>=? fun cfg ->
