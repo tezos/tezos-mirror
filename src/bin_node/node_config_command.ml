@@ -27,6 +27,8 @@
 (** Commands *)
 
 let show (args : Node_shared_arg.t) =
+  Internal_event_unix.init ()
+  >>= fun () ->
   if not @@ Sys.file_exists args.config_file then
     Format.eprintf
       "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
@@ -38,6 +40,8 @@ let show (args : Node_shared_arg.t) =
   return_unit
 
 let reset (args : Node_shared_arg.t) =
+  Internal_event_unix.init ()
+  >>= fun () ->
   if Sys.file_exists args.config_file then
     Format.eprintf
       "Ignoring previous configuration file: %s.@."
@@ -48,6 +52,8 @@ let reset (args : Node_shared_arg.t) =
   >>=? fun () -> Node_config_file.write args.config_file cfg
 
 let init (args : Node_shared_arg.t) =
+  Internal_event_unix.init ()
+  >>= fun () ->
   if Sys.file_exists args.config_file then
     failwith
       "Pre-existing configuration file at %s, use `reset`."
@@ -76,6 +82,8 @@ let init (args : Node_shared_arg.t) =
     return_unit
 
 let update (args : Node_shared_arg.t) =
+  Internal_event_unix.init ()
+  >>= fun () ->
   if not (Sys.file_exists args.config_file) then
     failwith
       "Missing configuration file at %s. Use `%s config init [options]` to \
