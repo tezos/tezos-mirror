@@ -43,7 +43,7 @@ let rec print_path : type pr p. (pr, p) Resto.Internal.path -> string list =
 
 (* TODO Once https://gitlab.com/nomadic-labs/resto/-/issues/3 is
    fixed, use the corresponding function from resto. The same applies
-   to print_path above. 
+   to print_path above.
 
    And at the same time, do the same in the mockup mode; which
    has these functions too. *)
@@ -88,13 +88,12 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
         else
           local_ctxt#call_service service params query input
           >>= fun y ->
-          let open Tezos_mockup_proxy.RPC_client in
           match y with
           | Ok x ->
               L.debug "Done call_service %s %s locally" meth_string
               @@ print_service service ;
               return x
-          | Error [Local_RPC_error (Rpc_not_found _)] ->
+          | Error [Tezos_rpc.RPC_context.Not_found _] ->
               delegate ()
           | Error _ as err ->
               Lwt.return err
@@ -139,16 +138,15 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
         else
           local_ctxt#generic_json_call meth ?body uri
           >>= fun y ->
-          let open Tezos_mockup_proxy.RPC_client in
           match y with
+          | Ok (`Not_found _) | Error [Tezos_rpc.RPC_context.Not_found _] ->
+              delegate ()
           | Ok x ->
               L.debug
                 "Done generic_json_call %s %s locally"
                 meth_string
                 uri_string ;
               return x
-          | Error [Local_RPC_error (Rpc_not_found _)] ->
-              delegate ()
           | Error _ as err ->
               Lwt.return err
   end

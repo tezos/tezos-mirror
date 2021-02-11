@@ -23,20 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type rpc_error =
-  | Rpc_generic_error
-  (* This case is caught by the proxy mode: when it is raised, the proxy
-     delegates to the node *)
-  | Rpc_not_found of string option
-  | Rpc_unauthorized
-  | Rpc_unexpected_type_of_failure
-  | Rpc_cannot_parse_path
-  | Rpc_cannot_parse_query
-  | Rpc_cannot_parse_body
-  | Rpc_streams_not_handled
-
-type error += Local_RPC_error of rpc_error
-
 (** Exception used by the proxy mode when creation of the input
     environment (of the RPC handler) fails. This exception is used
     to temporarily escape from monad, because at the point
