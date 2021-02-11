@@ -104,9 +104,33 @@ let unless condition ~event ~level ~payload =
 
 (* The following parts consist in node configuration validations. *)
 
+(* Validate expected proof-of-work. *)
+
+let invalid_pow ~level =
+  Internal_event.Simple.declare_1
+    ~section:Event.section
+    ~name:"invalid_pow"
+    ~level
+    ~msg:
+      (Format.sprintf
+         "the expected proof-of-work must be between 0 and 256 (inclusive), \
+          but found the value {proof-of-work} in field '%s'."
+         "p2p.expected-proof-of-work")
+    ("proof-of-work", Data_encoding.float)
+
+let validate_expected_pow (config : Node_config_file.t) : t tzresult Lwt.t =
+  let t =
+    unless
+      (0. <= config.p2p.expected_pow && config.p2p.expected_pow <= 256.)
+      ~event:invalid_pow
+      ~level:Error
+      ~payload:config.p2p.expected_pow
+  in
+  return t
+
 (* Main validation passes. *)
 
-let validation_passes = []
+let validation_passes = [validate_expected_pow]
 
 let validate_passes config =
   List.fold_left_es
