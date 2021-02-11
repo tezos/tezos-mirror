@@ -128,9 +128,98 @@ let validate_expected_pow (config : Node_config_file.t) : t tzresult Lwt.t =
   in
   return t
 
+(* Validate addresses. *)
+
+let cannot_parse_addr ~level =
+  Internal_event.Simple.declare_3
+    ~section:Event.section
+    ~name:"cannot_parse_addr"
+    ~msg:"failed to parse address '{addr}' in field '{field}': {why}."
+    ~level
+    ("addr", Data_encoding.string)
+    ("field", Data_encoding.string)
+    ("why", Data_encoding.string)
+
+let cannot_resolve_addr ~level =
+  Internal_event.Simple.declare_2
+    ~section:Event.section
+    ~name:"cannot_resolve_addr"
+    ~msg:"failed to resolve address '{addr}' in field '{field}'."
+    ~level
+    ("addr", Data_encoding.string)
+    ("field", Data_encoding.string)
+
+let validate_addr ~level ~field ~addr ~resolver =
+  resolver addr
+  >>= function
+  | Error [Node_config_file.Failed_to_parse_address (addr, why)] ->
+      return_some
+        (mk_alert ~event:cannot_parse_addr ~level ~payload:(addr, field, why))
+  | Ok [] ->
+      return_some
+        (mk_alert ~event:cannot_resolve_addr ~level ~payload:(addr, field))
+  | Ok _ ->
+      return_none
+  | Error _ as e ->
+      Lwt.return e
+
+let validate_addr_opt ~field ~level ~addr ~resolver =
+  Option.fold addr ~none:return_none ~some:(fun addr ->
+      validate_addr ~field ~level ~addr ~resolver)
+  >|=? Option.to_list
+
+let validate_rpc_listening_addrs (config : Node_config_file.t) =
+  let aux addr =
+    validate_addr
+      ~field:"rpc.listen-addrs"
+      ~level:Error
+      ~addr
+      ~resolver:Node_config_file.resolve_rpc_listening_addrs
+  in
+  List.filter_map_ep aux config.rpc.listen_addrs
+
+let validate_p2p_listening_addrs (config : Node_config_file.t) =
+  validate_addr_opt
+    ~field:"p2p.listen-addr"
+    ~level:Error
+    ~addr:config.p2p.listen_addr
+    ~resolver:Node_config_file.resolve_listening_addrs
+
+let validate_p2p_discovery_addr (config : Node_config_file.t) =
+  validate_addr_opt
+    ~field:"p2p.discovery-addr"
+    ~level:Error
+    ~addr:config.p2p.discovery_addr
+    ~resolver:Node_config_file.resolve_discovery_addrs
+
+let validate_p2p_bootstrap_addrs ~field peers =
+  let aux addr =
+    validate_addr ~level:Error ~field ~addr ~resolver:(fun x ->
+        Node_config_file.resolve_bootstrap_addrs [x])
+  in
+  List.filter_map_ep aux peers
+
+let validate_p2p_bootstrap_peers (config : Node_config_file.t) =
+  match config.p2p.bootstrap_peers with
+  | None ->
+      validate_p2p_bootstrap_addrs
+        ~field:"network.default_bootstrap-peers"
+        config.blockchain_network.default_bootstrap_peers
+  | Some peers ->
+      validate_p2p_bootstrap_addrs ~field:"p2p.bootstrap-peers" peers
+
+let validate_addresses config : t tzresult Lwt.t =
+  List.fold_left_es
+    (fun acc f -> f config >>=? fun res -> return (res @ acc))
+    empty
+    [ validate_rpc_listening_addrs;
+      validate_p2p_bootstrap_peers;
+      validate_p2p_listening_addrs;
+      validate_p2p_discovery_addr ]
+
 (* Main validation passes. *)
 
-let validation_passes = [validate_expected_pow]
+let validation_passes = [validate_expected_pow; validate_addresses]
 
 let validate_passes config =
   List.fold_left_es

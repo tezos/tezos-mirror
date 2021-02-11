@@ -1172,15 +1172,6 @@ module Event = struct
       ~msg:"failed to convert {addr} to an ipv4 address"
       ~pp1:(fun ppf -> Format.fprintf ppf "%S")
       ("addr", Data_encoding.string)
-
-  let cannot_resolve_addr =
-    Internal_event.Simple.declare_2
-      ~section
-      ~level
-      ~name:"cannot_resolve_addr"
-      ~msg:"failed to resolve {type} address: '{addr}'"
-      ("type", Data_encoding.string)
-      ("addr", Data_encoding.string)
 end
 
 let string_of_json_encoding_error exn =
@@ -1423,58 +1414,12 @@ let resolve_bootstrap_addrs peers =
     ~default_port:default_p2p_port
     peers
 
-let check_listening_addrs config =
-  match config.p2p.listen_addr with
-  | None ->
-      return_unit
-  | Some addr -> (
-      resolve_listening_addrs addr
-      >>=? function
-      | [] ->
-          Event.(emit cannot_resolve_addr) ("RPC listening", addr) >>= return
-      | _ :: _ ->
-          return_unit )
-
-let check_discovery_addr config =
-  match config.p2p.discovery_addr with
-  | None ->
-      return_unit
-  | Some addr -> (
-      resolve_discovery_addrs addr
-      >>=? function
-      | [] ->
-          Event.(emit cannot_resolve_addr) ("discovery", addr) >>= return
-      | _ :: _ ->
-          return_unit )
-
-let check_rpc_listening_addr config =
-  List.iter_ep
-    (fun addr ->
-      resolve_rpc_listening_addrs addr
-      >>=? function
-      | [] ->
-          Event.(emit cannot_resolve_addr) ("listenning", addr) >>= return
-      | _ :: _ ->
-          return_unit)
-    config.rpc.listen_addrs
-
-let check_bootstrap_peer addr =
-  resolve_bootstrap_addrs [addr]
-  >>=? function
-  | [] ->
-      Event.(emit cannot_resolve_addr) ("bootstrapping", addr) >>= return
-  | _ :: _ ->
-      return_unit
-
 let bootstrap_peers config =
   match config.p2p.bootstrap_peers with
   | None ->
       config.blockchain_network.default_bootstrap_peers
   | Some peers ->
       peers
-
-let check_bootstrap_peers config =
-  List.iter_ep check_bootstrap_peer (bootstrap_peers config)
 
 let fail fmt = Format.kasprintf (fun s -> prerr_endline s ; exit 1) fmt
 
@@ -1526,11 +1471,4 @@ let check_connections config =
           target_known_points
           max_known_points
 
-let check config =
-  check_listening_addrs config
-  >>=? fun () ->
-  check_rpc_listening_addr config
-  >>=? fun () ->
-  check_discovery_addr config
-  >>=? fun () ->
-  check_bootstrap_peers config >>=? fun () -> return (check_connections config)
+let check config = return (check_connections config)
