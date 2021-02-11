@@ -52,6 +52,12 @@ let print_service : type p q i o. (_, _, p, q, i, o) Service.t -> string =
   let iserv = Service.Internal.to_service serv in
   String.concat "/" (List.rev (print_path iserv.path))
 
+let method_is_writer = function
+  | `POST | `DELETE | `PUT | `PATCH ->
+      true
+  | `GET ->
+      false
+
 class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
   (http_ctxt : RPC_context.json) (proxy_env : Registration.proxy_environment) :
   RPC_context.json =
@@ -59,11 +65,23 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
     Tezos_mockup_proxy.RPC_client.local_ctxt
       (Proxy_services.build_directory printer http_ctxt proxy_env)
   in
-  let writer = function
-    | `POST | `DELETE | `PUT | `PATCH ->
-        true
-    | `GET ->
-        false
+  let dispatch_local_or_distant ~debug_name ~local ~distant meth path =
+    let meth_string = RPC_service.string_of_meth meth in
+    let delegate () =
+      L.debug "Delegating %s %s %s to http" meth_string debug_name path ;
+      distant ()
+    in
+    if method_is_writer meth then delegate ()
+    else
+      local ()
+      >>= function
+      | Ok x ->
+          L.debug "Done %s %s %s locally" meth_string debug_name path ;
+          return x
+      | Error [Tezos_rpc.RPC_context.Not_found _] ->
+          delegate ()
+      | Error _ as err ->
+          Lwt.return err
   in
   object
     method base = Uri.empty
@@ -72,31 +90,16 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
         : 'm 'p 'q 'i 'o.
           (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
           'q -> 'i -> 'o tzresult Lwt.t =
-      fun (type p q i o)
-          (service : (_, _, p, q, i, o) Service.t)
-          (params : p)
-          (query : q)
-          (input : i) ->
+      fun service params query input ->
+        let local () = local_ctxt#call_service service params query input in
+        let distant () = http_ctxt#call_service service params query input in
         let meth = RPC_service.meth service in
-        let meth_string = RPC_service.string_of_meth meth in
-        let delegate () =
-          L.debug "Delegating call_service %s %s to http" meth_string
-          @@ print_service service ;
-          http_ctxt#call_service service params query input
-        in
-        if writer meth then delegate ()
-        else
-          local_ctxt#call_service service params query input
-          >>= fun y ->
-          match y with
-          | Ok x ->
-              L.debug "Done call_service %s %s locally" meth_string
-              @@ print_service service ;
-              return x
-          | Error [Tezos_rpc.RPC_context.Not_found _] ->
-              delegate ()
-          | Error _ as err ->
-              Lwt.return err
+        dispatch_local_or_distant
+          ~debug_name:"call_service"
+          ~local
+          ~distant
+          meth
+        @@ print_service service
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
@@ -104,17 +107,31 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
           on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
           (unit -> unit) tzresult Lwt.t =
       fun service ~on_chunk ~on_close params query input ->
-        (* We need a finer grained implementation to be able
-           to implement this by using local_ctxt, see e.g.
-           the implementation of 'call_streamed_service'
-           in resto-cohttp-client's client.ml file *)
-        http_ctxt#call_streamed_service
-          service
-          ~on_chunk
-          ~on_close
-          params
-          query
-          input
+        let local () =
+          local_ctxt#call_streamed_service
+            service
+            ~on_chunk
+            ~on_close
+            params
+            query
+            input
+        in
+        let distant () =
+          http_ctxt#call_streamed_service
+            service
+            ~on_chunk
+            ~on_close
+            params
+            query
+            input
+        in
+        let meth = RPC_service.meth service in
+        dispatch_local_or_distant
+          ~debug_name:"call_streamed_service"
+          ~local
+          ~distant
+          meth
+        @@ print_service service
 
     method generic_json_call
         : RPC_service.meth ->
@@ -134,7 +151,7 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
             uri_string ;
           http_ctxt#generic_json_call meth ?body uri
         in
-        if writer meth then delegate ()
+        if method_is_writer meth then delegate ()
         else
           local_ctxt#generic_json_call meth ?body uri
           >>= fun y ->
