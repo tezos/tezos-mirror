@@ -25,12 +25,10 @@
 
 module Make
     (Monad : Traced_sigs.Monad.S)
-    (Seq : Traced_sigs.Seq.LWTRESLIB_TRACED_SEQ_S
-             with type 'error trace := 'error Monad.trace) :
-  Traced_sigs.Map.LWTRESLIB_TRACED_MAP_S
-    with type 'error trace := 'error Monad.trace = struct
+    (Seq : Traced_sigs.Seq.S with type 'error trace := 'error Monad.trace) :
+  Traced_sigs.Map.S with type 'error trace := 'error Monad.trace = struct
   module type S =
-    Traced_sigs.Map.S with type 'error trace := 'error Monad.trace
+    Traced_sigs_sigs.Map.S with type 'error trace := 'error Monad.trace
 
   module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t = struct
     include Bare_structs.Map.Make (Ord)

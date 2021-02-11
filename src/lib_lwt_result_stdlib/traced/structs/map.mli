@@ -25,7 +25,5 @@
 
 module Make
     (Monad : Traced_sigs.Monad.S)
-    (Seq : Traced_sigs.Seq.LWTRESLIB_TRACED_SEQ_S
-             with type 'error trace := 'error Monad.trace) :
-  Traced_sigs.Map.LWTRESLIB_TRACED_MAP_S
-    with type 'error trace := 'error Monad.trace
+    (Seq : Traced_sigs.Seq.S with type 'error trace := 'error Monad.trace) :
+  Traced_sigs.Map.S with type 'error trace := 'error Monad.trace

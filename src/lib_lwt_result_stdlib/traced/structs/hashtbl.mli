@@ -25,9 +25,5 @@
 
 module Make
     (Monad : Traced_sigs.Monad.S)
-    (Seq : Traced_sigs.Seq.LWTRESLIB_TRACED_SEQ_S
-             with type 'error trace := 'error Monad.trace) : sig
-  include
-    Traced_sigs.Hashtbl.LWTRESLIB_TRACED_HASHTBL_S
-      with type 'error trace := 'error Monad.trace
-end
+    (Seq : Traced_sigs.Seq.S with type 'error trace := 'error Monad.trace) :
+  Traced_sigs.Hashtbl.S with type 'error trace := 'error Monad.trace

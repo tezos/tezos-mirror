@@ -129,28 +129,19 @@ module Traced (Trace : Traced_sigs.Trace.S) : sig
     Traced_sigs.Monad.S with type 'error trace = 'error Trace.trace
 
   module Hashtbl :
-    Traced_sigs.Hashtbl.LWTRESLIB_TRACED_HASHTBL_S
-      with type 'error trace := 'error Trace.trace
+    Traced_sigs.Hashtbl.S with type 'error trace := 'error Trace.trace
 
-  module List :
-    Traced_sigs.List.LWTRESLIB_TRACED_LIST_S
-      with type 'error trace := 'error Trace.trace
+  module List : Traced_sigs.List.S with type 'error trace := 'error Trace.trace
 
-  module Map :
-    Traced_sigs.Map.LWTRESLIB_TRACED_MAP_S
-      with type 'error trace := 'error Trace.trace
+  module Map : Traced_sigs.Map.S with type 'error trace := 'error Trace.trace
 
   module Option : Traced_sigs.Option.S
 
   module Result : Traced_sigs.Result.S
 
-  module Seq :
-    Traced_sigs.Seq.LWTRESLIB_TRACED_SEQ_S
-      with type 'error trace := 'error Trace.trace
+  module Seq : Traced_sigs.Seq.S with type 'error trace := 'error Trace.trace
 
-  module Set :
-    Traced_sigs.Set.LWTRESLIB_TRACED_SET_S
-      with type 'error trace := 'error Trace.trace
+  module Set : Traced_sigs.Set.S with type 'error trace := 'error Trace.trace
 
   module WithExceptions : Traced_sigs.WithExceptions.S
 end
@@ -162,17 +153,17 @@ module TzLwtreslib : sig
             'error Tezos_error_monad.Error_monad.TzTrace.trace
 
   module Hashtbl :
-    Traced_sigs.Hashtbl.LWTRESLIB_TRACED_HASHTBL_S
+    Traced_sigs.Hashtbl.S
       with type 'error trace :=
             'error Tezos_error_monad.Error_monad.TzTrace.trace
 
   module List :
-    Traced_sigs.List.LWTRESLIB_TRACED_LIST_S
+    Traced_sigs.List.S
       with type 'error trace :=
             'error Tezos_error_monad.Error_monad.TzTrace.trace
 
   module Map :
-    Traced_sigs.Map.LWTRESLIB_TRACED_MAP_S
+    Traced_sigs.Map.S
       with type 'error trace :=
             'error Tezos_error_monad.Error_monad.TzTrace.trace
 
@@ -181,12 +172,12 @@ module TzLwtreslib : sig
   module Result : Traced_sigs.Result.S
 
   module Seq :
-    Traced_sigs.Seq.LWTRESLIB_TRACED_SEQ_S
+    Traced_sigs.Seq.S
       with type 'error trace :=
             'error Tezos_error_monad.Error_monad.TzTrace.trace
 
   module Set :
-    Traced_sigs.Set.LWTRESLIB_TRACED_SET_S
+    Traced_sigs.Set.S
       with type 'error trace :=
             'error Tezos_error_monad.Error_monad.TzTrace.trace
 

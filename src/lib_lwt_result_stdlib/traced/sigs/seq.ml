@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type LWTRESLIB_TRACED_SEQ_S = sig
+module type S = sig
   include Bare_sigs.Seq.S
 
   type 'error trace

@@ -24,20 +24,9 @@
 (*****************************************************************************)
 
 module type S = sig
-  include Bare_sigs.Set.S
-
   type 'error trace
 
-  val iter_ep :
-    (elt -> (unit, 'error trace) result Lwt.t) ->
-    t ->
-    (unit, 'error trace) result Lwt.t
-end
-
-module type LWTRESLIB_TRACED_SET_S = sig
-  type 'error trace
-
-  module type S = S with type 'error trace := 'error trace
+  module type S = Traced_sigs_sigs.Set.S with type 'error trace := 'error trace
 
   module Make (Ord : Stdlib.Set.OrderedType) : S with type elt = Ord.t
 end

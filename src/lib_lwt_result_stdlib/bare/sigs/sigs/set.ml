@@ -24,9 +24,97 @@
 (*****************************************************************************)
 
 module type S = sig
-  type 'error trace
+  type elt
 
-  module type S = Traced_sigs_sigs.Map.S with type 'error trace := 'error trace
+  type t
 
-  module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t
+  module Legacy : Stdlib.Set.S with type elt = elt and type t = t
+
+  val empty : t
+
+  val is_empty : t -> bool
+
+  val mem : elt -> t -> bool
+
+  val add : elt -> t -> t
+
+  val singleton : elt -> t
+
+  val remove : elt -> t -> t
+
+  val union : t -> t -> t
+
+  val inter : t -> t -> t
+
+  val disjoint : t -> t -> bool
+
+  val diff : t -> t -> t
+
+  val compare : t -> t -> int
+
+  val equal : t -> t -> bool
+
+  val subset : t -> t -> bool
+
+  val iter : (elt -> unit) -> t -> unit
+
+  val iter_e : (elt -> (unit, 'trace) result) -> t -> (unit, 'trace) result
+
+  val iter_s : (elt -> unit Lwt.t) -> t -> unit Lwt.t
+
+  val iter_p : (elt -> unit Lwt.t) -> t -> unit Lwt.t
+
+  val iter_es :
+    (elt -> (unit, 'trace) result Lwt.t) -> t -> (unit, 'trace) result Lwt.t
+
+  val map : (elt -> elt) -> t -> t
+
+  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val fold_e :
+    (elt -> 'a -> ('a, 'trace) result) -> t -> 'a -> ('a, 'trace) result
+
+  val fold_s : (elt -> 'a -> 'a Lwt.t) -> t -> 'a -> 'a Lwt.t
+
+  val fold_es :
+    (elt -> 'a -> ('a, 'trace) result Lwt.t) ->
+    t ->
+    'a ->
+    ('a, 'trace) result Lwt.t
+
+  val for_all : (elt -> bool) -> t -> bool
+
+  val exists : (elt -> bool) -> t -> bool
+
+  val filter : (elt -> bool) -> t -> t
+
+  val partition : (elt -> bool) -> t -> t * t
+
+  val cardinal : t -> int
+
+  val elements : t -> elt list
+
+  val min_elt : t -> elt option
+
+  val max_elt : t -> elt option
+
+  val choose : t -> elt option
+
+  val split : elt -> t -> t * bool * t
+
+  val find : elt -> t -> elt option
+
+  val find_first : (elt -> bool) -> t -> elt option
+
+  val find_last : (elt -> bool) -> t -> elt option
+
+  val of_list : elt list -> t
+
+  val to_seq_from : elt -> t -> elt Stdlib.Seq.t
+
+  val to_seq : t -> elt Stdlib.Seq.t
+
+  val add_seq : elt Stdlib.Seq.t -> t -> t
+
+  val of_seq : elt Stdlib.Seq.t -> t
 end

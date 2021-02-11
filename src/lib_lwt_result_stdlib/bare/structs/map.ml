@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = Bare_sigs.Map.S
+module type S = Bare_sigs_sigs.Map.S
 
 module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t = struct
   open Seq

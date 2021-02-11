@@ -23,23 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val hash : 'a -> int
-
-val seeded_hash : int -> 'a -> int
-
-val hash_param : meaningful:int -> total:int -> 'a -> int
-
-val seeded_hash_param : meaningful:int -> total:int -> int -> 'a -> int
-
-module type S = Bare_sigs.Hashtbl.S
-
-module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t
-
-module type SeededS = Bare_sigs.Hashtbl.SeededS
-
-module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
-  SeededS with type key = H.t
-
-module type S_LWT = Bare_sigs.Hashtbl.S_LWT
-
-module Make_Lwt (H : Stdlib.Hashtbl.HashedType) : S_LWT with type key = H.t
+include Bare_sigs.Hashtbl.S

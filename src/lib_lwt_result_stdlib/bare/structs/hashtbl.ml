@@ -33,7 +33,7 @@ let hash_param ~meaningful ~total v =
 let seeded_hash_param ~meaningful ~total seed v =
   Stdlib.Hashtbl.seeded_hash_param meaningful total seed v
 
-module type S = Bare_sigs.Hashtbl.S
+module type S = Bare_sigs_sigs.Hashtbl.S
 
 module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t = struct
   open Seq
@@ -65,7 +65,7 @@ module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t = struct
       t
 end
 
-module type SeededS = Bare_sigs.Hashtbl.SeededS
+module type SeededS = Bare_sigs_sigs.Hashtbl.SeededS
 
 module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
   SeededS with type key = H.t = struct
@@ -98,7 +98,7 @@ module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
       t
 end
 
-module type S_LWT = Bare_sigs.Hashtbl.S_LWT
+module type S_LWT = Bare_sigs_sigs.Hashtbl.S_LWT
 
 module Make_Lwt (H : Stdlib.Hashtbl.HashedType) : S_LWT with type key = H.t =
 struct

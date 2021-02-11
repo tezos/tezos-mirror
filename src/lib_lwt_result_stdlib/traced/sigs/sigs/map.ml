@@ -1,4 +1,3 @@
-(*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
@@ -24,9 +23,16 @@
 (*****************************************************************************)
 
 module type S = sig
+  include Bare_sigs_sigs.Map.S
+
   type 'error trace
 
-  module type S = Traced_sigs_sigs.Map.S with type 'error trace := 'error trace
-
-  module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t
+  (** [iter_ep f m] applies [f] to the bindings of [m]. All the applications are
+      done concurrently. If all the applications result in [Ok ()], then the
+      result of the iteration is [Ok ()]. If any of the applications results in
+      [Error e] then the result of the iteration is [Error e]. *)
+  val iter_ep :
+    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
+    'a t ->
+    (unit, 'error trace) result Lwt.t
 end

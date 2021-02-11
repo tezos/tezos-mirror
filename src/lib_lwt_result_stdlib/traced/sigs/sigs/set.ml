@@ -24,9 +24,12 @@
 (*****************************************************************************)
 
 module type S = sig
+  include Bare_sigs_sigs.Set.S
+
   type 'error trace
 
-  module type S = Traced_sigs_sigs.Map.S with type 'error trace := 'error trace
-
-  module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t
+  val iter_ep :
+    (elt -> (unit, 'error trace) result Lwt.t) ->
+    t ->
+    (unit, 'error trace) result Lwt.t
 end

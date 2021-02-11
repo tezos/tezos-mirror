@@ -23,10 +23,50 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Hashtbls with the signature [S] are safe (e.g., [find] uses [option] rather
+    than raising [Not_found]) extensions of [Hashtbl.S] with some Lwt- and
+    Error-aware traversal functions. *)
 module type S = sig
+  include Bare_sigs_sigs.Hashtbl.S
+
   type 'error trace
 
-  module type S = Traced_sigs_sigs.Map.S with type 'error trace := 'error trace
+  val iter_ep :
+    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
+    'a t ->
+    (unit, 'error trace) result Lwt.t
+end
 
-  module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t
+module type SeededS = sig
+  include Bare_sigs_sigs.Hashtbl.SeededS
+
+  type 'error trace
+
+  val iter_ep :
+    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
+    'a t ->
+    (unit, 'error trace) result Lwt.t
+end
+
+module type S_LWT = sig
+  include Bare_sigs_sigs.Hashtbl.S_LWT
+
+  type 'error trace
+
+  (** [iter_with_waiting_ep f tbl] iterates [f] over the bindings in [tbl].
+
+      Specifically, for each binding [(k, p)] it waits for [p] to be fulfilled
+      with [Ok v] and calls [f k v]. If [p] fulfills with [Error _] or is
+      rejected, then no call is made for this binding.
+
+      Note however that if one (or more) of the promises returned by [f] ends in
+      [Error]/rejection, the final result of this promise is an
+      [Error]/rejection. Even so, it only resolves once all the promises have.
+
+      It processes all bindings concurrently: it concurrently waits for all the
+      bound promises to resolve and calls [f] as they resolve. *)
+  val iter_with_waiting_ep :
+    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
+    ('a, 'error trace) t ->
+    (unit, 'error trace) result Lwt.t
 end

@@ -23,6 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = Bare_sigs.Set.S
-
-module Make (Ord : Stdlib.Map.OrderedType) : S with type elt = Ord.t
+include Bare_sigs.Set.S
