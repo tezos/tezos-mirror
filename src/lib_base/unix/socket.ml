@@ -117,38 +117,62 @@ let bind ?(backlog = 10) = function
 (* To get the encoding/decoding errors into scope. *)
 open Data_encoding_wrapper
 
-let message_len_size = 2
+(* length information is encoded as an [int16] which has a size of [2] bytes *)
+let size_of_length_of_message_payload = 2
+
+(* some messages may be too long for their length to be encoded *)
+let maximum_length_of_message_payload =
+  (* or [0b1111_1111_1111_1111] *)
+  1 lsl (size_of_length_of_message_payload * 8)
 
 let send fd encoding message =
-  let encoded_message_len = Data_encoding.Binary.length encoding message in
+  let length_of_message_payload =
+    Data_encoding.Binary.length encoding message
+  in
+  assert (length_of_message_payload >= 0) ;
   fail_unless
-    (encoded_message_len < 1 lsl (message_len_size * 8))
+    (length_of_message_payload < maximum_length_of_message_payload)
     Unexpected_size_of_encoded_value
   >>=? fun () ->
-  (* len is the length of int16 plus the length of the message we want to send *)
-  let len = message_len_size + encoded_message_len in
-  let buf = Bytes.create len in
-  let state =
-    Option.get
-    @@ Data_encoding.Binary.make_writer_state
-         buf
-         ~offset:message_len_size
-         ~allowed_bytes:encoded_message_len
+  let total_length_of_message =
+    size_of_length_of_message_payload + length_of_message_payload
   in
-  match Data_encoding.Binary.write encoding message state with
+  let message_serialisation_buffer = Bytes.create total_length_of_message in
+  let serialisation_state =
+    Data_encoding.Binary.make_writer_state
+      message_serialisation_buffer
+      ~offset:size_of_length_of_message_payload
+      ~allowed_bytes:length_of_message_payload
+  in
+  (* By construction, the length of the serialisation buffer is the state's
+     offset + the state's allowed_length. As a result, we are within the range
+     of valid parameter for [make_writer_state]. *)
+  assert (Option.is_some serialisation_state) ;
+  let serialisation_state = Option.get serialisation_state in
+  match Data_encoding.Binary.write encoding message serialisation_state with
   | Error we ->
       fail (Encoding_error we)
   | Ok last ->
-      fail_unless (last = len) Unexpected_size_of_encoded_value
+      fail_unless
+        (last = total_length_of_message)
+        Unexpected_size_of_encoded_value
       >>=? fun () ->
       (* we set the beginning of the buf with the length of what is next *)
-      Tezos_stdlib.TzEndian.set_int16 buf 0 encoded_message_len ;
-      protect (fun () -> Lwt_utils_unix.write_bytes fd buf >|= ok)
+      Tezos_stdlib.TzEndian.set_int16
+        message_serialisation_buffer
+        0
+        length_of_message_payload ;
+      protect (fun () ->
+          Lwt_utils_unix.write_bytes fd message_serialisation_buffer >|= ok)
 
 let recv ?timeout fd encoding =
-  let header_buf = Bytes.create message_len_size in
+  let header_buf = Bytes.create size_of_length_of_message_payload in
   protect (fun () ->
-      Lwt_utils_unix.read_bytes ?timeout ~len:message_len_size fd header_buf
+      Lwt_utils_unix.read_bytes
+        ?timeout
+        ~len:size_of_length_of_message_payload
+        fd
+        header_buf
       >|= ok)
   >>=? fun () ->
   let len = Tezos_stdlib.TzEndian.get_uint16 header_buf 0 in
