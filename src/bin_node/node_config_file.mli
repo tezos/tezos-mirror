@@ -161,8 +161,6 @@ val resolve_bootstrap_addrs :
 
 val encoding : t Data_encoding.t
 
-val check : t -> unit tzresult Lwt.t
-
 (** Return [p2p.bootstrap_peers] if not [None],
     [network.default_bootstrap_peers] otherwise. *)
 val bootstrap_peers : t -> string list

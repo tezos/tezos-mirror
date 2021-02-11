@@ -217,9 +217,140 @@ let validate_addresses config : t tzresult Lwt.t =
       validate_p2p_listening_addrs;
       validate_p2p_discovery_addr ]
 
+(* Validate connections setup. *)
+
+let connections_min_expected ~level =
+  Internal_event.Simple.declare_2
+    ~section:Event.section
+    ~name:"minimum_connections_greater_than_expected"
+    ~level
+    ~msg:
+      (Format.sprintf
+         "the minimum number of connections found in field '%s' ({minimum}) \
+          is greater than the expected number of connections found in field \
+          '%s' ({expected})."
+         "p2p.limits.min-connections"
+         "p2p.limits.expected-connections")
+    ("minimum", Data_encoding.int16)
+    ("expected", Data_encoding.int16)
+
+let connections_expected_max ~level =
+  Internal_event.Simple.declare_2
+    ~section:Event.section
+    ~name:"expected_connections_greater_than_maximum"
+    ~level
+    ~msg:
+      (Format.sprintf
+         "the expected number of connections found in field '%s' ({expected}) \
+          is greater than the maximum number of connections found in field \
+          '%s' ({maximum})."
+         "p2p.limits.expected-connections"
+         "p2p.limits.max-connections")
+    ("expected", Data_encoding.int16)
+    ("maximum", Data_encoding.int16)
+
+let target_number_of_known_peers_greater_than_maximum ~level =
+  Internal_event.Simple.declare_2
+    ~section:Event.section
+    ~name:"target_number_of_known_peers_greater_than_maximum"
+    ~level
+    ~msg:
+      (Format.sprintf
+         "in field '%s', the target number of known peer ids ({target}) is \
+          greater than the maximum number of known peers ids ({maximum})."
+         "p2p.limits.max_known_peer_ids")
+    ("target", Data_encoding.int16)
+    ("maximum", Data_encoding.int16)
+
+let target_number_of_known_peers_lower_than_maximum_conn ~level =
+  Internal_event.Simple.declare_2
+    ~section:Event.section
+    ~name:"target_number_of_known_peers_greater_than_maximum_conn"
+    ~level
+    ~msg:
+      (Format.sprintf
+         "the target number of known peer ids ({target}) in field '%s', is \
+          lower than the maximum number of connections ({maximum}) found in \
+          field '%s'."
+         "p2p.limits.max_known_peer_ids"
+         "p2p.limits.max-connections")
+    ("target", Data_encoding.int16)
+    ("maximum", Data_encoding.int16)
+
+let target_number_of_known_points_greater_than_maximum ~level =
+  Internal_event.Simple.declare_2
+    ~section:Event.section
+    ~name:"target_number_of_known_points_greater_than_maximum"
+    ~level
+    ~msg:
+      (Format.sprintf
+         "in field '%s', the target number of known point ids ({target}) is \
+          greater than the maximum number of known points ids ({maximum})."
+         "p2p.limits.max_known_points")
+    ("target", Data_encoding.int16)
+    ("maximum", Data_encoding.int16)
+
+let target_number_of_known_points_lower_than_maximum_conn ~level =
+  Internal_event.Simple.declare_2
+    ~section:Event.section
+    ~name:"target_number_of_known_points_greater_than_maximum_conn"
+    ~level
+    ~msg:
+      (Format.sprintf
+         "the target number of known point ids ({target}) found in field '%s' \
+          is lower than the maximum number of connections ({maximum}) found \
+          in '%s'."
+         "p2p.limits.max_known_points"
+         "p2p.limits.max-connections")
+    ("target", Data_encoding.int16)
+    ("maximum", Data_encoding.int16)
+
+let validate_connections (config : Node_config_file.t) =
+  let limits = config.p2p.limits in
+  when_
+    (limits.min_connections > limits.expected_connections)
+    ~level:Error
+    ~event:connections_min_expected
+    ~payload:(limits.min_connections, limits.expected_connections)
+  @ when_
+      (limits.expected_connections > limits.max_connections)
+      ~level:Error
+      ~event:connections_expected_max
+      ~payload:(limits.expected_connections, limits.max_connections)
+  @ Option.fold
+      limits.max_known_peer_ids
+      ~none:[]
+      ~some:(fun (max_known_peer_ids, target_known_peer_ids) ->
+        when_
+          (target_known_peer_ids > max_known_peer_ids)
+          ~event:target_number_of_known_peers_greater_than_maximum
+          ~level:Error
+          ~payload:(target_known_peer_ids, max_known_peer_ids)
+        @ when_
+            (limits.max_connections > target_known_peer_ids)
+            ~event:target_number_of_known_peers_lower_than_maximum_conn
+            ~level:Error
+            ~payload:(target_known_peer_ids, limits.max_connections))
+  @ Option.fold
+      limits.max_known_points
+      ~none:[]
+      ~some:(fun (max_known_points, target_known_points) ->
+        when_
+          (target_known_points > max_known_points)
+          ~event:target_number_of_known_points_greater_than_maximum
+          ~level:Error
+          ~payload:(max_known_points, target_known_points)
+        @ when_
+            (limits.max_connections > target_known_points)
+            ~event:target_number_of_known_points_lower_than_maximum_conn
+            ~level:Error
+            ~payload:(target_known_points, limits.max_connections))
+  |> return
+
 (* Main validation passes. *)
 
-let validation_passes = [validate_expected_pow; validate_addresses]
+let validation_passes =
+  [validate_expected_pow; validate_addresses; validate_connections]
 
 let validate_passes config =
   List.fold_left_es
