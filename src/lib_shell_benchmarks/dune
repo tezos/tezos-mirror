@@ -5,7 +5,8 @@
   tezos-base
   tezos-benchmark
   tezos-storage
-  tezos-shell-context)
+  tezos-shell-context
+  tezos-micheline)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_base
