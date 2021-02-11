@@ -10,10 +10,10 @@ dependencies to give a simple view of the main components, their
 responsibilities, and interactions. The second part is written for
 developers and is at the level of OPAM packages.
 
-The Big Picture
----------------
 .. _the_big_picture:
 
+The Big Picture
+---------------
 The diagram below shows a very coarse-grained architecture of Tezos.
 
 |Tezos architecture diagram|
@@ -69,10 +69,10 @@ interoperable, and auto descriptive, using JSON schema.
 .. |Tezos architecture diagram| image:: octopus.svg
 
 
-Software Architecture and Packages Relationship
-------------------------------------------------
 .. _packages:
 
+Software Architecture and Packages Relationship
+------------------------------------------------
 The diagram below shows the main OPAM packages present in the source
 code of Tezos, and their dependencies. The ``tezos-`` prefix has been
 dropped for clarity.
@@ -91,7 +91,8 @@ Base and below
 ~~~~~~~~~~~~~~
 
 At the center, the :package:`tezos-base` package is where
-the blockchain specific code starts. Before it is the set of libraries
+the blockchain specific code starts. Above it in the figure (but below
+in terms of abstraction level) is the set of libraries
 that are used everywhere for basic operations.
 
  - :package:`tezos-stdlib` contains a few extensions over the
@@ -109,8 +110,8 @@ that are used everywhere for basic operations.
    mechanism. It provides combinators for building service hierarchies
    à la Ocsigen/Eliom, registering, and calling services. This module
    is based on :opam:`resto`, that allows for automatic
-   generation of a machine and human-readable of the hierarchy of
-   services: the structure of URLs and the expected formats for input
+   generation of machine and human-readable descriptions of the hierarchy of
+   services, including: the structure of URLs and the expected formats for input
    and output bodies, via the use of ``data_encoding``.
  - :package:`tezos-crypto` wraps the external cryptography
    libraries that we use. We try to use minimal reference
