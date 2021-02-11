@@ -1017,7 +1017,14 @@ module Binary : sig
   (** [read enc buf ofs len] tries to reconstruct a value from the
       bytes in [buf] starting at offset [ofs] and reading at most
       [len] bytes. This function also returns the offset of the first
-      unread bytes in the [buf]. *)
+      unread bytes in the [buf].
+
+      The function will fail (returning [Error _]) if it needs to read more than
+      [len] bytes to decode the value.
+
+      The returned value contains no pointer back to [buf] (as a whole or as
+      sub-strings), even in the case where the encoding is or includes
+      [Fixed.string] or [Fixed.bytes]. *)
   val read :
     'a Encoding.t -> string -> int -> int -> (int * 'a, read_error) result
 
@@ -1038,7 +1045,7 @@ module Binary : sig
       variable-size encodings. *)
   val read_stream : ?init:Binary_stream.t -> 'a Encoding.t -> 'a status
 
-  (** The internal state that writers handle. It is presented explicitely as an
+  (** The internal state that writers handle. It is presented explicitly as an
       abstract type so that you must use the constructor to obtain it. The
       constructor ({!make_writer_state}) performs basic bound checks. *)
   type writer_state
