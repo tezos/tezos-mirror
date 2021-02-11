@@ -171,7 +171,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    particular, for configuration parameters of the Tezos node, update the node
    configuration :doc:`documentation <../user/node-configuration>` and the
    documentation of the modified component(s), usually referred by that page.
--  If your MR introduces new dependencies to opam packages, follow the
+-  If your MR introduces new dependencies, follow the
    :ref:`additional instructions <adding_new_dependencies>`.
 -  Check whether your changes need to be reflected in changes to the
    corresponding README file (the one in the directory of the patched
@@ -293,9 +293,15 @@ existing opam dependency, you will need to follow
 :ref:`this additional dedicated guide <adding_new_opam_dependency>`.
 
 In the special case where your MR adds a new Python, Rust, Javascript, or other
-dependency, additional steps must also be followed. There is currently no
-dedicated guide. Do not hesitate to ask for help on the ``#devteam`` channel of
-the developer channel.
+dependency, additional steps must also be followed.
+
+* for Python, you can refer to the related section in the :ref:`python testing documentation <python_adding_new_dependencies>`.
+* the Rust dependencies are located in the GitLab repository `tezos-rust-libs
+<https://gitlab.com/tezos/tezos-rust-libs>`_ and the instructions are listed
+there.
+
+For others, there is currently no dedicated guide. Do not hesitate to ask for
+help on the ``#devteam`` channel on the `tezos-dev` Slack.
 
 .. _protocol_mr:
 
