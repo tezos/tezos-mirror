@@ -1087,7 +1087,6 @@ let rec step_bounded :
     | ((contract, "default"), entrypoint) | ((contract, entrypoint), "default")
       ->
         Script_ir_translator.parse_contract_for_script
-          ~legacy:false
           ctxt
           loc
           t

@@ -5882,14 +5882,13 @@ and parse_contract :
    This can still fail on gas exhaustion. *)
 and parse_contract_for_script :
     type arg.
-    legacy:bool ->
     context ->
     Script.location ->
     arg ty ->
     Contract.t ->
     entrypoint:string ->
     (context * arg typed_contract option) tzresult Lwt.t =
- fun ~legacy ctxt loc arg contract ~entrypoint ->
+ fun ctxt loc arg contract ~entrypoint ->
   Gas.consume ctxt Typecheck_costs.contract_exists
   >>?= fun ctxt ->
   match (Contract.is_implicit contract, entrypoint) with
@@ -5940,7 +5939,7 @@ and parse_contract_for_script :
                   | Ok (Ex_ty targ, ctxt) -> (
                     match
                       find_entrypoint_for_type
-                        ~legacy
+                        ~legacy:false
                         ~full:targ
                         ~expected:arg
                         ~root_name
@@ -5958,7 +5957,7 @@ and parse_contract_for_script :
                     | Error _ ->
                         (* overapproximation by checking if targ = targ,
                                                        can only fail because of gas *)
-                        merge_types ~legacy ctxt loc targ targ
+                        merge_types ~legacy:false ctxt loc targ targ
                         >|? fun (Eq, _, ctxt) -> (ctxt, None) ) ) ) ) )
 
 and parse_toplevel :

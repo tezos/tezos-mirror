@@ -291,7 +291,6 @@ val parse_contract :
   (context * 'a Script_typed_ir.typed_contract) tzresult Lwt.t
 
 val parse_contract_for_script :
-  legacy:bool ->
   context ->
   Script.location ->
   'a Script_typed_ir.ty ->
