@@ -391,7 +391,7 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
     ~configuration:config.internal_events
     ()
   >>= fun () ->
-  Node_config_file.check config
+  Node_config_validation.check config
   >>=? fun () ->
   init_identity_file config
   >>=? fun identity ->

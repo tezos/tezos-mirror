@@ -35,8 +35,8 @@ let show (args : Node_shared_arg.t) =
        displaying the default configuration@]@]@."
       args.config_file ;
   Node_shared_arg.read_and_patch_config_file args
-  >>=? fun cfg ->
-  print_endline @@ Node_config_file.to_string cfg ;
+  >>=? fun config ->
+  print_endline @@ Node_config_file.to_string config ;
   return_unit
 
 let reset (args : Node_shared_arg.t) =
@@ -47,9 +47,9 @@ let reset (args : Node_shared_arg.t) =
       "Ignoring previous configuration file: %s.@."
       args.config_file ;
   Node_shared_arg.read_and_patch_config_file args
-  >>=? fun cfg ->
-  Node_config_file.check cfg
-  >>=? fun () -> Node_config_file.write args.config_file cfg
+  >>=? fun config ->
+  Node_config_validation.check config
+  >>=? fun () -> Node_config_file.write args.config_file config
 
 let init (args : Node_shared_arg.t) =
   Internal_event_unix.init ()
@@ -60,14 +60,14 @@ let init (args : Node_shared_arg.t) =
       args.config_file
   else
     Node_shared_arg.read_and_patch_config_file ~may_override_network:true args
-    >>=? fun cfg ->
-    Node_config_file.check cfg
+    >>=? fun config ->
+    Node_config_validation.check config
     >>=? fun () ->
-    Node_config_file.write args.config_file cfg
+    Node_config_file.write args.config_file config
     >>=? fun () ->
     let default = if args.network = None then " default" else "" in
     let alias =
-      match cfg.blockchain_network.alias with
+      match config.blockchain_network.alias with
       | None ->
           (* Cannot happen, as --network cannot take custom networks as arguments. *)
           ""
@@ -92,9 +92,9 @@ let update (args : Node_shared_arg.t) =
       Sys.argv.(0)
   else
     Node_shared_arg.read_and_patch_config_file args
-    >>=? fun cfg ->
-    Node_config_file.check cfg
-    >>=? fun () -> Node_config_file.write args.config_file cfg
+    >>=? fun config ->
+    Node_config_validation.check config
+    >>=? fun () -> Node_config_file.write args.config_file config
 
 (** Main *)
 
