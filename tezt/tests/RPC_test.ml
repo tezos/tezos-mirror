@@ -73,32 +73,30 @@ let check_rpc ~group_name ~protocol
       unit)
     rpcs
 
-(* Test the contracts RPC for protocol Alpha. *)
-let test_contracts_alpha client =
+(* Test the contracts RPC. *)
+let test_contracts (module Protocol_rpc : RPC_intf.COMMON_PROTOCOL_ALL) client
+    =
   let test_implicit_contract contract_id =
-    let* _ = RPC.Proto_alpha.Contract.get ~hooks ~contract_id client in
-    let* _ = RPC.Proto_alpha.Contract.get_balance ~hooks ~contract_id client in
-    let* _ = RPC.Proto_alpha.Contract.get_counter ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get_balance ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get_counter ~hooks ~contract_id client in
     let* _ =
-      RPC.Proto_alpha.Contract.get_manager_key ~hooks ~contract_id client
+      Protocol_rpc.Contract.get_manager_key ~hooks ~contract_id client
     in
     unit
   in
-  let* contracts = RPC.Proto_alpha.Contract.get_all ~hooks client in
+  let* contracts = Protocol_rpc.Contract.get_all ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* () = test_implicit_contract bootstrap in
   let* _ =
-    RPC.Proto_alpha.Contract.get_delegate ~hooks ~contract_id:bootstrap client
+    Protocol_rpc.Contract.get_delegate ~hooks ~contract_id:bootstrap client
   in
   Log.info "Test un-allocated implicit contract" ;
   let unallocated_implicit = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unallocated_implicit contracts) ;
   let* _ =
-    RPC.Proto_alpha.Contract.get
-      ~hooks
-      ~contract_id:unallocated_implicit
-      client
+    Protocol_rpc.Contract.get ~hooks ~contract_id:unallocated_implicit client
   in
   Log.info "Test non-delegated implicit contract" ;
   let simple_implicit = "simple" in
@@ -127,10 +125,10 @@ let test_contracts_alpha client =
           ~contract_id:simple_implicit_key.public_key_hash
           client
         |> Process.check ~expect_failure:true)
-      [ RPC.Proto_alpha.Contract.spawn_get_delegate;
-        RPC.Proto_alpha.Contract.spawn_get_entrypoints;
-        RPC.Proto_alpha.Contract.spawn_get_script;
-        RPC.Proto_alpha.Contract.spawn_get_storage ]
+      [ Protocol_rpc.Contract.spawn_get_delegate;
+        Protocol_rpc.Contract.spawn_get_entrypoints;
+        Protocol_rpc.Contract.spawn_get_script;
+        Protocol_rpc.Contract.spawn_get_storage ]
   in
   Log.info "Test delegated implicit contract" ;
   let delegated_implicit = "delegated" in
@@ -152,7 +150,7 @@ let test_contracts_alpha client =
   let* () = Client.bake_for client in
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
   let* _ =
-    RPC.Proto_alpha.Contract.get_delegate
+    Protocol_rpc.Contract.get_delegate
       ~hooks
       ~contract_id:delegated_implicit_key.public_key_hash
       client
@@ -168,19 +166,19 @@ let test_contracts_alpha client =
           ~contract_id:delegated_implicit_key.public_key_hash
           client
         |> Process.check ~expect_failure:true)
-      [ RPC.Proto_alpha.Contract.spawn_get_entrypoints;
-        RPC.Proto_alpha.Contract.spawn_get_script;
-        RPC.Proto_alpha.Contract.spawn_get_storage ]
+      [ Protocol_rpc.Contract.spawn_get_entrypoints;
+        Protocol_rpc.Contract.spawn_get_script;
+        Protocol_rpc.Contract.spawn_get_storage ]
   in
   let test_originated_contract contract_id =
-    let* _ = RPC.Proto_alpha.Contract.get ~hooks ~contract_id client in
-    let* _ = RPC.Proto_alpha.Contract.get_balance ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get_balance ~hooks ~contract_id client in
     let* () =
-      RPC.Proto_alpha.Contract.spawn_get_counter ~hooks ~contract_id client
+      Protocol_rpc.Contract.spawn_get_counter ~hooks ~contract_id client
       |> Process.check ~expect_failure:true
     in
     let* () =
-      RPC.Proto_alpha.Contract.spawn_get_manager_key ~hooks ~contract_id client
+      Protocol_rpc.Contract.spawn_get_manager_key ~hooks ~contract_id client
       |> Process.check ~expect_failure:true
     in
     let big_map_key =
@@ -188,17 +186,17 @@ let test_contracts_alpha client =
         "{ \"key\": { \"int\": \"0\" }, \"type\": { \"prim\": \"int\" } }"
     in
     let* _ =
-      RPC.Proto_alpha.Contract.big_map_get
+      Protocol_rpc.Contract.big_map_get
         ~hooks
         ~contract_id
         ~data:big_map_key
         client
     in
     let* _ =
-      RPC.Proto_alpha.Contract.get_entrypoints ~hooks ~contract_id client
+      Protocol_rpc.Contract.get_entrypoints ~hooks ~contract_id client
     in
-    let* _ = RPC.Proto_alpha.Contract.get_script ~hooks ~contract_id client in
-    let* _ = RPC.Proto_alpha.Contract.get_storage ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get_script ~hooks ~contract_id client in
+    let* _ = Protocol_rpc.Contract.get_storage ~hooks ~contract_id client in
     unit
   in
   (* A smart contract without any big map or entrypoints *)
@@ -235,7 +233,7 @@ let test_contracts_alpha client =
        } }"
   in
   let* _ =
-    RPC.Proto_alpha.Contract.big_map_get
+    Protocol_rpc.Contract.big_map_get
       ~hooks
       ~contract_id:originated_contract_advanced
       ~data:unique_big_map_key
@@ -246,183 +244,7 @@ let test_contracts_alpha client =
       "{ \"key\": { \"string\": \"dup\" }, \"type\": { \"prim\": \"string\" } }"
   in
   let* _ =
-    RPC.Proto_alpha.Contract.big_map_get
-      ~hooks
-      ~contract_id:originated_contract_advanced
-      ~data:duplicate_big_map_key
-      client
-  in
-  unit
-
-(* Test the contracts RPC for protocol 007. *)
-let test_contracts_007 client =
-  let test_implicit_contract contract_id =
-    let* _ = RPC.Proto_007.Contract.get ~hooks ~contract_id client in
-    let* _ = RPC.Proto_007.Contract.get_balance ~hooks ~contract_id client in
-    let* _ = RPC.Proto_007.Contract.get_counter ~hooks ~contract_id client in
-    let* _ =
-      RPC.Proto_007.Contract.get_manager_key ~hooks ~contract_id client
-    in
-    unit
-  in
-  let* contracts = RPC.Proto_007.Contract.get_all ~hooks client in
-  Log.info "Test implicit baker contract" ;
-  let bootstrap = List.hd contracts in
-  let* () = test_implicit_contract bootstrap in
-  let* _ =
-    RPC.Proto_007.Contract.get_delegate ~hooks ~contract_id:bootstrap client
-  in
-  Log.info "Test un-allocated implicit contract" ;
-  let unallocated_implicit = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
-  assert (not @@ List.mem unallocated_implicit contracts) ;
-  let* _ =
-    RPC.Proto_007.Contract.get ~hooks ~contract_id:unallocated_implicit client
-  in
-  Log.info "Test non-delegated implicit contract" ;
-  let simple_implicit = "simple" in
-  let* simple_implicit_key =
-    Client.gen_and_show_keys ~alias:simple_implicit client
-  in
-  let bootstrap1 = "bootstrap1" in
-  let* () =
-    Client.transfer
-      ~amount:Tez.(of_int 100)
-      ~giver:bootstrap1
-      ~receiver:simple_implicit_key.public_key_hash
-      ~burn_cap:Constant.implicit_account_burn
-      client
-  in
-  let* () = Client.bake_for client in
-  let* () = test_implicit_contract simple_implicit_key.public_key_hash in
-  let* () =
-    Lwt_list.iter_s
-      (fun rpc ->
-        rpc
-          ?node:None
-          ?hooks:(Some hooks)
-          ?chain:None
-          ?block:None
-          ~contract_id:simple_implicit_key.public_key_hash
-          client
-        |> Process.check ~expect_failure:true)
-      [ RPC.Proto_007.Contract.spawn_get_delegate;
-        RPC.Proto_007.Contract.spawn_get_entrypoints;
-        RPC.Proto_007.Contract.spawn_get_script;
-        RPC.Proto_007.Contract.spawn_get_storage ]
-  in
-  Log.info "Test delegated implicit contract" ;
-  let delegated_implicit = "delegated" in
-  let* delegated_implicit_key =
-    Client.gen_and_show_keys ~alias:delegated_implicit client
-  in
-  let* () =
-    Client.transfer
-      ~amount:Tez.(of_int 100)
-      ~giver:bootstrap1
-      ~receiver:delegated_implicit
-      ~burn_cap:Constant.implicit_account_burn
-      client
-  in
-  let* () = Client.bake_for client in
-  let* () =
-    Client.set_delegate ~src:delegated_implicit ~delegate:bootstrap1 client
-  in
-  let* () = Client.bake_for client in
-  let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
-  let* _ =
-    RPC.Proto_007.Contract.get_delegate
-      ~hooks
-      ~contract_id:delegated_implicit_key.public_key_hash
-      client
-  in
-  let* () =
-    Lwt_list.iter_s
-      (fun rpc ->
-        rpc
-          ?node:None
-          ?hooks:(Some hooks)
-          ?chain:None
-          ?block:None
-          ~contract_id:delegated_implicit_key.public_key_hash
-          client
-        |> Process.check ~expect_failure:true)
-      [ RPC.Proto_007.Contract.spawn_get_entrypoints;
-        RPC.Proto_007.Contract.spawn_get_script;
-        RPC.Proto_007.Contract.spawn_get_storage ]
-  in
-  let test_originated_contract contract_id =
-    let* _ = RPC.Proto_007.Contract.get ~hooks ~contract_id client in
-    let* _ = RPC.Proto_007.Contract.get_balance ~hooks ~contract_id client in
-    let* () =
-      RPC.Proto_007.Contract.spawn_get_counter ~hooks ~contract_id client
-      |> Process.check ~expect_failure:true
-    in
-    let* () =
-      RPC.Proto_007.Contract.spawn_get_manager_key ~hooks ~contract_id client
-      |> Process.check ~expect_failure:true
-    in
-    let big_map_key =
-      Ezjsonm.value_from_string
-        "{ \"key\": { \"int\": \"0\" }, \"type\": { \"prim\": \"int\" } }"
-    in
-    let* _ =
-      RPC.Proto_007.Contract.big_map_get
-        ~hooks
-        ~contract_id
-        ~data:big_map_key
-        client
-    in
-    let* _ =
-      RPC.Proto_007.Contract.get_entrypoints ~hooks ~contract_id client
-    in
-    let* _ = RPC.Proto_007.Contract.get_script ~hooks ~contract_id client in
-    let* _ = RPC.Proto_007.Contract.get_storage ~hooks ~contract_id client in
-    unit
-  in
-  (* A smart contract without any big map or entrypoints *)
-  let* originated_contract_simple =
-    Client.originate_contract
-      ~alias:"originated_contract_simple"
-      ~amount:Tez.zero
-      ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_007/str_id.tz"
-      ~init:"Some \"initial storage\""
-      ~burn_cap:Tez.(of_int 3)
-      client
-  in
-  let* () = Client.bake_for client in
-  let* () = test_originated_contract originated_contract_simple in
-  (* A smart contract with a big map and entrypoints *)
-  let* originated_contract_advanced =
-    Client.originate_contract
-      ~alias:"originated_contract_advanced"
-      ~amount:Tez.zero
-      ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_007/big_map_entrypoints.tz"
-      ~init:"Pair { Elt \"dup\" 0 } { Elt \"dup\" 1 ; Elt \"test\" 5 }"
-      ~burn_cap:Tez.(of_int 3)
-      client
-  in
-  let* () = Client.bake_for client in
-  let* () = test_originated_contract originated_contract_advanced in
-  let unique_big_map_key =
-    Ezjsonm.value_from_string
-      "{ \"key\": { \"string\": \"test\" }, \"type\": { \"prim\": \"string\" \
-       } }"
-  in
-  let* _ =
-    RPC.Proto_007.Contract.big_map_get
-      ~hooks
-      ~contract_id:originated_contract_advanced
-      ~data:unique_big_map_key
-      client
-  in
-  let duplicate_big_map_key =
-    Ezjsonm.value_from_string
-      "{ \"key\": { \"string\": \"dup\" }, \"type\": { \"prim\": \"string\" } }"
-  in
-  let* _ =
-    RPC.Proto_007.Contract.big_map_get
+    Protocol_rpc.Contract.big_map_get
       ~hooks
       ~contract_id:originated_contract_advanced
       ~data:duplicate_big_map_key
@@ -693,22 +515,13 @@ let test_votes_007 client =
   let* _ = RPC.Proto_007.Votes.get_proposals ~hooks client in
   unit
 
-(* Test the various other RPCs for protocol Alpha. *)
-let test_others_alpha client =
-  let* _ = RPC.Proto_alpha.get_constants ~hooks client in
-  let* _ = RPC.Proto_alpha.get_baking_rights ~hooks client in
-  let* _ = RPC.Proto_alpha.get_current_level ~hooks client in
-  let* _ = RPC.Proto_alpha.get_endorsing_rights ~hooks client in
-  let* _ = RPC.Proto_alpha.get_levels_in_current_cycle ~hooks client in
-  unit
-
-(* Test the various other RPCs for protocol 007. *)
-let test_others_007 client =
-  let* _ = RPC.Proto_007.get_constants ~hooks client in
-  let* _ = RPC.Proto_007.get_baking_rights ~hooks client in
-  let* _ = RPC.Proto_007.get_current_level ~hooks client in
-  let* _ = RPC.Proto_007.get_endorsing_rights ~hooks client in
-  let* _ = RPC.Proto_007.get_levels_in_current_cycle ~hooks client in
+(* Test the various other RPCs. *)
+let test_others (module Protocol_rpc : RPC_intf.COMMON_PROTOCOL_ALL) client =
+  let* _ = Protocol_rpc.get_constants ~hooks client in
+  let* _ = Protocol_rpc.get_baking_rights ~hooks client in
+  let* _ = Protocol_rpc.get_current_level ~hooks client in
+  let* _ = Protocol_rpc.get_endorsing_rights ~hooks client in
+  let* _ = Protocol_rpc.get_levels_in_current_cycle ~hooks client in
   unit
 
 let register () =
@@ -716,7 +529,7 @@ let register () =
     ~group_name:"alpha"
     ~protocol:Protocol.Alpha
     ~rpcs:
-      [ ("contracts", test_contracts_alpha, None);
+      [ ("contracts", test_contracts (module RPC.Proto_alpha), None);
         ("delegates", test_delegates_alpha, None);
         ( "votes",
           test_votes_alpha,
@@ -724,13 +537,13 @@ let register () =
             (* reduced periods duration to get to testing vote period faster *)
             [ (["blocks_per_cycle"], Some "4");
               (["blocks_per_voting_period"], Some "4") ] );
-        ("others", test_others_alpha, None) ]
+        ("others", test_others (module RPC.Proto_alpha), None) ]
     () ;
   check_rpc
     ~group_name:"007"
     ~protocol:Protocol.Delphi
     ~rpcs:
-      [ ("contracts", test_contracts_007, None);
+      [ ("contracts", test_contracts (module RPC.Proto_007), None);
         ("delegates", test_delegates_007, None);
         ( "votes",
           test_votes_007,
@@ -738,5 +551,5 @@ let register () =
             (* reduced periods duration to get to testing vote period faster *)
             [ (["blocks_per_cycle"], Some "4");
               (["blocks_per_voting_period"], Some "4") ] );
-        ("others", test_others_007, None) ]
+        ("others", test_others (module RPC.Proto_007), None) ]
     ()
