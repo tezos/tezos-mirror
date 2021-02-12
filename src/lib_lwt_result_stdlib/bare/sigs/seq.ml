@@ -115,6 +115,19 @@ module type S = sig
   val iter_es :
     ('a -> (unit, 'trace) result Lwt.t) -> 'a t -> (unit, 'trace) result Lwt.t
 
+  (** Similar to {!iter} but wraps the iteration in [result Lwt.t]. All the
+      steps of the iteration are started concurrently. The promise [iter_ep]
+      resolves once all the promises of the traversal resolve. At this point it
+      either:
+      - is rejected if at least one of the promises is, otherwise
+      - is fulfilled with [Error _] if at least one of the promises is,
+        otherwise
+      - is fulfilled with [Ok ()] if all the promises are. *)
+  val iter_ep :
+    ('a -> (unit, 'trace) result Lwt.t) ->
+    'a t ->
+    (unit, 'trace list) result Lwt.t
+
   (** Similar to {!iter} but wraps the iteration in {!Lwt}. All the
       steps of the iteration are started concurrently. The promise [iter_p f s]
       is resolved only once all the promises of the iteration are. At this point
@@ -155,6 +168,22 @@ module type S = sig
       tail-recursive. *)
   val map_es :
     ('a -> ('b, 'trace) result Lwt.t) -> 'a t -> ('b t, 'trace) result Lwt.t
+
+  (** Similar to {!map} but wraps the transformation in [result Lwt]. All the
+      transformations are done concurrently. The promise [map_p f s] resolves
+      once all the promises of the traversal resolve. At this point it is
+      rejected if any of the promises are, and otherwise it is resolved with
+      [Error _] if any of the promises are, and otherwise it is fulfilled (if
+      all the promises are).
+
+      Note that, unlike {!map}, [map_ep] is not lazy: it applies the
+      transformation eagerly to all the elements of the sequence and does not
+      terminate on infinite sequences. Moreover [map_p] is not tail-recursive.
+  *)
+  val map_ep :
+    ('a -> ('b, 'trace) result Lwt.t) ->
+    'a t ->
+    ('b t, 'trace list) result Lwt.t
 
   (** Similar to {!map} but wraps the transformation in {!Lwt}. All the
       transformations are done concurrently. The promise [map_p f s] resolves

@@ -129,4 +129,22 @@ module type S = sig
   val all_p : 'a Lwt.t list -> 'a list Lwt.t
 
   val both_p : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+
+  val join_e : (unit, 'trace) result list -> (unit, 'trace list) result
+
+  val all_e : ('a, 'trace) result list -> ('a list, 'trace list) result
+
+  val both_e :
+    ('a, 'trace) result -> ('b, 'trace) result -> ('a * 'b, 'trace list) result
+
+  val join_ep :
+    (unit, 'trace) result Lwt.t list -> (unit, 'trace list) result Lwt.t
+
+  val all_ep :
+    ('a, 'trace) result Lwt.t list -> ('a list, 'trace list) result Lwt.t
+
+  val both_ep :
+    ('a, 'trace) result Lwt.t ->
+    ('b, 'trace) result Lwt.t ->
+    ('a * 'b, 'trace list) result Lwt.t
 end

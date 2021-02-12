@@ -53,18 +53,6 @@ module type S_LWT = sig
 
   type 'error trace
 
-  (** [iter_with_waiting_ep f tbl] iterates [f] over the bindings in [tbl].
-
-      Specifically, for each binding [(k, p)] it waits for [p] to be fulfilled
-      with [Ok v] and calls [f k v]. If [p] fulfills with [Error _] or is
-      rejected, then no call is made for this binding.
-
-      Note however that if one (or more) of the promises returned by [f] ends in
-      [Error]/rejection, the final result of this promise is an
-      [Error]/rejection. Even so, it only resolves once all the promises have.
-
-      It processes all bindings concurrently: it concurrently waits for all the
-      bound promises to resolve and calls [f] as they resolve. *)
   val iter_with_waiting_ep :
     (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
     ('a, 'error trace) t ->

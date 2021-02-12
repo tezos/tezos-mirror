@@ -38,6 +38,8 @@ module Make (Ord : Stdlib.Map.OrderedType) : S with type elt = Ord.t = struct
 
   let iter_es f t = iter_es f (to_seq t)
 
+  let iter_ep f t = iter_ep f (to_seq t)
+
   let fold_e f t init = fold_left_e (fun acc e -> f e acc) init (to_seq t)
 
   let fold_s f t init = fold_left_s (fun acc e -> f e acc) init (to_seq t)

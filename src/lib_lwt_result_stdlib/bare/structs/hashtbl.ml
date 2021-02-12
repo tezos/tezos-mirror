@@ -48,6 +48,8 @@ module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t = struct
 
   let iter_p f t = iter_p (fun (k, v) -> f k v) (to_seq t)
 
+  let iter_ep f t = iter_ep (fun (k, v) -> f k v) (to_seq t)
+
   let fold_e f t init =
     fold_left_e (fun acc (k, v) -> f k v acc) init (to_seq t)
 
@@ -78,6 +80,8 @@ module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
   let iter_s f t = iter_s (fun (k, v) -> f k v) (to_seq t)
 
   let iter_es f t = iter_es (fun (k, v) -> f k v) (to_seq t)
+
+  let iter_ep f t = iter_ep (fun (k, v) -> f k v) (to_seq t)
 
   let iter_p f t = iter_p (fun (k, v) -> f k v) (to_seq t)
 
@@ -184,6 +188,20 @@ struct
             acc)
       t
       init
+
+  let iter_with_waiting_ep f t =
+    Monad.join_ep
+    @@ fold_promises
+         (fun k p acc ->
+           let promise =
+             Lwt.try_bind
+               (fun () -> p)
+               (function Error _ -> Monad.unit_es | Ok v -> f k v)
+               (fun _ -> Monad.unit_es)
+           in
+           promise :: acc)
+         t
+         []
 
   let length t = T.length t
 

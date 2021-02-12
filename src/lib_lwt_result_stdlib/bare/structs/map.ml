@@ -36,6 +36,8 @@ module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t = struct
 
   let iter_es f t = iter_es (fun (k, v) -> f k v) (to_seq t)
 
+  let iter_ep f t = iter_ep (fun (k, v) -> f k v) (to_seq t)
+
   let iter_p f t = iter_p (fun (k, v) -> f k v) (to_seq t)
 
   let fold_e f t init =

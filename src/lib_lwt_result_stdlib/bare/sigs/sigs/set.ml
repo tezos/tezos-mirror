@@ -67,6 +67,11 @@ module type S = sig
   val iter_es :
     (elt -> (unit, 'trace) result Lwt.t) -> t -> (unit, 'trace) result Lwt.t
 
+  val iter_ep :
+    (elt -> (unit, 'error) result Lwt.t) ->
+    t ->
+    (unit, 'error list) result Lwt.t
+
   val map : (elt -> elt) -> t -> t
 
   val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a

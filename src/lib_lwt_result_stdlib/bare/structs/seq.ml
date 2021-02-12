@@ -111,6 +111,16 @@ let iter_es f seq =
   | Cons (item, seq) ->
       Lwt.apply f item >>=? fun () -> iter_es f seq
 
+let iter_ep f seq =
+  let rec iter_ep f seq (acc : (unit, 'error) result Lwt.t list) =
+    match seq () with
+    | Nil ->
+        join_ep acc
+    | Cons (item, seq) ->
+        iter_ep f seq (Lwt.apply f item :: acc)
+  in
+  iter_ep f seq []
+
 let iter_p f seq =
   let rec iter_p f seq acc =
     match seq () with
@@ -165,6 +175,11 @@ let map_es f seq =
       Lwt.apply f item
       >>=? fun item ->
       map_es f seq >>=? fun seq -> Monad.return (fun () -> Cons (item, seq))
+
+let map_ep f seq =
+  all_ep (fold_left (fun acc x -> Lwt.apply f x :: acc) [] seq)
+  >|=? (* this is equivalent to rev |> to_seq but more direct *)
+       Stdlib.List.fold_left (fun s x () -> Cons (x, s)) empty
 
 let map_p f seq =
   all_p (fold_left (fun acc x -> Lwt.apply f x :: acc) [] seq)

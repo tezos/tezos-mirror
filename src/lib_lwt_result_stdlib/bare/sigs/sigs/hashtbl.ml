@@ -65,6 +65,11 @@ module type S = sig
     'a t ->
     (unit, 'trace) result Lwt.t
 
+  val iter_ep :
+    (key -> 'a -> (unit, 'error) result Lwt.t) ->
+    'a t ->
+    (unit, 'error list) result Lwt.t
+
   val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
 
   val try_map_inplace : (key -> 'a -> ('a, 'trace) result) -> 'a t -> unit
@@ -141,6 +146,11 @@ module type SeededS = sig
     (key -> 'a -> (unit, 'trace) result Lwt.t) ->
     'a t ->
     (unit, 'trace) result Lwt.t
+
+  val iter_ep :
+    (key -> 'a -> (unit, 'error) result Lwt.t) ->
+    'a t ->
+    (unit, 'error list) result Lwt.t
 
   val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
 
@@ -288,6 +298,23 @@ module type S_LWT = sig
     (key -> 'a -> (unit, 'trace) result Lwt.t) ->
     ('a, 'trace) t ->
     (unit, 'trace) result Lwt.t
+
+  (** [iter_with_waiting_ep f tbl] iterates [f] over the bindings in [tbl].
+
+      Specifically, for each binding [(k, p)] it waits for [p] to be fulfilled
+      with [Ok v] and calls [f k v]. If [p] fulfills with [Error _] or is
+      rejected, then no call is made for this binding.
+
+      Note however that if one (or more) of the promises returned by [f] ends in
+      [Error]/rejection, the final result of this promise is an
+      [Error]/rejection. Even so, it only resolves once all the promises have.
+
+      It processes all bindings concurrently: it concurrently waits for all the
+      bound promises to resolve and calls [f] as they resolve. *)
+  val iter_with_waiting_ep :
+    (key -> 'a -> (unit, 'error) result Lwt.t) ->
+    ('a, 'error) t ->
+    (unit, 'error list) result Lwt.t
 
   (** [fold_with_waiting_es f tbl init] folds [init] with [f] over the bindings
       in [tbl].

@@ -192,6 +192,15 @@ let init_es ~when_negative_length l f =
   else if l = 0 then nil_es
   else Lwt.apply f 0 >>=? fun v -> aux [v] 1
 
+let init_ep ~when_negative_length l f =
+  let rec aux acc i =
+    if i >= l then all_ep (rev acc)
+    else (aux [@ocaml.tailcall]) (Lwt.apply f i :: acc) (i + 1)
+  in
+  if l < 0 then Lwt.return (Error [when_negative_length])
+  else if l = 0 then nil_es
+  else aux [] 0
+
 let init_p ~when_negative_length l f =
   let rec aux acc i =
     if i >= l then all_p (rev acc) >>= fun xs -> Lwt.return (Ok xs)
@@ -382,6 +391,8 @@ let iter_es f = function
   | h :: t ->
       Lwt.apply f h >>=? fun () -> (iter_es [@ocaml.tailcall]) f t
 
+let iter_ep f l = join_ep (rev_map (Lwt.apply f) l)
+
 let iter_p f l = join_p (rev_map (Lwt.apply f) l)
 
 let iteri_e f l =
@@ -420,6 +431,8 @@ let iteri_es f l =
       unit_es
   | x :: xs ->
       lwt_apply2 f 0 x >>=? fun () -> aux 1 xs
+
+let iteri_ep f l = join_ep (mapi (lwt_apply2 f) l)
 
 let iteri_p f l = join_p (mapi (lwt_apply2 f) l)
 
@@ -462,7 +475,11 @@ let rev_map_es f l =
   | x :: xs ->
       Lwt.apply f x >>=? fun y -> aux [y] xs
 
+let rev_map_ep f l = all_ep @@ rev_map (Lwt.apply f) l
+
 let map_es f l = rev_map_es f l >|=? rev
+
+let map_ep f l = rev_map_ep f l >|=? rev
 
 let rev_map_p f l = all_p @@ rev_map (Lwt.apply f) l
 
@@ -520,7 +537,11 @@ let rev_mapi f l =
 
 let rev_mapi_p f l = all_p @@ rev_mapi f l
 
+let rev_mapi_ep f l = all_ep @@ rev_mapi f l
+
 let mapi_p f l = rev_mapi_p f l >|= rev
+
+let mapi_ep f l = rev_mapi_ep f l >|=? rev
 
 let rec fold_left_e f acc = function
   | [] ->
@@ -556,6 +577,10 @@ let filter_p f l =
   rev_map_p (fun x -> f x >|= fun b -> if b then Some x else None) l
   >|= rev_filter_some
 
+let filter_ep f l =
+  rev_map_ep (fun x -> f x >|=? fun b -> if b then Some x else None) l
+  >|=? rev_filter_some
+
 let rev_filter_map f l =
   fold_left
     (fun acc x -> match f x with None -> acc | Some y -> y :: acc)
@@ -587,6 +612,8 @@ let rev_filter_map_es f l =
     l
 
 let filter_map_es f l = rev_filter_map_es f l >|=? rev
+
+let filter_map_ep f l = rev_map_ep f l >|=? rev_filter_some
 
 let filter_map_p f l = rev_map_p f l >|= rev_filter_some
 
@@ -845,6 +872,8 @@ let for_all_es f = function
       >>=? function
       | true -> (for_all_es [@ocaml.tailcall]) f xs | false -> false_es )
 
+let for_all_ep f l = rev_map_ep f l >|=? for_all Fun.id
+
 let for_all_p f l = rev_map_p f l >|= for_all Fun.id
 
 let rec exists_e f = function
@@ -882,6 +911,8 @@ let exists_es f = function
       false_es
   | x :: xs -> (
       Lwt.apply f x >>=? function false -> exists_es f xs | true -> true_es )
+
+let exists_ep f l = rev_map_ep f l >|=? exists Fun.id
 
 let exists_p f l = rev_map_p f l >|= exists Fun.id
 
@@ -1057,6 +1088,15 @@ let rev_partition_es f l =
 
 let partition_es f l =
   rev_partition_es f l >|=? fun (trues, falses) -> (rev trues, rev falses)
+
+let partition_ep f l =
+  rev_map_ep (fun x -> f x >|=? fun b -> (b, x)) l
+  >|=? fun bxs ->
+  fold_left
+    (fun (trues, falses) (b, x) ->
+      if b then (x :: trues, falses) else (trues, x :: falses))
+    ([], [])
+    bxs
 
 let partition_p f l =
   rev_map_p (fun x -> f x >|= fun b -> (b, x)) l

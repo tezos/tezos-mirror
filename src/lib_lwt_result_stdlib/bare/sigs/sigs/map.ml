@@ -77,6 +77,15 @@ module type S = sig
     'a t ->
     (unit, 'trace) result Lwt.t
 
+  (** [iter_ep f m] applies [f] to the bindings of [m]. All the applications are
+      done concurrently. If all the applications result in [Ok ()], then the
+      result of the iteration is [Ok ()]. If any of the applications results in
+      [Error e] then the result of the iteration is [Error e]. *)
+  val iter_ep :
+    (key -> 'a -> (unit, 'error) result Lwt.t) ->
+    'a t ->
+    (unit, 'error list) result Lwt.t
+
   val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
   (** [fold_e f m init] is

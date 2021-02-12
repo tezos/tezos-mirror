@@ -288,6 +288,12 @@ module type S = sig
     (int -> ('a, 'trace) result Lwt.t) ->
     ('a list, 'trace) result Lwt.t
 
+  val init_ep :
+    when_negative_length:'error ->
+    int ->
+    (int -> ('a, 'error) result Lwt.t) ->
+    ('a list, 'error list) result Lwt.t
+
   val init_p :
     when_negative_length:'trace ->
     int ->
@@ -341,6 +347,11 @@ module type S = sig
     'a list ->
     ('a list, 'trace) result Lwt.t
 
+  val filter_ep :
+    ('a -> (bool, 'trace) result Lwt.t) ->
+    'a list ->
+    ('a list, 'trace list) result Lwt.t
+
   val filter_p : ('a -> bool Lwt.t) -> 'a list -> 'a list Lwt.t
 
   val rev_partition_result : ('a, 'b) result list -> 'a list * 'b list
@@ -372,6 +383,11 @@ module type S = sig
     'a list ->
     ('a list * 'a list, 'trace) result Lwt.t
 
+  val partition_ep :
+    ('a -> (bool, 'trace) result Lwt.t) ->
+    'a list ->
+    ('a list * 'a list, 'trace list) result Lwt.t
+
   val partition_p : ('a -> bool Lwt.t) -> 'a list -> ('a list * 'a list) Lwt.t
 
   (** {4 Traversal variants} *)
@@ -386,6 +402,11 @@ module type S = sig
     'a list ->
     (unit, 'trace) result Lwt.t
 
+  val iter_ep :
+    ('a -> (unit, 'trace) result Lwt.t) ->
+    'a list ->
+    (unit, 'trace list) result Lwt.t
+
   val iter_p : ('a -> unit Lwt.t) -> 'a list -> unit Lwt.t
 
   val iteri_e :
@@ -397,6 +418,11 @@ module type S = sig
     (int -> 'a -> (unit, 'trace) result Lwt.t) ->
     'a list ->
     (unit, 'trace) result Lwt.t
+
+  val iteri_ep :
+    (int -> 'a -> (unit, 'trace) result Lwt.t) ->
+    'a list ->
+    (unit, 'trace list) result Lwt.t
 
   val iteri_p : (int -> 'a -> unit Lwt.t) -> 'a list -> unit Lwt.t
 
@@ -410,6 +436,11 @@ module type S = sig
     'a list ->
     ('b list, 'trace) result Lwt.t
 
+  val map_ep :
+    ('a -> ('b, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'trace list) result Lwt.t
+
   val map_p : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
 
   val mapi_e :
@@ -421,6 +452,11 @@ module type S = sig
     (int -> 'a -> ('b, 'trace) result Lwt.t) ->
     'a list ->
     ('b list, 'trace) result Lwt.t
+
+  val mapi_ep :
+    (int -> 'a -> ('b, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'trace list) result Lwt.t
 
   val mapi_p : (int -> 'a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
 
@@ -436,6 +472,11 @@ module type S = sig
     'a list ->
     ('b list, 'trace) result Lwt.t
 
+  val rev_map_ep :
+    ('a -> ('b, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'trace list) result Lwt.t
+
   val rev_map_p : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
 
   val rev_mapi_e :
@@ -447,6 +488,11 @@ module type S = sig
     (int -> 'a -> ('b, 'trace) result Lwt.t) ->
     'a list ->
     ('b list, 'trace) result Lwt.t
+
+  val rev_mapi_ep :
+    (int -> 'a -> ('b, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'trace list) result Lwt.t
 
   val rev_mapi_p : (int -> 'a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
 
@@ -471,6 +517,11 @@ module type S = sig
     ('a -> ('b option, 'trace) result Lwt.t) ->
     'a list ->
     ('b list, 'trace) result Lwt.t
+
+  val filter_map_ep :
+    ('a -> ('b option, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'trace list) result Lwt.t
 
   val filter_map_p : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
 
@@ -630,6 +681,11 @@ module type S = sig
     'a list ->
     (bool, 'trace) result Lwt.t
 
+  val for_all_ep :
+    ('a -> (bool, 'trace) result Lwt.t) ->
+    'a list ->
+    (bool, 'trace list) result Lwt.t
+
   val for_all_p : ('a -> bool Lwt.t) -> 'a list -> bool Lwt.t
 
   val exists_e :
@@ -641,6 +697,11 @@ module type S = sig
     ('a -> (bool, 'trace) result Lwt.t) ->
     'a list ->
     (bool, 'trace) result Lwt.t
+
+  val exists_ep :
+    ('a -> (bool, 'trace) result Lwt.t) ->
+    'a list ->
+    (bool, 'trace list) result Lwt.t
 
   val exists_p : ('a -> bool Lwt.t) -> 'a list -> bool Lwt.t
 
