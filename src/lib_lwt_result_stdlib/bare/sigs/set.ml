@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** In Lwtreslib, like in the Stdlib, the Set module exports mainly functors
+    to instantiate sets with known-type keys. As a result, the bulk of the
+    documentation for sets is located within the module types returned by
+    the functors: in {!Bare_sigs_sigs.Set}. *)
 module type S = sig
   module type S = Bare_sigs_sigs.Set.S
 

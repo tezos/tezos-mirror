@@ -33,7 +33,7 @@ module type S = sig
       [trace] is the type of values that are seen when matching on [Error _]
       to, say, recover.
 
-      The types [error] and ['error trace] are kept separate (although they can
+      The types ['error] and ['error trace] are kept separate (although they can
       be equal) to support cases such as the following:
       - [trace] are richer than [error], such as by including a
         timestamp, a filename, or some other such metadata.

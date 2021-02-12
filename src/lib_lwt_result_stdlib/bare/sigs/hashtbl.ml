@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** In Lwtreslib, like in the Stdlib, the Hashtbl module exports mainly functors
+    to instantiate hashtables with known-type keys. As a result, the bulk of the
+    documentation for hashtables is located within the module types returned by
+    the functors: in {!Bare_sigs_sigs.Hashtbl}.
+
+    Note the presence of [Make_es] which deviates from the Stdlib to provide
+    specialised convenience for tables of elements the initialisation of which
+    may take time and may fail. *)
 module type S = sig
   val hash : 'a -> int
 
@@ -41,7 +49,7 @@ module type S = sig
   module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
     SeededS with type key = H.t
 
-  module type S_LWT = Bare_sigs_sigs.Hashtbl.S_LWT
+  module type S_ES = Bare_sigs_sigs.Hashtbl.S_ES
 
-  module Make_Lwt (H : Stdlib.Hashtbl.HashedType) : S_LWT with type key = H.t
+  module Make_es (H : Stdlib.Hashtbl.HashedType) : S_ES with type key = H.t
 end

@@ -23,4 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A replacement for {!Stdlib.Option} which is
+    - is exception-safe,
+    - includes Lwt-, result-, and Lwt-result-aware traversors.
+
+    See {!Lwtreslib} and {!Seq} for general description of traversors and the
+    meaning of [_s], [_e], and [_es] suffixes. *)
 module type S = Bare_sigs.Option.S

@@ -23,19 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A wrapper around {!Stdlib.Seq} that includes lwt-, error- and
-    lwt-error-aware traversal functions.
+(** {1 Seq}
 
-    All traversal functions that are suffixed with [_e] are within the error
-    monad. Note that this functions have a “fail-early” behaviour: the traversal
-    is interrupted as when any of the intermediate application fails (i.e.,
-    returns an [Error _]).
+    A replacement for {!Stdlib.Seq} which
+    - is exception-safe,
+    - includes Lwt-, result- and Lwt-result-aware traversal functions.
 
-    All traversal functions that are suffixed with [_s] are within Lwt. These
-    functions traverse the elements sequentially: the promise for a given step
-    of the traversal is only initiated when the promise for the previous step is
-    resolved. Note that these functions have a fail-early behaviour: the
-    traversal is interrupted if any of the intermediate promise is rejected.
+    See {!Lwtreslib} for a general description of traversors and the meaning for
+    the name suffixes. A full description is also below.
+
+    All traversal functions that are suffixed with [_e] are within the result
+    monad. Note that these functions have a "fail-early" behaviour: the
+    traversal is interrupted as when any of the intermediate application fails
+    (i.e., returns an [Error _]).
+
+    All traversal functions that are suffixed with [_s] are within the Lwt
+    monad. These functions traverse the elements sequentially: the promise for a
+    given step of the traversal is only initiated when the promise for the
+    previous step is resolved. Note that these functions have a fail-early
+    behaviour: the traversal is interrupted if any of the intermediate promise
+    is rejected.
 
     All the traversal functions that are suffixed with [_p] are within Lwt.
     These functions traverse the elements concurrently: the promise for all the
@@ -57,6 +64,13 @@
     combined error-and-Lwt monad. These function traverse the elements
     concurrently with a best-effort behaviour.
 *)
+
+(** {2 Special consideration}
+
+    Because of the type of {!Stdlib.Seq.t}, some interactions with Lwt are not
+    possible. Specifically, note that the type includes the variant
+    [Cons of (unit -> ('a * 'a t))] which is not within Lwt. *)
+
 module type S = sig
   (** including the OCaml's {!Stdlib.Seq} module to share the {!Seq.t} type
       (including concrete definition) and to bring the existing functions. *)

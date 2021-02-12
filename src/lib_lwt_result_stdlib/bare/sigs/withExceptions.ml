@@ -23,14 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Functions that raise exceptions are hidden in the main modules of Lwtreslib
+(** Functions that raise exceptions are hidden by the main modules of Lwtreslib
     but available here. These functions are either: very practical or are safe
     in some specific uses (e.g., [List.init] when used with a literal length).
 
     Functions that take a [loc] parameter raise {!Invalid_argument} with the
-    location included in the exception's message.
-*)
-
+    location included in the exception's message. It is intended to be used with
+    the {!__LOC__} value, but it can be used with different messages. *)
 module type S = sig
   module Option : sig
     val get : loc:string -> 'a option -> 'a

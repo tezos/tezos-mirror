@@ -23,18 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Modules with the [S] signature are used to instantiate the other modules of
-    this library. [S] describes a generic Lwt-Result combined monad, the rest of
-    this library builds upon. *)
+(** [S] is the signature for a Lwt, result and Lwt-result combined monad. It is
+    similar to {!Bare_sigs.Monad} with the addition of traces. Specifically:
+
+    - The type ['error trace] is meant to be substituted by a type provided by a
+      [Trace] module ([with type 'error trace := 'error Trace.trace]).
+    - The functions [error_trace] and [fail_trace] allow failing immediately
+      with a trace-wrapped error.
+    - [{join,all,both}_{e,ep}] return ['error trace] rather than ['error list].
+    *)
 module type S = sig
   include Bare_sigs.Monad.S
 
+  (** ['error trace] is intended to be substituted by a type provided by a
+      [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
   type 'error trace
 
+  (** [error_trace e] is [Error (Trace.make e)] where [Trace] is the
+      {!Traced_sigs.Trace} module that is provides the trace type and functions.
+      *)
   val error_trace : 'error -> ('a, 'error trace) result
 
+  (** [fail_trace e] is [Lwt.return (Error (Trace.make e))] where [Trace] is the
+      {!Traced_sigs.Trace} module that is provides the trace type and functions.
+      *)
   val fail_trace : 'error -> ('a, 'error trace) result Lwt.t
 
+  (** [join], [all], and [both] all return traces rather than lists of errors.
+      This applies to both result-only and Lwt-result monads. *)
   val join_e : (unit, 'error trace) result list -> (unit, 'error trace) result
 
   val all_e : ('a, 'error trace) result list -> ('a list, 'error trace) result

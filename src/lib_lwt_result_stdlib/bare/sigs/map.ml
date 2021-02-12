@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** In Lwtreslib, like in the Stdlib, the Map module exports a functor
+    to instantiate maps with known-type keys. As a result, the bulk of the
+    documentation for maps is located within the module types returned by
+    the functors: in {!Bare_sigs_sigs.Map}. *)
 module type S = sig
   module type S = Bare_sigs_sigs.Map.S
 

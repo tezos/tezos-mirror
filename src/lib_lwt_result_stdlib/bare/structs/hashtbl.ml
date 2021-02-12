@@ -102,9 +102,9 @@ module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
       t
 end
 
-module type S_LWT = Bare_sigs_sigs.Hashtbl.S_LWT
+module type S_ES = Bare_sigs_sigs.Hashtbl.S_ES
 
-module Make_Lwt (H : Stdlib.Hashtbl.HashedType) : S_LWT with type key = H.t =
+module Make_es (H : Stdlib.Hashtbl.HashedType) : S_ES with type key = H.t =
 struct
   open Seq
   open Monad

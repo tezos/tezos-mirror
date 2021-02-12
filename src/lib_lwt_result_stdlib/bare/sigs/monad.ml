@@ -23,6 +23,66 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** {1 Lwt, result, and Lwt-result monad operators}
+
+    This module provides the necessary functions and operators to use Lwt,
+    result and Lwt-result as a monad.
+
+    {2 Basics}
+
+    {!Lwt.return}, {!Lwt.bind} ({!(>>=)}), and {!Lwt.map} ({!(>|=)}) are the
+    return, bind, and map of the Lwt monad.
+
+    {!ok}, {!(>>?)}, {!(>|?)} are the return, bind, and map of the result monad.
+    In addition, {!error} is for failures within the result monad.
+
+    {!return}, {!(>>=?)}, {!(>|=?)} are the return, bind, and map of the
+    Lwt-result combined monad. In addition, {!fail} is for the failure within
+    the Lwt-result combined monad.
+
+    Note that future improvements are planned to (a) make those more uniform,
+    and (b) allow the opening of selected infix operators only.
+
+    {2 Preallocated values}
+
+    The module also provides preallocated values for the common types:
+
+    - {!unit_s} (resp {!unit_e}) (resp {!unit_es}) is [Lwt.return ()] (resp
+      [Ok ()]) (resp [Lwt.return (Ok ())]),
+    - {!none_s} (resp {!none_e}) (resp {!none_es}) is [Lwt.return None] (resp
+      [Ok None]) (resp [Lwt.return (Ok None)]),
+    - etc. (see full inventory below)
+
+    Note that some of these values are also available in their dedicated
+    modules. E.g., [none_*] are available in {!Option}.
+
+    {2 Joins}
+
+    The {!join_p} function takes a list of promises [ps] and returns a single
+    promise [p] that resolves with [()] when all the promises of [ps] have
+    resolved.
+
+    The {!all_p} function takes a list of promises [ps] and returns a single
+    promise [p] that resolves when all the promises of [ps] have resolved. The
+    value [p] resolves to is the list of values the promises of [ps] resolve to.
+    The order is preserved.
+
+    The {!both_p} function takes two promises [p1] and [p2] and returns a single
+    promise [p] that resolves when both promises [p1] and [p2] have resolved.
+    The value [p] resolves to is the tuple of values the promises [p1] and [p2]
+    resolve to.
+
+    Note that like all [_p] functions, these functions have a best-effort
+    semantic: they only resolve once all the underlying promises have resolved.
+
+    The [_e] variants are equivalent for the result monad: the final result is
+    [Ok] if all the underlying results are [Ok].
+
+    The [_es] variants are equivalent for the Lwt-result monad: the final
+    promise resolves to [Ok] if all the underlying promise resolve to [Ok].
+
+ *)
+
 module type S = sig
   (** lwt monad *)
 

@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Sets with the signature [S] are exception-safe replacements for
+    sets with the {!Stdlib.Set.S} signature with Lwt- and result-aware
+    traversal functions.
+
+    See {!Lwtreslib}'s introductory documentation for explanations regarding
+    [_e]-, [_s]-, [_es]-, [_p]-, and [_ep]-suffixed functions and exception
+    safety. See {!Stdlib.Set.S} for explanations regarding OCaml's
+    sets in general. *)
 module type S = sig
   type elt
 

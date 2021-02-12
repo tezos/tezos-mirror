@@ -23,9 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A replacement for {!Stdlib.Seq} which
+    - is exception-safe,
+    - includes Lwt-, result- and Lwt-result-aware traversal functions.
+
+    See {!Lwtreslib} for a general description of traversors and the meaning for
+    the name suffixes. A full description is also below. *)
 module type S = sig
   include Bare_sigs.Seq.S
 
+  (** ['error trace] is intended to be substituted by a type provided by a
+      [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
   type 'error trace
 
   (** Similar to {!iter} but wraps the iteration in [result Lwt.t]. All the

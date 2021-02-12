@@ -57,12 +57,12 @@ struct
     let iter_ep f t = Seq.iter_ep (fun (k, v) -> f k v) (to_seq t)
   end
 
-  module type S_LWT =
-    Traced_sigs_sigs.Hashtbl.S_LWT with type 'error trace := 'error Monad.trace
+  module type S_ES =
+    Traced_sigs_sigs.Hashtbl.S_ES with type 'error trace := 'error Monad.trace
 
-  module Make_Lwt (H : Stdlib.Hashtbl.HashedType) : S_LWT with type key = H.t =
+  module Make_es (H : Stdlib.Hashtbl.HashedType) : S_ES with type key = H.t =
   struct
-    include Bare_structs.Hashtbl.Make_Lwt (H)
+    include Bare_structs.Hashtbl.Make_es (H)
 
     let iter_with_waiting_ep f t =
       Monad.join_ep

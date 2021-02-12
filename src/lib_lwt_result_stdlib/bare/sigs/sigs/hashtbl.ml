@@ -23,9 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Hashtbls with the signature [S] are exception-safe (e.g., [find] uses
-    [option] rather than raising [Not_found]) extensions of [Hashtbl.S] with
-    some Lwt- and Error-aware traversal functions. *)
+(** Hashtables with the signature [S] are exception-safe replacements for
+    hashtables with the {!Stdlib.Hashtbl.S} signature with Lwt- and result-aware
+    traversal functions.
+
+    See {!Lwtreslib}'s introductory documentation for explanations regarding
+    [_e]-, [_s]-, [_es]-, [_p]-, and [_ep]-suffixed functions and exception
+    safety. See {!Stdlib.Hashtbl.S} for explanations regarding OCaml's
+    hashtables in general. *)
 module type S = sig
   type key
 
@@ -107,6 +112,14 @@ module type S = sig
   val of_seq : (key * 'a) Stdlib.Seq.t -> 'a t
 end
 
+(** Hashtables with the signature [SeededS] are exception-safe replacements for
+    hashtables with the {!Stdlib.Hashtbl.SeededS} signature with Lwt- and
+    result-aware traversal functions.
+
+    See {!Lwtreslib}'s introductory documentation for explanations regarding
+    [_e]-, [_s]-, [_es]-, [_p]-, and [_ep]-suffixed functions and exception
+    safety. See {!Stdlib.Hashtbl.SeededS} for explanations regarding OCaml's
+    seeded hashtables in general. *)
 module type SeededS = sig
   type key
 
@@ -189,7 +202,7 @@ module type SeededS = sig
   val of_seq : (key * 'a) Stdlib.Seq.t -> 'a t
 end
 
-(** Modules with the signature [S_LWT] are Hashtbl-like with the following
+(** Hashtables with the signature [S_ES] are Hashtbl-like with the following
     differences:
 
     First, the module exports only a few functions in an attempt to limit the
@@ -205,34 +218,34 @@ end
     a value is fulfilled with an [Error _], the binding is removed. This leads
     to the following behavior:
 
-    [
-    (* setup *)
-    let t = create 256 in
-    let () = assert (length t = 0) in
+{[
+(* setup *)
+let t = create 256 in
+let () = assert (length t = 0) in
 
-    (* insert a first promise for a value *)
-    let p, r = Lwt.task () in
-    let i1 = find_or_make t 1 (fun () -> p) in
-    let () = assert (length t = 1) in
+(* insert a first promise for a value *)
+let p, r = Lwt.task () in
+let i1 = find_or_make t 1 (fun () -> p) in
+let () = assert (length t = 1) in
 
-    (* because the same key is used, the promise is not inserted. *)
-    let i2 = find_or_make t 1 (fun () -> assert false) in
-    let () = assert (length t = 1) in
+(* because the same key is used, the promise is not inserted. *)
+let i2 = find_or_make t 1 (fun () -> assert false) in
+let () = assert (length t = 1) in
 
-    (* when the original promise errors, the binding is removed *)
-    let () = Lwt.wakeup r (Error ..) in
-    let () = assert (length t = 0) in
+(* when the original promise errors, the binding is removed *)
+let () = Lwt.wakeup r (Error ..) in
+let () = assert (length t = 0) in
 
-    (* and both [find_or_make] promises have the error *)
-    let () = match Lwt.state i1 with
-      | Return (Error ..) -> ()
-      | _ -> assert false
-    in
-    let () = match Lwt.state i2 with
-      | Return (Error ..) -> ()
-      | _ -> assert false
-    in
-    ]
+(* and both [find_or_make] promises have the error *)
+let () = match Lwt.state i1 with
+  | Return (Error ..) -> ()
+  | _ -> assert false
+in
+let () = match Lwt.state i2 with
+  | Return (Error ..) -> ()
+  | _ -> assert false
+in
+]}
 
     This automatic cleaning relieves the user from the responsibility of
     cleaning the table (which is another possible source of race condition).
@@ -242,7 +255,7 @@ end
     Third, every time a promise is removed from the table (be it by [clean],
     [reset], or just [remove]), the promise is canceled.
 *)
-module type S_LWT = sig
+module type S_ES = sig
   type key
 
   type ('a, 'trace) t

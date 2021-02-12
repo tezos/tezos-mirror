@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A wrapper around {!Stdlib.Option} that includes lwt-, error- and
-    lwt-error-aware traversal functions.
+(** A replacement for {!Stdlib.Option} which is
+    - is exception-safe,
+    - includes Lwt-, result-, and Lwt-result-aware traversors.
 
-    See {!Seq} for general description of traversors, the meaning of [_s], [_e],
-    and [_es] suffixes. *)
-
+    See {!Lwtreslib} and {!Seq} for general description of traversors and the
+    meaning of [_s], [_e], and [_es] suffixes. *)
 module type S = sig
   type 'a t = 'a option = None | Some of 'a
 
@@ -92,6 +92,9 @@ module type S = sig
 
   val join : 'a option option -> 'a option
 
+  (** [either] picks the first [Some _] value of its arguments if any.
+      More formally, [either (Some x) _] is [Some x], [either None (Some y)] is
+      [Some y], and [either None None] is [None]. *)
   val either : 'a option -> 'a option -> 'a option
 
   val map : ('a -> 'b) -> 'a option -> 'b option

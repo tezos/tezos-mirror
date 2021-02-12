@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [Make] is a functor that takes a [Trace] as argument and instantiates all
+    the Traced modules based on it. *)
 module Make (Trace : Traced_sigs.Trace.S) = struct
   module Monad = Monad.Make (Trace)
   module Seq = Seq.Make (Monad)

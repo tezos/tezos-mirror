@@ -23,9 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [S] is the signature for an exception-safe replacements for {!Stdlib.List}
+    with Lwt- and result-aware traversal functions.
+
+    See {!Lwtreslib}'s introductory documentation for explanations regarding
+    [_e]-, [_s]-, [_es]-, [_p]-, and [_ep]-suffixed functions and exception
+    safety. See {!Stdlib.Hashtbl.S} for explanations regarding OCaml's
+    hashtables in general.
+
+    Note that this signature is within the Traced part of the library. As a
+    result, the [_ep] traversor returns en ['error trace]. *)
 module type S = sig
   include Bare_sigs.List.S
 
+  (** ['error trace] is intended to be substituted by a type provided by a
+      [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
   type 'error trace
 
   val init_ep :

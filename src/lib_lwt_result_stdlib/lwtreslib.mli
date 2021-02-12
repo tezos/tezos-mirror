@@ -23,41 +23,172 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Lwt- and result-aware replacements for parts of the Stdlib.
+(** {1 Lwtreslib: the Lwt- and result-aware Stdlib complement.
 
-    This library aims to provide replacements to some parts of the Stdlib that:
+    Lwtreslib (or Lwt-result-stdlib) is a library to complement the OCaml's
+    Stdlib in software projects that make heavy use of Lwt and the result type.
 
-    - do not raise exceptions (e.g., it shadows [Map.find] with [Map.find_opt]),
-    - include traversal functions for Lwt (think [Lwt_list] for [List]),
-      [result], and the combined Lwt-[result] monad.
+    {2 Introduction}
 
-    The aim is to allow the use of the standard OCaml data-structures within the
-    context of Lwt and a result monad. *)
-
-(** [Bare] is a simple combined-monad (as described above) replacement for parts
-    of the Stdlib. It is intended to be opened to shadow some modules of
-    [Stdlib].
-
-    All values within the modules follow the same naming conventions:
-
+    Lwtreslib aims to
     {ul
-      {li Values and traversors with the [_e] suffix (e.g., {Bare.List.map_e})
-          are within the result monad. The [e] stands for "error".}
-      {li Values and traversors with the [_s] suffix (e.g., {Bare.List.map_s})
-          are within the Lwt monad. The [s] stands for "sequential".}
-      {li Traversors with the [_p] suffix (e.g., {Bare.List.map_p})
-          are within the Lwt monad. Unlike [s]-traversors, the [p] traversors
-          operate concurrently on all the elements of the collection. The [p]
-          stands for "parallel" (for compatibility with Lwt, even though
-          "parallel" traversors do not provide parallelism).}
-      {li Values and traversors with the [_es] suffix (e.g., {Bare.List.map_es})
-          are within the combined Lwt-result monad.}
+      {li Replace exception-raising functions with exception-safe one. E.g.,
+          functions that may raise {!Not_found} in the Stdlib are
+          shadowed by functions that return an {!option}.}
+      {li Provide an extensive set of Lwt-, result- and Lwt-result-traversors
+          for the common data-types of the Stdlib. E.g., {!List.map} is
+          available alongside [List.map_s] for Lwt sequential traversal,
+          [List.map_e] for result traversal, etc.}
+      {li Provide a uniform semantic, especially regarding error management.
+          E.g., all sequential traversal functions have the same fail-early
+          semantic, whereas all concurrent traversal functions have the same
+          best-effort semantic.}
+      {li Provide good documentation.}
     }
 
-    In addition, traversors within the result monad ([_e]) and the combined
-    Lwt-result monad ([_es]) have a consistent fail-early semantic: they stop at
-    the first error. For example, the following code returns an [Error] and does
-    not print anything:
+    {2 Semantic}
+
+    The semantic of the functions exported by Lwtreslib is uniform and
+    predictable. This applies to the Stdlib-like functions, the Lwt-aware
+    functions, the result-aware functions, and the Lwt-and-result-aware
+    functions.
+
+    {3 Semantic of vanilla-functions}
+
+    Functions that have the same signature as their Stdlib's counterpart have
+    the same semantic.
+
+    Functions exported by Lwtreslib do not raise exceptions. (With the exception
+    of the functions exported by the {!WithExceptions} module.) If a function
+    raises an exception in the Stdlib, its type is changed in Lwtreslib. In
+    general the following substitution apply:
+
+    {ul
+      {li Functions that may raise {!Not_found} (e.g., [List.find]) return an
+          {!option} instead.}
+      {li Functions that may fail because of indexing errors (e.g., [List.nth],
+          [List.hd], etc.) also return an {!option} instead.}
+      {li Functions that may raise {!Invalid_argument} (e.g., [List.iter2])
+          return a {!result} type instead. The take an additional argument
+          indicating what [Error_] to return instead of the exception.}
+    }
+
+    {3 Semantic of Lwt-aware functions}
+
+    Lwtreslib exports Lwt-aware functions for all traversal functions of the
+    Stdlib.
+
+    Functions with the [_s] suffix traverse their underlying collection
+    sequentially, waiting for the promise associated to one element to resolve
+    before processing to the next element.
+
+    Functions with the [_p] suffix traverse their underlying collection
+    concurrently, creating promises for all the elements and then waiting for
+    all of them to resolve. The "p" in the [_p] suffix is for compatibility with
+    Lwt and in particular [Lwt_list]. The mnemonic is "parallel" even though
+    there is not parallelism, only concurrency.
+
+    These [_s]- and [_p]-suffixed functions are semantically identical to their
+    Lwt counterpart when it is available. Most notably, [Lwtreslib.List] is a
+    strict superset of [Lwt_list].
+
+    {3 Semantic of result-aware functions}
+
+    Lwtreslib exports result-aware functions for all the traversal functions of
+    the Stdlib. These function allow easy manipulation of {!('a, 'e) result}
+    values.
+
+    Functions with the [_e] suffix traverse their underlying collection whilst
+    wrapping the accumulator/result in a [result]. These functions have a
+    fail-early semantic: if one of the step returns an [Error _], then the whole
+    traversal is interrupted and returns the same [Error _].
+
+    {3 Semantic of Lwt-result-aware functions}
+
+    Lwtreslib exports Lwt-result-aware functions for all the traversal functions
+    of the Stdlib. These function allow easy manipulation of
+    [!('a, 'e) result Lwt.t] -- i.e., promises that may fail.
+
+    Functions with the [_es] suffix traverse their underlying collection
+    sequentially (like [_s] functions) whilst wrapping the accumulator/result in
+    a [result] (like [_e] functions). These functions have a fail-early
+    semantic: if one of the step returns a promise that resolves to an
+    [Error _], then the whole traversal is interrupted and the returned promise
+    resolves to the same [Error _].
+
+    Functions with the [_ep] suffix traverse their underlying collection
+    concurrently (like [_p] functions) whilst wrapping the accumulator/result in
+    a [result] (like [_e] functions). These functions have a best-effort
+    semantic: if one of the step returns a promise that resolves to an
+    [Error _], the other promises are left to resolve; once all the promises
+    have resolved, then the returned promise resolves with an [Error _] that
+    carries all the other errors in a list. It is up to the user to convert this
+    list to a more manageable type if needed.
+
+    {3 [Traced]}
+
+    The {!Traced} module offers a small wrapper around Lwtreslib. This wrapper
+    is intended to ease the use of [_ep] functions. It does so by introducing a
+    trace data-type: a structured collection of errors.
+
+    This trace data-type is used to collapse the types ['e] and ['e list] of
+    errors. Indeed, without this collapse, chaining [_ep] together or chaining
+    [_ep] with [_es] functions requires significant boilerplate to flatten
+    lists, to listify single errors, etc. Need for boilerplate mostly vanishes
+    when using the [Traced] wrapper.
+
+    {2 Monad helpers}
+
+    Lwtreslib also exports monadic operators (binds, return, etc.) for the
+    Lwt-monad, the result-monad, and the combined Lwt-result-monad.
+
+    {2 Exceptions}
+
+    If at all possible, avoid exceptions.
+
+    If possible, avoid exceptions.
+
+    If you use exceptions, here are a few things to keep in mind:
+
+    The [_p] functions are semantically equivalent to Lwt's. This means that
+    some exceptions are dropped. Specifically, when more than one promise raises
+    an exception in a concurrent traversor, only one is passed on to the user,
+    the others are silently ignored.
+
+    Use [raise] (rather than [Lwt.fail]) when within an Lwt callback.
+
+    {2 [WithExceptions]}
+
+    The [WithExceptions] module is there for convenience in non-production code
+    and for the specific cases where it is guaranteed not to raise an exception.
+
+    E.g., it is intended for removing the {!option} boxing in cases where the
+    invariant is guaranteed by construction:
+
+{[
+(** Return an interval of integers, from 0 to its argument (if positive)
+    or from its argument to 0 (otherwise). *)
+let steps stop =
+   if stop = 0 then
+      []
+   else if stop > 0 then
+      List.init ~when_negative_length:() Fun.id
+      |> WithExceptions.Option.get ~loc:__LOC__
+   else
+      let stop = Int.neg stop in
+      List.init ~when_negative_length:() Int.neg
+      |> WithExceptions.Option.get ~loc:__LOC__
+]} *)
+
+(** {1 Instance: [Bare]}
+
+    [Bare] provides all the functions as described above. It is intended to be
+    opened to shadow some modules of [Stdlib].
+
+    All values within the modules follow the same naming and semantic
+    conventions described above. The sequential traversors are fail-early:
+    in the following example the code returns an [Error] and does not print
+    anything.
 
 {[
 List.iter_e
@@ -74,33 +205,9 @@ List.iter_e
    ]
 ]}
 
-    The module [WithExceptions] provides some exception-raising helpers to
-    reduce the boilerplate that the library imposes. For example
-
-{[
-let auto_fold f xs =
-   if operations = [] then
-      raise (Invalid_argument "apply: empty list of operations")
-   else
-      let acc = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd xs in
-      let xs = WithExceptions.Option.get ~loc:__LOC__ @@ List.tail xs in
-      List.fold_left f x xs
-]}
-*)
-module Bare : module type of Bare_structs.Structs
-
-(** [Traced] is a functor to generate an advanced combined-monad replaceements
-    for parts of the Stdlib. The generated module is similar to [Bare] with the
-    addition of concurrent, result-aware traversal.
-
-    Specifically, it adds traversors with the [_ep] suffix which operate
-    concurrently on all the elements of a collection within the combined
-    Lwt-result monad.
-
-    All the [_ep] traversors have a best-effort semantic: they return a promise
-    that is resolved only once all the concurrent promises have resolved, even
-    if one of them fails. For example, the following code prints all the
-    non-empty strings in an unspecified order before returning an [Error].
+    The concurrent (parallel) traversors are best-effort: in the following
+    example the code prints all the non-empty strings in an unspecified order
+    before returning an [Error].
 
 {[
 List.iter_ep
@@ -117,10 +224,54 @@ List.iter_ep
    ]
 ]}
 
-    When an [Error] is returned in one or more of the concurrent promises, all
-    the error payloads are combined into a trace. A trace is a data-structure
-    that holds multiple errors together. The specific trace type and
-    construction that holds the errors is specified by the functor argument.
+    The module [WithExceptions] provides some exception-raising helpers to
+    reduce the boilerplate that the library imposes.
+*)
+module Bare : sig
+  module Hashtbl : Bare_sigs.Hashtbl.S
+
+  module List : Bare_sigs.List.S
+
+  module Map : Bare_sigs.Map.S
+
+  module Monad : Bare_sigs.Monad.S
+
+  module Option : Bare_sigs.Option.S
+
+  module Result : Bare_sigs.Result.S
+
+  module Seq : Bare_sigs.Seq.S
+
+  module Set : Bare_sigs.Set.S
+
+  module WithExceptions : Bare_sigs.WithExceptions.S
+end
+
+(** [Traced] is a functor to generate an advanced combined-monad replacements
+    for parts of the Stdlib. The generated module is similar to [Bare] with the
+    addition of traces: structured collections of errors.
+
+    For convenience, the monad includes primitives to error directly with a
+    trace rather than a bare error.
+
+    All the [_ep] traversors return traces of errors rather than lists of
+    errors. The [_ep] traversors preserve their best-effort semantic.
+
+    Additional functions in the [Monad] allow the construction of sequential
+    traces: functions to enrich traces with new errors. E.g.,
+
+{[
+let load_config file =
+   Result.map_error
+     (fun trace ->
+        Trace.cons "cannot load configuration file" trace)
+   @@ begin
+     open_file >>=? fun file ->
+     read_lines file >>=? fun lines ->
+     parse_config lines >>=? fun json ->
+     make_dictionary json
+   end
+]}
 
     Example implementations of traces are provided in the [traces/] directory.
 *)
@@ -146,6 +297,8 @@ module Traced (Trace : Traced_sigs.Trace.S) : sig
   module WithExceptions : Traced_sigs.WithExceptions.S
 end
 
+(** [TzLwtreslib] is a Traced module instantiated to Tezos' Error_monad's Trace.
+*)
 module TzLwtreslib : sig
   module Monad :
     Traced_sigs.Monad.S

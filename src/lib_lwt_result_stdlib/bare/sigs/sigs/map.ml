@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Maps with the signature [S] are exception-safe replacements for
+    maps with the {!Stdlib.Map.S} signature with Lwt- and result-aware
+    traversal functions.
+
+    See {!Lwtreslib}'s introductory documentation for explanations regarding
+    [_e]-, [_s]-, [_es]-, [_p]-, and [_ep]-suffixed functions and exception
+    safety. See {!Stdlib.Map.S} for explanations regarding OCaml's
+    maps in general. *)
 module type S = sig
   type key
 

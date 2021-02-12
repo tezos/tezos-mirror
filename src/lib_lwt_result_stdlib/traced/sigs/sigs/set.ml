@@ -23,9 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Sets with the signature [S] are exception-safe replacements for
+    sets with the {!Stdlib.Set.S} signature with Lwt- and result-aware
+    traversal functions.
+
+    See {!Lwtreslib}'s introductory documentation for explanations regarding
+    [_e]-, [_s]-, [_es]-, [_p]-, and [_ep]-suffixed functions and exception
+    safety. See {!Stdlib.Set.S} for explanations regarding OCaml's
+    sets in general.
+
+    Note that this signature is within the Traced part of the library. As a
+    result, the [_ep] traversor returns en ['error trace]. *)
 module type S = sig
   include Bare_sigs_sigs.Set.S
 
+  (** ['error trace] is intended to be substituted by a type provided by a
+      [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
   type 'error trace
 
   val iter_ep :

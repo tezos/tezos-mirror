@@ -25,37 +25,35 @@
 
 (** {1 List}
 
-    A wrapper around {!Stdlib.List} that includes lwt-, error- and
-    lwt-error-aware traversal functions.
+    A replacement for {!Stdlib.List} which:
+    - replaces the exception-raising functions by exception-safe variants,
+    - provides Lwt-, result- and Lwt-result-aware traversors.
 
-    Supersedes {!Stdlib.List} and {!Lwt_list} both.
+    [List] is intended to shadow both {!Stdlib.List} and {!Lwt_list}. *)
 
-*)
+(** {2 Basics}
 
-(**
-    {2 Basics}
-
-    This follows the design principles and semantic described in {!Sigs.Seq}. In
-    a nutshell:
+    Checkout {!Lwtreslib} for an introduction to the naming and semantic
+    convention of Lwtreslib. In a nutshell:
     - Stdlib functions that raise exceptions are replaced by safe variants
       (typically returning [option]).
-    - The [_e] suffix is for error-aware traversors, [_s] and [_p] are for
-      lwt-aware, and [_es] and [_ep] are for lwt-error-aware.
+    - The [_e] suffix is for result-aware traversors ("e" stands for "error"),
+      [_s] and [_p] are for Lwt-aware, and [_es] and [_ep] are for
+      Lwt-result-aware.
     - [_e], [_s], and [_es] traversors are {i fail-early}: they stop traversal
       as soon as a failure ([Error] or [Fail]) occurs; [_p] and [_ep]
       traversors are {i best-effort}: they only resolve once all of the
-      intermediate promises have even if a failure occurs.
+      intermediate promises have even if a failure occurs. *)
 
-*)
-
-(**
-
-    {2 Double-traversal and combine}
+(** {2 Double-traversal and combine}
 
     Note that double-list traversors ([iter2], [map2], etc., and also [combine])
     take an additional [when_different_lengths] parameter. This is to control
     the error that is returned when the two lists passed as arguments have
     different lengths.
+
+    This mechanism is a replacement for {!Stdlib.List.iter2} (etc.) raising
+    [Invalid_argument].
 
     Note that, as per the fail-early behaviour mentioned above, [_e], [_s], and
     [_es] traversors will have already processed the common-prefix before the
@@ -64,8 +62,7 @@
     Because the best-effort behaviour of [_p] and [_ep] is unsatisfying for this
     failure case, double parallel traversors are omitted from this library.
     (Specifically, it is not obvious whether nor how the
-    [when_different_lengths] error should be composed with the other errors,
-    what shape the trace should have.)
+    [when_different_lengths] error should be composed with the other errors.)
 
     To obtain a different behaviour for sequential traversors, or to process
     two lists in parallel, you can use {!combine} or any of the alternative that
@@ -80,13 +77,10 @@
     of the processing starts. Whilst this is still within the fail-early
     behaviour, it may be surprising enough that it requires mentioning here.
 
-    Because they return early, {!for_all2} and {!exists2} and all their variants
-    may return [Ok _] even tough the arguments have different lengths.
-
-
+    Because they may return early, {!for_all2} and {!exists2} and all their
+    variants may return [Ok _] even tough the arguments have different lengths.
 *)
 
-(** {2 S} *)
 module type S = sig
   (** {3 Boilerplate} *)
 
@@ -117,7 +111,8 @@ module type S = sig
 
   (** {4 Safe lookups, scans, retrievals}
 
-      Return option rather than raise [Not_found] or [Invalid_argument _] *)
+      Return option rather than raise [Not_found], [Failure _], or
+      [Invalid_argument _] *)
 
   (** [hd xs] is the head (first element) of the list or [None] if the list is
       empty. *)
@@ -161,8 +156,7 @@ module type S = sig
   (** {4 Initialisation} *)
 
   (** [init ~when_negative_length n f] is [Error when_negative_length] if [n] is
-      strictly negative and
-      [Ok] {!Stdlib.List.init n f} otherwise. *)
+      strictly negative and [Ok (Stdlib.List.init n f)] otherwise. *)
   val init :
     when_negative_length:'trace ->
     int ->
@@ -261,8 +255,8 @@ module type S = sig
   (** {3 Monad-aware variants}
 
       The functions below are strict extensions of the standard {!Stdlib.List}
-      module. It is for error-, lwt- and lwt-error-aware variants. The meaning
-      of the suffix is as described above and in {!Sigs.Seq}. *)
+      module. It is for result-, lwt- and lwt-result-aware variants. The meaning
+      of the suffix is as described above, in {!Lwtreslib}, and in {!Sigs.Seq}. *)
 
   (** {4 Initialisation variants}
 
