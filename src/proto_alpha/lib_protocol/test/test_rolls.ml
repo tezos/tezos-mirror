@@ -45,21 +45,6 @@ let account_pair = function [a1; a2] -> (a1, a2) | _ -> assert false
 
 let wrap e = Lwt.return (Environment.wrap_tzresult e)
 
-let traverse_rolls ctxt head =
-  let rec loop acc roll =
-    Storage.Roll.Successor.find ctxt roll
-    >>= wrap
-    >>=? function
-    | None -> return (List.rev acc) | Some next -> loop (next :: acc) next
-  in
-  loop [head] head
-
-let get_rolls ctxt delegate =
-  Storage.Roll.Delegate_roll_list.find ctxt delegate
-  >>= wrap
-  >>=? function
-  | None -> return_nil | Some head_roll -> traverse_rolls ctxt head_roll
-
 (** Baking rights consistency. Assert that the number of rolls for
     [account]'s pkh - equals to the number of expected rolls, i.e.,
     staking balance of [account] / (token_per_roll). As of protocol
@@ -83,12 +68,10 @@ let check_rolls (b : Block.t) (account : Account.t) =
     ~fitness:b.header.shell.fitness
   >>= wrap
   >>=? fun ctxt ->
-  get_rolls ctxt account.pkh
+  Roll_storage.count_rolls ctxt account.pkh
+  >>= wrap
   >>=? fun rolls ->
-  Assert.equal_int
-    ~loc:__LOC__
-    (List.length rolls)
-    (Int64.to_int expected_rolls)
+  Assert.equal_int ~loc:__LOC__ rolls (Int64.to_int expected_rolls)
 
 let check_no_rolls (b : Block.t) (account : Account.t) =
   Raw_context.prepare
@@ -99,8 +82,9 @@ let check_no_rolls (b : Block.t) (account : Account.t) =
     ~fitness:b.header.shell.fitness
   >>= wrap
   >>=? fun ctxt ->
-  get_rolls ctxt account.pkh
-  >>=? fun rolls -> Assert.equal_int ~loc:__LOC__ (List.length rolls) 0
+  Roll_storage.count_rolls ctxt account.pkh
+  >>= wrap
+  >>=? fun rolls -> Assert.equal_int ~loc:__LOC__ rolls 0
 
 (** Create a block with two initialized contracts/accounts. Assert
     that the first account has a staking balance that is equal to its
