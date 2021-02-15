@@ -208,7 +208,7 @@ module Mempool = struct
     match receipt with
     | No_operation_metadata ->
         assert false (* only for multipass validator *)
-    | Operation_metadata {contents} -> (
+    | Operation_metadata {contents; mapped_keys = _} -> (
       match contents with
       | Single_result (Endorsement_result _) ->
           Lwt.return_false (* legacy format *)
