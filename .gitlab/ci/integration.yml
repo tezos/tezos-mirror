@@ -117,7 +117,7 @@ integration:sandboxes:daemons-upgrade:
 integration:007_fast:
   extends: .integration_python_template
   script:
-    - poetry run pytest tests_007 -m "not slow" -s --log-dir=tmp 2&>1 | tee tmp/007_fast.out | tail
+    - poetry run pytest tests_007 -m "not slow" -s --log-dir=tmp 2>&1 | tee tmp/007_fast.out | tail
   stage: test
 
 integration:007_baker_endorser:
@@ -213,7 +213,7 @@ integration:007_rpc:
 integration:008_fast:
   extends: .integration_python_template
   script:
-    - poetry run pytest tests_008 -m "not slow" -s --log-dir=tmp 2&>1 | tee tmp/008_fast.out | tail
+    - poetry run pytest tests_008 -m "not slow" -s --log-dir=tmp 2>&1 | tee tmp/008_fast.out | tail
   stage: test
 
 integration:008_baker_endorser:
@@ -309,7 +309,7 @@ integration:008_voting_full:
 integration:alpha_fast:
   extends: .integration_python_template
   script:
-    - poetry run pytest tests_alpha -m "not slow" -s --log-dir=tmp 2&>1 | tee tmp/alpha_fast.out | tail
+    - poetry run pytest tests_alpha -m "not slow" -s --log-dir=tmp 2>&1 | tee tmp/alpha_fast.out | tail
   stage: test
 
 integration:alpha_baker_endorser:
