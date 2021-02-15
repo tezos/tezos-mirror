@@ -22,7 +22,7 @@ fi
 # install dev dependencies if needed
 if [ -n "$dev" ]; then
     opam remote add default --rank=-1 > /dev/null 2>&1 || true
-    opam install merlin odoc ocaml-lsp-server --criteria="-changed,-removed"
+    opam install merlin odoc utop ocp-indent ocaml-lsp-server --criteria="-changed,-removed"
 fi
 
 # remove the default repo so install tezos dependencies
