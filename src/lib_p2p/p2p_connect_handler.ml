@@ -427,8 +427,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
                 ~medium:"Nack"
                 ~source:info.peer_id
                 t.pool
-                points ;
-              Lwt.return_unit
+                points
           | _ ->
               Events.(emit connection_error) (point, err)
               >>= fun () -> Lwt.return_unit )

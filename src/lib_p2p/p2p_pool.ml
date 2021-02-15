@@ -166,9 +166,10 @@ let register_new_point ?trusted t point =
   else None
 
 let register_list_of_new_points ?trusted ~medium ~source t point_list =
-  Event.(emit__dont_wait__use_with_care get_points) (medium, source, point_list) ;
+  Event.(emit get_points) (medium, source, point_list)
+  >>= fun () ->
   let f point = register_new_point ?trusted t point |> ignore in
-  List.iter f point_list
+  Lwt.return (List.iter f point_list)
 
 (* Bounded table used to garbage collect peer_id infos when needed. The
    strategy used is to remove the info of the peer_id with the lowest

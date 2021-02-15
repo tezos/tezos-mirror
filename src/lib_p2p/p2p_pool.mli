@@ -131,7 +131,7 @@ val register_list_of_new_points :
   source:P2p_peer.Id.t ->
   ('msg, 'peer, 'conn) t ->
   P2p_point.Id.t list ->
-  unit
+  unit Lwt.t
 
 (** If [peer] doesn't belong to the table of known peers,
     [register_peer t peer] creates a [P2p_peer.Info.t], triggers a
