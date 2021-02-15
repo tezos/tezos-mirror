@@ -301,14 +301,14 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.map_size
   | (Empty_big_map _, _) ->
       Interp_costs.empty_map
-  | (Big_map_mem, (key, (map, _))) ->
-      Interp_costs.map_mem key map.diff
-  | (Big_map_get, (key, (map, _))) ->
-      Interp_costs.map_get key map.diff
-  | (Big_map_update, (key, (_, (map, _)))) ->
-      Interp_costs.map_update key map.diff
-  | (Big_map_get_and_update, (key, (_, (map, _)))) ->
-      Interp_costs.map_get_and_update key map.diff
+  | (Big_map_mem, (_, (map, _))) ->
+      Interp_costs.big_map_mem map.diff
+  | (Big_map_get, (_, (map, _))) ->
+      Interp_costs.big_map_get map.diff
+  | (Big_map_update, (_, (_, (map, _)))) ->
+      Interp_costs.big_map_update map.diff
+  | (Big_map_get_and_update, (_, (_, (map, _)))) ->
+      Interp_costs.big_map_get_and_update map.diff
   | (Add_seconds_to_timestamp, (n, (t, _))) ->
       Interp_costs.add_seconds_timestamp n t
   | (Add_timestamp_to_seconds, (t, (n, _))) ->
@@ -749,10 +749,11 @@ let rec step_bounded :
       Script_ir_translator.big_map_get ctxt key map
       >>=? fun (res, ctxt) -> logged_return ((res, rest), ctxt)
   | (Big_map_update, (key, (maybe_value, (map, rest)))) ->
-      let big_map = Script_ir_translator.big_map_update key maybe_value map in
-      logged_return ((big_map, rest), ctxt)
+      Script_ir_translator.big_map_update ctxt key maybe_value map
+      >>=? fun (res, ctxt) -> logged_return ((res, rest), ctxt)
   | (Big_map_get_and_update, (k, (v, (map, rest)))) ->
-      let map' = Script_ir_translator.big_map_update k v map in
+      Script_ir_translator.big_map_update ctxt k v map
+      >>=? fun (map', ctxt) ->
       Script_ir_translator.big_map_get ctxt k map
       >>=? fun (v', ctxt) -> logged_return ((v', (map', rest)), ctxt)
   (* timestamp operations *)

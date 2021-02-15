@@ -603,29 +603,9 @@ let test_parse_comb_data () =
    *)
   let id_z = Big_map.Id.unparse_to_z big_map_id in
   let id_prim = Int (-1, id_z) in
-  let module M = struct
-    open Script_int
-
-    type key = n num
-
-    type value = n num option
-
-    let key_ty = Nat_key None
-
-    module OPS = Environment.Map.Make (struct
-      type t = key
-
-      let compare = compare
-    end)
-
-    let boxed = (OPS.empty, 0)
-
-    module type S =
-      Boxed_map with type key = n num and type value = n num option
-  end in
   let expected_big_map =
     let open Script_typed_ir in
-    let diff = (module M : M.S) in
+    let diff = {map = Big_map_overlay.empty; size = 0} in
     let nat_key_ty = Nat_key None in
     {id = Some big_map_id; diff; key_type = nat_key_ty; value_type = nat_ty}
   in
@@ -634,12 +614,9 @@ let test_parse_comb_data () =
     nat1 = nat2 && big_map1.id = big_map2.id
     && big_map1.key_type = big_map2.key_type
     && big_map1.value_type = big_map2.value_type
-    &&
-    let module Diff1 = (val big_map1.diff : M.S) in
-    let module Diff2 = (val big_map2.diff : M.S) in
-    snd Diff1.boxed = snd Diff2.boxed
-    && Diff1.OPS.bindings (fst Diff1.boxed)
-       = Diff2.OPS.bindings (fst Diff2.boxed)
+    && big_map1.diff.size = big_map2.diff.size
+    && Big_map_overlay.bindings big_map1.diff.map
+       = Big_map_overlay.bindings big_map2.diff.map
   in
   test_parse_data
     ~equal

@@ -101,6 +101,17 @@ end
 type ('key, 'value) map =
   (module Boxed_map with type key = 'key and type value = 'value)
 
+module Big_map_overlay = Map.Make (struct
+  type t = Script_expr_hash.t
+
+  let compare = Script_expr_hash.compare
+end)
+
+type ('key, 'value) big_map_overlay = {
+  map : ('key * 'value option) Big_map_overlay.t;
+  size : int;
+}
+
 type operation = packed_internal_operation * Lazy_storage.diffs option
 
 type 'a ticket = {ticketer : address; contents : 'a; amount : n num}
@@ -177,7 +188,7 @@ and 'ty stack_ty =
 
 and ('key, 'value) big_map = {
   id : Big_map.Id.t option;
-  diff : ('key, 'value option) map;
+  diff : ('key, 'value) big_map_overlay;
   key_type : 'key comparable_ty;
   value_type : 'value ty;
 }

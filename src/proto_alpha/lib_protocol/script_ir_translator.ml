@@ -755,22 +755,6 @@ let map_update : type a b. a -> b option -> (a, b) map -> (a, b) map =
           (Box.OPS.remove k map, size - if contains then 1 else 0)
   end )
 
-let map_set : type a b. a -> b -> (a, b) map -> (a, b) map =
- fun k v (module Box) ->
-  ( module struct
-    type key = a
-
-    type value = b
-
-    let key_ty = Box.key_ty
-
-    module OPS = Box.OPS
-
-    let boxed =
-      let (map, size) = Box.boxed in
-      (Box.OPS.add k v map, if Box.OPS.mem k map then size else size + 1)
-  end )
-
 let map_mem : type key value. key -> (key, value) map -> bool =
  fun k (module Box) -> Box.OPS.mem k (fst Box.boxed)
 
@@ -3332,6 +3316,66 @@ let rec parse_data :
     |> traced
     >|=? fun (_, items, ctxt) -> (items, ctxt)
   in
+  let parse_big_map_items (type t) ?type_logger ctxt expr
+      (key_type : t comparable_ty) value_type items item_wrapper =
+    fold_left_s
+      (fun (last_key, {map; size}, ctxt) item ->
+        match item with
+        | Prim (loc, D_Elt, [k; v], annot) ->
+            (if legacy then ok_unit else error_unexpected_annot loc annot)
+            >>?= fun () ->
+            parse_comparable_data ?type_logger ctxt key_type k
+            >>=? fun (k, ctxt) ->
+            hash_comparable_data ctxt key_type k
+            >>=? fun (key_hash, ctxt) ->
+            non_terminal_recursion ?type_logger ctxt ~legacy value_type v
+            >>=? fun (v, ctxt) ->
+            Lwt.return
+              ( ( match last_key with
+                | Some last_key ->
+                    Gas.consume
+                      ctxt
+                      (Michelson_v1_gas.Cost_of.Interpreter.compare
+                         key_type
+                         last_key
+                         k)
+                    >>? fun ctxt ->
+                    let c = compare_comparable key_type last_key k in
+                    if Compare.Int.(0 <= c) then
+                      if Compare.Int.(0 = c) then
+                        error (Duplicate_map_keys (loc, strip_locations expr))
+                      else
+                        error (Unordered_map_keys (loc, strip_locations expr))
+                    else ok ctxt
+                | None ->
+                    ok ctxt )
+              >>? fun ctxt ->
+              Gas.consume
+                ctxt
+                (Michelson_v1_gas.Cost_of.Interpreter.big_map_update
+                   {map; size})
+              >>? fun ctxt ->
+              if Big_map_overlay.mem key_hash map then
+                error (Duplicate_map_keys (loc, strip_locations expr))
+              else
+                ok
+                  ( Some k,
+                    {
+                      map = Big_map_overlay.add key_hash (k, item_wrapper v) map;
+                      size = size + 1;
+                    },
+                    ctxt ) )
+        | Prim (loc, D_Elt, l, _) ->
+            fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
+        | Prim (loc, name, _, _) ->
+            fail @@ Invalid_primitive (loc, [D_Elt], name)
+        | Int _ | String _ | Bytes _ | Seq _ ->
+            fail_parse_data ())
+      (None, {map = Big_map_overlay.empty; size = 0}, ctxt)
+      items
+    |> traced
+    >|=? fun (_, map, ctxt) -> (map, ctxt)
+  in
   match (ty, script_data) with
   | (Unit_t _, expr) ->
       Lwt.return @@ traced_no_lwt
@@ -3471,15 +3515,15 @@ let rec parse_data :
   | (Big_map_t (tk, tv, _ty_name), expr) ->
       ( match expr with
       | Int (loc, id) ->
-          return (Some (id, loc), empty_map tk, ctxt)
+          return (Some (id, loc), {map = Big_map_overlay.empty; size = 0}, ctxt)
       | Seq (_, vs) ->
-          parse_items ?type_logger ctxt expr tk tv vs (fun x -> Some x)
+          parse_big_map_items ?type_logger ctxt expr tk tv vs (fun x -> Some x)
           >|=? fun (diff, ctxt) -> (None, diff, ctxt)
       | Prim (loc, D_Pair, [Int (loc_id, id); Seq (_, vs)], annot) ->
           error_unexpected_annot loc annot
           >>?= fun () ->
           let tv_opt = Option_t (tv, None) in
-          parse_items ?type_logger ctxt expr tk tv_opt vs (fun x -> x)
+          parse_big_map_items ?type_logger ctxt expr tk tv_opt vs (fun x -> x)
           >|=? fun (diff, ctxt) -> (Some (id, loc_id), diff, ctxt)
       | Prim (_, D_Pair, [Int _; expr], _) ->
           traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
@@ -6688,12 +6732,20 @@ let rec unparse_data :
       let items = map_fold (fun k v acc -> (k, v) :: acc) map [] in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
-  | (Big_map_t (_kt, _vt, _), {id = Some id; diff = (module Diff); _})
-    when Diff.OPS.is_empty (fst Diff.boxed) ->
+  | (Big_map_t (_kt, _vt, _), {id = Some id; diff = {size}; _})
+    when Compare.Int.( = ) size 0 ->
       return (Micheline.Int (-1, Big_map.Id.unparse_to_z id), ctxt)
-  | (Big_map_t (kt, vt, _), {id = Some id; diff = (module Diff); _}) ->
+  | (Big_map_t (kt, vt, _), {id = Some id; diff = {map; _}; _}) ->
       let items =
-        Diff.OPS.fold (fun k v acc -> (k, v) :: acc) (fst Diff.boxed) []
+        Big_map_overlay.fold (fun _ (k, v) acc -> (k, v) :: acc) map []
+      in
+      let items =
+        (* Sort the items in Michelson comparison order and not in key
+           hash order. This code path is only exercized for tracing,
+           so we don't bother carbonating this sort operation
+           precisely. Also, the sort uses a reverse compare because
+           [unparse_items] will reverse the result. *)
+        List.sort (fun (a, _) (b, _) -> compare_comparable kt b a) items
       in
       let vt = Option_t (vt, None) in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
@@ -6704,12 +6756,17 @@ let rec unparse_data :
             [Int (-1, Big_map.Id.unparse_to_z id); Seq (-1, items)],
             [] ),
         ctxt )
-  | (Big_map_t (kt, vt, _), {id = None; diff = (module Diff); _}) ->
+  | (Big_map_t (kt, vt, _), {id = None; diff = {map; _}; _}) ->
       let items =
-        Diff.OPS.fold
-          (fun k v acc -> match v with None -> acc | Some v -> (k, v) :: acc)
-          (fst Diff.boxed)
+        Big_map_overlay.fold
+          (fun _ (k, v) acc ->
+            match v with None -> acc | Some v -> (k, v) :: acc)
+          map
           []
+      in
+      let items =
+        (* See note above. *)
+        List.sort (fun (a, _) (b, _) -> compare_comparable kt b a) items
       in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
@@ -6875,31 +6932,36 @@ let pack_data ctxt typ data = pack_data ctxt typ data ~mode:Optimized_legacy
 (* ---------------- Big map -------------------------------------------------*)
 
 let empty_big_map key_type value_type =
-  {id = None; diff = empty_map key_type; key_type; value_type}
+  {
+    id = None;
+    diff = {map = Big_map_overlay.empty; size = 0};
+    key_type;
+    value_type;
+  }
 
 let big_map_mem ctxt key {id; diff; key_type; _} =
-  match (map_get key diff, id) with
+  hash_comparable_data ctxt key_type key
+  >>=? fun (key, ctxt) ->
+  match (Big_map_overlay.find_opt key diff.map, id) with
   | (None, None) ->
       return (false, ctxt)
   | (None, Some id) ->
-      hash_comparable_data ctxt key_type key
-      >>=? fun (hash, ctxt) ->
-      Alpha_context.Big_map.mem ctxt id hash >|=? fun (ctxt, res) -> (res, ctxt)
-  | (Some None, _) ->
+      Alpha_context.Big_map.mem ctxt id key >|=? fun (ctxt, res) -> (res, ctxt)
+  | (Some (_, None), _) ->
       return (false, ctxt)
-  | (Some (Some _), _) ->
+  | (Some (_, Some _), _) ->
       return (true, ctxt)
 
 let big_map_get ctxt key {id; diff; key_type; value_type} =
-  match (map_get key diff, id) with
-  | (Some x, _) ->
+  hash_comparable_data ctxt key_type key
+  >>=? fun (key, ctxt) ->
+  match (Big_map_overlay.find_opt key diff.map, id) with
+  | (Some (_, x), _) ->
       return (x, ctxt)
   | (None, None) ->
       return (None, ctxt)
   | (None, Some id) -> (
-      hash_comparable_data ctxt key_type key
-      >>=? fun (hash, ctxt) ->
-      Alpha_context.Big_map.get_opt ctxt id hash
+      Alpha_context.Big_map.get_opt ctxt id key
       >>=? function
       | (ctxt, None) ->
           return (None, ctxt)
@@ -6913,8 +6975,20 @@ let big_map_get ctxt key {id; diff; key_type; value_type} =
             (Micheline.root value)
           >|=? fun (x, ctxt) -> (Some x, ctxt) )
 
-let big_map_update key value ({diff; _} as map) =
-  {map with diff = map_set key value diff}
+let big_map_update ctxt key value ({diff; key_type; _} as map) =
+  hash_comparable_data ctxt key_type key
+  >>=? fun (key_hash, ctxt) ->
+  let contains = Big_map_overlay.mem key_hash diff.map in
+  return
+    ( {
+        map with
+        diff =
+          {
+            map = Big_map_overlay.add key_hash (key, value) diff.map;
+            size = (if contains then diff.size else diff.size + 1);
+          };
+      },
+      ctxt )
 
 (* ---------------- Lazy storage---------------------------------------------*)
 
@@ -6955,13 +7029,16 @@ let diff_of_big_map ctxt mode ~temporary ~ids_to_copy
          let value_type = Micheline.strip_locations kv in
          (ctxt, Lazy_storage.(Alloc Big_map.{key_type; value_type}), id)) )
   >>=? fun (ctxt, init, id) ->
-  let pairs = map_fold (fun key value acc -> (key, value) :: acc) diff [] in
+  let pairs =
+    Big_map_overlay.fold
+      (fun key_hash (key, value) acc -> (key_hash, key, value) :: acc)
+      diff.map
+      []
+  in
   fold_left_s
-    (fun (acc, ctxt) (key, value) ->
+    (fun (acc, ctxt) (key_hash, key, value) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle
       >>?= fun ctxt ->
-      hash_comparable_data ctxt key_type key
-      >>=? fun (key_hash, ctxt) ->
       unparse_comparable_data ctxt mode key_type key
       >>=? fun (key_node, ctxt) ->
       Gas.consume ctxt (Script.strip_locations_cost key_node)
@@ -7136,8 +7213,13 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
     | (_, Big_map_t (_, _, _), map) ->
         diff_of_big_map ctxt mode ~temporary ~ids_to_copy map
         >|=? fun (diff, id, ctxt) ->
-        let (module Map) = map.diff in
-        let map = {map with diff = empty_map Map.key_ty; id = Some id} in
+        let map =
+          {
+            map with
+            diff = {map = Big_map_overlay.empty; size = 0};
+            id = Some id;
+          }
+        in
         let diff = Lazy_storage.make Big_map id diff in
         let ids_to_copy = Lazy_storage.IdSet.add Big_map id ids_to_copy in
         (ctxt, map, ids_to_copy, diff :: acc)

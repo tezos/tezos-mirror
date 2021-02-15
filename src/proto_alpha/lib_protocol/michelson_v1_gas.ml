@@ -831,6 +831,19 @@ module Cost_of = struct
 
     let map_size = atomic_step_cost cost_N_Map_size
 
+    let big_map_elt_size = S.safe_int Script_expr_hash.size
+
+    let big_map_mem ({size; _} : _ Script_typed_ir.big_map_overlay) =
+      atomic_step_cost (cost_N_Map_mem big_map_elt_size (S.safe_int size))
+
+    let big_map_get ({size; _} : _ Script_typed_ir.big_map_overlay) =
+      atomic_step_cost (cost_N_Map_get big_map_elt_size (S.safe_int size))
+
+    let big_map_update ({size; _} : _ Script_typed_ir.big_map_overlay) =
+      atomic_step_cost (cost_N_Map_update big_map_elt_size (S.safe_int size))
+
+    let big_map_get_and_update m = big_map_get m +@ big_map_update m
+
     let add_seconds_timestamp :
         'a Script_int.num -> Script_timestamp.t -> Gas.cost =
      fun seconds timestamp ->

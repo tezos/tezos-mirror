@@ -93,6 +93,15 @@ module Cost_of : sig
 
     val map_get_and_update : 'k -> ('k, 'v) Script_typed_ir.map -> Gas.cost
 
+    val big_map_mem : (_, _) Script_typed_ir.big_map_overlay -> Gas.cost
+
+    val big_map_get : (_, _) Script_typed_ir.big_map_overlay -> Gas.cost
+
+    val big_map_update : (_, _) Script_typed_ir.big_map_overlay -> Gas.cost
+
+    val big_map_get_and_update :
+      (_, _) Script_typed_ir.big_map_overlay -> Gas.cost
+
     val map_size : Gas.cost
 
     val add_seconds_timestamp :
