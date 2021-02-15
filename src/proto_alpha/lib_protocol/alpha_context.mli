@@ -1788,7 +1788,11 @@ module Parameters : sig
     script : Script.t;
   }
 
-  type bootstrap_baker = {hash : baker_hash; amount : Tez.t; key : public_key}
+  type bootstrap_baker = {
+    hash : baker_hash option;
+    amount : Tez.t;
+    key : public_key;
+  }
 
   type t = {
     bootstrap_accounts : bootstrap_account list;

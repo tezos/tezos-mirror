@@ -38,7 +38,7 @@ type bootstrap_contract = {
 (** A baker is bootstrapped with its hash, initial balance and a key serving as
     its consensus and owner key at the same time. *)
 type bootstrap_baker = {
-  hash : Baker_hash.t;
+  hash : Baker_hash.t option;
   amount : Tez_repr.t;
   key : Signature.Public_key.t;
 }

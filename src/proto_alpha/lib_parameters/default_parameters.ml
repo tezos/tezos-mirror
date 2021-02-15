@@ -128,7 +128,7 @@ let bootstrap_bakers : Parameters.bootstrap_baker list =
       let public_key = Signature.Public_key.of_b58check_exn pk in
       Parameters.
         {
-          hash = Baker_hash.of_b58check_exn baker_hash;
+          hash = Option.some @@ Baker_hash.of_b58check_exn baker_hash;
           amount = bootstrap_balance;
           key = public_key;
         })
@@ -162,7 +162,8 @@ let commitments =
 let make_bootstrap_account (pkh, pk, amount) =
   Parameters.{public_key_hash = pkh; public_key = Some pk; amount}
 
-let make_bootstrap_baker (hash, amount, key) = Parameters.{hash; amount; key}
+let make_bootstrap_baker (hash, amount, key) =
+  Parameters.{hash = Some hash; amount; key}
 
 let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
     ?(bootstrap_contracts = []) ?(bootstrap_bakers = bootstrap_bakers)

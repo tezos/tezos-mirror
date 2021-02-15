@@ -36,7 +36,7 @@ type bootstrap_contract = {
 }
 
 type bootstrap_baker = {
-  hash : Baker_hash.t;
+  hash : Baker_hash.t option;
   amount : Tez_repr.t;
   key : Signature.Public_key.t;
 }
@@ -101,7 +101,7 @@ let bootstrap_baker_encoding =
     (fun {hash; amount; key} -> (hash, amount, key))
     (fun (hash, amount, key) -> {hash; amount; key})
     (obj3
-       (req "hash" Baker_hash.encoding)
+       (opt "hash" Baker_hash.encoding)
        (req "amount" Tez_repr.encoding)
        (req "key" Signature.Public_key.encoding))
 

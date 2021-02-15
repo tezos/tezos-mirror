@@ -50,6 +50,12 @@ let init_contract ~typecheck ctxt
     ~delegate:(Some delegate)
 
 let init_baker ctxt ({hash; amount; key} : Parameters_repr.bootstrap_baker) =
+  ( match hash with
+  | Some hash ->
+      return (ctxt, hash)
+  | None ->
+      Baker_storage.fresh_baker_from_current_nonce ctxt )
+  >>=? fun (ctxt, hash) ->
   Baker_storage.register
     ~baker_hash:hash
     ~prepaid_bootstrap_storage:true
