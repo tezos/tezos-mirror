@@ -103,7 +103,7 @@ integration:sandboxes:daemons-upgrade:
     - touch tests_python/tmp/empty__to_avoid_glob_failing
     - cd tests_python
   after_script:
-    - tail -n +1 tests_python/tmp/*
+    - tail -n 100 tests_python/tmp/*
   artifacts:
     paths:
       - tests_python/tmp/
