@@ -48,14 +48,14 @@ let register protocol =
 let register_mockup () =
   (* Support for Mockup in Carthage was removed in https://gitlab.com/tezos/tezos/-/merge_requests/2502 *)
   let supported_mockup_protocols =
-    Protocol.all_protocols |> List.filter (fun p -> p <> Protocol.Carthage)
+    Protocol.all_protocols |> List.filter (fun p -> p > Protocol.Carthage)
   in
   List.iter Mockup.register supported_mockup_protocols
 
 let register_proxy () =
   (* Tests don't pass for Carthage, but this is not a big deal as Carthage support will drop in the near future. *)
   let supported_proxy_protocols =
-    Protocol.all_protocols |> List.filter (fun p -> p <> Protocol.Carthage)
+    Protocol.all_protocols |> List.filter (fun p -> p > Protocol.Carthage)
   in
   List.iter Proxy.register supported_proxy_protocols
 

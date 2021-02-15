@@ -24,7 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Alpha | Edo | Delphi | Carthage
+(** Declaration order must respect the version order. *)
+type t = Carthage | Delphi | Edo | Alpha
 
 let name = function
   | Alpha ->
