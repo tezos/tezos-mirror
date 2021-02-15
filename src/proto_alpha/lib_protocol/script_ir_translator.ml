@@ -785,6 +785,10 @@ let map_size : type key value. (key, value) map -> Script_int.n Script_int.num
 
 (* ---- Unparsing (Typed IR -> Untyped expressions) of types -----------------*)
 
+(* This part contains the unparsing that does not depend on parsing
+   (everything that cannot contain a lambda). The rest is located at
+   the end of the file. *)
+
 let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
   | Unit_key tname ->
       Unit_t tname
@@ -1166,6 +1170,296 @@ let name_of_ty : type a. a ty -> type_annot option = function
       tname
   | Sapling_transaction_t (_, tname) ->
       tname
+
+let unparse_unit ctxt () = ok (Prim (-1, D_Unit, [], []), ctxt)
+
+let unparse_int ctxt v = ok (Int (-1, Script_int.to_zint v), ctxt)
+
+let unparse_nat ctxt v = ok (Int (-1, Script_int.to_zint v), ctxt)
+
+let unparse_string ctxt s = ok (String (-1, s), ctxt)
+
+let unparse_bytes ctxt s = ok (Bytes (-1, s), ctxt)
+
+let unparse_bool ctxt b =
+  ok (Prim (-1, (if b then D_True else D_False), [], []), ctxt)
+
+let unparse_timestamp ctxt mode t =
+  match mode with
+  | Optimized | Optimized_legacy ->
+      ok (Int (-1, Script_timestamp.to_zint t), ctxt)
+  | Readable -> (
+      Gas.consume ctxt Unparse_costs.timestamp_readable
+      >>? fun ctxt ->
+      match Script_timestamp.to_notation t with
+      | None ->
+          ok (Int (-1, Script_timestamp.to_zint t), ctxt)
+      | Some s ->
+          ok (String (-1, s), ctxt) )
+
+let unparse_address ctxt mode (c, entrypoint) =
+  Gas.consume ctxt Unparse_costs.contract
+  >>? fun ctxt ->
+  ( match entrypoint with
+  (* given parse_address, this should not happen *)
+  | "" ->
+      error Unparsing_invariant_violated
+  | _ ->
+      ok () )
+  >|? fun () ->
+  match mode with
+  | Optimized | Optimized_legacy ->
+      let entrypoint =
+        match entrypoint with "default" -> "" | name -> name
+      in
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn
+          Data_encoding.(tup2 Contract.encoding Variable.string)
+          (c, entrypoint)
+      in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      let notation =
+        match entrypoint with
+        | "default" ->
+            Contract.to_b58check c
+        | entrypoint ->
+            Contract.to_b58check c ^ "%" ^ entrypoint
+      in
+      (String (-1, notation), ctxt)
+
+let unparse_contract ctxt mode (_, address) = unparse_address ctxt mode address
+
+let unparse_signature ctxt mode s =
+  match mode with
+  | Optimized | Optimized_legacy ->
+      Gas.consume ctxt Unparse_costs.signature_optimized
+      >|? fun ctxt ->
+      let bytes = Data_encoding.Binary.to_bytes_exn Signature.encoding s in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      Gas.consume ctxt Unparse_costs.signature_readable
+      >|? fun ctxt -> (String (-1, Signature.to_b58check s), ctxt)
+
+let unparse_mutez ctxt v = ok (Int (-1, Z.of_int64 (Tez.to_mutez v)), ctxt)
+
+let unparse_key ctxt mode k =
+  match mode with
+  | Optimized | Optimized_legacy ->
+      Gas.consume ctxt Unparse_costs.public_key_optimized
+      >|? fun ctxt ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k
+      in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      Gas.consume ctxt Unparse_costs.public_key_readable
+      >|? fun ctxt -> (String (-1, Signature.Public_key.to_b58check k), ctxt)
+
+let unparse_key_hash ctxt mode k =
+  match mode with
+  | Optimized | Optimized_legacy ->
+      Gas.consume ctxt Unparse_costs.key_hash_optimized
+      >|? fun ctxt ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding k
+      in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      Gas.consume ctxt Unparse_costs.key_hash_readable
+      >|? fun ctxt ->
+      (String (-1, Signature.Public_key_hash.to_b58check k), ctxt)
+
+let unparse_operation ctxt (op, _big_map_diff) =
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op
+  in
+  Gas.consume ctxt (Unparse_costs.operation bytes)
+  >|? fun ctxt -> (Bytes (-1, bytes), ctxt)
+
+let unparse_chain_id ctxt mode chain_id =
+  match mode with
+  | Optimized | Optimized_legacy ->
+      Gas.consume ctxt Unparse_costs.chain_id_optimized
+      >|? fun ctxt ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
+      in
+      (Bytes (-1, bytes), ctxt)
+  | Readable ->
+      Gas.consume ctxt Unparse_costs.chain_id_readable
+      >|? fun ctxt -> (String (-1, Chain_id.to_b58check chain_id), ctxt)
+
+let unparse_bls12_381_g1 ctxt x =
+  Gas.consume ctxt Unparse_costs.bls12_381_g1
+  >|? fun ctxt ->
+  let bytes = Bls12_381.G1.to_bytes x in
+  (Bytes (-1, bytes), ctxt)
+
+let unparse_bls12_381_g2 ctxt x =
+  Gas.consume ctxt Unparse_costs.bls12_381_g2
+  >|? fun ctxt ->
+  let bytes = Bls12_381.G2.to_bytes x in
+  (Bytes (-1, bytes), ctxt)
+
+let unparse_bls12_381_fr ctxt x =
+  Gas.consume ctxt Unparse_costs.bls12_381_fr
+  >|? fun ctxt ->
+  let bytes = Bls12_381.Fr.to_bytes x in
+  (Bytes (-1, bytes), ctxt)
+
+(* -- Unparsing data of complex types -- *)
+
+type ('ty, 'depth) comb_witness =
+  | Comb_Pair : ('t, 'd) comb_witness -> (_ * 't, unit -> 'd) comb_witness
+  | Comb_Any : (_, _) comb_witness
+
+let unparse_pair (type r) unparse_l unparse_r ctxt mode
+    (r_comb_witness : (r, unit -> unit -> _) comb_witness) (l, (r : r)) =
+  unparse_l ctxt l
+  >>=? fun (l, ctxt) ->
+  unparse_r ctxt r
+  >|=? fun (r, ctxt) ->
+  (* Fold combs.
+     For combs, three notations are supported:
+     - a) [Pair x1 (Pair x2 ... (Pair xn-1 xn) ...)],
+     - b) [Pair x1 x2 ... xn-1 xn], and
+     - c) [{x1; x2; ...; xn-1; xn}].
+     In readable mode, we always use b),
+     in optimized mode we use the shortest to serialize:
+     - for n=2, [Pair x1 x2],
+     - for n=3, [Pair x1 (Pair x2 x3)],
+     - for n>=4, [{x1; x2; ...; xn}].
+     *)
+  let res =
+    match (mode, r_comb_witness, r) with
+    | (Optimized, Comb_Pair _, Micheline.Seq (_, r)) ->
+        (* Optimized case n > 4 *)
+        Micheline.Seq (-1, l :: r)
+    | ( Optimized,
+        Comb_Pair (Comb_Pair _),
+        Prim (_, D_Pair, [x2; Prim (_, D_Pair, [x3; x4], [])], []) ) ->
+        (* Optimized case n = 4 *)
+        Micheline.Seq (-1, [l; x2; x3; x4])
+    | (Readable, Comb_Pair _, Prim (_, D_Pair, xs, [])) ->
+        (* Readable case n > 2 *)
+        Prim (-1, D_Pair, l :: xs, [])
+    | _ ->
+        (* The remaining cases are:
+            - Optimized n = 2,
+            - Optimized n = 3, and
+            - Readable n = 2,
+            - Optimized_legacy, any n *)
+        Prim (-1, D_Pair, [l; r], [])
+  in
+  (res, ctxt)
+
+let unparse_union unparse_l unparse_r ctxt = function
+  | L l ->
+      unparse_l ctxt l >|=? fun (l, ctxt) -> (Prim (-1, D_Left, [l], []), ctxt)
+  | R r ->
+      unparse_r ctxt r >|=? fun (r, ctxt) -> (Prim (-1, D_Right, [r], []), ctxt)
+
+let unparse_option unparse_v ctxt = function
+  | Some v ->
+      unparse_v ctxt v >|=? fun (v, ctxt) -> (Prim (-1, D_Some, [v], []), ctxt)
+  | None ->
+      return (Prim (-1, D_None, [], []), ctxt)
+
+(* -- Unparsing data of comparable types -- *)
+
+let comparable_comb_witness2 :
+    type t. t comparable_ty -> (t, unit -> unit -> unit) comb_witness =
+  function
+  | Pair_key (_, (Pair_key _, _), _) ->
+      Comb_Pair (Comb_Pair Comb_Any)
+  | Pair_key _ ->
+      Comb_Pair Comb_Any
+  | _ ->
+      Comb_Any
+
+let rec unparse_comparable_data :
+    type a.
+    context ->
+    unparsing_mode ->
+    a comparable_ty ->
+    a ->
+    (Script.node * context) tzresult Lwt.t =
+ fun ctxt mode ty a ->
+  (* No need for stack_depth here. Unlike [unparse_data],
+     [unparse_comparable_data] doesn't call [unparse_code].
+     The stack depth is bounded by the type depth, currently bounded
+     by 1000 (michelson_maximum_type_size). *)
+  Gas.consume ctxt Unparse_costs.unparse_data_cycle
+  (* We could have a smaller cost but let's keep it consistent with
+     [unparse_data] for now. *)
+  >>?= fun ctxt ->
+  match (ty, a) with
+  | (Unit_key _, v) ->
+      Lwt.return @@ unparse_unit ctxt v
+  | (Int_key _, v) ->
+      Lwt.return @@ unparse_int ctxt v
+  | (Nat_key _, v) ->
+      Lwt.return @@ unparse_nat ctxt v
+  | (String_key _, s) ->
+      Lwt.return @@ unparse_string ctxt s
+  | (Bytes_key _, s) ->
+      Lwt.return @@ unparse_bytes ctxt s
+  | (Bool_key _, b) ->
+      Lwt.return @@ unparse_bool ctxt b
+  | (Timestamp_key _, t) ->
+      Lwt.return @@ unparse_timestamp ctxt mode t
+  | (Address_key _, address) ->
+      Lwt.return @@ unparse_address ctxt mode address
+  | (Signature_key _, s) ->
+      Lwt.return @@ unparse_signature ctxt mode s
+  | (Mutez_key _, v) ->
+      Lwt.return @@ unparse_mutez ctxt v
+  | (Key_key _, k) ->
+      Lwt.return @@ unparse_key ctxt mode k
+  | (Key_hash_key _, k) ->
+      Lwt.return @@ unparse_key_hash ctxt mode k
+  | (Chain_id_key _, chain_id) ->
+      Lwt.return @@ unparse_chain_id ctxt mode chain_id
+  | (Pair_key ((tl, _), (tr, _), _), pair) ->
+      let r_witness = comparable_comb_witness2 tr in
+      let unparse_l ctxt v = unparse_comparable_data ctxt mode tl v in
+      let unparse_r ctxt v = unparse_comparable_data ctxt mode tr v in
+      unparse_pair unparse_l unparse_r ctxt mode r_witness pair
+  | (Union_key ((tl, _), (tr, _), _), v) ->
+      let unparse_l ctxt v = unparse_comparable_data ctxt mode tl v in
+      let unparse_r ctxt v = unparse_comparable_data ctxt mode tr v in
+      unparse_union unparse_l unparse_r ctxt v
+  | (Option_key (t, _), v) ->
+      let unparse_v ctxt v = unparse_comparable_data ctxt mode t v in
+      unparse_option unparse_v ctxt v
+  | (Never_key _, _) ->
+      .
+
+let pack_node unparsed ctxt =
+  Gas.consume ctxt (Script.strip_locations_cost unparsed)
+  >>? fun ctxt ->
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      expr_encoding
+      (Micheline.strip_locations unparsed)
+  in
+  Gas.consume ctxt (Script.serialized_cost bytes)
+  >>? fun ctxt ->
+  let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
+  Gas.consume ctxt (Script.serialized_cost bytes) >|? fun ctxt -> (bytes, ctxt)
+
+let pack_comparable_data ctxt typ data ~mode =
+  unparse_comparable_data ctxt mode typ data
+  >>=? fun (unparsed, ctxt) -> Lwt.return @@ pack_node unparsed ctxt
+
+let hash_bytes ctxt bytes =
+  Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
+  >|? fun ctxt -> (Script_expr_hash.(hash_bytes [bytes]), ctxt)
+
+let hash_comparable_data ctxt typ data =
+  pack_comparable_data ctxt typ data ~mode:Optimized_legacy
+  >>=? fun (bytes, ctxt) -> Lwt.return @@ hash_bytes ctxt bytes
 
 (* ---- Tickets ------------------------------------------------------------ *)
 
@@ -2793,10 +3087,6 @@ let parse_address ctxt = function
 let parse_never expr = error @@ Invalid_never_expr (location expr)
 
 (* -- parse data of complex types -- *)
-
-type ('ty, 'depth) comb_witness =
-  | Comb_Pair : ('t, 'd) comb_witness -> (_ * 't, unit -> 'd) comb_witness
-  | Comb_Any : (_, _) comb_witness
 
 let parse_pair (type r) parse_l parse_r ctxt ~legacy
     (r_comb_witness : (r, unit -> _) comb_witness) expr =
@@ -6299,269 +6589,6 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
 
 (* ---- Unparsing (Typed IR -> Untyped expressions) --------------------------*)
 
-(* -- Unparsing data of primitive types -- *)
-
-let unparse_unit ctxt () = ok (Prim (-1, D_Unit, [], []), ctxt)
-
-let unparse_int ctxt v = ok (Int (-1, Script_int.to_zint v), ctxt)
-
-let unparse_nat ctxt v = ok (Int (-1, Script_int.to_zint v), ctxt)
-
-let unparse_string ctxt s = ok (String (-1, s), ctxt)
-
-let unparse_bytes ctxt s = ok (Bytes (-1, s), ctxt)
-
-let unparse_bool ctxt b =
-  ok (Prim (-1, (if b then D_True else D_False), [], []), ctxt)
-
-let unparse_timestamp ctxt mode t =
-  match mode with
-  | Optimized | Optimized_legacy ->
-      ok (Int (-1, Script_timestamp.to_zint t), ctxt)
-  | Readable -> (
-      Gas.consume ctxt Unparse_costs.timestamp_readable
-      >>? fun ctxt ->
-      match Script_timestamp.to_notation t with
-      | None ->
-          ok (Int (-1, Script_timestamp.to_zint t), ctxt)
-      | Some s ->
-          ok (String (-1, s), ctxt) )
-
-let unparse_address ctxt mode (c, entrypoint) =
-  Gas.consume ctxt Unparse_costs.contract
-  >>? fun ctxt ->
-  ( match entrypoint with
-  (* given parse_address, this should not happen *)
-  | "" ->
-      error Unparsing_invariant_violated
-  | _ ->
-      ok () )
-  >|? fun () ->
-  match mode with
-  | Optimized | Optimized_legacy ->
-      let entrypoint =
-        match entrypoint with "default" -> "" | name -> name
-      in
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn
-          Data_encoding.(tup2 Contract.encoding Variable.string)
-          (c, entrypoint)
-      in
-      (Bytes (-1, bytes), ctxt)
-  | Readable ->
-      let notation =
-        match entrypoint with
-        | "default" ->
-            Contract.to_b58check c
-        | entrypoint ->
-            Contract.to_b58check c ^ "%" ^ entrypoint
-      in
-      (String (-1, notation), ctxt)
-
-let unparse_contract ctxt mode (_, address) = unparse_address ctxt mode address
-
-let unparse_signature ctxt mode s =
-  match mode with
-  | Optimized | Optimized_legacy ->
-      Gas.consume ctxt Unparse_costs.signature_optimized
-      >|? fun ctxt ->
-      let bytes = Data_encoding.Binary.to_bytes_exn Signature.encoding s in
-      (Bytes (-1, bytes), ctxt)
-  | Readable ->
-      Gas.consume ctxt Unparse_costs.signature_readable
-      >|? fun ctxt -> (String (-1, Signature.to_b58check s), ctxt)
-
-let unparse_mutez ctxt v = ok (Int (-1, Z.of_int64 (Tez.to_mutez v)), ctxt)
-
-let unparse_key ctxt mode k =
-  match mode with
-  | Optimized | Optimized_legacy ->
-      Gas.consume ctxt Unparse_costs.public_key_optimized
-      >|? fun ctxt ->
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k
-      in
-      (Bytes (-1, bytes), ctxt)
-  | Readable ->
-      Gas.consume ctxt Unparse_costs.public_key_readable
-      >|? fun ctxt -> (String (-1, Signature.Public_key.to_b58check k), ctxt)
-
-let unparse_key_hash ctxt mode k =
-  match mode with
-  | Optimized | Optimized_legacy ->
-      Gas.consume ctxt Unparse_costs.key_hash_optimized
-      >|? fun ctxt ->
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding k
-      in
-      (Bytes (-1, bytes), ctxt)
-  | Readable ->
-      Gas.consume ctxt Unparse_costs.key_hash_readable
-      >|? fun ctxt ->
-      (String (-1, Signature.Public_key_hash.to_b58check k), ctxt)
-
-let unparse_operation ctxt (op, _big_map_diff) =
-  let bytes =
-    Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op
-  in
-  Gas.consume ctxt (Unparse_costs.operation bytes)
-  >|? fun ctxt -> (Bytes (-1, bytes), ctxt)
-
-let unparse_chain_id ctxt mode chain_id =
-  match mode with
-  | Optimized | Optimized_legacy ->
-      Gas.consume ctxt Unparse_costs.chain_id_optimized
-      >|? fun ctxt ->
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
-      in
-      (Bytes (-1, bytes), ctxt)
-  | Readable ->
-      Gas.consume ctxt Unparse_costs.chain_id_readable
-      >|? fun ctxt -> (String (-1, Chain_id.to_b58check chain_id), ctxt)
-
-let unparse_bls12_381_g1 ctxt x =
-  Gas.consume ctxt Unparse_costs.bls12_381_g1
-  >|? fun ctxt ->
-  let bytes = Bls12_381.G1.to_bytes x in
-  (Bytes (-1, bytes), ctxt)
-
-let unparse_bls12_381_g2 ctxt x =
-  Gas.consume ctxt Unparse_costs.bls12_381_g2
-  >|? fun ctxt ->
-  let bytes = Bls12_381.G2.to_bytes x in
-  (Bytes (-1, bytes), ctxt)
-
-let unparse_bls12_381_fr ctxt x =
-  Gas.consume ctxt Unparse_costs.bls12_381_fr
-  >|? fun ctxt ->
-  let bytes = Bls12_381.Fr.to_bytes x in
-  (Bytes (-1, bytes), ctxt)
-
-(* -- Unparsing data of complex types -- *)
-
-let unparse_pair (type r) unparse_l unparse_r ctxt mode
-    (r_comb_witness : (r, unit -> unit -> _) comb_witness) (l, (r : r)) =
-  unparse_l ctxt l
-  >>=? fun (l, ctxt) ->
-  unparse_r ctxt r
-  >|=? fun (r, ctxt) ->
-  (* Fold combs.
-     For combs, three notations are supported:
-     - a) [Pair x1 (Pair x2 ... (Pair xn-1 xn) ...)],
-     - b) [Pair x1 x2 ... xn-1 xn], and
-     - c) [{x1; x2; ...; xn-1; xn}].
-     In readable mode, we always use b),
-     in optimized mode we use the shortest to serialize:
-     - for n=2, [Pair x1 x2],
-     - for n=3, [Pair x1 (Pair x2 x3)],
-     - for n>=4, [{x1; x2; ...; xn}].
-     *)
-  let res =
-    match (mode, r_comb_witness, r) with
-    | (Optimized, Comb_Pair _, Micheline.Seq (_, r)) ->
-        (* Optimized case n > 4 *)
-        Micheline.Seq (-1, l :: r)
-    | ( Optimized,
-        Comb_Pair (Comb_Pair _),
-        Prim (_, D_Pair, [x2; Prim (_, D_Pair, [x3; x4], [])], []) ) ->
-        (* Optimized case n = 4 *)
-        Micheline.Seq (-1, [l; x2; x3; x4])
-    | (Readable, Comb_Pair _, Prim (_, D_Pair, xs, [])) ->
-        (* Readable case n > 2 *)
-        Prim (-1, D_Pair, l :: xs, [])
-    | _ ->
-        (* The remaining cases are:
-            - Optimized n = 2,
-            - Optimized n = 3, and
-            - Readable n = 2,
-            - Optimized_legacy, any n *)
-        Prim (-1, D_Pair, [l; r], [])
-  in
-  (res, ctxt)
-
-let unparse_union unparse_l unparse_r ctxt = function
-  | L l ->
-      unparse_l ctxt l >|=? fun (l, ctxt) -> (Prim (-1, D_Left, [l], []), ctxt)
-  | R r ->
-      unparse_r ctxt r >|=? fun (r, ctxt) -> (Prim (-1, D_Right, [r], []), ctxt)
-
-let unparse_option unparse_v ctxt = function
-  | Some v ->
-      unparse_v ctxt v >|=? fun (v, ctxt) -> (Prim (-1, D_Some, [v], []), ctxt)
-  | None ->
-      return (Prim (-1, D_None, [], []), ctxt)
-
-(* -- Unparsing data of comparable types -- *)
-
-let comparable_comb_witness2 :
-    type t. t comparable_ty -> (t, unit -> unit -> unit) comb_witness =
-  function
-  | Pair_key (_, (Pair_key _, _), _) ->
-      Comb_Pair (Comb_Pair Comb_Any)
-  | Pair_key _ ->
-      Comb_Pair Comb_Any
-  | _ ->
-      Comb_Any
-
-let rec unparse_comparable_data :
-    type a.
-    context ->
-    unparsing_mode ->
-    a comparable_ty ->
-    a ->
-    (Script.node * context) tzresult Lwt.t =
- fun ctxt mode ty a ->
-  (* No need for stack_depth here. Unlike [unparse_data],
-     [unparse_comparable_data] doesn't call [unparse_code].
-     The stack depth is bounded by the type depth, currently bounded
-     by 1000 (michelson_maximum_type_size). *)
-  Gas.consume ctxt Unparse_costs.unparse_data_cycle
-  (* We could have a smaller cost but let's keep it consistent with
-     [unparse_data] for now. *)
-  >>?= fun ctxt ->
-  match (ty, a) with
-  | (Unit_key _, v) ->
-      Lwt.return @@ unparse_unit ctxt v
-  | (Int_key _, v) ->
-      Lwt.return @@ unparse_int ctxt v
-  | (Nat_key _, v) ->
-      Lwt.return @@ unparse_nat ctxt v
-  | (String_key _, s) ->
-      Lwt.return @@ unparse_string ctxt s
-  | (Bytes_key _, s) ->
-      Lwt.return @@ unparse_bytes ctxt s
-  | (Bool_key _, b) ->
-      Lwt.return @@ unparse_bool ctxt b
-  | (Timestamp_key _, t) ->
-      Lwt.return @@ unparse_timestamp ctxt mode t
-  | (Address_key _, address) ->
-      Lwt.return @@ unparse_address ctxt mode address
-  | (Signature_key _, s) ->
-      Lwt.return @@ unparse_signature ctxt mode s
-  | (Mutez_key _, v) ->
-      Lwt.return @@ unparse_mutez ctxt v
-  | (Key_key _, k) ->
-      Lwt.return @@ unparse_key ctxt mode k
-  | (Key_hash_key _, k) ->
-      Lwt.return @@ unparse_key_hash ctxt mode k
-  | (Chain_id_key _, chain_id) ->
-      Lwt.return @@ unparse_chain_id ctxt mode chain_id
-  | (Pair_key ((tl, _), (tr, _), _), pair) ->
-      let r_witness = comparable_comb_witness2 tr in
-      let unparse_l ctxt v = unparse_comparable_data ctxt mode tl v in
-      let unparse_r ctxt v = unparse_comparable_data ctxt mode tr v in
-      unparse_pair unparse_l unparse_r ctxt mode r_witness pair
-  | (Union_key ((tl, _), (tr, _), _), v) ->
-      let unparse_l ctxt v = unparse_comparable_data ctxt mode tl v in
-      let unparse_r ctxt v = unparse_comparable_data ctxt mode tr v in
-      unparse_union unparse_l unparse_r ctxt v
-  | (Option_key (t, _), v) ->
-      let unparse_v ctxt v = unparse_comparable_data ctxt mode t v in
-      unparse_option unparse_v ctxt v
-  | (Never_key _, _) ->
-      .
-
 (* -- Unparsing data of any type -- *)
 
 let comb_witness2 : type t. t ty -> (t, unit -> unit -> unit) comb_witness =
@@ -6835,37 +6862,12 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
       },
       ctxt ) )
 
-let pack_node unparsed ctxt =
-  Gas.consume ctxt (Script.strip_locations_cost unparsed)
-  >>? fun ctxt ->
-  let bytes =
-    Data_encoding.Binary.to_bytes_exn
-      expr_encoding
-      (Micheline.strip_locations unparsed)
-  in
-  Gas.consume ctxt (Script.serialized_cost bytes)
-  >>? fun ctxt ->
-  let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
-  Gas.consume ctxt (Script.serialized_cost bytes) >|? fun ctxt -> (bytes, ctxt)
-
 let pack_data ctxt typ data ~mode =
   unparse_data ~stack_depth:0 ctxt mode typ data
   >>=? fun (unparsed, ctxt) -> Lwt.return @@ pack_node unparsed ctxt
 
-let pack_comparable_data ctxt typ data ~mode =
-  unparse_comparable_data ctxt mode typ data
-  >>=? fun (unparsed, ctxt) -> Lwt.return @@ pack_node unparsed ctxt
-
-let hash_bytes ctxt bytes =
-  Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
-  >|? fun ctxt -> (Script_expr_hash.(hash_bytes [bytes]), ctxt)
-
 let hash_data ctxt typ data =
   pack_data ctxt typ data ~mode:Optimized_legacy
-  >>=? fun (bytes, ctxt) -> Lwt.return @@ hash_bytes ctxt bytes
-
-let hash_comparable_data ctxt typ data =
-  pack_comparable_data ctxt typ data ~mode:Optimized_legacy
   >>=? fun (bytes, ctxt) -> Lwt.return @@ hash_bytes ctxt bytes
 
 let pack_data ctxt typ data = pack_data ctxt typ data ~mode:Optimized_legacy
