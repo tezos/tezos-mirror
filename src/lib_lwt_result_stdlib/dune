@@ -6,7 +6,6 @@
             tezos-lwt-result-stdlib.bare.structs
             tezos-lwt-result-stdlib.traced.sigs
             tezos-lwt-result-stdlib.traced.structs
-            tezos-error-monad
             ))
 
 (rule

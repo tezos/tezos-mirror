@@ -13,6 +13,7 @@ depends: [
   "data-encoding" { >= "0.3" & < "0.4" }
   "lwt"
   "lwt-canceler" { >= "0.3" & < "0.4" }
+  "tezos-lwt-result-stdlib"
   "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [

@@ -7,7 +7,9 @@
  (libraries tezos-stdlib
             data-encoding
             lwt-canceler
-            lwt))
+            lwt
+            tezos-lwt-result-stdlib
+            ))
 
 (rule
  (alias runtest_lint)

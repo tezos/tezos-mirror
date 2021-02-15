@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -293,46 +293,6 @@ module Traced (Trace : Traced_sigs.Trace.S) : sig
   module Seq : Traced_sigs.Seq.S with type 'error trace := 'error Trace.trace
 
   module Set : Traced_sigs.Set.S with type 'error trace := 'error Trace.trace
-
-  module WithExceptions : Traced_sigs.WithExceptions.S
-end
-
-(** [TzLwtreslib] is a Traced module instantiated to Tezos' Error_monad's Trace.
-*)
-module TzLwtreslib : sig
-  module Monad :
-    Traced_sigs.Monad.S
-      with type 'error trace =
-            'error Tezos_error_monad.Error_monad.TzTrace.trace
-
-  module Hashtbl :
-    Traced_sigs.Hashtbl.S
-      with type 'error trace :=
-            'error Tezos_error_monad.Error_monad.TzTrace.trace
-
-  module List :
-    Traced_sigs.List.S
-      with type 'error trace :=
-            'error Tezos_error_monad.Error_monad.TzTrace.trace
-
-  module Map :
-    Traced_sigs.Map.S
-      with type 'error trace :=
-            'error Tezos_error_monad.Error_monad.TzTrace.trace
-
-  module Option : Traced_sigs.Option.S
-
-  module Result : Traced_sigs.Result.S
-
-  module Seq :
-    Traced_sigs.Seq.S
-      with type 'error trace :=
-            'error Tezos_error_monad.Error_monad.TzTrace.trace
-
-  module Set :
-    Traced_sigs.Set.S
-      with type 'error trace :=
-            'error Tezos_error_monad.Error_monad.TzTrace.trace
 
   module WithExceptions : Traced_sigs.WithExceptions.S
 end
