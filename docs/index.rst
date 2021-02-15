@@ -189,6 +189,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/004_Pt24m4xi
    protocols/005_babylon
    protocols/006_carthage
+   protocols/007_delphi
    protocols/008_edo
    protocols/alpha
 
