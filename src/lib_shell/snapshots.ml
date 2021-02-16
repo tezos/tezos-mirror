@@ -1180,6 +1180,19 @@ let import ?(reconstruct = false) ?patch_context ~data_dir
             |> Operation_metadata_list_list_hash.compute)
           predecessor_ops_metadata_hashes
       in
+      Option.iter_s
+        (Store.Block.Block_metadata_hash.store
+           (block_store, Block_header.hash predecessor_block_header))
+        predecessor_block_metadata_hash
+      >>= fun () ->
+      Option.iter_s
+        (Lwt_list.iteri_p (fun i hashes ->
+             Store.Block.Operations_metadata_hashes.store
+               (block_store, Block_header.hash predecessor_block_header)
+               i
+               hashes))
+        predecessor_ops_metadata_hashes
+      >>= fun () ->
       let env =
         {
           Block_validation.max_operations_ttl;
