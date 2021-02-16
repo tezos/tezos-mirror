@@ -145,6 +145,14 @@ val big_map_update :
   ('key, 'value) Script_typed_ir.big_map ->
   (('key, 'value) Script_typed_ir.big_map * context) tzresult Lwt.t
 
+val big_map_get_and_update :
+  context ->
+  'key ->
+  'value option ->
+  ('key, 'value) Script_typed_ir.big_map ->
+  ('value option * ('key, 'value) Script_typed_ir.big_map * context) tzresult
+  Lwt.t
+
 val ty_eq :
   context ->
   Script.location ->

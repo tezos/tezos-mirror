@@ -752,10 +752,8 @@ let rec step_bounded :
       Script_ir_translator.big_map_update ctxt key maybe_value map
       >>=? fun (res, ctxt) -> logged_return ((res, rest), ctxt)
   | (Big_map_get_and_update, (k, (v, (map, rest)))) ->
-      Script_ir_translator.big_map_update ctxt k v map
-      >>=? fun (map', ctxt) ->
-      Script_ir_translator.big_map_get ctxt k map
-      >>=? fun (v', ctxt) -> logged_return ((v', (map', rest)), ctxt)
+      Script_ir_translator.big_map_get_and_update ctxt k v map
+      >>=? fun (v', map', ctxt) -> logged_return ((v', (map', rest)), ctxt)
   (* timestamp operations *)
   | (Add_seconds_to_timestamp, (n, (t, rest))) ->
       let result = Script_timestamp.add_delta t n in

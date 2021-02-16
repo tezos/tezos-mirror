@@ -6952,9 +6952,7 @@ let big_map_mem ctxt key {id; diff; key_type; _} =
   | (Some (_, Some _), _) ->
       return (true, ctxt)
 
-let big_map_get ctxt key {id; diff; key_type; value_type} =
-  hash_comparable_data ctxt key_type key
-  >>=? fun (key, ctxt) ->
+let big_map_get_by_hash ctxt key {id; diff; value_type} =
   match (Big_map_overlay.find_opt key diff.map, id) with
   | (Some (_, x), _) ->
       return (x, ctxt)
@@ -6975,20 +6973,35 @@ let big_map_get ctxt key {id; diff; key_type; value_type} =
             (Micheline.root value)
           >|=? fun (x, ctxt) -> (Some x, ctxt) )
 
-let big_map_update ctxt key value ({diff; key_type; _} as map) =
-  hash_comparable_data ctxt key_type key
-  >>=? fun (key_hash, ctxt) ->
-  let contains = Big_map_overlay.mem key_hash diff.map in
+let big_map_get ctxt key map =
+  hash_comparable_data ctxt map.key_type key
+  >>=? fun (key_hash, ctxt) -> big_map_get_by_hash ctxt key_hash map
+
+let big_map_update_by_hash ctxt key_hash key value map =
+  let contains = Big_map_overlay.mem key_hash map.diff.map in
   return
     ( {
         map with
         diff =
           {
-            map = Big_map_overlay.add key_hash (key, value) diff.map;
-            size = (if contains then diff.size else diff.size + 1);
+            map = Big_map_overlay.add key_hash (key, value) map.diff.map;
+            size = (if contains then map.diff.size else map.diff.size + 1);
           };
       },
       ctxt )
+
+let big_map_update ctxt key value map =
+  hash_comparable_data ctxt map.key_type key
+  >>=? fun (key_hash, ctxt) ->
+  big_map_update_by_hash ctxt key_hash key value map
+
+let big_map_get_and_update ctxt key value map =
+  hash_comparable_data ctxt map.key_type key
+  >>=? fun (key_hash, ctxt) ->
+  big_map_update_by_hash ctxt key_hash key value map
+  >>=? fun (map', ctxt) ->
+  big_map_get_by_hash ctxt key_hash map
+  >>=? fun (old_value, ctxt) -> return (old_value, map', ctxt)
 
 (* ---------------- Lazy storage---------------------------------------------*)
 
