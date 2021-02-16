@@ -940,20 +940,14 @@ let reconstruct_storage store context_index chain_id ~user_activated_upgrades
               (fun i ops -> Store.Block.Operations_metadata.store st i ops)
               ops_metadata
             >>= fun () ->
-            ( match block_metadata_hash with
-            | Some block_metadata_hash ->
-                Store.Block.Block_metadata_hash.store st block_metadata_hash
-            | None ->
-                Lwt.return_unit )
+            Option.iter_s
+              (Store.Block.Block_metadata_hash.store st)
+              block_metadata_hash
             >>= fun () ->
-            ( match ops_metadata_hashes with
-            | Some ops_metadata_hashes ->
-                Lwt_list.iteri_p
-                  (fun i hashes ->
-                    Store.Block.Operations_metadata_hashes.store st i hashes)
-                  ops_metadata_hashes
-            | None ->
-                Lwt.return_unit )
+            Option.iter_s
+              (Lwt_list.iteri_p (fun i hashes ->
+                   Store.Block.Operations_metadata_hashes.store st i hashes))
+              ops_metadata_hashes
             >>= fun () -> reconstruct_chunks (level + 1)
         in
         if (level + 1) mod 1000 = 0 then return level
