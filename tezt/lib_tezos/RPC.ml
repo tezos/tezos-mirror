@@ -32,6 +32,10 @@ let get_connections ?node ?hooks ?peer_id client =
       let path = ["network"; "connections"; peer_id] in
       Client.rpc ?node ?hooks GET path client
 
+let get_greylist_ips ?node ?hooks client =
+  let path = ["network"; "greylist"; "ips"] in
+  Client.rpc ?node ?hooks GET path client
+
 let get_chain_id ?node ?hooks ?(chain = "main") client =
   let path = ["chains"; chain; "chain_id"] in
   Client.rpc ?node ?hooks GET path client

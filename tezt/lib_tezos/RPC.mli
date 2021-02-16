@@ -36,6 +36,10 @@ val get_connections :
   Client.t ->
   JSON.t Lwt.t
 
+(** Call RPC /network/greylist/ips *)
+val get_greylist_ips :
+  ?node:Node.t -> ?hooks:Process.hooks -> Client.t -> JSON.t Lwt.t
+
 (** Call RPC /chain/[chain]/chain_id *)
 val get_chain_id :
   ?node:Node.t ->

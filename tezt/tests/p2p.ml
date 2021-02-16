@@ -30,6 +30,76 @@
    Subject:      Integration tests of p2p layer.
 *)
 
+module ACL = struct
+  (* Test.
+
+   Check IP address greylisting mechanism with unauthenticated connection.
+
+   1. Start a node,
+   2. Write noise on the welcome worker of this node,
+   3. Check the IP greylist with a RPC,
+   4. Try to connect to a greylisted node. *)
+  let check_ip_greylisting () =
+    let pp_list ~elt_pp l =
+      let rec pp_rec ~elt_pp ppf = function
+        | [] ->
+            ()
+        | [elt] ->
+            Format.fprintf ppf "%a" elt_pp elt
+        | head :: tail ->
+            Format.fprintf ppf "%a, " elt_pp head ;
+            pp_rec ~elt_pp ppf tail
+      in
+      Format.asprintf "[%a]" (pp_rec ~elt_pp) l
+    in
+    Test.register
+      ~__FILE__
+      ~title:"check ip greylisting"
+      ~tags:["p2p"; "acl"; "greylist"]
+    @@ fun () ->
+    let localhost_ips =
+      [ (* 127.0.0.1 *)
+        Unix.inet_addr_loopback;
+        (* ::1 *)
+        Unix.inet6_addr_loopback;
+        Unix.inet_addr_of_string "::ffff:127.0.0.1";
+        Unix.inet_addr_of_string "::ffff:7f00:0001" ]
+    in
+    let* target = Node.init [] in
+    let* node = Node.init [] in
+    let* client = Client.init ~node:target () in
+    let* () =
+      Node.send_raw_data
+        target
+        ~data:"\000\010Hello, world. This is garbage, greylist me !"
+    in
+    let* json = RPC.get_greylist_ips client in
+    let greylisted_ips = JSON.(as_list (json |-> "ips")) in
+    let nb_greylisted_ips = List.length greylisted_ips in
+    if nb_greylisted_ips <> 1 then
+      Test.fail
+        "The number of greylisted IPs is incorrect (actual: %d, expected: 1)."
+        nb_greylisted_ips ;
+    let greylisted_ip =
+      Unix.inet_addr_of_string (JSON.as_string (List.hd greylisted_ips))
+    in
+    if List.for_all (( <> ) greylisted_ip) localhost_ips then
+      Test.fail
+        "The greylisted IP is incorrect (actual: %s, expected: one of %s)."
+        (Unix.string_of_inet_addr greylisted_ip)
+        (pp_list
+           ~elt_pp:(fun ppf ip ->
+             Format.fprintf ppf "%s" (Unix.string_of_inet_addr ip))
+           localhost_ips) ;
+    let process = Client.Admin.spawn_connect_address ~peer:node client in
+    let error_rex =
+      rex "Error:(\n|.)*The address you tried to connect \\(.*\\) is banned."
+    in
+    Process.check_error ~msg:error_rex process
+
+  let tests () = check_ip_greylisting ()
+end
+
 (* [wait_for_accepted_peer_ids] waits until the node connects to a peer for
    which an expected [peer_id] was set. *)
 let wait_for_accepted_peer_ids node =
@@ -203,4 +273,5 @@ let register_protocol_independent () = Maintenance.tests ()
 
 let register ~protocols =
   check_peer_option ~protocols ;
-  test_one_connection ~protocols
+  test_one_connection ~protocols ;
+  ACL.tests ()

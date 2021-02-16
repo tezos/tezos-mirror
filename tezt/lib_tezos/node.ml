@@ -399,3 +399,26 @@ let restart node arguments =
   let* () = terminate node in
   let* () = run node arguments in
   wait_for_ready node
+
+let send_raw_data node ~data =
+  (* Extracted from Lwt_utils_unix. *)
+  let write_string ?(pos = 0) ?len descr buf =
+    let len = match len with None -> String.length buf - pos | Some l -> l in
+    let rec inner pos len =
+      if len = 0 then Lwt.return_unit
+      else
+        Lwt.bind (Lwt_unix.write_string descr buf pos len) (function
+            | 0 ->
+                Lwt.fail End_of_file
+                (* other endpoint cleanly closed its connection *)
+            | nb_written ->
+                inner (pos + nb_written) (len - nb_written))
+    in
+    inner pos len
+  in
+  Log.debug "Write raw data to node %s" node.name ;
+  let socket = Lwt_unix.socket PF_INET SOCK_STREAM 0 in
+  Lwt_unix.set_close_on_exec socket ;
+  let uaddr = Lwt_unix.ADDR_INET (Unix.inet_addr_loopback, net_port node) in
+  let* () = Lwt_unix.connect socket uaddr in
+  write_string socket data

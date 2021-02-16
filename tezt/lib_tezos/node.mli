@@ -289,3 +289,7 @@ val init :
     You can pass them to [restart], or you can pass other values if you want
     to restart with other parameters. *)
 val restart : t -> argument list -> unit Lwt.t
+
+(** [send_raw_data node ~data] writes [~data] using an IP socket on the net
+    port of [node]. *)
+val send_raw_data : t -> data:string -> unit Lwt.t
