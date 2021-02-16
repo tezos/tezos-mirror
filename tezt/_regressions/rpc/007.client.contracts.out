@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/007.contracts.out
+tezt/_regressions/rpc/007.client.contracts.out
 
 ./tezos-client rpc get /chains/main/blocks/head/context/contracts
 [ "[PUBLIC_KEY_HASH]",

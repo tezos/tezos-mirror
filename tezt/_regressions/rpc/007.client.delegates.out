@@ -1,11 +1,10 @@
-tezt/_regressions/rpc/alpha.delegates.out
+tezt/_regressions/rpc/007.client.delegates.out
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "balance": "4000000000000", "frozen_balance": "0",
   "frozen_balance_by_cycle": [], "staking_balance": "4000000000000",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
-  "delegated_balance": "0", "deactivated": false, "grace_period": 5,
-  "voting_power": 500 }
+  "delegated_balance": "0", "deactivated": false, "grace_period": 5 }
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/balance'
 "4000000000000"
@@ -30,9 +29,6 @@ false
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'
 "4000000000000"
-
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/voting_power'
-500
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 Fatal error:
@@ -72,6 +68,3 @@ Fatal error:
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'
 "0"
-
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/voting_power'
-0

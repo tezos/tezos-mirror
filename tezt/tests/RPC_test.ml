@@ -41,24 +41,51 @@
    regression testing *)
 let hooks = Regression.scrubbing_hooks
 
+type client_mode_tag = Client | Mockup | Proxy
+
+let client_mode_tag_to_suffix = function
+  | Client ->
+      "client"
+  | Mockup ->
+      "mockup"
+  | Proxy ->
+      "proxy"
+
+let client_mode_tag_to_mode client_mode_tag node : Client.mode =
+  match client_mode_tag with
+  | Client ->
+      Client (Some node)
+  | Mockup ->
+      Mockup
+  | Proxy ->
+      Proxy node
+
 (* A helper to register a RPC test environment with a node and a client for the
    given protocol version. *)
-let check_rpc ~group_name ~protocol
+let check_rpc ~group_name ~protocol ~client_mode_tag
     ~(rpcs :
        (string * (Client.t -> unit Lwt.t) * Protocol.parameter_overrides option)
        list) () =
+  let client_mode_suffix = client_mode_tag_to_suffix client_mode_tag in
   List.iter
     (fun (sub_group, rpc, parameter_overrides) ->
       Regression.register
         ~__FILE__
-        ~title:(sf "%s RPC regression tests: %s" group_name sub_group)
+        ~title:
+          (sf
+             "%s (mode %s) RPC regression tests: %s"
+             group_name
+             client_mode_suffix
+             sub_group)
         ~tags:["rpc"; group_name; sub_group]
-        ~output_file:("rpc" // sf "%s.%s" group_name sub_group)
+        ~output_file:
+          ("rpc" // sf "%s.%s.%s" group_name client_mode_suffix sub_group)
       @@ fun () ->
       (* Initialize a node with alpha protocol and data to be used for RPC calls.
          The log of the node is not captured in the regression output. *)
       let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
       let* client = Client.init ~node () in
+      Client.set_mode (client_mode_tag_to_mode client_mode_tag node) client ;
       let* parameter_file =
         match parameter_overrides with
         | None ->
@@ -528,6 +555,7 @@ let register () =
   check_rpc
     ~group_name:"alpha"
     ~protocol:Protocol.Alpha
+    ~client_mode_tag:Client
     ~rpcs:
       [ ("contracts", test_contracts (module RPC.Proto_alpha), None);
         ("delegates", test_delegates_alpha, None);
@@ -542,6 +570,7 @@ let register () =
   check_rpc
     ~group_name:"007"
     ~protocol:Protocol.Delphi
+    ~client_mode_tag:Client
     ~rpcs:
       [ ("contracts", test_contracts (module RPC.Proto_007), None);
         ("delegates", test_delegates_007, None);

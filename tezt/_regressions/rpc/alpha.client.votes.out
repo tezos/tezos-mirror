@@ -1,10 +1,14 @@
-tezt/_regressions/rpc/007.votes.out
+tezt/_regressions/rpc/alpha.client.votes.out
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballot_list
 []
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballots
 { "yay": 0, "nay": 0, "pass": 0 }
+
+./tezos-client rpc get /chains/main/blocks/head/votes/current_period
+{ "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
+  "position": 1, "remaining": 2 }
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_period_kind
 "proposal"
@@ -25,6 +29,13 @@ null
 ./tezos-client rpc get /chains/main/blocks/head/votes/proposals
 [ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", 500 ] ]
 
+./tezos-client rpc get /chains/main/blocks/head/votes/successor_period
+{ "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
+  "position": 2, "remaining": 1 }
+
+./tezos-client rpc get /chains/main/blocks/head/votes/total_voting_power
+2500
+
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballot_list
 [ { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "nay" },
   { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "pass" },
@@ -33,8 +44,12 @@ null
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballots
 { "yay": 500, "nay": 500, "pass": 500 }
 
+./tezos-client rpc get /chains/main/blocks/head/votes/current_period
+{ "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
+  "position": 0, "remaining": 3 }
+
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_period_kind
-"testing_vote"
+"exploration"
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_proposal
 "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
@@ -51,3 +66,10 @@ null
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/proposals
 []
+
+./tezos-client rpc get /chains/main/blocks/head/votes/successor_period
+{ "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
+  "position": 1, "remaining": 2 }
+
+./tezos-client rpc get /chains/main/blocks/head/votes/total_voting_power
+2500
