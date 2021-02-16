@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module contains RPC module types that are shared between protocols.
+    Typically each protocol RPC module type should include these and add
+    protocol-specific RPC function signatures. *)
+
 module type COMMON_PROTOCOL = sig
   (** Call RPC /chain/[chain]/blocks/[block]/context/constants *)
   val get_constants :

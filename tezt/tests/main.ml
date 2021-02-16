@@ -40,9 +40,7 @@ let register protocol =
   Basic.register protocol ;
   Bootstrap.register protocol ;
   Synchronisation_heuristic.register protocol ;
-  Mockup.register protocol ;
   Normalize.register protocol ;
-  Proxy.register protocol ;
   Double_bake.register protocol
 
 let register_mockup () =

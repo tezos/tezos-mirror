@@ -71,6 +71,9 @@ let inject_block ?node ?hooks ~data client =
   let path = ["injection"; "block"] in
   Client.rpc ?node ?hooks ~data POST path client
 
+(** Module containing the implementation of the common RPCs between protocols.
+    Typically protocol RPC modules should include this module and add their
+    specific RPC implementations. *)
 module Proto_common = struct
   let get_constants ?node ?hooks ?(chain = "main") ?(block = "head") client =
     let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in
