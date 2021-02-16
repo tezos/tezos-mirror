@@ -568,9 +568,39 @@ let register () =
         ("others", test_others (module RPC.Proto_alpha), None) ]
     () ;
   check_rpc
+    ~group_name:"alpha"
+    ~protocol:Protocol.Alpha
+    ~client_mode_tag:Proxy
+    ~rpcs:
+      [ ("contracts", test_contracts (module RPC.Proto_alpha), None);
+        ("delegates", test_delegates_alpha, None);
+        ( "votes",
+          test_votes_alpha,
+          Some
+            (* reduced periods duration to get to testing vote period faster *)
+            [ (["blocks_per_cycle"], Some "4");
+              (["blocks_per_voting_period"], Some "4") ] );
+        ("others", test_others (module RPC.Proto_alpha), None) ]
+    () ;
+  check_rpc
     ~group_name:"007"
     ~protocol:Protocol.Delphi
     ~client_mode_tag:Client
+    ~rpcs:
+      [ ("contracts", test_contracts (module RPC.Proto_007), None);
+        ("delegates", test_delegates_007, None);
+        ( "votes",
+          test_votes_007,
+          Some
+            (* reduced periods duration to get to testing vote period faster *)
+            [ (["blocks_per_cycle"], Some "4");
+              (["blocks_per_voting_period"], Some "4") ] );
+        ("others", test_others (module RPC.Proto_007), None) ]
+    () ;
+  check_rpc
+    ~group_name:"007"
+    ~protocol:Protocol.Delphi
+    ~client_mode_tag:Proxy
     ~rpcs:
       [ ("contracts", test_contracts (module RPC.Proto_007), None);
         ("delegates", test_delegates_007, None);
