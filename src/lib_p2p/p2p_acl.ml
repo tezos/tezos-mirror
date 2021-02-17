@@ -116,6 +116,11 @@ module IPGreylist = struct
      acl.greylist_peers set until more peers are banned. *)
   let gc acl = Bloomer.countdown acl.greylist_ips
 
+  let fill_percentage acl = Bloomer.fill_percentage acl.greylist_ips
+
+  let life_expectancy_histogram acl =
+    Bloomer.life_expectancy_histogram acl.greylist_ips
+
   let encoding = Data_encoding.(list P2p_addr.encoding)
 end
 

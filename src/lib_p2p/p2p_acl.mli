@@ -91,6 +91,17 @@ module IPGreylist : sig
      false positive due to the underlying probabilistic structure. *)
   val mem : t -> P2p_addr.t -> bool
 
+  (** [fill_percentage t] returns the percentage (in the [0,1] interval)
+      of bloom filter cells which are nonzero. *)
+  val fill_percentage : t -> float
+
+  (** [life_expectancy_histogram t] returns the life expectancy
+      distribution of cells (measured in [gc] calls) stored as
+      an array: the value at index [k] stores the number
+      of cells that are [k] calls to [gc] away from being
+      removed from the greylist. *)
+  val life_expectancy_histogram : t -> int array
+
   val encoding : P2p_addr.t list Data_encoding.t
 end
 
