@@ -162,33 +162,41 @@ module P2p_connect_handler = struct
       ~level:Notice
       ()
 
+  let authenticate_start =
+    declare_2
+      ~section
+      ~name:"authenticate_start"
+      ~msg:"start authentication for point {point} ({direction})"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("direction", Data_encoding.string)
+
   let authenticate =
     declare_3
       ~section
       ~name:"authenticate"
-      ~msg:"authenticate: {point} {type} -> {state}"
+      ~msg:"authentication for point {point}. direction:{direction} -> {state}"
       ~level:Debug
       ("point", P2p_point.Id.encoding)
-      ("type", Data_encoding.(option string))
-      ("state", Data_encoding.(option string))
+      ("direction", Data_encoding.string)
+      ("state", Data_encoding.string)
 
   let authenticate_status =
     declare_3
       ~section
       ~name:"authenticate_status"
-      ~msg:"authenticate: {point} {type} -> {peer}"
+      ~msg:"authentication status for point {point} {type} -> {peer}"
       ~level:Debug
       ("type", Data_encoding.string)
       ("point", P2p_point.Id.encoding)
       ("peer", P2p_peer.Id.encoding)
 
   let authenticate_status_peer_id_correct =
-    declare_3
+    declare_2
       ~section
       ~name:"authenticate_status_peer_id_correct"
-      ~msg:"authenticate: {point} {type} -> {peer}"
+      ~msg:"expected peer id {peer} for this point {point}"
       ~level:Notice
-      ("type", Data_encoding.string)
       ("point", P2p_point.Id.encoding)
       ("peer", P2p_peer.Id.encoding)
 
@@ -209,7 +217,7 @@ module P2p_connect_handler = struct
     declare_2
       ~section
       ~name:"authentication_error"
-      ~msg:"authenticate: {point} {errors}"
+      ~msg:"authentication error for {point}: {errors}"
       ~level:Debug
       ~pp2:pp_print_error_first
       ("point", P2p_point.Id.encoding)
@@ -244,19 +252,18 @@ module P2p_connect_handler = struct
     declare_2
       ~section
       ~name:"connect_status"
-      ~msg:"connect: {point} {state}"
+      ~msg:"connection status for {point}: {state}"
       ~level:Debug
       ("state", Data_encoding.string)
       ("point", P2p_point.Id.encoding)
 
   let connect_error =
-    declare_3
+    declare_2
       ~section
       ~name:"connect_error"
-      ~msg:"connect: {point} {state} : {errors}"
+      ~msg:"connection error for point {point}, disconnecting: {errors}"
       ~level:Debug
-      ~pp3:pp_print_error_first
-      ("state", Data_encoding.string)
+      ~pp2:pp_print_error_first
       ("point", P2p_point.Id.encoding)
       ("errors", Error_monad.trace_encoding)
 

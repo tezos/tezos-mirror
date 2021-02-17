@@ -223,15 +223,15 @@ let check_expected_peer_id (point_info : 'a P2p_point_state.Info.t option)
                   })
           else
             Events.(emit authenticate_status_peer_id_correct)
-              ("peer_id", point, conn_info.peer_id)
+              (point, conn_info.peer_id)
             >>= return)
         (P2p_point_state.Info.get_expected_peer_id point_info))
     point_info
 
 let raw_authenticate t ?point_info canceler scheduled_conn point =
   let incoming = point_info = None in
-  let incoming_opt = if incoming then Some "incoming" else None in
-  Events.(emit authenticate) (point, incoming_opt, None)
+  let incoming_str = if incoming then "incoming" else "outgoing" in
+  Events.(emit authenticate_start) (point, incoming_str)
   >>= fun () ->
   protect
     ~canceler
@@ -250,7 +250,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
       ( match err with
       | [Canceled] ->
           (* Currently only on time out *)
-          Events.(emit authenticate) (point, incoming_opt, Some "canceled")
+          Events.(emit authenticate) (point, incoming_str, "canceled")
       | err ->
           (* Authentication incorrect! Temp ban the offending points/peers *)
           List.iter
@@ -268,7 +268,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
               | _ ->
                   ())
             err ;
-          Events.(emit authenticate) (point, incoming_opt, Some "failed") )
+          Events.(emit authenticate) (point, incoming_str, "failed") )
       >>= fun () ->
       Events.(emit authenticate_error) (point, err)
       >>= fun () ->
@@ -559,7 +559,7 @@ let connect ?timeout t point =
           t.log (Outgoing_connection point) ;
           P2p_fd.connect fd uaddr >>= fun () -> return_unit)
         ~on_error:(fun err ->
-          Events.(emit connect_error) ("disconnect", point, err)
+          Events.(emit connect_error) (point, err)
           >>= fun () ->
           let timestamp = Systime_os.now () in
           P2p_point_state.set_disconnected
