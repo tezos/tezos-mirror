@@ -184,6 +184,7 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: Protocols:
 
+   protocols/naming
    protocols/003_PsddFKi3
    protocols/004_Pt24m4xi
    protocols/005_babylon
