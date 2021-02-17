@@ -1,6 +1,6 @@
 (*****************************************************************************)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -66,3 +66,9 @@ val countdown : 'a t -> unit
 
 (** Clears the entire set. *)
 val clear : 'a t -> unit
+
+(** Percentage (in the [0;1] interval) of cells which are nonzero. *)
+val fill_percentage : 'a t -> float
+
+(** Histogram of life expectancies (measured in number of countdowns to 0). *)
+val life_expectancy_histogram : 'a t -> int array

@@ -1,6 +1,6 @@
 (*****************************************************************************)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -176,6 +176,25 @@ let countdown {hash = _; hashes = _; index_bits; countdown_bits; filter} =
 
 let clear {hash = _; hashes = _; index_bits = _; countdown_bits = _; filter} =
   Bytes.fill filter 0 (Bytes.length filter) '\000'
+
+let fill_percentage {hash = _; hashes = _; index_bits; countdown_bits; filter}
+    =
+  let total = float (1 lsl index_bits) in
+  let nonzero = ref 0 in
+  for j = 0 to (1 lsl index_bits) - 1 do
+    let cur = peek filter (j * countdown_bits) countdown_bits in
+    if cur > 0 then incr nonzero
+  done ;
+  float !nonzero /. total
+
+let life_expectancy_histogram
+    {hash = _; hashes = _; index_bits; countdown_bits; filter} =
+  let hist_table = Array.make (1 lsl countdown_bits) 0 in
+  for j = 0 to (1 lsl index_bits) - 1 do
+    let cur = peek filter (j * countdown_bits) countdown_bits in
+    hist_table.(cur) <- hist_table.(cur) + 1
+  done ;
+  hist_table
 
 let%test_unit "consistent_add_mem_countdown" =
   for _ = 0 to 100 do
