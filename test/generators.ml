@@ -29,7 +29,7 @@ let int31 : int Crowbar.gen =
   let open Crowbar in
   map [int32] (fun i32 ->
       let open Int32 in
-      guard (neg (shift_left 1l 30) <= i32 && i32 <= sub (shift_left 1l 30) 1l) ;
+      guard (neg (shift_left 1l 30) <= i32 && i32 <= sub (shift_left 1l 30) 1l);
       Int32.to_int i32)
 
 let string = Crowbar.bytes
@@ -111,92 +111,49 @@ type _ ty =
 let rec pp_ty : type a. a ty Crowbar.printer =
  fun ppf ty ->
   match ty with
-  | Null ->
-      Crowbar.pp ppf "(null)"
-  | Empty ->
-      Crowbar.pp ppf "{}"
-  | Unit ->
-      Crowbar.pp ppf "()"
-  | Constant s ->
-      Crowbar.pp ppf "(constant:%S)" s
-  | Int8 ->
-      Crowbar.pp ppf "int8"
-  | UInt8 ->
-      Crowbar.pp ppf "uint8"
-  | Int16 ->
-      Crowbar.pp ppf "int16"
-  | UInt16 ->
-      Crowbar.pp ppf "uint16"
-  | Int31 ->
-      Crowbar.pp ppf "int31"
-  | RangedInt (low, high) ->
-      Crowbar.pp ppf "rangedint:[%d;%d]" low high
-  | Int32 ->
-      Crowbar.pp ppf "int32"
-  | Int64 ->
-      Crowbar.pp ppf "int64"
-  | Float ->
-      Crowbar.pp ppf "float"
-  | RangedFloat (low, high) ->
-      Crowbar.pp ppf "rangedfloat:[%g;%g]" low high
-  | Bool ->
-      Crowbar.pp ppf "bool"
-  | String ->
-      Crowbar.pp ppf "string"
-  | Bytes ->
-      Crowbar.pp ppf "bytes"
-  | FixedString n ->
-      Crowbar.pp ppf "fixedstring(%d)" n
-  | FixedBytes n ->
-      Crowbar.pp ppf "fixedbytes(%d)" n
-  | Option ty ->
-      Crowbar.pp ppf "option(%a)" pp_ty ty
-  | Result (tya, tyb) ->
-      Crowbar.pp ppf "result(%a,%a)" pp_ty tya pp_ty tyb
-  | List ty ->
-      Crowbar.pp ppf "list(%a)" pp_ty ty
-  | Array ty ->
-      Crowbar.pp ppf "array(%a)" pp_ty ty
-  | Dynamic_size ty ->
-      Crowbar.pp ppf "dynamic_size(%a)" pp_ty ty
-  | Tup1 ty ->
-      Crowbar.pp ppf "tup1(%a)" pp_ty ty
-  | Tup2 (tya, tyb) ->
-      Crowbar.pp ppf "tup2(%a,%a)" pp_ty tya pp_ty tyb
+  | Null -> Crowbar.pp ppf "(null)"
+  | Empty -> Crowbar.pp ppf "{}"
+  | Unit -> Crowbar.pp ppf "()"
+  | Constant s -> Crowbar.pp ppf "(constant:%S)" s
+  | Int8 -> Crowbar.pp ppf "int8"
+  | UInt8 -> Crowbar.pp ppf "uint8"
+  | Int16 -> Crowbar.pp ppf "int16"
+  | UInt16 -> Crowbar.pp ppf "uint16"
+  | Int31 -> Crowbar.pp ppf "int31"
+  | RangedInt (low, high) -> Crowbar.pp ppf "rangedint:[%d;%d]" low high
+  | Int32 -> Crowbar.pp ppf "int32"
+  | Int64 -> Crowbar.pp ppf "int64"
+  | Float -> Crowbar.pp ppf "float"
+  | RangedFloat (low, high) -> Crowbar.pp ppf "rangedfloat:[%g;%g]" low high
+  | Bool -> Crowbar.pp ppf "bool"
+  | String -> Crowbar.pp ppf "string"
+  | Bytes -> Crowbar.pp ppf "bytes"
+  | FixedString n -> Crowbar.pp ppf "fixedstring(%d)" n
+  | FixedBytes n -> Crowbar.pp ppf "fixedbytes(%d)" n
+  | Option ty -> Crowbar.pp ppf "option(%a)" pp_ty ty
+  | Result (tya, tyb) -> Crowbar.pp ppf "result(%a,%a)" pp_ty tya pp_ty tyb
+  | List ty -> Crowbar.pp ppf "list(%a)" pp_ty ty
+  | Array ty -> Crowbar.pp ppf "array(%a)" pp_ty ty
+  | Dynamic_size ty -> Crowbar.pp ppf "dynamic_size(%a)" pp_ty ty
+  | Tup1 ty -> Crowbar.pp ppf "tup1(%a)" pp_ty ty
+  | Tup2 (tya, tyb) -> Crowbar.pp ppf "tup2(%a,%a)" pp_ty tya pp_ty tyb
   | Tup3 (tya, tyb, tyc) ->
       Crowbar.pp ppf "tup3(%a,%a,%a)" pp_ty tya pp_ty tyb pp_ty tyc
   | Tup4 (tya, tyb, tyc, tyd) ->
-      Crowbar.pp
-        ppf
-        "tup4(%a,%a,%a,%a)"
-        pp_ty
-        tya
-        pp_ty
-        tyb
-        pp_ty
-        tyc
-        pp_ty
-        tyd
-  | Union1 ty ->
-      Crowbar.pp ppf "union1(%a)" pp_ty ty
-  | Union2 (tya, tyb) ->
-      Crowbar.pp ppf "union2(%a,%a)" pp_ty tya pp_ty tyb
+      Crowbar.pp ppf "tup4(%a,%a,%a,%a)" pp_ty tya pp_ty tyb pp_ty tyc pp_ty tyd
+  | Union1 ty -> Crowbar.pp ppf "union1(%a)" pp_ty ty
+  | Union2 (tya, tyb) -> Crowbar.pp ppf "union2(%a,%a)" pp_ty tya pp_ty tyb
   | Matching2 (tya, tyb) ->
       Crowbar.pp ppf "matching2(%a,%a)" pp_ty tya pp_ty tyb
-  | Mu_matching ty ->
-      Crowbar.pp ppf "mu_matching(%a)" pp_ty ty
-  | Check_size ty ->
-      Crowbar.pp ppf "check_size(%a)" pp_ty ty
-  | StringEnum ->
-      Crowbar.pp ppf "string_enum"
+  | Mu_matching ty -> Crowbar.pp ppf "mu_matching(%a)" pp_ty ty
+  | Check_size ty -> Crowbar.pp ppf "check_size(%a)" pp_ty ty
+  | StringEnum -> Crowbar.pp ppf "string_enum"
 
 let dynamic_if_needed : 'a Data_encoding.t -> 'a Data_encoding.t =
  fun e ->
   match Data_encoding.classify e with
-  | `Fixed 0 | `Variable ->
-      Data_encoding.dynamic_size e
-  | `Fixed _ | `Dynamic ->
-      e
+  | `Fixed 0 | `Variable -> Data_encoding.dynamic_size e
+  | `Fixed _ | `Dynamic -> e
 
 type any_ty = AnyTy : _ ty -> any_ty
 
@@ -219,7 +176,7 @@ let any_ty_gen =
             const @@ AnyTy UInt16;
             const @@ AnyTy Int31;
             map [int31; int31] (fun a b ->
-                if a = b then Crowbar.bad_test () ;
+                if a = b then Crowbar.bad_test ();
                 let low = min a b in
                 let high = max a b in
                 AnyTy (RangedInt (low, high)));
@@ -227,8 +184,8 @@ let any_ty_gen =
             const @@ AnyTy Int64;
             const @@ AnyTy Float;
             map [float; float] (fun a b ->
-                if Float.is_nan a || Float.is_nan b then Crowbar.bad_test () ;
-                if a = b then Crowbar.bad_test () ;
+                if Float.is_nan a || Float.is_nan b then Crowbar.bad_test ();
+                if a = b then Crowbar.bad_test ();
                 let low = min a b in
                 let high = max a b in
                 AnyTy (RangedFloat (low, high)));
@@ -332,13 +289,12 @@ let full_uint8 : int full = make_int UInt8 Crowbar.uint8 Data_encoding.uint8
 
 let full_int16 : int full = make_int Int16 Crowbar.int16 Data_encoding.int16
 
-let full_uint16 : int full =
-  make_int UInt16 Crowbar.uint16 Data_encoding.uint16
+let full_uint16 : int full = make_int UInt16 Crowbar.uint16 Data_encoding.uint16
 
 let full_int31 : int full = make_int Int31 int31 Data_encoding.int31
 
 let full_rangedint low high : int full =
-  assert (low < high) ;
+  assert (low < high);
   make_int
     (RangedInt (low, high))
     Crowbar.(
@@ -393,17 +349,16 @@ let make_float ty gen encoding : float full =
     let encoding = encoding
   end )
 
-let full_float : float full =
-  make_float Float Crowbar.float Data_encoding.float
+let full_float : float full = make_float Float Crowbar.float Data_encoding.float
 
 let full_rangedfloat low high : float full =
-  assert (low < high) ;
+  assert (low < high);
   make_float
     (RangedFloat (low, high))
     Crowbar.(
       map [float] (fun f ->
-          if Float.is_nan f then Crowbar.bad_test () ;
-          if f < low || f > high then Crowbar.bad_test () ;
+          if Float.is_nan f then Crowbar.bad_test ();
+          if f < low || f > high then Crowbar.bad_test ();
           f))
     (Data_encoding.ranged_float low high)
 
@@ -480,18 +435,13 @@ let full_option : type a. a full -> a option full =
 
       let eq a b =
         match (a, b) with
-        | (None, None) ->
-            true
-        | (Some a, Some b) ->
-            Full.eq a b
-        | (Some _, None) | (None, Some _) ->
-            false
+        | (None, None) -> true
+        | (Some a, Some b) -> Full.eq a b
+        | (Some _, None) | (None, Some _) -> false
 
       let pp ppf = function
-        | None ->
-            Crowbar.pp ppf "none"
-        | Some p ->
-            Crowbar.pp ppf "some(%a)" Full.pp p
+        | None -> Crowbar.pp ppf "none"
+        | Some p -> Crowbar.pp ppf "some(%a)" Full.pp p
 
       let gen = Crowbar.option Full.gen
 
@@ -506,8 +456,7 @@ let full_list : type a. a full -> a list full =
 
     let ty = List Full.ty
 
-    let eq xs ys =
-      List.compare_lengths xs ys = 0 && List.for_all2 Full.eq xs ys
+    let eq xs ys = List.compare_lengths xs ys = 0 && List.for_all2 Full.eq xs ys
 
     let pp ppf v =
       Crowbar.pp
@@ -617,8 +566,7 @@ let full_tup3 : type a b c. a full -> b full -> c full -> (a * b * c) full =
   end )
 
 let full_tup4 :
-    type a b c d. a full -> b full -> c full -> d full -> (a * b * c * d) full
-    =
+    type a b c d. a full -> b full -> c full -> d full -> (a * b * c * d) full =
  fun fulla fullb fullc fulld ->
   let module Fulla = (val fulla) in
   let module Fullb = (val fullb) in
@@ -674,10 +622,8 @@ let full_result : type a b. a full -> b full -> (a, b) result full =
     let encoding = Data_encoding.result Fulla.encoding Fullb.encoding
 
     let pp ppf = function
-      | Ok a ->
-          Crowbar.pp ppf "ok(%a)" Fulla.pp a
-      | Error b ->
-          Crowbar.pp ppf "error(%a)" Fullb.pp b
+      | Ok a -> Crowbar.pp ppf "ok(%a)" Fulla.pp a
+      | Error b -> Crowbar.pp ppf "error(%a)" Fullb.pp b
   end )
 
 let full_union1 : type a. a full -> a full =
@@ -702,8 +648,7 @@ let full_union1 : type a. a full -> a full =
     let gen = Fulla.gen
 
     let pp ppf = function
-      | v1 ->
-          Crowbar.pp ppf "@[<hv 1>(Union1 %a)@]" Fulla.pp v1
+      | v1 -> Crowbar.pp ppf "@[<hv 1>(Union1 %a)@]" Fulla.pp v1
   end )
 
 let full_union2 : type a b. a full -> b full -> (a, b) either full =
@@ -717,12 +662,9 @@ let full_union2 : type a b. a full -> b full -> (a, b) either full =
 
     let eq x y =
       match (x, y) with
-      | (Left _, Right _) | (Right _, Left _) ->
-          false
-      | (Left x, Left y) ->
-          Fulla.eq x y
-      | (Right x, Right y) ->
-          Fullb.eq x y
+      | (Left _, Right _) | (Right _, Left _) -> false
+      | (Left x, Left y) -> Fulla.eq x y
+      | (Right x, Right y) -> Fullb.eq x y
 
     let a_ding =
       let open Data_encoding in
@@ -756,10 +698,8 @@ let full_union2 : type a b. a full -> b full -> (a, b) either full =
           if choice then Left a else Right b)
 
     let pp ppf = function
-      | Left v1 ->
-          Crowbar.pp ppf "@[<hv 1>(A %a)@]" Fulla.pp v1
-      | Right v2 ->
-          Crowbar.pp ppf "@[<hv 1>(B %a)@]" Fullb.pp v2
+      | Left v1 -> Crowbar.pp ppf "@[<hv 1>(A %a)@]" Fulla.pp v1
+      | Right v2 -> Crowbar.pp ppf "@[<hv 1>(B %a)@]" Fullb.pp v2
   end )
 
 let full_matching2 : type a b. a full -> b full -> (a, b) either full =
@@ -773,12 +713,9 @@ let full_matching2 : type a b. a full -> b full -> (a, b) either full =
 
     let eq x y =
       match (x, y) with
-      | (Left _, Right _) | (Right _, Left _) ->
-          false
-      | (Left x, Left y) ->
-          Fulla.eq x y
-      | (Right x, Right y) ->
-          Fullb.eq x y
+      | (Left _, Right _) | (Right _, Left _) -> false
+      | (Left x, Left y) -> Fulla.eq x y
+      | (Right x, Right y) -> Fullb.eq x y
 
     let a_ding =
       let open Data_encoding in
@@ -814,16 +751,14 @@ let full_matching2 : type a b. a full -> b full -> (a, b) either full =
           if choice then Left a else Right b)
 
     let pp ppf = function
-      | Left v1 ->
-          Crowbar.pp ppf "@[<hv 1>(A %a)@]" Fulla.pp v1
-      | Right v2 ->
-          Crowbar.pp ppf "@[<hv 1>(B %a)@]" Fullb.pp v2
+      | Left v1 -> Crowbar.pp ppf "@[<hv 1>(A %a)@]" Fulla.pp v1
+      | Right v2 -> Crowbar.pp ppf "@[<hv 1>(B %a)@]" Fullb.pp v2
   end )
 
 let fresh_name =
   let r = ref 0 in
   fun () ->
-    incr r ;
+    incr r;
     "mun" ^ string_of_int !r
 
 let full_mu_matching : type a. a full -> a list full =
@@ -836,21 +771,16 @@ let full_mu_matching : type a. a full -> a list full =
 
     let rec eq x y =
       match (x, y) with
-      | ([], []) ->
-          true
-      | (x :: xs, y :: ys) ->
-          Fulla.eq x y && eq xs ys
-      | (_ :: _, []) | ([], _ :: _) ->
-          false
+      | ([], []) -> true
+      | (x :: xs, y :: ys) -> Fulla.eq x y && eq xs ys
+      | (_ :: _, []) | ([], _ :: _) -> false
 
     let encoding =
       let open Data_encoding in
-      mu (fresh_name ())
-      @@ fun self ->
+      mu (fresh_name ()) @@ fun self ->
       matching
         (function
-          | [] ->
-              matched 0 (obj1 (req "nil" unit)) ()
+          | [] -> matched 0 (obj1 (req "nil" unit)) ()
           | x :: xs ->
               matched
                 2
@@ -886,8 +816,7 @@ let full_check_size : type a. a full -> a full =
  fun full ->
   let module Full = (val full) in
   match Data_encoding.Binary.maximum_length Full.encoding with
-  | None ->
-      Crowbar.bad_test ()
+  | None -> Crowbar.bad_test ()
   | Some size ->
       ( module struct
         include Full
@@ -914,58 +843,32 @@ let full_string_enum : int full =
        ])
 
 let rec full_of_ty : type a. a ty -> a full = function
-  | Null ->
-      full_null
-  | Empty ->
-      full_empty
-  | Unit ->
-      full_unit
-  | Constant s ->
-      full_constant s
-  | Int8 ->
-      full_int8
-  | UInt8 ->
-      full_uint8
-  | Int16 ->
-      full_int16
-  | UInt16 ->
-      full_uint16
-  | Int31 ->
-      full_int31
-  | RangedInt (low, high) ->
-      full_rangedint low high
-  | Int32 ->
-      full_int32
-  | Int64 ->
-      full_int64
-  | Float ->
-      full_float
-  | RangedFloat (low, high) ->
-      full_rangedfloat low high
-  | Bool ->
-      full_bool
-  | String ->
-      full_string
-  | Bytes ->
-      full_bytes
-  | FixedString n ->
-      full_fixed_string n
-  | FixedBytes n ->
-      full_fixed_bytes n
-  | Option ty ->
-      full_option (full_of_ty ty)
-  | Result (tya, tyb) ->
-      full_result (full_of_ty tya) (full_of_ty tyb)
-  | List ty ->
-      full_list (full_of_ty ty)
-  | Array ty ->
-      full_array (full_of_ty ty)
-  | Dynamic_size ty ->
-      full_dynamic_size (full_of_ty ty)
-  | Tup1 ty ->
-      full_tup1 (full_of_ty ty)
-  | Tup2 (tya, tyb) ->
-      full_tup2 (full_of_ty tya) (full_of_ty tyb)
+  | Null -> full_null
+  | Empty -> full_empty
+  | Unit -> full_unit
+  | Constant s -> full_constant s
+  | Int8 -> full_int8
+  | UInt8 -> full_uint8
+  | Int16 -> full_int16
+  | UInt16 -> full_uint16
+  | Int31 -> full_int31
+  | RangedInt (low, high) -> full_rangedint low high
+  | Int32 -> full_int32
+  | Int64 -> full_int64
+  | Float -> full_float
+  | RangedFloat (low, high) -> full_rangedfloat low high
+  | Bool -> full_bool
+  | String -> full_string
+  | Bytes -> full_bytes
+  | FixedString n -> full_fixed_string n
+  | FixedBytes n -> full_fixed_bytes n
+  | Option ty -> full_option (full_of_ty ty)
+  | Result (tya, tyb) -> full_result (full_of_ty tya) (full_of_ty tyb)
+  | List ty -> full_list (full_of_ty ty)
+  | Array ty -> full_array (full_of_ty ty)
+  | Dynamic_size ty -> full_dynamic_size (full_of_ty ty)
+  | Tup1 ty -> full_tup1 (full_of_ty ty)
+  | Tup2 (tya, tyb) -> full_tup2 (full_of_ty tya) (full_of_ty tyb)
   | Tup3 (tya, tyb, tyc) ->
       full_tup3 (full_of_ty tya) (full_of_ty tyb) (full_of_ty tyc)
   | Tup4 (tya, tyb, tyc, tyd) ->
@@ -974,18 +877,12 @@ let rec full_of_ty : type a. a ty -> a full = function
         (full_of_ty tyb)
         (full_of_ty tyc)
         (full_of_ty tyd)
-  | Union1 ty ->
-      full_union1 (full_of_ty ty)
-  | Union2 (tya, tyb) ->
-      full_union2 (full_of_ty tya) (full_of_ty tyb)
-  | Matching2 (tya, tyb) ->
-      full_matching2 (full_of_ty tya) (full_of_ty tyb)
-  | Mu_matching ty ->
-      full_mu_matching (full_of_ty ty)
-  | Check_size ty ->
-      full_check_size (full_of_ty ty)
-  | StringEnum ->
-      full_string_enum
+  | Union1 ty -> full_union1 (full_of_ty ty)
+  | Union2 (tya, tyb) -> full_union2 (full_of_ty tya) (full_of_ty tyb)
+  | Matching2 (tya, tyb) -> full_matching2 (full_of_ty tya) (full_of_ty tyb)
+  | Mu_matching ty -> full_mu_matching (full_of_ty ty)
+  | Check_size ty -> full_check_size (full_of_ty ty)
+  | StringEnum -> full_string_enum
 
 type full_and_v = FullAndV : 'a full * 'a -> full_and_v
 

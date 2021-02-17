@@ -33,10 +33,8 @@ let () =
     + max 0 Data_encoding__Binary_size.int64
   in
   match Binary.maximum_length ding with
-  | None ->
-      assert false
-  | Some n ->
-      assert (n = expect)
+  | None -> assert false
+  | Some n -> assert (n = expect)
 
 let () =
   let open Data_encoding in
@@ -48,15 +46,12 @@ let () =
         + max Data_encoding__Binary_size.int64 10 (* fixed-string size *) )
   in
   match Binary.maximum_length ding with
-  | None ->
-      assert false
-  | Some n ->
-      assert (n = expect)
+  | None -> assert false
+  | Some n -> assert (n = expect)
 
 let is_fixed_has_max ding =
   match Data_encoding.classify ding with
-  | `Variable | `Dynamic ->
-      Crowbar.bad_test ()
+  | `Variable | `Dynamic -> Crowbar.bad_test ()
   | `Fixed n ->
       Crowbar.check_eq (Data_encoding.Binary.maximum_length ding) (Some n)
 
@@ -70,14 +65,12 @@ let () =
 
 let has_no_max_is_dyn_or_var ding =
   match Data_encoding.Binary.maximum_length ding with
-  | Some _ ->
-      Crowbar.bad_test ()
+  | Some _ -> Crowbar.bad_test ()
   | None -> (
-    match Data_encoding.classify ding with
-    | `Variable | `Dynamic ->
-        ()
-    | `Fixed _ ->
-        Crowbar.fail "Encoding without a maximum length has a fixed length" )
+      match Data_encoding.classify ding with
+      | `Variable | `Dynamic -> ()
+      | `Fixed _ ->
+          Crowbar.fail "Encoding without a maximum length has a fixed length" )
 
 let () =
   Crowbar.add_test

@@ -39,9 +39,9 @@ let make_encoding ~name l =
 type _ t =
   | Version_0 : 'v0 encoding -> 'v0 t
   | Version_S : {
-      previous : 'vn t;
-      encoding : 'vnp1 encoding;
-      upgrade : 'vn -> 'vnp1;
+      previous: 'vn t;
+      encoding: 'vnp1 encoding;
+      upgrade: 'vn -> 'vnp1;
     }
       -> 'vnp1 t
 
@@ -58,15 +58,14 @@ let encoding : type a. name:string -> a t -> a encoding =
   | Version_S {previous; encoding; upgrade} ->
       let rec mk_nones :
           type (* This function generates encoding cases for all the
-             outdated versions.
-             These versions are never encoded to
-             (hence [fun _ -> None]) but are safely decoded with
-             the use of the upgrade functions. *)
+                  outdated versions.
+                  These versions are never encoded to
+                  (hence [fun _ -> None]) but are safely decoded with
+                  the use of the upgrade functions. *)
           b.
           (b -> a) -> b t -> (string -> int -> a case) list =
        fun upgr -> function
-        | Version_0 e ->
-            [version_case e (fun _ -> None) (fun x -> upgr x)]
+        | Version_0 e -> [version_case e (fun _ -> None) (fun x -> upgr x)]
         | Version_S {previous; encoding; upgrade} ->
             let others = mk_nones (fun x -> upgr (upgrade x)) previous in
             version_case encoding (fun _ -> None) (fun x -> upgr x) :: others

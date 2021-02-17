@@ -78,8 +78,7 @@ let ezjson : json Crowbar.gen =
           map [string] (fun s -> `String s);
           map [longstring] (fun s -> `String s);
           map [int32] (fun i -> `Float (Int32.to_float i));
-            (* map [float] (fun f -> `Float f); *)
-          
+          (* map [float] (fun f -> `Float f); *)
         ])
 
 let ezjson = Crowbar.with_printer pp_json ezjson
@@ -106,15 +105,15 @@ let jsonm_lexeme_seq =
 
 let () =
   let open Crowbar in
-  add_test ~name:"gen" [jsonm_lexeme_seq] (fun j -> ignore j ; check true)
+  add_test ~name:"gen" [jsonm_lexeme_seq] (fun j ->
+      ignore j;
+      check true)
 
 let () =
   let open Crowbar in
   add_test ~name:"small_string_serialisation" [jsonm_lexeme_seq] (fun j ->
       let s =
-        Data_encoding.Json.small_string_seq_of_jsonm_lexeme_seq
-          ~newline:false
-          j
+        Data_encoding.Json.small_string_seq_of_jsonm_lexeme_seq ~newline:false j
       in
       Seq.iter ignore s)
 
@@ -126,16 +125,12 @@ let () =
     (fun ezj ->
       let j = Json_encoding.jsonm_lexeme_seq_of_ezjson ezj in
       let s =
-        Data_encoding.Json.small_string_seq_of_jsonm_lexeme_seq
-          ~newline:false
-          j
+        Data_encoding.Json.small_string_seq_of_jsonm_lexeme_seq ~newline:false j
       in
       let s = Seq.fold_left ( ^ ) "" s in
       match Data_encoding.Json.from_string s with
-      | Error e ->
-          fail e
-      | Ok j ->
-          check_eq ~pp:pp_json ezj j)
+      | Error e -> fail e
+      | Ok j -> check_eq ~pp:pp_json ezj j)
 
 let () =
   let open Crowbar in
@@ -160,10 +155,8 @@ let () =
       in
       let s = Seq.fold_left ( ^ ) "" s in
       match Data_encoding.Json.from_string s with
-      | Error e ->
-          fail e
-      | Ok j ->
-          check_eq ~pp:pp_json ezj j)
+      | Error e -> fail e
+      | Ok j -> check_eq ~pp:pp_json ezj j)
 
 let () =
   let open Crowbar in
@@ -177,10 +170,8 @@ let () =
       in
       let s = Seq.fold_left ( ^ ) "" s in
       match Data_encoding.Json.from_string s with
-      | Error e ->
-          fail e
-      | Ok j ->
-          check_eq ~pp:pp_json ezj j)
+      | Error e -> fail e
+      | Ok j -> check_eq ~pp:pp_json ezj j)
 
 let () =
   let open Crowbar in
@@ -195,14 +186,12 @@ let () =
       in
       let s =
         let b = Buffer.create 8 in
-        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s ;
+        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s;
         Buffer.contents b
       in
       match Data_encoding.Json.from_string s with
-      | Error e ->
-          fail e
-      | Ok j ->
-          check_eq ~pp:pp_json ezj j)
+      | Error e -> fail e
+      | Ok j -> check_eq ~pp:pp_json ezj j)
 
 let () =
   let open Crowbar in
@@ -217,14 +206,12 @@ let () =
       in
       let s =
         let b = Buffer.create 8 in
-        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s ;
+        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s;
         Buffer.contents b
       in
       match Data_encoding.Json.from_string s with
-      | Error e ->
-          fail e
-      | Ok j ->
-          check_eq ~pp:pp_json ezj j)
+      | Error e -> fail e
+      | Ok j -> check_eq ~pp:pp_json ezj j)
 
 let () =
   let open Crowbar in
@@ -239,11 +226,9 @@ let () =
       in
       let s =
         let b = Buffer.create 128 in
-        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s ;
+        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s;
         Buffer.contents b
       in
       match Data_encoding.Json.from_string s with
-      | Error e ->
-          fail e
-      | Ok j ->
-          check_eq ~pp:pp_json ezj j)
+      | Error e -> fail e
+      | Ok j -> check_eq ~pp:pp_json ezj j)

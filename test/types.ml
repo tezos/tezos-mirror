@@ -25,7 +25,7 @@
 
 open Data_encoding
 
-type record = {a : int; b : bool; c : Z.t option; d : float}
+type record = {a: int; b: bool; c: Z.t option; d: float}
 
 let default_record = {a = 32; b = true; c = Some Z.one; d = 12.34}
 
@@ -47,7 +47,7 @@ let record_to_string {a; b; c; d} =
   let c = match c with None -> "none" | Some c -> Z.to_string c in
   Format.asprintf "(%d, %B, %s, %f)" a b c d
 
-type variable_record = {p : int; q : Bytes.t}
+type variable_record = {p: int; q: Bytes.t}
 
 let default_variable_record = {p = 23; q = Bytes.of_string "wwwxxyyzzz"}
 
@@ -58,18 +58,14 @@ let variable_record_obj_enc =
     (obj2 (req "p" int31) (req "q" Variable.bytes))
 
 let variable_record_tup_enc =
-  conv
-    (fun {p; q} -> (p, q))
-    (fun (p, q) -> {p; q})
-    (tup2 int31 Variable.bytes)
+  conv (fun {p; q} -> (p, q)) (fun (p, q) -> {p; q}) (tup2 int31 Variable.bytes)
 
 let variable_record_to_string {p; q} =
   Format.asprintf "(%d, %a)" p Hex.pp (Hex.of_bytes q)
 
-type variable_left_record = {x : int; y : Bytes.t; z : int}
+type variable_left_record = {x: int; y: Bytes.t; z: int}
 
-let default_variable_left_record =
-  {x = 98; y = Bytes.of_string "765"; z = 4321}
+let default_variable_left_record = {x = 98; y = Bytes.of_string "765"; z = 4321}
 
 let variable_left_record_obj_enc =
   conv
@@ -135,33 +131,20 @@ let mini_union_enc =
     ]
 
 let union_to_string = function
-  | A i ->
-      Printf.sprintf "A %d" i
-  | B s ->
-      Printf.sprintf "B %s" s
-  | C i ->
-      Printf.sprintf "C %d" i
-  | D s ->
-      Printf.sprintf "D %s" s
-  | E ->
-      "E"
+  | A i -> Printf.sprintf "A %d" i
+  | B s -> Printf.sprintf "B %s" s
+  | C i -> Printf.sprintf "C %d" i
+  | D s -> Printf.sprintf "D %s" s
+  | E -> "E"
 
 let enum_enc =
   string_enum
-    [
-      ("one", 1);
-      ("two", 2);
-      ("three", 3);
-      ("four", 4);
-      ("five", 5);
-      ("six", 6);
-    ]
+    [("one", 1); ("two", 2); ("three", 3); ("four", 4); ("five", 5); ("six", 6)]
 
 let mini_enum_enc = string_enum [("one", 1); ("two", 2)]
 
 let mu_list_enc enc =
-  mu "list"
-  @@ fun mu_list_enc ->
+  mu "list" @@ fun mu_list_enc ->
   union
     [
       case
@@ -187,10 +170,8 @@ module Alcotest = struct
   let float =
     testable Fmt.float (fun f1 f2 ->
         match (classify_float f1, classify_float f2) with
-        | (FP_nan, FP_nan) ->
-            true
-        | _ ->
-            f1 = f2)
+        | (FP_nan, FP_nan) -> true
+        | _ -> f1 = f2)
 
   let bytes =
     testable

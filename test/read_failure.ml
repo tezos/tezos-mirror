@@ -30,26 +30,19 @@ open Helpers
 open Types
 
 let not_enough_data = function
-  | Binary.Read_error Not_enough_data ->
-      true
-  | _ ->
-      false
+  | Binary.Read_error Not_enough_data -> true
+  | _ -> false
 
 let extra_bytes = function Binary.Read_error Extra_bytes -> true | _ -> false
 
 let trailing_zero = function
-  | Binary.Read_error Trailing_zero ->
-      true
-  | _ ->
-      false
+  | Binary.Read_error Trailing_zero -> true
+  | _ -> false
 
 let invalid_int = function
-  | Binary.Read_error (Invalid_int _) ->
-      true
-  | Json_encoding.Cannot_destruct ([], Failure _) ->
-      true
-  | _ ->
-      false
+  | Binary.Read_error (Invalid_int _) -> true
+  | Json_encoding.Cannot_destruct ([], Failure _) -> true
+  | _ -> false
 
 let invalid_string_length = function
   | Json_encoding.Cannot_destruct
@@ -58,38 +51,26 @@ let invalid_string_length = function
   | Json_encoding.Cannot_destruct
       ([], Json_encoding.Unexpected ("bytes (len 9)", "bytes (len 4)")) ->
       true
-  | Binary.Read_error Extra_bytes ->
-      true
-  | _ ->
-      false
+  | Binary.Read_error Extra_bytes -> true
+  | _ -> false
 
 let missing_case = function
-  | Json_encoding.Cannot_destruct ([], Json_encoding.No_case_matched _) ->
-      true
-  | Binary.Read_error (Unexpected_tag _) ->
-      true
-  | _ ->
-      false
+  | Json_encoding.Cannot_destruct ([], Json_encoding.No_case_matched _) -> true
+  | Binary.Read_error (Unexpected_tag _) -> true
+  | _ -> false
 
 let missing_enum = function
-  | Json_encoding.Cannot_destruct ([], Json_encoding.Unexpected _) ->
-      true
-  | Binary.Read_error No_case_matched ->
-      true
-  | _ ->
-      false
+  | Json_encoding.Cannot_destruct ([], Json_encoding.Unexpected _) -> true
+  | Binary.Read_error No_case_matched -> true
+  | _ -> false
 
 let list_too_long = function
-  | Binary.Read_error List_too_long ->
-      true
-  | _ ->
-      false
+  | Binary.Read_error List_too_long -> true
+  | _ -> false
 
 let array_too_long = function
-  | Binary.Read_error Array_too_long ->
-      true
-  | _ ->
-      false
+  | Binary.Read_error Array_too_long -> true
+  | _ -> false
 
 let json ?(expected = fun _ -> true) read_encoding json () =
   check_raises expected (fun () -> ignore (Json.destruct read_encoding json))
@@ -108,10 +89,8 @@ let stream ?(expected = fun _ -> true) read_encoding bytes () =
     match chunked_read sz read_encoding bytes with
     | Binary.Success _ ->
         Alcotest.failf "%s failed: expecting exception, got success." name
-    | Binary.Await _ ->
-        Alcotest.failf "%s failed: not enough data" name
-    | Binary.Error error when expected (Binary.Read_error error) ->
-        ()
+    | Binary.Await _ -> Alcotest.failf "%s failed: not enough data" name
+    | Binary.Error error when expected (Binary.Read_error error) -> ()
     | Binary.Error error ->
         Alcotest.failf
           "@[<v 2>%s failed: read error@ %a@]"
@@ -120,14 +99,13 @@ let stream ?(expected = fun _ -> true) read_encoding bytes () =
           error
   done
 
-let minimal_stream ?(expected = fun _ -> true) expected_read read_encoding
-    bytes () =
+let minimal_stream ?(expected = fun _ -> true) expected_read read_encoding bytes
+    () =
   let name = "minimal_stream" in
   match streamed_read read_encoding bytes with
   | (Binary.Success _, _) ->
       Alcotest.failf "%s failed: expecting exception, got success." name
-  | (Binary.Await _, _) ->
-      Alcotest.failf "%s failed: not enough data" name
+  | (Binary.Await _, _) -> Alcotest.failf "%s failed: not enough data" name
   | (Binary.Error error, count)
     when expected (Binary.Read_error error) && count = expected_read ->
       ()
@@ -154,10 +132,8 @@ let all_ranged_int minimum maximum =
   let encoding = ranged_int minimum maximum in
   let signed =
     match Data_encoding__Binary_size.range_to_size ~minimum ~maximum with
-    | `Int31 | `Int8 | `Int16 ->
-        true
-    | `Uint8 | `Uint16 | `Uint30 ->
-        false
+    | `Int31 | `Int8 | `Int16 -> true
+    | `Uint8 | `Uint16 | `Uint30 -> false
   in
   let write_encoding =
     splitted
@@ -167,12 +143,7 @@ let all_ranged_int minimum maximum =
         else ranged_int minimum (maximum + 1) )
   in
   let name = Format.asprintf "ranged_int.%d" minimum in
-  all
-    ~expected:invalid_int
-    (name ^ ".max")
-    write_encoding
-    encoding
-    (maximum + 1)
+  all ~expected:invalid_int (name ^ ".max") write_encoding encoding (maximum + 1)
   @
   if signed then
     all
@@ -185,9 +156,7 @@ let all_ranged_int minimum maximum =
     let json_value = Json.construct write_encoding (minimum - 1) in
     let bson_value = Bson.construct write_encoding (minimum - 1) in
     [
-      ( name ^ "min.json",
-        `Quick,
-        json ~expected:invalid_int encoding json_value );
+      (name ^ "min.json", `Quick, json ~expected:invalid_int encoding json_value);
       ( name ^ "min..bson",
         `Quick,
         bson ~expected:invalid_int encoding bson_value );
@@ -201,10 +170,8 @@ let all_ranged_float minimum maximum =
 
 let test_bounded_string_list =
   let expected = function
-    | Data_encoding__Binary_error_types.Read_error Size_limit_exceeded ->
-        true
-    | _ ->
-        false
+    | Data_encoding__Binary_error_types.Read_error Size_limit_exceeded -> true
+    | _ -> false
   in
   let test name ~total ~elements v expected_read expected_read' =
     let bytes = Binary.to_bytes_exn (Variable.list string) v in
@@ -247,8 +214,7 @@ let test_bounded_string_list =
   @ test "e" ~total:30 ~elements:10 ["ab"; "c"; "def"; "gh"; "ijk"] 4 4
 
 let tests =
-  all_ranged_int 100 400 @ all_ranged_int 19000 19253
-  @ all_ranged_int ~-100 300
+  all_ranged_int 100 400 @ all_ranged_int 19000 19253 @ all_ranged_int ~-100 300
   @ all_ranged_int ~-300_000_000 300_000_000
   @ all_ranged_float ~-.100. 300.
   @ all
@@ -265,12 +231,7 @@ let tests =
       (Fixed.bytes 4)
       (Bytes.of_string "turlututu")
   @ all "bytes.bounded" bytes (Bounded.bytes 4) (Bytes.of_string "turlututu")
-  @ all
-      "unknown_case.B"
-      ~expected:missing_case
-      union_enc
-      mini_union_enc
-      (B "2")
+  @ all "unknown_case.B" ~expected:missing_case union_enc mini_union_enc (B "2")
   @ all "unknown_case.E" ~expected:missing_case union_enc mini_union_enc E
   @ all "enum.missing" ~expected:missing_enum enum_enc mini_enum_enc 4
   @ test_bounded_string_list

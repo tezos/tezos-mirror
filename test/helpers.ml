@@ -41,7 +41,7 @@ let cut ?(copy = false) sz bytes =
     in
     let rec split_full_blocks curr_upper_limit acc =
       let start = curr_upper_limit - sz in
-      assert (start >= 0) ;
+      assert (start >= 0);
       (* copy the block [ start, curr_upper_limit [ of size sz *)
       let acc = may_copy (Bytes.sub bytes start sz) :: acc in
       if start = 0 then acc else split_full_blocks start acc
@@ -50,12 +50,9 @@ let cut ?(copy = false) sz bytes =
 
 let no_exception f =
   try f () with
-  | ( Json_encoding.Cannot_destruct _
-    | Json_encoding.Unexpected _
-    | Json_encoding.No_case_matched _
-    | Json_encoding.Bad_array_size _
-    | Json_encoding.Missing_field _
-    | Json_encoding.Unexpected_field _
+  | ( Json_encoding.Cannot_destruct _ | Json_encoding.Unexpected _
+    | Json_encoding.No_case_matched _ | Json_encoding.Bad_array_size _
+    | Json_encoding.Missing_field _ | Json_encoding.Unexpected_field _
     | Json_encoding.Bad_schema _ ) as exn ->
       Alcotest.failf
         "@[v 2>json failed:@ %a@]"
@@ -74,24 +71,19 @@ let no_exception f =
 
 let check_raises expected f =
   match f () with
-  | exception exn when expected exn ->
-      ()
+  | exception exn when expected exn -> ()
   | exception exn ->
       Alcotest.failf "Unexpected exception: %s." (Printexc.to_string exn)
-  | _ ->
-      Alcotest.failf "Expecting exception, got success."
+  | _ -> Alcotest.failf "Expecting exception, got success."
 
 let chunked_read sz encoding bytes =
   let status =
     List.fold_left
       (fun status chunk ->
         match status with
-        | Binary.Await f ->
-            f chunk
-        | Success _ when Bytes.length chunk <> 0 ->
-            Error Extra_bytes
-        | Success _ | Error _ ->
-            status)
+        | Binary.Await f -> f chunk
+        | Success _ when Bytes.length chunk <> 0 -> Error Extra_bytes
+        | Success _ | Error _ -> status)
       (Binary.read_stream encoding)
       (cut sz bytes)
   in
@@ -99,16 +91,13 @@ let chunked_read sz encoding bytes =
   | Success {stream; _} when not (Data_encoding__Binary_stream.is_empty stream)
     ->
       Binary.Error Extra_bytes
-  | _ ->
-      status
+  | _ -> status
 
 let streamed_read encoding bytes =
   List.fold_left
     (fun ((status, count) as acc) chunk ->
       match status with
-      | Binary.Await f ->
-          (f chunk, succ count)
-      | Success _ | Error _ ->
-          acc)
+      | Binary.Await f -> (f chunk, succ count)
+      | Success _ | Error _ -> acc)
     (Binary.read_stream encoding, 0)
     (cut 1 bytes)

@@ -712,11 +712,7 @@ let encoding_t =
   (** Give a name to an encoding and optionally
       add documentation to an encoding. *)
   val def :
-    string ->
-    ?title:string ->
-    ?description:string ->
-    't encoding ->
-    't encoding
+    string -> ?title:string -> ?description:string -> 't encoding -> 't encoding
 
   (** See {!lazy_encoding} below.*)
   type 'a lazy_t
@@ -950,8 +946,8 @@ module Binary : sig
     | No_case_matched
     | Unexpected_tag of int
     | Invalid_size of int
-    | Invalid_int of {min : int; v : int; max : int}
-    | Invalid_float of {min : float; v : float; max : float}
+    | Invalid_int of {min: int; v: int; max: int}
+    | Invalid_float of {min: float; v: float; max: float}
     | Trailing_zero
     | Size_limit_exceeded
     | List_too_long
@@ -967,10 +963,10 @@ module Binary : sig
   type write_error =
     | Size_limit_exceeded
     | No_case_matched
-    | Invalid_int of {min : int; v : int; max : int}
-    | Invalid_float of {min : float; v : float; max : float}
-    | Invalid_bytes_length of {expected : int; found : int}
-    | Invalid_string_length of {expected : int; found : int}
+    | Invalid_int of {min: int; v: int; max: int}
+    | Invalid_float of {min: float; v: float; max: float}
+    | Invalid_bytes_length of {expected: int; found: int}
+    | Invalid_string_length of {expected: int; found: int}
     | Invalid_natural
     | List_too_long
     | Array_too_long
@@ -1034,7 +1030,7 @@ module Binary : sig
 
   (** Return type for the function [read_stream]. *)
   type 'ret status =
-    | Success of {result : 'ret; size : int; stream : Binary_stream.t}
+    | Success of {result: 'ret; size: int; stream: Binary_stream.t}
         (** Fully decoded value, together with the total amount of bytes reads,
         and the remaining unread stream. *)
     | Await of (Bytes.t -> 'ret status)  (** Partially decoded value.*)

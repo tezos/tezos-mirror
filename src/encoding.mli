@@ -60,8 +60,8 @@ type 'a desc =
   | Int64 : Int64.t desc
   | N : Z.t desc
   | Z : Z.t desc
-  | RangedInt : {minimum : int; maximum : int} -> int desc
-  | RangedFloat : {minimum : float; maximum : float} -> float desc
+  | RangedInt : {minimum: int; maximum: int} -> int desc
+  | RangedFloat : {minimum: float; maximum: float} -> float desc
   | Float : float desc
   | Bytes : Kind.length -> Bytes.t desc
   | String : Kind.length -> string desc
@@ -70,93 +70,93 @@ type 'a desc =
   | Array : int option * 'a t -> 'a array desc
   | List : int option * 'a t -> 'a list desc
   | Obj : 'a field -> 'a desc
-  | Objs : {kind : Kind.t; left : 'a t; right : 'b t} -> ('a * 'b) desc
+  | Objs : {kind: Kind.t; left: 'a t; right: 'b t} -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
-  | Tups : {kind : Kind.t; left : 'a t; right : 'b t} -> ('a * 'b) desc
+  | Tups : {kind: Kind.t; left: 'a t; right: 'b t} -> ('a * 'b) desc
   | Union : {
-      kind : Kind.t;
-      tag_size : Binary_size.tag_size;
-      tagged_cases : 'a case array;
-      match_case : 'a -> match_result;
-      cases : 'a case list;
+      kind: Kind.t;
+      tag_size: Binary_size.tag_size;
+      tagged_cases: 'a case array;
+      match_case: 'a -> match_result;
+      cases: 'a case list;
     }
       -> 'a desc
   | Mu : {
-      kind : Kind.enum;
-      name : string;
-      title : string option;
-      description : string option;
-      fix : 'a t -> 'a t;
+      kind: Kind.enum;
+      name: string;
+      title: string option;
+      description: string option;
+      fix: 'a t -> 'a t;
     }
       -> 'a desc
   | Conv : {
-      proj : 'a -> 'b;
-      inj : 'b -> 'a;
-      encoding : 'b t;
-      schema : Json_schema.schema option;
+      proj: 'a -> 'b;
+      inj: 'b -> 'a;
+      encoding: 'b t;
+      schema: Json_schema.schema option;
     }
       -> 'a desc
   | Describe : {
-      id : string;
-      title : string option;
-      description : string option;
-      encoding : 'a t;
+      id: string;
+      title: string option;
+      description: string option;
+      encoding: 'a t;
     }
       -> 'a desc
   | Splitted : {
-      encoding : 'a t;
-      json_encoding : 'a Json_encoding.encoding;
-      is_obj : bool;
-      is_tup : bool;
+      encoding: 'a t;
+      json_encoding: 'a Json_encoding.encoding;
+      is_obj: bool;
+      is_tup: bool;
     }
       -> 'a desc
   | Dynamic_size : {
-      kind : Binary_size.unsigned_integer;
-      encoding : 'a t;
+      kind: Binary_size.unsigned_integer;
+      encoding: 'a t;
     }
       -> 'a desc
-  | Check_size : {limit : int; encoding : 'a t} -> 'a desc
+  | Check_size : {limit: int; encoding: 'a t} -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
   | Req : {
-      name : string;
-      encoding : 'a t;
-      title : string option;
-      description : string option;
+      name: string;
+      encoding: 'a t;
+      title: string option;
+      description: string option;
     }
       -> 'a field
   | Opt : {
-      name : string;
-      kind : Kind.enum;
-      encoding : 'a t;
-      title : string option;
-      description : string option;
+      name: string;
+      kind: Kind.enum;
+      encoding: 'a t;
+      title: string option;
+      description: string option;
     }
       -> 'a option field
   | Dft : {
-      name : string;
-      encoding : 'a t;
-      default : 'a;
-      title : string option;
-      description : string option;
+      name: string;
+      encoding: 'a t;
+      default: 'a;
+      title: string option;
+      description: string option;
     }
       -> 'a field
 
 and 'a case =
   | Case : {
-      title : string;
-      description : string option;
-      encoding : 'a t;
-      proj : 't -> 'a option;
-      inj : 'a -> 't;
-      tag : case_tag_internal;
+      title: string;
+      description: string option;
+      encoding: 'a t;
+      proj: 't -> 'a option;
+      inj: 'a -> 't;
+      tag: case_tag_internal;
     }
       -> 't case
 
 and 'a t = {
-  encoding : 'a desc;
-  mutable json_encoding : 'a Json_encoding.encoding option;
+  encoding: 'a desc;
+  mutable json_encoding: 'a Json_encoding.encoding option;
 }
 
 and match_result = Matched : int * 'b t * 'b -> match_result

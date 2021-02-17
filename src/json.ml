@@ -34,7 +34,7 @@ type json =
 type schema = Json_schema.schema
 
 type pair_builder = {
-  build :
+  build:
     'a 'b. Encoding.Kind.t -> 'a Encoding.t -> 'b Encoding.t ->
     ('a * 'b) Encoding.t;
 }
@@ -60,13 +60,13 @@ let n_encoding =
     ~description:"Decimal representation of a positive big number"
   @@ conv
        (fun z ->
-         if Z.sign z < 0 then invalid_arg "negative natural" ;
+         if Z.sign z < 0 then invalid_arg "negative natural";
          Z.to_string z)
        (fun s ->
          let n = Z.of_string s in
          if Z.sign n < 0 then
            raise
-             (Json_encoding.Cannot_destruct ([], Failure "negative natural")) ;
+             (Json_encoding.Cannot_destruct ([], Failure "negative natural"));
          n)
        string
 
@@ -143,34 +143,33 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
   let open Encoding in
   match e.encoding with
   | Conv {proj; inj; encoding = e; schema} -> (
-    match lift_union e with
-    | {encoding = Union {kind; tag_size; tagged_cases; cases; match_case}; _}
-      ->
-        let match_case x = match_case (proj x) in
-        let lift
-            (Case
-              {title; description; encoding; proj = proj'; inj = inj'; tag}) =
-          Case
-            {
-              encoding;
-              title;
-              description;
-              proj = (fun x -> proj' (proj x));
-              inj = (fun x -> inj (inj' x));
-              tag;
-            }
-        in
-        make
-        @@ Union
-             {
-               kind;
-               tag_size;
-               tagged_cases = Array.map lift tagged_cases;
-               match_case;
-               cases = List.map lift cases;
-             }
-    | e ->
-        make @@ Conv {proj; inj; encoding = e; schema} )
+      match lift_union e with
+      | {encoding = Union {kind; tag_size; tagged_cases; cases; match_case}; _}
+        ->
+          let match_case x = match_case (proj x) in
+          let lift
+              (Case
+                {title; description; encoding; proj = proj'; inj = inj'; tag}) =
+            Case
+              {
+                encoding;
+                title;
+                description;
+                proj = (fun x -> proj' (proj x));
+                inj = (fun x -> inj (inj' x));
+                tag;
+              }
+          in
+          make
+          @@ Union
+               {
+                 kind;
+                 tag_size;
+                 tagged_cases = Array.map lift tagged_cases;
+                 match_case;
+                 cases = List.map lift cases;
+               }
+      | e -> make @@ Conv {proj; inj; encoding = e; schema} )
   | Objs {kind; left; right} ->
       lift_union_in_pair
         {build = (fun kind left right -> make @@ Objs {kind; left; right})}
@@ -183,8 +182,7 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
         kind
         left
         right
-  | _ ->
-      e
+  | _ -> e
 
 and lift_union_in_pair :
     type a b.
@@ -254,45 +252,28 @@ and lift_union_in_pair :
              match_case;
              cases = List.map lift cases;
            }
-  | (e1, e2) ->
-      b.build p e1 e2
+  | (e1, e2) -> b.build p e1 e2
 
 let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   let open Encoding in
   let open Json_encoding in
   function
-  | Null ->
-      null
-  | Empty ->
-      empty
-  | Constant s ->
-      constant s
-  | Ignore ->
-      unit
-  | Int8 ->
-      ranged_int ~minimum:~-(1 lsl 7) ~maximum:((1 lsl 7) - 1) "int8"
-  | Uint8 ->
-      ranged_int ~minimum:0 ~maximum:((1 lsl 8) - 1) "uint8"
-  | Int16 ->
-      ranged_int ~minimum:~-(1 lsl 15) ~maximum:((1 lsl 15) - 1) "int16"
-  | Uint16 ->
-      ranged_int ~minimum:0 ~maximum:((1 lsl 16) - 1) "uint16"
-  | RangedInt {minimum; maximum} ->
-      ranged_int ~minimum ~maximum "rangedInt"
-  | Int31 ->
-      int
-  | Int32 ->
-      int32
-  | Int64 ->
-      int64_encoding
-  | N ->
-      n_encoding
-  | Z ->
-      z_encoding
-  | Bool ->
-      bool
-  | Float ->
-      float
+  | Null -> null
+  | Empty -> empty
+  | Constant s -> constant s
+  | Ignore -> unit
+  | Int8 -> ranged_int ~minimum:~-(1 lsl 7) ~maximum:((1 lsl 7) - 1) "int8"
+  | Uint8 -> ranged_int ~minimum:0 ~maximum:((1 lsl 8) - 1) "uint8"
+  | Int16 -> ranged_int ~minimum:~-(1 lsl 15) ~maximum:((1 lsl 15) - 1) "int16"
+  | Uint16 -> ranged_int ~minimum:0 ~maximum:((1 lsl 16) - 1) "uint16"
+  | RangedInt {minimum; maximum} -> ranged_int ~minimum ~maximum "rangedInt"
+  | Int31 -> int
+  | Int32 -> int32
+  | Int64 -> int64_encoding
+  | N -> n_encoding
+  | Z -> z_encoding
+  | Bool -> bool
+  | Float -> float
   | RangedFloat {minimum; maximum} ->
       ranged_float ~minimum ~maximum "rangedFloat"
   | String (`Fixed expected) ->
@@ -304,14 +285,12 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
                ( [],
                  Unexpected
                    ( Format.asprintf "string (len %d)" found,
-                     Format.asprintf "string (len %d)" expected ) )) ;
+                     Format.asprintf "string (len %d)" expected ) ));
         s
       in
       conv check check raw_string_encoding
-  | String _ ->
-      raw_string_encoding
-  | Padded (e, _) ->
-      get_json e
+  | String _ -> raw_string_encoding
+  | Padded (e, _) -> get_json e
   | Bytes (`Fixed expected) ->
       let check s =
         let found = Bytes.length s in
@@ -321,42 +300,29 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
                ( [],
                  Unexpected
                    ( Format.asprintf "string (len %d)" found,
-                     Format.asprintf "string (len %d)" expected ) )) ;
+                     Format.asprintf "string (len %d)" expected ) ));
         s
       in
       conv check check bytes_jsont
-  | Bytes _ ->
-      bytes_jsont
+  | Bytes _ -> bytes_jsont
   | String_enum (tbl, _) ->
       string_enum (Hashtbl.fold (fun a (str, _) acc -> (str, a) :: acc) tbl [])
-  | Array (_, e) ->
-      array (get_json e) (* FIXME TODO enforce max_length *)
-  | List (_, e) ->
-      list (get_json e)
-  | Obj f ->
-      obj1 (field_json f)
-  | Objs {left; right; _} ->
-      merge_objs (get_json left) (get_json right)
-  | Tup e ->
-      tup1 (get_json e)
-  | Tups {left; right; _} ->
-      merge_tups (get_json left) (get_json right)
-  | Conv {proj; inj; encoding = e; schema} ->
-      conv ?schema proj inj (get_json e)
+  | Array (_, e) -> array (get_json e) (* FIXME TODO enforce max_length *)
+  | List (_, e) -> list (get_json e)
+  | Obj f -> obj1 (field_json f)
+  | Objs {left; right; _} -> merge_objs (get_json left) (get_json right)
+  | Tup e -> tup1 (get_json e)
+  | Tups {left; right; _} -> merge_tups (get_json left) (get_json right)
+  | Conv {proj; inj; encoding = e; schema} -> conv ?schema proj inj (get_json e)
   | Describe {id; title; description; encoding = e} ->
       def id ?title ?description (get_json e)
   | Mu {name; fix; _} as ty ->
       mu name (fun json_encoding -> get_json @@ fix (make ~json_encoding ty))
-  | Union {cases; _} ->
-      union (List.map case_json cases)
-  | Splitted {json_encoding; _} ->
-      json_encoding
-  | Dynamic_size {encoding = e; _} ->
-      get_json e
-  | Check_size {encoding; _} ->
-      get_json encoding
-  | Delayed f ->
-      get_json (f ())
+  | Union {cases; _} -> union (List.map case_json cases)
+  | Splitted {json_encoding; _} -> json_encoding
+  | Dynamic_size {encoding = e; _} -> get_json e
+  | Check_size {encoding; _} -> get_json encoding
+  | Delayed f -> get_json (f ())
 
 and field_json : type a. a Encoding.field -> a Json_encoding.field =
   let open Json_encoding in
@@ -379,10 +345,9 @@ and get_json : type a. a Encoding.t -> a Json_encoding.encoding =
   match e.json_encoding with
   | None ->
       let json_encoding = json (lift_union e).encoding in
-      e.json_encoding <- Some json_encoding ;
+      e.json_encoding <- Some json_encoding;
       json_encoding
-  | Some json_encoding ->
-      json_encoding
+  | Some json_encoding -> json_encoding
 
 let convert = get_json
 
@@ -431,12 +396,9 @@ let pp = Json_repr.(pp (module Ezjsonm))
 
 let from_string s =
   match Ezjsonm.from_string ("[" ^ s ^ "]") with
-  | exception Ezjsonm.Parse_error (_, msg) ->
-      Error msg
-  | `A [json] ->
-      Ok json
-  | _ ->
-      Error "Malformed value"
+  | exception Ezjsonm.Parse_error (_, msg) -> Error msg
+  | `A [json] -> Ok json
+  | _ -> Error "Malformed value"
 
 let encoding =
   let binary : Json_repr.ezjsonm Encoding.t =

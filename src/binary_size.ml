@@ -66,44 +66,29 @@ let signed_range_to_size min max : [> signed_integer] =
 
 (* max should be centered at zero *)
 let unsigned_range_to_size max : [> unsigned_integer] =
-  assert (max >= 0) ;
+  assert (max >= 0);
   if max <= 255 then `Uint8 else if max <= 65535 then `Uint16 else `Uint30
 
 let integer_to_size = function
-  | `Int31 ->
-      int31
-  | `Int16 ->
-      int16
-  | `Int8 ->
-      int8
-  | `Uint30 ->
-      uint30
-  | `Uint16 ->
-      uint16
-  | `Uint8 ->
-      uint8
+  | `Int31 -> int31
+  | `Int16 -> int16
+  | `Int8 -> int8
+  | `Uint30 -> uint30
+  | `Uint16 -> uint16
+  | `Uint8 -> uint8
 
 let max_int = function
-  | `Uint30 | `Int31 ->
-      (1 lsl 30) - 1
-  | `Int16 ->
-      (1 lsl 15) - 1
-  | `Int8 ->
-      (1 lsl 7) - 1
-  | `Uint16 ->
-      (1 lsl 16) - 1
-  | `Uint8 ->
-      (1 lsl 8) - 1
+  | `Uint30 | `Int31 -> (1 lsl 30) - 1
+  | `Int16 -> (1 lsl 15) - 1
+  | `Int8 -> (1 lsl 7) - 1
+  | `Uint16 -> (1 lsl 16) - 1
+  | `Uint8 -> (1 lsl 8) - 1
 
 let min_int = function
-  | `Uint8 | `Uint16 | `Uint30 ->
-      0
-  | `Int31 ->
-      -(1 lsl 30)
-  | `Int16 ->
-      -(1 lsl 15)
-  | `Int8 ->
-      -(1 lsl 7)
+  | `Uint8 | `Uint16 | `Uint30 -> 0
+  | `Int31 -> -(1 lsl 30)
+  | `Int16 -> -(1 lsl 15)
+  | `Int8 -> -(1 lsl 7)
 
 let range_to_size ~minimum ~maximum : integer =
   if minimum < 0 then signed_range_to_size minimum maximum

@@ -64,10 +64,9 @@ let stream ty encoding value () =
             if
               size <> Bytes.length bytes
               || not (Data_encoding__Binary_stream.is_empty stream)
-            then Alcotest.failf "%s failed: remaining data" name ;
+            then Alcotest.failf "%s failed: remaining data" name;
             Alcotest.check ty name value result
-        | Binary.Await _ ->
-            Alcotest.failf "%s failed: not enough data" name
+        | Binary.Await _ -> Alcotest.failf "%s failed: not enough data" name
         | Binary.Error error ->
             Alcotest.failf
               "@[<v 2>%s failed: read error@ %a@]"
@@ -79,10 +78,8 @@ let stream ty encoding value () =
 let all name ty encoding value =
   let stream_encoding =
     match Data_encoding.classify encoding with
-    | `Variable ->
-        dynamic_size encoding
-    | `Dynamic | `Fixed _ ->
-        encoding
+    | `Variable -> dynamic_size encoding
+    | `Dynamic | `Fixed _ -> encoding
   in
   [
     (name ^ ".json", `Quick, json ty encoding value);
@@ -118,22 +115,28 @@ let all_ranged_float minimum maximum =
   @ all (name ^ ".max") Alcotest.float encoding maximum
 
 let test_n_sequence () =
-  let test i = binary Alcotest.z z i () ; stream Alcotest.z z i () in
+  let test i =
+    binary Alcotest.z z i ();
+    stream Alcotest.z z i ()
+  in
   for i = 0 to 10_000 do
     test (Z.of_int i)
-  done ;
+  done;
   for i = 100_000_000 to 100_010_000 do
     test (Z.of_int i)
   done
 
 let test_z_sequence () =
-  let test i = binary Alcotest.z z i () ; stream Alcotest.z z i () in
+  let test i =
+    binary Alcotest.z z i ();
+    stream Alcotest.z z i ()
+  in
   for i = -10_000 to 10_000 do
     test (Z.of_int i)
-  done ;
+  done;
   for i = 100_000_000 to 100_010_000 do
     test (Z.of_int i)
-  done ;
+  done;
   for i = -100_000_000 downto -100_010_000 do
     test (Z.of_int i)
   done
@@ -146,15 +149,15 @@ let test_string_enum_boundary () =
     List.iter
       (fun (_, num) ->
         let enc = string_enum cases in
-        json Alcotest.int enc num () ;
-        bson Alcotest.int enc num () ;
-        binary Alcotest.int enc num () ;
+        json Alcotest.int enc num ();
+        bson Alcotest.int enc num ();
+        binary Alcotest.int enc num ();
         stream Alcotest.int enc num ())
       cases
   in
-  run_test entries ;
+  run_test entries;
   let entries2 = ("255", 255) :: entries in
-  run_test entries2 ;
+  run_test entries2;
   run_test (("256", 256) :: entries2)
 
 let test_bounded_string_list =
@@ -194,11 +197,7 @@ let tests =
   @ all "bytes" Alcotest.bytes bytes (Bytes.of_string "titi")
   @ all "bytes.fixed" Alcotest.bytes (Fixed.bytes 4) (Bytes.of_string "titi")
   @ all "bytes.variable" Alcotest.bytes Variable.bytes (Bytes.of_string "titi")
-  @ all
-      "bytes.bounded1"
-      Alcotest.bytes
-      (Bounded.bytes 4)
-      (Bytes.of_string "tu")
+  @ all "bytes.bounded1" Alcotest.bytes (Bounded.bytes 4) (Bytes.of_string "tu")
   @ all
       "bytes.bounded2"
       Alcotest.bytes
@@ -279,11 +278,7 @@ let tests =
   @ all "some.string" Alcotest.(option string) (option string) (Some "thing")
   @ all "enum" Alcotest.int enum_enc 4
   @ all "obj" Alcotest.record record_obj_enc default_record
-  @ all
-      "obj.dft"
-      Alcotest.record
-      record_obj_enc
-      {default_record with b = false}
+  @ all "obj.dft" Alcotest.record record_obj_enc {default_record with b = false}
   @ all "obj.req" Alcotest.record record_obj_enc {default_record with c = None}
   @ all "tup" Alcotest.record record_tup_enc default_record
   @ all

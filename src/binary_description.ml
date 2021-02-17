@@ -26,7 +26,7 @@
 type recursives = string list
 
 type references = {
-  descriptions : (string * Binary_schema.toplevel_encoding) list;
+  descriptions: (string * Binary_schema.toplevel_encoding) list;
 }
 [@@unwrapped]
 
@@ -57,7 +57,7 @@ end = struct
     match Hashtbl.find tbl key with Ref s -> find tbl s | Root desc -> desc
 
   let union tbl ~new_canonical ~existing =
-    add tbl new_canonical ;
+    add tbl new_canonical;
     let root = find tbl existing in
     if root.title = new_canonical.title then ()
     else Hashtbl.replace tbl root.title (Ref new_canonical.title)
@@ -68,21 +68,13 @@ end
 let fixup_references uf =
   let open Binary_schema in
   let rec fixup_layout = function
-    | Ref s ->
-        Ref (UF.find uf s).title
-    | Enum (i, name) ->
-        Enum (i, (UF.find uf name).title)
-    | Seq (layout, len) ->
-        Seq (fixup_layout layout, len)
-    | ( Zero_width
-      | Int _
-      | Bool
+    | Ref s -> Ref (UF.find uf s).title
+    | Enum (i, name) -> Enum (i, (UF.find uf name).title)
+    | Seq (layout, len) -> Seq (fixup_layout layout, len)
+    | ( Zero_width | Int _ | Bool
       | RangedInt (_, _)
       | RangedFloat (_, _)
-      | Float
-      | Bytes
-      | String
-      | Padding ) as enc ->
+      | Float | Bytes | String | Padding ) as enc ->
         enc
   in
   let field = function
@@ -90,12 +82,10 @@ let fixup_references uf =
         Named_field (name, kind, fixup_layout layout)
     | Anonymous_field (kind, layout) ->
         Anonymous_field (kind, fixup_layout layout)
-    | (Dynamic_size_field _ | Optional_field _) as field ->
-        field
+    | (Dynamic_size_field _ | Optional_field _) as field -> field
   in
   function
-  | Obj {fields} ->
-      Obj {fields = List.map field fields}
+  | Obj {fields} -> Obj {fields = List.map field fields}
   | Cases ({cases; _} as x) ->
       Cases
         {
@@ -105,8 +95,7 @@ let fixup_references uf =
               (fun (i, name, fields) -> (i, name, List.map field fields))
               cases;
         }
-  | Int_enum _ as ie ->
-      ie
+  | Int_enum _ as ie -> ie
 
 let z_reference_name = "Z.t"
 
@@ -125,7 +114,7 @@ let z_encoding =
 let add_z_reference uf {descriptions} =
   UF.add
     uf
-    {title = z_reference_name; description = Some z_reference_description} ;
+    {title = z_reference_name; description = Some z_reference_description};
   {descriptions = (z_reference_name, z_encoding) :: descriptions}
 
 let n_reference_name = "N.t"
@@ -143,7 +132,7 @@ let n_encoding =
 let add_n_reference uf {descriptions} =
   UF.add
     uf
-    {title = n_reference_name; description = Some n_reference_description} ;
+    {title = n_reference_name; description = Some n_reference_description};
   {descriptions = (n_reference_name, n_encoding) :: descriptions}
 
 let dedup_canonicalize uf =
@@ -161,17 +150,17 @@ let dedup_canonicalize uf =
         if List.length fixedup = prev_len then
           List.map (fun (name, layout) -> (UF.find uf name, layout)) fixedup
         else (
-          Hashtbl.clear tbl ;
+          Hashtbl.clear tbl;
           help (List.length fixedup) [] fixedup )
     | (name, layout) :: tl -> (
-      match Hashtbl.find_opt tbl layout with
-      | None ->
-          let desc = UF.find uf name in
-          Hashtbl.add tbl layout desc ;
-          help prev_len ((desc.title, layout) :: acc) tl
-      | Some original_desc ->
-          UF.union uf ~new_canonical:original_desc ~existing:name ;
-          help prev_len acc tl )
+        match Hashtbl.find_opt tbl layout with
+        | None ->
+            let desc = UF.find uf name in
+            Hashtbl.add tbl layout desc;
+            help prev_len ((desc.title, layout) :: acc) tl
+        | Some original_desc ->
+            UF.union uf ~new_canonical:original_desc ~existing:name;
+            help prev_len acc tl )
   in
   help 0 []
 
@@ -187,15 +176,16 @@ let describe (type x) (encoding : x Encoding.t) =
   let new_reference =
     let x = ref ~-1 in
     fun () ->
-      x := !x + 1 ;
+      x := !x + 1;
       let name = "X_" ^ string_of_int !x in
-      uf_add_name name ; name
+      uf_add_name name;
+      name
   in
   let may_new_reference = function
-    | None ->
-        new_reference ()
+    | None -> new_reference ()
     | Some name ->
-        uf_add_name name ; name
+        uf_add_name name;
+        name
   in
   let rec extract_dynamic :
       type x.
@@ -203,18 +193,13 @@ let describe (type x) (encoding : x Encoding.t) =
       x Encoding.desc ->
       Binary_size.unsigned_integer option * string option * pdesc =
    fun ref_name -> function
-    | Conv {encoding; _} ->
-        extract_dynamic ref_name encoding.encoding
+    | Conv {encoding; _} -> extract_dynamic ref_name encoding.encoding
     | Describe {id = ref_name; encoding; _} ->
         extract_dynamic (Some ref_name) encoding.encoding
-    | Splitted {encoding; _} ->
-        extract_dynamic ref_name encoding.encoding
-    | Delayed f ->
-        extract_dynamic ref_name (f ()).encoding
-    | Dynamic_size {kind; encoding} ->
-        (Some kind, ref_name, P encoding.encoding)
-    | enc ->
-        (None, ref_name, P enc)
+    | Splitted {encoding; _} -> extract_dynamic ref_name encoding.encoding
+    | Delayed f -> extract_dynamic ref_name (f ()).encoding
+    | Dynamic_size {kind; encoding} -> (Some kind, ref_name, P encoding.encoding)
+    | enc -> (None, ref_name, P enc)
   in
   let rec field_descr :
       type a.
@@ -236,19 +221,13 @@ let describe (type x) (encoding : x Encoding.t) =
           in
           match dynamics with
           | Some kind ->
-              ( [Dynamic_size_field (ref_name, 1, kind); field_descr],
-                references )
-          | None ->
-              ([field_descr], references) )
+              ([Dynamic_size_field (ref_name, 1, kind); field_descr], references)
+          | None -> ([field_descr], references) )
     | Opt {kind = `Variable; name; encoding = {encoding; _}; _} ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Named_field (name, `Variable, layout)], references)
     | Opt {kind = `Dynamic; name; encoding = {encoding; _}; _} ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ( [
             Binary_schema.Optional_field name;
             Named_field (name, classify_desc encoding, layout);
@@ -306,14 +285,14 @@ let describe (type x) (encoding : x Encoding.t) =
       string * references =
    fun ?description ~title name recursives references encoding ->
     let new_canonical = {Binary_schema.title; description} in
-    UF.add uf new_canonical ;
+    UF.add uf new_canonical;
     let (layout, references) = layout None recursives references encoding in
     match layout with
     | Ref ref_name ->
-        UF.union uf ~existing:ref_name ~new_canonical ;
+        UF.union uf ~existing:ref_name ~new_canonical;
         (ref_name, references)
     | layout ->
-        UF.add uf new_canonical ;
+        UF.add uf new_canonical;
         ( name,
           add_reference
             name
@@ -321,9 +300,7 @@ let describe (type x) (encoding : x Encoding.t) =
             references )
   and enum : type a. (a, _) Hashtbl.t -> a array -> _ =
    fun tbl encoding_array ->
-    ( Binary_size.range_to_size
-        ~minimum:0
-        ~maximum:(Array.length encoding_array),
+    ( Binary_size.range_to_size ~minimum:0 ~maximum:(Array.length encoding_array),
       List.map
         (fun i -> (i, fst @@ Hashtbl.find tbl encoding_array.(i)))
         (List.init (Array.length encoding_array) (fun i -> i)) )
@@ -335,8 +312,7 @@ let describe (type x) (encoding : x Encoding.t) =
       b Encoding.desc ->
       Binary_schema.fields * references =
    fun ref_name recursives references -> function
-    | Obj field ->
-        field_descr recursives references field
+    | Obj field -> field_descr recursives references field
     | Objs {left; right; _} ->
         let (left_fields, references) =
           fields None recursives references left.encoding
@@ -345,14 +321,10 @@ let describe (type x) (encoding : x Encoding.t) =
           fields None recursives references right.encoding
         in
         (left_fields @ right_fields, references)
-    | Null ->
-        ([Anonymous_field (`Fixed 0, Zero_width)], references)
-    | Empty ->
-        ([Anonymous_field (`Fixed 0, Zero_width)], references)
-    | Ignore ->
-        ([Anonymous_field (`Fixed 0, Zero_width)], references)
-    | Constant _ ->
-        ([Anonymous_field (`Fixed 0, Zero_width)], references)
+    | Null -> ([Anonymous_field (`Fixed 0, Zero_width)], references)
+    | Empty -> ([Anonymous_field (`Fixed 0, Zero_width)], references)
+    | Ignore -> ([Anonymous_field (`Fixed 0, Zero_width)], references)
+    | Constant _ -> ([Anonymous_field (`Fixed 0, Zero_width)], references)
     | Dynamic_size {kind; encoding} ->
         let (fields, refs) =
           fields None recursives references encoding.encoding
@@ -366,22 +338,15 @@ let describe (type x) (encoding : x Encoding.t) =
         fields (Some name) recursives references encoding.encoding
     | Splitted {encoding; _} ->
         fields ref_name recursives references encoding.encoding
-    | Delayed func ->
-        fields ref_name recursives references (func ()).encoding
+    | Delayed func -> fields ref_name recursives references (func ()).encoding
     | List (len, {encoding; _}) ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (`Variable, Seq (layout, len))], references)
     | Array (len, {encoding; _}) ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (`Variable, Seq (layout, len))], references)
-    | Bytes kind ->
-        ([Anonymous_field ((kind :> Kind.t), Bytes)], references)
-    | String kind ->
-        ([Anonymous_field ((kind :> Kind.t), String)], references)
+    | Bytes kind -> ([Anonymous_field ((kind :> Kind.t), Bytes)], references)
+    | String kind -> ([Anonymous_field ((kind :> Kind.t), String)], references)
     | Padded ({encoding = e; _}, n) ->
         let (fields, references) = fields ref_name recursives references e in
         (fields @ [Named_field ("padding", `Fixed n, Padding)], references)
@@ -427,69 +392,43 @@ let describe (type x) (encoding : x Encoding.t) =
           in
           ([Anonymous_field (kind, Ref name)], references)
     | Bool as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | Int8 as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | Uint8 as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | Int16 as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | Uint16 as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | Int31 as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | Int32 as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | Int64 as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | N as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | Z as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | RangedInt _ as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | RangedFloat _ as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | Float as encoding ->
-        let (layout, references) =
-          layout None recursives references encoding
-        in
+        let (layout, references) = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
   and layout :
       type c.
@@ -499,44 +438,26 @@ let describe (type x) (encoding : x Encoding.t) =
       c Encoding.desc ->
       Binary_schema.layout * references =
    fun ref_name recursives references -> function
-    | Null ->
-        (Zero_width, references)
-    | Empty ->
-        (Zero_width, references)
-    | Ignore ->
-        (Zero_width, references)
-    | Constant _ ->
-        (Zero_width, references)
-    | Bool ->
-        (Bool, references)
-    | Int8 ->
-        (Int `Int8, references)
-    | Uint8 ->
-        (Int `Uint8, references)
-    | Int16 ->
-        (Int `Int16, references)
-    | Uint16 ->
-        (Int `Uint16, references)
-    | Int31 ->
-        (RangedInt (~-1073741824, 1073741823), references)
-    | Int32 ->
-        (Int `Int32, references)
-    | Int64 ->
-        (Int `Int64, references)
-    | N ->
-        (Ref n_reference_name, add_n_reference uf references)
-    | Z ->
-        (Ref z_reference_name, add_z_reference uf references)
-    | RangedInt {minimum; maximum} ->
-        (RangedInt (minimum, maximum), references)
+    | Null -> (Zero_width, references)
+    | Empty -> (Zero_width, references)
+    | Ignore -> (Zero_width, references)
+    | Constant _ -> (Zero_width, references)
+    | Bool -> (Bool, references)
+    | Int8 -> (Int `Int8, references)
+    | Uint8 -> (Int `Uint8, references)
+    | Int16 -> (Int `Int16, references)
+    | Uint16 -> (Int `Uint16, references)
+    | Int31 -> (RangedInt (~-1073741824, 1073741823), references)
+    | Int32 -> (Int `Int32, references)
+    | Int64 -> (Int `Int64, references)
+    | N -> (Ref n_reference_name, add_n_reference uf references)
+    | Z -> (Ref z_reference_name, add_z_reference uf references)
+    | RangedInt {minimum; maximum} -> (RangedInt (minimum, maximum), references)
     | RangedFloat {minimum; maximum} ->
         (RangedFloat (minimum, maximum), references)
-    | Float ->
-        (Float, references)
-    | Bytes _kind ->
-        (Bytes, references)
-    | String _kind ->
-        (String, references)
+    | Float -> (Float, references)
+    | Bytes _kind -> (Bytes, references)
+    | String _kind -> (String, references)
     | Padded _ as enc ->
         let name = may_new_reference ref_name in
         let (fields, references) = fields None recursives references enc in
@@ -579,8 +500,7 @@ let describe (type x) (encoding : x Encoding.t) =
           add_reference name (obj (fields1 @ fields2)) references
         in
         (Ref name, references)
-    | Tup {encoding; _} ->
-        layout ref_name recursives references encoding
+    | Tup {encoding; _} -> layout ref_name recursives references encoding
     | Tups _ as descr ->
         let name = may_new_reference ref_name in
         let (fields, references) = fields None recursives references descr in
@@ -614,30 +534,26 @@ let describe (type x) (encoding : x Encoding.t) =
         layout ref_name recursives references encoding.encoding
     | Dynamic_size _ as encoding ->
         let name = may_new_reference ref_name in
-        let (fields, references) =
-          fields None recursives references encoding
-        in
-        UF.add uf {title = name; description = None} ;
+        let (fields, references) = fields None recursives references encoding in
+        UF.add uf {title = name; description = None};
         (Ref name, add_reference name (obj fields) references)
     | Check_size {encoding; _} ->
         layout ref_name recursives references encoding.encoding
-    | Delayed func ->
-        layout ref_name recursives references (func ()).encoding
+    | Delayed func -> layout ref_name recursives references (func ()).encoding
   in
   let (fields, references) =
     fields None [] {descriptions = []} encoding.encoding
   in
-  uf_add_name "" ;
+  uf_add_name "";
   let (_, toplevel) = List.hd (dedup_canonicalize uf [("", obj fields)]) in
   let filtered =
     List.filter
       (fun (name, encoding) ->
         match encoding with
         | Binary_schema.Obj {fields = [Anonymous_field (_, Ref reference)]} ->
-            UF.union uf ~new_canonical:(UF.find uf name) ~existing:reference ;
+            UF.union uf ~new_canonical:(UF.find uf name) ~existing:reference;
             false
-        | _ ->
-            true)
+        | _ -> true)
       references.descriptions
   in
   let fields = List.rev (dedup_canonicalize uf filtered) in

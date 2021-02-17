@@ -37,19 +37,17 @@ let register_test () = Data_encoding.Registration.register e
 
 let find_test () =
   match Data_encoding.Registration.find id with
-  | None ->
-      Alcotest.failf "Could not find %s" id
+  | None -> Alcotest.failf "Could not find %s" id
   | Some r -> (
-    match Data_encoding.Registration.description r with
-    | None ->
-        Alcotest.failf "Expected description"
-    | Some rd ->
-        if rd = description then ()
-        else
-          Alcotest.failf
-            "Descriptions do not match (expected %s) (got %s)"
-            description
-            rd )
+      match Data_encoding.Registration.description r with
+      | None -> Alcotest.failf "Expected description"
+      | Some rd ->
+          if rd = description then ()
+          else
+            Alcotest.failf
+              "Descriptions do not match (expected %s) (got %s)"
+              description
+              rd )
 
 let tests =
   [("register-test", `Quick, register_test); ("find-test", `Quick, find_test)]

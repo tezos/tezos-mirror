@@ -41,26 +41,16 @@ let roundtrip_json pp ding v =
   Crowbar.check_eq ~pp v vv
 
 let pp_jsonm_lexeme fmt = function
-  | `Null ->
-      Format.pp_print_string fmt "(null)"
-  | `Bool true ->
-      Format.pp_print_string fmt "(true)"
-  | `Bool false ->
-      Format.pp_print_string fmt "(false)"
-  | `String _ ->
-      Format.pp_print_string fmt "(string)"
-  | `Float f ->
-      Format.fprintf fmt "(float:%f)" f
-  | `Name _ ->
-      Format.pp_print_string fmt "(name)"
-  | `As ->
-      Format.pp_print_char fmt '['
-  | `Ae ->
-      Format.pp_print_char fmt ']'
-  | `Os ->
-      Format.pp_print_char fmt '{'
-  | `Oe ->
-      Format.pp_print_char fmt '}'
+  | `Null -> Format.pp_print_string fmt "(null)"
+  | `Bool true -> Format.pp_print_string fmt "(true)"
+  | `Bool false -> Format.pp_print_string fmt "(false)"
+  | `String _ -> Format.pp_print_string fmt "(string)"
+  | `Float f -> Format.fprintf fmt "(float:%f)" f
+  | `Name _ -> Format.pp_print_string fmt "(name)"
+  | `As -> Format.pp_print_char fmt '['
+  | `Ae -> Format.pp_print_char fmt ']'
+  | `Os -> Format.pp_print_char fmt '{'
+  | `Oe -> Format.pp_print_char fmt '}'
 
 let pp_jsonm_lexeme_seq fmt s = Seq.iter (pp_jsonm_lexeme fmt) s
 
@@ -79,10 +69,8 @@ let roundtrip_json_stream pp ding v =
   in
   let ezjsonm =
     match Data_encoding.Json.from_string str with
-    | Error msg ->
-        Crowbar.failf "%s (%a) (%s)" msg pp_jsonm_lexeme_seq json str
-    | Ok json ->
-        json
+    | Error msg -> Crowbar.failf "%s (%a) (%s)" msg pp_jsonm_lexeme_seq json str
+    | Ok json -> json
   in
   let vv =
     try Data_encoding.Json.destruct ding ezjsonm
@@ -176,7 +164,7 @@ let roundtrip_binary_write pp ding v slack =
         Data_encoding.Binary.pp_write_error
         we
   in
-  Crowbar.check_eq written size ;
+  Crowbar.check_eq written size;
   let (read, vv) =
     try
       Data_encoding.Binary.read_exn ding (Bytes.unsafe_to_string buffer) 0 size
@@ -189,7 +177,8 @@ let roundtrip_binary_write pp ding v slack =
         Data_encoding.Binary.pp_read_error
         re
   in
-  Crowbar.check_eq read size ; Crowbar.check_eq ~pp v vv
+  Crowbar.check_eq read size;
+  Crowbar.check_eq ~pp v vv
 
 (* Setting up the actual tests *)
 let test_full_and_v_json (full_and_v : full_and_v) =
@@ -221,17 +210,17 @@ let () =
   add_test
     ~name:"binary roundtrips (write/read)"
     [gen; uint8]
-    test_full_and_v_binary_write ;
+    test_full_and_v_binary_write;
   add_test
     ~name:"binary roundtrips (to_/of_bytes)"
     [gen]
-    test_full_and_v_binary_to_bytes ;
+    test_full_and_v_binary_to_bytes;
   add_test
     ~name:"binary roundtrips (to_/of_string)"
     [gen]
-    test_full_and_v_binary_to_string ;
+    test_full_and_v_binary_to_string;
   add_test
     ~name:"json roundtrips (construct/destruct)"
     [gen]
-    test_full_and_v_json ;
+    test_full_and_v_json;
   ()

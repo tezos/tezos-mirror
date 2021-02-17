@@ -27,9 +27,9 @@ type id = string
 
 type t =
   | Record : {
-      encoding : 'a Encoding.t;
-      description : string option;
-      pp : (Format.formatter -> 'a -> unit) option;
+      encoding: 'a Encoding.t;
+      description: string option;
+      pp: (Format.formatter -> 'a -> unit) option;
     }
       -> t
 
@@ -52,14 +52,12 @@ let json_pretty_printer (Record {encoding; pp; _}) fmt json =
   | Some pp ->
       let json = Json.destruct encoding json in
       Format.fprintf fmt "%a" pp json
-  | None ->
-      Format.fprintf fmt "%a" Json.pp json
+  | None -> Format.fprintf fmt "%a" Json.pp json
 
 let binary_pretty_printer (Record {encoding; pp; _}) fmt bytes =
   let data = Binary_reader.of_bytes_exn encoding bytes in
   match pp with
-  | Some pp ->
-      Format.fprintf fmt "%a" pp data
+  | Some pp -> Format.fprintf fmt "%a" pp data
   | None ->
       let json = Json.construct encoding data in
       Format.fprintf fmt "%a" Json.pp json
@@ -70,10 +68,8 @@ let rec lookup_id_descr ({encoding; _} : 'a Encoding.t) =
   | Dynamic_size {encoding; _}
   | Check_size {encoding; _} ->
       lookup_id_descr encoding
-  | Describe {id; description; _} ->
-      Some (id, description)
-  | _ ->
-      None
+  | Describe {id; description; _} -> Some (id, description)
+  | _ -> None
 
 let register ?pp encoding =
   match lookup_id_descr encoding with
@@ -104,7 +100,5 @@ let bytes_of_json (Record {encoding; _}) json =
 
 let json_of_bytes (Record {encoding; _}) bytes =
   match Binary_reader.of_bytes_opt encoding bytes with
-  | Some v ->
-      Some (Json.construct encoding v)
-  | None ->
-      None
+  | Some v -> Some (Json.construct encoding v)
+  | None -> None

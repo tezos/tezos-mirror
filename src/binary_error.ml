@@ -64,20 +64,16 @@ let read_error_encoding : read_error Encoding.t =
         ~title:"Invalid int"
         (obj3 (req "min" int31) (req "v" int31) (req "max" int31))
         (function
-          | (Invalid_int {min; v; max} : read_error) ->
-              Some (min, v, max)
-          | _ ->
-              None)
+          | (Invalid_int {min; v; max} : read_error) -> Some (min, v, max)
+          | _ -> None)
         (fun (min, v, max) -> Invalid_int {min; v; max});
       case
         (Tag 6)
         ~title:"Invalid float"
         (obj3 (req "min" float) (req "v" float) (req "max" float))
         (function
-          | (Invalid_float {min; v; max} : read_error) ->
-              Some (min, v, max)
-          | _ ->
-              None)
+          | (Invalid_float {min; v; max} : read_error) -> Some (min, v, max)
+          | _ -> None)
         (fun (min, v, max) -> Invalid_float {min; v; max});
       case
         (Tag 7)
@@ -106,28 +102,19 @@ let read_error_encoding : read_error Encoding.t =
     ]
 
 let pp_read_error ppf = function
-  | Not_enough_data ->
-      Format.fprintf ppf "Not enough data"
-  | Extra_bytes ->
-      Format.fprintf ppf "Extra bytes"
-  | No_case_matched ->
-      Format.fprintf ppf "No case matched"
-  | Unexpected_tag tag ->
-      Format.fprintf ppf "Unexpected tag %d" tag
-  | Invalid_size sz ->
-      Format.fprintf ppf "Invalid size %d" sz
+  | Not_enough_data -> Format.fprintf ppf "Not enough data"
+  | Extra_bytes -> Format.fprintf ppf "Extra bytes"
+  | No_case_matched -> Format.fprintf ppf "No case matched"
+  | Unexpected_tag tag -> Format.fprintf ppf "Unexpected tag %d" tag
+  | Invalid_size sz -> Format.fprintf ppf "Invalid size %d" sz
   | Invalid_int {min; v; max} ->
       Format.fprintf ppf "Invalid int (%d <= %d <= %d) " min v max
   | Invalid_float {min; v; max} ->
       Format.fprintf ppf "Invalid float (%f <= %f <= %f) " min v max
-  | Trailing_zero ->
-      Format.fprintf ppf "Trailing zero in Z"
-  | Size_limit_exceeded ->
-      Format.fprintf ppf "Size limit exceeded"
-  | List_too_long ->
-      Format.fprintf ppf "List length limit exceeded"
-  | Array_too_long ->
-      Format.fprintf ppf "Array length limit exceeded"
+  | Trailing_zero -> Format.fprintf ppf "Trailing zero in Z"
+  | Size_limit_exceeded -> Format.fprintf ppf "Size limit exceeded"
+  | List_too_long -> Format.fprintf ppf "List length limit exceeded"
+  | Array_too_long -> Format.fprintf ppf "Array length limit exceeded"
 
 let write_error_encoding =
   let open Encoding in
@@ -149,8 +136,7 @@ let write_error_encoding =
         (Tag 2)
         ~title:"Invalid int"
         (obj3 (req "min" int31) (req "v" int31) (req "max" int31))
-        (function
-          | Invalid_int {min; v; max} -> Some (min, v, max) | _ -> None)
+        (function Invalid_int {min; v; max} -> Some (min, v, max) | _ -> None)
         (fun (min, v, max) -> Invalid_int {min; v; max});
       case
         (Tag 3)
@@ -164,20 +150,16 @@ let write_error_encoding =
         ~title:"Invalid bytes length"
         (obj2 (req "expected" int31) (req "found" int31))
         (function
-          | Invalid_bytes_length {expected; found} ->
-              Some (expected, found)
-          | _ ->
-              None)
+          | Invalid_bytes_length {expected; found} -> Some (expected, found)
+          | _ -> None)
         (fun (expected, found) -> Invalid_bytes_length {expected; found});
       case
         (Tag 5)
         ~title:"Invalid string length"
         (obj2 (req "expected" int31) (req "found" int31))
         (function
-          | Invalid_string_length {expected; found} ->
-              Some (expected, found)
-          | _ ->
-              None)
+          | Invalid_string_length {expected; found} -> Some (expected, found)
+          | _ -> None)
         (fun (expected, found) -> Invalid_bytes_length {expected; found});
       case
         (Tag 6)
@@ -200,10 +182,8 @@ let write_error_encoding =
     ]
 
 let pp_write_error ppf = function
-  | Size_limit_exceeded ->
-      Format.fprintf ppf "Size limit exceeded"
-  | No_case_matched ->
-      Format.fprintf ppf "No case matched"
+  | Size_limit_exceeded -> Format.fprintf ppf "Size limit exceeded"
+  | No_case_matched -> Format.fprintf ppf "No case matched"
   | Invalid_int {min; v; max} ->
       Format.fprintf ppf "Invalid int (%d <= %d <= %d) " min v max
   | Invalid_float {min; v; max} ->
@@ -220,9 +200,6 @@ let pp_write_error ppf = function
         "Invalid string length (expected: %d ; found %d)"
         expected
         found
-  | Invalid_natural ->
-      Format.fprintf ppf "Negative natural"
-  | List_too_long ->
-      Format.fprintf ppf "List length limit exceeded"
-  | Array_too_long ->
-      Format.fprintf ppf "Array length limit exceeded"
+  | Invalid_natural -> Format.fprintf ppf "Negative natural"
+  | List_too_long -> Format.fprintf ppf "List length limit exceeded"
+  | Array_too_long -> Format.fprintf ppf "Array length limit exceeded"

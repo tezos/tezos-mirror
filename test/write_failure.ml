@@ -30,12 +30,10 @@ open Types
 
 let check_raises expected f =
   match f () with
-  | exception exn when expected exn ->
-      ()
+  | exception exn when expected exn -> ()
   | exception exn ->
       Alcotest.failf "Unexpected exception: %s." (Printexc.to_string exn)
-  | _ ->
-      Alcotest.failf "Expecting exception, got success."
+  | _ -> Alcotest.failf "Expecting exception, got success."
 
 let json ?(expected = fun _ -> true) encoding value () =
   check_raises expected (fun () ->
@@ -70,10 +68,8 @@ let all_ranged_float minimum maximum =
 
 let test_bounded_string_list =
   let expected = function
-    | Data_encoding__Binary_error_types.Write_error Size_limit_exceeded ->
-        true
-    | _ ->
-        false
+    | Data_encoding__Binary_error_types.Write_error Size_limit_exceeded -> true
+    | _ -> false
   in
   let test name ~total ~elements v =
     ( "bounded_string_list." ^ name,
@@ -92,8 +88,7 @@ let test_bounded_string_list =
   ]
 
 let tests =
-  all_ranged_int 100 400 @ all_ranged_int 19000 19254
-  @ all_ranged_int ~-100 300
+  all_ranged_int 100 400 @ all_ranged_int 19000 19254 @ all_ranged_int ~-100 300
   @ all_ranged_int ~-300_000_000 300_000_000
   @ all_ranged_float ~-.100. 300.
   @ all "string.fixed" (Fixed.string 4) "turlututu"
