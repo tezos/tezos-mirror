@@ -13,6 +13,21 @@ else
     dev=
 fi
 
+# Check if the default opam repo was set in this switch
+default_switch=
+if opam remote -s | grep -q default ; then
+  default_switch=yes
+fi
+
+# install dev dependencies if needed
+if [ -n "$dev" ]; then
+    opam remote add default --rank=-1 > /dev/null 2>&1 || true
+    opam install merlin odoc ocaml-lsp-server --criteria="-changed,-removed"
+fi
+
+# remove the default repo so install tezos dependencies
+opam repository remove default > /dev/null 2>&1
+
 opam repository set-url tezos --dont-select $opam_repository || \
     opam repository add tezos --dont-select $opam_repository > /dev/null 2>&1
 
@@ -29,10 +44,6 @@ fi
 
 eval $(opam env --shell=sh)
 
-if [ -n "$dev" ]; then
-    opam repository remove default > /dev/null 2>&1 || true
-fi
-
 if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
     opam install --unlock-base ocaml-base-compiler.$ocaml_version
 fi
@@ -45,7 +56,9 @@ opam install --yes opam-depext
 
 "$script_dir"/install_build_deps.raw.sh
 
-if [ -n "$dev" ]; then
-    opam repository add default --rank=-1 > /dev/null 2>&1 || true
-    opam install merlin odoc ocaml-lsp-server --criteria="-changed,-removed"
+# add back the default repo if it was present in the first place.
+# we add the rank here even if it wasn't there just to be on the
+# safe side
+if [ -n "$default_switch" ]; then
+    opam remote add default --rank=-1 > /dev/null 2>&1 || true
 fi
