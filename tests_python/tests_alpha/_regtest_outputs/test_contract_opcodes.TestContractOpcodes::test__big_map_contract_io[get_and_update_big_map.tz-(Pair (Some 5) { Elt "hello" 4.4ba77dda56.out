@@ -9,35 +9,35 @@ big_map diff
   Set map(0)["hello"] to 4
   Set map(0)["hi"] to 5
 trace
-  - location: 11 (remaining gas: 1039988.057 units remaining)
+  - location: 11 (remaining gas: 1039975.301 units remaining)
     [ (Pair "hi" (Some 5) { Elt "hello" 4 })  	 ]
-  - location: 13 (remaining gas: 1039987.857 units remaining)
+  - location: 13 (remaining gas: 1039975.101 units remaining)
     [ "hi"  	@parameter
       (Pair (Some 5) { Elt "hello" 4 })  	@storage ]
-  - location: 16 (remaining gas: 1039987.557 units remaining)
+  - location: 16 (remaining gas: 1039974.801 units remaining)
     [ (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 15 (remaining gas: 1039987.487 units remaining)
+  - location: 15 (remaining gas: 1039974.731 units remaining)
     [ (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 14 (remaining gas: 1039987.487 units remaining)
+  - location: 14 (remaining gas: 1039974.731 units remaining)
     [ "hi"  	@parameter
       (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: -1 (remaining gas: 1039987.417 units remaining)
+  - location: -1 (remaining gas: 1039974.661 units remaining)
     [ "hi"  	@parameter
       (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 17 (remaining gas: 1039987.197 units remaining)
+  - location: 17 (remaining gas: 1039965.681 units remaining)
     [ None  	
       { Elt "hello" 4 ; Elt "hi" 5 }  	 ]
-  - location: 18 (remaining gas: 1039987.057 units remaining)
+  - location: 18 (remaining gas: 1039965.541 units remaining)
     [ (Pair None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: 19 (remaining gas: 1039986.917 units remaining)
+  - location: 19 (remaining gas: 1039965.401 units remaining)
     [ {}  	
       (Pair None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: 21 (remaining gas: 1039986.777 units remaining)
+  - location: 21 (remaining gas: 1039965.261 units remaining)
     [ (Pair {} None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: -1 (remaining gas: 1039986.707 units remaining)
+  - location: -1 (remaining gas: 1039965.191 units remaining)
     [ (Pair {} None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
 

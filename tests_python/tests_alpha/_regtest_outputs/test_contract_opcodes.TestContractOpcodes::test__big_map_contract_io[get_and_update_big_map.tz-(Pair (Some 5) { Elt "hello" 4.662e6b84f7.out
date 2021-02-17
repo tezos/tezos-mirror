@@ -8,35 +8,35 @@ big_map diff
   New map(0) of type (big_map string nat)
   Set map(0)["hello"] to 5
 trace
-  - location: 11 (remaining gas: 1039988.027 units remaining)
+  - location: 11 (remaining gas: 1039975.271 units remaining)
     [ (Pair "hello" (Some 5) { Elt "hello" 4 })  	 ]
-  - location: 13 (remaining gas: 1039987.827 units remaining)
+  - location: 13 (remaining gas: 1039975.071 units remaining)
     [ "hello"  	@parameter
       (Pair (Some 5) { Elt "hello" 4 })  	@storage ]
-  - location: 16 (remaining gas: 1039987.527 units remaining)
+  - location: 16 (remaining gas: 1039974.771 units remaining)
     [ (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 15 (remaining gas: 1039987.457 units remaining)
+  - location: 15 (remaining gas: 1039974.701 units remaining)
     [ (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 14 (remaining gas: 1039987.457 units remaining)
+  - location: 14 (remaining gas: 1039974.701 units remaining)
     [ "hello"  	@parameter
       (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: -1 (remaining gas: 1039987.387 units remaining)
+  - location: -1 (remaining gas: 1039974.631 units remaining)
     [ "hello"  	@parameter
       (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 17 (remaining gas: 1039987.167 units remaining)
+  - location: 17 (remaining gas: 1039961.648 units remaining)
     [ (Some 4)  	
       { Elt "hello" 5 }  	 ]
-  - location: 18 (remaining gas: 1039987.027 units remaining)
+  - location: 18 (remaining gas: 1039961.508 units remaining)
     [ (Pair (Some 4) { Elt "hello" 5 })  	 ]
-  - location: 19 (remaining gas: 1039986.887 units remaining)
+  - location: 19 (remaining gas: 1039961.368 units remaining)
     [ {}  	
       (Pair (Some 4) { Elt "hello" 5 })  	 ]
-  - location: 21 (remaining gas: 1039986.747 units remaining)
+  - location: 21 (remaining gas: 1039961.228 units remaining)
     [ (Pair {} (Some 4) { Elt "hello" 5 })  	 ]
-  - location: -1 (remaining gas: 1039986.677 units remaining)
+  - location: -1 (remaining gas: 1039961.158 units remaining)
     [ (Pair {} (Some 4) { Elt "hello" 5 })  	 ]
 

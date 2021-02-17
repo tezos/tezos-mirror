@@ -1511,8 +1511,8 @@ class TestContractOpcodes:
                 '(Pair 0 (Some "one"))',
                 [
                     ["New map(0) of type (big_map string string)"],
-                    ['Set map(0)["1"] to "one"'],
                     ['Set map(0)["2"] to "two"'],
+                    ['Set map(0)["1"] to "one"'],
                 ],
             ),
             # Test updating big maps
@@ -1523,8 +1523,8 @@ class TestContractOpcodes:
                 '(Pair 0 Unit)',
                 [
                     ["New map(0) of type (big_map string string)"],
-                    ['Set map(0)["1"] to "one"'],
                     ['Set map(0)["2"] to "two"'],
+                    ['Set map(0)["1"] to "one"'],
                 ],
             ),
             (
@@ -1534,8 +1534,8 @@ class TestContractOpcodes:
                 '(Pair 0 Unit)',
                 [
                     ["New map(0) of type (big_map string string)"],
-                    ['Set map(0)["1"] to "two"'],
                     ['Set map(0)["2"] to "two"'],
+                    ['Set map(0)["1"] to "two"'],
                 ],
             ),
             (
@@ -1545,9 +1545,9 @@ class TestContractOpcodes:
                 '(Pair 0 Unit)',
                 [
                     ["New map(0) of type (big_map string string)"],
-                    ['Set map(0)["1"] to "one"'],
                     ['Set map(0)["2"] to "two"'],
                     ['Set map(0)["3"] to "three"'],
+                    ['Set map(0)["1"] to "one"'],
                 ],
             ),
             (
@@ -1557,9 +1557,9 @@ class TestContractOpcodes:
                 '(Pair 0 Unit)',
                 [
                     ["New map(0) of type (big_map string string)"],
-                    ['Set map(0)["1"] to "one"'],
                     ['Set map(0)["2"] to "two"'],
                     ['Unset map(0)["3"]'],
+                    ['Set map(0)["1"] to "one"'],
                 ],
             ),
             (
@@ -1569,8 +1569,8 @@ class TestContractOpcodes:
                 '(Pair 0 Unit)',
                 [
                     ["New map(0) of type (big_map string string)"],
-                    ['Set map(0)["1"] to "one"'],
                     ['Unset map(0)["2"]'],
+                    ['Set map(0)["1"] to "one"'],
                 ],
             ),
             (
@@ -1580,8 +1580,8 @@ class TestContractOpcodes:
                 '(Pair 0 Unit)',
                 [
                     ["New map(0) of type (big_map string string)"],
-                    ['Set map(0)["1"] to "two"'],
                     ['Set map(0)["2"] to "two"'],
+                    ['Set map(0)["1"] to "two"'],
                 ],
             ),
             # test the GET_AND_UPDATE instruction on big maps
@@ -1645,8 +1645,8 @@ class TestContractOpcodes:
                 '(Pair (Some 1) 0)',
                 [
                     ["New map(0) of type (big_map string nat)"],
-                    ['Unset map(0)["1"]'],
                     ['Set map(0)["2"] to 2'],
+                    ['Unset map(0)["1"]'],
                 ],
             ),
             (
@@ -1657,8 +1657,8 @@ class TestContractOpcodes:
                 '(Pair (Some 1) 0)',
                 [
                     ["New map(0) of type (big_map string nat)"],
-                    ['Unset map(0)["1"]'],
                     ['Set map(0)["2"] to 2'],
+                    ['Unset map(0)["1"]'],
                 ],
             ),
         ],
@@ -1736,8 +1736,8 @@ class TestContractOpcodes:
                     ['New map(1) of type (big_map string string)'],
                     ['Set map(1)["2"] to "two"'],
                     ['New map(0) of type (big_map string string)'],
-                    ['Set map(0)["1"] to "one"'],
                     ['Set map(0)["3"] to "three"'],
+                    ['Set map(0)["1"] to "one"'],
                 ],
             ),
             # test remove from big_map
