@@ -93,8 +93,8 @@ let write_swap_ack t point peer_id =
 
 let write_advertise t points = P2p_socket.write_now t.conn (Advertise points)
 
-let create conn point_info peer_info messages canceler ~greylister callback
-    negotiated_version =
+let create ~conn ~point_info ~peer_info ~messages ~canceler ~greylister
+    ~callback negotiated_version =
   let private_node = P2p_socket.private_node conn in
   let trusted_node =
     P2p_peer_state.Info.trusted peer_info

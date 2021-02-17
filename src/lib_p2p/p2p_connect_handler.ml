@@ -102,13 +102,13 @@ let create_connection t p2p_conn id_point point_info peer_info
   in
   let conn =
     P2p_conn.create
-      p2p_conn
-      point_info
-      peer_info
-      messages
-      canceler
+      ~conn:p2p_conn
+      ~point_info
+      ~peer_info
+      ~messages
+      ~canceler
       ~greylister
-      (Lazy.force t.answerer)
+      ~callback:(Lazy.force t.answerer)
       negotiated_version
   in
   let conn_meta = P2p_socket.remote_metadata p2p_conn in
