@@ -186,3 +186,6 @@ linkcheck_ignore = [
     r'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/*',
     r'http(s)?://localhost:\d+/?'
 ]
+
+# Python module index generation is broken, deactivate it.
+html_domain_indices = False

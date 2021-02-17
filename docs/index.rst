@@ -37,7 +37,7 @@ The Community
 
     - https://tzstats.com
     - https://tezblock.io
-    - https://teztracker.everstake.one
+    - https://teztracker.com/
     - https://tzkt.io (Baking focused Explorer)
     - https://arronax.io
     - https://mininax.io
@@ -217,5 +217,4 @@ Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
