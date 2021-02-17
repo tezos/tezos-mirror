@@ -108,6 +108,7 @@ integration:sandboxes:daemons-upgrade:
     paths:
       - tests_python/tmp/
     expire_in: 7 day
+    when: always
   # python scripts don't need the _build directory
   # but only the binaries in the artifacts
   cache: {}
