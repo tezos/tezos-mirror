@@ -78,34 +78,6 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
     default_bootstrap_peers;
   }
 
-let blockchain_network_mainnet =
-  let giganode_1 = "116.202.172.21" in
-  let giganode_2 = "95.216.45.62" in
-  make_blockchain_network
-    ~alias:"mainnet"
-    {
-      time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-    }
-    ~chain_name:"TEZOS_MAINNET"
-    ~old_chain_name:"TEZOS_BETANET_2018-06-30T16:07:32Z"
-    ~incompatible_chain_name:"INCOMPATIBLE"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS_MAINNET"
-    ~user_activated_upgrades:
-      [ (28082l, "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt");
-        (204761l, "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP") ]
-    ~user_activated_protocol_overrides:
-      [ ( "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
-          "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS" );
-        ( "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq",
-          "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA" ) ]
-    ~default_bootstrap_peers:["boot.tzbeta.net"; giganode_1; giganode_2]
-
 let blockchain_network_delphinet =
   make_blockchain_network
     ~alias:"delphinet"
@@ -283,7 +255,6 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
 
 let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
-    (4, blockchain_network_mainnet);
     (9, blockchain_network_delphinet);
     (12, blockchain_network_edo2net);
     (13, blockchain_network_falphanet) ]
@@ -429,7 +400,7 @@ let default_config =
     log = Lwt_log_sink_unix.default_cfg;
     internal_events = Internal_event_unix.Configuration.default;
     shell = default_shell;
-    blockchain_network = blockchain_network_mainnet;
+    blockchain_network = blockchain_network_falphanet;
   }
 
 let limit : P2p.limits Data_encoding.t =
@@ -1051,7 +1022,7 @@ let encoding =
           ~description:
             "Configuration of which network/blockchain to connect to"
           sugared_blockchain_network_encoding
-          blockchain_network_mainnet))
+          blockchain_network_falphanet))
 
 (* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
    string representation of the path, second argument is the error message
