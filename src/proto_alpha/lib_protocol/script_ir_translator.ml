@@ -2636,7 +2636,7 @@ type 'before dup_n_proof_argument =
 
 let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
   let rec find_entrypoint :
-      type t. t ty -> string -> (Script.node -> Script.node) * ex_ty =
+      type t. t ty -> string -> ((Script.node -> Script.node) * ex_ty) option =
    fun t entrypoint ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) -> (
@@ -2646,23 +2646,26 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
               false
           | Some (Field_annot l) ->
               Compare.String.(l = entrypoint)
-        then ((fun e -> Prim (0, D_Left, [e], [])), Ex_ty tl)
+        then Some ((fun e -> Prim (0, D_Left, [e], [])), Ex_ty tl)
         else if
           match ar with
           | None ->
               false
           | Some (Field_annot r) ->
               Compare.String.(r = entrypoint)
-        then ((fun e -> Prim (0, D_Right, [e], [])), Ex_ty tr)
+        then Some ((fun e -> Prim (0, D_Right, [e], [])), Ex_ty tr)
         else
-          try
-            let (f, t) = find_entrypoint tl entrypoint in
-            ((fun e -> Prim (0, D_Left, [f e], [])), t)
-          with Not_found ->
-            let (f, t) = find_entrypoint tr entrypoint in
-            ((fun e -> Prim (0, D_Right, [f e], [])), t) )
+          match find_entrypoint tl entrypoint with
+          | Some (f, t) ->
+              Some ((fun e -> Prim (0, D_Left, [f e], [])), t)
+          | None -> (
+            match find_entrypoint tr entrypoint with
+            | Some (f, t) ->
+                Some ((fun e -> Prim (0, D_Right, [f e], [])), t)
+            | None ->
+                None ) )
     | _ ->
-        raise Not_found
+        None
   in
   let entrypoint =
     if Compare.String.(entrypoint = "") then "default" else entrypoint
@@ -2675,8 +2678,10 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
       ->
         ok ((fun e -> e), Ex_ty full)
     | _ -> (
-      try ok (find_entrypoint full entrypoint)
-      with Not_found -> (
+      match find_entrypoint full entrypoint with
+      | Some result ->
+          ok result
+      | None -> (
         match entrypoint with
         | "default" ->
             ok ((fun e -> e), Ex_ty full)
