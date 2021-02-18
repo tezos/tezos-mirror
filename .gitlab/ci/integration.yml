@@ -240,6 +240,12 @@ integration:008_contract_annotations:
     - poetry run pytest tests_008/test_contract_annotations.py -s --log-dir=tmp 2>&1 | tee tmp/008_contract_annotations.out | tail
   stage: test
 
+integration:008_contract_bls12_381:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_contract_bls12_381.py -s --log-dir=tmp 2>&1 | tee tmp/008_contract_bls12_381.out | tail
+  stage: test
+
 integration:008_contract_macros:
   extends: .integration_python_template
   script:
@@ -256,6 +262,12 @@ integration:008_contract_opcodes:
   extends: .integration_python_template
   script:
     - poetry run pytest tests_008/test_contract_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/008_contract_opcodes.out | tail
+  stage: test
+
+integration:008_crypto:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_crypto.py -s --log-dir=tmp 2>&1 | tee tmp/008_crypto.out | tail
   stage: test
 
 integration:008_forge_block:
@@ -342,6 +354,12 @@ integration:alpha_contract_annotations:
     - poetry run pytest tests_alpha/test_contract_annotations.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_contract_annotations.out | tail
   stage: test
 
+integration:alpha_contract_bls12_381:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_contract_bls12_381.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_contract_bls12_381.out | tail
+  stage: test
+
 integration:alpha_contract_macros:
   extends: .integration_python_template
   script:
@@ -358,6 +376,12 @@ integration:alpha_contract_opcodes:
   extends: .integration_python_template
   script:
     - poetry run pytest tests_alpha/test_contract_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_contract_opcodes.out | tail
+  stage: test
+
+integration:alpha_crypto:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_crypto.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_crypto.out | tail
   stage: test
 
 integration:alpha_forge_block:

@@ -148,6 +148,18 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
+   :caption: Falpha Protocol doc:
+
+   009/michelson
+   009/proof_of_stake
+   009/sapling
+   009/voting
+   009/glossary
+   009/cli-commands
+   009/rpc
+
+.. toctree::
+   :maxdepth: 2
    :caption: Alpha Development Protocol doc:
 
    alpha/michelson

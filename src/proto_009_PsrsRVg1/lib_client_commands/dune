@@ -1,0 +1,60 @@
+(library
+ (name tezos_client_009_PsrsRVg1_commands)
+ (public_name tezos-client-009-PsrsRVg1-commands)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-protocol-009-PsrsRVg1
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-mockup
+            tezos-mockup-registration
+            tezos-mockup-commands
+            tezos-client-base-unix
+            tezos-client-009-PsrsRVg1
+            tezos-client-commands
+            tezos-rpc
+            tezos-protocol-plugin-009-PsrsRVg1)
+ (library_flags (:standard -linkall))
+ (modules (:standard \ alpha_commands_registration))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_009_PsrsRVg1
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_009_PsrsRVg1
+                   -open Tezos_client_commands
+                   -open Tezos_rpc
+                   -open Tezos_client_base_unix
+                   -open Tezos_protocol_plugin_009_PsrsRVg1)))
+
+(library
+ (name tezos_client_009_PsrsRVg1_commands_registration)
+ (public_name tezos-client-009-PsrsRVg1-commands-registration)
+ (libraries tezos-base
+            tezos-protocol-009-PsrsRVg1
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-009-PsrsRVg1
+            tezos-client-commands
+            tezos-client-009-PsrsRVg1-commands
+            tezos-client-sapling-009-PsrsRVg1
+            tezos-rpc
+            tezos-protocol-plugin-009-PsrsRVg1)
+ (library_flags (:standard -linkall))
+ (modules alpha_commands_registration)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_009_PsrsRVg1
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_009_PsrsRVg1
+                   -open Tezos_client_commands
+                   -open Tezos_client_009_PsrsRVg1_commands
+                   -open Tezos_client_sapling_009_PsrsRVg1
+                   -open Tezos_rpc
+                   -open Tezos_protocol_plugin_009_PsrsRVg1)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

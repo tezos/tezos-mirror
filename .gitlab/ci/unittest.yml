@@ -70,6 +70,8 @@ unit:alltest:
     - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_protocol 007_PsDELPH1_lib_protocol
     - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
     - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_protocol 008_PtEdo2Zk_lib_protocol
+    - scripts/test_wrapper.sh src/proto_009_PsrsRVg1/lib_client 009_PsrsRVg1_lib_client
+    - scripts/test_wrapper.sh src/proto_009_PsrsRVg1/lib_protocol 009_PsrsRVg1_lib_protocol
     - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
     - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
     - scripts/test_wrapper.sh src/tooling src_tooling

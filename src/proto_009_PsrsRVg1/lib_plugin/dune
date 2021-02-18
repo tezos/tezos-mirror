@@ -1,0 +1,26 @@
+(library
+ (name tezos_protocol_plugin_009_PsrsRVg1)
+ (public_name tezos-protocol-plugin-009-PsrsRVg1)
+ (libraries tezos-base
+            tezos-embedded-protocol-009-PsrsRVg1
+            tezos-protocol-009-PsrsRVg1)
+ (modules (:standard) \ Registerer)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_protocol_009_PsrsRVg1
+                   -open Tezos_protocol_009_PsrsRVg1)))
+
+(library
+ (name tezos_protocol_plugin_009_PsrsRVg1_registerer)
+ (public_name tezos-protocol-plugin-009-PsrsRVg1-registerer)
+ (libraries tezos-base
+            tezos-protocol-plugin-009-PsrsRVg1
+            tezos-shell)
+ (modules Registerer)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_plugin_009_PsrsRVg1
+                   -open Tezos_shell)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
