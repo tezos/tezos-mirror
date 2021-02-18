@@ -94,6 +94,9 @@ $(addsuffix .test,${PACKAGES}): %.test:
 
 .PHONY: coverage-report
 coverage-report:
+	# remove spurious empty output files which prevent bisect from generating
+	# the report
+	@find ${COVERAGE_OUTPUT} -size 0 -type f -delete
 	@bisect-ppx-report html -o ${COVERAGE_REPORT} --coverage-path ${COVERAGE_OUTPUT}
 	@echo "Report should be available in ${COVERAGE_REPORT}/index.html"
 
