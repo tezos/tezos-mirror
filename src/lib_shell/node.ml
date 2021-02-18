@@ -171,7 +171,7 @@ let test_protocol_hashes =
     [ "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
       "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT";
       "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp";
-      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ]
+      "PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej" ]
 
 let store_known_protocols state =
   let embedded_protocols = Registered_protocol.seq_embedded () in

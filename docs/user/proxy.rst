@@ -26,7 +26,7 @@ Because computations done locally are protocol dependent, the proxy mode
 does not support all protocols. At the time of writing it supports
 the following protocols:
 
-* ``ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im``
+* ``PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej``
 * ``PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb``
 * ``PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb``
 * ``PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA``

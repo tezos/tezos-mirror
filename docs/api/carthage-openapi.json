@@ -20,7 +20,7 @@
                     "protocol": {
                       "type": "string",
                       "enum": [
-                        "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+                        "PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej"
                       ]
                     },
                     "chain_id": {
@@ -1612,7 +1612,7 @@
                     "protocol": {
                       "type": "string",
                       "enum": [
-                        "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+                        "PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej"
                       ]
                     },
                     "content": {
@@ -4156,7 +4156,7 @@
           "protocol": {
             "type": "string",
             "enum": [
-              "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+              "PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej"
             ]
           },
           "chain_id": {
@@ -4420,7 +4420,7 @@
           "protocol": {
             "type": "string",
             "enum": [
-              "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+              "PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej"
             ]
           },
           "next_protocol": {
@@ -4943,7 +4943,7 @@
           "protocol": {
             "type": "string",
             "enum": [
-              "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+              "PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej"
             ]
           },
           "chain_id": {

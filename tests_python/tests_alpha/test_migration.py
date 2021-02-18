@@ -57,7 +57,7 @@ NODE_CONFIG = {
         'genesis': {
             'timestamp': '2018-06-30T16:07:32Z',
             'block': 'BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2',
-            'protocol': 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im',
+            'protocol': 'PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej',
         },
         'genesis_parameters': {
             'values': {'genesis_pubkey': constants.GENESIS_PK}
@@ -94,7 +94,7 @@ NODE_CONFIG = {
         'genesis': {
             'timestamp': '2018-06-30T16:07:32Z',
             'block': 'BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2',
-            'protocol': 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im',
+            'protocol': 'PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej',
         },
         'genesis_parameters': {
             'values': {'genesis_pubkey': constants.GENESIS_PK}

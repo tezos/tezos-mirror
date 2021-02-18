@@ -47,7 +47,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
  (action
   (write-file %{targets}
     "module Environment = Tezos_protocol_environment_genesis.Environment
-let hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im\"
+let hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej\"
 let name = Environment.Name.name
 include Tezos_raw_protocol_genesis
 include Tezos_raw_protocol_genesis.Main
@@ -123,7 +123,7 @@ include Tezos_raw_protocol_genesis.Main
    services.ml
    main.mli main.ml
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))
+ (action (run %{bin:tezos-protocol-compiler}  .)))
 
 (rule
  (alias runtest_sandbox)

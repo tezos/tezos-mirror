@@ -31,7 +31,7 @@ let genesis : Genesis.t =
         "BLockGenesisGenesisGenesisGenesisGenesisa52f8bUWPcg";
     protocol =
       Protocol_hash.of_b58check_exn
-        "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
+        "PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej";
   }
 
 let with_node f =

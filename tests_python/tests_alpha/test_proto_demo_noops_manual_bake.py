@@ -3,7 +3,7 @@ import pytest
 from client.client import Client
 
 PROTO = 'ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp'
-PROTO_GENESIS = 'ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im'
+PROTO_GENESIS = 'PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej'
 PARAMS = ['-p', PROTO_GENESIS]
 
 

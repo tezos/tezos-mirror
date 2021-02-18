@@ -176,7 +176,7 @@ let blockchain_network_sandbox =
           "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
       protocol =
         Protocol_hash.of_b58check_exn
-          "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
+          "PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej";
     }
     ~genesis_parameters:
       (* Genesis public key corresponds to the following private key:
