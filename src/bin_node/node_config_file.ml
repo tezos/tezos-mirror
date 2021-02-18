@@ -166,6 +166,32 @@ let blockchain_network_edo2net =
         "edonet2.smartpy.io";
         "edonetb.boot.tezostaquito.io" ]
 
+let blockchain_network_falphanet =
+  make_blockchain_network
+    ~alias:"falphanet"
+    {
+      time = Time.Protocol.of_notation_exn "2021-02-18T10:30:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesise1bd7fh6LAS";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PrrUA9dCzbqBzugjQyw65HLHKjhH3HMFSLLHLZjj5rkmkG13Fej";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ) ];
+      }
+    ~chain_name:"TEZOS_FALPHANET_2021-02-18T13:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:
+      ["falphanet.kaml.fr"; "falphanet.smartpy.io"; "falphanet.boot.tez.ie"]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -259,7 +285,8 @@ let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (9, blockchain_network_delphinet);
-    (12, blockchain_network_edo2net) ]
+    (12, blockchain_network_edo2net);
+    (13, blockchain_network_falphanet) ]
   |> List.map (fun (tag, network) ->
          match network.alias with
          | None ->
