@@ -161,6 +161,8 @@ let blockchain_network_falphanet =
       }
     ~chain_name:"TEZOS_FALPHANET_2021-02-18T13:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~user_activated_upgrades:
+      [(1024l, "PsrsRVg1Gycjn5LvMtoYSQah1znvYmGp8bHLxwYLBZaYFf2CEkV")]
     ~default_bootstrap_peers:
       ["falphanet.kaml.fr"; "falphanet.smartpy.io"; "falphanet.boot.tez.ie"]
 
