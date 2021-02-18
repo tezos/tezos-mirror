@@ -390,9 +390,19 @@ let find_model_or_generic model_name model_list =
 let load_files (model_name : string) (files : string list) =
   (* Use a table to store loaded measurements *)
   let table = Hashtbl.create 51 in
+  let prune filename =
+    (* We assume filenames are of the form <dir>/<name>.workload, where <dir>
+       is common amongst all files. This function extracts only the <name> component,
+       and raises an exception if the suffix does not match.
+     *)
+    Filename.basename filename
+    |> Filename.chop_suffix_opt ~suffix:".workload"
+    |> WithExceptions.Option.get ~loc:__LOC__
+  in
   let state =
     List.fold_left
       (fun graph filename ->
+        let filename_short = prune filename in
         let measurement = Measure.load ~filename in
         match measurement with
         | Tezos_benchmark.Measure.Measurement ((module Bench), m) -> (
@@ -403,7 +413,7 @@ let load_files (model_name : string) (files : string list) =
               let () =
                 Format.eprintf "Loading %s in dependency graph@." filename
               in
-              Hashtbl.add table filename measurement ;
+              Hashtbl.add table filename_short measurement ;
               let names =
                 List.fold_left
                   (fun acc {Measure.workload; _} ->
@@ -412,7 +422,7 @@ let load_files (model_name : string) (files : string list) =
                   Free_variable.Set.empty
                   m.Measure.workload_data
               in
-              add_names graph filename names ))
+              add_names graph filename_short names ))
       Solver.empty_state
       files
   in
