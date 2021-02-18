@@ -157,15 +157,17 @@ let map_contracts_index ctxt ~init f =
     index_tree
     []
     ~depth:(`Eq 7)
-    ~init:(0, index_tree, init)
-    ~f:(fun key tree (nmod, index_tree, acc) ->
+    ~init:(ok (0, index_tree, init))
+    ~f:(fun key tree st ->
+      Lwt.return st
+      >>=? fun (nmod, index_tree, acc) ->
       f key tree acc
-      >>= fun (modified, tree, acc) ->
+      >>=? fun (modified, tree, acc) ->
       ( if modified then Raw_context.Tree.add_tree index_tree key tree
       else Lwt.return index_tree )
       >|= fun index_tree ->
-      ((if modified then nmod + 1 else nmod), index_tree, acc))
-  >>= fun (nmod, index_tree, acc) ->
+      ok ((if modified then nmod + 1 else nmod), index_tree, acc))
+  >>=? fun (nmod, index_tree, acc) ->
   Raw_context.update_tree ctxt index_key index_tree
   >>=? fun ctxt -> clear_tree ctxt index_key >|=? fun ctxt -> (ctxt, nmod, acc)
 
@@ -385,27 +387,73 @@ let contract_hash : Script_expr_hash.t =
   Script_expr_hash.of_bytes_exn @@ Hex.to_bytes
   @@ `Hex "41ebb2d762dfef4d53b8b4a7277c056d472ee028888c878d8f227787bfffdcae"
 
-let migrate_contract ctxt contract =
-  Contract_storage.get_script ctxt contract
-  >>=? fun (ctxt, script_opt) ->
-  match script_opt with
+let find_with_encoding tree path encoding =
+  Raw_context.Tree.find tree path
+  >>= function
   | None ->
-      return ctxt (* Do nothing on implicit accounts *)
-  | Some {Script_repr.code; Script_repr.storage = _storage} ->
-      Script_repr.force_decode code
-      >>?= fun (code, _gas_cost) ->
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn Script_repr.expr_encoding code
-      in
-      let hash = Script_expr_hash.hash_bytes [bytes] in
-      if Script_expr_hash.(hash = contract_hash) then
-        let migrated_code =
-          Script_repr.lazy_expr @@ Micheline.strip_locations
-          @@ update_contract_script @@ Micheline.root code
-        in
-        Storage.Contract.Code.update ctxt contract migrated_code
-        >>=? fun (ctxt, _code_size_diff) -> return ctxt
-      else return ctxt
+      return None
+  | Some bytes -> (
+    match Data_encoding.Binary.of_bytes encoding bytes with
+    | Some d ->
+        return (Some d)
+    | None ->
+        failwith "encoding failure" )
+
+let target_code_hash =
+  Context_hash.of_b58check_exn
+    "CoVXASXxJNRof7q1gxoSGuMsWKNRNcXThtA5MVWCqeCmn4GYN7sc"
+
+(* Patch the contract code of the specific hash *)
+let migrate_contract newcode tree =
+  Raw_context.Tree.find_tree tree ["data"; "code"]
+  >>= function
+  | Some code_tree
+    when Context_hash.( = ) (Raw_context.Tree.hash code_tree) target_code_hash
+    ->
+      ( match !newcode with
+      | Some code ->
+          return code
+      | None -> (
+          find_with_encoding code_tree [] Script_repr.lazy_expr_encoding
+          >>=? function
+          | None ->
+              assert false (* never happens *)
+          | Some code ->
+              Script_repr.force_decode code
+              >>?= fun (code, _gas_cost) ->
+              let bytes =
+                Data_encoding.Binary.to_bytes_exn
+                  Script_repr.expr_encoding
+                  code
+              in
+              let hash = Script_expr_hash.hash_bytes [bytes] in
+              (* only one script is patched, it is used in a few contracts *)
+              assert (Script_expr_hash.(hash = contract_hash)) ;
+              (* [code] is always the same, therefore [migrated_code] is a constant
+                 we could save some time by precomputing it but it won't be called
+                 often so we don't mind. *)
+              let migrated_code =
+                Script_repr.lazy_expr @@ Micheline.strip_locations
+                @@ update_contract_script @@ Micheline.root code
+              in
+              let migrated_code_bytes =
+                Data_encoding.Binary.to_bytes_exn
+                  Script_repr.lazy_expr_encoding
+                  migrated_code
+              in
+              newcode := Some migrated_code_bytes ;
+              return migrated_code_bytes ) )
+      >>=? fun migrated_code_bytes ->
+      Raw_context.Tree.update tree ["data"; "code"] migrated_code_bytes
+      >>=? fun tree ->
+      Raw_context.Tree.update
+        tree
+        ["len"; "code"]
+        Data_encoding.(
+          Binary.to_bytes_exn int31 (Bytes.length migrated_code_bytes))
+      >|=? fun tree -> Some tree
+  | _ ->
+      return None
 
 (* This is the genesis protocol: initialise the state *)
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
@@ -509,8 +557,9 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
         "Contract.Delegate + Contract.Inactive_delegate + \
          Contract.Delegate_desactivation"
       >>= fun () ->
-      (* Update Contract.Delegate, Contract.Inactive_delegate
-         and Contract.Delegate_desactivation in one folding *)
+      (* Update Contract.Delegate, Contract.Inactive_delegate,
+         Contract.Delegate_desactivation and contract patching in one folding *)
+      let code_cache = ref None in
       map_contracts_index
         ctxt
         ~init:(0, [], [])
@@ -544,7 +593,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           Raw_context.Tree.find tree delegate_key
           >>= (function
                 | None ->
-                    Lwt.return (false, tree, delegates)
+                    return (false, tree, delegates)
                 | Some pkh_bytes ->
                     let delegate =
                       match find_baker_hash_by_pkhbytes pkh_bytes with
@@ -582,15 +631,14 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
                       tree
                       delegate_key
                       delegate_tree
-                    >|= fun tree -> (true, tree, delegates + 1))
-          >>= fun (modified, tree, delegates) ->
+                    >|= fun tree -> ok (true, tree, delegates + 1))
+          >>=? fun (modified, tree, delegates) ->
           (* Contract.Inactive_delegate -> Baker.Inactive *)
           let inactive_delegate_key = ["inactive_delegate"] in
           Raw_context.Tree.find tree inactive_delegate_key
           >>= (function
                 | None ->
-                    Lwt.return (modified, tree, inactive_bakers)
-                    (* no update *)
+                    return (modified, tree, inactive_bakers) (* no update *)
                 | Some _ (* "inited" *) ->
                     let baker = get_baker () in
                     let migrated_baker =
@@ -599,14 +647,14 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
                     in
                     let inactive_bakers = migrated_baker :: inactive_bakers in
                     Raw_context.Tree.remove tree inactive_delegate_key
-                    >>= fun tree -> Lwt.return (true, tree, inactive_bakers))
-          >>= fun (modified, tree, inactive_bakers) ->
+                    >>= fun tree -> return (true, tree, inactive_bakers))
+          >>=? fun (modified, tree, inactive_bakers) ->
           (* Contract.Delegate_desactivation -> Baker.Inactive *)
           let delegate_desactivation_key = ["delegate_desactivation"] in
           Raw_context.Tree.find tree delegate_desactivation_key
           >>= (function
                 | None ->
-                    Lwt.return (modified, tree, desactivations) (* no update *)
+                    return (modified, tree, desactivations) (* no update *)
                 | Some cycle_bytes ->
                     let cycle =
                       (* never fails *)
@@ -624,9 +672,15 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
                       (migrated_baker, cycle) :: desactivations
                     in
                     Raw_context.Tree.remove tree delegate_desactivation_key
-                    >>= fun tree -> Lwt.return (true, tree, desactivations))
-          >|= fun (modified, tree, desactivations) ->
-          (modified, tree, (delegates, inactive_bakers, desactivations)))
+                    >>= fun tree -> return (true, tree, desactivations))
+          >>=? fun (modified, tree, desactivations) ->
+          (* Coontract code patching *)
+          migrate_contract code_cache tree
+          >|=? function
+          | None ->
+              (modified, tree, (delegates, inactive_bakers, desactivations))
+          | Some tree ->
+              (true, tree, (delegates, inactive_bakers, desactivations)))
       >>=? fun (ctxt, nmod, (delegates, inactive_bakers, desactivations)) ->
       lwt_log_notice "%d contracts updated" nmod
       >>= fun () ->
@@ -885,11 +939,6 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Pending_migration_balance_updates.init
         ctxt
         (balance_updates @ baker_balance_updates)
-      >>=? fun ctxt ->
-      (* TODO: stitching time can probably be improved by folding over the
-         contracts only once. *)
-      Storage.Contract.fold ctxt ~init:(Ok ctxt) ~f:(fun contract ctxt ->
-          ctxt >>?= fun ctxt -> migrate_contract ctxt contract)
       >>=? fun ctxt -> return ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
