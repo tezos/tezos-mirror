@@ -254,18 +254,39 @@ let () =
     (function Failed_to_preapply (hash, err) -> Some (hash, err) | _ -> None)
     (fun (hash, err) -> Failed_to_preapply (hash, err))
 
-let get_manager_operation_gas_and_fee op =
+type manager_content = {
+  total_fee : Tez.t;
+  total_gas : Fixed_point_repr.integral_tag Gas.Arith.t;
+  source : public_key_hash;
+  counter : counter;
+}
+
+let get_manager_content op =
   let {protocol_data = Operation_data {contents; _}; _} = op in
   let open Operation in
   let l = to_list (Contents_list contents) in
   List.fold_left_e
-    (fun ((total_fee, total_gas) as acc) -> function
-      | Contents (Manager_operation {fee; gas_limit; _}) ->
+    (fun ((first_source, first_counter, total_fee, total_gas) as acc) ->
+       function
+      | Contents (Manager_operation {source; counter; fee; gas_limit; _}) ->
           (Environment.wrap_tzresult @@ Tez.(total_fee +? fee))
-          >>? fun total_fee -> ok (total_fee, Gas.Arith.add total_gas gas_limit)
-      | _ -> ok acc)
-    (Tez.zero, Gas.Arith.zero)
+          >>? fun total_fee ->
+          (* There is only one unique source per packed transaction *)
+          let first_source = Option.value ~default:source first_source in
+          (* We only care about the first counter *)
+          let first_counter = Option.value ~default:counter first_counter in
+          ok
+            ( Some first_source,
+              Some first_counter,
+              total_fee,
+              Gas.Arith.add total_gas gas_limit ) | _ -> ok acc)
+    (None, None, Tez.zero, Gas.Arith.zero)
     l
+  |> function
+  | Ok (Some source, Some counter, total_fee, total_gas) ->
+      Some {total_fee; total_gas; source; counter}
+  | _ ->
+      None
 
 (* Sort operation considering potential gas and storage usage.
    Weight = fee / (max ( (size/size_total), (gas/gas_total))) *)
@@ -284,39 +305,53 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
     in
     (size, gas, Q.(fee_f / max size_ratio gas_ratio))
   in
-  List.filter_map_e
+  List.filter_map
     (fun op ->
-      get_manager_operation_gas_and_fee op
-      >>? fun (fee, gas) ->
-      if Tez.(fee < minimal_fees) then ok_none
-      else
-        let ((size, gas, _ratio) as weight) = compute_weight op (fee, gas) in
-        let fees_in_nanotez =
-          Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
-        in
-        let enough_fees_for_gas =
-          let minimal_fees_in_nanotez =
-            Q.mul
-              minimal_nanotez_per_gas_unit
-              (Q.of_bigint @@ Gas.Arith.integral_to_z gas)
-          in
-          Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
-        in
-        let enough_fees_for_size =
-          let minimal_fees_in_nanotez =
-            Q.mul minimal_nanotez_per_byte (Q.of_int size)
-          in
-          Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
-        in
-        if enough_fees_for_size && enough_fees_for_gas then ok_some (op, weight)
-        else ok_none)
+      match get_manager_content op with
+      | None ->
+          None
+      | Some {total_fee; total_gas; source; counter} ->
+          if Tez.(total_fee < minimal_fees) then None
+          else
+            let (size, gas, weight_ratio) =
+              compute_weight op (total_fee, total_gas)
+            in
+            let fees_in_nanotez =
+              Q.mul (Q.of_int64 (Tez.to_mutez total_fee)) (Q.of_int 1000)
+            in
+            let enough_fees_for_gas =
+              let minimal_fees_in_nanotez =
+                Q.mul
+                  minimal_nanotez_per_gas_unit
+                  (Q.of_bigint @@ Gas.Arith.integral_to_z gas)
+              in
+              Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
+            in
+            let enough_fees_for_size =
+              let minimal_fees_in_nanotez =
+                Q.mul minimal_nanotez_per_byte (Q.of_int size)
+              in
+              Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
+            in
+            if enough_fees_for_size && enough_fees_for_gas then
+              Some (op, weight_ratio, source, counter)
+            else None)
     operations
-  >>? fun operations ->
-  (* We sort by the biggest weight *)
-  ok
-    (List.sort
-       (fun (_, (_, _, w)) (_, (_, _, w')) -> Q.compare w' w)
-       operations)
+  |> fun operations ->
+  (* We order the operations by their weights except if they belong
+     to the same manager, if they do, we order them by their
+     counter. *)
+  let compare (_op, weight_ratio, source, counter)
+      (_op', weight_ratio', source', counter') =
+    (* Be careful with the [compare]s *)
+    if Signature.Public_key_hash.equal source source' then
+      (* we want the smallest counter first *)
+      Z.compare counter counter'
+    else
+      (* We want the biggest weight first *)
+      Q.compare weight_ratio' weight_ratio
+  in
+  List.sort compare operations |> List.map (fun (op, _, _, _) -> op)
 
 let retain_operations_up_to_quota operations quota =
   let {Tezos_protocol_environment.max_op; max_size} = quota in
@@ -343,14 +378,17 @@ let retain_operations_up_to_quota operations quota =
 
 let trim_manager_operations ~max_size ~hard_gas_limit_per_block
     manager_operations =
-  List.map_e
-    (fun op ->
-      get_manager_operation_gas_and_fee op
-      >>? fun (_fee, gas) ->
-      let size = Data_encoding.Binary.length Operation.encoding op in
-      ok (op, (size, gas)))
-    manager_operations
-  >>? fun manager_operations ->
+  let manager_operations =
+    List.filter_map
+      (fun op ->
+        match get_manager_content op with
+        | Some {total_gas; _} ->
+            let size = Data_encoding.Binary.length Operation.encoding op in
+            Some (op, (size, total_gas))
+        | None ->
+            None)
+      manager_operations
+  in
   List.fold_left
     (fun (total_size, total_gas, (good_ops, bad_ops)) (op, (size, gas)) ->
       let new_size = total_size + size in
@@ -362,7 +400,7 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block
     manager_operations
   |> fun (_, _, (good_ops, bad_ops)) ->
   (* We keep the overflowing operations, it may be used for client-side validation *)
-  ok (List.rev good_ops, List.rev bad_ops)
+  (List.rev good_ops, List.rev bad_ops)
 
 (* We classify operations, sort managers operation by interest and add bad ones at the end *)
 (* Hypothesis : we suppose that the received manager operations have a valid gas_limit *)
@@ -404,20 +442,22 @@ let classify_operations (cctxt : #Protocol_client_context.full) ~chain ~block
       WithExceptions.Option.get ~loc:__LOC__
       @@ List.nth Main.validation_passes managers_index
     in
-    sort_manager_operations
-      ~max_size
-      ~hard_gas_limit_per_block
-      ~minimal_fees
-      ~minimal_nanotez_per_gas_unit
-      ~minimal_nanotez_per_byte
-      manager_operations
-    >>? fun ordered_operations ->
+    let ordered_operations =
+      sort_manager_operations
+        ~max_size
+        ~hard_gas_limit_per_block
+        ~minimal_fees
+        ~minimal_nanotez_per_gas_unit
+        ~minimal_nanotez_per_byte
+        manager_operations
+    in
     (* Greedy heuristic *)
-    trim_manager_operations
-      ~max_size
-      ~hard_gas_limit_per_block
-      (List.map fst ordered_operations)
-    >>? fun (desired_manager_operations, overflowing_manager_operations) ->
+    let (desired_manager_operations, overflowing_manager_operations) =
+      trim_manager_operations
+        ~max_size
+        ~hard_gas_limit_per_block
+        ordered_operations
+    in
     t.(managers_index) <- desired_manager_operations ;
     ok overflowing_manager_operations
   in
@@ -673,6 +713,7 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
             Lwt.return (inc', op :: acc))
       (inc, [])
       ops
+    >>= fun (inc, ops) -> Lwt.return (inc, List.rev ops)
   in
   (* First pass : we filter out invalid operations by applying them in the correct order *)
   filter_valid_operations initial_inc endorsements
@@ -681,11 +722,6 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
   >>= fun (inc, votes) ->
   filter_valid_operations inc anonymous
   >>= fun (manager_inc, anonymous) ->
-  (* Retrieve the correct index order *)
-  let managers = List.sort Protocol.compare_operations managers in
-  let overflowing_operations =
-    List.sort Protocol.compare_operations overflowing_operations
-  in
   filter_valid_operations manager_inc (managers @ overflowing_operations)
   >>= fun (inc, managers) ->
   finalize_construction inc
@@ -694,34 +730,28 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
   let {Constants.hard_gas_limit_per_block; _} = state.constants.parametric in
   let votes =
     retain_operations_up_to_quota
-      (List.rev votes)
+      votes
       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota votes_index)
   in
   let anonymous =
     retain_operations_up_to_quota
-      (List.rev anonymous)
+      anonymous
       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota anonymous_index)
   in
-  Lwt.return
-  @@ trim_manager_operations
-       ~max_size:
-         ( WithExceptions.Option.get ~loc:__LOC__
-         @@ List.nth quota managers_index )
-           .max_size
-       ~hard_gas_limit_per_block
-       managers
-  >>=? fun (accepted_managers, _overflowing_managers) ->
-  (* Retrieve the correct index order *)
-  let accepted_managers =
-    List.sort Protocol.compare_operations accepted_managers
+  (* We found a valid subset of managers, trim them *)
+  let (accepted_managers, _overflowing_managers) =
+    trim_manager_operations
+      ~max_size:
+        ( WithExceptions.Option.get ~loc:__LOC__
+        @@ List.nth quota managers_index )
+          .max_size
+      ~hard_gas_limit_per_block
+      managers
   in
   (* Second pass : make sure we only keep valid operations *)
   filter_valid_operations manager_inc accepted_managers
   >>= fun (_, accepted_managers) ->
-  (* Put the operations back in order *)
-  let operations =
-    List.map List.rev [endorsements; votes; anonymous; accepted_managers]
-  in
+  let operations = [endorsements; votes; anonymous; accepted_managers] in
   (* Construct a context with the valid operations and a correct timestamp *)
   compute_endorsing_power cctxt ~chain ~block endorsements
   >>=? fun current_endorsing_power ->
