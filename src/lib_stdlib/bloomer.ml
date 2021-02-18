@@ -28,6 +28,7 @@ type 'a t = {
   index_bits : int;
   countdown_bits : int;
   filter : bytes;
+  count : int array;
 }
 
 (* Reads [bits] bits of [bytes] at offset [ofs] as an OCaml int in big endian order.
@@ -142,9 +143,10 @@ let create ~hash ~hashes ~index_bits ~countdown_bits =
   let filter =
     Bytes.make ((((1 lsl index_bits) * countdown_bits) + 7) / 8) '\000'
   in
-  {hash; hashes; index_bits; countdown_bits; filter}
+  let count = Array.make ((1 lsl countdown_bits) - 1) 0 in
+  {hash; hashes; index_bits; countdown_bits; filter; count}
 
-let mem {hash; hashes; index_bits; countdown_bits; filter} x =
+let mem {hash; hashes; index_bits; countdown_bits; filter; _} x =
   let h = hash x in
   try
     for i = 0 to hashes - 1 do
@@ -154,31 +156,39 @@ let mem {hash; hashes; index_bits; countdown_bits; filter} x =
     true
   with Exit -> false
 
-let add {hash; hashes; index_bits; countdown_bits; filter} x =
+let add {hash; hashes; index_bits; countdown_bits; filter; count} x =
+  count.(0) <- count.(0) + 1 ;
   let h = hash x in
   for i = 0 to hashes - 1 do
     let j = peek h (index_bits * i) index_bits in
     poke filter (j * countdown_bits) countdown_bits ((1 lsl countdown_bits) - 1)
   done
 
-let rem {hash; hashes; index_bits; countdown_bits; filter} x =
+let rem {hash; hashes; index_bits; countdown_bits; filter; _} x =
   let h = hash x in
   for i = 0 to hashes - 1 do
     let j = peek h (index_bits * i) index_bits in
     poke filter (j * countdown_bits) countdown_bits 0
   done
 
-let countdown {hash = _; hashes = _; index_bits; countdown_bits; filter} =
+let countdown {hash = _; hashes = _; index_bits; countdown_bits; filter; count}
+    =
+  for i = Array.length count - 1 downto 1 do
+    count.(i) <- count.(i - 1)
+  done ;
+  count.(0) <- 0 ;
   for j = 0 to (1 lsl index_bits) - 1 do
     let cur = peek filter (j * countdown_bits) countdown_bits in
     if cur > 0 then poke filter (j * countdown_bits) countdown_bits (cur - 1)
   done
 
-let clear {hash = _; hashes = _; index_bits = _; countdown_bits = _; filter} =
+let clear
+    {hash = _; hashes = _; index_bits = _; countdown_bits = _; filter; count} =
+  Array.fill count 0 (Array.length count) 0 ;
   Bytes.fill filter 0 (Bytes.length filter) '\000'
 
-let fill_percentage {hash = _; hashes = _; index_bits; countdown_bits; filter}
-    =
+let fill_percentage
+    {hash = _; hashes = _; index_bits; countdown_bits; filter; _} =
   let total = float (1 lsl index_bits) in
   let nonzero = ref 0 in
   for j = 0 to (1 lsl index_bits) - 1 do
@@ -188,13 +198,15 @@ let fill_percentage {hash = _; hashes = _; index_bits; countdown_bits; filter}
   float !nonzero /. total
 
 let life_expectancy_histogram
-    {hash = _; hashes = _; index_bits; countdown_bits; filter} =
+    {hash = _; hashes = _; index_bits; countdown_bits; filter; _} =
   let hist_table = Array.make (1 lsl countdown_bits) 0 in
   for j = 0 to (1 lsl index_bits) - 1 do
     let cur = peek filter (j * countdown_bits) countdown_bits in
     hist_table.(cur) <- hist_table.(cur) + 1
   done ;
   hist_table
+
+let approx_count {count; _} = Array.fold_left ( + ) 0 count
 
 let%test_unit "consistent_add_mem_countdown" =
   for _ = 0 to 100 do
@@ -221,6 +233,54 @@ let%test_unit "consistent_add_mem_countdown" =
       countdown bloomer
     done ;
     List.iter (fun x -> assert (not (mem bloomer x))) all
+  done
+
+let%test_unit "consistent_add_countdown_count" =
+  let module Set = Hashtbl.Make (struct
+    include Int
+
+    let hash = Hashtbl.hash
+  end) in
+  for _ = 0 to 100 do
+    let index_bits = 16 in
+    let hashes = Random.int 7 + 1 in
+    let countdown_bits = Random.int 5 + 1 in
+    let set = Set.create 100 in
+    let hash v =
+      Bytes.init
+        (((hashes * index_bits) + 7) / 8)
+        (fun i -> Char.chr (Hashtbl.hash (v, i) mod 256))
+    in
+    let bloomer = create ~hash ~index_bits ~hashes ~countdown_bits in
+    let next_ref = ref 0 in
+    let next () = incr next_ref ; !next_ref in
+    let actual_set () =
+      List.filter (mem bloomer) (List.of_seq @@ Set.to_seq_keys set)
+    in
+    let rec init_step n acc =
+      if n = 0 then acc
+      else
+        let x = next () in
+        add bloomer x ;
+        assert (mem bloomer x) ;
+        Set.add set x () ;
+        init_step (n - 1) (1 + acc)
+    in
+    let rec init n stop counts =
+      if n = stop then counts
+      else
+        let approx_counted = approx_count bloomer in
+        let accurate_count = List.length @@ actual_set () in
+        let count = Random.int 10 in
+        let added = init_step count 0 in
+        assert (added = count) ;
+        countdown bloomer ;
+        init (n + 1) stop ((approx_counted, accurate_count) :: counts)
+    in
+    let all = init 0 ((1 lsl countdown_bits) + 30) [] in
+    List.iter (fun (approx, accurate) -> assert (approx = accurate)) all ;
+    clear bloomer ;
+    assert (approx_count bloomer = 0)
   done
 
 let%test_unit "false_positive_rate" =

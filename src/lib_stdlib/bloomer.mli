@@ -72,3 +72,9 @@ val fill_percentage : 'a t -> float
 
 (** Histogram of life expectancies (measured in number of countdowns to 0). *)
 val life_expectancy_histogram : 'a t -> int array
+
+(** Over-approximation of the number of elements added in the filter that have not expired.
+
+    This is exact if rem is never used and over approximated otherwise
+   (rem are not decounted) . *)
+val approx_count : 'a t -> int
