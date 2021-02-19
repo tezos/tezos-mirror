@@ -50,17 +50,6 @@ val register0_noctxt :
   ('b -> 'c -> 'd Error_monad.tzresult Lwt.t) ->
   unit
 
-val register1_fullctxt :
-  ( [< RPC_service.meth],
-    Updater.rpc_context,
-    Updater.rpc_context * 'a,
-    'b,
-    'c,
-    'd )
-  RPC_service.t ->
-  (rpc_context -> 'a -> 'b -> 'c -> 'd Error_monad.tzresult Lwt.t) ->
-  unit
-
 val register1 :
   ( [< RPC_service.meth],
     Updater.rpc_context,
@@ -81,6 +70,39 @@ val register2 :
     'e )
   RPC_service.t ->
   (t -> 'a -> 'b -> 'c -> 'd -> 'e Error_monad.tzresult Lwt.t) ->
+  unit
+
+val opt_register0 :
+  ( [< RPC_service.meth],
+    Updater.rpc_context,
+    Updater.rpc_context,
+    'a,
+    'b,
+    'c )
+  RPC_service.t ->
+  (t -> 'a -> 'b -> 'c option Error_monad.tzresult Lwt.t) ->
+  unit
+
+val opt_register1 :
+  ( [< RPC_service.meth],
+    Updater.rpc_context,
+    Updater.rpc_context * 'a,
+    'b,
+    'c,
+    'd )
+  RPC_service.t ->
+  (t -> 'a -> 'b -> 'c -> 'd option Error_monad.tzresult Lwt.t) ->
+  unit
+
+val opt_register2 :
+  ( [< RPC_service.meth],
+    Updater.rpc_context,
+    (Updater.rpc_context * 'a) * 'b,
+    'c,
+    'd,
+    'e )
+  RPC_service.t ->
+  (t -> 'a -> 'b -> 'c -> 'd -> 'e option Error_monad.tzresult Lwt.t) ->
   unit
 
 val get_rpc_services : unit -> Updater.rpc_context RPC_directory.directory
