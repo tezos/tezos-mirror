@@ -213,11 +213,25 @@ val spawn_activate_protocol :
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val bake_for :
-  ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> unit Lwt.t
+  ?node:Node.t ->
+  ?key:string ->
+  ?minimal_timestamp:bool ->
+  ?mempool:string ->
+  ?force:bool ->
+  ?context_path:string ->
+  t ->
+  unit Lwt.t
 
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :
-  ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> Process.t
+  ?node:Node.t ->
+  ?key:string ->
+  ?minimal_timestamp:bool ->
+  ?mempool:string ->
+  ?force:bool ->
+  ?context_path:string ->
+  t ->
+  Process.t
 
 (** Run [tezos-client show address]. *)
 val show_address : ?show_secret:bool -> alias:string -> t -> Account.key Lwt.t
@@ -234,6 +248,7 @@ val transfer :
   ?node:Node.t ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
+  ?fee:Tez.t ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->
@@ -245,6 +260,7 @@ val spawn_transfer :
   ?node:Node.t ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
+  ?fee:Tez.t ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->

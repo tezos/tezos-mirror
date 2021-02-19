@@ -272,15 +272,31 @@ let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
   |> Process.check
 
 let spawn_bake_for ?node ?(key = Constant.bootstrap1.alias)
-    ?(minimal_timestamp = true) client =
+    ?(minimal_timestamp = true) ?mempool ?force ?context_path client =
   spawn_command
     ?node
     client
-    ( "bake" :: "for" :: key
-    :: (if minimal_timestamp then ["--minimal-timestamp"] else []) )
+    ( ["bake"; "for"; key]
+    @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
+    @ ( match mempool with
+      | None ->
+          []
+      | Some mempool_json ->
+          ["--mempool"; mempool_json] )
+    @ (match force with None | Some false -> [] | Some true -> ["--force"])
+    @ match context_path with None -> [] | Some path -> ["--context"; path] )
 
-let bake_for ?node ?key ?minimal_timestamp client =
-  spawn_bake_for ?node ?key ?minimal_timestamp client |> Process.check
+let bake_for ?node ?key ?minimal_timestamp ?mempool ?force ?context_path client
+    =
+  spawn_bake_for
+    ?node
+    ?key
+    ?minimal_timestamp
+    ?mempool
+    ?force
+    ?context_path
+    client
+  |> Process.check
 
 let spawn_gen_keys ~alias client = spawn_command client ["gen"; "keys"; alias]
 
@@ -315,8 +331,8 @@ let gen_and_show_keys ~alias client =
   let* () = gen_keys ~alias client in
   show_address ~show_secret:true ~alias client
 
-let spawn_transfer ?node ?(wait = "none") ?burn_cap ~amount ~giver ~receiver
-    client =
+let spawn_transfer ?node ?(wait = "none") ?burn_cap ?fee ~amount ~giver
+    ~receiver client =
   spawn_command
     ?node
     client
@@ -324,11 +340,15 @@ let spawn_transfer ?node ?(wait = "none") ?burn_cap ~amount ~giver ~receiver
     @ ["transfer"; Tez.to_string amount; "from"; giver; "to"; receiver]
     @ Option.fold
         ~none:[]
+        ~some:(fun f -> ["--fee"; Tez.to_string f; "--force-low-fee"])
+        fee
+    @ Option.fold
+        ~none:[]
         ~some:(fun b -> ["--burn-cap"; Tez.to_string b])
         burn_cap )
 
-let transfer ?node ?wait ?burn_cap ~amount ~giver ~receiver client =
-  spawn_transfer ?node ?wait ?burn_cap ~amount ~giver ~receiver client
+let transfer ?node ?wait ?burn_cap ?fee ~amount ~giver ~receiver client =
+  spawn_transfer ?node ?wait ?burn_cap ?fee ~amount ~giver ~receiver client
   |> Process.check
 
 let spawn_set_delegate ?node ?(wait = "none") ~src ~delegate client =
