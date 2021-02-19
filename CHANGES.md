@@ -34,6 +34,8 @@ be documented here either.
 - Fixes a bug where any event would allocate more memory than needed
   when it were not to be printed.
 
+- Add a new RPC for Alpha: `helpers/scripts/normalize_type`.
+
 ## Client
 
 - Fixed the return code of errors in the client calls to be non-zero.
