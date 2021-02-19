@@ -1135,6 +1135,14 @@ module Binary : sig
   val to_string_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> string
 
   val describe : 'a Encoding.t -> Binary_schema.t
+
+  type field = {name: string; value: bytes; pretty_printed: string}
+
+  val slice : _ Encoding.t -> Bytes.t -> int -> int -> field list option
+
+  val slice_bytes : _ Encoding.t -> Bytes.t -> field list option
+
+  val slice_bytes_exn : _ Encoding.t -> Bytes.t -> field list
 end
 
 type json = Json.t
@@ -1170,6 +1178,10 @@ module Registration : sig
       later be found using {!find} and providing the matching [id]. It will
       also appear in the results of {!list}. *)
   val register : ?pp:(Format.formatter -> 'a -> unit) -> 'a Encoding.t -> unit
+
+  val slice_from : t -> bytes -> Binary.field list
+
+  val slice : bytes -> (string * Binary.field list) list
 
   (** [find id] is [Some r] if [register id e] has been called, in which
       case [r] matches [e]. Otherwise, it is [None]. *)

@@ -142,6 +142,7 @@ module Binary = struct
   include Binary_length
   include Binary_writer
   include Binary_reader
+  include Binary_slicer
   include Binary_stream_reader
 
   let describe = Binary_description.describe
