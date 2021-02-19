@@ -744,16 +744,11 @@ module Dumpable_context = struct
 
   let update_context context tree = {context with tree}
 
-  let add_blob_hash (Batch (repo, _, _)) tree key hash =
-    Store.Contents.of_hash repo hash
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some v ->
-        Store.Tree.add tree key v >>= Lwt.return_some
-
-  let add_node_hash (Batch (repo, _, _)) tree key hash =
-    Store.Tree.of_hash repo hash
+  let add_hash (Batch (repo, _, _)) tree key hash =
+    let irmin_hash =
+      match hash with `Blob hash -> `Contents (hash, ()) | `Node _ as n -> n
+    in
+    Store.Tree.of_hash repo irmin_hash
     >>= function
     | None ->
         Lwt.return_none
@@ -769,17 +764,9 @@ module Dumpable_context = struct
       | [] ->
           Lwt.return_some sub_tree
       | (step, hash) :: tl -> (
-        match hash with
-        | `Blob hash -> (
-            add_blob_hash batch sub_tree [step] hash
-            >>= function
-            | None -> Lwt.return_none | Some sub_tree -> fold_list sub_tree tl
-            )
-        | `Node hash -> (
-            add_node_hash batch sub_tree [step] hash
-            >>= function
-            | None -> Lwt.return_none | Some sub_tree -> fold_list sub_tree tl
-            ) )
+          add_hash batch sub_tree [step] hash
+          >>= function
+          | None -> Lwt.return_none | Some sub_tree -> fold_list sub_tree tl )
     in
     fold_list Store.Tree.empty l
     >>= function
@@ -880,7 +867,7 @@ let validate_context_hash_consistency_and_commit ~data_hash
   let info =
     Irmin.Info.v ~date:(Time.Protocol.to_seconds timestamp) ~author message
   in
-  let data_tree = Store.Tree.shallow index.repo data_hash in
+  let data_tree = Store.Tree.shallow index.repo (`Node data_hash) in
   Store.Tree.add_tree tree current_data_key data_tree
   >>= fun node ->
   let node = Store.Tree.hash node in
@@ -911,7 +898,7 @@ let validate_context_hash_consistency_and_commit ~data_hash
     | None ->
         Lwt.return ctxt )
     >>= fun ctxt ->
-    let data_t = Store.Tree.shallow index.repo data_hash in
+    let data_t = Store.Tree.shallow index.repo (`Node data_hash) in
     Store.Tree.add_tree ctxt.tree current_data_key data_t
     >>= fun new_tree ->
     Store.Commit.v ctxt.index.repo ~info ~parents new_tree

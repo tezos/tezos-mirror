@@ -56,7 +56,7 @@ module Make_tree (Store : DB) = struct
   let to_value t =
     match Store.Tree.destruct t with
     | `Contents (c, _) ->
-        Lwt.return (Some c)
+        Store.Tree.Contents.force_exn c >|= Option.some
     | `Node _ ->
         Lwt.return_none
 
