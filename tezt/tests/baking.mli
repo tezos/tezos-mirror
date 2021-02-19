@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,34 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component: All
-   Invocation: make test-tezt
-   Subject: This file is the entrypoint of all Tezt tests. It dispatches to
-            other files.
- *)
-
-(* This module runs the tests implemented in all other modules of this directory.
-   Each module defines tests which are thematically related,
-   as functions to be called here. *)
-
-let register protocol =
-  Basic.register protocol ;
-  Bootstrap.register protocol ;
-  Synchronisation_heuristic.register protocol ;
-  Mockup.register protocol ;
-  Normalize.register protocol ;
-  Proxy.register protocol ;
-  Double_bake.register protocol
-
-let () =
-  register Alpha ;
-  P2p.register Alpha ;
-  Bootstrap.register_protocol_independent () ;
-  Cli_tezos.register_protocol_independent () ;
-  Encoding.register () ;
-  RPC_test.register () ;
-  Baking.register Alpha ;
-  (* Test.run () should be the last statement, don't register afterwards! *)
-  Test.run ()
+val register : Tezt_tezos.Protocol.t -> unit
