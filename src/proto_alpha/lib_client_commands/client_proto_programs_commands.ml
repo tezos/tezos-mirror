@@ -527,6 +527,34 @@ let commands () =
             >>= fun () -> cctxt#error "ill-typed data expression");
     command
       ~group
+      ~desc:"Ask the node to normalize a type."
+      no_options
+      ( prefixes ["normalize"; "type"]
+      @@ param
+           ~name:"typ"
+           ~desc:"the Michelson type to normalize"
+           data_parameter
+      @@ stop )
+      (fun () typ cctxt ->
+        Plugin.RPC.normalize_type
+          cctxt
+          (cctxt#chain, cctxt#block)
+          ~ty:typ.expanded
+        >>= function
+        | Ok expr ->
+            cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
+            >>= fun () -> return_unit
+        | Error errs ->
+            cctxt#warning
+              "%a"
+              (Michelson_v1_error_reporter.report_errors
+                 ~details:false
+                 ~show_source:false
+                 ?parsed:None)
+              errs
+            >>= fun () -> cctxt#error "ill-formed type");
+    command
+      ~group
       ~desc:
         "Sign a raw sequence of bytes and display it using the format \
          expected by Michelson instruction `CHECK_SIGNATURE`."
