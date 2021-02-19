@@ -1159,15 +1159,15 @@ let register () =
   let open Services_registration in
   register0 S.current_level (fun ctxt q () ->
       Level.from_raw ctxt ~offset:q.offset (Level.current ctxt).level |> return) ;
-  register0 S.levels_in_current_cycle (fun ctxt q () ->
+  opt_register0 S.levels_in_current_cycle (fun ctxt q () ->
       let levels = Level.levels_in_current_cycle ctxt ~offset:q.offset () in
       match levels with
       | [] ->
-          raise Not_found
+          return_none
       | _ ->
           let first = List.hd (List.rev levels) in
           let last = List.hd levels in
-          return (first.level, last.level))
+          return (Some (first.level, last.level)))
 
 let current_level ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.current_level ctxt block {offset} ()

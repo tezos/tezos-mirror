@@ -171,7 +171,7 @@ module S = struct
       >>=? fun (ctxt, script) ->
       match script with
       | None ->
-          raise Not_found
+          return (None, ctxt)
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
           Script_ir_translator.parse_script
@@ -198,14 +198,14 @@ module S = struct
           >>=? fun (sapling_id, ctxt) ->
           match sapling_id with
           | None ->
-              raise Not_found
+              return_none
           | Some sapling_id ->
-              f ctxt sapling_id q )
+              f ctxt sapling_id q >|=? Option.some )
 
     let get_diff = make_service Sapling_services.S.Args.get_diff
 
     let register () =
-      let reg (service, f) = Services_registration.register1 service f in
+      let reg (service, f) = Services_registration.opt_register1 service f in
       reg get_diff
 
     let mk_call1 (service, _f) ctxt block id q =
@@ -217,13 +217,15 @@ let[@coq_axiom_with_reason "gadt"] register () =
   let open Services_registration in
   register0 S.list (fun ctxt () () -> Contract.list ctxt >|= ok) ;
   let register_field s f =
-    register1 s (fun ctxt contract () () ->
+    opt_register1 s (fun ctxt contract () () ->
         Contract.exists ctxt contract
-        >>=? function true -> f ctxt contract | false -> raise Not_found)
+        >>=? function
+        | true -> f ctxt contract >|=? Option.some | false -> return_none)
   in
   let register_opt_field s f =
-    register_field s (fun ctxt a1 ->
-        f ctxt a1 >|=? function None -> raise Not_found | Some v -> v)
+    opt_register1 s (fun ctxt contract () () ->
+        Contract.exists ctxt contract
+        >>=? function true -> f ctxt contract | false -> return_none)
   in
   let do_big_map_get ctxt id key =
     let open Script_ir_translator in
@@ -232,7 +234,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
     >>=? fun (ctxt, types) ->
     match types with
     | None ->
-        raise Not_found
+        return_none
     | Some (_, value_type) -> (
         parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
         >>?= fun (Ex_ty value_type, ctxt) ->
@@ -240,7 +242,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
         >>=? fun (_ctxt, value) ->
         match value with
         | None ->
-            raise Not_found
+            return_none
         | Some value ->
             parse_data
               ctxt
@@ -250,27 +252,28 @@ let[@coq_axiom_with_reason "gadt"] register () =
               (Micheline.root value)
             >>=? fun (value, ctxt) ->
             unparse_data ctxt Readable value_type value
-            >|=? fun (value, _ctxt) -> Micheline.strip_locations value )
+            >|=? fun (value, _ctxt) -> Some (Micheline.strip_locations value) )
   in
   register_field S.balance Contract.get_balance ;
-  register1 S.manager_key (fun ctxt contract () () ->
+  opt_register1 S.manager_key (fun ctxt contract () () ->
       match Contract.is_implicit contract with
       | None ->
-          raise Not_found
+          return_none
       | Some mgr -> (
           Contract.is_manager_key_revealed ctxt mgr
           >>=? function
           | false ->
-              return_none
+              return_some None
           | true ->
-              Contract.get_manager_key ctxt mgr >>=? return_some )) ;
+              Contract.get_manager_key ctxt mgr >|=? fun key -> Some (Some key)
+          )) ;
   register_opt_field S.delegate Delegate.get ;
-  register1 S.counter (fun ctxt contract () () ->
+  opt_register1 S.counter (fun ctxt contract () () ->
       match Contract.is_implicit contract with
       | None ->
-          raise Not_found
+          return_none
       | Some mgr ->
-          Contract.get_counter ctxt mgr) ;
+          Contract.get_counter ctxt mgr >|=? fun counter -> Some counter) ;
   register_opt_field S.script (fun c v ->
       Contract.get_script c v >|=? fun (_, v) -> v) ;
   register_opt_field S.storage (fun ctxt contract ->
@@ -288,12 +291,12 @@ let[@coq_axiom_with_reason "gadt"] register () =
           >>=? fun (script, ctxt) ->
           Script.force_decode_in_context ctxt script.storage
           >>?= fun (storage, _ctxt) -> return_some storage) ;
-  register2 S.entrypoint_type (fun ctxt v entrypoint () () ->
+  opt_register2 S.entrypoint_type (fun ctxt v entrypoint () () ->
       Contract.get_script_code ctxt v
       >>=? fun (_, expr) ->
       match expr with
       | None ->
-          raise Not_found
+          return_none
       | Some expr ->
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = true in
@@ -312,15 +315,16 @@ let[@coq_axiom_with_reason "gadt"] register () =
             |> function
             | Ok (_f, Ex_ty ty) ->
                 unparse_ty ctxt ty
-                >|? fun (ty_node, _) -> Micheline.strip_locations ty_node
+                >|? fun (ty_node, _) ->
+                Some (Micheline.strip_locations ty_node)
             | Error _ ->
-                raise Not_found )) ;
-  register1 S.list_entrypoints (fun ctxt v () () ->
+                ok_none )) ;
+  opt_register1 S.list_entrypoints (fun ctxt v () () ->
       Contract.get_script_code ctxt v
       >>=? fun (_, expr) ->
       match expr with
       | None ->
-          raise Not_found
+          return_none
       | Some expr ->
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = true in
@@ -337,13 +341,16 @@ let[@coq_axiom_with_reason "gadt"] register () =
                     arg_type
                     ctxt)
             >|? fun (unreachable_entrypoint, map) ->
-            ( unreachable_entrypoint,
-              Entrypoints_map.fold
-                (fun entry (_, ty) acc ->
-                  (entry, Micheline.strip_locations ty) :: acc)
-                map
-                [] ) )) ;
-  register1 S.contract_big_map_get_opt (fun ctxt contract () (key, key_type) ->
+            Some
+              ( unreachable_entrypoint,
+                Entrypoints_map.fold
+                  (fun entry (_, ty) acc ->
+                    (entry, Micheline.strip_locations ty) :: acc)
+                  map
+                  [] ) )) ;
+  opt_register1
+    S.contract_big_map_get_opt
+    (fun ctxt contract () (key, key_type) ->
       Contract.get_script ctxt contract
       >>=? fun (ctxt, script) ->
       Script_ir_translator.parse_comparable_ty ctxt (Micheline.root key_type)
@@ -357,7 +364,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
       >>=? fun (key, ctxt) ->
       match script with
       | None ->
-          raise Not_found
+          return_none
       | Some script -> (
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
@@ -370,11 +377,11 @@ let[@coq_axiom_with_reason "gadt"] register () =
           >>?= fun (ids, _ctxt) ->
           match Script_ir_translator.list_of_big_map_ids ids with
           | [] | _ :: _ :: _ ->
-              return_none
-          | [id] -> (
-            try do_big_map_get ctxt id key >>=? return_some
-            with Not_found -> return_none ) )) ;
-  register2 S.big_map_get (fun ctxt id key () () -> do_big_map_get ctxt id key) ;
+              return_some None
+          | [id] ->
+              do_big_map_get ctxt id key >|=? Option.some )) ;
+  opt_register2 S.big_map_get (fun ctxt id key () () ->
+      do_big_map_get ctxt id key) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract
       >>=? fun balance ->
