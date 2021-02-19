@@ -1523,6 +1523,8 @@ class TestNormalize:
         'list (pair nat int)',
         'pair nat int bool',
         'list (pair nat int bool)',
+        'pair nat int bool bytes',
+        'list (pair nat int bool bytes)',
     ]
 
     @pytest.mark.parametrize('typ', types)
