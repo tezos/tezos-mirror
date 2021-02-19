@@ -40,6 +40,10 @@ val json_pretty_printer : t -> Format.formatter -> Json.t -> unit
 
 val binary_pretty_printer : t -> Format.formatter -> Bytes.t -> unit
 
+val slice_from : t -> bytes -> Binary_slicer.field list
+
+val slice : bytes -> (string * Binary_slicer.field list) list
+
 val register : ?pp:(Format.formatter -> 'a -> unit) -> 'a Encoding.t -> unit
 
 val find : id -> t option
