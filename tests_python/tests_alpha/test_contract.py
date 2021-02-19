@@ -1515,3 +1515,17 @@ class TestNormalize:
         client = client_regtest_scrubbed
         path = os.path.join(CONTRACT_PATH, 'opcodes', 'comb-literals.tz')
         client.normalize_script(path, mode=mode)
+
+    types = [
+        'nat',
+        'list nat',
+        'pair nat int',
+        'list (pair nat int)',
+        'pair nat int bool',
+        'list (pair nat int bool)',
+    ]
+
+    @pytest.mark.parametrize('typ', types)
+    def test_normalize_type(self, client_regtest_scrubbed, typ):
+        client = client_regtest_scrubbed
+        client.normalize_type(typ)
