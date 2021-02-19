@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,18 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Random.self_init ();
-  Alcotest.run
-    "tezos-data-encoding"
-    [
-      ("success", Success.tests);
-      ("invalid_encoding", Invalid_encoding.tests);
-      ("read_failure", Read_failure.tests);
-      ("write_failure", Write_failure.tests);
-      ("randomized", Randomized.tests);
-      ("versioned", Versioned.tests);
-      ("registration", Registrationed.tests);
-      ("mu", Mu.tests);
-      ("slice", Slice_test.tests);
-    ]
+open Data_encoding
+
+type t = int
+
+let encoding = int31
+
+type some_t = int
+
+let encoding_of_some_t = int31
+
+module SubTest = struct
+  type t = int
+
+  let ex = 5
+
+  let encoding = int31
+end
