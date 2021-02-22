@@ -25,11 +25,29 @@
 (*****************************************************************************)
 
 module Request = struct
-  type view = Block_hash.t
+  type view = Hash of Block_hash.t | PeerId of P2p_peer.Id.t
 
-  let encoding = Block_hash.encoding
+  let encoding =
+    let open Data_encoding in
+    union
+      [ case
+          (Tag 0)
+          ~title:"Hash"
+          (obj1 (req "hash" Block_hash.encoding))
+          (function Hash h -> Some h | _ -> None)
+          (fun h -> Hash h);
+        case
+          (Tag 1)
+          ~title:"Peer_id"
+          (obj1 (req "peer_id" P2p_peer.Id.encoding))
+          (function PeerId pid -> Some pid | _ -> None)
+          (fun pid -> PeerId pid) ]
 
-  let pp = Block_hash.pp
+  let pp ppf = function
+    | Hash h ->
+        Format.fprintf ppf "Block Hash %a" Block_hash.pp h
+    | PeerId pid ->
+        Format.fprintf ppf "Peer id %a" P2p_peer.Id.pp pid
 end
 
 module Event = struct
@@ -48,6 +66,9 @@ module Event = struct
         level : Int32.t;
         timestamp : Time.Protocol.t;
       }
+    | Notify_branch of P2p_peer.Id.t
+    | Notify_head of P2p_peer.Id.t
+    | Disconnection of P2p_peer.Id.t
     | Could_not_switch_testchain of error list
     | Bootstrapped
     | Sync_status of synchronisation_status
@@ -71,7 +92,7 @@ module Event = struct
           Internal_event.Notice )
     | Could_not_switch_testchain _ ->
         Internal_event.Error
-    | Bootstrapped ->
+    | Notify_branch _ | Notify_head _ | Disconnection _ | Bootstrapped ->
         Internal_event.Notice
     | Sync_status sync_status -> (
       match sync_status with
@@ -173,7 +194,25 @@ module Event = struct
                 None)
           (fun (min_head_time, max_head_time, most_recent_validation) ->
             Bootstrap_active_peers_heads_time
-              {min_head_time; max_head_time; most_recent_validation}) ]
+              {min_head_time; max_head_time; most_recent_validation});
+        case
+          (Tag 6)
+          ~title:"notify_branch"
+          (obj1 (req "peer_id" P2p_peer.Id.encoding))
+          (function Notify_branch peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> Notify_branch peer_id);
+        case
+          (Tag 7)
+          ~title:"notify_head"
+          (obj1 (req "peer_id" P2p_peer.Id.encoding))
+          (function Notify_head peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> Notify_head peer_id);
+        case
+          (Tag 8)
+          ~title:"disconnection"
+          (obj1 (req "peer_id" P2p_peer.Id.encoding))
+          (function Disconnection peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> Disconnection peer_id) ]
 
   let sync_status_to_string = function
     | Synchronised {is_chain_stuck = false} ->
@@ -210,6 +249,12 @@ module Event = struct
           Fitness.pp
           req.fitness ;
         Format.fprintf ppf "%a@]" Worker_types.pp_status req.request_status
+    | Notify_branch peer_id ->
+        Format.fprintf ppf "Notify branch from %a" P2p_peer.Id.pp peer_id
+    | Notify_head peer_id ->
+        Format.fprintf ppf "Notify head from %a" P2p_peer.Id.pp peer_id
+    | Disconnection peer_id ->
+        Format.fprintf ppf "Disconnection of %a" P2p_peer.Id.pp peer_id
     | Could_not_switch_testchain err ->
         Format.fprintf
           ppf

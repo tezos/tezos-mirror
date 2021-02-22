@@ -41,9 +41,22 @@ end
 module Request = struct
   include Request
 
-  type _ t = Validated : State.Block.t -> Event.update t
+  type _ t =
+    | Validated : State.Block.t -> Event.update t
+    | Notify_branch : P2p_peer.Id.t * Block_locator.t -> unit t
+    | Notify_head : P2p_peer.Id.t * Block_header.t * Mempool.t -> unit t
+    | Disconnection : P2p_peer.Id.t -> unit t
 
-  let view (type a) (Validated block : a t) : view = State.Block.hash block
+  let view (type a) (req : a t) : view =
+    match req with
+    | Validated block ->
+        Hash (State.Block.hash block)
+    | Notify_branch (peer_id, _) ->
+        PeerId peer_id
+    | Notify_head (peer_id, _, _) ->
+        PeerId peer_id
+    | Disconnection peer_id ->
+        PeerId peer_id
 end
 
 type synchronisation_limits = {latency : int; threshold : int}
@@ -450,9 +463,7 @@ let may_instantiate_prevalidator nv ~head =
       (nv.parameters.prevalidator_limits, nv.parameters.chain_db)
   else Lwt.return_unit
 
-let on_request (type a) w start_testchain active_chains spawn_child
-    (req : a Request.t) : a tzresult Lwt.t =
-  let (Request.Validated block) = req in
+let on_validation_request w start_testchain active_chains spawn_child block =
   let nv = Worker.state w in
   Chain.head nv.parameters.chain_state
   >>= fun head ->
@@ -493,17 +504,71 @@ let on_request (type a) w start_testchain active_chains spawn_child
       return Event.Head_increment
     else return Event.Branch_switch
 
+let on_notify_branch w peer_id locator =
+  let (block, _) = (locator : Block_locator.t :> _ * _) in
+  check_and_update_synchronisation_state w (block, peer_id)
+  >>= fun () ->
+  with_activated_peer_validator w peer_id (fun pv ->
+      Peer_validator.notify_branch pv locator ;
+      return_unit)
+
+let on_notify_head w peer_id header mempool =
+  let nv = Worker.state w in
+  check_and_update_synchronisation_state w (header, peer_id)
+  >>= fun () ->
+  with_activated_peer_validator w peer_id (fun pv ->
+      Peer_validator.notify_head pv header ;
+      return_unit)
+  >>=? fun () ->
+  (* TODO notify prevalidator only if head is known ??? *)
+  match nv.prevalidator with
+  | Some prevalidator ->
+      Prevalidator.notify_operations prevalidator peer_id mempool
+      >>= fun () -> return_unit
+  | None ->
+      return_unit
+
+let on_disconnection w peer_id =
+  let nv = Worker.state w in
+  match P2p_peer.Error_table.find nv.active_peers peer_id with
+  | None ->
+      return_unit
+  | Some pv ->
+      pv >>=? fun pv -> Peer_validator.shutdown pv >>= fun () -> return_unit
+
+let on_request (type a) w start_testchain active_chains spawn_child
+    (req : a Request.t) : a tzresult Lwt.t =
+  match req with
+  | Request.Validated block ->
+      on_validation_request w start_testchain active_chains spawn_child block
+  | Request.Notify_branch (peer_id, locator) ->
+      on_notify_branch w peer_id locator
+  | Request.Notify_head (peer_id, header, mempool) ->
+      on_notify_head w peer_id header mempool
+  | Request.Disconnection peer_id ->
+      on_disconnection w peer_id
+
 let on_completion (type a) w (req : a Request.t) (update : a) request_status =
-  let (Request.Validated block) = req in
-  let fitness = State.Block.fitness block in
-  let request = State.Block.hash block in
-  let level = State.Block.level block in
-  let timestamp = State.Block.timestamp block in
-  Worker.record_event
-    w
-    (Processed_block
-       {request; request_status; update; fitness; level; timestamp}) ;
-  Lwt.return_unit
+  match req with
+  | Request.Validated block ->
+      let fitness = State.Block.fitness block in
+      let request = Request.Hash (State.Block.hash block) in
+      let level = State.Block.level block in
+      let timestamp = State.Block.timestamp block in
+      Worker.record_event
+        w
+        (Processed_block
+           {request; request_status; update; fitness; level; timestamp}) ;
+      Lwt.return_unit
+  | Request.Notify_head (peer_id, _, _) ->
+      Worker.record_event w (Event.Notify_head peer_id) ;
+      Lwt.return_unit
+  | Request.Notify_branch (peer_id, _) ->
+      Worker.record_event w (Event.Notify_branch peer_id) ;
+      Lwt.return_unit
+  | Request.Disconnection peer_id ->
+      Worker.record_event w (Event.Disconnection peer_id) ;
+      Lwt.return_unit
 
 let on_close w =
   let nv = Worker.state w in
@@ -597,69 +662,13 @@ let on_launch w _ parameters =
     {
       notify_branch =
         (fun peer_id locator ->
-          Error_monad.dont_wait
-            (fun exc ->
-              Format.eprintf
-                "Uncaught exception: %s\n%!"
-                (Printexc.to_string exc))
-            (fun trace ->
-              Format.eprintf
-                "Uncaught error: %a\n%!"
-                Error_monad.pp_print_error
-                trace)
-            (fun () ->
-              let (block, _) = (locator : Block_locator.t :> _ * _) in
-              check_and_update_synchronisation_state w (block, peer_id)
-              >>= fun () ->
-              with_activated_peer_validator w peer_id
-              @@ fun pv ->
-              Peer_validator.notify_branch pv locator ;
-              return_unit));
+          Worker.Queue.push_request_now w (Notify_branch (peer_id, locator)));
       notify_head =
-        (fun peer_id block ops ->
-          Error_monad.dont_wait
-            (fun exc ->
-              Format.eprintf
-                "Uncaught exception: %s\n%!"
-                (Printexc.to_string exc))
-            (fun trace ->
-              Format.eprintf
-                "Uncaught error: %a\n%!"
-                Error_monad.pp_print_error
-                trace)
-            (fun () ->
-              check_and_update_synchronisation_state w (block, peer_id)
-              >>= fun () ->
-              with_activated_peer_validator w peer_id (fun pv ->
-                  Peer_validator.notify_head pv block ;
-                  return_unit)
-              >>=? fun () ->
-              (* TODO notify prevalidator only if head is known ??? *)
-              match nv.prevalidator with
-              | Some prevalidator ->
-                  Prevalidator.notify_operations prevalidator peer_id ops
-                  >>= fun () -> return_unit
-              | None ->
-                  return_unit));
+        (fun peer_id header ops ->
+          Worker.Queue.push_request_now w (Notify_head (peer_id, header, ops)));
       disconnection =
         (fun peer_id ->
-          Error_monad.dont_wait
-            (fun exc ->
-              Format.eprintf
-                "Uncaught exception: %s\n%!"
-                (Printexc.to_string exc))
-            (fun trace ->
-              Format.eprintf
-                "Uncaught error: %a\n%!"
-                Error_monad.pp_print_error
-                trace)
-            (fun () ->
-              let nv = Worker.state w in
-              match P2p_peer.Error_table.find nv.active_peers peer_id with
-              | None ->
-                  return_unit
-              | Some pv ->
-                  pv >>=? fun pv -> Peer_validator.shutdown pv >>= return));
+          Worker.Queue.push_request_now w (Disconnection peer_id));
     } ;
   return nv
 
