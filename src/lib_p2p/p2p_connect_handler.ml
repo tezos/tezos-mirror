@@ -141,15 +141,16 @@ let create_connection t p2p_conn id_point point_info peer_info
     negotiated_version =
   let peer_id = P2p_peer_state.Info.peer_id peer_info in
   let canceler = Lwt_canceler.create () in
-  let size =
+  let bound =
     Option.map
       (fun qs ->
         ( qs,
           fun (size, _) ->
-            (Sys.word_size / 8 * 11) + size + Lwt_pipe.push_overhead ))
+            (Sys.word_size / 8 * 11)
+            + size + Lwt_pipe.MaybeBounded.push_overhead ))
       t.config.incoming_app_message_queue_size
   in
-  let messages = Lwt_pipe.create ?size () in
+  let messages = Lwt_pipe.MaybeBounded.create ?bound () in
   let greylister () =
     t.dependencies.pool_greylist_peer
       t.pool
@@ -195,7 +196,7 @@ let create_connection t p2p_conn id_point point_info peer_info
       if t.config.max_connections <= P2p_pool.active_connections t.pool then (
         P2p_trigger.broadcast_too_many_connections t.triggers ;
         t.log Too_many_connections) ;
-      Lwt_pipe.close messages ;
+      Lwt_pipe.MaybeBounded.close messages ;
       P2p_conn.close conn) ;
   List.iter (fun f -> f peer_id conn) t.new_connection_hook ;
   if P2p_pool.active_connections t.pool < t.config.min_connections then (

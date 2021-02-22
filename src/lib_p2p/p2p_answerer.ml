@@ -47,7 +47,7 @@ type 'msg conn_info = {
           to the internal [peer_id]. It must return [Ok true] if the message
           has been successfully sent, [Ok false] if the message has been
           dropped, or fails with a corresponding error otherwise. *)
-  messages : (int * 'msg) Lwt_pipe.t;
+  messages : (int * 'msg) Lwt_pipe.MaybeBounded.t;
 }
 
 type request_info = {

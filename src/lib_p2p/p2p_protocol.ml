@@ -36,7 +36,8 @@ type ('msg, 'peer, 'conn) config = {
 
 open P2p_answerer
 
-let message conn _request size msg = Lwt_pipe.push conn.messages (size, msg)
+let message conn _request size msg =
+  Lwt_pipe.MaybeBounded.push conn.messages (size, msg)
 
 module Private_answerer = struct
   let advertise conn _request _points =
