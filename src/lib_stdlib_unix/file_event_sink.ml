@@ -618,7 +618,7 @@ module Query = struct
                   | `Directory event_name when name_matches event_name -> (
                       let open Internal_event in
                       match All_definitions.find (( = ) event_name) with
-                      | Some (Generic.Definition (_, ev)) ->
+                      | Some (Generic.Definition (_, _, ev)) ->
                           handle_event_kind_directory
                             ~time_query
                             ev

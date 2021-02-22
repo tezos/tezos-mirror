@@ -28,6 +28,8 @@ type attempt_event = {attempt : int; delay : float; text : string}
 module Attempt_logging = Internal_event.Make (struct
   type t = attempt_event
 
+  let section = None
+
   let name = "rpc_http_attempt"
 
   let doc = "Error emitted when an HTTP request returned a 502 error."

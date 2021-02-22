@@ -153,6 +153,8 @@ struct
         Format.fprintf ppf "Worker.launch: duplicate worker %s" full_name
 
   module Definition : Internal_event.EVENT_DEFINITION with type t = t = struct
+    let section = None
+
     let name = Static.worker_name
 
     type nonrec t = t

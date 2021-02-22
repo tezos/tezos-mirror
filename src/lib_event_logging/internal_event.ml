@@ -144,6 +144,8 @@ let register_section section =
 module type EVENT_DEFINITION = sig
   type t
 
+  val section : Section.t option
+
   val name : string
 
   val doc : string
@@ -333,13 +335,16 @@ module All_sinks = struct
 end
 
 module Generic = struct
-  type definition = Definition : (string * 'a event_definition) -> definition
+  type definition =
+    | Definition :
+        (Section.t option * string * 'a event_definition)
+        -> definition
 
   type event = Event : (string * 'a event_definition * 'a) -> event
 
   type with_name = < doc : string ; name : string >
 
-  let json_schema (Definition (_, d)) :
+  let json_schema (Definition (_, _, d)) :
       < schema : Json_schema.schema ; with_name > =
     let aux (type a) (ev : a event_definition) =
       let module E = (val ev : EVENT_DEFINITION with type t = a) in
@@ -383,19 +388,32 @@ module All_definitions = struct
 
   let add (type a) ev =
     let module E = (val ev : EVENT_DEFINITION with type t = a) in
-    match List.find (function Definition (n, _) -> E.name = n) !all with
+    match
+      List.find
+        (function Definition (s, n, _) -> E.section = s && E.name = n)
+        !all
+    with
     | Some _ ->
-        raise (registration_exn "duplicate Event name: %S" E.name)
+        raise
+          (registration_exn
+             "duplicate Event name: %a %S"
+             (Format.pp_print_option (fun fmt ss ->
+                  Format.fprintf
+                    fmt
+                    "%s"
+                    (String.concat "." (Section.to_string_list ss))))
+             E.section
+             E.name)
     | None ->
         check_name_exn
           E.name
           (registration_exn "invalid event name: %S contains '%c'") ;
-        all := Definition (E.name, ev) :: !all
+        all := Definition (E.section, E.name, ev) :: !all
 
   let get () = !all
 
   let find match_name =
-    List.find (function Definition (n, _) -> match_name n) !all
+    List.find (function Definition (_, n, _) -> match_name n) !all
 end
 
 module Make (E : EVENT_DEFINITION) : EVENT with type t = E.t = struct
@@ -734,6 +752,8 @@ module Simple = struct
 
       let doc = msg
 
+      let section = section
+
       let name = name
 
       let pp ~short fmt () = pp_log_message ~short parsed_msg fmt []
@@ -753,6 +773,8 @@ module Simple = struct
       type t = a
 
       let doc = msg
+
+      let section = section
 
       let name = name
 
@@ -779,6 +801,8 @@ module Simple = struct
       type t = a * b
 
       let doc = msg
+
+      let section = section
 
       let name = name
 
@@ -811,6 +835,8 @@ module Simple = struct
       type t = a * b * c
 
       let doc = msg
+
+      let section = section
 
       let name = name
 
@@ -847,6 +873,8 @@ module Simple = struct
       type t = a * b * c * d
 
       let doc = msg
+
+      let section = section
 
       let name = name
 
@@ -888,6 +916,8 @@ module Simple = struct
       type t = a * b * c * d * e
 
       let doc = msg
+
+      let section = section
 
       let name = name
 
@@ -932,6 +962,8 @@ module Simple = struct
       type t = a * b * c * d * e * f
 
       let doc = msg
+
+      let section = section
 
       let name = name
 
@@ -981,6 +1013,8 @@ module Simple = struct
       type t = a * b * c * d * e * f * g
 
       let doc = msg
+
+      let section = section
 
       let name = name
 
@@ -1033,6 +1067,8 @@ module Simple = struct
       type t = a * b * c * d * e * f * g * h
 
       let doc = msg
+
+      let section = section
 
       let name = name
 
@@ -1187,6 +1223,8 @@ module Legacy_logging = struct
       let doc = "Generic event legacy / string-based information logging."
 
       let level {level; _} = level
+
+      let section = Some section
     end
 
     let () =
@@ -1314,6 +1352,8 @@ module Error_event = struct
     {message; trace; severity}
 
   module Definition = struct
+    let section = None
+
     let name = "error-event"
 
     type nonrec t = t
@@ -1379,6 +1419,8 @@ module Debug_event = struct
       (obj2 (req "message" string) (req "attachment" json))
 
   module Definition = struct
+    let section = None
+
     let name = "debug-event"
 
     type nonrec t = t
@@ -1433,6 +1475,8 @@ module Lwt_worker_event = struct
                    (fun ((), s) -> `Failed s) ])))
 
   module Definition = struct
+    let section = None
+
     let name = "lwt-worker-event"
 
     type nonrec t = t

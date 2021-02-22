@@ -97,6 +97,12 @@ val register_section : Section.t -> unit
 module type EVENT_DEFINITION = sig
   type t
 
+  (** Defines an optional section for the event.
+
+      {b Warning} [None] is only for legacy events and
+     should not be used in new code.  *)
+  val section : Section.t option
+
   (** Defines the identifier for the event. Names should be unique and
       are restricted to alphanumeric characters or [".@-_+=,~"].*)
   val name : string
@@ -135,7 +141,10 @@ type 'a event_definition = (module EVENT_DEFINITION with type t = 'a)
 
 (** Helper functions to manipulate all kinds of events in a generic way. *)
 module Generic : sig
-  type definition = Definition : (string * 'a event_definition) -> definition
+  type definition =
+    | Definition :
+        (Section.t option * string * 'a event_definition)
+        -> definition
 
   type event = Event : (string * 'a event_definition * 'a) -> event
 

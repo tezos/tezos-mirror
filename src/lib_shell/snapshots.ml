@@ -92,6 +92,8 @@ let status_pp ppf = function
       Format.fprintf ppf "The storage was successfully reconstructed."
 
 module Definition = struct
+  let section = None
+
   let name = "snapshot"
 
   type t = status Time.System.stamped
