@@ -2,6 +2,7 @@ import os
 import re
 import json
 import itertools
+from typing import List, Union, Any
 import pytest
 
 from client.client import Client
@@ -31,10 +32,14 @@ def originate(
     contract_name=None,
     sender='bootstrap1',
     baker='bootstrap5',
+    arguments=None,
 ):
     if contract_name is None:
         contract_name = file_basename(contract)
+
     args = ['--init', init_storage, '--burn-cap', '10.0']
+    if arguments is not None:
+        args += arguments
     origination = client.originate(
         contract_name, amount, sender, contract, args
     )
@@ -341,6 +346,109 @@ class TestManager:
             == new_balance_bootstrap2
         )
         assert balance_bootstrap3 + amount_mutez_3 == new_balance_bootstrap3
+
+
+# This test to verifies contract execution order. There are 3
+# contracts: Storer, Caller, and Appender. Storer appends its argument
+# to storage. Caller calls the list of unit contracts in its
+# storage. Appender calls the string contract in its storage with a
+# stored argument.
+#
+# For each test, there is one unique Storer. Each test is
+# parameterized by a tree and the expected final storage of the
+# Storer. A leaf in the tree is a string. Inner nodes are lists of
+# leafs/inner nodes. The test maps maps over this tree to build a
+# tree of contracts. Leaf nodes map to Appender contracts calling
+# the Storer. Inner nodes map to Caller contract that calling
+# children.
+#
+# Example. Given the tree: ["A", ["B"], "C"], we obtain
+#  Caller([Appender("A"), Caller([Appender("B")]), Appender("C")])
+# Storer should end up with storage ACB.
+@pytest.mark.contract
+@pytest.mark.incremental
+class TestExecutionOrdering:
+    STORER = f'{CONTRACT_PATH}/mini_scenarios/execution_order_storer.tz'
+    CALLER = f'{CONTRACT_PATH}/mini_scenarios/execution_order_caller.tz'
+    APPENDER = f'{CONTRACT_PATH}/mini_scenarios/execution_order_appender.tz'
+
+    def originate_storer(self, client: Client, session: dict):
+        origination = originate(
+            client, session, self.STORER, '""', 0, arguments=['--force']
+        )
+        session['storer'] = origination.contract
+        client.bake('bootstrap3', BAKE_ARGS)
+        return origination.contract
+
+    def originate_appender(
+        self, client: Client, session: dict, storer: str, argument: str
+    ):
+        origination = originate(
+            client,
+            session,
+            self.APPENDER,
+            f'Pair "{storer}" "{argument}"',
+            0,
+            contract_name=f'appender-{argument}',
+            arguments=['--force'],
+        )
+        session[f'appender.{argument}'] = origination.contract
+        client.bake('bootstrap3', BAKE_ARGS)
+        return origination.contract
+
+    def originate_caller(
+        self, client: Client, session: dict, callees: List[str]
+    ):
+        storage = "{" + '; '.join(map('"{}"'.format, callees)) + "}"
+        origination = originate(
+            client,
+            session,
+            self.CALLER,
+            storage,
+            0,
+            contract_name=f'caller-{hash(storage)}',
+        )
+        client.bake('bootstrap3', BAKE_ARGS)
+        return origination.contract
+
+    @pytest.mark.parametrize(
+        "tree, expected",
+        [
+            ([["A", "B", "C"], "D", ["E", "F", "G"]], "DABCEFG"),
+            ([["A", ["B"], "C"]], "ACB"),
+            ([["A", ["B", ["C"], "D"]]], "ABDC"),
+            ([], ""),
+        ],
+    )
+    def test_ordering(
+        self,
+        client: Client,
+        session: dict,
+        # approximation of recursive type annotation
+        tree: Union[str, List[Any]],
+        expected: str,
+    ):
+        storer = self.originate_storer(client, session)
+
+        def deploy_tree(tree: Union[str, List[Any]]) -> str:
+            # leaf
+            if isinstance(tree, str):
+                # deploy and return caller str
+                return self.originate_appender(client, session, storer, tree)
+            # inner node
+            children = list(map(deploy_tree, tree))
+            return self.originate_caller(client, session, children)
+
+        root = deploy_tree(tree)
+
+        client.transfer(
+            0,
+            'bootstrap2',
+            root,
+            ["--burn-cap", "5"],
+        )
+        client.bake('bootstrap3', ["--minimal-timestamp"])
+        assert client.get_storage(storer) == '"{}"'.format(expected)
 
 
 @pytest.mark.slow
