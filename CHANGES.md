@@ -56,6 +56,9 @@ be documented here either.
 
 - Add `--version` flag
 
+- Fixes the operation ordering in the baker so that the most
+  profitable operations are applied first.
+
 ## Protocol Compiler And Environment
 
 - Add `--version` flag
