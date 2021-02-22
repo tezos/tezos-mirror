@@ -11,33 +11,33 @@ big_map diff
 trace
   - location: 13 (remaining gas: 1039967.843 units remaining)
     [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } Unit)  	 ]
-  - location: 15 (remaining gas: 1039967.643 units remaining)
+  - location: 15 (remaining gas: 1039967.733 units remaining)
     [ {}  	@parameter
       (Pair { Elt "1" "one" ; Elt "2" "two" } Unit)  	@storage ]
-  - location: 18 (remaining gas: 1039967.343 units remaining)
+  - location: 18 (remaining gas: 1039967.578 units remaining)
     [ { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 17 (remaining gas: 1039967.273 units remaining)
+  - location: 17 (remaining gas: 1039967.533 units remaining)
     [ { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 16 (remaining gas: 1039967.273 units remaining)
+  - location: 16 (remaining gas: 1039967.533 units remaining)
     [ {}  	@parameter
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: -1 (remaining gas: 1039967.203 units remaining)
+  - location: -1 (remaining gas: 1039967.488 units remaining)
     [ {}  	@parameter
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 19 (remaining gas: 1039967.063 units remaining)
+  - location: 19 (remaining gas: 1039967.378 units remaining)
     [ { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
-  - location: 23 (remaining gas: 1039966.923 units remaining)
+  - location: 23 (remaining gas: 1039967.303 units remaining)
     [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit)  	 ]
-  - location: 24 (remaining gas: 1039966.783 units remaining)
+  - location: 24 (remaining gas: 1039967.228 units remaining)
     [ {}  	
       (Pair { Elt "1" "one" ; Elt "2" "two" } Unit)  	 ]
-  - location: 26 (remaining gas: 1039966.643 units remaining)
+  - location: 26 (remaining gas: 1039967.153 units remaining)
     [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } Unit)  	 ]
-  - location: -1 (remaining gas: 1039966.573 units remaining)
+  - location: -1 (remaining gas: 1039967.108 units remaining)
     [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } Unit)  	 ]
 

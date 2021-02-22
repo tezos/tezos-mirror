@@ -9,37 +9,37 @@ big_map diff
 trace
   - location: 11 (remaining gas: 1039986.686 units remaining)
     [ (Pair "bar" {} None)  	 ]
-  - location: 12 (remaining gas: 1039986.546 units remaining)
+  - location: 12 (remaining gas: 1039986.606 units remaining)
     [ "bar"  	@parameter
       (Pair {} None)  	@storage ]
-  - location: 15 (remaining gas: 1039986.246 units remaining)
+  - location: 15 (remaining gas: 1039986.451 units remaining)
     [ {}  	 ]
-  - location: 16 (remaining gas: 1039986.106 units remaining)
+  - location: 16 (remaining gas: 1039986.371 units remaining)
     [ {}  	
       {}  	 ]
-  - location: -1 (remaining gas: 1039986.036 units remaining)
+  - location: -1 (remaining gas: 1039986.326 units remaining)
     [ {}  	
       {}  	 ]
-  - location: 13 (remaining gas: 1039986.036 units remaining)
+  - location: 13 (remaining gas: 1039986.326 units remaining)
     [ "bar"  	@parameter
       {}  	
       {}  	 ]
-  - location: 17 (remaining gas: 1039975.144 units remaining)
+  - location: 17 (remaining gas: 1039975.464 units remaining)
     [ False  	
       {}  	 ]
-  - location: 18 (remaining gas: 1039975.004 units remaining)
+  - location: 18 (remaining gas: 1039975.389 units remaining)
     [ (Some False)  	
       {}  	 ]
-  - location: 19 (remaining gas: 1039974.874 units remaining)
+  - location: 19 (remaining gas: 1039975.319 units remaining)
     [ {}  	
       (Some False)  	 ]
-  - location: 20 (remaining gas: 1039974.734 units remaining)
+  - location: 20 (remaining gas: 1039975.244 units remaining)
     [ (Pair {} (Some False))  	 ]
-  - location: 21 (remaining gas: 1039974.594 units remaining)
+  - location: 21 (remaining gas: 1039975.169 units remaining)
     [ {}  	
       (Pair {} (Some False))  	 ]
-  - location: 23 (remaining gas: 1039974.454 units remaining)
+  - location: 23 (remaining gas: 1039975.094 units remaining)
     [ (Pair {} {} (Some False))  	 ]
-  - location: -1 (remaining gas: 1039974.384 units remaining)
+  - location: -1 (remaining gas: 1039975.049 units remaining)
     [ (Pair {} {} (Some False))  	 ]
 
