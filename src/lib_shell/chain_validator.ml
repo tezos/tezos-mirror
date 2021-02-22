@@ -702,7 +702,35 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
 
     let on_close = on_close
 
-    let on_error _ _ _ errs = Lwt.return_error errs
+    let on_error w r st errs =
+      Worker.log_event w (Request_failure (r, st, errs))
+      >>= fun () ->
+      match r with
+      | Hash _ ->
+          (* If an error happens here, it means that the request
+            [Validated] failed. For this request, the payload
+            associated to the request was validated and therefore is
+            safe. The handler for such request does some I/Os, and
+            therefore a failure could be "No space left on device" for
+            example. If there is an error at this level, it certainly
+            requires a manual operation from the maintener of the
+            node. *)
+          Lwt.return_error errs
+      | PeerId _ ->
+          (* We do not crash the worker here mainly for one reason:
+            Such request comes from a remote peer. The payload for
+            this request may contain unsafe data. The current policy
+            with tzresult is not clear and there might be a non
+            serious error raised as a [tzresult] to say it was a bad
+            data. If if is the case, we do not want to crash the
+            worker.
+
+            With the current state of the code, it is possible that
+            this branch is not reachable. This would be possible to
+            see it if we relax the interface of [tezos-worker] to use
+            [('a, 'b) result] instead of [tzresult] and if each
+            request uses its own error type. *)
+          return_unit
 
     let on_completion = on_completion
 

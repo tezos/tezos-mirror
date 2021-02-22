@@ -78,6 +78,8 @@ module Event = struct
         max_head_time : Time.Protocol.t;
         most_recent_validation : Time.Protocol.t;
       }
+    | Request_failure of
+        Request.view * Worker_types.request_status * error list
 
   type view = t
 
@@ -105,6 +107,8 @@ module Event = struct
         Internal_event.Debug
     | Bootstrap_active_peers_heads_time _ ->
         Internal_event.Debug
+    | Request_failure _ ->
+        Internal_event.Notice
 
   let sync_status_encoding =
     let open Data_encoding in
@@ -212,7 +216,17 @@ module Event = struct
           ~title:"disconnection"
           (obj1 (req "peer_id" P2p_peer.Id.encoding))
           (function Disconnection peer_id -> Some peer_id | _ -> None)
-          (fun peer_id -> Disconnection peer_id) ]
+          (fun peer_id -> Disconnection peer_id);
+        case
+          (Tag 9)
+          ~title:"request_failure"
+          (obj3
+             (req "failed_validation" Request.encoding)
+             (req "status" Worker_types.request_status_encoding)
+             (dft "errors" RPC_error.encoding []))
+          (function
+            | Request_failure (r, s, err) -> Some (r, s, err) | _ -> None)
+          (fun (r, s, err) -> Request_failure (r, s, err)) ]
 
   let sync_status_to_string = function
     | Synchronised {is_chain_stuck = false} ->
@@ -286,6 +300,16 @@ module Event = struct
           max_head_time
           Time.Protocol.pp_hum
           most_recent_validation
+    | Request_failure (req, {pushed; treated; completed}, errs) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>Chain validator request %a failed@,%a, %a@]"
+          Request.pp
+          req
+          Worker_types.pp_status
+          {pushed; treated; completed}
+          (Format.pp_print_list Error_monad.pp)
+          errs
 end
 
 module Worker_state = struct

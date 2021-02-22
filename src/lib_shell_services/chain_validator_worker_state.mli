@@ -62,6 +62,8 @@ module Event : sig
         max_head_time : Time.Protocol.t;
         most_recent_validation : Time.Protocol.t;
       }
+    | Request_failure of
+        Request.view * Worker_types.request_status * error list
 
   type view = t
 
