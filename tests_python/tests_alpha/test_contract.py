@@ -364,7 +364,9 @@ class TestManager:
 #
 # Example. Given the tree: ["A", ["B"], "C"], we obtain
 #  Caller([Appender("A"), Caller([Appender("B")]), Appender("C")])
-# Storer should end up with storage ACB.
+# Before the protocol 009, contract execution order was in BFS
+# In BFS, Storer would've ended up with storage ACB.
+# In DFS, Storer will end up with storage ABC.
 @pytest.mark.contract
 @pytest.mark.incremental
 class TestExecutionOrdering:
@@ -414,9 +416,12 @@ class TestExecutionOrdering:
     @pytest.mark.parametrize(
         "tree, expected",
         [
-            ([["A", "B", "C"], "D", ["E", "F", "G"]], "DABCEFG"),
-            ([["A", ["B"], "C"]], "ACB"),
-            ([["A", ["B", ["C"], "D"]]], "ABDC"),
+            # before 009, the result should be "DABCEFG".
+            ([["A", "B", "C"], "D", ["E", "F", "G"]], "ABCDEFG"),
+            # before 009, the result should be "ACB".
+            ([["A", ["B"], "C"]], "ABC"),
+            # before 009, the result should be "ABDC".
+            ([["A", ["B", ["C"], "D"]]], "ABCD"),
             ([], ""),
         ],
     )
