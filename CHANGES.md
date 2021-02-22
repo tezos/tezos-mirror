@@ -14,6 +14,9 @@
 
 - Replace PtEdoTez by PtEdo2Zk.
 
+- Fixes the operation ordering in the baker so that the most
+  profitable operations are applied first.
+
 ## Miscellaneous
 
 - Update external opam dependencies. In particular, switch to `hacl-star.0.3.0-1`
