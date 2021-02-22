@@ -111,15 +111,15 @@ module Cost_of = struct
 
     (* model N_Add_bls12_381_fr *)
 
-    let cost_N_Add_bls12_381_fr = S.safe_int 230
+    let cost_N_Add_bls12_381_fr = S.safe_int 200
 
     (* model N_Add_bls12_381_g1 *)
 
-    let cost_N_Add_bls12_381_g1 = S.safe_int 9_300
+    let cost_N_Add_bls12_381_g1 = S.safe_int 8_300
 
     (* model N_Add_bls12_381_g2 *)
 
-    let cost_N_Add_bls12_381_g2 = S.safe_int 13_000
+    let cost_N_Add_bls12_381_g2 = S.safe_int 11_450
 
     (* model N_Add_intint *)
     (* Approximating 0.082158 x term *)
@@ -128,10 +128,10 @@ module Cost_of = struct
       S.safe_int (80 + ((v0 lsr 4) + (v0 lsr 6)))
 
     (* model N_Add_tez *)
-    let cost_N_Add_tez = S.safe_int 100
+    let cost_N_Add_tez = S.safe_int 55
 
     (* model N_And *)
-    let cost_N_And = S.safe_int 100
+    let cost_N_And = S.safe_int 50
 
     (* model N_And_nat *)
     (* Approximating 0.079325 x term *)
@@ -147,10 +147,10 @@ module Cost_of = struct
       S.safe_int 500 + (size + (size lsr 2))
 
     (* model N_Car *)
-    let cost_N_Car = S.safe_int 80
+    let cost_N_Car = S.safe_int 50
 
     (* model N_Cdr *)
-    let cost_N_Cdr = S.safe_int 80
+    let cost_N_Cdr = S.safe_int 50
 
     (* model N_Check_signature_ed25519 *)
     (* Approximating 1.372685 x term *)
@@ -227,31 +227,31 @@ module Cost_of = struct
       S.safe_int 80 + (v0 lsr 4)
 
     (* model N_Cons_list *)
-    let cost_N_Cons_list = S.safe_int 80
+    let cost_N_Cons_list = S.safe_int 50
 
     (* model N_Cons_none *)
-    let cost_N_Cons_none = S.safe_int 80
+    let cost_N_Cons_none = S.safe_int 45
 
     (* model N_Cons_pair *)
-    let cost_N_Cons_pair = S.safe_int 80
+    let cost_N_Cons_pair = S.safe_int 45
 
     (* model N_Cons_some *)
-    let cost_N_Cons_some = S.safe_int 80
+    let cost_N_Cons_some = S.safe_int 45
 
     (* model N_Const *)
-    let cost_N_Const = S.safe_int 80
+    let cost_N_Const = S.safe_int 45
 
     (* model N_Dig *)
     let cost_N_Dig size = S.safe_int (100 + (4 * size))
 
     (* model N_Dip *)
-    let cost_N_Dip = S.safe_int 100
+    let cost_N_Dip = S.safe_int 45
 
     (* model N_DipN *)
     let cost_N_DipN size = S.safe_int (100 + (4 * size))
 
     (* model N_Drop *)
-    let cost_N_Drop = S.safe_int 80
+    let cost_N_Drop = S.safe_int 45
 
     (* model N_DropN *)
     let cost_N_DropN size = S.safe_int (100 + (4 * size))
@@ -260,7 +260,7 @@ module Cost_of = struct
     let cost_N_Dug size = S.safe_int (100 + (4 * size))
 
     (* model N_Dup *)
-    let cost_N_Dup = S.safe_int 80
+    let cost_N_Dup = S.safe_int 50
 
     (* model N_DupN *)
     (* Approximating 1.299969 x term *)
@@ -284,31 +284,31 @@ module Cost_of = struct
     let cost_N_Ediv_teznat = S.safe_int 300
 
     (* model N_Empty_map *)
-    let cost_N_Empty_map = S.safe_int 240
+    let cost_N_Empty_map = S.safe_int 200
 
     (* model N_Empty_set *)
-    let cost_N_Empty_set = S.safe_int 240
+    let cost_N_Empty_set = S.safe_int 200
 
     (* model N_Eq *)
-    let cost_N_Eq = S.safe_int 80
+    let cost_N_Eq = S.safe_int 50
 
     (* model N_If *)
-    let cost_N_If = S.safe_int 60
+    let cost_N_If = S.safe_int 25
 
     (* model N_If_cons *)
-    let cost_N_If_cons = S.safe_int 110
+    let cost_N_If_cons = S.safe_int 30
 
     (* model N_If_left *)
-    let cost_N_If_left = S.safe_int 90
+    let cost_N_If_left = S.safe_int 30
 
     (* model N_If_none *)
-    let cost_N_If_none = S.safe_int 80
+    let cost_N_If_none = S.safe_int 30
 
     (* model N_Int_nat *)
-    let cost_N_Int_nat = S.safe_int 80
+    let cost_N_Int_nat = S.safe_int 45
 
     (* model N_Is_nat *)
-    let cost_N_Is_nat = S.safe_int 80
+    let cost_N_Is_nat = S.safe_int 50
 
     (* model N_Keccak *)
     let cost_N_Keccak size =
@@ -316,7 +316,7 @@ module Cost_of = struct
       S.safe_int 1_400 + (S.safe_int 30 * S.safe_int size)
 
     (* model N_Left *)
-    let cost_N_Left = S.safe_int 80
+    let cost_N_Left = S.safe_int 45
 
     (* model N_List_iter *)
     let cost_N_List_iter size =
@@ -329,13 +329,13 @@ module Cost_of = struct
       S.safe_int 500 + (S.safe_int 12 * S.safe_int size)
 
     (* model N_List_size *)
-    let cost_N_List_size = S.safe_int 80
+    let cost_N_List_size = S.safe_int 50
 
     (* model N_Loop *)
-    let cost_N_Loop = S.safe_int 70
+    let cost_N_Loop = S.safe_int 40
 
     (* model N_Loop_left *)
-    let cost_N_Loop_left = S.safe_int 80
+    let cost_N_Loop_left = S.safe_int 45
 
     (* model N_Lsl_nat *)
     (* Approximating 0.129443 x term *)
@@ -370,7 +370,7 @@ module Cost_of = struct
       S.safe_int 80 + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7)
 
     (* model N_Map_size *)
-    let cost_N_Map_size = S.safe_int 90
+    let cost_N_Map_size = S.safe_int 50
 
     (* model N_Map_update *)
     (* Approximating 0.119968 x term *)
@@ -381,15 +381,15 @@ module Cost_of = struct
 
     (* model N_Mul_bls12_381_fr *)
 
-    let cost_N_Mul_bls12_381_fr = S.safe_int 260
+    let cost_N_Mul_bls12_381_fr = S.safe_int 250
 
     (* model N_Mul_bls12_381_g1 *)
 
-    let cost_N_Mul_bls12_381_g1 = S.safe_int 265_000
+    let cost_N_Mul_bls12_381_g1 = S.safe_int 242_000
 
     (* model N_Mul_bls12_381_g2 *)
 
-    let cost_N_Mul_bls12_381_g2 = S.safe_int 850_000
+    let cost_N_Mul_bls12_381_g2 = S.safe_int 785_500
 
     (* Converting fr from/to S.t *)
     let cost_bls12_381_fr_of_z = S.safe_int 130
@@ -414,38 +414,38 @@ module Cost_of = struct
 
     (* model N_Neg_bls12_381_fr *)
 
-    let cost_N_Neg_bls12_381_fr = S.safe_int 180
+    let cost_N_Neg_bls12_381_fr = S.safe_int 150
 
     (* model N_Neg_bls12_381_g1 *)
 
-    let cost_N_Neg_bls12_381_g1 = S.safe_int 410
+    let cost_N_Neg_bls12_381_g1 = S.safe_int 350
 
     (* model N_Neg_bls12_381_g2 *)
 
-    let cost_N_Neg_bls12_381_g2 = S.safe_int 715
+    let cost_N_Neg_bls12_381_g2 = S.safe_int 600
 
     (* model N_Neg_int *)
     (* Approximating 0.068419 x term *)
     let cost_N_Neg_int size = S.safe_int (80 + (size lsr 4))
 
     (* model N_Neq *)
-    let cost_N_Neq = S.safe_int 80
+    let cost_N_Neq = S.safe_int 45
 
     (* model N_Nil *)
-    let cost_N_Nil = S.safe_int 80
+    let cost_N_Nil = S.safe_int 45
 
     (* model N_Nop *)
-    let cost_N_Nop = S.safe_int 70
+    let cost_N_Nop = S.safe_int 45
 
     (* model N_Not *)
-    let cost_N_Not = S.safe_int 90
+    let cost_N_Not = S.safe_int 50
 
     (* model N_Not_int *)
     (* Approximating 0.076564 x term *)
     let cost_N_Not_int size = S.safe_int (55 + ((size lsr 4) + (size lsr 7)))
 
     (* model N_Or *)
-    let cost_N_Or = S.safe_int 90
+    let cost_N_Or = S.safe_int 50
 
     (* model N_Or_nat *)
     (* Approximating 0.078718 x term *)
@@ -461,10 +461,10 @@ module Cost_of = struct
         (S.mul (S.safe_int 510_000) (S.safe_int size))
 
     (* model N_Right *)
-    let cost_N_Right = S.safe_int 80
+    let cost_N_Right = S.safe_int 45
 
     (* model N_Seq *)
-    let cost_N_Seq = S.safe_int 60
+    let cost_N_Seq = S.safe_int 30
 
     (* model N_Set_iter *)
     let cost_N_Set_iter size =
@@ -479,7 +479,7 @@ module Cost_of = struct
       S.safe_int 80 + (v0 lsr 5) + (v0 lsr 6) + (v0 lsr 7) + (v0 lsr 8)
 
     (* model N_Set_size *)
-    let cost_N_Set_size = S.safe_int 80
+    let cost_N_Set_size = S.safe_int 50
 
     (* model N_Set_update *)
     (* Approximating 0.126260 x term *)
@@ -508,7 +508,7 @@ module Cost_of = struct
     let cost_N_Slice_string size = S.safe_int (80 + (size lsr 4))
 
     (* model N_String_size *)
-    let cost_N_String_size = S.safe_int 80
+    let cost_N_String_size = S.safe_int 50
 
     (* model N_Sub_int *)
     (* Approximating 0.082399 x term *)
@@ -517,10 +517,10 @@ module Cost_of = struct
       S.safe_int (80 + ((v0 lsr 4) + (v0 lsr 6)))
 
     (* model N_Sub_tez *)
-    let cost_N_Sub_tez = S.safe_int 80
+    let cost_N_Sub_tez = S.safe_int 55
 
     (* model N_Swap *)
-    let cost_N_Swap = S.safe_int 70
+    let cost_N_Swap = S.safe_int 40
 
     (* model N_Total_voting_power *)
     let cost_N_Total_voting_power = S.safe_int 400
@@ -531,13 +531,13 @@ module Cost_of = struct
       S.safe_int (80 + ((3 * size) + (size lsr 1) + (size lsr 3)))
 
     (* model N_Unpair *)
-    let cost_N_Unpair = S.safe_int 80
+    let cost_N_Unpair = S.safe_int 50
 
     (* model N_Voting_power *)
     let cost_N_Voting_power = S.safe_int 400
 
     (* model N_Xor *)
-    let cost_N_Xor = S.safe_int 100
+    let cost_N_Xor = S.safe_int 50
 
     (* model N_Xor_nat *)
     (* Approximating 0.078258 x term *)
@@ -739,6 +739,14 @@ module Cost_of = struct
 
     (* TODO: benchmark *)
     let cost_COMPARABLE_TY_OF_TY = S.safe_int 120
+
+    (* model SAPLING_TRANSACTION_ENCODING *)
+    let cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs =
+      S.safe_int (1500 + (inputs * 160) + (outputs * 320))
+
+    (* model SAPLING_DIFF_ENCODING *)
+    let cost_SAPLING_DIFF_ENCODING ~nfs ~cms =
+      S.safe_int ((nfs * 22) + (cms * 215))
   end
 
   module Interpreter = struct
@@ -1468,16 +1476,14 @@ module Cost_of = struct
     (* Reuse 006 costs. *)
     let operation bytes = Script.bytes_node_cost bytes
 
-    let sapling_transaction _t =
-      (* TODO should it be scaled? *)
-      (*       let size = Data_encoding.Binary.length Sapling.transaction_encoding t in *)
-      (*       string_cost size *)
-      Gas.free
+    let sapling_transaction (t : Sapling.transaction) =
+      let inputs = List.length t.inputs in
+      let outputs = List.length t.outputs in
+      atomic_step_cost (cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs)
 
-    let sapling_diff _d =
-      (* TODO should it be scaled? *)
-      (*       let size = Data_encoding.Binary.length Sapling.diff_encoding d in *)
-      (*       string_cost size *)
-      Gas.free
+    let sapling_diff (d : Sapling.diff) =
+      let nfs = List.length d.nullifiers in
+      let cms = List.length d.commitments_and_ciphertexts in
+      atomic_step_cost (cost_SAPLING_DIFF_ENCODING ~nfs ~cms)
   end
 end
