@@ -12,6 +12,7 @@ depends: [
   "tezos-error-monad"
   "uutf"
   "alcotest-lwt" { with-test & >= "1.1.0" }
+  "ppx_inline_test"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

@@ -485,3 +485,224 @@ let erased_encoding ~variant default_location prim_encoding =
     (fun node -> strip_locations node)
     (fun canon -> inject_locations (fun _ -> default_location) canon)
     (canonical_encoding ~variant prim_encoding)
+
+(** Testing
+    -------
+    Component:    Micheline
+    Invocation:   dune build @src/lib_micheline/runtest
+    Subject:      Test preservation of semantics wrt original implementation
+*)
+
+let%test_module "semantics_preservation" =
+  ( module struct
+    module Original = struct
+      let strip_locations root =
+        let id =
+          let id = ref (-1) in
+          fun () -> incr id ; !id
+        in
+        let rec strip_locations l =
+          let id = id () in
+          match l with
+          | Int (_, v) ->
+              Int (id, v)
+          | String (_, v) ->
+              String (id, v)
+          | Bytes (_, v) ->
+              Bytes (id, v)
+          | Seq (_, seq) ->
+              Seq (id, List.map strip_locations seq)
+          | Prim (_, name, seq, annots) ->
+              Prim (id, name, List.map strip_locations seq, annots)
+        in
+        Canonical (strip_locations root)
+
+      let extract_locations root =
+        let id =
+          let id = ref (-1) in
+          fun () -> incr id ; !id
+        in
+        let loc_table = ref [] in
+        let rec strip_locations l =
+          let id = id () in
+          match l with
+          | Int (loc, v) ->
+              loc_table := (id, loc) :: !loc_table ;
+              Int (id, v)
+          | String (loc, v) ->
+              loc_table := (id, loc) :: !loc_table ;
+              String (id, v)
+          | Bytes (loc, v) ->
+              loc_table := (id, loc) :: !loc_table ;
+              Bytes (id, v)
+          | Seq (loc, seq) ->
+              loc_table := (id, loc) :: !loc_table ;
+              Seq (id, List.map strip_locations seq)
+          | Prim (loc, name, seq, annots) ->
+              loc_table := (id, loc) :: !loc_table ;
+              Prim (id, name, List.map strip_locations seq, annots)
+        in
+        let stripped = strip_locations root in
+        (Canonical stripped, List.rev !loc_table)
+
+      let inject_locations lookup (Canonical root) =
+        let rec inject_locations l =
+          match l with
+          | Int (loc, v) ->
+              Int (lookup loc, v)
+          | String (loc, v) ->
+              String (lookup loc, v)
+          | Bytes (loc, v) ->
+              Bytes (lookup loc, v)
+          | Seq (loc, seq) ->
+              Seq (lookup loc, List.map inject_locations seq)
+          | Prim (loc, name, seq, annots) ->
+              Prim (lookup loc, name, List.map inject_locations seq, annots)
+        in
+        inject_locations root
+
+      let map f (Canonical expr) =
+        let rec map_node f = function
+          | (Int _ | String _ | Bytes _) as node ->
+              node
+          | Seq (loc, seq) ->
+              Seq (loc, List.map (map_node f) seq)
+          | Prim (loc, name, seq, annots) ->
+              Prim (loc, f name, List.map (map_node f) seq, annots)
+        in
+        Canonical (map_node f expr)
+
+      let rec map_node fl fp = function
+        | Int (loc, v) ->
+            Int (fl loc, v)
+        | String (loc, v) ->
+            String (fl loc, v)
+        | Bytes (loc, v) ->
+            Bytes (fl loc, v)
+        | Seq (loc, seq) ->
+            Seq (fl loc, List.map (map_node fl fp) seq)
+        | Prim (loc, name, seq, annots) ->
+            Prim (fl loc, fp name, List.map (map_node fl fp) seq, annots)
+    end
+
+    module Sampler = struct
+      (* Sampler copied from [micheline_benchmarks.ml] - lib-micheline cannot depend
+       on lib-shell-benchmarks. *)
+
+      type 'a sampler = Random.State.t -> 'a
+
+      type width_function = depth:int -> int sampler
+
+      type node_kind =
+        | Int_node
+        | String_node
+        | Bytes_node
+        | Seq_node
+        | Prim_node
+
+      (* We skew the distribution towards non-leaf nodes by repeating the
+           relevant kinds ;) *)
+      let all_kinds = [|Int_node; String_node; Bytes_node; Seq_node; Prim_node|]
+
+      let sample_kind : node_kind sampler =
+       fun rng_state ->
+        let i = Random.State.int rng_state (Array.length all_kinds) in
+        all_kinds.(i)
+
+      let sample_string _ = ""
+
+      let sample_bytes _ = Bytes.empty
+
+      let sample_z _ = Z.zero
+
+      let sample (w : width_function) rng_state =
+        let rec sample depth rng_state k =
+          match sample_kind rng_state with
+          | Int_node ->
+              k (Int (0, sample_z rng_state))
+          | String_node ->
+              k (String (0, sample_string rng_state))
+          | Bytes_node ->
+              k (Bytes (0, sample_bytes rng_state))
+          | Seq_node ->
+              let width = w ~depth rng_state in
+              sample_list
+                depth
+                width
+                []
+                (fun terms -> k (Seq (0, terms)))
+                rng_state
+          | Prim_node ->
+              let width = w ~depth rng_state in
+              sample_list
+                depth
+                width
+                []
+                (fun terms -> k (Prim (0, (), terms, [])))
+                rng_state
+        and sample_list depth width acc k rng_state =
+          if width < 0 then invalid_arg "sample_list: negative width"
+          else if width = 0 then k (List.rev acc)
+          else
+            sample (depth + 1) rng_state (fun x ->
+                sample_list depth (width - 1) (x :: acc) k rng_state)
+        in
+        sample 0 rng_state (fun x -> x)
+
+      let sample_in_interval min max state =
+        if max - min >= 0 then min + Random.State.int state (max - min + 1)
+        else invalid_arg "sample_in_interval"
+
+      let reasonable_width_function ~depth rng_state =
+        (* Entirely ad-hoc *)
+        sample_in_interval 0 (20 / (Bits.numbits depth + 1)) rng_state
+
+      let sample = sample reasonable_width_function
+    end
+
+    let rng_state = Random.State.make [|0x1337; 0x533D|]
+
+    let rec sample_and_check_n_times n f g =
+      if n <= 0 then ()
+      else
+        let term = Sampler.sample rng_state in
+        (* Is this a legit use of polymorphic equality? *)
+        assert (f term = g term) ;
+        sample_and_check_n_times (n - 1) f g
+
+    let rec sample_and_check_n_times_canon n f g =
+      if n <= 0 then ()
+      else
+        let term = Sampler.sample rng_state in
+        let term = strip_locations term in
+        (* Is this a legit use of polymorphic equality? *)
+        assert (f term = g term) ;
+        sample_and_check_n_times_canon (n - 1) f g
+
+    let%test_unit "strip_locations" =
+      sample_and_check_n_times 1_000 Original.strip_locations strip_locations
+
+    let%test_unit "extract_locations" =
+      sample_and_check_n_times
+        1_000
+        Original.extract_locations
+        extract_locations
+
+    let%test_unit "inject_locations" =
+      sample_and_check_n_times_canon
+        1_000
+        (Original.inject_locations (fun i -> i))
+        (inject_locations (fun i -> i))
+
+    let%test_unit "map" =
+      sample_and_check_n_times_canon
+        1_000
+        (Original.map (fun _i -> ()))
+        (map (fun _i -> ()))
+
+    let%test_unit "map_node" =
+      sample_and_check_n_times
+        1_000
+        (Original.map_node (fun _i -> ()) (fun _i -> ()))
+        (map_node (fun _i -> ()) (fun _i -> ()))
+  end )
