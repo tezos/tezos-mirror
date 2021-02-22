@@ -28,21 +28,31 @@ open Tezos_client_base
 type bootstrap_secret = {name : string; sk_uri : Client_keys.sk_uri}
 
 let default_bootstrap_accounts =
-  let unencrypted_keys =
+  let register unencrypted_keys basename =
+    List.mapi_es
+      (fun i ukey ->
+        Client_keys.make_sk_uri @@ Uri.of_string ("unencrypted:" ^ ukey)
+        >>=? fun sk_uri ->
+        let name = basename ^ string_of_int (i + 1) in
+        return {name; sk_uri})
+      unencrypted_keys
+  in
+  register
     [ "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
       "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo";
       "edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ";
       "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
       "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm" ]
-  in
-  let basename = "bootstrap" in
-  List.mapi_es
-    (fun i ukey ->
-      Client_keys.make_sk_uri @@ Uri.of_string ("unencrypted:" ^ ukey)
-      >>=? fun sk_uri ->
-      let name = basename ^ string_of_int (i + 1) in
-      return {name; sk_uri})
-    unencrypted_keys
+    "bootstrap"
+  >>=? fun ls_bootstrap ->
+  register
+    [ "edsk432L71B91i1sE8rQxPDMo2Yxo4qaYqhktvpt8yovaMpo1NUbBt";
+      "edsk3jjD4cLvE1t3SiZKCRiH9SXnJ4jHEsVpfcuRwfe7sfbnsMGX6f";
+      "edsk3EVDFeDsefk1UoWWhDhnBpERhAwqHbVzWnBwA4tdUL8aBhw7RC";
+      "edsk2rAmeBDrQ5d1FhDoTdifMvBsqSosmPSBhxL74huszZhfMFtiKb";
+      "edsk4Ssc63dnYJUptVMaKfmHLJNMBYv9piYiRCiYjcH3gacKWP1z3v" ]
+    "baker"
+  >>=? fun ls_baker -> return (ls_bootstrap @ ls_baker)
 
 let add_bootstrap_secret cctxt {name; sk_uri} =
   let force = false in
