@@ -249,3 +249,60 @@ let rec retry ?(log = fun _ -> Lwt.return_unit) ?(n = 5) ?(sleep = 1.) f =
         >>= fun () ->
         Lwt_unix.sleep sleep >>= fun () -> retry ~log ~n:(n - 1) ~sleep f
       else Lwt.return x
+
+type 'action io_error = {
+  action : 'action;
+  unix_code : Unix.error;
+  caller : string;
+  arg : string;
+}
+
+let with_open_file ~flags ?(perm = 0o640) filename task =
+  Lwt.catch
+    (fun () ->
+      Lwt_unix.openfile filename flags perm >>= fun x -> Lwt.return (Ok x))
+    (function
+      | Unix.Unix_error (unix_code, caller, arg) ->
+          Lwt.return (Error {action = `Open; unix_code; caller; arg})
+      | exn ->
+          raise exn)
+  >>= function
+  | Error _ as x ->
+      Lwt.return x
+  | Ok fd ->
+      task fd
+      >>= fun res ->
+      Lwt.catch
+        (fun () -> Lwt_unix.close fd >>= fun () -> return res)
+        (function
+          | Unix.Unix_error (unix_code, caller, arg) ->
+              Lwt.return (Error {action = `Close; unix_code; caller; arg})
+          | exn ->
+              raise exn)
+
+let with_open_out ?(overwrite = true) file task =
+  let flags =
+    let open Unix in
+    if overwrite then [O_WRONLY; O_CREAT; O_TRUNC; O_CLOEXEC]
+    else [O_WRONLY; O_CREAT; O_CLOEXEC]
+  in
+  with_open_file ~flags file task
+
+let with_open_in file task =
+  with_open_file ~flags:[O_RDONLY; O_CLOEXEC] file task
+
+(* This is to avoid file corruption *)
+let with_atomic_open_out ?(overwrite = true) ?temp_dir filename f =
+  let temp_file =
+    Filename.temp_file ?temp_dir (Filename.basename filename) ".tmp"
+  in
+  with_open_out ~overwrite temp_file f
+  >>=? fun res ->
+  Lwt.catch
+    (fun () ->
+      Lwt_unix.rename temp_file filename >>= fun () -> Lwt.return (Ok res))
+    (function
+      | Unix.Unix_error (unix_code, caller, arg) ->
+          Lwt.return (Error {action = `Rename; unix_code; caller; arg})
+      | exn ->
+          raise exn)
