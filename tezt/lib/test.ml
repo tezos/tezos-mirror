@@ -265,66 +265,74 @@ type test = {
 (* List of tests added using [add] and that match command-line filters. *)
 let list : test list ref = ref []
 
-let list_tests () =
-  let file_header = "FILE" in
-  let title_header = "TITLE" in
-  let tags_header = "TAGS" in
-  let list =
-    List.map
-      (fun {file; title; tags; _} -> (file, title, String.concat ", " tags))
-      !list
-  in
-  (* Compute the size of each column. *)
-  let (file_size, title_size, tags_size) =
-    List.fold_left
-      (fun (max_file, max_title, max_tags) (file, title, tags) ->
-        ( max max_file (String.length file),
-          max max_title (String.length title),
-          max max_tags (String.length tags) ))
-      ( String.length file_header,
-        String.length title_header,
-        String.length tags_header )
-      list
-  in
-  (* Prepare the line separator. *)
-  let line =
-    "+"
-    ^ String.make (file_size + 2) '-'
-    ^ "+"
-    ^ String.make (title_size + 2) '-'
-    ^ "+"
-    ^ String.make (tags_size + 2) '-'
-    ^ "+\n"
-  in
-  (* Print the header row. *)
-  print_string line ;
-  let center size header =
-    let padding = size - String.length header in
-    let left_padding = padding / 2 in
-    let right_padding = padding - left_padding in
-    String.make left_padding ' ' ^ header ^ String.make right_padding ' '
-  in
-  Printf.printf
-    "| %s | %s | %s |\n"
-    (center file_size file_header)
-    (center title_size title_header)
-    (center tags_size tags_header) ;
-  print_string line ;
-  (* Print rows. *)
-  let pad size text =
-    let padding = size - String.length text in
-    text ^ String.make padding ' '
-  in
-  List.iter
-    (fun (file, title, tags) ->
+let list_tests format =
+  match format with
+  | `Tsv ->
+      List.iter
+        (fun {file; title; tags; _} ->
+          Printf.printf "%s\t%s\t%s\n%!" file title (String.concat " " tags))
+        !list
+  | `Ascii_art ->
+      let file_header = "FILE" in
+      let title_header = "TITLE" in
+      let tags_header = "TAGS" in
+      let list =
+        List.map
+          (fun {file; title; tags; _} ->
+            (file, title, String.concat ", " tags))
+          !list
+      in
+      (* Compute the size of each column. *)
+      let (file_size, title_size, tags_size) =
+        List.fold_left
+          (fun (max_file, max_title, max_tags) (file, title, tags) ->
+            ( max max_file (String.length file),
+              max max_title (String.length title),
+              max max_tags (String.length tags) ))
+          ( String.length file_header,
+            String.length title_header,
+            String.length tags_header )
+          list
+      in
+      (* Prepare the line separator. *)
+      let line =
+        "+"
+        ^ String.make (file_size + 2) '-'
+        ^ "+"
+        ^ String.make (title_size + 2) '-'
+        ^ "+"
+        ^ String.make (tags_size + 2) '-'
+        ^ "+\n"
+      in
+      (* Print the header row. *)
+      print_string line ;
+      let center size header =
+        let padding = size - String.length header in
+        let left_padding = padding / 2 in
+        let right_padding = padding - left_padding in
+        String.make left_padding ' ' ^ header ^ String.make right_padding ' '
+      in
       Printf.printf
         "| %s | %s | %s |\n"
-        (pad file_size file)
-        (pad title_size title)
-        (pad tags_size tags))
-    list ;
-  if list <> [] then print_string line ;
-  ()
+        (center file_size file_header)
+        (center title_size title_header)
+        (center tags_size tags_header) ;
+      print_string line ;
+      (* Print rows. *)
+      let pad size text =
+        let padding = size - String.length text in
+        text ^ String.make padding ' '
+      in
+      List.iter
+        (fun (file, title, tags) ->
+          Printf.printf
+            "| %s | %s | %s |\n"
+            (pad file_size file)
+            (pad title_size title)
+            (pad tags_size tags))
+        list ;
+      if list <> [] then print_string line ;
+      ()
 
 let display_time_summary () =
   let sum_time = List.fold_left (fun acc {time; _} -> acc +. time) 0. in
@@ -399,22 +407,24 @@ let run () =
              Cli.options.tests_to_run
          @ Cli.options.tags_to_run
          @ List.map (sf "/%s") Cli.options.tags_not_to_run )) ;
-    if not Cli.options.list then
+    if Cli.options.list = None then
       prerr_endline
         "You can use --list to get the list of tests and their tags." ) ;
   (* Actually run the tests (or list them). *)
-  if Cli.options.list then list_tests ()
-  else
-    let rec run iteration =
-      let run_and_measure_time test =
-        let start = Unix.gettimeofday () in
-        really_run ~iteration test.title test.body ;
-        let time = Unix.gettimeofday () -. start in
-        test.time <- test.time +. time
+  match Cli.options.list with
+  | Some format ->
+      list_tests format
+  | None ->
+      let rec run iteration =
+        let run_and_measure_time test =
+          let start = Unix.gettimeofday () in
+          really_run ~iteration test.title test.body ;
+          let time = Unix.gettimeofday () -. start in
+          test.time <- test.time +. time
+        in
+        List.iter run_and_measure_time !list ;
+        if Cli.options.loop then run (iteration + 1)
       in
-      List.iter run_and_measure_time !list ;
-      if Cli.options.loop then run (iteration + 1)
-    in
-    run 1 ;
-    if !a_test_failed then exit 1 ;
-    if Cli.options.time then display_time_summary ()
+      run 1 ;
+      if !a_test_failed then exit 1 ;
+      if Cli.options.time then display_time_summary ()
