@@ -39,6 +39,7 @@ open Tezos_test_services
 
 let default_bootstrap_accounts_names =
   List.map (fun i -> "bootstrap" ^ string_of_int i) (1 -- 5)
+  @ List.map (fun i -> "baker" ^ string_of_int i) (1 -- 5)
 
 let testable_public_key_hash =
   Alcotest.testable
