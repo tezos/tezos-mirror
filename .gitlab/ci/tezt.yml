@@ -1,16 +1,41 @@
-# We set a global timeout of 55min (3300s) so that in case of timeout,
-# we still get the artifact (CI timeouts cause artifacts to not be uploaded).
-tezt:main:
+# We use `scripts/run-tezt-tests-ci.sh` to split the Tezt tests into ranges:
+
+tezt:run-1-33:
   extends: .test_template
   before_script:
     - make
   script:
-    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --time
+    - sh scripts/run-tezt-tests-ci.sh 1 33
   artifacts:
     paths:
       - tezt.log
     expire_in: 1 day
     when: on_failure
+
+tezt:run-34-66:
+  extends: .test_template
+  before_script:
+    - make
+  script:
+    - sh scripts/run-tezt-tests-ci.sh 34 66
+  artifacts:
+    paths:
+      - tezt.log
+    expire_in: 1 day
+    when: on_failure
+
+tezt:run-67-end:
+  extends: .test_template
+  before_script:
+    - make
+  script:
+    - sh scripts/run-tezt-tests-ci.sh 67
+  artifacts:
+    paths:
+      - tezt.log
+    expire_in: 1 day
+    when: on_failure
+
 
 tezt:manual:migration:
   extends: .test_template
