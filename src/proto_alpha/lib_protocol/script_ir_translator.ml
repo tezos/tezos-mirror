@@ -7313,85 +7313,100 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
   let has_lazy_storage = has_lazy_storage ty in
   aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
 
-(** Prematurely abort if [f] generates an error. Use this function with the
-    [never] type for ['error] if you are in a case where errors are impossible.
+(** We namespace an error type for [fold_lazy_storage]. The error case is only
+    available when the ['error] parameter is equal to unit. *)
+module Fold_lazy_storage = struct
+  type ('acc, 'error) result =
+    | Ok : 'acc -> ('acc, 'error) result
+    | Error : ('acc, unit) result
+end
+
+(** Prematurely abort if [f] generates an error. Use this function without the
+    [unit] type for [error] if you are in a case where errors are impossible.
 *)
 let rec fold_lazy_storage :
-    type a.
-    f:('acc, 'error) result Lazy_storage.IdSet.fold_f ->
+    type a error.
+    f:('acc, error) Fold_lazy_storage.result Lazy_storage.IdSet.fold_f ->
     init:'acc ->
     context ->
     a ty ->
     a ->
     has_lazy_storage:a has_lazy_storage ->
-    (('acc, 'error) result * context) tzresult =
+    (('acc, error) Fold_lazy_storage.result * context) tzresult =
  fun ~f ~init ctxt ty x ~has_lazy_storage ->
   Gas.consume ctxt Typecheck_costs.parse_instr_cycle
   >>? fun ctxt ->
   match (has_lazy_storage, ty, x) with
   | (_, Big_map_t (_, _, _), {id = Some id}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle
-      >>? fun ctxt -> ok (f.f Big_map id (Pervasives.Ok init), ctxt)
+      >>? fun ctxt -> ok (f.f Big_map id (Fold_lazy_storage.Ok init), ctxt)
   | (_, Sapling_state_t _, {id = Some id}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle
-      >>? fun ctxt -> ok (f.f Sapling_state id (Pervasives.Ok init), ctxt)
+      >>? fun ctxt ->
+      ok (f.f Sapling_state id (Fold_lazy_storage.Ok init), ctxt)
   | (False_f, _, _) ->
-      ok (Pervasives.Ok init, ctxt)
+      ok (Fold_lazy_storage.Ok init, ctxt)
   | (_, Big_map_t (_, _, _), {id = None}) ->
-      ok (Pervasives.Ok init, ctxt)
+      ok (Fold_lazy_storage.Ok init, ctxt)
   | (_, Sapling_state_t _, {id = None}) ->
-      ok (Pervasives.Ok init, ctxt)
+      ok (Fold_lazy_storage.Ok init, ctxt)
   | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) -> (
       fold_lazy_storage ~f ~init ctxt tyl xl ~has_lazy_storage:hl
       >>? fun (init, ctxt) ->
       match init with
-      | Pervasives.Ok init ->
+      | Fold_lazy_storage.Ok init ->
           fold_lazy_storage ~f ~init ctxt tyr xr ~has_lazy_storage:hr
-      | Pervasives.Error _ ->
+      | Fold_lazy_storage.Error ->
           ok (init, ctxt) )
   | (Union_f (has_lazy_storage, _), Union_t ((ty, _), (_, _), _), L x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
   | (Union_f (_, has_lazy_storage), Union_t ((_, _), (ty, _), _), R x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
   | (_, Option_t (_, _), None) ->
-      ok (Pervasives.Ok init, ctxt)
+      ok (Fold_lazy_storage.Ok init, ctxt)
   | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
   | (List_f has_lazy_storage, List_t (ty, _), l) ->
       List.fold_left
-        (fun (acc : (('acc, 'error) result * context) tzresult) x ->
+        (fun (acc :
+               (('acc, error) Fold_lazy_storage.result * context) tzresult)
+             x ->
           acc
           >>? fun (init, ctxt) ->
           match init with
-          | Pervasives.Ok init ->
+          | Fold_lazy_storage.Ok init ->
               fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
-          | Pervasives.Error _ ->
+          | Fold_lazy_storage.Error ->
               ok (init, ctxt))
-        (ok (Pervasives.Ok init, ctxt))
+        (ok (Fold_lazy_storage.Ok init, ctxt))
         l.elements
   | (Map_f has_lazy_storage, Map_t (_, ty, _), m) ->
       map_fold
-        (fun _ v (acc : (('acc, 'error) result * context) tzresult) ->
+        (fun _
+             v
+             (acc :
+               (('acc, error) Fold_lazy_storage.result * context) tzresult) ->
           acc
           >>? fun (init, ctxt) ->
           match init with
-          | Pervasives.Ok init ->
+          | Fold_lazy_storage.Ok init ->
               fold_lazy_storage ~f ~init ctxt ty v ~has_lazy_storage
-          | Pervasives.Error _ ->
+          | Fold_lazy_storage.Error ->
               ok (init, ctxt))
         m
-        (ok (Pervasives.Ok init, ctxt))
+        (ok (Fold_lazy_storage.Ok init, ctxt))
   | _ ->
       (* TODO: fix injectivity of types *) assert false
 
 let collect_lazy_storage ctxt ty x =
   let has_lazy_storage = has_lazy_storage ty in
-  let f kind id (acc : (_, never) result) =
-    let acc = match acc with Pervasives.Ok acc -> acc in
-    Pervasives.Ok (Lazy_storage.IdSet.add kind id acc)
+  let f kind id (acc : (_, never) Fold_lazy_storage.result) =
+    let acc = match acc with Fold_lazy_storage.Ok acc -> acc in
+    Fold_lazy_storage.Ok (Lazy_storage.IdSet.add kind id acc)
   in
   fold_lazy_storage ~f:{f} ~init:no_lazy_storage_id ctxt ty x ~has_lazy_storage
-  >>? fun (ids, ctxt) -> match ids with Pervasives.Ok ids -> ok (ids, ctxt)
+  >>? fun (ids, ctxt) ->
+  match ids with Fold_lazy_storage.Ok ids -> ok (ids, ctxt)
 
 let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
     v =
@@ -7432,15 +7447,15 @@ let unparse_code = unparse_code ~stack_depth:0
 let get_single_sapling_state ctxt ty x =
   let has_lazy_storage = has_lazy_storage ty in
   let f (type i a u) (kind : (i, a, u) Lazy_storage.Kind.t) (id : i)
-      single_id_opt : (Sapling.Id.t option, unit) result =
+      single_id_opt : (Sapling.Id.t option, unit) Fold_lazy_storage.result =
     match kind with
     | Lazy_storage.Kind.Sapling_state -> (
       match single_id_opt with
-      | Pervasives.Ok None ->
-          Pervasives.Ok (Some id)
-      | Pervasives.Ok (Some _) ->
-          Pervasives.Error () (* more than one *)
-      | Pervasives.Error _ ->
+      | Fold_lazy_storage.Ok None ->
+          Fold_lazy_storage.Ok (Some id)
+      | Fold_lazy_storage.Ok (Some _) ->
+          Fold_lazy_storage.Error (* more than one *)
+      | Fold_lazy_storage.Error ->
           single_id_opt )
     | _ ->
         single_id_opt
@@ -7448,7 +7463,7 @@ let get_single_sapling_state ctxt ty x =
   fold_lazy_storage ~f:{f} ~init:None ctxt ty x ~has_lazy_storage
   >>? fun (id, ctxt) ->
   match id with
-  | Pervasives.Ok (Some id) ->
+  | Fold_lazy_storage.Ok (Some id) ->
       ok (Some id, ctxt)
   | _ ->
       ok (None, ctxt)
