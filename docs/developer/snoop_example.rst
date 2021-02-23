@@ -39,7 +39,7 @@ that allows listing benchmarks by kind.
 Typically, a benchmark will depend on a set of parameters corresponding eg to
 the parameters of the samplers used to generate input data to the function
 being benchmarked. This corresponds to the type ``config``. A ``default_config``
-is provided, which can be overriden by specifying a well-formatted json file.
+is provided, which can be overridden by specifying a well-formatted JSON file.
 This is made possible by defining a ``config_encoding`` using the
 :ref:`data-encoding<data_encoding>` library.
 
@@ -63,7 +63,7 @@ the information on the input of the function being benchmarked required
 to predict its execution time. Typically, it corresponds to some notion
 of "size" of the input. In order to be saved to disk, we must define
 a ``workload_encoding`` as well. The ``workload`` type is abstract from the
-outside of the module, however for plotting purposes it is
+outside of the module, however, for plotting purposes, it is
 necessary to exhibit a vector-like structure on these workloads. The
 ``workload_to_vector`` function maps workloads to sparse vectors. If one is
 not interested in plotting, this function can be made to always return
@@ -118,7 +118,7 @@ The auxiliary function ``blake2b_benchmark`` is in charge of
 preparing a ``closure``, corresponding to a call to ``Blake2b.hash_bytes``
 applied to a random ``bytes``, and the associated ``workload``, containing the
 size of the random ``bytes``. We want benchmarks to be easily replayable
-given a seed, hence the closure-generation function is parameterised with
+given a seed, hence the closure-generation function is parameterized with
 an explicit ``rng_state`` of type ``Random.State.t``.
 
 .. code-block:: ocaml
@@ -286,7 +286,7 @@ In this particular example, the data seems clean though:
    Validity interval: [-27310.589365, 97287.461365].
    Removed 0 outliers out of 500 elements.
 
-The best defence against outliers is to have clean data in the first place: use a stable environment for benchmarking.
+The best defense against outliers is to have clean data in the first place: use a stable environment for benchmarking.
 
 .. _Fitting the model:
 
@@ -361,21 +361,25 @@ but the principle is similar.
 
    tezos-snoop generate code using solution blake2b.sol and model blake2b_codegen
 
+By default, the tool produces integer code by casting floating point constant to integers.
 The tool produces the following code on ``stdout``:
 
-::
+:: code-block:: ocaml
 
-   let model_blake2b_codegen = fun size -> (129.279086813 + (1.09627036127 * size))
+   let model_blake2b_codegen size =
+       (int_of_float 144.753899773) + (int_of_float 1.17988921492) * size
 
 It is also possible to generate code implementing the cost function using
-fixed-point arithmetic. This requires specifying some codegen parameters in a json
+fixed-point arithmetic. This requires specifying some codegen parameters in a JSON
 file. For instance, we can require to consider 5 bits of precision and use
 rounding to nearest to convert constants, failing if we make more than 10% relative
-error when casting.
+error when casting. The ``inverse_scaling`` and ``resolution`` parameters respectively
+specify the fraction of digits considered to be not significant, and the resolution
+of the grid used when prettifying constants (in nanoseconds).
 
 .. code-block:: JSON
 
-   { "precision": 5, "max_relative_error": 0.1, "cast_mode": "Round" }
+   { "precision": 5, "max_relative_error": 0.1, "cast_mode": "Round", "inverse_scaling": 3, "resolution": 5 }
 
 Calling the tool:
 
@@ -385,6 +389,8 @@ Calling the tool:
 
 We get:
 
-::
+:: code-block:: ocaml
 
-   let model_blake2b_codegen = fun size -> let v0 = size in (129 + ((v0 + (v0 lsr 4)) + (v0 lsr 5)))
+   let model_blake2b_codegen size =
+       let v0 = size in
+       150 + ((v0 + (v0 lsr 3)) + (v0 lsr 5))
