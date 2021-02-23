@@ -218,24 +218,24 @@ val spawn_activate_protocol :
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val bake_for :
   ?node:Node.t ->
+  ?protocol:Protocol.t ->
   ?key:string ->
   ?minimal_timestamp:bool ->
   ?mempool:string ->
   ?force:bool ->
   ?context_path:string ->
-  ?protocol:Protocol.t ->
   t ->
   unit Lwt.t
 
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :
   ?node:Node.t ->
+  ?protocol:Protocol.t ->
   ?key:string ->
   ?minimal_timestamp:bool ->
   ?mempool:string ->
   ?force:bool ->
   ?context_path:string ->
-  ?protocol:Protocol.t ->
   t ->
   Process.t
 

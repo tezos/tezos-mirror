@@ -75,17 +75,21 @@ let test_cache_at_most_once ?query_string path protocol =
   let extract_chain_block line =
     (* Groups are 1-based (0 is for the whole match). *)
     if Re.Str.string_match proxy_cache_regexp line 0 then
-      [(Re.Str.matched_group 1 line, Re.Str.matched_group 2 line)]
-    else []
+      Some (Re.Str.matched_group 1 line, Re.Str.matched_group 2 line)
+    else None
   in
-  let chain_block_list =
-    lines |> List.map extract_chain_block |> List.concat
-  in
-  let rec find_duplicate = function
-    | [] ->
-        None
-    | hd :: tl ->
-        if List.mem hd tl then Some hd else find_duplicate tl
+  let chain_block_list = lines |> List.filter_map extract_chain_block in
+  let find_duplicate l =
+    let rec go with_duplicates without_duplicates =
+      match (with_duplicates, without_duplicates) with
+      | ([], []) ->
+          None
+      | (hd_dup :: tl_dup, hd_nodup :: tl_nodup) ->
+          if hd_dup = hd_nodup then go tl_dup tl_nodup else Some hd_dup
+      | _ ->
+          assert false
+    in
+    go (List.sort Stdlib.compare l) (List.sort_uniq Stdlib.compare l)
   in
   if chain_block_list = [] then
     Test.fail
@@ -185,10 +189,10 @@ let test_context_suffix_no_rpc ?query_string path protocol =
   let extract_rpc_path line =
     (* Groups are 1-based (0 is for the whole match). *)
     if Re.Str.string_match rpc_path_regexp line 0 then
-      [Re.Str.matched_group 1 line]
-    else []
+      Some (Re.Str.matched_group 1 line)
+    else None
   in
-  let context_queries = lines |> List.map extract_rpc_path |> List.concat in
+  let context_queries = lines |> List.filter_map extract_rpc_path in
   let rec test_no_overlap_rpc = function
     | [] ->
         ()
