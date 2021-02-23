@@ -207,10 +207,10 @@ let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color message =
             ( if level = Error then
               Log_buffer.iter
               @@ fun line ->
-              log_line_to ~use_colors:Cli.options.color line stdout ) ;
+              log_line_to ~use_colors:Cli.options.color line stderr ) ;
             Log_buffer.reset () ;
-            log_line_to ~use_colors:Cli.options.color line stdout ;
-            flush stdout
+            log_line_to ~use_colors:Cli.options.color line stderr ;
+            flush stderr
         | ((Quiet | Error | Warn | Report | Info), _) ->
             Log_buffer.push line
       in
