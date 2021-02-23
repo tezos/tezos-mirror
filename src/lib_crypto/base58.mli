@@ -55,6 +55,8 @@ module Prefix : sig
 
   val cryptobox_public_key_hash : string
 
+  val baker_hash : string
+
   val ed25519_seed : string
 
   val ed25519_public_key : string

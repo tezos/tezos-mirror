@@ -382,6 +382,8 @@ module Prefix = struct
   let cryptobox_public_key_hash = "\153\103" (* id(30) *)
 
   (* 32 *)
+  let baker_hash = "\003\056\226" (* SG1(36) *)
+
   let ed25519_seed = "\013\015\058\007" (* edsk(54) *)
 
   let ed25519_public_key = "\013\015\037\217" (* edpk(54) *)
