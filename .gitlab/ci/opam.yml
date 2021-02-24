@@ -76,11 +76,6 @@ opam:staTz:
   variables:
     package: staTz
 
-opam:tezos-007-PsDELPH1-test-helpers:
-  extends: .opam_template
-  variables:
-    package: tezos-007-PsDELPH1-test-helpers
-
 opam:tezos-008-PtEdo2Zk-test-helpers:
   extends: .opam_template
   variables:
@@ -680,11 +675,6 @@ opam:tezos-protocol-007-PsDELPH1-parameters:
   extends: .opam_template
   variables:
     package: tezos-protocol-007-PsDELPH1-parameters
-
-opam:tezos-protocol-007-PsDELPH1-tests:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-007-PsDELPH1-tests
 
 opam:tezos-protocol-008-PtEdo2Zk:
   extends: .opam_template
