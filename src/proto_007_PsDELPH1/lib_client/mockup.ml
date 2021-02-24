@@ -374,9 +374,17 @@ end
 
 let initial_context (header : Block_header.shell_header)
     (params : mockup_protocol_parameters) =
+  let bootstrap_accounts =
+    (* Required because of 0-balance baker accounts introduced since
+       Baking Accounts *)
+    List.filter
+      (fun (account : Protocol.Parameters_repr.bootstrap_account) ->
+        Protocol.Tez_repr.(account.amount <> zero))
+      params.bootstrap_accounts
+  in
   let parameters =
     Default_parameters.parameters_of_constants
-      ~bootstrap_accounts:params.bootstrap_accounts
+      ~bootstrap_accounts
       ~bootstrap_contracts:params.bootstrap_contracts
       ~with_commitments:false
       params.constants
