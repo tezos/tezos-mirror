@@ -24,6 +24,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Invoice a contract at a given address with a given amount. Returns the
+    updated context and a  balance update receipt (singleton list). The address
+    must be a valid base58 hash, otherwise this is no-op and returns an empty
+    receipts list.
+
+    Do not fail if something goes wrong.
+*)
+let invoice_contract ctxt ~address ~amount_mutez =
+  match Tez_repr.of_mutez amount_mutez with
+  | None ->
+      Lwt.return (ctxt, [])
+  | Some amount -> (
+      Contract_repr.of_b58check address
+      >>?= (fun recipient ->
+             Contract_storage.credit ctxt recipient amount
+             >|=? fun ctxt ->
+             ( ctxt,
+               Receipt_repr.
+                 [(Contract recipient, Credited amount, Protocol_migration)] ))
+      >|= function Ok res -> res | Error _ -> (ctxt, []) )
+
 (* This is the genesis protocol: initialise the state *)
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block ~level ~timestamp ~fitness ctxt
@@ -59,7 +80,11 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
          protocol - see [[prepare]] function below. Any balance updates attached
          in the migration should use the [[Receipt_repr.Migration]] constructor.
       *)
-      let balance_updates = [] in
+      invoice_contract
+        ctxt
+        ~address:"tz1abmz7jiCV2GH2u81LRrGgAFFgvQgiDiaf"
+        ~amount_mutez:100_000_000L
+      >>= fun (ctxt, balance_updates) ->
       Storage.Pending_migration_balance_updates.init ctxt balance_updates
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =

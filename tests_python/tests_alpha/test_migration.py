@@ -66,7 +66,14 @@ ALPHA_DEPOSIT_RECEIPTS = [
         "origin": "block",
     },
 ]
-MIGRATION_RECEIPTS: List[object] = []
+MIGRATION_RECEIPTS: List[object] = [
+    {
+        "kind": "contract",
+        "contract": 'tz1abmz7jiCV2GH2u81LRrGgAFFgvQgiDiaf',
+        "change": "100000000",
+        "origin": "migration",
+    },
+]
 
 # configure user-activate-upgrade at MIGRATION_LEVEL to test migration
 NODE_CONFIG = {
