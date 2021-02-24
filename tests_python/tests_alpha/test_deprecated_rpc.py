@@ -6,8 +6,8 @@ import pytest
 
 from tools import constants, paths
 
-# This test check that the deprecated RPC in protocol alpha works as in delphi.
-# This test can be removed after the activation of the protocol 008 that will
+# This test check that the deprecated RPC in protocol alpha works as in edo.
+# This test can be removed after the activation of the protocol 009 that will
 # contains the deprecated RPC or after the removal of the deprecated RPC in a
 # futur protocol. To do that it runs the same test twice, first with delphi
 # activated then with alpha activated.
@@ -24,8 +24,8 @@ BAKE_ARGS = [
     '512',
     '--minimal-timestamp',
 ]
-PROTO_A = constants.DELPHI
-PROTO_A_DAEMON = constants.DELPHI_DAEMON
+PROTO_A = constants.EDO
+PROTO_A_DAEMON = constants.EDO_DAEMON
 PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
 
 PROTO_A_PARAMETERS_FILE = (

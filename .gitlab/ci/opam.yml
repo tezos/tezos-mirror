@@ -96,16 +96,6 @@ opam:tezos-009-PsFLoren-test-helpers:
   variables:
     package: tezos-009-PsFLoren-test-helpers
 
-opam:tezos-accuser-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-007-PsDELPH1
-
-opam:tezos-accuser-007-PsDELPH1-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-accuser-007-PsDELPH1-commands
-
 opam:tezos-accuser-008-PtEdo2Zk:
   extends: .opam_template
   variables:
@@ -151,11 +141,6 @@ opam:tezos-alpha-test-helpers:
   variables:
     package: tezos-alpha-test-helpers
 
-opam:tezos-baker-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-baker-007-PsDELPH1
-
 opam:tezos-baker-008-PtEdo2Zk:
   extends: .opam_template
   variables:
@@ -175,16 +160,6 @@ opam:tezos-baker-alpha:
   extends: .opam_template
   variables:
     package: tezos-baker-alpha
-
-opam:tezos-baking-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-007-PsDELPH1
-
-opam:tezos-baking-007-PsDELPH1-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-baking-007-PsDELPH1-commands
 
 opam:tezos-baking-008-PtEdo2Zk:
   extends: .opam_template
@@ -545,16 +520,6 @@ opam:tezos-embedded-protocol-genesis-carthagenet:
   extends: .opam_template
   variables:
     package: tezos-embedded-protocol-genesis-carthagenet
-
-opam:tezos-endorser-007-PsDELPH1:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-007-PsDELPH1
-
-opam:tezos-endorser-007-PsDELPH1-commands:
-  extends: .opam_template
-  variables:
-    package: tezos-endorser-007-PsDELPH1-commands
 
 opam:tezos-endorser-008-PtEdo2Zk:
   extends: .opam_template

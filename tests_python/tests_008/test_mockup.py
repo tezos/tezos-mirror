@@ -673,11 +673,7 @@ def test_transfer_rpc(mockup_client: Client):
 
 @pytest.mark.parametrize(
     'protos',
-    [
-        (proto1, proto2)
-        for proto1 in [protocol.HASH, protocol.PREV_HASH]
-        for proto2 in [protocol.HASH, protocol.PREV_HASH, ""]
-    ],
+    [(protocol.HASH, proto2) for proto2 in [protocol.HASH, ""]],
 )
 @pytest.mark.parametrize(
     'command',

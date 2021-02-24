@@ -67,7 +67,6 @@ integration:sandboxes:acc-endorsement:
 integration:sandboxes:u-a-u:
   extends: .integration_template
   script:
-    - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_active
     - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_next
     - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_next_ba
     - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_alpha
@@ -80,7 +79,6 @@ integration:sandboxes:u-a-u:
 integration:sandboxes:daemons-upgrade:
   extends: .integration_template
   script:
-    - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_active
     - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_next
     - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_next_ba
     - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_alpha
@@ -119,96 +117,6 @@ integration:sandboxes:daemons-upgrade:
 
 # this section is updated using the script scripts/update_integration_test.sh
 ##BEGIN_INTEGRATION_PYTHON##
-integration:007_fast:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007 -m "not slow" -s --log-dir=tmp 2>&1 | tee tmp/007_fast.out | tail
-  stage: test
-
-integration:007_baker_endorser:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_baker_endorser.py -s --log-dir=tmp 2>&1 | tee tmp/007_baker_endorser.out | tail
-  stage: test
-
-integration:007_bootstrap:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_bootstrap.py -s --log-dir=tmp 2>&1 | tee tmp/007_bootstrap.out | tail
-  stage: test
-
-integration:007_contract:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_contract.py -s --log-dir=tmp 2>&1 | tee tmp/007_contract.out | tail
-  stage: test
-
-integration:007_contract_annotations:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_contract_annotations.py -s --log-dir=tmp 2>&1 | tee tmp/007_contract_annotations.out | tail
-  stage: test
-
-integration:007_contract_macros:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_contract_macros.py -s --log-dir=tmp 2>&1 | tee tmp/007_contract_macros.out | tail
-  stage: test
-
-integration:007_contract_onchain_opcodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_contract_onchain_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/007_contract_onchain_opcodes.out | tail
-  stage: test
-
-integration:007_contract_opcodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_contract_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/007_contract_opcodes.out | tail
-  stage: test
-
-integration:007_forge_block:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_forge_block.py -s --log-dir=tmp 2>&1 | tee tmp/007_forge_block.out | tail
-  stage: test
-
-integration:007_many_bakers:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_many_bakers.py -s --log-dir=tmp 2>&1 | tee tmp/007_many_bakers.out | tail
-  stage: test
-
-integration:007_many_nodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_many_nodes.py -s --log-dir=tmp 2>&1 | tee tmp/007_many_nodes.out | tail
-  stage: test
-
-integration:007_mempool:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_mempool.py -s --log-dir=tmp 2>&1 | tee tmp/007_mempool.out | tail
-  stage: test
-
-integration:007_multinode_snapshot:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_multinode_snapshot.py -s --log-dir=tmp 2>&1 | tee tmp/007_multinode_snapshot.out | tail
-  stage: test
-
-integration:007_multinode_storage_reconstruction:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_multinode_storage_reconstruction.py -s --log-dir=tmp 2>&1 | tee tmp/007_multinode_storage_reconstruction.out | tail
-  stage: test
-
-integration:007_rpc:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_007/test_rpc.py -s --log-dir=tmp 2>&1 | tee tmp/007_rpc.out | tail
-  stage: test
-
 integration:008_fast:
   extends: .integration_python_template
   script:
@@ -299,12 +207,6 @@ integration:008_rpc:
     - poetry run pytest tests_008/test_rpc.py -s --log-dir=tmp 2>&1 | tee tmp/008_rpc.out | tail
   stage: test
 
-integration:008_voting_full:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest tests_008/test_voting_full.py -s --log-dir=tmp 2>&1 | tee tmp/008_voting_full.out | tail
-  stage: test
-
 integration:009_fast:
   extends: .integration_python_template
   script:
@@ -357,6 +259,12 @@ integration:009_contract_opcodes:
   extends: .integration_python_template
   script:
     - poetry run pytest tests_009/test_contract_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/009_contract_opcodes.out | tail
+  stage: test
+
+integration:009_deprecated_rpc:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_deprecated_rpc.py -s --log-dir=tmp 2>&1 | tee tmp/009_deprecated_rpc.out | tail
   stage: test
 
 integration:009_forge_block:

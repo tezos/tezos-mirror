@@ -13,13 +13,11 @@ ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 FLOR_BA_LONG  = PsFLorBArSaXjuy9oP76Qv1v2FRYnUs7TFtteK5GkRBC24JvbdE
 FLORENCE_LONG = PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
 EDO_LONG      = PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
-DELPHI_LONG   = PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
 
 ALPHA_SHORT    = alpha
 FLOR_BA_SHORT  = 009-PsFLorBA
 FLORENCE_SHORT = 009-PsFLoren
 EDO_SHORT      = 008-PtEdo2Zk
-DELPHI_SHORT   = 007-PsDELPH1
 
 SCRIPTSDIR		= scripts
 CHECKXREFS		= $(SCRIPTSDIR)/check_proto_xrefs.py
@@ -107,7 +105,7 @@ $(DOCGENDIR)/rpc_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
-	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 008/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe 008 > 008/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe 009 > 009/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe 009_BA > 009_BA/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe alpha > alpha/rpc.rst

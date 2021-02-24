@@ -80,51 +80,6 @@ index d75b3f2b5f..730a6a9e2f 100644
   (modules Main_native))
  
  (executable
-diff --git a/src/proto_007_PsDELPH1/bin_accuser/dune b/src/proto_007_PsDELPH1/bin_accuser/dune
-index 8fe05cdc3e..dee6277ee2 100644
---- a/src/proto_007_PsDELPH1/bin_accuser/dune
-+++ b/src/proto_007_PsDELPH1/bin_accuser/dune
-@@ -10,7 +10,9 @@
-                    -open Tezos_client_commands
-                    -open Tezos_baking_007_PsDELPH1_commands
-                    -open Tezos_stdlib_unix
--                   -open Tezos_client_base_unix)))
-+                   -open Tezos_client_base_unix
-+                   -ccopt -static
-+                   -cclib "-lusb-1.0 -lhidapi-libusb -ludev")))
- 
- (rule
-  (alias runtest_lint)
-diff --git a/src/proto_007_PsDELPH1/bin_baker/dune b/src/proto_007_PsDELPH1/bin_baker/dune
-index 8b39572e37..7dd5146ddc 100644
---- a/src/proto_007_PsDELPH1/bin_baker/dune
-+++ b/src/proto_007_PsDELPH1/bin_baker/dune
-@@ -10,7 +10,9 @@
-                    -open Tezos_client_commands
-                    -open Tezos_baking_007_PsDELPH1_commands
-                    -open Tezos_stdlib_unix
--                   -open Tezos_client_base_unix)))
-+                   -open Tezos_client_base_unix
-+                   -ccopt -static
-+                   -cclib "-lusb-1.0 -lhidapi-libusb -ludev")))
- 
- (rule
-  (alias runtest_lint)
-diff --git a/src/proto_007_PsDELPH1/bin_endorser/dune b/src/proto_007_PsDELPH1/bin_endorser/dune
-index 049bd25a20..cfded75264 100644
---- a/src/proto_007_PsDELPH1/bin_endorser/dune
-+++ b/src/proto_007_PsDELPH1/bin_endorser/dune
-@@ -10,7 +10,9 @@
-                    -open Tezos_client_commands
-                    -open Tezos_baking_007_PsDELPH1_commands
-                    -open Tezos_stdlib_unix
--                   -open Tezos_client_base_unix)))
-+                   -open Tezos_client_base_unix
-+                   -ccopt -static
-+                   -cclib "-lusb-1.0 -lhidapi-libusb -ludev")))
- 
- (rule
-  (alias runtest_lint)
 diff --git a/src/proto_008_PtEdo2Zk/bin_accuser/dune b/src/proto_008_PtEdo2Zk/bin_accuser/dune
 index acf83c90f1..c6a402e786 100644
 --- a/src/proto_008_PtEdo2Zk/bin_accuser/dune
