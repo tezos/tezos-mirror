@@ -28,14 +28,16 @@ Their OpenAPI specification can be found at:
 - `openapi/rpc-openapi.json (version 8.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
 Edo RPCs
--------------
+--------
 
-The OpenAPI specification for RPCs which are specific
-to the Edo protocol can be found at:
+The OpenAPI specification for RPCs which are specific to the Edo
+protocol can be found at:
 
 - `openapi/edo-openapi.json (version 8.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/edo-openapi.json>`_
 
-The OpenAPI specification for RPCs which are related to the mempool and specific to the Edo protocol can be found at:
+The OpenAPI specification for RPCs which are related to the mempool
+and specific to the Edo protocol can be found at:
+
 - `openapi/edo-mempool-openapi.json (version 8.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/edo-mempool-openapi.json>`_
 
 How to Generate

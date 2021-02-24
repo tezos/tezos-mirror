@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# This script launches a sandbox node, activates Delphi, gets the RPC descriptions
+# This script launches a sandbox node, activates Edo, gets the RPC descriptions
 # as JSON, and converts this JSON into an OpenAPI specification.
 # You must compile the node and the client before running it.
 #
