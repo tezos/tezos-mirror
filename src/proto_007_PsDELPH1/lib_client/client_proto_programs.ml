@@ -27,7 +27,6 @@
 open Protocol
 open Alpha_context
 open Tezos_micheline
-open Michelson_v1_printer
 
 module Program = Client_aliases.Alias (struct
   type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
@@ -54,94 +53,6 @@ let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
        ~parsed)
     errs
   >>= fun () -> cctxt#error "error running script" >>= fun () -> return_unit
-
-let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
-  function
-  | Ok (storage, operations, maybe_diff) ->
-      cctxt#message
-        "@[<v 0>@[<v 2>storage@,\
-         %a@]@,\
-         @[<v 2>emitted operations@,\
-         %a@]@,\
-         @[<v 2>big_map diff@,\
-         %a@]@]@."
-        print_expr
-        storage
-        (Format.pp_print_list Operation_result.pp_internal_operation)
-        operations
-        (fun ppf -> function None -> () | Some diff ->
-              print_big_map_diff ppf diff)
-        maybe_diff
-      >>= fun () -> return_unit
-  | Error errs ->
-      print_errors cctxt errs ~show_source ~parsed
-
-let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
-  function
-  | Ok (storage, operations, trace, maybe_big_map_diff) ->
-      cctxt#message
-        "@[<v 0>@[<v 2>storage@,\
-         %a@]@,\
-         @[<v 2>emitted operations@,\
-         %a@]@,\
-         @[<v 2>big_map diff@,\
-         %a@]@,\
-         @[<v 2>trace@,\
-         %a@]@]@."
-        print_expr
-        storage
-        (Format.pp_print_list Operation_result.pp_internal_operation)
-        operations
-        (fun ppf -> function None -> () | Some diff ->
-              print_big_map_diff ppf diff)
-        maybe_big_map_diff
-        print_execution_trace
-        trace
-      >>= fun () -> return_unit
-  | Error errs ->
-      print_errors cctxt errs ~show_source ~parsed
-
-let run (cctxt : #Protocol_client_context.rpc_context)
-    ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents)
-    ~(program : Michelson_v1_parser.parsed)
-    ~(storage : Michelson_v1_parser.parsed)
-    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas
-    ?(entrypoint = "default") () =
-  Chain_services.chain_id cctxt ~chain ()
-  >>=? fun chain_id ->
-  Alpha_services.Helpers.Scripts.run_code
-    cctxt
-    (chain, block)
-    program.expanded
-    ( storage.expanded,
-      input.expanded,
-      amount,
-      chain_id,
-      source,
-      payer,
-      gas,
-      entrypoint )
-
-let trace (cctxt : #Protocol_client_context.rpc_context)
-    ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents)
-    ~(program : Michelson_v1_parser.parsed)
-    ~(storage : Michelson_v1_parser.parsed)
-    ~(input : Michelson_v1_parser.parsed) ?source ?payer ?gas
-    ?(entrypoint = "default") () =
-  Chain_services.chain_id cctxt ~chain ()
-  >>=? fun chain_id ->
-  Alpha_services.Helpers.Scripts.trace_code
-    cctxt
-    (chain, block)
-    program.expanded
-    ( storage.expanded,
-      input.expanded,
-      amount,
-      chain_id,
-      source,
-      payer,
-      gas,
-      entrypoint )
 
 let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas
     ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) ()
@@ -230,23 +141,6 @@ let list_entrypoints cctxt ~(chain : Chain_services.chain) ~block
 let print_entrypoints_list (cctxt : #Client_context.printer) ~emacs
     ?script_name ~show_source ~parsed ty =
   Michelson_v1_entrypoints.print_entrypoints_list
-    cctxt
-    ~emacs
-    ?script_name
-    ~on_errors:(print_errors cctxt ~show_source ~parsed)
-    ty
-
-let list_unreachables cctxt ~(chain : Chain_services.chain) ~block
-    (program : Michelson_v1_parser.parsed) =
-  Michelson_v1_entrypoints.list_unreachables
-    cctxt
-    ~chain
-    ~block
-    program.expanded
-
-let print_unreachables (cctxt : #Client_context.printer) ~emacs ?script_name
-    ~show_source ~parsed ty =
-  Michelson_v1_entrypoints.print_unreachables
     cctxt
     ~emacs
     ?script_name

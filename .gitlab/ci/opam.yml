@@ -671,11 +671,6 @@ opam:tezos-protocol-007-PsDELPH1:
   variables:
     package: tezos-protocol-007-PsDELPH1
 
-opam:tezos-protocol-007-PsDELPH1-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-007-PsDELPH1-parameters
-
 opam:tezos-protocol-008-PtEdo2Zk:
   extends: .opam_template
   variables:
