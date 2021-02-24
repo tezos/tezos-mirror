@@ -258,8 +258,8 @@ For more advanced key management we offer :ref:`ledger support
 Get Free Tez
 ~~~~~~~~~~~~
 
-To test the networks and help users get familiar with the
-system, on :doc:`test networks<test_networks>` you can obtain free tez from a
+To test the networks and help users get familiar with the system, on
+:doc:`test networks<test_networks>` you can obtain free tez from a
 `faucet <https://faucet.tzalpha.net>`__.
 
 This will provide a wallet in the form of a JSON file
@@ -268,18 +268,18 @@ command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
-If you use the ``tezos-docker-manager.sh`` script (renamed as ``delphinet.sh``
-to run the Delphinet test network for instance), you should prefix the file
+If you use the ``tezos-docker-manager.sh`` script (renamed as ``edo2net.sh``
+to run the Edo2net test network for instance), you should prefix the file
 with ``container:`` in order to copy it into the docker image:
-``./delphinet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"``
+``./edo2net.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"``
 
 Let's check the balance of the new account with::
 
     tezos-client get balance for alice
 
-Please preserve the JSON file. It will be necessary in order to reactivate the wallet
-when migrating between test networks, e.g., from one protocol to the next, 
-or in the event the test network is reset.
+Please preserve the JSON file. It will be necessary in order to
+reactivate the wallet when migrating between test networks, e.g., from
+one protocol to the next, or in the event the test network is reset.
 
 Please drink carefully and don't abuse the faucet: it only contains
 30,000 wallets for a total amount of ꜩ760,000,000.

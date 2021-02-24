@@ -5,7 +5,6 @@
             tezos-stdlib-unix
             tezos-shell
             tezos-protocol-updater
-            tezos-embedded-protocol-007-PsDELPH1
             tezos-embedded-protocol-008-PtEdo2Zk
             tezos-embedded-protocol-009-PsFLoren
             tezos-embedded-protocol-009-PsFLorBA

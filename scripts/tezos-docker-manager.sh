@@ -702,7 +702,7 @@ command="$1"
 if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 
 case $(basename "$0") in
-    edonet.sh)
+    edo2net.sh)
         docker_base_dir="$HOME/.tezos-edo2net"
         docker_image=tezos/tezos:master
         docker_compose_base_name=edo2net

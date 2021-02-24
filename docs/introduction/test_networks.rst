@@ -13,7 +13,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Delphi for Delphinet), the protocol
+network is activated (such as Edo for Edo2net), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -28,46 +28,19 @@ You can obtain the key to these accounts from a faucet to claim the funds.
 All networks share the same faucet: https://faucet.tzalpha.net/.
 The keys obtained from this faucet can be used in all test networks.
 
-Delphinet
----------
-
-- Built-in network alias: ``delphinet`` (see :ref:`builtin_networks`)
-
-  * Available since version 7.4
-
-- Run Docker image: ``wget -O delphinet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
-
-Delphinet is a test network running the Delphi protocol.
-Delphinet will run until Delphi is either rejected or replaced by another protocol on Mainnet.
-
-On Delphinet, the following constants differ from Mainnet:
-
-- ``preserved_cycles`` is 3 instead of 5;
-- ``blocks_per_cycle`` is 2048 instead of 4096;
-- ``blocks_per_voting_period`` is 2048 instead of 32768;
-- ``time_between_blocks`` is ``[ 30, 20 ]`` instead of ``[ 60, 40 ]``;
-- ``test_chain_duration`` is 61440 instead of 1966080;
-- ``delay_per_missing_endorsement`` is 4 instead of 8.
-
-This results in a faster chain than Mainnet:
-
-- 2 blocks per minute;
-- a cycle should last about 17 hours;
-- a voting period lasts 1 cycle and should thus also last about 17 hours.
-
-Edonet
+Edo2net
 ------
 
-- Built-in network alias: ``edonet`` (see :ref:`builtin_networks`)
+- Built-in network alias: ``edo2net`` (see :ref:`builtin_networks`)
 
-  * Available since version 8.0~rc2
+  * Available since version 8.3
 
-- Run Docker image: ``wget -O edonet.sh https://gitlab.com/tezos/tezos/raw/v8.0-rc2/scripts/tezos-docker-manager.sh``
+- Run Docker image: ``wget -O edo2net.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
 
-Edonet is a test network running the Edo protocol.
-Edonet will run until Edo is either rejected or replaced by another protocol on Mainnet.
+Edo2net is a test network running the Edo2Zk protocol.
+Edo2net will run until Edo is replaced by another protocol on Mainnet.
 
-On Edonet, the following constants differ from Mainnet:
+On Edo2net, the following constants differ from Mainnet:
 
 - ``preserved_cycles`` is 3 instead of 5;
 - ``blocks_per_cycle`` is 2048 instead of 4096;
@@ -94,6 +67,13 @@ P is activated, the previous test network will end and P-net will continue on it
 
 Old Networks
 ============
+
+Delphinet
+---------
+
+Delphinet was a test network running the Delphi protocol.
+Following the activation of the Edo protocol replacing Delphi on Mainnet,
+Delphinet stopped being maintained on Febuary 28th, 2021.
 
 Dalphanet
 ---------

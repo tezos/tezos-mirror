@@ -36,6 +36,12 @@ be documented here either.
 
 - Add a new RPC for Alpha: `helpers/scripts/normalize_type`.
 
+- Replace Edonet by Edo2net in built-in network configuration.
+  The alias to give to `--network` is now `edo2net`.
+
+- Removed the built-in configuration for Delphinet. You can no longer
+  configure your node with `--network delphinet`.
+
 ## Client
 
 - Fixed the return code of errors in the client calls to be non-zero.
