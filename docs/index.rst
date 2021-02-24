@@ -115,6 +115,7 @@ in the :ref:`introduction <howtoget>`.
    user/light
    user/proxy-server
    user/multisig
+   user/fa12
    user/various
 
 .. toctree::
