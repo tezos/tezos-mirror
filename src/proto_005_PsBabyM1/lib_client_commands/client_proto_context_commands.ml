@@ -205,7 +205,7 @@ let commands () =
               let {Michelson_v1_parser.source; _} =
                 Michelson_v1_printer.unparse_toplevel code
               in
-              cctxt#answer "%a" Format.pp_print_text source >>= return ));
+              cctxt#answer "%s" source >>= return ));
     command
       ~group
       ~desc:"Get the type of an entrypoint  of a contract."
