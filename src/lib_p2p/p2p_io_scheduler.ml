@@ -727,8 +727,7 @@ let close ?timeout conn =
      - closing read/write pipes
      - closing underlying socket (p2p_fd)
 
-    However we do not wait for all this to happen. We just wait for
-     the cancellation to start. *)
+     We wait the cancellation to be finished.*)
   ( match timeout with
   | None -> (
       Lwt_canceler.when_canceled conn.canceler
