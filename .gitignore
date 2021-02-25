@@ -65,3 +65,6 @@ __pycache__
 # .venv directories are created by poetry if the option in-project is set to true.
 **/.venv
 **/.mypy_cache/
+
+# Output of the update_opam_repo script
+opam_repo.patch
