@@ -926,7 +926,7 @@ let () =
     module Protocol = Protocol_client_context.Lifted_protocol
     module Block_services = Protocol_client_context.Alpha_block_services
 
-    let directory = Tezos_protocol_plugin_alpha.Plugin.RPC.rpc_services
+    let directory = Plugin.RPC.rpc_services
 
     let init = mem_init
 

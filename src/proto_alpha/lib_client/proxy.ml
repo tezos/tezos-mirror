@@ -131,7 +131,7 @@ let () =
 
     let protocol_hash = Protocol.hash
 
-    let directory = Tezos_protocol_plugin_alpha.Plugin.RPC.rpc_services
+    let directory = Plugin.RPC.rpc_services
 
     let hash = Protocol_client_context.Alpha_block_services.hash
 

@@ -23,5 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Prevalidator_filters.register (module Tezos_protocol_plugin_alpha.Plugin)
+let () = Prevalidator_filters.register (module Plugin)
