@@ -185,7 +185,12 @@ module type TRACE = sig
                | Ok handle -> Ok handle
                | Error error -> Error (cons error trace)
       ]
-  *)
+
+      When you are within the error monad itself, you should build traces using
+      the [record_trace], [trace], [record_trace_eval] and [trace_eval]
+      functions directly. You should rarely need to build traces manually using
+      [cons]. This here function can be useful in the case where you are at the
+      interface of the error monad. *)
   val cons : 'error -> 'error trace -> 'error trace
 
   (** [cons_list error errors] is the sequential composition of all the errors
@@ -199,7 +204,12 @@ module type TRACE = sig
    | [] -> Ok () (* or something else depending on the context *)
    | error :: errors -> Error (cons_list error errors)
 ]}
-  *)
+
+      When you are within the error monad itself, you should build traces using
+      the [record_trace], [trace], [record_trace_eval] and [trace_eval]
+      functions directly. You should rarely need to build traces manually using
+      [cons_list]. This here function can be useful in the case where you are at
+      the interface of the error monad. *)
   val cons_list : 'error -> 'error list -> 'error trace
 
   (** [conp t1 t2] (construct parallel) construct a parallel trace. This is for
@@ -214,7 +224,11 @@ module type TRACE = sig
          | Error trace, Ok _ | Ok _, Error trace -> Error trace
          | Error trace1, Error trace2 -> Error (conp trace1 trace2)
       ]
-  *)
+
+      When you are within the error monad itself, you should rarely need to
+      build traces manually using [conp]. The result-concurrent traversors will
+      return parallel traces when appropriate, and so will [join_e], [join_ep],
+      [both_e], [both_ep], [all_e] and [all_ep]. *)
   val conp : 'error trace -> 'error trace -> 'error trace
 
   (** [conp_list trace traces] is the parallel composition of all the traces
@@ -228,7 +242,11 @@ module type TRACE = sig
    | [] -> Ok () (* or something else depending on the context *)
    | trace :: traces -> Error (conp_list trace traces)
 ]}
-  *)
+
+      When you are within the error monad itself, you should rarely need to
+      build traces manually using [conp]. The result-concurrent traversors will
+      return parallel traces when appropriate, and so will [join_e], [join_ep],
+      [both_e], [both_ep], [all_e] and [all_ep]. *)
   val conp_list : 'err trace -> 'err trace list -> 'err trace
 
   (** [pp_print] pretty-prints a trace of errors *)
