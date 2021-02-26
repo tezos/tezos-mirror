@@ -71,6 +71,17 @@ xrefscheck:
 	$(CHECKXREFS) 007
 	$(CHECKXREFS) -l 008
 
+scriptsindoccheck:
+	introduction/test_howtoget.sh install-bin-bionic
+	introduction/test_howtoget.sh install-bin-focal
+	introduction/test_howtoget.sh install-bin-fedora31
+	introduction/test_howtoget.sh install-bin-fedora32
+	introduction/test_howtoget.sh install-opam-scratch
+	introduction/test_howtoget.sh install-opam-bionic
+	introduction/test_howtoget.sh install-opam-focal
+	introduction/test_howtoget.sh compile-sources-buster
+	#introduction/test_howtoget.sh use-docker # returns 1 (and eats alot of disk)
+
 api/errors.rst: $(DOCERRORDIR)/error_doc.ml
 	@cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe
 	../_build/default/docs/$(DOCERRORDIR)/error_doc.exe > api/errors.rst

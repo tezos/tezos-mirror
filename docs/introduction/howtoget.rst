@@ -50,10 +50,12 @@ Windows, OS X, and Linux.
 The same script can be used to run Tezos on Mainnet, on Delphinet, or on other network: it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Tezos on the Delphinet test network with the latest release::
+For example, to run Tezos on the Delphinet test network with the latest release:
 
-    wget -O delphinet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
-    chmod +x delphinet.sh
+.. literalinclude:: use-docker-delphinet.sh
+   :language: shell
+   :start-after: [get delphinet]
+   :end-before: [start delphinet]
 
 Alternatively, to run on Mainnet::
 
@@ -61,9 +63,11 @@ Alternatively, to run on Mainnet::
     chmod +x mainnet.sh
 
 In the following we assume you are running on the Delphinet test network.
-You are now one step away from a working node::
+You are now one step away from a working node:
 
-    ./delphinet.sh start
+.. literalinclude:: use-docker-delphinet.sh
+   :language: shell
+   :start-after: [start delphinet]
 
 This will download the right Docker image for your chosen network, launch 3
 Docker containers running the node, the baker and the endorser. Keep in mind
@@ -115,12 +119,9 @@ Ubuntu Launchpad PPA with Tezos packages
 If you're using Ubuntu, you can install packages with Tezos binaries from the Launchpad PPA.
 Currently it supports Focal and Bionic versions. In order to do that run the following commands:
 
-::
-
-   sudo add-apt-repository ppa:serokell/tezos && sudo apt-get update
-   sudo apt-get install tezos-client
-   sudo apt-get install tezos-node
-   sudo apt-get install tezos-baker-007-psdelph1
+.. literalinclude:: install-bin-ubuntu.sh
+   :language: shell
+   :start-after: [install tezos]
 
 Fedora Copr repository with Tezos packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -128,12 +129,10 @@ Fedora Copr repository with Tezos packages
 If you're using Fedora, you can install packages with Tezos binaries from the Copr repository.
 Currently it supports Fedora 32 and 31. In order to do that run the following commands:
 
-::
+.. literalinclude:: install-bin-fedora.sh
+   :language: shell
+   :start-after: [install tezos]
 
-   dnf copr enable @Serokell/Tezos && dnf update
-   dnf install tezos-client
-   dnf install tezos-node
-   dnf install tezos-baker-007-PsDELPH1
 
 .. _build_from_sources:
 .. _building_with_opam:
@@ -187,10 +186,10 @@ release) directly as OPAM packages.
 The binaries need a specific version of the OCaml compiler (currently
 4.09.1). To get an environment with it do:
 
-::
-
-   opam switch create for_tezos 4.09.1
-   eval $(opam env)
+.. literalinclude:: install-opam.sh
+  :language: shell
+  :start-after: [install ocaml compiler]
+  :end-before: [get system dependencies]
 
 .. note::
 
@@ -202,16 +201,23 @@ The binaries need a specific version of the OCaml compiler (currently
 
 In order to get the system dependencies of the binaries, do:
 
-::
+.. literalinclude:: install-opam.sh
+  :language: shell
+  :start-after: [get system dependencies]
+  :end-before: [install tezos]
 
-   opam install depext
-   opam depext tezos
+.. note::
+
+   If an OPAM commands times out, you may allocate it more time for its
+   computation by setting the OPAMSOLVERTIMEOUT environment variable (to a
+   number of seconds), e.g. by adding ``OPAMSOLVERTIMEOUT=1200`` before the
+   command. If no timeout occurs, you may omit this part.
 
 Now, install all the binaries by:
 
-::
-
-   opam install tezos
+.. literalinclude:: install-opam.sh
+  :language: shell
+  :start-after: [install tezos]
 
 You can be more specific and only ``opam install tezos-node``, ``opam
 install tezos-endorser-006-PsDelph1``, ... In that case, it is enough to install the system dependencies of this package only by running ``opam depext tezos-node`` for example instead of ``opam depext tezos``.
@@ -263,33 +269,13 @@ sources using the provided makefile.
 
 **TL;DR**: From a fresh Debian Buster x86_64, you typically want to do:
 
-.. code-block:: bash
+.. literalinclude:: compile-sources.sh
+  :language: shell
+  :start-after: [install packages]
+  :end-before: [test executable]
 
-   sudo apt install -y rsync git m4 build-essential patch unzip wget pkg-config libgmp-dev libev-dev libhidapi-dev libffi-dev opam jq
-   git clone https://gitlab.com/tezos/tezos.git
-   cd tezos
-   git checkout latest-release
-   opam init --bare
-   make build-deps
-   eval $(opam env)
-   make
-   export PATH=~/tezos:$PATH
-   source ./src/bin_client/bash-completion.sh
-   export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
 
 The following sections describe the individual steps above in more detail.
-
-Get the sources
-~~~~~~~~~~~~~~~
-
-Tezos ``git`` repository is hosted at `GitLab
-<https://gitlab.com/tezos/tezos/>`_. All development happens here. Do
-**not** use our `GitHub mirror <https://github.com/tezos/tezos>`_
-which we don't use anymore and only mirrors what happens on GitLab.
-
-Checkout the ``latest-release`` branch to use the latest release.
-Alternatively, you can checkout a specific version based on its tag.
-
 
 .. _setup_rust:
 
@@ -303,18 +289,22 @@ Starting from version 8.0, compiling Tezos requires the Rust compiler,
 version 1.44.0, and the Cargo package manager to be installed. You can use
 `rustup <https://rustup.rs/>`_ to install both. If you do not have ``rustup``,
 please avoid installing it from Snapcraft; you can rather follow the simple
-installation process shown below::
+installation process shown below:
 
-   wget https://sh.rustup.rs/rustup-init.sh
-   chmod +x rustup-init.sh
-   ./rustup-init.sh --profile minimal --default-toolchain 1.44.0 -y
+.. literalinclude:: compile-sources.sh
+  :language: shell
+  :start-after: [install rust]
+  :end-before: [source cargo]
 
 Once Rust is installed, note that your ``PATH`` environment variable
 (in ``.profile``) may be updated and you will need to restart your session
 so that changes can be taken into account. Alternatively, you can do it
-manually without restarting your session::
+manually without restarting your session:
 
-   source $HOME/.cargo/env
+.. literalinclude:: compile-sources.sh
+  :language: shell
+  :start-after: [source cargo]
+  :end-before: [get sources]
 
 Note that the command line above assumes that rustup
 installed Cargo in ``$HOME/.cargo``, but this may change depending on how
@@ -329,6 +319,17 @@ prompt you to install the Zcash parameter files. The easiest way is to
 download and run this script::
 
    https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh
+
+Get the sources
+~~~~~~~~~~~~~~~
+
+Tezos ``git`` repository is hosted at `GitLab
+<https://gitlab.com/tezos/tezos/>`_. All development happens here. Do
+**not** use our `GitHub mirror <https://github.com/tezos/tezos>`_
+which we don't use anymore and only mirrors what happens on GitLab.
+
+Checkout the ``latest-release`` branch to use the latest release.
+Alternatively, you can checkout a specific version based on its tag.
 
 Install Tezos dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -369,10 +370,12 @@ Compile
 ~~~~~~~
 
 Once the dependencies are installed we can update OPAM's environment to
-refer to the new switch and compile the project::
+refer to the new switch and compile the project:
 
-   eval $(opam env)
-   make
+.. literalinclude:: compile-sources.sh
+  :language: shell
+  :start-after: [compile sources]
+  :end-before: [optional setup]
 
 Lastly you can also add the Tezos binaries to your ``PATH`` variable,
 and after reading the Disclaimer a few
