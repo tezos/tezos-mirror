@@ -56,6 +56,8 @@ be documented here either.
 
 - Added wallet support for PVSS keys.
 
+- Added support for all protocol constants in Mockup mode
+
 ## Baker / Endorser / Accuser
 
 - Add `--version` flag
