@@ -27,8 +27,6 @@ does not support all protocols. At the time of writing it supports
 the following protocols:
 
 * ``ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im``
-* ``PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb``
-* ``PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb``
 * ``PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA``
 * ``ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK``
 
@@ -100,7 +98,7 @@ is doing differently, you may use three debug variables:
   a lot of such RPCs.
 
   This variable is dependent on the protocol being used. Replace ``PROTO``
-  by one of these values: ``genesis``, ``006-PsCARTHA``, or ``alpha``.
+  by one of these values: ``genesis``, or ``alpha``.
 * ``proxy_context`` shows low-level detail implementations of the client,
   you likely do not need it.
 
