@@ -30,18 +30,36 @@
 
     {2 Basics}
 
-    {!Lwt.return}, {!Lwt.bind} ({!(>>=)}), and {!Lwt.map} ({!(>|=)}) are the
-    return, bind, and map of the Lwt monad.
+    The three, tiered monads have each their full set of operators:
 
-    {!ok}, {!(>>?)}, {!(>|?)} are the return, bind, and map of the result monad.
-    In addition, {!error} is for failures within the result monad.
+    The Lwt monad:
+    {ul
+      {li {!Lwt.return} for return,}
+      {li {!Lwt.bind} or {!(>>=)} for bind, and}
+      {li {!Lwt.map} or {!(>|=)} for map.}
+    }
 
-    {!return}, {!(>>=?)}, {!(>|=?)} are the return, bind, and map of the
-    Lwt-result combined monad. In addition, {!fail} is for the failure within
-    the Lwt-result combined monad.
+    The result monad:
+    {ul
+      {li {!Result.ok} or {!ok} for return,}
+      {li {!Result.bind} or {!(>>?)} for bind, and}
+      {li {!Result.map} {!(>|?)} for map.}
+    }
+    In addition, {!Result.error} or {!error} is for failures within the result
+    monad.
+
+    The Lwt-result monad:
+    {ul
+      {li {!return} or {!Lwt.return_ok} for return,}
+      {li {!(>>=?)} for bind, and}
+      {li {!(>|=?)} for map.}
+    }
+    In addition, {!fail} is for the failure within the Lwt-result combined
+    monad.
 
     Note that future improvements are planned to (a) make those more uniform,
-    and (b) allow the opening of selected infix operators only.
+    (b) allow the opening of selected infix operators only, and (c) provide
+    [let*]-binds.
 
     {2 Preallocated values}
 
