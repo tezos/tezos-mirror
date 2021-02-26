@@ -339,6 +339,7 @@ module External_validator_process = struct
     stdin : Lwt_io.output_channel;
     stdout : Lwt_io.input_channel;
     canceler : Lwt_canceler.t;
+    clean_up_callback_id : Lwt_exit.clean_up_callback_id;
   }
 
   type process_status =
@@ -422,6 +423,12 @@ module External_validator_process = struct
      Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
      return (process, process_socket))
     >>=? fun (process, process_socket) ->
+    (* Register clean up callback to ensure that the validator process
+       will be terminated event if the node is brutally stopped. *)
+    let clean_up_callback_id =
+      Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+          Lwt.return (Stdlib.at_exit (fun () -> process#terminate)))
+    in
     let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
     let process_stdout = Lwt_io.of_fd ~mode:Input process_socket in
     Events.(emit validator_started process#pid)
@@ -439,7 +446,13 @@ module External_validator_process = struct
     in
     vp.validator_process <-
       Running
-        {process; stdin = process_stdin; stdout = process_stdout; canceler} ;
+        {
+          process;
+          stdin = process_stdin;
+          stdout = process_stdout;
+          canceler;
+          clean_up_callback_id;
+        } ;
     External_validation.send
       process_stdin
       Data_encoding.Variable.bytes
@@ -461,14 +474,18 @@ module External_validator_process = struct
   let send_request vp request result_encoding =
     ( match vp.validator_process with
     | Running
-        {process; stdin = process_stdin; stdout = process_stdout; canceler}
-      -> (
+        { process;
+          stdin = process_stdin;
+          stdout = process_stdout;
+          canceler;
+          clean_up_callback_id } -> (
       match process#state with
       | Running ->
           return (process, process_stdin, process_stdout)
       | Exited status ->
           Error_monad.cancel_with_exceptions canceler
           >>= fun () ->
+          Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
           vp.validator_process <- Uninitialized ;
           Events.(emit process_exited_abnormally status)
           >>= fun () -> start_process vp )
