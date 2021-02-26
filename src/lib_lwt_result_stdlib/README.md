@@ -56,6 +56,17 @@ The sources of Lwtreslib are organised as follow:
     - `bare/structs` contains the sources for of all the modules exported by
       `bare/`
 
+- `examples/traces/` contains multiple example implementation of traces. A trace
+  is a data-structure that holds multiple errors organised in a way that
+  reflects the way the errors happened. Specifically, errors can be stringed
+  together to represent that the control flow traversed multiple points, or they
+  can be held side-by-side to indicate that they happen in to simultaneously
+  evaluating promises.
+
+  The code in this directory is meant more as examples than fully-fledged
+  traces, but they can also be used for prototyping or as a basis for a more
+  complete trace implementation.
+
 - `traced/` contains the sources for a trace-enabled implementation of Lwtreslib
   that provides monadic combinators and collection traversals. This
   implementation provides all the functionality of `bare/` with added support
@@ -69,9 +80,5 @@ The sources of Lwtreslib are organised as follow:
       `bare/`. These modules are functorised over the implementation of a trace.
       The file `traced/structs/structs.ml` contains an all-in-one functor for
       instantiating all of the modules.
-
-- `traces/` contains multiple implementation of traces. These are meant more as
-  examples than fully-fledged traces, but they can also be used for prototyping
-  or as a basis for a more complete trace implementation.
 
 - `test/` contains code to test the library.
