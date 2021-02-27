@@ -125,6 +125,9 @@ do
     mv "$file" $(echo "$file" | sed s/alpha/${version}-${short_hash}/g)
 done
 
+# add this protocol to the immutable list
+printf \\n$long_hash >> ../../lib_protocol_compiler/final_protocol_versions
+
 dune exec ../../lib_protocol_compiler/replace.exe ../../lib_protocol_compiler/dune_protocol.template dune.inc ../../lib_protocol_compiler/final_protocol_versions ${version}_${short_hash}
 
 cd ../../..
