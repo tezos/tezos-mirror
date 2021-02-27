@@ -22,7 +22,7 @@ def client(sandbox):
     parameters["blocks_per_voting_period"] = 4
     parameters["blocks_per_cycle"] = BLOCKS_PER_CYCLE
     sandbox.add_node(0, params=constants.NODE_PARAMS)
-    utils.activate_alpha(sandbox.client(0), parameters)
+    protocol.activate(sandbox.client(0), parameters)
     yield sandbox.client(0)
 
 

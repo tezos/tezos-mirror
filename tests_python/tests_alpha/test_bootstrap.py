@@ -2,7 +2,7 @@ import time
 
 import pytest
 from launchers.sandbox import Sandbox
-from tools import constants, utils
+from tools import constants
 from . import protocol
 
 LOG_LEVEL = {"validator.chain": "debug", "validator.peer": "debug"}
@@ -43,7 +43,7 @@ class TestThresholdOne:
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        utils.activate_alpha(sandbox.client(0))
+        protocol.activate(sandbox.client(0))
         sandbox.add_baker(0, 'baker5', proto=protocol.DAEMON)
 
     def test_bootstrap(self, sandbox: Sandbox):
@@ -63,7 +63,7 @@ class TestThresholdOne:
 class TestThresholdTwo:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(0), log_levels=LOG_LEVEL)
-        utils.activate_alpha(sandbox.client(0))
+        protocol.activate(sandbox.client(0))
         sandbox.add_baker(0, 'baker5', proto=protocol.DAEMON)
 
     def test_add_nodes(self, sandbox: Sandbox):
@@ -93,7 +93,7 @@ class TestThresholdTwo:
 class TestStuck:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        utils.activate_alpha(sandbox.client(0))
+        protocol.activate(sandbox.client(0))
         sandbox.add_baker(0, 'baker5', proto=protocol.DAEMON)
 
     def test_kill_baker(self, sandbox: Sandbox):
@@ -127,7 +127,7 @@ class TestStuck:
 class TestSplitView:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        utils.activate_alpha(sandbox.client(0))
+        protocol.activate(sandbox.client(0))
         sandbox.add_node(
             1, params=params(), config_client=False, log_levels=LOG_LEVEL
         )
@@ -172,7 +172,7 @@ class TestManyNodesBootstrap:
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
         parameters = dict(protocol.PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
-        utils.activate_alpha(sandbox.client(0), parameters)
+        protocol.activate(sandbox.client(0), parameters)
         sandbox.add_baker(0, 'baker1', proto=protocol.DAEMON)
         sandbox.add_node(
             1, params=params(), log_levels=LOG_LEVEL, config_client=False

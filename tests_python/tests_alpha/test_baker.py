@@ -523,7 +523,7 @@ class TestResetBakerConsensusKey1:
         parameters = protocol.PARAMETERS
         parameters['blocks_per_cycle'] = BLOCKS_PER_CYCLE
         parameters['blocks_per_roll_snapshot'] = BLOCKS_PER_CYCLE
-        utils.activate_alpha(sandbox.client(0), parameters)
+        protocol.activate(sandbox.client(0), parameters)
         utils.synchronize(sandbox.all_clients())
         for i in range(1, NUM_NODES):
             utils.remember_baker_contracts(sandbox.client(i))
@@ -559,7 +559,7 @@ class TestResetBakerConsensusKey2:
         parameters = protocol.PARAMETERS
         parameters['blocks_per_cycle'] = BLOCKS_PER_CYCLE
         parameters['blocks_per_roll_snapshot'] = BLOCKS_PER_CYCLE
-        utils.activate_alpha(sandbox.client(0), parameters)
+        protocol.activate(sandbox.client(0), parameters)
         utils.synchronize(sandbox.all_clients())
         for i in range(1, NUM_NODES):
             utils.remember_baker_contracts(sandbox.client(i))

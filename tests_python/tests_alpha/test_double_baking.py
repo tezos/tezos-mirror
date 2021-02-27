@@ -18,7 +18,7 @@ class TestDoubleBaking:
     def test_init(self, sandbox):
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=PARAMS)
-        utils.activate_alpha(sandbox.client(0))
+        protocol.activate(sandbox.client(0))
         utils.synchronize(sandbox.all_clients())
         for i in range(1, NUM_NODES):
             utils.remember_baker_contracts(sandbox.client(i))
@@ -113,7 +113,7 @@ class TestDoubleBakingBeforeBakerKeyChange:
         parameters = protocol.PARAMETERS
         parameters['blocks_per_cycle'] = BLOCKS_PER_CYCLE
         parameters['blocks_per_roll_snapshot'] = BLOCKS_PER_CYCLE
-        utils.activate_alpha(sandbox.client(0), parameters)
+        protocol.activate(sandbox.client(0), parameters)
         utils.synchronize(sandbox.all_clients())
         for i in range(1, NUM_NODES):
             utils.remember_baker_contracts(sandbox.client(i))
@@ -240,7 +240,7 @@ class TestDoubleBakingAfterBakerKeyChange:
         parameters = protocol.PARAMETERS
         parameters['blocks_per_cycle'] = BLOCKS_PER_CYCLE
         parameters['blocks_per_roll_snapshot'] = BLOCKS_PER_CYCLE
-        utils.activate_alpha(sandbox.client(0), parameters)
+        protocol.activate(sandbox.client(0), parameters)
         utils.synchronize(sandbox.all_clients())
         for i in range(1, NUM_NODES):
             utils.remember_baker_contracts(sandbox.client(i))
