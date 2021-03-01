@@ -165,7 +165,7 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     (delegate : Signature.public_key_hash option) =
   build_delegate_operation cctxt ~chain ~block ?fee contract delegate
   >>=? fun operation ->
-  let operation = Injection.Single_manager operation in
+  let operation = Annotated_manager_operation.Single_manager operation in
   Injection.inject_manager_operation
     cctxt
     ~chain
@@ -175,8 +175,9 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing
     ?branch
     ~source
-    ?fee
-    ~storage_limit:Z.zero
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:Limit.unknown
+    ~storage_limit:(Limit.known Z.zero)
     ~src_pk
     ~src_sk
     ~fee_parameter
@@ -308,7 +309,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?storage_limit
     ()
   >>=? fun operation ->
-  let operation = Injection.Single_manager operation in
+  let operation = Annotated_manager_operation.Single_manager operation in
   Injection.inject_manager_operation
     cctxt
     ~chain
@@ -318,9 +319,9 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing
     ?branch
     ~source
-    ?fee
-    ?gas_limit
-    ?storage_limit
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~storage_limit:(Limit.of_option storage_limit)
     ?counter
     ~src_pk
     ~src_sk
