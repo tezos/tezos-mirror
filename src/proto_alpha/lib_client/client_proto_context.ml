@@ -68,7 +68,11 @@ let parse_arg_transfer arg =
 let build_transaction_operation ~amount ~parameters ?(entrypoint = "default")
     ?fee ?gas_limit ?storage_limit destination =
   let operation = Transaction {amount; parameters; destination; entrypoint} in
-  Injection.prepare_manager_operation ?fee ?gas_limit ?storage_limit operation
+  Injection.prepare_manager_operation
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~storage_limit:(Limit.of_option storage_limit)
+    operation
 
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?branch ~source ~src_pk ~src_sk ~destination
@@ -86,7 +90,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       ?storage_limit
       destination
   in
-  let contents = Injection.Single_manager contents in
+  let contents = Annotated_manager_operation.Single_manager contents in
   Injection.inject_manager_operation
     cctxt
     ~chain
@@ -96,9 +100,9 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing
     ?branch
     ~source
-    ?fee
-    ?gas_limit
-    ?storage_limit
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~storage_limit:(Limit.of_option storage_limit)
     ?counter
     ~src_pk
     ~src_sk
@@ -113,12 +117,16 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 
 let build_reveal_operation ?fee ?gas_limit ?storage_limit pk =
   let operation = Reveal pk in
-  Injection.prepare_manager_operation ?fee ?gas_limit ?storage_limit operation
+  Injection.prepare_manager_operation
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~storage_limit:(Limit.of_option storage_limit)
+    operation
 
 let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
     ~source ~src_pk ~src_sk ?fee ~fee_parameter () =
   let contents =
-    Injection.Single_manager
+    Annotated_manager_operation.Single_manager
       (build_reveal_operation ?fee ~storage_limit:Z.zero src_pk)
   in
   Injection.inject_manager_operation
@@ -130,7 +138,9 @@ let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
     ?verbose_signing
     ?branch
     ~source
-    ?fee
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:Limit.unknown
+    ~storage_limit:Limit.unknown
     ~src_pk
     ~src_sk
     ~fee_parameter
@@ -140,16 +150,19 @@ let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
 
-let build_delegate_operation ?fee ?gas_limit ?(storage_limit = Z.zero)
-    delegate_opt =
+let build_delegate_operation ?fee ?gas_limit ?storage_limit delegate_opt =
   let operation = Delegation delegate_opt in
-  Injection.prepare_manager_operation ?fee ?gas_limit ~storage_limit operation
+  Injection.prepare_manager_operation
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~storage_limit:(Limit.of_option storage_limit)
+    operation
 
 let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ?verbose_signing ~source ~src_pk ~src_sk ?fee ~fee_parameter delegate_opt =
   let operation =
-    Injection.Single_manager
-      (build_delegate_operation ?fee ~storage_limit:Z.zero delegate_opt)
+    Annotated_manager_operation.Single_manager
+      (build_delegate_operation ?fee delegate_opt)
   in
   Injection.inject_manager_operation
     cctxt
@@ -160,8 +173,9 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ?verbose_signing
     ?branch
     ~source
-    ?fee
-    ~storage_limit:Z.zero
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:Limit.unknown
+    ~storage_limit:Limit.unknown
     ~src_pk
     ~src_sk
     ~fee_parameter
@@ -268,9 +282,9 @@ let build_origination_operation ?fee ?gas_limit ?storage_limit ~initial_storage
   in
   return
     (Injection.prepare_manager_operation
-       ?fee
-       ?gas_limit
-       ?storage_limit
+       ~fee:(Limit.of_option fee)
+       ~gas_limit:(Limit.of_option gas_limit)
+       ~storage_limit:(Limit.of_option storage_limit)
        origination)
 
 let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
@@ -286,7 +300,7 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~balance
     ()
   >>=? fun origination ->
-  let origination = Injection.Single_manager origination in
+  let origination = Annotated_manager_operation.Single_manager origination in
   Injection.inject_manager_operation
     cctxt
     ~chain
@@ -296,9 +310,9 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing
     ?branch
     ~source
-    ?fee
-    ?gas_limit
-    ?storage_limit
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~storage_limit:(Limit.of_option storage_limit)
     ~src_pk
     ~src_sk
     ~fee_parameter
@@ -425,8 +439,6 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
     ~block
     ~fee_parameter:Injection.dummy_fee_parameter
     contents
-    ~unspecified_gas_limit:false
-    ~unspecified_storage_limit:false
   >>=? fun (oph, op, result) ->
   ( match confirmations with
   | None ->
@@ -568,8 +580,6 @@ let submit_proposals ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ~src_sk
     contents
     ?verbose_signing
-    ~unspecified_gas_limit:false
-    ~unspecified_storage_limit:false
 
 let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ?confirmations ~src_sk source proposal ballot =
@@ -588,8 +598,6 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ~src_sk
     contents
     ?verbose_signing
-    ~unspecified_gas_limit:false
-    ~unspecified_storage_limit:false
 
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match (a.receipt, a.protocol_data) with

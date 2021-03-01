@@ -27,47 +27,6 @@ open Protocol
 open Alpha_context
 open Apply_results
 
-type _ annotated_manager_operation =
-  | Manager_info : {
-      fee : Tez.t option;
-      operation : 'kind manager_operation;
-      gas_limit : Gas.Arith.integral option;
-      storage_limit : Z.t option;
-    }
-      -> 'kind annotated_manager_operation
-
-type packed_annotated_manager_operation =
-  | Annotated_manager_operation :
-      'kind annotated_manager_operation
-      -> packed_annotated_manager_operation
-
-(** The [annotated_manager_operation_list] type helps making
-    [contents_list] from a list of [manager_operation]s.
-    Its construction mimics [contents_list] in order to keep
-    consistent types when calling [inject_manager_operation]
-    and [inject_operation].*)
-type _ annotated_manager_operation_list =
-  | Single_manager :
-      'kind annotated_manager_operation
-      -> 'kind annotated_manager_operation_list
-  | Cons_manager :
-      'kind annotated_manager_operation
-      * 'rest annotated_manager_operation_list
-      -> ('kind * 'rest) annotated_manager_operation_list
-
-type packed_annotated_manager_operation_list =
-  | Manager_list :
-      'kind annotated_manager_operation_list
-      -> packed_annotated_manager_operation_list
-
-val manager_of_list :
-  packed_annotated_manager_operation list ->
-  packed_annotated_manager_operation_list
-
-val manager_to_list :
-  packed_annotated_manager_operation_list ->
-  packed_annotated_manager_operation list
-
 type 'kind preapply_result =
   Operation_hash.t * 'kind operation * 'kind operation_metadata
 
@@ -96,6 +55,9 @@ val preapply :
 type 'kind result_list =
   Operation_hash.t * 'kind contents_list * 'kind contents_result_list
 
+(** /!\ [inject_operation] does not perform automatic patching of
+    gas, storage and fees; use [inject_manager_operation] to inject
+    manager operations. *)
 val inject_operation :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -106,20 +68,17 @@ val inject_operation :
   ?src_sk:Client_keys.sk_uri ->
   ?verbose_signing:bool ->
   fee_parameter:fee_parameter ->
-  ?compute_fee:bool ->
-  unspecified_gas_limit:bool ->
-  unspecified_storage_limit:bool ->
   'kind contents_list ->
   'kind result_list tzresult Lwt.t
 
 type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
 val prepare_manager_operation :
-  ?fee:Tez.t ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
+  fee:Tez.t Limit.t ->
+  gas_limit:Gas.Arith.integral Limit.t ->
+  storage_limit:Z.t Limit.t ->
   'kind manager_operation ->
-  'kind annotated_manager_operation
+  'kind Annotated_manager_operation.t
 
 val inject_manager_operation :
   #Protocol_client_context.full ->
@@ -132,12 +91,12 @@ val inject_manager_operation :
   source:Signature.Public_key_hash.t ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
-  ?fee:Tez.t ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
+  fee:Tez.t Limit.t ->
+  gas_limit:Gas.Arith.integral Limit.t ->
+  storage_limit:Z.t Limit.t ->
   ?counter:Z.t ->
   fee_parameter:fee_parameter ->
-  'kind annotated_manager_operation_list ->
+  'kind Annotated_manager_operation.annotated_list ->
   'kind Kind.manager result_list tzresult Lwt.t
 
 val originated_contracts :
