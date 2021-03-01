@@ -500,6 +500,17 @@ def _test_create_mockup_init_show_roundtrip(
     ba_sent = _try_json_loads(_BA_FLAG, ba_str)
     pc_sent = _try_json_loads(_PC_FLAG, pc_str)
 
+    # Test that the initial mockup call honored the values it received. If
+    # it didn't, all calls would return the default values all along, and
+    # everything would seem fine; but it wouldn't be. This was witnessed in
+    # https://gitlab.com/tezos/tezos/-/issues/938
+    if bootstrap_json:
+        ba_input = json.loads(bootstrap_json)
+        assert ba_sent == ba_input
+    if protocol_constants_json:
+        pc_input = json.loads(protocol_constants_json)
+        assert pc_sent == pc_input
+
     # 3/ Pass obtained json to a new mockup instance, to check json
     # is valid w.r.t. ocaml encoding
 
