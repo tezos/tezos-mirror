@@ -121,8 +121,8 @@ module Protocol = struct
 
   let rpc_arg =
     RPC_arg.make
-      ~name:(Format.asprintf "date")
-      ~descr:(Format.asprintf "A date in seconds from epoch")
+      ~name:"date"
+      ~descr:"A date in seconds from epoch"
       ~destruct:(function
         | "none" | "epoch" ->
             Ok epoch
@@ -184,8 +184,8 @@ module System = struct
 
     let rpc_arg =
       RPC_arg.make
-        ~name:(Format.asprintf "timespan")
-        ~descr:(Format.asprintf "A span of time in seconds")
+        ~name:"timespan"
+        ~descr:"A span of time in seconds"
         ~destruct:(fun s ->
           match Ptime.Span.of_float_s (float_of_string s) with
           | Some t ->
@@ -284,8 +284,8 @@ module System = struct
 
   let rpc_arg =
     RPC_arg.make
-      ~name:(Format.asprintf "date")
-      ~descr:(Format.asprintf "A date in seconds from epoch")
+      ~name:"date"
+      ~descr:"A date in seconds from epoch"
       ~destruct:(function
         | "none" | "epoch" ->
             Ok Ptime.epoch
