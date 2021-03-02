@@ -33,10 +33,12 @@ data_dir=$tmp/tezos-sandbox
 client_dir=$tmp/tezos-client
 api_json=$tmp/rpc-api.json
 proto_api_json=$tmp/proto-api.json
+mempool_api_json=$tmp/mempool-api.json
 
 # Generated files.
 openapi_json=docs/api/rpc-openapi.json
 proto_openapi_json=docs/api/$protocol_name-openapi.json
+mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
 
 # Get version number.
 version=$(ocaml scripts/print_version.ml)
@@ -69,6 +71,7 @@ sleep 1
 # Get the RPC descriptions.
 curl "http://localhost:$rpc_port/describe/?recurse=yes" > $api_json
 curl "http://localhost:$rpc_port/describe/chains/main/blocks/head?recurse=yes" > $proto_api_json
+curl "http://localhost:$rpc_port/describe/chains/main/mempool?recurse=yes" > $mempool_api_json
 
 # Kill the node.
 kill -9 "$node_pid"
@@ -78,4 +81,6 @@ dune exec src/openapi/rpc_openapi.exe -- $version $api_json > $openapi_json
 echo "Generated OpenAPI specification: $openapi_json"
 dune exec src/openapi/rpc_openapi.exe -- $version $proto_api_json > $proto_openapi_json
 echo "Generated OpenAPI specification: $proto_openapi_json"
+dune exec src/openapi/rpc_openapi.exe -- $version $mempool_api_json > $mempool_openapi_json
+echo "Generated OpenAPI specification: $mempool_openapi_json"
 echo "You can now clean up with: rm -rf $tmp"
