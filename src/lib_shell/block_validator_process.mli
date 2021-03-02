@@ -58,6 +58,11 @@ type t
 
 val init : validator_environment -> validator_kind -> t tzresult Lwt.t
 
+(** [close vp] closes the given [vp]. In the case of an [External]
+   validator process, we first ask the validator to shutdown. If it is
+   still running after 5 seconds, we notice that the block validation
+   process is unresponsive and we force its termination (using a
+   registered Lwt_exit.clean_up_callback). *)
 val close : t -> unit Lwt.t
 
 val restore_context_integrity : t -> int option tzresult Lwt.t

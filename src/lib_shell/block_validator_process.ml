@@ -303,6 +303,16 @@ module External_validator_process = struct
         ~msg:"cannot close the block validation process: connection failed"
         ()
 
+    let unresponsive_validator =
+      declare_0
+        ~section
+        ~level:Notice
+        ~name:"unresponsive_validator"
+        ~msg:
+          "force quitting the block validation process as it seems to be \
+           unresponsive"
+        ()
+
     let cannot_start_process =
       declare_0
         ~section
@@ -359,6 +369,13 @@ module External_validator_process = struct
     lock : Lwt_mutex.t;
     sandbox_parameters : Data_encoding.json option;
   }
+
+  (* The shutdown_timeout is used when closing the block validator
+     process. It aims to allow it to shutdown gracefully. This delay
+     is long enough to allow the validator to successfully terminate
+     its current task and is short enough to avoid bothering the
+     user. *)
+  let shutdown_timeout = 5.
 
   (* Returns a temporary path for the socket to be
      spawned. $XDG_RUNTIME_DIR is returned if the environment variable
@@ -628,14 +645,21 @@ module External_validator_process = struct
             | e ->
                 Lwt.fail e)
         >>= fun () ->
-        process#status
-        >>= (function
-              | Unix.WEXITED 0 ->
-                  Events.(emit process_exited_normally ())
-                  >>= fun () -> Lwt.return_unit
-              | status ->
-                  Events.(emit process_exited_abnormally status)
-                  >>= fun () -> process#terminate ; Lwt.return_unit)
+        Lwt.catch
+          (fun () ->
+            Lwt_unix.with_timeout shutdown_timeout (fun () ->
+                process#status
+                >>= function
+                | Unix.WEXITED 0 ->
+                    Events.(emit process_exited_normally ())
+                | status ->
+                    Events.(emit process_exited_abnormally status)
+                    >>= fun () -> process#terminate ; Lwt.return_unit))
+          (function
+            | Lwt_unix.Timeout ->
+                Events.(emit unresponsive_validator) ()
+            | err ->
+                Lwt.fail err)
         >>= fun () ->
         Error_monad.cancel_with_exceptions canceler
         >>= fun () -> Lwt.return_unit
