@@ -187,5 +187,14 @@ module type S = sig
 
     (** [of_raw t] is the tree equivalent to the raw tree [t]. *)
     val of_raw : raw -> tree
+
+    (** The type of tree for which to build a shallow tree with [shallow] *)
+    type kinded_hash := [`Contents of Context_hash.t | `Node of Context_hash.t]
+
+    type repo
+
+    val make_repo : repo Lwt.t
+
+    val shallow : repo -> kinded_hash -> tree
   end
 end

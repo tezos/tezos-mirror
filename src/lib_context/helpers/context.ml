@@ -146,4 +146,17 @@ module Make_tree (Store : DB) = struct
               bytes
               (function `Value v -> Some v | `Tree _ -> None)
               (fun v -> `Value v) ])
+
+  type repo = Store.repo
+
+  let make_repo = Store.Repo.v (Irmin_mem.config ())
+
+  let shallow repo kinded_hash =
+    Store.Tree.shallow
+      repo
+      ( match kinded_hash with
+      | `Node hash ->
+          `Node (Hash.of_context_hash hash)
+      | `Contents hash ->
+          `Contents (Hash.of_context_hash hash, ()) )
 end
