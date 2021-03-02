@@ -59,5 +59,6 @@ let () =
       ("helpers rpcs", Test_helpers_rpcs.tests);
       ("script deserialize gas", Test_script_gas.tests);
       ("failing_noop operation", Test_failing_noop.tests);
-      ("storage description", Test_storage.tests) ]
+      ("storage description", Test_storage.tests);
+      ("time", Test_time_repr.tests) ]
   |> Lwt_main.run
