@@ -35,6 +35,10 @@ val of_seconds_string : string -> time option
 
 val to_seconds_string : time -> string
 
+(** [( +? ) t p] adds a time span [p] to a timestamp [t].
+    This function errors on integer overflow *)
 val ( +? ) : time -> Period_repr.t -> time tzresult
 
+(** [( -? ) t1 t2] subtracts timestamp [t2] from [t1].
+    This function errors when the difference is negative *)
 val ( -? ) : time -> time -> Period_repr.t tzresult
