@@ -147,7 +147,7 @@ let starts_with ~(prefix : string) (s : string) : bool =
     In this scenario, the proxy client should look directly in the data within the tree received by the first request.
 
     For this, this test inspects the debug output produced by
-    setting TEZOS_LOG to alphas.proxy_rpc->debug. This causes the client
+    setting TEZOS_LOG to alpha.proxy_rpc->debug. This causes the client
     to print the RPCs done to get pieces of the context:
 
     alpha.proxy_rpc: P/v1/constants
@@ -174,8 +174,9 @@ let test_context_suffix_no_rpc ?query_string path =
   @@ fun protocol ->
   let* (_, client) = init ~protocol () in
   let env =
-    [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")]
-    |> List.to_seq |> String_map.of_seq
+    String_map.singleton
+      "TEZOS_LOG"
+      (Protocol.daemon_name protocol ^ ".proxy_rpc->debug")
   in
   let* stderr =
     Client.spawn_rpc ~env ?query_string Client.GET path client
