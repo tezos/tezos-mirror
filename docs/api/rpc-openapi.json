@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "7.5"
+    "version": "8.2"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -68,6 +68,33 @@
             "in": "path",
             "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "length",
+            "in": "query",
+            "description": "The requested number of predecessors to return (per request; see next argument).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "head",
+            "in": "query",
+            "description": "block_hash (Base58Check-encoded) An empty argument requests blocks starting with the current head. A non empty list allows to request one or more specific fragments of the chain.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "min_date",
+            "in": "query",
+            "description": "A date in seconds from epoch When `min_date` is provided, blocks with a timestamp before `min_date` are filtered out",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -428,6 +455,662 @@
         }
       }
     },
+    "/config": {
+      "get": {
+        "description": "Return the runtime node configuration (this takes into account the command-line arguments and the on-disk configuration file)",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data-dir": {
+                      "description": "Location of the data dir on disk.",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/unistring"
+                        }
+                      ]
+                    },
+                    "rpc": {
+                      "description": "Configuration of rpc parameters",
+                      "type": "object",
+                      "properties": {
+                        "listen-addrs": {
+                          "description": "Hosts to listen to. If the port is not specified, the default port 8732 will be assumed.",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "listen-addr": {
+                          "description": "Legacy value: Host to listen to",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          ]
+                        },
+                        "cors-origin": {
+                          "description": "Cross Origin Resource Sharing parameters, see https://en.wikipedia.org/wiki/Cross-origin_resource_sharing.",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "cors-headers": {
+                          "description": "Cross Origin Resource Sharing parameters, see https://en.wikipedia.org/wiki/Cross-origin_resource_sharing.",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "crt": {
+                          "description": "Certificate file (necessary when TLS is used).",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          ]
+                        },
+                        "key": {
+                          "description": "Key file (necessary when TLS is used).",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "p2p": {
+                      "description": "Configuration of network parameters",
+                      "type": "object",
+                      "properties": {
+                        "expected-proof-of-work": {
+                          "description": "Floating point number between 0 and 256 that represents a difficulty, 24 signifies for example that at least 24 leading zeroes are expected in the hash.",
+                          "type": "integer"
+                        },
+                        "bootstrap-peers": {
+                          "description": "List of hosts. Tezos can connect to both IPv6 and IPv4 hosts. If the port is not specified, default port 9732 will be assumed.",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "listen-addr": {
+                          "description": "Host to listen to. If the port is not specified, the default port 8732 will be assumed.",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          ]
+                        },
+                        "discovery-addr": {
+                          "description": "Host for local peer discovery. If the port is not specified, the default port 10732 will be assumed.",
+                          "nullable": true,
+                          "oneOf": [
+                            {
+                              "title": "Some",
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/unistring"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "private-mode": {
+                          "description": "Specify if the node is in private mode or not. A node in private mode rejects incoming connections from untrusted peers and only opens outgoing connections to peers listed in 'bootstrap-peers' or provided with '--peer' option. Moreover, these peers will keep the identity and the address of the private node secret.",
+                          "type": "boolean"
+                        },
+                        "limits": {
+                          "description": "Network limits",
+                          "type": "object",
+                          "properties": {
+                            "connection-timeout": {
+                              "description": "Delay acceptable when initiating a connection to a new peer, in seconds.",
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/timespan.system"
+                                }
+                              ]
+                            },
+                            "authentication-timeout": {
+                              "description": "Delay granted to a peer to perform authentication, in seconds.",
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/timespan.system"
+                                }
+                              ]
+                            },
+                            "min-connections": {
+                              "description": "Strict minimum number of connections (triggers an urgent maintenance).",
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "expected-connections": {
+                              "description": "Targeted number of connections to reach when bootstrapping / maintaining.",
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "max-connections": {
+                              "description": "Maximum number of connections (exceeding peers are disconnected).",
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "backlog": {
+                              "description": "Number above which pending incoming connections are immediately rejected.",
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            },
+                            "max-incoming-connections": {
+                              "description": "Number above which pending incoming connections are immediately rejected.",
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            },
+                            "max-download-speed": {
+                              "description": "Max download speeds in KiB/s.",
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "max-upload-speed": {
+                              "description": "Max upload speeds in KiB/s.",
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "swap-linger": {
+                              "$ref": "#/components/schemas/timespan.system"
+                            },
+                            "binary-chunks-size": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            },
+                            "read-buffer-size": {
+                              "description": "Size of the buffer passed to read(2).",
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "read-queue-size": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "write-queue-size": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "incoming-app-message-queue-size": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "incoming-message-queue-size": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "outgoing-message-queue-size": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "max_known_points": {
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 65535
+                                  },
+                                  {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 65535
+                                  }
+                                ]
+                              }
+                            },
+                            "max_known_peer_ids": {
+                              "description": "max and target size for the known address table.",
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 65535
+                                  },
+                                  {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 65535
+                                  }
+                                ]
+                              }
+                            },
+                            "greylist-timeout": {
+                              "description": "GC delay for the greylists tables, in seconds.",
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/timespan.system"
+                                }
+                              ]
+                            },
+                            "maintenance-idle-time": {
+                              "description": "How long to wait at most, in seconds, before running a maintenance loop.",
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/timespan.system"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "disable_mempool": {
+                          "description": "If set to [true], the node will not participate in the propagation of pending operations (mempool). Default value is [false]. It can be used to decrease the memory and computation footprints of the node.",
+                          "type": "boolean"
+                        },
+                        "enable_testchain": {
+                          "description": "If set to [true], the node will spawn a testchain during the protocol's testing voting period. Default value is [false]. It is disabled to decrease the node storage usage and computation by dropping the validation of the test network blocks.",
+                          "type": "boolean"
+                        },
+                        "greylisting_config": {
+                          "description": "The reconnection policy regulates the frequency with which the node tries to reconnect to an old known peer.",
+                          "type": "object",
+                          "properties": {
+                            "factor": {
+                              "description": "The factor by which the reconnection delay is increased when a peer that was previously disconnected is disconnected again. This value should be set to 1 for a linear back-off and to >1 for an exponential back-off.",
+                              "type": "integer"
+                            },
+                            "initial-delay": {
+                              "description": "The span of time a peer is disconnected for when it is first disconnected.",
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/timespan.system"
+                                }
+                              ]
+                            },
+                            "disconnection-delay": {
+                              "description": "The span of time a peer is disconnected for when it is disconnected as the result of an error.",
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/timespan.system"
+                                }
+                              ]
+                            },
+                            "increase-cap": {
+                              "description": "The maximum amount by which the reconnection is extended. This limits the rate of the exponential back-off, which eventually becomes linear when it reaches this limit. This limit is set to avoid reaching the End-of-Time when repeatedly reconnection a peer.",
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/timespan.system"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "log": {
+                      "description": "Configuration of the Lwt-log sink (part of the logging framework)",
+                      "type": "object",
+                      "properties": {
+                        "output": {
+                          "description": "Output for the logging function. Either 'stdout', 'stderr' or the name of a log file .",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          ]
+                        },
+                        "level": {
+                          "description": "Verbosity level: one of 'fatal', 'error', 'warn','notice', 'info', 'debug'.",
+                          "type": "string",
+                          "enum": [
+                            "info",
+                            "debug",
+                            "error",
+                            "fatal",
+                            "warning",
+                            "notice"
+                          ]
+                        },
+                        "rules": {
+                          "description": "Fine-grained logging instructions. Same format as described in `tezos-node run --help`, DEBUG section. In the example below, sections 'p2p' and all sections starting by 'client' will have their messages logged up to the debug level, whereas the rest of log sections will be logged up to the notice level.",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          ]
+                        },
+                        "template": {
+                          "description": "Format for the log file, see http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates.",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/unistring"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "internal-events": {
+                      "description": "Configuration of the structured logging framework",
+                      "type": "object",
+                      "properties": {
+                        "activate": {
+                          "description": "List of URIs to activate/configure sinks.",
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        }
+                      }
+                    },
+                    "shell": {
+                      "description": "Configuration of network parameters",
+                      "type": "object",
+                      "properties": {
+                        "peer_validator": {
+                          "type": "object",
+                          "properties": {
+                            "block_header_request_timeout": {
+                              "$ref": "#/components/schemas/timespan.system"
+                            },
+                            "block_operations_request_timeout": {
+                              "$ref": "#/components/schemas/timespan.system"
+                            },
+                            "protocol_request_timeout": {
+                              "$ref": "#/components/schemas/timespan.system"
+                            },
+                            "new_head_request_timeout": {
+                              "$ref": "#/components/schemas/timespan.system"
+                            },
+                            "worker_backlog_size": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "worker_backlog_level": {
+                              "type": "string",
+                              "enum": [
+                                "info",
+                                "debug",
+                                "error",
+                                "fatal",
+                                "warning",
+                                "notice"
+                              ]
+                            }
+                          }
+                        },
+                        "block_validator": {
+                          "type": "object",
+                          "properties": {
+                            "protocol_request_timeout": {
+                              "$ref": "#/components/schemas/timespan.system"
+                            },
+                            "worker_backlog_size": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "worker_backlog_level": {
+                              "type": "string",
+                              "enum": [
+                                "info",
+                                "debug",
+                                "error",
+                                "fatal",
+                                "warning",
+                                "notice"
+                              ]
+                            }
+                          }
+                        },
+                        "prevalidator": {
+                          "type": "object",
+                          "properties": {
+                            "operations_request_timeout": {
+                              "$ref": "#/components/schemas/timespan.system"
+                            },
+                            "max_refused_operations": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "operations_batch_size": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "worker_backlog_size": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "worker_backlog_level": {
+                              "type": "string",
+                              "enum": [
+                                "info",
+                                "debug",
+                                "error",
+                                "fatal",
+                                "warning",
+                                "notice"
+                              ]
+                            }
+                          }
+                        },
+                        "chain_validator": {
+                          "oneOf": [
+                            {
+                              "title": "synchronisation_heuristic_encoding",
+                              "type": "object",
+                              "properties": {
+                                "latency": {
+                                  "description": "[latency] is the time interval (in seconds) used to determine if a peer is synchronized with a chain. For instance, a peer whose known head has a timestamp T is considered synchronized if T >= now - latency. This parameter depends on the baking rate and the latency of the network.",
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 65535
+                                },
+                                "synchronisation_threshold": {
+                                  "description": "The minimal number of peers this peer should be synchronized with in order to be bootstrapped.",
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 255
+                                },
+                                "worker_backlog_size": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 65535
+                                },
+                                "worker_backlog_level": {
+                                  "type": "string",
+                                  "enum": [
+                                    "info",
+                                    "debug",
+                                    "error",
+                                    "fatal",
+                                    "warning",
+                                    "notice"
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "title": "legacy_bootstrap_threshold_encoding",
+                              "type": "object",
+                              "properties": {
+                                "bootstrap_threshold": {
+                                  "description": "[DEPRECATED] Set the number of peers with whom a chain synchronisation must be completed to bootstrap the node.",
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 255
+                                },
+                                "worker_backlog_size": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 65535
+                                },
+                                "worker_backlog_level": {
+                                  "type": "string",
+                                  "enum": [
+                                    "info",
+                                    "debug",
+                                    "error",
+                                    "fatal",
+                                    "warning",
+                                    "notice"
+                                  ]
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "history_mode": {
+                          "type": "string",
+                          "enum": [
+                            "full",
+                            "archive",
+                            "rolling"
+                          ]
+                        }
+                      }
+                    },
+                    "network": {
+                      "description": "Configuration of which network/blockchain to connect to",
+                      "oneOf": [
+                        {
+                          "title": "sandbox",
+                          "type": "string",
+                          "enum": [
+                            "sandbox"
+                          ]
+                        },
+                        {
+                          "title": "mainnet",
+                          "type": "string",
+                          "enum": [
+                            "mainnet"
+                          ]
+                        },
+                        {
+                          "title": "delphinet",
+                          "type": "string",
+                          "enum": [
+                            "delphinet"
+                          ]
+                        },
+                        {
+                          "title": "edonet",
+                          "type": "string",
+                          "enum": [
+                            "edonet"
+                          ]
+                        },
+                        {
+                          "title": "Custom",
+                          "type": "object",
+                          "properties": {
+                            "genesis": {
+                              "type": "object",
+                              "properties": {
+                                "timestamp": {
+                                  "$ref": "#/components/schemas/timestamp.protocol"
+                                },
+                                "block": {
+                                  "$ref": "#/components/schemas/block_hash"
+                                },
+                                "protocol": {
+                                  "$ref": "#/components/schemas/Protocol_hash"
+                                }
+                              },
+                              "required": [
+                                "timestamp",
+                                "block",
+                                "protocol"
+                              ]
+                            },
+                            "genesis_parameters": {
+                              "type": "object",
+                              "properties": {
+                                "context_key": {
+                                  "$ref": "#/components/schemas/unistring"
+                                },
+                                "values": {}
+                              },
+                              "required": [
+                                "values"
+                              ]
+                            },
+                            "chain_name": {
+                              "$ref": "#/components/schemas/distributed_db_version.name"
+                            },
+                            "old_chain_name": {
+                              "$ref": "#/components/schemas/distributed_db_version.name"
+                            },
+                            "incompatible_chain_name": {
+                              "$ref": "#/components/schemas/distributed_db_version.name"
+                            },
+                            "sandboxed_chain_name": {
+                              "$ref": "#/components/schemas/distributed_db_version.name"
+                            },
+                            "user_activated_upgrades": {
+                              "$ref": "#/components/schemas/user_activated.upgrades"
+                            },
+                            "user_activated_protocol_overrides": {
+                              "$ref": "#/components/schemas/user_activated.protocol_overrides"
+                            },
+                            "default_bootstrap_peers": {
+                              "description": "List of hosts to use if p2p.bootstrap_peers is unspecified.",
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/unistring"
+                              }
+                            }
+                          },
+                          "required": [
+                            "genesis",
+                            "chain_name",
+                            "sandboxed_chain_name"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "p2p"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/config/network/user_activated_protocol_overrides": {
       "get": {
         "description": "List of protocols which replace other protocols",
@@ -546,6 +1229,33 @@
     "/injection/block": {
       "post": {
         "description": "Inject a block in the node and broadcast it. The `operations` embedded in `blockHeader` might be pre-validated using a contextual RPCs from the latest block (e.g. '/blocks/head/context/preapply'). Returns the ID of the block. By default, the RPC will wait for the block to be validated before answering. If ?async is true, the function returns immediately. Otherwise, the block will be validated before the result is returned. If ?force is true, it will be injected even on non strictly increasing fitness. An optional ?chain parameter can be used to specify whether to inject on the test chain or the main chain.",
+        "parameters": [
+          {
+            "name": "async",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chain",
+            "in": "query",
+            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -601,6 +1311,25 @@
     "/injection/operation": {
       "post": {
         "description": "Inject an operation in node and broadcast it. Returns the ID of the operation. The `signedOperationContents` should be constructed using a contextual RPCs from the latest block and signed by the client. By default, the RPC will wait for the operation to be (pre-)validated before answering. See RPCs under /blocks/prevalidation for more details on the prevalidation context. If ?async is true, the function returns immediately. Otherwise, the operation will be validated before the result is returned. An optional ?chain parameter can be used to specify whether to inject on the test chain or the main chain.",
+        "parameters": [
+          {
+            "name": "async",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chain",
+            "in": "query",
+            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -638,6 +1367,16 @@
     "/injection/protocol": {
       "post": {
         "description": "Inject a protocol in node. Returns the ID of the protocol. If ?async is true, the function returns immediately. Otherwise, the protocol will be validated before the result is returned.",
+        "parameters": [
+          {
+            "name": "async",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -824,6 +1563,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "next_protocol",
+            "in": "query",
+            "description": "Protocol_hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -931,6 +1679,35 @@
     "/monitor/valid_blocks": {
       "get": {
         "description": "Monitor all blocks that are successfully validated by the node, disregarding whether they were selected as the new head or not.",
+        "parameters": [
+          {
+            "name": "protocol",
+            "in": "query",
+            "description": "Protocol_hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "next_protocol",
+            "in": "query",
+            "description": "Protocol_hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chain",
+            "in": "query",
+            "description": "A chain identifier. This is either a chain hash in Base58Check notation or a one the predefined aliases: 'main', 'test'.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -1212,6 +1989,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1297,6 +2082,16 @@
     "/network/peers": {
       "get": {
         "description": "List the peers the node ever met.",
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -1342,120 +2137,291 @@
                                   "type": "object",
                                   "properties": {
                                     "sent": {
-                                      "type": "object",
-                                      "properties": {
-                                        "branch": {
-                                          "$ref": "#/components/schemas/bignum"
+                                      "oneOf": [
+                                        {
+                                          "title": "peer_metadata.v1",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "checkpoint": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocol_branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "predecessor_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "checkpoint",
+                                            "protocol_branch",
+                                            "predecessor_header",
+                                            "other"
+                                          ]
                                         },
-                                        "head": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "block_header": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "protocols": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operation_hashes_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "other": {
-                                          "$ref": "#/components/schemas/bignum"
+                                        {
+                                          "title": "peer_metadata.legacy_v0",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "other"
+                                          ]
                                         }
-                                      },
-                                      "required": [
-                                        "branch",
-                                        "head",
-                                        "block_header",
-                                        "operations",
-                                        "protocols",
-                                        "operation_hashes_for_block",
-                                        "operations_for_block",
-                                        "other"
                                       ]
                                     },
                                     "failed": {
-                                      "type": "object",
-                                      "properties": {
-                                        "branch": {
-                                          "$ref": "#/components/schemas/bignum"
+                                      "oneOf": [
+                                        {
+                                          "title": "peer_metadata.v1",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "checkpoint": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocol_branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "predecessor_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "checkpoint",
+                                            "protocol_branch",
+                                            "predecessor_header",
+                                            "other"
+                                          ]
                                         },
-                                        "head": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "block_header": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "protocols": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operation_hashes_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "other": {
-                                          "$ref": "#/components/schemas/bignum"
+                                        {
+                                          "title": "peer_metadata.legacy_v0",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "other"
+                                          ]
                                         }
-                                      },
-                                      "required": [
-                                        "branch",
-                                        "head",
-                                        "block_header",
-                                        "operations",
-                                        "protocols",
-                                        "operation_hashes_for_block",
-                                        "operations_for_block",
-                                        "other"
                                       ]
                                     },
                                     "received": {
-                                      "type": "object",
-                                      "properties": {
-                                        "branch": {
-                                          "$ref": "#/components/schemas/bignum"
+                                      "oneOf": [
+                                        {
+                                          "title": "peer_metadata.v1",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "checkpoint": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocol_branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "predecessor_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "checkpoint",
+                                            "protocol_branch",
+                                            "predecessor_header",
+                                            "other"
+                                          ]
                                         },
-                                        "head": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "block_header": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "protocols": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operation_hashes_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "other": {
-                                          "$ref": "#/components/schemas/bignum"
+                                        {
+                                          "title": "peer_metadata.legacy_v0",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "other"
+                                          ]
                                         }
-                                      },
-                                      "required": [
-                                        "branch",
-                                        "head",
-                                        "block_header",
-                                        "operations",
-                                        "protocols",
-                                        "operation_hashes_for_block",
-                                        "operations_for_block",
-                                        "other"
                                       ]
                                     },
                                     "unexpected": {
@@ -1477,159 +2443,387 @@
                                   "type": "object",
                                   "properties": {
                                     "sent": {
-                                      "type": "object",
-                                      "properties": {
-                                        "branch": {
-                                          "$ref": "#/components/schemas/bignum"
+                                      "oneOf": [
+                                        {
+                                          "title": "peer_metadata.v1",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "checkpoint": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocol_branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "predecessor_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "checkpoint",
+                                            "protocol_branch",
+                                            "predecessor_header",
+                                            "other"
+                                          ]
                                         },
-                                        "head": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "block_header": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "protocols": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operation_hashes_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "other": {
-                                          "$ref": "#/components/schemas/bignum"
+                                        {
+                                          "title": "peer_metadata.legacy_v0",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "other"
+                                          ]
                                         }
-                                      },
-                                      "required": [
-                                        "branch",
-                                        "head",
-                                        "block_header",
-                                        "operations",
-                                        "protocols",
-                                        "operation_hashes_for_block",
-                                        "operations_for_block",
-                                        "other"
                                       ]
                                     },
                                     "received": {
-                                      "type": "object",
-                                      "properties": {
-                                        "branch": {
-                                          "$ref": "#/components/schemas/bignum"
+                                      "oneOf": [
+                                        {
+                                          "title": "peer_metadata.v1",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "checkpoint": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocol_branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "predecessor_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "checkpoint",
+                                            "protocol_branch",
+                                            "predecessor_header",
+                                            "other"
+                                          ]
                                         },
-                                        "head": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "block_header": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "protocols": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operation_hashes_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "other": {
-                                          "$ref": "#/components/schemas/bignum"
+                                        {
+                                          "title": "peer_metadata.legacy_v0",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "other"
+                                          ]
                                         }
-                                      },
-                                      "required": [
-                                        "branch",
-                                        "head",
-                                        "block_header",
-                                        "operations",
-                                        "protocols",
-                                        "operation_hashes_for_block",
-                                        "operations_for_block",
-                                        "other"
                                       ]
                                     },
                                     "failed": {
-                                      "type": "object",
-                                      "properties": {
-                                        "branch": {
-                                          "$ref": "#/components/schemas/bignum"
+                                      "oneOf": [
+                                        {
+                                          "title": "peer_metadata.v1",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "checkpoint": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocol_branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "predecessor_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "checkpoint",
+                                            "protocol_branch",
+                                            "predecessor_header",
+                                            "other"
+                                          ]
                                         },
-                                        "head": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "block_header": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "protocols": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operation_hashes_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "other": {
-                                          "$ref": "#/components/schemas/bignum"
+                                        {
+                                          "title": "peer_metadata.legacy_v0",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "other"
+                                          ]
                                         }
-                                      },
-                                      "required": [
-                                        "branch",
-                                        "head",
-                                        "block_header",
-                                        "operations",
-                                        "protocols",
-                                        "operation_hashes_for_block",
-                                        "operations_for_block",
-                                        "other"
                                       ]
                                     },
                                     "scheduled": {
-                                      "type": "object",
-                                      "properties": {
-                                        "branch": {
-                                          "$ref": "#/components/schemas/bignum"
+                                      "oneOf": [
+                                        {
+                                          "title": "peer_metadata.v1",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "checkpoint": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocol_branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "predecessor_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "checkpoint",
+                                            "protocol_branch",
+                                            "predecessor_header",
+                                            "other"
+                                          ]
                                         },
-                                        "head": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "block_header": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "protocols": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operation_hashes_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "operations_for_block": {
-                                          "$ref": "#/components/schemas/bignum"
-                                        },
-                                        "other": {
-                                          "$ref": "#/components/schemas/bignum"
+                                        {
+                                          "title": "peer_metadata.legacy_v0",
+                                          "type": "object",
+                                          "properties": {
+                                            "branch": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "head": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "block_header": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "protocols": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operation_hashes_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "operations_for_block": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            },
+                                            "other": {
+                                              "$ref": "#/components/schemas/bignum"
+                                            }
+                                          },
+                                          "required": [
+                                            "branch",
+                                            "head",
+                                            "block_header",
+                                            "operations",
+                                            "protocols",
+                                            "operation_hashes_for_block",
+                                            "operations_for_block",
+                                            "other"
+                                          ]
                                         }
-                                      },
-                                      "required": [
-                                        "branch",
-                                        "head",
-                                        "block_header",
-                                        "operations",
-                                        "protocols",
-                                        "operation_hashes_for_block",
-                                        "operations_for_block",
-                                        "other"
                                       ]
                                     }
                                   },
@@ -1940,120 +3134,291 @@
                           "type": "object",
                           "properties": {
                             "sent": {
-                              "type": "object",
-                              "properties": {
-                                "branch": {
-                                  "$ref": "#/components/schemas/bignum"
+                              "oneOf": [
+                                {
+                                  "title": "peer_metadata.v1",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "checkpoint": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocol_branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "predecessor_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "checkpoint",
+                                    "protocol_branch",
+                                    "predecessor_header",
+                                    "other"
+                                  ]
                                 },
-                                "head": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "block_header": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "protocols": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operation_hashes_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "other": {
-                                  "$ref": "#/components/schemas/bignum"
+                                {
+                                  "title": "peer_metadata.legacy_v0",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "other"
+                                  ]
                                 }
-                              },
-                              "required": [
-                                "branch",
-                                "head",
-                                "block_header",
-                                "operations",
-                                "protocols",
-                                "operation_hashes_for_block",
-                                "operations_for_block",
-                                "other"
                               ]
                             },
                             "failed": {
-                              "type": "object",
-                              "properties": {
-                                "branch": {
-                                  "$ref": "#/components/schemas/bignum"
+                              "oneOf": [
+                                {
+                                  "title": "peer_metadata.v1",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "checkpoint": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocol_branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "predecessor_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "checkpoint",
+                                    "protocol_branch",
+                                    "predecessor_header",
+                                    "other"
+                                  ]
                                 },
-                                "head": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "block_header": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "protocols": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operation_hashes_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "other": {
-                                  "$ref": "#/components/schemas/bignum"
+                                {
+                                  "title": "peer_metadata.legacy_v0",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "other"
+                                  ]
                                 }
-                              },
-                              "required": [
-                                "branch",
-                                "head",
-                                "block_header",
-                                "operations",
-                                "protocols",
-                                "operation_hashes_for_block",
-                                "operations_for_block",
-                                "other"
                               ]
                             },
                             "received": {
-                              "type": "object",
-                              "properties": {
-                                "branch": {
-                                  "$ref": "#/components/schemas/bignum"
+                              "oneOf": [
+                                {
+                                  "title": "peer_metadata.v1",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "checkpoint": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocol_branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "predecessor_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "checkpoint",
+                                    "protocol_branch",
+                                    "predecessor_header",
+                                    "other"
+                                  ]
                                 },
-                                "head": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "block_header": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "protocols": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operation_hashes_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "other": {
-                                  "$ref": "#/components/schemas/bignum"
+                                {
+                                  "title": "peer_metadata.legacy_v0",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "other"
+                                  ]
                                 }
-                              },
-                              "required": [
-                                "branch",
-                                "head",
-                                "block_header",
-                                "operations",
-                                "protocols",
-                                "operation_hashes_for_block",
-                                "operations_for_block",
-                                "other"
                               ]
                             },
                             "unexpected": {
@@ -2075,159 +3440,387 @@
                           "type": "object",
                           "properties": {
                             "sent": {
-                              "type": "object",
-                              "properties": {
-                                "branch": {
-                                  "$ref": "#/components/schemas/bignum"
+                              "oneOf": [
+                                {
+                                  "title": "peer_metadata.v1",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "checkpoint": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocol_branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "predecessor_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "checkpoint",
+                                    "protocol_branch",
+                                    "predecessor_header",
+                                    "other"
+                                  ]
                                 },
-                                "head": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "block_header": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "protocols": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operation_hashes_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "other": {
-                                  "$ref": "#/components/schemas/bignum"
+                                {
+                                  "title": "peer_metadata.legacy_v0",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "other"
+                                  ]
                                 }
-                              },
-                              "required": [
-                                "branch",
-                                "head",
-                                "block_header",
-                                "operations",
-                                "protocols",
-                                "operation_hashes_for_block",
-                                "operations_for_block",
-                                "other"
                               ]
                             },
                             "received": {
-                              "type": "object",
-                              "properties": {
-                                "branch": {
-                                  "$ref": "#/components/schemas/bignum"
+                              "oneOf": [
+                                {
+                                  "title": "peer_metadata.v1",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "checkpoint": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocol_branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "predecessor_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "checkpoint",
+                                    "protocol_branch",
+                                    "predecessor_header",
+                                    "other"
+                                  ]
                                 },
-                                "head": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "block_header": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "protocols": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operation_hashes_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "other": {
-                                  "$ref": "#/components/schemas/bignum"
+                                {
+                                  "title": "peer_metadata.legacy_v0",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "other"
+                                  ]
                                 }
-                              },
-                              "required": [
-                                "branch",
-                                "head",
-                                "block_header",
-                                "operations",
-                                "protocols",
-                                "operation_hashes_for_block",
-                                "operations_for_block",
-                                "other"
                               ]
                             },
                             "failed": {
-                              "type": "object",
-                              "properties": {
-                                "branch": {
-                                  "$ref": "#/components/schemas/bignum"
+                              "oneOf": [
+                                {
+                                  "title": "peer_metadata.v1",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "checkpoint": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocol_branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "predecessor_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "checkpoint",
+                                    "protocol_branch",
+                                    "predecessor_header",
+                                    "other"
+                                  ]
                                 },
-                                "head": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "block_header": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "protocols": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operation_hashes_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "other": {
-                                  "$ref": "#/components/schemas/bignum"
+                                {
+                                  "title": "peer_metadata.legacy_v0",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "other"
+                                  ]
                                 }
-                              },
-                              "required": [
-                                "branch",
-                                "head",
-                                "block_header",
-                                "operations",
-                                "protocols",
-                                "operation_hashes_for_block",
-                                "operations_for_block",
-                                "other"
                               ]
                             },
                             "scheduled": {
-                              "type": "object",
-                              "properties": {
-                                "branch": {
-                                  "$ref": "#/components/schemas/bignum"
+                              "oneOf": [
+                                {
+                                  "title": "peer_metadata.v1",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "checkpoint": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocol_branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "predecessor_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "checkpoint",
+                                    "protocol_branch",
+                                    "predecessor_header",
+                                    "other"
+                                  ]
                                 },
-                                "head": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "block_header": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "protocols": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operation_hashes_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "operations_for_block": {
-                                  "$ref": "#/components/schemas/bignum"
-                                },
-                                "other": {
-                                  "$ref": "#/components/schemas/bignum"
+                                {
+                                  "title": "peer_metadata.legacy_v0",
+                                  "type": "object",
+                                  "properties": {
+                                    "branch": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "head": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "block_header": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "protocols": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operation_hashes_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "operations_for_block": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    },
+                                    "other": {
+                                      "$ref": "#/components/schemas/bignum"
+                                    }
+                                  },
+                                  "required": [
+                                    "branch",
+                                    "head",
+                                    "block_header",
+                                    "operations",
+                                    "protocols",
+                                    "operation_hashes_for_block",
+                                    "operations_for_block",
+                                    "other"
+                                  ]
                                 }
-                              },
-                              "required": [
-                                "branch",
-                                "head",
-                                "block_header",
-                                "operations",
-                                "protocols",
-                                "operation_hashes_for_block",
-                                "operations_for_block",
-                                "other"
                               ]
                             }
                           },
@@ -2573,6 +4166,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "monitor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2722,6 +4323,16 @@
     "/network/points": {
       "get": {
         "description": "List the pool of known `IP:port` used for establishing P2P connections.",
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2803,6 +4414,15 @@
             "name": "point",
             "in": "path",
             "description": "A network point (ipv4:port or [ipv6]:port).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "description": "A span of time in seconds",
             "required": true,
             "schema": {
               "type": "string"
@@ -2930,6 +4550,14 @@
             "in": "path",
             "description": "A network point (ipv4:port or [ipv6]:port).",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "monitor",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -3799,19 +5427,7 @@
                             "items": {
                               "oneOf": [
                                 {
-                                  "title": "Debug",
-                                  "type": "object",
-                                  "properties": {
-                                    "message": {
-                                      "$ref": "#/components/schemas/unistring"
-                                    }
-                                  },
-                                  "required": [
-                                    "message"
-                                  ]
-                                },
-                                {
-                                  "title": "Validation_success",
+                                  "title": "validation_success",
                                   "type": "object",
                                   "properties": {
                                     "successful_validation": {
@@ -3858,7 +5474,7 @@
                                   ]
                                 },
                                 {
-                                  "title": "Validation_failure",
+                                  "title": "validation_failure",
                                   "type": "object",
                                   "properties": {
                                     "failed_validation": {
@@ -3905,6 +5521,42 @@
                                   "required": [
                                     "failed_validation",
                                     "status"
+                                  ]
+                                },
+                                {
+                                  "title": "could_not_find_context",
+                                  "type": "object",
+                                  "properties": {
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "previously_validated",
+                                  "type": "object",
+                                  "properties": {
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "validating_block",
+                                  "type": "object",
+                                  "properties": {
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "block"
                                   ]
                                 }
                               ]
@@ -5288,18 +6940,6 @@
                             "items": {
                               "oneOf": [
                                 {
-                                  "title": "Debug",
-                                  "type": "object",
-                                  "properties": {
-                                    "message": {
-                                      "$ref": "#/components/schemas/unistring"
-                                    }
-                                  },
-                                  "required": [
-                                    "message"
-                                  ]
-                                },
-                                {
                                   "title": "Request",
                                   "type": "object",
                                   "properties": {
@@ -5455,6 +7095,248 @@
                                     "error",
                                     "failed_request",
                                     "status"
+                                  ]
+                                },
+                                {
+                                  "title": "validating_new_branch",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "nb_blocks": {
+                                      "type": "integer",
+                                      "minimum": -1073741824,
+                                      "maximum": 1073741823
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "nb_blocks"
+                                  ]
+                                },
+                                {
+                                  "title": "new_branch_validated",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "fetching_operations_for_head",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "Requesting_new_head_validation",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "new_head_validation_end",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "ignoring_head",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "ignoring_previously_validated_block",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "ignoring_invalid_block",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "missing_new_head_predecessor",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "ignoring_invalid_locator_branch",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "ignore_branch_without_common_ancestor",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "no_new_head_from_peer",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "timespan": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "timespan"
+                                  ]
+                                },
+                                {
+                                  "title": "processing_new_head",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "processing_new_branch",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "block": {
+                                      "$ref": "#/components/schemas/block_hash"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "block"
+                                  ]
+                                },
+                                {
+                                  "title": "terminating_worker",
+                                  "type": "object",
+                                  "properties": {
+                                    "peer": {
+                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                    },
+                                    "reason": {
+                                      "$ref": "#/components/schemas/unistring"
+                                    }
+                                  },
+                                  "required": [
+                                    "peer",
+                                    "reason"
                                   ]
                                 }
                               ]
@@ -6141,18 +8023,6 @@
                             "items": {
                               "oneOf": [
                                 {
-                                  "title": "Debug",
-                                  "type": "object",
-                                  "properties": {
-                                    "message": {
-                                      "$ref": "#/components/schemas/unistring"
-                                    }
-                                  },
-                                  "required": [
-                                    "message"
-                                  ]
-                                },
-                                {
                                   "title": "Request",
                                   "type": "object",
                                   "properties": {
@@ -6449,6 +8319,47 @@
                                     "failed_request",
                                     "status"
                                   ]
+                                },
+                                {
+                                  "title": "invalid_mempool_configuration",
+                                  "type": "object",
+                                  "properties": {}
+                                },
+                                {
+                                  "title": "unparsable_operation",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/Operation_hash"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "title": "processing_n_operations",
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                },
+                                {
+                                  "title": "fetching_operation",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/Operation_hash"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "title": "operation_included",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/Operation_hash"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "title": "operations_not_flushed",
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
                                 }
                               ]
                             }
