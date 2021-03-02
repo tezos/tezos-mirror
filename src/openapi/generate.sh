@@ -17,9 +17,9 @@ tezos_node=./tezos-node
 tezos_client=./tezos-client
 
 # Protocol configuration.
-protocol_hash=PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
-protocol_parameters=src/proto_007_PsDELPH1/parameters/sandbox-parameters.json
-protocol_name=delphi
+protocol_hash=PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
+protocol_parameters=src/proto_008_PtEdo2Zk/parameters/sandbox-parameters.json
+protocol_name=edo
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
