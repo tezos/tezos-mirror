@@ -36,32 +36,19 @@
    Each module defines tests which are thematically related,
    as functions to be called here. *)
 
-let register protocol =
-  Basic.register protocol ;
-  Bootstrap.register protocol ;
-  Synchronisation_heuristic.register protocol ;
-  Normalize.register protocol ;
-  Double_bake.register protocol
-
-let register_mockup () =
-  (* Support for Mockup in Carthage was removed in https://gitlab.com/tezos/tezos/-/merge_requests/2502 *)
-  let supported_mockup_protocols =
-    Protocol.all_protocols |> List.filter (fun p -> p > Protocol.Carthage)
-  in
-  List.iter Mockup.register supported_mockup_protocols
-
-let register_proxy () =
-  (* Tests don't pass for Carthage, but this is not a big deal as Carthage support will drop in the near future. *)
-  let supported_proxy_protocols =
-    Protocol.all_protocols |> List.filter (fun p -> p > Protocol.Carthage)
-  in
-  List.iter Proxy.register supported_proxy_protocols
-
 let () =
-  register Alpha ;
-  register_mockup () ;
+  Basic.register Alpha ;
+  Bootstrap.register Alpha ;
+  Synchronisation_heuristic.register Alpha ;
+  Normalize.register Alpha ;
+  Double_bake.register Alpha ;
+  Mockup.register Delphi ;
+  Mockup.register Edo ;
+  Mockup.register Alpha ;
   Mockup.register_protocol_independent () ;
-  register_proxy () ;
+  Proxy.register Delphi ;
+  Proxy.register Edo ;
+  Proxy.register Alpha ;
   P2p.register Alpha ;
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
