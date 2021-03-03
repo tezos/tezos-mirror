@@ -25,6 +25,8 @@
 
 (** In all RPCs, default [chain] is "main" and default [block] is "head". *)
 
+(** {2 Shell RPCs *)
+
 (** Call RPC /network/connections if [peer_id] is [None].
     Call RPC /network/connections/[peer_id] otherwise. *)
 val get_connections :
@@ -104,85 +106,643 @@ val preapply_block :
   Client.t ->
   JSON.t Lwt.t
 
-module Proto_alpha : sig
-  include RPC_intf.COMMON_PROTOCOL
+(** {2 Protocol RPCs *)
 
-  module Baker : sig
-    include RPC_intf.COMMON_PROTOCOL_BAKER
-  end
+(** Call RPC /chain/[chain]/blocks/[block]/context/constants *)
+val get_constants :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
-  module Contract : sig
-    include RPC_intf.COMMON_PROTOCOL_CONTRACT
-  end
+(** Call RPC /chain/[chain]/blocks/[block]/context/constants/errors *)
+val get_constants_errors :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
-  module Delegate : sig
-    include RPC_intf.COMMON_PROTOCOL_DELEGATE
+(** Call RPC /chain/[chain]/blocks/[block]/helpers/baking_rights *)
+val get_baking_rights :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  ?delegate:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
-    (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/voting_power *)
-    val get_voting_power :
-      ?node:Node.t ->
-      ?hooks:Process.hooks ->
-      ?chain:string ->
-      ?block:string ->
-      pkh:string ->
-      Client.t ->
-      JSON.t Lwt.t
+(** Call RPC /chain/[chain]/blocks/[block]/helpers/current_level *)
+val get_current_level :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  ?offset:int ->
+  Client.t ->
+  JSON.t Lwt.t
 
-    (** Same as [get_voting_power], but do not wait for the process to exit. *)
-    val spawn_get_voting_power :
-      ?node:Node.t ->
-      ?hooks:Process.hooks ->
-      ?chain:string ->
-      ?block:string ->
-      pkh:string ->
-      Client.t ->
-      Process.t
-  end
+(** Call RPC /chain/[chain]/blocks/[block]/helpers/endorsing_rights *)
+val get_endorsing_rights :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  ?delegate:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
-  module Votes : sig
-    include RPC_intf.COMMON_PROTOCOL_VOTES
+(** Call RPC /chain/[chain]/blocks/[block]/helpers/levels_in_current_cycle *)
+val get_levels_in_current_cycle :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  Client.t ->
+  JSON.t Lwt.t
 
-    (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period *)
-    val get_current_period :
-      ?node:Node.t ->
-      ?hooks:Process.hooks ->
-      ?chain:string ->
-      ?block:string ->
-      Client.t ->
-      JSON.t Lwt.t
+module Bakers : sig
+  (** Common protocol RPSs for bakers (i.e. under [/bakers]). *)
 
-    (** Call RPC /chain/[chain]/blocks/[block]/votes/successor_period *)
-    val get_successor_period :
-      ?node:Node.t ->
-      ?hooks:Process.hooks ->
-      ?chain:string ->
-      ?block:string ->
-      Client.t ->
-      JSON.t Lwt.t
+  (** Call RPC /chain/[chain]/blocks/[block]/context/bakers *)
+  val get_all :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    string list Lwt.t
 
-    (** Call RPC /chain/[chain]/blocks/[block]/votes/total_voting_power *)
-    val get_total_voting_power :
-      ?node:Node.t ->
-      ?hooks:Process.hooks ->
-      ?chain:string ->
-      ?block:string ->
-      Client.t ->
-      JSON.t Lwt.t
-  end
+  (** Same as [get_all], but do not wait for the process to exit. *)
+  val spawn_get_all :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/bakers/[baker_hash] *)
+  val get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    baker_hash:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get], but do not wait for the process to exit. *)
+  val spawn_get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    baker_hash:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/bakers/[baker_hash]/consensus_key *)
+  val get_consensus_key :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    baker_hash:string ->
+    Client.t ->
+    Tezos_crypto.Signature.public_key Lwt.t
+
+  (** Same as [get_consensus_key], but do not wait for the process to exit. *)
+  val spawn_get_consensus_key :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    baker_hash:string ->
+    Client.t ->
+    Process.t
 end
 
-module Proto_007 : sig
-  include RPC_intf.COMMON_PROTOCOL
+module Contracts : sig
+  (** Common protocol RPSs for contracts (i.e. under [/contracts]). *)
 
-  module Contract : sig
-    include RPC_intf.COMMON_PROTOCOL_CONTRACT
-  end
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts *)
+  val get_all :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    string list Lwt.t
 
-  module Delegate : sig
-    include RPC_intf.COMMON_PROTOCOL_DELEGATE
-  end
+  (** Same as [get_all], but do not wait for the process to exit. *)
+  val spawn_get_all :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    Process.t
 
-  module Votes : sig
-    include RPC_intf.COMMON_PROTOCOL_VOTES
-  end
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id] *)
+  val get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get], but do not wait for the process to exit. *)
+  val spawn_get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/balance *)
+  val get_balance :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_balance], but do not wait for the process to exit. *)
+  val spawn_get_balance :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/big_map_get *)
+  val big_map_get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    data:JSON.u ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [big_map_get], but do not wait for the process to exit. *)
+  val spawn_big_map_get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    data:JSON.u ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/counter *)
+  val get_counter :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_counter], but do not wait for the process to exit. *)
+  val spawn_get_counter :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/delegate *)
+  val get_delegate :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_delegate], but do not wait for the process to exit. *)
+  val spawn_get_delegate :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/entrypoints *)
+  val get_entrypoints :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_entrypoints], but do not wait for the process to exit. *)
+  val spawn_get_entrypoints :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/manager_key *)
+  val get_manager_key :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_manager_key], but do not wait for the process to exit. *)
+  val spawn_get_manager_key :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/script *)
+  val get_script :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_script], but do not wait for the process to exit. *)
+  val spawn_get_script :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/storage *)
+  val get_storage :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_storage], but do not wait for the process to exit. *)
+  val spawn_get_storage :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    Process.t
+end
+
+module Delegates : sig
+  (** Common protocol RPSs for delegates (i.e. under [/delegates]). *)
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
+  val get_all :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    string list Lwt.t
+
+  (** Same as [get_all], but do not wait for the process to exit. *)
+  val spawn_get_all :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh] *)
+  val get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get], but do not wait for the process to exit. *)
+  val spawn_get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/balance *)
+  val get_balance :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_balance], but do not wait for the process to exit. *)
+  val spawn_get_balance :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/deactivated *)
+  val get_deactivated :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_deactivated], but do not wait for the process to exit. *)
+  val spawn_get_deactivated :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/delegated_balance *)
+  val get_delegated_balance :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_delegated_balance], but do not wait for the process to exit. *)
+  val spawn_get_delegated_balance :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/delegated_contracts *)
+  val get_delegated_contracts :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_delegated_contracts], but do not wait for the process to exit. *)
+  val spawn_get_delegated_contracts :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_balance *)
+  val get_frozen_balance :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_frozen_balance], but do not wait for the process to exit. *)
+  val spawn_get_frozen_balance :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_balance_by_cycle *)
+  val get_frozen_balance_by_cycle :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_frozen_balance_by_cycle], but do not wait for the process to exit. *)
+  val spawn_get_frozen_balance_by_cycle :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/grace_period *)
+  val get_grace_period :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_grace_period], but do not wait for the process to exit. *)
+  val spawn_get_grace_period :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/staking_balance *)
+  val get_staking_balance :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_staking_balance], but do not wait for the process to exit. *)
+  val spawn_get_staking_balance :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/voting_power *)
+  val get_voting_power :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_voting_power], but do not wait for the process to exit. *)
+  val spawn_get_voting_power :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+end
+
+module Votes : sig
+  (** Common protocol RPSs for votes (i.e. under [/votes]). *)
+
+  (** Call RPC /chain/[chain]/blocks/[block]/votes/ballot_list *)
+  val get_ballot_list :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/votes/ballots *)
+  val get_ballots :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period_kind *)
+  val get_current_period_kind :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/votes/current_proposal *)
+  val get_current_proposal :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/votes/current_quorum *)
+  val get_current_quorum :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/votes/listings *)
+  val get_listings :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/votes/proposals *)
+  val get_proposals :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period *)
+  val get_current_period :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/votes/successor_period *)
+  val get_successor_period :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/votes/total_voting_power *)
+  val get_total_voting_power :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
 end
