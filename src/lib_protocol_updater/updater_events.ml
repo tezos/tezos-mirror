@@ -23,4 +23,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.LOG
+include Internal_event.Simple
+
+let level = Internal_event.Error
+
+let section = ["protocol_updater"]
+
+let node_uninitialized =
+  declare_0
+    ~section
+    ~level
+    ~name:"node_uninitialized"
+    ~msg:"node not initialized"
+    ()
+
+let compiler_exit_error =
+  declare_1
+    ~section
+    ~level
+    ~name:"compiler_exit_error"
+    ~msg:"error: {error}"
+    ("error", Error_monad.(TzTrace.encoding error_encoding))
+
+let compilation_interrupted =
+  declare_1
+    ~section
+    ~level
+    ~name:"compilation_interrupted"
+    ~msg:"compilation interrupted (see logs in: {filename})"
+    ("filename", Data_encoding.string)
+
+let compilation_error =
+  declare_1
+    ~section
+    ~level
+    ~name:"compilation_error"
+    ~msg:"compilation error (logs in file: {filename})"
+    ("filename", Data_encoding.string)
+
+let dynlink_error =
+  declare_2
+    ~section
+    ~level
+    ~name:"dynlink_error"
+    ~msg:"can't load plugin: {plugin} ({reason})"
+    ("plugin", Data_encoding.string)
+    ("reason", Data_encoding.string)
+
+let internal_error =
+  declare_1
+    ~section
+    ~level
+    ~name:"internal_error"
+    ~msg:"internal error while compiling {protocol}"
+    ("protocol", Protocol_hash.encoding)

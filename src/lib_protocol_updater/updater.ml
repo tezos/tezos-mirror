@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Updater_logging
 open Filename.Infix
+module Events = Updater_events
 
 (** Compiler *)
 
@@ -33,17 +33,18 @@ let datadir = ref None
 let get_datadir () =
   match !datadir with
   | None ->
-      fatal_error "Node not initialized" ;
-      Lwt_exit.exit_and_raise 1
+      Events.(emit node_uninitialized) ()
+      >>= fun () -> Lwt_exit.exit_and_raise 1
   | Some m ->
-      m
+      Lwt.return m
 
 let init dir = datadir := Some dir
 
 let compiler_name = "tezos-protocol-compiler"
 
 let do_compile hash p =
-  let datadir = get_datadir () in
+  get_datadir ()
+  >>= fun datadir ->
   let source_dir = datadir // Protocol_hash.to_short_b58check hash // "src" in
   let log_file = datadir // Protocol_hash.to_short_b58check hash // "LOG" in
   let plugin_file =
@@ -67,26 +68,20 @@ let do_compile hash p =
            ~stderr:(`FD_move fd)
            compiler_command
          >>= return)
-  >|= function
+  >>= function
   | Error err ->
-      log_error "Error %a" pp_print_error err ;
-      false
+      Events.(emit compiler_exit_error) err >|= Fun.const false
   | Ok (Unix.WSIGNALED _ | Unix.WSTOPPED _) ->
-      log_error "INTERRUPTED COMPILATION (%s)" log_file ;
-      false
+      Events.(emit compilation_interrupted) log_file >|= Fun.const false
   | Ok (Unix.WEXITED x) when x <> 0 ->
-      log_error "COMPILATION ERROR (%s)" log_file ;
-      false
+      Events.(emit compilation_error) log_file >|= Fun.const false
   | Ok (Unix.WEXITED _) -> (
     try
       Dynlink.loadfile_private (plugin_file ^ ".cmxs") ;
-      true
+      Lwt.return true
     with Dynlink.Error err ->
-      log_error
-        "Can't load plugin: %s (%s)"
-        (Dynlink.error_message err)
-        plugin_file ;
-      false )
+      Events.(emit dynlink_error) (plugin_file, Dynlink.error_message err)
+      >|= Fun.const false )
 
 let compile hash p =
   if Tezos_protocol_registerer.Registerer.mem hash then Lwt.return_true
@@ -95,5 +90,5 @@ let compile hash p =
     >>= fun success ->
     let loaded = Tezos_protocol_registerer.Registerer.mem hash in
     if success && not loaded then
-      log_error "Internal error while compiling %a" Protocol_hash.pp hash ;
-    Lwt.return loaded
+      Events.(emit internal_error) hash >>= fun () -> Lwt.return loaded
+    else Lwt.return loaded
