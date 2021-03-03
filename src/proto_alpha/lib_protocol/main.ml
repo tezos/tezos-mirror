@@ -414,3 +414,5 @@ let init ctxt block_header =
   in
   Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ~fitness ctxt
   >|=? fun ctxt -> Alpha_context.finalize ctxt
+
+(* Vanity nonce: 0000006957234545 *)
