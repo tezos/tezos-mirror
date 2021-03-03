@@ -93,6 +93,10 @@ EDO = "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
 EDO_DAEMON = "008-PtEdo2Zk"
 EDO_PARAMETERS = get_parameters("008_PtEdo2Zk")
 
+FLORENCE = "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i"
+FLORENCE_DAEMON = "009-PsFLoren"
+FLORENCE_PARAMETERS = get_parameters("009_PsFLoren")
+
 TEZOS_CRT = """
 Certificate:
     Data:

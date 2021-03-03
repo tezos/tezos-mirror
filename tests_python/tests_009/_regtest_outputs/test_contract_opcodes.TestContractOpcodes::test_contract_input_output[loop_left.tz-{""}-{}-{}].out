@@ -1,0 +1,52 @@
+tests_009/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[loop_left.tz-{""}-{}-{}]
+
+storage
+  {}
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039977.656 units remaining)
+    [ (Pair {} { "" })  	 ]
+  - location: 9 (remaining gas: 1039977.576 units remaining)
+    [ {}  	@parameter ]
+  - location: 10 (remaining gas: 1039977.501 units remaining)
+    [ {}  	
+      {}  	@parameter ]
+  - location: 12 (remaining gas: 1039977.431 units remaining)
+    [ {}  	@parameter
+      {}  	 ]
+  - location: 13 (remaining gas: 1039977.356 units remaining)
+    [ (Pair {} {})  	 ]
+  - location: 14 (remaining gas: 1039977.281 units remaining)
+    [ (Left (Pair {} {}))  	 ]
+  - location: 19 (remaining gas: 1039977.126 units remaining)
+    [ (Pair {} {})  	
+      (Pair {} {})  	 ]
+  - location: 20 (remaining gas: 1039977.046 units remaining)
+    [ {}  	@parameter
+      (Pair {} {})  	 ]
+  - location: 23 (remaining gas: 1039976.891 units remaining)
+    [ {}  	 ]
+  - location: 22 (remaining gas: 1039976.846 units remaining)
+    [ {}  	 ]
+  - location: 21 (remaining gas: 1039976.846 units remaining)
+    [ {}  	@parameter
+      {}  	 ]
+  - location: 35 (remaining gas: 1039976.711 units remaining)
+    [ (Right {})  	 ]
+  - location: 34 (remaining gas: 1039976.666 units remaining)
+    [ (Right {})  	 ]
+  - location: -1 (remaining gas: 1039976.621 units remaining)
+    [ (Right {})  	 ]
+  - location: 17 (remaining gas: 1039976.576 units remaining)
+    [ {}  	 ]
+  - location: 41 (remaining gas: 1039976.501 units remaining)
+    [ {}  	
+      {}  	 ]
+  - location: 43 (remaining gas: 1039976.426 units remaining)
+    [ (Pair {} {})  	 ]
+  - location: -1 (remaining gas: 1039976.381 units remaining)
+    [ (Pair {} {})  	 ]
+

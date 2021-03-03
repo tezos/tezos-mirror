@@ -1,0 +1,25 @@
+tests_009/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[hash_key.tz-None-"edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES"-(Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k")]
+
+storage
+  (Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k")
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 1039964.690 units remaining)
+    [ (Pair "edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES" None)  	 ]
+  - location: 8 (remaining gas: 1039964.610 units remaining)
+    [ "edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES"  	@parameter ]
+  - location: 9 (remaining gas: 1039964 units remaining)
+    [ "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k"  	 ]
+  - location: 10 (remaining gas: 1039963.925 units remaining)
+    [ (Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k")  	 ]
+  - location: 11 (remaining gas: 1039963.850 units remaining)
+    [ {}  	
+      (Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k")  	 ]
+  - location: 13 (remaining gas: 1039963.775 units remaining)
+    [ (Pair {} (Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k"))  	 ]
+  - location: -1 (remaining gas: 1039963.730 units remaining)
+    [ (Pair {} (Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k"))  	 ]
+

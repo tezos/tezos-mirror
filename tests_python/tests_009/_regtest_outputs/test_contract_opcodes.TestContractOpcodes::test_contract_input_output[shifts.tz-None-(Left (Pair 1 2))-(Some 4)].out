@@ -1,0 +1,30 @@
+tests_009/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[shifts.tz-None-(Left (Pair 1 2))-(Some 4)]
+
+storage
+  (Some 4)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 13 (remaining gas: 1039988.820 units remaining)
+    [ (Pair (Left (Pair 1 2)) None)  	 ]
+  - location: 14 (remaining gas: 1039988.740 units remaining)
+    [ (Left (Pair 1 2))  	@parameter ]
+  - location: 17 (remaining gas: 1039988.600 units remaining)
+    [ 1  	
+      2  	 ]
+  - location: 18 (remaining gas: 1039988.420 units remaining)
+    [ 4  	 ]
+  - location: -1 (remaining gas: 1039988.375 units remaining)
+    [ 4  	 ]
+  - location: 22 (remaining gas: 1039988.300 units remaining)
+    [ (Some 4)  	 ]
+  - location: 23 (remaining gas: 1039988.225 units remaining)
+    [ {}  	
+      (Some 4)  	 ]
+  - location: 25 (remaining gas: 1039988.150 units remaining)
+    [ (Pair {} (Some 4))  	 ]
+  - location: -1 (remaining gas: 1039988.105 units remaining)
+    [ (Pair {} (Some 4))  	 ]
+
