@@ -74,11 +74,11 @@ module Voting_period = struct
 end
 
 module Protocol_kind = struct
-  type t = [`Athens | `Babylon | `Carthage | `Delphi | `Edo | `Alpha]
+  type t = [`Athens | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Alpha]
 
   let names =
     [ ("Athens", `Athens); ("Babylon", `Babylon); ("Carthage", `Carthage)
-    ; ("Delphi", `Delphi); ("Edo", `Edo); ("Alpha", `Alpha) ]
+    ; ("Delphi", `Delphi); ("Edo", `Edo); ("Florence", `Florence); ("Alpha", `Alpha) ]
 
   let default = `Alpha
 
@@ -154,7 +154,7 @@ let protocol_parameters_json t : Ezjsonm.t =
       match subkind with
       | `Babylon -> (800_000, 8_000_000)
       | `Carthage -> (1_040_000, 10_400_000)
-      | `Delphi | `Edo | `Alpha -> (1_040_000, 10_400_000) in
+      | `Delphi | `Edo | `Florence | `Alpha -> (1_040_000, 10_400_000) in
     let open Ezjsonm in
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
     [ ("blocks_per_commitment", int 4); ("endorsers_per_block", int 32)
@@ -168,18 +168,18 @@ let protocol_parameters_json t : Ezjsonm.t =
     ; ("endorsement_security_deposit", string (Int.to_string 64_000_000))
     ; ( match subkind with
       | `Babylon -> ("block_reward", string (Int.to_string 16_000_000))
-      | `Carthage | `Delphi | `Edo | `Alpha ->
+      | `Carthage | `Delphi | `Edo | `Florence | `Alpha ->
           ( "baking_reward_per_endorsement"
           , list_of_zs t.baking_reward_per_endorsement ) )
     ; ( "endorsement_reward"
       , match subkind with
         | `Babylon -> string (Int.to_string 2_000_000)
-        | `Carthage | `Delphi | `Edo | `Alpha -> list_of_zs t.endorsement_reward
+        | `Carthage | `Delphi | `Edo | `Florence | `Alpha -> list_of_zs t.endorsement_reward
       ); ("hard_storage_limit_per_operation", string (Int.to_string 60_000))
     ; ( "cost_per_byte"
       , match subkind with
         | `Babylon | `Carthage -> string (Int.to_string 1_000)
-        | `Delphi | `Edo | `Alpha -> string (Int.to_string 250) )
+        | `Delphi | `Edo | `Florence | `Alpha -> string (Int.to_string 250) )
     ; ("test_chain_duration", string (Int.to_string 1_966_080))
     ; ("quorum_min", int 3_000); ("quorum_max", int 7_000)
     ; ("min_proposal_quorum", int 500); ("initial_endorsers", int 1)
@@ -201,7 +201,7 @@ let protocol_parameters_json t : Ezjsonm.t =
   | None ->
       dict
         ( match t.kind with
-        | (`Babylon | `Carthage | `Delphi | `Edo | `Alpha) as sk ->
+        | (`Babylon | `Carthage | `Delphi | `Edo | `Florence | `Alpha) as sk ->
             common @ extra_post_babylon_stuff sk
         | `Athens -> common )
 
