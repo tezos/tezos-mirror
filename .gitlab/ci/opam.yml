@@ -86,6 +86,11 @@ opam:tezos-008-PtEdo2Zk-test-helpers:
   variables:
     package: tezos-008-PtEdo2Zk-test-helpers
 
+opam:tezos-009-PsFLoren-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-009-PsFLoren-test-helpers
+
 opam:tezos-accuser-007-PsDELPH1:
   extends: .opam_template
   variables:
@@ -105,6 +110,16 @@ opam:tezos-accuser-008-PtEdo2Zk-commands:
   extends: .opam_template
   variables:
     package: tezos-accuser-008-PtEdo2Zk-commands
+
+opam:tezos-accuser-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-accuser-009-PsFLoren
+
+opam:tezos-accuser-009-PsFLoren-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-accuser-009-PsFLoren-commands
 
 opam:tezos-accuser-alpha:
   extends: .opam_template
@@ -131,6 +146,11 @@ opam:tezos-baker-008-PtEdo2Zk:
   variables:
     package: tezos-baker-008-PtEdo2Zk
 
+opam:tezos-baker-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-baker-009-PsFLoren
+
 opam:tezos-baker-alpha:
   extends: .opam_template
   variables:
@@ -155,6 +175,16 @@ opam:tezos-baking-008-PtEdo2Zk-commands:
   extends: .opam_template
   variables:
     package: tezos-baking-008-PtEdo2Zk-commands
+
+opam:tezos-baking-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-009-PsFLoren
+
+opam:tezos-baking-009-PsFLoren-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-009-PsFLoren-commands
 
 opam:tezos-baking-alpha:
   extends: .opam_template
@@ -291,6 +321,21 @@ opam:tezos-client-008-PtEdo2Zk-commands-registration:
   variables:
     package: tezos-client-008-PtEdo2Zk-commands-registration
 
+opam:tezos-client-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-client-009-PsFLoren
+
+opam:tezos-client-009-PsFLoren-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-009-PsFLoren-commands
+
+opam:tezos-client-009-PsFLoren-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-009-PsFLoren-commands-registration
+
 opam:tezos-client-alpha:
   extends: .opam_template
   variables:
@@ -340,6 +385,11 @@ opam:tezos-client-sapling-008-PtEdo2Zk:
   extends: .opam_template
   variables:
     package: tezos-client-sapling-008-PtEdo2Zk
+
+opam:tezos-client-sapling-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-client-sapling-009-PsFLoren
 
 opam:tezos-client-sapling-alpha:
   extends: .opam_template
@@ -411,6 +461,11 @@ opam:tezos-embedded-protocol-008-PtEdoTez:
   variables:
     package: tezos-embedded-protocol-008-PtEdoTez
 
+opam:tezos-embedded-protocol-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-009-PsFLoren
+
 opam:tezos-embedded-protocol-alpha:
   extends: .opam_template
   variables:
@@ -455,6 +510,16 @@ opam:tezos-endorser-008-PtEdo2Zk-commands:
   extends: .opam_template
   variables:
     package: tezos-endorser-008-PtEdo2Zk-commands
+
+opam:tezos-endorser-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-endorser-009-PsFLoren
+
+opam:tezos-endorser-009-PsFLoren-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-endorser-009-PsFLoren-commands
 
 opam:tezos-endorser-alpha:
   extends: .opam_template
@@ -611,6 +676,21 @@ opam:tezos-protocol-008-PtEdoTez:
   variables:
     package: tezos-protocol-008-PtEdoTez
 
+opam:tezos-protocol-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-009-PsFLoren
+
+opam:tezos-protocol-009-PsFLoren-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-009-PsFLoren-parameters
+
+opam:tezos-protocol-009-PsFLoren-tests:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-009-PsFLoren-tests
+
 opam:tezos-protocol-alpha:
   extends: .opam_template
   variables:
@@ -716,6 +796,11 @@ opam:tezos-protocol-functor-008-PtEdoTez:
   variables:
     package: tezos-protocol-functor-008-PtEdoTez
 
+opam:tezos-protocol-functor-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-009-PsFLoren
+
 opam:tezos-protocol-functor-alpha:
   extends: .opam_template
   variables:
@@ -770,6 +855,16 @@ opam:tezos-protocol-plugin-008-PtEdo2Zk-registerer:
   extends: .opam_template
   variables:
     package: tezos-protocol-plugin-008-PtEdo2Zk-registerer
+
+opam:tezos-protocol-plugin-009-PsFLoren:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-009-PsFLoren
+
+opam:tezos-protocol-plugin-009-PsFLoren-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-009-PsFLoren-registerer
 
 opam:tezos-protocol-plugin-alpha:
   extends: .opam_template

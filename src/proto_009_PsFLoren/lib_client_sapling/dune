@@ -1,0 +1,23 @@
+(library
+ (name tezos_client_sapling_009_PsFLoren)
+ (public_name tezos-client-sapling-009-PsFLoren)
+ (libraries tezos-base
+            tezos-crypto
+            tezos-client-base
+            tezos-signer-backends
+            tezos-client-009-PsFLoren
+            tezos-client-009-PsFLoren-commands
+            tezos-protocol-009-PsFLoren)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_client_base
+                   -open Tezos_client_009_PsFLoren
+                   -open Tezos_client_009_PsFLoren_commands
+                   -open Tezos_protocol_009_PsFLoren
+                   -open Tezos_protocol_environment_009_PsFLoren)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
