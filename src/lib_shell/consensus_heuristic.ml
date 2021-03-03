@@ -74,21 +74,19 @@ let get_state (type a) (t : a t) =
   else
     (* We retrieve the result of the functor application. *)
     let (module Map : Map.S with type key = a) = t.values_map_module in
-    let map = Map.empty in
-    (* We used the old trick to use Error as a way for an early
-       return. We do an early return if we found a consensus value. *)
+    (* We use Error as an early return mechanism. *)
     P2p_peer_id.Table.fold_e
       (fun _ value map ->
-        let count = 1 + (Map.find value map |> Option.value ~default:0) in
+        let count = Map.find value map |> Option.fold ~some:succ ~none:1 in
         let map' = Map.add value count map in
         if count = t.threshold then Error value else Ok map')
       t.candidates
-      map
+      Map.empty
     |> function
     | Ok map ->
-        if P2p_peer_id.Table.length t.candidates >= t.expected then
-          No_consensus (Map.bindings map)
-        else Need_more_candidates
+        if P2p_peer_id.Table.length t.candidates < t.expected then
+          Need_more_candidates
+        else No_consensus (Map.bindings map)
     | Error value ->
         Consensus value
 
@@ -100,7 +98,8 @@ module Worker = struct
     (* Internal state of the consensus heuristic *)
     mutable expired : unit Lwt.t;
     (* Expiration promise which is fulfilled when the consensus value
-       has expired *)
+       has expired. The expiration mechanism could be simply
+       implemented as a timestamp check too. *)
     job : unit -> 'a state Lwt.t;
     (* Job associated to the consensus heuristic *)
     mutable result : 'a Lwt.t;
@@ -136,32 +135,29 @@ module Worker = struct
        [loop]. To provent this, we wrap [t.job] as a cancelable
        promise. *)
     Lwt.wrap_in_cancelable (t.job ())
-    >>= fun res ->
-    match res with
+    >>= function
     | Need_more_candidates | No_consensus _ ->
-        let delay = Systime_os.sleep t.restart_delay in
-        delay >>= fun () -> loop t ()
+        Systime_os.sleep t.restart_delay >>= fun () -> loop t ()
     | Consensus data ->
         t.expired <- Systime_os.sleep t.expire_time ;
         (* We call [List.rev] to ensure hooks are called in the same
           order they were registered. *)
-        let hooks = List.rev t.next_consensus_hooks in
+        let one_shot_hooks = List.rev t.next_consensus_hooks in
         t.next_consensus_hooks <- [] ;
-        List.iter (fun hook -> hook data) hooks ;
-        let hooks = List.rev t.all_consensus_hooks in
-        List.iter (fun hook -> hook data) hooks ;
+        let forever_hooks = List.rev t.all_consensus_hooks in
+        List.iter (fun hook -> hook data) one_shot_hooks ;
+        List.iter (fun hook -> hook data) forever_hooks ;
         Lwt.return data
 
   let wait t =
     (* [t]'s job is ongoing if its [result] promise is pending
        ([Lwt.Sleep]).  [t]'s result is expired if its [expired]
-       promise is resolved ([Lwt.Return]).  In both of those cases, we
-       start/restart the job.  *)
-    if Lwt.state t.result = Lwt.Sleep || Lwt.state t.expired <> Lwt.Return ()
-    then Lwt.protected t.result
-    else (
-      t.result <- loop t () ;
-      Lwt.protected t.result )
+       promise is resolved ([Lwt.Return]). We start/restart the job if
+       the current [result] has expired meaning the [result] promise
+       is not pending.  *)
+    if Lwt.state t.result <> Lwt.Sleep && Lwt.state t.expired = Lwt.Return ()
+    then t.result <- loop t () ;
+    Lwt.protected t.result
 
   let on_next_consensus t hook =
     match Lwt.state t.result with

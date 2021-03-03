@@ -168,7 +168,7 @@ let worker_canceled () =
   Assert.equal ~prn (Lwt.state p) (Lwt.state (Lwt.fail Lwt.Canceled))
 
 let tests_worker_raw : (string * (unit -> unit)) list =
-  [ ("job fail", job_failed);
+  [ ("job failed", job_failed);
     ("job canceled", job_canceled);
     ("job return hash", job_return_hash);
     ("job sleep", job_sleep);
