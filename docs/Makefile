@@ -9,13 +9,15 @@ DOCGENDIR     = doc_gen
 DOCERRORDIR   = $(DOCGENDIR)/errors
 DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
-ALPHA_LONG   = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-EDO_LONG     = PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
-DELPHI_LONG  = PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
+ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+FLORENCE_LONG = PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
+EDO_LONG      = PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
+DELPHI_LONG   = PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
 
-ALPHA_SHORT  = alpha
-EDO_SHORT    = 008-PtEdo2Zk
-DELPHI_SHORT = 007-PsDELPH1
+ALPHA_SHORT     = alpha
+FLORENCE_SHORT = 009-PsFLoren
+EDO_SHORT      = 008-PtEdo2Zk
+DELPHI_SHORT   = 007-PsDELPH1
 
 SCRIPTSDIR		= scripts
 CHECKXREFS		= $(SCRIPTSDIR)/check_proto_xrefs.py
@@ -31,6 +33,11 @@ manuals: main
 	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker-alpha.html
 	@../tezos-endorser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-endorser-alpha.html
 	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser-alpha.html
+    # 009 (Florence) protocol
+	@../tezos-client -protocol $(FLORENCE_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-client-009.html
+	@../tezos-baker-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-baker-009.html
+	@../tezos-endorser-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-endorser-009.html
+	@../tezos-accuser-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-accuser-009.html
     # 008 (Edo) protocol
 	@../tezos-client -protocol $(EDO_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-client-008.html
 	@../tezos-baker-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-baker-008.html
@@ -92,6 +99,7 @@ $(DOCGENDIR)/rpc_doc.exe:
 rpc: $(DOCGENDIR)/rpc_doc.exe
 	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 007/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe 008 > 008/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe 009 > 009/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe shell > shell/rpc.rst
 
@@ -114,5 +122,5 @@ html: Makefile api/errors.rst rpc p2p
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst 007/rpc.rst 008/rpc.rst shell/rpc.rst shell/p2p_api.rst
+	@-rm -Rf api/errors.rst 007/rpc.rst 008/rpc.rst 009/rpc.rst shell/rpc.rst shell/p2p_api.rst
 	@-rm -Rf api/tezos-*.html api/tezos-*.txt 007/tezos-*.html 008/tezos-*.html

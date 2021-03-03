@@ -31,6 +31,10 @@ let protocols =
       "Alpha",
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
+    ( "009",
+      "009 Florence",
+      Some "/include/rpc_introduction.rst.inc",
+      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" );
     ( "008",
       "008 Edo",
       Some "/include/rpc_introduction.rst.inc",
