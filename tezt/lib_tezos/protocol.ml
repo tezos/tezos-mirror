@@ -88,6 +88,8 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
 
 let next_protocol = function Edo -> Some Alpha | Alpha -> None
 
+let previous_protocol = function Alpha -> Some Edo | Edo -> None
+
 let all = [Alpha; Edo]
 
 let current_mainnet = Edo
