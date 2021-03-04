@@ -355,9 +355,14 @@ def _try_json_loads(flag: str, string: str) -> Any:
             f"""Write back of {flag} value is not valid json:
 {string}"""
         )
+        # Added to get rid of pylint warning inconsistent-return-statements.
+        # pytest.fail has no return value (NoReturn).
+        return None
 
 
-def _get_state_using_config_init_mockup(mock_client: Client) -> Tuple[str, str]:
+def _get_state_using_config_init_mockup(
+    mock_client: Client,
+) -> Tuple[str, str]:
     """
     Calls `config init mockup` on a mockup client and returns
     the strings of the bootstrap accounts and the protocol
@@ -394,7 +399,9 @@ def _get_state_using_config_init_mockup(mock_client: Client) -> Tuple[str, str]:
     return (ba_str, pc_str)
 
 
-def _get_state_using_config_show_mockup(mock_client: Client) -> Tuple[str, str]:
+def _get_state_using_config_show_mockup(
+    mock_client: Client,
+) -> Tuple[str, str]:
     """
     Calls `--mode mockup config show` on a mockup client and returns
     the strings of the bootstrap accounts and the protocol

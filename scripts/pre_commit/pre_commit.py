@@ -126,7 +126,7 @@ def _get_py_files(tests_python_path: str, staged_or_modified: bool,
         Returns: whether the file is relevant to being an argument to pytest
         """
         forbidden_suffixes = ["__init__.py", "conftest.py"]
-        if any([path.endswith(x) for x in forbidden_suffixes]):
+        if any((path.endswith(x) for x in forbidden_suffixes)):
             return False
         if not path.startswith(f"{tests_python_basename}/tests"):
             return False
