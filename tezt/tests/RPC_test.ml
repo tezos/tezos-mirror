@@ -282,8 +282,8 @@ let test_contracts_alpha client =
   in
   unit
 
-(* Test the contracts RPC for protocol 008. *)
-let test_contracts_008 client =
+(* Test the contracts RPC for the current Mainnet protocol. *)
+let test_contracts_current_mainnet client =
   let test_implicit_contract contract_id =
     let* _ = RPC.Contracts.get ~hooks ~contract_id client in
     let* _ = RPC.Contracts.get_balance ~hooks ~contract_id client in
@@ -402,7 +402,7 @@ let test_contracts_008 client =
       ~alias:"originated_contract_simple"
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_008/str_id.tz"
+      ~prg:"file:./tezt/tests/contracts/proto_current_mainnet/str_id.tz"
       ~init:"Some \"initial storage\""
       ~burn_cap:Tez.(of_int 3)
       client
@@ -416,7 +416,8 @@ let test_contracts_008 client =
       ~alias:"originated_contract_advanced"
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_008/big_map_entrypoints.tz"
+      ~prg:
+        "file:./tezt/tests/contracts/proto_current_mainnet/big_map_entrypoints.tz"
       ~init:"Pair { Elt \"dup\" 0 } { Elt \"dup\" 1 ; Elt \"test\" 5 }"
       ~burn_cap:Tez.(of_int 3)
       client
@@ -521,8 +522,8 @@ let test_delegates_alpha client =
   in
   unit
 
-(* Test the delegates RPC for protocol 008. *)
-let test_delegates_008 client =
+(* Test the delegates RPC for the current Mainnet protocol. *)
+let test_delegates_current_mainnet client =
   let* contracts = RPC.Contracts.get_all client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
@@ -623,8 +624,8 @@ let test_votes_alpha client =
   (* RPC calls again *)
   unit
 
-(* Test the votes RPC for protocol 008. *)
-let test_votes_008 client =
+(* Test the votes RPC for the current Mainnet protocol. *)
+let test_votes_current_mainnet client =
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
   let* () = Client.submit_proposals ~proto_hash client in
@@ -688,16 +689,16 @@ let register () =
           ("others", test_others, None) ]
       ()
   in
-  let register_008 client_mode_tag =
+  let register_current_mainnet client_mode_tag =
     check_rpc
-      ~group_name:"008"
-      ~protocol:Protocol.Edo
+      ~group_name:"current"
+      ~protocol:Protocol.current_mainnet
       ~client_mode_tag
       ~rpcs:
-        [ ("contracts", test_contracts_008, None);
-          ("delegates", test_delegates_008, None);
+        [ ("contracts", test_contracts_current_mainnet, None);
+          ("delegates", test_delegates_current_mainnet, None);
           ( "votes",
-            test_votes_008,
+            test_votes_current_mainnet,
             Some
               (* reduced periods duration to get to testing vote period faster *)
               [ (["blocks_per_cycle"], Some "4");
@@ -706,4 +707,8 @@ let register () =
       ()
   in
   let modes = [Client; Proxy] in
-  List.iter (fun mode -> register_alpha mode ; register_008 mode) modes
+  List.iter
+    (fun mode ->
+      register_alpha mode ;
+      register_current_mainnet mode)
+    modes

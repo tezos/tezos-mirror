@@ -42,14 +42,17 @@ let () =
   Synchronisation_heuristic.register Alpha ;
   Normalize.register Alpha ;
   Double_bake.register Alpha ;
-  Mockup.register Edo ;
+  Mockup.register Protocol.current_mainnet ;
   Mockup.register Alpha ;
   Mockup.register_protocol_independent () ;
-  Proxy.register Edo ;
+  Proxy.register Protocol.current_mainnet ;
   Proxy.register Alpha ;
   P2p.register Alpha ;
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
+  (* Note: Encoding and RPC_test differ significantly depending on the protocol.
+     When deactivating a protocol and/or adding another,
+     don't forget to modify them directly. *)
   Encoding.register () ;
   RPC_test.register () ;
   Baking.register Alpha ;

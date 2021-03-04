@@ -284,7 +284,7 @@ let get_candidates_to_migration () =
               && List.exists (String.equal next_hash) mockup_protocols
             then Some (protocol, next)
             else None)
-      Protocol.all_protocols
+      Protocol.all
   in
   return result
 

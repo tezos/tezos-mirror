@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/008.proxy.votes.out
+tezt/_regressions/rpc/current.proxy.votes.out
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballot_list
 protocol of proxy unspecified, using the node's protocol: PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA

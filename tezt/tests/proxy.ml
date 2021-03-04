@@ -254,7 +254,15 @@ let test_wrong_proto protocol =
     ~tags:[Protocol.tag protocol; "proxy"; "bake"]
   @@ fun () ->
   let* (_, client) = init ~protocol () in
-  let other_proto = List.find (( <> ) protocol) Protocol.all_protocols in
+  let other_proto =
+    match List.find_opt (( <> ) protocol) Protocol.all with
+    | None ->
+        Test.fail
+          "No other protocol than %s is available."
+          (Protocol.name protocol)
+    | Some other_proto ->
+        other_proto
+  in
   let* stderr =
     Client.spawn_bake_for ~protocol:other_proto client
     |> Process.check_and_read_stderr ~expect_failure:true
