@@ -166,6 +166,66 @@ let blockchain_network_edo2net =
         "edonet2.smartpy.io";
         "edonetb.boot.tezostaquito.io" ]
 
+let blockchain_network_florencenobanet =
+  make_blockchain_network
+    ~alias:"florencenobanet"
+    {
+      time = Time.Protocol.of_notation_exn "2021-03-04T20:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BMFCHw1mv3A71KpTuGD3MoFnkHk9wvTYjUzuR9QqiUumKGFG6pM";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n" ) ];
+      }
+    ~chain_name:"TEZOS_FLORENCENOBANET_2021-03-04T20:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:
+      [ "florencenoba.tznode.net";
+        "florencenobanet.kaml.fr";
+        "florencenobanet.tezos.co.il";
+        "florencenobanet.boot.tez.ie";
+        "florencenobanet.smartpy.io:9733" ]
+
+let blockchain_network_florencenet =
+  make_blockchain_network
+    ~alias:"florencenet"
+    {
+      time = Time.Protocol.of_notation_exn "2021-03-04T20:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BMFCHw1mv3A71KpTuGD3MoFnkHk9wvTYjUzuR9QqiUumKGFG6pM";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n" ) ];
+      }
+    ~chain_name:"TEZOS_FLORENCENET_2021-03-04T20:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:
+      [ "florence.tznode.net";
+        "florencenet.kaml.fr";
+        "florencenet.tezos.co.il";
+        "florencenet.boot.tez.ie";
+        "florencenet.smartpy.io" ]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -259,7 +319,9 @@ let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (9, blockchain_network_delphinet);
-    (12, blockchain_network_edo2net) ]
+    (12, blockchain_network_edo2net);
+    (13, blockchain_network_florencenobanet);
+    (14, blockchain_network_florencenet) ]
   |> List.map (fun (tag, network) ->
          match network.alias with
          | None ->
