@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Tocqueville Group, Inc. <marcin.pastudzki@tqtezos.com> *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,9 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type cors = Resto_cohttp.Cors.t = {
-  allowed_headers : string list;
-  allowed_origins : string list;
-}
+(** This module is internal to the RPC layer. It provides logging interface
+    required by resto HTTP library and translates its log messages to events in
+    Tezos' internal logging system. It is not intended to be used for any other
+    purpose. For your own logging use Internal_event.Simple instead. *)
 
-include Resto_cohttp_server.Server.Make (RPC_encoding) (RPC_logging)
+val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
+
+val log_info : ('a, Format.formatter, unit, unit) format4 -> 'a
+
+val log_notice : ('a, Format.formatter, unit, unit) format4 -> 'a
+
+val warn : ('a, Format.formatter, unit, unit) format4 -> 'a
+
+val log_error : ('a, Format.formatter, unit, unit) format4 -> 'a
+
+val lwt_debug : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+
+val lwt_log_info : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+
+val lwt_log_notice : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+
+val lwt_warn : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+
+val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a

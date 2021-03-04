@@ -35,7 +35,8 @@
             resto-cohttp-server
             resto-acl
             tezos-rpc-http)
- (modules RPC_server)
+ (modules RPC_server RPC_logging)
+ (private_modules RPC_logging)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc
                    -open Tezos_rpc_http)))
