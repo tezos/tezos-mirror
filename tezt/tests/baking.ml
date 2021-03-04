@@ -483,8 +483,8 @@ let init ~protocol =
 let test_ordering ~protocol =
   Test.register
     ~__FILE__
-    ~title:"baking ordering"
-    ~tags:["baking"; "ordering"]
+    ~title:(sf "baking ordering (%s)" (Protocol.name protocol))
+    ~tags:["baking"; "ordering"; Protocol.tag protocol]
     (fun () ->
       let* state = init ~protocol in
       Log.info "Testing ordering by counter" ;

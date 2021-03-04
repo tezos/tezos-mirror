@@ -37,6 +37,8 @@
    as functions to be called here. *)
 
 let () =
+  (* Tests that are relatively protocol-agnostic.
+     We can run them on all protocols, or only one if the CI would be too slow. *)
   Basic.register Alpha ;
   Bootstrap.register Alpha ;
   Synchronisation_heuristic.register Alpha ;
@@ -44,17 +46,23 @@ let () =
   Double_bake.register Alpha ;
   Mockup.register Protocol.current_mainnet ;
   Mockup.register Alpha ;
-  Mockup.register_protocol_independent () ;
   Proxy.register Protocol.current_mainnet ;
   Proxy.register Alpha ;
   P2p.register Alpha ;
+  (* TODO: the "Baking" test does not have a documentation.
+     I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
+     test since it requires Alpha) or about baking (which would make it possible to run
+     on previous protocols, if not for a problem that was introduced in
+     Client.bake_for which causes the default key to be a baking account key). *)
+  Baking.register Alpha ;
+  (* Tests that are protocol-independent.
+     They do not take a protocol as a parameter and thus need to be registered only once. *)
+  Mockup.register_protocol_independent () ;
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
-  (* Note: Encoding and RPC_test differ significantly depending on the protocol.
-     When deactivating a protocol and/or adding another,
-     don't forget to modify them directly. *)
+  (* Tests that are heavily protocol-dependent.
+     Those modules define different tests for different protocols in their [register]. *)
   Encoding.register () ;
   RPC_test.register () ;
-  Baking.register Alpha ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
