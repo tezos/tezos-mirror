@@ -42,11 +42,9 @@ let () =
   Synchronisation_heuristic.register Alpha ;
   Normalize.register Alpha ;
   Double_bake.register Alpha ;
-  Mockup.register Delphi ;
   Mockup.register Edo ;
   Mockup.register Alpha ;
   Mockup.register_protocol_independent () ;
-  Proxy.register Delphi ;
   Proxy.register Edo ;
   Proxy.register Alpha ;
   P2p.register Alpha ;

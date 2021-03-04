@@ -25,9 +25,9 @@
 (*****************************************************************************)
 
 (** Declaration order must respect the version order. *)
-type t = Delphi | Edo | Alpha
+type t = Edo | Alpha
 
-let name = function Alpha -> "Alpha" | Edo -> "Edo" | Delphi -> "Delphi"
+let name = function Alpha -> "Alpha" | Edo -> "Edo"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -37,32 +37,20 @@ let hash = function
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Edo ->
       "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
-  | Delphi ->
-      "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo"
 
 let parameter_file = function
   | Alpha ->
       "src/proto_alpha/parameters/sandbox-parameters.json"
   | Edo ->
       "src/proto_008_PtEdo2Zk/parameters/sandbox-parameters.json"
-  | Delphi ->
-      "src/proto_007_PsDELPH1/parameters/sandbox-parameters.json"
 
 let accuser = function
   | Alpha ->
       "./tezos-accuser-alpha"
   | Edo ->
       "./tezos-accuser-008-PtEdo2Zk"
-  | Delphi ->
-      "./tezos-accuser-007-PsDELPH1"
 
-let daemon_name = function
-  | Alpha ->
-      "alpha"
-  | Edo ->
-      "008-PtEdo2Zk"
-  | Delphi ->
-      "007-PsDELPH1"
+let daemon_name = function Alpha -> "alpha" | Edo -> "008-PtEdo2Zk"
 
 (** Protocol parameters overrides are pairs of JSON paths and optional values
     that can be used to override or remove (when the value is [None]) the
@@ -94,12 +82,6 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
   in
   Lwt.return overriden_parameters
 
-let next_protocol = function
-  | Delphi ->
-      Some Edo
-  | Edo ->
-      Some Alpha
-  | Alpha ->
-      None
+let next_protocol = function Edo -> Some Alpha | Alpha -> None
 
-let all_protocols = [Alpha; Edo; Delphi]
+let all_protocols = [Alpha; Edo]
