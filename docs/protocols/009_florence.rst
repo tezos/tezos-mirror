@@ -195,5 +195,6 @@ Authors & Invoice
 
 This protocol amendment has been developed by Nomadic Labs, Metastate,
 Dai Lambda, Ligo, and the following external contributor:
+- `Keefer Taylor <https://gitlab.com/keefertaylor>`__, rewarded ꜩ100 for his
 - [Keefer Taylor](https://gitlab.com/keefertaylor), rewarded ꜩ100 for his
 contribution on increasing the maximal operation size.
