@@ -43,14 +43,19 @@ Depth-First Execution Order
 
 The applied order of inter-contract calls emitted by smart contracts has
 changed. The operations are now placed in a stack instead of a queue,
-resulting in a depth-first as opposed to breadth-first execution order.
+resulting in a depth-first as opposed to breadth-first execution order,
+making smart contract development more intuitive.
+
+This change could break contracts that relied on execution order;
+However, the development team has backtested the change against all available
+blocks in Edo, and found only one contract affected by the change, the developers
+of which are developing a patch.
 
 -  TZIP:
    `tzip!111 <https://gitlab.com/tzip/tzip/-/merge_requests/111>`__
 -  MR:
    `tezos!2420 <https://gitlab.com/tezos/tezos/-/merge_requests/2420>`__
 
-/!\ This is a breaking change that affects the security of smart contracts
 
 Tooling
 -------
@@ -86,15 +91,17 @@ future protocols.
 Performance
 -----------
 
-Endorsements Now Checked in Linear Time
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Endorsements Now Checked in Linear Time (⚠️ Attention Indexers!)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Endorsement and double endorsing evidence operations now contain an
 additional slot field; the slot should be the smallest among the
 endorser's slots.
 
-Software that make use of operations and receipts will have to be
-adapted, in particular indexers.
+Indexers, block explorers, and other software making use of
+operations and receipts should be aware that this a breaking
+change to the structure of blocks. All other users should be
+wholly unaffected.
 
 Most notably, the first list of operations is now composed of
 `endorsement_with_slot` instead of `endorsement` operations.
@@ -111,8 +118,6 @@ before injection.
    `tezos#1028 <https://gitlab.com/tezos/tezos/-/issues/1028>`__
 -  MR:
    `tezos!2471 <https://gitlab.com/tezos/tezos/-/merge_requests/2471>`__
-
-/!\ Breaking change: the format of endorsements and double endorsing evidences has changed
 
 Staking balance RPC
 ~~~~~~~~~~~~~~~~~~~
