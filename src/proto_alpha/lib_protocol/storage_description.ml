@@ -85,19 +85,19 @@ let pp_rev_path ppf path =
     (List.rev path)
 
 let rec register_named_subcontext : type r. r t -> string list -> r t =
- fun ({rev_path; dir} as desc) names ->
-  match (dir, names) with
+ fun desc names ->
+  match (desc.dir, names) with
   | (_, []) -> desc
   | (Value _, _) | (IndexedDir _, _) ->
       Format.kasprintf
         invalid_arg
         "Could not register a named subcontext at %a because of an existing %a."
         pp_rev_path
-        rev_path
+        desc.rev_path
         pp
         desc
   | (Empty, name :: names) ->
-      let subdir = {rev_path = name :: rev_path; dir = Empty} in
+      let subdir = {rev_path = name :: desc.rev_path; dir = Empty} in
       desc.dir <- NamedDir (StringMap.singleton name subdir) ;
       register_named_subcontext subdir names
   | (NamedDir map, name :: names) ->
@@ -105,7 +105,7 @@ let rec register_named_subcontext : type r. r t -> string list -> r t =
         match StringMap.find_opt name map with
         | Some subdir -> subdir
         | None ->
-            let subdir = {rev_path = name :: rev_path; dir = Empty} in
+            let subdir = {rev_path = name :: desc.rev_path; dir = Empty} in
             desc.dir <- NamedDir (StringMap.add name subdir map) ;
             subdir
       in
@@ -165,7 +165,7 @@ let destutter equal l =
 let rec register_indexed_subcontext :
     type r a b.
     r t -> list:(r -> a list tzresult Lwt.t) -> (r, a, b) args -> b t =
- fun ({dir; rev_path = desc_path} as desc) ~list path ->
+ fun desc ~list path ->
   match path with
   | Pair (left, right) ->
       let compare_left = compare left in
@@ -181,14 +181,14 @@ let rec register_indexed_subcontext :
         ~list:list_right
         right
   | One {rpc_arg = arg; encoding = arg_encoding; _} -> (
-      match dir with
+      match desc.dir with
       | Value _ | NamedDir _ ->
           Format.kasprintf
             invalid_arg
             "Could not register an indexed subcontext at %a because of an \
              existing %a."
             pp_rev_path
-            desc_path
+            desc.rev_path
             pp
             desc
       | Empty ->
@@ -210,7 +210,7 @@ let rec register_indexed_subcontext :
                 "An indexed subcontext at %a already exists but has a \
                  different argument: `%s` <> `%s`."
                 pp_rev_path
-                desc_path
+                desc.rev_path
                 (RPC_arg.descr arg).name
                 (RPC_arg.descr inner_arg).name
           | Some RPC_arg.Eq -> subdir))
@@ -219,15 +219,15 @@ let rec register_indexed_subcontext :
 let register_value :
     type a b.
     a t -> get:(a -> b option tzresult Lwt.t) -> b Data_encoding.t -> unit =
- fun ({dir; rev_path} as desc) ~get encoding ->
-  match dir with
+ fun desc ~get encoding ->
+  match desc.dir with
   | Empty -> desc.dir <- Value {get; encoding}
   | _ ->
       Format.kasprintf
         invalid_arg
         "Could not register a value at %a because of an existing %a."
         pp_rev_path
-        rev_path
+        desc.rev_path
         pp
         desc
 
@@ -303,8 +303,8 @@ let build_directory : type key. key t -> key RPC_directory.t =
   in
   let rec build_handler :
       type ikey. ikey t -> (key, ikey) RPC_path.t -> ikey opt_handler =
-   fun {dir; _} path ->
-    match dir with
+   fun desc path ->
+    match desc.dir with
     | Empty ->
         Opt_handler
           {encoding = Data_encoding.unit; get = (fun _ _ -> return_none)}
