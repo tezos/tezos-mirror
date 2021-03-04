@@ -54,6 +54,21 @@ is the tool used to compile this format into plain web pages in HTML format.
 
 For the RST syntax, see the `Sphinx RST primer <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html>`_.
 
+Line breaking
+-------------
+
+When writing documentation in text formats such as RST, it is not required to respect a maximal line width, such as 80 columns.
+Therefore, you may choose between the different line breaking policies your text editor proposes.
+However, you should be aware that differencing tools such as ``diff`` tend to output large differences for a paragraph that has been reformatted after only a small change in one phrase.
+Also, reviewing tools such as the one in the ``gitlab`` user interface associate comments and change suggestions to lines, while these comments and suggestions are usually logically associated to whole phrases.
+
+For such reasons:
+
+- Some contributors use one line per complete phrase, which allows to make rephrasing suggestions more easily in ``gitlab``, associated to this (possibly long) line; and which allows ``diff`` to isolate modified phrases, instead of showing the whole container paragraph as modified.
+- Other contributors, whose editor breaks lines at a fixed width, introduce an extra line break at the end of each phrase. This also allows ``diff`` to isolate modified phrases.
+
+Thus, you may choose your own formatting style, while tolerating different styles from other contributors.
+
 Sphinx extensions
 -----------------
 
