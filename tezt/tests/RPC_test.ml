@@ -101,7 +101,7 @@ let check_rpc ~group_name ~protocol ~client_mode_tag
         match protocol with
         | Protocol.Alpha ->
             Client.remember_baker_contracts client
-        | Carthage | Delphi | Edo ->
+        | Delphi | Edo ->
             unit
       in
       let* _ = rpc client in

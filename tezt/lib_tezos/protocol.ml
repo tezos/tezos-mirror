@@ -25,17 +25,9 @@
 (*****************************************************************************)
 
 (** Declaration order must respect the version order. *)
-type t = Carthage | Delphi | Edo | Alpha
+type t = Delphi | Edo | Alpha
 
-let name = function
-  | Alpha ->
-      "Alpha"
-  | Edo ->
-      "Edo"
-  | Delphi ->
-      "Delphi"
-  | Carthage ->
-      "Carthage"
+let name = function Alpha -> "Alpha" | Edo -> "Edo" | Delphi -> "Delphi"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -47,8 +39,6 @@ let hash = function
       "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
   | Delphi ->
       "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo"
-  | Carthage ->
-      "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb"
 
 let parameter_file = function
   | Alpha ->
@@ -57,8 +47,6 @@ let parameter_file = function
       "src/proto_008_PtEdo2Zk/parameters/sandbox-parameters.json"
   | Delphi ->
       "src/proto_007_PsDELPH1/parameters/sandbox-parameters.json"
-  | Carthage ->
-      "src/proto_006_PsCARTHA/parameters/sandbox-parameters.json"
 
 let accuser = function
   | Alpha ->
@@ -67,8 +55,6 @@ let accuser = function
       "./tezos-accuser-008-PtEdo2Zk"
   | Delphi ->
       "./tezos-accuser-007-PsDELPH1"
-  | Carthage ->
-      "./tezos-accuser-006-PsCARTHA"
 
 let daemon_name = function
   | Alpha ->
@@ -77,8 +63,6 @@ let daemon_name = function
       "008-PtEdo2Zk"
   | Delphi ->
       "007-PsDELPH1"
-  | Carthage ->
-      "006-PsCARTHA"
 
 (** Protocol parameters overrides are pairs of JSON paths and optional values
     that can be used to override or remove (when the value is [None]) the
@@ -111,8 +95,6 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Carthage ->
-      Some Delphi
   | Delphi ->
       Some Edo
   | Edo ->
@@ -120,4 +102,4 @@ let next_protocol = function
   | Alpha ->
       None
 
-let all_protocols = [Alpha; Edo; Delphi; Carthage]
+let all_protocols = [Alpha; Edo; Delphi]
