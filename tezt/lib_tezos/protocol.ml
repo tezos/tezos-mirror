@@ -52,6 +52,10 @@ let accuser = function
 
 let daemon_name = function Alpha -> "alpha" | Edo -> "008-PtEdo2Zk"
 
+(* The encoding prefix is the part which is added at the beginning of all encoding names.
+   It turns out this is equal to what the [daemon_name] function returns. *)
+let encoding_prefix = daemon_name
+
 (** Protocol parameters overrides are pairs of JSON paths and optional values
     that can be used to override or remove (when the value is [None]) the
     default parameters when activating protocol. *)

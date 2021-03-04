@@ -97,7 +97,7 @@ let check_sample ~name ~file =
 
 (** The given samples must be included in registered encodings. These can be
     found with [tezos-codec list encodings]. *)
-let check_samples_encoding ~group_name ~samples =
+let check_samples_encoding ~group_name ~protocol ~samples =
   List.iter
     (fun sample ->
       Regression.register
@@ -111,72 +111,76 @@ let check_samples_encoding ~group_name ~samples =
       in
       Sys.readdir base_path |> Array.to_list |> List.sort String.compare
       |> Lwt_list.iter_s (fun file ->
-             check_sample ~name:sample ~file:(base_path // file)))
+             check_sample
+               ~name:(Protocol.encoding_prefix protocol ^ "." ^ sample)
+               ~file:(base_path // file)))
     samples
 
 let register () =
   check_dump_encodings () ;
   check_samples_encoding
     ~group_name:"alpha"
+    ~protocol:Alpha
     ~samples:
-      [ "alpha.baker.frozen_balance";
-        "alpha.baker.frozen_balance_by_cycles";
-        "alpha.block_header";
-        "alpha.block_header.raw";
-        "alpha.block_header.unsigned";
-        "alpha.contract";
-        "alpha.contract.big_map_diff";
-        "alpha.cycle";
-        "alpha.fitness";
-        "alpha.gas.cost";
-        "alpha.gas";
-        "alpha.level";
-        "alpha.nonce";
-        "alpha.operation.internal";
-        "alpha.operation";
-        "alpha.operation.raw";
-        "alpha.operation.unsigned";
-        "alpha.period";
-        "alpha.raw_level";
-        "alpha.receipt.balance_updates";
-        "alpha.roll";
-        "alpha.seed";
-        "alpha.tez";
-        "alpha.timestamp";
-        "alpha.vote.ballot";
-        "alpha.vote.ballots";
-        "alpha.vote.listings";
-        "alpha.voting_period.kind";
-        "alpha.voting_period" ] ;
+      [ "baker.frozen_balance";
+        "baker.frozen_balance_by_cycles";
+        "block_header";
+        "block_header.raw";
+        "block_header.unsigned";
+        "contract";
+        "contract.big_map_diff";
+        "cycle";
+        "fitness";
+        "gas.cost";
+        "gas";
+        "level";
+        "nonce";
+        "operation.internal";
+        "operation";
+        "operation.raw";
+        "operation.unsigned";
+        "period";
+        "raw_level";
+        "receipt.balance_updates";
+        "roll";
+        "seed";
+        "tez";
+        "timestamp";
+        "vote.ballot";
+        "vote.ballots";
+        "vote.listings";
+        "voting_period.kind";
+        "voting_period" ] ;
   check_samples_encoding
-    ~group_name:"007"
+    ~group_name:"current"
+    ~protocol:Protocol.current_mainnet
     ~samples:
-      [ "007-PsDELPH1.block_header";
-        "007-PsDELPH1.block_header.raw";
-        "007-PsDELPH1.block_header.unsigned";
-        "007-PsDELPH1.contract";
-        "007-PsDELPH1.contract.big_map_diff";
-        "007-PsDELPH1.cycle";
-        "007-PsDELPH1.delegate.balance_updates";
-        "007-PsDELPH1.delegate.frozen_balance";
-        "007-PsDELPH1.delegate.frozen_balance_by_cycles";
-        "007-PsDELPH1.fitness";
-        "007-PsDELPH1.gas.cost";
-        "007-PsDELPH1.gas";
-        "007-PsDELPH1.level";
-        "007-PsDELPH1.nonce";
-        "007-PsDELPH1.operation.internal";
-        "007-PsDELPH1.operation";
-        "007-PsDELPH1.operation.raw";
-        "007-PsDELPH1.operation.unsigned";
-        "007-PsDELPH1.period";
-        "007-PsDELPH1.raw_level";
-        "007-PsDELPH1.roll";
-        "007-PsDELPH1.seed";
-        "007-PsDELPH1.tez";
-        "007-PsDELPH1.timestamp";
-        "007-PsDELPH1.vote.ballot";
-        "007-PsDELPH1.vote.ballots";
-        "007-PsDELPH1.vote.listings";
-        "007-PsDELPH1.voting_period.kind";
-        "007-PsDELPH1.voting_period" ]
+      [ "block_header";
+        "block_header.raw";
+        "block_header.unsigned";
+        "contract";
+        "contract.big_map_diff";
+        "cycle";
+        "delegate.balance_updates";
+        "delegate.frozen_balance";
+        "delegate.frozen_balance_by_cycles";
+        "fitness";
+        "gas.cost";
+        "gas";
+        "level";
+        "nonce";
+        "operation.internal";
+        "operation";
+        "operation.raw";
+        "operation.unsigned";
+        "period";
+        "raw_level";
+        "roll";
+        "seed";
+        "tez";
+        "timestamp";
+        "vote.ballot";
+        "vote.ballots";
+        "vote.listings";
+        "voting_period.kind";
+        "voting_period" ]
