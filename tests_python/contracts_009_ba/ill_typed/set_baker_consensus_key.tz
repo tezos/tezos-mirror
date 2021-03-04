@@ -1,0 +1,12 @@
+# Here we are checking we don't accept baker_operation as return value of
+# non-baking contracts
+parameter unit;
+storage unit;
+code {
+       NIL baker_operation ;
+       PUSH signature "edsigtYRv1QvnNQyfKy8yDpLdp4oqrdySc9Qbvb8echUVcVu13Y4dMiY6cEvSASmDvtgc55BFpxQsqB6ASYvEVy7LiAELPBVcmJ" ; # wrong signature but we don't care
+       PUSH key "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" ;
+       SET_BAKER_CONSENSUS_KEY ;
+       CONS ;
+       PAIR
+     }
