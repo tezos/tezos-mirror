@@ -82,7 +82,11 @@ let compile_ml ?for_pack source_file =
   let output_prefix = Filename.chop_extension source_file in
   Clflags.for_package := for_pack ;
   Compenv.(readenv Format.err_formatter (Before_compile source_file)) ;
-  Optcompile.implementation ~backend ~source_file ~output_prefix ;
+  Optcompile.implementation
+    ~backend
+    ~source_file
+    ~output_prefix
+    ~start_from:Clflags.Compiler_pass.Parsing ;
   Clflags.for_package := None ;
   output_prefix ^ ".cmx"
 
