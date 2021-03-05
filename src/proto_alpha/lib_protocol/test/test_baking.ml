@@ -124,7 +124,10 @@ let test_rewards_retrieval () =
       let real_endorsers = List.sub endorsers endorsing_power in
       List.map_ep
         (fun endorser ->
-          Op.endorsement ~delegate:endorser.delegate (B good_b) ()
+          Op.endorsement_with_slot
+            ~delegate:(endorser.delegate, endorser.slots)
+            (B good_b)
+            ()
           >|=? fun operation -> Operation.pack operation)
         real_endorsers
       >>=? fun operations ->
