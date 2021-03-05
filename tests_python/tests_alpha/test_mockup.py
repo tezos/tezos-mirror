@@ -605,6 +605,7 @@ def _test_create_mockup_init_show_roundtrip(
                 "blocks_per_commitment": 5,
                 "blocks_per_cycle": 9,
                 "preserved_cycles": 3,
+                "minimal_block_delay": "1",
             }
         ),
     ],
