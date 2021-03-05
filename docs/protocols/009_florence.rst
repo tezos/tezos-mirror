@@ -38,18 +38,20 @@ Fixed a discrepancy between ``CONTRACT`` and ``PACK`` in addresses without entry
 -  Commit:
    `tezos#e879b1a7 <https://gitlab.com/tezos/tezos/commit/e879b1a764ed95182ce33b0a13e0f807f21520ed>`__
 
-Depth-First Execution Order
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Depth-First Execution Order (⚠️ Attention Smart Contract Developers!)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The applied order of inter-contract calls emitted by smart contracts has
 changed. The operations are now placed in a stack instead of a queue,
 resulting in a depth-first as opposed to breadth-first execution order,
 making smart contract development more intuitive.
 
-This change could break contracts that relied on execution order;
-However, the development team has backtested the change against all available
-blocks in Edo, and found only one contract affected by the change, the developers
-of which are developing a patch.
+This change could break contracts that relied on execution order.
+The development team has backtested the change against all available
+blocks in Delphi, and found only one contract affected by the change, which has
+been patched and redeployed. However, smart contract developers should
+review their contracts for security threats made possible by the new execution
+order.
 
 -  TZIP:
    `tzip!111 <https://gitlab.com/tzip/tzip/-/merge_requests/111>`__
@@ -199,7 +201,6 @@ Authors & Invoice
 -----------------
 
 This protocol amendment has been developed by Nomadic Labs, Metastate,
-Dai Lambda, Ligo, and the following external contributor:
+DaiLambda, Marigold, Tarides and the following external contributor:
 - `Keefer Taylor <https://gitlab.com/keefertaylor>`__, rewarded ꜩ100 for his
-- [Keefer Taylor](https://gitlab.com/keefertaylor), rewarded ꜩ100 for his
 contribution on increasing the maximal operation size.

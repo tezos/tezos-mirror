@@ -60,19 +60,26 @@ Fixed a discrepancy between ``CONTRACT`` and ``PACK`` in addresses without entry
 -  Commit:
    `tezos#e879b1a7 <https://gitlab.com/tezos/tezos/commit/e879b1a764ed95182ce33b0a13e0f807f21520ed>`__
 
-Depth-First Execution Order
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Depth-First Execution Order (⚠️ Attention Smart Contract Developers!)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The applied order of inter-contract calls emitted by smart contracts has
 changed. The operations are now placed in a stack instead of a queue,
-resulting in a depth-first as opposed to breadth-first execution order.
+resulting in a depth-first as opposed to breadth-first execution order,
+making smart contract development more intuitive.
+
+This change could break contracts that relied on execution order.
+The development team has backtested the change against all available
+blocks in Delphi, and found only one contract affected by the change, which has
+been patched and redeployed. However, smart contract developers should
+review their contracts for security threats made possible by the new execution
+order.
 
 -  TZIP:
    `tzip!111 <https://gitlab.com/tzip/tzip/-/merge_requests/111>`__
 -  MR:
    `tezos!2420 <https://gitlab.com/tezos/tezos/-/merge_requests/2420>`__
 
-/!\ This is a breaking change that affects the security of smart contracts
 
 Tooling
 -------
@@ -108,15 +115,17 @@ future protocols.
 Performance
 -----------
 
-Endorsements Now Checked in Linear Time
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Endorsements Now Checked in Linear Time (⚠️ Attention Indexers!)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Endorsement and double endorsing evidence operations now contain an
 additional slot field; the slot should be the smallest among the
 endorser's slots.
 
-Software that make use of operations and receipts will have to be
-adapted, in particular indexers.
+Indexers, block explorers, and other software making use of
+operations and receipts should be aware that this a breaking
+change to the structure of blocks. All other users should be
+wholly unaffected.
 
 Most notably, the first list of operations is now composed of
 `endorsement_with_slot` instead of `endorsement` operations.
@@ -133,8 +142,6 @@ before injection.
    `tezos#1028 <https://gitlab.com/tezos/tezos/-/issues/1028>`__
 -  MR:
    `tezos!2471 <https://gitlab.com/tezos/tezos/-/merge_requests/2471>`__
-
-/!\ Breaking change: the format of endorsements and double endorsing evidences has changed
 
 Staking balance RPC
 ~~~~~~~~~~~~~~~~~~~
@@ -216,6 +223,6 @@ Authors & Invoice
 -----------------
 
 This protocol amendment has been developed by Nomadic Labs, Metastate,
-Dai Lambda, Ligo, and the following external contributor:
-- [Keefer Taylor](https://gitlab.com/keefertaylor), rewarded ꜩ100 for his
+DaiLambda, Marigold, Tarides and the following external contributor:
+- `Keefer Taylor <https://gitlab.com/keefertaylor>`__, rewarded ꜩ100 for his
 contribution on increasing the maximal operation size.
