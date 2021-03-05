@@ -19,7 +19,7 @@ respect to Edo.
 ..
    comment: Chop file here
 
-Baking Accounts
+Baking Accounts 
 ---------------
 
 A new account type has been added to represent accounts managed
@@ -37,7 +37,9 @@ voting for protocol amendments.
 -  Docs:
    `tezos!2490 <https://gitlab.com/tezos/tezos/-/merge_requests/2490>`__
 
-/!\ This is a breaking change, see `the corresponding section in the TZIP. <https://gitlab.com/tzip/tzip/-/merge_requests/133/diffs#9eb8e126493e85d8c9f2b71eb47cee980df5f5c2_0_524>`__
+
+⚠️ Note this feature includes several breaking changes. Please see
+`the corresponding section in the TZIP. <https://gitlab.com/tzip/tzip/-/merge_requests/133/diffs#9eb8e126493e85d8c9f2b71eb47cee980df5f5c2_0_524>`__
 
 
 Smart Contracts/Michelson
