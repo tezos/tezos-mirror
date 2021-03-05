@@ -16,6 +16,9 @@ respect to Edo.
 
 .. contents:: Summary of changes
 
+..
+   comment: Chop file here
+
 Baking Accounts
 ---------------
 
