@@ -40,6 +40,7 @@ module Protocol_constants_overrides = struct
     blocks_per_roll_snapshot : int32 option;
     blocks_per_voting_period : int32 option;
     time_between_blocks : Period.t list option;
+    minimal_block_delay : Period.t option;
     endorsers_per_block : int option;
     hard_gas_limit_per_operation : Gas.Arith.integral option;
     hard_gas_limit_per_block : Gas.Arith.integral option;
@@ -87,21 +88,21 @@ module Protocol_constants_overrides = struct
               c.endorsement_security_deposit,
               c.baking_reward_per_endorsement,
               c.endorsement_reward ),
-            ( c.cost_per_byte,
-              c.hard_storage_limit_per_operation,
-              Some 0L,
-              (* At this position in the encoding we used to have a test
+            ( ( c.cost_per_byte,
+                c.hard_storage_limit_per_operation,
+                Some 0L,
+                (* At this position in the encoding we used to have a test
                chain duration but it is not used anymore and should be
                removed when this encoding is updated. When the test
                chain was removed, we did not want to change the
                encoding for retrocompatibility. *)
-              c.quorum_min,
-              c.quorum_max,
-              c.min_proposal_quorum,
-              c.initial_endorsers,
-              c.delay_per_missing_endorsement,
-              c.chain_id,
-              c.timestamp ) ) ))
+                c.quorum_min,
+                c.quorum_max,
+                c.min_proposal_quorum,
+                c.initial_endorsers,
+                c.delay_per_missing_endorsement,
+                c.minimal_block_delay ),
+              (c.chain_id, c.timestamp) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
                blocks_per_commitment,
@@ -120,16 +121,16 @@ module Protocol_constants_overrides = struct
                  endorsement_security_deposit,
                  baking_reward_per_endorsement,
                  endorsement_reward ),
-               ( cost_per_byte,
-                 hard_storage_limit_per_operation,
-                 _test_chain_duration,
-                 quorum_min,
-                 quorum_max,
-                 min_proposal_quorum,
-                 initial_endorsers,
-                 delay_per_missing_endorsement,
-                 chain_id,
-                 timestamp ) ) ) ->
+               ( ( cost_per_byte,
+                   hard_storage_limit_per_operation,
+                   _test_chain_duration,
+                   quorum_min,
+                   quorum_max,
+                   min_proposal_quorum,
+                   initial_endorsers,
+                   delay_per_missing_endorsement,
+                   minimal_block_delay ),
+                 (chain_id, timestamp) ) ) ) ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -156,6 +157,7 @@ module Protocol_constants_overrides = struct
           min_proposal_quorum;
           initial_endorsers;
           delay_per_missing_endorsement;
+          minimal_block_delay;
           chain_id;
           timestamp;
         })
@@ -181,17 +183,20 @@ module Protocol_constants_overrides = struct
                (opt "endorsement_security_deposit" Tez.encoding)
                (opt "baking_reward_per_endorsement" (list Tez.encoding))
                (opt "endorsement_reward" (list Tez.encoding)))
-            (obj10
-               (opt "cost_per_byte" Tez.encoding)
-               (opt "hard_storage_limit_per_operation" z)
-               (opt "test_chain_duration" int64)
-               (opt "quorum_min" int32)
-               (opt "quorum_max" int32)
-               (opt "min_proposal_quorum" int32)
-               (opt "initial_endorsers" uint16)
-               (opt "delay_per_missing_endorsement" Period.encoding)
-               (opt "chain_id" Chain_id.encoding)
-               (opt "initial_timestamp" Time.Protocol.encoding))))
+            (merge_objs
+               (obj9
+                  (opt "cost_per_byte" Tez.encoding)
+                  (opt "hard_storage_limit_per_operation" z)
+                  (opt "test_chain_duration" int64)
+                  (opt "quorum_min" int32)
+                  (opt "quorum_max" int32)
+                  (opt "min_proposal_quorum" int32)
+                  (opt "initial_endorsers" uint16)
+                  (opt "delay_per_missing_endorsement" Period.encoding)
+                  (opt "minimal_block_delay" Period.encoding))
+               (obj2
+                  (opt "chain_id" Chain_id.encoding)
+                  (opt "initial_timestamp" Time.Protocol.encoding)))))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
       t tzresult Lwt.t =
@@ -213,6 +218,7 @@ module Protocol_constants_overrides = struct
         blocks_per_roll_snapshot = Some parametric.blocks_per_roll_snapshot;
         blocks_per_voting_period = Some parametric.blocks_per_voting_period;
         time_between_blocks = Some parametric.time_between_blocks;
+        minimal_block_delay = Some parametric.minimal_block_delay;
         endorsers_per_block = Some parametric.endorsers_per_block;
         hard_gas_limit_per_operation =
           Some parametric.hard_gas_limit_per_operation;
@@ -251,6 +257,7 @@ module Protocol_constants_overrides = struct
       blocks_per_roll_snapshot = None;
       blocks_per_voting_period = None;
       time_between_blocks = None;
+      minimal_block_delay = None;
       endorsers_per_block = None;
       hard_gas_limit_per_operation = None;
       hard_gas_limit_per_block = None;
@@ -331,6 +338,12 @@ module Protocol_constants_overrides = struct
             name = "time_between_blocks";
             override_value = o.time_between_blocks;
             pp = pp_print_list Period.pp;
+          };
+        O
+          {
+            name = "minimal_block_delay";
+            override_value = o.minimal_block_delay;
+            pp = Period.pp;
           };
         O
           {
@@ -486,6 +499,8 @@ module Protocol_constants_overrides = struct
               o.blocks_per_voting_period;
           time_between_blocks =
             Option.value ~default:c.time_between_blocks o.time_between_blocks;
+          minimal_block_delay =
+            Option.value ~default:c.minimal_block_delay o.minimal_block_delay;
           endorsers_per_block =
             Option.value ~default:c.endorsers_per_block o.endorsers_per_block;
           hard_gas_limit_per_operation =
