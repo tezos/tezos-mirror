@@ -39,14 +39,10 @@ let protocols =
       "009 Florence",
       Some "/include/rpc_introduction.rst.inc",
       "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" );
-    ( "008",
+    ( "",
       "008 Edo",
       Some "/include/rpc_introduction.rst.inc",
-      "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA" );
-    ( "",
-      "007 Delphi",
-      Some "/include/rpc_introduction.rst.inc",
-      "PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo" ) ]
+      "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA" ) ]
 
 let pp_name ppf = function
   | [] | [""] ->

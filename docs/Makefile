@@ -50,11 +50,6 @@ manuals: main
 	@../tezos-baker-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-baker-008.html
 	@../tezos-endorser-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-endorser-008.html
 	@../tezos-accuser-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-accuser-008.html
-    # 007 delphi
-	@../tezos-client -protocol $(DELPHI_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-client-007.html
-	@../tezos-baker-$(DELPHI_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-baker-007.html
-	@../tezos-endorser-$(DELPHI_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-endorser-007.html
-	@../tezos-accuser-$(DELPHI_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 007/tezos-accuser-007.html
     # generic
 	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
@@ -82,8 +77,7 @@ redirectcheck:
 	@cd $$(pwd)/.. ; ./src/tooling/lint.sh --check-redirects
 
 xrefscheck:
-	$(CHECKXREFS) 007
-	$(CHECKXREFS) -l 008
+	$(CHECKXREFS) 008
 	$(CHECKXREFS) -l 009
 	$(CHECKXREFS) -l 009_BA
 
@@ -106,8 +100,7 @@ $(DOCGENDIR)/rpc_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
-	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 007/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe 008 > 008/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 008/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe 009 > 009/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe 009_BA > 009_BA/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe alpha > alpha/rpc.rst
@@ -132,5 +125,5 @@ html: Makefile api/errors.rst rpc p2p
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst 007/rpc.rst 008/rpc.rst 009/rpc.rst 009_BA/rpc.rst shell/rpc.rst shell/p2p_api.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt 007/tezos-*.html 008/tezos-*.html 009/tezos-*.html 009_BA/tezos-*.html
+	@-rm -Rf api/errors.rst 008/rpc.rst 009/rpc.rst 009_BA/rpc.rst shell/rpc.rst shell/p2p_api.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt 008/tezos-*.html 009/tezos-*.html 009_BA/tezos-*.html

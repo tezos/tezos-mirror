@@ -125,17 +125,6 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 007 Delphi doc:
-
-   007/michelson
-   007/proof_of_stake
-   007/voting
-   007/glossary
-   007/cli-commands
-   007/rpc
-
-.. toctree::
-   :maxdepth: 2
    :caption: 008 Edo doc:
 
    008/michelson

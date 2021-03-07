@@ -1,4 +1,4 @@
-.. _cli_commands_009:
+.. _cli_commands_009_BA:
 
 **********************
 Command Line Interface
@@ -17,7 +17,7 @@ The rest of this page documents the protocol-dependent tools.
 The protocol-independent tools are documented :ref:`here <cli_commands_shell>`.
 
 
-.. _client_manual_009:
+.. _client_manual_009_BA:
 
 Client manual
 =============
@@ -26,7 +26,7 @@ Client manual
          :file: tezos-client-009.html
 
 
-.. _baker_manual_009:
+.. _baker_manual_009_BA:
 
 Baker manual
 ============
@@ -35,7 +35,7 @@ Baker manual
          :file: tezos-baker-009.html
 
 
-.. _endorser_manual_009:
+.. _endorser_manual_009_BA:
 
 Endorser manual
 ===============
@@ -44,7 +44,7 @@ Endorser manual
          :file: tezos-endorser-009.html
 
 
-.. _accuser_manual_009:
+.. _accuser_manual_009_BA:
 
 Accuser manual
 ==============

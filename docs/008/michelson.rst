@@ -1,3 +1,4 @@
+.. _michelson:
 .. _michelson_008:
 
 Michelson: the language of Smart Contracts in Tezos
@@ -1484,6 +1485,7 @@ value that was previously stored in the ``map`` at the same key as
 
 Operations on ``big_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _OperationsOnBigMaps:
 .. _OperationsOnBigMaps_008:
 
 Big maps have three possible representations. A map literal is always
@@ -1861,6 +1863,7 @@ until it is actually originated.
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
 
+.. _MichelsonSetDelegate:
 .. _MichelsonSetDelegate_008:
 
 -  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
@@ -2226,6 +2229,7 @@ comprehensive description of the Sapling protocol.
         with memo_size `ms`
 
 
+.. _MichelsonTickets:
 .. _MichelsonTickets_008:
 
 Operations on tickets
@@ -2545,6 +2549,7 @@ A typing rule can be inferred:
 
 Concrete syntax
 ---------------
+.. _ConcreteSyntax:
 .. _ConcreteSyntax_008:
 
 The concrete language is very close to the formal notation of the
@@ -3090,6 +3095,7 @@ type (which can be changed). For instance the annotated typing rule for
 
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
+.. _SpecialAnnotations:
 .. _SpecialAnnotations_008:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions
