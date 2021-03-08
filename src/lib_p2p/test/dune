@@ -4,18 +4,22 @@
         test_p2p_io_scheduler
         test_p2p_peerset
         test_p2p_banned_peers
-		  test_p2p_node
+        test_p2p_node
+        test_p2p_logging
         )
  (libraries tezos-base
             tezos-stdlib-unix
             tezos-p2p
             tezos-p2p-services
-            alcotest-lwt)
+            tezos-test-services
+            alcotest-lwt
+            astring)
  (flags (:standard -linkall
                    -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib
                    -open Tezos_p2p
+                   -open Tezos_test_services
                    -open Tezos_p2p_services)))
 
 (rule
@@ -25,7 +29,8 @@
        test_p2p_io_scheduler.exe
        test_p2p_peerset.exe
        test_p2p_banned_peers.exe
-		 test_p2p_node.exe
+       test_p2p_node.exe
+       test_p2p_logging.exe
        )
  (action (progn)))
 
@@ -84,6 +89,11 @@
  (action (run %{exe:test_p2p_node.exe})))
 
 (rule
+ (alias runtest_p2p_logging)
+ (locks /ports/49152-65535)
+ (action (run %{exe:test_p2p_logging.exe})))
+
+(rule
  (alias runtest)
  (package tezos-p2p)
  (deps (alias runtest_p2p_socket_ipv4)
@@ -91,7 +101,8 @@
        (alias runtest_p2p_io_scheduler_ipv4)
        (alias runtest_p2p_peerset)
        (alias runtest_p2p_banned_peers)
-		 (alias runtest_p2p_node)
+       (alias runtest_p2p_node)
+       (alias runtest_p2p_logging)
        )
  (action (progn)))
 

@@ -450,6 +450,89 @@ module P2p_welcome = struct
       ("exception", Error_monad.error_encoding)
 end
 
+module P2p_socket = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "socket"]
+
+  let nack_point_with_list =
+    declare_2
+      ~section
+      ~name:"nack_point_with_list"
+      ~msg:"nack point {point} with point list {points}"
+      ~level:Debug
+      ("point", P2p_connection.Id.encoding)
+      ("points", Data_encoding.list P2p_point.Id.encoding)
+
+  let nack_point_no_point =
+    declare_1
+      ~section
+      ~name:"nack_point_no_point"
+      ~msg:"nack point {point} (no point list due to p2p version)"
+      ~level:Debug
+      ("point", P2p_connection.Id.encoding)
+
+  let sending_authentication =
+    declare_1
+      ~section
+      ~name:"sending_authentication"
+      ~msg:"sending authentication to {point}"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+
+  let connection_closed =
+    declare_1
+      ~section
+      ~name:"connection_closed"
+      ~msg:"connection closed to {peer}"
+      ~level:Debug
+      ("peer", P2p_peer.Id.encoding)
+
+  let read_event =
+    declare_2
+      ~section
+      ~name:"socket_read"
+      ~level:Debug
+      ~msg:"reading {bytes} bytes from {peer}"
+      ("bytes", Data_encoding.int31)
+      ("peer", P2p_peer.Id.encoding)
+
+  let read_error =
+    declare_0
+      ~section
+      ~name:"socket_read_error"
+      ~level:Debug
+      ~msg:"[read message] incremental decoding error"
+      ()
+
+  let write_event =
+    declare_2
+      ~section
+      ~name:"socket_write"
+      ~level:Debug
+      ~msg:"writing {bytes} to {peer}"
+      ("bytes", Data_encoding.int31)
+      ("peer", P2p_peer.Id.encoding)
+
+  let write_error =
+    declare_2
+      ~section
+      ~name:"socket_write_error"
+      ~level:Error
+      ~msg:"unexpected error when writing to {peer}: {error}"
+      ("error", Error_monad.trace_encoding)
+      ("peer", P2p_peer.Id.encoding)
+
+  let send_message_event =
+    declare_2
+      ~section
+      ~name:"socket_send_message"
+      ~level:Debug
+      ~msg:"sending message to {peer}: {content}"
+      ("peer", P2p_peer.Id.encoding)
+      ("content", Data_encoding.json)
+end
+
 module P2p_io_scheduler = struct
   include Internal_event.Simple
 
