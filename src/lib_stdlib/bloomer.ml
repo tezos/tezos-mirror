@@ -24,17 +24,31 @@
 
 type 'a t = {
   hash : 'a -> bytes;
+      (** Cryptographically secure hash function. We must have
+          [Bytes.length (hash x) >= index_bits * hashes]. *)
   hashes : int;
+      (** The value returned by [hash] is split and converted in
+          [hashes] indices, each [index_bits] wide. *)
   index_bits : int;
+      (** [index_bits] is the width in bits of the indices into
+          the [filter]. *)
   countdown_bits : int;
+      (** [countdown_bits] is the width in bits of the counter cells
+          stored in the [filter]. *)
   filter : bytes;
+      (** [filter] stores [2^index_bits] counter cells,
+          each [countdown_bits] wide. *)
   count : int array;
+      (** [count] stores approximate statistics on the number of counter cells
+          with a given value. [count.(i)] is the approximate number of cells
+          equal to [2^countdown_bits - 1 - i].
+          Note that this field is not required for Bloom filter operation. *)
 }
 
 (* Reads [bits] bits of [bytes] at offset [ofs] as an OCaml int in big endian order.
    The function proceeds by iteratively blitting the bytes overlapping the sought
    bit interval into [v]. The superfluous bits at the beginning and at the end
-   are them removed from [v], yielding the returned value.
+   are then removed from [v], yielding the returned value.
  *)
 let peek bytes ofs bits =
   if bits <= 0 then invalid_arg "Bloomer.peek: non positive bits value" ;
@@ -59,7 +73,7 @@ let poke bytes ofs bits v =
   if bits <= 0 then invalid_arg "Bloomer.poke: non positive bits value" ;
   if ofs < 0 then invalid_arg "Bloomer.poke: negative bits value" ;
   if bits > Sys.word_size - 2 then
-    invalid_arg "Bloomer.peek: indexes out of bounds" ;
+    invalid_arg "Bloomer.poke: indexes out of bounds" ;
   if bits + ofs > Bytes.length bytes * 8 then
     invalid_arg "Bloomer.poke: indexes out of bounds" ;
   let first = ofs / 8 in

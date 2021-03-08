@@ -24,7 +24,26 @@
 
 (** A probabilistic set implementation in a fixed memory buffer, with
     an optional best-effort cleanup mechanism. The bigger the memory
-    buffer, the less false positive outcomes of [mem]. *)
+    buffer, the less false positive outcomes of [mem].
+
+    In a standard bloom filter, element membership is encoded as bits being
+    equal to 1 at indices obtained by hashing said element. In this
+    implementation, elements are associated not to bits but to counters.
+
+    The [countdown] function decrements the counter associated to an element.
+    Hence, each counter corresponds to the number of calls to the [countdown]
+    function before they are removed from the filter, assuming no collision
+    occurs.
+
+    To the best of our knowledge, the variant of bloom filters implemented
+    in this module is new. In particular, this implementation does not
+    correspond to counting bloom filters as described eg here:
+    https://en.wikipedia.org/wiki/Counting_Bloom_filter
+
+    In order to emphasize the use of counters as a time-based garbage
+    collection mechanism, we call this implementation a generational bloom
+    filter.
+ *)
 type 'a t
 
 (** [create ~hash ~hashes ~index_bits ~countdown_bits] creates an
@@ -32,7 +51,7 @@ type 'a t
     generations is [2^countdown_bits]. The filter is an array of
     [2^index_bits] countdown cells, each of size [countdown_bits].
     The resulting filter takes [2^index_bits * countdown_bits] bits
-    in memory. The hash function must return enough bytes to take
+    in memory. The hash function must return enough bytes to represent
     [hashes] indexes of [index_bits] bits.
 
     When a value is [add]ed, its [hash] is split into [hashes] chunks of
@@ -44,7 +63,12 @@ type 'a t
     are above zero, which in the most optimistic case (where no
     collision occur) is until [countdown] has been called
     [2^countdown_bits-1] times. An exception is if [clear] is called,
-    in which case it is certain to disappear, as all other values. *)
+    in which case it is certain to disappear, as all other values.
+
+    Arguments to [create] are subject to the following constraints:
+    - [0 < index_bits <= 24]
+    - [0 < countdown_bits <= 24]
+ *)
 val create :
   hash:('a -> bytes) ->
   hashes:int ->
@@ -52,19 +76,20 @@ val create :
   countdown_bits:int ->
   'a t
 
-(** Checks if the value is still considered in the set (see {!create}). *)
+(** Check if the value is still considered in the set (see {!create}). *)
 val mem : 'a t -> 'a -> bool
 
-(** Adds a member to the set (see {!create}). *)
+(** Add a member to the set (see {!create}). *)
 val add : 'a t -> 'a -> unit
 
-(** Force remove an element, which may remove others in case of collisions. *)
+(** Force removing an element, which may remove others in case of collisions.
+    Use with care. *)
 val rem : 'a t -> 'a -> unit
 
-(** Decrements all the countdowns cells of the set (see {!create}). *)
+(** Decrement all the countdowns cells of the set (see {!create}). *)
 val countdown : 'a t -> unit
 
-(** Clears the entire set. *)
+(** Clear the entire set. *)
 val clear : 'a t -> unit
 
 (** Percentage (in the [0;1] interval) of cells which are nonzero. *)
