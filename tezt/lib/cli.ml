@@ -38,6 +38,7 @@ type options = {
   keep_going : bool;
   files_to_run : string list;
   tests_to_run : string list;
+  tests_not_to_run : string list;
   tags_to_run : string list;
   tags_not_to_run : string list;
   list : [`Ascii_art | `Tsv] option;
@@ -61,6 +62,7 @@ let options =
   let keep_going = ref false in
   let files_to_run = ref [] in
   let tests_to_run = ref [] in
+  let tests_not_to_run = ref [] in
   let tags_to_run = ref [] in
   let tags_not_to_run = ref [] in
   let list = ref None in
@@ -159,6 +161,11 @@ let options =
         ( "-t",
           Arg.String (fun title -> tests_to_run := title :: !tests_to_run),
           "<TITLE> Same as --test." );
+        ( "--not-test",
+          Arg.String
+            (fun title -> tests_not_to_run := title :: !tests_not_to_run),
+          "<TITLE> Only run tests which are not exactly entitled TITLE (see \
+           SELECTING TESTS)." );
         ( "--global-timeout",
           Arg.Float (fun delay -> global_timeout := Some delay),
           "<SECONDS> Fail if the set of tests takes more than SECONDS to run."
@@ -201,7 +208,8 @@ let options =
        negate a tag, prefix it with a slash: /\n\n\
       \  The title of a test is given by the ~title argument of Test.run. It \
        is what is printed after [SUCCESS] (or [FAILURE] or [ABORTED]) in the \
-       reports. Use --test to select a test by its title on the command-line.\n\n\
+       reports. Use --test (respectively --not-test) to select (respectively \
+       unselect) a test by its title on the command-line.\n\n\
       \  The file in which a test is implemented is specified by the \
        ~__FILE__ argument of Test.run. In other words, it is the name of the \
        file in which the test is defined, without directories. Use --file to \
@@ -231,6 +239,7 @@ let options =
     keep_going = !keep_going;
     files_to_run = !files_to_run;
     tests_to_run = !tests_to_run;
+    tests_not_to_run = !tests_not_to_run;
     tags_to_run = !tags_to_run;
     tags_not_to_run = !tags_not_to_run;
     list = !list;

@@ -210,6 +210,7 @@ let test_should_be_run ~file ~title ~tags =
          true
      | titles ->
          List.mem title titles )
+  && (not (List.mem title Cli.options.tests_not_to_run))
   &&
   match Cli.options.files_to_run with
   | [] ->

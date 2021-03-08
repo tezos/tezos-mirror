@@ -42,6 +42,7 @@ let channel =
         keep_going = _;
         files_to_run = _;
         tests_to_run = _;
+        tests_not_to_run = _;
         tags_to_run = _;
         tags_not_to_run = _;
         list;
