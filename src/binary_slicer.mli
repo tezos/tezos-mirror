@@ -23,10 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type field = {name: string; value: Bytes.t; pretty_printed: string}
+(** This is for use *within* the data encoding library only. Instead, you should
+    use the corresponding module intended for use: {!Data_encoding.Encoding}. *)
 
-val slice : _ Encoding.t -> bytes -> int -> int -> field list option
+type slice = {name: string; value: Bytes.t; pretty_printed: string}
 
-val slice_bytes : _ Encoding.t -> bytes -> field list option
+val slice : _ Encoding.t -> bytes -> int -> int -> slice list option
 
-val slice_bytes_exn : _ Encoding.t -> bytes -> field list
+val slice_bytes : _ Encoding.t -> bytes -> slice list option
+
+val slice_bytes_exn : _ Encoding.t -> bytes -> slice list

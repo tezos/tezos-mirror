@@ -39,20 +39,19 @@ let table = ref EncodingTable.empty
 
 let description (Record {description; _}) = description
 
-let slice_from (Record {encoding; _}) bytes =
-  Binary_slicer.slice_bytes_exn encoding bytes
+let slice (Record {encoding; _}) bytes =
+  Binary_slicer.slice_bytes encoding bytes
 
-let slice bytes =
-  let sliced_data = ref [] in
-  EncodingTable.iter
-    (fun enc_nom (Record {encoding; _}) ->
+let slice_all bytes =
+  EncodingTable.fold
+    (fun enc_id (Record {encoding; _}) sliced ->
       try
         let _ = Binary_reader.of_bytes_exn encoding bytes in
         let slice = Binary_slicer.slice_bytes_exn encoding bytes in
-        sliced_data := (enc_nom, slice) :: !sliced_data
-      with _ -> ())
-    !table;
-  !sliced_data
+        (enc_id, slice) :: sliced
+      with _ -> sliced)
+    !table
+    []
 
 let json_schema (Record {encoding; _}) =
   let json_schema = Json.schema encoding in

@@ -27,14 +27,14 @@ open Binary_error_types
 
 let raise e = raise (Read_error e)
 
-type field = {name: string; value: bytes; pretty_printed: string}
+type slice = {name: string; value: bytes; pretty_printed: string}
 
 type state = {
   buffer: bytes;
   mutable offset: int;
   mutable remaining_bytes: int;
   mutable allowed_bytes: int option;
-  mutable fields: field list;
+  mutable slices: slice list;
 }
 
 let check_allowed_bytes state size =
@@ -54,7 +54,7 @@ let read_atom ?(pp = fun _ -> "") size conv name state =
   state.offset <- state.offset + size;
   let value = Bytes.sub state.buffer offset size in
   let result = conv state.buffer offset in
-  state.fields <- {name; value; pretty_printed = pp result} :: state.fields;
+  state.slices <- {name; value; pretty_printed = pp result} :: state.slices;
   result
 
 (** Reader for all the atomic types. *)
@@ -151,7 +151,7 @@ module Atom = struct
       let value =
         Bytes.sub state.buffer initial_offset (state.offset - initial_offset)
       in
-      state.fields <- {name; value; pretty_printed} :: state.fields;
+      state.slices <- {name; value; pretty_printed} :: state.slices;
       result )
 
   let n name state =
@@ -167,7 +167,7 @@ module Atom = struct
       let value =
         Bytes.sub state.buffer initial_offset (state.offset - initial_offset)
       in
-      state.fields <- {name; value; pretty_printed} :: state.fields;
+      state.slices <- {name; value; pretty_printed} :: state.slices;
       result
 
   let z name state =
@@ -293,10 +293,10 @@ let rec read_rec : type ret. ret Encoding.t -> ?name:string -> state -> ret =
             (function
               | Case {tag = tg; title; _} ->
                   if Uint_option.is_some tg && Uint_option.get tg = ctag then (
-                    let {value; pretty_printed; _} = List.hd state.fields in
-                    state.fields <-
+                    let {value; pretty_printed; _} = List.hd state.slices in
+                    state.slices <-
                       {name = title ^ " tag"; value; pretty_printed}
-                      :: List.tl state.fields;
+                      :: List.tl state.slices;
                     true )
                   else false)
             cases
@@ -383,14 +383,14 @@ let slice encoding buffer ofs len =
     {
       buffer;
       offset = ofs;
-      fields = [];
+      slices = [];
       remaining_bytes = len;
       allowed_bytes = None;
     }
   in
   match read_rec encoding state with
   | exception Read_error _ -> None
-  | _ -> Some (List.rev state.fields)
+  | _ -> Some (List.rev state.slices)
 
 let slice_bytes_exn encoding buffer =
   let len = Bytes.length buffer in
@@ -398,14 +398,14 @@ let slice_bytes_exn encoding buffer =
     {
       buffer;
       offset = 0;
-      fields = [];
+      slices = [];
       remaining_bytes = len;
       allowed_bytes = None;
     }
   in
   let _ = read_rec encoding state in
   if state.offset <> len then raise Extra_bytes;
-  List.rev state.fields
+  List.rev state.slices
 
 let slice_bytes encoding buffer =
   try Some (slice_bytes_exn encoding buffer) with Read_error _ -> None

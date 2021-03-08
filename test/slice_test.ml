@@ -241,9 +241,9 @@ let slice_test id result expected () =
   match Data_encoding.Registration.find id with
   | None -> Alcotest.failf "Could not find %s" id
   | Some r -> (
-      match Data_encoding.Registration.slice_from r result with
-      | [] -> Alcotest.failf "Empty result"
-      | l -> check_sliced_fields_result l expected )
+      match Data_encoding.Registration.slice r result with
+      | None -> Alcotest.failf "Empty result"
+      | Some l -> check_sliced_fields_result l expected )
 
 let tests =
   [
