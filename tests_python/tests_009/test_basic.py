@@ -175,6 +175,19 @@ class TestRawContext:
         assert client.get_balance(session['keys'][2]) == 3000
 
     def test_transfer_bar_foo(self, client: Client, session):
+        client.reveal(session['keys'][1], ['--fee', '0', '--force-low-fee'])
+        client.bake(
+            'bootstrap1',
+            BAKE_ARGS
+            + [
+                '--minimal-fees',
+                '0',
+                '--minimal-nanotez-per-byte',
+                '0',
+                '--minimal-nanotez-per-gas-unit',
+                '0',
+            ],
+        )
         client.transfer(
             1000,
             session['keys'][1],
@@ -199,12 +212,26 @@ class TestRawContext:
         assert client.get_balance(session['keys'][1]) == 1000
 
     def test_transfer_foo_bar(self, client: Client, session):
+        client.reveal(session['keys'][0], ['--fee', '0', '--force-low-fee'])
+        client.bake(
+            'bootstrap1',
+            BAKE_ARGS
+            + [
+                '--minimal-fees',
+                '0',
+                '--minimal-nanotez-per-byte',
+                '0',
+                '--minimal-nanotez-per-gas-unit',
+                '0',
+            ],
+        )
         client.transfer(
             1000, session['keys'][0], session['keys'][1], ['--fee', '0.05']
         )
         client.bake('bootstrap1', BAKE_ARGS)
 
     def test_balances_foo_bar(self, client: Client, session):
+        # 999.95 = 1000 - transfer fees
         assert client.get_balance(session['keys'][0]) == 999.95
         assert client.get_balance(session['keys'][1]) == 2000
 
