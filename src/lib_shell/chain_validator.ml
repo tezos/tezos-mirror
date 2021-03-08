@@ -520,7 +520,6 @@ let on_notify_head w peer_id header mempool =
       Peer_validator.notify_head pv header ;
       return_unit)
   >>=? fun () ->
-  (* TODO notify prevalidator only if head is known ??? *)
   match nv.prevalidator with
   | Some prevalidator ->
       Prevalidator.notify_operations prevalidator peer_id mempool
