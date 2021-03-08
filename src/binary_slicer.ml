@@ -200,16 +200,19 @@ module Atom = struct
     read_atom length @@ fun buf ofs -> Bytes.sub buf ofs length
 
   let fixed_length_string length =
-    read_atom ~pp:(fun x -> "\"" ^ x ^ "\"") length @@ fun buf ofs ->
+    read_atom ~pp:(Format.sprintf "%S") length @@ fun buf ofs ->
     Bytes.sub_string buf ofs length
 
   let tag = function `Uint8 -> uint8 | `Uint16 -> uint16
 end
 
 (** Main recursive reading function, in continuation passing style. *)
-let rec read_rec : type ret. ret Encoding.t -> string -> state -> ret =
- fun e p state ->
-  let ( !! ) x = if p = "" then x else "\"" ^ p ^ "\" (" ^ x ^ ")" in
+let rec read_rec : type ret. ret Encoding.t -> ?name:string -> state -> ret =
+ fun e ?name state ->
+  let ( !! ) x = match name with
+    | None -> x
+    | Some name -> Format.sprintf "%S (%s)" name x
+  in
   let open Encoding in
   match e.encoding with
   | Null -> ()
@@ -234,7 +237,7 @@ let rec read_rec : type ret. ret Encoding.t -> string -> state -> ret =
   | String `Variable ->
       Atom.fixed_length_string state.remaining_bytes !!"string" state
   | Padded (e, n) ->
-      let v = read_rec e p state in
+      let v = read_rec e ?name state in
       ignore (Atom.fixed_length_string n "padding" state : string);
       v
   | RangedInt {minimum; maximum} ->
@@ -244,44 +247,44 @@ let rec read_rec : type ret. ret Encoding.t -> string -> state -> ret =
   | String_enum (_, arr) -> Atom.string_enum arr !!"enum" state
   | Array (max_length, e) ->
       let max_length = match max_length with Some l -> l | None -> max_int in
-      let l = read_list List_too_long max_length e p state in
+      let l = read_list List_too_long max_length e ?name state in
       Array.of_list l
   | List (max_length, e) ->
       let max_length = match max_length with Some l -> l | None -> max_int in
-      read_list Array_too_long max_length e p state
-  | Obj (Req {encoding = e; name; _}) -> read_rec e name state
-  | Obj (Dft {encoding = e; name; _}) -> read_rec e name state
+      read_list Array_too_long max_length e ?name state
+  | Obj (Req {encoding = e; name; _}) -> read_rec e ~name state
+  | Obj (Dft {encoding = e; name; _}) -> read_rec e ~name state
   | Obj (Opt {kind = `Dynamic; encoding = e; name; _}) ->
       let present = Atom.bool (name ^ " presence flag") state in
-      if not present then None else Some (read_rec e !!name state)
+      if not present then None else Some (read_rec e ~name:(!!name) state)
   | Obj (Opt {kind = `Variable; encoding = e; name; _}) ->
-      if state.remaining_bytes = 0 then None else Some (read_rec e !!name state)
+      if state.remaining_bytes = 0 then None else Some (read_rec e ~name:(!!name) state)
   | Objs {kind = `Fixed sz; left; right} ->
       ignore (check_remaining_bytes state sz : int);
       ignore (check_allowed_bytes state sz : int option);
-      let left = read_rec left p state in
-      let right = read_rec right p state in
+      let left = read_rec left ?name state in
+      let right = read_rec right ?name state in
       (left, right)
   | Objs {kind = `Dynamic; left; right} ->
-      let left = read_rec left p state in
-      let right = read_rec right p state in
+      let left = read_rec left ?name state in
+      let right = read_rec right ?name state in
       (left, right)
   | Objs {kind = `Variable; left; right} ->
-      read_variable_pair left right p state
-  | Tup e -> read_rec e p state
+      read_variable_pair left right ?name state
+  | Tup e -> read_rec e ?name state
   | Tups {kind = `Fixed sz; left; right} ->
       ignore (check_remaining_bytes state sz : int);
       ignore (check_allowed_bytes state sz : int option);
-      let left = read_rec left p state in
-      let right = read_rec right p state in
+      let left = read_rec left ?name state in
+      let right = read_rec right ?name state in
       (left, right)
   | Tups {kind = `Dynamic; left; right} ->
-      let left = read_rec left p state in
-      let right = read_rec right p state in
+      let left = read_rec left ?name state in
+      let right = read_rec right ?name state in
       (left, right)
   | Tups {kind = `Variable; left; right} ->
-      read_variable_pair left right p state
-  | Conv {inj; encoding; _} -> inj (read_rec encoding p state)
+      read_variable_pair left right ?name state
+  | Conv {inj; encoding; _} -> inj (read_rec encoding ?name state)
   | Union {tag_size; cases; _} ->
       let ctag = Atom.tag tag_size "DUMMY" state in
       let (Case {encoding; inj; _}) =
@@ -299,13 +302,13 @@ let rec read_rec : type ret. ret Encoding.t -> string -> state -> ret =
             cases
         with Not_found -> raise (Unexpected_tag ctag)
       in
-      inj (read_rec encoding p state)
+      inj (read_rec encoding ?name state)
   | Dynamic_size {kind; encoding = e} ->
       let sz = Atom.int kind "dynamic length" state in
       let remaining = check_remaining_bytes state sz in
       state.remaining_bytes <- sz;
       ignore (check_allowed_bytes state sz : int option);
-      let v = read_rec e p state in
+      let v = read_rec e ?name state in
       if state.remaining_bytes <> 0 then raise Extra_bytes;
       state.remaining_bytes <- remaining;
       v
@@ -317,7 +320,7 @@ let rec read_rec : type ret. ret Encoding.t -> string -> state -> ret =
         | Some current_limit -> min current_limit limit
       in
       state.allowed_bytes <- Some limit;
-      let v = read_rec e p state in
+      let v = read_rec e ?name state in
       let allowed_bytes =
         match old_allowed_bytes with
         | None -> None
@@ -332,40 +335,41 @@ let rec read_rec : type ret. ret Encoding.t -> string -> state -> ret =
       in
       state.allowed_bytes <- allowed_bytes;
       v
-  | Describe {encoding = e; id; _} -> read_rec e !!id state
-  | Splitted {encoding = e; _} -> read_rec e p state
-  | Mu {fix; name; _} -> read_rec (fix e) !!name state
-  | Delayed f -> read_rec (f ()) p state
+  | Describe {encoding = e; id; _} -> read_rec e ~name:(!!id) state
+  | Splitted {encoding = e; _} -> read_rec e ?name state
+  | Mu {fix; name; _} -> read_rec (fix e) ~name:(!!name) state
+  | Delayed f -> read_rec (f ()) ?name state
 
 and read_variable_pair :
     type left right.
-    left Encoding.t -> right Encoding.t -> string -> state -> left * right =
- fun e1 e2 p state ->
+    left Encoding.t -> right Encoding.t -> ?name:string -> state -> left * right =
+ fun e1 e2 ?name state ->
   match (Encoding.classify e1, Encoding.classify e2) with
   | ((`Dynamic | `Fixed _), `Variable) ->
-      let left = read_rec e1 p state in
-      let right = read_rec e2 p state in
+      let left = read_rec e1 ?name state in
+      let right = read_rec e2 ?name state in
       (left, right)
   | (`Variable, `Fixed n) ->
       if n > state.remaining_bytes then raise Not_enough_data;
       state.remaining_bytes <- state.remaining_bytes - n;
-      let left = read_rec e1 p state in
+      let left = read_rec e1 ?name state in
       assert (state.remaining_bytes = 0);
       state.remaining_bytes <- n;
-      let right = read_rec e2 p state in
+      let right = read_rec e2 ?name state in
       assert (state.remaining_bytes = 0);
       (left, right)
   | _ -> assert false
 
 (* Should be rejected by [Encoding.Kind.combine] *)
 and read_list :
-    type a. read_error -> int -> a Encoding.t -> string -> state -> a list =
- fun error max_length e p state ->
+    type a. read_error -> int -> a Encoding.t -> ?name:string -> state -> a list =
+ fun error max_length e ?name state ->
   let rec loop max_length acc =
     if state.remaining_bytes = 0 then List.rev acc
     else if max_length = 0 then raise error
     else
-      let v = read_rec e (p ^ " element") state in
+      let name = Option.map (fun name -> name ^ " element") name in
+      let v = read_rec e ?name state in
       loop (max_length - 1) (v :: acc)
   in
   loop max_length []
@@ -384,7 +388,7 @@ let slice encoding buffer ofs len =
       allowed_bytes = None;
     }
   in
-  match read_rec encoding "" state with
+  match read_rec encoding state with
   | exception Read_error _ -> None
   | _ -> Some (List.rev state.fields)
 
@@ -399,7 +403,7 @@ let slice_bytes_exn encoding buffer =
       allowed_bytes = None;
     }
   in
-  let _ = read_rec encoding "" state in
+  let _ = read_rec encoding state in
   if state.offset <> len then raise Extra_bytes;
   List.rev state.fields
 
