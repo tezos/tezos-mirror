@@ -91,3 +91,16 @@ val shuffle : 'a list -> 'a list
 
 (** Get the index of an element in a list. *)
 val index_of : ?compare:('a -> 'a -> int) -> 'a -> 'a list -> int option
+
+(** Merge two lists into a list of pairs. Excess elements in the longer
+    list are discarded. *)
+val pair_common_prefix : 'a list -> 'b list -> ('a * 'b) list
+
+(** Zip two lists using a specific function. *)
+val map2_common_prefix : ('a -> 'b -> 'c) -> 'a list -> 'b list -> 'c list
+
+(** Zip two lists, taking into account the possibility that they
+    might be of different length. Any Nones returned by the supplied
+    funtion will NOT be included in the result list. *)
+val map2_opt :
+  ('a option -> 'b option -> 'c option) -> 'a list -> 'b list -> 'c list

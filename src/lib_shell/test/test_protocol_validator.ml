@@ -30,6 +30,7 @@
     Subject:      Unit tests for protocol_validator. Currently only tests that
                   events are emitted.
 *)
+
 open Shell_test_helpers
 
 (** A [Alcotest_protocol_validator] extends [Test_services] with protocol
@@ -71,7 +72,7 @@ let filter = Some section
     necessary, initializing a mock p2p network, an empty chain state and a
     validator. It passes the validator to the test function [f]. *)
 let wrap f _switch () =
-  with_empty_mock_sink (fun _ ->
+  Test_services.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
           init_chain test_dir
           >>= fun (st, _, _, _) ->
@@ -105,15 +106,16 @@ let test_pushing_validator_protocol vl _switch () =
     (Error
        [ Validation_errors.Invalid_protocol
            {hash = Protocol_hash.zero; error = Compilation_failed} ]) ;
-  Mock_sink.assert_has_event
-    "Should have a pushing_validation_request event"
-    ~filter
-    ( Internal_event.Debug,
-      section,
-      `O
-        [ ( "pushing_protocol_validation.v0",
-            `String "PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i" ) ]
-    ) ;
+  Test_services.Mock_sink.(
+    assert_has_event
+      "Should have a pushing_validation_request event"
+      ~filter
+      Pattern.
+        {
+          level = Some Internal_event.Debug;
+          section = Some section;
+          name = "pushing_protocol_validation";
+        }) ;
   Lwt.return_unit
 
 (** [previously_validated_protocol] tests that requesting the
@@ -128,15 +130,16 @@ let test_previously_validated_protocol vl _switch () =
     "Compilation should work."
     (Ok genesis_protocol)
     res ;
-  Mock_sink.assert_has_event
-    "Should have a previously_validated_protocol event"
-    ~filter
-    ( Internal_event.Debug,
-      section,
-      `O
-        [ ( "previously_validated_protocol.v0",
-            `String "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" ) ]
-    ) ;
+  Test_services.Mock_sink.(
+    assert_has_event
+      "Should have a previously_validated_protocol event"
+      ~filter
+      Pattern.
+        {
+          level = Some Internal_event.Debug;
+          section = Some section;
+          name = "previously_validated_protocol";
+        }) ;
   Lwt.return_unit
 
 (** [fetching_protocol] tests that requesting the fetch of a protocol
@@ -150,18 +153,16 @@ let test_fetching_protocol vl _switch () =
     vl
     Protocol_hash.zero
   >>= fun _ ->
-  Mock_sink.assert_has_event
-    "Should have a fetching_protocol event"
-    ~filter
-    ( Internal_event.Notice,
-      section,
-      `O
-        [ ( "fetching_protocol.v0",
-            `O
-              [ ( "hash",
-                  `String "PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i"
-                );
-                ("source", `String "idqRfGME9Bdhde2rksPSz7s6naxMW4") ] ) ] ) ;
+  Test_services.Mock_sink.(
+    assert_has_event
+      "Should have a fetching_protocol event"
+      ~filter
+      Pattern.
+        {
+          level = Some Internal_event.Notice;
+          section = Some section;
+          name = "fetching_protocol";
+        }) ;
   Lwt.return_unit
 
 let tests =

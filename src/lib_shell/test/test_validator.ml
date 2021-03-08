@@ -31,6 +31,8 @@
                   events are emitted.
 *)
 
+module Mock_sink = Test_services.Mock_sink
+
 (** [init_validator f] setups a mock validator, a mock block validator and
     mock chain and passes it them to the test function [f]. *)
 let init_validator
@@ -83,7 +85,7 @@ let init_validator
     necessary, initializing a mock p2p network, an empty chain state and a
     validator. It passes the validator to the test function [f] *)
 let wrap f _switch () =
-  Shell_test_helpers.with_empty_mock_sink (fun _ ->
+  Test_services.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
           init_validator f test_dir _switch ()))
 
@@ -92,7 +94,6 @@ let wrap f _switch () =
 (** Checks that validator emits activation and shutdown events. *)
 let validator_events validator block_validator chain _switch () =
   (* activate validator and check that the corresponding event is emitted *)
-  let open Shell_test_helpers in
   Validator.activate
     ~start_prevalidator:false
     validator
@@ -111,9 +112,11 @@ let validator_events validator block_validator chain _switch () =
       Mock_sink.assert_has_event
         "Should have an activate_chain event"
         ~filter
-        ( Internal_event.Notice,
-          section,
-          `O [("activate_chain.v0", `String "NetXJCwCkKLtb7s")] ) ;
+        {
+          level = Some Internal_event.Notice;
+          section = Some section;
+          name = "activate_chain";
+        } ;
       Mock_sink.clear_events () ;
       (* now shutdown the validator and verify that shutdown events are emitted
         *)
@@ -122,12 +125,17 @@ let validator_events validator block_validator chain _switch () =
       Mock_sink.assert_has_events
         "Should have an shutdown_block_validator"
         ~filter
-        [ ( Internal_event.Notice,
-            section,
-            `O [("shutdown_chain_validator.v0", `String "NetXJCwCkKLtb7s")] );
-          ( Internal_event.Notice,
-            section,
-            `O [("shutdown_block_validator.v0", `O [])] ) ] ;
+        Mock_sink.Pattern.
+          [ {
+              level = Some Internal_event.Notice;
+              section = Some section;
+              name = "shutdown_chain_validator";
+            };
+            {
+              level = Some Internal_event.Notice;
+              section = Some section;
+              name = "shutdown_block_validator";
+            } ] ;
       Lwt.return_unit
 
 let tests =

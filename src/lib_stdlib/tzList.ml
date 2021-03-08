@@ -193,3 +193,22 @@ let index_of ?(compare = Stdlib.compare) item list =
         if compare head item = 0 then Some index else find (index + 1) tail
   in
   find 0 list
+
+let map2_opt f xs ys =
+  let rec app_f = function
+    | ([], []) ->
+        []
+    | (x :: xs, []) ->
+        check (xs, []) (f (Some x) None)
+    | ([], y :: ys) ->
+        check ([], ys) (f None (Some y))
+    | (x :: xs, y :: ys) ->
+        check (xs, ys) (f (Some x) (Some y))
+  and check more = function None -> app_f more | Some r -> r :: app_f more in
+  app_f (xs, ys)
+
+let map2_common_prefix f =
+  map2_opt (fun x y ->
+      match (x, y) with (Some a, Some b) -> Some (f a b) | _ -> None)
+
+let pair_common_prefix xs ys = map2_common_prefix (fun x y -> (x, y)) xs ys
