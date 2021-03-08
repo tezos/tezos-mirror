@@ -383,6 +383,48 @@ let test_migration_constants ~migrate_from ~migrate_to =
           (JSON.encode const_migrated) ;
         Test.fail "Protocol constants mismatch" ))
 
+(** Test. Reproduce the scenario of https://gitlab.com/tezos/tezos/-/issues/1143 *)
+let test_origination_from_unrevealed_fees ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "(%s) (Mockup) origination fees from unrevealed"
+         (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "mockup"; "client"; "transfer"]
+  @@ fun () ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    Client.import_secret_key
+      client
+      {
+        identity = "";
+        alias = "originator";
+        secret =
+          "unencrypted:edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy";
+      }
+  in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 999999)
+      ~giver:"bootstrap1"
+      ~receiver:"originator"
+      client
+  in
+  let* _ =
+    Client.originate_contract
+      ~wait:"none"
+      ~alias:"contract_name"
+      ~amount:Tez.zero
+      ~src:"originator"
+      ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
+      ~init:"None"
+      ~burn_cap:(Tez.of_int 20)
+      client
+  in
+  return ()
+
 let register protocol =
   test_rpc_list ~protocol ;
   test_same_transfer_twice ~protocol ;
@@ -390,7 +432,8 @@ let register protocol =
   test_transfer ~protocol ;
   test_simple_baking_event ~protocol ;
   test_multiple_baking ~protocol ;
-  test_rpc_header_shell ~protocol
+  test_rpc_header_shell ~protocol ;
+  test_origination_from_unrevealed_fees ~protocol
 
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to
