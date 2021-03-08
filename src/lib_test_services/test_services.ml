@@ -72,11 +72,13 @@ module Mock_sink : sig
   (** A [filter] can be applied when asserting the contents of the sink. This
       restricts assertions to events from a specific section or to those that
       have no section. The value [filter] has the following meaning:
-       - [filter = None] :: apply no filtering.
-       - [filter = Some None] :: only keep events that have no section.
-       - [filter = Some (Some s)] :: only keep events with section [s].
+       - [filter = None]: only keep events that have no section.
+       - [filter = Some s]: only keep events with section [s].
+
+       Note that the filter is always passed as an optional parameter. It can be
+       omited to keep all events.
    *)
-  type filter = Internal_event.Section.t option option
+  type filter = Internal_event.Section.t option
 
   type event = {
     level : Internal_event.Level.t;
@@ -142,7 +144,7 @@ module Mock_sink : sig
 
   val testable_section : Internal_event.Section.t testable
 end = struct
-  type filter = Internal_event.Section.t option option
+  type filter = Internal_event.Section.t option
 
   type t = unit
 
@@ -247,9 +249,8 @@ end = struct
   (** testing stuff *)
 
   (** [get_events filter] returns the list of recorded events, in chronological
-      order. If [filter] is set, only the events whose section is
-      [filter] are returned. *)
-  let get_events ?(filter = None) () : event list =
+      order. *)
+  let get_events ?filter () : event list =
     match filter with
     | None ->
         !recorded_events
@@ -259,7 +260,7 @@ end = struct
   let clear_events () : unit = recorded_events := []
 
   (** Pretty prints the list of recorded events *)
-  let pp_state ?(filter = None) () =
+  let pp_state ?filter () =
     Format.printf "-- State of Mock_sink --\n" ;
     List.iteri
       (fun i {level = lvl; message = msg; section; _} ->
@@ -277,7 +278,7 @@ end = struct
           section_pp
           lvl_pp
           msg)
-      (get_events ~filter ()) ;
+      (get_events ?filter ()) ;
     Format.print_flush ()
 
   let pp_events_json =
@@ -317,9 +318,8 @@ end = struct
     end : Alcotest.TESTABLE
       with type t = event )
 
-  let assert_has_events str ?(filter = None) ?(strict = true)
-      (pats : Pattern.t list) =
-    let events = get_events ~filter () in
+  let assert_has_events str ?filter ?(strict = true) (pats : Pattern.t list) =
+    let events = get_events ?filter () in
     if strict then
       let _ =
         TzList.map2_opt
@@ -348,10 +348,9 @@ end = struct
             events)
         pats
 
-  let assert_has_event str ?(filter = None) ?(strict = true)
-      (pattern : Pattern.t) =
-    let log = get_events ~filter () in
-    if strict then assert_has_events str ~filter ~strict [pattern]
+  let assert_has_event str ?filter ?(strict = true) (pattern : Pattern.t) =
+    let log = get_events ?filter () in
+    if strict then assert_has_events str ?filter ~strict [pattern]
     else
       Alcotest_extra.check_any
         ~msg:(lazy str)

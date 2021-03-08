@@ -109,7 +109,7 @@ let test_pushing_validator_protocol vl _switch () =
   Test_services.Mock_sink.(
     assert_has_event
       "Should have a pushing_validation_request event"
-      ~filter
+      ?filter
       Pattern.
         {
           level = Some Internal_event.Debug;
@@ -133,7 +133,7 @@ let test_previously_validated_protocol vl _switch () =
   Test_services.Mock_sink.(
     assert_has_event
       "Should have a previously_validated_protocol event"
-      ~filter
+      ?filter
       Pattern.
         {
           level = Some Internal_event.Debug;
@@ -156,7 +156,7 @@ let test_fetching_protocol vl _switch () =
   Test_services.Mock_sink.(
     assert_has_event
       "Should have a fetching_protocol event"
-      ~filter
+      ?filter
       Pattern.
         {
           level = Some Internal_event.Notice;

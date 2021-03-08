@@ -143,7 +143,7 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
     None
   >>=?? fun n ->
   (* Start tests *)
-  let evs = Test_services.Mock_sink.get_events ~filter () in
+  let evs = Test_services.Mock_sink.get_events ?filter () in
   Alcotest.(check int) "should have one event" 1 (List.length evs) ;
   Test_services.Mock_sink.Pattern.(
     assert_event
@@ -176,7 +176,7 @@ let node_initialization_events _sandbox_parameters config _switch () =
     None
   >>=?? fun n ->
   (* Start tests *)
-  let evs = Test_services.Mock_sink.get_events ~filter () in
+  let evs = Test_services.Mock_sink.get_events ?filter () in
   Alcotest.(check int) "should have two events" 2 (List.length evs) ;
   Test_services.Mock_sink.Pattern.(
     assert_event
@@ -219,7 +219,7 @@ let node_store_known_protocol_events _sandbox_parameters config _switch () =
   Test_services.Mock_sink.(
     assert_has_event
       "Should have a store_protocol_incorrect_hash event"
-      ~filter
+      ?filter
       Pattern.
         {
           level = Some Internal_event.Info;

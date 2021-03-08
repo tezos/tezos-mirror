@@ -111,7 +111,7 @@ let validator_events validator block_validator chain _switch () =
       let filter = Some section in
       Mock_sink.assert_has_event
         "Should have an activate_chain event"
-        ~filter
+        ?filter
         {
           level = Some Internal_event.Notice;
           section = Some section;
@@ -124,7 +124,7 @@ let validator_events validator block_validator chain _switch () =
       >>= fun () ->
       Mock_sink.assert_has_events
         "Should have an shutdown_block_validator"
-        ~filter
+        ?filter
         Mock_sink.Pattern.
           [ {
               level = Some Internal_event.Notice;
