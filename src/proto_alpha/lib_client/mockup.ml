@@ -583,9 +583,7 @@ module Parsed_account = struct
     List.iter_s
       (function
         | (name, pkh, _pk_opt, Some sk_uri) -> (
-            let contract =
-              Protocol.Alpha_context.Contract.implicit_contract pkh
-            in
+            let contract = Contract.implicit_contract pkh in
             Client_proto_context.get_balance
               rpc_context
               ~chain:cctxt#chain
@@ -594,9 +592,7 @@ module Parsed_account = struct
             >>= fun tz_balance ->
             match tz_balance with
             | Ok balance -> (
-                let tez_repr =
-                  Tez.of_mutez @@ Protocol.Alpha_context.Tez.to_mutez balance
-                in
+                let tez_repr = Tez.of_mutez @@ Tez.to_mutez balance in
                 match tez_repr with
                 | None ->
                     (* we're reading the wallet, it's content MUST be valid *)
@@ -697,14 +693,14 @@ end
 
 type block = {
   hash : Block_hash.t;
-  header : Protocol.Alpha_context.Block_header.t;
-  operations : Protocol.Alpha_context.Operation.packed list;
+  header : Block_header.t;
+  operations : Operation.packed list;
   context : Protocol.Environment.Context.t;
 }
 
 module Forge = struct
   let default_proof_of_work_nonce =
-    Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
+    Bytes.create Constants.proof_of_work_nonce_size
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
     Tezos_base.Block_header.
