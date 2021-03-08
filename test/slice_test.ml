@@ -187,9 +187,9 @@ let recursive_result = ["4"; (* list length *) "0"]
 (* qualified type *)
 let qualified_enc =
   let open! Data_encoding in
-  def "qualified_enc" Test_types.SubTest.encoding
+  def "qualified_enc" int31
 
-let qualified_example = Test_types.SubTest.ex
+let qualified_example = 5
 
 let qualified_result = ["5"]
 
