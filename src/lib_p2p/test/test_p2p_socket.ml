@@ -32,6 +32,8 @@
     Subject:      Sockets and client-server communications.
 *)
 
+open P2p_test_utils
+
 include Internal_event.Legacy_logging.Make (struct
   let name = "test.p2p.connection"
 end)
@@ -40,165 +42,27 @@ let tzassert b pos =
   let p (file, lnum, cnum, _) = (file, lnum, cnum) in
   if b then return_unit else fail (Exn (Assert_failure (p pos)))
 
-let addr = ref Ipaddr.V6.localhost
-
-let canceler = Lwt_canceler.create () (* unused *)
-
-let proof_of_work_target = Crypto_box.make_pow_target 1.
-
-let id1 = P2p_identity.generate proof_of_work_target
-
-let id2 = P2p_identity.generate proof_of_work_target
-
-let high_pow_target = Crypto_box.make_pow_target 100.
-
 let id0 =
   (* Luckily, this will be an insufficient proof of work! *)
   P2p_identity.generate (Crypto_box.make_pow_target 0.)
 
-let version =
-  {
-    Network_version.chain_name =
-      Distributed_db_version.Name.of_string "SANDBOXED_TEZOS";
-    distributed_db_version = Distributed_db_version.one;
-    p2p_version = P2p_version.zero;
-  }
+let high_pow_target = Crypto_box.make_pow_target 100.
 
 type metadata = unit
-
-let conn_meta_config : metadata P2p_params.conn_meta_config =
-  {
-    conn_meta_encoding = Data_encoding.empty;
-    conn_meta_value = (fun () -> ());
-    private_node = (fun _ -> false);
-  }
-
-let rec listen ?port addr =
-  let tentative_port =
-    match port with None -> 49152 + Random.int 16384 | Some port -> port
-  in
-  let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
-  let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
-  Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
-  Lwt.catch
-    (fun () ->
-      Lwt_unix.bind main_socket (ADDR_INET (uaddr, tentative_port))
-      >>= fun () ->
-      Lwt_unix.listen main_socket 1 ;
-      Lwt.return (main_socket, tentative_port))
-    (function
-      | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
-        when port = None ->
-          listen addr
-      | exn ->
-          Lwt.fail exn)
 
 let sync ch =
   Process.Channel.push ch ()
   >>=? fun () -> Process.Channel.pop ch >>=? fun () -> return_unit
 
-let rec sync_nodes nodes =
-  List.iter_ep (fun p -> Process.receive p) nodes
-  >>=? fun () ->
-  List.iter_ep (fun p -> Process.send p ()) nodes
-  >>=? fun () -> sync_nodes nodes
-
-let sync_nodes nodes =
-  sync_nodes nodes
-  >>= function
-  | Ok () | Error (Exn End_of_file :: _) ->
-      return_unit
-  | Error _ as err ->
-      Lwt.return err
-
-let run_nodes client server =
-  listen !addr
-  >>= fun (main_socket, port) ->
-  Process.detach ~prefix:"server: " (fun channel ->
-      let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-      server channel sched main_socket
-      >>=? fun () -> P2p_io_scheduler.shutdown sched >>= fun () -> return_unit)
-  >>=? fun server_node ->
-  Process.detach ~prefix:"client: " (fun channel ->
-      Lwt_utils_unix.safe_close main_socket
-      >>= (function
-            | Error trace ->
-                Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
-                Lwt.return_unit
-            | Ok () ->
-                Lwt.return_unit)
-      >>= fun () ->
-      let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-      client channel sched !addr port
-      >>=? fun () -> P2p_io_scheduler.shutdown sched >>= fun () -> return_unit)
-  >>=? fun client_node ->
-  let nodes = [server_node; client_node] in
-  Lwt.ignore_result (sync_nodes nodes) ;
-  Process.wait_all nodes
-
-let raw_accept sched main_socket =
-  P2p_fd.accept main_socket
-  >>= fun (fd, sockaddr) ->
-  let fd = P2p_io_scheduler.register sched fd in
-  let point =
-    match sockaddr with
-    | Lwt_unix.ADDR_UNIX _ ->
-        assert false
-    | Lwt_unix.ADDR_INET (addr, port) ->
-        (Ipaddr_unix.V6.of_inet_addr_exn addr, port)
-  in
-  Lwt.return (fd, point)
-
-(** [accept ?id ?proof_of_work_target sched main_socket] connect
-   and performs [P2p_socket.authenticate] with the given
-   [proof_of_work_target].  *)
-let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
-    main_socket =
-  raw_accept sched main_socket
-  >>= fun (fd, point) ->
-  id
-  >>= fun id1 ->
-  P2p_socket.authenticate
-    ~canceler
-    ~proof_of_work_target
-    ~incoming:true
-    fd
-    point
-    id1
-    version
-    conn_meta_config
-
-let raw_connect sched addr port =
-  P2p_fd.socket PF_INET6 SOCK_STREAM 0
-  >>= fun fd ->
-  let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
-  P2p_fd.connect fd uaddr
-  >>= fun () ->
-  let fd = P2p_io_scheduler.register sched fd in
-  Lwt.return fd
-
 (** [connect ?target_id ?proof_of_work_target sched addr port] connect
    and performs [P2p_socket.authenticate] with the given
    [proof_of_work_target] (also checking that the remote point is the
    expected [target_id]). *)
-let connect ?(target_id = id1) ?(proof_of_work_target = proof_of_work_target)
-    sched addr port id =
-  raw_connect sched addr port
-  >>= fun fd ->
-  id
-  >>= fun id ->
+let connect ?proof_of_work_target ?(target_id = id1) sched addr port id =
+  P2p_test_utils.connect ?proof_of_work_target sched addr port id
+  >>=? fun (info, auth_fd) ->
   target_id
   >>= fun id1 ->
-  P2p_socket.authenticate
-    ~canceler
-    ~proof_of_work_target
-    ~incoming:false
-    fd
-    (addr, port)
-    id
-    version
-    conn_meta_config
-  >>=? fun (info, auth_fd) ->
   tzassert (not info.incoming) __POS__
   >>=? fun () ->
   tzassert (P2p_peer.Id.compare info.peer_id id1.peer_id = 0) __POS__
@@ -331,6 +195,31 @@ module Crypto_test = struct
                Format.kasprintf Stdlib.failwith "%a" pp_print_error error))
 end
 
+(** Spawns a client and a server. The client connects to the server
+    using identity [id0] (pow_target=0). The
+    server check it against a unreachable pow target.
+*)
+module Pow_check = struct
+  let encoding = Data_encoding.bytes
+
+  let is_failing = function
+    | Error (P2p_errors.Not_enough_proof_of_work _ :: _) ->
+        true
+    | _ ->
+        false
+
+  let server _ch sched socket =
+    accept ~proof_of_work_target:high_pow_target sched socket
+    >>= fun res -> tzassert (is_failing res) __POS__
+
+  let client _ch sched addr port =
+    id2 >>= fun id ->
+    connect sched addr port id
+    >>= fun conn -> tzassert (is_connection_closed conn) __POS__
+
+  let run _dir = run_nodes client server
+end
+
 (** Spawns a client and a server. After the client getting connected to
     the server, it reads a message [simple_msg] sent by the server and
     stores in [msg] of fixed same size. It asserts that both messages
@@ -354,30 +243,6 @@ module Low_level = struct
     P2p_io_scheduler.write fd simple_msg
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_io_scheduler.close fd >>=? fun _ -> return_unit
-
-  let run _dir = run_nodes client server
-end
-
-(** Spawns a client and a server. The client connects to the server
-    using identity [id0] (pow_target=0). The
-    server check it against a unreachable pow target.
-*)
-module Pow_check = struct
-  let encoding = Data_encoding.bytes
-
-  let is_failing = function
-    | Error (P2p_errors.Not_enough_proof_of_work _ :: _) ->
-        true
-    | _ ->
-        false
-
-  let server _ch sched socket =
-    accept ~proof_of_work_target:high_pow_target sched socket
-    >>= fun res -> tzassert (is_failing res) __POS__
-
-  let client _ch sched addr port =
-    connect sched addr port id2
-    >>= fun conn -> tzassert (is_connection_closed conn) __POS__
 
   let run _dir = run_nodes client server
 end
@@ -411,6 +276,8 @@ module Nack = struct
     P2p_socket.nack auth_fd P2p_rejection.No_motive [] >>= fun () -> sync ch
 
   let client ch sched addr port =
+    id2
+    >>= fun id2 ->
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.accept ~canceler auth_fd encoding
@@ -434,6 +301,8 @@ module Nacked = struct
     tzassert (Nack.is_rejected conn) __POS__ >>=? fun () -> sync ch
 
   let client ch sched addr port =
+    id2
+    >>= fun id2 ->
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.nack auth_fd P2p_rejection.No_motive [] >>= fun () -> sync ch
@@ -467,6 +336,8 @@ module Simple_message = struct
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
   let client ch sched addr port =
+    id2
+    >>= fun id2 ->
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.accept ~canceler auth_fd encoding
@@ -508,6 +379,8 @@ module Chunked_message = struct
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
   let client ch sched addr port =
+    id2
+    >>= fun id2 ->
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.accept ~canceler ~binary_chunks_size:21 auth_fd encoding
@@ -553,6 +426,8 @@ module Oversized_message = struct
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
   let client ch sched addr port =
+    id2
+    >>= fun id2 ->
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.accept ~canceler auth_fd encoding
@@ -585,6 +460,8 @@ module Close_on_read = struct
     sync ch >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
   let client ch sched addr port =
+    id2
+    >>= fun id2 ->
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.accept ~canceler auth_fd encoding
@@ -616,6 +493,8 @@ module Close_on_write = struct
     P2p_socket.close conn >>= fun _stat -> sync ch >>=? fun () -> return_unit
 
   let client ch sched addr port =
+    id2
+    >>= fun id2 ->
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.accept ~canceler auth_fd encoding
@@ -666,6 +545,8 @@ module Garbled_data = struct
     >>=? fun () -> P2p_socket.close conn >>= fun _stat -> return_unit
 
   let client _ch sched addr port =
+    id2
+    >>= fun id2 ->
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.accept ~canceler auth_fd encoding

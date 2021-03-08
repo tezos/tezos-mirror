@@ -69,3 +69,56 @@ val connect_all :
 (** [close_active_conns pool@] closes all actives connections of the pool. This
     function waits until the connections are effectively closed. *)
 val close_active_conns : ('a, 'b, 'c) Tezos_p2p.P2p_pool.t -> unit Lwt.t
+
+val addr : Ipaddr.V6.t ref
+
+val canceler : Lwt_canceler.t
+
+val proof_of_work_target : Crypto_box.pow_target
+
+val id1 : P2p_identity.t Lwt.t
+
+val id2 : P2p_identity.t Lwt.t
+
+val run_nodes :
+  ((unit, unit) Process.Channel.t ->
+  P2p_io_scheduler.t ->
+  Ipaddr.V6.t ->
+  int ->
+  (unit, error trace) result Lwt.t) ->
+  ((unit, unit) Process.Channel.t ->
+  P2p_io_scheduler.t ->
+  Lwt_unix.file_descr ->
+  (unit, error trace) result Lwt.t) ->
+  (unit, error trace) result Lwt.t
+
+val raw_accept :
+  P2p_io_scheduler.t ->
+  Lwt_unix.file_descr ->
+  (P2p_io_scheduler.connection * (P2p_addr.t * int)) Lwt.t
+
+val accept :
+  ?id:P2p_identity.t Lwt.t ->
+  ?proof_of_work_target:Crypto_box.pow_target ->
+  P2p_io_scheduler.t ->
+  Lwt_unix.file_descr ->
+  ( unit P2p_connection.Info.t * unit P2p_socket.authenticated_connection,
+    error trace )
+  result
+  Lwt.t
+
+val raw_connect :
+  P2p_io_scheduler.t -> P2p_addr.t -> int -> P2p_io_scheduler.connection Lwt.t
+
+val connect :
+  ?proof_of_work_target:Crypto_box.pow_target ->
+  P2p_io_scheduler.t ->
+  P2p_addr.t ->
+  int ->
+  P2p_identity.t ->
+  ( unit P2p_connection.Info.t * unit P2p_socket.authenticated_connection,
+    error trace )
+  result
+  Lwt.t
+
+val sync : (unit, unit) Process.Channel.t -> (unit, error trace) result Lwt.t
