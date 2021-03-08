@@ -51,10 +51,17 @@ let channel =
         reset_regressions = _;
         loop = _;
         time = _;
-        starting_port = _ } =
+        starting_port = _;
+        record = _;
+        job_count = _;
+        suggest_jobs } =
     Cli.options
   in
-  match list with None -> stdout | Some (`Ascii_art | `Tsv) -> stderr
+  if
+    (match list with None -> false | Some (`Ascii_art | `Tsv) -> true)
+    || match suggest_jobs with None -> false | Some _ -> true
+  then stderr
+  else stdout
 
 (* In theory we could simply escape spaces, backslashes, double quotes, single quotes
    and other symbols with a meaning for the shell.

@@ -79,6 +79,9 @@ type options = {
   loop : bool;
   time : bool;
   starting_port : int;
+  record : string option;
+  job_count : int;
+  suggest_jobs : string option;
 }
 
 (** Values for command-line options. *)

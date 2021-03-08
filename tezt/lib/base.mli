@@ -118,7 +118,6 @@ val wait_for_async : unit -> unit Lwt.t
 (** Repeat something a given amount of times. *)
 val repeat : int -> (unit -> unit Lwt.t) -> unit Lwt.t
 
-
 (** {2 Input/Output} *)
 
 (** Open file, use function to write output then close the output. In case of

@@ -369,6 +369,86 @@ let display_time_summary () =
   String_map.iter print_time_for_file tests_by_file ;
   ()
 
+type marshaled_test = {
+  file : string;
+  title : string;
+  tags : string list;
+  time : float;
+}
+
+let record_results filename =
+  (* Remove the closure ([body]). *)
+  let marshaled_tests =
+    List.map
+      (fun {file; title; tags; body = _; time} -> {file; title; tags; time})
+      !list
+  in
+  (* Write to file using Marshal.
+     This is not very robust but enough for the purposes of this file. *)
+  try
+    with_open_out filename
+    @@ fun file ->
+    Marshal.to_channel file (marshaled_tests : marshaled_test list) []
+  with Sys_error error -> Log.warn "Failed to write record: %s\n%!" error
+
+let read_recorded_results filename : marshaled_test list =
+  with_open_in filename Marshal.from_channel
+
+let suggest_jobs (tests : marshaled_test list) =
+  let job_count = max 1 Cli.options.job_count in
+  (* [jobs] is an array of pairs where the first value is the total time of the job
+     and the second value is the list of tests that are currently allocated to this job. *)
+  let jobs = Array.make job_count (0., []) in
+  let allocate test =
+    let smallest_job =
+      let best_index = ref 0 in
+      let best_time = ref max_float in
+      for i = 0 to job_count - 1 do
+        let (job_time, _) = jobs.(i) in
+        if job_time < !best_time then (
+          best_index := i ;
+          best_time := job_time )
+      done ;
+      !best_index
+    in
+    let (job_time, job_tests) = jobs.(smallest_job) in
+    jobs.(smallest_job) <- (job_time +. test.time, test :: job_tests)
+  in
+  (* Finding the optimal partition is NP-complete.
+     We use a heuristic to find an approximation: allocate longest tests first,
+     then fill the gaps with smaller tests. *)
+  let longest_first {time = a; _} {time = b; _} = Float.compare b a in
+  List.iter allocate (List.sort longest_first tests) ;
+  (* Jobs are allocated, now display them. *)
+  let display_job ~negate (total_job_time, job_tests) =
+    print_endline
+      ( String.concat
+          " "
+          (List.map
+             (fun test ->
+               Printf.sprintf
+                 "%s %s"
+                 (if negate then "--not-test" else "--test")
+                 (Log.quote_shell test.title))
+             job_tests)
+      ^ " # "
+      ^ string_of_float total_job_time
+      ^ "s" )
+  in
+  let all_other_tests = ref [] in
+  for i = 0 to job_count - 2 do
+    display_job ~negate:false jobs.(i) ;
+    List.iter
+      (fun test -> all_other_tests := test :: !all_other_tests)
+      (snd jobs.(i))
+  done ;
+  (* The last job uses --not-test so that if a test is added and the job list is not
+     updated, the new test is automatically added to the last job.
+     Note: if [job_count] is 1, this actually outputs no --not-test at all
+     since [all_other_tests] is empty, which is consistent
+     because it means to run all tests. *)
+  display_job ~negate:true (fst jobs.(job_count - 1), !all_other_tests)
+
 let register ~__FILE__ ~title ~tags body =
   let file = Filename.basename __FILE__ in
   check_tags tags ;
@@ -414,12 +494,22 @@ let run () =
       prerr_endline
         "You can use --list to get the list of tests and their tags." ) ;
   (* Actually run the tests (or list them). *)
-  match Cli.options.list with
-  | Some format ->
+  match (Cli.options.list, Cli.options.suggest_jobs) with
+  | (Some format, None) ->
       list_tests format
-  | None ->
+  | (None, Some record_file) -> (
+    match read_recorded_results record_file with
+    | exception Sys_error error ->
+        Printf.eprintf "Failed to read record: %s\n%!" error ;
+        exit 1
+    | record ->
+        suggest_jobs record )
+  | (Some _, Some _) ->
+      prerr_endline
+        "Cannot use both --list and --suggest-jobs at the same time."
+  | (None, None) ->
       let rec run iteration =
-        let run_and_measure_time test =
+        let run_and_measure_time (test : test) =
           let start = Unix.gettimeofday () in
           really_run ~iteration test.title test.body ;
           let time = Unix.gettimeofday () -. start in
@@ -429,5 +519,6 @@ let run () =
         if Cli.options.loop then run (iteration + 1)
       in
       run 1 ;
+      Option.iter record_results Cli.options.record ;
       if !a_test_failed then exit 1 ;
       if Cli.options.time then display_time_summary ()

@@ -48,6 +48,9 @@ type options = {
   loop : bool;
   time : bool;
   starting_port : int;
+  record : string option;
+  job_count : int;
+  suggest_jobs : string option;
 }
 
 let options =
@@ -72,6 +75,9 @@ let options =
   let loop = ref false in
   let time = ref false in
   let starting_port = ref 16384 in
+  let record = ref None in
+  let job_count = ref 3 in
+  let suggest_jobs = ref None in
   let set_log_level = function
     | "quiet" ->
         log_level := Quiet
@@ -87,6 +93,10 @@ let options =
         log_level := Debug
     | level ->
         raise (Arg.Bad (Printf.sprintf "invalid log level: %S" level))
+  in
+  let set_job_count value =
+    if value < 1 then raise (Arg.Bad "--job-count must be positive") ;
+    job_count := value
   in
   let spec =
     Arg.align
@@ -191,7 +201,23 @@ let options =
            failed." );
         ( "--starting-port",
           Arg.Set_int starting_port,
-          " If tests need to open ports, they may start from this number." ) ]
+          " If tests need to open ports, they may start from this number." );
+        ( "--record",
+          Arg.String (fun file -> record := Some file),
+          "<FILE> Record test results to FILE. This file can then be used \
+           with --suggest-jobs." );
+        ( "--job-count",
+          Arg.Int set_job_count,
+          "<COUNT> Set the number of target jobs for --suggest-jobs (default \
+           is 3)." );
+        ("-j", Arg.Int set_job_count, "<COUNT> Same as --job-count.");
+        ( "--suggest-jobs",
+          Arg.String (fun file -> suggest_jobs := Some file),
+          "<FILE> Read test results from a file generated with --record and \
+           suggest a partition of the tests that would result in --job-count \
+           sets of roughly the same total duration. Output each job as a list \
+           of flags that can be passed to Tezt, followed by a shell comment \
+           that denotes the expected duration of the job." ) ]
   in
   let usage =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
@@ -249,4 +275,7 @@ let options =
     loop = !loop;
     time = !time;
     starting_port = !starting_port;
+    record = !record;
+    job_count = !job_count;
+    suggest_jobs = !suggest_jobs;
   }
