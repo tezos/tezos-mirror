@@ -29,6 +29,8 @@ let raise e = raise (Read_error e)
 
 type slice = {name: string; value: string; pretty_printed: string}
 
+(* state management *)
+
 type slicer_state = {
   buffer: string;
   mutable offset: int;
@@ -372,7 +374,6 @@ and read_variable_pair :
       (left, right)
   | _ -> assert false
 
-(* Should be rejected by [Encoding.Kind.combine] *)
 and read_list :
     type a. read_error -> int -> a Encoding.t -> ?name:string -> slicer_state -> a list =
  fun error max_length e ?name state ->
@@ -385,8 +386,6 @@ and read_list :
       loop (max_length - 1) (v :: acc)
   in
   loop max_length []
-
-(** ******************** *)
 
 (** Various entry points *)
 
