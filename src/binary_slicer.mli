@@ -26,10 +26,20 @@
 (** This is for use *within* the data encoding library only. Instead, you should
     use the corresponding module intended for use: {!Data_encoding.Encoding}. *)
 
-type slice = {name: string; value: Bytes.t; pretty_printed: string}
+type slice = {name: string; value: string; pretty_printed: string}
 
-val slice : _ Encoding.t -> bytes -> int -> int -> slice list option
+type slicer_state
 
-val slice_bytes : _ Encoding.t -> bytes -> slice list option
+val make_slicer_state : string -> offset:int -> length:int -> slicer_state option
 
+val slice : _ Encoding.t -> slicer_state -> (slice list, Binary_error_types.read_error) result
+val slice_opt : _ Encoding.t -> slicer_state -> slice list option
+val slice_exn : _ Encoding.t -> slicer_state -> slice list
+
+val slice_string : _ Encoding.t -> string -> (slice list, Binary_error_types.read_error) result
+val slice_string_opt : _ Encoding.t -> string -> slice list option
+val slice_string_exn : _ Encoding.t -> string -> slice list
+
+val slice_bytes : _ Encoding.t -> bytes -> (slice list, Binary_error_types.read_error) result
+val slice_bytes_opt : _ Encoding.t -> bytes -> slice list option
 val slice_bytes_exn : _ Encoding.t -> bytes -> slice list

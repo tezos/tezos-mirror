@@ -27,15 +27,26 @@ open Binary_error_types
 
 let raise e = raise (Read_error e)
 
-type slice = {name: string; value: bytes; pretty_printed: string}
+type slice = {name: string; value: string; pretty_printed: string}
 
-type state = {
-  buffer: bytes;
+type slicer_state = {
+  buffer: string;
   mutable offset: int;
   mutable remaining_bytes: int;
   mutable allowed_bytes: int option;
   mutable slices: slice list;
 }
+
+let make_slicer_state buffer ~offset ~length =
+  if length < 0 || length > String.length buffer - offset then None
+  else
+  Some {
+    buffer;
+    offset;
+    remaining_bytes = length;
+    allowed_bytes = None;
+    slices = [];
+  }
 
 let check_allowed_bytes state size =
   match state.allowed_bytes with
@@ -52,7 +63,7 @@ let read_atom ?(pp = fun _ -> "") size conv name state =
   state.remaining_bytes <- check_remaining_bytes state size;
   state.allowed_bytes <- check_allowed_bytes state size;
   state.offset <- state.offset + size;
-  let value = Bytes.sub state.buffer offset size in
+  let value = String.sub state.buffer offset size in
   let result = conv state.buffer offset in
   state.slices <- {name; value; pretty_printed = pp result} :: state.slices;
   result
@@ -65,41 +76,41 @@ module Atom = struct
     state.remaining_bytes <- check_remaining_bytes state size;
     state.allowed_bytes <- check_allowed_bytes state size;
     state.offset <- state.offset + size;
-    Bytes.get_int8 state.buffer offset
+    TzEndian.get_int8_string state.buffer offset
 
-  let uint8 = read_atom ~pp:string_of_int Binary_size.uint8 TzEndian.get_uint8
+  let uint8 = read_atom ~pp:string_of_int Binary_size.uint8 TzEndian.get_uint8_string
 
-  let uint16 = read_atom ~pp:string_of_int Binary_size.int16 TzEndian.get_uint16
+  let uint16 = read_atom ~pp:string_of_int Binary_size.int16 TzEndian.get_uint16_string
 
-  let int8 = read_atom ~pp:string_of_int Binary_size.int8 TzEndian.get_int8
+  let int8 = read_atom ~pp:string_of_int Binary_size.int8 TzEndian.get_int8_string
 
-  let int16 = read_atom ~pp:string_of_int Binary_size.int16 TzEndian.get_int16
+  let int16 = read_atom ~pp:string_of_int Binary_size.int16 TzEndian.get_int16_string
 
-  let int32 = read_atom ~pp:Int32.to_string Binary_size.int32 TzEndian.get_int32
+  let int32 = read_atom ~pp:Int32.to_string Binary_size.int32 TzEndian.get_int32_string
 
-  let int64 = read_atom ~pp:Int64.to_string Binary_size.int64 TzEndian.get_int64
+  let int64 = read_atom ~pp:Int64.to_string Binary_size.int64 TzEndian.get_int64_string
 
   let float =
-    read_atom ~pp:string_of_float Binary_size.float TzEndian.get_double
+    read_atom ~pp:string_of_float Binary_size.float TzEndian.get_double_string
 
   let bool state name =
     read_atom
       ~pp:(fun x -> string_of_bool (x <> 0))
       Binary_size.int8
-      TzEndian.get_int8
+      TzEndian.get_int8_string
       state
       name
     <> 0
 
   let uint30 =
     read_atom ~pp:string_of_int Binary_size.uint30 @@ fun buffer ofs ->
-    let v = Int32.to_int (TzEndian.get_int32 buffer ofs) in
+    let v = Int32.to_int (TzEndian.get_int32_string buffer ofs) in
     if v < 0 then raise (Invalid_int {min = 0; v; max = (1 lsl 30) - 1});
     v
 
   let int31 =
     read_atom ~pp:string_of_int Binary_size.int31 @@ fun buffer ofs ->
-    Int32.to_int (TzEndian.get_int32 buffer ofs)
+    Int32.to_int (TzEndian.get_int32_string buffer ofs)
 
   let int = function
     | `Int31 -> int31
@@ -149,7 +160,7 @@ module Atom = struct
       let result = Z.of_bits (Buffer.contents res) in
       let pretty_printed = Z.to_string result in
       let value =
-        Bytes.sub state.buffer initial_offset (state.offset - initial_offset)
+        String.sub state.buffer initial_offset (state.offset - initial_offset)
       in
       state.slices <- {name; value; pretty_printed} :: state.slices;
       result )
@@ -165,7 +176,7 @@ module Atom = struct
       let result = Z.of_int first_value in
       let pretty_printed = Z.to_string result in
       let value =
-        Bytes.sub state.buffer initial_offset (state.offset - initial_offset)
+        String.sub state.buffer initial_offset (state.offset - initial_offset)
       in
       state.slices <- {name; value; pretty_printed} :: state.slices;
       result
@@ -197,17 +208,18 @@ module Atom = struct
     arr.(index)
 
   let fixed_length_bytes length =
-    read_atom length @@ fun buf ofs -> Bytes.sub buf ofs length
+    read_atom length @@ fun buf ofs ->
+    Bytes.unsafe_of_string @@ String.sub buf ofs length
 
   let fixed_length_string length =
     read_atom ~pp:(Format.sprintf "%S") length @@ fun buf ofs ->
-    Bytes.sub_string buf ofs length
+    String.sub buf ofs length
 
   let tag = function `Uint8 -> uint8 | `Uint16 -> uint16
 end
 
 (** Main recursive reading function, in continuation passing style. *)
-let rec read_rec : type ret. ret Encoding.t -> ?name:string -> state -> ret =
+let rec read_rec : type ret. ret Encoding.t -> ?name:string -> slicer_state -> ret =
  fun e ?name state ->
   let ( !! ) x = match name with
     | None -> x
@@ -342,7 +354,7 @@ let rec read_rec : type ret. ret Encoding.t -> ?name:string -> state -> ret =
 
 and read_variable_pair :
     type left right.
-    left Encoding.t -> right Encoding.t -> ?name:string -> state -> left * right =
+    left Encoding.t -> right Encoding.t -> ?name:string -> slicer_state -> left * right =
  fun e1 e2 ?name state ->
   match (Encoding.classify e1, Encoding.classify e2) with
   | ((`Dynamic | `Fixed _), `Variable) ->
@@ -362,7 +374,7 @@ and read_variable_pair :
 
 (* Should be rejected by [Encoding.Kind.combine] *)
 and read_list :
-    type a. read_error -> int -> a Encoding.t -> ?name:string -> state -> a list =
+    type a. read_error -> int -> a Encoding.t -> ?name:string -> slicer_state -> a list =
  fun error max_length e ?name state ->
   let rec loop max_length acc =
     if state.remaining_bytes = 0 then List.rev acc
@@ -378,22 +390,20 @@ and read_list :
 
 (** Various entry points *)
 
-let slice encoding buffer ofs len =
-  let state =
-    {
-      buffer;
-      offset = ofs;
-      slices = [];
-      remaining_bytes = len;
-      allowed_bytes = None;
-    }
-  in
-  match read_rec encoding state with
-  | exception Read_error _ -> None
-  | _ -> Some (List.rev state.slices)
+let slice_exn encoding state =
+  let _ = read_rec encoding state in
+  List.rev state.slices
 
-let slice_bytes_exn encoding buffer =
-  let len = Bytes.length buffer in
+let slice encoding state =
+  try Ok (slice_exn encoding state)
+  with Read_error e -> Error e
+
+let slice_opt encoding state =
+  try Some (slice_exn encoding state)
+  with Read_error _ -> None
+
+let slice_string_exn encoding buffer =
+  let len = String.length buffer in
   let state =
     {
       buffer;
@@ -407,5 +417,12 @@ let slice_bytes_exn encoding buffer =
   if state.offset <> len then raise Extra_bytes;
   List.rev state.slices
 
-let slice_bytes encoding buffer =
-  try Some (slice_bytes_exn encoding buffer) with Read_error _ -> None
+let slice_string encoding buffer =
+  try Ok (slice_string_exn encoding buffer) with Read_error e -> Error e
+
+let slice_string_opt encoding buffer =
+  try Some (slice_string_exn encoding buffer) with Read_error _ -> None
+
+let slice_bytes e b = slice_string e (Bytes.unsafe_to_string b)
+let slice_bytes_opt e b = slice_string_opt e (Bytes.unsafe_to_string b)
+let slice_bytes_exn e b = slice_string_exn e (Bytes.unsafe_to_string b)

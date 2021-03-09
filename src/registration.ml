@@ -40,14 +40,14 @@ let table = ref EncodingTable.empty
 let description (Record {description; _}) = description
 
 let slice (Record {encoding; _}) bytes =
-  Binary_slicer.slice_bytes encoding bytes
+  Binary_slicer.slice_string encoding bytes
 
 let slice_all bytes =
   EncodingTable.fold
     (fun enc_id (Record {encoding; _}) sliced ->
       try
-        let _ = Binary_reader.of_bytes_exn encoding bytes in
-        let slice = Binary_slicer.slice_bytes_exn encoding bytes in
+        let _ = Binary_reader.of_string_exn encoding bytes in
+        let slice = Binary_slicer.slice_string_exn encoding bytes in
         (enc_id, slice) :: sliced
       with _ -> sliced)
     !table

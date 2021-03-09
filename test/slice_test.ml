@@ -202,26 +202,26 @@ let () =
   Data_encoding.Registration.register recursive_enc;
   Data_encoding.Registration.register qualified_enc
 
-let bin_list = Data_encoding.Binary.to_bytes_exn list_enc list_example
+let bin_list = Data_encoding.Binary.to_string_exn list_enc list_example
 
-let bin_record = Data_encoding.Binary.to_bytes_exn record_enc record_example
+let bin_record = Data_encoding.Binary.to_string_exn record_enc record_example
 
-let bin_union1 = Data_encoding.Binary.to_bytes_exn union_enc union_example1
+let bin_union1 = Data_encoding.Binary.to_string_exn union_enc union_example1
 
-let bin_union2 = Data_encoding.Binary.to_bytes_exn union_enc union_example2
+let bin_union2 = Data_encoding.Binary.to_string_exn union_enc union_example2
 
-let bin_option1 = Data_encoding.Binary.to_bytes_exn option_enc option_example1
+let bin_option1 = Data_encoding.Binary.to_string_exn option_enc option_example1
 
-let bin_option2 = Data_encoding.Binary.to_bytes_exn option_enc option_example2
+let bin_option2 = Data_encoding.Binary.to_string_exn option_enc option_example2
 
 let bin_parameter =
-  Data_encoding.Binary.to_bytes_exn parameter_enc parameter_example
+  Data_encoding.Binary.to_string_exn parameter_enc parameter_example
 
 let bin_recursive =
-  Data_encoding.Binary.to_bytes_exn recursive_enc recursive_example
+  Data_encoding.Binary.to_string_exn recursive_enc recursive_example
 
 let bin_qualified =
-  Data_encoding.Binary.to_bytes_exn qualified_enc qualified_example
+  Data_encoding.Binary.to_string_exn qualified_enc qualified_example
 
 let rec check_sliced_fields_result fl rl =
   match (fl, rl) with
@@ -242,8 +242,10 @@ let slice_test id result expected () =
   | None -> Alcotest.failf "Could not find %s" id
   | Some r -> (
       match Data_encoding.Registration.slice r result with
-      | None -> Alcotest.failf "Empty result"
-      | Some l -> check_sliced_fields_result l expected )
+      | Error e ->
+         Alcotest.failf "Error %a" Data_encoding.Binary.pp_read_error e
+      | Ok l ->
+         check_sliced_fields_result l expected )
 
 let tests =
   [
