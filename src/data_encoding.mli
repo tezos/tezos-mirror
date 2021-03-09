@@ -83,6 +83,8 @@ module Encoding : sig
 
   (** {3 Ground descriptors} *)
 
+  (** {4 voids} *)
+
   (** Special value [null] in JSON, nothing in binary. *)
   val null : unit encoding
 
@@ -95,6 +97,21 @@ module Encoding : sig
 
   (** Constant string (data is not included in the binary data). *)
   val constant : string -> unit encoding
+
+  (** {4 ground numerical types}
+
+      All encodings are big-endians.
+
+      - 8-bit integers (signed or unsigned) are encoded over 1 single byte.
+      - 16-bit integers (signed or unsigned) are encoded over 2 bytes.
+      - 31-bit integers are always signed and always encoded over 4 bytes.
+      - 32-bit integers are always signed and always encoded over 4 bytes.
+      - 64-bit integers are always signed and always encoded over 8 bytes.
+
+      A note on 31-bit integers. The internal representation of integers in
+      OCaml reserves one bit for GC tagging. The remaining bits encode a signed
+      integer. For compatibility with 32-bit machine, we restrict these native
+      integers to the 31-bit range. *)
 
   (** Signed 8 bit integer
       (data is encoded as a byte in binary and an integer in JSON). *)
@@ -152,6 +169,8 @@ module Encoding : sig
 
   (** Float with bounds in a given range. Both bounds are inclusive *)
   val ranged_float : float -> float -> float encoding
+
+  (** {4 Other ground type encodings} *)
 
   (** Encoding of a boolean
       (data is encoded as a byte in binary and a boolean in JSON). *)
