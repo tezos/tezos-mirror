@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,7 +40,7 @@
 
 (* These hooks must be attached to every process that should be captured for
    regression testing *)
-let hooks = Regression.scrubbing_hooks
+let hooks = Tezos_regression.hooks
 
 type client_mode_tag = Client | Mockup | Proxy
 
