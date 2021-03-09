@@ -107,8 +107,9 @@ in the :ref:`introduction <howtoget>`.
    user/proxy
    user/history_modes
    user/snapshots
-   user/various
+   user/node-configuration
    user/multinetwork
+   user/various
 
 .. toctree::
    :maxdepth: 2

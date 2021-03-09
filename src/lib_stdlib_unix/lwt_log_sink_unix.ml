@@ -216,7 +216,7 @@ let cfg_encoding =
           "template"
           ~description:
             "Format for the log file, see \
-             http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates."
+             https://github.com/ocsigen/lwt_log/blob/1.1.1/src/core/lwt_log_core.mli#L229."
           string
           default_cfg.template))
 

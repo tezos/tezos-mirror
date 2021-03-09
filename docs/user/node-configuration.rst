@@ -1,0 +1,163 @@
+.. _node-conf:
+
+Node Configuration
+==================
+
+The Tezos node can be configured in flexible ways to control various
+aspects of its behavior, such as :ref:`RPC <configure_rpc>`, :ref:`P2P <configure_p2p>`, or :ref:`shell <configure_shell>` parameters, the directory for storing data, :ref:`logging levels <configure_logging>`, and so on. These aspects can be customized in two different ways:
+
+- by supplying **options** on the command line when running the node
+- by specifying **parameters** in a configuration file for the node
+
+When the same parameter is set both in the configuration file and using a command line option, the value on the command line is taken into account (and the configuration file is not updated).
+
+The list of configurable options on the command line interface (CLI) can be
+obtained using the following command::
+
+    tezos-node run --help
+
+.. _node-conf-file:
+
+Configuration file
+------------------
+
+Parameters in the configuration file can be specified in two different ways:
+
+- by creating and updating the configuration file using the ``config`` command of ``tezos-node``. This covers a subset of the CLI of the ``run`` command of ``tezos-node`` mentioned above.
+- by directly editing the configuration file. This allows to specify all the available configuration parameters, including some that cannot be set using the options of the ``config`` and ``run`` commands of ``tezos-node``, for example network parameters such as connection or authentication timeouts.
+
+The list of configurable options and parameters for the node can be obtained using the following command::
+
+    tezos-node config --help
+
+This command also explains the role of each option and parameter and the range of possible values.
+
+The config command
+~~~~~~~~~~~~~~~~~~
+
+::
+
+   ./tezos-node config init
+
+This will initialize a configuration file for the node in
+``$HOME/.tezos-node/config.json``, using default values. It only
+specifies that the node will listen to incoming connections on socket
+address ``[::]:9732``.
+
+The easiest way to amend this default configuration is to use
+
+::
+
+   # Update the config file
+   ./tezos-node config update <…>
+   # Start from an empty cfg file
+   ./tezos-node config reset <…>
+
+However, note that the ``network`` configuration parameter, needed to run the node on a network other than the default one (Mainnet), can only be defined when the configuration file is initialized (using ``init``), and cannot be updated later (using ``update``). See the instructions for :ref:`running the node in test networks <multinetwork>`.
+
+For example, the following script initializes and fills a configuration file using many command-line options:
+
+.. literalinclude:: node-config.sh
+    :language: shell
+    :start-at: [remove config file if exists]
+
+Editing the configuration file
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+All blockchain data is stored under ``$HOME/.tezos-node/``.  You can
+change this by doing `./tezos-node config update --data-dir
+</somewhere/in/your/disk>`.
+
+To run multiple nodes on the same machine, you can duplicate and edit
+``$HOME/.tezos-node/config.json`` while making sure they don't share
+the same ``data-dir``. Then run your node with ``./tezos-node
+run --config-file=</path/to/alternate_cfg>``.
+
+Here is an example configuration file with many parameters specified.
+Most of the time it uses default values, except for cases where the
+default is not explanatory enough (i.e. ``bootstrap-peers`` is an empty
+list by default). Comments are not allowed in JSON, so this
+configuration file would not parse. They are just provided here to help
+writing your own configuration file if needed.
+
+.. literalinclude:: node-config.json
+   :language: c
+
+The rest of this page provides more details about the use of some selected
+configuration options/parameters.
+
+.. _configure_rpc:
+
+RPC parameters
+--------------
+
+RPC parameters allow to customize the :doc:`JSON/RPC interface <../developer/rpc>`, by defining for instance hosts to listen for RPC requests, or a certificate/key file necessary when TLS is used.
+
+.. _configure_p2p:
+
+P2P parameters
+--------------
+
+P2P parameters allow to customize aspects related to the :doc:`peer-to-peer network layer <../shell/p2p>`, such as:
+
+- defining the bootstrap peers (and ports),
+- setting the greylist timeout,
+- running the node in private mode.
+
+.. _private-mode:
+
+Private node
+~~~~~~~~~~~~
+
+The node can be set in private mode with the option ``--private-mode``
+so that:
+
+- it doesn't connect to any peer other than those provided with
+  ``--peer`` or in ``bootstrap-peers``
+- the peers connected to a private node don't advertise it in the list
+  of peers sent to their neighborhood
+
+This feature is especially useful to hide a sensitive node that signs
+operations.
+
+For example we could have a set up with two nodes, a private one
+connected uniquely with a public one.
+The public node runs on a VPS, connects normally to the network and
+keeps an up to date state of the network while the private node runs at
+your home and is in charge of injecting and signing operations with a
+hardware wallet.
+
+::
+
+   tezos-node run --rpc-addr [::] --private-mode \
+                                  --no-bootstrap-peers \
+                                  --synchronisation-threshold=1 \
+                                  --connections 1 \
+                                  --peer <public-node-ip>
+
+
+.. _configure_logging:
+
+Logging
+-------
+
+It is possible to set independent log levels for different components in the Tezos node, as well as to specify an output file for logging.
+This can be done in two different ways:
+
+- by defining log parameters in the configuration file (see :ref:`node-conf-file`)
+- by setting the environment variable ``TEZOS_LOG`` before starting the node.
+
+The list of the Tezos components that can be logged and the syntax for the logging options can be found in the DEBUG section displayed by ``tezos-node run --help``:
+
+.. literalinclude:: ../api/tezos-node-run.txt
+    :start-after: DEBUG
+    :end-before: OPTIONS
+
+.. _configure_shell:
+
+Shell parameters
+----------------
+
+Configuration options/parameters for the shell allow tuning the working of the :doc:`validation subsystem <../shell/validation>`.
+
+In particular, the synchronization heuristics implemented by the chain validator can be controlled using parameters such as the synchronization threshold or the latency, described in the documentation of the  :doc:`synchronization heuristics <../shell/sync>`.

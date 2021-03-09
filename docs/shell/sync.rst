@@ -47,11 +47,12 @@ pair of a block's timestamp and a peer. The block from which the
 timestamp is taken must have been validated locally and it must be the
 most-recent such block advertised by the peer.
 
-The heuristic is parameterised by two values:
+The heuristic is parameterised by two values (see :doc:`node configuration <../user/node-configuration>`):
 
-- A ``threshold``: The number of candidates kept by the heuristic
-
-- A ``latency``: A delay in seconds to control possible forks and the
+- A ``threshold`` (configuration parameter ``synchronisation_threshold``): The
+  number of candidates kept by the heuristic
+- A ``latency`` (configuration parameter ``latency``): A delay in seconds to
+  control possible forks and the
   latency of the network (see :ref:`Acceptable values for
   parameters<acceptable_values>`)
 

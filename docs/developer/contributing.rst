@@ -166,6 +166,11 @@ While working on your branch to prepare a Merge Request, make sure you respect t
 -  If you add new functions to an interface, don’t forget to
    document the function in the interface (in the corresponding .mli file; or,
    if there is no .mli file, directly in the .ml file)
+-  If you modify the user API (e.g. add or change a configuration parameter or
+   a command-line option), update the corresponding documentation. In
+   particular, for configuration parameters of the Tezos node, update the node
+   configuration :doc:`documentation <../user/node-configuration>` and the
+   documentation of the modified component(s), usually referred by that page.
 -  If your MR introduces new dependencies to opam packages, follow the
    :ref:`additional instructions <adding_new_dependencies>`.
 -  Check whether your changes need to be reflected in changes to the
