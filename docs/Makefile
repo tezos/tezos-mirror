@@ -92,6 +92,13 @@ scriptsindoccheck:
 	introduction/test_howtoget.sh compile-sources-buster
 	#introduction/test_howtoget.sh use-docker # returns 1 (and eats alot of disk)
 
+sanitycheck:
+	@if grep -Rq alpha 0*; then					\
+		echo "'alpha' occurs in the docs for released protocols:";	\
+                grep -R alpha 0*;                                               \
+		exit 1;								\
+	fi
+
 api/errors.rst: $(DOCERRORDIR)/error_doc.ml
 	@cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe
 	../_build/default/docs/$(DOCERRORDIR)/error_doc.exe > api/errors.rst
