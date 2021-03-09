@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A replacement for {!Stdlib.Option} which is
+(** A replacement for {!Stdlib.Option} which
     - is exception-safe,
     - includes Lwt-, result-, and Lwt-result-aware traversors.
 

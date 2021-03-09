@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A replacement for {!Stdlib.Result} which is
+(** A replacement for {!Stdlib.Result} which
     - is exception-safe,
     - includes Lwt-, result-, and Lwt-result-aware traversors.
 

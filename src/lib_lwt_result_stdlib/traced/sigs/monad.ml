@@ -40,12 +40,12 @@ module type S = sig
   type 'error trace
 
   (** [error_trace e] is [Error (Trace.make e)] where [Trace] is the
-      {!Traced_sigs.Trace} module that is provides the trace type and functions.
+      {!Traced_sigs.Trace} module that provides the trace type and functions.
       *)
   val error_trace : 'error -> ('a, 'error trace) result
 
   (** [fail_trace e] is [Lwt.return (Error (Trace.make e))] where [Trace] is the
-      {!Traced_sigs.Trace} module that is provides the trace type and functions.
+      {!Traced_sigs.Trace} module that provides the trace type and functions.
       *)
   val fail_trace : 'error -> ('a, 'error trace) result Lwt.t
 

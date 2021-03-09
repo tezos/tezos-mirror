@@ -300,8 +300,8 @@ module type S_ES = sig
 
       Specifically, for each binding [(k, p)] it waits for [p] to be fulfilled
       with [Ok v] and calls [f k v]. If [p] fulfills with [Error _] or is
-      rejected, then no call is made for this binding. Note however that an
-      [Error]/rejection in one promise returned by [f] interrupts the
+      rejected, then no call to [f] is made for this binding. Note however that
+      an [Error]/rejection in one promise returned by [f] interrupts the
       iteration.
 
       It processes bindings one after the other: it waits for both the bound

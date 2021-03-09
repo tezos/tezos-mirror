@@ -1,7 +1,7 @@
 # Lwtreslib: an Lwt- and Result-friendly addition/replacement for the Stdlib
 
-The OCaml's Stdlib modules are orthogonal: each define their own data-type and a
-set of functions operating on this data-type. `Result` for `result`, `Option`
+The OCaml's Stdlib modules are orthogonal: each define their own datatype and a
+set of functions operating on this datatype. `Result` for `result`, `Option`
 for `option`, `List` for `list`, etc. This orthogonality provides a high
 expressive power for a low lines-of-code count. E.g.,
 
@@ -13,7 +13,7 @@ let fold f init xs =
       xs
 ```
 
-However, in code-bases that make heavy uses of some data-types, a little more
+However, in code-bases that make heavy uses of some datatypes, a little more
 integration is welcome. For example, in code bases that use the `result` type
 pervasively, the `fold` function above should be available in a module of
 list-traversing functions.
@@ -29,8 +29,7 @@ traversed (iterated, mapped, folded, what have you).
 
     The functions exported by Lwtreslib do not raise exceptions. These functions
     may return `option` or `result` to indicate that some error happened during
-    traversal, and they may propagate `result`. But the functions do not raise
-    exceptions.
+    traversal, and they may propagate `result`.
 
     (For convenience, the module `WithExceptions` provides a few
     exception-raising functions because they are convenient in specific
@@ -70,7 +69,7 @@ The sources of Lwtreslib are organised as follow:
 - `traced/` contains the sources for a trace-enabled implementation of Lwtreslib
   that provides monadic combinators and collection traversals. This
   implementation provides all the functionality of `bare/` with added support
-  for traces: structured collections of errors.
+  for traces (i.e., structured collections of errors).
 
     - `traced/sigs/` contains the sources for the signatures of all the modules
       exported by `traced/`

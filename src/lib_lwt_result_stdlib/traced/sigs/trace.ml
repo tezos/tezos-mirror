@@ -37,20 +37,49 @@ module type S = sig
       be equal) to support cases such as the following:
       - [trace] are richer than [error], such as by including a
         timestamp, a filename, or some other such metadata.
-      - [trace] is slightly different and [private] and [error] is simply
-        the type of argument to the functions that construct the private
+      - [trace] is a [private] type or an [abstract] type and [error] is the
+        type of argument to the functions that construct the private/abstract
         [trace].
       - [trace] is a collection of [error] and additional functions (not
         required by this library) allow additional manipulation. E.g., in the
         case of Tezos: errors are built into traces that can be grown.
-  *)
+
+     There is {e some} leeway about what traces are, what information they
+     carry, etc. Beyond this leeway, Lwtreslib is opinionated about traces.
+     Specifically, Lwtreslib has a notion of {e sequential} and {e parallel}
+     composition. A trace can be either of the following.
+     - A {e single-error trace}, i.e., the simplest possible trace that
+       corresponds to a simple failure/issue/unexpected behaviour in the
+       program. See [make].
+     - A {e sequential trace}, i.e., a trace of errors where one precedes
+       another. This is used to contextualise failures. E.g., in a high-level
+       network handshaking function, a low-level I/O error may be built into a
+       trace that shows how the low-level error caused a high-level issue). See
+       [cons].
+     - A {e parallel trace}, i.e., a trace of errors that happened in concurrent
+       (or non-causally related) parts of the program. See [conp]. *)
   type 'error trace
 
   (** [make e] is a trace made of one single error. *)
   val make : 'error -> 'error trace
 
   (** [cons e t] is a trace made of the error [e] composed sequentially with the
-      trace [t]. *)
+      trace [t].
+
+      Typically, this is used to give context to a low-level error.
+
+{[
+let query key =
+  connect_to_server () >>=? fun c ->
+  send_query_over_connection c key >>=? fun r ->
+  check_response r >>=? fun () ->
+  return r
+
+let query key =
+  query_key >|= function
+  | Ok r -> Ok r
+  | Error trace -> Error (cons `Query_failure trace)
+]} *)
   val cons : 'error -> 'error trace -> 'error trace
 
   (** [cons_list error errors] is the sequential composition of all the errors
@@ -89,133 +118,5 @@ module type S = sig
       recommended that you also make, for your own use, a pretty-printing
       function as well as some introspection functions.
 
-      Recommneded additions include:
-
-{[
-(** [pp_print] pretty-prints a trace of errors *)
-val pp_print :
-  (Format.formatter -> 'err -> unit) ->
-  Format.formatter ->
-  'err trace ->
-  unit
-
-(** [pp_print_top] pretty-prints the top errors of the trace *)
-val pp_print_top :
-  (Format.formatter -> 'err -> unit) ->
-  Format.formatter ->
-  'err trace ->
-  unit
-
-val encoding :
-  'error -> 'error Data_encoding.t -> 'error trace Data_encoding.t
-
-(** [fold f init trace] traverses the trace (in an unspecified manner) so that
-    [init] is folded over each of the error within [trace] by [f]. Typical use
-    is to find the worst error, to check for the presence of a given error,
-    etc. *)
-val fold : ('a -> 'error -> 'a) -> 'a -> 'error trace -> 'a
-
-(** Recovering from errors
-
-    This module ([TRACE]) focuses on giving a sound semantic on top of
-    abstract traces. The following functions are meant for the higher-level
-    monad (the one that gives combinators for [('a, 'e trace) result]) to
-    handle the [Error] constructor. The functions below are necessary because
-    the payload of the [Error] constructor is abstract and handling it should
-    be delegated to this here [TRACE] module.
-
-    Savlage
-
-    The function [salvage] and its variants ([salvage_s], etc.) are for
-    partial recovery: you salvage what you can.
-
-    In [salvage] (and variants), there is a single handler that returns an
-    option type. The handler is ignored if [salvage] is passed [Ok _] as
-    argument. Otherwise, if [salvage] is passed [Error _], the handler is
-    called.
-
-    The handler returns [Some x] to indicate a successful
-    recovery and the function returns the salvaged value [x]. The handler
-    returns [None] to indicate a failed recovery and the function returns the
-    original failure.
-
-    Note, for example, the following trivial cases:
-    [salvage (fun _ -> Some 0) t = Ok 0],
-    [salvage (fun _ -> None) t = Error t].
-
-    When [salvage] (or variants) is passed [Error t] as argument, its handler
-    is applied to each of the {e recoverable errors} from the trace [t]. There
-    is a single recoverable error in every trace:
-    - the single error of a singleton trace (i.e., [e] in [make e]),
-    - the most recent error of a sequential trace (i.e., [e] in [cons e _]),
-    - the recoverable error of one unsepcified member of either of parallel
-      traces (i.e., either of the recoverable errors from [tl] or [tr] in
-      [conp tl tr]).
-
-    In the future, there will be one-or-more recoverable errors per trace.
-    Specifically, it will be possible to recover from any of multiple parallel
-    traces.
-
-    Recover
-
-    The function [recover] and its variants ([recover_s], etc.) are for total
-    recovery: you simply {e recover}.
-
-    The function [recover] and its variants are similar to [salvage] and its
-    variants. However, they take one additional parameter: a total handler for
-    traces. This total handler is called if the partial handler has returned
-    [None] for all of the recoverable errors. The total handler returns a
-    non-option type and thus it cannot indicate failed recovery.
-
-    Because [recover] makes a full recovery, it returns a non-result type.
-
-    Note, for example, the following trivial cases:
-    [recover (fun _ -> Some 0) (fun _ -> 1) t = 0],
-    [recover (fun _ -> None) (fun _ -> 1) t = 1].
-
- *)
-
-val salvage :
-  ('error -> 'a option) -> 'error trace -> ('a, 'error trace) result
-
-val salvage_s :
-  ('error -> 'a Lwt.t option) ->
-  'error trace ->
-  ('a, 'error trace) result Lwt.t
-
-val salvage_e :
-  ('error -> ('a, 'error trace) result option) ->
-  'error trace ->
-  ('a, 'error trace) result
-
-val salvage_es :
-  ('error -> ('a, 'error trace) result Lwt.t option) ->
-  'error trace ->
-  ('a, 'error trace) result Lwt.t
-
-val recover :
-  ('error -> 'a option) -> ('error trace -> 'a) -> 'error trace -> 'a
-
-val recover_s :
-  ('error -> 'a Lwt.t option) ->
-  ('error trace -> 'a Lwt.t) ->
-  'error trace ->
-  'a Lwt.t
-
-val recover_e :
-  ('error -> ('a, 'error trace) result option) ->
-  ('error trace -> ('a, 'error trace) result) ->
-  'error trace ->
-  ('a, 'error trace) result
-
-val recover_es :
-  ('error -> ('a, 'error trace) result Lwt.t option) ->
-  ('error trace -> ('a, 'error trace) result Lwt.t) ->
-  'error trace ->
-  ('a, 'error trace) result Lwt.t
-
-val wrap : ('a -> 'b) -> 'a trace -> 'b trace
-]}
-
-  *)
+      One possible extension can be found in [examples/traces/traces.ml]. *)
 end

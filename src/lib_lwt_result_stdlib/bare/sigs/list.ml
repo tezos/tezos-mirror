@@ -43,7 +43,7 @@
     - [_e], [_s], and [_es] traversors are {i fail-early}: they stop traversal
       as soon as a failure ([Error] or [Fail]) occurs; [_p] and [_ep]
       traversors are {i best-effort}: they only resolve once all of the
-      intermediate promises have even if a failure occurs. *)
+      intermediate promises have, even if a failure occurs. *)
 
 (** {2 Double-traversal and combine}
 
