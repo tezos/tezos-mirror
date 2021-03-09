@@ -51,7 +51,7 @@ let rec raw_context_size = function
   | Tezos_shell_services.Block_services.Key _ | Cut ->
       0
   | Dir map ->
-      List.fold_left (fun sz (_, v) -> sz + 1 + raw_context_size v) 0 map
+      TzString.Map.fold (fun _key v acc -> acc + 1 + raw_context_size v) map 0
 
 let rec raw_context_to_tree
     (raw : Tezos_shell_services.Block_services.raw_context) :
@@ -61,8 +61,8 @@ let rec raw_context_to_tree
       Lwt.return (Some (Local.Tree.of_raw (`Value bytes)))
   | Cut ->
       Lwt.return None
-  | Dir pairs ->
-      let f tree (string, raw_context) =
+  | Dir map ->
+      let add_to_tree tree (string, raw_context) =
         raw_context_to_tree raw_context
         >>= function
         | None ->
@@ -70,7 +70,8 @@ let rec raw_context_to_tree
         | Some u ->
             Local.Tree.add_tree tree [string] u
       in
-      List.fold_left_s f (Local.Tree.empty Local.empty) pairs
+      TzString.Map.bindings map
+      |> List.fold_left_s add_to_tree (Local.Tree.empty Local.empty)
       >|= fun dir -> if Local.Tree.is_empty dir then None else Some dir
 
 module type M = sig

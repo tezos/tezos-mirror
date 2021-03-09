@@ -58,7 +58,7 @@ val live_blocks_path : ('a, 'b) RPC_path.t -> ('a, 'b) RPC_path.t
 
 type operation_list_quota = {max_size : int; max_op : int option}
 
-type raw_context = Key of Bytes.t | Dir of (string * raw_context) list | Cut
+type raw_context = Key of Bytes.t | Dir of raw_context TzString.Map.t | Cut
 
 val pp_raw_context : Format.formatter -> raw_context -> unit
 

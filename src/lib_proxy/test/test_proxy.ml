@@ -73,7 +73,7 @@ let mock_proto_rpc () =
             Tezos_shell_services.Block_services.Key Bytes.empty
         | hd :: tail ->
             Tezos_shell_services.Block_services.Dir
-              [(hd, mock_raw_context tail)]
+              (TzString.Map.singleton hd (mock_raw_context tail))
       in
       (* Remember call *)
       Stack.push k calls ;

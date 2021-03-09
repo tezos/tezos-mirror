@@ -34,7 +34,12 @@ let rec read_partial_context context path depth =
         Lwt.return (Block_services.Key v)
     | None ->
         (* try to read as directory *)
-        Context.fold ~depth:(`Eq 1) context path ~init:[] ~f:(fun k _ acc ->
+        Context.fold
+          ~depth:(`Eq 1)
+          context
+          path
+          ~init:TzString.Map.empty
+          ~f:(fun k _ acc ->
             match path @ k with
             | [] ->
                 (* This is an invariant of {!Context.fold} *)
@@ -43,8 +48,8 @@ let rec read_partial_context context path depth =
                 read_partial_context context k (depth - 1)
                 >>= fun v ->
                 let k = List.last khd ktl in
-                Lwt.return ((k, v) :: acc))
-        >>= fun l -> Lwt.return (Block_services.Dir (List.rev l))
+                Lwt.return (TzString.Map.add k v acc))
+        >|= fun map -> Block_services.Dir map
 
 let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
   let dir : (State.Chain.t * Block_hash.t * Block_header.t) RPC_directory.t ref
