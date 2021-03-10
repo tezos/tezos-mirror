@@ -420,6 +420,47 @@ end = struct
 
   let error_of_json json = Data_encoding.Json.destruct error_encoding json
 
+  let find_info_of_error error =
+    List.find
+      (fun (Error_kind {from_error; _}) -> Option.is_some (from_error error))
+      !error_kinds
+    |> function
+    | Error_kind {id; title; description; category; encoding_case; _} -> (
+        match category with
+        | Wrapped (module WEM) -> (
+            match WEM.unwrap error with
+            | None -> failwith "incorrectly registered wrapped error"
+            | Some error ->
+                let {WEM.id; title; description; category; schema} =
+                  WEM.find_info_of_error error
+                in
+                {id; title; description; category; schema})
+        | Main category -> (
+            match encoding_case with
+            | Non_recursive encoding_case ->
+                {
+                  id;
+                  title;
+                  description;
+                  category;
+                  schema =
+                    Data_encoding.Json.schema
+                      (Data_encoding.union [encoding_case]);
+                }
+            | Recursive make_encoding_case ->
+                {
+                  id;
+                  title;
+                  description;
+                  category;
+                  schema =
+                    Data_encoding.Json.schema
+                      ( Data_encoding.mu error_encoding_name
+                      @@ fun error_encoding ->
+                        Data_encoding.union [make_encoding_case error_encoding]
+                      );
+                }))
+
   let classify_error error =
     let rec find e = function
       | [] -> `Temporary
