@@ -4,6 +4,10 @@ This document lists changes to the [Tezos Environment](https://tezos.gitlab.io/s
 
 Changes are grouped by environment version and listed in reverse chronological order.
 
+## V3
+
+(no changes)
+
 ## V2
 
 Everywhere: update version dependencies for data-encoding, resto and lwt-canceler

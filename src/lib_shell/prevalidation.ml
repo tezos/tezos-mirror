@@ -400,7 +400,7 @@ let preapply chain_store ~user_activated_upgrades
   >>=? (function
          | Protocol.V0 ->
              return context
-         | Protocol.V1 | Protocol.V2 -> (
+         | Protocol.V1 | Protocol.V2 | Protocol.V3 -> (
              (* Block and operation metadata hashes may not be set on
                 the testchain genesis block and activation block, even
                 when they are using environment V1, they contain no

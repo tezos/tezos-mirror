@@ -31,7 +31,7 @@ and component = {
   implementation : string;
 }
 
-and env_version = V0 | V1 | V2
+and env_version = V0 | V1 | V2 | V3
 
 include Compare.Make (struct
   type nonrec t = t
@@ -58,12 +58,14 @@ let module_name_of_env_version = function
       "V1"
   | V2 ->
       "V2"
+  | V3 ->
+      "V3"
 
 let env_version_encoding =
   let open Data_encoding in
   def "protocol.environment_version"
   @@ conv
-       (function V0 -> 0 | V1 -> 1 | V2 -> 2)
+       (function V0 -> 0 | V1 -> 1 | V2 -> 2 | V3 -> 3)
        (function
          | 0 ->
              V0
@@ -71,6 +73,8 @@ let env_version_encoding =
              V1
          | 2 ->
              V2
+         | 3 ->
+             V3
          | _ ->
              failwith "unexpected environment version")
        uint16

@@ -419,7 +419,7 @@ module Make (Proto : Registered_protocol.T) = struct
     ( match new_protocol_env_version with
     | Protocol.V0 ->
         return (None, None)
-    | Protocol.V1 | Protocol.V2 ->
+    | Protocol.V1 | Protocol.V2 | Protocol.V3 ->
         return
           ( Some
               (List.map
