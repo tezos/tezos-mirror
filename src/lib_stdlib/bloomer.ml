@@ -45,18 +45,24 @@ type 'a t = {
           Note that this field is not required for Bloom filter operation. *)
 }
 
-(* Reads [bits] bits of [bytes] at offset [ofs] as an OCaml int in big endian order.
+let sf = Printf.sprintf
+
+let check_peek_poke_args fname bytes ofs bits =
+  if bits <= 0 then
+    invalid_arg (sf "Bloomer.%s: non positive bits value" fname) ;
+  if ofs < 0 then invalid_arg (sf "Bloomer.%s: negative offset" fname) ;
+  if bits > Sys.word_size - 2 then
+    invalid_arg (sf "Bloomer.%s: indexes out of bounds" fname) ;
+  if bits + ofs > Bytes.length bytes * 8 then
+    invalid_arg (sf "Bloomer.%s: indexes out of bounds" fname)
+
+(* Read [bits] bits of [bytes] at offset [ofs] as an OCaml int in big endian order.
    The function proceeds by iteratively blitting the bytes overlapping the sought
    bit interval into [v]. The superfluous bits at the beginning and at the end
    are then removed from [v], yielding the returned value.
  *)
 let peek bytes ofs bits =
-  if bits <= 0 then invalid_arg "Bloomer.peek: non positive bits value" ;
-  if ofs < 0 then invalid_arg "Bloomer.peek: negative offset" ;
-  if bits > Sys.word_size - 2 then
-    invalid_arg "Bloomer.peek: indexes out of bounds" ;
-  if bits + ofs > Bytes.length bytes * 8 then
-    invalid_arg "Bloomer.peek: indexes out of bounds" ;
+  check_peek_poke_args "peek" bytes ofs bits ;
   let first = ofs / 8 in
   let last = first + (((ofs mod 8) + bits + 7) / 8) in
   let v = ref 0 in
@@ -70,12 +76,7 @@ let peek bytes ofs bits =
 (* blits [bits] bits of [bytes] at offset [ofs] from an OCaml int in big endian order *)
 let poke bytes ofs bits v =
   if v lsr bits <> 0 then invalid_arg "Bloomer.poke: value too large" ;
-  if bits <= 0 then invalid_arg "Bloomer.poke: non positive bits value" ;
-  if ofs < 0 then invalid_arg "Bloomer.poke: negative bits value" ;
-  if bits > Sys.word_size - 2 then
-    invalid_arg "Bloomer.poke: indexes out of bounds" ;
-  if bits + ofs > Bytes.length bytes * 8 then
-    invalid_arg "Bloomer.poke: indexes out of bounds" ;
+  check_peek_poke_args "poke" bytes ofs bits ;
   let first = ofs / 8 in
   let last = first + (((ofs mod 8) + bits + 7) / 8) in
   let cur = ref 0 in
