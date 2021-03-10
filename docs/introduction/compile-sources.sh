@@ -5,6 +5,7 @@ cd
 sudo apt-get update
 sudo apt-get install -y sudo
 sudo apt-get install -y cargo # NV: to avoid error on compiling rust-conf
+export OPAMYES=true
 # [install packages]
 sudo apt install -y rsync git m4 build-essential patch unzip wget pkg-config libgmp-dev libev-dev libhidapi-dev libffi-dev opam jq
 # [install rust]
@@ -18,7 +19,7 @@ git clone https://gitlab.com/tezos/tezos.git
 cd tezos
 git checkout latest-release
 # [install Tezos dependencies]
-opam init --bare -y
+opam init --bare
 make build-deps
 # [compile sources]
 eval $(opam env)

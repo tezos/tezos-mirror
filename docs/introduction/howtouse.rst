@@ -258,7 +258,7 @@ Get Free Tez
 ~~~~~~~~~~~~
 
 To test the networks and help users get familiar with the
-system, on Zeronet and Delphinet test networks you can obtain free tez from a
+system, on :doc:`test networks<test_networks>` you can obtain free tez from a
 `faucet <https://faucet.tzalpha.net>`__.
 
 This will provide a wallet in the form of a JSON file
@@ -276,9 +276,9 @@ Let's check the balance of the new account with::
 
     tezos-client get balance for alice
 
-Please preserve the JSON file. After each reset of Zeronet or
-when Delphinet test network is replaced by a test network for the next protocol,
-you will have to reactivate the wallet.
+Please preserve the JSON file. It will be necessary in order to reactivate the wallet
+when migrating between test networks, e.g., from one protocol to the next, 
+or in the event the test network is reset.
 
 Please drink carefully and don't abuse the faucet: it only contains
 30,000 wallets for a total amount of ꜩ760,000,000.

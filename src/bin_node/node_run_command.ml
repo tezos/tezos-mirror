@@ -592,7 +592,7 @@ module Manpage = struct
            one of $(i," ^ log_sections
         ^ ") and level is one of $(i,fatal), $(i,error), $(i,warn), \
            $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
-           wildcard in sections, i.e. $(b, client* -> debug). The rules are \
+           wildcard in sections, i.e. $(b, node* -> debug). The rules are \
            matched left to right, therefore the leftmost rule is highest \
            priority ." ) ]
 

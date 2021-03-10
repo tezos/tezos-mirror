@@ -5,7 +5,7 @@ Protocol 008_PtEdo2Zk Edo
 =========================
 
 **Important: revision 008_PtEdoTez of protocol Edo contains a bug that
-is corrected in the latest version 008_PtEdo2Kt**
+is corrected in the latest version 008_PtEdo2Zk**
 
 This page contains all the relevant information for protocol 008 Edo.
 Each of the main changes is briefly described with links to relevant
