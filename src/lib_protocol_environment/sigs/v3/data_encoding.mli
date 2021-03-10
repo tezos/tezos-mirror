@@ -312,9 +312,20 @@ val case :
   ('a -> 't) ->
   't case
 
-type tag_size = [`Uint8 | `Uint16]
+type 'a matching_function = 'a -> match_result
 
-val union : ?tag_size:tag_size -> 't case list -> 't encoding
+and match_result
+
+val matched :
+  ?tag_size:[`Uint8 | `Uint16] -> int -> 'a encoding -> 'a -> match_result
+
+val matching :
+  ?tag_size:[`Uint8 | `Uint16] ->
+  't matching_function ->
+  't case list ->
+  't encoding
+
+val union : ?tag_size:[`Uint8 | `Uint16] -> 't case list -> 't encoding
 
 val def :
   string -> ?title:string -> ?description:string -> 't encoding -> 't encoding
@@ -397,23 +408,23 @@ module Json : sig
 end
 
 module Binary : sig
-  val length : 'a encoding -> 'a -> int
-
   val fixed_length : 'a encoding -> int option
 
-  val read : 'a encoding -> bytes -> int -> int -> (int * 'a) option
+  val maximum_length : 'a encoding -> int option
 
-  val write : 'a encoding -> 'a -> bytes -> int -> int -> int option
+  val length : 'a encoding -> 'a -> int
 
-  val to_bytes : 'a encoding -> 'a -> bytes option
+  val to_bytes_opt : ?buffer_size:int -> 'a encoding -> 'a -> bytes option
 
-  val to_bytes_exn : 'a encoding -> 'a -> bytes
+  val to_bytes_exn : ?buffer_size:int -> 'a encoding -> 'a -> bytes
 
-  val of_bytes : 'a encoding -> bytes -> 'a option
+  val of_bytes_opt : 'a encoding -> bytes -> 'a option
 
-  type write_error
+  val to_string_opt : ?buffer_size:int -> 'a encoding -> 'a -> string option
 
-  exception Write_error of write_error
+  val to_string_exn : ?buffer_size:int -> 'a encoding -> 'a -> string
+
+  val of_string_opt : 'a encoding -> string -> 'a option
 end
 
 (** [check_size size encoding] ensures that the binary encoding

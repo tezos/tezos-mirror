@@ -8,6 +8,10 @@ Changes are grouped by environment version and listed in reverse chronological o
 
 Architecture word-size: refuse to execute on 32-bit machines
 
+Data-encoding:
+- offer modern version of functions (notably to support string as well as bytes),
+- remove some unused functions
+
 ## V2
 
 Everywhere: update version dependencies for data-encoding, resto and lwt-canceler

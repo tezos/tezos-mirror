@@ -15,7 +15,6 @@
    v3/protocol_hash.ml
    v3/context_hash.ml
    v3/error_monad_traversors.ml
-   v3/data_encoding.ml
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}
