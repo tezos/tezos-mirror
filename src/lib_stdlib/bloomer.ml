@@ -90,14 +90,18 @@ let poke bytes ofs bits v =
   done
 
 let%test_unit "random_read_writes" =
+  let bytes_length = 45 in
+  let bit_length = bytes_length * 8 in
+  (* max_data_bit_width = 29 to to stay within Random.int bounds. *)
+  let max_data_bit_width = 29 in
   let bytes = Bytes.make 45 '\000' in
   let poke_et_peek ofs len v =
     poke bytes ofs len v ;
     assert (peek bytes ofs len = v)
   in
   for _ = 0 to 100_000 do
-    let ofs = Random.int 320 in
-    let len = Random.int 29 + 1 in
+    let ofs = Random.int (bit_length - max_data_bit_width) in
+    let len = Random.int max_data_bit_width + 1 in
     let v = Random.int (1 lsl len) in
     poke_et_peek ofs len v
   done ;
