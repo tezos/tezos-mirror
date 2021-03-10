@@ -1,9 +1,11 @@
 (executables
- (names main saturation_fuzzing)
+ (names main saturation_fuzzing test_gas_properties)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
             alcotest-lwt
+            lib-test
+            qcheck-alcotest
             crowbar
             tezos-alpha-test-helpers
             tezos-stdlib-unix

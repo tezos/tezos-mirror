@@ -65,8 +65,14 @@ module Protocol : sig
   (** The type of protocol times *)
   type t
 
-  (** Unix epoch is 1970-01-01 00:00:00 +0000 (UTC) *)
+  (** Unix epoch is 1970-01-01 00:00:00 +0000 (UTC). *)
   val epoch : t
+
+  (** The first instant supported by RFC 3339, corresponds to 0000-01-01 00:00:00 +0000 (UTC). *)
+  val min_rfc3339 : t
+
+  (** The last instant supported by RFC 3339, corresponds to 9999-12-31 23:59:59 +0000 (UTC). *)
+  val max_rfc3339 : t
 
   include Compare.S with type t := t
 
