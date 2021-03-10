@@ -23,214 +23,232 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Base
+   Invocation:   dune exec src/lib_base/test/test_time.exe
+   Subject:      Check that the Protocol and System times behave correctly
+                 regarding addition and encoding (binary and JSON)
+*)
+
 open Time
+open Lib_test.Qcheck_helpers
 
 module Protocol = struct
-  open Protocol
+  include Protocol
 
-  let t = Crowbar.map [Crowbar.int64] of_seconds
+  let max_rfc3339_seconds = to_seconds max_rfc3339
+
+  let min_rfc3339_seconds = to_seconds min_rfc3339
+
+  let t_arb = QCheck.map ~rev:to_seconds of_seconds QCheck.int64
+
+  let rfc3339_compatible_t_arb =
+    let within_rfc3339 =
+      QCheck.map
+        ~rev:to_seconds
+        of_seconds
+        (int64_range min_rfc3339_seconds max_rfc3339_seconds)
+    in
+    QCheck.frequency
+      [ (97, within_rfc3339);
+        (1, QCheck.always max_rfc3339);
+        (1, QCheck.always min_rfc3339);
+        (1, QCheck.always epoch) ]
 
   let pp fmt t = Format.fprintf fmt "%Lx" (to_seconds t)
 
-  let () =
-    Crowbar.add_test
-    (* Property:
-       forall [t]: [Protocol.t], forall [delta]: [int64]:
-         [(t + delta) - t = delta] *)
-      ~name:"Base.Time.Protocol.add-diff"
-      [t; Crowbar.int64]
-      (fun some_time delta ->
+  let add_diff_roundtrip =
+    QCheck.Test.make
+      ~name:"Protocol.[add|diff] roundtrip"
+      (QCheck.pair t_arb QCheck.int64)
+      (fun (some_time, delta) ->
         let other_time = add some_time delta in
-        let same_delta = diff other_time some_time in
-        Crowbar.check_eq
+        let actual = diff other_time some_time in
+        qcheck_eq'
           ~pp:(fun fmt i64 -> Format.fprintf fmt "%Lx" i64)
           ~eq:Int64.equal
-          delta
-          same_delta)
+          ~expected:delta
+          ~actual
+          ())
 
-  let () =
-    Crowbar.add_test
-    (* Property:
-       forall [ta]: [Protocol.t], forall [tb]: [Protocol.t]:
-         [(tb - ta) + ta = tb] *)
-      ~name:"Base.Time.Protocol.diff-add"
-      [t; t]
-      (fun some_time other_time ->
+  let diff_add_roundtrip =
+    QCheck.Test.make
+      ~name:"Protocol.[diff|add] roundtrip"
+      (QCheck.pair t_arb t_arb)
+      (fun (some_time, other_time) ->
         let delta = diff other_time some_time in
-        let same_other_time = add some_time delta in
-        Crowbar.check_eq ~pp ~eq:equal other_time same_other_time)
+        let actual = add some_time delta in
+        qcheck_eq' ~pp ~eq:equal ~expected:other_time ~actual ())
 
-  let () =
-    Crowbar.add_test
-    (* Property:
-       forall [ta]: [Protocol.encoding] roundtrips in binary *)
-      ~name:"Base.Time.Protocol.encoding-binary"
-      [t]
+  let encoding_binary_roundtrip =
+    QCheck.Test.make
+      ~name:"Protocol.encoding roundtrips in binary"
+      t_arb
       (fun t ->
         let b = Data_encoding.Binary.to_bytes_exn encoding t in
-        let tt = Data_encoding.Binary.of_bytes_exn encoding b in
-        Crowbar.check_eq ~pp ~eq:equal t tt)
+        let actual = Data_encoding.Binary.of_bytes_exn encoding b in
+        qcheck_eq' ~pp ~eq:equal ~expected:t ~actual ())
 
-  let () =
-    Crowbar.add_test
-    (* Property:
-       forall [ta]: [Protocol.encoding] roundtrips in json *)
-      ~name:"Base.Time.Protocol.encoding-json"
-      [t]
+  let encoding_json_roundtrip =
+    QCheck.Test.make
+      ~name:"Protocol.encoding roundtrips in JSON"
+      t_arb
       (fun t ->
         let j = Data_encoding.Json.construct encoding t in
-        let tt = Data_encoding.Json.destruct encoding j in
-        Crowbar.check_eq ~pp ~eq:equal t tt)
+        let actual = Data_encoding.Json.destruct encoding j in
+        qcheck_eq' ~pp ~eq:equal ~expected:t ~actual ())
 
-  let () =
-    Crowbar.add_test
-      ~name:"Base.Time.Protocol.to_notation roundtrip"
-      [Crowbar.range 1000]
-      (fun i ->
-        let close_to_epoch = add epoch (Int64.neg @@ Int64.of_int i) in
-        let s = to_notation close_to_epoch in
-        match of_notation s with
+  let encoding_to_notation_roundtrip =
+    QCheck.Test.make
+      ~name:"Protocol.[to|of]_notation roundtrip in RFC3339 range"
+      rfc3339_compatible_t_arb
+      (fun t ->
+        to_notation t |> of_notation
+        |> function
         | None ->
-            Crowbar.fail "Failed to roundtrip notation"
-        | Some after_roundtrip ->
-            Crowbar.check_eq ~pp ~eq:equal close_to_epoch after_roundtrip)
+            QCheck.Test.fail_report "Failed to roundtrip notation"
+        | Some actual ->
+            qcheck_eq' ~pp ~eq:equal ~expected:t ~actual ())
+
+  let tests =
+    [ add_diff_roundtrip;
+      diff_add_roundtrip;
+      encoding_binary_roundtrip;
+      encoding_json_roundtrip;
+      encoding_to_notation_roundtrip ]
 end
 
 module System = struct
   open System
 
-  let t_ymdhms =
-    let open Crowbar in
-    map
-      [ range 10000;
-        range ~min:01 12;
-        range ~min:01 31;
-        range 24;
-        range 60;
-        range 60 ]
-      (fun year month day hour minute second ->
-        match
-          Ptime.of_date_time ((year, month, day), ((hour, minute, second), 0))
-        with
-        | None ->
-            (* when the day of the month overflows for the month *)
-            bad_test ()
-        | Some p ->
-            p)
+  (** Arbitrary of {!t} from usual time fragments year-month-day hour-minute-second, parsed through {!Ptime.of_date_time}. *)
+  let t_ymdhms_arb : t QCheck.arbitrary =
+    let open QCheck in
+    let rev t =
+      Option.get t |> Ptime.to_date_time
+      |> fun (date, (time, _)) -> (date, time)
+    in
+    of_option_arb
+      ( pair
+          (triple (0 -- 9999) (1 -- 12) (1 -- 31))
+          (triple (0 -- 23) (0 -- 59) (0 -- 60))
+      |> map ~rev (fun (date, time) -> Ptime.of_date_time (date, (time, 0))) )
+    |> set_print (Format.asprintf "%a" pp_hum)
 
-  let min_day = Ptime.min |> Ptime.to_span |> Ptime.Span.to_d_ps |> fst
+  let (min_day, min_ps) = Ptime.min |> Ptime.to_span |> Ptime.Span.to_d_ps
 
-  let max_day = Ptime.max |> Ptime.to_span |> Ptime.Span.to_d_ps |> fst
+  let (max_day, max_ps) = Ptime.max |> Ptime.to_span |> Ptime.Span.to_d_ps
 
-  let day_range = max_day - min_day
+  (** Arbitrary of {!t} from days + picoseconds, parsed through {!Ptime.Span.of_d_ps}. *)
+  let t_dps_arb : t QCheck.arbitrary =
+    let open QCheck in
+    let rev t = Ptime.to_span t |> Ptime.Span.to_d_ps in
+    pair (min_day -- max_day) (int64_range min_ps max_ps)
+    |> map ~rev (fun (d, ps) ->
+           Ptime.Span.of_d_ps (d, ps)
+           |> Option.get |> Ptime.of_span |> Option.get)
+    (* But please keep using a nice pretty printer... We can probably write in the future a generic function that mixes features of [map ~rev] and [map_keep_input ~print] to only pass the monotonic transformation and the pretty printer, instead of manually writing [rev]. *)
+    |> set_print (Format.asprintf "%a" pp_hum)
 
-  let t_dps =
-    let open Crowbar in
-    (* to avoid generating lots of out-of-range ps, we assume we're on a 64-bit
-        machine and we clip the range to acceptable ps inputs *)
-    map
-      [range (day_range + 2); range 86_400_000_000_000_000]
-      (fun d ps ->
-        let d = d + min_day - 1 in
-        let ps = Int64.of_int ps in
-        match Ptime.Span.of_d_ps (d, ps) with
-        | None ->
-            assert false
-        | Some span -> (
-          match Ptime.of_span span with
-          | None ->
-              bad_test () (* range issue *)
-          | Some p ->
-              p ))
+  let t_arb = QCheck.choose [t_ymdhms_arb; t_dps_arb]
 
-  let t =
-    let open Crowbar in
-    choose [t_ymdhms; t_dps]
-
-  let () =
-    Crowbar.add_test
-    (* Property:
-       forall [t]: [System.t],
-         [of_protocol_opt (to_protocol t)] is [Some _] *)
-      ~name:"Base.Time.System.to-protocol"
-      [t]
-      (fun t ->
-        let protocol_time = to_protocol t in
-        match of_protocol_opt protocol_time with
-        | None ->
-            Crowbar.check false
-        | Some _ ->
-            Crowbar.check true)
-
-  let () =
-    Crowbar.add_test
-    (* Property:
-       forall [t]: [Protocol.t],
-         [to_protocol]/[of_protocol_opt] roundtrip modulo option. *)
-      ~name:"Base.Time.System.to-protocol-of-protocol"
-      [Protocol.t]
-      (fun protocol_time ->
-        match of_protocol_opt protocol_time with
-        | None ->
-            Crowbar.check true
-        | Some system_time ->
-            let same_protocol_time = to_protocol system_time in
-            Crowbar.check_eq
-              ~pp:Time.Protocol.pp_hum
-              ~eq:Time.Protocol.equal
-              protocol_time
-              same_protocol_time)
-
+  (** Check that the span is smaller than 1 second (useful for Protocol time roundtrips as Protocol time precision is the second). *)
   let is_small delta =
     Stdlib.( < )
       (Ptime.Span.compare delta (Ptime.Span.v (0, 1_000_000_000_000L)))
       0
 
-  let () =
-    Crowbar.add_test
-    (* Property:
-       forall [ta]: [System.rfc_encoding] roundtrips in binary modulo precision *)
-      ~name:"Base.Time.Protocol.rfc-encoding-binary"
-      [t]
+  let to_protocol_of_protocol_roundtrip =
+    QCheck.Test.make
+      ~name:"System.[to|of]_protocol roundtrip modulo option"
+      t_arb
+      (fun t ->
+        match to_protocol t |> of_protocol_opt with
+        | None ->
+            QCheck.Test.fail_report "Failed roundtrip"
+        | Some actual ->
+            let delta = Ptime.Span.abs @@ Ptime.diff t actual in
+            is_small delta)
+
+  (** Since Protocol time domain is (vastly) bigger than System time domain,
+      converting a Protocol time to a System time:
+      - either succeeds, in which case we can roundtrip back to the original
+        Protocol time
+      - or the Protocol time must be out of the System time range (i.e. out
+        of the RFC3339 time range)
+  *)
+  let of_protocol_to_protocol_roundtrip_or_outside_rfc3339 =
+    QCheck.Test.make
+      ~name:"System.[of|to]_protocol roundtrip or outside RFC3339 range"
+      (* Use both generators, otherwise statistically, we will almost
+          never hit the RFC3339 time range. *)
+      (QCheck.choose [Protocol.t_arb; Protocol.rfc3339_compatible_t_arb])
+      (fun protocol_time ->
+        match of_protocol_opt protocol_time with
+        | None ->
+            Protocol.(
+              protocol_time < min_rfc3339 || max_rfc3339 < protocol_time)
+        | Some system_time ->
+            let actual = to_protocol system_time in
+            qcheck_eq'
+              ~pp:Time.Protocol.pp
+              ~eq:Time.Protocol.equal
+              ~expected:protocol_time
+              ~actual
+              ())
+
+  let rfc_encoding_binary_roundtrip =
+    QCheck.Test.make
+      ~name:"System.rfc_encoding roundtrips in binary modulo precision"
+      t_arb
       (fun t ->
         let b = Data_encoding.Binary.to_bytes_exn rfc_encoding t in
         let tt = Data_encoding.Binary.of_bytes_exn rfc_encoding b in
         let delta = Ptime.Span.abs @@ Ptime.diff t tt in
-        Crowbar.check @@ is_small delta)
+        is_small delta)
 
-  let () =
-    Crowbar.add_test
-    (* Property:
-       forall [ta]: [System.rfc_encoding] roundtrips in json modulo precision *)
-      ~name:"Base.Time.Protocol.rfc-encoding-json"
-      [t]
+  let rfc_encoding_json_roundtrip =
+    QCheck.Test.make
+      ~name:"System.rfc_encoding roundtrips in JSON modulo precision"
+      t_arb
       (fun t ->
         let j = Data_encoding.Json.construct rfc_encoding t in
         let tt = Data_encoding.Json.destruct rfc_encoding j in
         let delta = Ptime.Span.abs @@ Ptime.diff t tt in
-        Crowbar.check @@ is_small delta)
+        is_small delta)
 
-  let () =
-    Crowbar.add_test
-    (* Property:
-       forall [ta]: [System.encoding] roundtrips in binary modulo precision *)
-      ~name:"Base.Time.Protocol.encoding-binary"
-      [t]
+  let encoding_binary_roundtrip =
+    QCheck.Test.make
+      ~name:"System.encoding roundtrips in binary modulo precision"
+      t_arb
       (fun t ->
         let b = Data_encoding.Binary.to_bytes_exn encoding t in
         let tt = Data_encoding.Binary.of_bytes_exn encoding b in
         let delta = Ptime.Span.abs @@ Ptime.diff t tt in
-        Crowbar.check @@ is_small delta)
+        is_small delta)
 
-  let () =
-    Crowbar.add_test
-    (* Property:
-       forall [ta]: [System.encoding] roundtrips in json modulo precision *)
-      ~name:"Base.Time.Protocol.encoding-json"
-      [t]
+  let encoding_json_roundtrip =
+    QCheck.Test.make
+      ~name:"System.encoding roundtrips in JSON modulo precision"
+      t_arb
       (fun t ->
         let j = Data_encoding.Json.construct encoding t in
         let tt = Data_encoding.Json.destruct encoding j in
         let delta = Ptime.Span.abs @@ Ptime.diff t tt in
-        Crowbar.check @@ is_small delta)
+        is_small delta)
+
+  let tests =
+    [ to_protocol_of_protocol_roundtrip;
+      of_protocol_to_protocol_roundtrip_or_outside_rfc3339;
+      rfc_encoding_binary_roundtrip;
+      rfc_encoding_json_roundtrip;
+      encoding_binary_roundtrip;
+      encoding_json_roundtrip ]
 end
+
+let () =
+  Alcotest.run
+    "Time"
+    [ ("Protocol", qcheck_wrap Protocol.tests);
+      ("System", qcheck_wrap System.tests) ]

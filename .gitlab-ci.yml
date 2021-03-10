@@ -15,7 +15,7 @@ include:
   - .gitlab/ci/test-doc-scripts.yml
 
 variables:
-  ## Please update `scripts/version.sh` accordingly
+  ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
   build_deps_image_version: ecb12b00769179e6022ad1547b69950781a45061
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}

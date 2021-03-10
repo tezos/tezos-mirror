@@ -84,13 +84,13 @@ in more detail.
 
 
 .. csv-table:: Testing frameworks and their applications in Tezos. PT:
-               :ref:`Python testing and execution framework <pytest_section>`, AT: :ref:`alcotest_section`, CB: :ref:`crowbar_test`, FT: :ref:`flextesa_section`, TZ: :ref:`tezt_section`
+               :ref:`Python testing and execution framework <pytest_section>`, AT: :ref:`alcotest_section`, PBT: :ref:`property_based_test`, FT: :ref:`flextesa_section`, TZ: :ref:`tezt_section`
    :header: "Component","Unit","Property","Integration","System","Regression"
 
-   "Node",":ref:`AT <alcotest_section>`",":ref:`CB <crowbar_test>`",":ref:`AT <alcotest_section>`",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
-   "-- Protocol",":ref:`AT <alcotest_section>`","",""
+   "Node",":ref:`AT <alcotest_section>`",":ref:`PBT <property_based_test>`",":ref:`AT <alcotest_section>`",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
+   "-- Protocol",":ref:`AT <alcotest_section>`",":ref:`PBT <property_based_test>`",""
    "-- -- Michelson interpreter",":ref:`AT <alcotest_section>`","","",":ref:`PT <pytest_section>`",":ref:`PT <pytest_section>`"
-   "Client","","","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
+   "Client","",":ref:`PBT <property_based_test>`","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`, :ref:`TZ <tezt_section>`"
    "Networked nodes","--","",":ref:`PT <pytest_section>`, :ref:`FT <flextesa_section>`","", ""
    "Endorser","","","",":ref:`FT <flextesa_section>`"
    "Baker","","","",":ref:`FT <flextesa_section>`"
@@ -132,13 +132,29 @@ Example tests:
 References:
  - `Alcotest README <https://github.com/mirage/alcotest>`_.
 
-.. _crowbar_test:
+.. _property_based_test:
+
+QCheck
+~~~~~~~
+`QCheck <https://github.com/c-cube/qcheck>`_ is a library for
+property-based testing in OCaml.
+
+Typical use cases:
+ - Verifying input-output invariants for functions with
+   randomized inputs.
+
+Example test:
+ - QCheck is used in :src:`src/lib_base/test/test_time.ml` to test the :src:`Tezos_base.Time<src/lib_base/test/test_time.ml>` module. For instance, subtracting and then adding a random amount of seconds to a random time should give back the original time: this tests that ``add`` and ``diff`` are consistent (and the inverse of each other). To run this test, you need to run ``dune exec src/lib_base/test/test_time.exe``.
+
+References:
+ - `QCheck README <https://github.com/c-cube/qcheck>`_
+ - `QCheck module documentation <https://c-cube.github.io/qcheck/>`_
 
 Crowbar
 ~~~~~~~
 
 `Crowbar <https://github.com/stedolan/crowbar>`_ is a library for
-property-based testing in OCaml. It also interfaces with `afl
+property-based testing and fuzzing in OCaml. It also interfaces with `afl
 <https://lcamtuf.coredump.cx/afl/>`_ to enable fuzzing.
 
 Typical use cases:

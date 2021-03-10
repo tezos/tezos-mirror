@@ -7,6 +7,8 @@
    tezos-base
    data-encoding
    crowbar
+   qcheck-alcotest
+   lib-test
  )
  (flags (:standard
           -open Tezos_base

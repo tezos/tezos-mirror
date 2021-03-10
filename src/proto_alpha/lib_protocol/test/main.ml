@@ -49,7 +49,6 @@ let () =
       ("voting", Test_voting.tests);
       ("interpretation", Test_interpretation.tests);
       ("typechecking", Test_typechecking.tests);
-      ("gas properties", Test_gas_properties.tests);
       ("fixed point computation", Test_fixed_point.tests);
       ("gas levels", Test_gas_levels.tests);
       ("saturation arithmetic", Test_saturation.tests);
