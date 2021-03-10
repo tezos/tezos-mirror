@@ -1,6 +1,6 @@
 (library
- (name traced_sigs_sigs)
- (public_name tezos-lwt-result-stdlib.traced.sigs.sigs)
+ (name traced_functor_outputs)
+ (public_name tezos-lwt-result-stdlib.traced.functor-outputs)
  (libraries lwt tezos-lwt-result-stdlib.bare.sigs))
 
 (rule

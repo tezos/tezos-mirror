@@ -1,6 +1,6 @@
 (library
- (name bare_sigs_sigs)
- (public_name tezos-lwt-result-stdlib.bare.sigs.sigs)
+ (name bare_functor_outputs)
+ (public_name tezos-lwt-result-stdlib.bare.functor-outputs)
  (libraries lwt))
 
 (rule

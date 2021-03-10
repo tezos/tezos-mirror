@@ -28,7 +28,7 @@ module Make
     (Seq : Traced_sigs.Seq.S with type 'error trace := 'error Monad.trace) :
   Traced_sigs.Set.S with type 'error trace := 'error Monad.trace = struct
   module type S =
-    Traced_sigs_sigs.Set.S with type 'error trace := 'error Monad.trace
+    Traced_functor_outputs.Set.S with type 'error trace := 'error Monad.trace
 
   module Make (Ord : Stdlib.Set.OrderedType) : S with type elt = Ord.t = struct
     include Bare_structs.Set.Make (Ord)

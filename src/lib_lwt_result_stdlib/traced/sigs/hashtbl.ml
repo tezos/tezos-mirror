@@ -26,7 +26,7 @@
 (** In Lwtreslib, like in the Stdlib, the Hashtbl module exports mainly functors
     to instantiate hashtables with known-type keys. As a result, the bulk of the
     documentation for hashtables is located within the module types returned by
-    the functors: in {!Traced_sigs_sigs.Hashtbl}.
+    the functors: in {!Traced_functor_outputs.Hashtbl}.
 
     Note the presence of [Make_es] which deviates from the Stdlib to provide
     specialised convenience for tables of elements the initialisation of which
@@ -43,18 +43,19 @@ module type S = sig
   val seeded_hash_param : meaningful:int -> total:int -> int -> 'a -> int
 
   module type S =
-    Traced_sigs_sigs.Hashtbl.S with type 'error trace := 'error trace
+    Traced_functor_outputs.Hashtbl.S with type 'error trace := 'error trace
 
   module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t
 
   module type SeededS =
-    Traced_sigs_sigs.Hashtbl.SeededS with type 'error trace := 'error trace
+    Traced_functor_outputs.Hashtbl.SeededS
+      with type 'error trace := 'error trace
 
   module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
     SeededS with type key = H.t
 
   module type S_ES =
-    Traced_sigs_sigs.Hashtbl.S_ES with type 'error trace := 'error trace
+    Traced_functor_outputs.Hashtbl.S_ES with type 'error trace := 'error trace
 
   module Make_es (H : Stdlib.Hashtbl.HashedType) : S_ES with type key = H.t
 end

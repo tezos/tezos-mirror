@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = Bare_sigs_sigs.Set.S
+module type S = Bare_functor_outputs.Set.S
 
 module Make (Ord : Stdlib.Map.OrderedType) : S with type elt = Ord.t = struct
   open Seq

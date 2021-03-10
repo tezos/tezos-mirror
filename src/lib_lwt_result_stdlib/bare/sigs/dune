@@ -1,7 +1,7 @@
 (library
  (name bare_sigs)
  (public_name tezos-lwt-result-stdlib.bare.sigs)
- (libraries lwt tezos-lwt-result-stdlib.bare.sigs.sigs))
+ (libraries lwt tezos-lwt-result-stdlib.bare.functor-outputs))
 
 (rule
  (alias runtest_lint)

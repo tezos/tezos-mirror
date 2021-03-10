@@ -38,7 +38,8 @@ struct
     Stdlib.Hashtbl.seeded_hash_param meaningful total seed v
 
   module type S =
-    Traced_sigs_sigs.Hashtbl.S with type 'error trace := 'error Monad.trace
+    Traced_functor_outputs.Hashtbl.S
+      with type 'error trace := 'error Monad.trace
 
   module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t = struct
     include Bare_structs.Hashtbl.Make (H)
@@ -47,7 +48,7 @@ struct
   end
 
   module type SeededS =
-    Traced_sigs_sigs.Hashtbl.SeededS
+    Traced_functor_outputs.Hashtbl.SeededS
       with type 'error trace := 'error Monad.trace
 
   module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
@@ -58,7 +59,8 @@ struct
   end
 
   module type S_ES =
-    Traced_sigs_sigs.Hashtbl.S_ES with type 'error trace := 'error Monad.trace
+    Traced_functor_outputs.Hashtbl.S_ES
+      with type 'error trace := 'error Monad.trace
 
   module Make_es (H : Stdlib.Hashtbl.HashedType) : S_ES with type key = H.t =
   struct

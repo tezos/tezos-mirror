@@ -23,68 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Hashtables with the signature [S] are exception-safe replacements for
-    hashtables with the {!Stdlib.Hashtbl.S} signature with Lwt- and result-aware
+(** Sets with the signature [S] are exception-safe replacements for
+    sets with the {!Stdlib.Set.S} signature with Lwt- and result-aware
     traversal functions.
 
     See {!Lwtreslib}'s introductory documentation for explanations regarding
     [_e]-, [_s]-, [_es]-, [_p]-, and [_ep]-suffixed functions and exception
-    safety. See {!Stdlib.Hashtbl.S} for explanations regarding OCaml's
-    hashtables in general.
+    safety. See {!Stdlib.Set.S} for explanations regarding OCaml's
+    sets in general.
 
     Note that this signature is within the Traced part of the library. As a
     result, the [_ep] traversor returns en ['error trace]. *)
 module type S = sig
-  include Bare_sigs_sigs.Hashtbl.S
+  include Bare_functor_outputs.Set.S
 
   (** ['error trace] is intended to be substituted by a type provided by a
       [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
   type 'error trace
 
   val iter_ep :
-    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
-    'a t ->
-    (unit, 'error trace) result Lwt.t
-end
-
-(** Hashtables with the signature [SeededS] are exception-safe replacements for
-    hashtables with the {!Stdlib.Hashtbl.SeededS} signature with Lwt- and
-    result-aware traversal functions.
-
-    See {!Lwtreslib}'s introductory documentation for explanations regarding
-    [_e]-, [_s]-, [_es]-, [_p]-, and [_ep]-suffixed functions and exception
-    safety. See {!Stdlib.Hashtbl.SeededS} for explanations regarding OCaml's
-    seeded hashtables in general.
-
-    Note that this signature is within the Traced part of the library. As a
-    result, the [_ep] traversor returns en ['error trace]. *)
-module type SeededS = sig
-  include Bare_sigs_sigs.Hashtbl.SeededS
-
-  (** ['error trace] is intended to be substituted by a type provided by a
-      [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
-  type 'error trace
-
-  val iter_ep :
-    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
-    'a t ->
-    (unit, 'error trace) result Lwt.t
-end
-
-(** Hashtables with the signature [S_ES] are Hashtbl-like data structures. See
-    {!Bare_sigs_sigs.Hashtbl.S_ES} for full information.
-
-    Note that this signature is within the Traced part of the library. As a
-    result, the [_ep] traversor returns en ['error trace]. *)
-module type S_ES = sig
-  include Bare_sigs_sigs.Hashtbl.S_ES
-
-  (** ['error trace] is intended to be substituted by a type provided by a
-      [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
-  type 'error trace
-
-  val iter_with_waiting_ep :
-    (key -> 'a -> (unit, 'error trace) result Lwt.t) ->
-    ('a, 'error trace) t ->
+    (elt -> (unit, 'error trace) result Lwt.t) ->
+    t ->
     (unit, 'error trace) result Lwt.t
 end

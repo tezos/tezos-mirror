@@ -26,13 +26,14 @@
 (** In Lwtreslib, like in the Stdlib, the Set module exports mainly functors
     to instantiate sets with known-type keys. As a result, the bulk of the
     documentation for sets is located within the module types returned by
-    the functors: in {!Traced_sigs_sigs.Set}. *)
+    the functors: in {!Traced_functor_outputs.Set}. *)
 module type S = sig
   (** ['error trace] is intended to be substituted by a type provided by a
       [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
   type 'error trace
 
-  module type S = Traced_sigs_sigs.Set.S with type 'error trace := 'error trace
+  module type S =
+    Traced_functor_outputs.Set.S with type 'error trace := 'error trace
 
   module Make (Ord : Stdlib.Set.OrderedType) : S with type elt = Ord.t
 end

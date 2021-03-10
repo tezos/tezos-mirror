@@ -26,13 +26,14 @@
 (** In Lwtreslib, like in the Stdlib, the Map module exports a functor
     to instantiate maps with known-type keys. As a result, the bulk of the
     documentation for maps is located within the module types returned by
-    the functors: in {!Traced_sigs_sigs.Map}. *)
+    the functors: in {!Traced_functor_outputs.Map}. *)
 module type S = sig
   (** ['error trace] is intended to be substituted by a type provided by a
       [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
   type 'error trace
 
-  module type S = Traced_sigs_sigs.Map.S with type 'error trace := 'error trace
+  module type S =
+    Traced_functor_outputs.Map.S with type 'error trace := 'error trace
 
   module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t
 end

@@ -50,7 +50,7 @@ The sources of Lwtreslib are organised as follow:
 
     - `bare/sigs/` contains the sources for the signatures of all the modules
       exported by `bare/`
-    - `bare/sigs/sigs` contains the sources for the signatures of all the
+    - `bare/functor_outputs` contains the sources for the signatures of all the
       modules constructed by functors exported by `bare/`
     - `bare/structs` contains the sources for of all the modules exported by
       `bare/`
@@ -73,8 +73,8 @@ The sources of Lwtreslib are organised as follow:
 
     - `traced/sigs/` contains the sources for the signatures of all the modules
       exported by `traced/`
-    - `traced/sigs/sigs` contains the sources for the signatures of all the
-      modules constructed by functors exported by `bare/`
+    - `traced/functor_outputs` contains the sources for the signatures of all
+      the modules constructed by functors exported by `bare/`
     - `traced/structs` contains the sources for of all the modules exported by
       `bare/`. These modules are functorised over the implementation of a trace.
       The file `traced/structs/structs.ml` contains an all-in-one functor for
