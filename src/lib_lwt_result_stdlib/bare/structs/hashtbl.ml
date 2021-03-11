@@ -106,6 +106,16 @@ module type S_ES = Bare_functor_outputs.Hashtbl.S_ES
 
 module Make_es (H : Stdlib.Hashtbl.HashedType) : S_ES with type key = H.t =
 struct
+  (* This [_es] overlay on top of Hashtables prevents programmers from shooting
+     themselves in the feet with some common errors. Specifically, it prevents
+     race-conditions whereby the same key is bound again before the promise it
+     is already bound to resolves.
+
+     More details in the interface: {!Bare_functor_outputs.Hashtbl.S_ES}
+
+     To achieve this, the library maintains the following invariant:
+     - at any point in time, keys are associated to at most one promise *)
+
   open Seq
   open Monad
   module T = Stdlib.Hashtbl.Make (H)
