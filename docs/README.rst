@@ -60,7 +60,7 @@ Line breaking
 When writing documentation in text formats such as RST, it is not required to respect a maximal line width, such as 80 columns.
 Therefore, you may choose between the different line breaking policies your text editor proposes.
 However, you should be aware that file comparison tools such as ``diff`` tend to output large differences for a paragraph that has been reformatted after only a small change in one phrase.
-Also, reviewing tools such as the one in the ``gitlab`` user interface associate comments and change suggestions to lines, while these comments and suggestions are usually logically associated to whole phrases.
+Also, reviewing tools such as the one in the GitLab user interface associate comments and change suggestions to lines, while these comments and suggestions are usually logically associated to whole phrases.
 
 For such reasons:
 
