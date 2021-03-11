@@ -227,7 +227,7 @@ Three kinds of economic protocols are included in the main Tezos repository.
     ``hhhhhhhh`` is a prefix of the hash of the protocol code.
     Also, :package:`tezos-protocol-alpha`
     (:package:`tezos-embedded-protocol-alpha`) on the ``master``
-    branch is basically a copy of the current protocol of Tezos
+    branch is the protocol currently under development
     (see :ref:`here<node-protocol>` for more details).
     A :ref:`tutorial<entering_alpha>` is available to start reading
     the protocol's code.

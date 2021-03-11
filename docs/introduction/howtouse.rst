@@ -23,7 +23,8 @@ After a successful compilation, you should have the following binaries:
 
 The daemons are suffixed with the name of the protocol they are
 bound to. For instance, ``tezos-baker-006-PsCARTHA`` is the baker
-for the Carthage protocol. See also the `Node Protocol`_ section below.
+for the Carthage protocol, and ``tezos-baker-alpha`` is the baker
+of the development protocol. See also the `Node Protocol`_ section below.
 
 
 Read The Manual
@@ -88,7 +89,7 @@ network.
 
 Other than passively observing the network, your node can also inject
 its own new operations when instructed by the ``tezos-client`` and even
-send new blocks when guided by the ``tezos-baker-alpha``.
+send new blocks when guided by the ``tezos-baker-*``.
 The node has also a view of the multiple chains that may exist
 concurrently and selects the best one based on its fitness (see
 :ref:`proof-of-stake`).
@@ -136,8 +137,8 @@ genesis protocol and then goes through all previous protocols until it
 finally switches to the current protocol.
 
 Throughout the documentation, `Alpha` refers to the protocol in the
-``src/proto_alpha`` directory of the ``master`` branch, which is a
-copy of the protocol active on Mainnet.  The Alpha protocol is used by
+``src/proto_alpha`` directory of the ``master`` branch, that is, a protocol under development, which serves as a basis to propose replacements
+for the currently active protocol. The Alpha protocol is used by
 default in :ref:`sandbox mode<sandboxed-mode>` and in the various test
 suites. Its git history is also more detailed.
 
@@ -267,8 +268,8 @@ command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
-If you use the ``alphanet.sh`` script (renamed as ``delphinet.sh``
-to run Delphinet test network for instance), you should prefix the file
+If you use the ``tezos-docker-manager.sh`` script (renamed as ``delphinet.sh``
+to run the Delphinet test network for instance), you should prefix the file
 with ``container:`` in order to copy it into the docker image:
 ``./delphinet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"``
 

@@ -35,7 +35,7 @@ handling blocks that belong to this chain, and select the best head for
 this chain. A chain validator is spawned for the main chain that
 starts at the genesis, a second one when there is an active test
 chain. Forking a chain is decided from within the economic protocol.  In
-version Alpha, this is only used to try new protocols before self
+protocol Alpha, this is only used to try new protocols before self
 amending the main chain.
 
 The chain validator spawns one *peer validator* worker per connected
@@ -60,7 +60,7 @@ mechanism is actually a bit more flexible and allows for an arbitrary
 number of lists of operations. The shell will only consider forks of a
 given length, that is exported by the protocol, so that block headers
 and operations are validated in the context of an ancestor block that
-is in a close enough time window. In version Alpha, the check
+is in a close enough time window. In protocol Alpha, the check
 performed on block headers is that the baking slots, baker signatures,
 and timestamp deltas are right. It can also detect too large fitness
 gaps, as the fitness difference between two consecutive blocks is

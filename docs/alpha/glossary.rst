@@ -2,16 +2,16 @@ Glossary
 ========
 
 This glossary is divided in two sections, the first one concerns Tezos, and
-the second one concerns the Alpha protocol, which is the current
-`economic protocol`_.
+the second one concerns the `economic protocol`_. The definitions in the latter
+section may be different for other protocol versions.
 
 Tezos
 -----
 
 .. include:: ../shell/glossary.rst.h
 
-Protocol Alpha
---------------
+Protocol
+--------
 
 _`Accuser`
     When a node_ attempts to inject several incompatible blocks (or when it tries
@@ -25,7 +25,7 @@ _`Accuser`
     separate binary.
 
 _`Account`
-    An account is a unique identifier within protocol Alpha. There are different
+    An account is a unique identifier within the protocol. There are different
     kinds of accounts (see `Originated account`_ and `Implicit account`_).
 
     In the Context_, each account is associated with a balance (an amount of
@@ -114,7 +114,7 @@ Michelson
     The built-in language used by a `smart contract`_.
 
 _`Operations`
-    In protocol Alpha, the main operations are transactions (to transfer funds
+    The main operations in the protocol are transactions (to transfer funds
     or to execute smart contracts), accusations, activations, delegations,
     endorsements and originations.
 

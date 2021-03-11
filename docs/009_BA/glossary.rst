@@ -2,8 +2,8 @@ Glossary
 ========
 
 This glossary is divided in two sections, the first one concerns Tezos, and
-the second one concerns the Alpha protocol, which is the current
-`economic protocol`_.
+the second one concerns the `economic protocol`_. The definitions in the latter
+section may be different for other protocol versions.
 
 Tezos
 -----
