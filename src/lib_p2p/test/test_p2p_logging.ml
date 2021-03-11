@@ -44,7 +44,7 @@ module Authentication = struct
     P2p_socket.accept ~canceler auth_fd encoding
     >>=? fun conn ->
     P2p_socket.close conn
-    >>= fun _stat ->
+    >>= fun () ->
     Mock_sink.assert_has_event
       ~strict:false
       "authentication should be sent"
@@ -63,7 +63,7 @@ module Authentication = struct
     P2p_socket.accept ~canceler auth_fd encoding
     >>=? fun conn ->
     P2p_socket.close conn
-    >>= fun _stat ->
+    >>= fun () ->
     Mock_sink.assert_has_event
       ~strict:false
       "authentication should be sent"
@@ -159,7 +159,7 @@ module Read_and_write = struct
     sync ch
     >>=? fun () ->
     P2p_socket.close conn
-    >>= fun _stat ->
+    >>= fun () ->
     Mock_sink.assert_has_event
       ~strict:false
       "socket should have been read"
@@ -225,10 +225,9 @@ let main () =
     ~argv:[|""|]
     "tezos-p2p"
     [ ( "p2p-logging.",
-        List.map
-          testcase
-          [(module Authentication); (module Nack); (module Read_and_write)] )
-    ]
+        [ testcase (module Authentication);
+          testcase (module Nack);
+          testcase (module Read_and_write) ] ) ]
 
 let () =
   Sys.catch_break true ;
