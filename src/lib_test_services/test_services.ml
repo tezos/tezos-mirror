@@ -321,24 +321,21 @@ end = struct
   let assert_has_events str ?filter ?(strict = true) (pats : Pattern.t list) =
     let events = get_events ?filter () in
     if strict then
-      let _ =
-        TzList.map2_opt
-          (fun p e ->
-            match (p, e) with
-            | (Some p, Some e) ->
-                Some (Pattern.assert_event p e)
-            | (Some p, None) ->
-                Alcotest.fail
-                @@ Format.asprintf "Missing events in sink: %a" Pattern.pp p
-            | (None, Some e) ->
-                Alcotest.fail
-                @@ Format.asprintf "Excess events in sink: %a" pp_event e
-            | (None, None) ->
-                None)
-          pats
-          events
-      in
-      ()
+      match List.combine_with_leftovers pats events with
+      | (pes, None) ->
+          List.iter (fun (p, e) -> Pattern.assert_event p e) pes
+      | (_, Some (`Left pats)) ->
+          Alcotest.fail
+          @@ Format.asprintf
+               "Missing events in sink: %a"
+               (Format.pp_print_list Pattern.pp)
+               pats
+      | (_, Some (`Right events)) ->
+          Alcotest.fail
+          @@ Format.asprintf
+               "Excess events in sink: %a"
+               (Format.pp_print_list pp_event)
+               events
     else
       List.iter
         (fun pattern ->
