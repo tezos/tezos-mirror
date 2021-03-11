@@ -40,6 +40,9 @@ let get_datadir () =
 
 let init dir = datadir := Some dir
 
+(* An optimization trick to avoid allocating meaningless promisses. *)
+let then_false () = Lwt.return_false
+
 let compiler_name = "tezos-protocol-compiler"
 
 let do_compile hash p =
@@ -70,18 +73,18 @@ let do_compile hash p =
          >>= return)
   >>= function
   | Error err ->
-      Events.(emit compiler_exit_error) err >|= Fun.const false
+      Events.(emit compiler_exit_error) err >>= then_false
   | Ok (Unix.WSIGNALED _ | Unix.WSTOPPED _) ->
-      Events.(emit compilation_interrupted) log_file >|= Fun.const false
+      Events.(emit compilation_interrupted) log_file >>= then_false
   | Ok (Unix.WEXITED x) when x <> 0 ->
-      Events.(emit compilation_error) log_file >|= Fun.const false
+      Events.(emit compilation_error) log_file >>= then_false
   | Ok (Unix.WEXITED _) -> (
     try
       Dynlink.loadfile_private (plugin_file ^ ".cmxs") ;
-      Lwt.return true
+      Lwt.return_true
     with Dynlink.Error err ->
       Events.(emit dynlink_error) (plugin_file, Dynlink.error_message err)
-      >|= Fun.const false )
+      >>= then_false )
 
 let compile hash p =
   if Tezos_protocol_registerer.Registerer.mem hash then Lwt.return_true
