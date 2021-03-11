@@ -44,7 +44,7 @@ let addr = ref Ipaddr.V6.localhost
 
 let canceler = Lwt_canceler.create () (* unused *)
 
-let proof_of_work_target = Crypto_box.make_pow_target 16.
+let proof_of_work_target = Crypto_box.make_pow_target 1.
 
 let id1 = P2p_identity.generate proof_of_work_target
 
