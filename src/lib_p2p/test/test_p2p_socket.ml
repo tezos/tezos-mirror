@@ -50,6 +50,8 @@ let id1 = P2p_identity.generate proof_of_work_target
 
 let id2 = P2p_identity.generate proof_of_work_target
 
+let high_pow_target = Crypto_box.make_pow_target 100.
+
 let id0 =
   (* Luckily, this will be an insufficient proof of work! *)
   P2p_identity.generate (Crypto_box.make_pow_target 0.)
@@ -147,10 +149,14 @@ let raw_accept sched main_socket =
   in
   Lwt.return (fd, point)
 
-let accept sched main_socket =
+(** [accept ?id ?proof_of_work_target sched main_socket] connect
+   and performs [P2p_socket.authenticate] with the given
+   [proof_of_work_target].  *)
+let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
+    main_socket =
   raw_accept sched main_socket
   >>= fun (fd, point) ->
-  id1
+  id
   >>= fun id1 ->
   P2p_socket.authenticate
     ~canceler
@@ -171,12 +177,17 @@ let raw_connect sched addr port =
   let fd = P2p_io_scheduler.register sched fd in
   Lwt.return fd
 
-let connect sched addr port id =
+(** [connect ?target_id ?proof_of_work_target sched addr port] connect
+   and performs [P2p_socket.authenticate] with the given
+   [proof_of_work_target] (also checking that the remote point is the
+   expected [target_id]). *)
+let connect ?(target_id = id1) ?(proof_of_work_target = proof_of_work_target)
+    sched addr port id =
   raw_connect sched addr port
   >>= fun fd ->
   id
   >>= fun id ->
-  id1
+  target_id
   >>= fun id1 ->
   P2p_socket.authenticate
     ~canceler
@@ -343,6 +354,30 @@ module Low_level = struct
     P2p_io_scheduler.write fd simple_msg
     >>=? fun () ->
     sync ch >>=? fun () -> P2p_io_scheduler.close fd >>=? fun _ -> return_unit
+
+  let run _dir = run_nodes client server
+end
+
+(** Spawns a client and a server. The client connects to the server
+    using identity [id0] (pow_target=0). The
+    server check it against a unreachable pow target.
+*)
+module Pow_check = struct
+  let encoding = Data_encoding.bytes
+
+  let is_failing = function
+    | Error (P2p_errors.Not_enough_proof_of_work _ :: _) ->
+        true
+    | _ ->
+        false
+
+  let server _ch sched socket =
+    accept ~proof_of_work_target:high_pow_target sched socket
+    >>= fun res -> tzassert (is_failing res) __POS__
+
+  let client _ch sched addr port =
+    connect sched addr port id2
+    >>= fun conn -> tzassert (is_connection_closed conn) __POS__
 
   let run _dir = run_nodes client server
 end
@@ -704,6 +739,7 @@ let main () =
     "tezos-p2p"
     [ ( "p2p-connection.",
         [ wrap "low-level" Low_level.run;
+          wrap "pow" Pow_check.run;
           wrap "nack" Nack.run;
           wrap "nacked" Nacked.run;
           wrap "simple-message" Simple_message.run;
