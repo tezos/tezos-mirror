@@ -43,6 +43,9 @@ type blockchain_network = {
 (** List of built-in networks with their alias. *)
 val builtin_blockchain_networks : (string * blockchain_network) list
 
+(** Data encoding for custom blockchain configuration. *)
+val blockchain_network_encoding : blockchain_network Data_encoding.t
+
 type t = {
   data_dir : string;
   disable_config_validation : bool;

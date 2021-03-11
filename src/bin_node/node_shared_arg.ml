@@ -27,11 +27,16 @@
 open Cmdliner
 open Filename.Infix
 
+type net_config =
+  | BuiltIn of Node_config_file.blockchain_network
+  | Url of string
+  | Filename of string
+
 type t = {
   disable_config_validation : bool;
   data_dir : string option;
   config_file : string;
-  network : Node_config_file.blockchain_network option;
+  network : net_config option;
   connections : int option;
   max_download_speed : int option;
   max_upload_speed : int option;
@@ -55,6 +60,84 @@ type t = {
   synchronisation_threshold : int option;
   latency : int option;
 }
+
+type error +=
+  | Invalid_network_config of string * string (* filename, exception raised *)
+  | Network_http_error of (Cohttp.Code.status_code * string)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"node.network.invalid_config"
+    ~title:"Invalid network config"
+    ~description:
+      "The network config provided by --network argument is invalid."
+    ~pp:(fun ppf (path, error) ->
+      Format.fprintf ppf "The network config at %s is invalid (%s)." path error)
+    Data_encoding.(
+      obj2 (req "path" Data_encoding.string) (req "error" Data_encoding.string))
+    (function
+      | Invalid_network_config (path, exn) -> Some (path, exn) | _ -> None)
+    (fun (path, exn) -> Invalid_network_config (path, exn)) ;
+  let http_status_enc =
+    let open Data_encoding in
+    let open Cohttp.Code in
+    conv code_of_status status_of_code int31
+  in
+  register_error_kind
+    `Permanent
+    ~id:"node.network.http_error"
+    ~title:"HTTP error when downloading network config"
+    ~description:
+      "The node encountered an HTTP error when downloading the network config."
+    ~pp:(fun ppf (status, body) ->
+      Format.fprintf
+        ppf
+        "Downloading network config resulted in: %s (%s)."
+        (Cohttp.Code.string_of_status status)
+        body)
+    Data_encoding.(
+      obj2 (req "status" http_status_enc) (req "body" Data_encoding.string))
+    (function
+      | Network_http_error (status, body) -> Some (status, body) | _ -> None)
+    (fun (status, body) -> Network_http_error (status, body))
+
+let decode_net_config source json =
+  try
+    Data_encoding.Json.destruct
+      Node_config_file.blockchain_network_encoding
+      json
+    |> return
+  with
+  | Json_encoding.Cannot_destruct (path, exn) ->
+      let path = Json_query.json_pointer_of_path path in
+      fail (Invalid_network_config (path, Printexc.to_string exn))
+  | ( Json_encoding.Unexpected _
+    | Json_encoding.No_case_matched _
+    | Json_encoding.Bad_array_size _
+    | Json_encoding.Missing_field _
+    | Json_encoding.Unexpected_field _
+    | Json_encoding.Bad_schema _ ) as exn ->
+      fail (Invalid_network_config (source, Printexc.to_string exn))
+
+let load_net_config = function
+  | BuiltIn net ->
+      return net
+  | Url url ->
+      Cohttp_lwt_unix.Client.get (Uri.of_string url)
+      >>= fun (resp, body) ->
+      Cohttp_lwt.Body.to_string body
+      >>= fun body_str ->
+      ( match resp.status with
+      | `OK -> (
+        try return (Ezjsonm.from_string body_str)
+        with Ezjsonm.Parse_error (_, msg) ->
+          fail (Invalid_network_config (url, msg)) )
+      | #Cohttp.Code.status_code ->
+          fail (Network_http_error (resp.status, body_str)) )
+      >>=? decode_net_config url
+  | Filename filename ->
+      Lwt_utils_unix.Json.read_file filename >>=? decode_net_config filename
 
 let wrap data_dir config_file network connections max_download_speed
     max_upload_speed binary_chunks_size peer_table_size listen_addr
@@ -139,33 +222,56 @@ module Term = struct
           `Error s),
       pp )
 
-  let network_name_converter =
-    let of_string s =
-      match
-        List.assoc_opt
-          (String.lowercase_ascii s)
-          Node_config_file.builtin_blockchain_networks
-      with
-      | Some ntw ->
-          Ok ntw
-      | None ->
-          Error
-            (`Msg
-              (Format.asprintf
-                 "invalid value '%s', expected one of '%a'"
-                 s
-                 (Format.pp_print_list
-                    ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-                    Format.pp_print_string)
-                 (List.map fst Node_config_file.builtin_blockchain_networks)))
+  let network_printer ppf = function
+    | BuiltIn ({alias; _} : Node_config_file.blockchain_network) ->
+        (* Should not fail by construction of Node_config_file.block_chain_network *)
+        let alias = WithExceptions.Option.get ~loc:__LOC__ alias in
+        Format.fprintf ppf "built-in network: %s" alias
+    | Url url ->
+        Format.fprintf ppf "URL network: %s" url
+    | Filename file ->
+        Format.fprintf ppf "local file network: %s" file
+
+  let network_parser =
+    let parse_network_name s =
+      List.assoc_opt
+        (String.lowercase_ascii s)
+        Node_config_file.builtin_blockchain_networks
+      |> Option.map (fun net -> Result.ok (BuiltIn net))
     in
-    let printer ppf ({alias; _} : Node_config_file.blockchain_network) =
-      (* Should not fail by construction of Node_config_file.block_chain_network *)
-      let alias = WithExceptions.Option.get ~loc:__LOC__ alias in
-      Format.fprintf ppf "%s" alias
+    let parse_network_url s =
+      let re =
+        Re.Str.regexp "^https?://[a-zA-Z0-9\\-\\._]+\\(:[0-9]+\\)?\\(/.*\\)?$"
+      in
+      if Re.Str.string_match re s 0 then Some (Ok (Url s)) else None
     in
-    ( (of_string : string -> ('a, [`Msg of string]) result),
-      (printer : 'a Cmdliner.Arg.printer) )
+    let parse_file_config filename =
+      if Sys.file_exists filename then Some (Result.ok (Filename filename))
+      else None
+    in
+    let parse_error s =
+      Error
+        (`Msg
+          (Format.asprintf
+             "invalid value '%s', expected one of '%a', a URL or an existing \
+              filename"
+             s
+             (Format.pp_print_list
+                ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+                Format.pp_print_string)
+             (List.map fst Node_config_file.builtin_blockchain_networks)))
+    in
+    let parser s =
+      let open TzOption in
+      (* Select the first parsing result that is not None. *)
+      lazy (parse_network_name s)
+      <||> lazy (parse_network_url s)
+      <||> lazy (parse_file_config s)
+      <|!> lazy (parse_error s)
+      |> Lazy.force
+    in
+    ( (parser : string -> (net_config, [`Msg of string]) result),
+      (network_printer : net_config Cmdliner.Arg.printer) )
 
   (* misc args *)
 
@@ -225,14 +331,19 @@ module Term = struct
       ^ String.concat
           ", "
           (List.map fst Node_config_file.builtin_blockchain_networks)
-      ^ ". Default is mainnet. You cannot specify custom networks on the \
-         command-line, but you can specify them in the node configuration \
-         file. With commands other than 'config init', specifying this option \
-         causes the node to fail if the configuration implies another network."
+      ^ ". Default is mainnet. You can also specify custom networks by \
+         passing a path to a file containing the custom network \
+         configuration, or by passing a URL from which such a file can be \
+         downloaded. If you have a file named after a built-in network, you \
+         can prefix its name with './' so that the node treats it as a file. \
+         Otherwise it will be treated as a proper name of the built-in \
+         network. With commands other than 'config init', specifying this \
+         option causes the node to fail if the configuration implies another \
+         network."
     in
     Arg.(
       value
-      & opt (some (conv network_name_converter)) None
+      & opt (some (conv network_parser)) None
       & info ~docs ~doc ~docv:"NETWORK" ["network"])
 
   (* P2p args *)
@@ -552,27 +663,33 @@ let read_and_patch_config_file ?(may_override_network = false)
   | (None, None) ->
       return_none )
   >>=? fun synchronisation_threshold ->
+  ( match network with
+  | None ->
+      return None
+  | Some n ->
+      load_net_config n >>=? fun x -> return (Some x) )
+  >>=? fun network_data ->
   (* Overriding the network with [--network] is a bad idea if the configuration
      file already specifies it. Essentially, [--network] tells the node
      "if there is no config file, use this network; otherwise, check that the
      config file uses the network I expect". This behavior can be overridden
      by [may_override_network], which is used when doing [config init]. *)
-  ( match network with
+  ( match network_data with
   | None ->
       return_unit
-  | Some network ->
+  | Some net ->
       if may_override_network then return_unit
       else if
         Distributed_db_version.Name.equal
           cfg.blockchain_network.chain_name
-          network.chain_name
+          net.chain_name
       then return_unit
       else
         fail
           (Network_configuration_mismatch
              {
                configuration_file_chain_name = cfg.blockchain_network.chain_name;
-               command_line_chain_name = network.chain_name;
+               command_line_chain_name = net.chain_name;
              }) )
   >>=? fun () ->
   (* Update bootstrap peers must take into account the updated config file
@@ -585,9 +702,9 @@ let read_and_patch_config_file ?(may_override_network = false)
       | Some peers ->
           peers
       | None -> (
-        match network with
-        | Some network ->
-            network.default_bootstrap_peers
+        match network_data with
+        | Some net ->
+            net.default_bootstrap_peers
         | None ->
             cfg.blockchain_network.default_bootstrap_peers )
     in
@@ -670,6 +787,6 @@ let read_and_patch_config_file ?(may_override_network = false)
     ?log_output
     ?synchronisation_threshold
     ?history_mode
-    ?network
+    ?network:network_data
     ?latency
     cfg
