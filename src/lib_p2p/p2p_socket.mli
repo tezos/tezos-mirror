@@ -104,7 +104,8 @@ val private_node : ('msg, 'meta) t -> bool
 
     Can fail with
     - [P2p_errors.Not_enough_proof_of_work] if PoW target isn't reached
-    - [P2p_errors.Myself] if both hosts are the same peer *)
+    - [P2p_errors.Myself] if both hosts are the same peer
+    - [P2p_errors.Connection_closed] if the remote peer closes the connection *)
 val authenticate :
   canceler:Lwt_canceler.t ->
   proof_of_work_target:Crypto_box.pow_target ->
