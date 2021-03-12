@@ -94,7 +94,9 @@ module Event = struct
           Internal_event.Notice )
     | Could_not_switch_testchain _ ->
         Internal_event.Error
-    | Notify_branch _ | Notify_head _ | Disconnection _ | Bootstrapped ->
+    | Notify_head _ ->
+        Internal_event.Info
+    | Disconnection _ | Notify_branch _ | Bootstrapped ->
         Internal_event.Notice
     | Sync_status sync_status -> (
       match sync_status with
