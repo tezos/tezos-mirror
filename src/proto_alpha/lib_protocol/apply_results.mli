@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,27 +30,8 @@
 
 open Alpha_context
 
-type mapped_key = {
-  consensus_key : Signature.Public_key_hash.t;
-  baker : Baker_hash.t;
-}
-
-type origination_result = {
-  lazy_storage_diff : Lazy_storage.diffs option;
-  balance_updates : Receipt.balance_updates;
-  originated_contracts : Contract.t list;
-  consumed_gas : Gas.Arith.fp;
-  storage_size : Z.t;
-  paid_storage_size_diff : Z.t;
-}
-
 (** Result of applying a {!Operation.t}. Follows the same structure. *)
-type 'kind operation_metadata = {
-  contents : 'kind contents_result_list;
-  mapped_keys : mapped_key list;
-      (* A set of baker's active consensus keys that were mapped to the baker's
-         contract *)
-}
+type 'kind operation_metadata = {contents : 'kind contents_result_list}
 
 and packed_operation_metadata =
   | Operation_metadata : 'kind operation_metadata -> packed_operation_metadata
@@ -74,7 +54,7 @@ and packed_contents_result_list =
 and 'kind contents_result =
   | Endorsement_result : {
       balance_updates : Receipt.balance_updates;
-      baker : Baker_hash.t;
+      delegate : Signature.Public_key_hash.t;
       slots : int list;
     }
       -> Kind.endorsement contents_result
@@ -107,26 +87,16 @@ and packed_contents_result =
 
 (** The result of an operation in the queue. [Skipped] ones should
     always be at the tail, and after a single [Failed]. *)
-and ('kind, 'successful_result) internal_operation_result =
-  | Applied of 'successful_result
-  | Backtracked of 'successful_result * error trace option
-  | Failed :
-      'kind * error trace
-      -> ('kind, 'successful_result) internal_operation_result
-  | Skipped : 'kind -> ('kind, 'successful_result) internal_operation_result
+and 'kind manager_operation_result =
+  | Applied of 'kind successful_manager_operation_result
+  | Backtracked of
+      'kind successful_manager_operation_result * error trace option
+  | Failed : 'kind Kind.manager * error trace -> 'kind manager_operation_result
+  | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
 [@@coq_force_gadt]
 
-and 'kind manager_operation_result =
-  ( 'kind Kind.manager,
-    'kind successful_manager_operation_result )
-  internal_operation_result
-
-and 'kind baker_operation_result =
-  ( 'kind Kind.baker,
-    'kind successful_baker_operation_result )
-  internal_operation_result
-
-(** Result of applying a {!manager_operation}, either internal or external. *)
+(** Result of applying a {!manager_operation_content}, either internal
+    or external. *)
 and _ successful_manager_operation_result =
   | Reveal_result : {
       consumed_gas : Gas.Arith.fp;
@@ -143,74 +113,28 @@ and _ successful_manager_operation_result =
       allocated_destination_contract : bool;
     }
       -> Kind.transaction successful_manager_operation_result
-  | Origination_legacy_result :
-      origination_result
-      -> Kind.origination_legacy successful_manager_operation_result
-  | Origination_result :
-      origination_result
-      -> Kind.origination successful_manager_operation_result
-  | Delegation_legacy_result : {
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.delegation_legacy successful_manager_operation_result
-  | Delegation_result : {
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.delegation successful_manager_operation_result
-  | Baker_registration_result : {
+  | Origination_result : {
+      lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
-      registered_baker : Baker_hash.t;
+      originated_contracts : Contract.t list;
       consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
     }
-      -> Kind.baker_registration successful_manager_operation_result
-
-(** Result of applying a {!baker_operation}, only internal. *)
-and _ successful_baker_operation_result =
-  | Baker_proposals_result : {
+      -> Kind.origination successful_manager_operation_result
+  | Delegation_result : {
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.proposals successful_baker_operation_result
-  | Baker_ballot_result : {
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.ballot successful_baker_operation_result
-  | Set_baker_active_result : {
-      active : bool;
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.set_baker_active successful_baker_operation_result
-  | Toggle_baker_delegations_result : {
-      accept : bool;
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.toggle_baker_delegations successful_baker_operation_result
-  | Set_baker_consensus_key_result : {
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.set_baker_consensus_key successful_baker_operation_result
-  | Set_baker_pvss_key_result : {
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.set_baker_pvss_key successful_baker_operation_result
+      -> Kind.delegation successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :
       'kind successful_manager_operation_result
       -> packed_successful_manager_operation_result
 
-and packed_successful_baker_operation_result =
-  | Successful_baker_result :
-      'kind successful_baker_operation_result
-      -> packed_successful_baker_operation_result
-
 and packed_internal_operation_result =
-  | Internal_manager_operation_result :
-      'kind internal_manager_operation * 'kind manager_operation_result
-      -> packed_internal_operation_result
-  | Internal_baker_operation_result :
-      'kind internal_baker_operation * 'kind baker_operation_result
+  | Internal_operation_result :
+      'kind internal_operation * 'kind manager_operation_result
       -> packed_internal_operation_result
 
 (** Serializer for {!packed_operation_result}. *)
@@ -258,17 +182,15 @@ val kind_equal_list :
   ('kind, 'kind2) eq option
 
 type block_metadata = {
-  baker : Baker_hash.t;
+  baker : Signature.Public_key_hash.t;
   level : Level.compat_t;
   level_info : Level.t;
   voting_period_kind : Voting_period.kind;
   voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Gas.Arith.fp;
-  deactivated : Baker_hash.t list;
+  deactivated : Signature.Public_key_hash.t list;
   balance_updates : Receipt.balance_updates;
 }
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding
-
-val mapped_key_encoding : mapped_key Data_encoding.encoding

@@ -3,7 +3,6 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,7 +38,6 @@ module type BASIC_DATA = sig
   val pp : Format.formatter -> t -> unit
 end
 
-module Baker_hash = Baker_hash
 module Tez = Tez_repr
 module Period = Period_repr
 
@@ -112,8 +110,6 @@ type public_key = Signature.Public_key.t
 type public_key_hash = Signature.Public_key_hash.t
 
 type signature = Signature.t
-
-type baker_hash = Baker_hash.t
 
 module Constants = struct
   include Constants_repr
@@ -215,8 +211,7 @@ module Sapling = struct
 end
 
 module Receipt = Receipt_repr
-module Delegation = Delegation_storage
-module Baker = Baker_storage
+module Delegate = Delegate_storage
 
 module Roll = struct
   include Roll_repr

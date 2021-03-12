@@ -43,7 +43,7 @@ let ten_tez = Tez.of_int 10
     set to true meaning that this contract is able to delegate. *)
 let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   Context.init 1
-  >>=? fun (b, contracts, _) ->
+  >>=? fun (b, contracts) ->
   let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Context.Contract.balance (B b) source
   >>=? fun source_balance ->
@@ -51,12 +51,15 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   >>=? fun (operation, originated) ->
   Block.bake ~operation b
   >>=? fun b ->
-  (* fee + credit were debited from source *)
+  (* fee + credit + block security deposit were debited from source *)
   Context.get_constants (B b)
-  >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
+  >>=? fun { parametric =
+               {origination_size; cost_per_byte; block_security_deposit; _};
+             _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
-  Tez.( +? ) credit fee
+  Tez.( +? ) credit block_security_deposit
+  >>? Tez.( +? ) fee
   >>? Tez.( +? ) origination_burn
   >>? Tez.( +? ) Op.dummy_script_cost
   >>?= fun total_fee ->
@@ -84,7 +87,7 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
 let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
     =
   Context.init 1
-  >>=? fun (b, contracts, _) ->
+  >>=? fun (b, contracts) ->
   let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Context.Contract.balance (B b) contract
   >>=? fun balance ->
@@ -92,12 +95,19 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
   >>=? fun (operation, new_contract) ->
   (* The possible fees are: a given credit, an origination burn fee
      (constants_repr.default.origination_burn = 257 mtez),
-     a fee that is paid when creating an originate contract *)
+     a fee that is paid when creating an originate contract.
+
+     We also take into account a block security deposit. Note that it
+     is not related to origination but to the baking done in the
+     tests.*)
   Context.get_constants (B b)
-  >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
+  >>=? fun { parametric =
+               {origination_size; cost_per_byte; block_security_deposit; _};
+             _ } ->
   Tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
-  Tez.( +? ) fee credit
+  Tez.( +? ) credit block_security_deposit
+  >>? Tez.( +? ) fee
   >>? Tez.( +? ) origination_burn
   >>? Tez.( +? ) Op.dummy_script_cost
   >>?= fun total_fee ->
@@ -149,7 +159,7 @@ let test_pay_fee () =
     enough tez to pay for the fee. *)
 let test_not_tez_in_contract_to_pay_fee () =
   Context.init 2
-  >>=? fun (b, contracts, _) ->
+  >>=? fun (b, contracts) ->
   let contract_1 =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
   in
@@ -190,7 +200,7 @@ let test_not_tez_in_contract_to_pay_fee () =
    account. *)
 let register_contract_get_endorser () =
   Context.init 1
-  >>=? fun (b, contracts, _) ->
+  >>=? fun (b, contracts) ->
   let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Incremental.begin_construction b
   >>=? fun inc ->
@@ -215,7 +225,7 @@ let test_multiple_originations () =
 (** Cannot originate two contracts with the same context's counter. *)
 let test_counter () =
   Context.init 1
-  >>=? fun (b, contracts, _) ->
+  >>=? fun (b, contracts) ->
   let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Incremental.begin_construction b
   >>=? fun inc ->

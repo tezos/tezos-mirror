@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -40,7 +39,7 @@ val build_delegate_operation :
   block:Block_services.block ->
   ?fee:Tez.t ->
   Contract.t ->
-  baker_hash option ->
+  public_key_hash option ->
   Kind.transaction Injection.annotated_manager_operation tzresult Lwt.t
 
 (** Set the delegate of a manageable contract.
@@ -62,7 +61,7 @@ val set_delegate :
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   Contract.t ->
-  baker_hash option ->
+  public_key_hash option ->
   Kind.transaction Kind.manager Injection.result tzresult Lwt.t
 
 (** Builds a transaction operation ready for injection *)

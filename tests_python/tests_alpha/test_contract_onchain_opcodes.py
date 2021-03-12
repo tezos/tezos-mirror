@@ -10,7 +10,7 @@ from tools.utils import (
     init_with_transfer,
     assert_balance,
 )
-from tools.constants import BOOTSTRAP_BAKERS, IDENTITIES
+from tools.constants import IDENTITIES
 from .contract_paths import OPCODES_CONTRACT_PATH, MINI_SCENARIOS_CONTRACT_PATH
 
 KEY1 = 'foo'
@@ -33,10 +33,10 @@ class TestContractOnchainOpcodes:
     def test_store_input(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
         client.transfer(1000, "bootstrap1", KEY1, ['--burn-cap', '0.257'])
-        bake(client, 'baker1')
+        bake(client)
 
         client.transfer(2000, "bootstrap1", KEY2, ['--burn-cap', '0.257'])
-        bake(client, 'baker1')
+        bake(client)
 
         assert_balance(client, KEY1, 1000)
         assert_balance(client, KEY2, 2000)
@@ -48,7 +48,6 @@ class TestContractOnchainOpcodes:
             '""',
             100,
             'bootstrap1',
-            baker='baker1',
         )
 
         client.transfer(
@@ -57,7 +56,7 @@ class TestContractOnchainOpcodes:
             "store_input",
             ["-arg", '"abcdefg"', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
 
         assert_balance(client, "store_input", 200)
 
@@ -69,7 +68,7 @@ class TestContractOnchainOpcodes:
             "store_input",
             ["-arg", '"xyz"', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
 
         assert_storage_contains(client, "store_input", '"xyz"')
 
@@ -81,7 +80,6 @@ class TestContractOnchainOpcodes:
             '0',
             100,
             'bootstrap1',
-            baker='baker1',
         )
 
         client.transfer(
@@ -91,7 +89,7 @@ class TestContractOnchainOpcodes:
             ['-arg', 'Unit', '--burn-cap', '10'],
         )
 
-        bake(client, 'baker1')
+        bake(client)
 
         assert_storage_contains(client, "transfer_amount", '500000000')
 
@@ -108,13 +106,12 @@ class TestContractOnchainOpcodes:
             '"2017-07-13T09:19:01Z"',
             100,
             'bootstrap1',
-            baker='baker1',
         )
 
         client.transfer(
             500, "bootstrap1", 'store_now', ['-arg', 'Unit', '--burn-cap', '10']
         )
-        bake(client, 'baker1')
+        bake(client)
 
         assert_storage_contains(client, 'store_now', f'"{client.get_now()}"')
 
@@ -128,7 +125,7 @@ class TestContractOnchainOpcodes:
             path.join(OPCODES_CONTRACT_PATH, 'noop.tz'),
             ['--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
 
         client.originate(
             'test_transfer_account2',
@@ -137,7 +134,7 @@ class TestContractOnchainOpcodes:
             path.join(OPCODES_CONTRACT_PATH, 'noop.tz'),
             ['--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
 
         init_with_transfer(
             client,
@@ -145,7 +142,6 @@ class TestContractOnchainOpcodes:
             'Unit',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
 
         assert_balance(client, 'test_transfer_account1', 100)
@@ -157,7 +153,7 @@ class TestContractOnchainOpcodes:
             'transfer_tokens',
             ['-arg', f'"{account1_addr}"', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
 
         # Why isn't this 200 ꜩ? Baking fee?
         assert_balance(client, 'test_transfer_account1', 200)
@@ -169,7 +165,7 @@ class TestContractOnchainOpcodes:
             'transfer_tokens',
             ['-arg', f'"{account2_addr}"', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
 
         assert_balance(client, 'test_transfer_account2', 120)
 
@@ -186,11 +182,10 @@ class TestContractOnchainOpcodes:
             '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
 
         client.transfer(0, 'bootstrap1', 'self', ['--burn-cap', '10'])
-        bake(client, 'baker1')
+        bake(client)
 
         self_addr = client.get_contract_address('self')
         assert_storage_contains(client, 'self', f'"{self_addr}"')
@@ -205,11 +200,10 @@ class TestContractOnchainOpcodes:
             'Unit',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
 
         client.transfer(0, 'bootstrap1', 'self', ['--burn-cap', '10'])
-        bake(client, 'baker1')
+        bake(client)
         addr = client.get_contract_address('contract')
 
         with assert_run_failure(r'script reached FAILWITH instruction'):
@@ -228,7 +222,6 @@ class TestContractOnchainOpcodes:
             'Unit',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
 
     def test_source(self, client_regtest_scrubbed: ClientRegression):
@@ -240,12 +233,11 @@ class TestContractOnchainOpcodes:
             f'"{init_store}"',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
 
         # direct transfer to the contract
         client.transfer(0, 'bootstrap2', 'source', ['--burn-cap', '10'])
-        bake(client, 'baker1')
+        bake(client)
 
         source_addr = IDENTITIES['bootstrap2']['identity']
         assert_storage_contains(client, 'source', f'"{source_addr}"')
@@ -258,7 +250,7 @@ class TestContractOnchainOpcodes:
             'proxy',
             ['--burn-cap', '10', '--arg', f'"{contract_addr}"'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_storage_contains(client, 'source', f'"{source_addr}"')
 
     def test_sender(self, client_regtest_scrubbed: ClientRegression):
@@ -272,12 +264,11 @@ class TestContractOnchainOpcodes:
             f'"{init_store}"',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
 
         # direct transfer to the contract
         client.transfer(0, 'bootstrap2', 'sender', ['--burn-cap', '10'])
-        bake(client, 'baker1')
+        bake(client)
 
         sender_addr = IDENTITIES['bootstrap2']['identity']
         assert_storage_contains(client, 'sender', f'"{sender_addr}"')
@@ -291,7 +282,7 @@ class TestContractOnchainOpcodes:
             'proxy',
             ['--burn-cap', '10', '--arg', f'"{contract_addr}"'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_storage_contains(client, 'sender', f'"{proxy_addr}"')
 
     def test_slice(self, client_regtest_scrubbed: ClientRegression):
@@ -302,7 +293,6 @@ class TestContractOnchainOpcodes:
             '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
 
     @pytest.mark.parametrize(
@@ -328,7 +318,7 @@ class TestContractOnchainOpcodes:
                 'slices',
                 ['-arg', contract_arg, '--burn-cap', '10'],
             )
-        # bake(client, 'baker1')
+        # bake(client)
 
     @pytest.mark.parametrize(
         'contract_arg',
@@ -351,7 +341,7 @@ class TestContractOnchainOpcodes:
             'slices',
             ['-arg', contract_arg, '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
 
     def test_split_string(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
@@ -361,7 +351,6 @@ class TestContractOnchainOpcodes:
             '{}',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
 
         client.transfer(
@@ -370,7 +359,7 @@ class TestContractOnchainOpcodes:
             'split_string',
             ['-arg', '"abc"', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_storage_contains(client, 'split_string', '{ "a" ; "b" ; "c" }')
 
         client.transfer(
@@ -379,7 +368,7 @@ class TestContractOnchainOpcodes:
             'split_string',
             ['-arg', '"def"', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_storage_contains(
             client, 'split_string', '{ "a" ; "b" ; "c" ; "d" ; "e" ; "f" }'
         )
@@ -392,7 +381,6 @@ class TestContractOnchainOpcodes:
             '{}',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
 
         client.transfer(
@@ -401,7 +389,7 @@ class TestContractOnchainOpcodes:
             'split_bytes',
             ['-arg', '0xaabbcc', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_storage_contains(client, 'split_bytes', '{ 0xaa ; 0xbb ; 0xcc }')
 
         client.transfer(
@@ -410,7 +398,7 @@ class TestContractOnchainOpcodes:
             'split_bytes',
             ['-arg', '0xddeeff', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_storage_contains(
             client, 'split_bytes', '{ 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }'
         )
@@ -423,22 +411,21 @@ class TestContractOnchainOpcodes:
             'Unit',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
 
         assert client.get_delegate('set_delegate').delegate is None
 
-        addr = BOOTSTRAP_BAKERS[0]['hash']
+        addr = IDENTITIES['bootstrap5']['identity']
         client.transfer(
             0, 'bootstrap1', 'set_delegate', ['-arg', f'(Some "{addr}")']
         )
-        bake(client, 'baker1')
+        bake(client)
 
         assert client.get_delegate('set_delegate').delegate == addr
 
         client.transfer(0, 'bootstrap1', 'set_delegate', ['-arg', 'None'])
-        bake(client, 'baker1')
+        bake(client)
 
         assert client.get_delegate('set_delegate').delegate is None
 
@@ -457,16 +444,15 @@ class TestContractOnchainOpcodes:
             'Unit',
             1000,
             'bootstrap1',
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
 
 
 class TestTickets:
     """Tests for tickets."""
 
     def test_ticket_user_forge(self, client):
-        bake(client, 'baker1')
+        bake(client)
         init_with_transfer(
             client,
             path.join(OPCODES_CONTRACT_PATH, 'ticket_store-2.tz'),
@@ -474,7 +460,6 @@ class TestTickets:
             100,
             'bootstrap1',
             'storer',
-            baker='baker1',
         )
 
         # Create parameter by hand with a ticket type but no ticket in it
@@ -500,11 +485,10 @@ class TestTickets:
                 100,
                 'bootstrap1',
                 'ticket_bad',
-                baker='baker1',
             )
 
     def test_ticket_user_big_forge(self, client):
-        bake(client, 'baker1')
+        bake(client)
         contract_name = 'big_storer'
         init_with_transfer(
             client,
@@ -513,13 +497,12 @@ class TestTickets:
             100,
             'bootstrap1',
             contract_name,
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         client.transfer(
             100, 'bootstrap1', contract_name, ['-arg', '42', '--burn-cap', '10']
         )
-        bake(client, 'baker1')
+        bake(client)
         storage = client.get_storage(contract_name)
 
         with assert_run_failure(r'Unexpected forged value'):
@@ -531,7 +514,6 @@ class TestTickets:
                 100,
                 'bootstrap1',
                 'thief',
-                baker='baker1',
             )
 
         with assert_run_failure(r'Unexpected forged value'):
@@ -543,7 +525,6 @@ class TestTickets:
                 100,
                 'bootstrap1',
                 'thief',
-                baker='baker1',
             )
 
     def test_ticket_read(self, client):
@@ -555,9 +536,8 @@ class TestTickets:
             100,
             'bootstrap1',
             'ticketer_read',
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         ticketer_addr = client.get_contract_address('ticketer_read')
         init_with_transfer(
             client,
@@ -566,9 +546,8 @@ class TestTickets:
             100,
             'bootstrap1',
             'reader',
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         reader_addr = client.get_contract_address('reader')
         client.transfer(
             100,
@@ -576,7 +555,7 @@ class TestTickets:
             'ticketer_read',
             ['-arg', '"' + reader_addr + '"', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_storage_contains(client, "reader", '"' + ticketer_addr + '"')
 
     def test_bad_ticket(self, client):
@@ -587,9 +566,8 @@ class TestTickets:
             100,
             'bootstrap1',
             'ticketer_bad',
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         ticketer_addr = client.get_contract_address('ticketer_bad')
         init_with_transfer(
             client,
@@ -598,9 +576,8 @@ class TestTickets:
             100,
             'bootstrap1',
             'reader_bad',
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         with assert_run_failure(r'Unexpected forged value'):
             client.transfer(
                 100,
@@ -608,7 +585,7 @@ class TestTickets:
                 'reader_bad',
                 ['-arg', '1', '--burn-cap', '10'],
             )
-            bake(client, 'baker1')
+            bake(client)
 
     def test_ticket_utxo(self, client):
         """Test UTXOs"""
@@ -618,9 +595,8 @@ class TestTickets:
             '42',
             100,
             'bootstrap1',
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         utxor_addr = client.get_contract_address('utxor')
         init_with_transfer(
             client,
@@ -629,9 +605,8 @@ class TestTickets:
             100,
             'bootstrap1',
             "reader_a",
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         reader_a_addr = client.get_contract_address('reader_a')
         utxor_addr = client.get_contract_address('utxor')
         init_with_transfer(
@@ -641,9 +616,8 @@ class TestTickets:
             100,
             'bootstrap1',
             "reader_b",
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         reader_b_addr = client.get_contract_address('reader_b')
         client.transfer(
             100,
@@ -656,7 +630,7 @@ class TestTickets:
                 '10',
             ],
         )
-        bake(client, 'baker1')
+        bake(client)
 
     def test_ticket_split(self, client):
         def ticket(target_addr, param, utxo_amount):
@@ -683,7 +657,6 @@ class TestTickets:
             100,
             'bootstrap1',
             'ticketer',
-            baker='baker1',
         )
         init_with_transfer(
             client,
@@ -692,15 +665,14 @@ class TestTickets:
             100,
             'bootstrap1',
             'splitter',
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         splitter_addr = client.get_contract_address('splitter')
         ticket(splitter_addr, 42, 3)
         with assert_run_failure(r'script reached FAILWITH instruction'):
             # Wrong Split Amount
             ticket(splitter_addr, 42, 4)
-        bake(client, 'baker1')
+        bake(client)
 
     def test_ticket_join(self, client):
         """Test JOIN"""
@@ -723,7 +695,6 @@ class TestTickets:
             100,
             'bootstrap1',
             'ticketer_a',
-            baker='baker1',
         )
         init_with_transfer(
             client,
@@ -732,7 +703,6 @@ class TestTickets:
             100,
             'bootstrap1',
             'ticketer_b',
-            baker='baker1',
         )
         init_with_transfer(
             client,
@@ -741,9 +711,8 @@ class TestTickets:
             100,
             'bootstrap1',
             'joiner',
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         joiner_addr = client.get_contract_address('joiner')
         client.transfer(
             100,
@@ -751,14 +720,14 @@ class TestTickets:
             'ticketer_a',
             ['-arg', params(joiner_addr, 42, 1), '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         client.transfer(
             100,
             'bootstrap1',
             'ticketer_a',
             ['-arg', params(joiner_addr, 144, 1), '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         with assert_run_failure(r'script reached FAILWITH instruction'):
             # Different Ticketer
             client.transfer(
@@ -804,7 +773,7 @@ class TestTickets:
                 args=['--init', f'"{manager_address}"', '--burn-cap', "10"],
             )
             builders[name] = origination.contract
-            bake(client, 'baker1')
+            bake(client)
 
         def originate_wallet(name):
             """Create a fungible token wallet managed by bootstrap1."""
@@ -821,7 +790,7 @@ class TestTickets:
                 ],
             )
             wallets[name] = origination.contract
-            bake(client, 'baker1')
+            bake(client)
 
         # Create 3 token contracts "A", "B", and "C".
         originate_builder("A")
@@ -860,7 +829,7 @@ class TestTickets:
                     parameter,
                 ],
             )
-            bake(client, 'baker1')
+            bake(client)
 
         def burn(builder, wallet, amount):
             """Burn fungible tokens."""
@@ -879,7 +848,7 @@ class TestTickets:
                     parameter,
                 ],
             )
-            bake(client, 'baker1')
+            bake(client)
 
         def transfer(builder, source_wallet, destination_wallet, amount):
             """Transfer fungible tokens."""
@@ -899,7 +868,7 @@ class TestTickets:
                     parameter,
                 ],
             )
-            bake(client, 'baker1')
+            bake(client)
 
         # 100A --> Alice
         mint(builder="A", wallet="Alice", amount=100)
@@ -1031,7 +1000,7 @@ class TestTickets:
                 args=['--init', storage, '--burn-cap', "10"],
             )
             builders[name] = origination.contract
-            bake(client, 'baker1')
+            bake(client)
 
         def originate_wallet(name):
             """Create a non-fungible token wallet managed by bootstrap1."""
@@ -1048,7 +1017,7 @@ class TestTickets:
                 ],
             )
             wallets[name] = origination.contract
-            bake(client, 'baker1')
+            bake(client)
 
         # Create 3 token contracts "A", "B", and "C".
         originate_builder("A")
@@ -1094,7 +1063,7 @@ class TestTickets:
                     parameter,
                 ],
             )
-            bake(client, 'baker1')
+            bake(client)
 
         def burn(builder, wallet, token_id):
             """Burn a non-fungible token."""
@@ -1115,7 +1084,7 @@ class TestTickets:
                     parameter,
                 ],
             )
-            bake(client, 'baker1')
+            bake(client)
 
         def transfer(builder, source_wallet, destination_wallet, token_id):
             """Transfer fungible tokens."""
@@ -1137,7 +1106,7 @@ class TestTickets:
                     parameter,
                 ],
             )
-            bake(client, 'baker1')
+            bake(client)
 
         # A0 --> Alice
         mint(builder="A", wallet="Alice", token_id=0)
@@ -1249,7 +1218,6 @@ class TestContractBigMapOrigination:
             1000,
             'bootstrap1',
             contract_name='originate_big_map_literal',
-            baker='baker1',
         )
 
     def test_big_map_origination_id(self, client_regtest_scrubbed):
@@ -1263,7 +1231,6 @@ class TestContractBigMapOrigination:
                 1000,
                 'bootstrap1',
                 contract_name='originate_big_map_id',
-                baker='baker1',
             )
 
     def test_big_map_origination_diff(self, client_regtest_scrubbed):
@@ -1278,7 +1245,6 @@ class TestContractBigMapOrigination:
                 1000,
                 'bootstrap1',
                 contract_name='originate_big_map_diff',
-                baker='baker1',
             )
 
     def test_big_map_transfer_id(self, client_regtest_scrubbed):
@@ -1321,23 +1287,22 @@ class TestContractOnchainLevel:
             '9999999',
             100,
             'bootstrap1',
-            baker='baker1',
         )
-        bake(client, 'baker1')
+        bake(client)
         client.transfer(
             500, "bootstrap1", 'level', ['-arg', 'Unit', '--burn-cap', '10']
         )
-        bake(client, 'baker1')
+        bake(client)
         level = client.get_level()
         slevel = str(level)
         assert_storage_contains(client, 'level', slevel)
-        bake(client, 'baker1')
-        bake(client, 'baker1')
+        bake(client)
+        bake(client)
         # checks the storage hasn't changed even though the current level has
         assert_storage_contains(client, 'level', slevel)
         # Run again to check the storage gets updated
         client.transfer(
             500, "bootstrap1", 'level', ['-arg', 'Unit', '--burn-cap', '10']
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_storage_contains(client, 'level', str(level + 3))

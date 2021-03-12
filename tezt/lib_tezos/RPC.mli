@@ -165,68 +165,6 @@ val get_levels_in_current_cycle :
   Client.t ->
   JSON.t Lwt.t
 
-module Bakers : sig
-  (** Common protocol RPSs for bakers (i.e. under [/bakers]). *)
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/bakers *)
-  val get_all :
-    ?node:Node.t ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    string list Lwt.t
-
-  (** Same as [get_all], but do not wait for the process to exit. *)
-  val spawn_get_all :
-    ?node:Node.t ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/bakers/[baker_hash] *)
-  val get :
-    ?node:Node.t ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    baker_hash:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get], but do not wait for the process to exit. *)
-  val spawn_get :
-    ?node:Node.t ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    baker_hash:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/bakers/[baker_hash]/consensus_key *)
-  val get_consensus_key :
-    ?node:Node.t ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    baker_hash:string ->
-    Client.t ->
-    Tezos_crypto.Signature.public_key Lwt.t
-
-  (** Same as [get_consensus_key], but do not wait for the process to exit. *)
-  val spawn_get_consensus_key :
-    ?node:Node.t ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    baker_hash:string ->
-    Client.t ->
-    Process.t
-end
-
 module Contracts : sig
   (** Common protocol RPSs for contracts (i.e. under [/contracts]). *)
 

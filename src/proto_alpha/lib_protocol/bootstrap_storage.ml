@@ -25,13 +25,17 @@
 
 open Misc
 
-let init_account ctxt Parameters_repr.{public_key_hash; public_key; amount} =
+let init_account ctxt
+    ({public_key_hash; public_key; amount} : Parameters_repr.bootstrap_account)
+    =
   let contract = Contract_repr.implicit_contract public_key_hash in
   Contract_storage.credit ctxt contract amount
   >>=? fun ctxt ->
   match public_key with
   | Some public_key ->
-      Contract_storage.reveal_public_key ctxt public_key_hash public_key
+      Contract_storage.reveal_manager_key ctxt public_key_hash public_key
+      >>=? fun ctxt ->
+      Delegate_storage.set ctxt contract (Some public_key_hash)
   | None ->
       return ctxt
 
@@ -49,26 +53,12 @@ let init_contract ~typecheck ctxt
     ~script
     ~delegate:(Some delegate)
 
-let init_baker ctxt ({hash; amount; key} : Parameters_repr.bootstrap_baker) =
-  Baker_storage.register
-    ?bootstrap_baker_hash:hash
-    ~prepaid_bootstrap_storage:true
-    ctxt
-    ~balance:amount
-    ~threshold:1
-    ~owner_keys:[key]
-    ~consensus_key:key
-
-let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts
-    bakers =
+let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
   let nonce =
     Operation_hash.hash_bytes [Bytes.of_string "Un festival de GADT."]
   in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
-  (* Initiate accounts before bakers to make ensure the invariant on zero-balance consensus key accounts is preserved. *)
   fold_left_s init_account ctxt accounts
-  >>=? fun ctxt ->
-  fold_left_s (fun ctxt baker -> init_baker ctxt baker >|=? fst) ctxt bakers
   >>=? fun ctxt ->
   fold_left_s (init_contract ~typecheck) ctxt contracts
   >>=? fun ctxt ->

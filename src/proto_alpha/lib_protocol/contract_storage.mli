@@ -24,14 +24,14 @@
 (*****************************************************************************)
 
 type error +=
+  | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
-      Balance_too_low of
-      Contract_repr.contract * Tez_repr.t * Tez_repr.t
-  | (* `Branch *)
       Counter_in_the_past of Contract_repr.contract * Z.t * Z.t
-  | (* `Temporary *)
+  | (* `Branch *)
       Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
   | (* `Temporary *)
+      Unspendable_contract of Contract_repr.contract
+  | (* `Permanent *)
       Non_existing_contract of Contract_repr.contract
   | (* `Temporary *)
       Empty_implicit_contract of Signature.Public_key_hash.t
@@ -39,9 +39,8 @@ type error +=
       Empty_implicit_delegated_contract of
       Signature.Public_key_hash.t
   | (* `Temporary *)
-      Empty_transaction of Contract_repr.t
-  | (* `Permanent *)
-      Inconsistent_hash of
+      Empty_transaction of Contract_repr.t (* `Temporary *)
+  | Inconsistent_hash of
       Signature.Public_key.t
       * Signature.Public_key_hash.t
       * Signature.Public_key_hash.t
@@ -49,11 +48,11 @@ type error +=
       Inconsistent_public_key of
       Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *)
-      Failure of string
-  | (* `Permanent *)
-      Previously_revealed_key of Contract_repr.t
-  | (* `Permanent *)
-      Unrevealed_public_key of Contract_repr.t
+      Failure of string (* `Permanent *)
+  | Previously_revealed_key of Contract_repr.t (* `Permanent *)
+  | Unrevealed_manager_key of Contract_repr.t
+
+(* `Permanent *)
 
 val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 
@@ -66,17 +65,20 @@ val must_be_allocated : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
 val check_counter_increment :
-  Raw_context.t -> Contract_repr.t -> Z.t -> unit tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> Z.t -> unit tzresult Lwt.t
 
 val increment_counter :
-  Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
-val get_public_key :
+val get_manager_key :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Signature.Public_key.t tzresult Lwt.t
 
-val reveal_public_key :
+val is_manager_key_revealed :
+  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+
+val reveal_manager_key :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Signature.Public_key.t ->
@@ -89,7 +91,8 @@ val get_balance_carbonated :
   Contract_repr.t ->
   (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 
-val get_counter : Raw_context.t -> Contract_repr.t -> Z.t tzresult Lwt.t
+val get_counter :
+  Raw_context.t -> Signature.Public_key_hash.t -> Z.t tzresult Lwt.t
 
 val get_script_code :
   Raw_context.t ->
@@ -156,7 +159,7 @@ val raw_originate :
   Contract_repr.t ->
   balance:Tez_repr.t ->
   script:Script_repr.t * Lazy_storage_diff.diffs option ->
-  delegate:Baker_hash.t option ->
+  delegate:Signature.Public_key_hash.t option ->
   Raw_context.t tzresult Lwt.t
 
 val fresh_contract_from_current_nonce :

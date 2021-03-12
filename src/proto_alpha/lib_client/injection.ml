@@ -3,7 +3,6 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -367,15 +366,9 @@ let estimated_gas_single (type kind)
     match result with
     | Applied (Transaction_result {consumed_gas; _}) ->
         Ok consumed_gas
-    | Applied (Origination_legacy_result {consumed_gas; _}) ->
-        Ok consumed_gas
     | Applied (Origination_result {consumed_gas; _}) ->
         Ok consumed_gas
-    | Applied (Baker_registration_result {consumed_gas; _}) ->
-        Ok consumed_gas
     | Applied (Reveal_result {consumed_gas}) ->
-        Ok consumed_gas
-    | Applied (Delegation_legacy_result {consumed_gas}) ->
         Ok consumed_gas
     | Applied (Delegation_result {consumed_gas}) ->
         Ok consumed_gas
@@ -388,46 +381,17 @@ let estimated_gas_single (type kind)
     | Failed (_, errs) ->
         Error (Environment.wrap_tztrace errs)
   in
-  let consumed_baker_gas (type kind) (result : kind baker_operation_result) =
-    match result with
-    | Applied (Baker_proposals_result {consumed_gas}) ->
-        Ok consumed_gas
-    | Applied (Baker_ballot_result {consumed_gas}) ->
-        Ok consumed_gas
-    | Applied (Set_baker_active_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Toggle_baker_delegations_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Set_baker_consensus_key_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Set_baker_pvss_key_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Skipped _ ->
-        assert false
-    | Backtracked (_, None) ->
-        Ok Gas.Arith.zero (* there must be another error for this to happen *)
-    | Backtracked (_, Some errs) ->
-        Error (Environment.wrap_tztrace errs)
-    | Failed (_, errs) ->
-        Error (Environment.wrap_tztrace errs)
-  in
   List.fold_left
-    (fun acc -> function Internal_manager_operation_result (_, r) ->
-          acc
-          >>? fun acc ->
-          consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas)
-      | Internal_baker_operation_result (_, r) ->
-          acc
-          >>? fun acc ->
-          consumed_baker_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
+    (fun acc (Internal_operation_result (_, r)) ->
+      acc
+      >>? fun acc -> consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
     (consumed_gas operation_result)
     internal_operation_results
 
 let estimated_storage_single (type kind) origination_size
     (Manager_operation_result {operation_result; internal_operation_results; _} :
       kind Kind.manager contents_result) =
-  let storage_size_diff_manager (type kind)
-      (result : kind manager_operation_result) =
+  let storage_size_diff (type kind) (result : kind manager_operation_result) =
     match result with
     | Applied
         (Transaction_result
@@ -435,15 +399,9 @@ let estimated_storage_single (type kind) origination_size
         if allocated_destination_contract then
           Ok (Z.add paid_storage_size_diff origination_size)
         else Ok paid_storage_size_diff
-    | Applied (Origination_legacy_result {paid_storage_size_diff; _}) ->
-        Ok (Z.add paid_storage_size_diff origination_size)
     | Applied (Origination_result {paid_storage_size_diff; _}) ->
         Ok (Z.add paid_storage_size_diff origination_size)
-    | Applied (Baker_registration_result {paid_storage_size_diff; _}) ->
-        Ok (Z.add paid_storage_size_diff origination_size)
     | Applied (Reveal_result _) ->
-        Ok Z.zero
-    | Applied (Delegation_legacy_result _) ->
         Ok Z.zero
     | Applied (Delegation_result _) ->
         Ok Z.zero
@@ -456,40 +414,12 @@ let estimated_storage_single (type kind) origination_size
     | Failed (_, errs) ->
         Error (Environment.wrap_tztrace errs)
   in
-  let storage_size_diff_baker (type kind)
-      (result : kind baker_operation_result) =
-    match result with
-    | Applied (Baker_proposals_result _) ->
-        Ok Z.zero
-    | Applied (Baker_ballot_result _) ->
-        Ok Z.zero
-    | Applied (Set_baker_active_result _) ->
-        Ok Z.zero
-    | Applied (Toggle_baker_delegations_result _) ->
-        Ok Z.zero
-    | Applied (Set_baker_consensus_key_result _) ->
-        Ok Z.zero
-    | Applied (Set_baker_pvss_key_result _) ->
-        Ok Z.zero
-    | Skipped _ ->
-        assert false
-    | Backtracked (_, None) ->
-        Ok Z.zero (* there must be another error for this to happen *)
-    | Backtracked (_, Some errs) ->
-        Error (Environment.wrap_tztrace errs)
-    | Failed (_, errs) ->
-        Error (Environment.wrap_tztrace errs)
-  in
   List.fold_left
-    (fun acc -> function Internal_manager_operation_result (_, r) ->
-          acc
-          >>? fun acc ->
-          storage_size_diff_manager r >>? fun storage -> Ok (Z.add acc storage)
-      | Internal_baker_operation_result (_, r) ->
-          acc
-          >>? fun acc ->
-          storage_size_diff_baker r >>? fun storage -> Ok (Z.add acc storage))
-    (storage_size_diff_manager operation_result)
+    (fun acc (Internal_operation_result (_, r)) ->
+      acc
+      >>? fun acc ->
+      storage_size_diff r >>? fun storage -> Ok (Z.add acc storage))
+    (storage_size_diff operation_result)
     internal_operation_results
 
 let estimated_storage origination_size res =
@@ -514,15 +444,9 @@ let originated_contracts_single (type kind)
     match result with
     | Applied (Transaction_result {originated_contracts; _}) ->
         Ok originated_contracts
-    | Applied (Origination_legacy_result {originated_contracts; _}) ->
-        Ok originated_contracts
     | Applied (Origination_result {originated_contracts; _}) ->
         Ok originated_contracts
-    | Applied (Baker_registration_result {registered_baker; _}) ->
-        Ok [Contract.baker_contract registered_baker]
     | Applied (Reveal_result _) ->
-        Ok []
-    | Applied (Delegation_legacy_result _) ->
         Ok []
     | Applied (Delegation_result _) ->
         Ok []
@@ -536,13 +460,11 @@ let originated_contracts_single (type kind)
         Error (Environment.wrap_tztrace errs)
   in
   List.fold_left
-    (fun acc -> function Internal_manager_operation_result (_, r) ->
-          acc
-          >>? fun acc ->
-          originated_contracts r
-          >>? fun contracts -> Ok (List.rev_append contracts acc)
-      | Internal_baker_operation_result _ ->
-          (* There are no baker operations that originate contracts *) acc)
+    (fun acc (Internal_operation_result (_, r)) ->
+      acc
+      >>? fun acc ->
+      originated_contracts r
+      >>? fun contracts -> Ok (List.rev_append contracts acc))
     (originated_contracts operation_result >|? List.rev)
     internal_operation_results
 
@@ -564,7 +486,8 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
         (Manager_operation_result
            {operation_result; internal_operation_results; _} :
           kind Kind.manager contents_result) =
-      let detect_script_failure result =
+      let detect_script_failure (type kind)
+          (result : kind manager_operation_result) =
         match result with
         | Applied _ ->
             Ok ()
@@ -583,10 +506,8 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
               (Error (Environment.wrap_tztrace errs))
       in
       List.fold_left
-        (fun acc -> function Internal_manager_operation_result (_, r) ->
-              acc >>? fun () -> detect_script_failure r
-          | Internal_baker_operation_result (_, r) ->
-              acc >>? fun () -> detect_script_failure r)
+        (fun acc (Internal_operation_result (_, r)) ->
+          acc >>? fun () -> detect_script_failure r)
         (detect_script_failure operation_result)
         internal_operation_results
     in
@@ -599,7 +520,7 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
         detect_script_failure_single res
         >>? fun () -> detect_script_failure rest
   in
-  fun {contents; mapped_keys = _} -> detect_script_failure contents
+  fun {contents} -> detect_script_failure contents
 
 (* This value is used as a safety guard for gas limit. *)
 let safety_guard = Gas.Arith.(integral_of_int_exn 100)
@@ -870,13 +791,6 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
       "@[<v 2>Simulation result:@,%a@]"
       Operation_result.pp_operation_result
       (op.protocol_data.contents, result.contents)
-    >>= fun () ->
-    ( if List.length result.mapped_keys > 0 then
-      cctxt#message
-        "@[<v 2>Active consensus keys mapped to baker contracts:@,%a@]"
-        Operation_result.pp_mapped_keys
-        result.mapped_keys
-    else Lwt.return_unit )
     >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
   else
     Shell_services.Injection.operation cctxt ~chain bytes
@@ -933,13 +847,6 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
       Operation_result.pp_operation_result
       (op.protocol_data.contents, result.contents)
     >>= fun () ->
-    ( if List.length result.mapped_keys > 0 then
-      cctxt#message
-        "@[<v 2>Active consensus keys mapped to baker contracts:@,%a@]"
-        Operation_result.pp_mapped_keys
-        result.mapped_keys
-    else Lwt.return_unit )
-    >>= fun () ->
     Lwt.return (originated_contracts result.contents)
     >>=? fun contracts ->
     List.iter_s
@@ -994,10 +901,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
   | Some counter ->
       return counter )
   >>=? fun counter ->
-  Alpha_services.Contract.public_key
-    cctxt
-    (chain, block)
-    (Contract.implicit_contract source)
+  Alpha_services.Contract.manager_key cctxt (chain, block) source
   >>=? fun key ->
   (* [is_reveal] assumes that a Reveal operation only appears as the first of a batch *)
   let is_reveal : type kind. kind annotated_manager_operation_list -> bool =

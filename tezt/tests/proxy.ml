@@ -40,14 +40,7 @@ let init ~protocol () =
   let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
   Client.set_mode (Proxy node) client ;
-  let baker =
-    match protocol with
-    | Protocol.Alpha ->
-        Constant.baker1.identity
-    | _ ->
-        "bootstrap1"
-  in
-  let* () = Client.bake_for ~key:baker client in
+  let* () = Client.bake_for client in
   Log.info "Baked 1 block: protocol is now %s" (Protocol.name protocol) ;
   Lwt.return (node, client)
 
@@ -292,14 +285,7 @@ let test_bake protocol =
   let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
   Client.set_mode (Proxy node) client ;
-  let baker =
-    match protocol with
-    | Protocol.Alpha ->
-        Constant.baker1.identity
-    | _ ->
-        "bootstrap1"
-  in
-  let* () = repeat 10 (fun () -> Client.bake_for ~key:baker client) in
+  let* () = repeat 10 (fun () -> Client.bake_for client) in
   Log.info "Baked 10 blocks." ;
   let* level = Node.wait_for_level node 11 in
   Log.info "Level is now %d." level ;
@@ -324,15 +310,8 @@ let test_transfer protocol =
       client
   in
   Log.info "Transferred 5 tez." ;
-  let baker =
-    match protocol with
-    | Protocol.Alpha ->
-        Constant.baker1.identity
-    | _ ->
-        "bootstrap1"
-  in
-  let* () = Client.bake_for ~key:baker client in
-  Log.info "Baked block for %s." baker ;
+  let* () = Client.bake_for client in
+  Log.info "Baked block for bootstrap1." ;
   let* () =
     Client.transfer
       ~wait:"none"
@@ -342,15 +321,8 @@ let test_transfer protocol =
       client
   in
   Log.info "Transferred 10 tez." ;
-  let baker =
-    match protocol with
-    | Protocol.Alpha ->
-        Constant.baker2.identity
-    | _ ->
-        "bootstrap2"
-  in
-  let* () = Client.bake_for ~key:baker client in
-  Log.info "Baked block for %s." baker ;
+  let* () = Client.bake_for ~key:"bootstrap2" client in
+  Log.info "Baked block for bootstrap2." ;
   return ()
 
 (** Module containing tests regarding where RPCs are executed: on

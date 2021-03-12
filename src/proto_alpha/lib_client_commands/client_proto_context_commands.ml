@@ -133,56 +133,57 @@ let transfer_command amount source destination cctxt
       burn_cap;
     }
   in
-  get_source_keys cctxt source
-  >>=? (function
-         | None ->
-             let contract = source in
-             Managed_contract.get_contract_manager cctxt source
-             >>=? fun source ->
-             Client_keys.get_key cctxt source
-             >>=? fun (_, src_pk, src_sk) ->
-             Managed_contract.transfer
-               cctxt
-               ~chain:cctxt#chain
-               ~block:cctxt#block
-               ?confirmations:cctxt#confirmations
-               ~dry_run
-               ~verbose_signing
-               ~fee_parameter
-               ?fee
-               ~contract
-               ~source
-               ~src_pk
-               ~src_sk
-               ~destination
-               ?entrypoint
-               ?arg
-               ~amount
-               ?gas_limit
-               ?storage_limit
-               ?counter
-               ()
-         | Some (_name, source, src_pk, src_sk) ->
-             transfer
-               cctxt
-               ~chain:cctxt#chain
-               ~block:cctxt#block
-               ?confirmations:cctxt#confirmations
-               ~dry_run
-               ~verbose_signing
-               ~fee_parameter
-               ~source
-               ?fee
-               ~src_pk
-               ~src_sk
-               ~destination
-               ?entrypoint
-               ?arg
-               ~amount
-               ?gas_limit
-               ?storage_limit
-               ?counter
-               ())
+  ( match Contract.is_implicit source with
+  | None ->
+      let contract = source in
+      Managed_contract.get_contract_manager cctxt source
+      >>=? fun source ->
+      Client_keys.get_key cctxt source
+      >>=? fun (_, src_pk, src_sk) ->
+      Managed_contract.transfer
+        cctxt
+        ~chain:cctxt#chain
+        ~block:cctxt#block
+        ?confirmations:cctxt#confirmations
+        ~dry_run
+        ~verbose_signing
+        ~fee_parameter
+        ?fee
+        ~contract
+        ~source
+        ~src_pk
+        ~src_sk
+        ~destination
+        ?entrypoint
+        ?arg
+        ~amount
+        ?gas_limit
+        ?storage_limit
+        ?counter
+        ()
+  | Some source ->
+      Client_keys.get_key cctxt source
+      >>=? fun (_, src_pk, src_sk) ->
+      transfer
+        cctxt
+        ~chain:cctxt#chain
+        ~block:cctxt#block
+        ?confirmations:cctxt#confirmations
+        ~dry_run
+        ~verbose_signing
+        ~fee_parameter
+        ~source
+        ?fee
+        ~src_pk
+        ~src_sk
+        ~destination
+        ?entrypoint
+        ?arg
+        ~amount
+        ?gas_limit
+        ?storage_limit
+        ?counter
+        () )
   >>= report_michelson_errors
         ~no_print_source
         ~msg:"transfer simulation failed"
@@ -209,9 +210,7 @@ let tez_of_opt_string_exn index field s =
 
 let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
     ?entrypoint source index batch =
-  Client_proto_contracts.Contract_alias.find_destination
-    cctxt
-    batch.destination
+  Client_proto_contracts.ContractAlias.find_destination cctxt batch.destination
   >>=? fun (_, destination) ->
   tez_of_string_exn index "amount" batch.amount
   >>=? fun amount ->
@@ -287,7 +286,7 @@ let commands network () =
       ~desc:"Get the balance of a contract."
       no_options
       ( prefixes ["get"; "balance"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
@@ -299,7 +298,7 @@ let commands network () =
       ~desc:"Get the storage of a contract."
       no_options
       ( prefixes ["get"; "contract"; "storage"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_storage cctxt ~chain:cctxt#chain ~block:cctxt#block contract
@@ -320,7 +319,7 @@ let commands network () =
       @@ prefixes ["of"; "type"]
       @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () key key_type (_, contract) (cctxt : Protocol_client_context.full) ->
         get_contract_big_map_value
@@ -366,7 +365,7 @@ let commands network () =
       ~desc:"Get the code of a contract."
       no_options
       ( prefixes ["get"; "contract"; "code"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         get_script cctxt ~chain:cctxt#chain ~block:cctxt#block contract
@@ -389,7 +388,7 @@ let commands network () =
       ( prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
       @@ Clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
       @@ prefixes ["for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () entrypoint (_, contract) (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.contract_entrypoint_type
@@ -408,7 +407,7 @@ let commands network () =
       ~desc:"Get the entrypoint list of a contract."
       no_options
       ( prefixes ["get"; "contract"; "entrypoints"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_entrypoints
@@ -425,7 +424,7 @@ let commands network () =
       ~desc:"Get the list of unreachable paths in a contract's parameter type."
       no_options
       ( prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_unreachables
@@ -442,7 +441,7 @@ let commands network () =
       ~desc:"Get the delegate of a contract."
       no_options
       ( prefixes ["get"; "delegate"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
         Client_proto_contracts.get_delegate
@@ -454,9 +453,9 @@ let commands network () =
         | None ->
             cctxt#message "none" >>= fun () -> return_unit
         | Some delegate ->
-            Baker_alias.rev_find cctxt delegate
+            Public_key_hash.rev_find cctxt delegate
             >>=? fun mn ->
-            Baker_alias.to_source delegate
+            Public_key_hash.to_source delegate
             >>=? fun m ->
             cctxt#message
               "%s (%s)"
@@ -477,9 +476,9 @@ let commands network () =
          fee_cap_arg
          burn_cap_arg)
       ( prefixes ["set"; "delegate"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ prefix "to"
-      @@ Baker_or_pkh_alias.source_param
+      @@ Public_key_hash.source_param
            ~name:"dlgt"
            ~desc:"new delegate of the contract"
       @@ stop )
@@ -511,8 +510,6 @@ let commands network () =
             >>=? fun source ->
             Client_keys.get_key cctxt source
             >>=? fun (_, src_pk, src_sk) ->
-            baker_of_contract cctxt delegate
-            >>=? fun delegate ->
             Managed_contract.set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -537,43 +534,19 @@ let commands network () =
         | Some mgr ->
             Client_keys.get_key cctxt mgr
             >>=? fun (_, src_pk, manager_sk) ->
-            ( match
-                (Contract.is_implicit delegate, Contract.is_baker delegate)
-              with
-            | (Some delegate, _) ->
-                set_delegate_legacy
-                  cctxt
-                  ~chain:cctxt#chain
-                  ~block:cctxt#block
-                  ?confirmations:cctxt#confirmations
-                  ~dry_run
-                  ~verbose_signing
-                  ~fee_parameter
-                  ?fee
-                  mgr
-                  (Some delegate)
-                  ~src_pk
-                  ~manager_sk
-                >>=? fun _ -> return_unit
-            | (_, Some baker) ->
-                set_delegate
-                  cctxt
-                  ~chain:cctxt#chain
-                  ~block:cctxt#block
-                  ?confirmations:cctxt#confirmations
-                  ~dry_run
-                  ~verbose_signing
-                  ~fee_parameter
-                  ?fee
-                  mgr
-                  (Some baker)
-                  ~src_pk
-                  ~manager_sk
-                >>=? fun _ -> return_unit
-            | _ ->
-                failwith
-                  "The delegate must be an implicit contract (that is the \
-                   consensus key of a baker contract) or a baker contract" )
+            set_delegate
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ~fee_parameter
+              ?fee
+              mgr
+              (Some delegate)
+              ~src_pk
+              ~manager_sk
             >>=? fun _ -> return_unit);
     command
       ~group
@@ -589,7 +562,7 @@ let commands network () =
          fee_cap_arg
          burn_cap_arg)
       ( prefixes ["withdraw"; "delegate"; "from"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun ( fee,
              dry_run,
@@ -676,13 +649,13 @@ let commands network () =
          fee_cap_arg
          burn_cap_arg)
       ( prefixes ["originate"; "contract"]
-      @@ Raw_contract_alias.fresh_alias_param
+      @@ RawContractAlias.fresh_alias_param
            ~name:"new"
            ~desc:"name of the new contract"
       @@ prefix "transferring"
       @@ tez_param ~name:"qty" ~desc:"amount taken from source"
       @@ prefix "from"
-      @@ Contract_alias.destination_param
+      @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ prefix "running"
@@ -712,125 +685,60 @@ let commands network () =
            (_, source)
            program
            (cctxt : Protocol_client_context.full) ->
-        Raw_contract_alias.of_fresh cctxt force alias_name
+        RawContractAlias.of_fresh cctxt force alias_name
         >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program)
         >>=? fun {expanded = code; _} ->
-        get_source_keys cctxt source
-        >>=? function
+        match Contract.is_implicit source with
         | None ->
             failwith
-              "only implicit and baker accounts can be the source of an \
-               origination"
-        | Some (_name, source, src_pk, src_sk) -> (
-            (let fee_parameter =
-               {
-                 Injection.minimal_fees;
-                 minimal_nanotez_per_byte;
-                 minimal_nanotez_per_gas_unit;
-                 force_low_fee;
-                 fee_cap;
-                 burn_cap;
-               }
-             in
-             match delegate with
-             | None ->
-                 originate_contract
-                   cctxt
-                   ~chain:cctxt#chain
-                   ~block:cctxt#block
-                   ?confirmations:cctxt#confirmations
-                   ~dry_run
-                   ~verbose_signing
-                   ?fee
-                   ?gas_limit
-                   ?storage_limit
-                   ~delegate:None
-                   ~initial_storage
-                   ~balance
-                   ~source
-                   ~src_pk
-                   ~src_sk
-                   ~code
-                   ~fee_parameter
-                   ()
-                 >>= fun errors ->
-                 report_michelson_errors
-                   ~no_print_source
-                   ~msg:"origination simulation failed"
-                   cctxt
-                   errors
-                 >|= fun res ->
-                 ok @@ Option.(map (fun (_res, contract) -> contract)) res
-             | Some delegate -> (
-               match
-                 (Contract.is_implicit delegate, Contract.is_baker delegate)
-               with
-               | (Some delegate, _) ->
-                   originate_contract_legacy
-                     cctxt
-                     ~chain:cctxt#chain
-                     ~block:cctxt#block
-                     ?confirmations:cctxt#confirmations
-                     ~dry_run
-                     ~verbose_signing
-                     ?fee
-                     ?gas_limit
-                     ?storage_limit
-                     ~delegate:(Some delegate)
-                     ~initial_storage
-                     ~balance
-                     ~source
-                     ~src_pk
-                     ~src_sk
-                     ~code
-                     ~fee_parameter
-                     ()
-                   >>= fun errors ->
-                   report_michelson_errors
-                     ~no_print_source
-                     ~msg:"origination simulation failed"
-                     cctxt
-                     errors
-                   >|= fun res ->
-                   ok @@ Option.(map (fun (_res, contract) -> contract)) res
-               | (_, Some baker) ->
-                   originate_contract
-                     cctxt
-                     ~chain:cctxt#chain
-                     ~block:cctxt#block
-                     ?confirmations:cctxt#confirmations
-                     ~dry_run
-                     ~verbose_signing
-                     ?fee
-                     ?gas_limit
-                     ?storage_limit
-                     ~delegate:(Some baker)
-                     ~initial_storage
-                     ~balance
-                     ~source
-                     ~src_pk
-                     ~src_sk
-                     ~code
-                     ~fee_parameter
-                     ()
-                   >>= fun errors ->
-                   report_michelson_errors
-                     ~no_print_source
-                     ~msg:"origination simulation failed"
-                     cctxt
-                     errors
-                   >|= fun res ->
-                   ok @@ Option.(map (fun (_res, contract) -> contract)) res
-               | _ ->
-                   failwith
-                     "The delegate must be an implicit contract (that is the \
-                      consensus key of a baker contract) or a baker contract" ))
-            >>=? function
-            | Some contract when not dry_run ->
-                save_contract ~force cctxt alias_name contract
-            | _ ->
-                return_unit ));
+              "only implicit accounts can be the source of an origination"
+        | Some source -> (
+            Client_keys.get_key cctxt source
+            >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            originate_contract
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ?gas_limit
+              ?storage_limit
+              ~delegate
+              ~initial_storage
+              ~balance
+              ~source
+              ~src_pk
+              ~src_sk
+              ~code
+              ~fee_parameter
+              ()
+            >>= fun errors ->
+            report_michelson_errors
+              ~no_print_source
+              ~msg:"origination simulation failed"
+              cctxt
+              errors
+            >>= function
+            | None ->
+                return_unit
+            | Some (_res, contract) ->
+                if dry_run then return_unit
+                else
+                  save_contract ~force cctxt alias_name contract
+                  >>=? fun () -> return_unit ));
     command
       ~group
       ~desc:
@@ -853,7 +761,7 @@ let commands network () =
          burn_cap_arg
          default_entrypoint_arg)
       ( prefixes ["multiple"; "transfers"; "from"]
-      @@ Contract_alias.destination_param
+      @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ prefix "using"
@@ -999,11 +907,11 @@ let commands network () =
       ( prefixes ["transfer"]
       @@ tez_param ~name:"qty" ~desc:"amount taken from source"
       @@ prefix "from"
-      @@ Contract_alias.destination_param
+      @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ prefix "to"
-      @@ Contract_alias.destination_param
+      @@ ContractAlias.destination_param
            ~name:"dst"
            ~desc:"name/literal of the destination contract"
       @@ stop )
@@ -1066,11 +974,11 @@ let commands network () =
          burn_cap_arg
          entrypoint_arg)
       ( prefixes ["call"]
-      @@ Contract_alias.destination_param
+      @@ ContractAlias.destination_param
            ~name:"dst"
            ~desc:"name/literal of the destination contract"
       @@ prefix "from"
-      @@ Contract_alias.destination_param
+      @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ stop )
@@ -1127,7 +1035,7 @@ let commands network () =
          fee_cap_arg
          burn_cap_arg)
       ( prefixes ["reveal"; "key"; "for"]
-      @@ Contract_alias.alias_param
+      @@ ContractAlias.alias_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ stop )
@@ -1174,132 +1082,64 @@ let commands network () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Register a new baker contract."
-      (args13
+      ~desc:"Register the public key hash as a delegate."
+      (args9
          fee_arg
          dry_run_switch
          verbose_signing_switch
-         gas_limit_arg
-         storage_limit_arg
-         (Client_keys.force_switch ())
-         no_print_source_flag
          minimal_fees_arg
          minimal_nanotez_per_byte_arg
          minimal_nanotez_per_gas_unit_arg
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
-      ( prefixes ["register"; "baker"]
-      @@ Raw_contract_alias.fresh_alias_param
-           ~name:"alias"
-           ~desc:"name of the new contract"
-      @@ prefix "transferring"
-      @@ tez_param ~name:"qty" ~desc:"amount taken from source"
-      @@ prefix "from"
-      @@ Contract_alias.destination_param
-           ~name:"src"
-           ~desc:"name of the source contract"
-      @@ prefixes ["with"; "consensus"; "key"]
-      @@ Client_keys.Public_key.source_param
-           ~name:"key"
-           ~desc:"consensus key, used for baking and endorsing"
-      @@ prefixes ["and"; "threshold"]
-      @@ Clic.param
-           ~name:"threshold"
-           ~desc:"Number of required signatures for calling baker contract"
-           Client_proto_args.int_parameter
-      @@ prefixes ["and"; "owner"; "keys"]
-      @@ seq_of_param
-           (Client_keys.Public_key.source_param
-              ~name:"key"
-              ~desc:"Each signer of the baker contract") )
+      ( prefixes ["register"; "key"]
+      @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
+      @@ prefixes ["as"; "delegate"]
+      @@ stop )
       (fun ( fee,
              dry_run,
              verbose_signing,
-             gas_limit,
-             storage_limit,
-             force,
-             no_print_source,
              minimal_fees,
              minimal_nanotez_per_byte,
              minimal_nanotez_per_gas_unit,
              force_low_fee,
              fee_cap,
              burn_cap )
-           alias_name
-           balance
-           (_, source)
-           (consensus_key_uri, consensus_key)
-           threshold
-           owner_keys
+           src_pkh
            cctxt ->
-        get_source_keys cctxt source
-        >>=? function
-        | None ->
-            failwith
-              "only implicit and baker accounts can be the source of a baker \
-               registration"
-        | Some (_name, source, src_pk, src_sk) -> (
-            Raw_contract_alias.of_fresh cctxt force alias_name
-            >>=? fun alias_name ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
-            List.map_es
-              (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
-              owner_keys
-            >>=? fun owner_keys ->
-            Client_proto_multisig.check_threshold
-              ~threshold:(Z.of_int threshold)
-              ~keys:owner_keys
-              ()
-            >>=? fun () ->
-            ( match consensus_key with
-            | None ->
-                Client_keys.public_key consensus_key_uri
-            | Some consensus_key ->
-                return consensus_key )
-            >>=? fun consensus_key ->
-            register_baker
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ?confirmations:cctxt#confirmations
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?gas_limit
-              ?storage_limit
-              ~balance
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~consensus_key
-              ~threshold
-              ~owner_keys
-              ()
-            >>= fun errors ->
-            report_michelson_errors
-              ~no_print_source
-              ~msg:"baker registration simulation failed"
-              cctxt
-              errors
-            >>= function
-            | None ->
-                return_unit
-            | Some (_res, contract) ->
-                if dry_run then return_unit
-                else
-                  save_contract ~force cctxt alias_name contract
-                  >>=? fun () -> return_unit )) ]
+        Client_keys.get_key cctxt src_pkh
+        >>=? fun (_, src_pk, src_sk) ->
+        let fee_parameter =
+          {
+            Injection.minimal_fees;
+            minimal_nanotez_per_byte;
+            minimal_nanotez_per_gas_unit;
+            force_low_fee;
+            fee_cap;
+            burn_cap;
+          }
+        in
+        register_as_delegate
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ?confirmations:cctxt#confirmations
+          ~dry_run
+          ~fee_parameter
+          ~verbose_signing
+          ?fee
+          ~manager_sk:src_sk
+          src_pk
+        >>= function
+        | Ok _ ->
+            return_unit
+        | Error [Environment.Ecoproto_error Delegate_storage.Active_delegate]
+          ->
+            cctxt#message "Delegate already activated."
+            >>= fun () -> return_unit
+        | Error el ->
+            Lwt.return_error el) ]
   @ ( match network with
     | Some `Mainnet ->
         []
@@ -1486,7 +1326,7 @@ let commands network () =
               ~long:"force"
               ()))
         ( prefixes ["submit"; "proposals"; "for"]
-        @@ Baker_or_pkh_alias.source_param
+        @@ ContractAlias.destination_param
              ~name:"delegate"
              ~desc:"the delegate who makes the proposal"
         @@ seq_of_param
@@ -1500,14 +1340,15 @@ let commands network () =
                      | Some hash ->
                          return hash))) )
         (fun (dry_run, verbose_signing, force)
-             source
+             (_name, source)
              proposals
              (cctxt : Protocol_client_context.full) ->
-          get_source_keys cctxt source
-          >>=? function
+          match Contract.is_implicit source with
           | None ->
-              failwith "only implicit and baker accounts can submit proposals"
-          | Some (src_name, source, _src_pk, src_sk) -> (
+              failwith "only implicit accounts can submit proposals"
+          | Some src_pkh -> (
+              Client_keys.get_key cctxt src_pkh
+              >>=? fun (src_name, _src_pk, src_sk) ->
               get_period_info
               (* Find period info of the successor, because the operation will
                  be injected on the next block at the earliest *)
@@ -1573,23 +1414,18 @@ let commands network () =
                         Protocol_hash.pp
                         p)
                   proposals ;
-                List.fold_left_es
-                  (fun acc (baker, _) ->
-                    if acc then return true
-                    else
-                      get_baker_consensus_key cctxt ~chain:cctxt#chain baker
-                      >>=? fun (_, consensus_key, _, _) ->
-                      return
-                      @@ Signature.Public_key_hash.equal consensus_key source)
-                  false
-                  listings
-                >>=? fun has_a_listing ->
-                if not has_a_listing then
+                if
+                  not
+                    (List.exists
+                       (fun (pkh, _) ->
+                         Signature.Public_key_hash.equal pkh src_pkh)
+                       listings)
+                then
                   error
                     "Public-key-hash `%a` from account `%s` does not appear \
                      to have voting rights."
                     Signature.Public_key_hash.pp
-                    source
+                    src_pkh
                     src_name ;
                 if !errors <> [] then
                   cctxt#message
@@ -1629,7 +1465,7 @@ let commands network () =
                 ~chain:cctxt#chain
                 ~block:cctxt#block
                 ~src_sk
-                source
+                src_pkh
                 proposals
               >>= function
               | Ok _res ->
@@ -1659,7 +1495,7 @@ let commands network () =
         ~desc:"Submit a ballot"
         (args2 verbose_signing_switch dry_run_switch)
         ( prefixes ["submit"; "ballot"; "for"]
-        @@ Baker_or_pkh_alias.source_param
+        @@ ContractAlias.destination_param
              ~name:"delegate"
              ~desc:"the delegate who votes"
         @@ param
@@ -1689,15 +1525,16 @@ let commands network () =
                       failwith "Invalid ballot: '%s'" s))
         @@ stop )
         (fun (verbose_signing, dry_run)
-             source
+             (_name, source)
              proposal
              ballot
              (cctxt : Protocol_client_context.full) ->
-          get_source_keys cctxt source
-          >>=? function
+          match Contract.is_implicit source with
           | None ->
-              failwith "only implicit and baker accounts can submit proposals"
-          | Some (_name, source, _src_pk, src_sk) ->
+              failwith "only implicit accounts can submit ballot"
+          | Some src_pkh ->
+              Client_keys.get_key cctxt src_pkh
+              >>=? fun (_src_name, _src_pk, src_sk) ->
               get_period_info
               (* Find period info of the successor, because the operation will
                  be injected on the next block at the earliest *)
@@ -1717,7 +1554,7 @@ let commands network () =
                 ~chain:cctxt#chain
                 ~block:cctxt#block
                 ~src_sk
-                source
+                src_pkh
                 ~verbose_signing
                 ~dry_run
                 proposal

@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let recorded_proposal_count_for_baker ctxt proposer =
+let recorded_proposal_count_for_delegate ctxt proposer =
   Storage.Vote.Proposals_count.find ctxt proposer >|=? Option.value ~default:0
 
 let record_proposal ctxt proposal proposer =
-  recorded_proposal_count_for_baker ctxt proposer
+  recorded_proposal_count_for_delegate ctxt proposer
   >>=? fun count ->
   Storage.Vote.Proposals_count.add ctxt proposer (count + 1)
   >>= fun ctxt -> Storage.Vote.Proposals.add ctxt (proposal, proposer) >|= ok
@@ -36,9 +36,9 @@ let get_proposals ctxt =
   Storage.Vote.Proposals.fold
     ctxt
     ~init:(ok Protocol_hash.Map.empty)
-    ~f:(fun (proposal, baker) acc ->
+    ~f:(fun (proposal, delegate) acc ->
       (* Assuming the same listings is used at votings *)
-      Storage.Vote.Listings.get ctxt baker
+      Storage.Vote.Listings.get ctxt delegate
       >>=? fun weight ->
       Lwt.return
         ( acc
@@ -72,9 +72,9 @@ let record_ballot = Storage.Vote.Ballots.init
 let get_ballots ctxt =
   Storage.Vote.Ballots.fold
     ctxt
-    ~f:(fun baker ballot (ballots : ballots tzresult) ->
+    ~f:(fun delegate ballot (ballots : ballots tzresult) ->
       (* Assuming the same listings is used at votings *)
-      Storage.Vote.Listings.get ctxt baker
+      Storage.Vote.Listings.get ctxt delegate
       >>=? fun weight ->
       let count = Int32.add weight in
       Lwt.return
@@ -95,17 +95,19 @@ let clear_ballots = Storage.Vote.Ballots.clear
 
 let listings_encoding =
   Data_encoding.(
-    list (obj2 (req "baker" Baker_hash.encoding) (req "rolls" int32)))
+    list
+      (obj2 (req "pkh" Signature.Public_key_hash.encoding) (req "rolls" int32)))
 
 let update_listings ctxt =
   Storage.Vote.Listings.clear ctxt
   >>= fun ctxt ->
-  Roll_storage.fold ctxt (ctxt, 0l) ~f:(fun _roll baker (ctxt, total) ->
+  Roll_storage.fold ctxt (ctxt, 0l) ~f:(fun _roll delegate (ctxt, total) ->
       (* TODO use snapshots *)
-      Storage.Vote.Listings.find ctxt baker
+      let delegate = Signature.Public_key.hash delegate in
+      Storage.Vote.Listings.find ctxt delegate
       >|=? Option.value ~default:0l
       >>=? fun count ->
-      Storage.Vote.Listings.add ctxt baker (Int32.succ count)
+      Storage.Vote.Listings.add ctxt delegate (Int32.succ count)
       >|= fun ctxt -> ok (ctxt, Int32.succ total))
   >>=? fun (ctxt, total) ->
   Storage.Vote.Listings_size.add ctxt total >>= fun ctxt -> return ctxt

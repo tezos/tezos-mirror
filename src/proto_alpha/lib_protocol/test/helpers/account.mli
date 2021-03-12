@@ -32,10 +32,6 @@ type t = {
   sk : Signature.Secret_key.t;
 }
 
-(** A baker is defined by its baker hash and a key serving as its consensus and
-    owner key at the same time. *)
-type baker = {key : t; baker : Baker_hash.t}
-
 type account = t
 
 val known_accounts : t Signature.Public_key_hash.Table.t
@@ -46,32 +42,18 @@ val dummy_account : account
 
 val new_account : ?seed:Bytes.t -> unit -> account
 
-val new_baker :
-  ?seed:bytes -> ?origination_nonce:Contract.origination_nonce -> unit -> baker
-
 val add_account : t -> unit
-
-val add_baker : baker -> unit
 
 val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
 
 val find_alternate : Signature.Public_key_hash.t -> t
 
-val find_baker : Baker_hash.t -> baker tzresult Lwt.t
-
-val find_alternate_baker : Baker_hash.t -> Baker_hash.t
-
-(** [generate_accounts ?initial_implicit_balances ?initial_baker_balances n] :
-    generates [n] random accounts with the initial balances of the [i]th account
-    implicit and baker contract given by the [i]th value in the list
-    [initial_implicit_balances] and [initial_baker_balances], respectively,
-    or otherwise 4.000.000.000 tz (if the list is too short); and add them to the
+(** [generate_accounts ?initial_balances n] : generates [n] random
+    accounts with the initial balance of the [i]th account given by the
+    [i]th value in the list [initial_balances] or otherwise
+    4.000.000.000 tz (if the list is too short); and add them to the
     global account state *)
-val generate_accounts :
-  ?initial_implicit_balances:int64 list ->
-  ?initial_baker_balances:int64 list ->
-  int ->
-  (t * Tez.t) list * (baker * Tez.t) list * Contract.origination_nonce
+val generate_accounts : ?initial_balances:int64 list -> int -> (t * Tez.t) list
 
 val commitment_secret : Blinded_public_key_hash.activation_code
 

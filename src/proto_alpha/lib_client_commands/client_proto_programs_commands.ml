@@ -3,7 +3,6 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -60,33 +59,26 @@ let commands () =
   let zero_loc_switch =
     switch ~short:'z' ~long:"zero-loc" ~doc:"replace location with \"0\"" ()
   in
-  let skip_typecheck_switch =
-    switch
-      ~long:"skip-typecheck"
-      ~doc:"do not type-check the script when converting from Micheline"
-      ()
-  in
   let legacy_switch =
     switch
       ~long:"legacy"
       ~doc:"typecheck in legacy mode as if the data was taken from the chain"
       ()
   in
-  let amount_arg ?default () =
-    let default = Option.value ~default:"0.05" default in
+  let amount_arg =
     Client_proto_args.tez_arg
       ~parameter:"amount"
       ~doc:"amount of the transfer in \xEA\x9C\xA9"
-      ~default
+      ~default:"0.05"
   in
   let source_arg =
-    Contract_alias.destination_arg
+    ContractAlias.destination_arg
       ~name:"source"
       ~doc:"name of the source (i.e. SENDER) contract for the transaction"
       ()
   in
   let payer_arg =
-    Contract_alias.destination_arg
+    ContractAlias.destination_arg
       ~name:"payer"
       ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
       ()
@@ -230,7 +222,7 @@ let commands () =
       ~desc:"Ask the node to run a script."
       (args9
          trace_stack_switch
-         (amount_arg ())
+         amount_arg
          balance_arg
          source_arg
          payer_arg
@@ -299,71 +291,6 @@ let commands () =
             ()
           >>= fun res ->
           print_run_result cctxt ~show_source ~parsed:program res);
-    command
-      ~group
-      ~desc:"Ask the node to run a baker script."
-      (args9
-         trace_stack_switch
-         (amount_arg ~default:"0" ())
-         balance_arg
-         source_arg
-         payer_arg
-         no_print_source_flag
-         custom_gas_flag
-         entrypoint_arg
-         (unparsing_mode_arg ~default:"Readable"))
-      ( prefixes ["run"; "baker"; "script"; "on"; "storage"]
-      @@ Clic.param ~name:"storage" ~desc:"the storage data" data_parameter
-      @@ prefixes ["and"; "input"]
-      @@ Clic.param ~name:"input" ~desc:"the input data" data_parameter
-      @@ stop )
-      (fun ( trace_exec,
-             amount,
-             balance,
-             source,
-             payer,
-             no_print_source,
-             gas,
-             entrypoint,
-             unparsing_mode )
-           storage
-           input
-           cctxt ->
-        let source = Option.map snd source in
-        let payer = Option.map snd payer in
-        let show_source = not no_print_source in
-        if trace_exec then
-          trace_baker
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~amount
-            ~balance
-            ~storage
-            ~input
-            ~unparsing_mode
-            ?source
-            ?payer
-            ?gas
-            ?entrypoint
-            ()
-          >>= fun res -> print_trace_result cctxt ~show_source res
-        else
-          run_baker
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~amount
-            ~balance
-            ~storage
-            ~input
-            ~unparsing_mode
-            ?source
-            ?payer
-            ?gas
-            ?entrypoint
-            ()
-          >>= fun res -> print_run_result cctxt ~show_source res);
     command
       ~group
       ~desc:"Ask the node to typecheck a script."
@@ -813,11 +740,11 @@ let commands () =
       ~desc:
         "Conversion of Michelson script from Micheline, JSON or binary to \
          Micheline, JSON, binary or OCaml"
-      (args2 zero_loc_switch skip_typecheck_switch)
+      (args1 zero_loc_switch)
       ( prefixes ["convert"; "script"]
       @@ file_or_literal_param @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop )
-      (fun (zero_loc, skip_typecheck)
+      (fun zero_loc
            expr_string
            from_format
            to_format
@@ -827,24 +754,22 @@ let commands () =
             let program = Michelson_v1_parser.parse_toplevel expr_string in
             Lwt.return @@ Micheline_parser.no_parsing_error program
             >>=? fun program ->
-            ( if skip_typecheck then return_unit
-            else
-              typecheck_program
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                program
-              >>= function
-              | Error _ as res ->
-                  print_typecheck_result
-                    ~emacs:false
-                    ~show_types:true
-                    ~print_source_on_error:true
-                    program
-                    res
-                    cctxt
-              | Ok _ ->
-                  return_unit )
+            typecheck_program
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              program
+            >>= (function
+                  | Error _ as res ->
+                      print_typecheck_result
+                        ~emacs:false
+                        ~show_types:true
+                        ~print_source_on_error:true
+                        program
+                        res
+                        cctxt
+                  | Ok _ ->
+                      return_unit)
             >>=? fun () -> return program.expanded
         | `JSON -> (
           match Data_encoding.Json.from_string expr_string with

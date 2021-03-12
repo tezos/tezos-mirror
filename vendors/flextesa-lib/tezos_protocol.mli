@@ -18,28 +18,18 @@ module Account : sig
   type t = private
     | Of_name of string
     | Key_pair of
-        { name: string
-        ; pubkey: string
-        ; pubkey_hash: string
-        ; private_key: string
-        ; baker_hash: string option }
+        {name: string; pubkey: string; pubkey_hash: string; private_key: string}
 
   val of_name : string -> t
   val of_namef : ('a, unit, string, t) format4 -> 'a
 
   val key_pair :
-       string
-    -> ?baker_hash:string
-    -> pubkey:string
-    -> pubkey_hash:string
-    -> private_key:string
-    -> t
+    string -> pubkey:string -> pubkey_hash:string -> private_key:string -> t
 
   val name : t -> string
   val pubkey : t -> string
   val pubkey_hash : t -> string
   val private_key : t -> string
-  val baker_hash : t -> string option
 end
 
 module Voting_period : sig
@@ -56,7 +46,7 @@ module Voting_period : sig
 end
 
 module Protocol_kind : sig
-  type t = [`Athens | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Florence_BA | `Alpha]
+  type t = [`Athens | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Alpha]
 
   val names : (string * t) list
   val cmdliner_term : docs:string -> unit -> t Cmdliner.Term.t
@@ -70,7 +60,6 @@ type t =
   ; bootstrap_accounts: (Account.t * Int64.t) list
   ; dictator: Account.t
         (* ; bootstrap_contracts: (Account.t * int * Script.origin) list *)
-  ; bootstrap_bakers: (string * Int64.t * Account.t) list
   ; expected_pow: int
   ; name: string
   ; hash: string

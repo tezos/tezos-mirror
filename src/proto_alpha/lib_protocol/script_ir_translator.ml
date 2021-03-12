@@ -94,10 +94,6 @@ let rec comparable_type_size : type t. t comparable_ty -> int =
       1
   | Key_key _ ->
       1
-  | Baker_hash_key _ ->
-      1
-  | Pvss_key_key _ ->
-      1
   | Timestamp_key _ ->
       1
   | Chain_id_key _ ->
@@ -132,10 +128,6 @@ let rec type_size : type t. t ty -> int =
       1
   | Key_t _ ->
       1
-  | Baker_hash_t _ ->
-      1
-  | Pvss_key_t _ ->
-      1
   | Timestamp_t _ ->
       1
   | Address_t _ ->
@@ -143,8 +135,6 @@ let rec type_size : type t. t ty -> int =
   | Bool_t _ ->
       1
   | Operation_t _ ->
-      1
-  | Baker_operation_t _ ->
       1
   | Chain_id_t _ ->
       1
@@ -441,8 +431,6 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Implicit_account ->
       0
-  | Create_contract_legacy _ ->
-      0
   | Create_contract _ ->
       0
   | Now ->
@@ -473,8 +461,6 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Sapling_verify_update ->
       0
-  | Set_delegate_legacy ->
-      0
   | Set_delegate ->
       0
   | Pack _ ->
@@ -491,23 +477,9 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int =
       0
   | Never ->
       0
-  | Voting_power_legacy ->
-      0
   | Voting_power ->
       0
   | Total_voting_power ->
-      0
-  | Submit_proposals ->
-      0
-  | Submit_ballot ->
-      0
-  | Set_baker_active ->
-      0
-  | Toggle_baker_delegations ->
-      0
-  | Set_baker_consensus_key ->
-      0
-  | Set_baker_pvss_key ->
       0
   | Keccak ->
       0
@@ -651,10 +623,6 @@ let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
       wrap_compare Signature.Public_key_hash.compare
   | Key_key _ ->
       wrap_compare Signature.Public_key.compare
-  | Baker_hash_key _ ->
-      wrap_compare Baker_hash.compare
-  | Pvss_key_key _ ->
-      wrap_compare Pvss_secp256k1.Public_key.compare
   | Int_key _ ->
       wrap_compare Script_int.compare
   | Nat_key _ ->
@@ -828,10 +796,6 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
       Key_hash_t tname
   | Key_key tname ->
       Key_t tname
-  | Baker_hash_key tname ->
-      Baker_hash_t tname
-  | Pvss_key_key tname ->
-      Pvss_key_t tname
   | Timestamp_key tname ->
       Timestamp_t tname
   | Address_key tname ->
@@ -882,10 +846,6 @@ let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
       Prim (-1, T_key_hash, [], unparse_type_annot tname)
   | Key_key tname ->
       Prim (-1, T_key, [], unparse_type_annot tname)
-  | Baker_hash_key tname ->
-      Prim (-1, T_baker_hash, [], unparse_type_annot tname)
-  | Pvss_key_key tname ->
-      Prim (-1, T_pvss_key, [], unparse_type_annot tname)
   | Timestamp_key tname ->
       Prim (-1, T_timestamp, [], unparse_type_annot tname)
   | Address_key tname ->
@@ -944,18 +904,12 @@ let rec unparse_ty :
       return ctxt (T_key_hash, [], unparse_type_annot tname)
   | Key_t tname ->
       return ctxt (T_key, [], unparse_type_annot tname)
-  | Baker_hash_t tname ->
-      return ctxt (T_baker_hash, [], unparse_type_annot tname)
-  | Pvss_key_t tname ->
-      return ctxt (T_pvss_key, [], unparse_type_annot tname)
   | Timestamp_t tname ->
       return ctxt (T_timestamp, [], unparse_type_annot tname)
   | Address_t tname ->
       return ctxt (T_address, [], unparse_type_annot tname)
   | Operation_t tname ->
       return ctxt (T_operation, [], unparse_type_annot tname)
-  | Baker_operation_t tname ->
-      return ctxt (T_baker_operation, [], unparse_type_annot tname)
   | Chain_id_t tname ->
       return ctxt (T_chain_id, [], unparse_type_annot tname)
   | Never_t tname ->
@@ -1086,10 +1040,6 @@ let rec comparable_ty_of_ty :
       ok (Key_hash_key tname, ctxt)
   | Key_t tname ->
       ok (Key_key tname, ctxt)
-  | Baker_hash_t tname ->
-      ok (Baker_hash_key tname, ctxt)
-  | Pvss_key_t tname ->
-      ok (Pvss_key_key tname, ctxt)
   | Timestamp_t tname ->
       ok (Timestamp_key tname, ctxt)
   | Address_t tname ->
@@ -1117,7 +1067,6 @@ let rec comparable_ty_of_ty :
   | Big_map_t _
   | Contract_t _
   | Operation_t _
-  | Baker_operation_t _
   | Bls12_381_fr_t _
   | Bls12_381_g1_t _
   | Bls12_381_g2_t _
@@ -1163,10 +1112,6 @@ let name_of_ty : type a. a ty -> type_annot option = function
       tname
   | Key_t tname ->
       tname
-  | Baker_hash_t tname ->
-      tname
-  | Pvss_key_t tname ->
-      tname
   | Timestamp_t tname ->
       tname
   | Address_t tname ->
@@ -1174,8 +1119,6 @@ let name_of_ty : type a. a ty -> type_annot option = function
   | Signature_t tname ->
       tname
   | Operation_t tname ->
-      tname
-  | Baker_operation_t tname ->
       tname
   | Chain_id_t tname ->
       tname
@@ -1311,39 +1254,7 @@ let unparse_key_hash ctxt mode k =
       >|? fun ctxt ->
       (String (-1, Signature.Public_key_hash.to_b58check k), ctxt)
 
-let unparse_baker_hash ctxt mode k =
-  match mode with
-  | Optimized | Optimized_legacy ->
-      Gas.consume ctxt Unparse_costs.baker_hash_optimized
-      >|? fun ctxt ->
-      let bytes = Data_encoding.Binary.to_bytes_exn Baker_hash.encoding k in
-      (Bytes (-1, bytes), ctxt)
-  | Readable ->
-      Gas.consume ctxt Unparse_costs.baker_hash_readable
-      >|? fun ctxt -> (String (-1, Baker_hash.to_b58check k), ctxt)
-
-let unparse_pvss_key ctxt mode k =
-  match mode with
-  | Optimized | Optimized_legacy ->
-      Gas.consume ctxt Unparse_costs.pvss_key_optimized
-      >|? fun ctxt ->
-      let bytes =
-        Data_encoding.Binary.to_bytes_exn Pvss_secp256k1.Public_key.encoding k
-      in
-      (Bytes (-1, bytes), ctxt)
-  | Readable ->
-      Gas.consume ctxt Unparse_costs.pvss_key_readable
-      >|? fun ctxt ->
-      (String (-1, Pvss_secp256k1.Public_key.to_b58check k), ctxt)
-
 let unparse_operation ctxt (op, _big_map_diff) =
-  let bytes =
-    Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op
-  in
-  Gas.consume ctxt (Unparse_costs.operation bytes)
-  >|? fun ctxt -> (Bytes (-1, bytes), ctxt)
-
-let unparse_baker_operation ctxt op =
   let bytes =
     Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op
   in
@@ -1492,10 +1403,6 @@ let rec unparse_comparable_data :
       Lwt.return @@ unparse_key ctxt mode k
   | (Key_hash_key _, k) ->
       Lwt.return @@ unparse_key_hash ctxt mode k
-  | (Baker_hash_key _, k) ->
-      Lwt.return @@ unparse_baker_hash ctxt mode k
-  | (Pvss_key_key _, k) ->
-      Lwt.return @@ unparse_pvss_key ctxt mode k
   | (Chain_id_key _, chain_id) ->
       Lwt.return @@ unparse_chain_id ctxt mode chain_id
   | (Pair_key ((tl, _), (tr, _), _), pair) ->
@@ -1556,8 +1463,6 @@ let check_dupable_comparable_ty : type a. a comparable_ty -> unit = function
   | Bool_key _
   | Key_hash_key _
   | Key_key _
-  | Baker_hash_key _
-  | Pvss_key_key _
   | Timestamp_key _
   | Chain_id_key _
   | Address_key _
@@ -1590,10 +1495,6 @@ let rec check_dupable_ty :
       ok ctxt
   | Key_t _ ->
       ok ctxt
-  | Baker_hash_t _ ->
-      ok ctxt
-  | Pvss_key_t _ ->
-      ok ctxt
   | Timestamp_t _ ->
       ok ctxt
   | Address_t _ ->
@@ -1604,9 +1505,6 @@ let rec check_dupable_ty :
       ok ctxt
   | Operation_t _ ->
       ok ctxt
-  | Baker_operation_t _ ->
-      (* Unlike operations, baker operations are not dupable. *)
-      error (Unexpected_operation loc)
   | Chain_id_t _ ->
       ok ctxt
   | Never_t _ ->
@@ -1719,12 +1617,6 @@ let rec merge_comparable_types :
   | (Key_key annot_a, Key_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Key_key annot, ctxt)
-  | (Baker_hash_key annot_a, Baker_hash_key annot_b) ->
-      merge_type_annot ~legacy annot_a annot_b
-      >|? fun annot -> (Eq, Baker_hash_key annot, ctxt)
-  | (Pvss_key_key annot_a, Pvss_key_key annot_b) ->
-      merge_type_annot ~legacy annot_a annot_b
-      >|? fun annot -> (Eq, Pvss_key_key annot, ctxt)
   | (Timestamp_key annot_a, Timestamp_key annot_b) ->
       merge_type_annot ~legacy annot_a annot_b
       >|? fun annot -> (Eq, Timestamp_key annot, ctxt)
@@ -1835,10 +1727,6 @@ let merge_types :
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Key_t tname, ctxt)
     | (Key_hash_t tn1, Key_hash_t tn2) ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Key_hash_t tname, ctxt)
-    | (Baker_hash_t tn1, Baker_hash_t tn2) ->
-        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Baker_hash_t tname, ctxt)
-    | (Pvss_key_t tn1, Pvss_key_t tn2) ->
-        merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Pvss_key_t tname, ctxt)
     | (String_t tn1, String_t tn2) ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, String_t tname, ctxt)
     | (Bytes_t tn1, Bytes_t tn2) ->
@@ -1859,9 +1747,6 @@ let merge_types :
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Never_t tname, ctxt)
     | (Operation_t tn1, Operation_t tn2) ->
         merge_type_annot tn1 tn2 >|? fun tname -> (Eq, Operation_t tname, ctxt)
-    | (Baker_operation_t tn1, Baker_operation_t tn2) ->
-        merge_type_annot tn1 tn2
-        >|? fun tname -> (Eq, Baker_operation_t tname, ctxt)
     | (Bls12_381_g1_t tn1, Bls12_381_g1_t tn2) ->
         merge_type_annot tn1 tn2
         >|? fun tname -> (Eq, Bls12_381_g1_t tname, ctxt)
@@ -2130,12 +2015,6 @@ let rec parse_comparable_ty :
   | Prim (loc, T_address, [], annot) ->
       parse_type_annot loc annot
       >|? fun tname -> (Ex_comparable_ty (Address_key tname), ctxt)
-  | Prim (loc, T_baker_hash, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Baker_hash_key tname), ctxt)
-  | Prim (loc, T_pvss_key, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Pvss_key_key tname), ctxt)
   | Prim
       ( loc,
         ( ( T_unit
@@ -2151,9 +2030,7 @@ let rec parse_comparable_ty :
           | T_address
           | T_chain_id
           | T_signature
-          | T_key
-          | T_baker_hash
-          | T_pvss_key ) as prim ),
+          | T_key ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -2228,9 +2105,7 @@ let rec parse_comparable_ty :
              T_option;
              T_chain_id;
              T_signature;
-             T_key;
-             T_baker_hash;
-             T_pvss_key ]
+             T_key ]
 
 and parse_packable_ty :
     context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
@@ -2322,12 +2197,6 @@ and parse_ty :
   | Prim (loc, T_key_hash, [], annot) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (Key_hash_t ty_name), ctxt)
-  | Prim (loc, T_baker_hash, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Baker_hash_t ty_name), ctxt)
-  | Prim (loc, T_pvss_key, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Pvss_key_t ty_name), ctxt)
   | Prim (loc, T_timestamp, [], annot) ->
       parse_type_annot loc annot
       >>? fun ty_name -> ok (Ex_ty (Timestamp_t ty_name), ctxt)
@@ -2341,11 +2210,6 @@ and parse_ty :
       if allow_operation then
         parse_type_annot loc annot
         >>? fun ty_name -> ok (Ex_ty (Operation_t ty_name), ctxt)
-      else error (Unexpected_operation loc)
-  | Prim (loc, T_baker_operation, [], annot) ->
-      if allow_operation then
-        parse_type_annot loc annot
-        >>? fun ty_name -> ok (Ex_ty (Baker_operation_t ty_name), ctxt)
       else error (Unexpected_operation loc)
   | Prim (loc, T_chain_id, [], annot) ->
       parse_type_annot loc annot
@@ -2531,9 +2395,7 @@ and parse_ty :
           | T_address
           | T_chain_id
           | T_operation
-          | T_never
-          | T_baker_hash
-          | T_pvss_key ) as prim ),
+          | T_never ) as prim ),
         l,
         _ ) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -2574,9 +2436,7 @@ and parse_ty :
              T_bls12_381_g1;
              T_bls12_381_g2;
              T_bls12_381_fr;
-             T_ticket;
-             T_baker_hash;
-             T_pvss_key ]
+             T_ticket ]
 
 and parse_big_map_ty ctxt ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.parse_type_cycle
@@ -2651,8 +2511,6 @@ let check_packable ~legacy loc root =
         error (Unexpected_lazy_storage loc)
     | Operation_t _ ->
         error (Unexpected_operation loc)
-    | Baker_operation_t _ ->
-        error (Unexpected_operation loc)
     | Unit_t _ ->
         ok_unit
     | Int_t _ ->
@@ -2670,10 +2528,6 @@ let check_packable ~legacy loc root =
     | Key_hash_t _ ->
         ok_unit
     | Key_t _ ->
-        ok_unit
-    | Baker_hash_t _ ->
-        ok_unit
-    | Pvss_key_t _ ->
         ok_unit
     | Timestamp_t _ ->
         ok_unit
@@ -2716,38 +2570,16 @@ let check_packable ~legacy loc root =
   in
   check root
 
-type ('arg, 'storage, 'ret) code = {
-  code : (('arg, 'storage) pair, ('ret, 'storage) pair) lambda;
+type ('arg, 'storage) code = {
+  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage_type : 'storage ty;
   root_name : field_annot option;
 }
 
-type ('arg, 'storage) originated_code =
-  ('arg, 'storage, operation Script_typed_ir.boxed_list) code
+type ex_script = Ex_script : ('a, 'c) script -> ex_script
 
-type ('arg, 'storage) baker_code =
-  ( 'arg,
-    'storage,
-    ( operation Script_typed_ir.boxed_list,
-      baker_operation Script_typed_ir.boxed_list )
-    pair )
-  code
-
-type 'ret ex_script = Ex_script : ('a, 'b, 'ret) script -> 'ret ex_script
-
-type ex_originated_script =
-  | Ex_originated_script : ('a, 'b) originated_script -> ex_originated_script
-
-type ex_baker_script =
-  | Ex_baker_script : ('a, 'b) baker_script -> ex_baker_script
-
-type 'ret ex_code = Ex_code : ('a, 'b, 'ret) code -> 'ret ex_code
-
-type ex_originated_code =
-  | Ex_originated_code : ('a, 'b) originated_code -> ex_originated_code
-
-type ex_baker_code = Ex_baker_code : ('a, 'b) baker_code -> ex_baker_code
+type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
 type _ dig_proof_argument =
   | Dig_proof_argument :
@@ -3138,60 +2970,6 @@ let parse_key_hash ctxt = function
       error
       @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-let parse_baker_hash ctxt = function
-  | Bytes (loc, bytes) as expr -> (
-      (* As unparsed with [Optimized]. *)
-      Gas.consume ctxt Typecheck_costs.baker_hash_optimized
-      >>? fun ctxt ->
-      match Data_encoding.Binary.of_bytes Baker_hash.encoding bytes with
-      | Some k ->
-          ok (k, ctxt)
-      | None ->
-          error
-          @@ Invalid_syntactic_constant
-               (loc, strip_locations expr, "a valid baker hash") )
-  | String (loc, s) as expr (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.baker_hash_readable
-      >>? fun ctxt ->
-      match Baker_hash.of_b58check_opt s with
-      | Some k ->
-          ok (k, ctxt)
-      | None ->
-          error
-          @@ Invalid_syntactic_constant
-               (loc, strip_locations expr, "a valid baker hash") )
-  | expr ->
-      error
-      @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
-
-let parse_pvss_key ctxt = function
-  | Bytes (loc, bytes) as expr -> (
-      (* As unparsed with [Optimized]. *)
-      Gas.consume ctxt Typecheck_costs.pvss_key_optimized
-      >>? fun ctxt ->
-      match
-        Data_encoding.Binary.of_bytes Pvss_secp256k1.Public_key.encoding bytes
-      with
-      | Some k ->
-          ok (k, ctxt)
-      | None ->
-          error
-          @@ Invalid_syntactic_constant
-               (loc, strip_locations expr, "a valid PVSS public key") )
-  | String (loc, s) as expr (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.pvss_key_readable
-      >>? fun ctxt ->
-      match Pvss_secp256k1.Public_key.of_b58check_opt s with
-      | Some k ->
-          ok (k, ctxt)
-      | None ->
-          error
-          @@ Invalid_syntactic_constant
-               (loc, strip_locations expr, "a valid PVSS public key") )
-  | expr ->
-      error
-      @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
-
 let parse_signature ctxt = function
   | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.signature_optimized
@@ -3411,10 +3189,6 @@ let rec parse_comparable_data :
       Lwt.return @@ traced_no_lwt @@ parse_key ctxt expr
   | (Key_hash_key _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_key_hash ctxt expr
-  | (Baker_hash_key _, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_baker_hash ctxt expr
-  | (Pvss_key_key _, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_pvss_key ctxt expr
   | (Signature_key _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_signature ctxt expr
   | (Chain_id_key _, expr) ->
@@ -3624,13 +3398,9 @@ let rec parse_data :
       Lwt.return @@ traced_no_lwt @@ parse_key ctxt expr
   | (Key_hash_t _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_key_hash ctxt expr
-  | (Baker_hash_t _, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_baker_hash ctxt expr
-  | (Pvss_key_t _, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_pvss_key ctxt expr
   | (Signature_t _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_signature ctxt expr
-  | (Operation_t _, _) | (Baker_operation_t _, _) ->
+  | (Operation_t _, _) ->
       (* operations cannot appear in parameters or storage,
          the protocol should never parse the bytes of an operation *)
       assert false
@@ -5660,20 +5430,6 @@ and parse_instr :
       typed ctxt loc Transfer_tokens (Item_t (Operation_t None, rest, annot))
   | ( Prim (loc, I_SET_DELEGATE, [], annot),
       Item_t (Option_t (Key_hash_t _, _), rest, _) ) ->
-      if legacy then
-        parse_var_annot loc annot
-        >>?= fun annot ->
-        typed
-          ctxt
-          loc
-          Set_delegate_legacy
-          (Item_t (Operation_t None, rest, annot))
-      else
-        (* For new contracts this instruction is not allowed anymore *)
-        fail (Deprecated_instruction I_SET_DELEGATE)
-  | ( Prim (loc, I_SET_DELEGATE, [], annot),
-      (* Changed the type of delegate from [key_hash option] to [baker_hash option] *)
-    Item_t (Option_t (Baker_hash_t _, _), rest, _) ) ->
       parse_var_annot loc annot
       >>?= fun annot ->
       typed ctxt loc Set_delegate (Item_t (Operation_t None, rest, annot))
@@ -5693,94 +5449,6 @@ and parse_instr :
         ( Option_t (Key_hash_t _, _),
           Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
           _ ) ) ->
-      if legacy then
-        (* For existing contracts, this instruction is still allowed *)
-        parse_two_var_annot loc annot
-        >>?= fun (op_annot, addr_annot) ->
-        let cannonical_code = fst @@ Micheline.extract_locations code in
-        parse_toplevel ~legacy cannonical_code
-        >>?= fun (arg_type, storage_type, code_field, root_name) ->
-        record_trace
-          (Ill_formed_type
-             (Some "parameter", cannonical_code, location arg_type))
-          (parse_parameter_ty ctxt ~legacy arg_type)
-        >>?= fun (Ex_ty arg_type, ctxt) ->
-        ( if legacy then ok_unit
-        else well_formed_entrypoints ~root_name arg_type )
-        >>?= fun () ->
-        record_trace
-          (Ill_formed_type
-             (Some "storage", cannonical_code, location storage_type))
-          (parse_storage_ty ctxt ~legacy storage_type)
-        >>?= fun (Ex_ty storage_type, ctxt) ->
-        let arg_annot =
-          default_annot
-            (type_to_var_annot (name_of_ty arg_type))
-            ~default:default_param_annot
-        in
-        let storage_annot =
-          default_annot
-            (type_to_var_annot (name_of_ty storage_type))
-            ~default:default_storage_annot
-        in
-        let arg_type_full =
-          Pair_t
-            ( (arg_type, None, arg_annot),
-              (storage_type, None, storage_annot),
-              None )
-        in
-        let ret_type_full =
-          Pair_t
-            ( (List_t (Operation_t None, None), None, None),
-              (storage_type, None, None),
-              None )
-        in
-        trace
-          (Ill_typed_contract (cannonical_code, []))
-          (parse_returning
-             (Toplevel
-                {
-                  storage_type;
-                  param_type = arg_type;
-                  root_name;
-                  legacy_create_contract_literal = false;
-                })
-             ctxt
-             ~legacy
-             ?type_logger
-             ~stack_depth
-             (arg_type_full, None)
-             ret_type_full
-             code_field)
-        >>=? fun ( ( Lam
-                       ( { bef = Item_t (arg, Empty_t, _);
-                           aft = Item_t (ret, Empty_t, _);
-                           _ },
-                         _ ) as lambda ),
-                   ctxt ) ->
-        merge_types ~legacy ctxt loc arg arg_type_full
-        >>?= fun (Eq, _, ctxt) ->
-        merge_types ~legacy ctxt loc ret ret_type_full
-        >>?= fun (Eq, _, ctxt) ->
-        merge_types ~legacy ctxt loc storage_type ginit
-        >>?= fun (Eq, _, ctxt) ->
-        typed
-          ctxt
-          loc
-          (Create_contract_legacy (storage_type, arg_type, lambda, root_name))
-          (Item_t
-             ( Operation_t None,
-               Item_t (Address_t None, rest, addr_annot),
-               op_annot ))
-      else
-        (* For new contracts this instruction is not allowed anymore *)
-        fail (Deprecated_instruction I_CREATE_CONTRACT)
-  | ( Prim (loc, I_CREATE_CONTRACT, [(Seq _ as code)], annot),
-      (* Changed the type of delegate from [key_hash option] to [baker_hash option] *)
-    Item_t
-      ( Option_t (Baker_hash_t _, _),
-        Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
-        _ ) ) ->
       parse_two_var_annot loc annot
       >>?= fun (op_annot, addr_annot) ->
       let canonical_code = fst @@ Micheline.extract_locations code in
@@ -5790,7 +5458,7 @@ and parse_instr :
         (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
         (parse_parameter_ty ctxt ~legacy arg_type)
       >>?= fun (Ex_ty arg_type, ctxt) ->
-      well_formed_entrypoints ~root_name arg_type
+      (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
       >>?= fun () ->
       record_trace
         (Ill_formed_type (Some "storage", canonical_code, location storage_type))
@@ -5876,15 +5544,6 @@ and parse_instr :
       >>?= fun annot ->
       typed ctxt loc Level (Item_t (Nat_t None, stack, annot))
   | (Prim (loc, I_VOTING_POWER, [], annot), Item_t (Key_hash_t _, rest, _)) ->
-      if legacy then
-        parse_var_annot loc annot
-        >>?= fun annot ->
-        typed ctxt loc Voting_power_legacy (Item_t (Nat_t None, rest, annot))
-      else
-        (* For new contracts this instruction is not allowed anymore *)
-        fail (Deprecated_instruction I_VOTING_POWER)
-  | (Prim (loc, I_VOTING_POWER, [], annot), Item_t (Baker_hash_t _, rest, _))
-    ->
       parse_var_annot loc annot
       >>?= fun annot ->
       typed ctxt loc Voting_power (Item_t (Nat_t None, rest, annot))
@@ -6158,59 +5817,6 @@ and parse_instr :
             (Item_t (Option_t (ty, None), rest, annot))
       | _ ->
           (* TODO: fix injectivity of types *) assert false )
-  | ( Prim (loc, I_SUBMIT_PROPOSALS, [], annot),
-      Item_t (List_t (String_t _, _), rest, _) ) ->
-      parse_var_annot loc annot
-      >>?= fun annot ->
-      typed
-        ctxt
-        loc
-        Submit_proposals
-        (Item_t (Baker_operation_t None, rest, annot))
-  | ( Prim (loc, I_SUBMIT_BALLOT, [], annot),
-      Item_t (String_t _, Item_t (String_t _, rest, _), _) ) ->
-      parse_var_annot loc annot
-      >>?= fun annot ->
-      typed
-        ctxt
-        loc
-        Submit_ballot
-        (Item_t (Baker_operation_t None, rest, annot))
-  | (Prim (loc, I_SET_BAKER_ACTIVE, [], annot), Item_t (Bool_t _, rest, _)) ->
-      parse_var_annot loc annot
-      >>?= fun annot ->
-      typed
-        ctxt
-        loc
-        Set_baker_active
-        (Item_t (Baker_operation_t None, rest, annot))
-  | ( Prim (loc, I_TOGGLE_BAKER_DELEGATIONS, [], annot),
-      Item_t (Bool_t _, rest, _) ) ->
-      Lwt.return @@ parse_var_annot loc annot
-      >>=? fun annot ->
-      typed
-        ctxt
-        loc
-        Toggle_baker_delegations
-        (Item_t (Baker_operation_t None, rest, annot))
-  | ( Prim (loc, I_SET_BAKER_CONSENSUS_KEY, [], annot),
-      Item_t (Key_t _, Item_t (Signature_t _, rest, _), _) ) ->
-      parse_var_annot loc annot
-      >>?= fun annot ->
-      typed
-        ctxt
-        loc
-        Set_baker_consensus_key
-        (Item_t (Baker_operation_t None, rest, annot))
-  | ( Prim (loc, I_SET_BAKER_PVSS_KEY, [], annot),
-      Item_t (Pvss_key_t _, rest, _) ) ->
-      parse_var_annot loc annot
-      >>?= fun annot ->
-      typed
-        ctxt
-        loc
-        Set_baker_pvss_key
-        (Item_t (Baker_operation_t None, rest, annot))
   (* Primitive parsing errors *)
   | ( Prim
         ( loc,
@@ -6280,13 +5886,7 @@ and parse_instr :
             | I_TICKET
             | I_READ_TICKET
             | I_SPLIT_TICKET
-            | I_JOIN_TICKETS
-            | I_SUBMIT_PROPOSALS
-            | I_SUBMIT_BALLOT
-            | I_SET_BAKER_ACTIVE
-            | I_TOGGLE_BAKER_DELEGATIONS
-            | I_SET_BAKER_CONSENSUS_KEY
-            | I_SET_BAKER_PVSS_KEY ) as name ),
+            | I_JOIN_TICKETS ) as name ),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -6555,13 +6155,7 @@ and parse_instr :
              I_TICKET;
              I_READ_TICKET;
              I_SPLIT_TICKET;
-             I_JOIN_TICKETS;
-             I_SUBMIT_PROPOSALS;
-             I_SUBMIT_BALLOT;
-             I_SET_BAKER_ACTIVE;
-             I_TOGGLE_BAKER_DELEGATIONS;
-             I_SET_BAKER_CONSENSUS_KEY;
-             I_SET_BAKER_PVSS_KEY ]
+             I_JOIN_TICKETS ]
 
 and parse_contract :
     type arg.
@@ -6803,15 +6397,13 @@ and parse_toplevel :
             Script_ir_annot.error_unexpected_annot sloc sannot
             >>? fun () -> ok (p, s, c, root_name) )
 
-let parse_code_returning :
-    type ret.
+let parse_code :
     ?type_logger:type_logger ->
     context ->
     legacy:bool ->
     code:lazy_expr ->
-    ret ty ->
-    (ret ex_code * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy ~code ret_type ->
+    (ex_code * context) tzresult Lwt.t =
+ fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode_in_context ctxt code
   >>?= fun (code, ctxt) ->
   parse_toplevel ~legacy code
@@ -6841,7 +6433,10 @@ let parse_code_returning :
       ((arg_type, None, arg_annot), (storage_type, None, storage_annot), None)
   in
   let ret_type_full =
-    Pair_t ((ret_type, None, None), (storage_type, None, None), None)
+    Pair_t
+      ( (List_t (Operation_t None, None), None, None),
+        (storage_type, None, None),
+        None )
   in
   trace
     (Ill_typed_contract (code, []))
@@ -6862,35 +6457,6 @@ let parse_code_returning :
        code_field)
   >|=? fun (code, ctxt) ->
   (Ex_code {code; arg_type; storage_type; root_name}, ctxt)
-
-let parse_code :
-    ?type_logger:type_logger ->
-    context ->
-    legacy:bool ->
-    code:lazy_expr ->
-    (ex_originated_code * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy ~code ->
-  let ret_type = List_t (Operation_t None, None) in
-  parse_code_returning ?type_logger ctxt ~legacy ~code ret_type
-  >|=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
-  (Ex_originated_code {code; arg_type; storage_type; root_name}, ctxt)
-
-let parse_baker_code :
-    ?type_logger:type_logger ->
-    context ->
-    legacy:bool ->
-    code:lazy_expr ->
-    (ex_baker_code * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy ~code ->
-  let ret_type =
-    Pair_t
-      ( (List_t (Operation_t None, None), None, None),
-        (List_t (Baker_operation_t None, None), None, None),
-        None )
-  in
-  parse_code_returning ?type_logger ctxt ~legacy ~code ret_type
-  >|=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
-  (Ex_baker_code {code; arg_type; storage_type; root_name}, ctxt)
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -6924,32 +6490,10 @@ let parse_script :
     legacy:bool ->
     allow_forged_in_storage:bool ->
     Script.t ->
-    (ex_originated_script * context) tzresult Lwt.t =
+    (ex_script * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~allow_forged_in_storage {code; storage} ->
   parse_code ~legacy ctxt ?type_logger ~code
-  >>=? fun (Ex_originated_code {code; arg_type; storage_type; root_name}, ctxt) ->
-  parse_storage
-    ?type_logger
-    ctxt
-    ~legacy
-    ~allow_forged:allow_forged_in_storage
-    storage_type
-    ~storage
-  >>=? fun (storage, ctxt) ->
-  return
-    ( Ex_originated_script {code; arg_type; storage; storage_type; root_name},
-      ctxt )
-
-let parse_baker_script :
-    ?type_logger:type_logger ->
-    context ->
-    legacy:bool ->
-    allow_forged_in_storage:bool ->
-    Script.t ->
-    (ex_baker_script * context) tzresult Lwt.t =
- fun ?type_logger ctxt ~legacy ~allow_forged_in_storage {code; storage} ->
-  parse_baker_code ~legacy ctxt ?type_logger ~code
-  >>=? fun (Ex_baker_code {code; arg_type; storage_type; root_name}, ctxt) ->
+  >>=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
   parse_storage
     ?type_logger
     ctxt
@@ -6958,7 +6502,7 @@ let parse_baker_script :
     storage_type
     ~storage
   >|=? fun (storage, ctxt) ->
-  (Ex_baker_script {code; arg_type; storage; storage_type; root_name}, ctxt)
+  (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt)
 
 let typecheck_code :
     legacy:bool ->
@@ -7143,14 +6687,8 @@ let rec unparse_data :
       Lwt.return @@ unparse_key ctxt mode k
   | (Key_hash_t _, k) ->
       Lwt.return @@ unparse_key_hash ctxt mode k
-  | (Baker_hash_t _, k) ->
-      Lwt.return @@ unparse_baker_hash ctxt mode k
-  | (Pvss_key_t _, k) ->
-      Lwt.return @@ unparse_pvss_key ctxt mode k
   | (Operation_t _, operation) ->
       Lwt.return @@ unparse_operation ctxt operation
-  | (Baker_operation_t _, baker_operation) ->
-      Lwt.return @@ unparse_baker_operation ctxt baker_operation
   | (Chain_id_t _, chain_id) ->
       Lwt.return @@ unparse_chain_id ctxt mode chain_id
   | (Bls12_381_g1_t _, x) ->
@@ -7620,10 +7158,6 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
       False_f
   | Key_t _ ->
       False_f
-  | Baker_hash_t _ ->
-      False_f
-  | Pvss_key_t _ ->
-      False_f
   | Timestamp_t _ ->
       False_f
   | Address_t _ ->
@@ -7637,8 +7171,6 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Contract_t (_, _) ->
       False_f
   | Operation_t _ ->
-      False_f
-  | Baker_operation_t _ ->
       False_f
   | Chain_id_t _ ->
       False_f

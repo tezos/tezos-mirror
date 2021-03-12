@@ -148,7 +148,7 @@ module Alpha_context_helpers = struct
 
   let init () =
     Context.init 1
-    >>=? fun (b, _contracts, _bakers) ->
+    >>=? fun (b, _) ->
     Alpha_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -277,19 +277,26 @@ end
 module Interpreter_helpers = struct
   include Common
 
-  (* Initialize a baker and 2 addresses to do operations. *)
+  (* Initialize 2 addresses to do only operations plus one that will be
+     used to bake. *)
   let init () =
-    Context.init 2
-    >|=? fun (b, contracts, bakers) ->
-    let (src0, src1) =
+    Context.init 3
+    >|=? fun (b, contracts) ->
+    let (src0, src1, src2) =
       match contracts with
-      | src0 :: src1 :: _ ->
-          (src0, src1)
+      | src0 :: src1 :: src2 :: _ ->
+          (src0, src1, src2)
       | _ ->
           assert false
     in
-    let baker = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
-    (b, baker, src0, src1)
+    let baker =
+      match Alpha_context.Contract.is_implicit src0 with
+      | Some v ->
+          v
+      | None ->
+          assert false
+    in
+    (b, baker, src1, src2)
 
   (* Parse a Michelson contract from string. *)
   let toplevel_from_string str =

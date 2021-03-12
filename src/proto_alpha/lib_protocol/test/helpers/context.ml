@@ -104,22 +104,22 @@ let rpc_ctxt =
   end
 
 let get_endorsers ctxt =
-  Alpha_services.Baker.Endorsing_rights.get rpc_ctxt ctxt
+  Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt
 
 let get_endorser ctxt =
-  Alpha_services.Baker.Endorsing_rights.get rpc_ctxt ctxt
+  Alpha_services.Delegate.Endorsing_rights.get rpc_ctxt ctxt
   >|=? fun endorsers ->
   let endorser = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers in
-  (endorser.baker, endorser.slots)
+  (endorser.delegate, endorser.slots)
 
-let get_voting_power = Alpha_services.Baker.voting_power rpc_ctxt
+let get_voting_power = Alpha_services.Delegate.voting_power rpc_ctxt
 
 let get_total_voting_power = Alpha_services.Voting.total_voting_power rpc_ctxt
 
 let get_bakers ctxt =
-  Alpha_services.Baker.Baking_rights.get ~max_priority:256 rpc_ctxt ctxt
+  Alpha_services.Delegate.Baking_rights.get ~max_priority:256 rpc_ctxt ctxt
   >|=? fun bakers ->
-  List.map (fun p -> p.Alpha_services.Baker.Baking_rights.baker) bakers
+  List.map (fun p -> p.Alpha_services.Delegate.Baking_rights.delegate) bakers
 
 let get_seed_nonce_hash ctxt =
   let header =
@@ -136,7 +136,7 @@ let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
 let get_constants ctxt = Alpha_services.Constants.all rpc_ctxt ctxt
 
 let get_minimal_valid_time ctxt ~priority ~endorsing_power =
-  Alpha_services.Baker.Minimal_valid_time.get
+  Alpha_services.Delegate.Minimal_valid_time.get
     rpc_ctxt
     ctxt
     priority
@@ -216,13 +216,6 @@ module Contract = struct
     |> function
     | Some p -> return p | None -> failwith "pkh: only for implicit contracts"
 
-  let baker c =
-    match Alpha_context.Contract.is_baker c with
-    | Some baker ->
-        return baker
-    | None ->
-        failwith "contract %a is not a baker" Contract.pp c
-
   type balance_kind = Main | Deposit | Fees | Rewards
 
   let balance ?(kind = Main) ctxt contract =
@@ -230,16 +223,16 @@ module Contract = struct
     | Main ->
         Alpha_services.Contract.balance rpc_ctxt ctxt contract
     | _ -> (
-      match Alpha_context.Contract.is_baker contract with
+      match Alpha_context.Contract.is_implicit contract with
       | None ->
           invalid_arg
-            "get_balance: no frozen accounts for a non-baking contract."
-      | Some baker ->
-          Alpha_services.Baker.frozen_balance_by_cycle rpc_ctxt ctxt baker
+            "get_balance: no frozen accounts for an originated contract."
+      | Some pkh ->
+          Alpha_services.Delegate.frozen_balance_by_cycle rpc_ctxt ctxt pkh
           >>=? fun map ->
           Lwt.return
           @@ Cycle.Map.fold
-               (fun _cycle {Baker.deposit; fees; rewards} acc ->
+               (fun _cycle {Delegate.deposit; fees; rewards} acc ->
                  acc
                  >>? fun acc ->
                  match kind with
@@ -249,7 +242,7 @@ module Contract = struct
                      Test_tez.Tez.(acc +? fees)
                  | Rewards ->
                      Test_tez.Tez.(acc +? rewards)
-                 | Main ->
+                 | _ ->
                      assert false)
                map
                (Ok Tez.zero) )
@@ -261,66 +254,56 @@ module Contract = struct
     | Some mgr ->
         Alpha_services.Contract.counter rpc_ctxt ctxt mgr
 
-  let find_account _ contract =
+  let manager _ contract =
     match Contract.is_implicit contract with
     | None ->
         invalid_arg "Helpers.Context.manager"
     | Some pkh ->
         Account.find pkh
 
-  let is_public_key_revealed ctxt contract =
-    Alpha_services.Contract.public_key rpc_ctxt ctxt contract
-    >|=? fun res -> res <> None
+  let is_manager_key_revealed ctxt contract =
+    match Contract.is_implicit contract with
+    | None ->
+        invalid_arg "Helpers.Context.is_manager_key_revealed"
+    | Some mgr ->
+        Alpha_services.Contract.manager_key rpc_ctxt ctxt mgr
+        >|=? fun res -> res <> None
 
-  let delegate = Alpha_services.Contract.delegate rpc_ctxt
+  let delegate ctxt contract =
+    Alpha_services.Contract.delegate rpc_ctxt ctxt contract
 
-  let delegate_opt = Alpha_services.Contract.delegate_opt rpc_ctxt
-
-  let storage = Alpha_services.Contract.storage rpc_ctxt
+  let delegate_opt ctxt contract =
+    Alpha_services.Contract.delegate_opt rpc_ctxt ctxt contract
 end
 
-module Baker = struct
-  type info = Baker_services.info = {
+module Delegate = struct
+  type info = Delegate_services.info = {
     balance : Tez.t;
     frozen_balance : Tez.t;
-    frozen_balance_by_cycle : Baker.frozen_balance Cycle.Map.t;
+    frozen_balance_by_cycle : Delegate.frozen_balance Cycle.Map.t;
     staking_balance : Tez.t;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
     deactivated : bool;
     grace_period : Cycle.t;
-    consensus_key : Signature.Public_key.t;
-    pending_consensus_key : (Signature.Public_key.t * Cycle.t) option;
     voting_power : int32;
   }
 
-  let info = Alpha_services.Baker.info rpc_ctxt
-
-  let consensus_key ?level ?offset =
-    Alpha_services.Baker.consensus_key rpc_ctxt ?level ?offset
+  let info ctxt pkh = Alpha_services.Delegate.info rpc_ctxt ctxt pkh
 end
 
-let init ?endorsers_per_block ?with_commitments
-    ?(initial_implicit_balances = []) ?(initial_baker_balances = [])
+let init ?endorsers_per_block ?with_commitments ?(initial_balances = [])
     ?initial_endorsers ?min_proposal_quorum n =
-  let (accounts, baker_accounts, origination_nonce) =
-    Account.generate_accounts
-      ~initial_implicit_balances
-      ~initial_baker_balances
-      n
-  in
+  let accounts = Account.generate_accounts ~initial_balances n in
   let contracts =
     List.map
       (fun (a, _) -> Alpha_context.Contract.implicit_contract Account.(a.pkh))
       accounts
   in
-  let bakers = List.map (fun (a, _) -> Account.(a.baker)) baker_accounts in
   Block.genesis
     ?endorsers_per_block
     ?with_commitments
     ?initial_endorsers
     ?min_proposal_quorum
     accounts
-    baker_accounts
-    origination_nonce
-  >|=? fun blk -> (blk, contracts, bakers)
+  >|=? fun blk -> (blk, contracts)

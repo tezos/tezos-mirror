@@ -44,14 +44,6 @@ type public_key_hash = Signature.Public_key_hash.t
 
 type signature = Signature.t
 
-module Baker_hash : sig
-  type t = Baker_hash.t
-
-  include S.HASH with type t := t
-end
-
-type baker_hash = Baker_hash.t
-
 module Tez : sig
   include BASIC_DATA
 
@@ -377,12 +369,6 @@ module Script : sig
     | I_READ_TICKET
     | I_SPLIT_TICKET
     | I_JOIN_TICKETS
-    | I_SUBMIT_PROPOSALS
-    | I_SUBMIT_BALLOT
-    | I_SET_BAKER_ACTIVE
-    | I_TOGGLE_BAKER_DELEGATIONS
-    | I_SET_BAKER_CONSENSUS_KEY
-    | I_SET_BAKER_PVSS_KEY
     | T_bool
     | T_contract
     | T_int
@@ -413,9 +399,6 @@ module Script : sig
     | T_bls12_381_g2
     | T_bls12_381_fr
     | T_ticket
-    | T_baker_hash
-    | T_baker_operation
-    | T_pvss_key
 
   type location = Micheline.canonical_location
 
@@ -667,7 +650,7 @@ module Nonce : sig
 
   type unrevealed = {
     nonce_hash : Nonce_hash.t;
-    baker : baker_hash;
+    delegate : public_key_hash;
     rewards : Tez.t;
     fees : Tez.t;
   }
@@ -886,11 +869,7 @@ module Contract : sig
 
   val implicit_contract : public_key_hash -> contract
 
-  val baker_contract : baker_hash -> contract
-
   val is_implicit : contract -> public_key_hash option
-
-  val is_baker : contract -> baker_hash option
 
   val exists : context -> contract -> bool tzresult Lwt.t
 
@@ -902,9 +881,12 @@ module Contract : sig
 
   val list : context -> contract list Lwt.t
 
-  val get_public_key : context -> public_key_hash -> public_key tzresult Lwt.t
+  val get_manager_key : context -> public_key_hash -> public_key tzresult Lwt.t
 
-  val reveal_public_key :
+  val is_manager_key_revealed :
+    context -> public_key_hash -> bool tzresult Lwt.t
+
+  val reveal_manager_key :
     context -> public_key_hash -> public_key -> context tzresult Lwt.t
 
   val get_script_code :
@@ -916,7 +898,7 @@ module Contract : sig
   val get_storage :
     context -> contract -> (context * Script.expr option) tzresult Lwt.t
 
-  val get_counter : context -> contract -> Z.t tzresult Lwt.t
+  val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
 
   val get_balance : context -> contract -> Tez.t tzresult Lwt.t
 
@@ -958,7 +940,7 @@ module Contract : sig
     contract ->
     balance:Tez.t ->
     script:Script.t * Lazy_storage.diffs option ->
-    delegate:baker_hash option ->
+    delegate:public_key_hash option ->
     context tzresult Lwt.t
 
   type error += Balance_too_low of contract * Tez.t * Tez.t
@@ -976,31 +958,27 @@ module Contract : sig
 
   val used_storage_space : context -> t -> Z.t tzresult Lwt.t
 
-  val increment_counter : context -> contract -> context tzresult Lwt.t
+  val increment_counter : context -> public_key_hash -> context tzresult Lwt.t
 
   val check_counter_increment :
-    context -> contract -> Z.t -> unit tzresult Lwt.t
+    context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
 
   (**/**)
 
   (* Only for testing *)
   type origination_nonce
 
-  val incr_origination_nonce : origination_nonce -> origination_nonce
-
   val initial_origination_nonce : Operation_hash.t -> origination_nonce
 
   val originated_contract : origination_nonce -> contract
-
-  val baker_from_nonce : origination_nonce -> baker_hash
 end
 
 module Receipt : sig
   type balance =
     | Contract of Contract.t
-    | Rewards of baker_hash * Cycle.t
-    | Fees of baker_hash * Cycle.t
-    | Deposits of baker_hash * Cycle.t
+    | Rewards of Signature.Public_key_hash.t * Cycle.t
+    | Fees of Signature.Public_key_hash.t * Cycle.t
+    | Deposits of Signature.Public_key_hash.t * Cycle.t
 
   type balance_update = Debited of Tez.t | Credited of Tez.t
 
@@ -1013,59 +991,48 @@ module Receipt : sig
   val cleanup_balance_updates : balance_updates -> balance_updates
 end
 
-module Delegation : sig
-  val get : context -> Contract.t -> baker_hash option tzresult Lwt.t
+module Delegate : sig
+  val get : context -> Contract.t -> public_key_hash option tzresult Lwt.t
 
   val set :
-    context -> Contract.t -> baker_hash option -> context tzresult Lwt.t
-end
+    context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
 
-module Baker : sig
-  val register :
-    ?bootstrap_baker_hash:baker_hash ->
-    ?prepaid_bootstrap_storage:bool ->
-    context ->
-    balance:Tez.t ->
-    threshold:int ->
-    owner_keys:public_key list ->
-    consensus_key:public_key ->
-    (context * baker_hash) tzresult Lwt.t
+  val fold :
+    context -> init:'a -> f:(public_key_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
-  val set_active : context -> baker_hash -> bool -> context tzresult Lwt.t
+  val list : context -> public_key_hash list Lwt.t
 
-  val toggle_delegations :
-    context -> baker_hash -> bool -> context tzresult Lwt.t
+  val freeze_deposit :
+    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
 
-  val fold : context -> init:'a -> f:(baker_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val freeze_rewards :
+    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
 
-  val list : context -> baker_hash list Lwt.t
-
-  val freeze_deposit : context -> baker_hash -> Tez.t -> context tzresult Lwt.t
-
-  val freeze_rewards : context -> baker_hash -> Tez.t -> context tzresult Lwt.t
-
-  val freeze_fees : context -> baker_hash -> Tez.t -> context tzresult Lwt.t
+  val freeze_fees :
+    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
 
   val cycle_end :
     context ->
     Cycle.t ->
     Nonce.unrevealed list ->
-    (context * Receipt.balance_updates * baker_hash list) tzresult Lwt.t
+    (context * Receipt.balance_updates * Signature.Public_key_hash.t list)
+    tzresult
+    Lwt.t
 
   type frozen_balance = {deposit : Tez.t; fees : Tez.t; rewards : Tez.t}
 
   val punish :
     context ->
-    baker_hash ->
+    public_key_hash ->
     Cycle.t ->
     (context * frozen_balance) tzresult Lwt.t
 
-  val full_balance : context -> baker_hash -> Tez.t tzresult Lwt.t
+  val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
 
   val has_frozen_balance :
-    context -> baker_hash -> Cycle.t -> bool tzresult Lwt.t
+    context -> public_key_hash -> Cycle.t -> bool tzresult Lwt.t
 
-  val frozen_balance : context -> baker_hash -> Tez.t tzresult Lwt.t
+  val frozen_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
 
   val frozen_balance_encoding : frozen_balance Data_encoding.t
 
@@ -1073,41 +1040,22 @@ module Baker : sig
     frozen_balance Cycle.Map.t Data_encoding.t
 
   val frozen_balance_by_cycle :
-    context -> baker_hash -> frozen_balance Cycle.Map.t Lwt.t
+    context -> Signature.Public_key_hash.t -> frozen_balance Cycle.Map.t Lwt.t
 
-  val staking_balance : context -> baker_hash -> Tez.t tzresult Lwt.t
+  val staking_balance :
+    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
 
-  val delegated_contracts : context -> baker_hash -> Contract.t list Lwt.t
+  val delegated_contracts :
+    context -> Signature.Public_key_hash.t -> Contract.t list Lwt.t
 
-  val delegated_balance : context -> baker_hash -> Tez.t tzresult Lwt.t
+  val delegated_balance :
+    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
 
-  val deactivated : context -> baker_hash -> bool tzresult Lwt.t
+  val deactivated :
+    context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
-  val grace_period : context -> baker_hash -> Cycle.t tzresult Lwt.t
-
-  val get_consensus_key :
-    ?level:Raw_level.t ->
-    ?offset:int32 ->
-    context ->
-    baker_hash ->
-    public_key tzresult Lwt.t
-
-  val set_consensus_key :
-    context -> baker_hash -> public_key -> context tzresult Lwt.t
-
-  val is_consensus_key :
-    context -> public_key_hash -> baker_hash option tzresult Lwt.t
-
-  val get_pending_consensus_key :
-    context -> baker_hash -> (public_key * Cycle.t) option tzresult Lwt.t
-
-  val is_pending_consensus_key : context -> Contract.t -> bool Lwt.t
-
-  val get_pvss_key :
-    context -> baker_hash -> Pvss_secp256k1.Public_key.t option tzresult Lwt.t
-
-  val init_set_pvss_key :
-    context -> baker_hash -> Pvss_secp256k1.Public_key.t -> context Lwt.t
+  val grace_period :
+    context -> Signature.Public_key_hash.t -> Cycle.t tzresult Lwt.t
 end
 
 module Voting_period : sig
@@ -1159,35 +1107,33 @@ module Vote : sig
   type proposal = Protocol_hash.t
 
   val record_proposal :
-    context -> Protocol_hash.t -> baker_hash -> context tzresult Lwt.t
+    context -> Protocol_hash.t -> public_key_hash -> context tzresult Lwt.t
 
   val get_proposals : context -> int32 Protocol_hash.Map.t tzresult Lwt.t
 
   val clear_proposals : context -> context Lwt.t
 
-  val recorded_proposal_count_for_baker :
-    context -> baker_hash -> int tzresult Lwt.t
+  val recorded_proposal_count_for_delegate :
+    context -> public_key_hash -> int tzresult Lwt.t
 
-  val listings_encoding : (baker_hash * int32) list Data_encoding.t
+  val listings_encoding :
+    (Signature.Public_key_hash.t * int32) list Data_encoding.t
 
   val update_listings : context -> context tzresult Lwt.t
 
   val listing_size : context -> int32 tzresult Lwt.t
 
-  val in_listings : context -> baker_hash -> bool Lwt.t
+  val in_listings : context -> public_key_hash -> bool Lwt.t
 
-  val get_listings : context -> (baker_hash * int32) list Lwt.t
+  val get_listings : context -> (public_key_hash * int32) list Lwt.t
 
   type ballot = Yay | Nay | Pass
 
-  val of_string : string -> ballot option
-
-  val to_string : ballot -> string
-
-  val get_voting_power_free : context -> baker_hash -> int32 tzresult Lwt.t
+  val get_voting_power_free :
+    context -> Signature.Public_key_hash.t -> int32 tzresult Lwt.t
 
   val get_voting_power :
-    context -> baker_hash -> (context * int32) tzresult Lwt.t
+    context -> Signature.Public_key_hash.t -> (context * int32) tzresult Lwt.t
 
   val get_total_voting_power_free : context -> int32 tzresult Lwt.t
 
@@ -1199,13 +1145,15 @@ module Vote : sig
 
   val ballots_encoding : ballots Data_encoding.t
 
-  val has_recorded_ballot : context -> baker_hash -> bool Lwt.t
+  val has_recorded_ballot : context -> public_key_hash -> bool Lwt.t
 
-  val record_ballot : context -> baker_hash -> ballot -> context tzresult Lwt.t
+  val record_ballot :
+    context -> public_key_hash -> ballot -> context tzresult Lwt.t
 
   val get_ballots : context -> ballots tzresult Lwt.t
 
-  val get_ballot_list : context -> (baker_hash * ballot) list Lwt.t
+  val get_ballot_list :
+    context -> (Signature.Public_key_hash.t * ballot) list Lwt.t
 
   val clear_ballots : context -> context Lwt.t
 
@@ -1284,42 +1232,17 @@ module Kind : sig
 
   type transaction = Transaction_kind
 
-  type origination_legacy = Origination_legacy_kind
-
   type origination = Origination_kind
-
-  type delegation_legacy = Delegation_legacy_kind
 
   type delegation = Delegation_kind
 
   type failing_noop = Failing_noop_kind
 
-  type baker_registration = Baker_registration_kind
-
-  type set_baker_active = Set_baker_active_kind
-
-  type toggle_baker_delegations = Toggle_baker_delegations_kind
-
-  type set_baker_consensus_key = Set_baker_consensus_key_kind
-
-  type set_baker_pvss_key = Set_baker_pvss_key_kind
-
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
-    | Origination_legacy_manager_kind : origination_legacy manager
     | Origination_manager_kind : origination manager
-    | Delegation_legacy_manager_kind : delegation_legacy manager
     | Delegation_manager_kind : delegation manager
-    | Baker_registration_manager_kind : baker_registration manager
-
-  type 'a baker =
-    | Baker_proposals_kind : proposals baker
-    | Baker_ballot_kind : ballot baker
-    | Set_baker_active_baker_kind : set_baker_active baker
-    | Toggle_baker_delegations_baker_kind : toggle_baker_delegations baker
-    | Set_baker_consensus_key_baker_kind : set_baker_consensus_key baker
-    | Set_baker_pvss_key_baker_kind : set_baker_pvss_key baker
 end
 
 type 'kind operation = {
@@ -1367,13 +1290,13 @@ and _ contents =
     }
       -> Kind.activate_account contents
   | Proposals : {
-      source : public_key_hash;
+      source : Signature.Public_key_hash.t;
       period : int32;
       proposals : Protocol_hash.t list;
     }
       -> Kind.proposals contents
   | Ballot : {
-      source : public_key_hash;
+      source : Signature.Public_key_hash.t;
       period : int32;
       proposal : Protocol_hash.t;
       ballot : Vote.ballot;
@@ -1381,7 +1304,7 @@ and _ contents =
       -> Kind.ballot contents
   | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
-      source : public_key_hash;
+      source : Signature.Public_key_hash.t;
       fee : Tez.tez;
       counter : counter;
       operation : 'kind manager_operation;
@@ -1399,75 +1322,27 @@ and _ manager_operation =
       destination : Contract.contract;
     }
       -> Kind.transaction manager_operation
-  | Origination_legacy : {
-      delegate : public_key_hash option;
-      script : Script.t;
-      credit : Tez.tez;
-      preorigination : Contract.t option;
-    }
-      -> Kind.origination_legacy manager_operation
   | Origination : {
-      delegate : baker_hash option;
+      delegate : Signature.Public_key_hash.t option;
       script : Script.t;
       credit : Tez.tez;
       preorigination : Contract.t option;
     }
       -> Kind.origination manager_operation
-  | Delegation_legacy :
-      public_key_hash option
-      -> Kind.delegation_legacy manager_operation
-  | Delegation : baker_hash option -> Kind.delegation manager_operation
-  | Baker_registration : {
-      credit : Tez.tez;
-      consensus_key : public_key;
-      ownership_proof : signature;
-      threshold : int;
-      owner_keys : Signature.Public_key.t list;
-    }
-      -> Kind.baker_registration manager_operation
-
-and _ baker_operation =
-  | Baker_proposals : {
-      period : int32;
-      proposals : string list;
-    }
-      -> Kind.proposals baker_operation
-  | Baker_ballot : {
-      period : int32;
-      proposal : string;
-      ballot : Vote.ballot;
-    }
-      -> Kind.ballot baker_operation
-  | Set_baker_active : bool -> Kind.set_baker_active baker_operation
-  | Toggle_baker_delegations :
-      bool
-      -> Kind.toggle_baker_delegations baker_operation
-  | Set_baker_consensus_key :
-      public_key * signature
-      -> Kind.set_baker_consensus_key baker_operation
-  | Set_baker_pvss_key :
-      Pvss_secp256k1.Public_key.t
-      -> Kind.set_baker_pvss_key baker_operation
+  | Delegation :
+      Signature.Public_key_hash.t option
+      -> Kind.delegation manager_operation
 
 and counter = Z.t
 
-type 'kind internal_manager_operation = {
+type 'kind internal_operation = {
   source : Contract.contract;
   operation : 'kind manager_operation;
   nonce : int;
 }
 
-type 'kind internal_baker_operation = {
-  baker : Baker_hash.t;
-  operation : 'kind baker_operation;
-  nonce : int;
-}
-
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
-
-type packed_baker_operation =
-  | Baker : 'kind baker_operation -> packed_baker_operation
 
 type packed_contents = Contents : 'kind contents -> packed_contents
 
@@ -1483,16 +1358,9 @@ type packed_operation = {
 }
 
 type packed_internal_operation =
-  | Internal_manager_operation :
-      'kind internal_manager_operation
-      -> packed_internal_operation
-  | Internal_baker_operation :
-      'kind internal_baker_operation
-      -> packed_internal_operation
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
 val manager_kind : 'kind manager_operation -> 'kind Kind.manager
-
-val baker_kind : 'kind baker_operation -> 'kind Kind.baker
 
 module Fees : sig
   val origination_burn : context -> (context * Tez.t) tzresult
@@ -1605,15 +1473,9 @@ module Operation : sig
 
     val transaction_case : Kind.transaction Kind.manager case
 
-    val origination_legacy_case : Kind.origination_legacy Kind.manager case
-
     val origination_case : Kind.origination Kind.manager case
 
-    val delegation_legacy_case : Kind.delegation_legacy Kind.manager case
-
     val delegation_case : Kind.delegation Kind.manager case
-
-    val baker_registration_case : Kind.baker_registration Kind.manager case
 
     module Manager_operations : sig
       type 'b case =
@@ -1632,40 +1494,9 @@ module Operation : sig
 
       val transaction_case : Kind.transaction case
 
-      val origination_legacy_case : Kind.origination_legacy case
-
       val origination_case : Kind.origination case
 
-      val delegation_legacy_case : Kind.delegation_legacy case
-
       val delegation_case : Kind.delegation case
-
-      val baker_registration_case : Kind.baker_registration case
-    end
-
-    module Baker_operations : sig
-      type 'b case =
-        | BCase : {
-            tag : int;
-            name : string;
-            encoding : 'a Data_encoding.t;
-            select : packed_baker_operation -> 'kind baker_operation option;
-            proj : 'kind baker_operation -> 'a;
-            inj : 'a -> 'kind baker_operation;
-          }
-            -> 'kind case
-
-      val baker_proposals_case : Kind.proposals case
-
-      val baker_ballot_case : Kind.ballot case
-
-      val set_baker_active_case : Kind.set_baker_active case
-
-      val toggle_baker_delegations_case : Kind.toggle_baker_delegations case
-
-      val set_baker_consensus_key_case : Kind.set_baker_consensus_key case
-
-      val set_baker_pvss_key_case : Kind.set_baker_pvss_key case
     end
   end
 
@@ -1686,14 +1517,18 @@ module Roll : sig
   val cycle_end : context -> Cycle.t -> context tzresult Lwt.t
 
   val baking_rights_owner :
-    context -> Level.t -> priority:int -> baker_hash tzresult Lwt.t
+    context -> Level.t -> priority:int -> public_key tzresult Lwt.t
 
   val endorsement_rights_owner :
-    context -> Level.t -> slot:int -> baker_hash tzresult Lwt.t
+    context -> Level.t -> slot:int -> public_key tzresult Lwt.t
 
-  val count_rolls : context -> baker_hash -> int tzresult Lwt.t
+  val delegate_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
 
-  val get_change : context -> baker_hash -> Tez.t tzresult Lwt.t
+  val count_rolls :
+    context -> Signature.Public_key_hash.t -> int tzresult Lwt.t
+
+  val get_change :
+    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
 end
 
 module Commitment : sig
@@ -1743,12 +1578,16 @@ val finalize : ?commit_message:string -> context -> Updater.validation_result
 
 val activate : context -> Protocol_hash.t -> context Lwt.t
 
-val record_endorsement : context -> Baker_hash.t -> context
+val record_endorsement : context -> Signature.Public_key_hash.t -> context
 
-val allowed_endorsements : context -> (int list * bool) Baker_hash.Map.t
+val allowed_endorsements :
+  context ->
+  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
 
 val init_endorsements :
-  context -> (int list * bool) Baker_hash.Map.t -> context
+  context ->
+  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
+  context
 
 val included_endorsements : context -> int
 
@@ -1764,13 +1603,14 @@ val add_fees : context -> Tez.t -> context tzresult
 
 val add_rewards : context -> Tez.t -> context tzresult
 
-val add_deposit : context -> baker_hash -> Tez.t -> context tzresult
+val add_deposit :
+  context -> Signature.Public_key_hash.t -> Tez.t -> context tzresult
 
 val get_fees : context -> Tez.t
 
 val get_rewards : context -> Tez.t
 
-val get_deposits : context -> Tez.t Baker_hash.Map.t
+val get_deposits : context -> Tez.t Signature.Public_key_hash.Map.t
 
 val description : context Storage_description.t
 
@@ -1782,21 +1622,14 @@ module Parameters : sig
   }
 
   type bootstrap_contract = {
-    delegate : baker_hash;
+    delegate : public_key_hash;
     amount : Tez.t;
     script : Script.t;
-  }
-
-  type bootstrap_baker = {
-    hash : baker_hash option;
-    amount : Tez.t;
-    key : public_key;
   }
 
   type t = {
     bootstrap_accounts : bootstrap_account list;
     bootstrap_contracts : bootstrap_contract list;
-    bootstrap_bakers : bootstrap_baker list;
     commitments : Commitment.t list;
     constants : Constants.parametric;
     security_deposit_ramp_up_cycles : int option;

@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,27 +37,27 @@ val encoding : t Data_encoding.t
 val may_inject_block :
   #Protocol_client_context.full ->
   [`Block] Client_baking_files.location ->
-  baker:baker_hash ->
+  delegate:Signature.public_key_hash ->
   Raw_level.t ->
   bool tzresult Lwt.t
 
 val may_inject_endorsement :
   #Protocol_client_context.full ->
   [`Endorsement] Client_baking_files.location ->
-  baker:baker_hash ->
+  delegate:Signature.public_key_hash ->
   Raw_level.t ->
   bool tzresult Lwt.t
 
 val record_block :
   #Protocol_client_context.full ->
   [`Block] Client_baking_files.location ->
-  baker:baker_hash ->
+  delegate:Signature.public_key_hash ->
   Raw_level.t ->
   unit tzresult Lwt.t
 
 val record_endorsement :
   #Protocol_client_context.full ->
   [`Endorsement] Client_baking_files.location ->
-  baker:baker_hash ->
+  delegate:Signature.public_key_hash ->
   Raw_level.t ->
   unit tzresult Lwt.t

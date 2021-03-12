@@ -46,42 +46,17 @@ module Kind = struct
 
   type transaction = Transaction_kind
 
-  type origination_legacy = Origination_legacy_kind
-
   type origination = Origination_kind
-
-  type delegation_legacy = Delegation_legacy_kind
 
   type delegation = Delegation_kind
 
   type failing_noop = Failing_noop_kind
 
-  type baker_registration = Baker_registration_kind
-
-  type set_baker_active = Set_baker_active_kind
-
-  type toggle_baker_delegations = Toggle_baker_delegations_kind
-
-  type set_baker_consensus_key = Set_baker_consensus_key_kind
-
-  type set_baker_pvss_key = Set_baker_pvss_key_kind
-
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
-    | Origination_legacy_manager_kind : origination_legacy manager
     | Origination_manager_kind : origination manager
-    | Delegation_legacy_manager_kind : delegation_legacy manager
     | Delegation_manager_kind : delegation manager
-    | Baker_registration_manager_kind : baker_registration manager
-
-  type 'a baker =
-    | Baker_proposals_kind : proposals baker
-    | Baker_ballot_kind : ballot baker
-    | Set_baker_active_baker_kind : set_baker_active baker
-    | Toggle_baker_delegations_baker_kind : toggle_baker_delegations baker
-    | Set_baker_consensus_key_baker_kind : set_baker_consensus_key baker
-    | Set_baker_pvss_key_baker_kind : set_baker_pvss_key baker
 end
 
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
@@ -165,55 +140,16 @@ and _ manager_operation =
       destination : Contract_repr.contract;
     }
       -> Kind.transaction manager_operation
-  | Origination_legacy : {
+  | Origination : {
       delegate : Signature.Public_key_hash.t option;
       script : Script_repr.t;
       credit : Tez_repr.tez;
       preorigination : Contract_repr.t option;
     }
-      -> Kind.origination_legacy manager_operation
-  | Origination : {
-      delegate : Baker_hash.t option;
-      script : Script_repr.t;
-      credit : Tez_repr.tez;
-      preorigination : Contract_repr.t option;
-    }
       -> Kind.origination manager_operation
-  | Delegation_legacy :
+  | Delegation :
       Signature.Public_key_hash.t option
-      -> Kind.delegation_legacy manager_operation
-  | Delegation : Baker_hash.t option -> Kind.delegation manager_operation
-  | Baker_registration : {
-      credit : Tez_repr.tez;
-      consensus_key : Signature.Public_key.t;
-      ownership_proof : Signature.t;
-      threshold : int;
-      owner_keys : Signature.Public_key.t list;
-    }
-      -> Kind.baker_registration manager_operation
-
-and _ baker_operation =
-  | Baker_proposals : {
-      period : int32;
-      proposals : string list;
-    }
-      -> Kind.proposals baker_operation
-  | Baker_ballot : {
-      period : int32;
-      proposal : string;
-      ballot : Vote_repr.ballot;
-    }
-      -> Kind.ballot baker_operation
-  | Set_baker_active : bool -> Kind.set_baker_active baker_operation
-  | Toggle_baker_delegations :
-      bool
-      -> Kind.toggle_baker_delegations baker_operation
-  | Set_baker_consensus_key :
-      Signature.Public_key.t * Signature.t
-      -> Kind.set_baker_consensus_key baker_operation
-  | Set_baker_pvss_key :
-      Pvss_secp256k1.Public_key.t
-      -> Kind.set_baker_pvss_key baker_operation
+      -> Kind.delegation manager_operation
 
 and counter = Z.t
 
@@ -223,48 +159,19 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
       Kind.Reveal_manager_kind
   | Transaction _ ->
       Kind.Transaction_manager_kind
-  | Origination_legacy _ ->
-      Kind.Origination_legacy_manager_kind
   | Origination _ ->
       Kind.Origination_manager_kind
-  | Delegation_legacy _ ->
-      Kind.Delegation_legacy_manager_kind
   | Delegation _ ->
       Kind.Delegation_manager_kind
-  | Baker_registration _ ->
-      Kind.Baker_registration_manager_kind
 
-let baker_kind : type kind. kind baker_operation -> kind Kind.baker = function
-  | Baker_proposals _ ->
-      Kind.Baker_proposals_kind
-  | Baker_ballot _ ->
-      Kind.Baker_ballot_kind
-  | Set_baker_active _ ->
-      Kind.Set_baker_active_baker_kind
-  | Toggle_baker_delegations _ ->
-      Kind.Toggle_baker_delegations_baker_kind
-  | Set_baker_consensus_key _ ->
-      Kind.Set_baker_consensus_key_baker_kind
-  | Set_baker_pvss_key _ ->
-      Kind.Set_baker_pvss_key_baker_kind
-
-type 'kind internal_manager_operation = {
+type 'kind internal_operation = {
   source : Contract_repr.contract;
   operation : 'kind manager_operation;
   nonce : int;
 }
 
-type 'kind internal_baker_operation = {
-  baker : Baker_hash.t;
-  operation : 'kind baker_operation;
-  nonce : int;
-}
-
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
-
-type packed_baker_operation =
-  | Baker : 'kind baker_operation -> packed_baker_operation
 
 type packed_contents = Contents : 'kind contents -> packed_contents
 
@@ -283,12 +190,7 @@ let pack ({shell; protocol_data} : _ operation) : packed_operation =
   {shell; protocol_data = Operation_data protocol_data}
 
 type packed_internal_operation =
-  | Internal_manager_operation :
-      'kind internal_manager_operation
-      -> packed_internal_operation
-  | Internal_baker_operation :
-      'kind internal_baker_operation
-      -> packed_internal_operation
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
 let rec to_list = function
   | Contents_list (Single o) ->
@@ -368,7 +270,6 @@ module Encoding = struct
           builtin_case 2 "do";
           builtin_case 3 "set_delegate";
           builtin_case 4 "remove_delegate";
-          builtin_case 5 "main";
           Data_encoding.case
             (Tag 255)
             ~title:"named"
@@ -415,7 +316,7 @@ module Encoding = struct
               Transaction {amount; destination; parameters; entrypoint});
         }
 
-    let origination_legacy_case =
+    let origination_case =
       MCase
         {
           tag = 2;
@@ -425,40 +326,6 @@ module Encoding = struct
               (req "balance" Tez_repr.encoding)
               (opt "delegate" Signature.Public_key_hash.encoding)
               (req "script" Script_repr.encoding);
-          select =
-            (function
-            | Manager (Origination_legacy _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Origination_legacy
-                { credit;
-                  delegate;
-                  script;
-                  preorigination =
-                    _
-                    (* the hash is only used internally
-                               when originating from smart
-                               contracts, don't serialize it *)
-                } ->
-                (credit, delegate, script));
-          inj =
-            (fun (credit, delegate, script) ->
-              Origination_legacy
-                {credit; delegate; script; preorigination = None});
-        }
-
-    let origination_case =
-      MCase
-        {
-          tag = 202;
-          name = "origination";
-          encoding =
-            obj4
-              (req "balance" Tez_repr.encoding)
-              (opt "delegate" Baker_hash.encoding)
-              (req "script" Script_repr.encoding)
-              (* version to disambiguate from [origination_legacy_case] *)
-              (req "version" (constant "1"));
           select =
             (function Manager (Origination _ as op) -> Some op | _ -> None);
           proj =
@@ -473,67 +340,22 @@ module Encoding = struct
                                when originating from smart
                                contracts, don't serialize it *)
                 } ->
-                (credit, delegate, script, ()));
+                (credit, delegate, script));
           inj =
-            (fun (credit, delegate, script, ()) ->
+            (fun (credit, delegate, script) ->
               Origination {credit; delegate; script; preorigination = None});
         }
 
-    let delegation_legacy_case =
+    let delegation_case =
       MCase
         {
           tag = 3;
           name = "delegation";
           encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
           select =
-            (function
-            | Manager (Delegation_legacy _ as op) -> Some op | _ -> None);
-          proj = (function Delegation_legacy key -> key);
-          inj = (fun key -> Delegation_legacy key);
-        }
-
-    let delegation_case =
-      MCase
-        {
-          tag = 203;
-          name = "delegation";
-          encoding =
-            obj2
-              (opt "delegate" Baker_hash.encoding)
-              (* version to disambiguate from [delegation_legacy_case] *)
-              (req "version" (constant "1"));
-          select =
             (function Manager (Delegation _ as op) -> Some op | _ -> None);
-          proj = (function Delegation key -> (key, ()));
-          inj = (fun (key, ()) -> Delegation key);
-        }
-
-    let baker_registration_case =
-      MCase
-        {
-          tag = 4;
-          name = "baker_registration";
-          encoding =
-            obj5
-              (req "credit" Tez_repr.encoding)
-              (req "consensus_key" Signature.Public_key.encoding)
-              (req "proof" Signature.encoding)
-              (req "threshold" uint16)
-              (req "owner_keys" (list Signature.Public_key.encoding));
-          select =
-            (function
-            | Manager (Baker_registration _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Baker_registration
-                {credit; consensus_key; ownership_proof; threshold; owner_keys}
-              ->
-                (credit, consensus_key, ownership_proof, threshold, owner_keys));
-          inj =
-            (fun (credit, consensus_key, ownership_proof, threshold, owner_keys)
-                 ->
-              Baker_registration
-                {credit; consensus_key; ownership_proof; threshold; owner_keys});
+          proj = (function Delegation key -> key);
+          inj = (fun key -> Delegation key);
         }
 
     let encoding =
@@ -550,11 +372,8 @@ module Encoding = struct
         ~tag_size:`Uint8
         [ make reveal_case;
           make transaction_case;
-          make origination_legacy_case;
           make origination_case;
-          make delegation_legacy_case;
-          make delegation_case;
-          make baker_registration_case ]
+          make delegation_case ]
   end
 
   type 'b case =
@@ -764,18 +583,18 @@ module Encoding = struct
       (req "gas_limit" (check_size 10 Gas_limit_repr.Arith.n_integral_encoding))
       (req "storage_limit" (check_size 10 n))
 
+  let extract (type kind)
+      (Manager_operation
+         {source; fee; counter; gas_limit; storage_limit; operation = _} :
+        kind Kind.manager contents) =
+    (source, fee, counter, gas_limit, storage_limit)
+
+  let rebuild (source, fee, counter, gas_limit, storage_limit) operation =
+    Manager_operation
+      {source; fee; counter; gas_limit; storage_limit; operation}
+
   let make_manager_case tag (type kind)
       (Manager_operations.MCase mcase : kind Manager_operations.case) =
-    let extract (type kind)
-        (Manager_operation
-           {source; fee; counter; gas_limit; storage_limit; operation = _} :
-          kind Kind.manager contents) =
-      (source, fee, counter, gas_limit, storage_limit)
-    in
-    let rebuild (source, fee, counter, gas_limit, storage_limit) operation =
-      Manager_operation
-        {source; fee; counter; gas_limit; storage_limit; operation}
-    in
     Case
       {
         tag;
@@ -803,20 +622,11 @@ module Encoding = struct
   let transaction_case =
     make_manager_case 108 Manager_operations.transaction_case
 
-  let origination_legacy_case =
-    make_manager_case 109 Manager_operations.origination_legacy_case
-
   let origination_case =
-    make_manager_case 209 Manager_operations.origination_case
-
-  let delegation_legacy_case =
-    make_manager_case 110 Manager_operations.delegation_legacy_case
+    make_manager_case 109 Manager_operations.origination_case
 
   let delegation_case =
-    make_manager_case 210 Manager_operations.delegation_case
-
-  let baker_registration_case =
-    make_manager_case 111 Manager_operations.baker_registration_case
+    make_manager_case 110 Manager_operations.delegation_case
 
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
@@ -839,12 +649,9 @@ module Encoding = struct
            make ballot_case;
            make reveal_case;
            make transaction_case;
-           make origination_legacy_case;
            make origination_case;
-           make delegation_legacy_case;
            make delegation_case;
-           make failing_noop_case;
-           make baker_registration_case ]
+           make failing_noop_case ]
 
   let contents_list_encoding =
     conv to_list of_list (Variable.list contents_encoding)
@@ -878,198 +685,16 @@ module Encoding = struct
          Operation.shell_header_encoding
          (obj1 (req "contents" contents_list_encoding))
 
-  module Baker_operations = struct
-    type 'kind case =
-      | BCase : {
-          tag : int;
-          name : string;
-          encoding : 'a Data_encoding.t;
-          select : packed_baker_operation -> 'kind baker_operation option;
-          proj : 'kind baker_operation -> 'a;
-          inj : 'a -> 'kind baker_operation;
-        }
-          -> 'kind case
-
-    let baker_proposals_case =
-      BCase
-        {
-          tag = 0;
-          name = "baker_proposals";
-          encoding = obj2 (req "period" int32) (req "proposals" (list string));
-          select =
-            (function Baker (Baker_proposals _ as op) -> Some op | _ -> None);
-          proj =
-            (fun (Baker_proposals {period; proposals}) -> (period, proposals));
-          inj =
-            (fun (period, proposals) -> Baker_proposals {period; proposals});
-        }
-
-    let baker_ballot_case =
-      BCase
-        {
-          tag = 1;
-          name = "baker_ballot";
-          encoding =
-            obj3
-              (req "period" int32)
-              (req "proposal" string)
-              (req "ballot" Vote_repr.ballot_encoding);
-          select =
-            (function Baker (Baker_ballot _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Baker_ballot {period; proposal; ballot} ->
-                (period, proposal, ballot));
-          inj =
-            (fun (period, proposal, ballot) ->
-              Baker_ballot {period; proposal; ballot});
-        }
-
-    let set_baker_active_case =
-      BCase
-        {
-          tag = 2;
-          name = "set_baker_active";
-          encoding = obj1 (req "active" bool);
-          select =
-            (function
-            | Baker (Set_baker_active _ as op) -> Some op | _ -> None);
-          proj = (function Set_baker_active active -> active);
-          inj = (fun active -> Set_baker_active active);
-        }
-
-    let toggle_baker_delegations_case =
-      BCase
-        {
-          tag = 3;
-          name = "toggle_baker_delegations";
-          encoding = obj1 (req "accept_delegations" bool);
-          select =
-            (function
-            | Baker (Toggle_baker_delegations _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Toggle_baker_delegations accept_delegations -> accept_delegations);
-          inj =
-            (fun accept_delegations ->
-              Toggle_baker_delegations accept_delegations);
-        }
-
-    let set_baker_consensus_key_case =
-      BCase
-        {
-          tag = 4;
-          name = "set_baker_consensus_key";
-          encoding =
-            obj2
-              (req "key" Signature.Public_key.encoding)
-              (req "proof" Signature.encoding);
-          select =
-            (function
-            | Baker (Set_baker_consensus_key _ as op) -> Some op | _ -> None);
-          proj =
-            (function Set_baker_consensus_key (key, proof) -> (key, proof));
-          inj = (fun (key, proof) -> Set_baker_consensus_key (key, proof));
-        }
-
-    let set_baker_pvss_key_case =
-      BCase
-        {
-          tag = 5;
-          name = "set_baker_pvss_key";
-          encoding = obj1 (req "key" Pvss_secp256k1.Public_key.encoding);
-          select =
-            (function
-            | Baker (Set_baker_pvss_key _ as op) -> Some op | _ -> None);
-          proj = (function Set_baker_pvss_key key -> key);
-          inj = (fun key -> Set_baker_pvss_key key);
-        }
-
-    let encoding =
-      let make (BCase {tag; name; encoding; select; proj; inj}) =
-        case
-          (Tag tag)
-          name
-          encoding
-          (fun o ->
-            match select o with None -> None | Some o -> Some (proj o))
-          (fun x -> Baker (inj x))
-      in
-      union
-        ~tag_size:`Uint8
-        [ make baker_proposals_case;
-          make baker_ballot_case;
-          make set_baker_active_case;
-          make toggle_baker_delegations_case;
-          make set_baker_consensus_key_case;
-          make set_baker_pvss_key_case ]
-  end
-
-  type 'b icase =
-    | ICase : {
-        tag : int;
-        name : string;
-        encoding : 'a Data_encoding.t;
-        proj : 'b -> 'a option;
-        inj : 'a -> 'b;
-      }
-        -> 'b icase
-
-  let icase tag name args proj inj =
-    let open Data_encoding in
-    case
-      tag
-      ~title:(String.capitalize_ascii name)
-      args
-      (fun x -> match proj x with None -> None | Some x -> Some x)
-      (fun x -> inj x)
-
-  let manager_case =
-    ICase
-      {
-        tag = 0;
-        name = "internal_manager_operation";
-        encoding =
-          merge_objs
-            (obj2 (req "source" Contract_repr.encoding) (req "nonce" uint16))
-            Manager_operations.encoding;
-        proj =
-          (function
-          | Internal_manager_operation {source; operation; nonce} ->
-              Some ((source, nonce), Manager operation)
-          | _ ->
-              None);
-        inj =
-          (fun ((source, nonce), Manager operation) ->
-            Internal_manager_operation {source; operation; nonce});
-      }
-
-  let baker_case =
-    ICase
-      {
-        tag = 1;
-        name = "internal_baker_operation";
-        encoding =
-          merge_objs
-            (obj2 (req "baker" Baker_hash.encoding) (req "nonce" uint16))
-            Baker_operations.encoding;
-        proj =
-          (function
-          | Internal_baker_operation {baker; operation; nonce} ->
-              Some ((baker, nonce), Baker operation)
-          | _ ->
-              None);
-        inj =
-          (fun ((baker, nonce), Baker operation) ->
-            Internal_baker_operation {baker; operation; nonce});
-      }
-
   let internal_operation_encoding =
-    let make (ICase {tag; name; encoding; proj; inj}) =
-      icase (Tag tag) name encoding proj inj
-    in
     def "operation.alpha.internal_operation"
-    @@ union [make manager_case; make baker_case]
+    @@ conv
+         (fun (Internal_operation {source; operation; nonce}) ->
+           ((source, nonce), Manager operation))
+         (fun ((source, nonce), Manager operation) ->
+           Internal_operation {source; operation; nonce})
+         (merge_objs
+            (obj2 (req "source" Contract_repr.encoding) (req "nonce" uint16))
+            Manager_operations.encoding)
 end
 
 let encoding = Encoding.operation_encoding
@@ -1202,25 +827,13 @@ let equal_manager_operation_kind :
       Some Eq
   | (Transaction _, _) ->
       None
-  | (Origination_legacy _, Origination_legacy _) ->
-      Some Eq
-  | (Origination_legacy _, _) ->
-      None
   | (Origination _, Origination _) ->
       Some Eq
   | (Origination _, _) ->
       None
-  | (Delegation_legacy _, Delegation_legacy _) ->
-      Some Eq
-  | (Delegation_legacy _, _) ->
-      None
   | (Delegation _, Delegation _) ->
       Some Eq
   | (Delegation _, _) ->
-      None
-  | (Baker_registration _, Baker_registration _) ->
-      Some Eq
-  | (Baker_registration _, _) ->
       None
 
 let equal_contents_kind :

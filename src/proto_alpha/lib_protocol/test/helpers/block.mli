@@ -32,7 +32,6 @@ type t = {
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;  (** Resulting context *)
-  origination_nonce : Contract.origination_nonce;
 }
 
 type block = t
@@ -41,20 +40,20 @@ val rpc_ctxt : t Environment.RPC_context.simple
 
 (** Policies to select the next baker:
     - [By_priority p] selects the baker at priority [p]
-    - [By_account baker_hash] selects the first slot for baker [baker_hash]
-    - [Excluding baker_hashes] selects the first baker that doesn't belong to [baker_hashes]
+    - [By_account pkh] selects the first slot for baker [pkh]
+    - [Excluding pkhs] selects the first baker that doesn't belong to [pkhs]
 *)
 type baker_policy =
   | By_priority of int
-  | By_account of baker_hash
-  | Excluding of baker_hash list
+  | By_account of public_key_hash
+  | Excluding of public_key_hash list
 
 (** Returns (account, priority, timestamp) of the next baker given
     a policy, defaults to By_priority 0. *)
 val get_next_baker :
   ?policy:baker_policy ->
   t ->
-  (baker_hash * int * Time.Protocol.t) tzresult Lwt.t
+  (public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
 
 val get_endorsing_power : block -> int tzresult Lwt.t
 
@@ -80,8 +79,8 @@ module Forge : sig
   (** Sets uniquely seed_nonce_hash of a header *)
   val set_seed_nonce_hash : Nonce_hash.t option -> header -> header
 
-  (** Sets the baker that will sign the header to an arbitrary baker's key *)
-  val set_baker : baker_hash -> header -> header
+  (** Sets the baker that will sign the header to an arbitrary pkh *)
+  val set_baker : public_key_hash -> header -> header
 
   (** Signs the header with the key of the baker configured in the header.
       The header can no longer be modified, only applied. *)
@@ -98,16 +97,12 @@ val genesis :
   ?initial_endorsers:int ->
   ?min_proposal_quorum:int32 ->
   (Account.t * Tez.tez) list ->
-  (Account.baker * Tez.tez) list ->
-  Contract.origination_nonce ->
   block tzresult Lwt.t
 
 val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
 
-(** Applies a signed header and its operations to a block and obtains a new
-    block. This will result in error, if any of the operation results in an
-    error.
-*)
+(** Applies a signed header and its operations to a block and
+    obtains a new block *)
 val apply :
   Block_header.block_header ->
   ?operations:Operation.packed list ->

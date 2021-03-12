@@ -35,7 +35,6 @@ type t = {
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;
-  origination_nonce : Contract.origination_nonce;
 }
 
 type block = t
@@ -58,48 +57,54 @@ let rpc_ctxt =
 (* This type is used only to provide a simpler interface to the exterior. *)
 type baker_policy =
   | By_priority of int
-  | By_account of baker_hash
-  | Excluding of baker_hash list
+  | By_account of public_key_hash
+  | Excluding of public_key_hash list
 
 let get_next_baker_by_priority priority block =
-  Alpha_services.Baker.Baking_rights.get
+  Alpha_services.Delegate.Baking_rights.get
     rpc_ctxt
     ~all:true
     ~max_priority:(priority + 1)
     block
   >|=? fun bakers ->
-  let {Alpha_services.Baker.Baking_rights.baker; timestamp; _} =
+  let {Alpha_services.Delegate.Baking_rights.delegate = pkh; timestamp; _} =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
-         (fun {Alpha_services.Baker.Baking_rights.priority = p; _} ->
+         (fun {Alpha_services.Delegate.Baking_rights.priority = p; _} ->
            p = priority)
          bakers
   in
-  (baker, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
+  (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
-let get_next_baker_by_account baker block =
-  Alpha_services.Baker.Baking_rights.get
+let get_next_baker_by_account pkh block =
+  Alpha_services.Delegate.Baking_rights.get
     rpc_ctxt
-    ~bakers:[baker]
+    ~delegates:[pkh]
     ~max_priority:256
     block
   >|=? fun bakers ->
-  let {Alpha_services.Baker.Baking_rights.baker; timestamp; priority; _} =
+  let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
+        timestamp;
+        priority;
+        _ } =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers
   in
-  (baker, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
+  (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
 let get_next_baker_excluding excludes block =
-  Alpha_services.Baker.Baking_rights.get rpc_ctxt ~max_priority:256 block
+  Alpha_services.Delegate.Baking_rights.get rpc_ctxt ~max_priority:256 block
   >|=? fun bakers ->
-  let {Alpha_services.Baker.Baking_rights.baker; timestamp; priority; _} =
+  let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
+        timestamp;
+        priority;
+        _ } =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
-         (fun {Alpha_services.Baker.Baking_rights.baker; _} ->
-           not (List.mem baker excludes))
+         (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
+           not (List.mem delegate excludes))
          bakers
   in
-  (baker, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
+  (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
 
 let dispatch_policy = function
   | By_priority p ->
@@ -117,7 +122,11 @@ let get_endorsing_power b =
       let (Operation_data data) = op.protocol_data in
       match data.contents with
       | Single (Endorsement _) ->
-          Alpha_services.Baker.Endorsing_power.get rpc_ctxt b op Chain_id.zero
+          Alpha_services.Delegate.Endorsing_power.get
+            rpc_ctxt
+            b
+            op
+            Chain_id.zero
           >|=? fun endorsement_power -> acc + endorsement_power
       | _ ->
           return acc)
@@ -126,7 +135,7 @@ let get_endorsing_power b =
 
 module Forge = struct
   type header = {
-    baker : baker_hash;
+    baker : public_key_hash;
     (* the signer of the block *)
     shell : Block_header.shell_header;
     contents : Block_header.contents;
@@ -159,8 +168,8 @@ module Forge = struct
   let set_baker baker header = {header with baker}
 
   let sign_header {baker; shell; contents} =
-    Account.find_baker baker
-    >|=? fun account ->
+    Account.find baker
+    >|=? fun delegate ->
     let unsigned_bytes =
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding
@@ -169,7 +178,7 @@ module Forge = struct
     let signature =
       Signature.sign
         ~watermark:Signature.(Block_header Chain_id.zero)
-        account.key.sk
+        delegate.sk
         unsigned_bytes
     in
     Block_header.{shell; protocol_data = {contents; signature}}
@@ -177,8 +186,8 @@ module Forge = struct
   let forge_header ?(policy = By_priority 0) ?timestamp ?(operations = []) pred
       =
     dispatch_policy policy pred
-    >>=? fun (baker, priority, _timestamp) ->
-    Alpha_services.Baker.Minimal_valid_time.get rpc_ctxt pred priority 0
+    >>=? fun (pkh, priority, _timestamp) ->
+    Alpha_services.Delegate.Minimal_valid_time.get rpc_ctxt pred priority 0
     >>=? fun expected_timestamp ->
     let timestamp = Option.value ~default:expected_timestamp timestamp in
     let level = Int32.succ pred.header.shell.level in
@@ -208,7 +217,7 @@ module Forge = struct
         ~operations_hash
     in
     let contents = make_contents ~priority ~seed_nonce_hash () in
-    {baker; shell; contents}
+    {baker = pkh; shell; contents}
 
   (* compatibility only, needed by incremental *)
   let contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
@@ -237,7 +246,7 @@ let check_constants_consistency constants =
          blocks per roll snapshot")
 
 let initial_context ?(with_commitments = false) constants header
-    initial_accounts initial_bakers =
+    initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let bootstrap_accounts =
     List.map
@@ -245,16 +254,9 @@ let initial_context ?(with_commitments = false) constants header
         Default_parameters.make_bootstrap_account (pkh, pk, amount))
       initial_accounts
   in
-  let bootstrap_bakers =
-    List.map
-      (fun (Account.{key = {pk; _}; baker}, amount) ->
-        Default_parameters.make_bootstrap_baker (baker, amount, pk))
-      initial_bakers
-  in
   let parameters =
     Default_parameters.parameters_of_constants
       ~bootstrap_accounts
-      ~bootstrap_bakers
       ~with_commitments
       constants
   in
@@ -296,24 +298,18 @@ let genesis_with_parameters parameters =
   >>= fun ctxt ->
   Main.init ctxt shell >|= Environment.wrap_tzresult
   >|=? fun {context; _} ->
-  let origination_nonce =
-    Contract.initial_origination_nonce Operation_hash.zero
-  in
   {
     hash;
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
     operations = [];
     context;
-    origination_nonce;
   }
 
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
 let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
-    ?min_proposal_quorum (initial_accounts : (Account.t * Tez.t) list)
-    (initial_bakers : (Account.baker * Tez.t) list)
-    (origination_nonce : Contract.origination_nonce) =
-  if initial_bakers = [] then
+    ?min_proposal_quorum (initial_accounts : (Account.t * Tez.t) list) =
+  if initial_accounts = [] then
     Stdlib.failwith "Must have one account with a roll to bake" ;
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
@@ -338,13 +334,13 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
   Lwt.catch
     (fun () ->
       List.fold_left_es
-        (fun acc (_baker, baker_amount) ->
-          Environment.wrap_tzresult @@ Tez.( +? ) acc baker_amount
+        (fun acc (_, amount) ->
+          Environment.wrap_tzresult @@ Tez.( +? ) acc amount
           >>?= fun acc ->
           if acc >= constants.tokens_per_roll then raise Exit else return acc)
         Tez.zero
-        initial_bakers
-      >>=? fun (_ : Tez.t) ->
+        initial_accounts
+      >>=? fun _ ->
       failwith "Insufficient tokens in initial accounts to create one roll")
     (function Exit -> return_unit | exc -> raise exc)
   >>=? fun () ->
@@ -363,69 +359,16 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
       ~operations_hash:Operation_list_list_hash.zero
   in
   let contents = Forge.make_contents ~priority:0 ~seed_nonce_hash:None () in
-  initial_context
-    ?with_commitments
-    constants
-    shell
-    initial_accounts
-    initial_bakers
+  initial_context ?with_commitments constants shell initial_accounts
   >|=? fun context ->
   {
     hash;
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
     operations = [];
     context;
-    origination_nonce;
   }
 
 (********* Baking *************)
-
-(* collect operation receipt errors, if any *)
-let get_operation_receipt_errors : operation_receipt -> unit tzresult =
- fun receipt ->
-  let open Apply_results in
-  let get_operation_result_errors = function
-    | Failed (_, trace) ->
-        generic_error "%a" Environment.Error_monad.pp_trace trace
-    | Backtracked (_, trace) ->
-        Option.fold
-          ~none:ok_unit
-          ~some:(fun trace ->
-            generic_error "%a" Environment.Error_monad.pp_trace trace)
-          trace
-    | _ ->
-        ok_unit
-  in
-  let get_internal_operation_result_errors :
-      packed_internal_operation_result -> unit tzresult = function
-    | Internal_manager_operation_result (_op, mop) ->
-        get_operation_result_errors mop
-    | Internal_baker_operation_result (_op, mop) ->
-        get_operation_result_errors mop
-  in
-  let get_contents_result_errors :
-      type kind. kind contents_result -> unit tzresult = function
-    | Manager_operation_result
-        {operation_result; internal_operation_results = rs; _} ->
-        get_operation_result_errors operation_result
-        >>? fun () ->
-        List.fold_left_e (fun () -> get_internal_operation_result_errors) () rs
-    | _ ->
-        ok_unit
-  in
-  let rec get_contents_result_list_errors :
-      type kind. kind contents_result_list -> unit tzresult = function
-    | Single_result result ->
-        get_contents_result_errors result
-    | Cons_result (r, rs) ->
-        get_contents_result_list_errors rs
-        >>? fun () -> get_contents_result_errors r
-  in
-  match receipt with
-  | No_operation_metadata ->
-      ok_unit
-  | Operation_metadata {contents; _} ->
-      get_contents_result_list_errors contents
 
 let apply header ?(operations = []) pred =
   (let open Environment.Error_monad in
@@ -437,27 +380,17 @@ let apply header ?(operations = []) pred =
     header
   >>=? fun vstate ->
   List.fold_left_es
-    (fun (vstate, receipts) op ->
-      apply_operation vstate op
-      >|=? fun (state, receipt) -> (state, receipt :: receipts))
-    (vstate, [])
+    (fun vstate op ->
+      apply_operation vstate op >|=? fun (state, _result) -> state)
+    vstate
     operations
-  >>=? fun (vstate, op_receipts) ->
+  >>=? fun vstate ->
   Main.finalize_block vstate
-  >|=? fun (validation, _result) -> (validation.context, op_receipts))
+  >|=? fun (validation, _result) -> validation.context)
   >|= Environment.wrap_tzresult
-  >>=? fun (context, op_receipts) ->
-  Lwt.return
-    (List.fold_left_e (fun () -> get_operation_receipt_errors) () op_receipts)
-  >|=? fun () ->
+  >|=? fun context ->
   let hash = Block_header.hash header in
-  {
-    hash;
-    header;
-    operations;
-    context;
-    origination_nonce = pred.origination_nonce;
-  }
+  {hash; header; operations; context}
 
 let bake ?policy ?timestamp ?operation ?operations pred =
   let operations =
@@ -481,7 +414,7 @@ let bake ?policy ?timestamp ?operation ?operations pred =
 let get_constants b = Alpha_services.Constants.all rpc_ctxt b
 
 let bake_n ?policy n b =
-  List.fold_left_es (fun b _i -> bake ?policy b) b (1 -- n)
+  List.fold_left_es (fun b _ -> bake ?policy b) b (1 -- n)
 
 let bake_until_cycle_end ?policy b =
   get_constants b
@@ -492,7 +425,7 @@ let bake_until_cycle_end ?policy b =
   bake_n ?policy (Int32.to_int delta) b
 
 let bake_until_n_cycle_end ?policy n b =
-  List.fold_left_es (fun b _i -> bake_until_cycle_end ?policy b) b (1 -- n)
+  List.fold_left_es (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
 
 let current_cycle b =
   get_constants b

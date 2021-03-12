@@ -27,9 +27,9 @@
 (** Places where tezzies can be found in the ledger's state. *)
 type balance =
   | Contract of Contract_repr.t
-  | Rewards of Baker_hash.t * Cycle_repr.t
-  | Fees of Baker_hash.t * Cycle_repr.t
-  | Deposits of Baker_hash.t * Cycle_repr.t
+  | Rewards of Signature.Public_key_hash.t * Cycle_repr.t
+  | Fees of Signature.Public_key_hash.t * Cycle_repr.t
+  | Deposits of Signature.Public_key_hash.t * Cycle_repr.t
 
 (** A credit or debit of tezzies to a balance. *)
 type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t

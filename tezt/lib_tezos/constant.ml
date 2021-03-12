@@ -34,8 +34,6 @@ let tezos_codec = "./tezos-codec"
 
 type key = {identity : string; alias : string; secret : string}
 
-type baker = {identity : string; alias : string}
-
 let activator =
   {
     identity = "";
@@ -85,69 +83,8 @@ let bootstrap5 =
       "unencrypted:edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm";
   }
 
-let baker1_key =
-  {
-    identity = "tz1UJbFsTQfdpa1qYrqHG9Ykw834AXi5WqRR";
-    alias = "baker1_key";
-    secret =
-      "unencrypted:edsk432L71B91i1sE8rQxPDMo2Yxo4qaYqhktvpt8yovaMpo1NUbBt";
-  }
-
-let baker1 =
-  {identity = "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW"; alias = "baker1"}
-
-let baker2_key =
-  {
-    identity = "tz1fWJ2oeeG6h2r61XY1wen2sV87AvCqGjAU";
-    alias = "baker2_key";
-    secret =
-      "unencrypted:edsk3jjD4cLvE1t3SiZKCRiH9SXnJ4jHEsVpfcuRwfe7sfbnsMGX6f";
-  }
-
-let baker2 =
-  {identity = "SG1TLmKJHVJxQosY6iN21AW77HsAapdupxnR"; alias = "baker2"}
-
-let baker3_key =
-  {
-    identity = "tz1SERFDUknkjJTas8sUco7dskxWrUWhTc2s";
-    alias = "baker3_key";
-    secret =
-      "unencrypted:edsk3EVDFeDsefk1UoWWhDhnBpERhAwqHbVzWnBwA4tdUL8aBhw7RC";
-  }
-
-let baker3 =
-  {identity = "SG1hExdK69Z2RZkkQjKtLG6H4L4FGTZeGKHu"; alias = "baker3"}
-
-let baker4_key =
-  {
-    identity = "tz1eJ9yR95LmJgVrGLvgt56T6ngCFcgjLo2S";
-    alias = "baker4_key";
-    secret =
-      "unencrypted:edsk2rAmeBDrQ5d1FhDoTdifMvBsqSosmPSBhxL74huszZhfMFtiKb";
-  }
-
-let baker4 =
-  {identity = "SG1mHgeWHGMnCUMJ8jZ1Cdh3DkWEcQ88tziJ"; alias = "baker4"}
-
-let baker5_key =
-  {
-    identity = "tz1cwoRFe3BzJv9nZZBA5fk8uV6w9AVVrBF9";
-    alias = "baker5_key";
-    secret =
-      "unencrypted:edsk4Ssc63dnYJUptVMaKfmHLJNMBYv9piYiRCiYjcH3gacKWP1z3v";
-  }
-
-let baker5 =
-  {identity = "SG1jfZeHRzeWAM1T4zrwunEyUpwWc82D4tbv"; alias = "baker5"}
-
-let all_baker_keys : key list =
-  [baker1_key; baker2_key; baker3_key; baker4_key; baker5_key]
-
-let all_secret_keys : key list =
+let all_secret_keys =
   [activator; bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
-  @ all_baker_keys
-
-let all_bakers : baker list = [baker1; baker2; baker3; baker4; baker5]
 
 (** The default burn for an implicit account. *)
 let implicit_account_burn =

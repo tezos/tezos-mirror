@@ -3,7 +3,6 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,7 +27,7 @@
 open Protocol
 open Alpha_context
 
-(** [forge_endorsement cctxt blk baker] emits an endorsement
+(** [forge_endorsement cctxt blk ~src_sk src_pk] emits an endorsement
     operation for the block [blk]
 *)
 val forge_endorsement :
@@ -36,13 +35,14 @@ val forge_endorsement :
   ?async:bool ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
-  baker_hash ->
+  src_sk:Client_keys.sk_uri ->
+  public_key ->
   Operation_hash.t tzresult Lwt.t
 
 val create :
   #Protocol_client_context.full ->
   ?max_past:int64 (* number of seconds *) ->
   delay:int ->
-  Contract.t list ->
+  public_key_hash list ->
   Client_baking_blocks.block_info tzresult Lwt_stream.t ->
   unit tzresult Lwt.t

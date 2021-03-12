@@ -3,7 +3,6 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -36,4 +35,3 @@ let () =
   @ Client_proto_mockup_commands.commands ()
   @ Client_sapling_commands.commands ()
   @ Client_proto_utils_commands.commands ()
-  @ Client_proto_baker_commands.commands ()

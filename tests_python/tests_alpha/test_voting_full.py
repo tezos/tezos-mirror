@@ -1,10 +1,10 @@
 import time
-import pytest
-from tools import utils, constants
 
-from client import client_output
-from client.client import Client
+import pytest
+
 from launchers.sandbox import Sandbox
+from client.client import Client
+from tools import utils, constants
 from . import protocol
 
 BLOCKS_PER_VOTING_PERIOD = 8
@@ -101,8 +101,7 @@ class TestVotingFull:
 
     def test_submit_proto_b_proposal(self, sandbox):
         client = sandbox.client(0)
-        cmd = ['submit', 'proposals', 'for', BAKER, PROTO_B]
-        proposals = client_output.SubmitProposalsResult(client.run(cmd))
+        proposals = client.submit_proposals(BAKER, [PROTO_B])
         # bake a block for the submit proposal to be included
         bake_n_blocks(client, BAKER, 1)
         client.wait_for_inclusion(proposals.operation_hash, check_previous=1)

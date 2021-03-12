@@ -35,7 +35,9 @@ type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t
 
 (* `Temporary *)
 
-type error += Duplicate_endorsement of baker_hash (* `Branch *)
+type error += Duplicate_endorsement of Signature.Public_key_hash.t
+
+(* `Branch *)
 
 type error += Invalid_endorsement_level
 
@@ -49,8 +51,8 @@ type error += Invalid_double_endorsement_evidence (* `Permanent *)
 
 type error +=
   | Inconsistent_double_endorsement_evidence of {
-      delegate1 : baker_hash;
-      delegate2 : baker_hash;
+      delegate1 : Signature.Public_key_hash.t;
+      delegate2 : Signature.Public_key_hash.t;
     }
 
 (* `Permanent *)
@@ -87,8 +89,8 @@ type error +=
 
 type error +=
   | Inconsistent_double_baking_evidence of {
-      delegate1 : baker_hash;
-      delegate2 : baker_hash;
+      delegate1 : Signature.Public_key_hash.t;
+      delegate2 : Signature.Public_key_hash.t;
     }
 
 (* `Permanent *)
@@ -129,16 +131,6 @@ type error +=
 
 type error += (* `Permanent *) Failing_noop_error
 
-type error += Not_a_baker_contract
-
-type error += Invalid_protocols of string list
-
-type error += Forbidden_pending_consensus_key_destination of Contract.t
-
-type error += Not_an_active_consensus_key of Signature.Public_key_hash.t
-
-type error += Invalid_consensus_key_proof
-
 let () =
   register_error_kind
     `Temporary
@@ -178,14 +170,14 @@ let () =
     `Branch
     ~id:"operation.duplicate_endorsement"
     ~title:"Duplicate endorsement"
-    ~description:"Two endorsements received from same baker"
+    ~description:"Two endorsements received from same delegate"
     ~pp:(fun ppf k ->
       Format.fprintf
         ppf
-        "Duplicate endorsement from baker %a (possible replay attack)."
-        Baker_hash.pp_short
+        "Duplicate endorsement from delegate %a (possible replay attack)."
+        Signature.Public_key_hash.pp_short
         k)
-    Data_encoding.(obj1 (req "baker" Baker_hash.encoding))
+    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
     (function Duplicate_endorsement k -> Some k | _ -> None)
     (fun k -> Duplicate_endorsement k) ;
   register_error_kind
@@ -249,10 +241,7 @@ let () =
     ~id:"internal_operation_replay"
     ~title:"Internal operation replay"
     ~description:"An internal operation was emitted twice by a script"
-    ~pp:
-      (fun ppf
-           ( Internal_manager_operation {nonce; _}
-           | Internal_baker_operation {nonce; _} ) ->
+    ~pp:(fun ppf (Internal_operation {nonce; _}) ->
       Format.fprintf
         ppf
         "Internal operation %d was emitted twice by a script"
@@ -281,14 +270,14 @@ let () =
         ppf
         "Inconsistent double-endorsement evidence  (distinct delegate: %a and \
          %a)"
-        Baker_hash.pp_short
+        Signature.Public_key_hash.pp_short
         delegate1
-        Baker_hash.pp_short
+        Signature.Public_key_hash.pp_short
         delegate2)
     Data_encoding.(
       obj2
-        (req "delegate1" Baker_hash.encoding)
-        (req "delegate2" Baker_hash.encoding))
+        (req "delegate1" Signature.Public_key_hash.encoding)
+        (req "delegate2" Signature.Public_key_hash.encoding))
     (function
       | Inconsistent_double_endorsement_evidence {delegate1; delegate2} ->
           Some (delegate1, delegate2)
@@ -393,14 +382,14 @@ let () =
       Format.fprintf
         ppf
         "Inconsistent double-baking evidence  (distinct delegate: %a and %a)"
-        Baker_hash.pp_short
+        Signature.Public_key_hash.pp_short
         delegate1
-        Baker_hash.pp_short
+        Signature.Public_key_hash.pp_short
         delegate2)
     Data_encoding.(
       obj2
-        (req "delegate1" Baker_hash.encoding)
-        (req "delegate2" Baker_hash.encoding))
+        (req "delegate1" Signature.Public_key_hash.encoding)
+        (req "delegate2" Signature.Public_key_hash.encoding))
     (function
       | Inconsistent_double_baking_evidence {delegate1; delegate2} ->
           Some (delegate1, delegate2)
@@ -563,269 +552,30 @@ let () =
         "The failing_noop operation cannot be executed by the protocol")
     Data_encoding.empty
     (function Failing_noop_error -> Some () | _ -> None)
-    (fun () -> Failing_noop_error) ;
-  register_error_kind
-    `Temporary
-    ~id:"operation.invalid_protocols"
-    ~title:"Invalid protocol(s)"
-    ~description:
-      "One or more submitted proposals/ballots is not a valid protocol hash"
-    ~pp:(fun ppf protocols ->
-      Format.(
-        fprintf
-          ppf
-          "One or more submitted proposals/ballots is not a valid protocol \
-           hash: %a"
-          (pp_print_list pp_print_string)
-          protocols))
-    Data_encoding.(obj1 (req "protocols" (list string)))
-    (function Invalid_protocols protocols -> Some protocols | _ -> None)
-    (fun protocols -> Invalid_protocols protocols) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.not_a_baker_contract"
-    ~title:"Not a baker contract"
-    ~description:"Operation is only valid for baker contracts"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Operation is only valid for baker contracts")
-    Data_encoding.empty
-    (function Not_a_baker_contract -> Some () | _ -> None)
-    (fun () -> Not_a_baker_contract) ;
-  register_error_kind
-    `Temporary
-    ~id:"operation.forbidden_pending_consensus_key_destination"
-    ~title:"Forbidden pending consensus key destination"
-    ~description:
-      "Forbidden transaction to a destination that is being used as a pending \
-       consensus key."
-    ~pp:(fun ppf contract ->
-      Format.fprintf
-        ppf
-        "Forbidden transaction to a destination %a that is being used as a \
-         pending consensus key."
-        Contract.pp
-        contract)
-    Data_encoding.(obj1 (req "contract" Contract.encoding))
-    (function
-      | Forbidden_pending_consensus_key_destination c -> Some c | _ -> None)
-    (fun c -> Forbidden_pending_consensus_key_destination c) ;
-  register_error_kind
-    `Temporary
-    ~id:"operation.not_an_active_consensus_key"
-    ~title:"Not an active baker consensus key"
-    ~description:"The given key is not an active baker consensus key."
-    ~pp:(fun ppf key ->
-      Format.fprintf
-        ppf
-        "The given key %a is not an active baker consensus key."
-        Signature.Public_key_hash.pp
-        key)
-    Data_encoding.(obj1 (req "key" Signature.Public_key_hash.encoding))
-    (function Not_an_active_consensus_key k -> Some k | _ -> None)
-    (fun k -> Not_an_active_consensus_key k) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.invalid_consensus_key_proof"
-    ~title:"Invalid consensus key proof"
-    ~description:"The consensus key update contains an invalid ownership proof"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "The consensus key update contains an invalid ownership proof")
-    Data_encoding.empty
-    (function Invalid_consensus_key_proof -> Some () | _ -> None)
-    (fun () -> Invalid_consensus_key_proof)
+    (fun () -> Failing_noop_error)
 
 open Apply_results
-
-(* Operation sources and destinations that refer to an active baker consensus
-   key are mapped to the baker account that owns the key. *)
-type mapped_contract = Consensus_key of baker_hash | Original of Contract.t
-
-module Mapped_key_set = Set.Make (struct
-  type t = mapped_key
-
-  let compare {consensus_key = pkh_a; _} {consensus_key = pkh_b; _} =
-    Signature.Public_key_hash.compare pkh_a pkh_b
-end)
-
-(* Try to find if the given contract is being used as an active consensus key.
-   If so, find the baker with this key. *)
-let map_consensus_key ~mapped_keys ctxt contract =
-  match Contract.is_implicit contract with
-  | None ->
-      return (Original contract, mapped_keys)
-  | Some pkh -> (
-      Baker.is_consensus_key ctxt pkh
-      >>=? function
-      | None ->
-          return (Original contract, mapped_keys)
-      | Some baker ->
-          let mapped_keys =
-            Mapped_key_set.add {baker; consensus_key = pkh} mapped_keys
-          in
-          return (Consensus_key baker, mapped_keys) )
-
-let contract_of_mapped_key : mapped_contract -> Contract.t = function
-  | Consensus_key baker ->
-      Contract.baker_contract baker
-  | Original contract ->
-      contract
-
-let map_contract ~mapped_keys ctxt contract =
-  map_consensus_key ~mapped_keys ctxt contract
-  >|=? fun (mapped_key, mapped_keys) ->
-  (contract_of_mapped_key mapped_key, mapped_keys)
-
-(* Try to map the given key to a baker consensus key. Fails with
-   [Not_an_active_consensus_key] when no matching consensus key is found. *)
-let map_delegate ?(mapped_keys = Mapped_key_set.empty) ctxt delegate =
-  Baker.is_consensus_key ctxt delegate
-  >>=? function
-  | None ->
-      fail @@ Not_an_active_consensus_key delegate
-  | Some baker ->
-      let mapped_keys =
-        Mapped_key_set.add {baker; consensus_key = delegate} mapped_keys
-      in
-      return (baker, mapped_keys)
-
-let apply_origination ctxt ~before_operation ~(delegate : baker_hash option)
-    ~(script : Script.t) ~(preorigination : Contract.t option)
-    ~(credit : Tez.t) ~internal ~source ~payer =
-  Script.force_decode_in_context ctxt script.storage
-  >>?= fun (unparsed_storage, ctxt) ->
-  (* see [note] *)
-  Gas.consume ctxt (Script.deserialized_cost unparsed_storage)
-  >>?= fun ctxt ->
-  Script.force_decode_in_context ctxt script.code
-  >>?= fun (unparsed_code, ctxt) ->
-  (* see [note] *)
-  Gas.consume ctxt (Script.deserialized_cost unparsed_code)
-  >>?= fun ctxt ->
-  Script_ir_translator.parse_script
-    ctxt
-    ~legacy:false
-    ~allow_forged_in_storage:internal
-    script
-  >>=? fun (Ex_originated_script parsed_script, ctxt) ->
-  Script_ir_translator.collect_lazy_storage
-    ctxt
-    parsed_script.storage_type
-    parsed_script.storage
-  >>?= fun (to_duplicate, ctxt) ->
-  let to_update = Script_ir_translator.no_lazy_storage_id in
-  Script_ir_translator.extract_lazy_storage_diff
-    ctxt
-    Optimized
-    parsed_script.storage_type
-    parsed_script.storage
-    ~to_duplicate
-    ~to_update
-    ~temporary:false
-  >>=? fun (storage, lazy_storage_diff, ctxt) ->
-  Script_ir_translator.unparse_data
-    ctxt
-    Optimized
-    parsed_script.storage_type
-    storage
-  >>=? fun (storage, ctxt) ->
-  let storage = Script.lazy_expr (Micheline.strip_locations storage) in
-  let script = {script with storage} in
-  Contract.spend ctxt source credit
-  >>=? fun ctxt ->
-  ( match preorigination with
-  | Some contract ->
-      assert internal ;
-      (* The preorigination field is only used to early return
-           the address of an originated contract in Michelson.
-           It cannot come from the outside. *)
-      ok (ctxt, contract)
-  | None ->
-      Contract.fresh_contract_from_current_nonce ctxt )
-  >>?= fun (ctxt, contract) ->
-  Contract.originate
-    ctxt
-    contract
-    ~delegate
-    ~balance:credit
-    ~script:(script, lazy_storage_diff)
-  >>=? fun ctxt ->
-  Fees.origination_burn ctxt
-  >>?= fun (ctxt, origination_burn) ->
-  Fees.record_paid_storage_space ctxt contract
-  >|=? fun (ctxt, storage_size, paid_storage_size_diff, fees) ->
-  let balance_updates =
-    Receipt.cleanup_balance_updates
-      [ (Contract payer, Debited fees, Block_application);
-        (Contract payer, Debited origination_burn, Block_application);
-        (Contract source, Debited credit, Block_application);
-        (Contract contract, Credited credit, Block_application) ]
-  in
-  let originated_contracts = [contract] in
-  let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
-  ( ctxt,
-    {
-      lazy_storage_diff;
-      balance_updates;
-      originated_contracts;
-      consumed_gas;
-      storage_size;
-      paid_storage_size_diff;
-    } )
-
-let baker_consensus_key_proof_operation chain_id payload signature =
-  let payload =
-    [ Bytes.of_string "\xD3\x13\x64\x73";
-      (* TODO: write TZIP for failing noop magic namespace *)
-      Chain_id.to_bytes chain_id;
-      payload ]
-    |> Bytes.concat Bytes.empty |> Bytes.to_string
-  in
-  ( {
-      shell = {branch = Block_hash.zero};
-      protocol_data = {contents = Single (Failing_noop payload); signature};
-    }
-    : Kind.failing_noop Operation.t )
-
-let set_baker_consensus_key_proof_operation chain_id payload signature =
-  let payload = Baker_hash.to_bytes payload in
-  baker_consensus_key_proof_operation chain_id payload signature
-
-let register_baker_consensus_key_proof_operation chain_id payload signature =
-  let encoding =
-    Data_encoding.(
-      obj2
-        (req "threshold" uint16)
-        (req "owner_keys" (list Signature.Public_key.encoding)))
-  in
-  let payload = Data_encoding.Binary.to_bytes_exn encoding payload in
-  baker_consensus_key_proof_operation chain_id payload signature
 
 let apply_manager_operation_content :
     type kind.
     Alpha_context.t ->
     Script_ir_translator.unparsing_mode ->
-    payer:mapped_contract ->
-    source:mapped_contract ->
+    payer:Contract.t ->
+    source:Contract.t ->
     chain_id:Chain_id.t ->
     internal:bool ->
-    mapped_keys:Mapped_key_set.t ->
     kind manager_operation ->
     ( context
     * kind successful_manager_operation_result
-    * packed_internal_operation list
-    * Mapped_key_set.t )
+    * packed_internal_operation list )
     tzresult
     Lwt.t =
- fun ctxt mode ~payer ~source ~chain_id ~internal ~mapped_keys operation ->
+ fun ctxt mode ~payer ~source ~chain_id ~internal operation ->
   let before_operation =
     (* This context is not used for backtracking. Only to compute
          gas consumption and originations for the operation result. *)
     ctxt
   in
-  let source = contract_of_mapped_key source in
-  let payer = contract_of_mapped_key payer in
   Contract.must_exist ctxt source
   >>=? fun () ->
   Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation
@@ -838,16 +588,8 @@ let apply_manager_operation_content :
           ( Reveal_result
               {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
             : kind successful_manager_operation_result ),
-          [],
-          mapped_keys )
+          [] )
   | Transaction {amount; parameters; destination; entrypoint} -> (
-      Baker.is_pending_consensus_key ctxt destination
-      >>= fun is_destination_pending_consensus_key ->
-      fail_when is_destination_pending_consensus_key
-      @@ Forbidden_pending_consensus_key_destination destination
-      >>=? fun () ->
-      map_contract ~mapped_keys ctxt destination
-      >>=? fun (destination, mapped_keys) ->
       Contract.spend ctxt source amount
       >>=? fun ctxt ->
       ( match Contract.is_implicit destination with
@@ -921,7 +663,7 @@ let apply_manager_operation_content :
                   allocated_destination_contract;
                 }
             in
-            (ctxt, result, [], mapped_keys) )
+            (ctxt, result, []) )
       | Some script ->
           Script.force_decode_in_context ctxt parameters
           >>?= fun (parameter, ctxt) ->
@@ -933,14 +675,7 @@ let apply_manager_operation_content :
             let open Script_interpreter in
             {source; payer; self = destination; amount; chain_id}
           in
-          let execute =
-            match Contract.is_baker destination with
-            | Some _ ->
-                Script_interpreter.execute_baker
-            | None ->
-                Script_interpreter.execute
-          in
-          execute
+          Script_interpreter.execute
             ctxt
             mode
             step_constants
@@ -979,253 +714,106 @@ let apply_manager_operation_content :
                 allocated_destination_contract;
               }
           in
-          (ctxt, result, operations, mapped_keys) )
-  | Origination_legacy {delegate; script; preorigination; credit} ->
-      ( match delegate with
-      | None ->
-          return (None, mapped_keys)
-      | Some delegate ->
-          map_delegate ~mapped_keys ctxt delegate
-          >|=? fun (delegate, mapped_keys) -> (Some delegate, mapped_keys) )
-      >>=? fun (delegate, mapped_keys) ->
-      apply_origination
-        ctxt
-        ~before_operation
-        ~delegate
-        ~script
-        ~preorigination
-        ~credit
-        ~internal
-        ~source
-        ~payer
-      >|=? fun (ctxt, origination_result) ->
-      let result = Origination_legacy_result origination_result in
-      (ctxt, result, [], mapped_keys)
+          (ctxt, result, operations) )
   | Origination {delegate; script; preorigination; credit} ->
-      apply_origination
+      Script.force_decode_in_context ctxt script.storage
+      >>?= fun (unparsed_storage, ctxt) ->
+      (* see [note] *)
+      Gas.consume ctxt (Script.deserialized_cost unparsed_storage)
+      >>?= fun ctxt ->
+      Script.force_decode_in_context ctxt script.code
+      >>?= fun (unparsed_code, ctxt) ->
+      (* see [note] *)
+      Gas.consume ctxt (Script.deserialized_cost unparsed_code)
+      >>?= fun ctxt ->
+      Script_ir_translator.parse_script
         ctxt
-        ~before_operation
-        ~delegate
-        ~script
-        ~preorigination
-        ~credit
-        ~internal
-        ~source
-        ~payer
-      >|=? fun (ctxt, origination_result) ->
-      let result = Origination_result origination_result in
-      (ctxt, result, [], mapped_keys)
-  | Delegation_legacy delegate ->
-      ( match delegate with
-      | None ->
-          return (None, mapped_keys)
-      | Some delegate ->
-          map_delegate ~mapped_keys ctxt delegate
-          >|=? fun (delegate, mapped_keys) -> (Some delegate, mapped_keys) )
-      >>=? fun (delegate, mapped_keys) ->
-      Delegation.set ctxt source delegate
-      >>=? fun ctxt ->
-      return
-        ( ctxt,
-          Delegation_legacy_result
-            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
-          [],
-          mapped_keys )
-  | Delegation delegate ->
-      Delegation.set ctxt source delegate
-      >>=? fun ctxt ->
-      return
-        ( ctxt,
-          Delegation_result
-            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
-          [],
-          mapped_keys )
-  | Baker_registration
-      {credit; consensus_key; ownership_proof; threshold; owner_keys} ->
-      let proof_operation =
-        register_baker_consensus_key_proof_operation
-          chain_id
-          (threshold, owner_keys)
-          (Some ownership_proof)
-      in
-      Lwt.return
-        (record_trace
-           Invalid_consensus_key_proof
-           (Operation.check_signature consensus_key chain_id proof_operation))
-      >>=? fun () ->
+        ~legacy:false
+        ~allow_forged_in_storage:internal
+        script
+      >>=? fun (Ex_script parsed_script, ctxt) ->
+      Script_ir_translator.collect_lazy_storage
+        ctxt
+        parsed_script.storage_type
+        parsed_script.storage
+      >>?= fun (to_duplicate, ctxt) ->
+      let to_update = Script_ir_translator.no_lazy_storage_id in
+      Script_ir_translator.extract_lazy_storage_diff
+        ctxt
+        Optimized
+        parsed_script.storage_type
+        parsed_script.storage
+        ~to_duplicate
+        ~to_update
+        ~temporary:false
+      >>=? fun (storage, lazy_storage_diff, ctxt) ->
+      Script_ir_translator.unparse_data
+        ctxt
+        Optimized
+        parsed_script.storage_type
+        storage
+      >>=? fun (storage, ctxt) ->
+      let storage = Script.lazy_expr (Micheline.strip_locations storage) in
+      let script = {script with storage} in
       Contract.spend ctxt source credit
       >>=? fun ctxt ->
-      Baker.register ctxt ~balance:credit ~threshold ~owner_keys ~consensus_key
-      >>=? fun (ctxt, baker) ->
-      let contract = Contract.baker_contract baker in
+      ( match preorigination with
+      | Some contract ->
+          assert internal ;
+          (* The preorigination field is only used to early return
+                 the address of an originated contract in Michelson.
+                 It cannot come from the outside. *)
+          ok (ctxt, contract)
+      | None ->
+          Contract.fresh_contract_from_current_nonce ctxt )
+      >>?= fun (ctxt, contract) ->
+      Contract.originate
+        ctxt
+        contract
+        ~delegate
+        ~balance:credit
+        ~script:(script, lazy_storage_diff)
+      >>=? fun ctxt ->
       Fees.origination_burn ctxt
       >>?= fun (ctxt, origination_burn) ->
       Fees.record_paid_storage_space ctxt contract
       >|=? fun (ctxt, size, paid_storage_size_diff, fees) ->
       let result =
-        Baker_registration_result
+        Origination_result
           {
+            lazy_storage_diff;
             balance_updates =
               Receipt.cleanup_balance_updates
                 [ (Contract payer, Debited fees, Block_application);
                   (Contract payer, Debited origination_burn, Block_application);
                   (Contract source, Debited credit, Block_application);
                   (Contract contract, Credited credit, Block_application) ];
-            registered_baker = baker;
+            originated_contracts = [contract];
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             storage_size = size;
             paid_storage_size_diff;
           }
       in
-      (ctxt, result, [], mapped_keys)
+      (ctxt, result, [])
+  | Delegation delegate ->
+      Delegate.set ctxt source delegate
+      >|=? fun ctxt ->
+      ( ctxt,
+        Delegation_result
+          {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
+        [] )
 
 type success_or_failure = Success of context | Failure
 
-let apply_baker_operation_content :
-    type kind.
-    Alpha_context.t ->
-    baker:baker_hash ->
-    kind baker_operation ->
-    Chain_id.t ->
-    ( context
-    * kind successful_baker_operation_result
-    * packed_internal_operation list )
-    tzresult
-    Lwt.t =
- fun ctxt ~baker operation chain_id ->
-  let before_operation =
-    (* This context is not used for backtracking. Only to compute
-         gas consumption and originations for the operation result. *)
-    ctxt
-  in
-  Contract.(must_exist ctxt @@ baker_contract baker)
-  >>=? fun () ->
-  Gas.consume ctxt Michelson_v1_gas.Cost_of.baker_operation
-  >>?= fun ctxt ->
-  match operation with
-  | Baker_proposals {period; proposals} ->
-      Voting_period.get_current ctxt
-      >>=? fun {index = current_period; _} ->
-      error_unless
-        Compare.Int32.(current_period = period)
-        (Wrong_voting_period (current_period, period))
-      >>?= fun () ->
-      (* try to convert proposals to protocol hashes *)
-      List.fold_left
-        (fun acc proposal ->
-          match (acc, Protocol_hash.of_b58check_opt proposal) with
-          | (Ok acc, Some proposal) ->
-              Ok (proposal :: acc)
-          | (Ok _, None) ->
-              Error [proposal]
-          | (Error acc, None) ->
-              Error (proposal :: acc)
-          | (Error _, Some _) ->
-              acc)
-        (Ok [])
-        proposals
-      |> (function
-           | Error invalid_proposals ->
-               fail (Invalid_protocols invalid_proposals)
-           | Ok p ->
-               return p)
-      >>=? fun proposals ->
-      Amendment.record_proposals ctxt baker proposals
-      >>=? fun ctxt ->
-      return
-        ( ctxt,
-          ( Baker_proposals_result
-              {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
-            : kind successful_baker_operation_result ),
-          [] )
-  | Baker_ballot {period; proposal; ballot} ->
-      Voting_period.get_current ctxt
-      >>=? fun {index = current_period; _} ->
-      error_unless
-        Compare.Int32.(current_period = period)
-        (Wrong_voting_period (current_period, period))
-      >>?= fun () ->
-      ( match Protocol_hash.of_b58check_opt proposal with
-      | None ->
-          fail (Invalid_protocols [proposal])
-      | Some proposal ->
-          return proposal )
-      >>=? fun proposal ->
-      Amendment.record_ballot ctxt baker proposal ballot
-      >>=? fun ctxt ->
-      return
-        ( ctxt,
-          Baker_ballot_result
-            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
-          [] )
-  | Set_baker_active active ->
-      Baker.set_active ctxt baker active
-      >>=? fun ctxt ->
-      return
-        ( ctxt,
-          Set_baker_active_result
-            {
-              active;
-              consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            },
-          [] )
-  | Toggle_baker_delegations accept ->
-      Baker.toggle_delegations ctxt baker accept
-      >>=? fun ctxt ->
-      return
-        ( ctxt,
-          Toggle_baker_delegations_result
-            {
-              accept;
-              consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            },
-          [] )
-  | Set_baker_consensus_key (key, proof) ->
-      let proof_operation =
-        set_baker_consensus_key_proof_operation chain_id baker (Some proof)
-      in
-      Lwt.return
-        (record_trace
-           Invalid_consensus_key_proof
-           (Operation.check_signature key chain_id proof_operation))
-      >>=? fun () ->
-      Baker.set_consensus_key ctxt baker key
-      >>=? fun ctxt ->
-      return
-        ( ctxt,
-          Set_baker_consensus_key_result
-            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
-          [] )
-  | Set_baker_pvss_key key ->
-      Baker.init_set_pvss_key ctxt baker key
-      >>= fun ctxt ->
-      return
-        ( ctxt,
-          Set_baker_pvss_key_result
-            {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
-          [] )
-
-let apply_internal_operations ctxt mode ~payer ~chain_id ~mapped_keys ops =
-  let skip =
-    List.rev_map (function
-        | Internal_manager_operation op ->
-            Internal_manager_operation_result
-              (op, Skipped (manager_kind op.operation))
-        | Internal_baker_operation op ->
-            Internal_baker_operation_result
-              (op, Skipped (baker_kind op.operation)))
-  in
-  let rec apply ctxt applied worklist mapped_keys =
+let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
+  let rec apply ctxt applied worklist =
     match worklist with
     | [] ->
-        Lwt.return (Success ctxt, List.rev applied, mapped_keys)
-    | Internal_manager_operation ({source; operation; nonce} as op) :: rest
-      -> (
+        Lwt.return (Success ctxt, List.rev applied)
+    | Internal_operation ({source; operation; nonce} as op) :: rest -> (
         ( if internal_nonce_already_recorded ctxt nonce then
-          fail (Internal_operation_replay (Internal_manager_operation op))
+          fail (Internal_operation_replay (Internal_operation op))
         else
-          map_consensus_key ~mapped_keys ctxt source
-          >>=? fun (source, mapped_keys) ->
           let ctxt = record_internal_nonce ctxt nonce in
           apply_manager_operation_content
             ctxt
@@ -1234,47 +822,28 @@ let apply_internal_operations ctxt mode ~payer ~chain_id ~mapped_keys ops =
             ~payer
             ~chain_id
             ~internal:true
-            ~mapped_keys
             operation )
         >>= function
         | Error errors ->
             let result =
-              Internal_manager_operation_result
+              Internal_operation_result
                 (op, Failed (manager_kind op.operation, errors))
             in
-            let skipped = skip rest in
-            Lwt.return
-              (Failure, List.rev (skipped @ (result :: applied)), mapped_keys)
-        | Ok (ctxt, result, emitted, mapped_keys) ->
-            apply
-              ctxt
-              ( Internal_manager_operation_result (op, Applied result)
-              :: applied )
-              (emitted @ rest)
-              mapped_keys )
-    | Internal_baker_operation ({baker; operation; nonce} as op) :: rest -> (
-        ( if internal_nonce_already_recorded ctxt nonce then
-          fail (Internal_operation_replay (Internal_baker_operation op))
-        else
-          let ctxt = record_internal_nonce ctxt nonce in
-          apply_baker_operation_content ctxt ~baker operation chain_id )
-        >>= function
-        | Error errors ->
-            let result =
-              Internal_baker_operation_result
-                (op, Failed (baker_kind op.operation, errors))
+            let skipped =
+              List.rev_map
+                (fun (Internal_operation op) ->
+                  Internal_operation_result
+                    (op, Skipped (manager_kind op.operation)))
+                rest
             in
-            let skipped = skip rest in
-            Lwt.return
-              (Failure, List.rev (skipped @ (result :: applied)), mapped_keys)
+            Lwt.return (Failure, List.rev (skipped @ (result :: applied)))
         | Ok (ctxt, result, emitted) ->
             apply
               ctxt
-              (Internal_baker_operation_result (op, Applied result) :: applied)
-              (emitted @ rest)
-              mapped_keys )
+              (Internal_operation_result (op, Applied result) :: applied)
+              (emitted @ rest) )
   in
-  apply ctxt [] ops mapped_keys
+  apply ctxt [] ops
 
 let precheck_manager_contents (type kind) ctxt
     (op : kind Kind.manager contents) : context tzresult Lwt.t =
@@ -1282,23 +851,18 @@ let precheck_manager_contents (type kind) ctxt
         {source; fee; counter; operation; gas_limit; storage_limit}) =
     op
   in
-  map_contract
-    ctxt
-    (Contract.implicit_contract source)
-    ~mapped_keys:Mapped_key_set.empty
-  >>=? fun (source_contract, _mapped_keys) ->
   Gas.check_limit ctxt gas_limit
   >>?= fun () ->
   let ctxt = Gas.set_limit ctxt gas_limit in
   Fees.check_storage_limit ctxt storage_limit
   >>?= fun () ->
-  Contract.must_be_allocated ctxt source_contract
+  Contract.must_be_allocated ctxt (Contract.implicit_contract source)
   >>=? fun () ->
-  Contract.check_counter_increment ctxt source_contract counter
+  Contract.check_counter_increment ctxt source counter
   >>=? fun () ->
   ( match operation with
   | Reveal pk ->
-      Contract.reveal_public_key ctxt source pk
+      Contract.reveal_manager_key ctxt source pk
   | Transaction {parameters; _} ->
       Lwt.return
       (* Fail quickly if not enough gas for minimal deserialization cost *)
@@ -1308,7 +872,7 @@ let precheck_manager_contents (type kind) ctxt
          (* Fail if not enough gas for complete deserialization cost *)
          Script.force_decode_in_context ctxt parameters
          >|? fun (_arg, ctxt) -> ctxt )
-  | Origination_legacy {script; _} | Origination {script; _} ->
+  | Origination {script; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
       @@ (* Fail quickly if not enough gas for minimal deserialization cost *)
@@ -1326,71 +890,56 @@ let precheck_manager_contents (type kind) ctxt
   | _ ->
       return ctxt )
   >>=? fun ctxt ->
-  Contract.increment_counter ctxt source_contract
+  Contract.increment_counter ctxt source
   >>=? fun ctxt ->
-  Contract.spend ctxt source_contract fee
+  Contract.spend ctxt (Contract.implicit_contract source) fee
   >>=? fun ctxt -> Lwt.return (add_fees ctxt fee)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
-    (op : kind Kind.manager contents) ~(mapped_keys : Mapped_key_set.t) :
+    (op : kind Kind.manager contents) :
     ( success_or_failure
     * kind manager_operation_result
-    * packed_internal_operation_result list
-    * Mapped_key_set.t )
-    tzresult
+    * packed_internal_operation_result list )
     Lwt.t =
   let (Manager_operation {source; operation; gas_limit; storage_limit}) = op in
   (* We do not expose the internal scaling to the users. Instead, we multiply
        the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
   let ctxt = Fees.start_counting_storage_fees ctxt in
-  map_consensus_key ~mapped_keys ctxt (Contract.implicit_contract source)
-  >>=? fun (source, mapped_keys) ->
+  let source = Contract.implicit_contract source in
   apply_manager_operation_content
     ctxt
     mode
     ~source
     ~payer:source
     ~internal:false
-    ~mapped_keys
     ~chain_id
     operation
   >>= function
-  | Ok (ctxt, operation_results, internal_operations, mapped_keys) -> (
-      apply_internal_operations
+  | Ok (ctxt, operation_results, internal_operations) -> (
+      apply_internal_manager_operations
         ctxt
         mode
         ~payer:source
         ~chain_id
-        ~mapped_keys
         internal_operations
       >>= function
-      | (Success ctxt, internal_operations_results, mapped_keys) -> (
-          Fees.burn_storage_fees
-            ctxt
-            ~storage_limit
-            ~payer:(contract_of_mapped_key source)
+      | (Success ctxt, internal_operations_results) -> (
+          Fees.burn_storage_fees ctxt ~storage_limit ~payer:source
           >|= function
           | Ok ctxt ->
-              ok
-                ( Success ctxt,
-                  Applied operation_results,
-                  internal_operations_results,
-                  mapped_keys )
+              ( Success ctxt,
+                Applied operation_results,
+                internal_operations_results )
           | Error errors ->
-              ok
-                ( Failure,
-                  Backtracked (operation_results, Some errors),
-                  internal_operations_results,
-                  mapped_keys ) )
-      | (Failure, internal_operations_results, mapped_keys) ->
-          return
-            ( Failure,
-              Applied operation_results,
-              internal_operations_results,
-              mapped_keys ) )
+              ( Failure,
+                Backtracked (operation_results, Some errors),
+                internal_operations_results ) )
+      | (Failure, internal_operations_results) ->
+          Lwt.return
+            (Failure, Applied operation_results, internal_operations_results) )
   | Error errors ->
-      return (Failure, Failed (manager_kind operation, errors), [], mapped_keys)
+      Lwt.return (Failure, Failed (manager_kind operation, errors), [])
 
 let skipped_operation_result :
     type kind. kind manager_operation -> kind manager_operation_result =
@@ -1406,53 +955,38 @@ let skipped_operation_result :
 
 let rec mark_skipped :
     type kind.
-    Alpha_context.t ->
-    baker:baker_hash ->
-    mapped_keys:Mapped_key_set.t ->
+    baker:Signature.Public_key_hash.t ->
     Level.t ->
     kind Kind.manager contents_list ->
-    (kind Kind.manager contents_result_list * Mapped_key_set.t) tzresult Lwt.t
-    =
- fun ctxt ~baker ~mapped_keys level -> function
+    kind Kind.manager contents_result_list =
+ fun ~baker level -> function
   | Single (Manager_operation {source; fee; operation}) ->
       let source = Contract.implicit_contract source in
-      map_contract ~mapped_keys ctxt source
-      >>=? fun (source, mapped_keys) ->
-      return
-        ( Single_result
-            (Manager_operation_result
-               {
-                 balance_updates =
-                   Receipt.cleanup_balance_updates
-                     [ (Contract source, Debited fee, Block_application);
-                       ( Fees (baker, level.cycle),
-                         Credited fee,
-                         Block_application ) ];
-                 operation_result = skipped_operation_result operation;
-                 internal_operation_results = [];
-               }),
-          mapped_keys )
+      Single_result
+        (Manager_operation_result
+           {
+             balance_updates =
+               Receipt.cleanup_balance_updates
+                 [ (Contract source, Debited fee, Block_application);
+                   (Fees (baker, level.cycle), Credited fee, Block_application)
+                 ];
+             operation_result = skipped_operation_result operation;
+             internal_operation_results = [];
+           })
   | Cons (Manager_operation {source; fee; operation}, rest) ->
       let source = Contract.implicit_contract source in
-      map_contract ~mapped_keys ctxt source
-      >>=? fun (source, mapped_keys) ->
-      mark_skipped ctxt ~baker ~mapped_keys level rest
-      >>=? fun (skipped_rest, mapped_keys) ->
-      return
-        ( Cons_result
-            ( Manager_operation_result
-                {
-                  balance_updates =
-                    Receipt.cleanup_balance_updates
-                      [ (Contract source, Debited fee, Block_application);
-                        ( Fees (baker, level.cycle),
-                          Credited fee,
-                          Block_application ) ];
-                  operation_result = skipped_operation_result operation;
-                  internal_operation_results = [];
-                },
-              skipped_rest ),
-          mapped_keys )
+      Cons_result
+        ( Manager_operation_result
+            {
+              balance_updates =
+                Receipt.cleanup_balance_updates
+                  [ (Contract source, Debited fee, Block_application);
+                    (Fees (baker, level.cycle), Credited fee, Block_application)
+                  ];
+              operation_result = skipped_operation_result operation;
+              internal_operation_results = [];
+            },
+          mark_skipped ~baker level rest )
 
 let rec precheck_manager_contents_list :
     type kind.
@@ -1510,7 +1044,7 @@ let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
   | Some key ->
       return key
   | None ->
-      Contract.get_public_key ctxt source )
+      Contract.get_manager_key ctxt source )
   >>=? fun public_key ->
   Lwt.return (Operation.check_signature public_key chain_id raw_operation)
 
@@ -1518,27 +1052,17 @@ let rec apply_manager_contents_list_rec :
     type kind.
     Alpha_context.t ->
     Script_ir_translator.unparsing_mode ->
-    baker_hash ->
+    public_key_hash ->
     Chain_id.t ->
     kind Kind.manager contents_list ->
-    mapped_keys:Mapped_key_set.t ->
-    ( success_or_failure
-    * kind Kind.manager contents_result_list
-    * Mapped_key_set.t )
-    tzresult
-    Lwt.t =
- fun ctxt mode baker chain_id contents_list ~mapped_keys ->
+    (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
+ fun ctxt mode baker chain_id contents_list ->
   let level = Level.current ctxt in
   match contents_list with
   | Single (Manager_operation {source; fee; _} as op) ->
       let source = Contract.implicit_contract source in
-      map_contract ~mapped_keys ctxt source
-      >>=? fun (source, mapped_keys) ->
-      apply_manager_contents ctxt mode chain_id op ~mapped_keys
-      >|=? fun ( ctxt_result,
-                 operation_result,
-                 internal_operation_results,
-                 mapped_keys ) ->
+      apply_manager_contents ctxt mode chain_id op
+      >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
         Manager_operation_result
           {
@@ -1551,14 +1075,12 @@ let rec apply_manager_contents_list_rec :
             internal_operation_results;
           }
       in
-      (ctxt_result, Single_result result, mapped_keys)
+      (ctxt_result, Single_result result)
   | Cons ((Manager_operation {source; fee; _} as op), rest) -> (
       let source = Contract.implicit_contract source in
-      map_contract ~mapped_keys ctxt source
-      >>=? fun (source, mapped_keys) ->
-      apply_manager_contents ctxt mode chain_id op ~mapped_keys
-      >>=? function
-      | (Failure, operation_result, internal_operation_results, mapped_keys) ->
+      apply_manager_contents ctxt mode chain_id op
+      >>= function
+      | (Failure, operation_result, internal_operation_results) ->
           let result =
             Manager_operation_result
               {
@@ -1572,13 +1094,9 @@ let rec apply_manager_contents_list_rec :
                 internal_operation_results;
               }
           in
-          mark_skipped ctxt ~baker ~mapped_keys level rest
-          >|=? fun (skipped, mapped_keys) ->
-          (Failure, Cons_result (result, skipped), mapped_keys)
-      | ( Success ctxt,
-          operation_result,
-          internal_operation_results,
-          mapped_keys ) ->
+          Lwt.return
+            (Failure, Cons_result (result, mark_skipped ~baker level rest))
+      | (Success ctxt, operation_result, internal_operation_results) ->
           let result =
             Manager_operation_result
               {
@@ -1592,43 +1110,11 @@ let rec apply_manager_contents_list_rec :
                 internal_operation_results;
               }
           in
-          apply_manager_contents_list_rec
-            ctxt
-            mode
-            baker
-            chain_id
-            rest
-            ~mapped_keys
-          >|=? fun (ctxt_result, results, mapped_keys) ->
-          (ctxt_result, Cons_result (result, results), mapped_keys) )
+          apply_manager_contents_list_rec ctxt mode baker chain_id rest
+          >|= fun (ctxt_result, results) ->
+          (ctxt_result, Cons_result (result, results)) )
 
 let mark_backtracked results =
-  let mark_manager_operation_result :
-      type kind. kind manager_operation_result -> kind manager_operation_result
-      = function
-    | (Failed _ | Skipped _ | Backtracked _) as result ->
-        result
-    | Applied (Reveal_result _) as result ->
-        result
-    | Applied result ->
-        Backtracked (result, None)
-  in
-  let mark_baker_operation_result :
-      type kind. kind baker_operation_result -> kind baker_operation_result =
-    function
-    | (Failed _ | Skipped _ | Backtracked _) as result ->
-        result
-    | Applied result ->
-        Backtracked (result, None)
-  in
-  let mark_internal_operation_results = function
-    | Internal_manager_operation_result (kind, result) ->
-        Internal_manager_operation_result
-          (kind, mark_manager_operation_result result)
-    | Internal_baker_operation_result (kind, result) ->
-        Internal_baker_operation_result
-          (kind, mark_baker_operation_result result)
-  in
   let rec mark_contents_list :
       type kind.
       kind Kind.manager contents_result_list ->
@@ -1658,29 +1144,34 @@ let mark_backtracked results =
                     op.internal_operation_results;
               },
             mark_contents_list rest )
+  and mark_internal_operation_results
+      (Internal_operation_result (kind, result)) =
+    Internal_operation_result (kind, mark_manager_operation_result result)
+  and mark_manager_operation_result :
+      type kind. kind manager_operation_result -> kind manager_operation_result
+      = function
+    | (Failed _ | Skipped _ | Backtracked _) as result ->
+        result
+    | Applied (Reveal_result _) as result ->
+        result
+    | Applied result ->
+        Backtracked (result, None)
   in
   mark_contents_list results
   [@@coq_axiom "non-top-level mutual recursion"]
 
 let apply_manager_contents_list ctxt mode baker chain_id contents_list =
-  apply_manager_contents_list_rec
-    ctxt
-    mode
-    baker
-    chain_id
-    contents_list
-    ~mapped_keys:Mapped_key_set.empty
-  >>=? fun (ctxt_result, results, mapped_keys) ->
+  apply_manager_contents_list_rec ctxt mode baker chain_id contents_list
+  >>= fun (ctxt_result, results) ->
   match ctxt_result with
   | Failure ->
-      return (ctxt (* backtracked *), mark_backtracked results, mapped_keys)
+      Lwt.return (ctxt (* backtracked *), mark_backtracked results)
   | Success ctxt ->
-      Lazy_storage.cleanup_temporaries ctxt
-      >|= fun ctxt -> ok (ctxt, results, mapped_keys)
+      Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
 let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
     (operation : kind operation) (contents_list : kind contents_list) :
-    (context * kind contents_result_list * Mapped_key_set.t) tzresult Lwt.t =
+    (context * kind contents_result_list) tzresult Lwt.t =
   match contents_list with
   | Single
       (Endorsement_with_slot
@@ -1710,20 +1201,20 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           Invalid_endorsement_level
         >>?= fun () ->
         Baking.check_endorsement_rights ctxt chain_id operation ~slot
-        >>=? fun (baker, slots, used) ->
-        if used then fail (Duplicate_endorsement baker)
+        >>=? fun (delegate, slots, used) ->
+        if used then fail (Duplicate_endorsement delegate)
         else
-          let ctxt = record_endorsement ctxt baker in
+          let ctxt = record_endorsement ctxt delegate in
           let gap = List.length slots in
           Tez.(Constants.endorsement_security_deposit ctxt *? Int64.of_int gap)
           >>?= fun deposit ->
-          Baker.freeze_deposit ctxt baker deposit
+          Delegate.freeze_deposit ctxt delegate deposit
           >>=? fun ctxt ->
           Global.get_block_priority ctxt
           >>=? fun block_priority ->
           Baking.endorsing_reward ctxt ~block_priority gap
           >>?= fun reward ->
-          Baker.freeze_rewards ctxt baker reward
+          Delegate.freeze_rewards ctxt delegate reward
           >|=? fun ctxt ->
           let level = Level.from_raw ctxt level in
           ( ctxt,
@@ -1733,19 +1224,18 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
                     {
                       balance_updates =
                         Receipt.cleanup_balance_updates
-                          [ ( Contract (Contract.baker_contract baker),
+                          [ ( Contract (Contract.implicit_contract delegate),
                               Debited deposit,
                               Block_application );
-                            ( Deposits (baker, level.cycle),
+                            ( Deposits (delegate, level.cycle),
                               Credited deposit,
                               Block_application );
-                            ( Rewards (baker, level.cycle),
+                            ( Rewards (delegate, level.cycle),
                               Credited reward,
                               Block_application ) ];
-                      baker;
+                      delegate;
                       slots;
-                    })),
-            Mapped_key_set.empty )
+                    })) )
   | Single (Endorsement _) ->
       fail Unwrapped_endorsement
   | Single (Seed_nonce_revelation {level; nonce}) ->
@@ -1763,8 +1253,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
             (Seed_nonce_revelation_result
                [ ( Rewards (baker, level.cycle),
                    Credited seed_nonce_revelation_tip,
-                   Block_application ) ]),
-          Mapped_key_set.empty ) )
+                   Block_application ) ]) ) )
   | Single (Double_endorsement_evidence {op1; op2; slot}) -> (
     match (op1.protocol_data.contents, op2.protocol_data.contents) with
     | (Single (Endorsement e1), Single (Endorsement e2))
@@ -1787,14 +1276,14 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         Baking.check_endorsement_rights ctxt chain_id op2 ~slot
         >>=? fun (delegate2, _, _) ->
         fail_unless
-          (Baker_hash.equal delegate1 delegate2)
+          (Signature.Public_key_hash.equal delegate1 delegate2)
           (Inconsistent_double_endorsement_evidence {delegate1; delegate2})
         >>=? fun () ->
-        Baker.has_frozen_balance ctxt delegate1 level.cycle
+        Delegate.has_frozen_balance ctxt delegate1 level.cycle
         >>=? fun valid ->
         fail_unless valid Unrequired_double_endorsement_evidence
         >>=? fun () ->
-        Baker.punish ctxt delegate1 level.cycle
+        Delegate.punish ctxt delegate1 level.cycle
         >>=? fun (ctxt, balance) ->
         Lwt.return Tez.(balance.deposit +? balance.fees)
         >>=? fun burned ->
@@ -1820,8 +1309,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
                         Block_application );
                       ( Rewards (baker, current_cycle),
                         Credited reward,
-                        Block_application ) ])),
-            Mapped_key_set.empty )
+                        Block_application ) ])) )
     | (_, _) ->
         fail Invalid_double_endorsement_evidence )
   | Single (Double_baking_evidence {bh1; bh2}) ->
@@ -1852,25 +1340,29 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         level
         ~priority:bh1.protocol_data.contents.priority
       >>=? fun delegate1 ->
-      Baking.check_signature ctxt bh1 chain_id delegate1
+      Baking.check_signature bh1 chain_id delegate1
       >>=? fun () ->
       Roll.baking_rights_owner
         ctxt
         level
         ~priority:bh2.protocol_data.contents.priority
       >>=? fun delegate2 ->
-      Baking.check_signature ctxt bh2 chain_id delegate2
+      Baking.check_signature bh2 chain_id delegate2
       >>=? fun () ->
       fail_unless
-        (Baker_hash.equal delegate1 delegate2)
-        (Inconsistent_double_baking_evidence {delegate1; delegate2})
+        (Signature.Public_key.equal delegate1 delegate2)
+        (Inconsistent_double_baking_evidence
+           {
+             delegate1 = Signature.Public_key.hash delegate1;
+             delegate2 = Signature.Public_key.hash delegate2;
+           })
       >>=? fun () ->
-      let convicted_baker = delegate1 in
-      Baker.has_frozen_balance ctxt convicted_baker level.cycle
+      let delegate = Signature.Public_key.hash delegate1 in
+      Delegate.has_frozen_balance ctxt delegate level.cycle
       >>=? fun valid ->
       fail_unless valid Unrequired_double_baking_evidence
       >>=? fun () ->
-      Baker.punish ctxt convicted_baker level.cycle
+      Delegate.punish ctxt delegate level.cycle
       >>=? fun (ctxt, balance) ->
       Tez.(balance.deposit +? balance.fees)
       >>?= fun burned ->
@@ -1885,19 +1377,18 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           Single_result
             (Double_baking_evidence_result
                (Receipt.cleanup_balance_updates
-                  [ ( Deposits (convicted_baker, level.cycle),
+                  [ ( Deposits (delegate, level.cycle),
                       Debited balance.deposit,
                       Block_application );
-                    ( Fees (convicted_baker, level.cycle),
+                    ( Fees (delegate, level.cycle),
                       Debited balance.fees,
                       Block_application );
-                    ( Rewards (convicted_baker, level.cycle),
+                    ( Rewards (delegate, level.cycle),
                       Debited balance.rewards,
                       Block_application );
                     ( Rewards (baker, current_cycle),
                       Credited reward,
-                      Block_application ) ])),
-          Mapped_key_set.empty ) )
+                      Block_application ) ])) ) )
   | Single (Activate_account {id = pkh; activation_code}) -> (
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
@@ -1915,14 +1406,11 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           ( ctxt,
             Single_result
               (Activate_account_result
-                 [(Contract contract, Credited amount, Block_application)]),
-            Mapped_key_set.empty ) )
+                 [(Contract contract, Credited amount, Block_application)]) ) )
   | Single (Proposals {source; period; proposals}) ->
-      map_delegate ctxt source
-      >>=? fun (baker, mapped_keys) ->
-      Baker.get_consensus_key ctxt baker
-      >>=? fun key ->
-      Operation.check_signature key chain_id operation
+      Roll.delegate_pubkey ctxt source
+      >>=? fun delegate ->
+      Operation.check_signature delegate chain_id operation
       >>?= fun () ->
       Voting_period.get_current ctxt
       >>=? fun {index = current_period; _} ->
@@ -1930,14 +1418,12 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         Compare.Int32.(current_period = period)
         (Wrong_voting_period (current_period, period))
       >>?= fun () ->
-      Amendment.record_proposals ctxt baker proposals
-      >|=? fun ctxt -> (ctxt, Single_result Proposals_result, mapped_keys)
+      Amendment.record_proposals ctxt source proposals
+      >|=? fun ctxt -> (ctxt, Single_result Proposals_result)
   | Single (Ballot {source; period; proposal; ballot}) ->
-      map_delegate ctxt source
-      >>=? fun (baker, mapped_keys) ->
-      Baker.get_consensus_key ctxt baker
-      >>=? fun key ->
-      Operation.check_signature key chain_id operation
+      Roll.delegate_pubkey ctxt source
+      >>=? fun delegate ->
+      Operation.check_signature delegate chain_id operation
       >>?= fun () ->
       Voting_period.get_current ctxt
       >>=? fun {index = current_period; _} ->
@@ -1945,8 +1431,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
         Compare.Int32.(current_period = period)
         (Wrong_voting_period (current_period, period))
       >>?= fun () ->
-      Amendment.record_ballot ctxt baker proposal ballot
-      >|=? fun ctxt -> (ctxt, Single_result Ballot_result, mapped_keys)
+      Amendment.record_ballot ctxt source proposal ballot
+      >|=? fun ctxt -> (ctxt, Single_result Ballot_result)
   | Single (Failing_noop _) ->
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
@@ -1954,12 +1440,14 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       precheck_manager_contents_list ctxt op
       >>=? fun ctxt ->
       check_manager_signature ctxt chain_id op operation
-      >>=? fun () -> apply_manager_contents_list ctxt mode baker chain_id op
+      >>=? fun () ->
+      apply_manager_contents_list ctxt mode baker chain_id op >|= ok
   | Cons (Manager_operation _, _) as op ->
       precheck_manager_contents_list ctxt op
       >>=? fun ctxt ->
       check_manager_signature ctxt chain_id op operation
-      >>=? fun () -> apply_manager_contents_list ctxt mode baker chain_id op
+      >>=? fun () ->
+      apply_manager_contents_list ctxt mode baker chain_id op >|= ok
 
 let apply_operation ctxt chain_id mode pred_block baker hash operation =
   let ctxt = Contract.init_origination_nonce ctxt hash in
@@ -1971,11 +1459,10 @@ let apply_operation ctxt chain_id mode pred_block baker hash operation =
     baker
     operation
     operation.protocol_data.contents
-  >|=? fun (ctxt, result, mapped_keys) ->
+  >|=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
   let ctxt = Contract.unset_origination_nonce ctxt in
-  let mapped_keys = Mapped_key_set.elements mapped_keys in
-  (ctxt, {contents = result; mapped_keys})
+  (ctxt, {contents = result})
 
 let may_snapshot_roll ctxt =
   let level = Alpha_context.Level.current ctxt in
@@ -1996,7 +1483,7 @@ let may_start_new_cycle ctxt =
       >>=? fun (ctxt, unrevealed) ->
       Roll.cycle_end ctxt last_cycle
       >>=? fun ctxt ->
-      Baker.cycle_end ctxt last_cycle unrevealed
+      Delegate.cycle_end ctxt last_cycle unrevealed
       >>=? fun (ctxt, update_balances, deactivated) ->
       Bootstrap.cycle_end ctxt last_cycle
       >|=? fun ctxt -> (ctxt, update_balances, deactivated)
@@ -2014,12 +1501,12 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
     protocol_data.Block_header.priority
   >>=? fun ctxt ->
   Baking.check_baking_rights ctxt protocol_data pred_timestamp
-  >>=? fun (baker, block_delay) ->
+  >>=? fun (delegate_pk, block_delay) ->
   let ctxt = Fitness.increase ctxt in
   endorsement_rights_of_pred_level ctxt
   >|=? fun rights ->
   let ctxt = init_endorsements ctxt rights in
-  (ctxt, protocol_data, baker, block_delay)
+  (ctxt, protocol_data, delegate_pk, block_delay)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
@@ -2040,8 +1527,8 @@ let begin_application ctxt chain_id block_header pred_timestamp =
     ctxt
     block_header.protocol_data.contents
     pred_timestamp
-  >>=? fun (baker, block_delay) ->
-  Baking.check_signature ctxt block_header chain_id baker
+  >>=? fun (delegate_pk, block_delay) ->
+  Baking.check_signature block_header chain_id delegate_pk
   >>=? fun () ->
   let has_commitment =
     Option.is_some block_header.protocol_data.contents.seed_nonce_hash
@@ -2054,7 +1541,7 @@ let begin_application ctxt chain_id block_header pred_timestamp =
   endorsement_rights_of_pred_level ctxt
   >|=? fun rights ->
   let ctxt = init_endorsements ctxt rights in
-  (ctxt, baker, block_delay)
+  (ctxt, delegate_pk, block_delay)
 
 let check_minimum_endorsements ctxt protocol_data block_delay
     included_endorsements =
@@ -2070,7 +1557,7 @@ let check_minimum_endorsements ctxt protocol_data block_delay
          timestamp;
        })
 
-let finalize_application ctxt protocol_data baker ~block_delay
+let finalize_application ctxt protocol_data delegate ~block_delay
     migration_balance_updates =
   let included_endorsements = included_endorsements ctxt in
   check_minimum_endorsements
@@ -2080,7 +1567,7 @@ let finalize_application ctxt protocol_data baker ~block_delay
     included_endorsements
   >>?= fun () ->
   let deposit = Constants.block_security_deposit ctxt in
-  add_deposit ctxt baker deposit
+  add_deposit ctxt delegate deposit
   >>?= fun ctxt ->
   Baking.baking_reward
     ctxt
@@ -2089,24 +1576,24 @@ let finalize_application ctxt protocol_data baker ~block_delay
   >>?= fun reward ->
   add_rewards ctxt reward
   >>?= fun ctxt ->
-  Baker_hash.Map.fold
-    (fun baker deposit ctxt ->
-      ctxt >>=? fun ctxt -> Baker.freeze_deposit ctxt baker deposit)
+  Signature.Public_key_hash.Map.fold
+    (fun delegate deposit ctxt ->
+      ctxt >>=? fun ctxt -> Delegate.freeze_deposit ctxt delegate deposit)
     (get_deposits ctxt)
     (return ctxt)
   >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
   let fees = Alpha_context.get_fees ctxt in
-  Baker.freeze_fees ctxt baker fees
+  Delegate.freeze_fees ctxt delegate fees
   >>=? fun ctxt ->
   let rewards = Alpha_context.get_rewards ctxt in
-  Baker.freeze_rewards ctxt baker rewards
+  Delegate.freeze_rewards ctxt delegate rewards
   >>=? fun ctxt ->
   ( match protocol_data.Block_header.seed_nonce_hash with
   | None ->
       return ctxt
   | Some nonce_hash ->
-      Nonce.record_hash ctxt {nonce_hash; baker; rewards; fees} )
+      Nonce.record_hash ctxt {nonce_hash; delegate; rewards; fees} )
   >>=? fun ctxt ->
   (* end of cycle *)
   may_snapshot_roll ctxt
@@ -2120,11 +1607,11 @@ let finalize_application ctxt protocol_data baker ~block_delay
     Receipt.(
       cleanup_balance_updates
         ( migration_balance_updates
-        @ [ ( Contract (Contract.baker_contract baker),
+        @ [ ( Contract (Contract.implicit_contract delegate),
               Debited deposit,
               Block_application );
-            (Deposits (baker, cycle), Credited deposit, Block_application);
-            (Rewards (baker, cycle), Credited reward, Block_application) ]
+            (Deposits (delegate, cycle), Credited deposit, Block_application);
+            (Rewards (delegate, cycle), Credited reward, Block_application) ]
         @ balance_updates ))
   in
   let consumed_gas =
@@ -2143,7 +1630,7 @@ let finalize_application ctxt protocol_data baker ~block_delay
   let receipt =
     Apply_results.
       {
-        baker;
+        baker = delegate;
         level =
           Level.to_deprecated_type
             level_info

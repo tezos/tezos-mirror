@@ -832,7 +832,10 @@ class TestSaplingDifferentMemosize:
 
     @pytest.fixture
     def contract_path(self):
-        return path.join(CONTRACT_PATH, 'contracts', 'sapling_contract.tz')
+        return (
+            f'{paths.TEZOS_HOME}/src/proto_009_PsFLoren/lib_protocol/test/'
+            'contracts/sapling_contract.tz'
+        )
 
     def test_shield_with_different_memo_size(self, contract_path, client):
         contract_name = "sapling_memo_size_different"
@@ -869,7 +872,10 @@ class TestSaplingRightMemosize:
 
     @pytest.fixture
     def contract_path(self):
-        return path.join(CONTRACT_PATH, 'contracts', 'sapling_contract.tz')
+        return (
+            f'{paths.TEZOS_HOME}/src/proto_009_PsFLoren/lib_protocol/test/'
+            'contracts/sapling_contract.tz'
+        )
 
     def test_shield_with_same_memo_size(self, contract_path, client):
         contract_name = "sapling_memo_size_same"

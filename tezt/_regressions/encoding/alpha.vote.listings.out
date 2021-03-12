@@ -2,16 +2,16 @@ tezt/_regressions/encoding/alpha.vote.listings.out
 
 ./tezos-codec encode alpha.vote.listings from '[
   {
-    "baker": "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW",
+    "pkh": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
     "rolls": 20115
   },
   {
-    "baker": "SG1TLmKJHVJxQosY6iN21AW77HsAapdupxnR",
+    "pkh": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
     "rolls": 9000
   }
 ]'
-00000030b31ba9bfde1dd3598b5a10b17fe8162a3de554e100004e932a475384a38e62f5c2e1669d393bff864fef2d4f00002328
+000000320002298c03ed7d454a101eb7022bc95f7e5f41ac7800004e9300e7670f32038107a59a2b9cfefae36ea21f5aa63c00002328
 
-./tezos-codec decode alpha.vote.listings from 00000030b31ba9bfde1dd3598b5a10b17fe8162a3de554e100004e932a475384a38e62f5c2e1669d393bff864fef2d4f00002328
-[ { "baker": "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW", "rolls": 20115 },
-  { "baker": "SG1TLmKJHVJxQosY6iN21AW77HsAapdupxnR", "rolls": 9000 } ]
+./tezos-codec decode alpha.vote.listings from 000000320002298c03ed7d454a101eb7022bc95f7e5f41ac7800004e9300e7670f32038107a59a2b9cfefae36ea21f5aa63c00002328
+[ { "pkh": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "rolls": 20115 },
+  { "pkh": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN", "rolls": 9000 } ]

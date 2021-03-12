@@ -1,9 +1,8 @@
 from typing import List
-
 import pytest
-
-from client.client import Client
 from tools import utils
+from client.client import Client
+
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
 
@@ -27,7 +26,7 @@ class TestManualBaking:
     def test_bake_and_check_level(self, clients: List[Client]):
         level = 2
         for i in range(1, 6):
-            account = f'baker{i}'
+            account = f'bootstrap{i}'
             client_i = level % len(clients)
             clients[client_i].bake(account, BAKE_ARGS)
             for client in clients:
@@ -35,7 +34,7 @@ class TestManualBaking:
             level += 1
 
     def test_endorse(self, clients: List[Client], session: dict):
-        endorse = clients[2 % len(clients)].endorse('baker3')
+        endorse = clients[2 % len(clients)].endorse('bootstrap3')
         session["endorse_hash"] = endorse.operation_hash
 
     def test_transfer(self, clients: List[Client], session: dict):
@@ -55,7 +54,7 @@ class TestManualBaking:
             )
 
     def test_bake(self, clients: List[Client]):
-        clients[3 % len(clients)].bake('baker4', BAKE_ARGS)
+        clients[3 % len(clients)].bake('bootstrap4', BAKE_ARGS)
 
     def test_block_contains_endorse_and_transfer(
         self, clients: List[Client], session
@@ -70,4 +69,4 @@ class TestManualBaking:
 
     def test_balance(self, clients: List[Client]):
         bal = clients[0].get_balance('tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx')
-        assert bal == 3999499.999595
+        assert bal == 3998987.999595

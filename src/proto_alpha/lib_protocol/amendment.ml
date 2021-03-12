@@ -25,7 +25,7 @@
 
 open Alpha_context
 
-(** Returns the proposal submitted by the most bakers.
+(** Returns the proposal submitted by the most delegates.
     Returns None in case of a tie, if proposal quorum is below required
     minimum or if there are no proposals. *)
 let select_winning_proposal ctxt =
@@ -111,7 +111,7 @@ let get_approval_and_update_participation_ema ctxt =
   >|=? fun ctxt -> (ctxt, approval)
 
 (** Implements the state machine of the amendment procedure. Note that
-   [update_listings], that computes the vote weight of each baker, is run at
+   [update_listings], that computes the vote weight of each delegate, is run at
    the end of each voting period. This state-machine prepare the voting_period
    for the next block. *)
 let start_new_voting_period ctxt =
@@ -188,7 +188,7 @@ let () =
     ~id:"unauthorized_proposal"
     ~title:"Unauthorized proposal"
     ~description:
-      "The baker provided for the proposal is not in the voting listings."
+      "The delegate provided for the proposal is not in the voting listings."
     ~pp:(fun ppf () -> Format.fprintf ppf "Unauthorized proposal")
     empty
     (function Unauthorized_proposal -> Some () | _ -> None)
@@ -209,7 +209,7 @@ let () =
     ~id:"unauthorized_ballot"
     ~title:"Unauthorized ballot"
     ~description:
-      "The baker provided for the ballot is not in the voting listings."
+      "The delegate provided for the ballot is not in the voting listings."
     ~pp:(fun ppf () -> Format.fprintf ppf "Unauthorized ballot")
     empty
     (function Unauthorized_ballot -> Some () | _ -> None)
@@ -219,7 +219,8 @@ let () =
     `Branch
     ~id:"too_many_proposals"
     ~title:"Too many proposals"
-    ~description:"The baker reached the maximum number of allowed proposals."
+    ~description:
+      "The delegate reached the maximum number of allowed proposals."
     ~pp:(fun ppf () -> Format.fprintf ppf "Too many proposals")
     empty
     (function Too_many_proposals -> Some () | _ -> None)
@@ -247,30 +248,30 @@ let rec longer_than l n =
         else (* n > 0 *)
           longer_than rest (n - 1)
 
-let record_proposals ctxt baker proposals =
+let record_proposals ctxt delegate proposals =
   (match proposals with [] -> error Empty_proposal | _ :: _ -> ok_unit)
   >>?= fun () ->
   Voting_period.get_current_kind ctxt
   >>=? function
   | Proposal ->
-      Vote.in_listings ctxt baker
+      Vote.in_listings ctxt delegate
       >>= fun in_listings ->
       if in_listings then
-        Vote.recorded_proposal_count_for_baker ctxt baker
+        Vote.recorded_proposal_count_for_delegate ctxt delegate
         >>=? fun count ->
         error_when
           (longer_than proposals (Constants.max_proposals_per_delegate - count))
           Too_many_proposals
         >>?= fun () ->
         fold_left_s
-          (fun ctxt proposal -> Vote.record_proposal ctxt proposal baker)
+          (fun ctxt proposal -> Vote.record_proposal ctxt proposal delegate)
           ctxt
           proposals
       else fail Unauthorized_proposal
   | Exploration | Cooldown | Promotion | Adoption ->
       fail Unexpected_proposal
 
-let record_ballot ctxt baker proposal ballot =
+let record_ballot ctxt delegate proposal ballot =
   Voting_period.get_current_kind ctxt
   >>=? function
   | Exploration | Promotion ->
@@ -280,13 +281,13 @@ let record_ballot ctxt baker proposal ballot =
         (Protocol_hash.equal proposal current_proposal)
         Invalid_proposal
       >>?= fun () ->
-      Vote.has_recorded_ballot ctxt baker
+      Vote.has_recorded_ballot ctxt delegate
       >>= fun has_ballot ->
       error_when has_ballot Unauthorized_ballot
       >>?= fun () ->
-      Vote.in_listings ctxt baker
+      Vote.in_listings ctxt delegate
       >>= fun in_listings ->
-      if in_listings then Vote.record_ballot ctxt baker ballot
+      if in_listings then Vote.record_ballot ctxt delegate ballot
       else fail Unauthorized_ballot
   | Cooldown | Proposal | Adoption ->
       fail Unexpected_ballot

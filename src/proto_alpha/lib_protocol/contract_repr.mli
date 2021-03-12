@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,7 +26,6 @@
 type t = private
   | Implicit of Signature.Public_key_hash.t
   | Originated of Contract_hash.t
-  | Baker of Baker_hash.t
 
 type contract = t
 
@@ -37,11 +35,7 @@ include Compare.S with type t := contract
 
 val implicit_contract : Signature.Public_key_hash.t -> contract
 
-val baker_contract : Baker_hash.t -> contract
-
 val is_implicit : contract -> Signature.Public_key_hash.t option
-
-val is_baker : contract -> Baker_hash.t option
 
 (** {2 Originated contracts} *)
 
@@ -53,8 +47,6 @@ val is_baker : contract -> Baker_hash.t option
 type origination_nonce
 
 val originated_contract : origination_nonce -> contract
-
-val baker_from_nonce : origination_nonce -> Baker_hash.t
 
 val originated_contracts :
   since:origination_nonce -> until:origination_nonce -> contract list

@@ -1,19 +1,17 @@
 import itertools
 import random
-import subprocess
 import time
-
+import subprocess
 import pytest
-
+from tools import utils, constants
 from launchers.sandbox import Sandbox
-from tools import constants, utils
 from . import protocol
 
 random.seed(42)
 KEYS = [f'bootstrap{i}' for i in range(1, 6)]
 NEXT_KEY = itertools.cycle(KEYS)
-NUM_NODES = 4
-NEW_NODES = 4
+NUM_NODES = 5
+NEW_NODES = 5
 REPLACE = False
 NUM_CYCLES = 60
 TIME_BETWEEN_CYCLE = 1
@@ -44,16 +42,13 @@ class TestAllDaemonsWithOperations:
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
         protocol.activate(sandbox.client(0), parameters)
-        utils.synchronize(sandbox.all_clients())
-        for i in range(1, NUM_NODES):
-            utils.remember_baker_contracts(sandbox.client(i))
-        sandbox.add_baker(0, 'baker5', proto=protocol.DAEMON)
-        sandbox.add_baker(1, 'baker4', proto=protocol.DAEMON)
+        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        sandbox.add_baker(1, 'bootstrap4', proto=protocol.DAEMON)
         sandbox.add_endorser(
-            0, account='baker1', endorsement_delay=1, proto=protocol.DAEMON
+            0, account='bootstrap1', endorsement_delay=1, proto=protocol.DAEMON
         )
         sandbox.add_endorser(
-            1, account='baker2', endorsement_delay=1, proto=protocol.DAEMON
+            1, account='bootstrap2', endorsement_delay=1, proto=protocol.DAEMON
         )
 
     def test_wait_for_protocol(self, sandbox: Sandbox):

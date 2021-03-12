@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -70,20 +69,12 @@ val get_balance :
   Contract.t ->
   Tez.t tzresult Lwt.t
 
-val set_delegate_legacy :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?fee:Tez.tez ->
-  public_key_hash ->
-  src_pk:public_key ->
-  manager_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  Signature.Public_key_hash.t option ->
-  Kind.delegation_legacy Kind.manager Injection.result tzresult Lwt.t
+val build_delegate_operation :
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  public_key_hash option ->
+  Kind.delegation Injection.annotated_manager_operation
 
 val set_delegate :
   #Protocol_client_context.full ->
@@ -97,7 +88,20 @@ val set_delegate :
   src_pk:public_key ->
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
-  Baker_hash.t option ->
+  public_key_hash option ->
+  Kind.delegation Kind.manager Injection.result tzresult Lwt.t
+
+val register_as_delegate :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?fee:Tez.tez ->
+  manager_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  public_key ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
 
 val save_contract :
@@ -106,30 +110,6 @@ val save_contract :
   string ->
   Contract.t ->
   unit tzresult Lwt.t
-
-(* legacy version accepts PKH for delegate *)
-val originate_contract_legacy :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?branch:int ->
-  ?fee:Tez.t ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  delegate:public_key_hash option ->
-  initial_storage:string ->
-  balance:Tez.t ->
-  source:public_key_hash ->
-  src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
-  code:Script.expr ->
-  fee_parameter:Injection.fee_parameter ->
-  unit ->
-  (Kind.origination_legacy Kind.manager Injection.result * Contract.t) tzresult
-  Lwt.t
 
 val originate_contract :
   #Protocol_client_context.full ->
@@ -142,7 +122,7 @@ val originate_contract :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  delegate:baker_hash option ->
+  delegate:public_key_hash option ->
   initial_storage:string ->
   balance:Tez.t ->
   source:public_key_hash ->
@@ -164,29 +144,6 @@ val build_transaction_operation :
   ?storage_limit:Z.t ->
   Contract.t ->
   Kind.transaction Injection.annotated_manager_operation
-
-val register_baker :
-  #Protocol_client_context.full ->
-  chain:Shell_services.chain ->
-  block:Shell_services.block ->
-  ?confirmations:int ->
-  ?dry_run:bool ->
-  ?verbose_signing:bool ->
-  ?branch:int ->
-  ?fee:Tez.t ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  balance:Tez.t ->
-  source:public_key_hash ->
-  src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
-  fee_parameter:Injection.fee_parameter ->
-  consensus_key:public_key ->
-  threshold:int ->
-  owner_keys:public_key list ->
-  unit ->
-  (Kind.baker_registration Kind.manager Injection.result * Contract.t) tzresult
-  Lwt.t
 
 val transfer :
   #Protocol_client_context.full ->

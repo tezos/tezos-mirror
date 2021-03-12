@@ -190,7 +190,6 @@ class TestGuestBook:
             '{ Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" None }',
             100,
             'bootstrap1',
-            baker='baker1',
         )
 
         assert_transfer_failwith(
@@ -207,7 +206,7 @@ class TestGuestBook:
             'guestbook',
             ['-arg', '"Coucou"', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_storage_contains(
             client,
             'guestbook',
@@ -244,7 +243,6 @@ class TestBigmap:
             '(Pair { Elt 1 Unit ; Elt 2 Unit ; Elt 3 Unit } Unit)',
             100,
             'bootstrap1',
-            baker='baker1',
         )
 
         client.transfer(
@@ -253,7 +251,7 @@ class TestBigmap:
             'big_map_mem',
             ['-arg', '(Pair 0 False)', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
 
         assert_transfer_failwith(
             client,
@@ -269,7 +267,7 @@ class TestBigmap:
             'big_map_mem',
             ['--arg', '(Pair 0 False)', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_transfer_failwith(
             client,
             1,
@@ -283,7 +281,7 @@ class TestBigmap:
             'big_map_mem',
             ['--arg', '(Pair 1 True)', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_transfer_failwith(
             client,
             1,
@@ -297,7 +295,7 @@ class TestBigmap:
             'big_map_mem',
             ['--arg', '(Pair 2 True)', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_transfer_failwith(
             client,
             1,
@@ -311,7 +309,7 @@ class TestBigmap:
             'big_map_mem',
             ['--arg', '(Pair 3 True)', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_transfer_failwith(
             client,
             1,
@@ -325,7 +323,7 @@ class TestBigmap:
             'big_map_mem',
             ['--arg', '(Pair 4 False)', '--burn-cap', '10'],
         )
-        bake(client, 'baker1')
+        bake(client)
         assert_transfer_failwith(
             client,
             1,
@@ -349,7 +347,6 @@ class TestBigmapGetAdd:
             '(Pair { Elt 0 1 ; Elt 1 2 ; Elt 2 3 } Unit)',
             100,
             'bootstrap1',
-            baker='baker1',
         )
 
         client.transfer(
@@ -363,7 +360,7 @@ class TestBigmapGetAdd:
                 '10',
             ],
         )
-        bake(client, 'baker1')
+        bake(client)
         client.transfer(
             1,
             'bootstrap1',
@@ -375,7 +372,7 @@ class TestBigmapGetAdd:
                 '10',
             ],
         )
-        bake(client, 'baker1')
+        bake(client)
         client.transfer(
             1,
             'bootstrap1',
@@ -387,7 +384,7 @@ class TestBigmapGetAdd:
                 '10',
             ],
         )
-        bake(client, 'baker1')
+        bake(client)
         client.transfer(
             1,
             'bootstrap1',
@@ -399,7 +396,7 @@ class TestBigmapGetAdd:
                 '10',
             ],
         )
-        bake(client, 'baker1')
+        bake(client)
         client.transfer(
             1,
             'bootstrap1',
@@ -411,7 +408,7 @@ class TestBigmapGetAdd:
                 '10',
             ],
         )
-        bake(client, 'baker1')
+        bake(client)
         client.transfer(
             1,
             'bootstrap1',
@@ -423,7 +420,7 @@ class TestBigmapGetAdd:
                 '10',
             ],
         )
-        bake(client, 'baker1')
+        bake(client)
         client.transfer(
             1,
             'bootstrap1',
@@ -435,7 +432,7 @@ class TestBigmapGetAdd:
                 '10',
             ],
         )
-        bake(client, 'baker1')
+        bake(client)
 
 
 @pytest.mark.regression

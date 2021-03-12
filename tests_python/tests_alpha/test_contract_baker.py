@@ -1,10 +1,9 @@
 import os
-
 import pytest
-
-from client.client import Client
 from tools import utils
-from .contract_paths import OPCODES_CONTRACT_PATH
+from client.client import Client
+from . import contract_paths
+
 
 BAKE_ARGS = ['--minimal-timestamp']
 
@@ -17,11 +16,15 @@ class TestOriginationCall:
 
     def test_originate(self, client: Client, session: dict):
         initial_storage = 'Unit'
-        contract = os.path.join(OPCODES_CONTRACT_PATH, 'transfer_tokens.tz')
+        contract = os.path.join(
+            contract_paths.OPCODES_CONTRACT_PATH, 'transfer_tokens.tz'
+        )
         args = ['--init', initial_storage, '--burn-cap', '0.400']
-        origination = client.originate('foobar', 1000, 'baker1', contract, args)
+        origination = client.originate(
+            'foobar', 1000, 'bootstrap1', contract, args
+        )
         session['contract'] = origination.contract
-        client.bake('baker5', BAKE_ARGS)
+        client.bake('bootstrap5', BAKE_ARGS)
 
         # Unsolved mystery:
         #    client.wait_for_inclusion(origination.operation_hash)
@@ -37,7 +40,7 @@ class TestOriginationCall:
         contract = session['contract']
         bootstrap3 = '"tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"'
         transfer = client.call('bootstrap2', contract, ['--arg', bootstrap3])
-        client.bake('baker5', BAKE_ARGS)
+        client.bake('bootstrap5', BAKE_ARGS)
         assert utils.check_block_contains_operations(
             client, [transfer.operation_hash]
         )

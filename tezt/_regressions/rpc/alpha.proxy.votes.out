@@ -27,11 +27,11 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/listings
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-[ { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 } ]
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -48,9 +48,9 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballot_list
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-[ { "baker": "[BAKER_HASH]", "ballot": "pass" },
-  { "baker": "[BAKER_HASH]", "ballot": "yay" },
-  { "baker": "[BAKER_HASH]", "ballot": "nay" } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "nay" },
+  { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "pass" },
+  { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "yay" } ]
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballots
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -75,11 +75,11 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/listings
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-[ { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 } ]
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK

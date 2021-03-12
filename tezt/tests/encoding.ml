@@ -122,14 +122,14 @@ let register () =
     ~group_name:"alpha"
     ~protocol:Alpha
     ~samples:
-      [ "baker.frozen_balance";
-        "baker.frozen_balance_by_cycles";
-        "block_header";
+      [ "block_header";
         "block_header.raw";
         "block_header.unsigned";
         "contract";
         "contract.big_map_diff";
         "cycle";
+        "delegate.frozen_balance";
+        "delegate.frozen_balance_by_cycles";
         "fitness";
         "gas.cost";
         "gas";

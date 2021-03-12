@@ -1,9 +1,9 @@
 [{
-    "baker": "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW",
+    "pkh": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
     "rolls": 20115
   },
   {
-    "baker": "SG1TLmKJHVJxQosY6iN21AW77HsAapdupxnR",
+    "pkh": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
     "rolls": 9000
   }
 ]

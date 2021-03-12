@@ -23,7 +23,7 @@ BAKE_ARGS = [
 PROTO_A = constants.EDO
 PROTO_A_DAEMON = constants.EDO_DAEMON
 PROTO_A_PATH = f"proto_{PROTO_A_DAEMON.replace('-','_')}"
-PROTO_B = constants.FLORENCE
+PROTO_B = constants.ALPHA
 
 PARAMETERS_FILE = (
     f'{paths.TEZOS_HOME}src/{PROTO_A_PATH}/parameters/' 'test-parameters.json'

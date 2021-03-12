@@ -271,14 +271,7 @@ let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
     client
   |> Process.check
 
-let remember_baker_contracts client =
-  Lwt_list.iter_s
-    (fun (baker : Constant.baker) ->
-      spawn_command client ["remember"; "contract"; baker.alias; baker.identity]
-      |> Process.check)
-    Constant.all_bakers
-
-let spawn_bake_for ?node ?protocol ?(key = Constant.baker1.identity)
+let spawn_bake_for ?node ?protocol ?(key = Constant.bootstrap1.alias)
     ?(minimal_timestamp = true) ?mempool ?force ?context_path client =
   spawn_command
     ?node
@@ -524,22 +517,6 @@ let spawn_migrate_mockup ~next_protocol client =
 
 let migrate_mockup ~next_protocol client =
   spawn_migrate_mockup ~next_protocol client |> Process.check
-
-let spawn_find_baker_with_consensus_key ~key client =
-  spawn_command
-    client
-    (mode_arg client @ ["find"; "baker"; "with"; "consensus"; "key"; key])
-
-let find_baker_with_consensus_key ~key client =
-  let* output =
-    spawn_find_baker_with_consensus_key ~key client
-    |> Process.check_and_read_stdout
-  in
-  match output =~* rex "Found baker: ?(\\w*)" with
-  | None ->
-      Test.fail "Cannot extract baker hash from output: %s" output
-  | Some hash ->
-      return hash
 
 let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   let client = create ?path ?admin_path ?name ?color ?base_dir ?node () in

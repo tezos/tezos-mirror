@@ -41,7 +41,7 @@ module Raw_context_tests = struct
      tests that the returned root is as expected. *)
   let commitments_add_uncommitted () =
     Context.init 1
-    >>=? fun (b, _, _bakers) ->
+    >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -89,7 +89,7 @@ module Raw_context_tests = struct
      trying to initialize the same key twice. *)
   let nullifier_double () =
     Context.init 1
-    >>=? fun (b, _, _bakers) ->
+    >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -127,7 +127,7 @@ module Raw_context_tests = struct
      and false for a third one. *)
   let nullifier_test () =
     Context.init 1
-    >>=? fun (b, _, _bakers) ->
+    >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -202,7 +202,7 @@ module Raw_context_tests = struct
     Random.self_init () ;
     let memo_size = Random.int 200 in
     Context.init 1
-    >>=? fun (b, _, _bakers) ->
+    >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -259,7 +259,7 @@ module Raw_context_tests = struct
     Random.self_init () ;
     let memo_size = Random.int 200 in
     Context.init 1
-    >>=? fun (b, _, _bakers) ->
+    >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -347,7 +347,7 @@ module Raw_context_tests = struct
       | Error () -> assert false (* size >= 0 *) | Ok roots_ctx -> roots_ctx
     in
     Context.init 1
-    >>=? fun (b, _, _bakers) ->
+    >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -426,7 +426,7 @@ module Raw_context_tests = struct
 
   let test_get_memo_size () =
     Context.init 1
-    >>=? fun (b, _, _bakers) ->
+    >>=? fun (b, _) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -975,7 +975,11 @@ module Interpreter_tests = struct
     >>=? fun incr ->
     (* We need to manually get the counter here *)
     let ctx = Incremental.alpha_ctxt incr in
-    Alpha_context.Contract.get_counter ctx src
+    let pkh =
+      Alpha_context.Contract.is_implicit src
+      |> WithExceptions.Option.get ~loc:__LOC__
+    in
+    Alpha_context.Contract.get_counter ctx pkh
     >>= wrap
     >>=? fun counter ->
     Op.transaction
@@ -1014,7 +1018,7 @@ module Interpreter_tests = struct
         ~allow_forged_in_storage:true
         script
       >>= wrap
-      >>=? fun (Ex_originated_script script, ctxt) ->
+      >>=? fun (Ex_script script, ctxt) ->
       Script_ir_translator.get_single_sapling_state
         ctxt
         script.storage_type

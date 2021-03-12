@@ -23,7 +23,7 @@ This sequence of operations was run:
       From: [CONTRACT_HASH]
       Credit: ꜩ1000
       Script:
-        { parameter (option baker_hash) ;
+        { parameter (option key_hash) ;
           storage unit ;
           code { UNPAIR ; SET_DELEGATE ; DIP { NIL operation } ; CONS ; PAIR } }
         Initial storage: Unit
@@ -46,7 +46,7 @@ Injected block [BLOCK_HASH]
 Injected block [BLOCK_HASH]
 none
 Node is bootstrapped.
-Estimated gas: 3519.136 units (will add 100 for safety)
+Estimated gas: 3519.936 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -68,20 +68,20 @@ This sequence of operations was run:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
       To: [CONTRACT_HASH]
-      Parameter: (Some "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW")
+      Parameter: (Some "[CONTRACT_HASH]")
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 51 bytes
-      Consumed gas: 2519.136
+      Consumed gas: 2519.936
     Internal operations:
       Delegation:
         Contract: [CONTRACT_HASH]
-        To: SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW
+        To: [CONTRACT_HASH]
         This delegation was successfully applied
         Consumed gas: 1000
 
 Injected block [BLOCK_HASH]
-SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW (known as baker1)
+[CONTRACT_HASH] (known as bootstrap5)
 Node is bootstrapped.
 Estimated gas: 3494.396 units (will add 100 for safety)
 Estimated storage: no bytes added

@@ -32,51 +32,51 @@ tezt/_regressions/encoding/alpha.receipt.balance_updates.out
   {
     "kind": "freezer",
     "category": "deposits",
-    "baker": "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW",
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
     "cycle": 5,
     "change": "-1",
     "origin": "block"
   }
 ]'
-0000002203b31ba9bfde1dd3598b5a10b17fe8162a3de554e100000005ffffffffffffffff00
+00000023030002298c03ed7d454a101eb7022bc95f7e5f41ac7800000005ffffffffffffffff00
 
-./tezos-codec decode alpha.receipt.balance_updates from 0000002203b31ba9bfde1dd3598b5a10b17fe8162a3de554e100000005ffffffffffffffff00
+./tezos-codec decode alpha.receipt.balance_updates from 00000023030002298c03ed7d454a101eb7022bc95f7e5f41ac7800000005ffffffffffffffff00
 [ { "kind": "freezer", "category": "deposits",
-    "baker": "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW", "cycle": 5,
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "cycle": 5,
     "change": "-1", "origin": "block" } ]
 
 ./tezos-codec encode alpha.receipt.balance_updates from '[
   {
     "kind": "freezer",
     "category": "fees",
-    "baker": "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW",
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
     "cycle": 2147483647,
     "change": "1",
     "origin": "block"
   }
 ]'
-0000002202b31ba9bfde1dd3598b5a10b17fe8162a3de554e17fffffff000000000000000100
+00000023020002298c03ed7d454a101eb7022bc95f7e5f41ac787fffffff000000000000000100
 
-./tezos-codec decode alpha.receipt.balance_updates from 0000002202b31ba9bfde1dd3598b5a10b17fe8162a3de554e17fffffff000000000000000100
+./tezos-codec decode alpha.receipt.balance_updates from 00000023020002298c03ed7d454a101eb7022bc95f7e5f41ac787fffffff000000000000000100
 [ { "kind": "freezer", "category": "fees",
-    "baker": "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW", "cycle": 2147483647,
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "cycle": 2147483647,
     "change": "1", "origin": "block" } ]
 
 ./tezos-codec encode alpha.receipt.balance_updates from '[
   {
     "kind": "freezer",
     "category": "rewards",
-    "baker": "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW",
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
     "cycle": 0,
     "change": "0",
     "origin": "block"
   }
 ]'
-0000002201b31ba9bfde1dd3598b5a10b17fe8162a3de554e100000000000000000000000000
+00000023010002298c03ed7d454a101eb7022bc95f7e5f41ac7800000000000000000000000000
 
-./tezos-codec decode alpha.receipt.balance_updates from 0000002201b31ba9bfde1dd3598b5a10b17fe8162a3de554e100000000000000000000000000
+./tezos-codec decode alpha.receipt.balance_updates from 00000023010002298c03ed7d454a101eb7022bc95f7e5f41ac7800000000000000000000000000
 [ { "kind": "freezer", "category": "rewards",
-    "baker": "SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW", "cycle": 0,
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "cycle": 0,
     "change": "0", "origin": "block" } ]
 
 ./tezos-codec encode alpha.receipt.balance_updates from '[

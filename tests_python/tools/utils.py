@@ -2,6 +2,7 @@
 Assertions are retried to avoid using arbitrary time constants in test.
 """
 import datetime
+from typing import Any, List
 import hashlib
 import contextlib
 import json
@@ -9,7 +10,6 @@ import os
 import re
 import subprocess
 import time
-from typing import Any, List, Optional
 
 import base58check
 import ed25519
@@ -118,7 +118,7 @@ def check_operation_in_receipt(
 
 
 @retry(timeout=5, attempts=20)
-def synchronize(clients: List[Client], max_diff: int = 0) -> bool:
+def synchronize(clients: List[Client], max_diff: int = 2) -> bool:
     """Return when nodes head levels are within max_diff units"""
     levels = [client.get_level() for client in clients]
     return max(levels) - min(levels) <= max_diff
@@ -229,15 +229,6 @@ def activate_alpha(
     activate_protocol(
         client, constants.ALPHA, parameters, timestamp, activate_in_the_past
     )
-    remember_baker_contracts(client)
-
-
-def remember_baker_contracts(client):
-    client.remember_contract('baker1', constants.BOOTSTRAP_BAKERS[0]["hash"])
-    client.remember_contract('baker2', constants.BOOTSTRAP_BAKERS[1]["hash"])
-    client.remember_contract('baker3', constants.BOOTSTRAP_BAKERS[2]["hash"])
-    client.remember_contract('baker4', constants.BOOTSTRAP_BAKERS[3]["hash"])
-    client.remember_contract('baker5', constants.BOOTSTRAP_BAKERS[4]["hash"])
 
 
 def pprint(json_data: dict) -> None:
@@ -428,9 +419,9 @@ def contract_name_of_file(contract_path: str) -> str:
     return os.path.splitext(os.path.basename(contract_path))[0]
 
 
-def bake(client: Client, baker='bootstrap1') -> BakeForResult:
+def bake(client: Client) -> BakeForResult:
     return client.bake(
-        baker,
+        'bootstrap1',
         [
             '--max-priority',
             '512',
@@ -445,41 +436,6 @@ def bake(client: Client, baker='bootstrap1') -> BakeForResult:
     )
 
 
-def bake_many(
-    times: int, client: Client, baker: str, args: List[str] = None
-) -> Optional[BakeForResult]:
-    result = None
-    while times > 0:
-        result = client.bake(baker, args)
-        times -= 1
-    return result
-
-
-def bake_until_cycle_end(
-    client: Client,
-    baker: str,
-    blocks_per_cycle: int,
-    args: List[str] = None,
-) -> Optional[BakeForResult]:
-    current_level = client.get_level() % blocks_per_cycle
-    delta = blocks_per_cycle - current_level
-    return bake_many(delta, client, baker, args)
-
-
-def bake_until_nth_cycle_end(
-    cycles: int,
-    client: Client,
-    baker: str,
-    blocks_per_cycle: int,
-    args: List[str] = None,
-) -> Optional[BakeForResult]:
-    result = None
-    while cycles > 0:
-        result = bake_until_cycle_end(client, baker, blocks_per_cycle, args)
-        cycles -= 1
-    return result
-
-
 def init_with_transfer(
     client: Client,
     contract: str,
@@ -487,7 +443,6 @@ def init_with_transfer(
     amount: float,
     sender: str,
     contract_name: str = None,
-    baker='bootstrap1',
 ):
     if contract_name is None:
         contract_name = contract_name_of_file(contract)
@@ -498,7 +453,7 @@ def init_with_transfer(
         contract,
         ['-init', initial_storage, '--burn-cap', '10'],
     )
-    bake(client, baker)
+    bake(client)
 
 
 def assert_balance(

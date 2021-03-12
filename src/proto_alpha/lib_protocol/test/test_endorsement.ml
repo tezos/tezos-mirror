@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -69,11 +68,11 @@ let get_expected_deposit ctxt ~baker ~endorsing_power =
   >>?= fun endorsement_deposit ->
   endorsement_deposit +? baking_deposit >>?= fun deposit -> return deposit
 
-(* [baker] is true if the [baker_hash] has also baked the current block, in
+(* [baker] is true if the [pkh] has also baked the current block, in
    which case corresponding deposit and reward should be adjusted *)
 let assert_endorser_balance_consistency ~loc ?(priority = 0) ?(baker = false)
-    ~endorsing_power ctxt baker_hash initial_balance =
-  let contract = Contract.baker_contract baker_hash in
+    ~endorsing_power ctxt pkh initial_balance =
+  let contract = Contract.implicit_contract pkh in
   get_expected_reward ctxt ~priority ~baker ~endorsing_power
   >>=? fun reward ->
   get_expected_deposit ctxt ~baker ~endorsing_power
@@ -87,15 +86,15 @@ let assert_endorser_balance_consistency ~loc ?(priority = 0) ?(baker = false)
   Context.Contract.balance ~kind:Deposit ctxt contract
   >>=? fun deposit_balance -> Assert.equal_tez ~loc deposit_balance deposit
 
-let bakers_with_slots endorsers =
+let delegates_with_slots endorsers =
   List.map
-    (fun (endorser : Baker_services.Endorsing_rights.t) ->
-      (endorser.baker, endorser.slots))
+    (fun (endorser : Delegate_services.Endorsing_rights.t) ->
+      (endorser.delegate, endorser.slots))
     endorsers
 
 let endorsing_power endorsers =
   List.fold_left
-    (fun sum (endorser : Baker_services.Endorsing_rights.t) ->
+    (fun sum (endorser : Delegate_services.Endorsing_rights.t) ->
       sum + List.length endorser.slots)
     0
     endorsers
@@ -107,14 +106,14 @@ let endorsing_power endorsers =
 (** Apply a single endorsement from the slot 0 endorser. *)
 let test_simple_endorsement () =
   Context.init 5
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_endorser (B b)
-  >>=? fun (baker, slots) ->
-  Op.endorsement_with_slot ~baker:(baker, slots) (B b) ()
+  >>=? fun (delegate, slots) ->
+  Op.endorsement_with_slot ~delegate:(delegate, slots) (B b) ()
   >>=? fun op ->
-  Context.Contract.balance (B b) (Contract.baker_contract baker)
+  Context.Contract.balance (B b) (Contract.implicit_contract delegate)
   >>=? fun initial_balance ->
-  let policy = Block.Excluding [baker] in
+  let policy = Block.Excluding [delegate] in
   Block.get_next_baker ~policy b
   >>=? fun (_, priority, _) ->
   Block.bake ~policy ~operations:[Operation.pack op] b
@@ -124,7 +123,7 @@ let test_simple_endorsement () =
     (B b2)
     ~priority
     ~endorsing_power:(List.length slots)
-    baker
+    delegate
     initial_balance
 
 (** Apply a maximum number of endorsements. An endorser can be
@@ -132,7 +131,7 @@ let test_simple_endorsement () =
 let test_max_endorsement () =
   let endorsers_per_block = 16 in
   Context.init ~endorsers_per_block 32
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_endorsers (B b)
   >>=? fun endorsers ->
   Assert.equal_int
@@ -140,25 +139,25 @@ let test_max_endorsement () =
     (List.length
        (List.concat
           (List.map
-             (fun {Alpha_services.Baker.Endorsing_rights.slots; _} -> slots)
+             (fun {Alpha_services.Delegate.Endorsing_rights.slots; _} -> slots)
              endorsers)))
     endorsers_per_block
   >>=? fun () ->
   List.fold_left_es
-    (fun (bakers, ops, balances)
-         (endorser : Alpha_services.Baker.Endorsing_rights.t) ->
-      let baker = endorser.baker in
-      Context.Contract.balance (B b) (Contract.baker_contract baker)
+    (fun (delegates, ops, balances)
+         (endorser : Alpha_services.Delegate.Endorsing_rights.t) ->
+      let delegate = endorser.delegate in
+      Context.Contract.balance (B b) (Contract.implicit_contract delegate)
       >>=? fun balance ->
-      Op.endorsement_with_slot ~baker:(baker, endorser.slots) (B b) ()
+      Op.endorsement_with_slot ~delegate:(delegate, endorser.slots) (B b) ()
       >|=? fun op ->
-      ( baker :: bakers,
+      ( delegate :: delegates,
         Operation.pack op :: ops,
         (List.length endorser.slots, balance) :: balances ))
     ([], [], [])
     endorsers
-  >>=? fun (bakers, ops, previous_balances) ->
-  Block.bake ~policy:(Excluding bakers) ~operations:(List.rev ops) b
+  >>=? fun (delegates, ops, previous_balances) ->
+  Block.bake ~policy:(Excluding delegates) ~operations:(List.rev ops) b
   >>=? fun b ->
   (* One account can endorse more than one time per level, we must
      check that the bonds are summed up *)
@@ -171,7 +170,7 @@ let test_max_endorsement () =
         ~endorsing_power
         endorser_account
         previous_balance)
-    bakers
+    delegates
     previous_balances
 
 (** Check that every endorsers' balances are consistent with different
@@ -179,50 +178,56 @@ let test_max_endorsement () =
 let test_consistent_priorities () =
   let priorities = 0 -- 64 in
   Context.init 64
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   List.fold_left_es
-    (fun (b, used_hashes) priority ->
+    (fun (b, used_pkhes) priority ->
       (* Choose an endorser that has not baked nor endorsed before *)
       Context.get_endorsers (B b)
       >>=? fun endorsers ->
       let endorser =
         List.find_opt
-          (fun (e : Baker_services.Endorsing_rights.t) ->
-            not (Baker_hash.Set.mem e.baker used_hashes))
+          (fun (e : Delegate_services.Endorsing_rights.t) ->
+            not (Signature.Public_key_hash.Set.mem e.delegate used_pkhes))
           endorsers
       in
       match endorser with
       | None ->
-          return (b, used_hashes) (* not enough fresh endorsers; we "stop" *)
+          return (b, used_pkhes) (* not enough fresh endorsers; we "stop" *)
       | Some endorser ->
           Context.Contract.balance
             (B b)
-            (Contract.baker_contract endorser.baker)
+            (Contract.implicit_contract endorser.delegate)
           >>=? fun balance ->
           Op.endorsement_with_slot
-            ~baker:(endorser.baker, endorser.slots)
+            ~delegate:(endorser.delegate, endorser.slots)
             (B b)
             ()
           >>=? fun operation ->
           let operation = Operation.pack operation in
           Block.get_next_baker ~policy:(By_priority priority) b
           >>=? fun (baker, _, _) ->
-          let used_hashes = Baker_hash.Set.add baker used_hashes in
-          let used_hashes = Baker_hash.Set.add endorser.baker used_hashes in
+          let used_pkhes =
+            Signature.Public_key_hash.Set.add baker used_pkhes
+          in
+          let used_pkhes =
+            Signature.Public_key_hash.Set.add endorser.delegate used_pkhes
+          in
           (* Bake with a specific priority *)
           Block.bake ~policy:(By_priority priority) ~operation b
           >>=? fun b ->
-          let is_baker = Baker_hash.(baker = endorser.baker) in
+          let is_baker =
+            Signature.Public_key_hash.(baker = endorser.delegate)
+          in
           assert_endorser_balance_consistency
             ~loc:__LOC__
             ~priority
             ~baker:is_baker
             (B b)
             ~endorsing_power:(List.length endorser.slots)
-            endorser.baker
+            endorser.delegate
             balance
-          >|=? fun () -> (b, used_hashes))
-    (b, Baker_hash.Set.empty)
+          >|=? fun () -> (b, used_pkhes))
+    (b, Signature.Public_key_hash.Set.empty)
     priorities
   >>=? fun _b -> return_unit
 
@@ -230,14 +235,14 @@ let test_consistent_priorities () =
     gets his reward. *)
 let test_reward_retrieval () =
   Context.init 5
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.{parametric = {preserved_cycles; _}; _} ->
   Context.get_endorser (B b)
   >>=? fun (endorser, slots) ->
-  Context.Contract.balance (B b) (Contract.baker_contract endorser)
+  Context.Contract.balance (B b) (Contract.implicit_contract endorser)
   >>=? fun balance ->
-  Op.endorsement_with_slot ~baker:(endorser, slots) (B b) ()
+  Op.endorsement_with_slot ~delegate:(endorser, slots) (B b) ()
   >>=? fun operation ->
   let operation = Operation.pack operation in
   let policy = Block.Excluding [endorser] in
@@ -260,7 +265,7 @@ let test_reward_retrieval () =
   Assert.balance_was_credited
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser)
+    (Contract.implicit_contract endorser)
     balance
     reward
 
@@ -269,7 +274,7 @@ let test_reward_retrieval () =
     cycles. *)
 let test_reward_retrieval_two_endorsers () =
   Context.init 5
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.
              { parametric = {preserved_cycles; endorsement_security_deposit; _};
@@ -277,17 +282,24 @@ let test_reward_retrieval_two_endorsers () =
   Context.get_endorsers (B b)
   >>=? fun endorsers ->
   let (endorser1, endorser2) = get_hd_hd endorsers in
-  Context.Contract.balance (B b) (Contract.baker_contract endorser1.baker)
+  Context.Contract.balance
+    (B b)
+    (Contract.implicit_contract endorser1.delegate)
   >>=? fun balance1 ->
-  Context.Contract.balance (B b) (Contract.baker_contract endorser2.baker)
+  Context.Contract.balance
+    (B b)
+    (Contract.implicit_contract endorser2.delegate)
   >>=? fun balance2 ->
   Tez.(
     endorsement_security_deposit *? Int64.of_int (List.length endorser1.slots))
   >>?= fun security_deposit1 ->
   (* endorser1 endorses the genesis block in cycle 0 *)
-  Op.endorsement_with_slot ~baker:(endorser1.baker, endorser1.slots) (B b) ()
+  Op.endorsement_with_slot
+    ~delegate:(endorser1.delegate, endorser1.slots)
+    (B b)
+    ()
   >>=? fun operation1 ->
-  let policy = Block.Excluding [endorser1.baker; endorser2.baker] in
+  let policy = Block.Excluding [endorser1.delegate; endorser2.delegate] in
   Block.get_next_baker ~policy b
   >>=? fun (_, priority, _) ->
   Context.get_endorsing_reward
@@ -301,14 +313,14 @@ let test_reward_retrieval_two_endorsers () =
   Assert.balance_was_debited
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser1.baker)
+    (Contract.implicit_contract endorser1.delegate)
     balance1
     security_deposit1
   >>=? fun () ->
   Assert.balance_is
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser2.baker)
+    (Contract.implicit_contract endorser2.delegate)
     balance2
   >>=? fun () ->
   (* complete cycle 0 *)
@@ -317,22 +329,22 @@ let test_reward_retrieval_two_endorsers () =
   Assert.balance_was_debited
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser1.baker)
+    (Contract.implicit_contract endorser1.delegate)
     balance1
     security_deposit1
   >>=? fun () ->
   Assert.balance_is
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser2.baker)
+    (Contract.implicit_contract endorser2.delegate)
     balance2
   >>=? fun () ->
   (* get the slots of endorser2 for the current block *)
   Context.get_endorsers (B b)
   >>=? fun endorsers ->
   let same_endorser2 endorser =
-    Baker_hash.(
-      endorser.Baker_services.Endorsing_rights.baker = endorser2.baker)
+    Signature.Public_key_hash.(
+      endorser.Delegate_services.Endorsing_rights.delegate = endorser2.delegate)
   in
   let endorser2 =
     WithExceptions.Option.get ~loc:__LOC__
@@ -343,7 +355,10 @@ let test_reward_retrieval_two_endorsers () =
     endorsement_security_deposit *? Int64.of_int (List.length endorser2.slots))
   >>?= fun security_deposit2 ->
   (* endorser2 endorses the last block in cycle 0 *)
-  Op.endorsement_with_slot ~baker:(endorser2.baker, endorser2.slots) (B b) ()
+  Op.endorsement_with_slot
+    ~delegate:(endorser2.delegate, endorser2.slots)
+    (B b)
+    ()
   >>=? fun operation2 ->
   (* bake first block in cycle 1, include endorsement of endorser2 *)
   Block.bake ~policy ~operation:(Operation.pack operation2) b
@@ -357,14 +372,14 @@ let test_reward_retrieval_two_endorsers () =
   Assert.balance_was_debited
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser1.baker)
+    (Contract.implicit_contract endorser1.delegate)
     balance1
     security_deposit1
   >>=? fun () ->
   Assert.balance_was_debited
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser2.baker)
+    (Contract.implicit_contract endorser2.delegate)
     balance2
     security_deposit2
   >>=? fun () ->
@@ -374,14 +389,14 @@ let test_reward_retrieval_two_endorsers () =
       Assert.balance_was_debited
         ~loc:__LOC__
         (B b)
-        (Contract.baker_contract endorser1.baker)
+        (Contract.implicit_contract endorser1.delegate)
         balance1
         security_deposit1
       >>=? fun () ->
       Assert.balance_was_debited
         ~loc:__LOC__
         (B b)
-        (Contract.baker_contract endorser2.baker)
+        (Contract.implicit_contract endorser2.delegate)
         balance2
         security_deposit2
       >>=? fun () -> Block.bake_until_cycle_end ~policy b)
@@ -391,14 +406,14 @@ let test_reward_retrieval_two_endorsers () =
   Assert.balance_was_credited
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser1.baker)
+    (Contract.implicit_contract endorser1.delegate)
     balance1
     reward1
   >>=? fun () ->
   Assert.balance_was_debited
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser2.baker)
+    (Contract.implicit_contract endorser2.delegate)
     balance2
     security_deposit2
   >>=? fun () ->
@@ -408,14 +423,14 @@ let test_reward_retrieval_two_endorsers () =
   Assert.balance_was_credited
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser1.baker)
+    (Contract.implicit_contract endorser1.delegate)
     balance1
     reward1
   >>=? fun () ->
   Assert.balance_was_credited
     ~loc:__LOC__
     (B b)
-    (Contract.baker_contract endorser2.baker)
+    (Contract.implicit_contract endorser2.delegate)
     balance2
     reward2
 
@@ -426,12 +441,12 @@ let test_reward_retrieval_two_endorsers () =
 (** Apply an endorsement without its slot bearing wrapper. *)
 let test_unwrapped_endorsement () =
   Context.init 5
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_endorser (B b)
-  >>=? fun (baker, _slots) ->
-  Op.endorsement ~baker (B b) ()
+  >>=? fun (delegate, _slots) ->
+  Op.endorsement ~delegate (B b) ()
   >>=? fun op ->
-  let policy = Block.Excluding [baker] in
+  let policy = Block.Excluding [delegate] in
   Block.bake ~policy ~operations:[Operation.pack op] b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -443,12 +458,12 @@ let test_unwrapped_endorsement () =
 (** Apply an endorsement with an invalid slot in its slot bearing wrapper. *)
 let test_bad_slot_wrapper () =
   Context.init 5
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_endorser (B b)
-  >>=? fun (baker, _slots) ->
-  Op.endorsement_with_slot ~baker:(baker, [2000]) (B b) ()
+  >>=? fun (delegate, _slots) ->
+  Op.endorsement_with_slot ~delegate:(delegate, [2000]) (B b) ()
   >>=? fun op ->
-  let policy = Block.Excluding [baker] in
+  let policy = Block.Excluding [delegate] in
   Block.bake ~policy ~operations:[Operation.pack op] b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -460,12 +475,12 @@ let test_bad_slot_wrapper () =
 (** Apply an endorsement with a negative slot in its slot bearing wrapper. *)
 let test_neg_slot_wrapper () =
   Context.init 5
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_endorser (B b)
-  >>=? fun (baker, _slots) ->
-  Op.endorsement_with_slot ~baker:(baker, [-1]) (B b) ()
+  >>=? fun (delegate, _slots) ->
+  Op.endorsement_with_slot ~delegate:(delegate, [-1]) (B b) ()
   >>=? fun op ->
-  let policy = Block.Excluding [baker] in
+  let policy = Block.Excluding [delegate] in
   Lwt.catch
     (fun () ->
       Block.bake ~policy ~operations:[Operation.pack op] b
@@ -478,7 +493,7 @@ let test_neg_slot_wrapper () =
 (** Apply an endorsement with a non-normalized slot in its slot bearing wrapper. *)
 let test_non_normalized_slot_wrapper () =
   Context.init 5
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_endorsers (B b)
   >>=? fun endorsers ->
   (* find an endorsers with more than 1 slot *)
@@ -486,10 +501,10 @@ let test_non_normalized_slot_wrapper () =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun endorser ->
-           List.length endorser.Baker_services.Endorsing_rights.slots > 1)
+           List.length endorser.Delegate_services.Endorsing_rights.slots > 1)
          endorsers
   in
-  let (baker, slots) = (endorser.baker, endorser.slots) in
+  let (delegate, slots) = (endorser.delegate, endorser.slots) in
   (* the first slot should be the smallest slot *)
   Assert.equal_int
     ~loc:__LOC__
@@ -497,9 +512,9 @@ let test_non_normalized_slot_wrapper () =
     ( WithExceptions.Option.get ~loc:__LOC__
     @@ List.hd (List.sort compare endorser.slots) )
   >>=? fun () ->
-  Op.endorsement_with_slot ~baker:(baker, List.rev slots) (B b) ()
+  Op.endorsement_with_slot ~delegate:(delegate, List.rev slots) (B b) ()
   >>=? fun op ->
-  let policy = Block.Excluding [baker] in
+  let policy = Block.Excluding [delegate] in
   Block.bake ~policy ~operations:[Operation.pack op] b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -512,13 +527,13 @@ let test_non_normalized_slot_wrapper () =
     incorrect block predecessor. *)
 let test_wrong_endorsement_predecessor () =
   Context.init 5
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_endorser (B b)
   >>=? fun (genesis_endorser, slots) ->
   Block.bake b
   >>=? fun b' ->
   Op.endorsement_with_slot
-    ~baker:(genesis_endorser, slots)
+    ~delegate:(genesis_endorser, slots)
     ~signing_context:(B b)
     (B b')
     ()
@@ -536,7 +551,7 @@ let test_wrong_endorsement_predecessor () =
     level (i.e. the predecessor level). *)
 let test_invalid_endorsement_level () =
   Context.init 5
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_level (B b)
   >>?= fun genesis_level ->
   Block.bake b
@@ -556,7 +571,7 @@ let test_invalid_endorsement_level () =
     done. *)
 let test_duplicate_endorsement () =
   Context.init 5
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Incremental.begin_construction b
   >>=? fun inc ->
   Op.endorsement_with_slot (B b) ()
@@ -578,23 +593,30 @@ let test_duplicate_endorsement () =
 (** Apply a single endorsement from the slot 0 endorser. *)
 let test_not_enough_for_deposit () =
   Context.init 5 ~endorsers_per_block:1
-  >>=? fun (b_init, _contracts, bakers) ->
+  >>=? fun (b_init, contracts) ->
+  List.map_es
+    (fun c -> Context.Contract.manager (B b_init) c >|=? fun m -> (m, c))
+    contracts
+  >>=? fun managers ->
   Block.bake b_init
   >>=? fun b ->
   (* retrieve the level 2's endorser *)
   Context.get_endorser (B b)
   >>=? fun (endorser, slots) ->
-  let contract_other_than_endorser =
-    Contract.baker_contract
-    @@ WithExceptions.Option.get ~loc:__LOC__
-    @@ List.find (fun c -> not (Baker_hash.equal c endorser)) bakers
+  let (_, contract_other_than_endorser) =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.find
+         (fun (c, _) ->
+           not (Signature.Public_key_hash.equal c.Account.pkh endorser))
+         managers
   in
-  let contract_of_endorser =
-    Contract.baker_contract
-    @@ WithExceptions.Option.get ~loc:__LOC__
-    @@ List.find (fun c -> Baker_hash.equal c endorser) bakers
+  let (_, contract_of_endorser) =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.find
+         (fun (c, _) -> Signature.Public_key_hash.equal c.Account.pkh endorser)
+         managers
   in
-  Context.Contract.balance (B b) (Contract.baker_contract endorser)
+  Context.Contract.balance (B b) (Contract.implicit_contract endorser)
   >>=? fun initial_balance ->
   (* Empty the future endorser account *)
   Op.transaction
@@ -606,7 +628,7 @@ let test_not_enough_for_deposit () =
   Block.bake ~operation:op_trans b_init
   >>=? fun b ->
   (* Endorse with a zero balance *)
-  Op.endorsement_with_slot ~baker:(endorser, slots) (B b) ()
+  Op.endorsement_with_slot ~delegate:(endorser, slots) (B b) ()
   >>=? fun op_endo ->
   Block.bake
     ~policy:(Excluding [endorser])
@@ -614,7 +636,7 @@ let test_not_enough_for_deposit () =
     b
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Baker_storage.Balance_too_low_for_deposit _ ->
+      | Delegate_storage.Balance_too_low_for_deposit _ ->
           true
       | _ ->
           false)
@@ -624,7 +646,7 @@ let test_endorsement_threshold () =
   let initial_endorsers = 28 in
   let num_accounts = 100 in
   Context.init ~initial_endorsers num_accounts
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_endorsers (B b)
   >>=? fun endorsers ->
   let num_endorsers = List.length endorsers in
@@ -636,8 +658,10 @@ let test_endorsement_threshold () =
       let priority = num_endorsers - i in
       let crt_endorsers = List.take_n i endorsers in
       let endorsing_power = endorsing_power crt_endorsers in
-      let bakers = bakers_with_slots crt_endorsers in
-      List.map_es (fun x -> Op.endorsement_with_slot ~baker:x (B b) ()) bakers
+      let delegates = delegates_with_slots crt_endorsers in
+      List.map_es
+        (fun x -> Op.endorsement_with_slot ~delegate:x (B b) ())
+        delegates
       >>=? fun ops ->
       Context.get_minimal_valid_time (B b) ~priority ~endorsing_power
       >>=? fun timestamp ->
@@ -666,8 +690,10 @@ let test_endorsement_threshold () =
   (* we bake with all endorsers endorsing, at the right time *)
   let priority = 0 in
   let endorsing_power = endorsing_power endorsers in
-  let bakers = bakers_with_slots endorsers in
-  List.map_es (fun baker -> Op.endorsement_with_slot ~baker (B b) ()) bakers
+  let delegates = delegates_with_slots endorsers in
+  List.map_es
+    (fun delegate -> Op.endorsement_with_slot ~delegate (B b) ())
+    delegates
   >>=? fun ops ->
   Context.get_minimal_valid_time (B b) ~priority ~endorsing_power
   >>=? fun timestamp ->
@@ -682,7 +708,7 @@ let test_endorsement_threshold () =
 let test_fitness_gap () =
   let num_accounts = 5 in
   Context.init num_accounts
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   ( match Fitness_repr.to_int64 b.header.shell.fitness with
   | Ok fitness ->
       Int64.to_int fitness
@@ -690,8 +716,8 @@ let test_fitness_gap () =
       assert false )
   |> fun fitness ->
   Context.get_endorser (B b)
-  >>=? fun (baker, slots) ->
-  Op.endorsement_with_slot ~baker:(baker, slots) (B b) ()
+  >>=? fun (delegate, slots) ->
+  Op.endorsement_with_slot ~delegate:(delegate, slots) (B b) ()
   >>=? fun op ->
   (* bake at priority 0 succeed thanks to enough endorsements *)
   Block.bake ~policy:(By_priority 0) ~operations:[Operation.pack op] b

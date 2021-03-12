@@ -24,14 +24,12 @@ TODO this test is a copy and paste from tests/test_baker_endorser.py
 
 import itertools
 import random
-import subprocess
 import time
-
+import subprocess
 import pytest
-
+from tools import utils, constants
 from launchers.sandbox import SandboxMultiBranch
-from tests_alpha import protocol
-from tools import constants, utils
+
 
 random.seed(42)
 KEYS = [f'bootstrap{i}' for i in range(1, 6)]
@@ -84,18 +82,16 @@ class TestAllDaemonsWithOperations:
         # Set appropriate time to avoid double-baking
         for i in range(NUM_NODES):
             sandbox_multibranch.add_node(i, params=params(i))
-        parameters = dict(protocol.PARAMETERS)
+        parameters = dict(constants.ALPHA_PARAMETERS)
         parameters["time_between_blocks"] = ["10", "0"]
-        sandbox_multibranch.client(0).activate_protocol_json(
-            protocol.HASH, parameters
-        )
-        sandbox_multibranch.add_baker(0, 'baker5', proto=protocol.DAEMON)
-        sandbox_multibranch.add_baker(1, 'baker4', proto=protocol.DAEMON)
+        sandbox_multibranch.client(0).activate_protocol_json(ALPHA, parameters)
+        sandbox_multibranch.add_baker(0, 'bootstrap5', proto=ALPHA_DAEMON)
+        sandbox_multibranch.add_baker(1, 'bootstrap4', proto=ALPHA_DAEMON)
         sandbox_multibranch.add_endorser(
-            0, account='baker1', endorsement_delay=1, proto=protocol.DAEMON
+            0, account='bootstrap1', endorsement_delay=1, proto=ALPHA_DAEMON
         )
         sandbox_multibranch.add_endorser(
-            1, account='baker2', endorsement_delay=1, proto=protocol.DAEMON
+            1, account='bootstrap2', endorsement_delay=1, proto=ALPHA_DAEMON
         )
 
     def test_wait_for_alpha(self, sandbox_multibranch: SandboxMultiBranch):

@@ -41,7 +41,7 @@ open Alpha_context
 
 let register_one_contract () =
   Context.init 1
-  >>=? fun (b, contracts, _bakers) ->
+  >>=? fun (b, contracts) ->
   let contract =
     List.nth contracts 0 |> WithExceptions.Option.get ~loc:__LOC__
   in

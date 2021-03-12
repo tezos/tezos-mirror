@@ -131,14 +131,7 @@ let test_simple_baking_event ~protocol =
     receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   Log.info "Baking pending operations..." ;
-  let baker =
-    match protocol with
-    | Protocol.Alpha ->
-        Constant.baker1.identity
-    | _ ->
-        "bootstrap1"
-  in
-  Client.bake_for ~key:baker client
+  Client.bake_for ~key:giver client
 
 let test_same_transfer_twice ~protocol =
   Test.register
@@ -220,14 +213,7 @@ let test_multiple_baking ~protocol =
     ~tags:
       ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
   @@ fun () ->
-  let (alice, _amount, bob) = transfer_data in
-  let baker =
-    match protocol with
-    | Protocol.Alpha ->
-        Constant.baker3.identity
-    | _ ->
-        "bootstrap3"
-  in
+  let (alice, _amount, bob) = transfer_data and baker = "bootstrap3" in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
@@ -336,17 +322,11 @@ let test_migration_transfer ?migration_spec () =
       return (giver_balance_before, receiver_balance_before))
     ~post_migration:
       (fun client (giver_balance_before, receiver_balance_before) ->
-      let* giver_post_migration =
-        Client.find_baker_with_consensus_key ~key:giver client
-      in
-      let* receiver_post_migration =
-        Client.find_baker_with_consensus_key ~key:receiver client
-      in
       let* giver_balance_after =
-        Client.get_balance_for ~account:giver_post_migration client
+        Client.get_balance_for ~account:giver client
       in
       let* receiver_balance_after =
-        Client.get_balance_for ~account:receiver_post_migration client
+        Client.get_balance_for ~account:receiver client
       in
       test_balances_after_transfer
         (giver_balance_before, giver_balance_after)

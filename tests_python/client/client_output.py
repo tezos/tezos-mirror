@@ -507,23 +507,3 @@ class CheckSignMessageResult:
         if match is None:
             raise InvalidClientOutput(client_output)
         self.check = True
-
-
-class FindBakerWithConsensusKeyResult:
-    """Result of a 'find baker with consensus key' command."""
-
-    def __init__(self, client_output: str):
-        pattern = r"Found baker:\ (\w*)"
-        match = re.search(pattern, client_output)
-        if match is None:
-            raise InvalidClientOutput(client_output)
-        self.baker = match.groups()[0]
-
-
-class ListPvssKeysResult:
-    """Result of 'list pvss keys' operation."""
-
-    def __init__(self, client_output: str):
-
-        pattern = re.compile(r"^(\w+):\s*(\w+).*$", re.MULTILINE)
-        self.keys = dict(re.findall(pattern, client_output))

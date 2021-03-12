@@ -146,12 +146,6 @@ type prim =
   | I_READ_TICKET
   | I_SPLIT_TICKET
   | I_JOIN_TICKETS
-  | I_SUBMIT_PROPOSALS
-  | I_SUBMIT_BALLOT
-  | I_SET_BAKER_ACTIVE
-  | I_TOGGLE_BAKER_DELEGATIONS
-  | I_SET_BAKER_CONSENSUS_KEY
-  | I_SET_BAKER_PVSS_KEY
   | T_bool
   | T_contract
   | T_int
@@ -182,9 +176,6 @@ type prim =
   | T_bls12_381_g2
   | T_bls12_381_fr
   | T_ticket
-  | T_baker_hash
-  | T_baker_operation
-  | T_pvss_key
 
 (* Auxiliary types for error documentation.
    All the prim constructor prefixes must match their namespace. *)
@@ -285,10 +276,6 @@ let namespace = function
   | I_SELF
   | I_SELF_ADDRESS
   | I_SENDER
-  | I_SET_BAKER_ACTIVE
-  | I_TOGGLE_BAKER_DELEGATIONS
-  | I_SET_BAKER_CONSENSUS_KEY
-  | I_SET_BAKER_PVSS_KEY
   | I_SET_DELEGATE
   | I_SHA256
   | I_SHA512
@@ -300,8 +287,6 @@ let namespace = function
   | I_SPLIT_TICKET
   | I_STEPS_TO_QUOTA
   | I_SUB
-  | I_SUBMIT_BALLOT
-  | I_SUBMIT_PROPOSALS
   | I_SWAP
   | I_TICKET
   | I_TOTAL_VOTING_POWER
@@ -314,8 +299,6 @@ let namespace = function
   | I_XOR ->
       Instr_namespace
   | T_address
-  | T_baker_hash
-  | T_baker_operation
   | T_big_map
   | T_bool
   | T_bytes
@@ -334,7 +317,6 @@ let namespace = function
   | T_option
   | T_or
   | T_pair
-  | T_pvss_key
   | T_sapling_state
   | T_sapling_transaction
   | T_set
@@ -585,18 +567,6 @@ let string_of_prim = function
       "SPLIT_TICKET"
   | I_JOIN_TICKETS ->
       "JOIN_TICKETS"
-  | I_SUBMIT_PROPOSALS ->
-      "SUBMIT_PROPOSALS"
-  | I_SUBMIT_BALLOT ->
-      "SUBMIT_BALLOT"
-  | I_SET_BAKER_ACTIVE ->
-      "SET_BAKER_ACTIVE"
-  | I_TOGGLE_BAKER_DELEGATIONS ->
-      "TOGGLE_BAKER_DELEGATIONS"
-  | I_SET_BAKER_CONSENSUS_KEY ->
-      "SET_BAKER_CONSENSUS_KEY"
-  | I_SET_BAKER_PVSS_KEY ->
-      "SET_BAKER_PVSS_KEY"
   | T_bool ->
       "bool"
   | T_contract ->
@@ -657,12 +627,6 @@ let string_of_prim = function
       "bls12_381_fr"
   | T_ticket ->
       "ticket"
-  | T_baker_hash ->
-      "baker_hash"
-  | T_baker_operation ->
-      "baker_operation"
-  | T_pvss_key ->
-      "pvss_key"
 
 let prim_of_string = function
   | "parameter" ->
@@ -887,18 +851,6 @@ let prim_of_string = function
       ok I_SPLIT_TICKET
   | "JOIN_TICKETS" ->
       ok I_JOIN_TICKETS
-  | "SUBMIT_PROPOSALS" ->
-      ok I_SUBMIT_PROPOSALS
-  | "SUBMIT_BALLOT" ->
-      ok I_SUBMIT_BALLOT
-  | "SET_BAKER_ACTIVE" ->
-      ok I_SET_BAKER_ACTIVE
-  | "TOGGLE_BAKER_DELEGATIONS" ->
-      ok I_TOGGLE_BAKER_DELEGATIONS
-  | "SET_BAKER_CONSENSUS_KEY" ->
-      ok I_SET_BAKER_CONSENSUS_KEY
-  | "SET_BAKER_PVSS_KEY" ->
-      ok I_SET_BAKER_PVSS_KEY
   | "bool" ->
       ok T_bool
   | "contract" ->
@@ -959,12 +911,6 @@ let prim_of_string = function
       ok T_bls12_381_fr
   | "ticket" ->
       ok T_ticket
-  | "baker_hash" ->
-      ok T_baker_hash
-  | "baker_operation" ->
-      ok T_baker_operation
-  | "pvss_key" ->
-      ok T_pvss_key
   | n ->
       if valid_case n then error (Unknown_primitive_name n)
       else error (Invalid_case n)
@@ -1165,19 +1111,7 @@ let prim_encoding =
          ("READ_TICKET", I_READ_TICKET);
          ("SPLIT_TICKET", I_SPLIT_TICKET);
          ("JOIN_TICKETS", I_JOIN_TICKETS);
-         ("GET_AND_UPDATE", I_GET_AND_UPDATE);
-         (* Alpha_009 addition *)
-         ("baker_hash", T_baker_hash);
-         ("baker_operation", T_baker_operation);
-         ("pvss_key", T_pvss_key);
-         (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
-         (* Alpha_009 addition *)
-         ("SUBMIT_PROPOSALS", I_SUBMIT_PROPOSALS);
-         ("SUBMIT_BALLOT", I_SUBMIT_BALLOT);
-         ("SET_BAKER_ACTIVE", I_SET_BAKER_ACTIVE);
-         ("TOGGLE_BAKER_DELEGATIONS", I_TOGGLE_BAKER_DELEGATIONS);
-         ("SET_BAKER_CONSENSUS_KEY", I_SET_BAKER_CONSENSUS_KEY);
-         ("SET_BAKER_PVSS_KEY", I_SET_BAKER_PVSS_KEY)
+         ("GET_AND_UPDATE", I_GET_AND_UPDATE)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
         ]

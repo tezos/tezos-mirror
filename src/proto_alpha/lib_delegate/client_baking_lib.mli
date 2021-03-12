@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,16 +37,17 @@ val bake_block :
   ?minimal_timestamp:bool ->
   ?mempool:string ->
   ?context_path:string ->
+  ?src_sk:Client_keys.sk_uri ->
   chain:Chain_services.chain ->
   head:Block_services.block ->
-  baker_hash ->
+  public_key_hash ->
   unit tzresult Lwt.t
 
 (** Endorse a block *)
 val endorse_block :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
-  baker_hash ->
+  Client_keys.Public_key_hash.t ->
   unit Error_monad.tzresult Lwt.t
 
 (** Get the previous cycle of the given cycle *)

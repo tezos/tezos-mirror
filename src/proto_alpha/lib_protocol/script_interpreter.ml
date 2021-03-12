@@ -50,12 +50,6 @@ type error += Cannot_serialize_storage
 
 type error += Michelson_too_many_recursive_calls
 
-type error += Not_an_active_consensus_key of Signature.Public_key_hash.t
-
-type error += Not_a_baker_contract
-
-type error += Invalid_ballot_string of string
-
 let () =
   let open Data_encoding in
   let trace_encoding =
@@ -148,39 +142,7 @@ let () =
        script"
     Data_encoding.empty
     (function Michelson_too_many_recursive_calls -> Some () | _ -> None)
-    (fun () -> Michelson_too_many_recursive_calls) ;
-  register_error_kind
-    `Temporary
-    ~id:"michelson_v1.not_an_active_consensus_key"
-    ~title:"Not an active baker consensus key"
-    ~description:"The given key is not an active baker consensus key."
-    ~pp:(fun ppf key ->
-      Format.fprintf
-        ppf
-        "The given key %a is not an active baker consensus key."
-        Signature.Public_key_hash.pp
-        key)
-    Data_encoding.(obj1 (req "key" Signature.Public_key_hash.encoding))
-    (function Not_an_active_consensus_key k -> Some k | _ -> None)
-    (fun k -> Not_an_active_consensus_key k) ;
-  (* Not a baker contract *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.not_a_baker_contract"
-    ~title:"Not a baker contract"
-    ~description:"Instruction is only valid for baker contracts"
-    Data_encoding.empty
-    (function Not_a_baker_contract -> Some () | _ -> None)
-    (fun () -> Not_a_baker_contract) ;
-  (* Invalid ballot *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.invalid_ballot_string"
-    ~title:"Invalid ballot string"
-    ~description:"Invalid ballot string. Y, N, or P expected"
-    Data_encoding.(obj1 (req "ballot_string" string))
-    (function Invalid_ballot_string b -> Some b | _ -> None)
-    (fun b -> Invalid_ballot_string b)
+    (fun () -> Michelson_too_many_recursive_calls)
 
 (* ---- interpreter ---------------------------------------------------------*)
 
@@ -489,8 +451,6 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.transfer_tokens
   | (Implicit_account, _) ->
       Interp_costs.implicit_account
-  | (Set_delegate_legacy, _) ->
-      Interp_costs.set_delegate
   | (Set_delegate, _) ->
       Interp_costs.set_delegate
   | (Balance, _) ->
@@ -529,14 +489,10 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.dropn n
   | (ChainId, _) ->
       Interp_costs.chain_id
-  | (Create_contract_legacy _, _) ->
-      Interp_costs.create_contract
   | (Create_contract _, _) ->
       Interp_costs.create_contract
   | (Never, (_, _)) ->
       .
-  | (Voting_power_legacy, _) ->
-      Interp_costs.voting_power
   | (Voting_power, _) ->
       Interp_costs.voting_power
   | (Total_voting_power, _) ->
@@ -595,18 +551,6 @@ let cost_of_instr : type b a. (b, a) descr -> b -> Gas.cost =
       Interp_costs.split_ticket ticket.amount amount_a amount_b
   | (Join_tickets ty, ((ticket_a, ticket_b), _)) ->
       Interp_costs.join_tickets ty ticket_a ticket_b
-  | (Submit_proposals, _) ->
-      Interp_costs.submit_proposals
-  | (Submit_ballot, _) ->
-      Interp_costs.submit_ballot
-  | (Set_baker_active, _) ->
-      Interp_costs.set_baker_active
-  | (Set_baker_consensus_key, _) ->
-      Interp_costs.set_baker_consensus_key
-  | (Set_baker_pvss_key, _) ->
-      Interp_costs.set_baker_pvss_key
-  | (Toggle_baker_delegations, _) ->
-      Interp_costs.toggle_baker_delegations
 
 let unpack ctxt ~ty ~bytes =
   Gas.check_enough ctxt (Script.serialized_cost bytes)
@@ -663,14 +607,6 @@ let rec step_bounded :
     if Compare.Int.(stack_depth >= 10_000) then
       fail Michelson_too_many_recursive_calls
     else step_bounded logger ~stack_depth ctxt step_constants descr stack
-  in
-  let is_self_baker : unit -> baker_hash tzresult =
-   fun () ->
-    match Contract.is_baker step_constants.self with
-    | None ->
-        error Not_a_baker_contract
-    | Some baker ->
-        ok baker
   in
   match (instr, stack) with
   (* stack ops *)
@@ -1159,7 +1095,6 @@ let rec step_bounded :
         logged_return ((maybe_contract, rest), ctxt)
     | _ ->
         logged_return ((None, rest), ctxt) )
-  (* operations *)
   | (Transfer_tokens, (p, (amount, ((tp, (destination, entrypoint)), rest))))
     ->
       collect_lazy_storage ctxt tp p
@@ -1190,7 +1125,7 @@ let rec step_bounded :
       fresh_internal_nonce ctxt
       >>?= fun (ctxt, nonce) ->
       logged_return
-        ( ( ( Internal_manager_operation
+        ( ( ( Internal_operation
                 {source = step_constants.self; operation; nonce},
               lazy_storage_diff ),
             rest ),
@@ -1198,8 +1133,7 @@ let rec step_bounded :
   | (Implicit_account, (key, rest)) ->
       let contract = Contract.implicit_contract key in
       logged_return (((Unit_t None, (contract, "default")), rest), ctxt)
-  | ( Create_contract_legacy
-        (storage_type, param_type, Lam (_, code), root_name),
+  | ( Create_contract (storage_type, param_type, Lam (_, code), root_name),
       (* Removed the instruction's arguments manager, spendable and delegatable *)
     (delegate, (credit, (init, rest))) ) ->
       unparse_ty ctxt param_type
@@ -1237,63 +1171,6 @@ let rec step_bounded :
       Contract.fresh_contract_from_current_nonce ctxt
       >>?= fun (ctxt, contract) ->
       let operation =
-        Origination_legacy
-          {
-            credit;
-            delegate;
-            preorigination = Some contract;
-            script =
-              {
-                code = Script.lazy_expr code;
-                storage = Script.lazy_expr storage;
-              };
-          }
-      in
-      fresh_internal_nonce ctxt
-      >>?= fun (ctxt, nonce) ->
-      logged_return
-        ( ( ( Internal_manager_operation
-                {source = step_constants.self; operation; nonce},
-              lazy_storage_diff ),
-            ((contract, "default"), rest) ),
-          ctxt )
-  | ( Create_contract (storage_type, param_type, Lam (_, code), root_name),
-      (* Changed the type of delegate from [public_key_hash option] to
-        [baker_hash option] *)
-    (delegate, (credit, (init, rest))) ) ->
-      unparse_ty ctxt param_type
-      >>?= fun (unparsed_param_type, ctxt) ->
-      let unparsed_param_type =
-        Script_ir_translator.add_field_annot root_name None unparsed_param_type
-      in
-      unparse_ty ctxt storage_type
-      >>?= fun (unparsed_storage_type, ctxt) ->
-      let code =
-        Micheline.strip_locations
-          (Seq
-             ( 0,
-               [ Prim (0, K_parameter, [unparsed_param_type], []);
-                 Prim (0, K_storage, [unparsed_storage_type], []);
-                 Prim (0, K_code, [code], []) ] ))
-      in
-      collect_lazy_storage ctxt storage_type init
-      >>?= fun (to_duplicate, ctxt) ->
-      let to_update = no_lazy_storage_id in
-      extract_lazy_storage_diff
-        ctxt
-        Optimized
-        storage_type
-        init
-        ~to_duplicate
-        ~to_update
-        ~temporary:true
-      >>=? fun (init, lazy_storage_diff, ctxt) ->
-      unparse_data ctxt Optimized storage_type init
-      >>=? fun (storage, ctxt) ->
-      let storage = Micheline.strip_locations storage in
-      Contract.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, contract) ->
-      let operation =
         Origination
           {
             credit;
@@ -1309,101 +1186,21 @@ let rec step_bounded :
       fresh_internal_nonce ctxt
       >>?= fun (ctxt, nonce) ->
       logged_return
-        ( ( ( Internal_manager_operation
+        ( ( ( Internal_operation
                 {source = step_constants.self; operation; nonce},
               lazy_storage_diff ),
             ((contract, "default"), rest) ),
           ctxt )
-  | (Set_delegate_legacy, (delegate, rest)) ->
-      let operation = Delegation_legacy delegate in
-      fresh_internal_nonce ctxt
-      >>?= fun (ctxt, nonce) ->
-      logged_return
-        ( ( ( Internal_manager_operation
-                {source = step_constants.self; operation; nonce},
-              None ),
-            rest ),
-          ctxt )
   | (Set_delegate, (delegate, rest)) ->
-      (* Changed the type of delegate from [public_key_hash option] to
-        [baker_hash option] *)
       let operation = Delegation delegate in
       fresh_internal_nonce ctxt
       >>?= fun (ctxt, nonce) ->
       logged_return
-        ( ( ( Internal_manager_operation
+        ( ( ( Internal_operation
                 {source = step_constants.self; operation; nonce},
               None ),
             rest ),
           ctxt )
-  (* baker operations *)
-  | (Submit_proposals, (proposals, rest)) ->
-      is_self_baker ()
-      >>?= fun baker ->
-      Voting_period.get_current ctxt
-      >>=? fun {index = period; _} ->
-      let operation =
-        Baker_proposals {period; proposals = proposals.elements}
-      in
-      fresh_internal_nonce ctxt
-      >>?= fun (ctxt, nonce) ->
-      logged_return
-        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
-  | (Submit_ballot, (proposal, (ballot_string, rest))) -> (
-      is_self_baker ()
-      >>?= fun baker ->
-      Voting_period.get_current ctxt
-      >>=? fun {index = period; _} ->
-      match Vote.of_string ballot_string with
-      | None ->
-          fail @@ Invalid_ballot_string ballot_string
-      | Some ballot ->
-          let operation = Baker_ballot {period; proposal; ballot} in
-          fresh_internal_nonce ctxt
-          >>?= fun (ctxt, nonce) ->
-          logged_return
-            ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
-      )
-  | (Set_baker_active, (active, rest)) ->
-      is_self_baker ()
-      >>?= fun baker ->
-      fresh_internal_nonce ctxt
-      >>?= fun (ctxt, nonce) ->
-      let operation : _ Alpha_context.baker_operation =
-        Set_baker_active active
-      in
-      logged_return
-        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
-  | (Toggle_baker_delegations, (accept, rest)) ->
-      is_self_baker ()
-      >>?= fun baker ->
-      fresh_internal_nonce ctxt
-      >>?= fun (ctxt, nonce) ->
-      let operation : _ Alpha_context.baker_operation =
-        Toggle_baker_delegations accept
-      in
-      logged_return
-        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
-  | (Set_baker_consensus_key, (key, (proof, rest))) ->
-      is_self_baker ()
-      >>?= fun baker ->
-      fresh_internal_nonce ctxt
-      >>?= fun (ctxt, nonce) ->
-      let operation : _ Alpha_context.baker_operation =
-        Set_baker_consensus_key (key, proof)
-      in
-      logged_return
-        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
-  | (Set_baker_pvss_key, (key, rest)) ->
-      is_self_baker ()
-      >>?= fun baker ->
-      fresh_internal_nonce ctxt
-      >>?= fun (ctxt, nonce) ->
-      let operation : _ Alpha_context.baker_operation =
-        Set_baker_pvss_key key
-      in
-      logged_return
-        ((Internal_baker_operation {baker; operation; nonce}, rest), ctxt)
   | (Balance, rest) ->
       Contract.get_balance_carbonated ctxt step_constants.self
       >>=? fun (ctxt, balance) -> logged_return ((balance, rest), ctxt)
@@ -1490,17 +1287,8 @@ let rec step_bounded :
       logged_return ((step_constants.chain_id, rest), ctxt)
   | (Never, (_, _)) ->
       .
-  | (Voting_power_legacy, (key_hash, rest)) -> (
-      Baker.is_consensus_key ctxt key_hash
-      >>=? function
-      | None ->
-          fail @@ Not_an_active_consensus_key key_hash
-      | Some baker_hash ->
-          Vote.get_voting_power ctxt baker_hash
-          >>=? fun (ctxt, rolls) ->
-          logged_return ((Script_int.(abs (of_int32 rolls)), rest), ctxt) )
-  | (Voting_power, (baker_hash, rest)) ->
-      Vote.get_voting_power ctxt baker_hash
+  | (Voting_power, (key_hash, rest)) ->
+      Vote.get_voting_power ctxt key_hash
       >>=? fun (ctxt, rolls) ->
       logged_return ((Script_int.(abs (of_int32 rolls)), rest), ctxt)
   | (Total_voting_power, rest) ->
@@ -1685,26 +1473,16 @@ let interp :
   >|=? fun ((ret, ()), ctxt) -> (ret, ctxt)
 
 (* ---- contract handling ---------------------------------------------------*)
-
-type execution_result = {
-  ctxt : context;
-  storage : Script.expr;
-  lazy_storage_diff : Lazy_storage.diffs option;
-  operations : packed_internal_operation list;
-}
-
-let execute_with_result
-    ~(translate_output :
-       'ret ->
-       Lazy_storage.diffs option ->
-       packed_internal_operation list * Lazy_storage.diffs option) logger ctxt
-    mode step_constants ~entrypoint ~internal unparsed_code
-    (parsed_script : 'ret ex_script) parameter :
-    execution_result tzresult Lwt.t =
-  let arg = Micheline.root parameter in
-  let (Ex_script {code; arg_type; storage; storage_type; root_name}) =
-    parsed_script
-  in
+let execute logger ctxt mode step_constants ~entrypoint ~internal
+    unparsed_script arg :
+    ( Script.expr
+    * packed_internal_operation list
+    * context
+    * Lazy_storage.diffs option )
+    tzresult
+    Lwt.t =
+  parse_script ctxt unparsed_script ~legacy:true ~allow_forged_in_storage:true
+  >>=? fun (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt) ->
   record_trace
     (Bad_contract_parameter step_constants.self)
     (find_entrypoint arg_type ~root_name entrypoint)
@@ -1713,7 +1491,7 @@ let execute_with_result
     (Bad_contract_parameter step_constants.self)
     (parse_data ctxt ~legacy:false ~allow_forged:internal arg_type (box arg))
   >>=? fun (arg, ctxt) ->
-  Script.force_decode_in_context ctxt unparsed_code
+  Script.force_decode_in_context ctxt unparsed_script.code
   >>?= fun (script_code, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->
@@ -1722,7 +1500,7 @@ let execute_with_result
   trace
     (Runtime_contract_error (step_constants.self, script_code))
     (interp logger ctxt step_constants code (arg, storage))
-  >>=? fun ((output, storage), ctxt) ->
+  >>=? fun ((ops, storage), ctxt) ->
   Script_ir_translator.extract_lazy_storage_diff
     ctxt
     mode
@@ -1740,66 +1518,36 @@ let execute_with_result
       ( Gas.consume ctxt (Script.strip_locations_cost storage)
       >>? fun ctxt -> ok (Micheline.strip_locations storage, ctxt) ) )
   >|=? fun (storage, ctxt) ->
-  let (operations, lazy_storage_diff) =
-    translate_output output lazy_storage_diff
+  let (ops, op_diffs) = List.split ops.elements in
+  let lazy_storage_diff =
+    match
+      List.flatten
+        (List.map (Option.value ~default:[]) (op_diffs @ [lazy_storage_diff]))
+    with
+    | [] ->
+        None
+    | diff ->
+        Some diff
   in
-  {ctxt; storage; lazy_storage_diff; operations}
+  (storage, ops, ctxt, lazy_storage_diff)
 
-let extract_lazy_storage_diffs op_diffs lazy_storage_diff =
-  match
-    List.flatten
-      (List.map (Option.value ~default:[]) (op_diffs @ [lazy_storage_diff]))
-  with
-  | [] ->
-      None
-  | diff ->
-      Some diff
+type execution_result = {
+  ctxt : context;
+  storage : Script.expr;
+  lazy_storage_diff : Lazy_storage.diffs option;
+  operations : packed_internal_operation list;
+}
 
 let execute ?(logger = (module No_trace : STEP_LOGGER)) ctxt mode
-    step_constants ~script ~entrypoint ~parameter ~internal :
-    execution_result tzresult Lwt.t =
-  parse_script ctxt script ~legacy:true ~allow_forged_in_storage:true
-  >>=? fun (Ex_originated_script parsed_script, ctxt) ->
-  let translate_output output lazy_storage_diff =
-    let (ops, op_diffs) = List.split output.elements in
-    let lazy_storage_diff =
-      extract_lazy_storage_diffs op_diffs lazy_storage_diff
-    in
-    (ops, lazy_storage_diff)
-  in
-  execute_with_result
-    ~translate_output
+    step_constants ~script ~entrypoint ~parameter ~internal =
+  execute
     logger
     ctxt
     mode
     step_constants
     ~entrypoint
     ~internal
-    script.code
-    (Ex_script parsed_script)
-    parameter
-
-let execute_baker ?(logger = (module No_trace : STEP_LOGGER)) ctxt mode
-    step_constants ~script ~entrypoint ~parameter ~internal :
-    execution_result tzresult Lwt.t =
-  parse_baker_script ctxt script ~legacy:true ~allow_forged_in_storage:true
-  >>=? fun (Ex_baker_script parsed_script, ctxt) ->
-  let translate_output (ops, baker_ops) lazy_storage_diff =
-    let (ops, op_diffs) = List.split ops.elements in
-    let baker_ops = baker_ops.elements in
-    let lazy_storage_diff =
-      extract_lazy_storage_diffs op_diffs lazy_storage_diff
-    in
-    (ops @ baker_ops, lazy_storage_diff)
-  in
-  execute_with_result
-    ~translate_output
-    logger
-    ctxt
-    mode
-    step_constants
-    ~entrypoint
-    ~internal
-    script.code
-    (Ex_script parsed_script)
-    parameter
+    script
+    (Micheline.root parameter)
+  >|=? fun (storage, operations, ctxt, lazy_storage_diff) ->
+  {ctxt; storage; lazy_storage_diff; operations}

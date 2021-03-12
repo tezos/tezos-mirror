@@ -30,21 +30,14 @@ type bootstrap_account = {
 }
 
 type bootstrap_contract = {
-  delegate : Baker_hash.t;
+  delegate : Signature.Public_key_hash.t;
   amount : Tez_repr.t;
   script : Script_repr.t;
-}
-
-type bootstrap_baker = {
-  hash : Baker_hash.t option;
-  amount : Tez_repr.t;
-  key : Signature.Public_key.t;
 }
 
 type t = {
   bootstrap_accounts : bootstrap_account list;
   bootstrap_contracts : bootstrap_contract list;
-  bootstrap_bakers : bootstrap_baker list;
   commitments : Commitment_repr.t list;
   constants : Constants_repr.parametric;
   security_deposit_ramp_up_cycles : int option;
@@ -91,40 +84,27 @@ let bootstrap_contract_encoding =
     (fun {delegate; amount; script} -> (delegate, amount, script))
     (fun (delegate, amount, script) -> {delegate; amount; script})
     (obj3
-       (req "delegate" Baker_hash.encoding)
+       (req "delegate" Signature.Public_key_hash.encoding)
        (req "amount" Tez_repr.encoding)
        (req "script" Script_repr.encoding))
-
-let bootstrap_baker_encoding =
-  let open Data_encoding in
-  conv
-    (fun {hash; amount; key} -> (hash, amount, key))
-    (fun (hash, amount, key) -> {hash; amount; key})
-    (obj3
-       (opt "hash" Baker_hash.encoding)
-       (req "amount" Tez_repr.encoding)
-       (req "key" Signature.Public_key.encoding))
 
 let encoding =
   let open Data_encoding in
   conv
     (fun { bootstrap_accounts;
            bootstrap_contracts;
-           bootstrap_bakers;
            commitments;
            constants;
            security_deposit_ramp_up_cycles;
            no_reward_cycles } ->
       ( ( bootstrap_accounts,
           bootstrap_contracts,
-          bootstrap_bakers,
           commitments,
           security_deposit_ramp_up_cycles,
           no_reward_cycles ),
         constants ))
     (fun ( ( bootstrap_accounts,
              bootstrap_contracts,
-             bootstrap_bakers,
              commitments,
              security_deposit_ramp_up_cycles,
              no_reward_cycles ),
@@ -132,17 +112,15 @@ let encoding =
       {
         bootstrap_accounts;
         bootstrap_contracts;
-        bootstrap_bakers;
         commitments;
         constants;
         security_deposit_ramp_up_cycles;
         no_reward_cycles;
       })
     (merge_objs
-       (obj6
+       (obj5
           (req "bootstrap_accounts" (list bootstrap_account_encoding))
           (dft "bootstrap_contracts" (list bootstrap_contract_encoding) [])
-          (dft "bootstrap_bakers" (list bootstrap_baker_encoding) [])
           (dft "commitments" (list Commitment_repr.encoding) [])
           (opt "security_deposit_ramp_up_cycles" int31)
           (opt "no_reward_cycles" int31))

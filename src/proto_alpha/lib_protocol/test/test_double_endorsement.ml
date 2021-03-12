@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -43,7 +42,9 @@ let get_hd_hd = function x :: y :: _ -> (x, y) | _ -> assert false
 
 let get_first_different_baker baker bakers =
   WithExceptions.Option.get ~loc:__LOC__
-  @@ List.find (fun baker' -> Baker_hash.( <> ) baker baker') bakers
+  @@ List.find
+       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
+       bakers
 
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
@@ -68,20 +69,20 @@ let block_fork b =
 (****************************************************************)
 
 (** Simple scenario where two endorsements are made from the same
-    baker and exposed by a double_endorsement operation. Also verify
+    delegate and exposed by a double_endorsement operation. Also verify
     that punishment is operated. *)
 let test_valid_double_endorsement_evidence () =
   Context.init 2
-  >>=? fun (b, _, bakers) ->
+  >>=? fun (b, _) ->
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
-  >>=? fun (baker, slots) ->
-  Op.endorsement ~baker (B blk_a) ()
+  >>=? fun (delegate, slots) ->
+  Op.endorsement ~delegate (B blk_a) ()
   >>=? fun endorsement_a ->
-  Op.endorsement ~baker (B blk_b) ()
+  Op.endorsement ~delegate (B blk_b) ()
   >>=? fun endorsement_b ->
-  Op.endorsement_with_slot ~baker:(baker, slots) (B blk_a) ()
+  Op.endorsement_with_slot ~delegate:(delegate, slots) (B blk_a) ()
   >>=? fun endorsement_with_slot_a ->
   Block.bake ~operations:[Operation.pack endorsement_with_slot_a] blk_a
   >>=? fun blk_a ->
@@ -93,14 +94,16 @@ let test_valid_double_endorsement_evidence () =
     ~slot:(WithExceptions.Option.get ~loc:__LOC__ (List.hd slots))
   |> fun operation ->
   (* Bake with someone different than the bad endorser *)
-  get_first_different_baker baker bakers
-  |> fun other_baker ->
-  Block.bake ~policy:(By_account other_baker) ~operation blk_a
+  Context.get_bakers (B blk_a)
+  >>=? fun bakers ->
+  get_first_different_baker delegate bakers
+  |> fun baker ->
+  Block.bake ~policy:(By_account baker) ~operation blk_a
   >>=? fun blk ->
   (* Check that the frozen deposit, the fees and rewards are removed *)
   List.iter_es
     (fun kind ->
-      let contract = Alpha_context.Contract.baker_contract baker in
+      let contract = Alpha_context.Contract.implicit_contract delegate in
       Assert.balance_is ~loc:__LOC__ (B blk) contract ~kind Tez.zero)
     [Deposit; Fees; Rewards]
 
@@ -112,7 +115,7 @@ let test_valid_double_endorsement_evidence () =
     valid endorsement fails. *)
 let test_invalid_double_endorsement () =
   Context.init 10
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Block.bake b
   >>=? fun b ->
   Op.endorsement (B b) ()
@@ -135,14 +138,14 @@ let test_invalid_double_endorsement () =
     endorsement operation fails. *)
 let test_too_early_double_endorsement_evidence () =
   Context.init 2
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
-  >>=? fun (baker, slots) ->
-  Op.endorsement ~baker (B blk_a) ()
+  >>=? fun (delegate, slots) ->
+  Op.endorsement ~delegate (B blk_a) ()
   >>=? fun endorsement_a ->
-  Op.endorsement ~baker (B blk_b) ()
+  Op.endorsement ~delegate (B blk_b) ()
   >>=? fun endorsement_b ->
   Op.double_endorsement
     (B b)
@@ -162,16 +165,16 @@ let test_too_early_double_endorsement_evidence () =
     to create a double_endorsement anymore. *)
 let test_too_late_double_endorsement_evidence () =
   Context.init 2
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.{parametric = {preserved_cycles; _}; _} ->
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
-  >>=? fun (baker, slots) ->
-  Op.endorsement ~baker (B blk_a) ()
+  >>=? fun (delegate, slots) ->
+  Op.endorsement ~delegate (B blk_a) ()
   >>=? fun endorsement_a ->
-  Op.endorsement ~baker (B blk_b) ()
+  Op.endorsement ~delegate (B blk_b) ()
   >>=? fun endorsement_b ->
   List.fold_left_es
     (fun blk _ -> Block.bake_until_cycle_end blk)
@@ -194,9 +197,9 @@ let test_too_late_double_endorsement_evidence () =
 
 (** Check that an invalid double endorsement evidence that exposes two
     endorsements made by two different endorsers fails. *)
-let test_different_bakers () =
+let test_different_delegates () =
   Context.init 2
-  >>=? fun (b, _, _) ->
+  >>=? fun (b, _) ->
   Block.bake b
   >>=? fun b ->
   block_fork b
@@ -206,15 +209,15 @@ let test_different_bakers () =
   get_first_different_endorsers (B blk_b)
   >>=? fun (endorser_b1c, endorser_b2c) ->
   let (endorser_b, b_slots) =
-    if Baker_hash.( = ) endorser_a endorser_b1c.baker then
-      (endorser_b2c.baker, endorser_b2c.slots)
-    else (endorser_b1c.baker, endorser_b1c.slots)
+    if Signature.Public_key_hash.( = ) endorser_a endorser_b1c.delegate then
+      (endorser_b2c.delegate, endorser_b2c.slots)
+    else (endorser_b1c.delegate, endorser_b1c.slots)
   in
-  Op.endorsement ~baker:endorser_a (B blk_a) ()
+  Op.endorsement ~delegate:endorser_a (B blk_a) ()
   >>=? fun e_a ->
-  Op.endorsement ~baker:endorser_b (B blk_b) ()
+  Op.endorsement ~delegate:endorser_b (B blk_b) ()
   >>=? fun e_b ->
-  Op.endorsement_with_slot ~baker:(endorser_b, b_slots) (B blk_b) ()
+  Op.endorsement_with_slot ~delegate:(endorser_b, b_slots) (B blk_b) ()
   >>=? fun e_ws_b ->
   Block.bake ~operation:(Operation.pack e_ws_b) blk_b
   >>=? fun _ ->
@@ -234,21 +237,26 @@ let test_different_bakers () =
 
 (** Check that a double endorsement evidence that exposes a ill-formed
     endorsement fails. *)
-let test_wrong_baker () =
+let test_wrong_delegate () =
   Context.init ~endorsers_per_block:1 2
-  >>=? fun (b, _contracts, bakers) ->
-  let baker1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
-  let baker2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth bakers 1 in
+  >>=? fun (b, contracts) ->
+  List.map_es (Context.Contract.manager (B b)) contracts
+  >>=? fun accounts ->
+  let (account_1, account_2) = get_hd_hd accounts in
+  let pkh1 = account_1.Account.pkh in
+  let pkh2 = account_2.Account.pkh in
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
   >>=? fun (endorser_a, a_slots) ->
-  Op.endorsement ~baker:endorser_a (B blk_a) ()
+  Op.endorsement ~delegate:endorser_a (B blk_a) ()
   >>=? fun endorsement_a ->
   Context.get_endorser (B blk_b)
   >>=? fun (endorser_b, _b_slots) ->
-  let baker = if Baker_hash.equal baker1 endorser_b then baker2 else baker1 in
-  Op.endorsement ~baker (B blk_b) ()
+  let delegate =
+    if Signature.Public_key_hash.equal pkh1 endorser_b then pkh2 else pkh1
+  in
+  Op.endorsement ~delegate (B blk_b) ()
   >>=? fun endorsement_b ->
   Op.double_endorsement
     (B blk_b)
@@ -281,5 +289,5 @@ let tests =
       "too late double endorsement evidence"
       `Quick
       test_too_late_double_endorsement_evidence;
-    Test_services.tztest "different bakers" `Quick test_different_bakers;
-    Test_services.tztest "wrong baker" `Quick test_wrong_baker ]
+    Test_services.tztest "different delegates" `Quick test_different_delegates;
+    Test_services.tztest "wrong delegate" `Quick test_wrong_delegate ]

@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,7 +26,6 @@
 open Protocol
 open Alpha_context
 open Protocol_client_context
-open Client_proto_contracts
 
 include Internal_event.Legacy_logging.Make_semantic (struct
   let name = Protocol.name ^ ".baking.forge"
@@ -59,15 +57,15 @@ let default_minimal_nanotez_per_byte = Q.of_int 1000
 let default_retry_counter = 5
 
 type slot =
-  Time.Protocol.t * (Client_baking_blocks.block_info * int * baker_hash)
+  Time.Protocol.t * (Client_baking_blocks.block_info * int * public_key_hash)
 
 type state = {
   context_path : string;
   mutable index : Context.index;
   (* Nonces file location *)
   nonces_location : [`Nonce] Client_baking_files.location;
-  (* see [get_bakers] below to find bakers when the list is empty *)
-  bakers : baker_hash list;
+  (* see [get_delegates] below to find delegates when the list is empty *)
+  delegates : public_key_hash list;
   (* lazy-initialisation with retry-on-error *)
   constants : Constants.t;
   (* Minimal operation fee required to include an operation in a block *)
@@ -85,12 +83,12 @@ let create_state ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
     ?(retry_counter = default_retry_counter) context_path index nonces_location
-    bakers constants =
+    delegates constants =
   {
     context_path;
     index;
     nonces_location;
-    bakers;
+    delegates;
     constants;
     minimal_fees;
     minimal_nanotez_per_gas_unit;
@@ -99,20 +97,13 @@ let create_state ?(minimal_fees = default_minimal_fees)
     retry_counter;
   }
 
-let get_bakers cctxt state =
-  match state.bakers with
-  | [] -> (
-      Baker_or_pkh_alias.load cctxt
-      >>=? List.filter_map_es (fun (_name, contract) ->
-               baker_of_contract cctxt contract
-               >>= function Ok baker -> return_some baker | _ -> return_none)
-      >>=? function
-      | [] ->
-          failwith "No baker contract could be found in the wallet"
-      | bakers ->
-          return bakers )
-  | bakers ->
-      return bakers
+let get_delegates cctxt state =
+  match state.delegates with
+  | [] ->
+      Client_keys.get_keys cctxt
+      >>=? fun keys -> return (List.map (fun (_, pkh, _, _) -> pkh) keys)
+  | _ ->
+      return state.delegates
 
 let generate_seed_nonce () =
   match Nonce.of_bytes (Rand.generate Constants.nonce_length) with
@@ -122,7 +113,7 @@ let generate_seed_nonce () =
       nonce
 
 let forge_block_header (cctxt : #Protocol_client_context.full) ~chain block
-    baker_sk shell priority seed_nonce_hash =
+    delegate_sk shell priority seed_nonce_hash =
   Client_baking_pow.mine cctxt chain block shell (fun proof_of_work_nonce ->
       {Block_header.priority; seed_nonce_hash; proof_of_work_nonce})
   >>=? fun contents ->
@@ -135,7 +126,7 @@ let forge_block_header (cctxt : #Protocol_client_context.full) ~chain block
   >>=? fun chain_id ->
   Client_keys.append
     cctxt
-    baker_sk
+    delegate_sk
     ~watermark:(Block_header chain_id)
     unsigned_header
 
@@ -172,7 +163,11 @@ let compute_endorsing_power cctxt ~chain ~block operations =
       | { Alpha_context.protocol_data =
             Operation_data {contents = Single (Endorsement_with_slot _); _};
           _ } as op -> (
-          Baker_services.Endorsing_power.get cctxt (chain, block) op chain_id
+          Delegate_services.Endorsing_power.get
+            cctxt
+            (chain, block)
+            op
+            chain_id
           >>= function
           | Error _ ->
               (* Filters invalid endorsements *)
@@ -183,7 +178,7 @@ let compute_endorsing_power cctxt ~chain ~block operations =
     operations
 
 let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
-    ~priority ~baker ~baker_sk ~level operations =
+    ~priority ~delegate_pkh ~delegate_sk ~level operations =
   assert_valid_operations_hash shell_header operations
   >>=? fun () ->
   let block = `Hash (shell_header.Tezos_base.Block_header.predecessor, 0) in
@@ -191,7 +186,7 @@ let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
     cctxt
     ~chain
     block
-    baker_sk
+    delegate_sk
     shell_header
     priority
     seed_nonce_hash
@@ -201,10 +196,10 @@ let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
   cctxt#with_lock (fun () ->
       Client_baking_files.resolve_location cctxt ~chain `Block
       >>=? fun block_location ->
-      may_inject_block cctxt block_location ~baker level
+      may_inject_block cctxt block_location ~delegate:delegate_pkh level
       >>=? function
       | true ->
-          record_block cctxt block_location ~baker level
+          record_block cctxt block_location ~delegate:delegate_pkh level
           >>=? fun () -> return_true
       | false ->
           lwt_log_error
@@ -522,29 +517,29 @@ let all_ops_valid (results : error Preapply_result.t list) =
 let decode_priority cctxt chain block ~priority ~endorsing_power =
   match priority with
   | `Set priority ->
-      Alpha_services.Baker.Minimal_valid_time.get
+      Alpha_services.Delegate.Minimal_valid_time.get
         cctxt
         (chain, block)
         priority
         endorsing_power
       >>=? fun minimal_timestamp -> return (priority, minimal_timestamp)
-  | `Auto (baker, max_priority) -> (
+  | `Auto (src_pkh, max_priority) -> (
       Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
       >>=? fun {level; _} ->
-      Alpha_services.Baker.Baking_rights.get
+      Alpha_services.Delegate.Baking_rights.get
         cctxt
         ?max_priority
         ~levels:[level]
-        ~bakers:[baker]
+        ~delegates:[src_pkh]
         (chain, block)
       >>=? fun possibilities ->
       match
         List.find
-          (fun p -> p.Alpha_services.Baker.Baking_rights.level = level)
+          (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
           possibilities
       with
-      | Some {Alpha_services.Baker.Baking_rights.priority = prio; _} ->
-          Alpha_services.Baker.Minimal_valid_time.get
+      | Some {Alpha_services.Delegate.Baking_rights.priority = prio; _} ->
+          Alpha_services.Delegate.Minimal_valid_time.get
             cctxt
             (chain, block)
             prio
@@ -613,7 +608,7 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
     ?protocol_data
     ((operations : packed_operation list list), overflowing_operations) =
   (* Retrieve the minimal valid time for when the block can be baked with 0 endorsements *)
-  Baker_services.Minimal_valid_time.get cctxt (chain, block) priority 0
+  Delegate_services.Minimal_valid_time.get cctxt (chain, block) priority 0
   >>=? fun min_valid_timestamp ->
   let open Client_baking_simulator in
   lwt_debug
@@ -760,7 +755,7 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
   (* Construct a context with the valid operations and a correct timestamp *)
   compute_endorsing_power cctxt ~chain ~block endorsements
   >>=? fun current_endorsing_power ->
-  Baker_services.Minimal_valid_time.get
+  Delegate_services.Minimal_valid_time.get
     cctxt
     (chain, block)
     priority
@@ -833,8 +828,8 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     ?(sort = best_effort) ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) ?timestamp
-    ?mempool ?context_path ?seed_nonce_hash ~chain ~priority ~baker ~baker_sk
-    block =
+    ?mempool ?context_path ?seed_nonce_hash ~chain ~priority ~delegate_pkh
+    ~delegate_sk block =
   (* making the arguments usable *)
   unopt_operations cctxt chain mempool operations
   >>=? fun operations_arg ->
@@ -926,7 +921,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           index;
           nonces_location;
           constants;
-          bakers = [];
+          delegates = [];
           best_slot = None;
           minimal_fees = default_minimal_fees;
           minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
@@ -1018,8 +1013,8 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     ~shell_header
     ~priority
     ?seed_nonce_hash
-    ~baker
-    ~baker_sk
+    ~delegate_pkh
+    ~delegate_sk
     ~level
     operations
   >>= function
@@ -1038,8 +1033,8 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
       >>= fun () -> Lwt.return error
 
 let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
-    ~timestamp seed_nonce_hash operations ((_, (bi, priority, baker)) as _slot)
-    =
+    ~timestamp seed_nonce_hash operations
+    ((_, (bi, priority, delegate)) as _slot) =
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   Alpha_block_services.Helpers.Preapply.block
     cctxt
@@ -1064,7 +1059,8 @@ let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
       let raw_ops =
         List.map (fun l -> List.map snd l.Preapply_result.applied) operations
       in
-      return_some (bi, priority, shell_header, raw_ops, baker, seed_nonce_hash)
+      return_some
+        (bi, priority, shell_header, raw_ops, delegate, seed_nonce_hash)
 
 let filter_outdated_endorsements expected_level ops =
   List.filter
@@ -1090,7 +1086,7 @@ let filter_outdated_endorsements expected_level ops =
     mempool. If no endorsements are present in the initial set, it
     waits until it's able to build a valid block. *)
 let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
-    (_, (head, priority, _baker)) =
+    (_, (head, priority, _delegate)) =
   Alpha_block_services.Mempool.monitor_operations
     cctxt
     ~chain
@@ -1117,7 +1113,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
       let compute_minimal_valid_time () =
         compute_endorsing_power cctxt ~chain ~block !operations
         >>=? fun current_endorsing_power ->
-        Baker_services.Minimal_valid_time.get
+        Delegate_services.Minimal_valid_time.get
           cctxt
           (chain, block)
           priority
@@ -1172,11 +1168,11 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
       in
       loop ()
 
-(** Given a baker baking slot [build_block] constructs a full block
+(** Given a delegate baking slot [build_block] constructs a full block
     with consistent operations that went through the client-side
     validation *)
 let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
-    ((slot_timestamp, (bi, priority, baker)) as slot) =
+    ((slot_timestamp, (bi, priority, delegate)) as slot) =
   let chain = `Hash bi.Client_baking_blocks.chain_id in
   let block = `Hash (bi.hash, 0) in
   Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
@@ -1184,7 +1180,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
   let seed_nonce_hash =
     if next_level.expected_commitment then Some seed_nonce_hash else None
   in
-  Baker_or_pkh_alias.name cctxt (Contract.baker_contract baker)
+  Client_keys.Public_key_hash.name cctxt delegate
   >>=? fun name ->
   lwt_debug
     Tag.DSL.(
@@ -1338,7 +1334,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
                       priority,
                       shell_header,
                       raw_ops,
-                      baker,
+                      delegate,
                       seed_nonce_hash )
             else
               lwt_log_notice
@@ -1371,10 +1367,10 @@ let bake (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
   let seed_nonce_hash = Nonce.hash seed_nonce in
   build_block cctxt ~user_activated_upgrades state seed_nonce_hash slot
   >>=? function
-  | Some (head, priority, shell_header, operations, baker, seed_nonce_hash)
+  | Some (head, priority, shell_header, operations, delegate, seed_nonce_hash)
     -> (
       let level = Raw_level.succ head.level in
-      Baker_or_pkh_alias.name cctxt (Contract.baker_contract baker)
+      Client_keys.Public_key_hash.name cctxt delegate
       >>=? fun name ->
       lwt_log_info
         Tag.DSL.(
@@ -1385,10 +1381,10 @@ let bake (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
             -% a fitness_tag shell_header.fitness
             -% s Client_keys.Logging.tag name
             -% a Block_hash.Logging.predecessor_tag shell_header.predecessor
-            -% t baker_hash_tag baker)
+            -% t Signature.Public_key_hash.Logging.tag delegate)
       >>= fun () ->
-      get_baker_consensus_key cctxt ~chain ~offset:1l baker
-      >>=? fun (name, _pkh, _pk, sk) ->
+      Client_keys.get_key cctxt delegate
+      >>=? fun (_, _, delegate_sk) ->
       inject_block
         cctxt
         ~chain
@@ -1396,8 +1392,8 @@ let bake (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
         ~shell_header
         ~priority
         ?seed_nonce_hash
-        ~baker
-        ~baker_sk:sk
+        ~delegate_pkh:delegate
+        ~delegate_sk
         ~level
         operations
       >>= function
@@ -1442,17 +1438,17 @@ let bake (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
       return_unit
 
 (** [get_baking_slots] calls the node via RPC to retrieve the potential
-    slots for the given bakers within a given range of priority *)
+    slots for the given delegates within a given range of priority *)
 let get_baking_slots cctxt ?(max_priority = default_max_priority) new_head
-    bakers =
+    delegates =
   let chain = `Hash new_head.Client_baking_blocks.chain_id in
   let block = `Hash (new_head.hash, 0) in
   let level = Raw_level.succ new_head.level in
-  Alpha_services.Baker.Baking_rights.get
+  Alpha_services.Delegate.Baking_rights.get
     cctxt
     ~max_priority
     ~levels:[level]
-    ~bakers
+    ~delegates
     (chain, block)
   >>= function
   | Error errs ->
@@ -1469,24 +1465,24 @@ let get_baking_slots cctxt ?(max_priority = default_max_priority) new_head
       let slots =
         List.filter_map
           (function
-            | {Alpha_services.Baker.Baking_rights.timestamp = None; _} ->
+            | {Alpha_services.Delegate.Baking_rights.timestamp = None; _} ->
                 None
-            | {timestamp = Some timestamp; priority; baker; _} ->
-                Some (timestamp, (new_head, priority, baker)))
+            | {timestamp = Some timestamp; priority; delegate; _} ->
+                Some (timestamp, (new_head, priority, delegate)))
           slots
       in
       Lwt.return slots
 
 (** [compute_best_slot_on_current_level] retrieves, among the given
-    bakers, the highest priority slot for the current level. Then,
+    delegates, the highest priority slot for the current level. Then,
     it registers this slot in the state so the timeout knows when to
     wake up. *)
 let compute_best_slot_on_current_level ?max_priority
     (cctxt : #Protocol_client_context.full) state new_head =
-  get_bakers cctxt state
-  >>=? fun bakers ->
+  get_delegates cctxt state
+  >>=? fun delegates ->
   let level = Raw_level.succ new_head.Client_baking_blocks.level in
-  get_baking_slots cctxt ?max_priority new_head bakers
+  get_baking_slots cctxt ?max_priority new_head delegates
   >>= function
   | [] ->
       lwt_log_notice
@@ -1503,14 +1499,14 @@ let compute_best_slot_on_current_level ?max_priority
   | h :: t ->
       (* One or more slot found, fetching the best (lowest) priority.
          We do not suppose that the received slots are sorted. *)
-      let ((timestamp, (_, priority, baker)) as best_slot) =
+      let ((timestamp, (_, priority, delegate)) as best_slot) =
         List.fold_left
           (fun ((_, (_, priority, _)) as acc) ((_, (_, priority', _)) as slot) ->
             if priority < priority' then acc else slot)
           h
           t
       in
-      Baker_or_pkh_alias.name cctxt (Contract.baker_contract baker)
+      Client_keys.Public_key_hash.name cctxt delegate
       >>=? fun name ->
       lwt_log_notice
         Tag.DSL.(
@@ -1523,7 +1519,7 @@ let compute_best_slot_on_current_level ?max_priority
             -% a timestamp_tag (Time.System.of_protocol_exn timestamp)
             -% s Client_keys.Logging.tag name
             -% a Block_hash.Logging.tag new_head.hash
-            -% t baker_hash_tag baker)
+            -% t Signature.Public_key_hash.Logging.tag delegate)
       >>= fun () ->
       (* Found at least a slot *)
       return_some best_slot
@@ -1590,10 +1586,10 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
 
 (** [create] starts the main loop of the baker. The loop monitors new blocks and
     starts individual baking operations when baking-slots are available to any of
-    the [bakers] *)
+    the [delegates] *)
 let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
-    ?max_priority ~chain ~context_path ~bakers block_stream =
+    ?max_priority ~chain ~context_path delegates block_stream =
   let state_maker bi =
     Alpha_services.Constants.all cctxt (chain, `Head 0)
     >>=? fun constants ->
@@ -1605,8 +1601,6 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     >>=? fun () ->
     Client_baking_files.resolve_location cctxt ~chain `Nonce
     >>=? fun nonces_location ->
-    List.map_es (baker_of_contract cctxt) bakers
-    >>=? fun bakers ->
     let state =
       create_state
         ?minimal_fees
@@ -1615,7 +1609,7 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
         context_path
         index
         nonces_location
-        bakers
+        delegates
         constants
     in
     return state

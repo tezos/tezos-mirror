@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -49,9 +48,8 @@ let default_args =
     params =
       {
         bootstrap_accounts = [];
-        bootstrap_contracts = [];
-        bootstrap_bakers = [];
         commitments = [];
+        bootstrap_contracts = [];
         constants = Default_parameters.constants_mainnet;
         security_deposit_ramp_up_cycles = None;
         no_reward_cycles = None;
@@ -163,8 +161,8 @@ let get_n_endorsements ctxt n =
   >>=? fun endorsing_rights ->
   let endorsing_rights = List.sub endorsing_rights n in
   List.map_es
-    (fun {Baker_services.Endorsing_rights.baker; level; _} ->
-      Op.endorsement ~baker ~level ctxt ())
+    (fun {Delegate_services.Endorsing_rights.delegate; level; _} ->
+      Op.endorsement ~delegate ~level ctxt ())
     endorsing_rights
 
 let generate_and_add_random_endorsements inc =
@@ -334,23 +332,19 @@ let init () =
   in
   List.map_es
     (fun _ ->
-      return
-        ( Account.new_account ~seed:(new_seed ()) (),
-          initial_amount,
-          Account.new_baker ~seed:(new_seed ()) (),
-          initial_amount ))
+      return (Account.new_account ~seed:(new_seed ()) (), initial_amount))
     (1 -- args.accounts)
   >>=? fun initial_accounts ->
   if_debug (fun () ->
       List.iter
-        (fun (Account.{pkh; _}, _, _, _) ->
+        (fun (Account.{pkh; _}, _) ->
           Format.printf
             "[DEBUG] Account %a created\n%!"
             Signature.Public_key_hash.pp_short
             pkh)
         initial_accounts) ;
   let possible_transfers =
-    let l = List.map (fun (a, _, _, _) -> a) initial_accounts in
+    let l = List.map fst initial_accounts in
     List.product l l |> List.filter (fun (a, b) -> a <> b)
   in
   ( match args.nb_commitments with
@@ -379,23 +373,16 @@ let init () =
       remaining_activations;
     }
   in
-  let (bootstrap_accounts, bootstrap_bakers) =
+  let bootstrap_accounts =
     List.map
-      (fun ( Account.{pk; pkh; _},
-             implicit_amount,
-             Account.{key = {pk = baker_pk; _}; baker},
-             baker_amount ) ->
-        ( Default_parameters.make_bootstrap_account (pkh, pk, implicit_amount),
-          Default_parameters.make_bootstrap_baker
-            (baker, baker_amount, baker_pk) ))
+      (fun (Account.{pk; pkh; _}, amount) ->
+        Default_parameters.make_bootstrap_account (pkh, pk, amount))
       initial_accounts
-    |> List.split
   in
   let parameters =
     {
       Parameters.bootstrap_accounts;
       bootstrap_contracts = [];
-      Parameters.bootstrap_bakers;
       commitments;
       constants;
       security_deposit_ramp_up_cycles;
@@ -407,9 +394,9 @@ let init () =
   if_debug_s (fun () ->
       List.iter_es
         (let open Account in
-        fun (({pkh; _} as acc), _, _, _) ->
+        fun (({pkh; _} as acc), _) ->
           let contract = Alpha_context.Contract.implicit_contract acc.pkh in
-          Context.Contract.find_account (B genesis) contract
+          Context.Contract.manager (B genesis) contract
           >>=? fun {pkh = pkh'; _} ->
           Context.Contract.balance (B genesis) contract
           >>=? fun balance ->

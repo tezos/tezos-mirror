@@ -3,7 +3,7 @@ from os import path
 import pytest
 
 from tools.client_regression import ClientRegression
-from tools.constants import BOOTSTRAP_BAKERS
+from tools.constants import IDENTITIES
 from tools.utils import (
     assert_run_failure,
     assert_run_script_failwith,
@@ -11,7 +11,8 @@ from tools.utils import (
 )
 from .contract_paths import MINI_SCENARIOS_CONTRACT_PATH, OPCODES_CONTRACT_PATH
 
-BAKER_HASH = BOOTSTRAP_BAKERS[0]['hash']
+
+PUBLIC_KEY = IDENTITIES['bootstrap1']['public']
 
 
 @pytest.mark.slow
@@ -988,7 +989,7 @@ class TestContractOpcodes:
             (
                 'voting_power.tz',
                 '(Pair 0 0)',
-                f'"{BAKER_HASH}"',
+                f'"{PUBLIC_KEY}"',
                 '(Pair 500 2500)',
             ),
             # Test KECCAK

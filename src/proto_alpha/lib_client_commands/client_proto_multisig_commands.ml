@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,7 +25,6 @@
 
 open Protocol
 open Alpha_context
-open Client_proto_contracts
 
 let group =
   {
@@ -137,7 +135,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            Client_proto_context_commands.verbose_signing_switch
            Client_proto_args.burn_cap_arg)
         ( prefixes ["deploy"; "multisig"]
-        @@ Client_proto_contracts.Raw_contract_alias.fresh_alias_param
+        @@ Client_proto_contracts.RawContractAlias.fresh_alias_param
              ~name:"new_multisig"
              ~desc:"name of the new multisig contract"
         @@ prefix "transferring"
@@ -145,7 +143,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"qty"
              ~desc:"amount taken from source"
         @@ prefix "from"
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"src"
              ~desc:"name of the source contract"
         @@ prefixes ["with"; "threshold"]
@@ -172,18 +170,18 @@ let commands () : #Protocol_client_context.full Clic.command list =
              threshold
              keys
              (cctxt : #Protocol_client_context.full) ->
-          Client_proto_contracts.Raw_contract_alias.of_fresh
+          Client_proto_contracts.RawContractAlias.of_fresh
             cctxt
             force
             alias_name
           >>=? fun alias_name ->
-          get_source_keys cctxt source
-          >>=? function
+          match Contract.is_implicit source with
           | None ->
               failwith
-                "only implicit and baker accounts can be the source of an \
-                 origination"
-          | Some (_name, source, src_pk, src_sk) -> (
+                "only implicit accounts can be the source of an origination"
+          | Some source -> (
+              Client_keys.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -198,12 +196,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
                 keys
               >>=? fun keys ->
-              ( match delegate with
-              | Some delegate ->
-                  baker_of_contract cctxt delegate >>=? return_some
-              | None ->
-                  return_none )
-              >>=? fun delegate ->
               Client_proto_multisig.originate_multisig
                 cctxt
                 ~chain:cctxt#chain
@@ -248,7 +240,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            a multisigned transfer."
         (args1 bytes_only_switch)
         ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefix "transferring"
@@ -256,7 +248,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"qty"
              ~desc:"amount taken from source"
         @@ prefix "to"
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"dst"
              ~desc:"name/literal of the destination contract"
         @@ stop )
@@ -281,11 +273,11 @@ let commands () : #Protocol_client_context.full Clic.command list =
            a multisigned delegate change."
         (args1 bytes_only_switch)
         ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "delegate"; "to"]
-        @@ Baker_alias.source_param
+        @@ Client_keys.Public_key_hash.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ stop )
@@ -309,7 +301,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            a multisigned delegate withdraw."
         (args1 bytes_only_switch)
         ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["withdrawing"; "delegate"]
@@ -333,7 +325,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
            a multisigned change of keys and threshold."
         (args1 bytes_only_switch)
         ( prefixes ["prepare"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "threshold"; "to"]
@@ -364,7 +356,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Sign a transaction for a multisig contract."
         no_options
         ( prefixes ["sign"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefix "transferring"
@@ -372,7 +364,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"qty"
              ~desc:"amount taken from source"
         @@ prefix "to"
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"dst"
              ~desc:"name/literal of the destination contract"
         @@ prefixes ["using"; "secret"; "key"]
@@ -399,11 +391,11 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Sign a delegate change for a multisig contract."
         no_options
         ( prefixes ["sign"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "delegate"; "to"]
-        @@ Baker_alias.source_param
+        @@ Client_keys.Public_key_hash.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ prefixes ["using"; "secret"; "key"]
@@ -429,7 +421,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Sign a delegate withdraw for a multisig contract."
         no_options
         ( prefixes ["sign"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["withdrawing"; "delegate"]
@@ -456,7 +448,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
           "Sign a change of public keys and threshold for a multisig contract."
         no_options
         ( prefixes ["sign"; "multisig"; "transaction"; "on"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["using"; "secret"; "key"]
@@ -492,7 +484,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Transfer tokens using a multisig contract."
         transfer_options
         ( prefixes ["from"; "multisig"; "contract"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name/literal of the multisig contract"
         @@ prefix "transfer"
@@ -500,11 +492,11 @@ let commands () : #Protocol_client_context.full Clic.command list =
              ~name:"qty"
              ~desc:"amount taken from the multisig contract"
         @@ prefix "to"
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"dst"
              ~desc:"name/literal of the destination contract"
         @@ prefixes ["on"; "behalf"; "of"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
@@ -528,13 +520,13 @@ let commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          get_source_keys cctxt source
-          >>=? function
+          match Contract.is_implicit source with
           | None ->
               failwith
-                "only implicit and baker accounts can be the source of a \
-                 contract call"
-          | Some (_name, source, src_pk, src_sk) -> (
+                "only implicit accounts can be the source of a contract call"
+          | Some source -> (
+              Client_keys.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -576,15 +568,15 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Change the delegate of a multisig contract."
         transfer_options
         ( prefixes ["set"; "delegate"; "of"; "multisig"; "contract"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefix "to"
-        @@ Baker_alias.source_param
+        @@ Client_keys.Public_key_hash.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ prefixes ["on"; "behalf"; "of"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
@@ -607,13 +599,13 @@ let commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          get_source_keys cctxt source
-          >>=? function
+          match Contract.is_implicit source with
           | None ->
               failwith
-                "only implicit and baker accounts can be the source of a \
-                 contract call"
-          | Some (_name, source, src_pk, src_sk) -> (
+                "only implicit accounts can be the source of a contract call"
+          | Some source -> (
+              Client_keys.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -655,11 +647,11 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Withdraw the delegate of a multisig contract."
         transfer_options
         ( prefixes ["withdraw"; "delegate"; "of"; "multisig"; "contract"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["on"; "behalf"; "of"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
@@ -681,13 +673,13 @@ let commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          get_source_keys cctxt source
-          >>=? function
+          match Contract.is_implicit source with
           | None ->
               failwith
-                "only implicit and baker accounts can be the source of a \
-                 contract call"
-          | Some (_name, source, src_pk, src_sk) -> (
+                "only implicit accounts can be the source of a contract call"
+          | Some source -> (
+              Client_keys.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -729,14 +721,14 @@ let commands () : #Protocol_client_context.full Clic.command list =
         ~desc:"Change public keys and threshold for a multisig contract."
         transfer_options
         ( prefixes ["set"; "threshold"; "of"; "multisig"; "contract"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["to"]
         @@ threshold_param ()
         @@ prefixes ["and"; "public"; "keys"; "to"]
         @@ non_terminal_seq (public_key_param ()) ~suffix:["on"; "behalf"; "of"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
@@ -825,11 +817,11 @@ let commands () : #Protocol_client_context.full Clic.command list =
                 can be obtained by one of the \"prepare multisig \
                 transaction\" commands"
         @@ prefixes ["on"; "multisig"; "contract"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["on"; "behalf"; "of"]
-        @@ Client_proto_contracts.Contract_alias.destination_param
+        @@ Client_proto_contracts.ContractAlias.destination_param
              ~name:"src"
              ~desc:"source calling the multisig contract"
         @@ prefixes ["with"; "signatures"]
@@ -852,13 +844,13 @@ let commands () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          get_source_keys cctxt source
-          >>=? function
+          match Contract.is_implicit source with
           | None ->
               failwith
-                "only implicit and baker accounts can be the source of a \
-                 contract call"
-          | Some (_name, source, src_pk, src_sk) -> (
+                "only implicit accounts can be the source of a contract call"
+          | Some source -> (
+              Client_keys.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;

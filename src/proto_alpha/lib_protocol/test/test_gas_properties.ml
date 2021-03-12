@@ -135,7 +135,7 @@ let rec loop_check check n ctxt =
 let check_property prop () =
   Random.init 89809344 ;
   Context.init 1
-  >>=? fun (b, _contracts, _bakers) ->
+  >>=? fun (b, _contracts) ->
   Incremental.begin_construction b
   >>=? fun inc ->
   let state = Incremental.validation_state inc in

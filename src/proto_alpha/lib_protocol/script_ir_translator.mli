@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -36,42 +35,21 @@ type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 
 type ex_stack_ty = Ex_stack_ty : 'a Script_typed_ir.stack_ty -> ex_stack_ty
 
-type 'ret ex_script =
-  | Ex_script : ('a, 'b, 'ret) Script_typed_ir.script -> 'ret ex_script
+type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
 
-type ex_originated_script =
-  | Ex_originated_script :
-      ('a, 'b) Script_typed_ir.originated_script
-      -> ex_originated_script
-
-type ex_baker_script =
-  | Ex_baker_script : ('a, 'b) Script_typed_ir.baker_script -> ex_baker_script
-
-type ('arg, 'storage, 'ret) code = {
+type ('arg, 'storage) code = {
   code :
     ( ('arg, 'storage) Script_typed_ir.pair,
-      ('ret, 'storage) Script_typed_ir.pair )
+      ( Script_typed_ir.operation Script_typed_ir.boxed_list,
+        'storage )
+      Script_typed_ir.pair )
     Script_typed_ir.lambda;
   arg_type : 'arg Script_typed_ir.ty;
   storage_type : 'storage Script_typed_ir.ty;
   root_name : Script_typed_ir.field_annot option;
 }
 
-type ('arg, 'storage) originated_code =
-  ('arg, 'storage, Script_typed_ir.operation Script_typed_ir.boxed_list) code
-
-type ('arg, 'storage) baker_code =
-  ( 'arg,
-    'storage,
-    ( Script_typed_ir.operation Script_typed_ir.boxed_list,
-      Script_typed_ir.baker_operation Script_typed_ir.boxed_list )
-    Script_typed_ir.pair )
-  code
-
-type ex_originated_code =
-  | Ex_originated_code : ('a, 'c) originated_code -> ex_originated_code
-
-type ex_baker_code = Ex_baker_code : ('a, 'c) baker_code -> ex_baker_code
+type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
 type tc_context =
   | Lambda : tc_context
@@ -285,14 +263,7 @@ val parse_code :
   context ->
   legacy:bool ->
   code:Script.lazy_expr ->
-  (ex_originated_code * context) tzresult Lwt.t
-
-val parse_baker_code :
-  ?type_logger:type_logger ->
-  context ->
-  legacy:bool ->
-  code:Script.lazy_expr ->
-  (ex_baker_code * context) tzresult Lwt.t
+  (ex_code * context) tzresult Lwt.t
 
 val parse_storage :
   ?type_logger:type_logger ->
@@ -310,22 +281,13 @@ val parse_script :
   legacy:bool ->
   allow_forged_in_storage:bool ->
   Script.t ->
-  (ex_originated_script * context) tzresult Lwt.t
-
-(** Combines [parse_baker_code] and [parse_storage] *)
-val parse_baker_script :
-  ?type_logger:type_logger ->
-  context ->
-  legacy:bool ->
-  allow_forged_in_storage:bool ->
-  Script.t ->
-  (ex_baker_script * context) tzresult Lwt.t
+  (ex_script * context) tzresult Lwt.t
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 val unparse_script :
   context ->
   unparsing_mode ->
-  ('a, 'b, 'c) Script_typed_ir.script ->
+  ('a, 'b) Script_typed_ir.script ->
   (Script.t * context) tzresult Lwt.t
 
 val parse_contract :

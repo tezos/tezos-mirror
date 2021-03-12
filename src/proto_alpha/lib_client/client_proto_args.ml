@@ -3,7 +3,6 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,7 +28,6 @@ open Protocol_client_context
 open Protocol
 open Alpha_context
 open Clic
-open Client_proto_contracts
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 
@@ -165,13 +163,10 @@ let default_arg_arg =
     string_parameter
 
 let delegate_arg =
-  Baker_or_pkh_alias.source_arg
+  Client_keys.Public_key_hash.source_arg
     ~long:"delegate"
     ~placeholder:"address"
-    ~doc:
-      "delegate of the contract\n\
-       Must be a known address. This can be either a baker contract or the \
-       consensus key of a baker contract."
+    ~doc:"delegate of the contract\nMust be a known address."
     ()
 
 let source_arg =

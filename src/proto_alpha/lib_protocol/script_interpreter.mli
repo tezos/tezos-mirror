@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -43,10 +42,6 @@ type error += Cannot_serialize_failure
 type error += Cannot_serialize_storage
 
 type error += Michelson_too_many_recursive_calls
-
-type error += Not_an_active_consensus_key of Signature.Public_key_hash.t
-
-type error += Not_a_baker_contract
 
 type execution_result = {
   ctxt : context;
@@ -100,17 +95,6 @@ val step :
   ('aft * context) tzresult Lwt.t
 
 val execute :
-  ?logger:logger ->
-  Alpha_context.t ->
-  Script_ir_translator.unparsing_mode ->
-  step_constants ->
-  script:Script.t ->
-  entrypoint:string ->
-  parameter:Script.expr ->
-  internal:bool ->
-  execution_result tzresult Lwt.t
-
-val execute_baker :
   ?logger:logger ->
   Alpha_context.t ->
   Script_ir_translator.unparsing_mode ->

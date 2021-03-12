@@ -20,11 +20,11 @@ null
 5500
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/listings
-[ { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 } ]
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/proposals
 [ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", 500 ] ]
@@ -37,9 +37,9 @@ null
 2500
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballot_list
-[ { "baker": "[BAKER_HASH]", "ballot": "pass" },
-  { "baker": "[BAKER_HASH]", "ballot": "yay" },
-  { "baker": "[BAKER_HASH]", "ballot": "nay" } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "nay" },
+  { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "pass" },
+  { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "yay" } ]
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballots
 { "yay": 500, "nay": 500, "pass": 500 }
@@ -58,11 +58,11 @@ null
 5500
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/listings
-[ { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 },
-  { "baker": "[BAKER_HASH]", "rolls": 500 } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 } ]
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/proposals
 []

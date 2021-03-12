@@ -1,11 +1,5 @@
 tezt/_regressions/encoding/alpha.contract.out
 
-./tezos-codec encode alpha.contract from '"SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW"'
-02b31ba9bfde1dd3598b5a10b17fe8162a3de554e100
-
-./tezos-codec decode alpha.contract from 02b31ba9bfde1dd3598b5a10b17fe8162a3de554e100
-"SG1fpFaowYY8G7PfkYdKkGmsMziHKUfrHRHW"
-
 ./tezos-codec encode alpha.contract from '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
 000002298c03ed7d454a101eb7022bc95f7e5f41ac78
 
