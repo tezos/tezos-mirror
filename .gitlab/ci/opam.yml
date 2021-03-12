@@ -846,11 +846,6 @@ opam:tezos-protocol-006-PsCARTHA:
   variables:
     package: tezos-protocol-006-PsCARTHA
 
-opam:tezos-protocol-006-PsCARTHA-parameters:
-  extends: .opam_template
-  variables:
-    package: tezos-protocol-006-PsCARTHA-parameters
-
 opam:tezos-protocol-007-PsDELPH1:
   extends: .opam_template
   variables:

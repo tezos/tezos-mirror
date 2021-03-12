@@ -6,8 +6,7 @@
             tezos-shell-services
             tezos-client-base
             tezos-rpc
-            tezos-signer-backends
-            tezos-protocol-006-PsCARTHA-parameters)
+            tezos-signer-backends)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
