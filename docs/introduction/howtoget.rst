@@ -9,14 +9,14 @@ Tezos consists of :ref:`several binaries <tezos_binaries>` (i.e., executable fil
 
 There are several options for getting the binaries, depending on how you plan to use Tezos:
 
-- :ref:`using docker images <using_docker_images>`.
-  This is the easiest way to install the latest stable version, as a Docker
-  container, on any OS supported by Docker.
 - :ref:`getting static binaries <getting_static_binaries>`.
   This is the easiest way to get native binaries for the latest stable version,
   requiring no dependencies, under Linux.
 - :ref:`installing binaries <installing_binaries>`.
   This is the easiest way to install native binaries for the latest stable version, together with their dependencies, using a package manager.
+- :ref:`using docker images <using_docker_images>`.
+  This is the easiest way to run the latest stable versions of the binaries in
+  Docker containers, on any OS supported by Docker.
 - :ref:`building the binaries via the OPAM source package manager <building_with_opam>`.
   Take this way to install the latest stable release in your native OS
   environment, automatically built from sources.
@@ -29,6 +29,71 @@ There are several options for getting the binaries, depending on how you plan to
 
 
 These different options are described in the following sections.
+
+When choosing between these options, you may take into account the
+convenience of the installation step (and of upgrading steps), but also
+efficiency and security considerations. For instance, static binaries have a
+different memory footprint compared to dynamically-linked binaries. Also,
+compiling the sources in the official Tezos
+repository is more secure than installing OPAM packages from a repository which
+is not under Tezos control. In particular, compiling from sources enforces a fixed set of dependencies; when compiling via OPAM, this set of dependencies may change, which may or may not be compatible with your security practices.
+
+.. _getting_static_binaries:
+
+Getting static binaries
+-----------------------
+
+You can get static Linux binaries from the
+`latest release in the tezos-packaging repository <https://github.com/serokell/tezos-packaging/releases/latest>`__.
+
+This repository provides static binaries for x86_64 and arm64 architectures. Since these binaries
+are static, they can be used on any Linux distribution without any additional prerequisites.
+However, note that, by embedding all dependencies, static binary executables are typically much larger than dynamically-linked executables.
+
+For upgrading to a newer release, you just have to download and run the new
+versions of the binaries.
+
+.. _installing_binaries:
+
+Installing binaries
+-------------------
+
+Depending on your operating system, you may install Tezos (dynamically-linked)
+binaries and their dependencies using a package manager, as follows.
+
+Ubuntu Launchpad PPA with Tezos packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you're using Ubuntu, you can install packages with Tezos binaries from the Launchpad PPA.
+Currently it supports Focal and Bionic versions. In order to add the PPA repository to your machine and install the binaries, run the following commands:
+
+.. literalinclude:: install-bin-ubuntu.sh
+   :language: shell
+   :start-after: [install tezos]
+
+Upgrading to a newer release is made easy by the APT package manager, using
+commands such as ``apt-get update``, ``apt-get upgrade <package>``, and
+``apt-get install <new-package>``. Indeed, as the names of some packages (e.g.
+the baker) depend on their version, you may have to also install new packages.
+You may take a look at the available packages in the Tezos PPA repository listed
+by ``apt-get update``.
+
+Fedora Copr repository with Tezos packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you're using Fedora, you can install packages with Tezos binaries from the Copr repository.
+Currently it supports Fedora 32 and 31. In order to dd the Copr repository to your machine and install the binaries, run the following commands:
+
+.. literalinclude:: install-bin-fedora.sh
+   :language: shell
+   :start-after: [install tezos]
+
+Upgrading to a newer release is made easy by the DNF package manager, using
+commands such as ``dnf upgrade <package>``, and
+``dnf install <new-package>``. Indeed, as the names of some packages (e.g.
+the baker) depend on their version, you may have to also install new packages.
+You may take a look at the available packages in the Tezos Copr repository
+listed by ``dnf repoinfo``.
 
 .. _using_docker_images:
 
@@ -53,21 +118,21 @@ name.
 For example, to run Tezos on the Delphinet test network with the latest release:
 
 .. literalinclude:: use-docker-delphinet.sh
-   :language: shell
-   :start-after: [get delphinet]
-   :end-before: [start delphinet]
+  :language: shell
+  :start-after: [get delphinet]
+  :end-before: [start delphinet]
 
 Alternatively, to run on Mainnet::
 
-    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
-    chmod +x mainnet.sh
+   wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
+   chmod +x mainnet.sh
 
 In the following we assume you are running on the Delphinet test network.
 You are now one step away from a working node:
 
 .. literalinclude:: use-docker-delphinet.sh
-   :language: shell
-   :start-after: [start delphinet]
+  :language: shell
+  :start-after: [start delphinet]
 
 This will download the right Docker image for your chosen network, launch 3
 Docker containers running the node, the baker and the endorser. Keep in mind
@@ -80,12 +145,12 @@ Every call to ``delphinet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
 run::
 
-    ./delphinet.sh restart
+   ./delphinet.sh restart
 
 If you prefer to temporarily disable automatic updates, you just have to
 set an environment variable::
 
-    export TEZOS_ALPHANET_DO_NOT_PULL=yes
+   export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
 See ``./delphinet.sh --help`` for more information about the
 script. In particular see ``./delphinet.sh client --help`` or the
@@ -93,45 +158,6 @@ script. In particular see ``./delphinet.sh client --help`` or the
 the client. Every command to the ``tezos-client`` can be equivalently
 executed by using ``./delphinet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
 can be executed using ``./delphinet.sh admin-client``.
-
-.. _getting_static_binaries:
-
-Getting static binaries
------------------------
-
-You can get static Linux binaries from the
-`latest release in the tezos-packaging repository <https://github.com/serokell/tezos-packaging/releases/latest>`__.
-
-This repository provides static binaries for x86_64 and arm64 architectures. Since these binaries
-are static, they can be used on any Linux distribution without any additional prerequisites.
-
-.. _installing_binaries:
-
-Installing binaries
--------------------
-
-Depending on your operating system, you may install Tezos (dynamically-linked)
-binaries and their dependencies using a package manager, as follows.
-
-Ubuntu Launchpad PPA with Tezos packages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If you're using Ubuntu, you can install packages with Tezos binaries from the Launchpad PPA.
-Currently it supports Focal and Bionic versions. In order to do that run the following commands:
-
-.. literalinclude:: install-bin-ubuntu.sh
-   :language: shell
-   :start-after: [install tezos]
-
-Fedora Copr repository with Tezos packages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If you're using Fedora, you can install packages with Tezos binaries from the Copr repository.
-Currently it supports Fedora 32 and 31. In order to do that run the following commands:
-
-.. literalinclude:: install-bin-fedora.sh
-   :language: shell
-   :start-after: [install tezos]
 
 
 .. _build_from_sources:
@@ -392,3 +418,12 @@ You may also activate Bash autocompletion by executing::
 
   Note that if your shell is `zsh`, you may need extra configuration to customize shell
   completion (refer to the `zsh` documentation).
+
+Update
+~~~~~~
+
+For updating to a new version, you typically have to
+update the sources by doing ``git pull`` in the ``tezos/`` directory and replay
+the compilation scenario starting from ``make build-deps``.
+You may also use ``make clean`` (and ``rm -Rf _opam/`` if needed) before that, for restarting compilation in a
+fresh state.
