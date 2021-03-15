@@ -52,7 +52,7 @@ module Event = struct
 
   let section = ["node"; "config"; "validation"]
 
-  let sucess_event =
+  let success_event =
     Internal_event.Simple.declare_0
       ~section
       ~name:"node_config_validation_success"
@@ -377,4 +377,4 @@ let check config =
   >>=? fun t ->
   if has_error t then Event.report t >>= fun () -> exit 1
   else if has_warning t then Event.report t >>= fun () -> return_unit
-  else Event.(emit sucess_event ()) >>= fun () -> return_unit
+  else Event.(emit success_event ()) >>= fun () -> return_unit
