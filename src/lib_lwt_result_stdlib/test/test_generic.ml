@@ -288,7 +288,31 @@ struct
   let tests = [Alcotest_lwt.test_case "fail-early" `Quick test_fail_early]
 end
 
-module SeqMapTest = MakeMapperTest (SeqGen)
+let flip_e seq_e =
+  let open Support.Lib.Monad in
+  Support.Lib.Seq_e.fold_left (fun acc item -> item :: acc) [] seq_e
+  >|? List.rev >|? List.to_seq
+
+let flip_s seq_s =
+  let open Support.Lib.Monad in
+  Support.Lib.Seq_s.fold_left (fun acc item -> item :: acc) [] seq_s
+  >|= List.rev >|= List.to_seq
+
+let flip_es seq_es =
+  let open Support.Lib.Monad in
+  Support.Lib.Seq_es.fold_left (fun acc item -> item :: acc) [] seq_es
+  >|=? List.rev >|=? List.to_seq
+
+module SeqMapTest = MakeMapperTest (struct
+  include SeqGen
+
+  let map_e f seq = flip_e @@ Support.Lib.Seq_e.(map_e f @@ of_seq seq)
+
+  let map_s f seq = flip_s @@ Support.Lib.Seq_s.(map_s f @@ of_seq seq)
+
+  let map_es f seq = flip_es @@ Support.Lib.Seq_es.(map_es f @@ of_seq seq)
+end)
+
 module ListMapTest = MakeMapperTest (ListGen)
 
 let () =

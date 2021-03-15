@@ -50,16 +50,6 @@ let wrap (name, (module Test : F)) =
 
 let () =
   let name = "Test_fuzzing_seq" in
-  let tests =
-    [ ("TestSeqIterfold", (module TestIterFold : F));
-      ("Filter", (module TestFilterAgainstStdlibList : F));
-      ("Filtermap", (module TestFiltermapAgainstStdlibList : F));
-      ("Fold", (module TestFoldAgainstStdlibList : F));
-      ("Iter", (module TestIterAgainstStdlibList : F));
-      ("Iterp", (module TestIterMonotoneAgainstStdlibList : F));
-      ("Map", (module TestMapAgainstStdlibList : F));
-      ("Mapp", (module TestMappAgainstStdlibList : F));
-      ("Find", (module TestFindStdlibList : F)) ]
-  in
+  let tests = [("TestSeqIterfold", (module TestIterFold : F))] in
   let tests = List.map wrap tests in
   Alcotest.run name tests

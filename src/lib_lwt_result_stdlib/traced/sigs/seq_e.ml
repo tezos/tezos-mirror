@@ -23,29 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A replacement for {!Stdlib.Seq} which
-    - is exception-safe,
-    - includes Lwt-, result- and Lwt-result-aware traversal functions.
+(** The [S] signature is similar to [Seq.S] except that suspended nodes are
+    wrapped in a result.
 
-    See {!Lwtreslib} for a general description of traversors and the meaning for
-    the name suffixes. A full description is also below. *)
-module type S = sig
-  include Bare_sigs.Seq.S
+    This allows some additional traversors to be applied lazily.
 
-  (** ['error trace] is intended to be substituted by a type provided by a
-      [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
-  type 'error trace
+    The functions [of_seq] and [of_seq_e] allow conversion from vanilla
+    sequences. *)
+module type S =
+  Bare_sigs.Seq_e.S
+    with type ('a, 'e) node = ('a, 'e) Bare_structs.Seq_e.node
+     and type ('a, 'e) t = ('a, 'e) Bare_structs.Seq_e.t
 
-  (** Similar to {!iter} but wraps the iteration in [result Lwt.t]. All the
-      steps of the iteration are started concurrently. The promise [iter_ep]
-      resolves once all the promises of the traversal resolve. At this point it
-      either:
-      - is rejected if at least one of the promises is, otherwise
-      - is fulfilled with [Error _] if at least one of the promises is,
-        otherwise
-      - is fulfilled with [Ok ()] if all the promises are. *)
-  val iter_ep :
-    ('a -> (unit, 'error trace) result Lwt.t) ->
-    'a t ->
-    (unit, 'error trace) result Lwt.t
-end
+(* Developer note:
+
+   Due to the type of sequences and the availability of traces, we can add the
+   following traversors that are not supported in the [Bare] version. We will
+   add those in future versions.
+
+   - [iter_p] which returns a [Trace.cons] of the sequence-interruption and the
+     [Trace.conp_list] of the iterator errors. We need to decide on a semantic:
+     which error is consed "above" the other?
+
+   - [stitch] which "concatenates" multiple sequences, stacking the interrupting
+     errors for the end.
+
+   - [recover] which feeds the interruption error into an unfold to continue the
+     sequence.
+
+   Also note that those can be made available in [Seq_es] too. *)

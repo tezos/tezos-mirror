@@ -31,6 +31,9 @@ module Bare = struct
   module Option = Bare_structs.Option
   module Result = Bare_structs.Result
   module Seq = Bare_structs.Seq
+  module Seq_e = Bare_structs.Seq_e
+  module Seq_s = Bare_structs.Seq_s
+  module Seq_es = Bare_structs.Seq_es
   module Set = Bare_structs.Set
   module WithExceptions = Bare_structs.WithExceptions
 end

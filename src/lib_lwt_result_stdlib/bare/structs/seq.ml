@@ -26,20 +26,8 @@
 open Monad
 include Stdlib.Seq
 
-let nil_e = Ok Nil
-
-let nil_s = Lwt.return Nil
-
-let nil_es = Lwt.return nil_e
-
-let empty_e = Ok empty
-
-let empty_s = Lwt.return empty
-
-let empty_es = Lwt.return empty_e
-
-(* Like Lwt.apply but specialised for three parameters *)
-let apply3 f x y = try f x y with exn -> Lwt.fail exn
+(* Like Lwt.apply but specialised for two-parameter functions *)
+let apply2 f x y = try f x y with exn -> Lwt.fail exn
 
 let rec fold_left_e f acc seq =
   match seq () with
@@ -60,7 +48,7 @@ let fold_left_s f acc seq =
   | Nil ->
       Lwt.return acc
   | Cons (item, seq) ->
-      apply3 f acc item >>= fun acc -> fold_left_s f acc seq
+      apply2 f acc item >>= fun acc -> fold_left_s f acc seq
 
 let rec fold_left_es f acc seq =
   match seq () with
@@ -74,7 +62,7 @@ let fold_left_es f acc seq =
   | Nil ->
       Monad.return acc
   | Cons (item, seq) ->
-      apply3 f acc item >>=? fun acc -> fold_left_es f acc seq
+      apply2 f acc item >>=? fun acc -> fold_left_es f acc seq
 
 let rec iter_e f seq =
   match seq () with
@@ -130,189 +118,6 @@ let iter_p f seq =
         iter_p f seq (Lwt.apply f item :: acc)
   in
   iter_p f seq []
-
-let rec map_e f seq =
-  match seq () with
-  | Nil ->
-      empty_e
-  | Cons (item, seq) ->
-      f item
-      >>? fun item ->
-      map_e f seq >>? fun seq -> ok (fun () -> Cons (item, seq))
-
-let rec map_s f seq =
-  match seq () with
-  | Nil ->
-      empty_s
-  | Cons (item, seq) ->
-      f item
-      >>= fun item ->
-      map_s f seq >>= fun seq -> Lwt.return (fun () -> Cons (item, seq))
-
-let map_s f seq =
-  match seq () with
-  | Nil ->
-      empty_s
-  | Cons (item, seq) ->
-      Lwt.apply f item
-      >>= fun item ->
-      map_s f seq >>= fun seq -> Lwt.return (fun () -> Cons (item, seq))
-
-let rec map_es f seq =
-  match seq () with
-  | Nil ->
-      empty_es
-  | Cons (item, seq) ->
-      f item
-      >>=? fun item ->
-      map_es f seq >>=? fun seq -> Monad.return (fun () -> Cons (item, seq))
-
-let map_es f seq =
-  match seq () with
-  | Nil ->
-      empty_es
-  | Cons (item, seq) ->
-      Lwt.apply f item
-      >>=? fun item ->
-      map_es f seq >>=? fun seq -> Monad.return (fun () -> Cons (item, seq))
-
-let map_ep f seq =
-  all_ep (fold_left (fun acc x -> Lwt.apply f x :: acc) [] seq)
-  >|=? (* this is equivalent to rev |> to_seq but more direct *)
-       Stdlib.List.fold_left (fun s x () -> Cons (x, s)) empty
-
-let map_p f seq =
-  all_p (fold_left (fun acc x -> Lwt.apply f x :: acc) [] seq)
-  >|= (* this is equivalent to rev |> to_seq but more direct *)
-      Stdlib.List.fold_left (fun s x () -> Cons (x, s)) empty
-
-let rec filter_e f seq =
-  match seq () with
-  | Nil ->
-      empty_e
-  | Cons (item, seq) -> (
-      f item
-      >>? function
-      | false ->
-          filter_e f seq
-      | true ->
-          filter_e f seq >>? fun seq -> ok (fun () -> Cons (item, seq)) )
-
-let rec filter_s f seq =
-  match seq () with
-  | Nil ->
-      empty_s
-  | Cons (item, seq) -> (
-      f item
-      >>= function
-      | false ->
-          filter_s f seq
-      | true ->
-          filter_s f seq >>= fun seq -> Lwt.return (fun () -> Cons (item, seq))
-      )
-
-let filter_s f seq =
-  match seq () with
-  | Nil ->
-      empty_s
-  | Cons (item, seq) -> (
-      Lwt.apply f item
-      >>= function
-      | false ->
-          filter_s f seq
-      | true ->
-          filter_s f seq >>= fun seq -> Lwt.return (fun () -> Cons (item, seq))
-      )
-
-let rec filter_es f seq =
-  match seq () with
-  | Nil ->
-      empty_es
-  | Cons (item, seq) -> (
-      f item
-      >>=? function
-      | false ->
-          filter_es f seq
-      | true ->
-          filter_es f seq
-          >>=? fun seq -> Monad.return (fun () -> Cons (item, seq)) )
-
-let filter_es f seq =
-  match seq () with
-  | Nil ->
-      empty_es
-  | Cons (item, seq) -> (
-      Lwt.apply f item
-      >>=? function
-      | false ->
-          filter_es f seq
-      | true ->
-          filter_es f seq
-          >>=? fun seq -> Monad.return (fun () -> Cons (item, seq)) )
-
-let rec filter_map_e f seq =
-  match seq () with
-  | Nil ->
-      empty_e
-  | Cons (item, seq) -> (
-      f item
-      >>? function
-      | None ->
-          filter_map_e f seq
-      | Some item ->
-          filter_map_e f seq >>? fun seq -> ok (fun () -> Cons (item, seq)) )
-
-let rec filter_map_s f seq =
-  match seq () with
-  | Nil ->
-      empty_s
-  | Cons (item, seq) -> (
-      f item
-      >>= function
-      | None ->
-          filter_map_s f seq
-      | Some item ->
-          filter_map_s f seq
-          >>= fun seq -> Lwt.return (fun () -> Cons (item, seq)) )
-
-let filter_map_s f seq =
-  match seq () with
-  | Nil ->
-      empty_s
-  | Cons (item, seq) -> (
-      Lwt.apply f item
-      >>= function
-      | None ->
-          filter_map_s f seq
-      | Some item ->
-          filter_map_s f seq
-          >>= fun seq -> Lwt.return (fun () -> Cons (item, seq)) )
-
-let rec filter_map_es f seq =
-  match seq () with
-  | Nil ->
-      empty_es
-  | Cons (item, seq) -> (
-      f item
-      >>=? function
-      | None ->
-          filter_map_es f seq
-      | Some item ->
-          filter_map_es f seq
-          >>=? fun seq -> Monad.return (fun () -> Cons (item, seq)) )
-
-let filter_map_es f seq =
-  match seq () with
-  | Nil ->
-      empty_es
-  | Cons (item, seq) -> (
-      Lwt.apply f item
-      >>=? function
-      | None ->
-          filter_map_es f seq
-      | Some item ->
-          filter_map_es f seq
-          >>=? fun seq -> Monad.return (fun () -> Cons (item, seq)) )
 
 let rec find f seq =
   match seq () with

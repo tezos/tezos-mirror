@@ -23,14 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A replacement for {!Stdlib.Seq} which
-    - is exception-safe,
-    - includes Lwt-, result- and Lwt-result-aware traversal functions.
+(** The [S] signature is similar to [Seq.S] except that suspended nodes are
+    wrapped in a promise.
 
-    See {!Lwtreslib} for a general description of traversors and the meaning for
-    the name suffixes. A full description is also below. *)
+    This allows some additional traversors to be applied lazily.
+
+    The functions [of_seq] and [of_seq_s] allow conversion from vanilla
+    sequences. *)
 module type S = sig
-  include Bare_sigs.Seq.S
+  include
+    Bare_sigs.Seq_s.S
+      with type 'a node = 'a Bare_structs.Seq_s.node
+       and type 'a t = 'a Bare_structs.Seq_s.t
 
   (** ['error trace] is intended to be substituted by a type provided by a
       [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
@@ -39,11 +43,10 @@ module type S = sig
   (** Similar to {!iter} but wraps the iteration in [result Lwt.t]. All the
       steps of the iteration are started concurrently. The promise [iter_ep]
       resolves once all the promises of the traversal resolve. At this point it
-      either:
-      - is rejected if at least one of the promises is, otherwise
-      - is fulfilled with [Error _] if at least one of the promises is,
-        otherwise
-      - is fulfilled with [Ok ()] if all the promises are. *)
+      is either:
+      - rejected if at least one of the promises is, or
+      - fulfilled with [Error _] if at least one of the promises is, or
+      - fulfilled with [Ok ()] if all the promises are. *)
   val iter_ep :
     ('a -> (unit, 'error trace) result Lwt.t) ->
     'a t ->

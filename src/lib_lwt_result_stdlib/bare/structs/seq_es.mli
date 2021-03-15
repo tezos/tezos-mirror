@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,29 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A replacement for {!Stdlib.Seq} which
-    - is exception-safe,
-    - includes Lwt-, result- and Lwt-result-aware traversal functions.
-
-    See {!Lwtreslib} for a general description of traversors and the meaning for
-    the name suffixes. A full description is also below. *)
-module type S = sig
-  include Bare_sigs.Seq.S
-
-  (** ['error trace] is intended to be substituted by a type provided by a
-      [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
-  type 'error trace
-
-  (** Similar to {!iter} but wraps the iteration in [result Lwt.t]. All the
-      steps of the iteration are started concurrently. The promise [iter_ep]
-      resolves once all the promises of the traversal resolve. At this point it
-      either:
-      - is rejected if at least one of the promises is, otherwise
-      - is fulfilled with [Error _] if at least one of the promises is,
-        otherwise
-      - is fulfilled with [Ok ()] if all the promises are. *)
-  val iter_ep :
-    ('a -> (unit, 'error trace) result Lwt.t) ->
-    'a t ->
-    (unit, 'error trace) result Lwt.t
-end
+include
+  Bare_sigs.Seq_es.S
+    with type ('a, 'e) seq_e_t := ('a, 'e) Seq_e.t
+     and type 'a seq_s_t := 'a Seq_s.t

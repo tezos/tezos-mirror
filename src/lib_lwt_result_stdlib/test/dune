@@ -6,6 +6,7 @@
   test_fuzzing_seq
   test_fuzzing_list
   test_fuzzing_set
+  test_fuzzing_seq_tiered
  )
  (libraries
             tezos-lwt-result-stdlib
@@ -45,6 +46,9 @@
 (rule
  (alias runtest_fuzzing_set)
  (action (run %{exe:test_fuzzing_set.exe})))
+(rule
+ (alias runtest_fuzzing_seq_tiered)
+ (action (run %{exe:test_fuzzing_seq_tiered.exe})))
 
 (rule
  (alias runtest)
@@ -56,6 +60,7 @@
   (alias runtest_fuzzing_seq)
   (alias runtest_fuzzing_list)
   (alias runtest_fuzzing_set)
+  (alias runtest_fuzzing_seq_tiered)
  )
  (action (progn))
 )

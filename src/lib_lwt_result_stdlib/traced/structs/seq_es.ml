@@ -23,29 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A replacement for {!Stdlib.Seq} which
-    - is exception-safe,
-    - includes Lwt-, result- and Lwt-result-aware traversal functions.
+module Make
+    (Monad : Traced_sigs.Monad.S)
+    (Seq_e : Traced_sigs.Seq_e.S)
+    (Seq_s : Traced_sigs.Seq_s.S with type 'error trace := 'error Monad.trace) :
+  Traced_sigs.Seq_es.S
+    with type ('a, 'e) node = ('a, 'e) Bare_structs.Seq_es.node
+     and type ('a, 'e) t = ('a, 'e) Bare_structs.Seq_es.t
+     and type ('a, 'e) seq_e_t := ('a, 'e) Seq_e.t
+     and type 'a seq_s_t := 'a Seq_s.t = struct
+  include Bare_structs.Seq_es
 
-    See {!Lwtreslib} for a general description of traversors and the meaning for
-    the name suffixes. A full description is also below. *)
-module type S = sig
-  include Bare_sigs.Seq.S
+  let nil_es = Lwt.return (Ok Nil)
 
-  (** ['error trace] is intended to be substituted by a type provided by a
-      [Trace] module ([with type 'error trace := 'error Trace.trace]) *)
-  type 'error trace
+  let rec of_seqe seq () =
+    match seq () with
+    | Ok Seq_e.Nil ->
+        nil_es
+    | Ok (Seq_e.Cons (item, seq)) ->
+        Monad.return (Cons (item, of_seqe seq))
+    | Error _ as e ->
+        Lwt.return e
 
-  (** Similar to {!iter} but wraps the iteration in [result Lwt.t]. All the
-      steps of the iteration are started concurrently. The promise [iter_ep]
-      resolves once all the promises of the traversal resolve. At this point it
-      either:
-      - is rejected if at least one of the promises is, otherwise
-      - is fulfilled with [Error _] if at least one of the promises is,
-        otherwise
-      - is fulfilled with [Ok ()] if all the promises are. *)
-  val iter_ep :
-    ('a -> (unit, 'error trace) result Lwt.t) ->
-    'a t ->
-    (unit, 'error trace) result Lwt.t
+  let rec of_seqs seq () =
+    Lwt.bind (seq ())
+    @@ function
+    | Seq_s.Nil ->
+        nil_es
+    | Seq_s.Cons (e, seq) ->
+        Monad.return (Cons (e, of_seqs seq))
 end

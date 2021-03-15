@@ -125,6 +125,26 @@
     carries all the other errors in a list. It is up to the user to convert this
     list to a more manageable type if needed.
 
+    {3 A note on [Seq]}
+
+    The [Seq] module exports a type that suspends nodes under a closure.
+    Consequently, some interactions with result, Lwt, and result-Lwt is not
+    possible. E.g., [map]ping can be either lazy or within Lwt but not both:
+    [Seq.map_s] would have type [('a -> 'b Lwt.t) -> 'a t -> 'b t Lwt.t] where
+    the returned promise forces the whole sequence (and never resolves on
+    infinite sequences).
+
+    In Lwtreslib, [Seq] does not provide these additional traversors that would
+    force the sequence simply due to the bad interaction of the Monads and the
+    type of sequences. Instead, Lwtreslib provides variants of [Seq] called
+    [Seq_e], [Seq_s], and [Seq_es] where the combination with the monad is baked
+    into the sequence type itself.
+
+    If you want to map a sequnence using an Lwt-returning function, you should
+    do the following: [Seq_s.map_s f (Seq_s.of_seq s)]. Note that this returns
+    a [Seq_s.t] sequence so further transformations will be within [Seq_s] and
+    not within [Seq]. Once in a monad, you stay in the monad.
+
     {3 [Traced]}
 
     The {!Traced} module offers a small wrapper around Lwtreslib. This wrapper
@@ -242,6 +262,15 @@ module Bare : sig
 
   module Seq : Bare_sigs.Seq.S
 
+  module Seq_e : Bare_sigs.Seq_e.S
+
+  module Seq_s : Bare_sigs.Seq_s.S
+
+  module Seq_es :
+    Bare_sigs.Seq_es.S
+      with type ('a, 'e) seq_e_t := ('a, 'e) Seq_e.t
+       and type 'a seq_s_t := 'a Seq_s.t
+
   module Set : Bare_sigs.Set.S
 
   module WithExceptions : Bare_sigs.WithExceptions.S
@@ -291,6 +320,16 @@ module Traced (Trace : Traced_sigs.Trace.S) : sig
   module Result : Traced_sigs.Result.S
 
   module Seq : Traced_sigs.Seq.S with type 'error trace := 'error Trace.trace
+
+  module Seq_e : Traced_sigs.Seq_e.S
+
+  module Seq_s :
+    Traced_sigs.Seq_s.S with type 'error trace := 'error Trace.trace
+
+  module Seq_es :
+    Traced_sigs.Seq_es.S
+      with type ('a, 'e) seq_e_t := ('a, 'e) Seq_e.t
+       and type 'a seq_s_t := 'a Seq_s.t
 
   module Set : Traced_sigs.Set.S with type 'error trace := 'error Trace.trace
 
