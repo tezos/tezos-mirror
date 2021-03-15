@@ -112,11 +112,9 @@ let mk_alert ~event ~level ~payload = Alert {event; level; payload}
 
 let when_ condition ~event ~level ~payload =
   if not condition then [] else [mk_alert ~event ~level ~payload]
-  [@@ocaml.warning "-32"]
 
 let unless condition ~event ~level ~payload =
   if condition then [] else [mk_alert ~event ~level ~payload]
-  [@@ocaml.warning "-32"]
 
 (* The following parts consist in node configuration validations. *)
 
