@@ -170,7 +170,10 @@ let validate_addr ~level ~field ~addr ~resolver =
   >>= function
   | Error [Node_config_file.Failed_to_parse_address (addr, why)] ->
       return_some
-        (mk_alert ~event:cannot_parse_addr ~level ~payload:(addr, field, why))
+        (mk_alert
+           ~event:cannot_parse_addr
+           ~level:Error
+           ~payload:(addr, field, why))
   | Ok [] ->
       return_some
         (mk_alert ~event:cannot_resolve_addr ~level ~payload:(addr, field))
