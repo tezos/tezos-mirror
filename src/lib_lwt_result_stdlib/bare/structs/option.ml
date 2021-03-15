@@ -79,6 +79,8 @@ let value_fe o ~error =
 
 let either oa ob = match oa with Some _ -> oa | None -> ob
 
+let either_f oa ob = match oa with Some _ -> oa | None -> ob ()
+
 let map_s f o =
   match o with None -> Lwt.return_none | Some v -> f v >>= Lwt.return_some
 

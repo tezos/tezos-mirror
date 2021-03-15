@@ -262,13 +262,13 @@ module Term = struct
              (List.map fst Node_config_file.builtin_blockchain_networks)))
     in
     let parser s =
-      let open TzOption in
+      let ( <||> ) = Option.either_f
+      and ( <|!> ) opt default = Option.value_f ~default opt in
       (* Select the first parsing result that is not None. *)
-      lazy (parse_network_name s)
-      <||> lazy (parse_network_url s)
-      <||> lazy (parse_file_config s)
-      <|!> lazy (parse_error s)
-      |> Lazy.force
+      parse_network_name s
+      <||> (fun () -> parse_network_url s)
+      <||> (fun () -> parse_file_config s)
+      <|!> fun () -> parse_error s
     in
     ( (parser : string -> (net_config, [`Msg of string]) result),
       (network_printer : net_config Cmdliner.Arg.printer) )

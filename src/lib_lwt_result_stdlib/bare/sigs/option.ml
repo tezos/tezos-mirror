@@ -97,6 +97,8 @@ module type S = sig
       [Some y], and [either None None] is [None]. *)
   val either : 'a option -> 'a option -> 'a option
 
+  val either_f : 'a option -> (unit -> 'a option) -> 'a option
+
   val map : ('a -> 'b) -> 'a option -> 'b option
 
   val map_s : ('a -> 'b Lwt.t) -> 'a option -> 'b option Lwt.t
