@@ -191,7 +191,7 @@ let validate_rpc_listening_addrs (config : Node_config_file.t) =
   let aux addr =
     validate_addr
       ~field:"rpc.listen-addrs"
-      ~level:Error
+      ~level:Warning
       ~addr
       ~resolver:Node_config_file.resolve_rpc_listening_addrs
   in
@@ -200,20 +200,20 @@ let validate_rpc_listening_addrs (config : Node_config_file.t) =
 let validate_p2p_listening_addrs (config : Node_config_file.t) =
   validate_addr_opt
     ~field:"p2p.listen-addr"
-    ~level:Error
+    ~level:Warning
     ~addr:config.p2p.listen_addr
     ~resolver:Node_config_file.resolve_listening_addrs
 
 let validate_p2p_discovery_addr (config : Node_config_file.t) =
   validate_addr_opt
     ~field:"p2p.discovery-addr"
-    ~level:Error
+    ~level:Warning
     ~addr:config.p2p.discovery_addr
     ~resolver:Node_config_file.resolve_discovery_addrs
 
 let validate_p2p_bootstrap_addrs ~field peers =
   let aux addr =
-    validate_addr ~level:Error ~field ~addr ~resolver:(fun x ->
+    validate_addr ~level:Warning ~field ~addr ~resolver:(fun x ->
         Node_config_file.resolve_bootstrap_addrs [x])
   in
   List.filter_map_ep aux peers
