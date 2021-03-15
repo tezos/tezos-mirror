@@ -42,6 +42,10 @@ be documented here either.
 - Removed the built-in configuration for Delphinet. You can no longer
   configure your node with `--network delphinet`.
 
+- The `--network` option now also accepts the name of a file
+  containing the configuration for a custom network,
+  or a URL from which such a file can be downloaded.
+
 ## Client
 
 - Fixed the return code of errors in the client calls to be non-zero.
