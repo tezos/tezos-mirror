@@ -19,22 +19,32 @@ be documented here either.
 
 ## Node
 
-- Cap the number of expected connections to `100` on the command line
+- Added Florence, the current protocol proposal on Mainnet.
+  This is the version of Florence without baking accounts (`PsFLoren`).
+
+- Added a new version of the protocol environment (v2).
+  It is used by Florence.
+
+- Added built-in network configurations for Edo2net (which runs Edo2,
+  the current Mainnet protocol) and Florencenet (which runs Florence).
+  Their corresponding aliases for `--network` are `edo2net` and `florencenet`.
+
+- Capped the number of expected connections to `100` on the command-line
   interface.
 
-- Fixes a bug that launched the prevalidator when the node was not
+- Fixed a bug that caused the execution of the prevalidator when the node was not
   bootstrapped.
 
-- Enforce loading of non-embedded protocols before starting the node
-  allowing the prevalidator to start correctly.
+- Enforced loading of non-embedded protocols before starting the node
+  to allow the prevalidator to start correctly.
 
-- Optimize I/O and CPU usage by removing an unnecessary access to the
+- Optimized I/O and CPU usage by removing an unnecessary access to the
   context during block validation.
 
-- Fixes a bug where any event would allocate more memory than needed
-  when it were not to be printed.
+- Fixed a bug where any event would allocate more memory than needed
+  when it was not to be printed.
 
-- Add a new RPC for Alpha: `helpers/scripts/normalize_type`.
+- Added a new RPC for Alpha: `helpers/scripts/normalize_type`.
 
 - Replace Edonet by Edo2net in built-in network configuration.
   The alias to give to `--network` is now `edo2net`.
@@ -57,49 +67,51 @@ be documented here either.
 
 - Fixed the return code of errors in the client calls to be non-zero.
 
-- Added a new multisig command to change keys and threshold
+- Added a new multisig command to change keys and threshold:
   `set threshold of multisig contract ...`.
 
-- Added a command to perform protocol migrations in persistent mockup mode
-  `migrate mockup to <protocol_hash>`
+- Added a command to perform protocol migrations in persistent mockup mode:
+  `migrate mockup to <protocol_hash>`.
 
-- Add `--version` flag
+- Added the `--version` flag.
 
-- Fixed commands `--mode mockup config show` and `--mode mockup config init` which returned the default values rather than the actual ones.
+- Fixed commands `--mode mockup config show` and `--mode mockup config init`
+  which returned the default values rather than the actual ones.
 
 - Replaced command `check that <bytes> was signed by <pkh>` by `check that bytes
   <bytes> were signed by <pkh>` to differentiate from new command `check that
-  message <string> was signed by <pkh>`
+  message <string> was signed by <pkh>`.
 
 - Added wallet support for PVSS keys.
 
-- Added support for all protocol constants in Mockup mode
+- Added support for all protocol constants in Mockup mode.
 
 ## Baker / Endorser / Accuser
 
-- Add `--version` flag
+- Added the `--version` flag.
 
-- Fixes the operation ordering in the baker so that the most
+- Fixed the operation ordering in the baker so that the most
   profitable operations are applied first.
 
 ## Protocol Compiler And Environment
 
-- Add `--version` flag
+- Added the `--version` flag.
 
 ## Codec
 
-- Add `--version` flag
-- Register some ground encodings including arbitrary precision integers, n-bit
-  sized integers, and floating point numbers.
+- Added the `--version` flag.
 
+- Added support for some base encodings including arbitrary precision integers, n-bit
+  sized integers, and floating point numbers.
 
 ## Docker Images
 
 ## Miscellaneous
 
-- Make sure file descriptors are opened with the `O_CLOEXEC` flag.
-- Sapling: fix dummy address generator (set correctly the last 5 bits to 0
+- Sapling: fixed dummy address generator (the last 5 bits are now correctly set to 0
   instead of the first 5 bits).
+
+- Fixed a bug that caused some file descriptors to be leaked to external processes.
 
 # Version 8.2
 
@@ -260,9 +272,9 @@ be documented here either.
   + PATCH: `/network/peers/<peer_id>` payload `{ acl: [ban,trust,open] }`
   + PATCH: `/network/point/<point>` payload `{ acl: [ban,trust,open], peer_id: <peer_id> }`
   where
-    - `{acl : ban}`: blacklist the given address/peer and remove it from 
+    - `{acl : ban}`: blacklist the given address/peer and remove it from
       the whitelist if present
-    - `{acl: trust}`: trust a given address/peer permanently and remove it 
+    - `{acl: trust}`: trust a given address/peer permanently and remove it
       from the blacklist if present.
     - `{acl: open}`: removes an address/peer from the blacklist and whitelist.
 
