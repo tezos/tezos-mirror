@@ -29,7 +29,7 @@ open Filename.Infix
 
 type net_config =
   | BuiltIn of Node_config_file.blockchain_network
-  | Url of string
+  | Url of Uri.t
   | Filename of string
 
 type t = {
@@ -123,8 +123,8 @@ let decode_net_config source json =
 let load_net_config = function
   | BuiltIn net ->
       return net
-  | Url url ->
-      Cohttp_lwt_unix.Client.get (Uri.of_string url)
+  | Url uri ->
+      Cohttp_lwt_unix.Client.get uri
       >>= fun (resp, body) ->
       Cohttp_lwt.Body.to_string body
       >>= fun body_str ->
@@ -132,10 +132,10 @@ let load_net_config = function
       | `OK -> (
         try return (Ezjsonm.from_string body_str)
         with Ezjsonm.Parse_error (_, msg) ->
-          fail (Invalid_network_config (url, msg)) )
+          fail (Invalid_network_config (Uri.to_string uri, msg)) )
       | #Cohttp.Code.status_code ->
           fail (Network_http_error (resp.status, body_str)) )
-      >>=? decode_net_config url
+      >>=? decode_net_config (Uri.to_string uri)
   | Filename filename ->
       Lwt_utils_unix.Json.read_file filename >>=? decode_net_config filename
 
@@ -228,7 +228,7 @@ module Term = struct
         let alias = WithExceptions.Option.get ~loc:__LOC__ alias in
         Format.fprintf ppf "built-in network: %s" alias
     | Url url ->
-        Format.fprintf ppf "URL network: %s" url
+        Format.fprintf ppf "URL network: %s" (Uri.to_string url)
     | Filename file ->
         Format.fprintf ppf "local file network: %s" file
 
@@ -240,10 +240,12 @@ module Term = struct
       |> Option.map (fun net -> Result.ok (BuiltIn net))
     in
     let parse_network_url s =
-      let re =
-        Re.Str.regexp "^https?://[a-zA-Z0-9\\-\\._]+\\(:[0-9]+\\)?\\(/.*\\)?$"
-      in
-      if Re.Str.string_match re s 0 then Some (Ok (Url s)) else None
+      let uri = Uri.of_string s in
+      match Uri.scheme uri with
+      | Some "http" | Some "https" ->
+          Some (Ok (Url uri))
+      | Some _ | None ->
+          None
     in
     let parse_file_config filename =
       if Sys.file_exists filename then Some (Result.ok (Filename filename))
