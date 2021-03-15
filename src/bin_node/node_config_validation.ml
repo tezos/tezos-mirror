@@ -52,6 +52,14 @@ module Event = struct
 
   let section = ["node"; "config"; "validation"]
 
+  let disabled_event =
+    Internal_event.Simple.declare_0
+      ~section
+      ~name:"node_config_validation_disabled"
+      ~msg:"the node configuration validation is disabled."
+      ~level:Notice
+      ()
+
   let success_event =
     Internal_event.Simple.declare_0
       ~section
@@ -368,13 +376,12 @@ let validate_passes config =
 
 (* Main validation functions. *)
 
-let validate_config (config : Node_config_file.t) : t tzresult Lwt.t =
-  if config.disable_config_validation then return empty
-  else validate_passes config
-
 let check config =
-  validate_config config
-  >>=? fun t ->
-  if has_error t then Event.report t >>= fun () -> exit 1
-  else if has_warning t then Event.report t >>= fun () -> return_unit
-  else Event.(emit success_event ()) >>= fun () -> return_unit
+  if config.Node_config_file.disable_config_validation then
+    Event.(emit disabled_event ()) >>= fun () -> return_unit
+  else
+    validate_passes config
+    >>=? fun t ->
+    if has_error t then Event.report t >>= fun () -> exit 1
+    else if has_warning t then Event.report t >>= fun () -> return_unit
+    else Event.(emit success_event ()) >>= fun () -> return_unit
