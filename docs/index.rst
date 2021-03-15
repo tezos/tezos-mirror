@@ -105,6 +105,7 @@ in the :ref:`introduction <howtoget>`.
    introduction/howtouse
    introduction/howtorun
    introduction/test_networks
+   introduction/get_troubleshooting
    introduction/support
 
 .. toctree::
