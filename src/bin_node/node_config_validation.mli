@@ -23,12 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Invalid_node_configuration
+
 (** [check config] verifies if the [config] parameter is valid.
     If the validation report of the [config]:
     - contains at least one error, it is considered as invalid. [check config] then logs
-      its error(s) and potential warnings, then exits with code 1.
+      its error(s) and potential warnings, then fails with the Invalid_node_configuration error.
     - contains at least one warning but no error, [check config] logs its warnings then returns unit.
     - otherwise, it returns unit.
     If the [config.disable_config_validation] is set to true, the validation is not applied
     and [check config] returns unit. *)
+
 val check : Node_config_file.t -> unit tzresult Lwt.t

@@ -105,7 +105,15 @@ let validate (args : Node_shared_arg.t) =
        validating the default configuration@]@]@."
       args.config_file ;
   Node_shared_arg.read_and_patch_config_file args
-  >>=? fun config -> Node_config_validation.check config
+  >>=? fun config ->
+  Node_config_validation.check config
+  >>= function
+  (* Here we do not consider the node configuration file
+     being invalid as a failure. *)
+  | Error (Node_config_validation.Invalid_node_configuration :: _) | Ok () ->
+      return_unit
+  | err ->
+      Lwt.return err
 
 (** Main *)
 module Term = struct

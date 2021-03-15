@@ -37,6 +37,25 @@ let is_error (Alert {level; _}) = level = Error
 
 let is_warning (Alert {level; _}) = level = Warning
 
+(* Errors *)
+
+type error += Invalid_node_configuration
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"node_config_validation.invalid_node_configuration"
+    ~title:"Invalid node configuration"
+    ~description:"The node configuration is invalid."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The node configuration is invalid, use `%s config validate [options]`"
+        Sys.argv.(0))
+    Data_encoding.unit
+    (function Invalid_node_configuration -> Some () | _ -> None)
+    (fun () -> Invalid_node_configuration)
+
 (* The type for a configuration validation report. *)
 
 type t = alert list
@@ -383,6 +402,7 @@ let check config =
   else
     validate_passes config
     >>=? fun t ->
-    if has_error t then Event.report t >>= fun () -> exit 1
+    if has_error t then
+      Event.report t >>= fun () -> fail Invalid_node_configuration
     else if has_warning t then Event.report t >>= fun () -> return_unit
     else Event.(emit success_event ()) >>= fun () -> return_unit
