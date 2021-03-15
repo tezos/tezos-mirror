@@ -71,7 +71,7 @@ type limits = {
 
 let create_scheduler limits =
   let max_upload_speed = Option.map (( * ) 1024) limits.max_upload_speed in
-  let max_download_speed = Option.map (( * ) 1024) limits.max_upload_speed in
+  let max_download_speed = Option.map (( * ) 1024) limits.max_download_speed in
   P2p_io_scheduler.create
     ~read_buffer_size:limits.read_buffer_size
     ?max_upload_speed
