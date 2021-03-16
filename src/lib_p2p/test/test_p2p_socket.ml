@@ -213,7 +213,8 @@ module Pow_check = struct
     >>= fun res -> tzassert (is_failing res) __POS__
 
   let client _ch sched addr port =
-    id2 >>= fun id ->
+    id2
+    >>= fun id ->
     connect sched addr port id
     >>= fun conn -> tzassert (is_connection_closed conn) __POS__
 

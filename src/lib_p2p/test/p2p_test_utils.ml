@@ -234,8 +234,7 @@ let raw_connect sched addr port =
 (** [connect ?proof_of_work_target sched addr port] connect
    and performs [P2p_socket.authenticate] with the given
    [proof_of_work_target]. *)
-let connect ?(proof_of_work_target = proof_of_work_target)
-    sched addr port id =
+let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
   raw_connect sched addr port
   >>= fun fd ->
   P2p_socket.authenticate

@@ -54,14 +54,8 @@ let tztest name speed f =
           Lwt.fail Alcotest.Test_error)
 
 module Alcotest_extra = struct
-  let rec check_any
-      ?(msg = lazy "No value in the list satifies the condition.") f = function
-    | [] ->
-        Alcotest.fail @@ Lazy.force msg
-    | x :: _ when f x ->
-        ()
-    | _ :: xs ->
-        check_any ~msg f xs
+  let check_any ?(msg = "No value in the list satifies the condition.") f l =
+    if not (List.exists f l) then Alcotest.fail msg
 end
 
 (* A mock event sink that records handled events for verifying test
@@ -269,7 +263,7 @@ end = struct
           | None ->
               "[~]"
           | Some section ->
-            Format.asprintf "%a" Internal_event.Section.pp section
+              Format.asprintf "%a" Internal_event.Section.pp section
         in
         let lvl_pp = Internal_event.Level.to_string lvl in
         Format.printf
@@ -318,7 +312,7 @@ end = struct
     end : Alcotest.TESTABLE
       with type t = event )
 
-  let assert_has_events str ?filter ?(strict = true) (pats : Pattern.t list) =
+  let assert_has_events msg ?filter ?(strict = true) (pats : Pattern.t list) =
     let events = get_events ?filter () in
     if strict then
       match List.combine_with_leftovers pats events with
@@ -339,20 +333,13 @@ end = struct
     else
       List.iter
         (fun pattern ->
-          Alcotest_extra.check_any
-            ~msg:(lazy str)
-            (Pattern.match_event pattern)
-            events)
+          Alcotest_extra.check_any ~msg (Pattern.match_event pattern) events)
         pats
 
-  let assert_has_event str ?filter ?(strict = true) (pattern : Pattern.t) =
+  let assert_has_event msg ?filter ?(strict = true) (pattern : Pattern.t) =
     let log = get_events ?filter () in
-    if strict then assert_has_events str ?filter ~strict [pattern]
-    else
-      Alcotest_extra.check_any
-        ~msg:(lazy str)
-        (Pattern.match_event pattern)
-        log
+    if strict then assert_has_events msg ?filter ~strict [pattern]
+    else Alcotest_extra.check_any ~msg (Pattern.match_event pattern) log
 end
 
 let mock_sink : Mock_sink.t Internal_event.sink_definition =
