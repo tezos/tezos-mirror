@@ -63,6 +63,11 @@ be documented here either.
   may impact some RPC representations of timestamps.
  
 
+- Some RPCs now send their response in chunked transfer encoding.
+  Additionally, the implementation allows for more concurrency internally: it
+  allows RPC requests to be treated even if a request is currently being
+  treated. This leads to some improved response times on some RPC requests.
+
 ## Client
 
 - Fixed the return code of errors in the client calls to be non-zero.
