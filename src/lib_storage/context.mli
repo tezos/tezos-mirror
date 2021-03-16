@@ -226,3 +226,10 @@ val validate_context_hash_consistency_and_commit :
   bool Lwt.t
 
 val upgrade_0_0_3 : context_dir:string -> unit tzresult Lwt.t
+
+(** Offline integrity checking and statistics for contexts. *)
+module Checks : sig
+  module Pack : Irmin_pack.Checks.S
+
+  module Index : Index.Checks.S
+end
