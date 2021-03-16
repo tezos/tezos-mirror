@@ -129,11 +129,7 @@ module Event_filter = struct
           "(section-in@ [%a])"
           (pp_print_list
              ~pp_sep:(fun fmt () -> fprintf fmt ",@ ")
-             (fun fmt s ->
-               fprintf
-                 fmt
-                 "(Some %s)"
-                 (String.concat "," (Internal_event.Section.to_string_list s))))
+             (fun fmt s -> fprintf fmt "(Some %a)" Internal_event.Section.pp s))
           l
     [@@warning "-32"]
 
@@ -212,7 +208,7 @@ let wrapped_encoding event_encoding =
 
 module Section_dir = struct
   let of_section (section : Internal_event.Section.t) =
-    String.concat "." (Internal_event.Section.to_string_list section)
+    Format.asprintf "%a" Internal_event.Section.pp section
 
   let section_name = function
     | "no-section" ->

@@ -99,6 +99,8 @@ module Section : sig
   val encoding : t Data_encoding.t
 
   val to_string_list : t -> string list
+
+  val pp : Format.formatter -> t -> unit
 end = struct
   type t = {path : string list; lwt_log_section : Lwt_log_core.section}
 
@@ -129,6 +131,8 @@ end = struct
   let encoding =
     let open Data_encoding in
     conv (fun {path; _} -> path) (fun l -> make l) (list string)
+
+  let pp fmt section = Format.fprintf fmt "%s" (String.concat "." section.path)
 end
 
 let registered_sections = ref TzString.Set.empty

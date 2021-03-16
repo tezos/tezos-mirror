@@ -219,9 +219,7 @@ end = struct
           | None ->
               "[~]"
           | Some section ->
-              String.concat
-                " > "
-                (Internal_event.Section.to_string_list section)
+              Format.asprintf "%a" Internal_event.Section.pp section
         in
         let lvl_pp = Internal_event.Level.to_string lvl in
         Format.printf
@@ -242,12 +240,7 @@ end = struct
     testable level_pp level_eq
 
   let testable_section : Internal_event.Section.t testable =
-    let section_pp =
-      Fmt.using
-        Internal_event.Section.to_string_list
-        (Fmt.brackets (Fmt.list ~sep:Fmt.comma Fmt.string))
-    in
-    of_pp section_pp
+    of_pp Internal_event.Section.pp
 
   let testable_event : event Test_services.testable =
     tuple3 testable_level (option testable_section) json

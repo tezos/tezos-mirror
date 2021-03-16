@@ -85,6 +85,8 @@ module Section : sig
   val encoding : t Data_encoding.t
 
   val to_string_list : t -> string list
+
+  val pp : Format.formatter -> t -> unit
 end
 
 (** All the section that has been registered. Currently, sections are registered
