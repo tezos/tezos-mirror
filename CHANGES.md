@@ -45,6 +45,13 @@ be documented here either.
 - The `--network` option now also accepts the name of a file
   containing the configuration for a custom network,
   or a URL from which such a file can be downloaded.
+  
+- Fixed JSON encoding of timestamps before epoch (1970).
+  Pretty-printing and encoding of dates before epoch in human-readable form (as part
+  of a JSON value) that failed in the past will now succeed. Binary
+  form (used when nodes exchange data) was unaffected by the bug. This
+  may impact some RPC representations of timestamps.
+ 
 
 ## Client
 

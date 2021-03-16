@@ -41,13 +41,20 @@
     protocol update changes the notion of time.
     - Protocol time and system time have different levels of precision.
     - Protocol time and system time have different end-of-times. Respectively
-    that's int64 end-of-time (some time in the year 292277026596) and rfc3339
+    that's int64 end-of-time (some time in the year 292277026596) and RFC3339
     end-of-time (end of the year 9999).
+
+    Note that while Protocol time has the int64 range, many of its functions
+    do not work outside of the RFC3339 range, namely:
+    - all [xx_notation_xx] functions (will be renamed and moved to an RFC
+    submodule later)
+    - [rfc_encoding]
+    - [pp_hum]
 
 *)
 
 module Protocol : sig
-  (** {1:Protocol time} *)
+  (** {1 Protocol time} *)
 
   (** The out-of-protocol view of in-protocol timestamps. The precision of
       in-protocol timestamps are only precise to the second.
@@ -70,27 +77,50 @@ module Protocol : sig
       [b] is later than [a]. *)
   val diff : t -> t -> int64
 
-  (** Conversions to and from string representations. *)
+  (** {2 Conversions to and from string representations} *)
 
+  (** Convert a string in the RFC3339 format (e.g., ["1970-01-01T00:00:00Z"]) into a protocol time.
+      Invalid RFC3339 notations will return [None].
+
+      Note that years outside the 0000-9999 range are invalid RFC3339-wise. *)
   val of_notation : string -> t option
 
+  (** Convert a string in the RFC3339 format (e.g., ["1970-01-01T00:00:00Z"]) into a protocol time.
+      Invalid RFC3339 notations will raise [Invalid_argument].
+
+      Note that years outside the 0000-9999 range are invalid RFC3339-wise. *)
   val of_notation_exn : string -> t
 
+  (** Convert a protocol time into an RFC3339 notation (e.g., ["1970-01-01T00:00:00Z"]).
+
+      Note that years outside the 0000-9999 range will raise [Invalid_argument] as they are invalid RFC3339-wise. *)
   val to_notation : t -> string
 
   (** Conversion to and from "number of seconds since epoch" representation. *)
 
+  (** Make a Protocol time from a number of seconds since the {!epoch}. *)
   val of_seconds : int64 -> t
 
+  (** Convert a Protocol time into a number of seconds since the {!epoch}. *)
   val to_seconds : t -> int64
 
-  (** Serialization functions *)
+  (** {2 Serialization functions} *)
 
+  (** Binary and JSON encoding.
+
+      Binary is always encoding/decoding as [int64].
+
+      JSON is more complex (for backward compatibility and user-friendliness):
+      - encoding uses the RFC3339 format (e.g., ["1970-01-01T00:00:00Z"]) if the year
+        is between 0000 and 9999 (RFC3339-compatible); otherwise it uses the [int64] format
+      - decoding tries to decode as an RFC3339 notation, and if it fails, it decodes as
+        [int64].
+       *)
   val encoding : t Data_encoding.t
 
-  (* Note: the RFC has a different range than the internal representation.
-     Specifically, the RFC can only represent times from 0000-00-00 and
-     9999-12-31 (inclusive). The rfc-encoding fails for dates outside of this
+  (** Note: the RFC has a different range than the internal representation.
+     Specifically, the RFC can only represent times between 0000-00-00 and
+     9999-12-31 (inclusive). The RFC-encoding fails for dates outside of this
      range.
 
      For this reason, it is preferable to use {!encoding} and only resort to
@@ -99,12 +129,12 @@ module Protocol : sig
 
   val rpc_arg : t RPC_arg.t
 
-  (** Pretty-printing functions *)
+  (** {2 Pretty-printing functions} *)
 
-  (* Pretty print as a number of seconds after epoch. *)
+  (** Pretty print as a number of seconds after epoch. *)
   val pp : Format.formatter -> t -> unit
 
-  (* Note: pretty-printing uses the rfc3999 for human-readability. As mentioned
+  (** Note: pretty-printing uses the RFC3339 for human-readability. As mentioned
      in the comment on {!rfc_encoding}, this representation fails when given
      dates too far in the future (after 9999-12-31) or the past (before
      0000-00-00).
@@ -114,7 +144,7 @@ module Protocol : sig
 end
 
 module System : sig
-  (** {1:System time} *)
+  (** {1 System time} *)
 
   (** A representation of timestamps.
 
@@ -127,6 +157,7 @@ module System : sig
 
   type t = Ptime.t
 
+  (** Unix epoch is 1970-01-01 00:00:00.000000000000 UTC *)
   val epoch : t
 
   module Span : sig
@@ -141,7 +172,7 @@ module System : sig
         span cannot be represented. *)
     val of_seconds_exn : float -> t
 
-    (** Serialization functions *)
+    (** {2 Serialization functions} *)
 
     val rpc_arg : t RPC_arg.t
 
@@ -150,24 +181,43 @@ module System : sig
     val encoding : t Data_encoding.t
   end
 
-  (** Conversions to and from Protocol time. Note that converting system time to
-      protocol time truncates any subsecond precision.  *)
+  (** {2 Conversions to and from Protocol time} *)
 
+  (** Note that converting system time to protocol time truncates any subsecond precision. *)
+
+  (** Convert a Protocol time into a System time.
+
+      Return [None] if the Protocol time is outside the RFC3339 range. *)
   val of_protocol_opt : Protocol.t -> t option
 
+  (** Convert a Protocol time into a System time.
+
+      Raises [Invalid_argument] if the Protocol time is outside the RFC3339 range. *)
   val of_protocol_exn : Protocol.t -> t
 
+  (** Convert a System time into a Protocol time.
+
+      Note that subseconds are truncated. *)
   val to_protocol : t -> Protocol.t
 
-  (** Conversions to and from string. It uses rfc3339. *)
+  (** {2 Conversions to and from string (using RFC3339)} *)
 
+  (** Convert a string in the RFC3339 format (e.g., ["1970-01-01T00:00:00.000-00:00"]) into a system time.
+      Invalid RFC3339 notations will return [None].
+
+      Note that years outside the 0000-9999 range are invalid RFC3339-wise. *)
   val of_notation_opt : string -> t option
 
+  (** Convert a string in the RFC3339 format (e.g., ["1970-01-01T00:00:00.000-00:00"]) into a system time.
+      Invalid RFC3339 notations will raise [Invalid_argument].
+
+      Note that years outside the 0000-9999 range are invalid RFC3339-wise. *)
   val of_notation_exn : string -> t
 
+  (** Convert a system time into an RFC3339 notation (e.g., ["1970-01-01T00:00:00.000-00:00"]). *)
   val to_notation : t -> string
 
-  (** Serialization. *)
+  (** {2 Serialization} *)
 
   val encoding : t Data_encoding.t
 
@@ -175,11 +225,11 @@ module System : sig
 
   val rpc_arg : t RPC_arg.t
 
-  (** Pretty-printing *)
+  (** {2 Pretty-printing} *)
 
   val pp_hum : Format.formatter -> t -> unit
 
-  (** Timestamping data. *)
+  (** {2 Timestamping data} *)
 
   (** Data with an associated time stamp. *)
   type 'a stamped = {data : 'a; stamp : t}
@@ -196,7 +246,7 @@ module System : sig
       timestamp), or [None] if both [a] and [b] are [None]. *)
   val recent : ('a * t) option -> ('a * t) option -> ('a * t) option
 
-  (** Helper modules *)
+  (** {2 Helper modules} *)
 
   val hash : t -> int
 

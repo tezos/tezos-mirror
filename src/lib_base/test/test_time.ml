@@ -81,6 +81,19 @@ module Protocol = struct
         let j = Data_encoding.Json.construct encoding t in
         let tt = Data_encoding.Json.destruct encoding j in
         Crowbar.check_eq ~pp ~eq:equal t tt)
+
+  let () =
+    Crowbar.add_test
+      ~name:"Base.Time.Protocol.to_notation roundtrip"
+      [Crowbar.range 1000]
+      (fun i ->
+        let close_to_epoch = add epoch (Int64.neg @@ Int64.of_int i) in
+        let s = to_notation close_to_epoch in
+        match of_notation s with
+        | None ->
+            Crowbar.fail "Failed to roundtrip notation"
+        | Some after_roundtrip ->
+            Crowbar.check_eq ~pp ~eq:equal close_to_epoch after_roundtrip)
 end
 
 module System = struct
