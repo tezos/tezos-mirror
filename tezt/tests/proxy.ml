@@ -351,23 +351,26 @@ module Location = struct
 
   let block_id = "head"
 
+  let log_line_prefix =
+    Re.Str.regexp "[A-Z][a-z]+[ 0-9:\\.]+ - proxy_rpc_ctxt: +"
+
   (** [output] is the output of executing [rpc get rpc_path] *)
   let parse_rpc_exec_location ?query_string output rpc_path =
-    let re prefix suffix =
+    let log = Re.Str.global_replace log_line_prefix "" output in
+    let re prefix =
       let re_str =
         Printf.sprintf
-          "proxy_rpc_ctxt: %s [a-zA-Z_]+ [A-Z]+ %s %s"
+          "%s[ a-zA-Z]*: [A-Z]+\\(\n\\| \\)%s"
           prefix
           ( Re.Str.quote
           @@ Client.rpc_path_query_to_string ?query_string rpc_path )
-          suffix
       in
       Re.Str.regexp re_str
     in
-    let re_local = re "Done" "locally" in
-    let re_http = re "Delegating" "to http" in
-    if matches re_local output then Local
-    else if matches re_http output then Distant
+    let re_local = re "locally done" in
+    let re_http = re "delegating to http" in
+    if matches re_local log then Local
+    else if matches re_http log then Distant
     else Unknown
 
   (** Calls [rpc get] on the given [client] but specifies an alternative

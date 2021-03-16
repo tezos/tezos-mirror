@@ -24,10 +24,7 @@
 (*****************************************************************************)
 
 module Service = RPC_service
-
-module L = Internal_event.Legacy_logging.Make (struct
-  let name = "proxy_rpc_ctxt"
-end)
+module Events = Proxy_events
 
 let rec print_path : type pr p. (pr, p) Resto.Internal.path -> string list =
  fun path ->
@@ -68,16 +65,16 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
   let dispatch_local_or_distant ~debug_name ~local ~distant meth path =
     let meth_string = RPC_service.string_of_meth meth in
     let delegate () =
-      L.debug "Delegating %s %s %s to http" meth_string debug_name path ;
-      distant ()
+      Events.(emit delegate_to_http) (meth_string, debug_name, path)
+      >>= distant
     in
     if method_is_writer meth then delegate ()
     else
       local ()
       >>= function
       | Ok x ->
-          L.debug "Done %s %s %s locally" meth_string debug_name path ;
-          return x
+          Events.(emit done_locally) (meth_string, debug_name, path)
+          >>= fun () -> return x
       | Error [Tezos_rpc.RPC_context.Not_found _] ->
           delegate ()
       | Error _ as err ->
@@ -145,11 +142,8 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
         let meth_string = RPC_service.string_of_meth meth in
         let uri_string = Uri.to_string uri in
         let delegate () =
-          L.debug
-            "Delegating generic_json_call %s %s to http"
-            meth_string
-            uri_string ;
-          http_ctxt#generic_json_call meth ?body uri
+          Events.(emit delegate_json_call_to_http) (meth_string, uri_string)
+          >>= fun () -> http_ctxt#generic_json_call meth ?body uri
         in
         if method_is_writer meth then delegate ()
         else
@@ -159,11 +153,8 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
           | Ok (`Not_found _) | Error [Tezos_rpc.RPC_context.Not_found _] ->
               delegate ()
           | Ok x ->
-              L.debug
-                "Done generic_json_call %s %s locally"
-                meth_string
-                uri_string ;
-              return x
+              Events.(emit done_json_call_locally) (meth_string, uri_string)
+              >>= fun () -> return x
           | Error _ as err ->
               Lwt.return err
   end
