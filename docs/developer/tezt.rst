@@ -45,6 +45,11 @@ And here is how to get the list of tests and their tags::
 
     dune exec tezt/tests/main.exe -- --list
 
+To speed things up, you can run tests in parallel.
+Use ``parallel-tezt.Makefile`` and specify the number of parallel jobs with ``-j``::
+
+    make --makefile parallel-tezt.Makefile --jobs 8
+
 Regression Tests
 ----------------
 

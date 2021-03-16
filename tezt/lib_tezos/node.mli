@@ -83,7 +83,8 @@ type t
     as a named pipe so that node events can be received.
 
     Default values for [net_port] or [rpc_port] are chosen automatically
-    with values starting from 19732. They are used by [config_init]
+    with values starting from 16384 (configurable with `--starting-port`).
+    They are used by [config_init]
     and by functions from the [Client] module. They are not used by [run],
     so if you do not call [config_init] or generate the configuration file
     through some other means, your node will not listen.

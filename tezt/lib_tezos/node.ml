@@ -98,13 +98,15 @@ let rpc_port node = node.persistent_state.rpc_port
 
 let data_dir node = node.persistent_state.data_dir
 
-let next_port = ref 19732
+let next_port = ref Cli.options.starting_port
 
 let fresh_port () =
   let port = !next_port in
   incr next_port ; port
 
-let () = Test.declare_reset_function @@ fun () -> next_port := 19732
+let () =
+  Test.declare_reset_function
+  @@ fun () -> next_port := Cli.options.starting_port
 
 let spawn_command node =
   Process.spawn ~name:node.name ~color:node.color node.path

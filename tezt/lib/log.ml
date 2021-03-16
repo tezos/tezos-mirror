@@ -49,7 +49,8 @@ let channel =
         test_timeout = _;
         reset_regressions = _;
         loop = _;
-        time = _ } =
+        time = _;
+        starting_port = _ } =
     Cli.options
   in
   match list with None -> stdout | Some (`Ascii_art | `Tsv) -> stderr
