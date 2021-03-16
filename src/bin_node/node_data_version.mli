@@ -27,6 +27,7 @@
 type t
 
 (** Errors related to checks related to the data dir. *)
+type error += Invalid_data_dir of string
 
 type error += Invalid_data_dir_version of t * t
 
