@@ -145,7 +145,7 @@ let commands () =
                     Scriptable.output_row
                       scriptable
                       ~for_human:(fun () ->
-                        cctxt#message "Unknown: %s" path >>= fun () ->
+                        cctxt#error "Unknown: %s" path >>= fun () ->
                         Lwt_stream.iter_s
                           (fun line -> cctxt#message "    |%s" line)
                           (Lwt_io.lines_of_file path)
@@ -201,7 +201,7 @@ let commands () =
                 Scriptable.output
                   scriptable
                   ~for_human:(fun () ->
-                    cctxt#message
+                    cctxt#warning
                       "### Some things were not perfect:@.@[<2>%a@]"
                       (pp_print_list
                          ~pp_sep:(fun fmt () -> fprintf fmt "@.")
