@@ -16,7 +16,6 @@ check_opam_deps:
   extends: .build_template
   script:
     - ./scripts/opam-check.sh
-  allow_failure: true # This check currently timesout, a fix is in the work
   timeout: 10m # if it takes more than 10 minutes, then it'll just timeout after 1h
 
 check_opam_lint:
