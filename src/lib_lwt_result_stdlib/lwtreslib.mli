@@ -246,6 +246,18 @@ List.iter_ep
 
     The module [WithExceptions] provides some exception-raising helpers to
     reduce the boilerplate that the library imposes.
+
+    {2 Comparison, Equality, etc.}
+
+    When a function requires a comparison function, it takes a [compare] named
+    parameter. This must define a total order as described in
+    {!Stdlib.Map.OrderedType}.
+
+    Note that the polymorphic structural comparison {!Stdlib.compare} is unsound
+    for comparing some values; notably, it may fail when comparing
+    data-structures that include functions or closures.
+
+    Similarly and for the same reason, some functions take an [equal] function.
 *)
 module Bare : sig
   module Hashtbl : Bare_sigs.Hashtbl.S

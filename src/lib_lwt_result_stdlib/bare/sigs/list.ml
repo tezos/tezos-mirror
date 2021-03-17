@@ -144,14 +144,37 @@ module type S = sig
       [predicate x] is [true] or [None] if the list [xs] has no such element. *)
   val find : ('a -> bool) -> 'a list -> 'a option
 
-  (** [assoc k kvs] is [v] such that [(k', v)] is the first pair in the list
-      such that [k' = k] (uses the polymorphic equality) or [None] if the list
-      contains no such pair. *)
-  val assoc : 'a -> ('a * 'b) list -> 'b option
+  (** [mem ~equal a l] is [true] iff there is an element [e] of [l] such that
+      [equal a e]. *)
+  val mem : equal:('a -> 'a -> bool) -> 'a -> 'a list -> bool
 
-  (** [assq k kvs] is the same as [assoc k kvs] but it uses the physical
-      equality. *)
+  (** [assoc ~equal k kvs] is [Some v] such that [(k', v)] is the first pair in
+      the list such that [equal k' k] or [None] if the list contains no such
+      pair. *)
+  val assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
+
+  val assoc_opt : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
+
+  (** [assq k kvs] is the same as [assoc ~equal:Stdlib.( == ) k kvs]: it uses
+      the physical equality. *)
   val assq : 'a -> ('a * 'b) list -> 'b option
+
+  val assq_opt : 'a -> ('a * 'b) list -> 'b option
+
+  (** [mem_assoc ~equal k l] is equivalent to
+      [Option.is_some @@ assoc ~equal k l]. *)
+  val mem_assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> bool
+
+  (** [mem_assq k l] is [mem_assoc ~equal:Stdlib.( == ) k l]. *)
+  val mem_assq : 'a -> ('a * 'b) list -> bool
+
+  (** [remove_assoc ~equal k l] is [l] without the first element [(k', _)] such
+      that [equal k k']. *)
+  val remove_assoc :
+    equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> ('a * 'b) list
+
+  (** [remove_assoq k l] is [remove_assoc ~equal:Stdlib.( == ) k l]. *)
+  val remove_assq : 'a -> ('a * 'b) list -> ('a * 'b) list
 
   (** {4 Initialisation} *)
 
@@ -776,4 +799,10 @@ module type S = sig
     'a list ->
     'b list ->
     ('a * 'b) list * [`Left of 'a list | `Right of 'b list] option
+
+  (** {3 compare / equal} *)
+
+  val compare : ('a -> 'a -> int) -> 'a list -> 'a list -> int
+
+  val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 end

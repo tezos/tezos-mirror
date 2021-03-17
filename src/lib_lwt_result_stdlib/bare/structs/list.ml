@@ -156,9 +156,33 @@ let exists2 ~when_different_lengths f xs ys =
   in
   aux xs ys
 
-let assoc = assoc_opt
+let rec mem ~equal x = function
+  | [] ->
+      false
+  | y :: ys ->
+      equal x y || mem ~equal x ys
+
+let rec assoc ~equal k = function
+  | [] ->
+      None
+  | (kk, v) :: kvs ->
+      if equal k kk then Some v else assoc ~equal k kvs
+
+let assoc_opt = assoc
 
 let assq = assq_opt
+
+let rec mem_assoc ~equal k = function
+  | [] ->
+      false
+  | (kk, _) :: kvs ->
+      equal k kk || mem_assoc ~equal k kvs
+
+let rec remove_assoc ~equal k = function
+  | [] ->
+      []
+  | ((kk, _) as kv) :: kvs ->
+      if equal k kk then kvs else kv :: remove_assoc ~equal k kvs
 
 let init ~when_negative_length l f =
   if l < 0 then Error when_negative_length
@@ -1136,3 +1160,24 @@ let combine_drop xs ys =
         rev rev_combined
   in
   aux [] xs ys
+
+let rec compare ecomp xs ys =
+  match (xs, ys) with
+  | ([], []) ->
+      0
+  | ([], _ :: _) ->
+      -1
+  | (_ :: _, []) ->
+      1
+  | (x :: xs, y :: ys) ->
+      let ec = ecomp x y in
+      if ec = 0 then compare ecomp xs ys else ec
+
+let rec equal eeq xs ys =
+  match (xs, ys) with
+  | ([], []) ->
+      true
+  | ([], _ :: _) | (_ :: _, []) ->
+      false
+  | (x :: xs, y :: ys) ->
+      eeq x y && equal eeq xs ys
