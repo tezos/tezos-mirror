@@ -15,7 +15,6 @@ FLORENCE_LONG = PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
 EDO_LONG      = PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
 
 ALPHA_SHORT    = alpha
-FLOR_BA_SHORT  = 009-PsFLorBA
 FLORENCE_SHORT = 009-PsFLoren
 EDO_SHORT      = 008-PtEdo2Zk
 
@@ -33,11 +32,6 @@ manuals: main
 	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker-alpha.html
 	@../tezos-endorser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-endorser-alpha.html
 	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser-alpha.html
-    # 009 (Florence with baking accounts) protocol
-	@../tezos-client -protocol $(FLOR_BA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009_BA/tezos-client-009.html
-	@../tezos-baker-$(FLOR_BA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009_BA/tezos-baker-009.html
-	@../tezos-endorser-$(FLOR_BA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009_BA/tezos-endorser-009.html
-	@../tezos-accuser-$(FLOR_BA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009_BA/tezos-accuser-009.html
     # 009 (Florence) protocol
 	@../tezos-client -protocol $(FLORENCE_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-client-009.html
 	@../tezos-baker-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-baker-009.html
@@ -77,7 +71,6 @@ redirectcheck:
 xrefscheck:
 	$(CHECKXREFS) 008
 	$(CHECKXREFS) -l 009
-	$(CHECKXREFS) -l 009_BA
 
 scriptsindoccheck:
 	introduction/test_howtoget.sh install-bin-bionic
@@ -105,9 +98,8 @@ $(DOCGENDIR)/rpc_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
-	@dune exec $(DOCGENDIR)/rpc_doc.exe 008 > 008/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 008/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe 009 > 009/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe 009_BA > 009_BA/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe shell > shell/rpc.rst
 
@@ -130,5 +122,5 @@ html: Makefile api/errors.rst rpc p2p
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst 008/rpc.rst 009/rpc.rst 009_BA/rpc.rst shell/rpc.rst shell/p2p_api.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt 008/tezos-*.html 009/tezos-*.html 009_BA/tezos-*.html
+	@-rm -Rf api/errors.rst 008/rpc.rst 009/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt 008/tezos-*.html 009/tezos-*.html

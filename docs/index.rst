@@ -137,7 +137,7 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 009 Florence (No Baking Accounts) doc:
+   :caption: 009 Florence doc:
 
    009/michelson
    009/proof_of_stake
@@ -146,18 +146,6 @@ in the :ref:`introduction <howtoget>`.
    009/glossary
    009/cli-commands
    009/rpc
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 009 Florence with Baking Accounts doc:
-
-   009_BA/michelson
-   009_BA/proof_of_stake
-   009_BA/sapling
-   009_BA/voting
-   009_BA/glossary
-   009_BA/cli-commands
-   009_BA/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -205,7 +193,6 @@ in the :ref:`introduction <howtoget>`.
    protocols/007_delphi
    protocols/008_edo
    protocols/009_florence
-   protocols/009_florence_BA
    protocols/alpha
 
 .. toctree::

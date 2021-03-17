@@ -31,15 +31,11 @@ let protocols =
       "Alpha",
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
-    ( "009_BA",
-      "009 Florence with baking accounts",
-      Some "/include/rpc_introduction.rst.inc",
-      "PsFLorBArSaXjuy9oP76Qv1v2FRYnUs7TFtteK5GkRBC24JvbdE" );
     ( "009",
       "009 Florence",
       Some "/include/rpc_introduction.rst.inc",
       "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" );
-    ( "008",
+    ( "",
       "008 Edo",
       Some "/include/rpc_introduction.rst.inc",
       "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA" ) ]
