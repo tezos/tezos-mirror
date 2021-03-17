@@ -151,13 +151,14 @@ and ('arg, 'storage) script = {
    Second, we maintain the invariant that the stack type always has a
    distinguished topmost element. This invariant is important to
    implement the stack as an accumulator followed by a linked list of
-   cells. This representation is considered in the literature as an
-   efficient representation of the stack for a stack-based abstract
-   machine, mainly because this opens the opportunity for the
-   accumulator to be stored in a hardware register. In the GADT, this
-   invariant is encoded by representing the stack type using two
-   parameters instead of one: the first one is the type of the
-   accumulator while the second is the type of the rest of the stack.
+   cells, a so-called A-Stack. This representation is considered in
+   the literature[1] as an efficient representation of the stack for a
+   stack-based abstract machine, mainly because this opens the
+   opportunity for the accumulator to be stored in a hardware
+   register. In the GADT, this invariant is encoded by representing
+   the stack type using two parameters instead of one: the first one
+   is the type of the accumulator while the second is the type of the
+   rest of the stack.
 
    Third, in this representation, each instruction embeds its
    potential successor instructions in the control flow. This design
@@ -183,14 +184,21 @@ and ('arg, 'storage) script = {
    Hence, an instruction which has a successor instruction enjoys a
    type of the form:
 
-   ('after_top, 'after, 'result_top, 'result) kinstr ->
+   ... * ('after_top, 'after, 'result_top, 'result) kinstr * ... ->
    ('before_top, 'before, 'result_top, 'result) kinstr
 
    where ['before_top] and ['before] are the types of the stack top
    and rest before the instruction chain, ['after_top] and ['after]
    are the types of the stack top and rest after the instruction
    chain, and ['result_top] and ['result] are the types of the stack
-   top and rest after the instruction chain
+   top and rest after the instruction chain. The [IHalt] instruction
+   ends a sequence of instructions and has no successor, as shown by
+   its type:
+
+   IHalt : ('a, 's) kinfo -> ('a, 's, 'a, 's) kinstr
+
+   Each instruction is decorated by some metadata (typically to hold
+   locations). The type for these metadata is [kinfo].
 
    Notations:
    ----------
@@ -206,7 +214,7 @@ and ('arg, 'storage) script = {
    Instructions for internal execution steps
    =========================================
 
-   Some instructions of the following list are not present in the
+   Some instructions encoded in the following type are not present in the
    source language. They only appear during evaluation to account for
    intermediate execution steps. Indeed, since the interpreter follows
    a small-step style, it is sometimes necessary to decompose a
@@ -217,6 +225,10 @@ and ('arg, 'storage) script = {
    References
    ==========
 
+   [1]: http://www.complang.tuwien.ac.at/projects/interpreters.html
+
+   References
+   ==========
    [1]: http://www.complang.tuwien.ac.at/projects/interpreters.html
 
 *)
@@ -283,9 +295,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('b, 's, 'r, 'f) kinstr
   | IIf_left :
       (('a, 'b) union, 's) kinfo
-      (* Notice that the continuations of the following two
-         instructions should have a shared suffix to avoid code
-         duplication. *)
+      (* See remark in IIf_none. *)
       * ('a, 's, 'r, 'f) kinstr
       * ('b, 's, 'r, 'f) kinstr
       -> (('a, 'b) union, 's, 'r, 'f) kinstr
@@ -301,9 +311,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_cons :
       ('a boxed_list, 'b * 's) kinfo
-      (* Notice that the continuations of the following two
-         instructions should have a shared suffix to avoid code
-         duplication. *)
+      (* See remark in IIf_none. *)
       * ('a, 'a boxed_list * ('b * 's), 'r, 'f) kinstr
       * ('b, 's, 'r, 'f) kinstr
       -> ('a boxed_list, 'b * 's, 'r, 'f) kinstr
@@ -586,9 +594,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IIf :
       (bool, 'a * 's) kinfo
-      (* Notice that the continuations of the following two
-         instructions should have a shared suffix to avoid code
-         duplication. *)
+      (* See remark in IIf_none. *)
       * ('a, 's, 'r, 'f) kinstr
       * ('a, 's, 'r, 'f) kinstr
       -> (bool, 'a * 's, 'r, 'f) kinstr
@@ -998,8 +1004,10 @@ and ('value, 'before, 'after) comb_set_gadt_witness =
 
 (*
 
-   [dup_n_gadt_witness ('s, 't)] ensures that the n-th element of ['s]
-   is of type ['t].
+   [dup_n_gadt_witness ('s, 't)] ensures that there exists at least
+   [n] elements in ['s] and that the [n]-th element of ['s] is of type
+   ['t]. Here [n] follows Peano's encoding (0 and successor).
+   Besides, [0] corresponds to the topmost element of ['s].
 
    This relational predicate is defined by induction on [n].
 

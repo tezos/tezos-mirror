@@ -209,12 +209,14 @@ module Internals : sig
   (** Internally, the interpretation loop uses a local gas counter. *)
   type local_gas_counter = int
 
-  (** During the evaluation, the gas level in the context is outdated. *)
+  (** During the evaluation, the gas level in the context is outdated.
+      See comments in the implementation file for more details. *)
   type outdated_context = OutDatedContext of context [@@unboxed]
 
-  (** [run logger ctxt step_constants local_gas_counter i k ks accu stack]
-    evaluates [k] (having [i] as predecessor) under the control flow
-    stack [ks] and the A-stack represented by [accu] and [stack]. *)
+  (** [run logger (ctxt, step_constants) local_gas_counter i k ks accu
+     stack] evaluates instruction [k] (having [i] as predecessor)
+     under the control flow stack [ks] and the A-stack represented by
+     [accu] and [stack]. *)
   val run :
     logger option ->
     outdated_context * step_constants ->
@@ -226,6 +228,9 @@ module Internals : sig
     's ->
     ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
+  (** [next logger (ctxt, step_constants) local_gas_counter ks accu
+      stack] is an internal function which interprets the continuation
+      [ks] to execute the interpreter on the current A-stack. *)
   val next :
     logger option ->
     outdated_context * step_constants ->

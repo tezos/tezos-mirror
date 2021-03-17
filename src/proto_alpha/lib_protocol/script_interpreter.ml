@@ -42,7 +42,7 @@
     their outputs.
 
   In addition, the machine has access to effectful primitives to interact
-  with the execution environment (e.g. the tezos node). These primitives
+  with the execution environment (e.g. the Tezos node). These primitives
   live in the [Lwt+State+Error] monad. Hence, this interpreter produces
   a computation in the [Lwt+State+Error] monad.
 
@@ -50,7 +50,7 @@
 
   - The interpreter is tail-recursive, hence it is robust to stack
     overflow. This property is checked by the compiler thanks to the
-    [@ocaml.tailcall] annotation of each recursive calls.
+    [@ocaml.tailcall] annotation of each recursive call.
 
   - The interpreter is type-preserving. Thanks to GADTs, the
     typing rules of Michelson are statically checked by the OCaml
@@ -206,24 +206,24 @@ let () =
   Control stack
   =============
 
-  The stack of control is a list of [kinstr]. This type is documented
+  The control stack is a list of [kinstr]. This type is documented
   in the module [Script_typed_ir].
 
-  Since [kinstr] denotes a list  of instructions, the stack of control
-  can be seen as a list  of instruction sequences, each representing a
-  form of delimited continuation (i.e.  a control stack fragment). The
-  [continuation] GADT  ensures that the input  and output stack types  of the
+  Since [kinstr] denotes a list  of instructions, the control stack
+  can be seen as a list of instruction sequences, each representing a
+  form of delimited continuation (i.e. a control stack fragment). The
+  [continuation] GADT ensures that the input and output stack types of the
   continuations are consistent.
 
   Loops have a special treatment because their control stack is reused
   as is during the next iteration. This avoids the reallocation of a
   control stack cell at each iteration.
 
-  Higher-order iterators (i.e. MAPs and ITERs) need internal instructions
-  to implement [step] as a tail-recursive function. Roughly speaking,
-  these instructions help in decomposing the execution of [I f c]
-  (where [I] is an higher-order iterator over a container [c]) into
-  three phases: to start the iteration, to execute [f] if there are
+  To implement [step] as a tail-recursive function, we implement
+  higher-order iterators (i.e. MAPs and ITERs) using internal instructions
+. Roughly speaking, these instructions help in decomposing the execution
+  of [I f c] (where [I] is an higher-order iterator over a container [c])
+  into three phases: to start the iteration, to execute [f] if there are
   elements to be processed in [c], and to loop.
 
   Dip also has a dedicated constructor in the control stack.  This
@@ -241,25 +241,40 @@ let () =
 
 *)
 type (_, _, _, _) continuation =
+  (* This continuation returns immediately. *)
   | KNil : ('r, 'f, 'r, 'f) continuation
+  (* This continuation starts with the next instruction to execute. *)
   | KCons :
       ('a, 's, 'b, 't) kinstr * ('b, 't, 'r, 'f) continuation
       -> ('a, 's, 'r, 'f) continuation
+  (* This continuation represents a call frame: it stores the caller's
+     stack of type ['s] and the continuation which expects the callee's
+     result on top of the stack. *)
   | KReturn :
       's * ('a, 's, 'r, 'f) continuation
       -> ('a, end_of_stack, 'r, 'f) continuation
+  (* This continuation comes right after a [Dip i] to restore the topmost
+     element ['b] of the stack after having executed [i] in the substack
+     of type ['a * 's]. *)
   | KUndip :
       'b * ('b, 'a * 's, 'r, 'f) continuation
       -> ('a, 's, 'r, 'f) continuation
+  (* This continuation is executed at each iteration of a loop with
+     a Boolean condition. *)
   | KLoop_in :
       ('a, 's, bool, 'a * 's) kinstr * ('a, 's, 'r, 'f) continuation
       -> (bool, 'a * 's, 'r, 'f) continuation
+  (* This continuation is executed at each iteration of a loop with
+     a condition encoded by a sum type. *)
   | KLoop_in_left :
       ('a, 's, ('a, 'b) union, 's) kinstr * ('b, 's, 'r, 'f) continuation
       -> (('a, 'b) union, 's, 'r, 'f) continuation
+  (* This continuation is executed at each iteration of a traversal.
+     (Used in List, Map and Big_map.) *)
   | KIter :
       ('a, 'b * 's, 'b, 's) kinstr * 'a list * ('b, 's, 'r, 'f) continuation
       -> ('b, 's, 'r, 'f) continuation
+  (* This continuation represents each step of a List.map. *)
   | KList_mapping :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
@@ -267,6 +282,7 @@ type (_, _, _, _) continuation =
       * int
       * ('b boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('c, 's, 'r, 'f) continuation
+  (* This continuation represents what is done after each step of a List.map. *)
   | KList_mapped :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
@@ -274,12 +290,14 @@ type (_, _, _, _) continuation =
       * int
       * ('b boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('b, 'c * 's, 'r, 'f) continuation
+  (* This continuation represents each step of a Map.map. *)
   | KMap_mapping :
       ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * ('a * 'b) list
       * ('a, 'c) map
       * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
       -> ('d, 's, 'r, 'f) continuation
+  (* This continuation represents what is done after each step of a Map.map. *)
   | KMap_mapped :
       ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * ('a * 'b) list
@@ -500,7 +518,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let (ticket_a, ticket_b) = accu in
       Interp_costs.join_tickets ty ticket_a ticket_b
   | IHalt _ ->
-      (* FIXME *)
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | IDrop _ ->
       Interp_costs.drop
@@ -722,7 +740,7 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
    =======================================
 
    Each instruction has a cost. The runtime subtracts this cost
-   to an amount of gas made available for the script execution.
+   from an amount of gas made available for the script execution.
 
    Updating the gas counter is a critical aspect to Michelson
    execution because it is done at each execution step.
@@ -748,7 +766,7 @@ type local_gas_counter = int
    function, the [local_gas_counter] must be updated as well.
 
    To statically track these points where the context's gas counter
-   must be updated, we introduce a type for outdated contexts.  The
+   must be updated, we introduce a type for outdated contexts. The
    [step] function carries an [outdated_context]. When an external
    function needs a [context], the typechecker points out the need for
    a conversion: this forces us to either call [update_context], or
@@ -785,7 +803,7 @@ let use_gas_counter_in_ctxt ctxt local_gas_counter f =
 
    [consume'] is used in the implementation of [IConcat_string]
    and [IConcat_bytes] because in that special cases, the cost
-   is expressed with respec to the final result of the concatenation.
+   is expressed with respect to the final result of the concatenation.
 
 *)
 
