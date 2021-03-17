@@ -23,19 +23,76 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Overlay for simple events that allows us to retrieve the level. *)
+
+let section = ["node"; "config"; "validation"]
+
+module E : sig
+  type 'a t
+
+  val level : 'a t -> Internal_event.level
+
+  val event : 'a t -> 'a Internal_event.Simple.t
+
+  val declare_1 :
+    name:string ->
+    msg:string ->
+    level:Internal_event.level ->
+    string * 'a Data_encoding.t ->
+    'a t
+
+  val declare_2 :
+    name:string ->
+    msg:string ->
+    level:Internal_event.level ->
+    string * 'a Data_encoding.t ->
+    string * 'b Data_encoding.t ->
+    ('a * 'b) t
+
+  val declare_3 :
+    name:string ->
+    msg:string ->
+    level:Internal_event.level ->
+    string * 'a Data_encoding.t ->
+    string * 'b Data_encoding.t ->
+    string * 'c Data_encoding.t ->
+    ('a * 'b * 'c) t
+end = struct
+  type 'a t = {
+    level : Internal_event.Level.t;
+    event : 'a Internal_event.Simple.t;
+  }
+
+  let level {level; _} = level
+
+  let event {event; _} = event
+
+  let declare_1 ~name ~msg ~level x =
+    {
+      level;
+      event = Internal_event.Simple.declare_1 ~section ~name ~msg ~level x;
+    }
+
+  let declare_2 ~name ~msg ~level x y =
+    {
+      level;
+      event = Internal_event.Simple.declare_2 ~section ~name ~msg ~level x y;
+    }
+
+  let declare_3 ~name ~msg ~level x y z =
+    {
+      level;
+      event = Internal_event.Simple.declare_3 ~section ~name ~msg ~level x y z;
+    }
+end
+
 (* The type for a node configuration warning/error. *)
 
-type alert =
-  | Alert : {
-      event : level:Internal_event.Level.t -> 'a Internal_event.Simple.t;
-      level : Internal_event.Level.t;
-      payload : 'a;
-    }
-      -> alert
+type alert = Alert : {event : 'a E.t; payload : 'a} -> alert
 
-let is_error (Alert {level; _}) = level = Error
+let is_error (Alert {event; _}) = E.level event = Error
 
-let is_warning (Alert {level; _}) = level = Warning
+let is_warning (Alert {event; _}) = E.level event = Warning
 
 (* Errors *)
 
@@ -67,12 +124,12 @@ let has_error t = List.exists is_error t
 let has_warning t = List.exists is_warning t
 
 module Event = struct
-  include Internal_event.Simple
+  open Internal_event.Simple
 
-  let section = ["node"; "config"; "validation"]
+  let emit = emit
 
   let disabled_event =
-    Internal_event.Simple.declare_0
+    declare_0
       ~section
       ~name:"node_config_validation_disabled"
       ~msg:"the node configuration validation is disabled."
@@ -80,7 +137,7 @@ module Event = struct
       ()
 
   let success_event =
-    Internal_event.Simple.declare_0
+    declare_0
       ~section
       ~name:"node_config_validation_success"
       ~msg:"the node configuration has been successfully validated."
@@ -88,7 +145,7 @@ module Event = struct
       ()
 
   let error_event =
-    Internal_event.Simple.declare_0
+    declare_0
       ~section
       ~name:"node_config_validation_error"
       ~msg:
@@ -97,7 +154,7 @@ module Event = struct
       ()
 
   let warning_event =
-    Internal_event.Simple.declare_0
+    declare_0
       ~section
       ~name:"node_config_validation_warning"
       ~msg:
@@ -108,7 +165,7 @@ module Event = struct
 
   let emit_all t =
     Lwt_list.iter_s
-      (function Alert {level; event; payload} -> emit (event ~level) payload)
+      (function Alert {event; payload} -> emit (E.event event) payload)
       t
 
   let report t =
@@ -127,23 +184,22 @@ module Event = struct
         emit warning_event () >>= fun () -> emit_all xs
 end
 
-let mk_alert ~event ~level ~payload = Alert {event; level; payload}
+let mk_alert ~event ~payload = Alert {event; payload}
 
-let when_ condition ~event ~level ~payload =
-  if not condition then [] else [mk_alert ~event ~level ~payload]
+let when_ condition ~event ~payload =
+  if not condition then [] else [mk_alert ~event ~payload]
 
-let unless condition ~event ~level ~payload =
-  if condition then [] else [mk_alert ~event ~level ~payload]
+let unless condition ~event ~payload =
+  if condition then [] else [mk_alert ~event ~payload]
 
 (* The following parts consist in node configuration validations. *)
 
 (* Validate expected proof-of-work. *)
 
-let invalid_pow ~level =
-  Internal_event.Simple.declare_1
-    ~section:Event.section
+let invalid_pow =
+  E.declare_1
     ~name:"invalid_pow"
-    ~level
+    ~level:Error
     ~msg:
       (Format.sprintf
          "the expected proof-of-work must be between 0 and 256 (inclusive), \
@@ -156,59 +212,51 @@ let validate_expected_pow (config : Node_config_file.t) : t tzresult Lwt.t =
     unless
       (0. <= config.p2p.expected_pow && config.p2p.expected_pow <= 256.)
       ~event:invalid_pow
-      ~level:Error
       ~payload:config.p2p.expected_pow
   in
   return t
 
 (* Validate addresses. *)
 
-let cannot_parse_addr ~level =
-  Internal_event.Simple.declare_3
-    ~section:Event.section
+let cannot_parse_addr =
+  E.declare_3
     ~name:"cannot_parse_addr"
     ~msg:"failed to parse address '{addr}' in field '{field}': {why}."
-    ~level
+    ~level:Error
     ("addr", Data_encoding.string)
     ("field", Data_encoding.string)
     ("why", Data_encoding.string)
 
-let cannot_resolve_addr ~level =
-  Internal_event.Simple.declare_2
-    ~section:Event.section
+let cannot_resolve_addr =
+  E.declare_2
     ~name:"cannot_resolve_addr"
     ~msg:"failed to resolve address '{addr}' in field '{field}'."
-    ~level
+    ~level:Warning
     ("addr", Data_encoding.string)
     ("field", Data_encoding.string)
 
-let validate_addr ~level ~field ~addr ~resolver =
+let validate_addr ~field ~addr ~resolver =
   resolver addr
   >>= function
   | Error [Node_config_file.Failed_to_parse_address (addr, why)] ->
       return_some
-        (mk_alert
-           ~event:cannot_parse_addr
-           ~level:Error
-           ~payload:(addr, field, why))
+        (mk_alert ~event:cannot_parse_addr ~payload:(addr, field, why))
   | Ok [] ->
-      return_some
-        (mk_alert ~event:cannot_resolve_addr ~level ~payload:(addr, field))
+      return_some (mk_alert ~event:cannot_resolve_addr ~payload:(addr, field))
   | Ok _ ->
       return_none
   | Error _ as e ->
       Lwt.return e
 
-let validate_addr_opt ~field ~level ~addr ~resolver =
+let validate_addr_opt ~field ~addr ~resolver =
   Option.fold addr ~none:return_none ~some:(fun addr ->
-      validate_addr ~field ~level ~addr ~resolver)
+      validate_addr ~field ~addr ~resolver)
   >|=? Option.to_list
 
 let validate_rpc_listening_addrs (config : Node_config_file.t) =
   let aux addr =
     validate_addr
       ~field:"rpc.listen-addrs"
-      ~level:Warning
       ~addr
       ~resolver:Node_config_file.resolve_rpc_listening_addrs
   in
@@ -217,20 +265,18 @@ let validate_rpc_listening_addrs (config : Node_config_file.t) =
 let validate_p2p_listening_addrs (config : Node_config_file.t) =
   validate_addr_opt
     ~field:"p2p.listen-addr"
-    ~level:Warning
     ~addr:config.p2p.listen_addr
     ~resolver:Node_config_file.resolve_listening_addrs
 
 let validate_p2p_discovery_addr (config : Node_config_file.t) =
   validate_addr_opt
     ~field:"p2p.discovery-addr"
-    ~level:Warning
     ~addr:config.p2p.discovery_addr
     ~resolver:Node_config_file.resolve_discovery_addrs
 
 let validate_p2p_bootstrap_addrs ~field peers =
   let aux addr =
-    validate_addr ~level:Warning ~field ~addr ~resolver:(fun x ->
+    validate_addr ~field ~addr ~resolver:(fun x ->
         Node_config_file.resolve_bootstrap_addrs [x])
   in
   List.filter_map_ep aux peers
@@ -255,11 +301,10 @@ let validate_addresses config : t tzresult Lwt.t =
 
 (* Validate connections setup. *)
 
-let connections_min_expected ~level =
-  Internal_event.Simple.declare_2
-    ~section:Event.section
+let connections_min_expected =
+  E.declare_2
     ~name:"minimum_connections_greater_than_expected"
-    ~level
+    ~level:Error
     ~msg:
       (Format.sprintf
          "the minimum number of connections found in field '%s' ({minimum}) \
@@ -270,11 +315,10 @@ let connections_min_expected ~level =
     ("minimum", Data_encoding.int16)
     ("expected", Data_encoding.int16)
 
-let connections_expected_max ~level =
-  Internal_event.Simple.declare_2
-    ~section:Event.section
+let connections_expected_max =
+  E.declare_2
     ~name:"expected_connections_greater_than_maximum"
-    ~level
+    ~level:Error
     ~msg:
       (Format.sprintf
          "the expected number of connections found in field '%s' ({expected}) \
@@ -285,11 +329,10 @@ let connections_expected_max ~level =
     ("expected", Data_encoding.int16)
     ("maximum", Data_encoding.int16)
 
-let target_number_of_known_peers_greater_than_maximum ~level =
-  Internal_event.Simple.declare_2
-    ~section:Event.section
+let target_number_of_known_peers_greater_than_maximum =
+  E.declare_2
     ~name:"target_number_of_known_peers_greater_than_maximum"
-    ~level
+    ~level:Error
     ~msg:
       (Format.sprintf
          "in field '%s', the target number of known peer ids ({target}) is \
@@ -298,11 +341,10 @@ let target_number_of_known_peers_greater_than_maximum ~level =
     ("target", Data_encoding.int16)
     ("maximum", Data_encoding.int16)
 
-let target_number_of_known_peers_lower_than_maximum_conn ~level =
-  Internal_event.Simple.declare_2
-    ~section:Event.section
+let target_number_of_known_peers_lower_than_maximum_conn =
+  E.declare_2
     ~name:"target_number_of_known_peers_greater_than_maximum_conn"
-    ~level
+    ~level:Error
     ~msg:
       (Format.sprintf
          "the target number of known peer ids ({target}) in field '%s', is \
@@ -313,11 +355,10 @@ let target_number_of_known_peers_lower_than_maximum_conn ~level =
     ("target", Data_encoding.int16)
     ("maximum", Data_encoding.int16)
 
-let target_number_of_known_points_greater_than_maximum ~level =
-  Internal_event.Simple.declare_2
-    ~section:Event.section
+let target_number_of_known_points_greater_than_maximum =
+  E.declare_2
     ~name:"target_number_of_known_points_greater_than_maximum"
-    ~level
+    ~level:Error
     ~msg:
       (Format.sprintf
          "in field '%s', the target number of known point ids ({target}) is \
@@ -326,11 +367,10 @@ let target_number_of_known_points_greater_than_maximum ~level =
     ("target", Data_encoding.int16)
     ("maximum", Data_encoding.int16)
 
-let target_number_of_known_points_lower_than_maximum_conn ~level =
-  Internal_event.Simple.declare_2
-    ~section:Event.section
+let target_number_of_known_points_lower_than_maximum_conn =
+  E.declare_2
     ~name:"target_number_of_known_points_greater_than_maximum_conn"
-    ~level
+    ~level:Error
     ~msg:
       (Format.sprintf
          "the target number of known point ids ({target}) found in field '%s' \
@@ -345,12 +385,10 @@ let validate_connections (config : Node_config_file.t) =
   let limits = config.p2p.limits in
   when_
     (limits.min_connections > limits.expected_connections)
-    ~level:Error
     ~event:connections_min_expected
     ~payload:(limits.min_connections, limits.expected_connections)
   @ when_
       (limits.expected_connections > limits.max_connections)
-      ~level:Error
       ~event:connections_expected_max
       ~payload:(limits.expected_connections, limits.max_connections)
   @ Option.fold
@@ -360,12 +398,10 @@ let validate_connections (config : Node_config_file.t) =
         when_
           (target_known_peer_ids > max_known_peer_ids)
           ~event:target_number_of_known_peers_greater_than_maximum
-          ~level:Error
           ~payload:(target_known_peer_ids, max_known_peer_ids)
         @ when_
             (limits.max_connections > target_known_peer_ids)
             ~event:target_number_of_known_peers_lower_than_maximum_conn
-            ~level:Error
             ~payload:(target_known_peer_ids, limits.max_connections))
   @ Option.fold
       limits.max_known_points
@@ -374,12 +410,10 @@ let validate_connections (config : Node_config_file.t) =
         when_
           (target_known_points > max_known_points)
           ~event:target_number_of_known_points_greater_than_maximum
-          ~level:Error
           ~payload:(max_known_points, target_known_points)
         @ when_
             (limits.max_connections > target_known_points)
             ~event:target_number_of_known_points_lower_than_maximum_conn
-            ~level:Error
             ~payload:(target_known_points, limits.max_connections))
   |> return
 
