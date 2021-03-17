@@ -108,6 +108,8 @@ html_css_files = [
     'css/custom.css',
 ]
 
+html_extra_path = ['404.html', '_redirects']
+
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
 #

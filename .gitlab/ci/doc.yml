@@ -9,7 +9,7 @@ documentation:build:
     - tags@tezos/tezos
     - /-release$/@tezos/tezos
   script:
-    - make -C docs html redirects
+    - make -C docs html
   artifacts:
     paths:
       - docs
@@ -36,7 +36,7 @@ documentation:linkcheck:
       when: on_success
   script:
     - make -C docs redirectcheck
-    - make -C docs linkcheck 
+    - make -C docs linkcheck
     - make -C docs sanitycheck
   allow_failure: true
   interruptible: true

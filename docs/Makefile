@@ -21,7 +21,7 @@ EDO_SHORT      = 008-PtEdo2Zk
 SCRIPTSDIR		= scripts
 CHECKXREFS		= $(SCRIPTSDIR)/check_proto_xrefs.py
 
-all: manuals odoc html redirects
+all: manuals odoc html
 
 main:
 	@${MAKE} -C .. all
@@ -108,10 +108,6 @@ $(DOCGENDIR)/p2p_doc.exe:
 
 p2p: $(DOCGENDIR)/p2p_doc.exe shell/p2p_usage.rst.inc
 	@dune exec $(DOCGENDIR)/p2p_doc.exe < shell/p2p_usage.rst.inc > shell/p2p_api.rst
-
-.PHONY: redirects
-redirects:
-	@cp $$(pwd)/_redirects "$(BUILDDIR)"
 
 .PHONY: help Makefile
 
