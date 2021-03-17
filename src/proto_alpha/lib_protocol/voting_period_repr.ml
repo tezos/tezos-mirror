@@ -97,7 +97,7 @@ let root ~start_position = {index = 0l; kind = Proposal; start_position}
 let pp ppf {index; kind; start_position} =
   Format.fprintf
     ppf
-    "@[<hv 2>index: %ld@ ,kind:%a@, start_position: %ld@]"
+    "@[<hv 2>index: %ld,@ kind:%a,@ start_position: %ld@]"
     index
     pp_kind
     kind
@@ -106,7 +106,7 @@ let pp ppf {index; kind; start_position} =
 let pp_info ppf {voting_period; position; remaining} =
   Format.fprintf
     ppf
-    "@[<hv 2>voting_period: %a@ ,position:%ld@, remaining: %ld@]"
+    "@[<hv 2>voting_period: %a,@ position:%ld,@ remaining: %ld@]"
     pp
     voting_period
     position
