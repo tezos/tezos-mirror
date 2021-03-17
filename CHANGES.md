@@ -19,6 +19,22 @@ be documented here either.
 
 ## Node
 
+## Client
+
+## Baker / Endorser / Accuser
+
+## Protocol Compiler And Environment
+
+## Codec
+
+## Docker Images
+
+## Miscellaneous
+
+# Version 9.0~rc1
+
+## Node
+
 - Added Florence, the current protocol proposal on Mainnet.
   This is the version of Florence without baking accounts (`PsFLoren`).
 
@@ -55,13 +71,12 @@ be documented here either.
 - The `--network` option now also accepts the name of a file
   containing the configuration for a custom network,
   or a URL from which such a file can be downloaded.
-  
+
 - Fixed JSON encoding of timestamps before epoch (1970).
   Pretty-printing and encoding of dates before epoch in human-readable form (as part
   of a JSON value) that failed in the past will now succeed. Binary
   form (used when nodes exchange data) was unaffected by the bug. This
   may impact some RPC representations of timestamps.
- 
 
 - Some RPCs now send their response in chunked transfer encoding.
   Additionally, the implementation allows for more concurrency internally: it
@@ -108,8 +123,6 @@ be documented here either.
 
 - Added support for some base encodings including arbitrary precision integers, n-bit
   sized integers, and floating point numbers.
-
-## Docker Images
 
 ## Miscellaneous
 
