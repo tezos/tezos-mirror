@@ -64,6 +64,7 @@ val inject_operation :
   block:Shell_services.block ->
   ?confirmations:int ->
   ?dry_run:bool ->
+  ?simulation:bool ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
   ?verbose_signing:bool ->
@@ -88,6 +89,7 @@ val inject_manager_operation :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
+  ?simulation:bool ->
   source:Signature.Public_key_hash.t ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
