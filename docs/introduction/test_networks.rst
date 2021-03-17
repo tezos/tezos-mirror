@@ -28,8 +28,35 @@ You can obtain the key to these accounts from a faucet to claim the funds.
 All networks share the same faucet: https://faucet.tzalpha.net/.
 The keys obtained from this faucet can be used in all test networks.
 
+Florencenet
+-----------
+
+- Built-in network alias: ``florencenet`` (see :ref:`builtin_networks`)
+
+  * Available on ``master``, will be available in version 9.0
+
+- Run Docker image: ``wget -O florencenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+
+Florencenet is a test network running the PsFLoren protocol.
+Florencenet will run until Florence is rejected or replaced by another protocol on Mainnet.
+
+On Florencenet, the following constants differ from Mainnet:
+
+- ``preserved_cycles`` is 3 instead of 5;
+- ``blocks_per_cycle`` is 2048 instead of 4096;
+- ``blocks_per_voting_period`` is 1024 instead of 32768;
+- ``time_between_blocks`` is ``[ 30, 20 ]`` instead of ``[ 60, 40 ]``;
+- ``test_chain_duration`` is 0 instead of 1966080;
+- ``delay_per_missing_endorsement`` is 4 instead of 8.
+
+This results in a faster chain than Mainnet:
+
+- 2 blocks per minute;
+- a cycle should last about 17 hours;
+- a voting period lasts half a cycle and should thus last about 8 hours.
+
 Edo2net
-------
+-------
 
 - Built-in network alias: ``edo2net`` (see :ref:`builtin_networks`)
 
