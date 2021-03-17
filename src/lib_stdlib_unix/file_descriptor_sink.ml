@@ -34,6 +34,11 @@ type t = {
   level_at_least : Internal_event.Level.t;
 }
 
+let hostname =
+  Option.value
+    (Sys.getenv_opt "TEZOS_NODE_HOSTNAME")
+    ~default:(Unix.gethostname ())
+
 type 'event wrapped = {
   time_stamp : float;
   section : Internal_event.Section.t;
@@ -46,9 +51,11 @@ let wrapped_encoding event_encoding =
   let open Data_encoding in
   let v0 =
     conv
-      (fun {time_stamp; section; event} -> (time_stamp, section, event))
-      (fun (time_stamp, section, event) -> {time_stamp; section; event})
-      (obj3
+      (fun {time_stamp; section; event} ->
+        (hostname, time_stamp, section, event))
+      (fun (_, time_stamp, section, event) -> {time_stamp; section; event})
+      (obj4
+         (req "hostname" string)
          (req "time_stamp" float)
          (req "section" Internal_event.Section.encoding)
          (req "event" event_encoding))
@@ -145,7 +152,7 @@ end) : Internal_event.SINK with type t = t = struct
           Fmt.str "%d:%s," (String.length bytes) bytes
     in
     protect (fun () ->
-        (* 
+        (*
            If the write does happen at once (i.e. returns the same number of bytes),
            POSIX (and Linux >= 3.14) ensure this is atomic.
            Cf. http://man7.org/linux/man-pages/man2/write.2.html#BUGS
