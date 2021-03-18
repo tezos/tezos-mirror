@@ -50,6 +50,7 @@ let () =
   Proxy.register Protocol.current_mainnet ;
   Proxy.register Alpha ;
   P2p.register Alpha ;
+  Protocol_limits.register Alpha ;
   (* TODO: the "Baking" test does not have a documentation.
      I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
      test since it requires Alpha) or about baking (which would make it possible to run
