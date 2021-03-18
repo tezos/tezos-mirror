@@ -21,6 +21,7 @@
         - /scripts/version.sh
         - /.gitlab-ci.yml
       when: on_success
+    - when: never
   script:
     - ./scripts/opam-pin.sh
     - opam depext --yes ${package}

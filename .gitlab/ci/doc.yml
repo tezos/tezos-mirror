@@ -34,6 +34,7 @@ documentation:linkcheck:
     - changes:
         - /docs
       when: on_success
+    - when: never
   script:
     - make -C docs redirectcheck
     - make -C docs linkcheck

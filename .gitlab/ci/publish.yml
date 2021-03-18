@@ -13,6 +13,7 @@
       when: on_success
     - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
       when: on_success
+    - when: never
   before_script:
     - mkdir ~/.docker || true
     - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
@@ -40,6 +41,7 @@ publish:docker_manual:
     - if: $CI_COMMIT_BRANCH
       when: manual
       allow_failure: true
+    - when: never
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
 
@@ -69,6 +71,7 @@ build_release:docker_arm64:
       when: on_success
     - if: '$CI_COMMIT_TAG != null'
       when: on_success
+    - when: never
   before_script:
     - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils
     # TODO: include static version of this libraries to the default docker image
@@ -100,6 +103,7 @@ build_release:static-arm64-linux-binaries:
       when: on_success
     - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
       when: on_success
+    - when: never
   script:
     - echo "No compression for now"
   tags:
@@ -112,6 +116,7 @@ build_release:static-arm64-linux-binaries:
   rules:
     - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == "tezos"'
       when: on_success
+    - when: never
   variables:
     PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
   stage: publish_release
@@ -138,6 +143,7 @@ release-on-gitlab:
   rules:
     - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == "tezos"'
       when: on_success
+    - when: never
   variables:
     PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
   stage: publish_release
