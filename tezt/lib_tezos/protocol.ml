@@ -27,6 +27,8 @@
 (** Declaration order must respect the version order. *)
 type t = Edo | Alpha
 
+type constants = Constants_sandbox | Constants_mainnet | Constants_test
+
 let name = function Alpha -> "Alpha" | Edo -> "Edo"
 
 (* Test tags must be lowercase. *)
@@ -38,11 +40,20 @@ let hash = function
   | Edo ->
       "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
 
-let parameter_file = function
-  | Alpha ->
-      "src/proto_alpha/parameters/sandbox-parameters.json"
-  | Edo ->
-      "src/proto_008_PtEdo2Zk/parameters/sandbox-parameters.json"
+let parameter_file ?(constants = Constants_sandbox) protocol =
+  let name =
+    match constants with
+    | Constants_sandbox ->
+        "sandbox"
+    | Constants_mainnet ->
+        "mainnet"
+    | Constants_test ->
+        "test"
+  in
+  let directory =
+    match protocol with Alpha -> "proto_alpha" | Edo -> "proto_008_PtEdo2Zk"
+  in
+  sf "src/%s/parameters/%s-parameters.json" directory name
 
 let accuser = function
   | Alpha ->
