@@ -255,6 +255,8 @@ val transfer :
   ?wait:string ->
   ?burn_cap:Tez.t ->
   ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->
@@ -267,6 +269,8 @@ val spawn_transfer :
   ?wait:string ->
   ?burn_cap:Tez.t ->
   ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->
