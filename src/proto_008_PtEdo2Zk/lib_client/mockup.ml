@@ -739,6 +739,34 @@ module Protocol_parameters = struct
     }
 end
 
+(* This encoding extends [Protocol_constants_overrides.encoding] to allow
+   reading json files as produced by lib_parameters. Sadly, this require
+   copying partially [bootstrap_account_encoding], which is not exposed
+   in parameters_repr.ml. *)
+let lib_parameters_json_encoding =
+  let bootstrap_account_encoding =
+    let open Data_encoding in
+    let open Protocol.Parameters_repr in
+    conv
+      (function
+        | {public_key; amount; _} -> (
+          match public_key with None -> assert false | Some pk -> (pk, amount)
+          ))
+      (fun (pk, amount) ->
+        {
+          public_key = Some pk;
+          public_key_hash = Signature.Public_key.hash pk;
+          amount;
+        })
+      (tup2 Signature.Public_key.encoding Protocol.Tez_repr.encoding)
+  in
+  Data_encoding.(
+    merge_objs
+      (obj2
+         (opt "bootstrap_accounts" (list bootstrap_account_encoding))
+         (opt "commitments" (list Protocol.Commitment_repr.encoding)))
+      Protocol_constants_overrides.encoding)
+
 (* ------------------------------------------------------------------------- *)
 (* Blocks *)
 
@@ -810,10 +838,8 @@ let mem_init :
   | None ->
       return Protocol_constants_overrides.no_overrides
   | Some json -> (
-    match
-      Data_encoding.Json.destruct Protocol_constants_overrides.encoding json
-    with
-    | x ->
+    match Data_encoding.Json.destruct lib_parameters_json_encoding json with
+    | (_, x) ->
         return x
     | exception error ->
         failwith
