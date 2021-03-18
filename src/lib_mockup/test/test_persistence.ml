@@ -33,6 +33,7 @@
 open Tezos_mockup
 open Tezos_stdlib_unix
 open Tezos_test_services
+open Tezos_mockup_registration
 
 let base_dir_class_testable =
   Alcotest.(testable Persistence.M.pp_base_dir_class ( = ))
@@ -83,6 +84,213 @@ let test_classify_is_empty =
           Persistence.M.classify_base_dir base_dir
           >|=? check_base_dir "An empty directory" Base_dir_is_empty))
 
+module Mock_protocol : Registration_intf.PROTOCOL = struct
+  type validation_state = unit
+
+  type block_header_data = unit
+
+  type operation = {
+    shell : Tezos_base.Operation.shell_header;
+    protocol_data : block_header_data;
+  }
+
+  type operation_receipt = unit
+
+  type operation_data = unit
+
+  type block_header_metadata = unit
+
+  type block_header = {
+    shell : Tezos_base.Block_header.shell_header;
+    protocol_data : block_header_data;
+  }
+
+  let environment_version = Protocol.V0
+
+  let init _ = assert false
+
+  let rpc_services = RPC_directory.empty
+
+  let finalize_block _ = assert false
+
+  let apply_operation _ = assert false
+
+  let begin_construction ~chain_id:_ ~predecessor_context:_
+      ~predecessor_timestamp:_ ~predecessor_level:_ ~predecessor_fitness:_
+      ~predecessor:_ ~timestamp:_ ?protocol_data:_ _ =
+    assert false
+
+  let begin_application ~chain_id:_ ~predecessor_context:_
+      ~predecessor_timestamp:_ ~predecessor_fitness:_ _ =
+    assert false
+
+  let begin_partial_application ~chain_id:_ ~ancestor_context:_
+      ~predecessor_timestamp:_ ~predecessor_fitness:_ _ =
+    assert false
+
+  let current_context _ = assert false
+
+  let compare_operations _ = assert false
+
+  let acceptable_passes _ = assert false
+
+  let operation_data_and_receipt_encoding =
+    Data_encoding.conv
+      (function ((), ()) -> ())
+      (fun () -> ((), ()))
+      Data_encoding.unit
+
+  let operation_receipt_encoding = Data_encoding.unit
+
+  let operation_data_encoding = Data_encoding.unit
+
+  let block_header_metadata_encoding = Data_encoding.unit
+
+  let block_header_data_encoding = Data_encoding.unit
+
+  let validation_passes = []
+
+  let max_operation_data_length = 0
+
+  let max_block_length = 0
+
+  let hash = Protocol_hash.hash_string [""]
+end
+
+module Mock_mockup : Registration_intf.MOCKUP = struct
+  type parameters = unit
+
+  type protocol_constants = unit
+
+  let parameters_encoding = Data_encoding.unit
+
+  let default_parameters = ()
+
+  let protocol_constants_encoding = Data_encoding.unit
+
+  let default_protocol_constants _ = assert false
+
+  let default_bootstrap_accounts _ = assert false
+
+  let protocol_hash = Mock_protocol.hash
+
+  module Protocol = Mock_protocol
+  module Block_services =
+    Tezos_shell_services.Block_services.Make (Mock_protocol) (Mock_protocol)
+
+  let directory = RPC_directory.empty
+
+  let init ~cctxt:_ ~parameters:_ ~constants_overrides_json:_
+      ~bootstrap_accounts_json:_ =
+    assert false
+
+  let migrate _ = assert false
+end
+
+let mock_mockup_module (protocol_hash' : Protocol_hash.t) :
+    (module Registration_intf.MOCKUP) =
+  ( module struct
+    include Mock_mockup
+
+    let protocol_hash = protocol_hash'
+  end )
+
+(** [get_registered_mockup] fails when no environment was registered. *)
+let test_get_registered_mockup_no_env =
+  Test_services.tztest
+    "get_registered_mockup fails when no environment was registered"
+    `Quick
+    (fun () ->
+      let module Registration = Registration.Internal.Make () in
+      let module Persistence = Persistence.Internal.Make (Registration) in
+      Persistence.get_registered_mockup None
+      >>= function
+      | Ok _ ->
+          Alcotest.fail "Should have failed"
+      | Error ([_] as errors) ->
+          let actual = Format.asprintf "%a" pp_print_error_first errors in
+          return
+          @@ Alcotest.check'
+               Alcotest.string
+               ~msg:"The error message must be correct"
+               ~expected:
+                 "get_registered_mockup: no registered mockup environment"
+               ~actual
+      | Error _ ->
+          Alcotest.fail "There should be exactly 1 error")
+
+(** [get_registered_mockup] fails if the requested protocol is not found. *)
+let test_get_registered_mockup_not_found =
+  Test_services.tztest
+    "get_registered_mockup fails if the requested protocol is not found"
+    `Quick
+    (fun () ->
+      let module Registration = Registration.Internal.Make () in
+      let module Persistence = Persistence.Internal.Make (Registration) in
+      Registration.register_mockup_environment
+        (mock_mockup_module (Protocol_hash.hash_string ["mock1"])) ;
+      Persistence.get_registered_mockup
+        (Some (Protocol_hash.hash_string ["mock2"]))
+      >>= function
+      | Ok _ ->
+          Alcotest.fail "Should have failed"
+      | Error ([_] as errors) ->
+          let actual = Format.asprintf "%a" pp_print_error_first errors in
+          return
+          @@ Alcotest.check'
+               Alcotest.string
+               ~msg:"The error message must be correct"
+               ~expected:
+                 "requested protocol not found in available mockup environments"
+               ~actual
+      | Error _ ->
+          Alcotest.fail "There should be exactly 1 error")
+
+(** [get_registered_mockup] returns the first found protocol if none is specified (behavior to be changed in next commit). *)
+let test_get_registered_mockup_take_first =
+  Test_services.tztest
+    "get_registered_mockup returns the first found protocol if none is \
+     specified (behavior to be changed in next commit)"
+    `Quick
+    (fun () ->
+      let module Registration = Registration.Internal.Make () in
+      let module Persistence = Persistence.Internal.Make (Registration) in
+      let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
+      let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
+      Registration.register_mockup_environment
+        (mock_mockup_module proto_hash_1) ;
+      Registration.register_mockup_environment
+        (mock_mockup_module proto_hash_2) ;
+      Persistence.get_registered_mockup None
+      >|=? fun (module Result) ->
+      Alcotest.check'
+        (Alcotest.testable Protocol_hash.pp Protocol_hash.equal)
+        ~msg:"The first found protocol is the last registered"
+        ~expected:proto_hash_2
+        ~actual:Result.protocol_hash)
+
+(** [get_registered_mockup] returns the requested protocol. *)
+let test_get_registered_mockup_take_requested =
+  Test_services.tztest
+    "get_registered_mockup returns the requested protocol"
+    `Quick
+    (fun () ->
+      let module Registration = Registration.Internal.Make () in
+      let module Persistence = Persistence.Internal.Make (Registration) in
+      let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
+      let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
+      Registration.register_mockup_environment
+        (mock_mockup_module proto_hash_1) ;
+      Registration.register_mockup_environment
+        (mock_mockup_module proto_hash_2) ;
+      Persistence.get_registered_mockup (Some proto_hash_1)
+      >|=? fun (module Result) ->
+      Alcotest.check'
+        (Alcotest.testable Protocol_hash.pp Protocol_hash.equal)
+        ~msg:"The requested protocol is returned"
+        ~expected:proto_hash_1
+        ~actual:Result.protocol_hash)
+
 let () =
   Alcotest_lwt.run
     "tezos-mockup"
@@ -91,5 +299,9 @@ let () =
           test_classify_is_file;
           test_classify_is_mockup;
           test_classify_is_nonempty;
-          test_classify_is_empty ] ) ]
+          test_classify_is_empty;
+          test_get_registered_mockup_no_env;
+          test_get_registered_mockup_not_found;
+          test_get_registered_mockup_take_first;
+          test_get_registered_mockup_take_requested ] ) ]
   |> Lwt_main.run
