@@ -307,11 +307,19 @@ val spawn_get_balance_for : ?node:Node.t -> account:string -> t -> Process.t
 
 (** Run [tezos-client create mockup]. *)
 val create_mockup :
-  ?sync_mode:mockup_sync_mode -> protocol:Protocol.t -> t -> unit Lwt.t
+  ?sync_mode:mockup_sync_mode ->
+  ?constants:Protocol.constants ->
+  protocol:Protocol.t ->
+  t ->
+  unit Lwt.t
 
 (** Same as [create_mockup], but do not wait for the process to exit. *)
 val spawn_create_mockup :
-  ?sync_mode:mockup_sync_mode -> protocol:Protocol.t -> t -> Process.t
+  ?sync_mode:mockup_sync_mode ->
+  ?constants:Protocol.constants ->
+  protocol:Protocol.t ->
+  t ->
+  Process.t
 
 (** Run [tezos-client submit proposals for].
 
@@ -420,6 +428,7 @@ val init_mockup :
   ?color:Log.Color.t ->
   ?base_dir:string ->
   ?sync_mode:mockup_sync_mode ->
+  ?constants:Protocol.constants ->
   protocol:Protocol.t ->
   unit ->
   t Lwt.t

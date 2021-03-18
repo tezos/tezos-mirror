@@ -40,7 +40,9 @@ let hash = function
   | Edo ->
       "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
 
-let parameter_file ?(constants = Constants_sandbox) protocol =
+let default_constants = Constants_sandbox
+
+let parameter_file ?(constants = default_constants) protocol =
   let name =
     match constants with
     | Constants_sandbox ->

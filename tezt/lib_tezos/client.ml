@@ -390,19 +390,25 @@ let get_balance_for ?node ~account client =
   and* output = Lwt_io.read (Process.stdout process) in
   return @@ extract_balance output
 
-let spawn_create_mockup ?(sync_mode = Synchronous) ~protocol client =
+let spawn_create_mockup ?(sync_mode = Synchronous) ?constants ~protocol client
+    =
   let cmd =
     let common = ["--protocol"; Protocol.hash protocol; "create"; "mockup"] in
-    match sync_mode with
+    ( match sync_mode with
     | Synchronous ->
         common
     | Asynchronous ->
-        common @ ["--asynchronous"]
+        common @ ["--asynchronous"] )
+    @ Option.fold
+        ~none:[]
+        ~some:(fun constants ->
+          ["--protocol-constants"; Protocol.parameter_file ~constants protocol])
+        constants
   in
   spawn_command client cmd
 
-let create_mockup ?sync_mode ~protocol client =
-  spawn_create_mockup ?sync_mode ~protocol client |> Process.check
+let create_mockup ?sync_mode ?constants ~protocol client =
+  spawn_create_mockup ?sync_mode ?constants ~protocol client |> Process.check
 
 let spawn_submit_proposals ?(key = Constant.bootstrap1.alias) ?(wait = "none")
     ~proto_hash client =
@@ -525,14 +531,14 @@ let init ?path ?admin_path ?name ?color ?base_dir ?node () =
   in
   return client
 
-let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ~protocol
-    () =
+let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ?constants
+    ~protocol () =
   (* The mockup's public documentation doesn't use `--mode mockup`
      for `create mockup` (as it is not required). We wanna do the same here.
      Hence `Client None` here: *)
   let client =
     create_with_mode ?path ?admin_path ?name ?color ?base_dir (Client None)
   in
-  let* () = create_mockup ?sync_mode ~protocol client in
+  let* () = create_mockup ?sync_mode ?constants ~protocol client in
   (* We want, however, to return a mockup client; hence the following: *)
   set_mode Mockup client ; return client
