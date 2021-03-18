@@ -85,10 +85,16 @@ module Protocol_constants_overrides = struct
               c.origination_size,
               c.block_security_deposit,
               c.endorsement_security_deposit,
-              c.baking_reward_per_endorsement ),
-            ( c.endorsement_reward,
-              c.cost_per_byte,
+              c.baking_reward_per_endorsement,
+              c.endorsement_reward ),
+            ( c.cost_per_byte,
               c.hard_storage_limit_per_operation,
+              Some 0L,
+              (* At this position in the encoding we used to have a test
+               chain duration but it is not used anymore and should be
+               removed when this encoding is updated. When the test
+               chain was removed, we did not want to change the
+               encoding for retrocompatibility. *)
               c.quorum_min,
               c.quorum_max,
               c.min_proposal_quorum,
@@ -112,10 +118,11 @@ module Protocol_constants_overrides = struct
                  origination_size,
                  block_security_deposit,
                  endorsement_security_deposit,
-                 baking_reward_per_endorsement ),
-               ( endorsement_reward,
-                 cost_per_byte,
+                 baking_reward_per_endorsement,
+                 endorsement_reward ),
+               ( cost_per_byte,
                  hard_storage_limit_per_operation,
+                 _test_chain_duration,
                  quorum_min,
                  quorum_max,
                  min_proposal_quorum,
@@ -164,7 +171,7 @@ module Protocol_constants_overrides = struct
             (opt "hard_gas_limit_per_operation" Gas.Arith.z_integral_encoding)
             (opt "hard_gas_limit_per_block" Gas.Arith.z_integral_encoding))
          (merge_objs
-            (obj8
+            (obj9
                (opt "proof_of_work_threshold" int64)
                (opt "tokens_per_roll" Tez.encoding)
                (opt "michelson_maximum_type_size" uint16)
@@ -172,11 +179,12 @@ module Protocol_constants_overrides = struct
                (opt "origination_size" int31)
                (opt "block_security_deposit" Tez.encoding)
                (opt "endorsement_security_deposit" Tez.encoding)
-               (opt "baking_reward_per_endorsement" (list Tez.encoding)))
+               (opt "baking_reward_per_endorsement" (list Tez.encoding))
+               (opt "endorsement_reward" (list Tez.encoding)))
             (obj10
-               (opt "endorsement_reward" (list Tez.encoding))
                (opt "cost_per_byte" Tez.encoding)
                (opt "hard_storage_limit_per_operation" z)
+               (opt "test_chain_duration" int64)
                (opt "quorum_min" int32)
                (opt "quorum_max" int32)
                (opt "min_proposal_quorum" int32)
@@ -688,6 +696,33 @@ module Protocol_parameters = struct
     }
 end
 
+(* This encoding extends [Protocol_constants_overrides.encoding] to allow
+   reading json files as produced by lib_parameters. Sadly, this require
+   copying partially [bootstrap_account_encoding], which is not exposed
+   in parameters_repr.ml. *)
+let lib_parameters_json_encoding =
+  let bootstrap_account_encoding =
+    let open Data_encoding in
+    conv
+      (function
+        | {Parameters.public_key; amount; _} -> (
+          match public_key with None -> assert false | Some pk -> (pk, amount)
+          ))
+      (fun (pk, amount) ->
+        {
+          Parameters.public_key = Some pk;
+          public_key_hash = Signature.Public_key.hash pk;
+          amount;
+        })
+      (tup2 Signature.Public_key.encoding Tez.encoding)
+  in
+  Data_encoding.(
+    merge_objs
+      (obj2
+         (opt "bootstrap_accounts" (list bootstrap_account_encoding))
+         (opt "commitments" (list Commitment.encoding)))
+      Protocol_constants_overrides.encoding)
+
 (* ------------------------------------------------------------------------- *)
 (* Blocks *)
 
@@ -759,10 +794,8 @@ let mem_init :
   | None ->
       return Protocol_constants_overrides.no_overrides
   | Some json -> (
-    match
-      Data_encoding.Json.destruct Protocol_constants_overrides.encoding json
-    with
-    | x ->
+    match Data_encoding.Json.destruct lib_parameters_json_encoding json with
+    | (_, x) ->
         return x
     | exception error ->
         failwith
