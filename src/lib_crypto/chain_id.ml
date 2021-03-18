@@ -45,9 +45,10 @@ let of_string s =
   match of_string_opt s with
   | None ->
       generic_error
-        "%s.of_string: wrong string size (%d)"
+        "%s.of_string: wrong string size (%d) instead of %d"
         name
         (String.length s)
+        size
   | Some h ->
       Ok h
 

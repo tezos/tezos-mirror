@@ -534,7 +534,7 @@ let read_config_file config_file =
 
 let fail_on_non_mockup_dir (cctxt : #Client_context.full) =
   let base_dir = cctxt#get_base_dir in
-  let open Tezos_mockup.Persistence in
+  let open Tezos_mockup.Persistence.M in
   classify_base_dir base_dir
   >>=? function
   | Base_dir_does_not_exist
@@ -579,7 +579,7 @@ let config_show_mockup (cctxt : #Client_context.full)
     (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
   fail_on_non_mockup_dir cctxt
   >>=? fun () ->
-  Tezos_mockup.Persistence.get_mockup_context_from_disk
+  Tezos_mockup.Persistence.M.get_mockup_context_from_disk
     ~base_dir
     ~protocol_hash:protocol_hash_opt
   >>=? fun (mockup, _) ->
@@ -628,7 +628,7 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
        mockup_protocol_constants
        protocol_constants_file)
   >>=? fun () ->
-  Tezos_mockup.Persistence.get_mockup_context_from_disk
+  Tezos_mockup.Persistence.M.get_mockup_context_from_disk
     ~base_dir
     ~protocol_hash:protocol_hash_opt
   >>=? fun (mockup, _) ->
@@ -790,7 +790,7 @@ let default_parsed_config_args =
  * fail).
  *)
 let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
-  let open Tezos_mockup.Persistence in
+  let open Tezos_mockup.Persistence.M in
   classify_base_dir base_dir
   >>=? fun base_dir_class ->
   match client_mode with

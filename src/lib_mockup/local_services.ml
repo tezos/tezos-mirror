@@ -61,7 +61,7 @@ let () =
 (* [MENV] is a thin extension of [Registration.MOCKUP] comprising some
  * parameters used in most functions. *)
 module type MENV = sig
-  include Registration.MOCKUP
+  include Registration_intf.MOCKUP
 
   val chain_id : Chain_id.t
 
@@ -730,7 +730,7 @@ module Make (E : MENV) = struct
 end
 
 let build_shell_directory (base_dir : string)
-    (mockup_env : Registration.mockup_environment) chain_id
+    (mockup_env : Registration.M.mockup_environment) chain_id
     (rpc_context : Tezos_protocol_environment.rpc_context) (mem_only : bool)
     (write_context_callback :
       Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
@@ -754,12 +754,12 @@ let build_shell_directory (base_dir : string)
     [rpc_context] is data used when honoring an RPC.
  *)
 let build_directory (base_dir : string) (mem_only : bool)
-    (mockup_env : Registration.mockup_environment) (chain_id : Chain_id.t)
+    (mockup_env : Registration.M.mockup_environment) (chain_id : Chain_id.t)
     (rpc_context : Tezos_protocol_environment.rpc_context) :
     unit RPC_directory.t =
   let write_context rpc_context =
     let (module Mockup_environment) = mockup_env in
-    Persistence.overwrite_mockup
+    Persistence.M.overwrite_mockup
       ~chain_id
       ~protocol_hash:Mockup_environment.protocol_hash
       ~rpc_context

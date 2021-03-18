@@ -57,9 +57,10 @@ module Make_minimal (K : Name) = struct
     match of_string_opt s with
     | None ->
         generic_error
-          "%s.of_string: wrong string size (%d)"
+          "%s.of_string: wrong string size (%d) instead of %d"
           K.name
           (String.length s)
+          size
     | Some h ->
         Ok h
 
@@ -68,9 +69,10 @@ module Make_minimal (K : Name) = struct
     | None ->
         Format.kasprintf
           invalid_arg
-          "%s.of_string: wrong string size (%d)"
+          "%s.of_string: wrong string size (%d) instead of %d !!"
           K.name
           (String.length s)
+          size
     | Some h ->
         h
 

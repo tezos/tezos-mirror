@@ -22,58 +22,11 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Registration_intf
 
-(** Type of a mockup environment *)
-type mockup_context = Chain_id.t * Tezos_protocol_environment.rpc_context
+module M : S
 
-(** The module type of a mockup environment. Modules of this type should be
-    prepared protocol-side and registered here to become available to the
-    mockup facility. *)
-module type MOCKUP = sig
-  type parameters
-
-  type protocol_constants
-
-  val parameters_encoding : parameters Data_encoding.t
-
-  val default_parameters : parameters
-
-  val protocol_constants_encoding : protocol_constants Data_encoding.t
-
-  (** The content equivalent to the default value of {[--protocol-constants]} *)
-  val default_protocol_constants :
-    Tezos_client_base.Client_context.full -> protocol_constants tzresult Lwt.t
-
-  (** The content equivalent to the default value of {[--bootstrap-acounts]} *)
-  val default_bootstrap_accounts :
-    Tezos_client_base.Client_context.full -> string tzresult Lwt.t
-
-  val protocol_hash : Protocol_hash.t
-
-  module Protocol : sig
-    val hash : Protocol_hash.t
-
-    include Tezos_protocol_environment.PROTOCOL
-  end
-
-  module Block_services :
-      module type of
-        Tezos_shell_services.Block_services.Make (Protocol) (Protocol)
-
-  val directory : Tezos_protocol_environment.rpc_context RPC_directory.t
-
-  val init :
-    cctxt:Tezos_client_base.Client_context.full ->
-    parameters:parameters ->
-    constants_overrides_json:Data_encoding.json option ->
-    bootstrap_accounts_json:Data_encoding.json option ->
-    mockup_context tzresult Lwt.t
-
-  val migrate : mockup_context -> mockup_context tzresult Lwt.t
+module Internal : sig
+  (** Functor extracted for testability (make new registration modules instead of one global shared state). *)
+  module Make () : S
 end
-
-type mockup_environment = (module MOCKUP)
-
-val register_mockup_environment : mockup_environment -> unit
-
-val get_registered_environments : unit -> mockup_environment list

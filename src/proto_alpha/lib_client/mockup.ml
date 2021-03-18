@@ -856,7 +856,8 @@ let migrate :
 (* Register mockup *)
 
 let () =
-  let open Tezos_mockup_registration.Registration in
+  let open Tezos_mockup_registration.Registration.M in
+  let open Tezos_mockup_registration.Registration_intf in
   let module Mockup : MOCKUP = struct
     type parameters = Protocol_parameters.t
 

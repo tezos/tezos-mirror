@@ -1,7 +1,7 @@
 (library
  (name tezos_mockup_registration)
  (public_name tezos-mockup-registration)
- (modules registration mockup_args)
+ (modules registration registration_intf mockup_args)
  (libraries
    tezos-base
    tezos-client-base
@@ -12,7 +12,7 @@
 (library
  (name tezos_mockup)
  (public_name tezos-mockup)
- (modules files local_services persistence RPC_client migration)
+ (modules files local_services persistence persistence_intf RPC_client migration)
  (libraries
    tezos-base
    tezos-client-base

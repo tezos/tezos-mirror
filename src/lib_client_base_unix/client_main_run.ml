@@ -131,7 +131,7 @@ let setup_remote_signer (module C : M) client_config
 
 let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
   (* Make sure that base_dir is not a mockup. *)
-  Tezos_mockup.Persistence.classify_base_dir base_dir
+  Tezos_mockup.Persistence.M.classify_base_dir base_dir
   >>=? (function
          | Base_dir_is_mockup ->
              failwith
@@ -195,25 +195,25 @@ let setup_mockup_rpc_client_config
   let in_memory_mockup (args : Client_config.cli_args) =
     match args.protocol with
     | None ->
-        Tezos_mockup.Persistence.default_mockup_context cctxt
+        Tezos_mockup.Persistence.M.default_mockup_context cctxt
     | Some protocol_hash ->
-        Tezos_mockup.Persistence.init_mockup_context_by_protocol_hash
+        Tezos_mockup.Persistence.M.init_mockup_context_by_protocol_hash
           ~cctxt
           ~protocol_hash
           ~constants_overrides_json:None
           ~bootstrap_accounts_json:None
   in
-  Tezos_mockup.Persistence.classify_base_dir base_dir
+  Tezos_mockup.Persistence.M.classify_base_dir base_dir
   >>=? (function
-         | Tezos_mockup.Persistence.Base_dir_is_empty
-         | Tezos_mockup.Persistence.Base_dir_is_file
-         | Tezos_mockup.Persistence.Base_dir_is_nonempty
-         | Tezos_mockup.Persistence.Base_dir_does_not_exist ->
+         | Tezos_mockup.Persistence.M.Base_dir_is_empty
+         | Tezos_mockup.Persistence.M.Base_dir_is_file
+         | Tezos_mockup.Persistence.M.Base_dir_is_nonempty
+         | Tezos_mockup.Persistence.M.Base_dir_does_not_exist ->
              let mem_only = true in
              in_memory_mockup args >>=? fun res -> return (res, mem_only)
-         | Tezos_mockup.Persistence.Base_dir_is_mockup ->
+         | Tezos_mockup.Persistence.M.Base_dir_is_mockup ->
              let mem_only = false in
-             Tezos_mockup.Persistence.get_mockup_context_from_disk
+             Tezos_mockup.Persistence.M.get_mockup_context_from_disk
                ~base_dir
                ~protocol_hash:args.protocol
              >>=? fun res -> return (res, mem_only))
