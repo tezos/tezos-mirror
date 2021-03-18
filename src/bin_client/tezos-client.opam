@@ -24,7 +24,6 @@ depends: [
   "tezos-client-006-PsCARTHA"
   "tezos-client-007-PsDELPH1"
   "tezos-client-008-PtEdo2Zk"
-  "tezos-client-009-PsFLorBA"
   "tezos-client-009-PsFLoren"
   "tezos-client-demo-counter"
 
@@ -37,12 +36,10 @@ depends: [
   "tezos-client-006-PsCARTHA-commands"
   "tezos-client-007-PsDELPH1-commands-registration"
   "tezos-client-008-PtEdo2Zk-commands-registration"
-  "tezos-client-009-PsFLorBA-commands-registration"
   "tezos-client-009-PsFLoren-commands-registration"
 
   "tezos-baking-alpha-commands"
   "tezos-baking-008-PtEdo2Zk-commands"
-  "tezos-baking-009-PsFLorBA-commands"
   "tezos-baking-009-PsFLoren-commands"
 
   "tezos-client-base-unix"

@@ -125,51 +125,6 @@ index 1df9d7639e..4e15d75248 100644
  
  (rule
   (alias runtest_lint)
-diff --git a/src/proto_009_PsFLorBA/bin_accuser/dune b/src/proto_009_PsFLorBA/bin_accuser/dune
-index 1ff3946bb0..097c167110 100644
---- a/src/proto_009_PsFLorBA/bin_accuser/dune
-+++ b/src/proto_009_PsFLorBA/bin_accuser/dune
-@@ -10,7 +10,9 @@
-                    -open Tezos_client_commands
-                    -open Tezos_baking_009_PsFLorBA_commands
-                    -open Tezos_stdlib_unix
--                   -open Tezos_client_base_unix)))
-+                   -open Tezos_client_base_unix
-+                   -ccopt -static
-+                   -cclib "-lusb-1.0 -lhidapi-libusb -ludev")))
- 
- (rule
-  (alias runtest_lint)
-diff --git a/src/proto_009_PsFLorBA/bin_baker/dune b/src/proto_009_PsFLorBA/bin_baker/dune
-index 01a3a5d3cb..932b2a49f1 100644
---- a/src/proto_009_PsFLorBA/bin_baker/dune
-+++ b/src/proto_009_PsFLorBA/bin_baker/dune
-@@ -10,7 +10,9 @@
-                    -open Tezos_client_commands
-                    -open Tezos_baking_009_PsFLorBA_commands
-                    -open Tezos_stdlib_unix
--                   -open Tezos_client_base_unix)))
-+                   -open Tezos_client_base_unix
-+                   -ccopt -static
-+                   -cclib "-lusb-1.0 -lhidapi-libusb -ludev")))
- 
- (rule
-  (alias runtest_lint)
-diff --git a/src/proto_009_PsFLorBA/bin_endorser/dune b/src/proto_009_PsFLorBA/bin_endorser/dune
-index 7d0ff99457..837717305a 100644
---- a/src/proto_009_PsFLorBA/bin_endorser/dune
-+++ b/src/proto_009_PsFLorBA/bin_endorser/dune
-@@ -10,7 +10,9 @@
-                    -open Tezos_client_commands
-                    -open Tezos_baking_009_PsFLorBA_commands
-                    -open Tezos_stdlib_unix
--                   -open Tezos_client_base_unix)))
-+                   -open Tezos_client_base_unix
-+                   -ccopt -static
-+                   -cclib "-lusb-1.0 -lhidapi-libusb -ludev")))
- 
- (rule
-  (alias runtest_lint)
 diff --git a/src/proto_009_PsFLoren/bin_accuser/dune b/src/proto_009_PsFLoren/bin_accuser/dune
 index 11c77973e3..43515f16ed 100644
 --- a/src/proto_009_PsFLoren/bin_accuser/dune
