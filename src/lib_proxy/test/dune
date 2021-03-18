@@ -2,6 +2,7 @@
  (names test_proxy test_fuzzing_proxy_getter)
  (libraries
   tezos-base
+  tezos-base.unix
   tezos-stdlib-unix
   tezos-proxy
   tezos-test-services

@@ -1,6 +1,6 @@
 (executables
  (names test test_mem_context_array_theory)
- (libraries tezos-base
+ (libraries tezos-base.unix
             tezos-protocol-environment
             alcotest-lwt
             crowbar

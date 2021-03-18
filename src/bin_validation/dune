@@ -2,6 +2,7 @@
  (name tezos_validator)
  (public_name tezos-validator)
  (libraries tezos-base
+            tezos-base.unix
             tezos-context
             tezos-stdlib-unix
             tezos-protocol-environment

@@ -3,6 +3,7 @@
  (public_name tezos-protocol-alpha-parameters)
  (modules :standard \ gen)
  (libraries tezos-base
+            tezos-base.unix
             tezos-protocol-environment
             tezos-protocol-alpha)
  (flags (:standard -open Tezos_base__TzPervasives

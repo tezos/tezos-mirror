@@ -15,6 +15,7 @@
  (modules files local_services persistence persistence_intf RPC_client migration)
  (libraries
    tezos-base
+   tezos-base.unix
    tezos-client-base
    tezos-mockup-proxy
    resto-cohttp-self-serving-client

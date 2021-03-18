@@ -7,6 +7,8 @@
  (deps vectors.csv vectors-zip32.csv)
  (libraries tezos-sapling
             str
+            tezos-base
+            tezos-base.unix
             tezos-stdlib-unix
             tezos-test-services
             alcotest-lwt)

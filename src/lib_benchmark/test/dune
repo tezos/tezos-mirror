@@ -2,6 +2,7 @@
  (names main main_ci)
  (libraries alcotest-lwt
             tezos-base
+            tezos-base.unix
             tezos-stdlib-unix
             tezos-micheline
             tezos-crypto

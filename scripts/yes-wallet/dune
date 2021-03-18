@@ -4,6 +4,7 @@
           -open Tezos_stdlib
           -open Data_encoding))
  (libraries tezos-base
+            tezos-base.unix
             lwt.unix
             ezjsonm)
 (modules yes_wallet_lib))

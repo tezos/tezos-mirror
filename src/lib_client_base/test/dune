@@ -1,7 +1,11 @@
 (executable
  (name bip39_tests)
  (modules bip39_tests)
- (libraries tezos-client-base alcotest)
+ (libraries
+   tezos-base
+   tezos-base.unix
+   tezos-client-base
+   alcotest)
  (flags (:standard -open Tezos_client_base)))
 
 (rule
@@ -13,7 +17,11 @@
 (executable
  (name pbkdf_tests)
  (modules pbkdf_tests)
- (libraries tezos-client-base alcotest)
+ (libraries
+   tezos-base
+   tezos-base.unix
+   tezos-client-base
+   alcotest)
  (flags (:standard -open Tezos_client_base)))
 
 (rule

@@ -8,6 +8,7 @@
         test_p2p_logging
         )
  (libraries tezos-base
+            tezos-base.unix
             tezos-stdlib-unix
             tezos-p2p
             tezos-p2p-services

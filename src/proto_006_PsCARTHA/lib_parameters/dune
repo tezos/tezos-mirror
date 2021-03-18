@@ -3,6 +3,7 @@
  (public_name tezos-protocol-006-PsCARTHA-parameters)
  (modules :standard \ gen)
  (libraries tezos-base
+            tezos-base.unix
             tezos-protocol-environment
             tezos-protocol-006-PsCARTHA)
  (flags (:standard -open Tezos_base__TzPervasives

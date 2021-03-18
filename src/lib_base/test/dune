@@ -5,6 +5,7 @@
  )
  (libraries
    tezos-base
+   tezos-base.unix
    data-encoding
    crowbar
    qcheck-alcotest
@@ -12,7 +13,7 @@
  )
  (flags (:standard
           -open Tezos_base
-	  -open Tezos_error_monad
+          -open Tezos_error_monad
         )))
 
 (rule

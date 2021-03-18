@@ -12,6 +12,7 @@
  (public_name tezos-node)
  (package tezos-node)
  (libraries tezos-base
+            tezos-base.unix
             tezos-version
             tezos-stdlib-unix
             tezos-shell-services

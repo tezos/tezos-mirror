@@ -1,6 +1,7 @@
 (executables
  (names test_requester)
  (libraries tezos-base
+            tezos-base.unix
             tezos-stdlib-unix
             tezos-requester
             tezos-test-services

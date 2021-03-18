@@ -3,6 +3,7 @@
  (public_names tezos-snoop)
  (package tezos-snoop)
  (libraries tezos-base
+            tezos-base.unix
             tezos-stdlib-unix
             tezos-clic
             tezos-benchmark

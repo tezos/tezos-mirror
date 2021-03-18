@@ -1,6 +1,8 @@
 (executables
   (names main)
-  (libraries flextesa)
+  (libraries tezos-base
+             tezos-base.unix
+             flextesa)
   (flags :standard))
 
 (rule

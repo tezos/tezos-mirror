@@ -1,6 +1,7 @@
 (executables
  (names test)
  (libraries tezos-base
+            tezos-base.unix
             tezos-context
             tezos-stdlib-unix
             alcotest-lwt)
