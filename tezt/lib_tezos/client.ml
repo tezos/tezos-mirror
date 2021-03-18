@@ -336,8 +336,8 @@ let gen_and_show_keys ~alias client =
   let* () = gen_keys ~alias client in
   show_address ~show_secret:true ~alias client
 
-let spawn_transfer ?node ?(wait = "none") ?burn_cap ?fee ~amount ~giver
-    ~receiver client =
+let spawn_transfer ?node ?(wait = "none") ?burn_cap ?fee ?gas_limit
+    ?storage_limit ~amount ~giver ~receiver client =
   spawn_command
     ?node
     client
@@ -350,10 +350,29 @@ let spawn_transfer ?node ?(wait = "none") ?burn_cap ?fee ~amount ~giver
     @ Option.fold
         ~none:[]
         ~some:(fun b -> ["--burn-cap"; Tez.to_string b])
-        burn_cap )
+        burn_cap
+    @ Option.fold
+        ~none:[]
+        ~some:(fun g -> ["--gas-limit"; string_of_int g])
+        gas_limit
+    @ Option.fold
+        ~none:[]
+        ~some:(fun s -> ["--storage-limit"; string_of_int s])
+        storage_limit )
 
-let transfer ?node ?wait ?burn_cap ?fee ~amount ~giver ~receiver client =
-  spawn_transfer ?node ?wait ?burn_cap ?fee ~amount ~giver ~receiver client
+let transfer ?node ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ~amount
+    ~giver ~receiver client =
+  spawn_transfer
+    ?node
+    ?wait
+    ?burn_cap
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~amount
+    ~giver
+    ~receiver
+    client
   |> Process.check
 
 let spawn_set_delegate ?node ?(wait = "none") ~src ~delegate client =
