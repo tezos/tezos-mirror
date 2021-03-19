@@ -3,7 +3,7 @@ coq:lint:
   script:
     - make
     - cd src/proto_alpha/lib_protocol
-    - for source in *.{ml,mli} ; do
+    - for source in *.ml ; do
         coq-of-ocaml -config coq-of-ocaml/config.json $source ;
       done
   allow_failure: true
