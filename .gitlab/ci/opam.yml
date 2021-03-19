@@ -42,6 +42,11 @@ opam:flextesa:
   variables:
     package: flextesa
 
+opam:hacl-star-raw-empty:
+  extends: .opam_template
+  variables:
+    package: hacl-star-raw-empty
+
 opam:latex:
   extends: .opam_template
   variables:
@@ -506,6 +511,21 @@ opam:tezos-event-logging:
   extends: .opam_template
   variables:
     package: tezos-event-logging
+
+opam:tezos-hacl-glue:
+  extends: .opam_template
+  variables:
+    package: tezos-hacl-glue
+
+opam:tezos-hacl-glue-js:
+  extends: .opam_template
+  variables:
+    package: tezos-hacl-glue-js
+
+opam:tezos-hacl-glue-unix:
+  extends: .opam_template
+  variables:
+    package: tezos-hacl-glue-unix
 
 opam:tezos-legacy-store:
   extends: .opam_template

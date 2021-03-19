@@ -1,0 +1,31 @@
+(executable
+ (name test)
+ (modes js)
+ (preprocess (pps js_of_ocaml-ppx))
+ (js_of_ocaml
+   (javascript_files hacl_stubs.js)
+ )
+ (libraries
+  tezos-hacl-glue-js
+  zarith_stubs_js
+  js_of_ocaml-compiler
+  js_of_ocaml)
+)
+
+(rule
+  (targets hacl_stubs.js)
+  (action (copy %{lib:tezos-hacl-glue-js:hacl_stubs.js} hacl_stubs.js))
+)
+
+(rule
+ (alias runtest_yarn)
+ (deps
+   ../.yarnrc
+   test.bc.js
+   test.sh)
+ (action (system "./test.sh")))
+
+(rule
+ (alias runtest)
+ (deps (alias runtest_yarn))
+ (action (progn)))

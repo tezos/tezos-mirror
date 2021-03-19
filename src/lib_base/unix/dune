@@ -16,6 +16,8 @@
  (libraries data-encoding
             tezos-crypto
             bls12-381-unix
+            ; unix implementation of hacl
+            tezos-hacl-glue-unix
             tezos-base
             tezos-stdlib
             tezos-stdlib-unix

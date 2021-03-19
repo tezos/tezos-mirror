@@ -1,0 +1,10 @@
+(library
+  (name tezos_hacl_glue)
+  (public_name tezos-hacl-glue)
+  (virtual_modules hacl)
+)
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
