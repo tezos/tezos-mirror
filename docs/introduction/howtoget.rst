@@ -308,10 +308,7 @@ The following sections describe the individual steps above in more detail.
 Install Rust
 ~~~~~~~~~~~~
 
-For compiling pre-8.0 releases, you don't need Rust, so you can skip this
-section.
-
-Starting from version 8.0, compiling Tezos requires the Rust compiler,
+Compiling Tezos requires the Rust compiler,
 version 1.44.0, and the Cargo package manager to be installed. If you
 have `rustup <https://rustup.rs/>`_ installed, it should work without
 any additional steps on your side. You can use `rustup
@@ -339,7 +336,12 @@ installed Cargo in ``$HOME/.cargo``, but this may change depending on how
 you installed rustup. See the documentation of your rustup distribution
 if file ``.cargo`` does not exist in your home directory.
 
-Finally, Tezos binaries requires the Zcash parameter files to run.
+.. _setup_zcash_params:
+
+Install Zcash Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tezos binaries requires the Zcash parameter files to run.
 Docker images come with those files, and the source distribution also
 includes those files. But if you compile from source and move Tezos to
 another location (such as ``/usr/local/bin``), the Tezos binaries may
@@ -347,6 +349,29 @@ prompt you to install the Zcash parameter files. The easiest way is to
 download and run this script::
 
    https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh
+
+The node will try to find Zcash parameters in the following directories,
+in this order:
+
+#. ``$XDG_DATA_HOME/.local/share/zcash-params``
+#. ``$XDG_DATA_DIRS/zcash-params`` (if ``$XDG_DATA_DIRS`` contains
+   several paths separated by colons ``:``, each path is considered)
+#. ``$OPAM_SWITCH_PREFIX/share/zcash-params``
+#. ``./_opam/share/zcash-params``
+#. ``~/.zcash-params``
+#. ``~/.local/share/zcash-params``
+#. ``/usr/local/share/zcash-params``
+#. ``/usr/share/zcash-params``
+
+If the node complains that it cannot find Zcash parameters, check that
+at least one of those directories contains both files ``sapling-spend.params``
+and ``sapling-output.params``. Here is where you should expect to find those files:
+
+* if you are compiling from source, parameters should be in
+  ``_opam/share/zcash-params`` (you may need to run ``eval $(opam env)``
+  before running the node);
+
+* if you used ``fetch-params.sh``, parameters should be in ``~/.zcash-params``.
 
 Get the sources
 ~~~~~~~~~~~~~~~
