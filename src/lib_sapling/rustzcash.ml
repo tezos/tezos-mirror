@@ -704,6 +704,9 @@ let () =
   Printexc.register_printer
   @@ function
   | Params_not_found locations ->
+      (* We tend to look at the same location several times,
+         but there is no need to confuse the user about it. *)
+      let locations = List.sort_uniq String.compare locations in
       Some
         (Format.asprintf
            "@[<v>cannot find Zcash params in any of:@,\
@@ -715,73 +718,60 @@ let () =
       None
 
 let init_params () =
-  let home = Option.value (Sys.getenv_opt "HOME") ~default:"/" in
-  let opam_switch =
-    match Sys.getenv_opt "OPAM_SWITCH_PREFIX" with
-    | Some _ as x ->
-        x
-    | None -> (
-      match Sys.getenv_opt "PWD" with
-      | Some d ->
-          let switch = Filename.concat d "_opam" in
-          if Sys.file_exists switch then Some switch else None
+  let ( // ) = Filename.concat in
+  (* [env name path] looks up the value of environment variable [name]
+     and concatenates it with [path].
+     If [split] is specified, the environment variable is expected
+     to contain a list of paths separated by character [split].
+     Otherwise the environment variable is expected to contain a single path. *)
+  let env ?split name path =
+    match Sys.getenv_opt name with
+    | None ->
+        []
+    | Some value -> (
+      match split with
       | None ->
-          None )
+          [Filename.concat value path]
+      | Some char ->
+          List.map (fun dir -> dir // path) (String.split_on_char char value) )
   in
-  let candidates =
-    Option.fold
-      ~none:[]
-      ~some:(fun d -> [Filename.concat d "share/zcash-params"])
-      opam_switch
+  (* [cwd path] is the current directory concatenated to [path]. *)
+  let cwd path = try [Sys.getcwd () // path] with Sys_error _ -> [] in
+  (* List directories where we could find zcash parameter files.
+     Directories with higher priority come first. *)
+  let candidate_directories =
+    env "XDG_DATA_HOME" ".local/share/zcash-params"
+    @ env ~split:':' "XDG_DATA_DIRS" "zcash-params"
+    @ env "OPAM_SWITCH_PREFIX" "share/zcash-params"
+    @ env "PWD" "_opam/share/zcash-params"
+    @ cwd "_opam/share/zcash-params"
+    @ env "HOME" ".zcash-params"
+    @ env "HOME" ".local/share/zcash-params"
+    @ ["/usr/local/share/zcash-params"; "/usr/share/zcash-params"]
   in
-  let candidates = candidates @ [Filename.concat home ".zcash-params"] in
-  let data_home =
-    match Sys.getenv_opt "XDG_DATA_HOME" with
-    | Some x ->
-        x
-    | None ->
-        Filename.concat home ".local/share/"
-  in
-  let data_dirs =
-    data_home
-    :: String.split_on_char
-         ':'
-         (Option.value
-            (Sys.getenv_opt "XDG_DATA_DIRS")
-            ~default:"/usr/local/share/:/usr/share/")
-  in
-  let candidates =
-    List.fold_right
-      (fun x acc -> Filename.concat x "zcash-params" :: acc)
-      data_dirs
-      candidates
-  in
-  let prefix_opt =
-    List.fold_left
-      (fun acc x ->
-        match acc with
-        | Some _ ->
-            acc
-        | None ->
-            if Sys.file_exists x then Some x else acc)
-      None
-      candidates
-  in
-  let prefix =
-    match prefix_opt with
-    | Some p ->
-        p
-    | None ->
-        raise (Params_not_found candidates)
-  in
-  let spend_path = prefix ^ "/sapling-spend.params" in
+  (* Files we are looking for. *)
+  let spend_path = "sapling-spend.params" in
   let spend_hash =
     "8270785a1a0d0bc77196f000ee6d221c9c9894f55307bd9357c3f0105d31ca63991ab91324160d8f53e2bbd3c2633a6eb8bdf5205d822e7f3f73edac51b2b70c\000"
   in
-  let output_path = prefix ^ "/sapling-output.params" in
+  let output_path = "sapling-output.params" in
   let output_hash =
     "657e3d38dbb5cb5e7dd2970e8b03d69b4787dd907285b5a7f0790dcc8072f60bf593b32cc2d1c030e00ff5ae64bf84c5c3beb84ddc841d48264b4a171744d028\000"
   in
+  (* Find the first candidate directory that contains the expected files. *)
+  let directory =
+    let contains_zcash_files directory =
+      Sys.file_exists (directory // spend_path)
+      && Sys.file_exists (directory // output_path)
+    in
+    match List.find_opt contains_zcash_files candidate_directories with
+    | None ->
+        raise (Params_not_found candidate_directories)
+    | Some directory ->
+        directory
+  in
+  let spend_path = directory // spend_path in
+  let output_path = directory // output_path in
   init_zksnark_params ~spend_path ~spend_hash ~output_path ~output_hash
 
 let init_params_lazy = Lazy.from_fun init_params

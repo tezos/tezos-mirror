@@ -42,9 +42,15 @@ exception Params_not_found of string list
 (** Loads the parameters for our instance of Groth16.
 
     The parameters are searched in:
-    - [/usr/share/zcash-params]
-    - [${OPAM_SWITCH_PREFIX}/share/zcash-params]
-    - [${HOME}/.zcash-params]
+    - [$XDG_DATA_HOME/.local/share/zcash-params];
+    - [$XDG_DATA_DIRS/zcash-params] (splitting on the [:] character);
+    - [$OPAM_SWITCH_PREFIX/share/zcash-params];
+    - [_opam/share/zcash-params];
+    - [$HOME/.zcash-params];
+    - [$HOME/.local/share/zcash-params];
+    - [/usr/local/share/zcash-params];
+    - [/usr/share/zcash-params];
+    in this order.
 
     @raise Params_not_found if parameters could not be found at any of those locations.
 
