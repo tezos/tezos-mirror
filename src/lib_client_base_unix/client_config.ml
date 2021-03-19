@@ -378,14 +378,15 @@ let wait_parameter () =
 let protocol_parameter () =
   parameter (fun _ arg ->
       match
-        Seq.find
+        Seq.filter
           (fun (hash, _commands) ->
             String.has_prefix ~prefix:arg (Protocol_hash.to_b58check hash))
           (Client_commands.get_versions ())
+        @@ ()
       with
-      | Some (hash, _commands) ->
+      | Cons ((hash, _commands), _) ->
           return_some hash
-      | None ->
+      | Nil ->
           fail (Invalid_protocol_argument arg))
 
 (* Command-line only args (not in config file) *)

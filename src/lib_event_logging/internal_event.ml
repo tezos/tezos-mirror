@@ -108,6 +108,8 @@ module Section : sig
   val to_string_list : t -> string list
 
   val pp : Format.formatter -> t -> unit
+
+  val equal : t -> t -> bool
 end = struct
   type t = {path : string list; lwt_log_section : Lwt_log_core.section}
 
