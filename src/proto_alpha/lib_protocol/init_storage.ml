@@ -45,12 +45,12 @@ let invoice_contract ctxt ~address ~amount_mutez =
                  [(Contract recipient, Credited amount, Protocol_migration)] ))
       >|= function Ok res -> res | Error _ -> (ctxt, []) )
 
-(* This is the genesis protocol: initialise the state *)
 let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   Raw_context.prepare_first_block ~level ~timestamp ~fitness ctxt
   >>=? fun (previous_protocol, ctxt) ->
   match previous_protocol with
   | Genesis param ->
+      (* This is the genesis protocol: initialise the state *)
       Commitment_storage.init ctxt param.commitments
       >>=? fun ctxt ->
       Roll_storage.init ctxt
