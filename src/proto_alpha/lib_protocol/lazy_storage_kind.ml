@@ -268,7 +268,7 @@ module Temp_ids = struct
           Sapling_state.Id.Temp.next temp_ids.sapling_state
         in
         ({temp_ids with sapling_state}, (sapling_state :> Sapling_state.Id.t))
-   [@@coq_axiom "gadt"]
+   [@@coq_axiom_with_reason "gadt"]
 
   let fold_s :
       type i a u.
@@ -292,7 +292,7 @@ module Temp_ids = struct
           (module Sapling_state.Id.Temp)
           ~last:temp_ids.sapling_state
           (fun acc temp_id -> f acc (temp_id :> i))
-   [@@coq_axiom "gadt"]
+   [@@coq_axiom_with_reason "gadt"]
 end
 
 module IdSet = struct

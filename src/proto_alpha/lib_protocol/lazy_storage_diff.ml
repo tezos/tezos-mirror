@@ -160,7 +160,7 @@ let get_ops : type i a u. (i, a, u) Lazy_storage_kind.t -> (i, a, u) ops =
       (module Big_map)
   | Sapling_state ->
       (module Sapling_state)
-  [@@coq_axiom "gadt"]
+  [@@coq_axiom_with_reason "gadt"]
 
 type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
 
@@ -335,7 +335,7 @@ let item_encoding =
                  None)
            (fun ((), id, diff) -> Item (k, id, diff)))
        Lazy_storage_kind.all
-  [@@coq_axiom "gadt"]
+  [@@coq_axiom_with_reason "gadt"]
 
 type diffs = diffs_item list
 
@@ -370,7 +370,7 @@ let fresh :
   else
     let (module OPS) = get_ops kind in
     OPS.Next.incr ctxt
- [@@coq_axiom "gadt"]
+ [@@coq_axiom_with_reason "gadt"]
 
 let init ctxt =
   fold_left_s
@@ -379,7 +379,7 @@ let init ctxt =
       OPS.Next.init ctxt)
     ctxt
     Lazy_storage_kind.all
-  [@@coq_axiom "gadt"]
+  [@@coq_axiom_with_reason "gadt"]
 
 let cleanup_temporaries ctxt =
   Raw_context.map_temporary_lazy_storage_ids_s ctxt (fun temp_ids ->
@@ -390,4 +390,4 @@ let cleanup_temporaries ctxt =
         ctxt
         Lazy_storage_kind.all
       >|= fun ctxt -> (ctxt, Lazy_storage_kind.Temp_ids.init))
-  [@@coq_axiom "gadt"]
+  [@@coq_axiom_with_reason "gadt"]

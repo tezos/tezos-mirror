@@ -57,7 +57,7 @@ let split delim ?(limit = max_int) path =
     else do_component acc limit i (j + 1)
   in
   if Compare.Int.(limit > 0) then do_slashes [] limit 0 else [path]
-  [@@coq_axiom "non-top-level mutual recursion"]
+  [@@coq_axiom_with_reason "non-top-level mutual recursion"]
 
 let pp_print_paragraph ppf description =
   Format.fprintf

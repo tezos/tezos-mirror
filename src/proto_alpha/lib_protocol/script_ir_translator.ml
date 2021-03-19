@@ -1859,7 +1859,7 @@ let merge_types :
         >>? fun (ty2, _ctxt) -> error (Inconsistent_types (ty1, ty2))
   in
   help ctxt ty1 ty2
- [@@coq_axiom "non-top-level mutual recursion"]
+ [@@coq_axiom_with_reason "non-top-level mutual recursion"]
 
 let ty_eq :
     type ta tb.
