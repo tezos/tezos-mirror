@@ -26,6 +26,11 @@
 open Monad
 include Stdlib.Seq
 
+let cons item t () = Cons (item, t)
+
+let rec append ta tb () =
+  match ta () with Nil -> tb () | Cons (item, ta) -> Cons (item, append ta tb)
+
 (* Like Lwt.apply but specialised for two-parameter functions *)
 let apply2 f x y = try f x y with exn -> Lwt.fail exn
 
@@ -118,3 +123,6 @@ let iter_p f seq =
         iter_p f seq (Lwt.apply f item :: acc)
   in
   iter_p f seq []
+
+let rec unfold f a () =
+  match f a with None -> Nil | Some (item, a) -> Cons (item, unfold f a)

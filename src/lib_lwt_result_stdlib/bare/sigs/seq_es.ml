@@ -51,6 +51,16 @@ module type S = sig
 
   val nil : ('a, 'e) node
 
+  val cons : 'a -> ('a, 'e) t -> ('a, 'e) t
+
+  val cons_s : 'a Lwt.t -> ('a, 'e) t -> ('a, 'e) t
+
+  val cons_e : ('a, 'e) result -> ('a, 'e) t -> ('a, 'e) t
+
+  val cons_es : ('a, 'e) result Lwt.t -> ('a, 'e) t -> ('a, 'e) t
+
+  val append : ('a, 'e) t -> ('a, 'e) t -> ('a, 'e) t
+
   val return : 'a -> ('a, 'e) t
 
   val return_e : ('a, 'e) result -> ('a, 'e) t
@@ -118,6 +128,15 @@ module type S = sig
 
   val filter_map_es :
     ('a -> ('b option, 'e) result Lwt.t) -> ('a, 'e) t -> ('b, 'e) t
+
+  val unfold : ('b -> ('a * 'b) option) -> 'b -> ('a, 'e) t
+
+  val unfold_s : ('b -> ('a * 'b) option Lwt.t) -> 'b -> ('a, 'e) t
+
+  val unfold_e : ('b -> (('a * 'b) option, 'e) result) -> 'b -> ('a, 'e) t
+
+  val unfold_es :
+    ('b -> (('a * 'b) option, 'e) result Lwt.t) -> 'b -> ('a, 'e) t
 
   val of_seq : 'a Stdlib.Seq.t -> ('a, 'e) t
 

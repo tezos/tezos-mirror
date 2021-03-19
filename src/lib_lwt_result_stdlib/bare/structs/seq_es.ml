@@ -51,6 +51,24 @@ let interrupted e () = Lwt.return (Error e)
 
 let interrupted_s p () = Lwt.bind p Lwt.return_error
 
+let cons item t () = Monad.return (Cons (item, t))
+
+let cons_e item t () =
+  match item with
+  | Error _ as e ->
+      Lwt.return e
+  | Ok item ->
+      Monad.return (Cons (item, t))
+
+let cons_s item t () = item >>= fun item -> Monad.return (Cons (item, t))
+
+let cons_es item t () = item >>=? fun item -> Monad.return (Cons (item, t))
+
+let rec append ta tb () =
+  ta ()
+  >>=? function
+  | Nil -> tb () | Cons (item, ta) -> Monad.return (Cons (item, append ta tb))
+
 let rec fold_left f acc seq =
   seq ()
   >>=? function
@@ -287,6 +305,37 @@ let rec filter_map_es f seq () =
           Monad.return (Cons (item, filter_map_es f seq)) )
 
 let filter_map_es f seq = filter_map_es f @@ protect seq
+
+let rec unfold f a () =
+  match f a with
+  | None ->
+      nil_es
+  | Some (item, a) ->
+      Monad.return (Cons (item, unfold f a))
+
+let rec unfold_s f a () =
+  f a
+  >>= function
+  | None -> nil_es | Some (item, a) -> Monad.return (Cons (item, unfold_s f a))
+
+let rec unfold_e f a () =
+  match f a with
+  | Error _ as e ->
+      Lwt.return e
+  | Ok None ->
+      nil_es
+  | Ok (Some (item, a)) ->
+      Monad.return (Cons (item, unfold_e f a))
+
+let rec unfold_es f a () =
+  f a
+  >>= function
+  | Error _ as e ->
+      Lwt.return e
+  | Ok None ->
+      nil_es
+  | Ok (Some (item, a)) ->
+      Monad.return (Cons (item, unfold_es f a))
 
 let rec of_seq seq () =
   match seq () with

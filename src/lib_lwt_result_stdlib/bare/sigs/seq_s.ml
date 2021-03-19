@@ -42,6 +42,12 @@ module type S = sig
 
   val return_s : 'a Lwt.t -> 'a t
 
+  val cons : 'a -> 'a t -> 'a t
+
+  val cons_s : 'a Lwt.t -> 'a t -> 'a t
+
+  val append : 'a t -> 'a t -> 'a t
+
   (** Similar to {!fold_left} but applies to Lwt-suspended sequences. Because
       the nodes are suspended in promises, traversing may yield and,
       consequently, the function [fold_left] returns a promise. *)
@@ -123,6 +129,10 @@ module type S = sig
   (** Similar to {!filter_map} but within [Lwt.t]. Not lazy and not
       tail-recursive. *)
   val filter_map_s : ('a -> 'b option Lwt.t) -> 'a t -> 'b t
+
+  val unfold : ('b -> ('a * 'b) option) -> 'b -> 'a t
+
+  val unfold_s : ('b -> ('a * 'b) option Lwt.t) -> 'b -> 'a t
 
   val of_seq : 'a Stdlib.Seq.t -> 'a t
 

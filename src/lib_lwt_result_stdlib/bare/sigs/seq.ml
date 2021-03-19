@@ -87,6 +87,12 @@ module type S = sig
       with type 'a t = 'a Stdlib.Seq.t
        and type 'a node = 'a Stdlib.Seq.node
 
+  (** {3 Some values that made it to Stdlib's Seq since} *)
+
+  val cons : 'a -> 'a t -> 'a t
+
+  val append : 'a t -> 'a t -> 'a t
+
   (** {3 Lwtreslib-specific extensions} *)
 
   (** Similar to {!fold_left} but wraps the traversal in {!result}. The
@@ -144,4 +150,6 @@ module type S = sig
       it is either fulfilled if all promises are, or rejected if at least one of
       them is. *)
   val iter_p : ('a -> unit Lwt.t) -> 'a t -> unit Lwt.t
+
+  val unfold : ('b -> ('a * 'b) option) -> 'b -> 'a t
 end

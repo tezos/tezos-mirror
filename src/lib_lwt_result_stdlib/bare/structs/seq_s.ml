@@ -39,6 +39,15 @@ let return x () = Lwt.return (Cons (x, empty))
 
 let return_s p () = Lwt.map (fun x -> Cons (x, empty)) p
 
+let cons item t () = Lwt.return (Cons (item, t))
+
+let cons_s item t () = item >|= fun item -> Cons (item, t)
+
+let rec append ta tb () =
+  ta ()
+  >>= function
+  | Nil -> tb () | Cons (item, ta) -> Lwt.return (Cons (item, append ta tb))
+
 let rec fold_left f acc seq =
   seq ()
   >>= function
@@ -177,6 +186,18 @@ let rec filter_map_s f seq () =
           Lwt.return (Cons (item, filter_map_s f seq)) )
 
 let filter_map_s f seq = filter_map_s f @@ protect seq
+
+let rec unfold f a () =
+  match f a with
+  | None ->
+      nil_s
+  | Some (item, a) ->
+      Lwt.return (Cons (item, unfold f a))
+
+let rec unfold_s f a () =
+  f a
+  >>= function
+  | None -> nil_s | Some (item, a) -> Lwt.return (Cons (item, unfold_s f a))
 
 let rec of_seq seq () =
   match seq () with

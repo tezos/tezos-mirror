@@ -69,6 +69,12 @@ module type S = sig
 
   val nil : ('a, 'e) node
 
+  val cons : 'a -> ('a, 'e) t -> ('a, 'e) t
+
+  val cons_e : ('a, 'e) result -> ('a, 'e) t -> ('a, 'e) t
+
+  val append : ('a, 'e) t -> ('a, 'e) t -> ('a, 'e) t
+
   (** [fold_left f init seq] is
 
       - if [seq] is a whole sequence, then [Ok x] where [x] is the result of
@@ -216,6 +222,10 @@ fold_left_e
       successful prefix thereof are transformed by [f] (when it returns
       [Some _]) or dropped (when it returns [None]). *)
   val filter_map_e : ('a -> ('b option, 'e) result) -> ('a, 'e) t -> ('b, 'e) t
+
+  val unfold : ('b -> ('a * 'b) option) -> 'b -> ('a, 'e) t
+
+  val unfold_e : ('b -> (('a * 'b) option, 'e) result) -> 'b -> ('a, 'e) t
 
   val of_seq : 'a Stdlib.Seq.t -> ('a, 'e) t
 

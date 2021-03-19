@@ -44,6 +44,15 @@ let return_e r () = Result.map (fun x -> Cons (x, empty)) r
 
 let interrupted e () = Error e
 
+let cons item t () = Ok (Cons (item, t))
+
+let cons_e item t () = item >|? fun item -> Cons (item, t)
+
+let rec append ta tb () =
+  ta ()
+  >>? function
+  | Nil -> tb () | Cons (item, ta) -> Ok (Cons (item, append ta tb))
+
 let rec fold_left f acc seq =
   seq ()
   >>? function
@@ -199,6 +208,18 @@ let rec filter_map_e f seq () =
           filter_map_e f seq ()
       | Some item ->
           Ok (Cons (item, filter_map_e f seq)) )
+
+let rec unfold f a () =
+  match f a with
+  | None ->
+      nil_e
+  | Some (item, a) ->
+      Ok (Cons (item, unfold f a))
+
+let rec unfold_e f a () =
+  f a
+  >>? function
+  | None -> nil_e | Some (item, a) -> Ok (Cons (item, unfold_e f a))
 
 let rec of_seq seq () =
   match seq () with
