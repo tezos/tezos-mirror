@@ -12,30 +12,20 @@
     "side_effect"
   ],
   "error_filename_blacklist": [
-    "apply.ml",
-    "contract_hash.ml",
-    "contract_repr.ml",
-    "level_repr.ml",
-    "main.mli",
-    "michelson_v1_gas.ml",
-    "misc.ml",
-    "nonce_hash.ml",
-    "raw_context.ml",
-    "raw_context.mli",
-    "raw_level_repr.ml",
-    "script_expr_hash.ml",
-    "script_interpreter.ml",
-    "script_ir_translator.ml",
-    "state_hash.ml",
-    "storage_functors.ml",
-    "storage_functors.mli",
-    "storage.ml",
-    "storage_sigs.ml",
-    "tez_repr.ml"
   ],
   "error_message_blacklist": [
     "Unbound module Tezos_protocol_alpha_functor",
-    "The placeholders `_` in types are not handled"
+    "The placeholders `_` in types are not handled",
+    "No type known for the following variants: `Ge, `Lt, `Eq, `Le, `Gt",
+    "No type known for the following variants: `Eq, `Ge, `Gt, `Le, `Lt",
+    "Constructor of the variant `Eq unknown",
+    "No type known for the following variants: `Tree, `Value",
+    "Constructor of the variant `Tree unknown",
+    "Constructor of the variant `Value unknown",
+    "Anonymous definition of signatures is not handled",
+    "A variable name instead of a pattern was expected",
+    "We only support extensible types in patterns at the head",
+    "This kind of signature is not handled"
   ],
   "escape_value": [
     "a",
