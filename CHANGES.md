@@ -107,6 +107,8 @@ be documented here either.
 
 - Added support for all protocol constants in Mockup mode.
 
+- Mockup mode now uses Alpha instead of an arbitrary protocol when none is specified. It also warns that it takes this default behavior.
+
 ## Baker / Endorser / Accuser
 
 - Added the `--version` flag.
