@@ -216,6 +216,7 @@ let setup_mockup_rpc_client_config
              Tezos_mockup.Persistence.M.get_mockup_context_from_disk
                ~base_dir
                ~protocol_hash:args.protocol
+               cctxt
              >>=? fun res -> return (res, mem_only))
   >>=? fun ((mockup_env, (chain_id, rpc_context)), mem_only) ->
   return

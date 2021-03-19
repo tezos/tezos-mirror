@@ -199,6 +199,10 @@ let mock_mockup_module ?is_alpha:(is_alpha' = false)
     let is_alpha = is_alpha'
   end )
 
+let mock_printer =
+  new Tezos_client_base.Client_context.simple_printer (fun _ _ ->
+      Lwt.return_unit)
+
 (** [get_registered_mockup] fails when no environment was registered. *)
 let test_get_registered_mockup_no_env =
   Test_services.tztest
@@ -207,7 +211,7 @@ let test_get_registered_mockup_no_env =
     (fun () ->
       let module Registration = Registration.Internal.Make () in
       let module Persistence = Persistence.Internal.Make (Registration) in
-      Persistence.get_registered_mockup None
+      Persistence.get_registered_mockup None mock_printer
       >>= function
       | Ok _ ->
           Alcotest.fail "Should have failed"
@@ -239,7 +243,7 @@ let test_get_registered_mockup_not_found =
         (mock_mockup_module proto_hash_1) ;
       Registration.register_mockup_environment
         (mock_mockup_module proto_hash_2) ;
-      Persistence.get_registered_mockup (Some proto_hash_3)
+      Persistence.get_registered_mockup (Some proto_hash_3) mock_printer
       >>= function
       | Ok _ ->
           Alcotest.fail "Should have failed"
@@ -282,7 +286,7 @@ let test_get_registered_mockup_take_alpha =
         (mock_mockup_module proto_hash_alpha ~is_alpha:true) ;
       Registration.register_mockup_environment
         (mock_mockup_module proto_hash_3) ;
-      Persistence.get_registered_mockup None
+      Persistence.get_registered_mockup None mock_printer
       >|=? fun (module Result) ->
       Alcotest.check'
         (Alcotest.testable Protocol_hash.pp Protocol_hash.equal)
@@ -304,7 +308,7 @@ let test_get_registered_mockup_take_requested =
         (mock_mockup_module proto_hash_1) ;
       Registration.register_mockup_environment
         (mock_mockup_module proto_hash_2) ;
-      Persistence.get_registered_mockup (Some proto_hash_1)
+      Persistence.get_registered_mockup (Some proto_hash_1) mock_printer
       >|=? fun (module Result) ->
       Alcotest.check'
         (Alcotest.testable Protocol_hash.pp Protocol_hash.equal)

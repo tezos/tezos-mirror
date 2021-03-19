@@ -582,6 +582,7 @@ let config_show_mockup (cctxt : #Client_context.full)
   Tezos_mockup.Persistence.M.get_mockup_context_from_disk
     ~base_dir
     ~protocol_hash:protocol_hash_opt
+    cctxt
   >>=? fun (mockup, _) ->
   let (module Mockup) = mockup in
   let json_pp encoding ppf value =
@@ -631,6 +632,7 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
   Tezos_mockup.Persistence.M.get_mockup_context_from_disk
     ~base_dir
     ~protocol_hash:protocol_hash_opt
+    cctxt
   >>=? fun (mockup, _) ->
   let (module Mockup) = mockup in
   Mockup.default_bootstrap_accounts cctxt

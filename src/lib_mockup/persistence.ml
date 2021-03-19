@@ -62,16 +62,22 @@ module Internal = struct
       let of_json = Data_encoding.Json.destruct encoding
     end
 
-    let get_registered_mockup (protocol_hash_opt : Protocol_hash.t option) :
+    let get_registered_mockup (protocol_hash_opt : Protocol_hash.t option)
+        (printer : #Tezos_client_base.Client_context.printer) :
         Registration.mockup_environment tzresult Lwt.t =
       let mockup_environments = Registration.get_registered_environments () in
       let criterion (module Mockup : Registration_intf.MOCKUP) =
-        protocol_hash_opt
-        |> Option.fold
-             ~some:(Protocol_hash.equal Mockup.protocol_hash)
-             ~none:Mockup.is_alpha
+        match protocol_hash_opt with
+        | Some protocol_hash ->
+            Lwt.return
+            @@ Protocol_hash.equal protocol_hash Mockup.protocol_hash
+        | None ->
+            printer#warning
+              "No protocol specified: using Alpha as default protocol."
+            >>= fun () -> Lwt.return Mockup.is_alpha
       in
-      match List.find criterion mockup_environments with
+      List.find_s criterion mockup_environments
+      >>= function
       | Some mockup ->
           return mockup
       | None ->
@@ -107,7 +113,7 @@ module Internal = struct
         tzresult
         Lwt.t =
      fun cctxt ->
-      get_registered_mockup None
+      get_registered_mockup None cctxt
       >>=? fun mockup ->
       let (module Mockup) = mockup in
       Mockup.init
@@ -129,7 +135,7 @@ module Internal = struct
          ~protocol_hash
          ~constants_overrides_json
          ~bootstrap_accounts_json ->
-      get_registered_mockup (Some protocol_hash)
+      get_registered_mockup (Some protocol_hash) cctxt
       >>=? fun mockup ->
       let (module Mockup) = mockup in
       Mockup.init
@@ -139,12 +145,15 @@ module Internal = struct
         ~bootstrap_accounts_json
       >>=? fun menv -> return (mockup, menv)
 
-    let mockup_context_from_persisted pm_env =
-      let open Persistent_mockup_environment in
-      get_registered_mockup (Some pm_env.protocol_hash)
-      >>=? fun mockup -> return (mockup, (pm_env.chain_id, pm_env.rpc_context))
+    let mockup_context_from_persisted
+        ({protocol_hash; chain_id; rpc_context} :
+          Persistent_mockup_environment.t)
+        (printer : #Tezos_client_base.Client_context.printer) =
+      get_registered_mockup (Some protocol_hash) printer
+      >>=? fun mockup -> return (mockup, (chain_id, rpc_context))
 
-    let get_mockup_context_from_disk ~base_dir ~protocol_hash =
+    let get_mockup_context_from_disk ~base_dir ~protocol_hash
+        (printer : #Tezos_client_base.Client_context.printer) =
       let file = (Files.Context.get ~dirname:base_dir :> string) in
       if not (Sys.file_exists file) then
         failwith "get_mockup_context_from_disk: file %s not found" file
@@ -153,7 +162,7 @@ module Internal = struct
         >>=? fun context_json ->
         match Persistent_mockup_environment.of_json context_json with
         | persisted_mockup ->
-            mockup_context_from_persisted persisted_mockup
+            mockup_context_from_persisted persisted_mockup printer
             >>=? fun (((module Mockup_environment), _) as res) ->
             ( match protocol_hash with
             | None ->

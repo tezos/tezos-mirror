@@ -24,7 +24,9 @@
 (*****************************************************************************)
 module type S = sig
   val get_registered_mockup :
-    Protocol_hash.t option -> Registration.M.mockup_environment tzresult Lwt.t
+    Protocol_hash.t option ->
+    #Tezos_client_base.Client_context.printer ->
+    Registration.M.mockup_environment tzresult Lwt.t
 
   (** Returns a mockup environment for the default protocol (which is the first
     in the list of registered protocol, cf [Registration] module). *)
@@ -50,6 +52,7 @@ module type S = sig
   val get_mockup_context_from_disk :
     base_dir:string ->
     protocol_hash:Protocol_hash.t option ->
+    #Tezos_client_base.Client_context.printer ->
     (Registration.M.mockup_environment * Registration.M.mockup_context)
     tzresult
     Lwt.t
