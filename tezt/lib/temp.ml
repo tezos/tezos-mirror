@@ -93,11 +93,15 @@ let rec remove_recursively filename =
   else Sys.remove filename
 
 let start () =
+  if !allowed then invalid_arg "Temp.start: a test is already running" ;
   main_dir_ref := fresh_main_dir () ;
-  allowed := true
+  allowed := true ;
+  !main_dir_ref
+
+let stop () = allowed := false
 
 let clean_up () =
-  allowed := false ;
+  stop () ;
   List.iter
     (fun filename -> if Sys.file_exists filename then Sys.remove filename)
     !files ;

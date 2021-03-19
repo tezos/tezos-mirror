@@ -25,12 +25,6 @@
 
 (** Temporary files for tests. *)
 
-(** Main temporary directory, e.g. ["/tmp/tezt-1234/1"].
-
-    Don't use it directly to create files, use [file] or [dir] instead.
-    Use this value only in messages to users. *)
-val main_dir : unit -> string
-
 (** Get a temporary file name.
 
     For instance:
@@ -51,7 +45,10 @@ val file : ?perms:Unix.file_perm -> string -> string
 (** Get a temporary file name and create it as a directory. *)
 val dir : ?perms:Unix.file_perm -> string -> string
 
-(** Allow calls to [file] and [dir] until the next [clean_up].
+(** Allow calls to [file] and [dir] until the next [clean_up] or [stop].
+
+    Return the main temporary directory, e.g. ["/tmp/tezt-1234/1"],
+    so that it can be displayed to users.
 
     Calls to [file] and [dir] which are made before [start] result in an error.
 
@@ -60,7 +57,12 @@ val dir : ?perms:Unix.file_perm -> string -> string
     actually runs. Indeed, if your test is disabled from the command-line it should
     not create temporary files. By using {!Test.run} you also ensure that {!clean_up}
     is called. *)
-val start : unit -> unit
+val start : unit -> string
+
+(** Disallow calls to [file] and [dir] until the next [start].
+
+    This can be called in place of [clean_up] if you want to keep temporary files. *)
+val stop : unit -> unit
 
 (** Delete temporary files and directories.
 

@@ -85,7 +85,7 @@ let really_run ~iteration title f =
   let already_logged_exn = ref false in
   let test_result = ref Log.Failed in
   (* Run the test until it succeeds, fails, or we receive SIGINT. *)
-  Temp.start () ;
+  let main_temporary_directory = Temp.start () in
   let* () =
     let run_test () =
       let* () = f () in
@@ -154,15 +154,15 @@ let really_run ~iteration title f =
           Temp.clean_up () ; false
       | Delete_if_successful ->
           if !test_result = Successful then (Temp.clean_up () ; false)
-          else true
+          else (Temp.stop () ; true)
       | Keep ->
-          true
+          Temp.stop () ; true
     with exn ->
       Log.warn "Failed to clean up: %s" (Printexc.to_string exn) ;
       true
   in
   if kept_temp then
-    Log.report "Temporary files can be found in: %s" (Temp.main_dir ()) ;
+    Log.report "Temporary files can be found in: %s" main_temporary_directory ;
   (* Resolve all pending promises so that they won't do anything
      (like raise [Canceled]) during the next test. *)
   let* () =
