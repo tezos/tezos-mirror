@@ -119,18 +119,6 @@ module type S = sig
   val filter_map_es :
     ('a -> ('b option, 'e) result Lwt.t) -> ('a, 'e) t -> ('b, 'e) t
 
-  val find : ('a -> bool) -> ('a, 'e) t -> ('a option, 'e) result Lwt.t
-
-  val find_e :
-    ('a -> (bool, 'e) result) -> ('a, 'e) t -> ('a option, 'e) result Lwt.t
-
-  val find_s : ('a -> bool Lwt.t) -> ('a, 'e) t -> ('a option, 'e) result Lwt.t
-
-  val find_es :
-    ('a -> (bool, 'e) result Lwt.t) ->
-    ('a, 'e) t ->
-    ('a option, 'e) result Lwt.t
-
   val of_seq : 'a Stdlib.Seq.t -> ('a, 'e) t
 
   val of_seq_s : 'a Lwt.t Stdlib.Seq.t -> ('a, 'e) t

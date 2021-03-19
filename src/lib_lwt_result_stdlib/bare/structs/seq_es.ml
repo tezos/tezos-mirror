@@ -288,46 +288,6 @@ let rec filter_map_es f seq () =
 
 let filter_map_es f seq = filter_map_es f @@ protect seq
 
-let rec find f seq =
-  seq ()
-  >>=? function
-  | Nil ->
-      Monad.none_es
-  | Cons (item, seq) ->
-      if f item then Monad.return (Some item) else find f seq
-
-let find f seq = find f @@ protect seq
-
-let rec find_e f seq =
-  seq ()
-  >>=? function
-  | Nil ->
-      Monad.none_es
-  | Cons (item, seq) -> (
-      f item >>?= function true -> some_es item | false -> find_e f seq )
-
-let find_e f seq = find_e f @@ protect seq
-
-let rec find_s f seq =
-  seq ()
-  >>=? function
-  | Nil ->
-      Monad.none_es
-  | Cons (item, seq) -> (
-      f item >>= function true -> some_es item | false -> find_s f seq )
-
-let find_s f seq = find_s f @@ protect seq
-
-let rec find_es f seq =
-  seq ()
-  >>=? function
-  | Nil ->
-      Monad.none_es
-  | Cons (item, seq) -> (
-      f item >>=? function true -> some_es item | false -> find_es f seq )
-
-let find_es f seq = find_es f @@ protect seq
-
 let rec of_seq seq () =
   match seq () with
   | Stdlib.Seq.Nil ->

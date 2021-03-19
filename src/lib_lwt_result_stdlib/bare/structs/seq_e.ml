@@ -200,38 +200,6 @@ let rec filter_map_e f seq () =
       | Some item ->
           Ok (Cons (item, filter_map_e f seq)) )
 
-let rec find f seq =
-  seq ()
-  >>? function
-  | Nil ->
-      Monad.none_e
-  | Cons (item, seq) ->
-      if f item then Ok (Some item) else find f seq
-
-let rec find_e f seq =
-  seq ()
-  >>? function
-  | Nil ->
-      Monad.none_e
-  | Cons (item, seq) -> (
-      f item >>? function true -> some_e item | false -> find_e f seq )
-
-let rec find_s f seq =
-  seq ()
-  >>?= function
-  | Nil ->
-      none_es
-  | Cons (item, seq) -> (
-      f item >>= function true -> some_es item | false -> find_s f seq )
-
-let rec find_es f seq =
-  seq ()
-  >>?= function
-  | Nil ->
-      none_es
-  | Cons (item, seq) -> (
-      f item >>=? function true -> some_es item | false -> find_es f seq )
-
 let rec of_seq seq () =
   match seq () with
   | Stdlib.Seq.Nil ->

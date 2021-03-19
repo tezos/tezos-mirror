@@ -217,40 +217,6 @@ fold_left_e
       [Some _]) or dropped (when it returns [None]). *)
   val filter_map_e : ('a -> ('b option, 'e) result) -> ('a, 'e) t -> ('b, 'e) t
 
-  (** [find f s] is
-
-      - [Ok (Some x)] if [x] is the first element of [s] or the successful
-        prefix of [s] for which [f x] holds, or
-      - [Ok None] if [s] is whole and [f] doesn't hold for any of the elements
-        of [s], or
-      - [Error e] if [s] is interrupted by [e]. *)
-  val find : ('a -> bool) -> ('a, 'e) t -> ('a option, 'e) result
-
-  (** [find_e f s] is
-
-      - [Ok (Some x)] if [x] is the first element of [s] or the successful
-        prefix of [s] for which [f x] holds, or
-      - [Ok None] if [s] is whole and [f] doesn't hold for any of the elements
-        of [s], or
-      - [Error e] if there is an element of [s] or the successful prefix of [s]
-        for which [f] returns [Error e], or
-      - [Error e] if [s] is interrupted by [e]. *)
-  val find_e :
-    ('a -> (bool, 'e) result) -> ('a, 'e) t -> ('a option, 'e) result
-
-  (** [find_s] is similar to [find] but it returns a promise. Also note that the
-      elements are traversed sequentially and that the sequence's node are
-      unsuspended only when the previous node's predicate has been evaluated. *)
-  val find_s : ('a -> bool Lwt.t) -> ('a, 'e) t -> ('a option, 'e) result Lwt.t
-
-  (** [find_es] is similar to [find_e] but it returns a promise. Also note that
-      the elements are traversed sequentially and that the sequence's node are
-      unsuspended only when the previous node's predicate has been evaluated. *)
-  val find_es :
-    ('a -> (bool, 'e) result Lwt.t) ->
-    ('a, 'e) t ->
-    ('a option, 'e) result Lwt.t
-
   val of_seq : 'a Stdlib.Seq.t -> ('a, 'e) t
 
   val of_seq_e : ('a, 'e) result Stdlib.Seq.t -> ('a, 'e) t

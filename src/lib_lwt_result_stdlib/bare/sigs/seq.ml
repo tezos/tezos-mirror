@@ -144,33 +144,4 @@ module type S = sig
       it is either fulfilled if all promises are, or rejected if at least one of
       them is. *)
   val iter_p : ('a -> unit Lwt.t) -> 'a t -> unit Lwt.t
-
-  (** [find f t] is [Some x] where [x] is the first item in [t] such that
-      [f x]. It is [None] if there are no such element. It does not terminate if
-      the sequence is infinite and the predicate is always false. *)
-  val find : ('a -> bool) -> 'a t -> 'a option
-
-  (** [find_e f t] is similar to {!find} but wraps the search within
-      [result]. Specifically, [find_e f t] is either
-    - [Ok (Some x)] if forall [y] before [x] [f y = Ok false] and
-      [f x = Ok true],
-    - [Error e] if there exists [x] such that forall [y] before [x]
-      [f y = Ok false] and [f x = Error e],
-    - [Ok None] otherwise and [t] is finite,
-    - an expression that never returns otherwise. *)
-  val find_e :
-    ('a -> (bool, 'trace) result) -> 'a t -> ('a option, 'trace) result
-
-  (** [find_s f t] is similar to {!find} but wrapped within
-      [Lwt.t]. The search is identical to [find_e] but each
-      predicate is applied when the previous one has resolved. *)
-  val find_s : ('a -> bool Lwt.t) -> 'a t -> 'a option Lwt.t
-
-  (** [find_es f t] is similar to {!find} but wrapped within
-      [result Lwt.t]. The search is identical to [find_e] but each
-      predicate is applied when the previous one has resolved. *)
-  val find_es :
-    ('a -> (bool, 'trace) result Lwt.t) ->
-    'a t ->
-    ('a option, 'trace) result Lwt.t
 end
