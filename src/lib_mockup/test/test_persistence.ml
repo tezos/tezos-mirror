@@ -185,14 +185,18 @@ module Mock_mockup : Registration_intf.MOCKUP = struct
     assert false
 
   let migrate _ = assert false
+
+  let is_alpha = false
 end
 
-let mock_mockup_module (protocol_hash' : Protocol_hash.t) :
-    (module Registration_intf.MOCKUP) =
+let mock_mockup_module ?is_alpha:(is_alpha' = false)
+    (protocol_hash' : Protocol_hash.t) : (module Registration_intf.MOCKUP) =
   ( module struct
     include Mock_mockup
 
     let protocol_hash = protocol_hash'
+
+    let is_alpha = is_alpha'
   end )
 
 (** [get_registered_mockup] fails when no environment was registered. *)
@@ -214,7 +218,8 @@ let test_get_registered_mockup_no_env =
                Alcotest.string
                ~msg:"The error message must be correct"
                ~expected:
-                 "get_registered_mockup: no registered mockup environment"
+                 "Default protocol Alpha (no requested protocol) not found in \
+                  available mockup environments. Available protocol hashes: []"
                ~actual
       | Error _ ->
           Alcotest.fail "There should be exactly 1 error")
@@ -227,46 +232,62 @@ let test_get_registered_mockup_not_found =
     (fun () ->
       let module Registration = Registration.Internal.Make () in
       let module Persistence = Persistence.Internal.Make (Registration) in
+      let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
+      let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
+      let proto_hash_3 = Protocol_hash.hash_string ["mock3"] in
       Registration.register_mockup_environment
-        (mock_mockup_module (Protocol_hash.hash_string ["mock1"])) ;
-      Persistence.get_registered_mockup
-        (Some (Protocol_hash.hash_string ["mock2"]))
+        (mock_mockup_module proto_hash_1) ;
+      Registration.register_mockup_environment
+        (mock_mockup_module proto_hash_2) ;
+      Persistence.get_registered_mockup (Some proto_hash_3)
       >>= function
       | Ok _ ->
           Alcotest.fail "Should have failed"
       | Error ([_] as errors) ->
           let actual = Format.asprintf "%a" pp_print_error_first errors in
+          let expected =
+            Format.asprintf
+              "Requested protocol with hash %a not found in available mockup \
+               environments. Available protocol hashes: [%a, %a]"
+              Protocol_hash.pp
+              proto_hash_3
+              Protocol_hash.pp
+              proto_hash_2
+              Protocol_hash.pp
+              proto_hash_1
+          in
           return
           @@ Alcotest.check'
                Alcotest.string
                ~msg:"The error message must be correct"
-               ~expected:
-                 "requested protocol not found in available mockup environments"
+               ~expected
                ~actual
       | Error _ ->
           Alcotest.fail "There should be exactly 1 error")
 
-(** [get_registered_mockup] returns the first found protocol if none is specified (behavior to be changed in next commit). *)
-let test_get_registered_mockup_take_first =
+(** [get_registered_mockup] returns Alpha if none is specified. *)
+let test_get_registered_mockup_take_alpha =
   Test_services.tztest
-    "get_registered_mockup returns the first found protocol if none is \
-     specified (behavior to be changed in next commit)"
+    "get_registered_mockup returns Alpha if none is specified"
     `Quick
     (fun () ->
       let module Registration = Registration.Internal.Make () in
       let module Persistence = Persistence.Internal.Make (Registration) in
       let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
-      let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
+      let proto_hash_alpha = Protocol_hash.hash_string ["mock2"] in
+      let proto_hash_3 = Protocol_hash.hash_string ["mock3"] in
       Registration.register_mockup_environment
         (mock_mockup_module proto_hash_1) ;
       Registration.register_mockup_environment
-        (mock_mockup_module proto_hash_2) ;
+        (mock_mockup_module proto_hash_alpha ~is_alpha:true) ;
+      Registration.register_mockup_environment
+        (mock_mockup_module proto_hash_3) ;
       Persistence.get_registered_mockup None
       >|=? fun (module Result) ->
       Alcotest.check'
         (Alcotest.testable Protocol_hash.pp Protocol_hash.equal)
-        ~msg:"The first found protocol is the last registered"
-        ~expected:proto_hash_2
+        ~msg:"The Alpha protocol is returned"
+        ~expected:proto_hash_alpha
         ~actual:Result.protocol_hash)
 
 (** [get_registered_mockup] returns the requested protocol. *)
@@ -302,6 +323,6 @@ let () =
           test_classify_is_empty;
           test_get_registered_mockup_no_env;
           test_get_registered_mockup_not_found;
-          test_get_registered_mockup_take_first;
+          test_get_registered_mockup_take_alpha;
           test_get_registered_mockup_take_requested ] ) ]
   |> Lwt_main.run

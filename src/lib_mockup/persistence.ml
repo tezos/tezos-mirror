@@ -62,31 +62,44 @@ module Internal = struct
       let of_json = Data_encoding.Json.destruct encoding
     end
 
-    let get_registered_mockup :
-        Protocol_hash.t option ->
+    let get_registered_mockup (protocol_hash_opt : Protocol_hash.t option) :
         Registration.mockup_environment tzresult Lwt.t =
-     fun protocol_hash_opt ->
       let mockup_environments = Registration.get_registered_environments () in
-      match mockup_environments with
-      | [] ->
-          failwith "get_registered_mockup: no registered mockup environment"
-      | fst_mockup :: _ -> (
-        match protocol_hash_opt with
-        | None ->
-            return fst_mockup
-        | Some protocol_hash -> (
-          match
-            List.find_opt
+      let criterion (module Mockup : Registration_intf.MOCKUP) =
+        protocol_hash_opt
+        |> Option.fold
+             ~some:(Protocol_hash.equal Mockup.protocol_hash)
+             ~none:Mockup.is_alpha
+      in
+      match List.find criterion mockup_environments with
+      | Some mockup ->
+          return mockup
+      | None ->
+          let requested_protocol =
+            match protocol_hash_opt with
+            | Some requested ->
+                Format.asprintf
+                  "Requested protocol with hash %a"
+                  Protocol_hash.pp
+                  requested
+            | None ->
+                "Default protocol Alpha (no requested protocol)"
+          in
+          let protocol_hashes =
+            List.map
               (fun (module Mockup : Registration_intf.MOCKUP) ->
-                Protocol_hash.equal protocol_hash Mockup.protocol_hash)
+                Mockup.protocol_hash)
               mockup_environments
-          with
-          | Some mockup ->
-              return mockup
-          | None ->
-              failwith
-                "requested protocol not found in available mockup environments"
-          ) )
+          in
+          failwith
+            "%s not found in available mockup environments. Available \
+             protocol hashes: [%a]"
+            requested_protocol
+            Format.(
+              pp_print_list
+                ~pp_sep:(fun fmt () -> fprintf fmt ", ")
+                Protocol_hash.pp)
+            protocol_hashes
 
     let default_mockup_context :
         Tezos_client_base.Client_context.full ->

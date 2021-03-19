@@ -74,6 +74,8 @@ module type MOCKUP = sig
     T.mockup_context tzresult Lwt.t
 
   val migrate : T.mockup_context -> T.mockup_context tzresult Lwt.t
+
+  val is_alpha : bool
 end
 
 module type S = sig
