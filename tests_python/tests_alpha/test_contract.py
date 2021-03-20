@@ -149,7 +149,7 @@ class TestManager:
         utils.bake(client, 'bootstrap5')
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.000691
+        fee = 0.000670
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance - amount_mutez == new_balance
         assert (
@@ -173,7 +173,7 @@ class TestManager:
         new_balance = client.get_mutez_balance('manager')
         new_balance_dest = client.get_mutez_balance('manager2')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.000833
+        fee = 0.000812
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance_bootstrap - fee_mutez == new_balance_bootstrap
         assert balance - amount_mutez == new_balance
@@ -304,7 +304,7 @@ class TestManager:
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
         new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
-        fee_mutez = 691 + 595
+        fee_mutez = 670 + 574
         assert balance - amount_mutez_2 - amount_mutez_3 == new_balance
         assert (
             balance_bootstrap2 + amount_mutez_2 - fee_mutez

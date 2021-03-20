@@ -56,6 +56,14 @@ type error +=
 
 val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 
+(** [must_exist ctxt contract] fails with the [Non_existing_contract] error if
+    [exists ctxt contract] returns [false]. Even though this function is
+    gas-free, it is always called in a context where some gas consumption is
+    guaranteed whenever necessary. The first context is that of a transfer
+    operation, and in that case the base cost of a manager operation
+    ([Micheclson_v1_gas.Cost_of.manager_operation]) is consumed. The second
+    context is that of an activation operation, and in that case no gas needs to
+    be consumed since that operation is not a manager operation. *)
 val must_exist : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 
 val allocated : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t

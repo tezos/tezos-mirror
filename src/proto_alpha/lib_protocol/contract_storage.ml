@@ -706,13 +706,13 @@ let spend c contract amount =
                 delete c contract))
 
 let credit c contract amount =
-  (if Tez_repr.(amount <> Tez_repr.zero) then return c
+  (if Tez_repr.(amount <> Tez_repr.zero) then return_unit
   else
-    must_exist c contract >>=? fun () ->
-    Storage.Contract.Code.mem c contract >>=? fun (c, target_has_code) ->
-    Lwt.return
-      (error_unless target_has_code (Empty_transaction contract) >|? fun () -> c))
-  >>=? fun c ->
+    error_unless
+      (Option.is_some (Contract_repr.is_originated contract))
+      (Empty_transaction contract)
+    >>?= fun () -> must_exist c contract)
+  >>=? fun () ->
   Storage.Contract.Balance.find c contract >>=? function
   | None -> (
       match Contract_repr.is_implicit contract with
