@@ -25,9 +25,6 @@
 
 open Monad
 
-(* Like Lwt.apply but specialised for three parameters *)
-let apply3 f x y = try f x y with exn -> Lwt.fail exn
-
 type (+'a, 'e) node = Nil | Cons of 'a * ('a, 'e) t
 
 and ('a, 'e) t = unit -> (('a, 'e) node, 'e) result
@@ -80,7 +77,7 @@ let fold_left_s f acc seq =
   | Nil ->
       Monad.return acc
   | Cons (item, seq) ->
-      apply3 f acc item >>= fun acc -> fold_left_s f acc seq
+      lwt_apply2 f acc item >>= fun acc -> fold_left_s f acc seq
 
 let rec fold_left_es f acc seq =
   seq ()
@@ -96,7 +93,7 @@ let fold_left_es f acc seq =
   | Nil ->
       Monad.return acc
   | Cons (item, seq) ->
-      apply3 f acc item >>=? fun acc -> fold_left_es f acc seq
+      lwt_apply2 f acc item >>=? fun acc -> fold_left_es f acc seq
 
 let rec iter f seq =
   seq () >>? function Nil -> unit_e | Cons (item, seq) -> f item ; iter f seq

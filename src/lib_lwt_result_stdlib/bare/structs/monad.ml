@@ -161,3 +161,12 @@ let join_ep ts = all_p ts >|= join_e
 let all_ep ts = all_p ts >|= all_e
 
 let both_ep a b = both_p a b >|= fun (a, b) -> both_e a b
+
+(**/**)
+
+(* For internal use only, not advertised *)
+
+(* Like Lwt.apply but specialised for two-parameters functions *)
+let lwt_apply2 f x y = try f x y with exn -> Lwt.fail exn
+
+let lwt_apply3 f a x y = try f a x y with exn -> Lwt.fail exn

@@ -31,9 +31,6 @@ let cons item t () = Cons (item, t)
 let rec append ta tb () =
   match ta () with Nil -> tb () | Cons (item, ta) -> Cons (item, append ta tb)
 
-(* Like Lwt.apply but specialised for two-parameter functions *)
-let apply2 f x y = try f x y with exn -> Lwt.fail exn
-
 let rec fold_left_e f acc seq =
   match seq () with
   | Nil ->
@@ -53,7 +50,7 @@ let fold_left_s f acc seq =
   | Nil ->
       Lwt.return acc
   | Cons (item, seq) ->
-      apply2 f acc item >>= fun acc -> fold_left_s f acc seq
+      lwt_apply2 f acc item >>= fun acc -> fold_left_s f acc seq
 
 let rec fold_left_es f acc seq =
   match seq () with
@@ -67,7 +64,7 @@ let fold_left_es f acc seq =
   | Nil ->
       Monad.return acc
   | Cons (item, seq) ->
-      apply2 f acc item >>=? fun acc -> fold_left_es f acc seq
+      lwt_apply2 f acc item >>=? fun acc -> fold_left_es f acc seq
 
 let rec iter_e f seq =
   match seq () with

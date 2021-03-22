@@ -428,8 +428,6 @@ let iteri_e f l =
   in
   aux 0 l
 
-let lwt_apply2 f x y = try f x y with exc -> Lwt.fail exc
-
 let iteri_s f l =
   let rec aux i = function
     | [] ->
@@ -778,8 +776,6 @@ let fold_left2_e ~when_different_lengths f init xs ys =
         Error when_different_lengths
   in
   aux init xs ys
-
-let lwt_apply3 f a x y = try f a x y with exc -> Lwt.fail exc
 
 let fold_left2_s ~when_different_lengths f init xs ys =
   let rec aux acc xs ys =
