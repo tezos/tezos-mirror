@@ -66,18 +66,17 @@ module Internal = struct
         (printer : #Tezos_client_base.Client_context.printer) :
         Registration.mockup_environment tzresult Lwt.t =
       let mockup_environments = Registration.get_registered_environments () in
-      let criterion (module Mockup : Registration_intf.MOCKUP) =
-        match protocol_hash_opt with
-        | Some protocol_hash ->
-            Lwt.return
-            @@ Protocol_hash.equal protocol_hash Mockup.protocol_hash
-        | None ->
-            printer#warning
-              "No protocol specified: using Alpha as default protocol."
-            >>= fun () -> Lwt.return Mockup.is_alpha
-      in
-      List.find_s criterion mockup_environments
-      >>= function
+      ( match protocol_hash_opt with
+      | Some protocol_hash ->
+          Lwt.return (fun (module Mockup : Registration_intf.MOCKUP) ->
+              Protocol_hash.equal protocol_hash Mockup.protocol_hash)
+      | None ->
+          printer#warning
+            "No protocol specified: using Alpha as default protocol."
+          >|= fun () (module Mockup : Registration_intf.MOCKUP) ->
+          Mockup.is_alpha )
+      >>= fun criterion ->
+      match List.find criterion mockup_environments with
       | Some mockup ->
           return mockup
       | None ->
