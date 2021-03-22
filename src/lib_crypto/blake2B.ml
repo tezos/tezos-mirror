@@ -57,7 +57,7 @@ module Make_minimal (K : Name) = struct
     match of_string_opt s with
     | None ->
         generic_error
-          "%s.of_string: wrong string size (%d) instead of %d"
+          "%s.of_string: wrong string size (%d instead of %d)"
           K.name
           (String.length s)
           size
@@ -69,7 +69,7 @@ module Make_minimal (K : Name) = struct
     | None ->
         Format.kasprintf
           invalid_arg
-          "%s.of_string: wrong string size (%d) instead of %d !!"
+          "%s.of_string_exn: wrong string size (%d instead of %d)"
           K.name
           (String.length s)
           size
@@ -102,9 +102,10 @@ module Make_minimal (K : Name) = struct
     | None ->
         let msg =
           Printf.sprintf
-            "%s.of_bytes: wrong string size (%d)"
+            "%s.of_bytes_exn: wrong string size (%d instead of %d)"
             K.name
             (Bytes.length b)
+            size
         in
         raise (Invalid_argument msg)
     | Some h ->

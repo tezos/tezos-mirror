@@ -45,7 +45,7 @@ let of_string s =
   match of_string_opt s with
   | None ->
       generic_error
-        "%s.of_string: wrong string size (%d) instead of %d"
+        "%s.of_string: wrong string size (%d instead of %d)"
         name
         (String.length s)
         size
@@ -57,9 +57,10 @@ let of_string_exn s =
   | None ->
       Format.kasprintf
         invalid_arg
-        "%s.of_string_exn: wrong string size (%d)"
+        "%s.of_string_exn: wrong string size (%d instead of %d)"
         name
         (String.length s)
+        size
   | Some h ->
       h
 
@@ -81,9 +82,10 @@ let of_bytes_exn b =
   | None ->
       let msg =
         Printf.sprintf
-          "%s.of_bytes: wrong string size (%d)"
+          "%s.of_bytes_exn: wrong string size (%d instead of %d)"
           name
           (Bytes.length b)
+          size
       in
       raise (Invalid_argument msg)
   | Some h ->
