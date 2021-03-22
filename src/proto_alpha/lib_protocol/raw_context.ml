@@ -812,7 +812,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Edo_008
+type previous_protocol = Genesis of Parameters_repr.t | Florence_009
 
 let check_and_update_protocol_version ctxt =
   Context.find ctxt version_key
@@ -827,7 +827,8 @@ let check_and_update_protocol_version ctxt =
             else if Compare.String.(s = "genesis") then
               get_proto_param ctxt
               >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-            else if Compare.String.(s = "edo_008") then return (Edo_008, ctxt)
+            else if Compare.String.(s = "florence_009") then
+              return (Florence_009, ctxt)
             else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.add ctxt version_key (Bytes.of_string version_value)
@@ -880,7 +881,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
       in
       set_cycle_eras ctxt [cycle_era]
       >>=? fun ctxt -> add_constants ctxt param.constants >|= ok
-  | Edo_008 ->
+  | Florence_009 ->
       get_first_level ctxt
       >>=? fun first_level ->
       Context.remove ctxt first_level_key

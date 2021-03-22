@@ -79,7 +79,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun ctxt ->
       Storage.Block_priority.init ctxt 0
       >>=? fun ctxt -> Vote_storage.update_listings ctxt
-  | Edo_008 ->
+  | Florence_009 ->
       (* Only the starting position of the voting period is shifted by
        one level into the future, so that voting periods are again
        aligned with cycles. The period kind does not change, as a new
