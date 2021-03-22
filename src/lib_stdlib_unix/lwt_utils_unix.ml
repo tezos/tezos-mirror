@@ -134,6 +134,9 @@ let write_string ?(pos = 0) ?len descr buf =
   in
   inner pos len
 
+let is_directory file_name =
+  Lwt_unix.lstat file_name >|= fun s -> s.st_kind = S_DIR
+
 let remove_dir dir =
   let rec remove dir =
     let files = Lwt_unix.files_of_directory dir in

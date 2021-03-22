@@ -60,7 +60,7 @@ val read_bytes :
 val write_string :
   ?pos:int -> ?len:int -> Lwt_unix.file_descr -> string -> unit Lwt.t
 
-(** [write_bytes ?file_offset ?pos ?len fd buf] write [len-pos] bytes
+(** [write_bytes ?file_offset ?pos ?len fd buf] writes [len-pos] bytes
     from [bytes] to [fd]. If [file_offset] is given, {!Lwt_unix.pwrite}
     will be used instead of {!Lwt_unix.write}.
 
@@ -73,6 +73,11 @@ val write_bytes :
   Lwt_unix.file_descr ->
   Bytes.t ->
   unit Lwt.t
+
+(** [is_directory path] tests if the given [path] refers to a
+   directory (file kind is [S_DIR]). Returns [false] if [path] refers
+   to a symbolic link. *)
+val is_directory : string -> bool Lwt.t
 
 val remove_dir : string -> unit Lwt.t
 
