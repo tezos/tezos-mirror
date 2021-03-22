@@ -35,7 +35,7 @@ module type PROTOCOL = sig
 end
 
 (** The module type of a mockup environment. Modules of this type should be
-    prepared protocol-side and registered here to become available to the
+    prepared protocol-side and registered in {!Registration} to become available to the
     mockup facility. *)
 module type MOCKUP = sig
   type parameters
