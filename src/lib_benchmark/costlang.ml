@@ -860,30 +860,35 @@ module Fold_constants (X : S) = struct
 
   let int i = Int i
 
+  let arith_op op_i op_f op_x x y =
+    match (x, y) with
+    | (Int i, Int j) ->
+        Int (op_i i j)
+    | (Float i, Float j) ->
+        Float (op_f i j)
+    | (Int i, Float j) ->
+        Float (op_f (float_of_int i) j)
+    | (Float i, Int j) ->
+        Float (op_f i (float_of_int j))
+    | (Not_const term, Int i) ->
+        Not_const (op_x term (X.int i))
+    | (Int i, Not_const term) ->
+        Not_const (op_x (X.int i) term)
+    | (Not_const term, Float i) ->
+        Not_const (op_x term (X.float i))
+    | (Float i, Not_const term) ->
+        Not_const (op_x (X.float i) term)
+    | (Not_const x, Not_const y) ->
+        Not_const (op_x x y)
+    | (Bool _, _) | (_, Bool _) ->
+        assert false
+
   let ( + ) x y =
     match (x, y) with
     | (Int 0, term) | (Float 0.0, term) | (term, Int 0) | (term, Float 0.0) ->
         term
-    | (Int i, Int j) ->
-        Int (i + j)
-    | (Float i, Float j) ->
-        Float (i +. j)
-    | (Int i, Float j) ->
-        Float (float_of_int i +. j)
-    | (Float i, Int j) ->
-        Float (i +. float_of_int j)
-    | (Not_const term, Int i) ->
-        Not_const X.(term + int i)
-    | (Int i, Not_const term) ->
-        Not_const X.(int i + term)
-    | (Not_const term, Float i) ->
-        Not_const X.(term + float i)
-    | (Float i, Not_const term) ->
-        Not_const X.(float i + term)
-    | (Not_const x, Not_const y) ->
-        Not_const X.(x + y)
-    | (Bool _, _) | (_, Bool _) ->
-        assert false
+    | _ ->
+        arith_op ( + ) ( +. ) X.( + ) x y
 
   let ( * ) x y =
     match (x, y) with
@@ -891,51 +896,15 @@ module Fold_constants (X : S) = struct
         Int 0
     | (Int 1, term) | (Float 1.0, term) | (term, Int 1) | (term, Float 1.0) ->
         term
-    | (Int i, Int j) ->
-        Int (i * j)
-    | (Float i, Float j) ->
-        Float (i *. j)
-    | (Int i, Float j) ->
-        Float (float_of_int i *. j)
-    | (Float i, Int j) ->
-        Float (i *. float_of_int j)
-    | (Not_const term, Int i) ->
-        Not_const X.(term * int i)
-    | (Int i, Not_const term) ->
-        Not_const X.(int i * term)
-    | (Not_const term, Float i) ->
-        Not_const X.(term * float i)
-    | (Float i, Not_const term) ->
-        Not_const X.(float i * term)
-    | (Not_const x, Not_const y) ->
-        Not_const X.(x * y)
-    | (Bool _, _) | (_, Bool _) ->
-        assert false
+    | _ ->
+        arith_op ( * ) ( *. ) X.( * ) x y
 
   let ( - ) x y =
     match (x, y) with
     | (term, Int 0) | (term, Float 0.0) ->
         term
-    | (Int i, Int j) ->
-        Int (i - j)
-    | (Float i, Float j) ->
-        Float (i -. j)
-    | (Int i, Float j) ->
-        Float (float_of_int i -. j)
-    | (Float i, Int j) ->
-        Float (i -. float_of_int j)
-    | (Not_const term, Int i) ->
-        Not_const X.(term - int i)
-    | (Int i, Not_const term) ->
-        Not_const X.(int i - term)
-    | (Not_const term, Float i) ->
-        Not_const X.(term - float i)
-    | (Float i, Not_const term) ->
-        Not_const X.(float i - term)
-    | (Not_const x, Not_const y) ->
-        Not_const X.(x - y)
-    | (Bool _, _) | (_, Bool _) ->
-        assert false
+    | _ ->
+        arith_op ( - ) ( -. ) X.( - ) x y
 
   let ( / ) x y =
     match (x, y) with
@@ -943,6 +912,7 @@ module Fold_constants (X : S) = struct
         term
     | (term, Float 1.0) ->
         term
+    (* The next cases are here to avoid introducing floating point constants from the division *)
     | (Int i, Int j) ->
         Not_const X.(int i / int j)
     | (Float i, Float j) ->
@@ -951,64 +921,12 @@ module Fold_constants (X : S) = struct
         Not_const X.(int i / float j)
     | (Float i, Int j) ->
         Not_const X.(float i / int j)
-    | (Not_const term, Int i) ->
-        Not_const X.(term / int i)
-    | (Int i, Not_const term) ->
-        Not_const X.(int i / term)
-    | (Not_const term, Float i) ->
-        Not_const X.(term / float i)
-    | (Float i, Not_const term) ->
-        Not_const X.(float i / term)
-    | (Not_const x, Not_const y) ->
-        Not_const X.(x / y)
-    | (Bool _, _) | (_, Bool _) ->
-        assert false
+    | _ ->
+        arith_op ( / ) ( /. ) X.( / ) x y
 
-  let max x y =
-    match (x, y) with
-    | (Int i, Int j) ->
-        Int (max i j)
-    | (Float i, Float j) ->
-        Float (max i j)
-    | (Int i, Float j) ->
-        Float (max (float_of_int i) j)
-    | (Float i, Int j) ->
-        Float (max i (float_of_int j))
-    | (Not_const term, Int i) ->
-        Not_const X.(max term (int i))
-    | (Int i, Not_const term) ->
-        Not_const X.(max (int i) term)
-    | (Not_const term, Float i) ->
-        Not_const X.(max term (float i))
-    | (Float i, Not_const term) ->
-        Not_const X.(max (float i) term)
-    | (Not_const x, Not_const y) ->
-        Not_const X.(max x y)
-    | (Bool _, _) | (_, Bool _) ->
-        assert false
+  let max = arith_op max max X.max
 
-  let min x y =
-    match (x, y) with
-    | (Int i, Int j) ->
-        Int (min i j)
-    | (Float i, Float j) ->
-        Float (min i j)
-    | (Int i, Float j) ->
-        Float (min (float_of_int i) j)
-    | (Float i, Int j) ->
-        Float (min i (float_of_int j))
-    | (Not_const term, Int i) ->
-        Not_const X.(min term (int i))
-    | (Int i, Not_const term) ->
-        Not_const X.(min (int i) term)
-    | (Not_const term, Float i) ->
-        Not_const X.(min term (float i))
-    | (Float i, Not_const term) ->
-        Not_const X.(min (float i) term)
-    | (Not_const x, Not_const y) ->
-        Not_const X.(min x y)
-    | (Bool _, _) | (_, Bool _) ->
-        assert false
+  let min = arith_op min min X.min
 
   let shift_left x s =
     inj
