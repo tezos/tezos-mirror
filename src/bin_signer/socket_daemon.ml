@@ -23,10 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Signer_logging
 open Signer_messages
-
-let log = lwt_log_notice
+module Events = Signer_events.Socket_daemon
 
 let handle_client_step ?magic_bytes ?timeout ~check_high_watermark
     ~require_auth cctxt fd =
@@ -86,12 +84,7 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
   let open Tezos_base_unix.Socket in
   ( match path with
   | Tcp (host, service, _opts) ->
-      log
-        Tag.DSL.(
-          fun f ->
-            f "Accepting TCP requests on %s:%s"
-            -% t event "accepting_tcp_requests"
-            -% s host_name host -% s service_name service)
+      Events.(emit accepting_tcp_requests) (host, service)
   | Unix path ->
       ListLabels.iter
         Sys.[sigint; sigterm]
@@ -103,12 +96,7 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
                  Format.printf "Removing the local socket file and quitting.@." ;
                  Unix.unlink path ;
                  exit 0))) ;
-      log
-        Tag.DSL.(
-          fun f ->
-            f "Accepting UNIX requests on %s"
-            -% t event "accepting_unix_requests"
-            -% s unix_socket_path path) )
+      Events.(emit accepting_unix_requests) path )
   >>= fun () ->
   bind path
   >>=? fun fds ->

@@ -22,10 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-open Signer_logging
-
-let log = lwt_log_notice
+module Events = Signer_events.Handler
 
 module High_watermark = struct
   let encoding =
@@ -160,14 +157,8 @@ let check_authorization cctxt pkh data require_auth signature =
 let sign (cctxt : #Client_context.wallet)
     Signer_messages.Sign.Request.{pkh; data; signature} ?magic_bytes
     ~check_high_watermark ~require_auth =
-  log
-    Tag.DSL.(
-      fun f ->
-        f "Request for signing %d bytes of data for key %a, magic byte = %02X"
-        -% t event "request_for_signing"
-        -% s num_bytes (Bytes.length data)
-        -% a Signature.Public_key_hash.Logging.tag pkh
-        -% s magic_byte (TzEndian.get_uint8 data 0))
+  Events.(emit request_for_signing)
+    (Bytes.length data, pkh, TzEndian.get_uint8 data 0)
   >>= fun () ->
   check_magic_byte magic_bytes data
   >>=? fun () ->
@@ -175,12 +166,7 @@ let sign (cctxt : #Client_context.wallet)
   >>=? fun () ->
   Client_keys.get_key cctxt pkh
   >>=? fun (name, _pkh, sk_uri) ->
-  log
-    Tag.DSL.(
-      fun f ->
-        f "Signing data for key %s"
-        -% t event "signing_data"
-        -% s Client_keys.Logging.tag name)
+  Events.(emit signing_data) name
   >>= fun () ->
   let sign = Client_keys.sign cctxt sk_uri in
   if check_high_watermark then
@@ -190,78 +176,37 @@ let sign (cctxt : #Client_context.wallet)
 let deterministic_nonce (cctxt : #Client_context.wallet)
     Signer_messages.Deterministic_nonce.Request.{pkh; data; signature}
     ~require_auth =
-  log
-    Tag.DSL.(
-      fun f ->
-        f "Request for creating a nonce from %d input bytes for key %a"
-        -% t event "request_for_deterministic_nonce"
-        -% s num_bytes (Bytes.length data)
-        -% a Signature.Public_key_hash.Logging.tag pkh)
+  Events.(emit request_for_deterministic_nonce) (Bytes.length data, pkh)
   >>= fun () ->
   check_authorization cctxt pkh data require_auth signature
   >>=? fun () ->
   Client_keys.get_key cctxt pkh
   >>=? fun (name, _pkh, sk_uri) ->
-  log
-    Tag.DSL.(
-      fun f ->
-        f "Creating nonce for key %s"
-        -% t event "creating_nonce"
-        -% s Client_keys.Logging.tag name)
+  Events.(emit creating_nonce) name
   >>= fun () -> Client_keys.deterministic_nonce sk_uri data
 
 let deterministic_nonce_hash (cctxt : #Client_context.wallet)
     Signer_messages.Deterministic_nonce_hash.Request.{pkh; data; signature}
     ~require_auth =
-  log
-    Tag.DSL.(
-      fun f ->
-        f "Request for creating a nonce hash from %d input bytes for key %a"
-        -% t event "request_for_deterministic_nonce_hash"
-        -% s num_bytes (Bytes.length data)
-        -% a Signature.Public_key_hash.Logging.tag pkh)
+  Events.(emit request_for_deterministic_nonce_hash) (Bytes.length data, pkh)
   >>= fun () ->
   check_authorization cctxt pkh data require_auth signature
   >>=? fun () ->
   Client_keys.get_key cctxt pkh
   >>=? fun (name, _pkh, sk_uri) ->
-  log
-    Tag.DSL.(
-      fun f ->
-        f "Creating nonce hash for key %s"
-        -% t event "creating_nonce_hash"
-        -% s Client_keys.Logging.tag name)
+  Events.(emit creating_nonce_hash) name
   >>= fun () -> Client_keys.deterministic_nonce_hash sk_uri data
 
 let supports_deterministic_nonces (cctxt : #Client_context.wallet) pkh =
-  log
-    Tag.DSL.(
-      fun f ->
-        f
-          "Request for checking whether the signer supports deterministic \
-           nonces for key %a"
-        -% t event "request_for_supports_deterministic_nonces"
-        -% a Signature.Public_key_hash.Logging.tag pkh)
+  Events.(emit request_for_supports_deterministic_nonces) pkh
   >>= fun () ->
   Client_keys.get_key cctxt pkh
   >>=? fun (name, _pkh, sk_uri) ->
-  log
-    Tag.DSL.(
-      fun f ->
-        f
-          "Returns true if and only if signer can generate deterministic \
-           nonces for key %s"
-        -% t event "supports_deterministic_nonces"
-        -% s Client_keys.Logging.tag name)
+  Events.(emit supports_deterministic_nonces) name
   >>= fun () -> Client_keys.supports_deterministic_nonces sk_uri
 
 let public_key (cctxt : #Client_context.wallet) pkh =
-  log
-    Tag.DSL.(
-      fun f ->
-        f "Request for public key %a"
-        -% t event "request_for_public_key"
-        -% a Signature.Public_key_hash.Logging.tag pkh)
+  Events.(emit request_for_public_key) pkh
   >>= fun () ->
   Client_keys.list_keys cctxt
   >>=? fun all_keys ->
@@ -270,28 +215,7 @@ let public_key (cctxt : #Client_context.wallet) pkh =
       (fun (_, h, _, _) -> Signature.Public_key_hash.equal h pkh)
       all_keys
   with
-  | None ->
-      log
-        Tag.DSL.(
-          fun f ->
-            f "No public key found for hash %a"
-            -% t event "not_found_public_key"
-            -% a Signature.Public_key_hash.Logging.tag pkh)
-      >>= fun () -> Lwt.fail Not_found
-  | Some (_, _, None, _) ->
-      log
-        Tag.DSL.(
-          fun f ->
-            f "No public key found for hash %a"
-            -% t event "not_found_public_key"
-            -% a Signature.Public_key_hash.Logging.tag pkh)
-      >>= fun () -> Lwt.fail Not_found
+  | None | Some (_, _, None, _) ->
+      Events.(emit not_found_public_key) pkh >>= fun () -> Lwt.fail Not_found
   | Some (name, _, Some pk, _) ->
-      log
-        Tag.DSL.(
-          fun f ->
-            f "Found public key for hash %a (name: %s)"
-            -% t event "found_public_key"
-            -% a Signature.Public_key_hash.Logging.tag pkh
-            -% s Client_keys.Logging.tag name)
-      >>= fun () -> return pk
+      Events.(emit found_public_key) (pkh, name) >>= fun () -> return pk

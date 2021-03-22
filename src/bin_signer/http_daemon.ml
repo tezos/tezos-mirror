@@ -23,9 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let log = Signer_logging.lwt_log_notice
-
-open Signer_logging
+module Events = Signer_events.Http_daemon
 
 let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
     ~check_high_watermark ~require_auth mode =
@@ -56,15 +54,10 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
     (fun () ->
       List.map
         (fun host ->
-          let host = Ipaddr.V6.to_string host in
-          log
-            Tag.DSL.(
-              fun f ->
-                f "Listening on address %s"
-                -% t event "signer_listening" -% s host_name host)
+          Events.(emit listening) host
           >>= fun () ->
           RPC_server.launch
-            ~host
+            ~host:(Ipaddr.V6.to_string host)
             mode
             dir
             ~media_types:Media_type.all_media_types
@@ -88,12 +81,7 @@ let run_https (cctxt : #Client_context.wallet) ~host ~port ~cert ~key
       failwith "Cannot resolve listening address: %S" host
   | points ->
       let hosts = fst (List.split points) in
-      log
-        Tag.DSL.(
-          fun f ->
-            f "Accepting HTTPS requests on port %d"
-            -% t event "accepting_https_requests"
-            -% s port_number port)
+      Events.(emit accepting_requests) ("HTTPS", port)
       >>= fun () ->
       let mode : Conduit_lwt_unix.server =
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
@@ -117,12 +105,7 @@ let run_http (cctxt : #Client_context.wallet) ~host ~port ?magic_bytes
       failwith "Cannot resolve listening address: %S" host
   | points ->
       let hosts = fst (List.split points) in
-      log
-        Tag.DSL.(
-          fun f ->
-            f "Accepting HTTP requests on port %d"
-            -% t event "accepting_http_requests"
-            -% s port_number port)
+      Events.(emit accepting_requests) ("HTTP", port)
       >>= fun () ->
       let mode : Conduit_lwt_unix.server = `TCP (`Port port) in
       run
