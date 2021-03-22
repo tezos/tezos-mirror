@@ -6,6 +6,7 @@ from . import protocol
 
 
 BAKE_ARGS = ['--max-priority', '512', '--minimal-timestamp']
+TRANSFER_AMOUNT = 500
 
 
 # TODO  test doesn't pass with n=2 (--bootstrap-treshold?)
@@ -40,7 +41,9 @@ class TestManualBaking:
 
     def test_transfer(self, clients: List[Client], session: dict):
         client_id = 3 % len(clients)
-        transfer = clients[client_id].transfer(500, 'bootstrap1', 'bootstrap3')
+        transfer = clients[client_id].transfer(
+            TRANSFER_AMOUNT, 'bootstrap1', 'bootstrap3'
+        )
         session["transfer_hash"] = transfer.operation_hash
         session["transfer_fees"] = transfer.fees
 
@@ -76,4 +79,7 @@ class TestManualBaking:
         initial_amount = int(parameters["bootstrap_accounts"][0][1])
         deposit = int(parameters["block_security_deposit"])
         tx_fee = session['transfer_fees']
-        assert bal == (initial_amount - deposit) / 1000000 - tx_fee - 500
+        assert (
+            bal
+            == (initial_amount - deposit) / 1000000 - tx_fee - TRANSFER_AMOUNT
+        )
