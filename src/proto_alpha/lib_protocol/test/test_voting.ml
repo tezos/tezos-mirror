@@ -1226,6 +1226,23 @@ let test_voting_power_updated_each_voting_period () =
         power_of_baker_3)
     block
 
+let test_voting_period_pp () =
+  let vp =
+    Voting_period_repr.
+      {
+        index = Int32.of_int 123;
+        kind = Proposal;
+        start_position = Int32.of_int 321;
+      }
+  in
+  Assert.equal
+    ~loc:__LOC__
+    ( = )
+    "Unexpected pretty printing of voting period"
+    Format.pp_print_string
+    (Format.asprintf "%a" Voting_period_repr.pp vp)
+    "index: 123, kind:proposal, start_position: 321"
+
 let tests =
   [ Test_services.tztest
       "voting successful_vote"
@@ -1282,4 +1299,8 @@ let tests =
     Test_services.tztest
       "voting power updated in each voting period"
       `Quick
-      test_voting_power_updated_each_voting_period ]
+      test_voting_power_updated_each_voting_period;
+    Test_services.tztest
+      "voting period pretty print"
+      `Quick
+      test_voting_period_pp ]
