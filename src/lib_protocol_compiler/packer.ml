@@ -78,6 +78,19 @@ let include_ml oc file =
   let unit =
     String.capitalize_ascii (Filename.chop_extension (Filename.basename file))
   in
+  let () =
+    String.iter
+      (function
+        | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' ->
+            ()
+        | other ->
+            Format.kasprintf
+              Stdlib.failwith
+              "protocol-compiler: module %S uses an illegal character: %c."
+              unit
+              other)
+      unit
+  in
   Printf.fprintf oc "module %s " unit ;
   let mli = file ^ "i" in
   if Sys.file_exists mli then (
