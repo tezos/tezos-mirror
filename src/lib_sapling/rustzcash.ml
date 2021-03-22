@@ -717,7 +717,13 @@ let () =
   | _ ->
       None
 
-let init_params () =
+type parameter_files = {spend_path : string; output_path : string}
+
+(* Find Zcash parameter files.
+   This function is parameterized by system functions in order to be able to test it
+   with a mock. *)
+let find_params ?(getenv_opt = Sys.getenv_opt) ?(getcwd = Sys.getcwd)
+    ?(file_exists = Sys.file_exists) () =
   let ( // ) = Filename.concat in
   (* [env name path] looks up the value of environment variable [name]
      and concatenates it with [path].
@@ -725,7 +731,7 @@ let init_params () =
      to contain a list of paths separated by character [split].
      Otherwise the environment variable is expected to contain a single path. *)
   let env ?split name path =
-    match Sys.getenv_opt name with
+    match getenv_opt name with
     | None ->
         []
     | Some value -> (
@@ -736,7 +742,7 @@ let init_params () =
           List.map (fun dir -> dir // path) (String.split_on_char char value) )
   in
   (* [cwd path] is the current directory concatenated to [path]. *)
-  let cwd path = try [Sys.getcwd () // path] with Sys_error _ -> [] in
+  let cwd path = try [getcwd () // path] with Sys_error _ -> [] in
   (* List directories where we could find zcash parameter files.
      Directories with higher priority come first. *)
   let candidate_directories =
@@ -751,18 +757,12 @@ let init_params () =
   in
   (* Files we are looking for. *)
   let spend_path = "sapling-spend.params" in
-  let spend_hash =
-    "8270785a1a0d0bc77196f000ee6d221c9c9894f55307bd9357c3f0105d31ca63991ab91324160d8f53e2bbd3c2633a6eb8bdf5205d822e7f3f73edac51b2b70c\000"
-  in
   let output_path = "sapling-output.params" in
-  let output_hash =
-    "657e3d38dbb5cb5e7dd2970e8b03d69b4787dd907285b5a7f0790dcc8072f60bf593b32cc2d1c030e00ff5ae64bf84c5c3beb84ddc841d48264b4a171744d028\000"
-  in
   (* Find the first candidate directory that contains the expected files. *)
   let directory =
     let contains_zcash_files directory =
-      Sys.file_exists (directory // spend_path)
-      && Sys.file_exists (directory // output_path)
+      file_exists (directory // spend_path)
+      && file_exists (directory // output_path)
     in
     match List.find_opt contains_zcash_files candidate_directories with
     | None ->
@@ -772,6 +772,16 @@ let init_params () =
   in
   let spend_path = directory // spend_path in
   let output_path = directory // output_path in
+  {spend_path; output_path}
+
+let init_params () =
+  let {spend_path; output_path} = find_params () in
+  let spend_hash =
+    "8270785a1a0d0bc77196f000ee6d221c9c9894f55307bd9357c3f0105d31ca63991ab91324160d8f53e2bbd3c2633a6eb8bdf5205d822e7f3f73edac51b2b70c\000"
+  in
+  let output_hash =
+    "657e3d38dbb5cb5e7dd2970e8b03d69b4787dd907285b5a7f0790dcc8072f60bf593b32cc2d1c030e00ff5ae64bf84c5c3beb84ddc841d48264b4a171744d028\000"
+  in
   init_zksnark_params ~spend_path ~spend_hash ~output_path ~output_hash
 
 let init_params_lazy = Lazy.from_fun init_params

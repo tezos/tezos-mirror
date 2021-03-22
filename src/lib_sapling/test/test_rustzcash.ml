@@ -1,3 +1,292 @@
+(* Test the [Rustzcash.find_params] function. *)
+let test_find_params () =
+  (* Helper function to quickly define tests. *)
+  let test ~env ~files ?(cwd = ".") expected_result =
+    let fail x =
+      Printf.ksprintf
+        (fun s ->
+          Alcotest.failf
+            "%s with environment [%s] and files [%s]"
+            s
+            (List.map (fun (n, v) -> n ^ ", " ^ v) env |> String.concat "; ")
+            (String.concat "; " files))
+        x
+    in
+    try
+      let {Rustzcash.spend_path; output_path} =
+        Rustzcash.find_params
+          ~getenv_opt:(fun name -> List.assoc_opt name env)
+          ~getcwd:(fun () -> cwd)
+          ~file_exists:(fun path -> List.mem path files)
+          ()
+      in
+      match expected_result with
+      | None ->
+          fail "Did not expect to find Zcash parameter files"
+      | Some (expected_spend_path, expected_output_path) ->
+          if spend_path <> expected_spend_path then
+            fail
+              "Expected spend_path = %S, got %S"
+              expected_spend_path
+              spend_path ;
+          if output_path <> expected_output_path then
+            fail
+              "Expected output_path = %S, got %S"
+              expected_output_path
+              output_path
+    with Rustzcash.Params_not_found _ -> (
+      match expected_result with
+      | None ->
+          ()
+      | Some _ ->
+          fail "Expected to find Zcash parameter files" )
+  in
+  (* Test cases where parameter files are installed in one location
+     and we expect to find them. *)
+  test
+    ~env:[("XDG_DATA_HOME", "~/xdg")]
+    ~files:
+      [ "~/xdg/.local/share/zcash-params/sapling-spend.params";
+        "~/xdg/.local/share/zcash-params/sapling-output.params" ]
+    (Some
+       ( "~/xdg/.local/share/zcash-params/sapling-spend.params",
+         "~/xdg/.local/share/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[("XDG_DATA_DIRS", "/xdg/data")]
+    ~files:
+      [ "/xdg/data/zcash-params/sapling-spend.params";
+        "/xdg/data/zcash-params/sapling-output.params" ]
+    (Some
+       ( "/xdg/data/zcash-params/sapling-spend.params",
+         "/xdg/data/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[("XDG_DATA_DIRS", "/xdg/data1:/xdg/data2")]
+    ~files:
+      [ "/xdg/data1/zcash-params/sapling-spend.params";
+        "/xdg/data1/zcash-params/sapling-output.params" ]
+    (Some
+       ( "/xdg/data1/zcash-params/sapling-spend.params",
+         "/xdg/data1/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[("XDG_DATA_DIRS", "/xdg/data1:/xdg/data2")]
+    ~files:
+      [ "/xdg/data2/zcash-params/sapling-spend.params";
+        "/xdg/data2/zcash-params/sapling-output.params" ]
+    (Some
+       ( "/xdg/data2/zcash-params/sapling-spend.params",
+         "/xdg/data2/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[("XDG_DATA_DIRS", "/xdg/data1:/xdg/data2:::")]
+    ~files:
+      [ "/xdg/data2/zcash-params/sapling-spend.params";
+        "/xdg/data2/zcash-params/sapling-output.params" ]
+    (Some
+       ( "/xdg/data2/zcash-params/sapling-spend.params",
+         "/xdg/data2/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[("OPAM_SWITCH_PREFIX", "~/.opam/4.10.0")]
+    ~files:
+      [ "~/.opam/4.10.0/share/zcash-params/sapling-spend.params";
+        "~/.opam/4.10.0/share/zcash-params/sapling-output.params" ]
+    (Some
+       ( "~/.opam/4.10.0/share/zcash-params/sapling-spend.params",
+         "~/.opam/4.10.0/share/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[("PWD", "~/fake-pwd")]
+    ~files:
+      [ "~/fake-pwd/_opam/share/zcash-params/sapling-spend.params";
+        "~/fake-pwd/_opam/share/zcash-params/sapling-output.params" ]
+    (Some
+       ( "~/fake-pwd/_opam/share/zcash-params/sapling-spend.params",
+         "~/fake-pwd/_opam/share/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[]
+    ~files:
+      [ "./_opam/share/zcash-params/sapling-spend.params";
+        "./_opam/share/zcash-params/sapling-output.params" ]
+    (Some
+       ( "./_opam/share/zcash-params/sapling-spend.params",
+         "./_opam/share/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[("HOME", "~")]
+    ~files:
+      [ "~/.zcash-params/sapling-spend.params";
+        "~/.zcash-params/sapling-output.params" ]
+    (Some
+       ( "~/.zcash-params/sapling-spend.params",
+         "~/.zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[("HOME", "~")]
+    ~files:
+      [ "~/.local/share/zcash-params/sapling-spend.params";
+        "~/.local/share/zcash-params/sapling-output.params" ]
+    (Some
+       ( "~/.local/share/zcash-params/sapling-spend.params",
+         "~/.local/share/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[]
+    ~files:
+      [ "/usr/local/share/zcash-params/sapling-spend.params";
+        "/usr/local/share/zcash-params/sapling-output.params" ]
+    (Some
+       ( "/usr/local/share/zcash-params/sapling-spend.params",
+         "/usr/local/share/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[]
+    ~files:
+      [ "/usr/share/zcash-params/sapling-spend.params";
+        "/usr/share/zcash-params/sapling-output.params" ]
+    (Some
+       ( "/usr/share/zcash-params/sapling-spend.params",
+         "/usr/share/zcash-params/sapling-output.params" )) ;
+  (* Test cases where parameter files are installed in several locations
+     and we expect to find the one with higher priority. *)
+  let files =
+    [ "~/xdg/.local/share/zcash-params/sapling-spend.params";
+      "~/xdg/.local/share/zcash-params/sapling-output.params";
+      "/xdg/data1/zcash-params/sapling-spend.params";
+      "/xdg/data1/zcash-params/sapling-output.params";
+      "/xdg/data2/zcash-params/sapling-spend.params";
+      "/xdg/data2/zcash-params/sapling-output.params";
+      "~/.opam/4.10.0/share/zcash-params/sapling-spend.params";
+      "~/.opam/4.10.0/share/zcash-params/sapling-output.params";
+      "~/fake-pwd/_opam/share/zcash-params/sapling-spend.params";
+      "~/fake-pwd/_opam/share/zcash-params/sapling-output.params";
+      "./_opam/share/zcash-params/sapling-spend.params";
+      "./_opam/share/zcash-params/sapling-output.params";
+      "~/.zcash-params/sapling-spend.params";
+      "~/.zcash-params/sapling-output.params";
+      "~/.local/share/zcash-params/sapling-spend.params";
+      "~/.local/share/zcash-params/sapling-output.params";
+      "/usr/local/share/zcash-params/sapling-spend.params";
+      "/usr/local/share/zcash-params/sapling-output.params";
+      "/usr/share/zcash-params/sapling-spend.params";
+      "/usr/share/zcash-params/sapling-output.params" ]
+  in
+  test
+    ~env:
+      [ ("XDG_DATA_HOME", "~/xdg");
+        ("XDG_DATA_DIRS", "/xdg/data1:/xdg/data2");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.10.0");
+        ("HOME", "~") ]
+    ~files
+    (Some
+       ( "~/xdg/.local/share/zcash-params/sapling-spend.params",
+         "~/xdg/.local/share/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:
+      [ ("XDG_DATA_DIRS", "/xdg/data1:/xdg/data2");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.10.0");
+        ("HOME", "~") ]
+    ~files
+    (Some
+       ( "/xdg/data1/zcash-params/sapling-spend.params",
+         "/xdg/data1/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:
+      [ ("XDG_DATA_DIRS", "/xdg/data2:/xdg/data1");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.10.0");
+        ("HOME", "~") ]
+    ~files
+    (Some
+       ( "/xdg/data2/zcash-params/sapling-spend.params",
+         "/xdg/data2/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:
+      [ ("XDG_DATA_DIRS", "/xdg/inexisting");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.10.0");
+        ("HOME", "~") ]
+    ~files
+    (Some
+       ( "~/.opam/4.10.0/share/zcash-params/sapling-spend.params",
+         "~/.opam/4.10.0/share/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:
+      [ ("XDG_DATA_HOME", "~/xdg/inexisting");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.11.0");
+        ("HOME", "/root") ]
+    ~files
+    (Some
+       ( "./_opam/share/zcash-params/sapling-spend.params",
+         "./_opam/share/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:
+      [ ("XDG_DATA_HOME", "~/xdg/inexisting");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.11.0");
+        ("HOME", "/root") ]
+    ~cwd:"/pwd"
+    ~files
+    (Some
+       ( "/usr/local/share/zcash-params/sapling-spend.params",
+         "/usr/local/share/zcash-params/sapling-output.params" )) ;
+  (* Test cases where parameter files are installed in several locations
+     but one of them only contains one of the two files and we expect to
+     use the location with lower priority. *)
+  test
+    ~env:
+      [ ("XDG_DATA_HOME", "~/xdg");
+        ("XDG_DATA_DIRS", "/xdg/data1:/xdg/data2");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.10.0");
+        ("HOME", "~") ]
+    ~files:
+      [ "~/xdg/.local/share/zcash-params/sapling-output.params";
+        "/xdg/data1/zcash-params/sapling-spend.params";
+        "/xdg/data1/zcash-params/sapling-output.params";
+        "/xdg/data2/zcash-params/sapling-spend.params";
+        "/xdg/data2/zcash-params/sapling-output.params";
+        "~/.opam/4.10.0/share/zcash-params/sapling-spend.params" ]
+    (Some
+       ( "/xdg/data1/zcash-params/sapling-spend.params",
+         "/xdg/data1/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:
+      [ ("XDG_DATA_HOME", "~/xdg");
+        ("XDG_DATA_DIRS", "/xdg/data1:/xdg/data2");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.10.0");
+        ("HOME", "~") ]
+    ~files:
+      [ "~/xdg/.local/share/zcash-params/sapling-output.params";
+        "/xdg/data1/zcash-params/sapling-spend.params";
+        "/xdg/data2/zcash-params/sapling-output.params";
+        "~/.opam/4.10.0/share/zcash-params/sapling-spend.params";
+        "/usr/share/zcash-params/sapling-spend.params";
+        "/usr/share/zcash-params/sapling-output.params" ]
+    (Some
+       ( "/usr/share/zcash-params/sapling-spend.params",
+         "/usr/share/zcash-params/sapling-output.params" )) ;
+  (* Test cases where we do not expect to find parameter files. *)
+  test
+    ~env:
+      [ ("XDG_DATA_HOME", "~/xdg");
+        ("XDG_DATA_DIRS", "/xdg/data1:/xdg/data2");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.10.0");
+        ("HOME", "~") ]
+    ~files:[]
+    None ;
+  test
+    ~env:
+      [ ("XDG_DATA_DIRS", "/xdg/data1:/xdg/data2");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.10.0");
+        ("HOME", "~") ]
+    ~files:
+      [ "~/xdg/.local/share/zcash-params/sapling-output.params";
+        "~/xdg/.local/share/zcash-params/sapling-output.params" ]
+    None ;
+  test
+    ~env:
+      [ ("XDG_DATA_HOME", "~/xdg");
+        ("XDG_DATA_DIRS", "/xdg/data1:/xdg/data2");
+        ("OPAM_SWITCH_PREFIX", "~/.opam/4.10.0");
+        ("HOME", "~") ]
+    ~files:
+      [ "~/xdg/.local/share/zcash-params/sapling-output.params";
+        "/xdg/data1/zcash-params/sapling-spend.params";
+        "/xdg/data2/zcash-params/sapling-output.params";
+        "~/.opam/4.10.0/share/zcash-params/sapling-spend.params";
+        "/usr/share/zcash-params/sapling-output.params" ]
+    None ;
+  ()
+
 let test_init () = Rustzcash.init_params ()
 
 (* test custom block for ctx *)
@@ -111,7 +400,8 @@ let test_failing_ivk_to_pkd () =
     test_inputs
 
 let tests =
-  [ ("init", `Quick, test_init);
+  [ ("find params", `Quick, test_find_params);
+    ("init", `Quick, test_init);
     ("proving context", `Quick, test_ctx_prove);
     ("verification context", `Quick, test_ctx_verif);
     ("fail binding_sig", `Quick, test_fail_make_binding_sig);
