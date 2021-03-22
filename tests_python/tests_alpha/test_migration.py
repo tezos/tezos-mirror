@@ -1,3 +1,4 @@
+from typing import Dict, List
 import time
 
 import pytest
@@ -40,16 +41,7 @@ DEPOSIT_RECEIPTS = [
         "origin": "block",
     },
 ]
-
-
-MIGRATION_RECEIPTS = [
-    {
-        "kind": "contract",
-        "contract": 'tz1abmz7jiCV2GH2u81LRrGgAFFgvQgiDiaf',
-        "change": "100000000",
-        "origin": "migration",
-    },
-]
+MIGRATION_RECEIPTS: List[Dict[str, str]] = []
 
 
 # configure user-activate-upgrade at MIGRATION_LEVEL to test migration
