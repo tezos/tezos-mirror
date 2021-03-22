@@ -303,7 +303,7 @@ module P2p_conn = struct
       ~name:"bytes_popped_from_queue"
       ~msg:"{bytes} bytes message popped from queue {peer}"
       ~level:Debug
-      ("bytes", Data_encoding.int8)
+      ("bytes", Data_encoding.int31)
       ("peer", P2p_peer.Id.encoding)
 end
 
