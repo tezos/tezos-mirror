@@ -1,7 +1,7 @@
 coq:lint:
   extends: .test_template
   script:
-    - make
+    - dune build src/proto_alpha/lib_protocol
     - cd src/proto_alpha/lib_protocol
     # We ignore `storage.ml` because there is an assert failure
     # in `coq-of-ocaml`. We should release a fixed version of `coq-of-ocaml`
@@ -14,4 +14,3 @@ coq:lint:
       done
   allow_failure: true
   retry: 0
-
