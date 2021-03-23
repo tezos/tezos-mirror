@@ -185,18 +185,14 @@ module Mock_mockup : Registration_intf.MOCKUP = struct
     assert false
 
   let migrate _ = assert false
-
-  let is_alpha = false
 end
 
-let mock_mockup_module ?is_alpha:(is_alpha' = false)
-    (protocol_hash' : Protocol_hash.t) : (module Registration_intf.MOCKUP) =
+let mock_mockup_module (protocol_hash' : Protocol_hash.t) :
+    (module Registration_intf.MOCKUP) =
   ( module struct
     include Mock_mockup
 
     let protocol_hash = protocol_hash'
-
-    let is_alpha = is_alpha'
   end )
 
 let mock_printer () =
@@ -287,12 +283,15 @@ let test_get_registered_mockup_take_alpha =
       let module Persistence = Persistence.Internal.Make (Registration) in
       let printer = mock_printer () in
       let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
-      let proto_hash_alpha = Protocol_hash.hash_string ["mock2"] in
+      let proto_hash_alpha =
+        Protocol_hash.of_b58check_exn
+          "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+      in
       let proto_hash_3 = Protocol_hash.hash_string ["mock3"] in
       Registration.register_mockup_environment
         (mock_mockup_module proto_hash_1) ;
       Registration.register_mockup_environment
-        (mock_mockup_module proto_hash_alpha ~is_alpha:true) ;
+        (mock_mockup_module proto_hash_alpha) ;
       Registration.register_mockup_environment
         (mock_mockup_module proto_hash_3) ;
       Persistence.get_registered_mockup None printer

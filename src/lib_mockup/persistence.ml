@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 module Internal = struct
+  (** The regexp that tests if a protocol hash is the one of Alpha.
+
+      This inelegant design is the best we could think of that is resilient
+      in the face of protocol changes: we don't want to have to change code in
+      each protocol every time the Alpha protocol changes.
+  *)
+  let is_proto_alpha_regexp = Re.Str.regexp_case_fold ".*ProtoAlpha.*"
+
   module Make (Registration : Registration_intf.S) = struct
     let rpc_context_encoding :
         Tezos_protocol_environment.rpc_context Data_encoding.t =
@@ -74,7 +82,10 @@ module Internal = struct
           printer#warning
             "No protocol specified: using Alpha as default protocol."
           >|= fun () (module Mockup : Registration_intf.MOCKUP) ->
-          Mockup.is_alpha )
+          Re.Str.string_match
+            is_proto_alpha_regexp
+            (Protocol_hash.to_b58check Mockup.protocol_hash)
+            0 )
       >>= fun criterion ->
       match List.find criterion mockup_environments with
       | Some mockup ->

@@ -934,7 +934,5 @@ let () =
     let init = mem_init
 
     let migrate = migrate
-
-    let is_alpha = false
   end in
   register_mockup_environment (module Mockup)
