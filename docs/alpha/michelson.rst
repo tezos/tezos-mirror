@@ -1977,9 +1977,11 @@ of the contract in which the ``SELF_ADDRESS`` instruction is written.
 Special operations
 ~~~~~~~~~~~~~~~~~~
 
--  ``NOW``: Push the timestamp of the block whose validation triggered
-   this execution (does not change during the execution of the
-   contract).
+-  ``NOW``: Push the minimal injection time for the current block,
+   namely the block whose validation triggered this execution. The
+   minimal injection time is 60 seconds after the timestamp of the
+   predecessor block. This value does not change during the execution
+   of the contract.
 
 ::
 
