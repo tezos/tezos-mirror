@@ -199,7 +199,7 @@ Example tests:
    ``gitlab-runner exec docker integration:p2p``.
 
 References:
- - `Pytest Documentation <https://github.com/stedolan/crowbar>`_
+ - `Pytest Documentation <https://docs.pytest.org/en/stable/contents.html>`_
  - :ref:`python_testing_framework`
  - `pytest-regtest README <https://gitlab.com/uweschmitt/pytest-regtest>`_
  - `pytest-regtest pip package <https://pypi.org/project/pytest-regtest/>`_
