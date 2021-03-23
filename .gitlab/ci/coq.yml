@@ -1,7 +1,9 @@
 coq:lint:
   extends: .test_template
   script:
-    - dune build src/proto_alpha/lib_protocol
+    # we only need merlin to be able to read the cmt files, the @check target
+    # provides this
+    - dune build @src/proto_alpha/lib_protocol/check
     - cd src/proto_alpha/lib_protocol
     # We ignore `storage.ml` because there is an assert failure
     # in `coq-of-ocaml`. We should release a fixed version of `coq-of-ocaml`
