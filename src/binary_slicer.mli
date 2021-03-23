@@ -30,16 +30,28 @@ type slice = {name: string; value: string; pretty_printed: string}
 
 type slicer_state
 
-val make_slicer_state : string -> offset:int -> length:int -> slicer_state option
+val make_slicer_state :
+  string -> offset:int -> length:int -> slicer_state option
 
-val slice : _ Encoding.t -> slicer_state -> (slice list, Binary_error_types.read_error) result
+val slice :
+  _ Encoding.t ->
+  slicer_state ->
+  (slice list, Binary_error_types.read_error) result
+
 val slice_opt : _ Encoding.t -> slicer_state -> slice list option
+
 val slice_exn : _ Encoding.t -> slicer_state -> slice list
 
-val slice_string : _ Encoding.t -> string -> (slice list, Binary_error_types.read_error) result
+val slice_string :
+  _ Encoding.t -> string -> (slice list, Binary_error_types.read_error) result
+
 val slice_string_opt : _ Encoding.t -> string -> slice list option
+
 val slice_string_exn : _ Encoding.t -> string -> slice list
 
-val slice_bytes : _ Encoding.t -> bytes -> (slice list, Binary_error_types.read_error) result
+val slice_bytes :
+  _ Encoding.t -> bytes -> (slice list, Binary_error_types.read_error) result
+
 val slice_bytes_opt : _ Encoding.t -> bytes -> slice list option
+
 val slice_bytes_exn : _ Encoding.t -> bytes -> slice list

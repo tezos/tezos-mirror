@@ -243,9 +243,8 @@ let slice_test id result expected () =
   | Some r -> (
       match Data_encoding.Registration.slice r result with
       | Error e ->
-         Alcotest.failf "Error %a" Data_encoding.Binary.pp_read_error e
-      | Ok l ->
-         check_sliced_fields_result l expected )
+          Alcotest.failf "Error %a" Data_encoding.Binary.pp_read_error e
+      | Ok l -> check_sliced_fields_result l expected )
 
 let tests =
   [

@@ -40,7 +40,10 @@ val json_pretty_printer : t -> Format.formatter -> Json.t -> unit
 
 val binary_pretty_printer : t -> Format.formatter -> Bytes.t -> unit
 
-val slice : t -> string -> (Binary_slicer.slice list, Binary_error_types.read_error) result
+val slice :
+  t ->
+  string ->
+  (Binary_slicer.slice list, Binary_error_types.read_error) result
 
 val slice_all : string -> (string * Binary_slicer.slice list) list
 

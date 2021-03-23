@@ -1143,23 +1143,34 @@ module Binary : sig
   type slicer_state
 
   (** [None] if [offset] and [length] do not describe a valid substring. *)
-  val make_slicer_state : string -> offset:int -> length:int -> slicer_state option
+  val make_slicer_state :
+    string -> offset:int -> length:int -> slicer_state option
 
   (** [slice e b offset length] slices the data represented by the [length]
       bytes in [b] starting at index [offset].
 
       If [e] does not correctly describe the given bytes (i.e., if [read]
       would fail on equivalent parameters) then it returns [Error]. *)
-  val slice : _ Encoding.t -> slicer_state -> (slice list, Binary_error_types.read_error) result
+  val slice :
+    _ Encoding.t ->
+    slicer_state ->
+    (slice list, Binary_error_types.read_error) result
+
   val slice_opt : _ Encoding.t -> slicer_state -> slice list option
+
   val slice_exn : _ Encoding.t -> slicer_state -> slice list
 
   (** [slice_string] slices the whole content of the buffer. *)
   val slice_string : _ Encoding.t -> string -> (slice list, read_error) result
+
   val slice_string_opt : _ Encoding.t -> string -> slice list option
+
   val slice_string_exn : _ Encoding.t -> string -> slice list
+
   val slice_bytes : _ Encoding.t -> bytes -> (slice list, read_error) result
+
   val slice_bytes_opt : _ Encoding.t -> bytes -> slice list option
+
   val slice_bytes_exn : _ Encoding.t -> bytes -> slice list
 end
 

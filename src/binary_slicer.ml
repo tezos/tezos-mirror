@@ -42,13 +42,14 @@ type slicer_state = {
 let make_slicer_state buffer ~offset ~length =
   if length < 0 || length > String.length buffer - offset then None
   else
-  Some {
-    buffer;
-    offset;
-    remaining_bytes = length;
-    allowed_bytes = None;
-    slices = [];
-  }
+    Some
+      {
+        buffer;
+        offset;
+        remaining_bytes = length;
+        allowed_bytes = None;
+        slices = [];
+      }
 
 let check_allowed_bytes state size =
   match state.allowed_bytes with
@@ -80,17 +81,23 @@ module Atom = struct
     state.offset <- state.offset + size;
     TzEndian.get_int8_string state.buffer offset
 
-  let uint8 = read_atom ~pp:string_of_int Binary_size.uint8 TzEndian.get_uint8_string
+  let uint8 =
+    read_atom ~pp:string_of_int Binary_size.uint8 TzEndian.get_uint8_string
 
-  let uint16 = read_atom ~pp:string_of_int Binary_size.int16 TzEndian.get_uint16_string
+  let uint16 =
+    read_atom ~pp:string_of_int Binary_size.int16 TzEndian.get_uint16_string
 
-  let int8 = read_atom ~pp:string_of_int Binary_size.int8 TzEndian.get_int8_string
+  let int8 =
+    read_atom ~pp:string_of_int Binary_size.int8 TzEndian.get_int8_string
 
-  let int16 = read_atom ~pp:string_of_int Binary_size.int16 TzEndian.get_int16_string
+  let int16 =
+    read_atom ~pp:string_of_int Binary_size.int16 TzEndian.get_int16_string
 
-  let int32 = read_atom ~pp:Int32.to_string Binary_size.int32 TzEndian.get_int32_string
+  let int32 =
+    read_atom ~pp:Int32.to_string Binary_size.int32 TzEndian.get_int32_string
 
-  let int64 = read_atom ~pp:Int64.to_string Binary_size.int64 TzEndian.get_int64_string
+  let int64 =
+    read_atom ~pp:Int64.to_string Binary_size.int64 TzEndian.get_int64_string
 
   let float =
     read_atom ~pp:string_of_float Binary_size.float TzEndian.get_double_string
@@ -221,11 +228,11 @@ module Atom = struct
 end
 
 (** Main recursive reading function, in continuation passing style. *)
-let rec read_rec : type ret. ret Encoding.t -> ?name:string -> slicer_state -> ret =
+let rec read_rec :
+    type ret. ret Encoding.t -> ?name:string -> slicer_state -> ret =
  fun e ?name state ->
-  let ( !! ) x = match name with
-    | None -> x
-    | Some name -> Format.sprintf "%S (%s)" name x
+  let ( !! ) x =
+    match name with None -> x | Some name -> Format.sprintf "%S (%s)" name x
   in
   let open Encoding in
   match e.encoding with
@@ -270,9 +277,10 @@ let rec read_rec : type ret. ret Encoding.t -> ?name:string -> slicer_state -> r
   | Obj (Dft {encoding = e; name; _}) -> read_rec e ~name state
   | Obj (Opt {kind = `Dynamic; encoding = e; name; _}) ->
       let present = Atom.bool (name ^ " presence flag") state in
-      if not present then None else Some (read_rec e ~name:(!!name) state)
+      if not present then None else Some (read_rec e ~name:!!name state)
   | Obj (Opt {kind = `Variable; encoding = e; name; _}) ->
-      if state.remaining_bytes = 0 then None else Some (read_rec e ~name:(!!name) state)
+      if state.remaining_bytes = 0 then None
+      else Some (read_rec e ~name:!!name state)
   | Objs {kind = `Fixed sz; left; right} ->
       ignore (check_remaining_bytes state sz : int);
       ignore (check_allowed_bytes state sz : int option);
@@ -349,14 +357,18 @@ let rec read_rec : type ret. ret Encoding.t -> ?name:string -> slicer_state -> r
       in
       state.allowed_bytes <- allowed_bytes;
       v
-  | Describe {encoding = e; id; _} -> read_rec e ~name:(!!id) state
+  | Describe {encoding = e; id; _} -> read_rec e ~name:!!id state
   | Splitted {encoding = e; _} -> read_rec e ?name state
-  | Mu {fix; name; _} -> read_rec (fix e) ~name:(!!name) state
+  | Mu {fix; name; _} -> read_rec (fix e) ~name:!!name state
   | Delayed f -> read_rec (f ()) ?name state
 
 and read_variable_pair :
     type left right.
-    left Encoding.t -> right Encoding.t -> ?name:string -> slicer_state -> left * right =
+    left Encoding.t ->
+    right Encoding.t ->
+    ?name:string ->
+    slicer_state ->
+    left * right =
  fun e1 e2 ?name state ->
   match (Encoding.classify e1, Encoding.classify e2) with
   | ((`Dynamic | `Fixed _), `Variable) ->
@@ -375,7 +387,9 @@ and read_variable_pair :
   | _ -> assert false
 
 and read_list :
-    type a. read_error -> int -> a Encoding.t -> ?name:string -> slicer_state -> a list =
+    type a.
+    read_error -> int -> a Encoding.t -> ?name:string -> slicer_state -> a list
+    =
  fun error max_length e ?name state ->
   let rec loop max_length acc =
     if state.remaining_bytes = 0 then List.rev acc
@@ -394,12 +408,10 @@ let slice_exn encoding state =
   List.rev state.slices
 
 let slice encoding state =
-  try Ok (slice_exn encoding state)
-  with Read_error e -> Error e
+  try Ok (slice_exn encoding state) with Read_error e -> Error e
 
 let slice_opt encoding state =
-  try Some (slice_exn encoding state)
-  with Read_error _ -> None
+  try Some (slice_exn encoding state) with Read_error _ -> None
 
 let slice_string_exn encoding buffer =
   let len = String.length buffer in
@@ -423,5 +435,7 @@ let slice_string_opt encoding buffer =
   try Some (slice_string_exn encoding buffer) with Read_error _ -> None
 
 let slice_bytes e b = slice_string e (Bytes.unsafe_to_string b)
+
 let slice_bytes_opt e b = slice_string_opt e (Bytes.unsafe_to_string b)
+
 let slice_bytes_exn e b = slice_string_exn e (Bytes.unsafe_to_string b)
