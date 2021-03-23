@@ -35,7 +35,7 @@ let frozen_balance_encoding =
     (fun {deposit; fees; rewards} -> (deposit, fees, rewards))
     (fun (deposit, fees, rewards) -> {deposit; fees; rewards})
     (obj3
-       (req "deposit" Tez_repr.encoding)
+       (req "deposits" Tez_repr.encoding)
        (req "fees" Tez_repr.encoding)
        (req "rewards" Tez_repr.encoding))
 
