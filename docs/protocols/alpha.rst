@@ -48,6 +48,8 @@ seconds after.
 Changelog
 ---------
 
+- RPC: replace `deposit` by `deposits` in `frozen_balance` RPC.
+
 .. contents:: Summary of changes
 
 - Fix handling of potential integer overflow in `Time_repr` addition `Protocol/time_repr: check for potential overflow on addition <https://gitlab.com/tezos/tezos/-/merge_requests/2660>`_
