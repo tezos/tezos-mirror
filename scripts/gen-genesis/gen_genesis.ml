@@ -64,17 +64,18 @@ let () =
   echo "  make_blockchain_network" ;
   echo "    ~alias:\"%s\"" (String.lowercase_ascii network_name) ;
   echo "    {" ;
-  echo "        time = Time.Protocol.of_notation_exn %S;" date ;
-  echo "        block =" ;
-  echo "          Block_hash.of_b58check_exn" ;
-  echo "            %S;" genesis ;
-  echo "        protocol =" ;
-  echo "          Protocol_hash.of_b58check_exn" ;
-  echo "            %S;" genesis_protocol_hash ;
-  echo "      }" ;
+  echo "      time = Time.Protocol.of_notation_exn %S;" date ;
+  echo "      block =" ;
+  echo "        Block_hash.of_b58check_exn" ;
+  echo "          %S;" genesis ;
+  echo "      protocol =" ;
+  echo "        Protocol_hash.of_b58check_exn" ;
+  echo "          %S;" genesis_protocol_hash ;
+  echo "    }" ;
   echo "    ~chain_name:%S" chain_name ;
   echo "    ~sandboxed_chain_name:%S" sandboxed_chain_name ;
-  echo "    ~default_bootstrap_peers:[ %s ]" default_bootstrap_peers ;
+  echo "    ~default_bootstrap_peers:" ;
+  echo "      [ %s ]" default_bootstrap_peers ;
   echo "" ;
   echo
     "Don't forget to add this network to update \
