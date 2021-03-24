@@ -295,7 +295,7 @@ the migration is triggered at level three by invoking::
 
   $ ./scripts/user_activated_upgrade.sh src/proto_007_* 3
 
-If we had opted for not snapshoting the Alpha protocol, we could pass the path
+If we had opted for not snapshotting the Alpha protocol, we could pass the path
 ``src/proto_alpha`` as the parameter of the command above.
 
 Now we consider the case when testing the migration on a context imported from
@@ -315,7 +315,7 @@ snapshot was taken by invoking::
 
   $ ./scripts/user_activated_upgrade.sh src/proto_007_* 1039321
 
-As before, if we had opted for not snapshoting the Alpha protocol, we could pass
+As before, if we had opted for not snapshotting the Alpha protocol, we could pass
 the path ``src/proto_alpha`` as the parameter of the command above.
 
 If we are testing the migration on an empty context on the sandbox, then we
@@ -462,7 +462,7 @@ passes the path of a folder instead of the path of a snapshot file, then the
 script will use the corresponding folder as the original folder, and will not
 import a new context.
 
-In case we opted for not snapshoting the Alpha protocol, we could batch steps
+In case we opted for not snapshotting the Alpha protocol, we could batch steps
 1--7 by respectively using the commands above, but omitting the name parameter
 ``d_007``.
 
@@ -526,7 +526,7 @@ If we run the migration on a context imported from Mainnet, then we would start
 the node using the context imported from the snapshot file. Since importing a
 snapshot file is very time consuming, we will leave the original folder
 unchanged, and every time we want to run the test, we will copy its contents to
-a fresh test folder. In our example, we can do this by taking advantage of a
+a fresh test folder. In our example, we can do this by taking advantage of an
 environment variable ``test-directory`` and the tool ``mktemp`` as follows::
 
   $ test_directory=$(mktemp -d -t "tezos-node-mainnet_2020-07-14_12 00-XXXX") && cp -r "/tmp/tezos-node-mainnet_2020-07-14_12 00/." "$test_directory"
@@ -608,7 +608,7 @@ Commit the feature::
 
   $ git commit -am 'My awesome feature'
 
-Prepare migration by snapshoting the Alpha protocol, linking it to the build
+Prepare migration by snapshotting the Alpha protocol, linking it to the build
 system, setting user-activate upgrades, and compiling the project::
 
   $ ./scripts/prepare_migration_test.sh manual d_007 3
@@ -676,7 +676,7 @@ Commit the feature::
 
   $ git commit -am 'My awesome feature'
 
-Prepare migration by snapshoting the Alpha protocol, linking it to the build
+Prepare migration by snapshotting the Alpha protocol, linking it to the build
 system, patching the shell in order to obtain yes-node, creating a yes-wallet,
 setting user-activated upgrades, importing a context from Mainnet into the
 original context folder, generating an identity in the same folder, and
@@ -765,7 +765,7 @@ Preparing the automatic migration with Tezt can be done with the script
 first argument. As in Section `Batch steps 1--7 above`_, the developer can
 decide whether to snapshot the Alpha protocol by passing an optional second
 parameter to the script with a protocol name in the format
-``<tag_with_version_letter>_<version_number>``. Recall that snapshoting the
+``<tag_with_version_letter>_<version_number>``. Recall that snapshotting the
 Alpha protocol may be useful for producing a realistic hash of the protocol in
 the file
 ``src/proto_<version_number>_<short_hash>/lib_protocol/TEZOS_PROTOCOL``.
@@ -802,7 +802,7 @@ receive an optional ``<block_hash>`` parameter as the last argument which, if
 present, will be used for the option ``--block <block_hash>`` of the command
 ``./tezos-node snapshot import`` when importing the context form Mainnet.
 
-If we opt for not snapshoting the Alpha protocol, we can prepare the automatic
+If we opt for not snapshotting the Alpha protocol, we can prepare the automatic
 migration with the same command as above, but omitting the optional name
 parameter ``d_007``.
 
@@ -874,7 +874,7 @@ Commit the feature::
 
   $ git commit -am 'My awesome feature'
 
-Prepare migration by snapshoting the Alpha protocol, linking it in the build
+Prepare migration by snapshotting the Alpha protocol, linking it in the build
 system, patching the shell in order to obtain a yes-node and compiling the
 project::
 
@@ -1039,7 +1039,7 @@ data can usually be done by manipulating the ``Raw_context.t``, and such code
 should be placed in the match case ``Alpha_previous`` of
 ``init_storage.ml:prepare_first_block``.
 
-Conversion of data structures from the previous protocol are typically found in
+Conversions of data structures from the previous protocol are typically found in
 ``storage.ml,i``, which may involve the functors in ``storage_functors.ml,i``.
 Each migration is very custom, but there are two recurring schemas that emerged
 over time.
@@ -1054,7 +1054,7 @@ data structures of the current protocol, thus performing the migration. The last
 step in the migration would be to manually remove any remaining code with a
 suffix corresponding to the previous version (``_006`` in our example).
 
-Some migrations may requires to break the interface offered by the
+Some migrations may require breaking the interface offered by the
 ``storage_functors``, and to modify the file ``raw_context.mli`` directly. In
 this case we usually `copy` the data to a temporary path, perform the
 conversion, and then `recursively remove` the temporary path.
