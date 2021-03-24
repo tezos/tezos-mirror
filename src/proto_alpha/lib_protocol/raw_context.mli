@@ -105,15 +105,9 @@ val add_fees : t -> Tez_repr.t -> t tzresult
     frozen_fees account at finalize_application *)
 val add_rewards : t -> Tez_repr.t -> t tzresult
 
-(** Increment the current block deposit stash for a specific delegate. All the
-    delegates' frozen_deposit accounts are credited at finalize_application *)
-val add_deposit : t -> Signature.Public_key_hash.t -> Tez_repr.t -> t tzresult
-
 val get_fees : t -> Tez_repr.t
 
 val get_rewards : t -> Tez_repr.t
-
-val get_deposits : t -> Tez_repr.t Signature.Public_key_hash.Map.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 

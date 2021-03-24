@@ -341,13 +341,9 @@ let record_internal_nonce = Raw_context.record_internal_nonce
 let internal_nonce_already_recorded =
   Raw_context.internal_nonce_already_recorded
 
-let add_deposit = Raw_context.add_deposit
-
 let add_fees = Raw_context.add_fees
 
 let add_rewards = Raw_context.add_rewards
-
-let get_deposits = Raw_context.get_deposits
 
 let get_fees = Raw_context.get_fees
 
