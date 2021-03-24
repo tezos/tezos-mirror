@@ -715,7 +715,7 @@ let read_and_patch_config_file ?(may_override_network = false)
   Option.iter_es
     (fun connections ->
       fail_when
-        (connections > 100)
+        (connections > 100 && disable_config_validation = false)
         (Invalid_command_line_arguments
            "The number of expected connections is limited to `100`. This \
             maximum cap may be overridden by manually modifying the \
