@@ -92,7 +92,7 @@ Manual Migration Testing
 
 The most delicate part of migrating to a new protocol is to produce a new
 context from the context of its predecessor. The migration code takes care of
-producing the new context, which often has to convert large data
+producing the new context, which often involves converting large data
 structures. Therefore, it is important to bench the migration running time and
 the size of the context produced. For these reasons it is imperative to test the
 migration on a real context imported from `Mainnet`, bench it, and manually
