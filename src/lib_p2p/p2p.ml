@@ -24,9 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "p2p"
-end)
+module Events = P2p_events.P2p
 
 type config = {
   listening_port : P2p_addr.port option;
@@ -255,7 +253,7 @@ module Real = struct
   let maintain {maintenance; _} () = P2p_maintenance.maintain maintenance
 
   let activate t () =
-    log_info "activate" ;
+    Events.(emit__dont_wait__use_with_care activate_network) () ;
     (match t.welcome with None -> () | Some w -> P2p_welcome.activate w) ;
     P2p_maintenance.activate t.maintenance ;
     ()
@@ -265,23 +263,23 @@ module Real = struct
   (* returns when all workers have shut down in the opposite
      creation order. *)
   let shutdown net () =
-    lwt_log_notice "Shutting down the p2p's welcome worker..."
+    Events.(emit shutdown_welcome_worker) ()
     >>= fun () ->
     Option.iter_s P2p_welcome.shutdown net.welcome
     >>= fun () ->
-    lwt_log_notice "Shutting down the p2p's network maintenance worker..."
+    Events.(emit shutdown_maintenance_worker) ()
     >>= fun () ->
     P2p_maintenance.shutdown net.maintenance
     >>= fun () ->
-    lwt_log_notice "Shutting down the p2p connection pool..."
+    Events.(emit shutdown_connection_pool) ()
     >>= fun () ->
     P2p_pool.destroy net.pool
     >>= fun () ->
-    lwt_log_notice "Shutting down the p2p connection handler..."
+    Events.(emit shutdown_connection_handler) ()
     >>= fun () ->
     P2p_connect_handler.destroy net.connect_handler
     >>= fun () ->
-    lwt_log_notice "Shutting down the p2p scheduler..."
+    Events.(emit shutdown_scheduler) ()
     >>= fun () -> P2p_io_scheduler.shutdown ~timeout:3.0 net.io_sched
 
   let connections {pool; _} () =
@@ -312,10 +310,7 @@ module Real = struct
   let recv _net conn =
     P2p_conn.read conn
     >>=? fun msg ->
-    lwt_debug
-      "message read from %a"
-      P2p_peer.Id.pp
-      (P2p_conn.info conn).peer_id
+    Events.(emit message_read) (P2p_conn.info conn).peer_id
     >>= fun () -> return msg
 
   let rec recv_any net () =
@@ -340,51 +335,31 @@ module Real = struct
         P2p_conn.read conn
         >>= function
         | Ok msg ->
-            lwt_debug
-              "message read from %a"
-              P2p_peer.Id.pp
-              (P2p_conn.info conn).peer_id
+            Events.(emit message_read) (P2p_conn.info conn).peer_id
             >>= fun () -> Lwt.return (conn, msg)
         | Error _ ->
-            lwt_debug
-              "error reading message from %a"
-              P2p_peer.Id.pp
-              (P2p_conn.info conn).peer_id
+            Events.(emit message_read_error) (P2p_conn.info conn).peer_id
             >>= fun () -> Lwt_unix.yield () >>= fun () -> recv_any net () )
 
   let send _net conn m =
     P2p_conn.write conn m
     >>= function
     | Ok () ->
-        lwt_debug
-          "message sent to %a"
-          P2p_peer.Id.pp
-          (P2p_conn.info conn).peer_id
+        Events.(emit message_sent) (P2p_conn.info conn).peer_id
         >>= fun () -> return_unit
     | Error err ->
-        lwt_debug
-          "error sending message from %a: %a"
-          P2p_peer.Id.pp
-          (P2p_conn.info conn).peer_id
-          pp_print_error
-          err
+        Events.(emit sending_message_error) ((P2p_conn.info conn).peer_id, err)
         >>= fun () -> Lwt.return_error err
 
   let try_send _net conn v =
     match P2p_conn.write_now conn v with
     | Ok v ->
-        debug
-          "message trysent to %a"
-          P2p_peer.Id.pp
+        Events.(emit__dont_wait__use_with_care message_trysent)
           (P2p_conn.info conn).peer_id ;
         v
     | Error err ->
-        debug
-          "error trysending message to %a@ %a"
-          P2p_peer.Id.pp
-          (P2p_conn.info conn).peer_id
-          pp_print_error
-          err ;
+        Events.(emit__dont_wait__use_with_care trysending_message_error)
+          ((P2p_conn.info conn).peer_id, err) ;
         false
 
   let broadcast {pool; _} msg =
@@ -400,7 +375,7 @@ module Real = struct
         | _ ->
             ())
       (P2p_pool.connected_peer_ids pool) ;
-    debug "message broadcasted"
+    Events.(emit__dont_wait__use_with_care broadcast) ()
 
   let fold_connections {pool; _} ~init ~f =
     P2p_pool.Connection.fold pool ~init ~f
@@ -564,7 +539,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
     }
 
 let activate t =
-  log_info "activate P2P layer !" ;
+  Events.(emit__dont_wait__use_with_care activate_layer) () ;
   t.activate ()
 
 let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg

@@ -24,77 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Events = struct
-  include Internal_event.Simple
-
-  let section = ["p2p"; "discovery"]
-
-  let create_socket =
-    declare_0
-      ~section
-      ~name:"create_socket"
-      ~msg:"Error creating a socket"
-      ~level:Debug
-      ()
-
-  let message_received =
-    declare_0
-      ~section
-      ~name:"message_received"
-      ~msg:"Received discovery message"
-      ~level:Debug
-      ()
-
-  let parse_error =
-    declare_1
-      ~section
-      ~name:"parse_error"
-      ~msg:"Failed to parse ({address})"
-      ~level:Debug
-      ("address", Data_encoding.string)
-
-  let register_new =
-    declare_2
-      ~section
-      ~name:"too_many_connections"
-      ~msg:"Registering new point {address}:{port}"
-      ~level:Notice
-      ("address", P2p_addr.encoding)
-      ("port", Data_encoding.int16)
-
-  let unexpected_error =
-    declare_2
-      ~section
-      ~name:"unexpected_error"
-      ~msg:"Unexpected error in {worker} worker: {error}"
-      ~level:Error
-      ("worker", Data_encoding.string)
-      ("error", Error_monad.trace_encoding)
-
-  let unexpected_exit =
-    declare_0
-      ~section
-      ~name:"unexpected_exit"
-      ~msg:"Answer worker exited unexpectedly"
-      ~level:Error
-      ()
-
-  let broadcast_message =
-    declare_0
-      ~section
-      ~name:"broadcast_message"
-      ~msg:"Broadcasting discovery message"
-      ~level:Debug
-      ()
-
-  let broadcast_error =
-    declare_0
-      ~section
-      ~name:"broadcast_error"
-      ~msg:"Error broadcasting a discovery request"
-      ~level:Debug
-      ()
-end
+module Events = P2p_events.Discovery
 
 type pool = Pool : ('msg, 'meta, 'meta_conn) P2p_pool.t -> pool
 
@@ -141,7 +71,8 @@ module Answer = struct
           Lwt_unix.ADDR_INET (Unix.inet_addr_any, st.discovery_port)
         in
         Lwt_unix.bind socket addr >>= fun () -> Lwt.return socket)
-      (fun exn -> Events.(emit create_socket) () >>= fun () -> Lwt.fail exn)
+      (fun exn ->
+        Events.(emit create_socket_error) () >>= fun () -> Lwt.fail exn)
 
   let loop st =
     protect ~canceler:st.canceler (fun () ->

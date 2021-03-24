@@ -436,7 +436,7 @@ module P2p_welcome = struct
     declare_1
       ~section
       ~name:"unexpected_error_welcome"
-      ~msg:"unexpected error"
+      ~msg:"unexpected error: {error}"
       ~level:Error
       ~pp1:pp_print_error_first
       ("error", Error_monad.trace_encoding)
@@ -520,6 +520,7 @@ module P2p_socket = struct
       ~name:"socket_write_error"
       ~level:Error
       ~msg:"unexpected error when writing to {peer}: {error}"
+      ~pp1:pp_print_error_first
       ("error", Error_monad.trace_encoding)
       ("peer", P2p_peer.Id.encoding)
 
@@ -647,7 +648,7 @@ module P2p_io_scheduler = struct
   let shutdown_scheduler =
     declare_0
       ~section
-      ~name:"shutdown_scheduler"
+      ~name:"shutdown_io_scheduler"
       ~msg:"shutdown scheduler"
       ~level:Info
       ()
@@ -682,6 +683,7 @@ module P2p_pool = struct
       ~name:"parse_error_peers"
       ~msg:"failed to parse peers file: {error}"
       ~level:Error
+      ~pp1:pp_print_error_first
       ("error", Error_monad.trace_encoding)
 
   let saving_metadata =
@@ -698,5 +700,195 @@ module P2p_pool = struct
       ~name:"save_error_peers"
       ~msg:"failed to save peers file: {error}"
       ~level:Error
+      ~pp1:pp_print_error_first
       ("error", Error_monad.trace_encoding)
+end
+
+module Discovery = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "discovery"]
+
+  let create_socket_error =
+    declare_0
+      ~section
+      ~name:"create_socket_error"
+      ~msg:"error creating a socket"
+      ~level:Debug
+      ()
+
+  let message_received =
+    declare_0
+      ~section
+      ~name:"message_received"
+      ~msg:"received discovery message"
+      ~level:Debug
+      ()
+
+  let parse_error =
+    declare_1
+      ~section
+      ~name:"parse_error"
+      ~msg:"failed to parse ({address})"
+      ~level:Debug
+      ("address", Data_encoding.string)
+
+  let register_new =
+    declare_1
+      ~section
+      ~name:"register_new"
+      ~msg:"registering new point {point}"
+      ~level:Notice
+      ("point", P2p_point.Id.encoding)
+
+  let unexpected_error =
+    declare_2
+      ~section
+      ~name:"unexpected_error"
+      ~msg:"unexpected error in {worker} worker: {error}"
+      ~level:Error
+      ~pp2:pp_print_error_first
+      ("worker", Data_encoding.string)
+      ("error", Error_monad.trace_encoding)
+
+  let unexpected_exit =
+    declare_0
+      ~section
+      ~name:"unexpected_exit"
+      ~msg:"Answer worker exited unexpectedly"
+      ~level:Error
+      ()
+
+  let broadcast_message =
+    declare_0
+      ~section
+      ~name:"broadcast_message"
+      ~msg:"Broadcasting discovery message"
+      ~level:Debug
+      ()
+
+  let broadcast_error =
+    declare_0
+      ~section
+      ~name:"broadcast_error"
+      ~msg:"Error broadcasting a discovery request"
+      ~level:Debug
+      ()
+end
+
+module P2p = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"]
+
+  let activate_layer =
+    declare_0
+      ~section
+      ~name:"activate_layer"
+      ~level:Info
+      ~msg:"activate P2P layer"
+      ()
+
+  let activate_network =
+    declare_0 ~section ~name:"activate_network" ~level:Info ~msg:"activate" ()
+
+  let message_read =
+    declare_1
+      ~section
+      ~name:"message_read"
+      ~level:Debug
+      ~msg:"message read from {peer}"
+      ("peer", P2p_peer.Id.encoding)
+
+  let message_read_error =
+    declare_1
+      ~section
+      ~name:"message_read_error"
+      ~level:Debug
+      ~msg:"error reading message from {peer}"
+      ("peer", P2p_peer.Id.encoding)
+
+  let shutdown_welcome_worker =
+    declare_0
+      ~section
+      ~name:"shutdown_welcome_worker"
+      ~level:Notice
+      ~msg:"shutting down the p2p's welcome worker..."
+      ()
+
+  let shutdown_maintenance_worker =
+    declare_0
+      ~section
+      ~name:"shutdown_maintenance_worker"
+      ~level:Notice
+      ~msg:"shutting down the p2p's network maintenance worker..."
+      ()
+
+  let shutdown_connection_pool =
+    declare_0
+      ~section
+      ~name:"shutdown_connection_pool"
+      ~level:Notice
+      ~msg:"shutting down the p2p connection pool..."
+      ()
+
+  let shutdown_connection_handler =
+    declare_0
+      ~section
+      ~name:"shutdown_connection_handler"
+      ~level:Notice
+      ~msg:"shutting down the p2p connection handler..."
+      ()
+
+  let shutdown_scheduler =
+    declare_0
+      ~section
+      ~name:"shutdown_scheduler"
+      ~level:Notice
+      ~msg:"shutting down the p2p scheduler..."
+      ()
+
+  let message_sent =
+    declare_1
+      ~section
+      ~name:"message_to_send"
+      ~level:Debug
+      ~msg:"message sent to {peer}"
+      ("peer", P2p_peer.Id.encoding)
+
+  let sending_message_error =
+    declare_2
+      ~section
+      ~name:"sending_message_error"
+      ~level:Debug
+      ~msg:"error sending message to {peer}: {error}"
+      ~pp2:pp_print_error_first
+      ("peer", P2p_peer.Id.encoding)
+      ("error", Error_monad.trace_encoding)
+
+  let message_trysent =
+    declare_1
+      ~section
+      ~name:"message_trysent"
+      ~level:Debug
+      ~msg:"message trysent to {peer}"
+      ("peer", P2p_peer.Id.encoding)
+
+  let trysending_message_error =
+    declare_2
+      ~section
+      ~name:"trysending_message_error"
+      ~level:Debug
+      ~msg:"error trysending message to {peer}: {error}"
+      ~pp2:pp_print_error_first
+      ("peer", P2p_peer.Id.encoding)
+      ("error", Error_monad.trace_encoding)
+
+  let broadcast =
+    declare_0
+      ~section
+      ~name:"broadcast"
+      ~level:Debug
+      ~msg:"message broadcast"
+      ()
 end
