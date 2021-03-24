@@ -201,7 +201,7 @@ The next subsections explain each of the individual steps 1--7.
 1. Snapshot the Alpha Protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Snapshoting the Alpha protocol is an optional procedure whose objective is to
+Snapshotting the Alpha protocol is an optional procedure whose objective is to
 convert the Alpha protocol to a format that could be injected into Mainnet,
 which is done by performing the following three steps:
 
