@@ -105,8 +105,7 @@ let include_ml oc file =
   dump_file oc file ;
   Printf.fprintf oc "end\n%!"
 
-let opened_modules =
-  ["Tezos_protocol_environment"; "Pervasives"; "Error_monad"; "Logging"]
+let opened_modules = ["Tezos_protocol_environment"; "Pervasives"; "Error_monad"]
 
 let dump oc version hash files =
   Printf.fprintf
