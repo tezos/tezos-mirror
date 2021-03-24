@@ -75,9 +75,9 @@ block fixtures that can be used in tests requiring these components.
 
 Testing migration code
 ----------------------
-The remainder of the tutorial is organised as follows. Section `Manual migration
+The remainder of the tutorial is organized as follows. Section `Manual migration
 testing`_ provides detailed indications on how to test a migration, and Section
-`Wrap up the manual migration procedure`_ summarises this indications by
+`Wrap up the manual migration procedure`_ summarises these indications by
 collecting all the steps needed to test the migration. Section `Automatic
 migration testing with Tezt`_ describes how to test a migration automatically by
 using a test within the :ref:`Tezt <tezt>` framework, and Section `Wrap up the automatic
