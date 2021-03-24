@@ -247,7 +247,7 @@ our example, this can be done by invoking::
   $ ./scripts/link_protocol.sh src/proto_007_*
 
 Alternatively, you can snapshot Alpha and link it with one single script:
-``snapshot_alpha_and_link.sh``. This replaces step 1 and 2. This script effectively
+``snapshot_alpha_and_link.sh``. This replaces steps 1 and 2. This script effectively
 runs ``snapshot_alpha.sh`` and ``link_protocol.sh`` for you. In particular
 it means you do not have to find the short hash of the protocol yourself
 to pass it to ``link_protocol.sh``. Finally, this script also updates ``.gitlab-ci.yml``
