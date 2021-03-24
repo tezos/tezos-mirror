@@ -260,7 +260,7 @@ To run it, pass the protocol version number and name as follows::
 3. Set User-Activated Upgrade
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The current Alpha protocol supports self-amending through the voting procedure
+The currently active protocol supports self-amending through the voting procedure
 of Tezos. However, such procedure needs to go through several voting periods
 that involve several quorums of bakers, and we would rather test our migration
 in a less involved way. Besides the amendments driven by the protocol, Tezos
