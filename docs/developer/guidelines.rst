@@ -58,24 +58,31 @@ Constants and struct fields:
 
 - Purpose and definition of this data. If the unit is a measurement of time, include it, e.g., TIMEOUT_MS for timeout in milliseconds.
 
-Documenting interfaces
-----------------------
+Documenting interfaces and implementations
+------------------------------------------
 
 At the granularity of OCaml files, it is essential to document the interface implemented by each file.
+In many cases, it is useful to also document the implementation, but *separately* from the interface.
 
 Implementation (``.ml``) files:
 
-- In the common case where there is a corresponding interface (``.mli``) file,
-  document the interface file instead, as detailed below.
-- In the less common case where there is no corresponding interface (``.mli``)
-  file, document the exported elements directly in the implementation (``.ml``)
-  file.
+- Document the interface:
+
+  + In the common case where there is a corresponding interface (``.mli``) file,
+    document the interface file instead, as detailed below.
+  + In the less common case where there is no corresponding interface (``.mli``)
+    file, document the exported elements directly in the implementation
+    (``.ml``) file.
+
+- Document the implementation: For many non-trivial implementations, it is most useful to document the design principles, code structure, internal invariants, and so on.
+  Such information should be placed in a comment block at the top of the file.
 
 Interface (``.mli``) file comments:
 
 - One-line description
 - Brief description of the library, introducing the needed concepts
-- Brief description of each module, type, function, data, as described for :ref:`comments in the code<in_code_comments>`.
+- Brief description of each module, type, function, data, as described for :ref:`comments in the code<in_code_comments>`
+- If applicable, external invariants (i.e., visible to the user).
 
 README files
 ------------
@@ -171,7 +178,7 @@ for additional options).
 Coding conventions
 ------------------
 
-+Other than the formatting rules above, there are currently no coding
+Other than the formatting rules above, there are currently no coding
 conventions enforced in the codebase. However, Tezos developers should be aware
 of general `OCaml programming guidelines <http://caml.inria.fr/resources/doc/
 guides/guidelines.en.html>`_, which recommend formatting, naming conventions,

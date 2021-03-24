@@ -296,9 +296,7 @@ In the special case where your MR adds a new Python, Rust, Javascript, or other
 dependency, additional steps must also be followed.
 
 * for Python, you can refer to the related section in the :ref:`python testing documentation <python_adding_new_dependencies>`.
-* the Rust dependencies are located in the GitLab repository `tezos-rust-libs
-<https://gitlab.com/tezos/tezos-rust-libs>`_ and the instructions are listed
-there.
+* the Rust dependencies are located in the GitLab repository `tezos-rust-libs <https://gitlab.com/tezos/tezos-rust-libs>`_ and the instructions are listed there.
 
 For others, there is currently no dedicated guide. Do not hesitate to ask for
 help on the ``#devteam`` channel on the `tezos-dev` Slack.

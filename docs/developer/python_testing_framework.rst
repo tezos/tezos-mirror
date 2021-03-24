@@ -674,6 +674,7 @@ such as ``utils.check_contains_operations(client, [op_hash])``
 instead of using blocking commands.
 
 .. _python_adding_new_dependencies:
+
 Adding new dependencies
 -----------------------
 

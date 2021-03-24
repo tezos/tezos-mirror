@@ -30,8 +30,9 @@ scripts without interacting with a Tezos node) by adding in your
 Note that the Michelson mode will be chosen automatically by Emacs for
 files with a ``.tz`` or ``.tez`` extension.
 
-We can now open our favourite contract ``emacs
-./src/bin_client/test/contracts/attic/id.tz`` and, when moving the cursor on
+We can now open our favourite contract
+:src:`./tests_python/contracts_alpha/attic/id.tz` in Emacs
+and, when moving the cursor on
 a Michelson instruction, in the bottom of the windows Emacs should
 display the state of the stack before (left) and after (right) the
 application of the instruction.
@@ -41,7 +42,7 @@ run it locally:
 
 ::
 
-   tezos-client run script ./src/bin_client/test/contracts/attic/id.tz \
+   tezos-client run script ./tests_python/contracts_alpha/attic/id.tz \
                 on storage '"hello"' and input '"world"'
 
 .. _tezos-admin-client:

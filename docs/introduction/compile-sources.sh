@@ -30,3 +30,4 @@ source ./src/bin_client/bash-completion.sh
 export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
 # [test executable]
 ./tezos-client
+./tezos-node config --help

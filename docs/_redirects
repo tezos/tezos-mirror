@@ -1,5 +1,10 @@
 /api/cli-commands.html /shell/cli-commands.html 302
 /007/cli-commands.html /shell/cli-commands.html 302
+/007/rpc.html /shell/rpc.html 302
+/007/glossary.html /alpha/glossary.html 302
+/007/michelson.html /alpha/michelson.html 302
+/007/proof_of_stake.html /alpha/proof_of_stake.html 302
+/007/voting.html /alpha/voting.html 302
 /api/rpc.html /008/rpc.html 302
 /developer/sapling.html /008/sapling.html 302
 /user/glossary.html /008/glossary.html 302

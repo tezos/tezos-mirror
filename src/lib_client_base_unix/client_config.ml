@@ -368,11 +368,12 @@ let base_dir_arg () =
     ~placeholder:"path"
     ~doc:
       (Format.asprintf
-         "@[<v>@[<2>client data directory@,\
+         "@[<v>@[<2>client data directory (absent: %s env)@,\
           The directory where the Tezos client will store all its data.@,\
           If absent, its value is the value of the %s@,\
           environment variable. If %s is itself not specified,@,\
           defaults to %s@]@]@."
+         base_dir_env_name
          base_dir_env_name
          base_dir_env_name
          default_base_dir)
