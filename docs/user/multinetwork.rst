@@ -32,11 +32,20 @@ Built-In Networks
 -----------------
 
 The simplest way to select the network to connect to is to use the ``--network``
-option when you initialize your node configuration. For instance, to run on Edo2net::
+option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Edo2net::
 
   tezos-node config init --data-dir ~/tezos-edonet --network edo2net
   tezos-node identity generate --data-dir ~/tezos-edonet
   tezos-node run --data-dir ~/tezos-edonet
+
+.. note::
+   Once initialized, the node remembers its network settings on subsequent runs
+   and reconnects to the same network every time you run it. If you specify a
+   different network when running the node again, it will refuse to start. In
+   order to switch to a different network you need to either reinitialize it
+   with a different data directory using the ``--data-dir`` option or remove
+   everything from the existing data directory, which defaults to ``~/.tezos-node``
+   (and also initialize again).
 
 The ``--network`` option is not case-sensitive and can be used with
 the following built-in networks:
@@ -62,7 +71,20 @@ Custom Networks
 ---------------
 
 If the network you want to connect to is not in the list of built-in networks,
-you can configure a custom network in the configuration file.
+you need a corresponding network configuration file. There are several ways to
+get that. If you have an appropriate file, you can specify it with ``--network``
+argument when you initialize your node configuration (see above), and the node will load it. If you know a URL from which the file can be
+downloaded, you can also specify it with ``--network``. The node will then
+download the config automatically. The network configuration should be in JSON format,
+containing an object matching the contents of the ``network`` field in
+``config.json`` (see below for an example, and the :doc:`node configuration <./node-configuration>` documentation for reference).
+
+.. note::
+   The contents of the network configuration file will be saved in your node
+   configuration file ``config.json``, so it won't be downloaded again on
+   subsequent runs of the node.
+
+Finally you can manually edit the main configuration file of the node (``config.json``).
 Here is an example configuration file for Mainnet::
 
   {
