@@ -276,7 +276,7 @@ respectively at a small level (some blocks after the genesis block at level
 which contains several hundreds of thousands of blocks). By convention, when
 setting a user-activated upgrade the scripts would consider that the migration
 is on the sandbox if the level is less or equal than ``28082``, and on a real
-context imported form Mainnet otherwise, and the scripts would behave
+context imported from Mainnet otherwise, and the scripts would behave
 differently.
 
 If we are testing the migration on the sandbox, the user-activated upgrade
