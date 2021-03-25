@@ -812,7 +812,7 @@ The automatic test can be run by invoking::
 
 By default, the automatic test starts the node, activates the Alpha protocol
 when the first block is baked, and then bakes as many blocks as to complete a
-cycle. This behaviour can be personalised by modifying test file
+cycle. This behaviour can be personalized by modifying test file
 ``tezt/manual_tests/migration.ml``.
 
 The developer will not see the ``STITCHING!`` message when the migration is
