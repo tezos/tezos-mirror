@@ -419,11 +419,12 @@ In Tezos there are two kinds of accounts: *implicit accounts* and *smart contrac
 Let's originate our first contract and call it *id*::
 
     tezos-client originate contract id transferring 1 from alice \
-                 running ./tests_python/contracts/attic/id.tz \
+                 running ./tests_python/contracts_alpha/attic/id.tz \
                  --init '"hello"' --burn-cap 0.4
 
 The initial balance is ꜩ1, generously provided by implicit account
-*alice*. The contract stores a Michelson program ``id.tz``, with
+*alice*. The contract stores a Michelson program ``id.tz``
+(found in file :src:`./tests_python/contracts_alpha/attic/id.tz`), with
 Michelson value ``"hello"`` as initial storage (the extra quotes are
 needed to avoid shell expansion). The parameter ``--burn-cap``
 specifies the maximal fee the user is willing to pay for this

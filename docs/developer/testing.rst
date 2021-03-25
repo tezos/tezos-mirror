@@ -144,7 +144,7 @@ Typical use cases:
    randomized inputs.
 
 Example test:
- - QCheck is used in :src:`src/lib_base/test/test_time.ml` to test the :src:`Tezos_base.Time<src/lib_base/test/test_time.ml>` module. For instance, subtracting and then adding a random amount of seconds to a random time should give back the original time: this tests that ``add`` and ``diff`` are consistent (and the inverse of each other). To run this test, you need to run ``dune exec src/lib_base/test/test_time.exe``.
+ - QCheck is used in :src:`src/lib_base/test/test_time.ml` to test the `Tezos_base.Time <https://tezos.gitlab.io/api/odoc/_html/tezos-base/Tezos_base/Time/index.html>`_ module. For instance, subtracting and then adding a random amount of seconds to a random time should give back the original time: this tests that ``add`` and ``diff`` are consistent (and the inverse of each other). To run this test, you need to run ``dune exec src/lib_base/test/test_time.exe``.
 
 References:
  - `QCheck README <https://github.com/c-cube/qcheck>`_
@@ -539,7 +539,7 @@ Conventions
 
 Besides implementing tests, it is necessary to comment test files as
 much as possible to keep a maintainable project for future
-contributors. As part of this effort, we require that contributors 
+contributors. As part of this effort, we require that contributors
 follow this convention:
 
 1. For each unit test module, add a header that explains the overall

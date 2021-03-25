@@ -35,7 +35,7 @@ convenience of the installation step (and of upgrading steps), but also
 efficiency and security considerations. For instance, static binaries have a
 different memory footprint compared to dynamically-linked binaries. Also,
 compiling the sources in the official Tezos
-repository is more secure than installing OPAM packages from a repository which
+repository is more secure than installing OPAM packages from a repository that
 is not under Tezos control. In particular, compiling from sources enforces a fixed set of dependencies; when compiling via OPAM, this set of dependencies may change, which may or may not be compatible with your security practices.
 
 .. _getting_static_binaries:
@@ -82,7 +82,7 @@ Fedora Copr repository with Tezos packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Fedora, you can install packages with Tezos binaries from the Copr repository.
-Currently it supports Fedora 32 and 31. In order to dd the Copr repository to your machine and install the binaries, run the following commands:
+Currently it supports Fedora 32 and 33. In order to dd the Copr repository to your machine and install the binaries, run the following commands:
 
 .. literalinclude:: install-bin-fedora.sh
    :language: shell
@@ -203,7 +203,7 @@ release) directly as OPAM packages.
 .. note::
 
    Every file related to OPAM is (by default) in ``$HOME/.opam`` which
-   means that, first, OPAM installs are user specific and, second, you
+   means that, first, OPAM installs are user-specific and, second, you
    can get rid of everything by removing this directory (+ updating
    your rc files (``$HOME/.bashrc``, ``$HOME/.profile``,
    ``$HOME/.zshrc``, ``$HOME/.emacs``, ...) if you asked/allowed OPAM
@@ -341,7 +341,7 @@ if file ``.cargo`` does not exist in your home directory.
 Install Zcash Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Tezos binaries requires the Zcash parameter files to run.
+Tezos binaries require the Zcash parameter files to run.
 Docker images come with those files, and the source distribution also
 includes those files. But if you compile from source and move Tezos to
 another location (such as ``/usr/local/bin``), the Tezos binaries may
@@ -391,7 +391,7 @@ Install the OCaml compiler and the libraries that Tezos depends on::
 
    make build-deps
 
-Alternatively, if you want to to install extra
+Alternatively, if you want to install extra
 development packages such as ``merlin``, you may use the following
 command instead:
 
@@ -430,7 +430,7 @@ refer to the new switch and compile the project:
   :start-after: [compile sources]
   :end-before: [optional setup]
 
-Lastly you can also add the Tezos binaries to your ``PATH`` variable,
+Lastly, you can also add the Tezos binaries to your ``PATH`` variable,
 and after reading the Disclaimer a few
 hundred times you are allowed to disable it with
 ``TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y``.
