@@ -96,23 +96,19 @@ let find_pending_operation {peer_active_chains; _} h =
          Distributed_db_requester.Raw_operation.pending chain_db.operation_db h)
 
 let read_operation state h =
-  (* NOTE: to optimise this into an early-return map-and-search we need either a
-     special [Seq.find_map : ('a -> 'b option) -> 'a Seq.t -> 'b option]
-     or we need a [Seq.map_s] that is lazy. *)
-  Chain_id.Table.fold_s
-    (fun chain_id chain_db acc ->
-      match acc with
-      | Some _ ->
-          Lwt.return acc
-      | None -> (
-          Distributed_db_requester.Raw_operation.read_opt
-            chain_db.operation_db
-            h
-          >>= function
-          | None -> Lwt.return_none | Some bh -> Lwt.return_some (chain_id, bh)
-          ))
-    state.active_chains
-    None
+  (* Remember that seqs are lazy. The table is only traversed until a match is
+     found, the rest is not explored. *)
+  let id_db_seq = Seq_s.of_seq (Chain_id.Table.to_seq state.active_chains) in
+  let id_bh_seq =
+    Seq_s.filter_map_s
+      (fun (chain_id, chain_db) ->
+        Distributed_db_requester.Raw_operation.read_opt chain_db.operation_db h
+        >|= Option.map (fun bh -> (chain_id, bh)))
+      id_db_seq
+  in
+  id_bh_seq ()
+  >>= function
+  | Seq_s.Nil -> Lwt.return_none | Seq_s.Cons (item, _) -> Lwt.return_some item
 
 let read_block {disk; _} h =
   Store.all_chain_stores disk
