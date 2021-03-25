@@ -64,6 +64,8 @@ be documented here either.
   to compute rewards payouts. The default number of extra preserved
   cycles is 5 (`5 + 5` on mainnet).
 
+- Improved the shutdown procedure for external validator process.
+
 ## Client
 
 ## Baker / Endorser / Accuser
