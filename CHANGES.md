@@ -45,8 +45,9 @@ be documented here either.
   the current Mainnet protocol) and Florencenet (which runs Florence).
   Their corresponding aliases for `--network` are `edo2net` and `florencenet`.
 
-- Capped the number of expected connections to `100` on the command-line
-  interface.
+- Capped the number of expected connections to `100` on the
+  command-line interface. This limitation can be bypassed with the
+  option `--disable-config-validation`.
 
 - Fixed a bug that caused the execution of the prevalidator when the node was not
   bootstrapped.
