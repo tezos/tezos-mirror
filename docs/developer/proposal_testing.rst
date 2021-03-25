@@ -56,7 +56,7 @@ the shell (see :ref:`sandboxed-mode`)::
 
   $ tezos-client bake for bootstrap1 --minimal-timestamp
 
-Adding new protocol tests in OCaml
+Adding New Protocol Tests in OCaml
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Be sure you first read the :ref:`introduction on the testing ecosystem for Tezos <testing>`.
