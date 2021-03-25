@@ -141,7 +141,7 @@ code that we want to test, we need to commit the changes locally::
 
   $ git commit -am 'My awesome feature'
 
-The next section summarises how to prepare the migration once we have tweaked
+The next section summarizes how to prepare the migration once we have tweaked
 the Alpha protocol.
 
 
