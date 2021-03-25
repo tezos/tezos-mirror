@@ -73,7 +73,7 @@ the subdirectory `helpers`. For instance, it contains context, operation and
 block fixtures that can be used in tests requiring these components.
 
 
-Testing migration code
+Testing Migration Code
 ----------------------
 The remainder of the tutorial is organized as follows. Section `Manual migration
 testing`_ provides detailed indications on how to test a migration, and Section
