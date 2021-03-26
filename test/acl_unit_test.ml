@@ -77,6 +77,45 @@ let () =
 
 let () =
   List.iter
+    (fun matcher ->
+      let string = to_string matcher in
+      try
+        if parse string <> matcher then
+          Format.kasprintf
+            failwith
+            "parse-to_string roundtrip failure (%S)"
+            string
+      with Invalid_argument _ ->
+        Format.kasprintf failwith "Parsing failed for path %S" string)
+    [
+      {meth = Any; path = Exact []};
+      {meth = Exact `GET; path = Exact []};
+      {meth = Exact `POST; path = Exact []};
+      {meth = Any; path = FollowedByAnySuffix []};
+      {meth = Exact `DELETE; path = FollowedByAnySuffix []};
+      {
+        meth = Any;
+        path =
+          Exact
+            [Literal "a"; Literal "b"; Literal "c"; Literal "d"; Literal "e"];
+      };
+      {meth = Any; path = Exact [Wildcard; Literal "a"; Wildcard; Literal "b"]};
+      {
+        meth = Any;
+        path =
+          FollowedByAnySuffix [Wildcard; Literal "a"; Wildcard; Literal "b"];
+      };
+      {
+        meth = Exact `PATCH;
+        path =
+          FollowedByAnySuffix [Wildcard; Literal "a"; Wildcard; Literal "b"];
+      };
+      {meth = Any; path = FollowedByAnySuffix [Literal "???"]};
+      {meth = Any; path = Exact [Literal "*/%"]};
+    ]
+
+let () =
+  List.iter
     (fun string ->
       try
         let _ = parse string in

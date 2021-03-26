@@ -106,6 +106,39 @@ let parse : string -> matcher =
     let path = parse_path s offset in
     {meth; path}
 
+(* Serialising *)
+
+let to_string_meth = function
+  | Any -> ""
+  | Exact `GET -> "GET"
+  | Exact `PUT -> "PUT"
+  | Exact `POST -> "POST"
+  | Exact `PATCH -> "PATCH"
+  | Exact `DELETE -> "DELETE"
+
+let escaped_asterisk_seq = String.to_seq "%2A"
+
+let to_string_chunk = function
+  | Wildcard -> "*"
+  | Literal l ->
+      let s = Uri.pct_encode l in
+      if String.contains s '*' then
+        (* slow path *)
+        String.of_seq
+          (Seq.flat_map
+             (function '*' -> escaped_asterisk_seq | c -> Seq.return c)
+             (String.to_seq s))
+      else s
+
+let to_string_chunk_list l =
+  "/" ^ String.concat "/" (List.map to_string_chunk l)
+
+let to_string_path = function
+  | FollowedByAnySuffix l -> to_string_chunk_list l ^ "/**"
+  | Exact l -> to_string_chunk_list l
+
+let to_string {meth; path} = to_string_meth meth ^ to_string_path path
+
 (* Matching paths *)
 
 let rec matches_path any_suffix_of matcher path =

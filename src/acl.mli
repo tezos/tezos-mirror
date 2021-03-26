@@ -112,6 +112,8 @@ type matcher = {meth: meth_matcher; path: path_matcher}
     above. *)
 val parse : string -> matcher
 
+val to_string : matcher -> string
+
 (** access policy *)
 type t =
   | Allow_all of {except: matcher list}
