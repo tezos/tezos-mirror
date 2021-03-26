@@ -566,6 +566,60 @@ module Baking_forge = struct
       ~msg:"retrying after baking error {errors}"
       ~pp1:pp_print_error_first
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
+
+  let endorsement_received =
+    declare_2
+      ~section
+      ~level:Info
+      ~name:"endorsement_received"
+      ~msg:"received endorsement for slot {slot} (power: {power})"
+      ~pp1:Format.pp_print_int
+      ("slot", Data_encoding.int31)
+      ~pp2:Format.pp_print_int
+      ("power", Data_encoding.int31)
+
+  let expected_validity_time =
+    declare_2
+      ~section
+      ~name:"expected_validity_time"
+      ~level:Info
+      ~msg:"expected validity time: {time} (endorsing power: {power})"
+      ~pp1:Alpha_context.Timestamp.pp
+      ("time", Alpha_context.Timestamp.encoding)
+      ~pp2:Format.pp_print_int
+      ("power", Data_encoding.int31)
+
+  let reading_per_block =
+    declare_1
+      ~section
+      ~name:"reading_per_block"
+      ~level:Notice
+      ~msg:"reading per block vote file path: {path}"
+      ("path", Data_encoding.string)
+
+  let per_block_vote_file_notice =
+    declare_1
+      ~section
+      ~name:"per_block_vote_file_notice"
+      ~level:Notice
+      ~msg:"per block vote file {event}"
+      ("event", Data_encoding.string)
+
+  let reading_liquidity_baking =
+    declare_0
+      ~section
+      ~name:"reading_liquidity_baking"
+      ~level:Notice
+      ~msg:"reading liquidity baking escape vote"
+      ()
+
+  let liquidity_baking_escape_vote =
+    declare_1
+      ~section
+      ~name:"liquidity_baking_escape_vote"
+      ~level:Notice
+      ~msg:"liquidity baking escape vote = {value}"
+      ("value", Data_encoding.bool)
 end
 
 module Endorsement = struct
