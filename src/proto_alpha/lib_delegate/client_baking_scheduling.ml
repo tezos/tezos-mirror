@@ -23,14 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = Protocol.name ^ ".baking.scheduling"
-end)
-
-open Logging
 open Protocol_client_context
 
 type error += Node_connection_lost
+
+module Events = Delegate_events.Baking_scheduling
 
 let () =
   register_error_kind
@@ -54,12 +51,7 @@ let rec wait_for_first_event ~name stream =
   Lwt_stream.get stream
   >>= function
   | None | Some (Error _) ->
-      lwt_log_info
-        Tag.DSL.(
-          fun f ->
-            f "Can't fetch the current event. Waiting for new event."
-            -% t event "cannot_fetch_event"
-            -% t worker_tag name)
+      Events.(emit cannot_fetch_event) name
       >>= fun () ->
       (* NOTE: this is not a tight loop because of Lwt_stream.get *)
       wait_for_first_event ~name stream
@@ -72,11 +64,7 @@ let log_errors_and_continue ~name p =
   | Ok () ->
       Lwt.return_unit
   | Error errs ->
-      lwt_log_error
-        Tag.DSL.(
-          fun f ->
-            f "Error while baking:@\n%a"
-            -% t event "daemon_error" -% t worker_tag name -% a errs_tag errs)
+      Events.(emit daemon_error) (name, errs)
 
 let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
     ~(stream : 'event tzresult Lwt_stream.t)
@@ -92,11 +80,7 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
     ~(event_k :
        #Protocol_client_context.full -> 'state -> 'event -> unit tzresult Lwt.t)
     ~finalizer =
-  lwt_log_info
-    Tag.DSL.(
-      fun f ->
-        f "Setting up before the %s can start."
-        -% t event "daemon_setup" -% s worker_tag name)
+  Events.(emit daemon_setup) name
   >>= fun () ->
   wait_for_first_event ~name stream
   >>= fun first_event ->
@@ -128,12 +112,7 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
     | `Event (None | Some (Error _)) ->
         (* exit when the node is unavailable *)
         last_get_event := None ;
-        lwt_log_error
-          Tag.DSL.(
-            fun f ->
-              f "Connection to node lost, %s exiting."
-              -% t event "daemon_connection_lost"
-              -% s worker_tag name)
+        Events.(emit daemon_connection_lost) name
         >>= fun () -> fail Node_connection_lost
     | `Event (Some (Ok event)) ->
         (* new event: cancel everything and execute callback *)
@@ -143,21 +122,14 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
         >>= fun () -> worker_loop ()
     | `Timeout timesup ->
         (* main event: it's time *)
-        lwt_debug
-          Tag.DSL.(
-            fun f ->
-              f "Waking up for %s." -% t event "daemon_wakeup"
-              -% s worker_tag name)
+        Events.(emit daemon_wakeup) name
         >>= fun () ->
         (* core functionality *)
         log_errors_and_continue ~name @@ timeout_k cctxt state timesup
         >>= fun () -> worker_loop ()
   in
   (* ignition *)
-  lwt_log_info
-    Tag.DSL.(
-      fun f ->
-        f "Starting %s daemon" -% t event "daemon_start" -% s worker_tag name)
+  Events.(emit daemon_start) name
   >>= fun () ->
   Lwt.finalize
     (fun () ->
