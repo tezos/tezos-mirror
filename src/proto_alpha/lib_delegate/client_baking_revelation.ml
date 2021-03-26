@@ -23,9 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = Protocol.name ^ ".baking.nonce_revelation"
-end)
+module Events = Delegate_events.Revelation
 
 let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
     ~block ?async nonces =
@@ -33,13 +31,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
   >>=? fun hash ->
   match nonces with
   | [] ->
-      lwt_log_notice
-        Tag.DSL.(
-          fun f ->
-            f "Nothing to reveal for block %a"
-            -% t event "no_nonce_reveal"
-            -% a Block_hash.Logging.tag hash)
-      >>= fun () -> return_unit
+      Events.(emit no_nonce_reveal) hash >>= fun () -> return_unit
   | _ ->
       List.iter_es
         (fun (level, nonce) ->
@@ -54,15 +46,11 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
           let bytes = Signature.concat bytes Signature.zero in
           Shell_services.Injection.operation cctxt ?async ~chain bytes
           >>=? fun oph ->
-          lwt_log_notice
-            Tag.DSL.(
-              fun f ->
-                f
-                  "Revealing nonce %a from level %a for chain %a, block %a \
-                   with operation %a"
-                -% t event "reveal_nonce" -% a Logging.nonce_tag nonce
-                -% a Logging.level_tag level -% a Logging.chain_tag chain
-                -% a Logging.block_tag block
-                -% a Operation_hash.Logging.tag oph)
+          Events.(emit reveal_nonce)
+            ( nonce,
+              level,
+              Block_services.chain_to_string chain,
+              Block_services.to_string block,
+              oph )
           >>= fun () -> return_unit)
         nonces
