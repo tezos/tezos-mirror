@@ -46,6 +46,7 @@ let () =
   Double_bake.register Alpha ;
   Mockup.register Protocol.current_mainnet ;
   Mockup.register Alpha ;
+  Mockup.register_constant_migration ~migrate_from:Edo ~migrate_to:Alpha ;
   Proxy.register Protocol.current_mainnet ;
   Proxy.register Alpha ;
   P2p.register Alpha ;

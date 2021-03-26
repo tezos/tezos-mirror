@@ -342,46 +342,45 @@ let test_migration_transfer ?migration_spec () =
 (* Check constants equality between that obtained by directly initializing
    a mockup context at alpha and that obtained by migrating from
    alpha~1 to alpha *)
-let test_migration_constants () =
+let test_migration_constants ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__
-    ~title:(sf "check constants consistency after migration")
+    ~title:
+      (sf
+         "(%s -> %s) constant migration"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to))
     ~tags:["mockup"; "migration"]
     (fun () ->
-      let alpha_pred =
-        let predecessor_opt = Protocol.previous_protocol Protocol.Alpha in
-        match predecessor_opt with
-        | None ->
-            Test.fail "Could not find predecessor protocol to Alpha"
-        | Some proto ->
-            proto
-      in
       let constants_path =
         ["chains"; "main"; "blocks"; "head"; "context"; "constants"]
       in
-      let* client_alpha =
+      let* client_to =
         Client.init_mockup
           ~constants:Protocol.Constants_mainnet
-          ~protocol:Protocol.Alpha
+          ~protocol:migrate_to
           ()
       in
-      let* const_alpha = Client.(rpc GET constants_path client_alpha) in
-      let* const_alpha_migrated =
+      let* const_to = Client.(rpc GET constants_path client_to) in
+      let* const_migrated =
         perform_migration
-          ~protocol:alpha_pred
-          ~next_protocol:Protocol.Alpha
+          ~protocol:migrate_from
+          ~next_protocol:migrate_to
           ~next_constants:Protocol.Constants_mainnet
           ~pre_migration:(fun _ -> return ())
           ~post_migration:(fun client () ->
             Client.(rpc GET constants_path client))
       in
-      if const_alpha = const_alpha_migrated then return ()
+      if const_to = const_migrated then return ()
       else (
-        Log.error "constants (alpha):\n%s\n" (JSON.encode const_alpha) ;
+        Log.error
+          "constants (%s):\n%s\n"
+          (Protocol.tag migrate_to)
+          (JSON.encode const_to) ;
         Log.error
           "constants (migrated from %s):\n%s\n"
-          (Protocol.tag alpha_pred)
-          (JSON.encode const_alpha_migrated) ;
+          (Protocol.tag migrate_from)
+          (JSON.encode const_migrated) ;
         Test.fail "Protocol constants mismatch" ))
 
 let register protocol =
@@ -393,6 +392,7 @@ let register protocol =
   test_multiple_baking ~protocol ;
   test_rpc_header_shell ~protocol
 
-let register_protocol_independent () =
-  test_migration_transfer () ;
-  test_migration_constants ()
+let register_constant_migration ~migrate_from ~migrate_to =
+  test_migration_constants ~migrate_from ~migrate_to
+
+let register_protocol_independent () = test_migration_transfer ()
