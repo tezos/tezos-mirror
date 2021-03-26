@@ -53,7 +53,7 @@ let history_mode =
 
 module Logging = struct
   let configure =
-    RPC_service.post_service
+    RPC_service.put_service
       ~description:"Replace the logging configuration of the node."
       ~query:RPC_query.empty
       ~input:Tezos_stdlib_unix.Internal_event_unix.Configuration.encoding

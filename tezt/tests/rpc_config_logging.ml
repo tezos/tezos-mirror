@@ -49,7 +49,7 @@ let change_logging_configuration =
     | false -> Test.fail "Expecting failure: %s" msg
   in
   let call_config data =
-    let* _ = Client.rpc ~data Client.POST ["config"; "logging"] client in
+    let* _ = Client.rpc ~data Client.PUT ["config"; "logging"] client in
     Lwt.return_unit
   in
   should_fail "wrong-json" (fun () ->

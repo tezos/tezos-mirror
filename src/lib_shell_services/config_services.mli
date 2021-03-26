@@ -42,7 +42,7 @@ val history_mode :
 
 module Logging : sig
   val configure :
-    ( [`POST],
+    ( [`PUT],
       unit,
       unit,
       unit,
