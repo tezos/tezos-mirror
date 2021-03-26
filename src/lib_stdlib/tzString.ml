@@ -85,3 +85,5 @@ let is_hex s =
       s ;
     true
   with Exit -> false
+
+let pp_bytes_hex fmt bytes = Hex.(of_bytes bytes |> pp fmt)
