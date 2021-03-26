@@ -78,9 +78,10 @@ def src_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
       text = text
 
     # raise a warning if the file does not exist
-    if not Path(TEZOS_HOME, src).exists():
+    file = re.sub("#L[0-9]+$", "", src) # drop line number if present
+    if not Path(TEZOS_HOME, file).exists():
         msg = [inliner.reporter.warning(
-            f'source file {src} does not exist in the repo',
+            f'source file {file} does not exist in the repo',
             line=lineno
         )]
     else:
