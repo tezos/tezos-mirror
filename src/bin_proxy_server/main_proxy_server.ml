@@ -155,7 +155,7 @@ let main_promise (config_file : string option)
     Tezos_proxy.Proxy_services.build_directory
       printer
       http_ctxt
-      Tezos_proxy.Proxy_services.Proxy
+      Tezos_proxy.Proxy_services.Proxy_server
       proxy_env
   in
   let server_args : Proxy_server_main_run.args =

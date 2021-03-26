@@ -25,8 +25,12 @@
 
 (** Whether using the light mode or the proxy mode (remember that
     the light mode is a different instance of the proxy mode
-    (see srcs/lib_proxy/README_LIGHT.md for documentation). *)
-type mode = Light of Light.sources | Proxy
+    (see srcs/lib_proxy/README_LIGHT.md for documentation)
+    and whether [tezos-client] or [tezos-proxy-server] is running. *)
+type mode =
+  | Light_client of Light.sources  (** [tezos-client --mode light] is running *)
+  | Proxy_client  (** [tezos-client --mode proxy] is running *)
+  | Proxy_server  (** [tezos-proxy-server] is running *)
 
 (** [build_directory printer rpc_context mode env] returns the directory
     of RPCs that is served locally by the proxy mode
