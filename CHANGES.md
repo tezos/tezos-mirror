@@ -19,6 +19,51 @@ be documented here either.
 
 ## Node
 
+- Replaced the chain storage layer with a more efficient
+  backend in both terms of performance and storage size.
+
+- Added an upgrade procedure to upgrade from the previous store to the
+  new one. The procedure is implemented through the `tezos-node
+  upgrade storage` command. This command is non-destructive: the
+  previous store is preserved at `<data_dir>/lmdb_store_to_be_removed`
+  and needs to be manually removed when the user made sure the upgrade
+  process went well.
+
+- Reworked the storage snapshots:
+  - Introduced a new snapshot format (v2)
+  - Improved the snapshot export/import process in both terms of
+	duration and memory usage
+  - Added `--export-format` option:
+	- `--export-format tar` (default) creates a snapshot as a portable
+      tar archive
+	- `--export-format raw` creates a snapshot as a raw directory
+      suitable for IPFS sharing
+  - The argument `[output_file]` in `tezos-node export snapshot
+    [output_file]` becomes optional and defaults to a file whose name
+    follows this pattern
+    `<NETWORK>-<BLOCK_HASH>-<BLOCK_LEVEL>.<SNAPSHOT_HISTORY_MODE>`
+  - Improved the metadata of snasphots which can be displayed using
+	`tezos-node snapshot info`
+  - The `tezos-node snapshot import` command is retro-compatible with
+	the previous snapshot format (v1) but legacy snapshots cannot be
+	exported anymore
+
+- Interrupted context reconstruction can now be resumed.
+
+- Promoted the `experimental-rolling` history mode to `rolling`. The
+  node's option `--history-mode experimental-rolling` is now
+  deprecated and is equivalent to `--history-mode rolling`.
+
+- Reworked the nodes rolling and full history modes. Previously, these
+  two modes were maintaining a window of `<preserved cycles>` cycles
+  of metadata (`5` on mainnet). These modes may now be configured to
+  keep a larger window of metadata. E.g. `tezos-node run
+  --history-mode full+2` will maintain 2 extra cycles of metadata, in
+  addition to the network's preserved cycles. This may become useful
+  for users that want to keep more data from the past: for instance,
+  to compute rewards payouts. The default number of extra preserved
+  cycles is 5 (`5 + 5` on mainnet).
+
 ## Client
 
 ## Baker / Endorser / Accuser
