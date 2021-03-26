@@ -23,15 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = Protocol.name ^ ".baking.denunciation"
-end)
-
 open Protocol
 open Alpha_context
 open Protocol_client_context
 open Client_baking_blocks
-open Logging
+module Events = Delegate_events.Denunciator
 
 module HLevel = Hashtbl.Make (struct
   type t = Chain_id.t * Raw_level.t
@@ -70,13 +66,7 @@ let get_block_offset level =
   | Ok min_level ->
       Lwt.return (if Raw_level.(level < min_level) then `Head 0 else `Head 5)
   | Error errs ->
-      let errs = Environment.wrap_tztrace errs in
-      lwt_log_error
-        Tag.DSL.(
-          fun f ->
-            f "Invalid level conversion : %a"
-            -% t event "invalid_level_conversion"
-            -% a errs_tag errs)
+      Events.(emit invalid_level_conversion) (Environment.wrap_tztrace errs)
       >>= fun () -> Lwt.return (`Head 0)
 
 let process_endorsements (cctxt : #Protocol_client_context.full) state
@@ -139,25 +129,14 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
                 ()
               >>=? fun bytes ->
               let bytes = Signature.concat bytes Signature.zero in
-              lwt_log_notice
-                Tag.DSL.(
-                  fun f ->
-                    f "Double endorsement detected"
-                    -% t event "double_endorsement_detected"
-                    -% t
-                         conflicting_endorsements_tag
-                         (existing_endorsement, new_endorsement))
+              Events.(emit double_endorsement_detected)
+                ( Operation.hash existing_endorsement,
+                  Operation.hash new_endorsement )
               >>= fun () ->
               (* A denunciation may have already occurred *)
               Shell_services.Injection.operation cctxt ~chain bytes
               >>=? fun op_hash ->
-              lwt_log_notice
-                Tag.DSL.(
-                  fun f ->
-                    f "Double endorsement evidence injected %a"
-                    -% t event "double_endorsement_denounced"
-                    -% t signed_operation_tag bytes
-                    -% a Operation_hash.Logging.tag op_hash)
+              Events.(emit double_endorsement_denounced) (op_hash, bytes)
               >>= fun () ->
               return
               @@ HLevel.replace
@@ -169,13 +148,7 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
                    block but endorse the same predecessor *)
               return_unit )
       | _ ->
-          lwt_log_error
-            Tag.DSL.(
-              fun f ->
-                f "Inconsistent endorsement found %a"
-                -% t event "inconsistent_endorsement"
-                -% a Operation_hash.Logging.tag hash)
-          >>= fun () -> return_unit)
+          Events.(emit inconsistent_endorsement) hash >>= fun () -> return_unit)
     endorsements
   >>=? fun () -> return_unit
 
@@ -183,13 +156,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
     (header : Alpha_block_services.block_info) =
   match header with
   | {hash; metadata = None; _} ->
-      lwt_log_error
-        Tag.DSL.(
-          fun f ->
-            f "Unexpected pruned block: %a"
-            -% t event "unexpected_pruned_block"
-            -% a Block_hash.Logging.tag hash)
-      >>= fun () -> return_unit
+      Events.(emit unexpected_pruned_block) hash >>= fun () -> return_unit
   | { Alpha_block_services.chain_id;
       hash;
       metadata = Some {protocol_data = {baker; level_info = {level; _}; _}; _};
@@ -211,13 +178,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
                (Delegate_Map.add baker hash map)
       | Some existing_hash when Block_hash.( = ) existing_hash hash ->
           (* This case should never happen *)
-          lwt_debug
-            Tag.DSL.(
-              fun f ->
-                f
-                  "Double baking detected but block hashes are equivalent. \
-                   Skipping..."
-                -% t event "double_baking_but_not")
+          Events.(emit double_baking_but_not) ()
           >>= fun () ->
           return
           @@ HLevel.replace
@@ -253,21 +214,12 @@ let process_block (cctxt : #Protocol_client_context.full) state
             ()
           >>=? fun bytes ->
           let bytes = Signature.concat bytes Signature.zero in
-          lwt_log_notice
-            Tag.DSL.(
-              fun f ->
-                f "Double baking detected" -% t event "double_baking_detected")
+          Events.(emit double_baking_detected) ()
           >>= fun () ->
           (* A denunciation may have already occurred *)
           Shell_services.Injection.operation cctxt ~chain bytes
           >>=? fun op_hash ->
-          lwt_log_notice
-            Tag.DSL.(
-              fun f ->
-                f "Double baking evidence injected %a"
-                -% t event "double_baking_denounced"
-                -% t signed_operation_tag bytes
-                -% a Operation_hash.Logging.tag op_hash)
+          Events.(emit double_baking_denounced) (op_hash, bytes)
           >>= fun () ->
           return
           @@ HLevel.replace
@@ -306,21 +258,9 @@ let endorsements_index = 0
 let process_new_block (cctxt : #Protocol_client_context.full) state
     {hash; chain_id; level; protocol; next_protocol; _} =
   if Protocol_hash.(protocol <> next_protocol) then
-    lwt_log_error
-      Tag.DSL.(
-        fun f ->
-          f "Protocol changing detected. Skipping the block."
-          -% t event "protocol_change_detected"
-        (* TODO which protocols -- in tag *))
-    >>= fun () -> return_unit
+    Events.(emit protocol_change_detected) () >>= fun () -> return_unit
   else
-    lwt_debug
-      Tag.DSL.(
-        fun f ->
-          f "Block level : %a"
-          -% t event "accuser_saw_block"
-          -% a level_tag level
-          -% t Block_hash.Logging.tag hash)
+    Events.(emit accuser_saw_block) (level, hash)
     >>= fun () ->
     let chain = `Hash chain_id in
     let block = `Hash (hash, 0) in
@@ -332,13 +272,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
           | Ok block_info ->
               process_block cctxt state block_info
           | Error errs ->
-              lwt_log_error
-                Tag.DSL.(
-                  fun f ->
-                    f "Error while fetching operations in block %a@\n%a"
-                    -% t event "fetch_operations_error"
-                    -% a Block_hash.Logging.tag hash
-                    -% a errs_tag errs)
+              Events.(emit fetch_operations_error) (hash, errs)
               >>= fun () -> return_unit)
     >>=? fun () ->
     (* Processing endorsements *)
@@ -351,13 +285,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
             | None ->
                 return_unit )
           | Error errs ->
-              lwt_log_error
-                Tag.DSL.(
-                  fun f ->
-                    f "Error while fetching operations in block %a@\n%a"
-                    -% t event "fetch_operations_error"
-                    -% a Block_hash.Logging.tag hash
-                    -% a errs_tag errs)
+              Events.(emit fetch_operations_error) (hash, errs)
               >>= fun () -> return_unit)
     >>=? fun () ->
     cleanup_old_operations state ;
@@ -369,22 +297,9 @@ let create (cctxt : #Protocol_client_context.full) ~preserved_levels
     process_new_block cctxt state bi
     >>= function
     | Ok () ->
-        lwt_log_notice
-          Tag.DSL.(
-            fun f ->
-              f "Block %a registered"
-              -% t event "accuser_processed_block"
-              -% a Block_hash.Logging.tag bi.Client_baking_blocks.hash)
-        >>= return
+        Events.(emit accuser_processed_block) bi.hash >>= return
     | Error errs ->
-        lwt_log_error
-          Tag.DSL.(
-            fun f ->
-              f "Error while processing block %a@\n%a"
-              -% t event "accuser_block_error"
-              -% a Block_hash.Logging.tag bi.hash
-              -% a errs_tag errs)
-        >>= return
+        Events.(emit accuser_block_error) (bi.hash, errs) >>= return
   in
   let state_maker _ = create_state ~preserved_levels >>= return in
   Client_baking_scheduling.main
