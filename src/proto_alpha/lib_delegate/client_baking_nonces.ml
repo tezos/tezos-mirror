@@ -25,10 +25,7 @@
 
 open Protocol
 open Alpha_context
-
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = Protocol.name ^ ".baking.nonces"
-end)
+module Events = Delegate_events.Nonces
 
 type t = Nonce.t Block_hash.Map.t
 
@@ -79,14 +76,8 @@ let get_block_level_opt cctxt ~chain ~block =
   | Ok {level; _} ->
       Lwt.return_some level
   | Error errs ->
-      lwt_warn
-        Tag.DSL.(
-          fun f ->
-            f
-              "@[<v 2>Cannot retrieve block %a header associated to nonce:@ \
-               @[%a@]@]@."
-            -% t event "cannot_retrieve_block_header"
-            -% a Logging.block_tag block -% a errs_tag errs)
+      Events.(emit cannot_retrieve_block_header)
+        (Block_services.to_string block, errs)
       >>= fun () -> Lwt.return_none
 
 let get_outdated_nonces cctxt ?constants ~chain nonces =
@@ -99,11 +90,7 @@ let get_outdated_nonces cctxt ?constants ~chain nonces =
   get_block_level_opt cctxt ~chain ~block:(`Head 0)
   >>= function
   | None ->
-      lwt_log_error
-        Tag.DSL.(
-          fun f ->
-            f "Cannot fetch chain's head level. Aborting nonces filtering."
-            -% t event "cannot_retrieve_head_level")
+      Events.(emit cannot_retrieve_head_level) ()
       >>= fun () -> return (empty, empty)
   | Some current_level ->
       let current_cycle = Int32.(div current_level blocks_per_cycle) in
@@ -131,18 +118,7 @@ let filter_outdated_nonces cctxt ?constants location nonces =
   get_outdated_nonces cctxt ?constants ~chain nonces
   >>=? fun (orphans, outdated_nonces) ->
   ( if Block_hash.Map.cardinal orphans >= 50 then
-    lwt_warn
-      Tag.DSL.(
-        fun f ->
-          f
-            "Found too many nonces associated to blocks unknown by the node \
-             in '$TEZOS_CLIENT/%s'. After checking that these blocks were \
-             never included in the chain (e.g. via a block explorer), \
-             consider using `tezos-client filter orphan nonces` to clear them."
-          -% s
-               Logging.filename_tag
-               (Client_baking_files.filename location ^ "s")
-          -% t event "too_many_orphans")
+    Events.(emit too_many_orphans) (Client_baking_files.filename location)
     >>= fun () -> Lwt.return_unit
   else Lwt.return_unit )
   >>= fun () -> return (remove_all nonces outdated_nonces)
@@ -170,21 +146,10 @@ let get_unrevealed_nonces cctxt location nonces =
               Alpha_services.Nonce.get cctxt (chain, `Head 0) level
               >>=? function
               | Missing nonce_hash when Nonce.check_hash nonce nonce_hash ->
-                  lwt_log_notice
-                    Tag.DSL.(
-                      fun f ->
-                        f "Found nonce to reveal for %a (level: %a)"
-                        -% t event "found_nonce"
-                        -% a Block_hash.Logging.tag hash
-                        -% a Logging.level_tag level)
+                  Events.(emit found_nonce) (hash, level)
                   >>= fun () -> return_some (level, nonce)
               | Missing _nonce_hash ->
-                  lwt_log_error
-                    Tag.DSL.(
-                      fun f ->
-                        f "Incoherent nonce for level %a"
-                        -% t event "bad_nonce" -% a Logging.level_tag level)
-                  >>= fun () -> return_none
+                  Events.(emit bad_nonce) level >>= fun () -> return_none
               | Forgotten ->
                   return_none
               | Revealed _ ->
