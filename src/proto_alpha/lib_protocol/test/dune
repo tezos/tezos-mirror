@@ -6,7 +6,6 @@
             alcotest-lwt
             lib-test
             qcheck-alcotest
-            crowbar
             tezos-alpha-test-helpers
             tezos-stdlib-unix
             tezos-client-base

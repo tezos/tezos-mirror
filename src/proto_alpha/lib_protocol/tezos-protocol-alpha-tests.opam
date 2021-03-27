@@ -10,7 +10,6 @@ depends: [
   "tezos-protocol-compiler"
   "alcotest-lwt" { with-test & >= "1.1.0" }
   "astring" { with-test }
-  "crowbar" { with-test }
   "lib-test" { with-test }
   "qcheck-alcotest" { with-test }
   "tezos-alpha-test-helpers" { with-test }
