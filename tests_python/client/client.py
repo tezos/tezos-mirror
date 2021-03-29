@@ -233,6 +233,9 @@ class Client:
             params += ['--legacy']
         return self.run(params)
 
+    def get_script(self, contract: str) -> str:
+        return self.run(['get', 'contract', 'code', 'for', contract])
+
     def run_script(
         self,
         contract: str,
@@ -841,7 +844,13 @@ class Client:
         return client_output.OriginationResult(self.run(cmd))
 
     def msig_sign_transfer(
-        self, msig_name: str, amount: float, dest: str, secret_key: str
+        self,
+        msig_name: str,
+        amount: float,
+        dest: str,
+        secret_key: str,
+        args: List[str] = None,
+        expected_warning: str = "",
     ) -> str:
         cmd = [
             'sign',
@@ -858,6 +867,33 @@ class Client:
             'key',
             secret_key,
         ]
+        if args is None:
+            args = []
+        cmd += args
+        (res, err, _) = self.run_generic(cmd)
+        assert err == expected_warning
+        return res[:-1]
+
+    def msig_sign_lambda(
+        self, msig_name: str, lam: str, secret_key: str, args: List[str] = None
+    ) -> str:
+        cmd = [
+            'sign',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'running',
+            'lambda',
+            lam,
+            'using',
+            'secret',
+            'key',
+            secret_key,
+        ]
+        if args is None:
+            args = []
+        cmd += args
         res = self.run(cmd)
         return res[:-1]
 
@@ -955,11 +991,13 @@ class Client:
         cmd = ['sign', 'bytes', data, 'for', identity]
         return client_output.SignBytesResult(self.run(cmd)).signature
 
-    def sign_bytes(self, to_sign: bytes, key: str) -> str:
-        return self.sign_bytes_of_string(str(to_sign), key)
-
     def msig_prepare_transfer(
-        self, msig_name: str, amount: float, dest: str, args: List[str] = None
+        self,
+        msig_name: str,
+        amount: float,
+        dest: str,
+        args: List[str] = None,
+        expected_warning: str = "",
     ):
         cmd = [
             'prepare',
@@ -971,6 +1009,26 @@ class Client:
             str(amount),
             'to',
             dest,
+        ]
+        if args is None:
+            args = []
+        cmd += args
+        (res, err, _) = self.run_generic(cmd)
+        assert err == expected_warning
+        return res[:-1]
+
+    def msig_prepare_lambda(
+        self, msig_name: str, lam: str, args: List[str] = None
+    ):
+        cmd = [
+            'prepare',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'running',
+            'lambda',
+            lam,
         ]
         if args is None:
             args = []
@@ -1049,6 +1107,7 @@ class Client:
         src: str,
         signatures: List[str],
         args: List[str] = None,
+        expected_warning: str = "",
     ) -> str:
         cmd = [
             'from',
@@ -1059,6 +1118,36 @@ class Client:
             str(amount),
             'to',
             dest,
+            'on',
+            'behalf',
+            'of',
+            src,
+            'with',
+            'signatures',
+        ] + signatures
+        if args is None:
+            args = []
+        cmd += args
+        (res, err, _) = self.run_generic(cmd)
+        assert err == expected_warning
+        return res[:-1]
+
+    def msig_run_lambda(
+        self,
+        msig_name: str,
+        lam: str,
+        src: str,
+        signatures: List[str],
+        args: List[str] = None,
+    ) -> str:
+        cmd = [
+            'from',
+            'multisig',
+            'contract',
+            msig_name,
+            'run',
+            'lambda',
+            lam,
             'on',
             'behalf',
             'of',
@@ -1132,6 +1221,8 @@ class Client:
         transaction: bytes,
         src: str,
         signatures: List[str],
+        args: List[str] = None,
+        expected_warning: str = "",
     ) -> str:
         cmd = [
             'run',
@@ -1148,7 +1239,12 @@ class Client:
             'with',
             'signatures',
         ] + signatures
-        return self.run(cmd)
+        if args is None:
+            args = []
+        cmd += args
+        (res, err, _) = self.run_generic(cmd)
+        assert err == expected_warning
+        return res[:-1]
 
     def msig_set_threshold(
         self,
