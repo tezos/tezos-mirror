@@ -192,7 +192,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
       >>= fun () -> return_unit
   | { Alpha_block_services.chain_id;
       hash;
-      metadata = Some {protocol_data = {baker; level = {level; _}; _}; _};
+      metadata = Some {protocol_data = {baker; level_info = {level; _}; _}; _};
       _ } -> (
       let chain = `Hash chain_id in
       let map =
