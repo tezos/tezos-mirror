@@ -244,6 +244,30 @@ let check_constants_consistency constants =
       failwith
         "Inconsistent constants : blocks per cycle must be superior than \
          blocks per roll snapshot")
+  >>=? fun () ->
+  let min_time_between_blocks =
+    match constants.time_between_blocks with
+    | first_time_between_blocks :: _ ->
+        first_time_between_blocks
+    | [] ->
+        (* this constant is used in the Baking module *)
+        Period.one_minute
+  in
+  Error_monad.unless
+    Compare.Int64.(
+      Period.to_seconds min_time_between_blocks
+      >= Period.to_seconds constants.minimal_block_delay)
+    (fun () ->
+      failwith
+        "minimal_block_delay value (%Ld) should be smaller than \
+         time_between_blocks[0] value (%Ld)"
+        (Period.to_seconds constants.minimal_block_delay)
+        (Period.to_seconds min_time_between_blocks))
+  >>=? fun () ->
+  Error_monad.unless
+    Compare.Int.(constants.endorsers_per_block >= constants.initial_endorsers)
+    (fun () ->
+      failwith "initial_endorsers should be smaller than endorsers_per_block")
 
 let initial_context ?(with_commitments = false) constants header
     initial_accounts =
