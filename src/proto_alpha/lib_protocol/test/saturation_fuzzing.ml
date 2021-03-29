@@ -74,6 +74,17 @@ let test_add_zero =
       qcheck_eq' ~pp ~expected:t ~actual:t_plus_zero ())
 
 (* Test.
+ * Tests that t1 + t2 >= t1
+ *)
+let test_add_neq =
+  QCheck.Test.make
+    ~name:"t1 + t2 >= t1"
+    (QCheck.pair t_arb t_arb)
+    (fun (t1, t2) ->
+      let t1_plus_t2 = add t1 t2 in
+      t1_plus_t2 >= t1)
+
+(* Test.
  * Tests that 1 is neutral for [mul].
  *)
 let test_mul_one =
@@ -98,15 +109,73 @@ let test_sub_zero =
       let t_sub_zero = sub t zero in
       qcheck_eq' ~pp ~expected:t ~actual:t_sub_zero ())
 
-let tests_add = [test_add_commutes; test_add_zero]
+(* Test.
+ * Tests that [t] [sub] [t] equals [zero].
+ *)
+let test_sub_itself =
+  QCheck.Test.make ~name:"t - t = 0" t_arb (fun t ->
+      let t_sub_t = sub t t in
+      qcheck_eq' ~pp ~expected:zero ~actual:t_sub_t ())
+
+(* Test.
+ * Tests that t1 - t2 <= t1
+ *)
+let test_sub_neq =
+  QCheck.Test.make
+    ~name:"t1 - t2 <= t1"
+    (QCheck.pair t_arb t_arb)
+    (fun (t1, t2) ->
+      let t1_minus_t2 = sub t1 t2 in
+      t1_minus_t2 <= t1)
+
+(* Test.
+ * Tests that (t1 + t2) - t2 <= t1
+ *)
+let test_add_sub =
+  QCheck.Test.make
+    ~name:"(t1 + t2) - t2 <= t1"
+    (QCheck.pair t_arb t_arb)
+    (fun (t1, t2) ->
+      let lhs = sub (add t1 t2) t2 in
+      lhs <= t1)
+
+(* Test.
+ * Tests that (t1 - t2) + t2 >= t1
+ *)
+let test_sub_add =
+  QCheck.Test.make
+    ~name:"(t1 - t2) + t2 >= t1"
+    (QCheck.pair t_arb t_arb)
+    (fun (t1, t2) ->
+      let lhs = add (sub t1 t2) t2 in
+      lhs >= t1)
+
+(* Test.
+ * Tests that [saturated] >= t
+ *)
+let test_leq_saturated =
+  QCheck.Test.make ~name:"t <= saturated" t_arb (fun t -> saturated >= t)
+
+(* Test.
+ * Tests that [zero] <= t
+ *)
+let test_geq_zero = QCheck.Test.make ~name:"t >= 0" t_arb (fun t -> zero <= t)
+
+let tests_add = [test_add_commutes; test_add_zero; test_add_neq]
 
 let tests_mul = [test_mul_commutes; test_mul_one; test_mul_zero]
 
-let tests_sub = [test_sub_zero]
+let tests_sub = [test_sub_zero; test_sub_itself; test_sub_neq]
+
+let tests_add_sub = [test_add_sub; test_sub_add]
+
+let tests_boundaries = [test_leq_saturated; test_geq_zero]
 
 let tests =
   Alcotest.run
     "Saturation"
     [ ("add", qcheck_wrap tests_add);
       ("mul", qcheck_wrap tests_mul);
-      ("sub", qcheck_wrap tests_sub) ]
+      ("sub", qcheck_wrap tests_sub);
+      ("add and sub", qcheck_wrap tests_add_sub);
+      ("<= and >=", qcheck_wrap tests_boundaries) ]
