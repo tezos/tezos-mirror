@@ -88,6 +88,17 @@ let parse code =
     >>? fun exp ->
     Error_monad.ok @@ Script.lazy_expr Michelson_v1_parser.(exp.expanded) )
 
+let build_lambda_for_set_delegate ~delegate =
+  match delegate with
+  | Some delegate ->
+      let (`Hex delegate) = Signature.Public_key_hash.to_hex delegate in
+      Format.asprintf
+        "{ DROP ; NIL operation ; PUSH key_hash 0x%s ; SOME ; SET_DELEGATE ; \
+         CONS }"
+        delegate
+  | None ->
+      "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
+
 let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
     contract (* the KT1 to delegate *)
     (delegate : Signature.public_key_hash option) =
@@ -101,21 +112,8 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
   >>=? (function
          | Some _ ->
              (* their is a "do" entrypoint (we could check its type here)*)
-             let lambda =
-               match delegate with
-               | Some delegate ->
-                   let (`Hex delegate) =
-                     Signature.Public_key_hash.to_hex delegate
-                   in
-                   Format.asprintf
-                     "{ DROP ; NIL operation ; PUSH key_hash 0x%s ; SOME ; \
-                      SET_DELEGATE ; CONS }"
-                     delegate
-               | None ->
-                   "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; \
-                    CONS }"
-             in
-             parse lambda >>=? fun param -> return (param, entrypoint)
+             parse @@ build_lambda_for_set_delegate ~delegate
+             >>=? fun param -> return (param, entrypoint)
          | None -> (
              (*  their is no "do" entrypoint trying "set/remove_delegate" *)
              let entrypoint =
@@ -190,15 +188,15 @@ let d_unit =
 let t_unit =
   Micheline.strip_locations (Prim (0, Michelson_v1_primitives.T_unit, [], []))
 
-let build_lambda_for_implicit ~delegate ~amount =
-  let (`Hex delegate) = Signature.Public_key_hash.to_hex delegate in
+let build_lambda_for_transfer_to_implicit ~destination ~amount =
+  let (`Hex destination) = Signature.Public_key_hash.to_hex destination in
   Format.asprintf
     "{ DROP ; NIL operation ;PUSH key_hash 0x%s; IMPLICIT_ACCOUNT;PUSH mutez \
      %Ld ;UNIT;TRANSFER_TOKENS ; CONS }"
-    delegate
+    destination
     (Tez.to_mutez amount)
 
-let build_lambda_for_originated ~destination ~entrypoint ~amount
+let build_lambda_for_transfer_to_originated ~destination ~entrypoint ~amount
     ~parameter_type ~parameter =
   let destination =
     Data_encoding.Binary.to_bytes_exn Contract.encoding destination
@@ -233,8 +231,8 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
     ~destination ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit
     ?storage_limit () =
   ( match Alpha_context.Contract.is_implicit destination with
-  | Some delegate when entrypoint = "default" ->
-      return @@ build_lambda_for_implicit ~delegate ~amount
+  | Some destination when entrypoint = "default" ->
+      return @@ build_lambda_for_transfer_to_implicit ~destination ~amount
   | Some _ ->
       cctxt#error
         "Implicit accounts have no entrypoints. (targeted entrypoint %%%s on \
@@ -269,7 +267,7 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
       >>=? fun parameter ->
       let parameter = Option.value ~default:d_unit parameter in
       return
-      @@ build_lambda_for_originated
+      @@ build_lambda_for_transfer_to_originated
            ~destination
            ~entrypoint
            ~amount
