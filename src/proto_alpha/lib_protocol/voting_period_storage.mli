@@ -55,7 +55,7 @@ val is_last_block : Raw_context.t -> bool tzresult Lwt.t
    For retro-compatibility, we keep this function but we provide two new fixed
    functions to reply correctly to RPCs [get_rpc_fixed_current_info] and
    [get_rpc_fixed_succ_info]. *)
-val get_current_info : Raw_context.t -> Voting_period_repr.info tzresult Lwt.t
+(* val get_current_info : Raw_context.t -> Voting_period_repr.info tzresult Lwt.t *)
 
 (* In order to avoid the problem of `get_current_info` explained above, this
    function provides the corrent behavior for the new RPC `votes/current_period`.

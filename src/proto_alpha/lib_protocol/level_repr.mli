@@ -66,22 +66,3 @@ val level_from_raw :
   level
 
 val diff : level -> level -> int32
-
-(** Compatibility module with Level_repr.t from protocol 007.
-    In this version, the [voting_period] and [voting_period_position] fields are
-    deprecated and replaced by a new RPC endpoint at
-    [Voting_services.voting_period] *)
-type compat_t = {
-  level : Raw_level_repr.t;
-  level_position : int32;
-  cycle : Cycle_repr.t;
-  cycle_position : int32;
-  voting_period : int32;
-  voting_period_position : int32;
-  expected_commitment : bool;
-}
-
-val compat_encoding : compat_t Data_encoding.t
-
-val to_deprecated_type :
-  t -> voting_period_index:int32 -> voting_period_position:int32 -> compat_t

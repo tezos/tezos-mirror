@@ -65,15 +65,6 @@ module S = struct
       ~output:Voting_period.info_encoding
       RPC_path.(path / "successor_period")
 
-  let current_period_kind_deprecated =
-    RPC_service.get_service
-      ~description:
-        "Current period kind. This RPC is DEPRECATED: use \
-         `..<block_id>/votes/current_period` RPC instead."
-      ~query:RPC_query.empty
-      ~output:Voting_period.kind_encoding
-      RPC_path.(path / "current_period_kind")
-
   let current_quorum =
     RPC_service.get_service
       ~description:"Current expected quorum."
@@ -120,9 +111,6 @@ let register () =
       Voting_period.get_rpc_fixed_current_info ctxt) ;
   register0 S.successor_period (fun ctxt () () ->
       Voting_period.get_rpc_fixed_succ_info ctxt) ;
-  register0 S.current_period_kind_deprecated (fun ctxt () () ->
-      Voting_period.get_current_info ctxt
-      >|=? fun {voting_period; _} -> voting_period.kind) ;
   register0 S.current_quorum (fun ctxt () () -> Vote.get_current_quorum ctxt) ;
   register0 S.proposals (fun ctxt () () -> Vote.get_proposals ctxt) ;
   register0 S.listings (fun ctxt () () -> Vote.get_listings ctxt >|= ok) ;

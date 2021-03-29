@@ -30,10 +30,7 @@ type error += Cannot_parse_operation (* `Branch *)
 type error += Cannot_serialize_log
 
 val current_level :
-  'a #RPC_context.simple ->
-  ?offset:int32 ->
-  'a ->
-  Level.compat_t shell_tzresult Lwt.t
+  'a #RPC_context.simple -> ?offset:int32 -> 'a -> Level.t shell_tzresult Lwt.t
 
 val levels_in_current_cycle :
   'a #RPC_context.simple ->

@@ -1229,9 +1229,7 @@ let operation_data_and_metadata_encoding =
 
 type block_metadata = {
   baker : Signature.Public_key_hash.t;
-  level : Level.compat_t;
   level_info : Level.t;
-  voting_period_kind : Voting_period.kind;
   voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Gas.Arith.fp;
@@ -1244,27 +1242,21 @@ let block_metadata_encoding =
   def "block_header.alpha.metadata"
   @@ conv
        (fun { baker;
-              level;
               level_info;
-              voting_period_kind;
               voting_period_info;
               nonce_hash;
               consumed_gas;
               deactivated;
               balance_updates } ->
          ( baker,
-           level,
            level_info,
-           voting_period_kind,
            voting_period_info,
            nonce_hash,
            consumed_gas,
            deactivated,
            balance_updates ))
        (fun ( baker,
-              level,
               level_info,
-              voting_period_kind,
               voting_period_info,
               nonce_hash,
               consumed_gas,
@@ -1272,27 +1264,16 @@ let block_metadata_encoding =
               balance_updates ) ->
          {
            baker;
-           level;
            level_info;
-           voting_period_kind;
            voting_period_info;
            nonce_hash;
            consumed_gas;
            deactivated;
            balance_updates;
          })
-       (obj9
+       (obj7
           (req "baker" Signature.Public_key_hash.encoding)
-          (req
-             ~description:"This field is DEPRECATED: use level_info instead"
-             "level"
-             Level.compat_encoding)
           (req "level_info" Level.encoding)
-          (req
-             ~description:
-               "This field is DEPRECATED: use voting_period_info instead"
-             "voting_period_kind"
-             Voting_period.kind_encoding)
           (req "voting_period_info" Voting_period.info_encoding)
           (req "nonce_hash" (option Nonce_hash.encoding))
           (req "consumed_gas" Gas.Arith.n_fp_encoding)
