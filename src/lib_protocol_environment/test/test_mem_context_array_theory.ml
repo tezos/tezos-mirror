@@ -44,83 +44,50 @@
 
     These tests complement [Test_mem_context]: while [Test_mem_context]
     creates values of Context.t manually, this file
-    use automatically generated values; thanks to [Crowbar].
+    use automatically generated values; thanks to [QCheck].
 *)
+
+open Lib_test.Qcheck_helpers
 
 type key = Context.key
 
 type value = Context.value
 
-(** On the one hand, it seemed interesting to have a limited
-    domain for keys (see [key_gen] implementation) and on the other hand fully
-    random values are good too. Hence testing both modes. We do
-    the same for values, for consistency. *)
-type mode = Random | Limited
+(** Using [QCheck.small_list] for performance reasons: using [QCheck.list] here
+    makes the file 40 times slower, which is not acceptable. *)
+let key_arb = QCheck.small_list QCheck.string
 
-let mode_to_string = function Random -> "Random" | Limited -> "Limited"
+(* As bytes are mutable this is fine because the test doesn't do any
+   mutation. Otherwise [rev] could be called on a value different than
+   the value passed to the test. *)
+let value_arb = QCheck.map ~rev:Bytes.to_string Bytes.of_string QCheck.string
 
-let key_gen mode =
-  let open Crowbar in
-  match mode with
-  | Limited ->
-      (* We voluntarily choose a limited subset, so that get and set
-       * events likely have conflicting keys. That's where the most likely
-       * failures could happen. This is complementary to data generated
-       * by a really random generator *)
-      let strs = ["a"; "b"; "c"; "d"; "e"; "f"; "g"; "h"] in
-      List.map const strs |> choose |> list1
-  | Random ->
-      bytes |> list
-
-let value_gen =
-  let open Crowbar in
-  map [bytes] Bytes.of_string
-
-let key_value_gen kmode =
-  let open Crowbar in
-  map [key_gen kmode; value_gen] (fun k v -> (k, v))
-
-(* Function set in memory_context.ml relies on a lower-level function
-   named 'raw_set' which can fail with an exception when setting a value
-   below an existing Key entry. Function [safe_set] circumvents this by
-   aborting the enclosing test (by calling [Crowbar.bad_test]) if the (k, v)
-   pair to set would trigger the exception. *)
-let safe_set m k v =
-  let prefix l =
-    if l = [] then None
-    else
-      Some
-        ( List.rev l |> List.tl
-        |> WithExceptions.Option.get ~loc:__LOC__
-        |> List.rev )
-  in
-  let rec any_prefix_mem m k =
-    let prefix = prefix k in
-    match prefix with
-    | None ->
-        Lwt.return_false
-    | Some prefix -> (
-        Context.mem m prefix
-        >>= function
-        | true -> Lwt.return_true | false -> any_prefix_mem m prefix )
-  in
-  (* If any_prefix_mem m k holds, Context.set will throw an exception; hence: *)
-  any_prefix_mem m k
-  >>= function true -> Crowbar.bad_test () | false -> Context.add m k v
+let key_value_arb = QCheck.pair key_arb value_arb
 
 (* We generate contexts by starting from a fresh one and
-   doing a sequence of calls to Context.set *)
-let context_gen kv_gen : Context.t Crowbar.gen =
-  let open Crowbar in
-  let rec set_seq ctxt key_value_list =
-    match key_value_list with
-    | [] ->
-        Lwt.return ctxt
-    | (k, v) :: rest ->
-        safe_set ctxt k v >>= fun ctxt' -> set_seq ctxt' rest
+   doing a sequence of calls to [Context.add].  *)
+let context_arb : Context.t QCheck.arbitrary =
+  let set_all key_value_list =
+    Lwt_main.run
+    @@ Lwt_list.fold_left_s
+         (fun ctxt (k, v) -> Context.add ctxt k v)
+         Memory_context.empty
+         key_value_list
   in
-  let set_seq ctxt kvs = Lwt_main.run @@ set_seq ctxt kvs in
-  map [list1 kv_gen] (set_seq Memory_context.empty)
+  let rev ctxt =
+    let keys = Lwt_main.run @@ Test_mem_context.domain ctxt in
+    List.map
+      (fun key ->
+        ( key,
+          Lwt_main.run @@ Context.find ctxt key
+          |> WithExceptions.Option.get ~loc:__LOC__ ))
+      keys
+  in
+  QCheck.map ~rev set_all @@ QCheck.small_list key_value_arb
+
+(** Some printers for passing to [check_eq*] functions *)
+
+let pp_print_value fmt v = Format.fprintf fmt "%s" (Bytes.to_string v)
 
 (* We're done with generators. *)
 
@@ -131,88 +98,85 @@ let context_gen kv_gen : Context.t Crowbar.gen =
 let test_domain_spec (ctxt, k) =
   if k = [] then
     (* This is a bit puzzling, but the empty key is special; because
-       of the implementation of memory_context.ml's raw_get method which
+       of the implementation of memory_context.ml's [Context.mem] method which
        returns true on the empty key. This means the empty key
        is considered to exist in an empty context, on which,
        [Test_mem_contex.domain] appropriately returns an empty list. One
        could complexify this test to support this case, but I didn't want
        to spend too much time on this; we're testing a test after all here. *)
-    Crowbar.bad_test ()
+    QCheck.assume_fail ()
   else
     let domain = Lwt_main.run @@ Test_mem_context.domain ctxt in
-    Crowbar.check_eq (Lwt_main.run @@ Context.mem ctxt k) (List.mem k domain)
+    qcheck_eq
+      ~pp:Format.pp_print_bool
+      (Lwt_main.run @@ Context.mem ctxt k)
+      (List.mem k domain)
 
 (* Tests that (get (set m k v) k) equals v.
    This is the first axiom of array theory *)
 let test_get_set (ctxt, (k, v)) =
-  (* The initial context *)
-  let at_k =
-    Lwt_main.run
-      (* Map k to v *)
-      ( safe_set ctxt k v
-      >>= fun ctxt' ->
-      (* Read value at k *)
-      Context.find ctxt' k )
-  in
-  match at_k with
-  | None ->
-      (* k must be mapped *)
-      Crowbar.fail "at_k not mapped after set"
-  | Some at_k ->
-      (* and it must be mapped to v *)
-      Crowbar.check_eq at_k v
-
-let value_opt ppf value_opt =
-  let ppv ppf v = Format.fprintf ppf "%s" @@ Bytes.to_string v in
-  Format.pp_print_option ppv ppf value_opt
+  let ctxt' = Lwt_main.run @@ Context.add ctxt k v in
+  let at_k = Lwt_main.run @@ Context.find ctxt' k in
+  qcheck_eq'
+    ~pp:(Format.pp_print_option pp_print_value)
+    ~expected:(Some v)
+    ~actual:at_k
+    ()
 
 (* Tests that: forall k2 <> k1, (get (set m k1 v) k2) equals get m k2;
  * i.e. setting a key doesn't affect other keys.
  * This is the second axiom of array theory *)
 let test_get_set_other (ctxt, (k1, v)) =
-  let ctxt' = Lwt_main.run @@ safe_set ctxt k1 v in
+  let ctxt' = Lwt_main.run @@ Context.add ctxt k1 v in
   let keys = Lwt_main.run @@ Test_mem_context.domain ctxt' in
   let check_key k2 =
-    if k1 = k2 then ()
+    if k1 = k2 then true
     else
       let v_before = Lwt_main.run @@ Context.find ctxt k2 in
       let v_after = Lwt_main.run @@ Context.find ctxt' k2 in
-      Crowbar.check_eq ~pp:value_opt v_before v_after
+      qcheck_eq'
+        ~pp:(Format.pp_print_option pp_print_value)
+        ~expected:v_before
+        ~actual:v_after
+        ()
   in
-  List.iter check_key keys
+  List.for_all check_key keys
 
 let test_set_domain (ctxt, (k, v)) =
   let domain = Lwt_main.run @@ Test_mem_context.domain ctxt in
-  let ctxt' = Lwt_main.run @@ safe_set ctxt k v in
+  let ctxt' = Lwt_main.run @@ Context.add ctxt k v in
   let domain' = Lwt_main.run @@ Test_mem_context.domain ctxt' in
-  Crowbar.check
-    (List.for_all
-       (fun in_domain' -> in_domain' = k || List.mem in_domain' domain)
-       domain')
+  List.for_all
+    (fun in_domain' -> in_domain' = k || List.mem in_domain' domain)
+    domain'
 
 let () =
-  List.iter
-    (fun kmode ->
-      let k_gen = key_gen kmode in
-      let kv_gen = key_value_gen kmode in
-      let context_gen = context_gen kv_gen in
-      let mode_str = Printf.sprintf "[%s]" (mode_to_string kmode) in
-      Crowbar.add_test
-        ~name:("Test_mem_context.domain's specification " ^ mode_str)
-        [Crowbar.pair context_gen k_gen]
-        test_domain_spec ;
-      Crowbar.add_test
-        ~name:("get (set m k v) k = v " ^ mode_str)
-        [Crowbar.pair context_gen kv_gen]
-        test_get_set ;
-      Crowbar.add_test
-        ~name:("forall k1 <> k2, get (set m k1 v) k2 = get m k2 " ^ mode_str)
-        [Crowbar.pair context_gen kv_gen]
-        test_get_set_other ;
-      Crowbar.add_test
-        ~name:
-          ( "forall k2 in domain (set m k1 v), k2 in domain m || k1 = k2 "
-          ^ mode_str )
-        [Crowbar.pair context_gen kv_gen]
-        test_set_domain)
-    [Random; Limited]
+  let test_domain =
+    QCheck.Test.make
+      ~name:"Test_mem_context.domain's specification "
+      (QCheck.pair context_arb key_arb)
+      test_domain_spec
+  in
+  let test_set =
+    QCheck.Test.make
+      ~name:"get (set m k v) k = v "
+      (QCheck.pair context_arb key_value_arb)
+      test_get_set
+  in
+  let test_get_set_other =
+    QCheck.Test.make
+      ~name:"forall k1 <> k2, get (set m k1 v) k2 = get m k2 "
+      (QCheck.pair context_arb key_value_arb)
+      test_get_set_other
+  in
+  let test_get_set =
+    QCheck.Test.make
+      ~name:"forall k2 in domain (set m k1 v), k2 in domain m || k1 = k2 "
+      (QCheck.pair context_arb key_value_arb)
+      test_set_domain
+  in
+  Alcotest.run
+    "Memory context array theory"
+    [ ("domain", qcheck_wrap [test_domain]);
+      ("set", qcheck_wrap [test_set]);
+      ("get_set", qcheck_wrap [test_get_set_other; test_get_set]) ]

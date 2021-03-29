@@ -15,7 +15,8 @@ depends: [
   "tezos-protocol-environment-sigs"
   "tezos-protocol-environment-structs"
   "alcotest-lwt" { with-test & >= "1.1.0" }
-  "crowbar" { with-test }
+  "lib-test" { with-test }
+  "qcheck-alcotest" { with-test }
   "lwt" { with-test }
   "tezos-sapling"
 ]

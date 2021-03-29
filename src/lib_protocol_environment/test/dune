@@ -3,7 +3,8 @@
  (libraries tezos-base.unix
             tezos-protocol-environment
             alcotest-lwt
-            crowbar
+            lib-test
+            qcheck-alcotest
             lwt.unix)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_environment)))
