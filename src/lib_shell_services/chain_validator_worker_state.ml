@@ -45,9 +45,9 @@ module Request = struct
 
   let pp ppf = function
     | Hash h ->
-        Format.fprintf ppf "Block Hash %a" Block_hash.pp h
+        Block_hash.pp ppf h
     | PeerId pid ->
-        Format.fprintf ppf "Peer id %a" P2p_peer.Id.pp pid
+        P2p_peer.Id.pp ppf pid
 end
 
 module Event = struct
