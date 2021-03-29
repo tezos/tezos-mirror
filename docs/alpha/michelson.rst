@@ -485,7 +485,7 @@ Core data types and notations
    of type ``(t)`` that we write ``{ Elt key value ; ... }``, with keys
    sorted.
 
-- ``big_map (k) (t)``: Lazily deserialized maps from keys of type
+-  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
    ``(k)`` of values of type ``(t)``. These maps should be used if one
    intends to store large amounts of data in a map. They have higher
    gas costs than standard maps as data is lazily deserialized. A
@@ -578,7 +578,7 @@ result (second rule below). Its type is thus completely generic.
     > DIP code / x : S  =>  x : S'
         where    code / S  =>  S'
 
-- ``DIP n code``: Runs code protecting the ``n`` topmost elements of
+-  ``DIP n code``: Runs code protecting the ``n`` topmost elements of
    the stack. In particular, ``DIP 0 code`` is equivalent to ``code``
    and ``DIP 1 code`` is equivalent to ``DIP code``.
 
@@ -1872,15 +1872,15 @@ contract, unit for an account.
     :: option key_hash : 'S   ->   operation : 'S
 
 Using this instruction is the only way to modify the delegation of a
-smart contract. If the parameter is `None` then the delegation of the
-current contract is withdrawn; if it is `Some kh` where `kh` is the
+smart contract. If the parameter is ``None`` then the delegation of the
+current contract is withdrawn; if it is ``Some kh`` where ``kh`` is the
 key hash of a registered delegate that is not the current delegate of
 the contract, then this operation sets the delegate of the contract to
-this registered delegate. The operation fails if `kh` is the current
-delegate of the contract or if `kh` is not a registered delegate.
+this registered delegate. The operation fails if ``kh`` is the current
+delegate of the contract or if ``kh`` is not a registered delegate.
 
 -  ``BALANCE``: Push the current amount of mutez held by the executing
-    contract, including any mutez added by the calling transaction.
+   contract, including any mutez added by the calling transaction.
 
 ::
 
@@ -1966,7 +1966,7 @@ of the contract in which the ``SELF_ADDRESS`` instruction is written.
 
     :: key_hash : 'S   ->   contract unit : 'S
 
-- ``VOTING_POWER``: Return the voting power of a given contract. This voting power
+-  ``VOTING_POWER``: Return the voting power of a given contract. This voting power
    coincides with the weight of the contract in the voting listings (i.e., the rolls
    count) which is calculated at the beginning of every voting period.
 
@@ -2171,7 +2171,7 @@ BLS12-381 primitives
     :: bls12_381_g2 : bls12_381_g2 : 'S -> bls12_381_g2 : 'S
     :: bls12_381_fr : bls12_381_fr : 'S -> bls12_381_fr : 'S
 
-- ``MUL``: Multiply a curve point or field element by a scalar field element. Fr
+-  ``MUL``: Multiply a curve point or field element by a scalar field element. Fr
    elements can be built from naturals by multiplying by the unit of Fr using ``PUSH bls12_381_fr 1; MUL``. Note
    that the multiplication will be computed using the natural modulo the order
    of Fr.
@@ -2983,7 +2983,7 @@ stack accept ``n`` variable annotations.
    > CA(\rest=[AD]+)R @annot %field_name / S  =>  CAR ; C(\rest)R @annot %field_name / S
    > CD(\rest=[AD]+)R @annot %field_name / S  =>  CDR ; C(\rest)R @annot %field_name / S
 
-   ``CMP{EQ|NEQ|LT|GT|LE|GE}`` @annot
+   CMP{EQ|NEQ|LT|GT|LE|GE} @annot
    > CMP(\op) @annot / S  =>  COMPARE ; (\op) @annot / S
 
 The variable annotation on ``SET_C[AD]+R`` and ``MAP_C[AD]+R`` annotates
