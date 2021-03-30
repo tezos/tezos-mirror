@@ -165,11 +165,15 @@ Each URI defines a *sink* for log events consisting in a Unix output stream and 
 
 The URIs may further append options in the form of a query ``?<opt1>=<val1>&<opt2>=<val2>...``.
 
-For example, the following definition sends all the events of level `notice` or above to file ``/the/path/to/write.log``, formatted as one event per line::
+For example, the following definition sends all the events to file ``/the/path/to/write.log``, formatted as one event per line::
 
-  export TEZOS_EVENTS_CONFIG=file-descriptor-path:///the/path/to/write.log?format=one-per-line&level-at-least=notice
+  export TEZOS_EVENTS_CONFIG=file-descriptor-path:///the/path/to/write.log?format=one-per-line
 
 You may find all the available options in the `file descriptor sink API <https://tezos.gitlab.io/api/odoc/_html/tezos-stdlib-unix/Tezos_stdlib_unix/File_descriptor_sink/index.html>`__.
+
+.. note::
+  Note that, as the Tezos codebase is in the process of moving from the legacy logging framework to the events-based logging framework, some interferences are observed between the two.
+  In particular, the configuration option ``level-at-least`` documented in the above API does not currently work as expected, so you should avoid using it.
 
 .. _configure_shell:
 
