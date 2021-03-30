@@ -511,9 +511,8 @@ let hash_data ?expect_failure ?hooks ~data ~typ client =
     spawn_hash_data ?hooks ~data ~typ client
     |> Process.check_and_read_stdout ?expect_failure
   in
-  let regexp = Re.compile (Re.Perl.re "(.*): (.*)") in
   let parse_line line =
-    match Re.exec_opt regexp line with
+    match line =~** rex "(.*): (.*)" with
     | None ->
         Log.warn
           "Unparsable output line of `hash data %s of type %s`: %s"
@@ -521,8 +520,8 @@ let hash_data ?expect_failure ?hooks ~data ~typ client =
           typ
           line ;
         None
-    | Some group ->
-        Some (Re.Group.get group 1, Re.Group.get group 2)
+    | Some _ as x ->
+        x
   in
   (* Filtering avoids the last line (after the trailing \n).
      We don't want to produce a warning about an empty line. *)

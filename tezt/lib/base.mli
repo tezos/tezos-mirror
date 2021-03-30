@@ -83,6 +83,9 @@ val ( =~! ) : string -> rex -> bool
 (** Match a regular expression with one capture group. *)
 val ( =~* ) : string -> rex -> string option
 
+(** Match a regular expression with two capture groups. *)
+val ( =~** ) : string -> rex -> (string * string) option
+
 (** [replace_string ~all rex ~by s] iterates on [s], and replaces every
     occurrence of [rex] with [by]. If [all = false], then only the first
     occurrence of [rex] is replaced. *)
