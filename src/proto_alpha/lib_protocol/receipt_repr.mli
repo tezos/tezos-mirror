@@ -24,14 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Places where tezzies can be found in the ledger's state. *)
+(** Places where tez can be found in the ledger's state. *)
 type balance =
   | Contract of Contract_repr.t
   | Rewards of Signature.Public_key_hash.t * Cycle_repr.t
   | Fees of Signature.Public_key_hash.t * Cycle_repr.t
   | Deposits of Signature.Public_key_hash.t * Cycle_repr.t
 
-(** A credit or debit of tezzies to a balance. *)
+(** A credit or debit of tez to a balance. *)
 type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
 
 (** An origin of a balance update *)
