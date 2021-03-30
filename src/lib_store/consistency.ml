@@ -149,7 +149,7 @@ let check_consistency chain_dir genesis =
           (current_head, true, "current_head");
         ]
         @ List.map
-            (fun descr -> (descr, true, "alternate_head"))
+            (fun descr -> (descr, true, "alternate_heads"))
             alternate_heads
       in
       List.iter_es

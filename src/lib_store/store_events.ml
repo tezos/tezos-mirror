@@ -181,7 +181,7 @@ module Event = struct
       ~section
       ~level:Internal_event.Notice
       ~name:"fix_head"
-      ~msg:"updating head with the highest block found in the store: {new}"
+      ~msg:"updating head with the fittest block present in the store: {new}"
       ~pp1:pp_block_descriptor
       ("new", block_descriptor_encoding)
 
