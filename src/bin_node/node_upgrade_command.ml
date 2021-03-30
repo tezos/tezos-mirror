@@ -44,24 +44,29 @@ module Term = struct
     let run =
       Internal_event_unix.init () >>= fun () ->
       match subcommand with
-      | Storage ->
+      | Storage -> (
           Node_config_file.read args.Node_shared_arg.config_file
-          >>=? fun node_config ->
-          let data_dir = node_config.data_dir in
-          let genesis = node_config.blockchain_network.genesis in
-          if status then Node_data_version.upgrade_status data_dir
-          else
-            trace
-              (failure
-                 "Fail to lock the data directory. Is a `tezos-node` running?")
-            @@ Lwt_lock_file.create
-                 ~unlink_on_exit:true
-                 (Node_data_version.lock_file data_dir)
-            >>=? fun () ->
-            Node_data_version.upgrade_data_dir
-              ~data_dir
-              genesis
-              ~chain_name:node_config.blockchain_network.chain_name
+          >>=? fun config ->
+          Lwt_lock_file.is_locked (Node_data_version.lock_file config.data_dir)
+          >>=? function
+          | true ->
+              failwith
+                "Failed to lock the data directory '%s'. Is a `tezos-node` \
+                 running?"
+                config.data_dir
+          | false ->
+              let data_dir = config.data_dir in
+              Lwt_lock_file.create
+                ~unlink_on_exit:true
+                (Node_data_version.lock_file config.data_dir)
+              >>=? fun () ->
+              let genesis = config.blockchain_network.genesis in
+              if status then Node_data_version.upgrade_status data_dir
+              else
+                Node_data_version.upgrade_data_dir
+                  ~data_dir
+                  genesis
+                  ~chain_name:config.blockchain_network.chain_name )
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () -> `Ok ()
