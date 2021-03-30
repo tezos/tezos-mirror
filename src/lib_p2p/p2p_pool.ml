@@ -537,19 +537,20 @@ let create config peer_meta_config triggers ~log =
   | Error err ->
       Event.(emit parse_error) err >>= fun () -> Lwt.return pool
 
-let destroy {config; peer_meta_config; known_peer_ids; known_points; _} =
+let save_peers {config; peer_meta_config; known_peer_ids; _} =
   Event.(emit saving_metadata) config.peers_file
   >>= fun () ->
   P2p_peer_state.Info.File.save
     config.peers_file
     peer_meta_config.peer_meta_encoding
     (P2p_peer.Table.fold (fun _ a b -> a :: b) known_peer_ids [])
-  >>= (function
-        | Error err ->
-            Event.(emit save_peers_error) err >>= fun () -> Lwt.return_unit
-        | Ok () ->
-            Lwt.return_unit)
-  >>= fun () ->
+  >>= function
+  | Error err ->
+      Event.(emit save_peers_error) err >>= fun () -> Lwt.return_unit
+  | Ok () ->
+      Lwt.return_unit
+
+let tear_down_connections {known_peer_ids; known_points; _} =
   P2p_peer.Table.iter_p
     (fun _peer_id peer_info ->
       match P2p_peer_state.get peer_info with
@@ -571,6 +572,8 @@ let destroy {config; peer_meta_config; known_peer_ids; known_points; _} =
       | Disconnected ->
           Lwt.return_unit)
     known_points
+
+let destroy pool = save_peers pool >>= fun () -> tear_down_connections pool
 
 let add_to_id_points t point =
   P2p_point.Table.add t.my_id_points point () ;
