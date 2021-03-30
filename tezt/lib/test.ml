@@ -263,25 +263,32 @@ type test = {
   mutable time : float;
 }
 
-(* List of tests added using [add] and that match command-line filters. *)
-let list : test list ref = ref []
+(* Tests added using [register] and that match command-line filters. *)
+let registered : test String_map.t ref = ref String_map.empty
+
+(* Using [iter_registered] instead of [String_map.iter] allows to more easily
+   change the representation of [registered] in the future if needed. *)
+let iter_registered f = String_map.iter (fun _ -> f) !registered
+
+let fold_registered acc f =
+  String_map.fold (fun _ test acc -> f acc test) !registered acc
+
+(* Map [register] as if it was a list, to obtain a list. *)
+let map_registered_list f = fold_registered [] @@ fun acc test -> f test :: acc
 
 let list_tests format =
   match format with
   | `Tsv ->
-      List.iter
-        (fun {file; title; tags; _} ->
-          Printf.printf "%s\t%s\t%s\n%!" file title (String.concat " " tags))
-        !list
+      iter_registered
+      @@ fun {file; title; tags; _} ->
+      Printf.printf "%s\t%s\t%s\n%!" file title (String.concat " " tags)
   | `Ascii_art ->
       let file_header = "FILE" in
       let title_header = "TITLE" in
       let tags_header = "TAGS" in
       let list =
-        List.map
-          (fun {file; title; tags; _} ->
-            (file, title, String.concat ", " tags))
-          !list
+        map_registered_list
+        @@ fun {file; title; tags; _} -> (file, title, String.concat ", " tags)
       in
       (* Compute the size of each column. *)
       let (file_size, title_size, tags_size) =
@@ -336,18 +343,14 @@ let list_tests format =
       ()
 
 let display_time_summary () =
-  let sum_time = List.fold_left (fun acc {time; _} -> acc +. time) 0. in
-  let total_time = sum_time !list in
+  let total_time = fold_registered 0. @@ fun acc {time; _} -> acc +. time in
   let tests_by_file =
-    List.fold_left
-      (fun acc test ->
-        String_map.add
-          test.file
-          ( test
-          :: (String_map.find_opt test.file acc |> Option.value ~default:[]) )
-          acc)
-      String_map.empty
-      !list
+    fold_registered String_map.empty
+    @@ fun acc test ->
+    String_map.add
+      test.file
+      (test :: (String_map.find_opt test.file acc |> Option.value ~default:[]))
+      acc
   in
   let show_time seconds =
     let seconds = int_of_float seconds in
@@ -363,7 +366,10 @@ let display_time_summary () =
       title
   in
   let print_time_for_file file tests =
-    print_time "" file (sum_time tests) ;
+    print_time
+      ""
+      file
+      (List.fold_left (fun acc {time; _} -> acc +. time) 0. tests) ;
     List.iter (fun {title; time; _} -> print_time "- " title time) tests
   in
   String_map.iter print_time_for_file tests_by_file ;
@@ -379,9 +385,8 @@ type marshaled_test = {
 let record_results filename =
   (* Remove the closure ([body]). *)
   let marshaled_tests =
-    List.map
-      (fun {file; title; tags; body = _; time} -> {file; title; tags; time})
-      !list
+    map_registered_list
+    @@ fun {file; title; tags; body = _; time} -> {file; title; tags; time}
   in
   (* Write to file using Marshal.
      This is not very robust but enough for the purposes of this file. *)
@@ -451,12 +456,27 @@ let suggest_jobs (tests : marshaled_test list) =
 
 let register ~__FILE__ ~title ~tags body =
   let file = Filename.basename __FILE__ in
+  ( match String_map.find_opt title !registered with
+  | None ->
+      ()
+  | Some {file = other_file; tags = other_tags; _} ->
+      Printf.eprintf "Error: there are several tests with title: %S\n" title ;
+      Printf.eprintf
+        "- first seen in: %s with tags: %s\n"
+        other_file
+        (String.concat ", " other_tags) ;
+      Printf.eprintf
+        "- also seen in: %s with tags: %s\n%!"
+        file
+        (String.concat ", " tags) ;
+      exit 1 ) ;
   check_tags tags ;
   register_file file ;
   register_title title ;
   List.iter register_tag tags ;
   if test_should_be_run ~file ~title ~tags then
-    list := {file; title; tags; body; time = 0.} :: !list
+    let test = {file; title; tags; body; time = 0.} in
+    registered := String_map.add title test !registered
 
 let run () =
   (* Now that all tests are registered, put them in registration order. *)
@@ -477,7 +497,7 @@ let run () =
   if (not all_files_exist) || (not all_titles_exist) || not all_tags_exist then
     exit 1 ;
   (* Print a warning if no test was selected. *)
-  if !list = [] then (
+  if String_map.is_empty !registered then (
     Printf.eprintf
       "No test found for filters: %s\n%!"
       (String.concat
@@ -515,7 +535,7 @@ let run () =
           let time = Unix.gettimeofday () -. start in
           test.time <- test.time +. time
         in
-        List.iter run_and_measure_time !list ;
+        iter_registered run_and_measure_time ;
         if Cli.options.loop then run (iteration + 1)
       in
       run 1 ;
