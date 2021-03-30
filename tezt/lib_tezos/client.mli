@@ -374,6 +374,42 @@ val spawn_originate_contract :
   t ->
   Process.t
 
+(** Run [tezos-client hash data .. of type ...]
+
+    Given that the output of [tezos-client] is:
+
+    [Raw packed data: 0x050303
+     Script-expression-ID-Hash: exprvDnoPjyKeR9FSnvwYg5a1v6mDyB6TmnATwWySSP6VmJxrzQb9E
+     Raw Script-expression-ID-Hash: 0xe0978ddc9329cbd84d25fd15a161a7d2e7e555da91e2a335ece8c8bc11ade245
+     Ledger Blake2b hash: G7iMrYNckCFRujDLFgtj3cDMCnfeSQ2cmhnDtkh9REc4
+     Raw Sha256 hash: 0x35ef99f7718e7d1f065bae635780f41c0cd201e9ffb3390ba6ef428c2815fa66
+     Raw Sha512 hash: 0x2c9ca967bf47f6cc76861693379b7397f65e6a1b6e633df28cf02be0b0d18319ae783b4c199fd61115e000a15a5ba8a292a3b1468c2cfe2b3e3a9fa08d419698
+     Gas remaining: 1039991.350 units remaining]
+
+    this function returns the list:
+
+    [("Raw packed data"; "0x050303")
+     ("Script-expression-ID-Hash"; "exprvDnoPjyKeR9FSnvwYg5a1v6mDyB6TmnATwWySSP6VmJxrzQb9E")
+     ("Raw Script-expression-ID-Hash"; "0xe0978ddc9329cbd84d25fd15a161a7d2e7e555da91e2a335ece8c8bc11ade245")
+     ("Ledger Blake2b hash"; "G7iMrYNckCFRujDLFgtj3cDMCnfeSQ2cmhnDtkh9REc4")
+     ("Raw Sha256 hash"; "0x35ef99f7718e7d1f065bae635780f41c0cd201e9ffb3390ba6ef428c2815fa66")
+     ("Raw Sha512 hash"; "0x2c9ca967bf47f6cc76861693379b7397f65e6a1b6e633df28cf02be0b0d18319ae783b4c199fd61115e000a15a5ba8a292a3b1468c2cfe2b3e3a9fa08d419698")
+     ("Gas remaining"; "1039991.350 units remaining")]
+
+    If some lines cannot be parsed, warnings are emitted in output and
+    the corresponding lines are omitted from the result. *)
+val hash_data :
+  ?expect_failure:bool ->
+  ?hooks:Process.hooks ->
+  data:string ->
+  typ:string ->
+  t ->
+  (string * string) list Lwt.t
+
+(** Same as [hash_data], but do not wait for the process to exit. *)
+val spawn_hash_data :
+  ?hooks:Process.hooks -> data:string -> typ:string -> t -> Process.t
+
 (** Run [tezos-client normalize data .. of type ...]*)
 val normalize_data :
   ?mode:normalize_mode ->

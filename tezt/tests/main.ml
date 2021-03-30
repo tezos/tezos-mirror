@@ -41,6 +41,7 @@ let () =
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Basic.register Alpha ;
   Bootstrap.register Alpha ;
+  Hash_data.register Alpha ;
   Synchronisation_heuristic.register Alpha ;
   Normalize.register Alpha ;
   Double_bake.register Alpha ;
