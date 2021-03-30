@@ -71,8 +71,8 @@ def src_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
     rel_lvl = inliner.document.current_source.replace(os.getcwd(),'').count('/')
     parts = re.match("^([^<>]*)<([^<>]*)>$", text)
     if parts:
-      text = parts.group(2)
-      src = parts.group(1)
+      text = parts.group(1)
+      src = parts.group(2)
     else:
       src = text
       text = text
