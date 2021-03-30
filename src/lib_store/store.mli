@@ -1025,7 +1025,6 @@ module Unsafe : sig
   val restore_from_legacy_upgrade :
     [`Store_dir] Naming.directory ->
     genesis:Genesis.t ->
-    alternate_heads:block_descriptor list ->
     invalid_blocks:invalid_block Block_hash.Map.t ->
     forked_chains:Block_hash.t Chain_id.Map.t ->
     unit tzresult Lwt.t

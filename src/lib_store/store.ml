@@ -2865,13 +2865,13 @@ module Unsafe = struct
     Stored_data.write_file (Naming.chain_config_file chain_dir) chain_config
     >>=? fun () -> return_unit
 
-  let restore_from_legacy_upgrade store_dir ~genesis ~alternate_heads
-      ~invalid_blocks ~forked_chains =
+  let restore_from_legacy_upgrade store_dir ~genesis ~invalid_blocks
+      ~forked_chains =
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let chain_dir = Naming.chain_dir store_dir chain_id in
-    Stored_data.write_file
-      (Naming.alternate_heads_file chain_dir)
-      alternate_heads
+    (* We don't import branches, only a linear history, thus we don't
+       write any alternate heads *)
+    Stored_data.write_file (Naming.alternate_heads_file chain_dir) []
     >>=? fun () ->
     Stored_data.write_file (Naming.invalid_blocks_file chain_dir) invalid_blocks
     >>=? fun () ->
