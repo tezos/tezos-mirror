@@ -47,18 +47,21 @@ module Term = struct
       | Storage -> (
           Node_config_file.read args.Node_shared_arg.config_file
           >>=? fun config ->
-          Lwt_lock_file.is_locked (Node_data_version.lock_file config.data_dir)
+          (* Use the command-line argument data-dir if present: the
+             configuration data-dir may be inconsistent if the
+             directory was moved. *)
+          let data_dir = Option.value ~default:config.data_dir args.data_dir in
+          Lwt_lock_file.is_locked (Node_data_version.lock_file data_dir)
           >>=? function
           | true ->
               failwith
                 "Failed to lock the data directory '%s'. Is a `tezos-node` \
                  running?"
-                config.data_dir
+                data_dir
           | false ->
-              let data_dir = config.data_dir in
               Lwt_lock_file.create
                 ~unlink_on_exit:true
-                (Node_data_version.lock_file config.data_dir)
+                (Node_data_version.lock_file data_dir)
               >>=? fun () ->
               let genesis = config.blockchain_network.genesis in
               if status then Node_data_version.upgrade_status data_dir
