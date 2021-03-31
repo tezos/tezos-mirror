@@ -28,6 +28,8 @@ type log_level = Quiet | Error | Warn | Report | Info | Debug
 
 type temporary_file_mode = Delete | Delete_if_successful | Keep
 
+type loop_mode = Infinite | Count of int
+
 type options = {
   color : bool;
   log_level : log_level;
@@ -45,7 +47,7 @@ type options = {
   global_timeout : float option;
   test_timeout : float option;
   reset_regressions : bool;
-  loop : bool;
+  loop_mode : loop_mode;
   time : bool;
   starting_port : int;
   record : string option;
@@ -72,7 +74,7 @@ let options =
   let global_timeout = ref None in
   let test_timeout = ref None in
   let reset_regressions = ref false in
-  let loop = ref false in
+  let loop_mode = ref (Count 1) in
   let time = ref false in
   let starting_port = ref 16384 in
   let record = ref None in
@@ -97,6 +99,10 @@ let options =
   let set_job_count value =
     if value < 1 then raise (Arg.Bad "--job-count must be positive") ;
     job_count := value
+  in
+  let set_loop_count value =
+    if value < 0 then raise (Arg.Bad "--loop-count must be positive or null") ;
+    loop_mode := Count value
   in
   let spec =
     Arg.align
@@ -189,12 +195,18 @@ let options =
           " Remove regression test outputs if they exist, and regenerate them."
         );
         ( "--loop",
-          Arg.Set loop,
+          Arg.Unit (fun () -> loop_mode := Infinite),
           " Restart from the beginning once all tests are done. All tests are \
            repeated until one of them fails or if you interrupt with Ctrl+C. \
            This is useful to reproduce non-deterministic failures. When used \
            in conjunction with --keep-going, tests are repeated even if they \
            fail, until you interrupt them with Ctrl+C." );
+        ( "--loop-count",
+          Arg.Int set_loop_count,
+          "<COUNT> Same as --loop, but stop after all tests have been run \
+           COUNT times. A value of 0 means tests are not run. The default \
+           behavior corresponds to --loop-count 1. If you specify both --loop \
+           and --loop-count, only the last one is taken into account." );
         ( "--time",
           Arg.Set time,
           " Print a summary of the time taken by each test. Ignored if a test \
@@ -272,7 +284,7 @@ let options =
     global_timeout = !global_timeout;
     test_timeout = !test_timeout;
     reset_regressions = !reset_regressions;
-    loop = !loop;
+    loop_mode = !loop_mode;
     time = !time;
     starting_port = !starting_port;
     record = !record;

@@ -516,14 +516,18 @@ let run () =
         "Cannot use both --list and --suggest-jobs at the same time."
   | (None, None) ->
       let rec run iteration =
-        let run_and_measure_time (test : test) =
-          let start = Unix.gettimeofday () in
-          really_run ~iteration test.title test.body ;
-          let time = Unix.gettimeofday () -. start in
-          test.time <- test.time +. time
-        in
-        iter_registered run_and_measure_time ;
-        if Cli.options.loop then run (iteration + 1)
+        match Cli.options.loop_mode with
+        | Count n when n < iteration ->
+            ()
+        | _ ->
+            let run_and_measure_time (test : test) =
+              let start = Unix.gettimeofday () in
+              really_run ~iteration test.title test.body ;
+              let time = Unix.gettimeofday () -. start in
+              test.time <- test.time +. time
+            in
+            iter_registered run_and_measure_time ;
+            run (iteration + 1)
       in
       run 1 ;
       Option.iter record_results Cli.options.record ;

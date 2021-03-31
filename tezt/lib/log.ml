@@ -49,7 +49,7 @@ let channel =
         global_timeout = _;
         test_timeout = _;
         reset_regressions = _;
-        loop = _;
+        loop_mode = _;
         time = _;
         starting_port = _;
         record = _;
@@ -273,7 +273,8 @@ let test_result ~iteration test_result test_name =
         ("ABORTED", Color.(FG.red ++ bold))
   in
   let message =
-    if Cli.options.loop then Printf.sprintf "(loop %d) %s" iteration test_name
+    if Cli.options.loop_mode <> Count 1 then
+      Printf.sprintf "(loop %d) %s" iteration test_name
     else test_name
   in
   log_string ~level:Report ~prefix ~prefix_color message
