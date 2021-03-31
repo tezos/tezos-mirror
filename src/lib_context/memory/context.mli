@@ -28,6 +28,23 @@
 
 include Tezos_context_sigs.Context.S
 
+type index
+
+val index : t -> index
+
+val exists : index -> Context_hash.t -> bool Lwt.t
+
+val checkout : index -> Context_hash.t -> t option Lwt.t
+
+val checkout_exn : index -> Context_hash.t -> t Lwt.t
+
+val hash : time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t
+
+val commit :
+  time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t Lwt.t
+
+val create : unit -> t
+
 val empty : t
 
 val encoding : t Data_encoding.t
@@ -49,8 +66,11 @@ val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t
     operations on shallow trees are expected. *)
 exception Context_dangling_hash of string
 
-val add_predecessor_block_metadata_hash :
-  tree -> Block_metadata_hash.t -> tree Lwt.t
+val add_predecessor_block_metadata_hash : t -> Block_metadata_hash.t -> t Lwt.t
 
 val add_predecessor_ops_metadata_hash :
-  tree -> Operation_metadata_list_list_hash.t -> tree Lwt.t
+  t -> Operation_metadata_list_list_hash.t -> t Lwt.t
+
+val get_test_chain : t -> Test_chain_status.t Lwt.t
+
+val add_test_chain : t -> Test_chain_status.t -> t Lwt.t
