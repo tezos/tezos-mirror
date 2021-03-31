@@ -55,7 +55,8 @@ let channel =
   in
   match list with None -> stdout | Some (`Ascii_art | `Tsv) -> stderr
 
-(* In theory we could simply escape spaces, backslashes, double quotes and single quotes.
+(* In theory we could simply escape spaces, backslashes, double quotes, single quotes
+   and other symbols with a meaning for the shell.
    But 'some long argument' is arguably more readable than some\ long\ argument.
    We use this quoting method if the string contains no single quote. *)
 let quote_shell s =
@@ -83,16 +84,7 @@ let quote_shell s =
   String.iter categorize s ;
   if not !needs_quotes then s
   else if not !contains_single_quote then "'" ^ s ^ "'"
-  else
-    let buffer = Buffer.create (String.length s * 2) in
-    let add_char = function
-      | (' ' | '\\' | '"' | '\'') as c ->
-          Buffer.add_char buffer '\\' ;
-          Buffer.add_char buffer c
-      | c ->
-          Buffer.add_char buffer c
-    in
-    String.iter add_char s ; Buffer.contents buffer
+  else Filename.quote s
 
 let quote_shell_command command arguments =
   String.concat " " (List.map quote_shell (command :: arguments))
