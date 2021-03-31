@@ -50,7 +50,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Tezos'
-copyright = '2018, Nomadic Labs <contact@nomadic-labs.com>'
+copyright = '2018-2021, Nomadic Labs <contact@nomadic-labs.com>'
 author = 'Nomadic Labs <contact@nomadic-labs.com>'
 
 # The version info for the project you're documenting, acts as replacement for
