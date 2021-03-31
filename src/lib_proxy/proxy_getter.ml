@@ -45,6 +45,15 @@ module Events = struct
       ~msg:"Cache miss: ({key})"
       ~level:Debug
       ("key", Data_encoding.string)
+
+  let split_key_triggers =
+    declare_2
+      ~section
+      ~level:Debug
+      ~name:"split_key_triggers"
+      ~msg:"split_key heuristic triggers, getting {parent} instead of {leaf}"
+      ("parent", Data_encoding.string)
+      ("leaf", Data_encoding.string)
 end
 
 let rec raw_context_size = function
@@ -177,18 +186,18 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   type kind = Get | Mem
 
   (** Handles the application of [X.split_key] to optimize queries. *)
-  let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind) (key : Local.key) :
-      unit tzresult Lwt.t =
-    let (key, split) =
+  let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind)
+      (requested_key : Local.key) : unit tzresult Lwt.t =
+    let (key_to_get, split) =
       match kind with
       | Mem ->
           (* If the value is not going to be used, don't request a parent *)
-          (key, false)
+          (requested_key, false)
       | Get -> (
-          match X.split_key key with
+          match X.split_key requested_key with
           | None ->
               (* There's no splitting for this key *)
-              (key, false)
+              (requested_key, false)
           | Some (prefix, _) ->
               (* Splitting triggers: a parent key will be requested *)
               (prefix, true))
@@ -197,12 +206,17 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
        for the key received as parameter. Hence it only makes sense
        to check it if a parent key is being retrieved ('split' = true
        and hence 'key' here differs from the key received as parameter) *)
-    if split && is_all key then return_unit
+    if split && is_all key_to_get then return_unit
     else
-      C.do_rpc pgi key >>=? fun () ->
+      (if split then
+       Events.(
+         emit split_key_triggers (pp_key key_to_get, pp_key requested_key))
+      else Lwt.return_unit)
+      >>= fun () ->
+      C.do_rpc pgi key_to_get >>=? fun () ->
       (* Remember request was done: map [key] to [All] in [!requests]
          (see [REQUESTS_TREE]'s mli for further details) *)
-      requests := RequestsTree.add !requests key ;
+      requests := RequestsTree.add !requests key_to_get ;
       return_unit
 
   (* [generic_call] and [do_rpc] above go hand in hand. [do_rpc] takes
