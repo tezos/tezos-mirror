@@ -245,14 +245,9 @@ let register_tag tag = known_tags := String_set.add tag !known_tags
 
 (* Check that all [specified] values are in [!known]. *)
 let check_existence kind known specified =
-  match
-    String_set.elements (String_set.diff (String_set.of_list specified) !known)
-  with
-  | [] ->
-      true
-  | unknown ->
-      List.iter (Printf.eprintf "Unknown %s: %s\n" kind) unknown ;
-      false
+  String_set.iter
+    (Log.warn "Unknown %s: %s" kind)
+    (String_set.diff (String_set.of_list specified) !known)
 
 (* Field [time] contains the cumulated time taken by all successful runs of this test. *)
 type test = {
@@ -482,20 +477,12 @@ let run () =
   (* Now that all tests are registered, put them in registration order. *)
   list := List.rev !list ;
   (* Check command-line options. *)
-  let all_files_exist =
-    check_existence "--file" known_files Cli.options.files_to_run
-  in
-  let all_titles_exist =
-    check_existence "--test" known_titles Cli.options.tests_to_run
-  in
-  let all_tags_exist =
-    check_existence
-      "tag"
-      known_tags
-      (Cli.options.tags_to_run @ Cli.options.tags_not_to_run)
-  in
-  if (not all_files_exist) || (not all_titles_exist) || not all_tags_exist then
-    exit 1 ;
+  check_existence "--file" known_files Cli.options.files_to_run ;
+  check_existence "--test" known_titles Cli.options.tests_to_run ;
+  check_existence
+    "tag"
+    known_tags
+    (Cli.options.tags_to_run @ Cli.options.tags_not_to_run) ;
   (* Print a warning if no test was selected. *)
   if String_map.is_empty !registered then (
     Printf.eprintf
