@@ -32,8 +32,14 @@
 
 module Local = Tezos_context_memory.Context
 
+(** Whether [tezos-client] or [tezos-proxy-server] is running. *)
+type mode =
+  | Client  (** Mode when [tezos-client] executes *)
+  | Server  (** Mode when [tezos-proxy-server] executes *)
+
 type proxy_getter_input = {
   rpc_context : RPC_context.simple;
+  mode : mode;
   chain : Tezos_shell_services.Block_services.chain;
   block : Tezos_shell_services.Block_services.block;
 }

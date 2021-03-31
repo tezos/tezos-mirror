@@ -47,6 +47,7 @@ module type Proxy_sig = sig
 
       - A printer (for logging)
       - An instance of [RPC_context.json], to perform RPCs
+      - Whether [tezos-client] or [tezos-proxy-server] is running
       - The chain for which the context is required
       - The block for which the context is required
     *)
@@ -54,6 +55,7 @@ module type Proxy_sig = sig
     Tezos_client_base.Client_context.printer ->
     (Proxy_proto.proto_rpc -> Proxy_getter.proxy_m Lwt.t) ->
     RPC_context.json ->
+    Proxy.mode ->
     Block_services.chain ->
     Block_services.block ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t

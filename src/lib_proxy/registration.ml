@@ -64,6 +64,7 @@ module type Proxy_sig = sig
     Tezos_client_base.Client_context.printer ->
     (Proxy_proto.proto_rpc -> Proxy_getter.proxy_m Lwt.t) ->
     RPC_context.json ->
+    Proxy.mode ->
     Block_services.chain ->
     Block_services.block ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t

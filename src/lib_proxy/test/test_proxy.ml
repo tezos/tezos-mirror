@@ -58,7 +58,7 @@ let mock_proto_rpc () =
   (module struct
     let calls : Local.key Stack.t = Stack.create ()
 
-    let split_key (k : Local.key) =
+    let split_key _ (k : Local.key) =
       match k with
       (* These constants are used in tests below *)
       | "split" :: "key" :: "trigger_now!" :: tail ->
@@ -94,7 +94,12 @@ let mock_chain = `Main
 let mock_block = `Head 0
 
 let mock_input : Tezos_proxy.Proxy.proxy_getter_input =
-  {rpc_context = new mock_rpc_context; chain = mock_chain; block = mock_block}
+  {
+    rpc_context = new mock_rpc_context;
+    mode = Client;
+    chain = mock_chain;
+    block = mock_block;
+  }
 
 open Test_services_base
 

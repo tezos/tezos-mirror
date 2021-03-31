@@ -130,7 +130,7 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
        contain this key. *)
     let check_merkle_tree_with_endpoint (uri, rpc_context) =
       Light_proto.merkle_tree
-        {rpc_context; chain; block}
+        {rpc_context; chain; block; mode = Client}
         key
         Tezos_shell_services.Block_services.Hole
       >>= validate uri key tree mtree

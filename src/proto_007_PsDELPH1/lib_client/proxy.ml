@@ -42,7 +42,7 @@ let proxy_block_header (rpc_context : RPC_context.json)
     ()
 
 module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
-  let split_key (key : Proxy_context.M.key) :
+  let split_key _ (key : Proxy_context.M.key) :
       (Proxy_context.M.key * Proxy_context.M.key) option =
     match key with
     (* matches paths like:
@@ -86,6 +86,7 @@ let initial_context
     (proxy_builder :
       Tezos_proxy.Proxy_proto.proto_rpc ->
       Tezos_proxy.Proxy_getter.proxy_m Lwt.t) (rpc_context : RPC_context.json)
+    (mode : Tezos_proxy.Proxy.mode)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
     Environment_context.Context.t Lwt.t =
@@ -97,7 +98,7 @@ let initial_context
       Tezos_shell_services.Block_services.to_string block )
   >>= fun () ->
   let pgi : Tezos_proxy.Proxy.proxy_getter_input =
-    {rpc_context = (rpc_context :> RPC_context.simple); chain; block}
+    {rpc_context = (rpc_context :> RPC_context.simple); mode; chain; block}
   in
   let module N : Proxy_context.M.ProxyDelegate = struct
     let proxy_dir_mem = M.proxy_dir_mem pgi
@@ -117,12 +118,13 @@ let init_env_rpc_context (_printer : Tezos_client_base.Client_context.printer)
     (proxy_builder :
       Tezos_proxy.Proxy_proto.proto_rpc ->
       Tezos_proxy.Proxy_getter.proxy_m Lwt.t) (rpc_context : RPC_context.json)
+    (mode : Tezos_proxy.Proxy.mode)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
     Tezos_protocol_environment.rpc_context tzresult Lwt.t =
   proxy_block_header rpc_context chain block >>=? fun {shell; hash; _} ->
   let block_hash = hash in
-  initial_context proxy_builder rpc_context chain block >>= fun context ->
+  initial_context proxy_builder rpc_context mode chain block >>= fun context ->
   return {Tezos_protocol_environment.block_hash; block_header = shell; context}
 
 let () =

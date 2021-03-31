@@ -194,7 +194,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
           (* If the value is not going to be used, don't request a parent *)
           (requested_key, false)
       | Get -> (
-          match X.split_key requested_key with
+          match X.split_key pgi.mode requested_key with
           | None ->
               (* There's no splitting for this key *)
               (requested_key, false)

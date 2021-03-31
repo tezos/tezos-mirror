@@ -89,6 +89,10 @@ end
 
 type mode = Light_client of Light.sources | Proxy_client | Proxy_server
 
+let to_client_server_mode = function
+  | Light_client _ | Proxy_client -> Proxy.Client
+  | Proxy_server -> Proxy.Server
+
 (** [protocols hash] returns the implementation of the RPC
     [/chains/<chain_id>/blocks/<block_id>/protocols] of the proxy server.
 
@@ -163,6 +167,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
           printer
           (make chain block_key)
           rpc_context
+          (to_client_server_mode mode)
           chain
           block_key
         >>=? fun rpc_context ->
