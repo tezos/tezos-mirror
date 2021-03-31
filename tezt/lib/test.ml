@@ -73,8 +73,6 @@ let fail x =
 
 let global_starting_time = Unix.gettimeofday ()
 
-let a_test_failed = ref false
-
 let really_run ~progress_state ~iteration title f =
   Log.info "Starting test: %s" title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
@@ -193,16 +191,13 @@ let really_run ~progress_state ~iteration title f =
   Log.test_result ~progress_state ~iteration !test_result title ;
   match !test_result with
   | Successful ->
-      unit
+      return true
   | Failed ->
       Log.report
         "Try again with: %s --verbose --test %s"
         Sys.argv.(0)
         (Log.quote_shell title) ;
-      if Cli.options.keep_going then (
-        a_test_failed := true ;
-        unit )
-      else exit 1
+      return false
   | Aborted ->
       exit 2
 
@@ -536,6 +531,8 @@ let run () =
       prerr_endline
         "Cannot use both --list and --suggest-jobs at the same time."
   | (None, None) ->
+      let exception Stop in
+      let a_test_failed = ref false in
       let rec run iteration =
         match Cli.options.loop_mode with
         | Count n when n < iteration ->
@@ -546,15 +543,20 @@ let run () =
             in
             let run_and_measure_time (test : test) =
               let start = Unix.gettimeofday () in
-              really_run ~progress_state ~iteration test.title test.body ;
+              let success =
+                really_run ~progress_state ~iteration test.title test.body
+              in
               let time = Unix.gettimeofday () -. start in
               test.run_count <- test.run_count + 1 ;
-              test.time <- test.time +. time
+              test.time <- test.time +. time ;
+              if not success then (
+                a_test_failed := true ;
+                if not Cli.options.keep_going then raise Stop )
             in
             iter_registered run_and_measure_time ;
             run (iteration + 1)
       in
-      run 1 ;
+      (try run 1 with Stop -> ()) ;
       Option.iter record_results Cli.options.record ;
-      if !a_test_failed then exit 1 ;
-      if Cli.options.time then display_time_summary ()
+      if Cli.options.time then display_time_summary () ;
+      if !a_test_failed then exit 1
