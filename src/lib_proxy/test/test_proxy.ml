@@ -65,6 +65,8 @@ let mock_proto_rpc () =
           Some (["split"; "key"; "trigger_now!"], tail)
       | _ -> None
 
+    let failure_is_permanent _ = false
+
     let do_rpc _chain_n_block (k : Local.key) =
       let rec mock_raw_context = function
         | [] -> Tezos_shell_services.Block_services.Key Bytes.empty

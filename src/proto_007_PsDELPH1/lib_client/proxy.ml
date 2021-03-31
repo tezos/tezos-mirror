@@ -61,6 +61,8 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
     | "v1" :: tail -> Some (["v1"], tail)
     | _ -> None
 
+  let failure_is_permanent _ = false
+
   let do_rpc (pgi : Tezos_proxy.Proxy.proxy_getter_input)
       (key : Proxy_context.M.key) =
     let chain = pgi.chain in

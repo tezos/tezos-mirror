@@ -102,6 +102,12 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
             None
         | Server -> split_server key)
 
+  let failure_is_permanent = function
+    | ["pending_migration_balance_updates"]
+    | ["pending_migration_operation_results"] ->
+        true
+    | _ -> false
+
   let do_rpc (pgi : Tezos_proxy.Proxy.proxy_getter_input)
       (key : Proxy_context.M.key) =
     let chain = pgi.chain in

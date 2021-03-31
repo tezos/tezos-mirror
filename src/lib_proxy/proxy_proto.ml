@@ -58,6 +58,13 @@ module type PROTO_RPC = sig
     Proxy_context.M.key ->
     (Proxy_context.M.key * Proxy_context.M.key) option
 
+  (** [failure_is_permanent key] means that, if the request 
+      [rpc get /chains/<chain_id>/blocks/<block_id>/context/raw/bytes/key]
+      fails once, then it should not be retried; because this key is known
+      to be missing all the time. It is safe to return always [false].
+      Returning [true] for some keys will reduce the number of RPC calls. *)
+  val failure_is_permanent : Proxy_context.M.key -> bool
+
   val do_rpc :
     Proxy.proxy_getter_input ->
     Proxy_context.M.key ->
