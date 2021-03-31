@@ -240,7 +240,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
     min nb_operations_per_block (List.length gen_state.remaining_transfers)
   in
   (* Nonce *)
-  Alpha_services.Helpers.current_level ~offset:1l Block.rpc_ctxt blk
+  Plugin.RPC.current_level ~offset:1l Block.rpc_ctxt blk
   >|=? (function
          | {expected_commitment = true; cycle; level; _} ->
              if_debug (fun () ->
@@ -274,7 +274,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
   >>=? fun inc ->
   (* Revelations *)
   (* TODO debug cycle *)
-  Alpha_services.Helpers.current_level ~offset:1l Incremental.rpc_ctxt inc
+  Plugin.RPC.current_level ~offset:1l Incremental.rpc_ctxt inc
   >|=? (function
          | {cycle; level; _} -> (
              if_debug (fun () ->

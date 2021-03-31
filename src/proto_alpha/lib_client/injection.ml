@@ -304,7 +304,7 @@ let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   let oph = Operation.hash op in
   Chain_services.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
-  Alpha_services.Helpers.Scripts.run_operation
+  Plugin.RPC.Scripts.run_operation
     cctxt
     (chain, block)
     ~op:(Operation.pack op)

@@ -129,7 +129,7 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
               >>= fun block ->
               Alpha_block_services.hash cctxt ~chain ~block ()
               >>=? fun block_hash ->
-              Alpha_services.Forge.double_endorsement_evidence
+              Plugin.RPC.Forge.double_endorsement_evidence
                 cctxt
                 (`Hash chain_id, block)
                 ~branch:block_hash
@@ -244,7 +244,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           >>= fun block ->
           Alpha_block_services.hash cctxt ~chain ~block ()
           >>=? fun block_hash ->
-          Alpha_services.Forge.double_baking_evidence
+          Plugin.RPC.Forge.double_baking_evidence
             cctxt
             (chain, block)
             ~branch:block_hash

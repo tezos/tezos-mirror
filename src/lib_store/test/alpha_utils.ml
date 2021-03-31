@@ -140,7 +140,7 @@ let rpc_context ctxt block =
 let rpc_ctxt ctxt =
   new Environment.proto_rpc_context_of_directory
     (rpc_context ctxt)
-    rpc_services
+    Plugin.RPC.rpc_services
 
 (******** Policies ***********)
 
@@ -291,7 +291,7 @@ module Forge = struct
     | Error _ ->
         assert false )
     >>=? fun fitness ->
-    Alpha_services.Helpers.current_level ~offset:1l (rpc_ctxt ctxt) pred
+    Plugin.RPC.current_level ~offset:1l (rpc_ctxt ctxt) pred
     >|=? (function
            | {expected_commitment = true; _} ->
                Some (fst (Proto_nonce.generate ()))

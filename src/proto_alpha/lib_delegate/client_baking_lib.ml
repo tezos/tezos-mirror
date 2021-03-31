@@ -37,7 +37,7 @@ let bake_block (cctxt : #Protocol_client_context.full) ?minimal_fees
   | Some sk ->
       return sk )
   >>=? fun src_sk ->
-  Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, head)
+  Plugin.RPC.current_level cctxt ~offset:1l (chain, head)
   >>=? fun level ->
   let (seed_nonce, seed_nonce_hash) =
     if level.expected_commitment then

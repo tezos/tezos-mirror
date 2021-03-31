@@ -987,7 +987,7 @@ let check_parameter_type (cctxt : #Protocol_client_context.full) ?gas ?legacy
     ~destination ~entrypoint ~parameter_type ~parameter () =
   trace
     (Ill_typed_argument (destination, entrypoint, parameter_type, parameter))
-  @@ Alpha_services.Helpers.Scripts.typecheck_data
+  @@ Plugin.RPC.Scripts.typecheck_data
        cctxt
        (cctxt#chain, cctxt#block)
        ~data:parameter
@@ -1022,7 +1022,7 @@ let check_action (cctxt : #Protocol_client_context.full) ~action ~balance ?gas
         Tezos_micheline.Micheline.strip_locations (lambda_action_t ~loc:0)
       in
       trace (Ill_typed_lambda (code, action_t))
-      @@ Alpha_services.Helpers.Scripts.typecheck_data
+      @@ Plugin.RPC.Scripts.typecheck_data
            cctxt
            (cctxt#chain, cctxt#block)
            ~data:code

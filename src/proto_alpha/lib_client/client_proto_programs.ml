@@ -110,7 +110,7 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ?entrypoint () =
   Chain_services.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
-  Alpha_services.Helpers.Scripts.run_code
+  Plugin.RPC.Scripts.run_code
     cctxt
     (chain, block)
     ?gas
@@ -134,7 +134,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ?entrypoint () =
   Chain_services.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
-  Alpha_services.Helpers.Scripts.trace_code
+  Plugin.RPC.Scripts.trace_code
     cctxt
     (chain, block)
     ?gas
@@ -152,7 +152,7 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
 let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) ()
     =
-  Alpha_services.Helpers.Scripts.typecheck_data
+  Plugin.RPC.Scripts.typecheck_data
     cctxt
     (chain, block)
     ?gas
@@ -162,7 +162,7 @@ let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
 
 let typecheck_program cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     (program : Michelson_v1_parser.parsed) =
-  Alpha_services.Helpers.Scripts.typecheck_code
+  Plugin.RPC.Scripts.typecheck_code
     cctxt
     (chain, block)
     ?gas
