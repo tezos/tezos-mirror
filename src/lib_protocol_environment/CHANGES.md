@@ -6,7 +6,7 @@ Changes are grouped by environment version and listed in reverse chronological o
 
 ## V3
 
-(no changes)
+Architecture word-size: refuse to execute on 32-bit machines
 
 ## V2
 
