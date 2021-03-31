@@ -32,9 +32,9 @@ def sanity_check(request) -> None:
 
 
 @pytest.fixture(scope="session")
-def log_dir(request) -> Iterator[str]:
+def log_dir(request) -> str:
     """Retrieve user-provided logging directory on the command line."""
-    yield request.config.getoption("--log-dir")
+    return request.config.getoption("--log-dir")
 
 
 @pytest.fixture(scope="session")
