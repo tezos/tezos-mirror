@@ -50,10 +50,8 @@ sed -i '1 s@^tests_alpha/test_@tests_${SNAPSHOT_PROTO}/test_@' \
 # 4. sanity check: `rgrep alpha` and other protocol names in the set of
 #    snapshotted tests. remove absolute protocol references to relative ones
 #    using the constants of tests_python/tests_alpha/protocol.py
-# 5. remove multibranch test tests_${SNAPSHOT_PROTO}/multibranch/test_baker_endorser_mb.py if still
-#    present. it is no longer maintained, and there cannot be two modules named multibranch.
-# 6. update tests_python/README.md (this file) with a description of the new folders.
-# 7. update .gitlab-ci.yml by running ./scripts/update_integration_tests.sh
+# 5. update tests_python/README.md (this file) with a description of the new folders.
+# 6. update .gitlab-ci.yml by running ./scripts/update_integration_tests.sh
 
 # Sanity checks
 
