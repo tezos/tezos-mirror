@@ -11,10 +11,12 @@
         test_prop_signature
         test_prop_hacl_hash
         test_deterministic_nonce
-        test_signature)
+        test_signature
+	    test_timelock)
  (libraries tezos-stdlib
             tezos-crypto
             bls12-381-unix
+	    zarith
             data-encoding
             alcotest
             alcotest-lwt
