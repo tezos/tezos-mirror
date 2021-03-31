@@ -53,6 +53,7 @@ type options = {
   record : string option;
   job_count : int;
   suggest_jobs : string option;
+  junit : string option;
 }
 
 let options =
@@ -80,6 +81,7 @@ let options =
   let record = ref None in
   let job_count = ref 3 in
   let suggest_jobs = ref None in
+  let junit = ref None in
   let set_log_level = function
     | "quiet" ->
         log_level := Quiet
@@ -230,7 +232,10 @@ let options =
            suggest a partition of the tests that would result in --job-count \
            sets of roughly the same total duration. Output each job as a list \
            of flags that can be passed to Tezt, followed by a shell comment \
-           that denotes the expected duration of the job." ) ]
+           that denotes the expected duration of the job." );
+        ( "--junit",
+          Arg.String (fun path -> junit := Some path),
+          "<FILE> Store test results in FILE using JUnit XML format." ) ]
   in
   let usage =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
@@ -291,4 +296,5 @@ let options =
     record = !record;
     job_count = !job_count;
     suggest_jobs = !suggest_jobs;
+    junit = !junit;
   }

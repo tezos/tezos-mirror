@@ -85,6 +85,7 @@ type options = {
   record : string option;
   job_count : int;
   suggest_jobs : string option;
+  junit : string option;
 }
 
 (** Values for command-line options. *)

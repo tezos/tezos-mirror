@@ -121,7 +121,12 @@ val warn : ('a, unit, string, unit) format4 -> 'a
 (** Same as [log ~level:Error ~color:red ~prefix:"error"]. *)
 val error : ('a, unit, string, unit) format4 -> 'a
 
-type test_result = Successful | Failed | Aborted
+(** Whether a test succeeded, failed or was aborted by the user.
+
+    [Failed] comes with the error message, which is a string version
+    of the exception that was raised (usually with [Test.fail]).
+    This message is unused by the [Log] module itself. *)
+type test_result = Successful | Failed of string | Aborted
 
 (** Log the result of a test.
 
