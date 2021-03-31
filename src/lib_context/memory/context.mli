@@ -48,3 +48,9 @@ val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t
     trees. It is exposed so that it can be catched by the proxy where such
     operations on shallow trees are expected. *)
 exception Context_dangling_hash of string
+
+val add_predecessor_block_metadata_hash :
+  tree -> Block_metadata_hash.t -> tree Lwt.t
+
+val add_predecessor_ops_metadata_hash :
+  tree -> Operation_metadata_list_list_hash.t -> tree Lwt.t

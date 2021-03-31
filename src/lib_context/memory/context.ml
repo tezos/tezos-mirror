@@ -63,6 +63,12 @@ let fold ?depth t key ~init ~f = Tree.fold ?depth t (data_key key) ~init ~f
 
 let current_protocol_key = ["protocol"]
 
+let current_predecessor_block_metadata_hash_key =
+  ["predecessor_block_metadata_hash"]
+
+let current_predecessor_ops_metadata_hash_key =
+  ["predecessor_ops_metadata_hash"]
+
 let get_protocol t =
   Tree.find t current_protocol_key >>= function
   | None -> assert false
@@ -77,6 +83,20 @@ let get_hash_version _c = Context_hash.Version.of_int 0
 let set_hash_version c v =
   if Context_hash.Version.(of_int 0 = v) then return c
   else fail (Tezos_context_helpers.Context.Unsupported_context_hash_version v)
+
+let add_predecessor_block_metadata_hash v hash =
+  let data =
+    Data_encoding.Binary.to_bytes_exn Block_metadata_hash.encoding hash
+  in
+  Tree.add v current_predecessor_block_metadata_hash_key data
+
+let add_predecessor_ops_metadata_hash v hash =
+  let data =
+    Data_encoding.Binary.to_bytes_exn
+      Operation_metadata_list_list_hash.encoding
+      hash
+  in
+  Tree.add v current_predecessor_ops_metadata_hash_key data
 
 let empty = Store.Tree.empty
 
