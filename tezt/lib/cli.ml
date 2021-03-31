@@ -217,7 +217,8 @@ let options =
         ( "--record",
           Arg.String (fun file -> record := Some file),
           "<FILE> Record test results to FILE. This file can then be used \
-           with --suggest-jobs." );
+           with --suggest-jobs. If you use --loop or --loop-count, times are \
+           averaged for each test." );
         ( "--job-count",
           Arg.Int set_job_count,
           "<COUNT> Set the number of target jobs for --suggest-jobs (default \

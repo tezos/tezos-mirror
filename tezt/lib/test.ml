@@ -256,6 +256,7 @@ type test = {
   tags : string list;
   body : unit -> unit Lwt.t;
   mutable time : float;
+  mutable run_count : int;
 }
 
 (* Tests added using [register] and that match command-line filters. *)
@@ -381,7 +382,8 @@ let record_results filename =
   (* Remove the closure ([body]). *)
   let marshaled_tests =
     map_registered_list
-    @@ fun {file; title; tags; body = _; time} -> {file; title; tags; time}
+    @@ fun {file; title; tags; body = _; time; run_count} ->
+    {file; title; tags; time = time /. float (max 1 run_count)}
   in
   (* Write to file using Marshal.
      This is not very robust but enough for the purposes of this file. *)
@@ -470,7 +472,7 @@ let register ~__FILE__ ~title ~tags body =
   register_title title ;
   List.iter register_tag tags ;
   if test_should_be_run ~file ~title ~tags then
-    let test = {file; title; tags; body; time = 0.} in
+    let test = {file; title; tags; body; time = 0.; run_count = 0} in
     registered := String_map.add title test !registered
 
 let run () =
@@ -524,6 +526,7 @@ let run () =
               let start = Unix.gettimeofday () in
               really_run ~iteration test.title test.body ;
               let time = Unix.gettimeofday () -. start in
+              test.run_count <- test.run_count + 1 ;
               test.time <- test.time +. time
             in
             iter_registered run_and_measure_time ;
