@@ -191,10 +191,6 @@ val commit_invalid_block :
   Error_monad.error list ->
   unit tzresult Lwt.t
 
-(** Monitor all the fetched block headers (for all activate chains). *)
-val watch_block_header :
-  t -> (Block_hash.t * Block_header.t) Lwt_stream.t * Lwt_watcher.stopper
-
 (** {2 Operations index} *)
 
 (** Index of operations (for the mempool). *)
@@ -212,10 +208,6 @@ end
 (** Inject a new operation in the local index (memory only). *)
 val inject_operation :
   chain_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
-
-(** Monitor all the fetched operations (for all activate chains). *)
-val watch_operation :
-  t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Lwt_watcher.stopper
 
 (** {2 Protocol index} *)
 
