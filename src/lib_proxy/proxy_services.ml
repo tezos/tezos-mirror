@@ -93,6 +93,37 @@ let to_client_server_mode = function
   | Light_client _ | Proxy_client -> Proxy.Client
   | Proxy_server -> Proxy.Server
 
+type env_cache_key =
+  Tezos_shell_services.Chain_services.chain
+  * Tezos_shell_services.Block_services.block
+
+module Env_cache_key_hashed_type :
+  Hashtbl.HashedType with type t = env_cache_key = struct
+  type t = env_cache_key
+
+  let equal ((lchain, lblock) : t) ((rchain, rblock) : t) =
+    (* Avoid using polymorphic equality *)
+    lchain = rchain && lblock = rblock
+
+  let hash = Hashtbl.hash
+end
+
+module Env_cache =
+  (* Rationale for this configuration:
+
+     - Using LRU as it'll discard old heads if the client is always using
+       the <head> identifier (supposing that new blocks keep coming)
+     - overflow:Strong: we want collection to happen before the GC MUST do
+       it, because we don't want performance to degrade with a nearly-full
+       heap all the time.
+     - accounting:Sloppy: because ringo specifies that Sloppy's antagonist
+       (Precise) should mainly be used when removing a lot or inserting the same
+       key often. We do none of that, so Sloppy seems better. *)
+    (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Sloppy))
+    (Env_cache_key_hashed_type)
+
+module Env_cache_lwt = Ringo_lwt.Functors.Make_result (Env_cache)
+
 (** [protocols hash] returns the implementation of the RPC
     [/chains/<chain_id>/blocks/<block_id>/protocols] of the proxy server.
 
@@ -100,7 +131,7 @@ let to_client_server_mode = function
     returned by the node for its [head] block when [tezos-proxy-server]
     started. While it look like we could do something smarter in
     [build_directory] (such as inspecting the header of the block being queried),
-    it is impossible to have a different implementation that this one.
+    it is impossible to have a different implementation than this one.
     That's because the proxy server will anyway only succeed on blocks that are
     in the protocol returned initially by the node, as the
     proxy server's implementation is protocol-dependent (see [proxy_env]
@@ -131,7 +162,6 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     (proxy_env : Registration.proxy_environment) : unit RPC_directory.t =
   let (module Proxy_environment) = proxy_env in
   let module B2H = BlockToHash (Proxy_environment) in
-  let envs_cache = Hashtbl.create 17 in
   let make chain block (module P_RPC : Proxy_proto.PROTO_RPC) =
     match mode with
     | Light_client sources ->
@@ -150,31 +180,39 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
         let module M = Proxy_getter.MakeProxy (P_RPC) in
         Lwt.return (module M : Proxy_getter.M)
   in
+  (* proxy_server case: given that a new block arrives every minute,
+     make the cache keep blocks from approximately the last hour.
+     Starting at protocol G, blocks may arrive faster than one per minute.
+     We can either forward the protocol's constants here, or do an
+     RPC call to obtain the exact value.
+     Anyway we're safe, having an appromixation here is fine. *)
+  let envs_cache =
+    Env_cache_lwt.create
+      (match mode with
+      | Proxy_server -> 64
+      | Proxy_client | Light_client _ -> 16)
+  in
   let get_env_rpc_context chain block =
     B2H.hash_of_block rpc_context chain block >>=? fun block_hash_opt ->
-    let (block_key, fill_b2h) =
+    let (block_key, (fill_b2h : Block_hash.t -> unit)) =
       match block_hash_opt with
-      | None ->
-          ( block,
-            fun (rpc_context : Tezos_protocol_environment.rpc_context) ->
-              B2H.add chain block rpc_context.block_hash )
+      | None -> (block, fun block_hash -> B2H.add chain block block_hash)
       | Some block_hash -> (`Hash (block_hash, 0), ignore)
     in
     let key = (chain, block_key) in
-    match Hashtbl.find_opt envs_cache key with
-    | None ->
-        Proxy_environment.init_env_rpc_context
-          printer
-          (make chain block_key)
-          rpc_context
-          (to_client_server_mode mode)
-          chain
-          block_key
-        >>=? fun rpc_context ->
-        fill_b2h rpc_context ;
-        Hashtbl.add envs_cache key rpc_context ;
-        return rpc_context
-    | Some cached -> return cached
+    let compute_value (chain, block_key) =
+      Proxy_environment.init_env_rpc_context
+        printer
+        (make chain block_key)
+        rpc_context
+        (to_client_server_mode mode)
+        chain
+        block_key
+      >>=? fun rpc_context ->
+      fill_b2h @@ rpc_context.block_hash ;
+      return rpc_context
+    in
+    Env_cache_lwt.find_or_replace envs_cache key compute_value
   in
   let get_env_rpc_context' chain block =
     get_env_rpc_context chain block >>= fun result ->
