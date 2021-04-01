@@ -103,20 +103,13 @@ let read_block store h =
   Lwt_utils.find_map_s
     (fun chain_store ->
       Store.Block.read_block_opt chain_store h
-      >>= function
-      | None ->
-          Lwt.return_none
-      | Some b ->
-          Lwt.return_some (Store.Chain.chain_id chain_store, b))
+      >|= Option.map (fun b -> (Store.Chain.chain_id chain_store, b)))
     chain_stores
 
 let read_block_header db h =
   read_block (Distributed_db.store db) h
-  >>= function
-  | None ->
-      Lwt.return_none
-  | Some (chain_id, block) ->
-      Lwt.return_some (chain_id, Store.Block.header block)
+  >|= Option.map (fun (chain_id, block) ->
+          (chain_id, Store.Block.header block))
 
 let validate_block v ?(force = false) ?chain_id bytes operations =
   let hash = Block_hash.hash_bytes [bytes] in
