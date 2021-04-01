@@ -683,7 +683,7 @@ module Make (Encoding : ENCODING) = struct
          _ )
 
   let register_dynamic_directory :
-      type pr a pr.
+      type pr a.
       ?descr:string ->
       pr directory ->
       (pr, a) Path.path ->
