@@ -201,22 +201,83 @@ let box_tests =
           "\x77\x87\x8b\x2b\xce\x5a\xbf\x2f\xac\x5a\x14\xec\xd9\x58\x09\x68\xa6\x97\x6a\x8a\xf3\x41\x15\xce\x02\x3c\x95\x0e";
     } ]
 
-(* keypair also runs the neuterize function *)
-let test_keypair (_v : Bytes.t ed25519_test) : unit =
-  let (pk1, sk1) = Hacl.Ed25519.keypair () in
-  let (pk2, sk2) = Hacl.Ed25519.keypair () in
-  assert (sk1 <> sk2 && pk1 <> pk2) ;
-  log_s "[Ed25519.keypair] Success"
+type 'a p256_test = {
+  name : string;
+  sk : 'a;
+  pk : 'a;
+  msg : 'a;
+  k : 'a;
+  expected_sig : 'a;
+}
+
+let p256_tests =
+  [ {
+      name = "Test 1";
+      msg =
+        Bytes.of_string
+          "\x1c\xcb\xe9\x1c\x07\x5f\xc7\xf4\xf0\x33\xbf\xa2\x48\xdb\x8f\xcc\xd3\x56\x5d\xe9\x4b\xbf\xb1\x2f\x3c\x59\xff\x46\xc2\x71\xbf\x83";
+      sk =
+        Bytes.of_string
+          "\x51\x9b\x42\x3d\x71\x5f\x8b\x58\x1f\x4f\xa8\xee\x59\xf4\x77\x1a\x5b\x44\xc8\x13\x0b\x4e\x3e\xac\xca\x54\xa5\x6d\xda\x72\xb4\x64";
+      pk =
+        Bytes.of_string
+          "\x04\x1c\xcb\xe9\x1c\x07\x5f\xc7\xf4\xf0\x33\xbf\xa2\x48\xdb\x8f\xcc\xd3\x56\x5d\xe9\x4b\xbf\xb1\x2f\x3c\x59\xff\x46\xc2\x71\xbf\x83\xce\x40\x14\xc6\x88\x11\xf9\xa2\x1a\x1f\xdb\x2c\x0e\x61\x13\xe0\x6d\xb7\xca\x93\xb7\x40\x4e\x78\xdc\x7c\xcd\x5c\xa8\x9a\x4c\xa9";
+      k =
+        Bytes.of_string
+          "\x94\xa1\xbb\xb1\x4b\x90\x6a\x61\xa2\x80\xf2\x45\xf9\xe9\x3c\x7f\x3b\x4a\x62\x47\x82\x4f\x5d\x33\xb9\x67\x07\x87\x64\x2a\x68\xde";
+      expected_sig =
+        Bytes.of_string
+          "\xf3\xac\x80\x61\xb5\x14\x79\x5b\x88\x43\xe3\xd6\x62\x95\x27\xed\x2a\xfd\x6b\x1f\x6a\x55\x5a\x7a\xca\xbb\x5e\x6f\x79\xc8\xc2\xac\xcf\xa7\x40\xfe\xc7\x67\x96\xd2\xe3\x92\x16\xbe\x7e\xbf\x58\x0e\xa3\xc0\xef\x4b\xb0\x0a\xb2\xe7\xe4\x20\x84\x34\xf4\x5f\x8c\x9c";
+    } ]
 
 let test_ed25519 (v : Bytes.t ed25519_test) : unit =
   log_s "Testing Ed25519" ;
+  let (pk1, sk1) = Hacl.Ed25519.keypair () in
+  let (pk2, _) = Hacl.Ed25519.keypair () in
+  assert (pk1 <> pk2) ;
+  log_s "[Ed25519.keypair] Success" ;
+  assert (pk1 = Hacl.Ed25519.neuterize sk1) ;
+  let pk = Option.get @@ Hacl.Ed25519.pk_of_bytes v.pk in
   let sk = Option.get @@ Hacl.Ed25519.sk_of_bytes v.sk in
+  assert (pk = Hacl.Ed25519.neuterize sk) ;
+  log_s "[Ed25519.neuterize] Success" ;
   let signature = Hacl.Ed25519.sign ~sk ~msg:v.msg in
   assert (Bytes.compare signature v.expected_sig = 0) ;
   log_s "[Ed25519.sign] Success" ;
-  let pk = Option.get @@ Hacl.Ed25519.pk_of_bytes v.pk in
   assert (Hacl.Ed25519.verify ~pk ~msg:v.msg ~signature) ;
   log_s "[Ed25519.verify] Success"
+
+let test_p256 (v : Bytes.t p256_test) : unit =
+  log_s "Testing P256" ;
+  let (pk1, sk1) = Hacl.P256.keypair () in
+  let (pk2, _) = Hacl.P256.keypair () in
+  assert (pk1 <> pk2) ;
+  log_s "[P256.keypair] Success" ;
+  assert (pk1 = Hacl.P256.neuterize sk1) ;
+  let pk = Option.get @@ Hacl.P256.pk_of_bytes v.pk in
+  let pk_unsafe =
+    Option.get @@ Hacl.P256.pk_of_bytes_without_validation v.pk
+  in
+  assert (Hacl.P256.equal pk pk_unsafe) ;
+  let sk = Option.get @@ Hacl.P256.sk_of_bytes v.sk in
+  assert (pk = Hacl.P256.neuterize sk) ;
+  log_s "[P256.neuterize] Success" ;
+  let sk_bytes = Hacl.P256.to_bytes sk in
+  assert (sk_bytes = v.sk) ;
+  (* for to_bytes pk we cannot directly compare the output buffer with the input
+   * buffer because of_bytes takes a pk in either compressed or uncompressed form
+   * v.pk is in uncompressed form but to_bytes only outputs the pk in compressed
+     form; thus we only compare the relevant bytes *)
+  let pk_bytes = Hacl.P256.to_bytes pk in
+  assert (Bytes.get_int8 pk_bytes 0 = 3) ;
+  assert (Bytes.sub pk_bytes 1 32 = Bytes.sub v.pk 1 32) ;
+  log_s "[P256.to_bytes] Success" ;
+  let pk_bytes_blit = Bytes.create 33 in
+  Hacl.P256.blit_to_bytes pk pk_bytes_blit ;
+  assert (pk_bytes_blit = pk_bytes) ;
+  log_s "[P256.blit_to_bytes] Success" ;
+  assert (Hacl.P256.verify ~pk ~msg:v.msg ~signature:v.expected_sig) ;
+  log_s "[P256.verify] Success"
 
 let test_curve25519 (v : Bytes.t curve25519_test) : unit =
   log_s "Testing Curve25519" ;
@@ -335,7 +396,7 @@ let test_box (v : Bytes.t box_test) : unit =
 let main () =
   let () = log_s "STARTING TESTS" in
   List.iter test_ed25519 ed25519_tests ;
-  List.iter test_keypair ed25519_tests ;
+  List.iter test_p256 p256_tests ;
   List.iter test_curve25519 curve25519_tests ;
   List.iter test_sha2_256 sha2_256_tests ;
   List.iter test_sha2_512 sha2_512_tests ;

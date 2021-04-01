@@ -39,22 +39,22 @@ end
 
 type haclstar_hash_state
 
-external ml_Hacl_SHA2_256_init : unit -> haclstar_hash_state
+external js_Hacl_SHA2_256_init : unit -> haclstar_hash_state
   = "Hacl_Hash_Core_SHA2_init_256"
 
-external ml_Hacl_SHA2_256_update : haclstar_hash_state -> Bytes.t -> unit
+external js_Hacl_SHA2_256_update : haclstar_hash_state -> Bytes.t -> unit
   = "Hacl_Hash_Core_SHA2_update_256"
 
-external ml_Hacl_SHA2_256_finish : haclstar_hash_state -> Bytes.t -> unit
+external js_Hacl_SHA2_256_finish : haclstar_hash_state -> Bytes.t -> unit
   = "Hacl_Hash_Core_SHA2_finish_256"
 
-external ml_Hacl_SHA2_512_init : unit -> haclstar_hash_state
+external js_Hacl_SHA2_512_init : unit -> haclstar_hash_state
   = "Hacl_Hash_Core_SHA2_init_512"
 
-external ml_Hacl_SHA2_512_update : haclstar_hash_state -> Bytes.t -> unit
+external js_Hacl_SHA2_512_update : haclstar_hash_state -> Bytes.t -> unit
   = "Hacl_Hash_Core_SHA2_update_512"
 
-external ml_Hacl_SHA2_512_finish : haclstar_hash_state -> Bytes.t -> unit
+external js_Hacl_SHA2_512_finish : haclstar_hash_state -> Bytes.t -> unit
   = "Hacl_Hash_Core_SHA2_finish_512"
 
 external js_Hacl_SHA3_keccak : int -> int -> int -> Bytes.t -> Bytes.t -> unit
@@ -110,13 +110,13 @@ module Hash = struct
 
     let size = 32
 
-    let init () = ml_Hacl_SHA2_256_init ()
+    let init () = js_Hacl_SHA2_256_init ()
 
-    let update st msg = ml_Hacl_SHA2_256_update st msg
+    let update st msg = js_Hacl_SHA2_256_update st msg
 
     let finish st =
       let output = Bytes.create size in
-      ml_Hacl_SHA2_256_finish st output ;
+      js_Hacl_SHA2_256_finish st output ;
       output
 
     let digest msg =
@@ -137,13 +137,13 @@ module Hash = struct
 
     let size = 64
 
-    let init () = ml_Hacl_SHA2_512_init ()
+    let init () = js_Hacl_SHA2_512_init ()
 
-    let update st msg = ml_Hacl_SHA2_512_update st msg
+    let update st msg = js_Hacl_SHA2_512_update st msg
 
     let finish st =
       let output = Bytes.create size in
-      ml_Hacl_SHA2_512_finish st output ;
+      js_Hacl_SHA2_512_finish st output ;
       output
 
     let digest msg =
@@ -411,15 +411,6 @@ module Box = struct
     js_Hacl_NaCl_box_open_detached_afternm buf buf tag nonce k
 end
 
-external js_Hacl_Ed25519_secret_to_public : Bytes.t -> Bytes.t -> unit
-  = "Hacl_Ed25519_secret_to_public"
-
-external js_Hacl_Ed25519_sign : Bytes.t -> Bytes.t -> Bytes.t -> unit
-  = "Hacl_Ed25519_sign"
-
-external js_Hacl_Ed25519_verify : Bytes.t -> Bytes.t -> Bytes.t -> bool
-  = "Hacl_Ed25519_verify"
-
 module type SIGNATURE = sig
   type _ key
 
@@ -452,31 +443,14 @@ module type SIGNATURE = sig
   val verify : pk:public key -> msg:Bytes.t -> signature:Bytes.t -> bool
 end
 
-external js_Hacl_P256_dh_initiator : Bytes.t -> Bytes.t -> bool
-  = "Hacl_P256_ecp256dh_i"
+external js_Hacl_Ed25519_secret_to_public : Bytes.t -> Bytes.t -> unit
+  = "Hacl_Ed25519_secret_to_public"
 
-external js_Hacl_P256_valid_pk : Bytes.t -> bool = "Hacl_P256_verify_q"
+external js_Hacl_Ed25519_sign : Bytes.t -> Bytes.t -> Bytes.t -> unit
+  = "Hacl_Ed25519_sign"
 
-external js_Hacl_P256_valid_sk : Bytes.t -> bool
-  = "Hacl_P256_is_more_than_zero_less_than_order"
-
-external js_Hacl_P256_sign : Bytes.t -> Bytes.t -> Bytes.t -> Bytes.t -> bool
-  = "Hacl_P256_ecdsa_sign_p256_without_hash"
-
-external js_Hacl_P256_verify : Bytes.t -> Bytes.t -> Bytes.t -> bool
-  = "Hacl_P256_ecdsa_verif_without_hash"
-
-external js_Hacl_P256_compress_c : Bytes.t -> Bytes.t -> unit
-  = "Hacl_P256_compression_compressed_form"
-
-external js_Hacl_P256_compress_n : Bytes.t -> Bytes.t -> unit
-  = "Hacl_P256_compression_not_compressed_form"
-
-external js_Hacl_P256_decompress_c : Bytes.t -> Bytes.t -> bool
-  = "Hacl_P256_decompression_compressed_form"
-
-external js_Hacl_P256_decompress_n : Bytes.t -> Bytes.t -> bool
-  = "Hacl_P256_decompression_not_compressed_form"
+external js_Hacl_Ed25519_verify : Bytes.t -> Bytes.t -> Bytes.t -> bool
+  = "Hacl_Ed25519_verify"
 
 module Ed25519 : SIGNATURE = struct
   type _ key = Sk : Bytes.t -> secret key | Pk : Bytes.t -> public key
@@ -540,6 +514,32 @@ module Ed25519 : SIGNATURE = struct
   let verify ~pk:(Pk pk) ~msg ~signature =
     js_Hacl_Ed25519_verify pk msg signature
 end
+
+external js_Hacl_P256_dh_initiator : Bytes.t -> Bytes.t -> bool
+  = "Hacl_P256_ecp256dh_i"
+
+external js_Hacl_P256_valid_pk : Bytes.t -> bool = "Hacl_P256_verify_q"
+
+external js_Hacl_P256_valid_sk : Bytes.t -> bool
+  = "Hacl_P256_is_more_than_zero_less_than_order"
+
+external js_Hacl_P256_sign : Bytes.t -> Bytes.t -> Bytes.t -> Bytes.t -> bool
+  = "Hacl_P256_ecdsa_sign_p256_without_hash"
+
+external js_Hacl_P256_verify : Bytes.t -> Bytes.t -> Bytes.t -> Bytes.t -> bool
+  = "Hacl_P256_ecdsa_verif_without_hash"
+
+external js_Hacl_P256_compress_c : Bytes.t -> Bytes.t -> unit
+  = "Hacl_P256_compression_compressed_form"
+
+external js_Hacl_P256_compress_n : Bytes.t -> Bytes.t -> unit
+  = "Hacl_P256_compression_not_compressed_form"
+
+external js_Hacl_P256_decompress_c : Bytes.t -> Bytes.t -> bool
+  = "Hacl_P256_decompression_compressed_form"
+
+external js_Hacl_P256_decompress_n : Bytes.t -> Bytes.t -> bool
+  = "Hacl_P256_decompression_not_compressed_form"
 
 module P256 : SIGNATURE = struct
   type _ key = Sk : Bytes.t -> secret key | Pk : Bytes.t -> public key
@@ -687,5 +687,12 @@ module P256 : SIGNATURE = struct
 
   let verify ~pk:(Pk pk) ~msg ~signature =
     if Bytes.length signature <> size then false
-    else js_Hacl_P256_verify pk msg signature
+    else
+      (* The C function for P-256 signature verification (and the equivalent wasm function)
+       * takes the signature as its 2 separate components. In the Unix implementation we don't
+       * do this separation because we use the higher level hacl-star interface which accepts
+       * the signature buffer, but in order to call the wasm function we have to do it here. *)
+      let sig_r = Bytes.sub signature 0 32 in
+      let sig_s = Bytes.sub signature 32 32 in
+      js_Hacl_P256_verify pk msg sig_r sig_s
 end

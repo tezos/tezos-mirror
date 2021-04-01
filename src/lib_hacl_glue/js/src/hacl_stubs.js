@@ -56,7 +56,6 @@ function blit_buf_onto_MlBytes(buf, MlBytes) {
   return 0;
 }
 
-
 //Provides: _1_Lib_RandomBuffer_System_randombytes
 //Requires: blit_buf_onto_MlBytes
 function _1_Lib_RandomBuffer_System_randombytes(buf) { // eslint-disable-line no-unused-vars
@@ -79,7 +78,6 @@ function _1_Lib_RandomBuffer_System_randombytes(buf) { // eslint-disable-line no
     })(buf)
 }
 
-
 //Provides: Hacl_Hash_Core_SHA2_init_256
 function Hacl_Hash_Core_SHA2_init_256(state) { // eslint-disable-line no-unused-vars
   throw ' not implemented Hacl_Hash_Core_SHA2_init_256';
@@ -90,12 +88,10 @@ function Hacl_Hash_Core_SHA2_update_256(state, bytes) { // eslint-disable-line n
   throw ' not implemented Hacl_Hash_Core_SHA2_update_256';
 }
 
-
 //Provides: Hacl_Hash_Core_SHA2_finish_256
 function Hacl_Hash_Core_SHA2_finish_256(state, hash) { // eslint-disable-line no-unused-vars
   throw ' not implemented Hacl_Hash_Core_SHA2_finish_256';
 }
-
 
 //Provides: Hacl_Hash_Core_SHA2_init_512
 function Hacl_Hash_Core_SHA2_init_512(state) { // eslint-disable-line no-unused-vars
@@ -106,7 +102,6 @@ function Hacl_Hash_Core_SHA2_init_512(state) { // eslint-disable-line no-unused-
 function Hacl_Hash_Core_SHA2_update_512(state, bytes) { // eslint-disable-line no-unused-vars
   throw ' not implemented Hacl_Hash_Core_SHA2_update_512';
 }
-
 
 //Provides: Hacl_Hash_Core_SHA2_finish_512
 function Hacl_Hash_Core_SHA2_finish_512(state, hash) { // eslint-disable-line no-unused-vars
@@ -194,11 +189,7 @@ function Hacl_HMAC_compute_sha2_512 (output, key, msg) { // eslint-disable-line 
 //Provides: Hacl_Curve25519_51_scalarmult
 //Requires: MlBytes2buf, blit_buf_onto_MlBytes
 function Hacl_Curve25519_51_scalarmult(pk, sk, basepoint) { // eslint-disable-line no-unused-vars
-  // Not sure why but in the OCaml code we use scalarmult with a basepoint
-  // rather than secret_to_public, we could use secret_to_public directly
   var bsk = MlBytes2buf(sk);
-  // var bbasepoint = MlBytes2buf(basepoint);
-  // var bret = _HACL.Curve25519_51.scalarmult(bsk, bbasepoint);
   var bret = _HACL.Curve25519_51.secret_to_public(bsk);
   blit_buf_onto_MlBytes(bret[0], pk);
   return 0;
@@ -313,45 +304,78 @@ function Hacl_Ed25519_verify(pk, msg, signature) { // eslint-disable-line no-unu
 
 //Provides: Hacl_P256_ecdsa_sign_p256_without_hash
 function Hacl_P256_ecdsa_sign_p256_without_hash () { // eslint-disable-line no-unused-vars
-  return "not implemented Hacl_P256_ecdsa_sign_p256_without_hash"
+  //Not implemented, failing
+  assert.fail();
 }
 
 //Provides: Hacl_P256_ecdsa_verif_without_hash
-function Hacl_P256_ecdsa_verif_without_hash () { // eslint-disable-line no-unused-vars
-  return "not implemented Hacl_P256_ecdsa_verif_without_hash"
+//Requires: MlBytes2buf
+function Hacl_P256_ecdsa_verif_without_hash (pk, msg, sig_r, sig_s) { // eslint-disable-line no-unused-vars
+  var bpk = MlBytes2buf(pk);
+  var bmsg = MlBytes2buf(msg);
+  var bsig_r = MlBytes2buf(sig_r);
+  var bsig_s = MlBytes2buf(sig_s);
+  var bret = _HACL.P256.ecdsa_verif_without_hash(bmsg, bpk, bsig_r, bsig_s);
+  return bret[0];
 }
 
 //Provides: Hacl_P256_is_more_than_zero_less_than_order
-function Hacl_P256_is_more_than_zero_less_than_order () { // eslint-disable-line no-unused-vars
-  return "not implemented Hacl_P256_is_more_than_zero_less_than_order"
+//Requires: MlBytes2buf
+function Hacl_P256_is_more_than_zero_less_than_order (sk) { // eslint-disable-line no-unused-vars
+  var bsk = MlBytes2buf(sk);
+  var bret = _HACL.P256.is_more_than_zero_less_than_order(bsk);
+  return bret[0];
 }
 
 //Provides: Hacl_P256_verify_q
-function Hacl_P256_verify_q () { // eslint-disable-line no-unused-vars
-  return "not implemented Hacl_P256_verify_q"
+//Requires: MlBytes2buf
+function Hacl_P256_verify_q (pk) { // eslint-disable-line no-unused-vars
+  var bpk = MlBytes2buf(pk);
+  var bret = _HACL.P256.verify_q(bpk);
+  return bret[0];
 }
 
 //Provides: Hacl_P256_ecp256dh_i
-function Hacl_P256_ecp256dh_i () { // eslint-disable-line no-unused-vars
-  return "not implemented Hacl_P256_ecp256dh_i"
+//Requires: MlBytes2buf, blit_buf_onto_MlBytes
+function Hacl_P256_ecp256dh_i (pk, sk) { // eslint-disable-line no-unused-vars
+  var bsk = MlBytes2buf(sk);
+  var bret = _HACL.P256.dh_initiator(bsk);
+  blit_buf_onto_MlBytes(bret[1], pk);
+  return bret[0];
 }
 
 //Provides: Hacl_P256_compression_compressed_form
-function Hacl_P256_compression_compressed_form () { // eslint-disable-line no-unused-vars
-  return "not implemented Hacl_P256_compression_compressed_form"
+//Requires: MlBytes2buf, blit_buf_onto_MlBytes
+function Hacl_P256_compression_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
+  var bpk = MlBytes2buf(pk);
+  var bret = _HACL.P256.compression_compressed_form(bpk);
+  blit_buf_onto_MlBytes(bret[0], out);
+  return 0;
 }
 
 //Provides: Hacl_P256_compression_not_compressed_form
-function Hacl_P256_compression_not_compressed_form () { // eslint-disable-line no-unused-vars
-  return "not implemented Hacl_P256_compression_not_compressed_form"
+//Requires: MlBytes2buf, blit_buf_onto_MlBytes
+function Hacl_P256_compression_not_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
+  var bpk = MlBytes2buf(pk);
+  var bret = _HACL.P256.compression_not_compressed_form(bpk);
+  blit_buf_onto_MlBytes(bret[0], out);
+  return 0;
 }
 
 //Provides: Hacl_P256_decompression_compressed_form
-function Hacl_P256_decompression_compressed_form () { // eslint-disable-line no-unused-vars
-  return "not implemented Hacl_P256_decompression_compressed_form"
+//Requires: MlBytes2buf, blit_buf_onto_MlBytes
+function Hacl_P256_decompression_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
+  var bpk = MlBytes2buf(pk);
+  var bret = _HACL.P256.decompression_compressed_form(bpk);
+  blit_buf_onto_MlBytes(bret[1], out);
+  return bret[0];
 }
 
 //Provides: Hacl_P256_decompression_not_compressed_form
-function Hacl_P256_decompression_not_compressed_form () { // eslint-disable-line no-unused-vars
-  return "not implemented Hacl_P256_decompression_not_compressed_form"
+//Requires: MlBytes2buf, blit_buf_onto_MlBytes
+function Hacl_P256_decompression_not_compressed_form (pk, out) { // eslint-disable-line no-unused-vars
+  var bpk = MlBytes2buf(pk);
+  var bret = _HACL.P256.decompression_not_compressed_form(bpk);
+  blit_buf_onto_MlBytes(bret[1], out);
+  return bret[0];
 }
