@@ -17,6 +17,8 @@ depends: [
   "alcotest-lwt" { with-test & >= "1.1.0" }
   "crowbar" { with-test }
   "tezos-test-services" { with-test }
+  "lib-test" { with-test }
+  "qcheck-alcotest" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
