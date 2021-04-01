@@ -150,10 +150,6 @@ module Block_header : sig
        and type param := unit
 end
 
-(** Lookup for block header in any active chains *)
-val read_block_header :
-  db -> Block_hash.t -> (Chain_id.t * Block_header.t) option Lwt.t
-
 (** Index of all the operations of a given block (per validation pass).
 
     For instance, [fetch chain_db (block_hash, validation_pass)

@@ -425,27 +425,6 @@ module Protocol = struct
            and type param := unit )
 end
 
-let read_block {disk; _} h =
-  Store.all_chain_stores disk
-  >>= fun chain_stores ->
-  Lwt_utils.find_map_s
-    (fun chain_store ->
-      Store.Block.read_block_opt chain_store h
-      >>= function
-      | None ->
-          Lwt.return_none
-      | Some b ->
-          Lwt.return_some (Store.Chain.chain_id chain_store, b))
-    chain_stores
-
-let read_block_header db h =
-  read_block db h
-  >>= function
-  | None ->
-      Lwt.return_none
-  | Some (chain_id, block) ->
-      Lwt.return_some (chain_id, Store.Block.header block)
-
 let broadcast chain_db msg =
   P2p_peer.Table.iter
     (fun _peer_id conn ->

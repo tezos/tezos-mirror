@@ -97,6 +97,27 @@ let get_active_chains {active_chains; _} =
   let l = Chain_id.Table.fold (fun c _ acc -> c :: acc) active_chains [] in
   List.rev l
 
+let read_block store h =
+  Store.all_chain_stores store
+  >>= fun chain_stores ->
+  Lwt_utils.find_map_s
+    (fun chain_store ->
+      Store.Block.read_block_opt chain_store h
+      >>= function
+      | None ->
+          Lwt.return_none
+      | Some b ->
+          Lwt.return_some (Store.Chain.chain_id chain_store, b))
+    chain_stores
+
+let read_block_header db h =
+  read_block (Distributed_db.store db) h
+  >>= function
+  | None ->
+      Lwt.return_none
+  | Some (chain_id, block) ->
+      Lwt.return_some (chain_id, Store.Block.header block)
+
 let validate_block v ?(force = false) ?chain_id bytes operations =
   let hash = Block_hash.hash_bytes [bytes] in
   match Block_header.of_bytes bytes with
@@ -108,7 +129,7 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
       else
         ( match chain_id with
         | None -> (
-            Distributed_db.read_block_header v.db block.shell.predecessor
+            read_block_header v.db block.shell.predecessor
             >>= function
             | None ->
                 failwith
@@ -163,7 +184,7 @@ let chains_watcher {chains_input; _} = Lwt_watcher.create_stream chains_input
 let inject_operation v ?chain_id op =
   ( match chain_id with
   | None -> (
-      Distributed_db.read_block_header v.db op.Operation.shell.branch
+      read_block_header v.db op.Operation.shell.branch
       >>= function
       | None ->
           failwith
