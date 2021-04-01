@@ -247,6 +247,13 @@ baking for user *bob*::
 
    tezos-baker-alpha run with local node ~/.tezos-node bob
 
+**Remember that having two bakers or endorsers running connected to the
+same account could lead to double baking/endorsing and the loss of all
+your bonds.**
+If you are worried about the availability of your node when it is its turn to
+bake/endorse, **there are other ways** than duplicating your credentials.
+**Never** use the same account on two daemons.
+
 Endorser
 ~~~~~~~~
 
@@ -278,13 +285,6 @@ cause the offender to lose its security deposit.
 ::
 
    tezos-accuser-alpha run
-
-Remember that having two bakers or endorsers running connected to the
-same account could lead to double baking/endorsing and the loss of all
-your bonds.
-If you are worried about the availability of your node when it is its turn to
-bake/endorse, there are other ways than duplicating your credentials.
-**Never** use the same account on two daemons.
 
 
 Docker
