@@ -66,12 +66,26 @@ val shutdown : t -> unit Lwt.t
 (** An instance of the distributed DB for a given chain *)
 type chain_db
 
-(** The first call to [activate t chain] activates [chain], creates a [chain_db]
-    and sends a [Get_current_branch chain_id] message to all neighbors,
-    where [chain_id] is the identifier of [chain]. This informs the neighbors
-    that this node expects notifications for new heads/mempools. Subsequent
-    calls simply return the existing [chain_db]. *)
-val activate : t -> Store.Chain.t -> chain_db
+(** The first call to [activate t chain callbacks] activates [chain],
+   creates a [chain_db] and sends a [Get_current_branch chain_id]
+   message to all neighbors, where [chain_id] is the identifier of
+   [chain]. This informs the neighbors that this node expects
+   notifications for new heads/mempools. The given [callbacks] are
+   given to the [P2p_reader] for each [peer]:
+
+    - [notify_branch peer locator] is called when the [P2p_reader]
+   receives the message [Current_branch (chain, locator)] from peer
+   [peer].
+
+    - [notify_head peer head] is called when the [P2p_reader] receives
+   the message [Current_head (chain, head, mempool)] from peer [peer].
+
+    - [Disconnection peer] is called when the [P2p_reader] receives
+   the message [Deactivate chain] from peer [peer] or when the
+   [P2p_reader] associated to [peer] is shutdown.
+
+    Subsequent calls simply return the existing [chain_db]. *)
+val activate : t -> Store.Chain.t -> P2p_reader.callback -> chain_db
 
 (** Look for the database of an active chain. *)
 val get_chain : t -> Chain_id.t -> chain_db option
@@ -80,10 +94,6 @@ val get_chain : t -> Chain_id.t -> chain_db option
     neighbors for this chain. This notifies them that this node isn't interested
     in messages for this chain *)
 val deactivate : chain_db -> unit Lwt.t
-
-(** Register all the possible callback from the distributed DB to the
-    validator. *)
-val set_callback : chain_db -> P2p_reader.callback -> unit
 
 (** Kick a given peer. *)
 val disconnect : chain_db -> P2p_peer.Id.t -> unit Lwt.t

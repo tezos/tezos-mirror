@@ -64,14 +64,6 @@ type db = {
 
 type chain_db = {global_db : db; reader_chain_db : P2p_reader.chain_db}
 
-let noop_callback =
-  P2p_reader.
-    {
-      notify_branch = (fun _gid _locator -> ());
-      notify_head = (fun _gid _block _ops -> ());
-      disconnection = (fun _gid -> ());
-    }
-
 type t = db
 
 let store {disk; _} = disk
@@ -145,7 +137,7 @@ let create disk p2p =
 
 let activate
     ({p2p; active_chains; protocol_db; disk; p2p_readers; _} as global_db)
-    chain_store =
+    chain_store callback =
   let run_p2p_reader gid =
     let register p2p_reader = P2p_peer.Table.add p2p_readers gid p2p_reader in
     let unregister () = P2p_peer.Table.remove p2p_readers gid in
@@ -196,7 +188,7 @@ let activate
               operation_db;
               block_header_db;
               operations_db;
-              callback = noop_callback;
+              callback;
               active_peers;
               active_connections = P2p_peer.Table.create ~random:true 53;
             }
@@ -220,9 +212,6 @@ let activate
         local_db
   in
   {global_db; reader_chain_db}
-
-let set_callback chain_db callback =
-  chain_db.reader_chain_db.callback <- callback
 
 let deactivate chain_db =
   let {active_chains; p2p; _} = chain_db.global_db in
