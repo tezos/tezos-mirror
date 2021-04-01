@@ -61,9 +61,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
   type raw_content = Cohttp_lwt.Body.t * content_type option
 
   type content =
-    Cohttp_lwt.Body.t
-    * content_type option
-    * Media_type.Make(Encoding).t option
+    Cohttp_lwt.Body.t * content_type option * Media_type.Make(Encoding).t option
 
   (** The type for possible results when calling over HTTP. Some results
       correspond to an HTTP return code, other results correspond to internal

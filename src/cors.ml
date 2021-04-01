@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {allowed_headers : string list; allowed_origins : string list}
+type t = {allowed_headers: string list; allowed_origins: string list}
 
 let default = {allowed_headers = []; allowed_origins = []}
 
@@ -51,15 +51,13 @@ let find_matching_origin allowed_origins origin =
 
 let add_allow_origin headers cors origin_header =
   match origin_header with
-  | None ->
-      headers
+  | None -> headers
   | Some origin -> (
-    match find_matching_origin cors.allowed_origins origin with
-    | None ->
-        headers
-    | Some allowed_origin ->
-        Cohttp.Header.add headers "Access-Control-Allow-Origin" allowed_origin
-    )
+      match find_matching_origin cors.allowed_origins origin with
+      | None -> headers
+      | Some allowed_origin ->
+          Cohttp.Header.add headers "Access-Control-Allow-Origin" allowed_origin
+      )
 
 let add_headers headers cors origin_header =
   let cors_headers =
@@ -72,11 +70,8 @@ let add_headers headers cors origin_header =
 
 let check_host headers cors =
   match Cohttp.Header.get headers "Host" with
-  | None ->
-      List.mem "*" cors.allowed_origins
+  | None -> List.mem "*" cors.allowed_origins
   | Some host -> (
-    match find_matching_origin cors.allowed_origins host with
-    | None ->
-        false
-    | Some _ ->
-        true )
+      match find_matching_origin cors.allowed_origins host with
+      | None -> false
+      | Some _ -> true )

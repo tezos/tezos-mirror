@@ -20,4 +20,5 @@ depends: [
   "ezjsonm" {with-test}
   "lwt" {with-test}
   "base-unix"{with-test}
+  "ocamlformat" { = "0.15.0" & dev }
 ]

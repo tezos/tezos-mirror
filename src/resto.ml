@@ -46,40 +46,26 @@ end
 
 let bool_of_string s =
   match String.lowercase_ascii s with
-  | "" | "true" | "t" | "yes" | "y" ->
-      Ok true
-  | "false" | "f" | "no" | "n" ->
-      Ok false
-  | _ ->
-      Error "Cannot parse boolean value"
+  | "" | "true" | "t" | "yes" | "y" -> Ok true
+  | "false" | "f" | "no" | "n" -> Ok false
+  | _ -> Error "Cannot parse boolean value"
 
 type meth = [`GET | `POST | `DELETE | `PUT | `PATCH]
 
 let string_of_meth = function
-  | `GET ->
-      "GET"
-  | `POST ->
-      "POST"
-  | `DELETE ->
-      "DELETE"
-  | `PUT ->
-      "PUT"
-  | `PATCH ->
-      "PATCH"
+  | `GET -> "GET"
+  | `POST -> "POST"
+  | `DELETE -> "DELETE"
+  | `PUT -> "PUT"
+  | `PATCH -> "PATCH"
 
 let meth_of_string = function
-  | "GET" ->
-      Some `GET
-  | "POST" ->
-      Some `POST
-  | "DELETE" ->
-      Some `DELETE
-  | "PUT" ->
-      Some `PUT
-  | "PATCH" ->
-      Some `PATCH
-  | _ ->
-      None
+  | "GET" -> Some `GET
+  | "POST" -> Some `POST
+  | "DELETE" -> Some `DELETE
+  | "PUT" -> Some `PUT
+  | "PATCH" -> Some `PATCH
+  | _ -> None
 
 module MethMap = Map.Make (struct
   type t = meth
@@ -116,10 +102,8 @@ module Internal = struct
         let witness = Ty
 
         let eq (type b) : b witness -> (b, t) eq = function
-          | Ty ->
-              Eq
-          | _ ->
-              raise Not_equal
+          | Ty -> Eq
+          | _ -> raise Not_equal
       end in
       (module Ty : Ty with type t = a)
 
@@ -127,13 +111,13 @@ module Internal = struct
      fun (module TyA) (module TyB) -> TyB.eq TyA.witness
   end
 
-  type descr = {name : string; descr : string option}
+  type descr = {name: string; descr: string option}
 
   type 'a arg = {
-    id : 'a Ty.id;
-    destruct : string -> ('a, string) result;
-    construct : 'a -> string;
-    descr : descr;
+    id: 'a Ty.id;
+    destruct: string -> ('a, string) result;
+    construct: 'a -> string;
+    descr: descr;
   }
 
   let from_arg x = x
@@ -147,49 +131,33 @@ module Internal = struct
     | DynamicTail : ('rkey, 'key) path * 'a arg -> ('rkey, 'key * 'a list) path
 
   let rec subst0 : type a b. (a, a) path -> (b, b) path = function
-    | Root ->
-        Root
-    | Static (path, name) ->
-        Static (subst0 path, name)
-    | Dynamic _ ->
-        assert false (* impossible *)
-    | DynamicTail _ ->
-        assert false
+    | Root -> Root
+    | Static (path, name) -> Static (subst0 path, name)
+    | Dynamic _ -> assert false (* impossible *)
+    | DynamicTail _ -> assert false
 
   (* impossible *)
 
   let rec subst1 : type a b c. (a, a * c) path -> (b, b * c) path = function
-    | Root ->
-        assert false (* impossible *)
-    | Static (path, name) ->
-        Static (subst1 path, name)
-    | Dynamic (path, arg) ->
-        Dynamic (subst0 path, arg)
-    | DynamicTail (path, arg) ->
-        DynamicTail (subst0 path, arg)
+    | Root -> assert false (* impossible *)
+    | Static (path, name) -> Static (subst1 path, name)
+    | Dynamic (path, arg) -> Dynamic (subst0 path, arg)
+    | DynamicTail (path, arg) -> DynamicTail (subst0 path, arg)
 
   let rec subst2 : type a b c d. (a, (a * c) * d) path -> (b, (b * c) * d) path
       = function
-    | Root ->
-        assert false (* impossible *)
-    | Static (path, name) ->
-        Static (subst2 path, name)
-    | Dynamic (path, arg) ->
-        Dynamic (subst1 path, arg)
-    | DynamicTail (path, arg) ->
-        DynamicTail (subst1 path, arg)
+    | Root -> assert false (* impossible *)
+    | Static (path, name) -> Static (subst2 path, name)
+    | Dynamic (path, arg) -> Dynamic (subst1 path, arg)
+    | DynamicTail (path, arg) -> DynamicTail (subst1 path, arg)
 
   let rec subst3 :
-      type a b c d e.
-      (a, ((a * c) * d) * e) path -> (b, ((b * c) * d) * e) path = function
-    | Root ->
-        assert false (* impossible *)
-    | Static (path, name) ->
-        Static (subst3 path, name)
-    | Dynamic (path, arg) ->
-        Dynamic (subst2 path, arg)
-    | DynamicTail (path, arg) ->
-        DynamicTail (subst2 path, arg)
+      type a b c d e. (a, ((a * c) * d) * e) path -> (b, ((b * c) * d) * e) path
+      = function
+    | Root -> assert false (* impossible *)
+    | Static (path, name) -> Static (subst3 path, name)
+    | Dynamic (path, arg) -> Dynamic (subst2 path, arg)
+    | DynamicTail (path, arg) -> DynamicTail (subst2 path, arg)
 
   let from_path x = x
 
@@ -207,31 +175,31 @@ module Internal = struct
 
   and ('a, 'b) query_field =
     | Single : {
-        name : string;
-        description : string option;
-        ty : 'b arg;
-        default : 'b;
-        get : 'a -> 'b;
+        name: string;
+        description: string option;
+        ty: 'b arg;
+        default: 'b;
+        get: 'a -> 'b;
       }
         -> ('a, 'b) query_field
     | Opt : {
-        name : string;
-        description : string option;
-        ty : 'b arg;
-        get : 'a -> 'b option;
+        name: string;
+        description: string option;
+        ty: 'b arg;
+        get: 'a -> 'b option;
       }
         -> ('a, 'b option) query_field
     | Flag : {
-        name : string;
-        description : string option;
-        get : 'a -> bool;
+        name: string;
+        description: string option;
+        get: 'a -> bool;
       }
         -> ('a, bool) query_field
     | Multi : {
-        name : string;
-        description : string option;
-        ty : 'b arg;
-        get : 'a -> 'b list;
+        name: string;
+        description: string option;
+        ty: 'b arg;
+        get: 'a -> 'b list;
       }
         -> ('a, 'b list) query_field
 
@@ -242,34 +210,22 @@ module Internal = struct
     | Multi of descr
 
   let field_name (type t) : (_, t) query_field -> _ = function
-    | Single {name; _} ->
-        name
-    | Opt {name; _} ->
-        name
-    | Flag {name; _} ->
-        name
-    | Multi {name; _} ->
-        name
+    | Single {name; _} -> name
+    | Opt {name; _} -> name
+    | Flag {name; _} -> name
+    | Multi {name; _} -> name
 
   let field_description (type t) : (_, t) query_field -> _ = function
-    | Single {description; _} ->
-        description
-    | Opt {description; _} ->
-        description
-    | Flag {description; _} ->
-        description
-    | Multi {description; _} ->
-        description
+    | Single {description; _} -> description
+    | Opt {description; _} -> description
+    | Flag {description; _} -> description
+    | Multi {description; _} -> description
 
   let field_kind (type t) : (_, t) query_field -> query_kind = function
-    | Single {ty; _} ->
-        Single ty.descr
-    | Opt {ty; _} ->
-        Optional ty.descr
-    | Flag _ ->
-        Flag
-    | Multi {ty; _} ->
-        Multi ty.descr
+    | Single {ty; _} -> Single ty.descr
+    | Opt {ty; _} -> Optional ty.descr
+    | Flag _ -> Flag
+    | Multi {ty; _} -> Multi ty.descr
 
   let from_query x = x
 
@@ -279,7 +235,7 @@ end
 open Internal
 
 module Arg = struct
-  type descr = Internal.descr = {name : string; descr : string option}
+  type descr = Internal.descr = {name: string; descr: string option}
 
   type 'a t = 'a Internal.arg
 
@@ -290,8 +246,7 @@ module Arg = struct
     let descr = {name; descr} in
     {descr; id; construct; destruct}
 
-  let like arg ?descr name =
-    {arg with id = Ty.new_id (); descr = {name; descr}}
+  let like arg ?descr name = {arg with id = Ty.new_id (); descr = {name; descr}}
 
   let descr (ty : 'a arg) = ty.descr
 
@@ -347,44 +302,32 @@ module Path = struct
 
   let add_suffix (type p pr) (path : (p, pr) path) name =
     match path with
-    | DynamicTail _ ->
-        invalid_arg "Resto.Path.add_suffix"
-    | path ->
-        Static (path, name)
+    | DynamicTail _ -> invalid_arg "Resto.Path.add_suffix"
+    | path -> Static (path, name)
 
   let add_arg (type p pr) (path : (p, pr) path) arg =
     match path with
-    | DynamicTail _ ->
-        invalid_arg "Resto.Path.add_arg"
-    | path ->
-        Dynamic (path, arg)
+    | DynamicTail _ -> invalid_arg "Resto.Path.add_arg"
+    | path -> Dynamic (path, arg)
 
   let add_final_args (type p pr) (path : (p, pr) path) arg =
     match path with
-    | DynamicTail _ ->
-        invalid_arg "Resto.Path.add_final_arg"
-    | path ->
-        DynamicTail (path, arg)
+    | DynamicTail _ -> invalid_arg "Resto.Path.add_final_arg"
+    | path -> DynamicTail (path, arg)
 
   let prefix : type p pr a. (pr, a) path -> (a, p) path -> (pr, p) path =
    fun p1 p2 ->
     let rec prefix : type pr a k. (pr, a) path -> (a, k) path -> (pr, k) path =
      fun p1 p2 ->
       match p2 with
-      | Root ->
-          p1
-      | Static (path, name) ->
-          add_suffix (prefix p1 path) name
-      | Dynamic (path, arg) ->
-          add_arg (prefix p1 path) arg
-      | DynamicTail (path, arg) ->
-          add_final_args (prefix p1 path) arg
+      | Root -> p1
+      | Static (path, name) -> add_suffix (prefix p1 path) name
+      | Dynamic (path, arg) -> add_arg (prefix p1 path) arg
+      | DynamicTail (path, arg) -> add_final_args (prefix p1 path) arg
     in
     match p1 with
-    | DynamicTail _ ->
-        invalid_arg "Resto.Path.prefix"
-    | _ ->
-        prefix p1 p2
+    | DynamicTail _ -> invalid_arg "Resto.Path.prefix"
+    | _ -> prefix p1 p2
 
   let ( / ) = add_suffix
 
@@ -446,10 +389,8 @@ module Query = struct
   let fold_fields (type fs) ~f ~init fs =
     let rec loop : type f. _ -> (fs, f) query_fields -> _ =
      fun acc -> function
-      | F0 ->
-          acc
-      | F1 (field, fs) ->
-          loop (f acc (Field field)) fs
+      | F0 -> acc
+      | F1 (field, fs) -> loop (f acc (Field field)) fs
     in
     loop init fs
 
@@ -459,39 +400,34 @@ module Query = struct
   let rec rebuild : type fs f. _ -> (fs, f) query_fields -> f -> fs =
    fun map fs f ->
     match fs with
-    | F0 ->
-        f
+    | F0 -> f
     | F1 (Single field, fs) -> (
-      match StringMap.find field.name map with
-      | Parsed (Single field', v) ->
-          let Eq = Ty.eq field.ty.id field'.ty.id in
-          let v = match v with None -> field.default | Some v -> v in
-          rebuild map fs (f v)
-      | Parsed _ ->
-          assert false )
+        match StringMap.find field.name map with
+        | Parsed (Single field', v) ->
+            let Eq = Ty.eq field.ty.id field'.ty.id in
+            let v = match v with None -> field.default | Some v -> v in
+            rebuild map fs (f v)
+        | Parsed _ -> assert false )
     | F1 (Opt field, fs) -> (
-      match StringMap.find field.name map with
-      | Parsed (Opt field', v) ->
-          let Eq = Ty.eq field.ty.id field'.ty.id in
-          let v = match v with None -> None | Some v -> v in
-          rebuild map fs (f v)
-      | Parsed _ ->
-          assert false )
+        match StringMap.find field.name map with
+        | Parsed (Opt field', v) ->
+            let Eq = Ty.eq field.ty.id field'.ty.id in
+            let v = match v with None -> None | Some v -> v in
+            rebuild map fs (f v)
+        | Parsed _ -> assert false )
     | F1 (Flag field, fs) -> (
-      match StringMap.find field.name map with
-      | Parsed (Flag _, v) ->
-          let v = match v with None -> false | Some v -> v in
-          rebuild map fs (f v)
-      | Parsed _ ->
-          assert false )
+        match StringMap.find field.name map with
+        | Parsed (Flag _, v) ->
+            let v = match v with None -> false | Some v -> v in
+            rebuild map fs (f v)
+        | Parsed _ -> assert false )
     | F1 (Multi field, fs) -> (
-      match StringMap.find field.name map with
-      | Parsed (Multi field', v) ->
-          let Eq = Ty.eq field.ty.id field'.ty.id in
-          let v = match v with None -> [] | Some v -> v in
-          rebuild map fs (f v)
-      | Parsed _ ->
-          assert false )
+        match StringMap.find field.name map with
+        | Parsed (Multi field', v) ->
+            let Eq = Ty.eq field.ty.id field'.ty.id in
+            let v = match v with None -> [] | Some v -> v in
+            rebuild map fs (f v)
+        | Parsed _ -> assert false )
 
   exception Invalid of string
 
@@ -511,8 +447,7 @@ module Query = struct
         List.fold_left
           (fun fields (name, value) ->
             match StringMap.find name fields with
-            | exception Not_found ->
-                fields
+            | exception Not_found -> fields
             | Parsed (Single _, Some _) ->
                 fail "Duplicate argument '%s' in query string." name
             | Parsed (Opt _, Some _) ->
@@ -520,48 +455,47 @@ module Query = struct
             | Parsed (Flag _, Some _) ->
                 fail "Duplicate argument '%s' in query string." name
             | Parsed (Single f, None) -> (
-              match f.ty.destruct value with
-              | Error error ->
-                  fail
-                    "Failed to parse argument '%s' (%S): %s"
-                    name
-                    value
-                    error
-              | Ok v ->
-                  StringMap.add name (Parsed (Single f, Some v)) fields )
+                match f.ty.destruct value with
+                | Error error ->
+                    fail
+                      "Failed to parse argument '%s' (%S): %s"
+                      name
+                      value
+                      error
+                | Ok v -> StringMap.add name (Parsed (Single f, Some v)) fields
+                )
             | Parsed (Opt f, None) -> (
-              match f.ty.destruct value with
-              | Error error ->
-                  fail
-                    "Failed to parse argument '%s' (%S): %s"
-                    name
-                    value
-                    error
-              | Ok v ->
-                  StringMap.add name (Parsed (Opt f, Some (Some v))) fields )
+                match f.ty.destruct value with
+                | Error error ->
+                    fail
+                      "Failed to parse argument '%s' (%S): %s"
+                      name
+                      value
+                      error
+                | Ok v ->
+                    StringMap.add name (Parsed (Opt f, Some (Some v))) fields )
             | Parsed (Flag f, None) -> (
-              match bool_of_string value with
-              | Ok v ->
-                  StringMap.add name (Parsed (Flag f, Some v)) fields
-              | Error error ->
-                  fail
-                    "Failed to parse argument '%s' (%S): %s"
-                    name
-                    value
-                    error )
+                match bool_of_string value with
+                | Ok v -> StringMap.add name (Parsed (Flag f, Some v)) fields
+                | Error error ->
+                    fail
+                      "Failed to parse argument '%s' (%S): %s"
+                      name
+                      value
+                      error )
             | Parsed (Multi f, previous) -> (
-              match f.ty.destruct value with
-              | Error error ->
-                  fail
-                    "Failed to parse argument '%s' (%S): %s"
-                    name
-                    value
-                    error
-              | Ok v ->
-                  let v =
-                    match previous with None -> [v] | Some l -> v :: l
-                  in
-                  StringMap.add name (Parsed (Multi f, Some v)) fields ))
+                match f.ty.destruct value with
+                | Error error ->
+                    fail
+                      "Failed to parse argument '%s' (%S): %s"
+                      name
+                      value
+                      error
+                | Ok v ->
+                    let v =
+                      match previous with None -> [v] | Some l -> v :: l
+                    in
+                    StringMap.add name (Parsed (Multi f, Some v)) fields ))
           fields
           query
       in
@@ -569,7 +503,7 @@ module Query = struct
 end
 
 module Description = struct
-  type request = {recurse : bool}
+  type request = {recurse: bool}
 
   let request_query =
     let open Query in
@@ -586,13 +520,13 @@ module Description = struct
   [@@@ocaml.warning "-30"]
 
   type 'schema service = {
-    description : string option;
-    path : path_item list;
-    meth : meth;
-    query : query_item list;
-    input : 'schema Lazy.t option;
-    output : 'schema Lazy.t;
-    error : 'schema Lazy.t;
+    description: string option;
+    path: path_item list;
+    meth: meth;
+    query: query_item list;
+    input: 'schema Lazy.t option;
+    output: 'schema Lazy.t;
+    error: 'schema Lazy.t;
   }
 
   and path_item =
@@ -600,11 +534,7 @@ module Description = struct
     | PDynamic of Arg.descr
     | PDynamicTail of Arg.descr
 
-  and query_item = {
-    name : string;
-    description : string option;
-    kind : query_kind;
-  }
+  and query_item = {name: string; description: string option; kind: query_kind}
 
   type 'schema directory =
     | Empty
@@ -612,8 +542,8 @@ module Description = struct
     | Dynamic of string option
 
   and 'schema static_directory = {
-    services : 'schema service MethMap.t;
-    subdirs : 'schema static_subdirectories option;
+    services: 'schema service MethMap.t;
+    subdirs: 'schema static_subdirectories option;
   }
 
   and 'schema static_subdirectories =
@@ -623,14 +553,10 @@ module Description = struct
   let rec pp_print_directory ppf =
     let open Format in
     function
-    | Empty ->
-        fprintf ppf "<empty>"
-    | Static dir ->
-        fprintf ppf "@[%a@]" pp_print_static_directory dir
-    | Dynamic None ->
-        fprintf ppf "<dyntree>"
-    | Dynamic (Some descr) ->
-        fprintf ppf "<dyntree> : %s" descr
+    | Empty -> fprintf ppf "<empty>"
+    | Static dir -> fprintf ppf "@[%a@]" pp_print_static_directory dir
+    | Dynamic None -> fprintf ppf "<dyntree>"
+    | Dynamic (Some descr) -> fprintf ppf "<dyntree> : %s" descr
 
   and pp_print_static_directory ppf =
     let open Format in
@@ -663,12 +589,7 @@ module Description = struct
           (pp_print_list ~pp_sep:pp_print_cut print_binding)
           (StringMap.bindings map)
     | Arg (arg, tree) ->
-        fprintf
-          ppf
-          "@[<hov 2>[:%s:]@ @[%a@]@]"
-          arg.name
-          pp_print_directory
-          tree
+        fprintf ppf "@[<hov 2>[:%s:]@ @[%a@]@]" arg.name pp_print_directory tree
 
   and pp_print_dispatch_services ppf services =
     MethMap.iter
@@ -704,10 +625,10 @@ module MakeService (Encoding : ENCODING) = struct
     include Internal
 
     type ('query, 'input, 'output, 'error) types = {
-      query : 'query query;
-      input : 'input input;
-      output : 'output Encoding.t;
-      error : 'error Encoding.t;
+      query: 'query query;
+      input: 'input input;
+      output: 'output Encoding.t;
+      error: 'error Encoding.t;
     }
 
     and _ input =
@@ -715,10 +636,10 @@ module MakeService (Encoding : ENCODING) = struct
       | Input : 'input Encoding.t -> 'input input
 
     type (+'meth, 'prefix, 'params, 'query, 'input, 'output, 'error) iservice = {
-      description : string option;
-      meth : 'meth;
-      path : ('prefix, 'params) path;
-      types : ('query, 'input, 'output, 'error) types;
+      description: string option;
+      meth: 'meth;
+      path: ('prefix, 'params) path;
+      types: ('query, 'input, 'output, 'error) types;
     }
       constraint 'meth = [< meth]
 
@@ -750,14 +671,7 @@ module MakeService (Encoding : ENCODING) = struct
   open Path
 
   type (+'meth, 'prefix, 'params, 'query, 'input, 'output, 'error) t =
-    ( 'meth,
-      'prefix,
-      'params,
-      'query,
-      'input,
-      'output,
-      'error )
-    Internal.iservice
+    ('meth, 'prefix, 'params, 'query, 'input, 'output, 'error) Internal.iservice
 
   type (+'meth, 'prefix, 'params, 'query, 'input, 'output, 'error) service =
     ('meth, 'prefix, 'params, 'query, 'input, 'output, 'error) t
@@ -830,7 +744,7 @@ module MakeService (Encoding : ENCODING) = struct
       ~error
       Path.(path /:* Arg.string)
 
-  type 'input request = {meth : meth; uri : Uri.t; input : 'input input}
+  type 'input request = {meth: meth; uri: Uri.t; input: 'input input}
 
   let forge_request_args : type pr p. (pr, p) path -> p -> string list =
    fun path args ->
@@ -838,10 +752,8 @@ module MakeService (Encoding : ENCODING) = struct
         type k. (pr, k) path -> k -> string list -> string list =
      fun path args acc ->
       match (path, args) with
-      | (Root, _) ->
-          acc
-      | (Static (path, name), args) ->
-          forge_request_args path args (name :: acc)
+      | (Root, _) -> acc
+      | (Static (path, name), args) -> forge_request_args path args (name :: acc)
       | (Dynamic (path, arg), (args, x)) ->
           forge_request_args path args (arg.construct x :: acc)
       | (DynamicTail (path, arg), (args, xs)) ->
@@ -855,31 +767,25 @@ module MakeService (Encoding : ENCODING) = struct
   let forge_request_query : type q. q query -> q -> (string * string) list =
    fun (Fields (fields, _)) q ->
     let rec loop : type t. (q, t) query_fields -> _ = function
-      | F0 ->
-          []
+      | F0 -> []
       | F1 (Single {name; ty; get; _}, fields) ->
           (name, ty.construct (get q)) :: loop fields
       | F1 (Opt {name; ty; get; _}, fields) -> (
-        match get q with
-        | None ->
-            loop fields
-        | Some v ->
-            (name, ty.construct v) :: loop fields )
+          match get q with
+          | None -> loop fields
+          | Some v -> (name, ty.construct v) :: loop fields )
       | F1 (Flag {name; get; _}, fields) -> (
-        match get q with
-        | false ->
-            loop fields
-        | true ->
-            (name, "true") :: loop fields )
+          match get q with
+          | false -> loop fields
+          | true -> (name, "true") :: loop fields )
       | F1 (Multi {name; ty; get; _}, fields) -> (
-        match get q with
-        | [] ->
-            loop fields
-        | l ->
-            List.fold_right
-              (fun v acc -> (name, ty.construct v) :: acc)
-              l
-              (loop fields) )
+          match get q with
+          | [] -> loop fields
+          | l ->
+              List.fold_right
+                (fun v acc -> (name, ty.construct v) :: acc)
+                l
+                (loop fields) )
     in
     loop fields
 

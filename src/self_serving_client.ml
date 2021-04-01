@@ -32,11 +32,11 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
   module Server = Server.Make_selfserver (Encoding) (Log)
 
   type self_server = {
-    root : unit Directory.directory;
-    cors : Cors.t;
-    medias : Server.Media.medias;
-    acl : Acl.t;
-    agent : string;
+    root: unit Directory.directory;
+    cors: Cors.t;
+    medias: Server.Media.medias;
+    acl: Acl.t;
+    agent: string;
   }
 
   let create (server : self_server) =
@@ -78,16 +78,13 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
                     (Option.value body ~default:Cohttp_lwt.Body.empty)
                   >>= fun body ->
                   match input_media_type.destruct input body with
-                  | Error s ->
-                      Lwt.return_error (`Cannot_parse_body s)
-                  | Ok body ->
-                      s.handler query body >>= Lwt.return_ok ) ) )
+                  | Error s -> Lwt.return_error (`Cannot_parse_body s)
+                  | Ok body -> s.handler query body >>= Lwt.return_ok ) ) )
         >>= function
         | Ok answer -> (
             let output = output_media_type.construct s.types.output in
             let error = function
-              | None ->
-                  (Cohttp_lwt.Body.empty, Cohttp.Transfer.Fixed 0L)
+              | None -> (Cohttp_lwt.Body.empty, Cohttp.Transfer.Fixed 0L)
               | Some e ->
                   let s = output_media_type.construct s.types.error e in
                   ( Cohttp_lwt.Body.of_string s,
@@ -113,12 +110,8 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
                 Lwt.return_ok
                   ( Cohttp.Response.make ~status:`OK ~encoding ~headers (),
                     Cohttp_lwt.Body.of_stream body )
-            | ( `Unauthorized _
-              | `Forbidden _
-              | `Gone _
-              | `Not_found _
-              | `Conflict _
-              | `Error _ ) as a ->
+            | ( `Unauthorized _ | `Forbidden _ | `Gone _ | `Not_found _
+              | `Conflict _ | `Error _ ) as a ->
                 Lwt.return_ok
                 @@ Server.Handlers.handle_rpc_answer_error
                      "local"
@@ -134,15 +127,12 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
         ( match meth with
         | #Resto.meth when Server.Handlers.invalid_cors server.cors headers ->
             Lwt.return_ok (Server.Handlers.invalid_cors_response server.agent)
-        | #Resto.meth as meth ->
-            call ~headers ?body meth uri path
+        | #Resto.meth as meth -> call ~headers ?body meth uri path
         | `OPTIONS ->
             Server.Handlers.handle_options server.root server.cors headers path
-        | _ ->
-            Lwt.return_error `Not_implemented )
+        | _ -> Lwt.return_error `Not_implemented )
         >>= function
-        | Ok a ->
-            Lwt.return a
+        | Ok a -> Lwt.return a
         | Error err ->
             Lwt.return @@ Server.Handlers.handle_error server.medias err
     end : Client.CALL )

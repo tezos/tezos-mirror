@@ -30,9 +30,9 @@
 *)
 
 type t = {
-  allowed_headers : string list;
+  allowed_headers: string list;
       (** https://fetch.spec.whatwg.org/#http-access-control-allow-headers *)
-  allowed_origins : string list;
+  allowed_origins: string list;
       (** https://fetch.spec.whatwg.org/#http-access-control-allow-origin *)
 }
 

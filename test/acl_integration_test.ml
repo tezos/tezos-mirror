@@ -141,18 +141,19 @@ let child expect_foo_bar expect_foo_blah expect_bwraf =
   let open Lwt.Infix in
   Client.call_service media_types ~base ~logger get_foo_bar () () ()
   >>= fun (_, _, r) ->
-  assert (r = expect_foo_bar) ;
+  assert (r = expect_foo_bar);
   Client.call_service media_types ~base ~logger get_foo_blah () () ()
   >>= fun (_, _, r) ->
-  assert (r = expect_foo_blah) ;
+  assert (r = expect_foo_blah);
   Client.call_service media_types ~base ~logger post_bwraf () () ()
   >>= fun (_, _, r) ->
-  assert (r = expect_bwraf) ;
+  assert (r = expect_bwraf);
   Stdlib.exit 0
 
 let parent pid =
-  Lwt_unix.waitpid [] pid
-  >>= function (_, WEXITED 0) -> Lwt.return () | _ -> assert false
+  Lwt_unix.waitpid [] pid >>= function
+  | (_, WEXITED 0) -> Lwt.return ()
+  | _ -> assert false
 
 module Server = Resto_cohttp_server.Server.Make (Encoding) (Logger)
 
@@ -160,73 +161,72 @@ module Server = Resto_cohttp_server.Server.Make (Encoding) (Logger)
 let main () =
   (* set up and start the server *)
   let open Lwt.Infix in
-  Server.launch ~media_types (`TCP (`Port port)) directory
-  >>= fun server ->
+  Server.launch ~media_types (`TCP (`Port port)) directory >>= fun server ->
   (* first test *)
   Server.set_acl server
   @@ Resto_acl.Acl.Allow_all
-       {except = [{meth = Any; path = Exact [Literal "foo"; Wildcard]}]} ;
+       {except = [{meth = Any; path = Exact [Literal "foo"; Wildcard]}]};
   ( match Lwt_unix.fork () with
   | 0 ->
-      Lwt_unix.sleep 1.0
-      >>= fun () ->
+      Lwt_unix.sleep 1.0 >>= fun () ->
       child (`Unauthorized None) (`Unauthorized None) (`Ok (Some ()))
-  | pid ->
-      parent pid )
+  | pid -> parent pid )
   >>= fun () ->
   (* second test *)
   Server.set_acl server
   @@ Resto_acl.Acl.Deny_all
-       {except = [{meth = Any; path = FollowedByAnySuffix [Literal "foo"]}]} ;
+       {except = [{meth = Any; path = FollowedByAnySuffix [Literal "foo"]}]};
   ( match Lwt_unix.fork () with
   | 0 ->
-      Lwt_unix.sleep 1.0
-      >>= fun () -> child (`Ok (Some ())) (`Ok (Some ())) (`Unauthorized None)
-  | pid ->
-      parent pid )
+      Lwt_unix.sleep 1.0 >>= fun () ->
+      child (`Ok (Some ())) (`Ok (Some ())) (`Unauthorized None)
+  | pid -> parent pid )
   >>= fun () ->
   (* third test *)
   Server.set_acl server
   @@ Resto_acl.Acl.Deny_all
        {
          except =
-           [ {meth = Exact `GET; path = FollowedByAnySuffix [Literal "foo"]};
-             {meth = Exact `DELETE; path = FollowedByAnySuffix []} ];
-       } ;
+           [
+             {meth = Exact `GET; path = FollowedByAnySuffix [Literal "foo"]};
+             {meth = Exact `DELETE; path = FollowedByAnySuffix []};
+           ];
+       };
   ( match Lwt_unix.fork () with
   | 0 ->
-      Lwt_unix.sleep 1.0
-      >>= fun () -> child (`Ok (Some ())) (`Ok (Some ())) (`Unauthorized None)
-  | pid ->
-      parent pid )
+      Lwt_unix.sleep 1.0 >>= fun () ->
+      child (`Ok (Some ())) (`Ok (Some ())) (`Unauthorized None)
+  | pid -> parent pid )
   >>= fun () ->
   (* fourth test *)
   Server.set_acl server
   @@ Resto_acl.Acl.Deny_all
        {
          except =
-           [ {
+           [
+             {
                meth = Exact `POST;
                path =
                  FollowedByAnySuffix
-                   [ Literal "blue";
+                   [
+                     Literal "blue";
                      Literal "white";
                      Wildcard;
                      Wildcard;
-                     Literal "fuchsia" ];
-             } ];
-       } ;
+                     Literal "fuchsia";
+                   ];
+             };
+           ];
+       };
   ( match Lwt_unix.fork () with
   | 0 ->
-      Lwt_unix.sleep 1.0
-      >>= fun () ->
+      Lwt_unix.sleep 1.0 >>= fun () ->
       child (`Unauthorized None) (`Unauthorized None) (`Ok (Some ()))
-  | pid ->
-      parent pid )
+  | pid -> parent pid )
   >>= fun () ->
   (* end of tests *)
   Lwt.return ()
 
 let () =
-  Lwt_main.run @@ main () ;
+  Lwt_main.run @@ main ();
   Stdlib.exit 0

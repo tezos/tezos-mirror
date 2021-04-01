@@ -33,14 +33,13 @@ type path_matcher =
 
 type meth_matcher = Exact of Resto.meth | Any
 
-type matcher = {meth : meth_matcher; path : path_matcher}
+type matcher = {meth: meth_matcher; path: path_matcher}
 
 (* matchers parsing *)
 
 let parse_meth_matcher s =
   match s.[0] with
-  | '/' | ' ' ->
-      (Any, 0)
+  | '/' | ' ' -> (Any, 0)
   | _ ->
       if String.length s > 3 && String.sub s 0 3 = "GET" then (Exact `GET, 3)
       else if String.length s > 3 && String.sub s 0 3 = "PUT" then
@@ -55,15 +54,14 @@ let parse_meth_matcher s =
 
 let ignore_whitespace s offset =
   match String.index_from_opt s offset '/' with
-  | None ->
-      raise (Invalid_argument "Resto.Acl.parse: invalid method matcher")
+  | None -> raise (Invalid_argument "Resto.Acl.parse: invalid method matcher")
   | Some first_slash ->
-      assert (first_slash >= offset) ;
+      assert (first_slash >= offset);
       if first_slash > offset then
         for i = offset to first_slash - 1 do
           if s.[i] <> ' ' then
             raise (Invalid_argument "Resto.Acl.parse: invalid method matcher")
-        done ;
+        done;
       first_slash
 
 let add_chunk (matcher : path_matcher) (chunk : string) =
@@ -73,36 +71,30 @@ let add_chunk (matcher : path_matcher) (chunk : string) =
         (Invalid_argument
            "Resto.Acl.parse: double-star can only appear in suffix position")
   | Exact f -> (
-    match chunk with
-    | "**" ->
-        FollowedByAnySuffix f
-    | "*" ->
-        Exact (Wildcard :: f)
-    | literal ->
-        String.iter
-          (function
-            | '/' ->
-                assert false
-            | ('*' | '?' | '&' | '#' | '=') as c ->
-                Format.kasprintf
-                  invalid_arg
-                  "Resto.Acl.parse: %c must be percent-encoded"
-                  c
-            | _ ->
-                ())
-          literal ;
-        let decoded_literal = Uri.pct_decode literal in
-        Exact (Literal decoded_literal :: f) )
+      match chunk with
+      | "**" -> FollowedByAnySuffix f
+      | "*" -> Exact (Wildcard :: f)
+      | literal ->
+          String.iter
+            (function
+              | '/' -> assert false
+              | ('*' | '?' | '&' | '#' | '=') as c ->
+                  Format.kasprintf
+                    invalid_arg
+                    "Resto.Acl.parse: %c must be percent-encoded"
+                    c
+              | _ -> ())
+            literal;
+          let decoded_literal = Uri.pct_decode literal in
+          Exact (Literal decoded_literal :: f) )
 
 let parse_path s offset =
   String.sub s offset (String.length s - offset)
   |> Resto.Utils.split_path
   |> List.fold_left add_chunk (Exact [])
   |> function
-  | FollowedByAnySuffix m ->
-      FollowedByAnySuffix (List.rev m)
-  | Exact m ->
-      Exact (List.rev m)
+  | FollowedByAnySuffix m -> FollowedByAnySuffix (List.rev m)
+  | Exact m -> Exact (List.rev m)
 
 let parse : string -> matcher =
  fun s ->
@@ -118,29 +110,21 @@ let parse : string -> matcher =
 
 let rec matches_path any_suffix_of matcher path =
   match (matcher, path) with
-  | ([], []) ->
-      true
-  | ([], _ :: _) ->
-      any_suffix_of
-  | (_ :: _, []) ->
-      false
-  | (Wildcard :: matcher, _ :: path) ->
-      matches_path any_suffix_of matcher path
+  | ([], []) -> true
+  | ([], _ :: _) -> any_suffix_of
+  | (_ :: _, []) -> false
+  | (Wildcard :: matcher, _ :: path) -> matches_path any_suffix_of matcher path
   | (Literal lit :: matcher, chunk :: path) ->
       String.equal lit chunk && matches_path any_suffix_of matcher path
 
 let matches_path path matcher =
   match matcher with
-  | FollowedByAnySuffix matcher ->
-      matches_path true matcher path
-  | Exact matcher ->
-      matches_path false matcher path
+  | FollowedByAnySuffix matcher -> matches_path true matcher path
+  | Exact matcher -> matches_path false matcher path
 
 let matches_meth (meth : [< Resto.meth]) = function
-  | Any ->
-      true
-  | Exact m ->
-      m = meth
+  | Any -> true
+  | Exact m -> m = meth
 
 let matches_matcher meth_ path_ {meth; path} =
   matches_meth meth_ meth && matches_path path_ path
@@ -151,8 +135,8 @@ let matches_any_matcher meth path matchers =
 (* ACL policy and implementation *)
 
 type t =
-  | Allow_all of {except : matcher list}
-  | Deny_all of {except : matcher list}
+  | Allow_all of {except: matcher list}
+  | Deny_all of {except: matcher list}
 
 let allowed policy ~meth ~path =
   match policy with

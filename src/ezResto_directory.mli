@@ -56,14 +56,11 @@ module Answer : sig
     | `Gone of 'e option (* 410 *)
     | `Error of 'e option (* 500 *) ]
 
-  and 'a stream = {next : unit -> 'a option Lwt.t; shutdown : unit -> unit}
+  and 'a stream = {next: unit -> 'a option Lwt.t; shutdown: unit -> unit}
 end
 
 (** Possible error while registering services. *)
-type step =
-  | Static of string
-  | Dynamic of Arg.descr
-  | DynamicTail of Arg.descr
+type step = Static of string | Dynamic of Arg.descr | DynamicTail of Arg.descr
 
 type conflict =
   | CService of meth
@@ -101,16 +98,16 @@ type 'input input =
   | Input : 'input Json_encoding.encoding -> 'input input
 
 type ('q, 'i, 'o, 'e) types = {
-  query : 'q Resto.Query.t;
-  input : 'i input;
-  output : 'o Json_encoding.encoding;
-  error : 'e Json_encoding.encoding;
+  query: 'q Resto.Query.t;
+  input: 'i input;
+  output: 'o Json_encoding.encoding;
+  error: 'e Json_encoding.encoding;
 }
 
 type registered_service =
   | Service : {
-      types : ('q, 'i, 'o, 'e) types;
-      handler : 'q -> 'i -> ('o, 'e) Answer.t Lwt.t;
+      types: ('q, 'i, 'o, 'e) types;
+      handler: 'q -> 'i -> ('o, 'e) Answer.t Lwt.t;
     }
       -> registered_service
 
@@ -193,13 +190,7 @@ val register4 :
 
 val register5 :
   directory ->
-  ( 'meth,
-    ((((unit * 'a) * 'b) * 'c) * 'd) * 'e,
-    'q,
-    'i,
-    'o,
-    'e )
-  EzResto.service ->
+  ('meth, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q, 'i, 'o, 'e) EzResto.service ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> ('o, 'e) Answer.t Lwt.t) ->
   directory
 

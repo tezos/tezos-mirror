@@ -47,28 +47,33 @@ module Encoding = struct
 
   let meth_encoding =
     Json_encoding.string_enum
-      [ ("GET", `GET);
+      [
+        ("GET", `GET);
         ("POST", `POST);
         ("DELETE", `DELETE);
         ("PUT", `PUT);
-        ("PATCH", `PATCH) ]
+        ("PATCH", `PATCH);
+      ]
 
   let path_item_encoding =
     let open Json_encoding in
     union
-      [ case
+      [
+        case
           string
           (function PStatic s -> Some s | _ -> None)
           (fun s -> PStatic s);
         case
           arg_encoding
           (function PDynamic s -> Some s | _ -> None)
-          (fun s -> PDynamic s) ]
+          (fun s -> PDynamic s);
+      ]
 
   let query_kind_encoding =
     let open Json_encoding in
     union
-      [ case
+      [
+        case
           (obj1 (req "single" arg_encoding))
           (function Single s -> Some s | _ -> None)
           (fun s -> Single s);
@@ -83,7 +88,8 @@ module Encoding = struct
         case
           (obj1 (req "multi" arg_encoding))
           (function Multi s -> Some s | _ -> None)
-          (fun s -> Multi s) ]
+          (fun s -> Multi s);
+      ]
 
   let query_item_encoding =
     let open Json_encoding in
@@ -104,10 +110,8 @@ module Encoding = struct
           description,
           query,
           ( match input with
-          | None ->
-              None
-          | Some input ->
-              Some (Lazy.force input) ),
+          | None -> None
+          | Some input -> Some (Lazy.force input) ),
           Lazy.force output,
           Lazy.force error ))
       (fun (meth, path, description, query, input, output, error) ->
@@ -118,10 +122,8 @@ module Encoding = struct
           query;
           input =
             ( match input with
-            | None ->
-                None
-            | Some input ->
-                Some (Lazy.from_val input) );
+            | None -> None
+            | Some input -> Some (Lazy.from_val input) );
           output = Lazy.from_val output;
           error = Lazy.from_val error;
         })
@@ -136,11 +138,11 @@ module Encoding = struct
 
   let directory_descr_encoding =
     let open Json_encoding in
-    mu "service_tree"
-    @@ fun directory_descr_encoding ->
+    mu "service_tree" @@ fun directory_descr_encoding ->
     let static_subdirectories_descr_encoding =
       union
-        [ case
+        [
+          case
             (obj1
                (req
                   "suffixes"
@@ -161,7 +163,8 @@ module Encoding = struct
                      (req "arg" arg_encoding)
                      (req "tree" directory_descr_encoding))))
             (function Arg (ty, tree) -> Some (ty, tree) | _ -> None)
-            (fun (ty, tree) -> Arg (ty, tree)) ]
+            (fun (ty, tree) -> Arg (ty, tree));
+        ]
     in
     let static_directory_descr_encoding =
       conv
@@ -173,10 +176,8 @@ module Encoding = struct
         (fun (get, post, delete, put, patch, subdirs) ->
           let add meth s services =
             match s with
-            | None ->
-                services
-            | Some s ->
-                Resto.MethMap.add meth s services
+            | None -> services
+            | Some s -> Resto.MethMap.add meth s services
           in
           let services =
             Resto.MethMap.empty
@@ -196,14 +197,16 @@ module Encoding = struct
            (opt "subdirs" static_subdirectories_descr_encoding))
     in
     union
-      [ case
+      [
+        case
           (obj1 (req "static" static_directory_descr_encoding))
           (function Static descr -> Some descr | _ -> None)
           (fun descr -> Static descr);
         case
           (obj1 (req "dynamic" (option string)))
           (function Dynamic descr -> Some descr | _ -> None)
-          (fun descr -> Dynamic descr) ]
+          (fun descr -> Dynamic descr);
+      ]
 
   let description_request_encoding =
     conv

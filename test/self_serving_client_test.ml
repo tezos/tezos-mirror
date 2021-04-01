@@ -78,12 +78,9 @@ let json : Media_type.t =
   in
   let from_string s =
     match Ezjsonm.from_string ("[" ^ s ^ "]") with
-    | exception Ezjsonm.Parse_error (_, msg) ->
-        Error msg
-    | `A [json] ->
-        Ok json
-    | _ ->
-        Error "Malformed value"
+    | exception Ezjsonm.Parse_error (_, msg) -> Error msg
+    | `A [json] -> Ok json
+    | _ -> Error "Malformed value"
   in
   let construct enc v =
     let x : Json_repr.ezjsonm = Json_encoding.construct enc v in
@@ -102,17 +99,14 @@ let json : Media_type.t =
                %s@]@]"
               err
               raw
-        | Ok json ->
-            Json_repr.(pp (module Ezjsonm) ppf json));
+        | Ok json -> Json_repr.(pp (module Ezjsonm) ppf json));
     construct;
     construct_seq = (fun enc v -> seqing @@ construct enc v);
     destruct =
       (fun enc body ->
         match from_string body with
-        | Error _ as err ->
-            err
-        | Ok json ->
-            Ok (Json_encoding.destruct enc json));
+        | Error _ as err -> err
+        | Ok json -> Ok (Json_encoding.destruct enc json));
   }
 
 let media_types = [json]
@@ -159,7 +153,8 @@ let () =
     let call r =
       C.call_service media_types repeat_service ((), r) () (`Bool true)
       |> Lwt_main.run
-      |> function (_meth, _uri, service_result) -> service_result
+      |> function
+      | (_meth, _uri, service_result) -> service_result
     in
     List.iter (function r -> assert (is_ok_some (call r))) [0; 1; 2; 3]
   in
@@ -188,14 +183,14 @@ let () =
     let (_meth, _uri, service_result) =
       C.call_service media_types add_service ((), i) () j |> Lwt_main.run
     in
-    assert (service_result <> `Ok (Some 0)) ;
+    assert (service_result <> `Ok (Some 0));
     assert (service_result = `Ok (Some (i + j)))
   in
   let idx = ref 0 in
   List.iter
     (function
       | test ->
-          test () ;
-          Printf.printf "test%d: ✔️\n" !idx ;
+          test ();
+          Printf.printf "test%d: ✔️\n" !idx;
           idx := !idx + 1)
     [test0; test1; test2; test3; test4]

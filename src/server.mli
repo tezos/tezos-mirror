@@ -92,8 +92,8 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
 
   module Media : sig
     type medias = {
-      media_types : Media_type.t list;
-      default_media_type : string * Media_type.t;
+      media_types: Media_type.t list;
+      default_media_type: string * Media_type.t;
     }
 
     val default_media_type : Media_type.t list -> string * Media_type.t

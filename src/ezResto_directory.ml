@@ -87,16 +87,16 @@ type 'input input = 'input Service.input =
   | Input : 'input Json_encoding.encoding -> 'input input
 
 type ('q, 'i, 'o, 'e) types = ('q, 'i, 'o, 'e) Directory.types = {
-  query : 'q Resto.Query.t;
-  input : 'i Service.input;
-  output : 'o Json_encoding.encoding;
-  error : 'e Json_encoding.encoding;
+  query: 'q Resto.Query.t;
+  input: 'i Service.input;
+  output: 'o Json_encoding.encoding;
+  error: 'e Json_encoding.encoding;
 }
 
 type registered_service = Directory.registered_service =
   | Service : {
-      types : ('q, 'i, 'o, 'e) types;
-      handler : 'q -> 'i -> ('o, 'e) Answer.t Lwt.t;
+      types: ('q, 'i, 'o, 'e) types;
+      handler: 'q -> 'i -> ('o, 'e) Answer.t Lwt.t;
     }
       -> registered_service
 

@@ -101,7 +101,7 @@ module Arg : sig
     'a arg
 
   (** [descr] is a type for the documentation of a [t]. *)
-  type descr = Resto.Arg.descr = {name : string; descr : string option}
+  type descr = Resto.Arg.descr = {name: string; descr: string option}
 
   (** [descr t] is the documentation of [t]. *)
   val descr : 'a arg -> descr
@@ -300,7 +300,7 @@ type 'input input =
   | No_input : unit input
   | Input : 'input Json_encoding.encoding -> 'input input
 
-type 'input request = {meth : meth; uri : Uri.t; input : 'input input}
+type 'input request = {meth: meth; uri: Uri.t; input: 'input input}
 
 val forge_request :
   ('meth, 'params, 'query, 'input, 'output, 'error) service ->

@@ -67,9 +67,9 @@ type 'input input = 'input Service.input =
   | Input : 'input Json_encoding.encoding -> 'input input
 
 type 'input request = 'input Service.request = {
-  meth : meth;
-  uri : Uri.t;
-  input : 'input input;
+  meth: meth;
+  uri: Uri.t;
+  input: 'input input;
 }
 
 let forge_request = forge_request

@@ -36,7 +36,8 @@ let () =
             string
       with Invalid_argument _ ->
         Format.kasprintf failwith "Parsing failed for path %S" string)
-    [ ("/", {meth = Any; path = Exact []});
+    [
+      ("/", {meth = Any; path = Exact []});
       (" /", {meth = Any; path = Exact []});
       ("                                    /", {meth = Any; path = Exact []});
       ("GET /", {meth = Exact `GET; path = Exact []});
@@ -70,9 +71,9 @@ let () =
           path =
             FollowedByAnySuffix [Wildcard; Literal "a"; Wildcard; Literal "b"];
         } );
-      ( "/%3F%3F%3F/**",
-        {meth = Any; path = FollowedByAnySuffix [Literal "???"]} );
-      ("/%2A%2F%25", {meth = Any; path = Exact [Literal "*/%"]}) ]
+      ("/%3F%3F%3F/**", {meth = Any; path = FollowedByAnySuffix [Literal "???"]});
+      ("/%2A%2F%25", {meth = Any; path = Exact [Literal "*/%"]});
+    ]
 
 let () =
   List.iter
@@ -84,7 +85,8 @@ let () =
           "Parsing unexepectedly succeeded for invalid input %S"
           string
       with Invalid_argument _ -> ())
-    [ "NOTAMETH /a/b";
+    [
+      "NOTAMETH /a/b";
       "GET /a*";
       "GET /a&";
       "GET /a?";
@@ -118,7 +120,8 @@ let () =
       "/**/a";
       "/**/a/b/*/c";
       "/**/a/b*";
-      "/a/%25*%2524" ]
+      "/a/%25*%2524";
+    ]
 
 let () =
   List.iter
@@ -134,7 +137,8 @@ let () =
               pp_print_string)
           path
           (if exp then "forbidden" else "allowed"))
-    [ (Allow_all {except = []}, `GET, [], true);
+    [
+      (Allow_all {except = []}, `GET, [], true);
       (Allow_all {except = []}, `GET, ["still"; "this"], true);
       (Deny_all {except = []}, `GET, [], false);
       (Deny_all {except = []}, `GET, ["still"; "this"], false);
@@ -192,14 +196,16 @@ let () =
       ( Deny_all
           {
             except =
-              [ {
+              [
+                {
                   meth = Any;
                   path = Exact [Wildcard; Literal "a"; Wildcard; Literal "b"];
                 };
                 {
                   meth = Any;
                   path = Exact [Wildcard; Literal "0"; Wildcard; Literal "1"];
-                } ];
+                };
+              ];
           },
         `GET,
         ["this"; "a"; "that"; "b"],
@@ -207,14 +213,16 @@ let () =
       ( Deny_all
           {
             except =
-              [ {
+              [
+                {
                   meth = Any;
                   path = Exact [Wildcard; Literal "a"; Wildcard; Literal "b"];
                 };
                 {
                   meth = Any;
                   path = Exact [Wildcard; Literal "0"; Wildcard; Literal "1"];
-                } ];
+                };
+              ];
           },
         `GET,
         ["foo"; "a"; "barbarbar"; "b"],
@@ -222,14 +230,16 @@ let () =
       ( Deny_all
           {
             except =
-              [ {
+              [
+                {
                   meth = Any;
                   path = Exact [Wildcard; Literal "a"; Wildcard; Literal "b"];
                 };
                 {
                   meth = Any;
                   path = Exact [Wildcard; Literal "0"; Wildcard; Literal "1"];
-                } ];
+                };
+              ];
           },
         `GET,
         ["foo"; "0"; "barbarbar"; "1"],
@@ -237,14 +247,16 @@ let () =
       ( Deny_all
           {
             except =
-              [ {
+              [
+                {
                   meth = Any;
                   path = Exact [Wildcard; Literal "a"; Wildcard; Literal "b"];
                 };
                 {
                   meth = Any;
                   path = Exact [Wildcard; Literal "0"; Wildcard; Literal "1"];
-                } ];
+                };
+              ];
           },
         `GET,
         ["foo"; "1"; "barbarbar"; "0"],
@@ -252,14 +264,16 @@ let () =
       ( Deny_all
           {
             except =
-              [ {
+              [
+                {
                   meth = Any;
                   path = Exact [Wildcard; Literal "a"; Wildcard; Literal "b"];
                 };
                 {
                   meth = Any;
                   path = Exact [Wildcard; Literal "0"; Wildcard; Literal "1"];
-                } ];
+                };
+              ];
           },
         `GET,
         ["foo"; "0"; "1"],
@@ -267,15 +281,18 @@ let () =
       ( Deny_all
           {
             except =
-              [ {
+              [
+                {
                   meth = Any;
                   path = Exact [Wildcard; Literal "a"; Wildcard; Literal "b"];
                 };
                 {
                   meth = Any;
                   path = Exact [Wildcard; Literal "0"; Wildcard; Literal "1"];
-                } ];
+                };
+              ];
           },
         `GET,
         ["foo"; "a"; "barbarbar"; "1"],
-        false ) ]
+        false );
+    ]

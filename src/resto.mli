@@ -69,7 +69,7 @@ module Arg : sig
     'a arg
 
   (** [descr] is a type for the documentation of a [t]. *)
-  type descr = {name : string; descr : string option}
+  type descr = {name: string; descr: string option}
 
   (** [descr t] is the documentation of [t]. *)
   val descr : 'a arg -> descr
@@ -199,18 +199,18 @@ end
 
 (** Service directory description *)
 module Description : sig
-  type request = {recurse : bool}
+  type request = {recurse: bool}
 
   [@@@ocaml.warning "-30"]
 
   type 'schema service = {
-    description : string option;
-    path : path_item list;
-    meth : meth;
-    query : query_item list;
-    input : 'schema Lazy.t option;
-    output : 'schema Lazy.t;
-    error : 'schema Lazy.t;
+    description: string option;
+    path: path_item list;
+    meth: meth;
+    query: query_item list;
+    input: 'schema Lazy.t option;
+    output: 'schema Lazy.t;
+    error: 'schema Lazy.t;
   }
 
   and path_item =
@@ -218,11 +218,7 @@ module Description : sig
     | PDynamic of Arg.descr
     | PDynamicTail of Arg.descr
 
-  and query_item = {
-    name : string;
-    description : string option;
-    kind : query_kind;
-  }
+  and query_item = {name: string; description: string option; kind: query_kind}
 
   and query_kind =
     | Single of Arg.descr
@@ -236,8 +232,8 @@ module Description : sig
     | Dynamic of string option
 
   and 'schema static_directory = {
-    services : 'schema service MethMap.t;
-    subdirs : 'schema static_subdirectories option;
+    services: 'schema service MethMap.t;
+    subdirs: 'schema static_subdirectories option;
   }
 
   and 'schema static_subdirectories =
@@ -308,10 +304,10 @@ module Internal : sig
   end
 
   type 'a arg = {
-    id : 'a Ty.id;
-    destruct : string -> ('a, string) result;
-    construct : 'a -> string;
-    descr : Arg.descr;
+    id: 'a Ty.id;
+    destruct: string -> ('a, string) result;
+    construct: 'a -> string;
+    descr: Arg.descr;
   }
 
   val from_arg : 'a arg -> 'a Arg.t
@@ -338,31 +334,31 @@ module Internal : sig
 
   and ('a, 'b) query_field =
     | Single : {
-        name : string;
-        description : string option;
-        ty : 'b arg;
-        default : 'b;
-        get : 'a -> 'b;
+        name: string;
+        description: string option;
+        ty: 'b arg;
+        default: 'b;
+        get: 'a -> 'b;
       }
         -> ('a, 'b) query_field
     | Opt : {
-        name : string;
-        description : string option;
-        ty : 'b arg;
-        get : 'a -> 'b option;
+        name: string;
+        description: string option;
+        ty: 'b arg;
+        get: 'a -> 'b option;
       }
         -> ('a, 'b option) query_field
     | Flag : {
-        name : string;
-        description : string option;
-        get : 'a -> bool;
+        name: string;
+        description: string option;
+        get: 'a -> bool;
       }
         -> ('a, bool) query_field
     | Multi : {
-        name : string;
-        description : string option;
-        ty : 'b arg;
-        get : 'a -> 'b list;
+        name: string;
+        description: string option;
+        ty: 'b arg;
+        get: 'a -> 'b list;
       }
         -> ('a, 'b list) query_field
 
@@ -513,7 +509,7 @@ module MakeService (Encoding : ENCODING) : sig
     ('prefix, 'params) Path.t ->
     ('prefix, 'params, 'error) description_service
 
-  type 'input request = {meth : meth; uri : Uri.t; input : 'input input}
+  type 'input request = {meth: meth; uri: Uri.t; input: 'input input}
 
   val forge_request :
     ('meth, unit, 'params, 'query, 'input, 'output, 'error) service ->
@@ -535,17 +531,17 @@ module MakeService (Encoding : ENCODING) : sig
     end
 
     type ('query, 'input, 'output, 'error) types = {
-      query : 'query Query.t;
-      input : 'input input;
-      output : 'output Encoding.t;
-      error : 'error Encoding.t;
+      query: 'query Query.t;
+      input: 'input input;
+      output: 'output Encoding.t;
+      error: 'error Encoding.t;
     }
 
     type (+'meth, 'prefix, 'params, 'query, 'input, 'output, 'error) iservice = {
-      description : string option;
-      meth : 'meth;
-      path : ('prefix, 'params) path;
-      types : ('query, 'input, 'output, 'error) types;
+      description: string option;
+      meth: 'meth;
+      path: ('prefix, 'params) path;
+      types: ('query, 'input, 'output, 'error) types;
     }
       constraint 'meth = [< meth]
 

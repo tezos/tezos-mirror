@@ -62,7 +62,7 @@ type path_matcher =
     methods. [Exact m] matches [m] whilst [Any] matches any method. *)
 type meth_matcher = Exact of Resto.meth | Any
 
-type matcher = {meth : meth_matcher; path : path_matcher}
+type matcher = {meth: meth_matcher; path: path_matcher}
 
 (** [parse s] parses the string [s] as a matcher. It raises {!Invalid_argument}
     if the argument [s] is not in line with the following format.
@@ -114,9 +114,9 @@ val parse : string -> matcher
 
 (** access policy *)
 type t =
-  | Allow_all of {except : matcher list}
+  | Allow_all of {except: matcher list}
       (** Allow all by default but deny requests matched by the exception list. *)
-  | Deny_all of {except : matcher list}
+  | Deny_all of {except: matcher list}
       (** Deny all by default but allow requests matched by the exception list.  *)
 
 val allowed : t -> meth:Resto.meth -> path:string list -> bool

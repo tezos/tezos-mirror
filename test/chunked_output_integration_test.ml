@@ -151,8 +151,7 @@ let directory =
         Lwt.return @@ `OkChunk val_foo_blah)
   in
   let dir =
-    register0 dir post_bwraf (fun () () ->
-        Lwt.return @@ `OkChunk (val_bwraf 7))
+    register0 dir post_bwraf (fun () () -> Lwt.return @@ `OkChunk (val_bwraf 7))
   in
   dir
 
@@ -175,50 +174,48 @@ let child () =
   let open Lwt.Infix in
   Client.call_service media_types ~base ~logger get_foo_bar () () ()
   >>= fun (_, _, r) ->
-  is_ok_result r val_foo_bar ;
+  is_ok_result r val_foo_bar;
   Client.call_service media_types ~base ~logger get_foo_blah () () ()
   >>= fun (_, _, r) ->
-  is_ok_result r val_foo_blah ;
+  is_ok_result r val_foo_blah;
   Client.call_service media_types ~base ~logger post_bwraf () () ()
   >>= fun (_, _, r) ->
-  is_ok_result r (val_bwraf 7) ;
+  is_ok_result r (val_bwraf 7);
   Stdlib.exit 0
 
 module Server = Resto_cohttp_server.Server.Make (Encoding) (Logger)
 
 let parent pid chunk_size =
   let media_types = media_types chunk_size in
-  Server.launch ~media_types (`TCP (`Port port)) directory
-  >>= fun server ->
-  ignore server ;
-  Lwt_unix.waitpid [] pid
-  >>= function (_, WEXITED 0) -> Lwt.return () | _ -> assert false
+  Server.launch ~media_types (`TCP (`Port port)) directory >>= fun server ->
+  ignore server;
+  Lwt_unix.waitpid [] pid >>= function
+  | (_, WEXITED 0) -> Lwt.return ()
+  | _ -> assert false
 
 let test_one_size chunk_size =
   match Lwt_unix.fork () with
   | 0 -> (
-    match Lwt_unix.fork () with
-    | 0 ->
-        Lwt_unix.sleep 2.0 (* leave time for the server to start *)
-        >>= fun () -> child ()
-    | pid ->
-        parent pid chunk_size )
+      match Lwt_unix.fork () with
+      | 0 ->
+          Lwt_unix.sleep 2.0 (* leave time for the server to start *)
+          >>= fun () -> child ()
+      | pid -> parent pid chunk_size )
   | pid -> (
-      Lwt_unix.waitpid [] pid
-      >>= function (_, WEXITED 0) -> Lwt.return () | _ -> assert false )
+      Lwt_unix.waitpid [] pid >>= function
+      | (_, WEXITED 0) -> Lwt.return ()
+      | _ -> assert false )
 
 let main () =
   (* test smaller and smaller, more and more numerous chunks *)
   let open Lwt.Infix in
-  Printf.printf "Testing chunking with size %d\n%!" (16 * 1024) ;
-  test_one_size (16 * 1024)
-  >>= fun () ->
-  Printf.printf "Testing chunking with size %d\n%!" 64 ;
-  test_one_size 64
-  >>= fun () ->
-  Printf.printf "Testing chunking with size %d\n%!" 1 ;
+  Printf.printf "Testing chunking with size %d\n%!" (16 * 1024);
+  test_one_size (16 * 1024) >>= fun () ->
+  Printf.printf "Testing chunking with size %d\n%!" 64;
+  test_one_size 64 >>= fun () ->
+  Printf.printf "Testing chunking with size %d\n%!" 1;
   test_one_size 1 >>= fun () -> Lwt.return_unit
 
 let () =
-  Lwt_main.run @@ main () ;
+  Lwt_main.run @@ main ();
   Stdlib.exit 0

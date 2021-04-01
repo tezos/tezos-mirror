@@ -41,7 +41,7 @@ module Answer : sig
     | `Gone of 'e option (* 410 *)
     | `Error of 'e option (* 500 *) ]
 
-  and 'a stream = {next : unit -> 'a option Lwt.t; shutdown : unit -> unit}
+  and 'a stream = {next: unit -> 'a option Lwt.t; shutdown: unit -> unit}
 
   val return : 'o -> ('o, 'e) t Lwt.t
 
@@ -68,16 +68,16 @@ module Make (Encoding : ENCODING) : sig
     | CType of Arg.descr * string list
 
   type ('query, 'input, 'output, 'error) types = {
-    query : 'query Resto.Query.t;
-    input : 'input Service.input;
-    output : 'output Encoding.t;
-    error : 'error Encoding.t;
+    query: 'query Resto.Query.t;
+    input: 'input Service.input;
+    output: 'output Encoding.t;
+    error: 'error Encoding.t;
   }
 
   type registered_service =
     | Service : {
-        types : ('q, 'i, 'o, 'e) types;
-        handler : 'q -> 'i -> ('o, 'e) Answer.t Lwt.t;
+        types: ('q, 'i, 'o, 'e) types;
+        handler: 'q -> 'i -> ('o, 'e) Answer.t Lwt.t;
       }
         -> registered_service
 
