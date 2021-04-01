@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let qcheck_wrap = List.map QCheck_alcotest.to_alcotest
+let qcheck_wrap ?verbose ?long ?rand =
+  List.map (QCheck_alcotest.to_alcotest ?verbose ?long ?rand)
 
 let qcheck_eq ?pp ?cmp ?eq expected actual =
   let pass =
@@ -86,3 +87,43 @@ let of_option_arb QCheck.{gen; print; small; shrink; collect; stats} =
 let uint16 = QCheck.(0 -- 65535)
 
 let int16 = QCheck.(-32768 -- 32767)
+
+let bytes_arb = QCheck.(map ~rev:Bytes.to_string Bytes.of_string string)
+
+let of_option_shrink shrink_opt x yield =
+  Option.iter (fun shrink -> shrink x yield) shrink_opt
+
+module MakeMapArb (Map : Stdlib.Map.S) = struct
+  open QCheck
+
+  let arb_of_size (size_gen : int Gen.t) (key_arb : Map.key arbitrary)
+      (val_arb : 'v arbitrary) : 'v Map.t arbitrary =
+    map
+      ~rev:(fun map -> Map.to_seq map |> List.of_seq)
+      (fun entries -> List.to_seq entries |> Map.of_seq)
+      (list_of_size size_gen @@ pair key_arb val_arb)
+
+  let arb (key_arb : Map.key arbitrary) (val_arb : 'v arbitrary) :
+      'v Map.t arbitrary =
+    arb_of_size Gen.small_nat key_arb val_arb
+
+  let gen_of_size (size_gen : int Gen.t) (key_gen : Map.key Gen.t)
+      (val_gen : 'v Gen.t) : 'v Map.t Gen.t =
+    let open Gen in
+    map
+      (fun entries -> List.to_seq entries |> Map.of_seq)
+      (list_size size_gen @@ pair key_gen val_gen)
+
+  let gen (key_gen : Map.key Gen.t) (val_gen : 'v Gen.t) : 'v Map.t Gen.t =
+    gen_of_size Gen.small_nat key_gen val_gen
+
+  let shrink ?key:key_shrink ?value:val_shrink map yield =
+    let open Shrink in
+    let kv_list = map |> Map.to_seq |> List.of_seq in
+    list
+      ~shrink:
+        (pair (of_option_shrink key_shrink) (of_option_shrink val_shrink))
+      kv_list
+      (fun smaller_kv_list ->
+        smaller_kv_list |> List.to_seq |> Map.of_seq |> yield)
+end
