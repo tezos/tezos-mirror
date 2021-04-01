@@ -495,6 +495,12 @@ the pipeline, as well as on the pipeline number. Examples:
 ``https://nomadic-labs.gitlab.io/tezos/105822404/``,
 ``https://tezos.gitlab.io/tezos/1234822404/``.
 
+The results of the tests suite on terminated pipelines is presented on
+the details of the merge request page that corresponds to the
+pipeline's branch (if any). For more information, see the `GitLab
+documentation on Unit test reports
+<https://docs.gitlab.com/ee/ci/unit_test_reports.html>`__.
+
 .. _executing_gitlab_ci_locally:
 
 Executing the GitLab CI locally
