@@ -227,13 +227,9 @@ let checkout index key =
   sync index
   >>= fun () ->
   Store.Commit.of_hash index.repo (Hash.of_context_hash key)
-  >>= function
-  | None ->
-      Lwt.return_none
-  | Some commit ->
-      let tree = Store.Commit.tree commit in
-      let ctxt = {index; tree; parents = [commit]} in
-      Lwt.return_some ctxt
+  >|= Option.map (fun commit ->
+          let tree = Store.Commit.tree commit in
+          {index; tree; parents = [commit]})
 
 let checkout_exn index key =
   checkout index key
@@ -432,11 +428,8 @@ let merkle_tree t leaf_kind key =
 
 let get_protocol v =
   raw_find v current_protocol_key
-  >>= function
-  | None ->
-      assert false
-  | Some data ->
-      Lwt.return (Protocol_hash.of_bytes_exn data)
+  >|= function
+  | None -> assert false | Some data -> Protocol_hash.of_bytes_exn data
 
 let add_protocol v key =
   let key = Protocol_hash.to_bytes key in
@@ -578,8 +571,7 @@ let commit_test_chain_genesis ctxt (forked_header : Block_header.t) =
     }
   in
   let branch = get_branch chain_id in
-  Store.Branch.set ctxt.index.repo branch commit
-  >>= fun () -> Lwt.return genesis_header
+  Store.Branch.set ctxt.index.repo branch commit >|= fun () -> genesis_header
 
 let clear_test_chain index chain_id =
   (* TODO remove commits... ??? *)
@@ -764,7 +756,7 @@ module Dumpable_context = struct
     | None ->
         Lwt.return_none
     | Some t ->
-        Store.Tree.add_tree tree key (t :> tree) >>= Lwt.return_some
+        Store.Tree.add_tree tree key (t :> tree) >|= Option.some
 
   let add_bytes (Batch (_, t, _)) bytes =
     (* Save the contents in the store *)
