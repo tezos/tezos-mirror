@@ -11,6 +11,7 @@ TEST_DURATION = 10
 BD = 3  # base delay = time_between_blocks[0]
 PD = 20  # priority delay = time_between_blocks[1]
 IE = 2  # initial_endorsers
+MD = 2  # base delay = time_between_blocks[0]
 
 
 @pytest.mark.baker
@@ -84,7 +85,7 @@ class TestBakersAndEndorsers:
     def test_setup_network(self, sandbox: Sandbox):
         parameters = dict(protocol.PARAMETERS)
         parameters["time_between_blocks"] = [str(BD), str(PD)]
-        parameters["minimal_block_delay"] = "1"
+        parameters["minimal_block_delay"] = "2"
         # we require all endorsements to be present
         parameters["initial_endorsers"] = parameters["endorsers_per_block"]
         for i in range(NUM_NODES):
@@ -110,13 +111,17 @@ class TestBakersAndEndorsers:
                 proto=protocol.DAEMON,
             )
 
+    def test_rm_bakers(self, sandbox: Sandbox):
+        time.sleep(TEST_DURATION)
+        for i in range(NUM_NODES):
+            sandbox.rm_baker(i, proto=protocol.DAEMON)
+
     def test_check_level_and_timestamp(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        first_level = client.get_level()
-        time.sleep(TEST_DURATION)
         levels = [client.get_level() for client in sandbox.all_clients()]
-        min_level = min(levels)
-        max_level = max(levels)
+        levels.sort()
+        min_level = levels[0]
+        max_level = levels[NUM_NODES - 1]
 
         heads_hash = set()
         # check there is exactly one block at the common level
@@ -125,17 +130,17 @@ class TestBakersAndEndorsers:
             heads_hash.add(header['hash'])
         assert len(heads_hash) == 1
 
-        # there should be one block every two seconds, so normally the max level
-        # should have increased with TEST_DURATION / BD levels
-        # we decrement by 1 "for safety"
-        assert max_level >= first_level - 1 + TEST_DURATION / BD
+        # There should be one block every MD seconds, so normally the level
+        # should have increased with TEST_DURATION / MD levels.
+        # We decrement by 1 "for safety".
+        assert max_level >= TEST_DURATION / MD
 
-        # the rpc calls should be quick wrt to the time between blocks,
+        # the RPCs should be quick wrt to the time between blocks,
         # so nodes do not have time to diverge
-        assert min_level >= max_level - 1
+        assert levels[(NUM_NODES + 1) // 2] >= max_level - 2
 
         # check that the timestamp difference is the expected one
         ts0 = client.get_block_timestamp(block=str(2))
         ts1 = client.get_block_timestamp(block=str(max_level))
         time_diff = (ts1 - ts0).total_seconds()
-        assert time_diff == (max_level - 2)
+        assert time_diff == MD * (max_level - 2)
