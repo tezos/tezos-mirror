@@ -67,8 +67,6 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_stdlib stdlib
     - scripts/test_wrapper.sh src/lib_store/legacy_store store_legacy_store
     - scripts/test_wrapper.sh src/lib_store store
-    - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_client 006_PsCARTHA_lib_client
-    - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_client 007_PsDELPH1_lib_client
     - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
     - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_protocol 008_PtEdo2Zk_lib_protocol
     - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_client 009_PsFLoren_lib_client
