@@ -75,7 +75,7 @@ def check_mempool_contains_operations(
     return set(operation_hashes).issubset(res)
 
 
-@retry(timeout=1.0, attempts=20)
+@retry(timeout=2.0, attempts=120)
 def check_protocol(
     client: Client, proto: str, params: List[str] = None
 ) -> bool:
