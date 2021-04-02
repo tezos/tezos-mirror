@@ -75,9 +75,6 @@
             (select void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer from
               (tezos-protocol-plugin-008-PtEdo2Zk-registerer -> void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer.empty)
               (-> void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer.empty))
-            (select void_for_linking-009-PsFLorBA-protocol-plugin-registerer from
-              (tezos-protocol-plugin-009-PsFLorBA-registerer -> void_for_linking-009-PsFLorBA-protocol-plugin-registerer.empty)
-              (-> void_for_linking-009-PsFLorBA-protocol-plugin-registerer.empty))
             (select void_for_linking-009-PsFLoren-protocol-plugin-registerer from
               (tezos-protocol-plugin-009-PsFLoren-registerer -> void_for_linking-009-PsFLoren-protocol-plugin-registerer.empty)
               (-> void_for_linking-009-PsFLoren-protocol-plugin-registerer.empty))
@@ -122,11 +119,9 @@
    (write-file void_for_linking-007-PsDELPH1.empty "")
    (write-file void_for_linking-008-PtEdoTez.empty "")
    (write-file void_for_linking-008-PtEdo2Zk.empty "")
-   (write-file void_for_linking-009-PsFLorBA.empty "")
    (write-file void_for_linking-009-PsFLoren.empty "")
    (write-file void_for_linking-alpha-protocol-plugin-registerer.empty "")
    (write-file void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer.empty "")
-   (write-file void_for_linking-009-PsFLorBA-protocol-plugin-registerer.empty "")
    (write-file void_for_linking-009-PsFLoren-protocol-plugin-registerer.empty "")
 )))
 
