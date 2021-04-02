@@ -23,6 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let pp_bracketted_list elem_enc ppf l =
+  let open Format in
+  pp_print_string ppf "[ " ;
+  pp_print_list
+    ~pp_sep:(fun ppf () -> pp_print_char ppf ';' ; pp_print_space ppf ())
+    elem_enc
+    ppf
+    l ;
+  pp_print_string ppf " ]"
+
 module P2p_protocol = struct
   include Internal_event.Simple
 
@@ -273,6 +283,8 @@ module P2p_connect_handler = struct
       ~name:"authenticate_reject_protocol_mismatch"
       ~msg:"no common protocol with {peer}"
       ~level:Debug
+      ~pp5:(pp_bracketted_list Distributed_db_version.pp)
+      ~pp7:(pp_bracketted_list P2p_version.pp)
       ("point", P2p_point.Id.encoding)
       ("peer", P2p_peer.Id.encoding)
       ("local_chain", Distributed_db_version.Name.encoding)
@@ -461,6 +473,7 @@ module P2p_socket = struct
       ~name:"nack_point_with_list"
       ~msg:"nack point {point} with point list {points}"
       ~level:Debug
+      ~pp2:(pp_bracketted_list P2p_point.Id.pp)
       ("point", P2p_connection.Id.encoding)
       ("points", Data_encoding.list P2p_point.Id.encoding)
 
@@ -530,6 +543,7 @@ module P2p_socket = struct
       ~name:"socket_send_message"
       ~level:Debug
       ~msg:"sending message to {peer}: {content}"
+      ~pp2:Data_encoding.Json.pp
       ("peer", P2p_peer.Id.encoding)
       ("content", Data_encoding.json)
 end
@@ -665,6 +679,7 @@ module P2p_pool = struct
       ~name:"get_points"
       ~msg:"getting points from {medium} of {source}: {point_list}"
       ~level:Debug
+      ~pp3:(pp_bracketted_list P2p_point.Id.pp)
       ("medium", Data_encoding.string)
       ("source", P2p_peer.Id.encoding)
       ("point_list", Data_encoding.list P2p_point.Id.encoding)
@@ -675,6 +690,7 @@ module P2p_pool = struct
       ~name:"create_pool"
       ~msg:"create pool: known points {point_list}"
       ~level:Debug
+      ~pp1:(pp_bracketted_list P2p_point.Id.pp)
       ("point_list", Data_encoding.list P2p_point.Id.encoding)
 
   let parse_error =
