@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Declaration order must respect the version order. *)
+(* Declaration order must respect the version order. *)
 type t = Edo | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
@@ -65,17 +65,10 @@ let accuser = function
 
 let daemon_name = function Alpha -> "alpha" | Edo -> "008-PtEdo2Zk"
 
-(* The encoding prefix is the part which is added at the beginning of all encoding names.
-   It turns out this is equal to what the [daemon_name] function returns. *)
 let encoding_prefix = daemon_name
 
-(** Protocol parameters overrides are pairs of JSON paths and optional values
-    that can be used to override or remove (when the value is [None]) the
-    default parameters when activating protocol. *)
 type parameter_overrides = (string list * string option) list
 
-(** Write a file with protocol parameters, overriding the defaults with
-    [parameter_overrides] *)
 let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
  fun ~protocol parameter_overrides ->
   (* make a copy of the parameters file and update the given constants *)
