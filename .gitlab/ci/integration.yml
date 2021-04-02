@@ -122,10 +122,10 @@ integration:sandboxes:daemons-upgrade:
 
 # this section is updated using the script scripts/update_integration_test.sh
 ##BEGIN_INTEGRATION_PYTHON##
-integration:008_fast:
+integration:008_batch:
   extends: .integration_python_template
   script:
-    - poetry run pytest "tests_008" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/008_fast.xml" 2>&1 | tee "tmp/008_fast.out" | tail
+    - poetry run pytest "tests_008" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/008_batch.xml" 2>&1 | tee "tmp/008_batch.out" | tail
   stage: test
 
 integration:008_baker_endorser:
@@ -212,10 +212,10 @@ integration:008_rpc:
     - poetry run pytest "tests_008/test_rpc.py" --exitfirst -s --log-dir=tmp "--junitxml=reports/008_rpc.xml" 2>&1 | tee "tmp/008_rpc.out" | tail
   stage: test
 
-integration:009_fast:
+integration:009_batch:
   extends: .integration_python_template
   script:
-    - poetry run pytest "tests_009" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/009_fast.xml" 2>&1 | tee "tmp/009_fast.out" | tail
+    - poetry run pytest "tests_009" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/009_batch.xml" 2>&1 | tee "tmp/009_batch.out" | tail
   stage: test
 
 integration:009_baker_endorser:
@@ -326,10 +326,10 @@ integration:009_voting_full:
     - poetry run pytest "tests_009/test_voting_full.py" --exitfirst -s --log-dir=tmp "--junitxml=reports/009_voting_full.xml" 2>&1 | tee "tmp/009_voting_full.out" | tail
   stage: test
 
-integration:alpha_fast:
+integration:alpha_batch:
   extends: .integration_python_template
   script:
-    - poetry run pytest "tests_alpha" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/alpha_fast.xml" 2>&1 | tee "tmp/alpha_fast.out" | tail
+    - poetry run pytest "tests_alpha" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/alpha_batch.xml" 2>&1 | tee "tmp/alpha_batch.out" | tail
   stage: test
 
 integration:alpha_baker_endorser:
