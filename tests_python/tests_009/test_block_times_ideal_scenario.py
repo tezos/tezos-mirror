@@ -8,7 +8,7 @@ from . import protocol
 random.seed(42)
 NUM_NODES = 5
 TEST_DURATION = 10
-BD = 3  # base delay = time_between_blocks[0]
+BD = 2  # base delay = time_between_blocks[0]
 PD = 20  # priority delay = time_between_blocks[1]
 IE = 2  # initial_endorsers
 
@@ -109,13 +109,17 @@ class TestBakersAndEndorsers:
                 proto=protocol.DAEMON,
             )
 
+    def test_rm_bakers(self, sandbox: Sandbox):
+        time.sleep(TEST_DURATION)
+        for i in range(NUM_NODES):
+            sandbox.rm_baker(i, proto=protocol.DAEMON)
+
     def test_check_level_and_timestamp(self, sandbox: Sandbox):
         client = sandbox.client(0)
-        first_level = client.get_level()
-        time.sleep(TEST_DURATION)
         levels = [client.get_level() for client in sandbox.all_clients()]
-        min_level = min(levels)
-        max_level = max(levels)
+        levels.sort()
+        min_level = levels[0]
+        max_level = levels[NUM_NODES - 1]
 
         heads_hash = set()
         # check there is exactly one block at the common level
@@ -124,14 +128,14 @@ class TestBakersAndEndorsers:
             heads_hash.add(header['hash'])
         assert len(heads_hash) == 1
 
-        # there should be one block every two seconds, so normally the max level
-        # should have increased with TEST_DURATION / BD levels
-        # we decrement by 1 "for safety"
-        assert max_level >= first_level - 1 + TEST_DURATION / BD
+        # There should be one block every BD seconds, so normally the max level
+        # should have increased with TEST_DURATION / BD levels.
+        # We decrement by 1 "for safety".
+        assert max_level >= TEST_DURATION / BD
 
-        # the rpc calls should be quick wrt to the time between blocks,
+        # the RPCs should be quick wrt to the time between blocks,
         # so nodes do not have time to diverge
-        assert min_level >= max_level - 1
+        assert levels[NUM_NODES // 2] >= max_level - 2
 
         # check that the timestamp difference is the expected one
         ts0 = client.get_block_timestamp(block=str(2))
