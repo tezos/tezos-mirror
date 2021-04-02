@@ -425,12 +425,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       | n ->
           Worker.log_event w (Processing_n_operations n)
           >>= fun () ->
-          let operations =
-            List.map snd (Operation_hash.Map.bindings pv.pending)
-          in
           Lwt_utils.fold_left_s_n
             ~n:pv.limits.operations_batch_size
-            (fun (acc_validation_state, acc_mempool) op ->
+            (fun (acc_validation_state, acc_mempool) (_, op) ->
               let refused hash raw errors =
                 notify_operation pv `Refused raw ;
                 let new_mempool =
@@ -536,7 +533,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                   | Duplicate | Outdated ->
                       Lwt.return (acc_validation_state, acc_mempool) ))
             (state, Mempool.empty)
-            operations
+            (* FIXME: Bindings + fold could be made in one go. *)
+            (Operation_hash.Map.bindings pv.pending)
           >>= fun ((state, advertised_mempool), remaining_op) ->
           ( if remaining_op != [] then
             Worker.Queue.push_request w Request.Leftover
