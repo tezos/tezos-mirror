@@ -166,14 +166,10 @@ let deactivate gid chain_db =
 
 (* Active the chain_id for the remote peer. Is a nop if it is already activated. *)
 let activate state chain_id chain_db =
-  let meta = P2p.get_peer_metadata state.p2p state.gid in
   match Chain_id.Table.find state.peer_active_chains chain_id with
   | Some _ ->
       ()
   | None ->
-      Peer_metadata.update_requests meta Branch
-      @@ P2p.try_send state.p2p state.conn
-      @@ Get_current_branch chain_id ;
       chain_db.active_peers :=
         P2p_peer.Set.add state.gid !(chain_db.active_peers) ;
       P2p_peer.Table.add chain_db.active_connections state.gid state.conn ;
