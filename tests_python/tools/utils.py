@@ -419,21 +419,22 @@ def contract_name_of_file(contract_path: str) -> str:
     return os.path.splitext(os.path.basename(contract_path))[0]
 
 
-def bake(client: Client, bake_for='bootstrap1') -> BakeForResult:
-    return client.bake(
-        bake_for,
-        [
-            '--max-priority',
-            '1024',
-            '--minimal-timestamp',
-            '--minimal-fees',
-            '0',
-            '--minimal-nanotez-per-byte',
-            '0',
-            '--minimal-nanotez-per-gas-unit',
-            '0',
-        ],
-    )
+def bake(
+    client: Client, bake_for='bootstrap1', bake_args: List[str] = None
+) -> BakeForResult:
+    default_bake_args = [
+        '--max-priority',
+        '1024',
+        '--minimal-timestamp',
+        '--minimal-fees',
+        '0',
+        '--minimal-nanotez-per-byte',
+        '0',
+        '--minimal-nanotez-per-gas-unit',
+        '0',
+    ]
+    bake_args = bake_args or default_bake_args
+    return client.bake(bake_for, bake_args)
 
 
 def init_with_transfer(
