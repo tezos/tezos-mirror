@@ -425,121 +425,134 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       | n ->
           Worker.log_event w (Processing_n_operations n)
           >>= fun () ->
-          Lwt_utils.fold_left_s_n
-            ~n:pv.limits.operations_batch_size
-            (fun (acc_validation_state, acc_mempool) (_, op) ->
-              let refused hash raw errors =
-                notify_operation pv `Refused raw ;
-                let new_mempool =
-                  Mempool.
-                    {
-                      acc_mempool with
-                      pending = Operation_hash.Set.add hash acc_mempool.pending;
-                    }
+          Operation_hash.Map.fold_es
+            (fun _ op (acc_validation_state, acc_mempool, limit) ->
+              if limit <= 0 then
+                (* Using Error as an early-return mechanism *)
+                Lwt.return_error (acc_validation_state, acc_mempool)
+              else
+                let limit = limit - 1 in
+                let refused hash raw errors =
+                  notify_operation pv `Refused raw ;
+                  let new_mempool =
+                    Mempool.
+                      {
+                        acc_mempool with
+                        pending =
+                          Operation_hash.Set.add hash acc_mempool.pending;
+                      }
+                  in
+                  Option.iter
+                    (fun e ->
+                      pv.refusals <- Operation_hash.Map.remove e pv.refusals)
+                    (Ringo.Ring.add_and_return_erased pv.refused hash) ;
+                  pv.refusals <-
+                    Operation_hash.Map.add hash (raw, errors) pv.refusals ;
+                  Distributed_db.Operation.clear_or_cancel pv.chain_db hash ;
+                  Lwt.return_ok (acc_validation_state, new_mempool, limit)
                 in
-                Option.iter
-                  (fun e ->
-                    pv.refusals <- Operation_hash.Map.remove e pv.refusals)
-                  (Ringo.Ring.add_and_return_erased pv.refused hash) ;
-                pv.refusals <-
-                  Operation_hash.Map.add hash (raw, errors) pv.refusals ;
-                Distributed_db.Operation.clear_or_cancel pv.chain_db hash ;
-                Lwt.return (acc_validation_state, new_mempool)
-              in
-              match Prevalidation.parse op with
-              | Error errors ->
-                  refused (Operation.hash op) op errors
-              | Ok op -> (
-                  Prevalidation.apply_operation state op
-                  >>= function
-                  | Applied (new_acc_validation_state, receipt) ->
-                      post_filter
-                        w
-                        pv
-                        ~validation_state_before:
-                          (Prevalidation.validation_state acc_validation_state)
-                        ~validation_state_after:
-                          (Prevalidation.validation_state
-                             new_acc_validation_state)
-                        op.protocol_data
-                        receipt
-                      >>= fun accept ->
-                      if
-                        (accept && pv.applied_count <= 2000)
-                        (* this test is a quick fix while we wait for the new mempool *)
-                        || is_endorsement op
-                      then (
-                        notify_operation pv `Applied op.raw ;
+                match Prevalidation.parse op with
+                | Error errors ->
+                    refused (Operation.hash op) op errors
+                | Ok op -> (
+                    Prevalidation.apply_operation state op
+                    >>= function
+                    | Applied (new_acc_validation_state, receipt) ->
+                        post_filter
+                          w
+                          pv
+                          ~validation_state_before:
+                            (Prevalidation.validation_state
+                               acc_validation_state)
+                          ~validation_state_after:
+                            (Prevalidation.validation_state
+                               new_acc_validation_state)
+                          op.protocol_data
+                          receipt
+                        >>= fun accept ->
+                        if
+                          (accept && pv.applied_count <= 2000)
+                          (* this test is a quick fix while we wait for the new mempool *)
+                          || is_endorsement op
+                        then (
+                          notify_operation pv `Applied op.raw ;
+                          let new_mempool =
+                            Mempool.
+                              {
+                                acc_mempool with
+                                known_valid =
+                                  op.hash :: acc_mempool.known_valid;
+                              }
+                          in
+                          pv.applied <- (op.hash, op.raw) :: pv.applied ;
+                          pv.in_mempool <-
+                            Operation_hash.Set.add op.hash pv.in_mempool ;
+                          Lwt.return_ok
+                            (new_acc_validation_state, new_mempool, limit) )
+                        else
+                          Lwt.return_ok
+                            (acc_validation_state, acc_mempool, limit)
+                    | Branch_delayed errors ->
+                        notify_operation pv `Branch_delayed op.raw ;
                         let new_mempool =
-                          Mempool.
-                            {
-                              acc_mempool with
-                              known_valid = op.hash :: acc_mempool.known_valid;
-                            }
+                          if is_endorsement op then
+                            Mempool.
+                              {
+                                acc_mempool with
+                                pending =
+                                  Operation_hash.Set.add
+                                    op.hash
+                                    acc_mempool.pending;
+                              }
+                          else acc_mempool
                         in
-                        pv.applied <- (op.hash, op.raw) :: pv.applied ;
+                        Option.iter
+                          (fun e ->
+                            pv.branch_delays <-
+                              Operation_hash.Map.remove e pv.branch_delays ;
+                            pv.in_mempool <-
+                              Operation_hash.Set.remove e pv.in_mempool)
+                          (Ringo.Ring.add_and_return_erased
+                             pv.branch_delayed
+                             op.hash) ;
                         pv.in_mempool <-
                           Operation_hash.Set.add op.hash pv.in_mempool ;
-                        Lwt.return (new_acc_validation_state, new_mempool) )
-                      else Lwt.return (acc_validation_state, acc_mempool)
-                  | Branch_delayed errors ->
-                      notify_operation pv `Branch_delayed op.raw ;
-                      let new_mempool =
-                        if is_endorsement op then
-                          Mempool.
-                            {
-                              acc_mempool with
-                              pending =
-                                Operation_hash.Set.add
-                                  op.hash
-                                  acc_mempool.pending;
-                            }
-                        else acc_mempool
-                      in
-                      Option.iter
-                        (fun e ->
-                          pv.branch_delays <-
-                            Operation_hash.Map.remove e pv.branch_delays ;
-                          pv.in_mempool <-
-                            Operation_hash.Set.remove e pv.in_mempool)
-                        (Ringo.Ring.add_and_return_erased
-                           pv.branch_delayed
-                           op.hash) ;
-                      pv.in_mempool <-
-                        Operation_hash.Set.add op.hash pv.in_mempool ;
-                      pv.branch_delays <-
-                        Operation_hash.Map.add
-                          op.hash
-                          (op.raw, errors)
-                          pv.branch_delays ;
-                      Lwt.return (acc_validation_state, new_mempool)
-                  | Branch_refused errors ->
-                      let new_mempool =
-                        if is_endorsement op then
-                          Mempool.
-                            {
-                              acc_mempool with
-                              pending =
-                                Operation_hash.Set.add
-                                  op.hash
-                                  acc_mempool.pending;
-                            }
-                        else acc_mempool
-                      in
-                      handle_branch_refused pv op.raw op.hash errors ;
-                      Lwt.return (acc_validation_state, new_mempool)
-                  | Refused errors ->
-                      refused op.hash op.raw errors
-                  | Duplicate | Outdated ->
-                      Lwt.return (acc_validation_state, acc_mempool) ))
-            (state, Mempool.empty)
-            (* FIXME: Bindings + fold could be made in one go. *)
-            (Operation_hash.Map.bindings pv.pending)
-          >>= fun ((state, advertised_mempool), remaining_op) ->
-          ( if remaining_op != [] then
-            Worker.Queue.push_request w Request.Leftover
-          else Lwt.return_unit )
-          >>= fun () ->
+                        pv.branch_delays <-
+                          Operation_hash.Map.add
+                            op.hash
+                            (op.raw, errors)
+                            pv.branch_delays ;
+                        Lwt.return_ok (acc_validation_state, new_mempool, limit)
+                    | Branch_refused errors ->
+                        let new_mempool =
+                          if is_endorsement op then
+                            Mempool.
+                              {
+                                acc_mempool with
+                                pending =
+                                  Operation_hash.Set.add
+                                    op.hash
+                                    acc_mempool.pending;
+                              }
+                          else acc_mempool
+                        in
+                        handle_branch_refused pv op.raw op.hash errors ;
+                        Lwt.return_ok (acc_validation_state, new_mempool, limit)
+                    | Refused errors ->
+                        refused op.hash op.raw errors
+                    | Duplicate | Outdated ->
+                        Lwt.return_ok (acc_validation_state, acc_mempool, limit)
+                    ))
+            pv.pending
+            (state, Mempool.empty, pv.limits.operations_batch_size)
+          >>= (function
+                | Error (state, advertised_mempool) ->
+                    (* Early return after iteration limit was reached *)
+                    Worker.Queue.push_request w Request.Leftover
+                    >>= fun () -> Lwt.return (state, advertised_mempool)
+                | Ok (state, advertised_mempool, _) ->
+                    Lwt.return (state, advertised_mempool))
+          >>= fun (state, advertised_mempool) ->
           pv.validation_state <- Ok state ;
           pv.pending <- Operation_hash.Map.empty ;
           advertise
