@@ -97,15 +97,16 @@ let check_sample ~name ~file =
 
 (** The given samples must be included in registered encodings. These can be
     found with [tezos-codec list encodings]. *)
-let check_samples_encoding ~group_name ~protocol ~samples =
+let check_samples_encoding ~group_name ~protocols ~samples =
   List.iter
     (fun sample ->
-      Regression.register
+      Protocol.register_regression_test
         ~__FILE__
         ~title:(sf "%s encoding regression test: %s" group_name sample)
         ~tags:["encoding"; group_name]
         ~output_file:("encoding" // sf "%s.%s" group_name sample)
-      @@ fun () ->
+        ~protocols
+      @@ fun protocol ->
       let base_path =
         "tezt" // "tests" // "encoding_samples" // group_name // sample
       in
@@ -120,7 +121,7 @@ let register () =
   check_dump_encodings () ;
   check_samples_encoding
     ~group_name:"alpha"
-    ~protocol:Alpha
+    ~protocols:[Alpha]
     ~samples:
       [ "block_header";
         "block_header.raw";
@@ -153,7 +154,7 @@ let register () =
         "voting_period" ] ;
   check_samples_encoding
     ~group_name:"current"
-    ~protocol:Protocol.current_mainnet
+    ~protocols:[Protocol.current_mainnet]
     ~samples:
       [ "block_header";
         "block_header.raw";

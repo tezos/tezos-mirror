@@ -48,16 +48,15 @@ let init ~protocol () =
     This test checks that the proxy client creates its cache for
     RPC answers at most once for a given (chain, block) pair.
 *)
-let test_cache_at_most_once ?query_string path protocol =
-  Test.register
+let test_cache_at_most_once ?query_string path =
+  Protocol.register_test
     ~__FILE__
     ~title:
       (sf
-         "(%s) (Proxy) (%s) Cache at most once"
-         (Protocol.name protocol)
+         "(Proxy) (%s) Cache at most once"
          (Client.rpc_path_query_to_string ?query_string path))
-    ~tags:[Protocol.tag protocol; "proxy"; "rpc"; "get"]
-  @@ fun () ->
+    ~tags:["proxy"; "rpc"; "get"]
+  @@ fun protocol ->
   let* (_, client) = init ~protocol () in
   let env =
     [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")]
@@ -103,7 +102,7 @@ let test_cache_at_most_once ?query_string path protocol =
            block)
   |> Lwt.return
 
-let test_cache_at_most_once protocol =
+let test_cache_at_most_once ~protocols =
   let paths =
     [ (["context"; "constants"], []);
       (["helpers"; "baking_rights"], []);
@@ -131,7 +130,7 @@ let test_cache_at_most_once protocol =
       test_cache_at_most_once
         ~query_string
         ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
-        protocol)
+        ~protocols)
     paths
 
 (** [starts_with prefix s] returns [true] iff [prefix] is a prefix of [s]. *)
@@ -164,16 +163,15 @@ let starts_with ~(prefix : string) (s : string) : bool =
 
     where [P] is [/chains/<main>/blocks/<head>/context/raw/bytes]
  *)
-let test_context_suffix_no_rpc ?query_string path protocol =
-  Test.register
+let test_context_suffix_no_rpc ?query_string path =
+  Protocol.register_test
     ~__FILE__
     ~title:
       (sf
-         "(%s) (Proxy) (%s) No useless RPC call"
-         (Protocol.name protocol)
+         "(Proxy) (%s) No useless RPC call"
          (Client.rpc_path_query_to_string ?query_string path))
-    ~tags:[Protocol.tag protocol; "proxy"; "rpc"; "get"]
-  @@ fun () ->
+    ~tags:["proxy"; "rpc"; "get"]
+  @@ fun protocol ->
   let* (_, client) = init ~protocol () in
   let env =
     [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")]
@@ -215,7 +213,10 @@ let test_context_suffix_no_rpc ?query_string path protocol =
   assert (List.length context_queries >= 2) ;
   Lwt.return @@ test_no_overlap_rpc (List.rev context_queries)
 
-let test_context_suffix_no_rpc protocol =
+let test_context_suffix_no_rpc ~protocols =
+  let iter l f = List.iter f l in
+  iter protocols
+  @@ fun protocol ->
   let paths =
     ( match protocol with
     | Protocol.Alpha ->
@@ -237,24 +238,23 @@ let test_context_suffix_no_rpc protocol =
         (["votes"; "listings"], []);
         (["votes"; "proposals"], []) ]
   in
-  List.iter
-    (fun (sub_path, query_string) ->
-      test_context_suffix_no_rpc
-        ~query_string
-        ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
-        protocol)
-    paths
+  iter paths
+  @@ fun (sub_path, query_string) ->
+  test_context_suffix_no_rpc
+    ~query_string
+    ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
+    ~protocols:[protocol]
 
 (** Test.
     Test that [tezos-client --mode proxy --protocol P] fails
     when the endpoint's protocol is not [P].
  *)
-let test_wrong_proto protocol =
-  Test.register
+let test_wrong_proto =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "(%s) (Proxy) Wrong proto" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "proxy"; "bake"]
-  @@ fun () ->
+    ~title:"(Proxy) Wrong proto"
+    ~tags:["proxy"; "bake"]
+  @@ fun protocol ->
   let* (_, client) = init ~protocol () in
   let other_proto =
     match List.find_opt (( <> ) protocol) Protocol.all with
@@ -283,12 +283,9 @@ let test_wrong_proto protocol =
 (** Test.
     Bake a few blocks in proxy mode.
  *)
-let test_bake protocol =
-  Test.register
-    ~__FILE__
-    ~title:(sf "(%s) (Proxy) Bake" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "proxy"; "bake"]
-  @@ fun () ->
+let test_bake =
+  Protocol.register_test ~__FILE__ ~title:"(Proxy) Bake" ~tags:["proxy"; "bake"]
+  @@ fun protocol ->
   let* node = Node.init [] in
   let* client = Client.init ~node () in
   let* () = Client.activate_protocol ~protocol client in
@@ -303,12 +300,12 @@ let test_bake protocol =
 (** Test.
     Do some transfers and bakes the corresponding blocks in proxy mode.
  *)
-let test_transfer protocol =
-  Test.register
+let test_transfer =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "(%s) (Proxy) Transfer" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "proxy"; "transfer"]
-  @@ fun () ->
+    ~title:"(Proxy) Transfer"
+    ~tags:["proxy"; "transfer"]
+  @@ fun protocol ->
   let* (_, client) = init ~protocol () in
   let* () =
     Client.transfer
@@ -416,22 +413,18 @@ module Location = struct
         check_location alt_mode client rpc_path expected_loc)
       paths_n_locations
 
-  let locations_tags alt_mode protocol =
-    [ Protocol.tag protocol;
-      alt_mode_to_string alt_mode;
-      "location";
-      "rpc";
-      "get" ]
+  let locations_tags alt_mode =
+    [alt_mode_to_string alt_mode; "location"; "rpc"; "get"]
 
   (** Test.
       Check the location where an RPC is executed by the proxy client. *)
-  let test_locations_proxy protocol =
+  let test_locations_proxy =
     let alt_mode = Proxy in
-    Test.register
+    Protocol.register_test
       ~__FILE__
-      ~title:(sf "(%s) (Proxy) RPC get's location" (Protocol.name protocol))
-      ~tags:(locations_tags alt_mode protocol)
-    @@ fun () ->
+      ~title:"(Proxy) RPC get's location"
+      ~tags:(locations_tags alt_mode)
+    @@ fun protocol ->
     let* (_, client) = init ~protocol () in
     check_locations alt_mode client
 
@@ -525,30 +518,29 @@ module Location = struct
     in
     Lwt_list.iter_s perform compared
 
-  let compare_tags alt_mode protocol =
-    [Protocol.tag protocol; alt_mode_to_string alt_mode; "rpc"; "get"]
+  let compare_tags alt_mode = [alt_mode_to_string alt_mode; "rpc"; "get"]
 
   (** Test.
       Check that executing a number of RPCs with a vanilla client and
       an alternative client yield the same results. *)
-  let test_compare_proxy protocol =
+  let test_compare_proxy =
     let alt_mode = Proxy in
-    Test.register
+    Protocol.register_test
       ~__FILE__
-      ~title:(sf "(%s) (Proxy) Compare RPC get" (Protocol.name protocol))
-      ~tags:(compare_tags alt_mode protocol)
-    @@ fun () ->
+      ~title:"(Proxy) Compare RPC get"
+      ~tags:(compare_tags alt_mode)
+    @@ fun protocol ->
     let* (node, alternative) = init ~protocol () in
     let* vanilla = Client.init ~node () in
     let clients = {vanilla; alternative} in
     check_equivalence protocol alt_mode clients
 end
 
-let register protocol =
-  test_bake protocol ;
-  test_transfer protocol ;
-  test_wrong_proto protocol ;
-  test_context_suffix_no_rpc protocol ;
-  test_cache_at_most_once protocol ;
-  Location.test_locations_proxy protocol ;
-  Location.test_compare_proxy protocol
+let register ~protocols =
+  test_bake ~protocols ;
+  test_transfer ~protocols ;
+  test_wrong_proto ~protocols ;
+  test_context_suffix_no_rpc ~protocols ;
+  test_cache_at_most_once ~protocols ;
+  Location.test_locations_proxy ~protocols ;
+  Location.test_compare_proxy ~protocols

@@ -99,3 +99,29 @@ let previous_protocol = function Alpha -> Some Edo | Edo -> None
 let all = [Alpha; Edo]
 
 let current_mainnet = Edo
+
+(* Used to ensure that [register_test] and [register_regression_test]
+   share the same conventions. *)
+let add_to_test_parameters protocol title tags =
+  (name protocol ^ ": " ^ title, tag protocol :: tags)
+
+let register_test ~__FILE__ ~title ~tags body ~protocols =
+  let register_with_protocol protocol =
+    let (title, tags) = add_to_test_parameters protocol title tags in
+    Test.register ~__FILE__ ~title ~tags (fun () -> body protocol)
+  in
+  List.iter register_with_protocol protocols
+
+let register_regression_test ~__FILE__ ~title ~tags ~output_file
+    ?regression_output_path body ~protocols =
+  let register_with_protocol protocol =
+    let (title, tags) = add_to_test_parameters protocol title tags in
+    Regression.register
+      ~__FILE__
+      ~title
+      ~tags
+      ~output_file
+      ?regression_output_path
+      (fun () -> body protocol)
+  in
+  List.iter register_with_protocol protocols

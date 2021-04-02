@@ -100,3 +100,41 @@ val all : t list
 
     Use this when registering tests that are not expected to break in future protocols. *)
 val current_mainnet : t
+
+(** Register a test that uses the protocol.
+
+    This is the same as [Test.register] except that:
+    - the name of the protocol is automatically added at the beginning of [title];
+    - the name of the protocol is automatically added as a tag in [tags];
+    - the function that implements the test takes a protocol as parameter;
+    - an additional parameter gives the list of protocols to run the test on.
+
+    The list of protocol is the last parameter because this function is intended
+    to be applied partially, without this list; the test function being
+    the parameter of type [t -> unit Lwt.t] before the list. The list of protocols is
+    specified in [main.ml], next to the registration of all other tests, so that it
+    is easy to see at a glance which tests run on which protocols.
+
+    If your test involves several protocols (for instance to test migration),
+    use [Test.register] directly. *)
+val register_test :
+  __FILE__:string ->
+  title:string ->
+  tags:string list ->
+  (t -> unit Lwt.t) ->
+  protocols:t list ->
+  unit
+
+(** Register a regression test that uses the protocol.
+
+    This is the same as [Regression.register], with the same differences
+    as [Protocol.register_test] compared to [Test.register]. *)
+val register_regression_test :
+  __FILE__:string ->
+  title:string ->
+  tags:string list ->
+  output_file:string ->
+  ?regression_output_path:string ->
+  (t -> unit Lwt.t) ->
+  protocols:t list ->
+  unit

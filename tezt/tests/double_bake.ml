@@ -138,12 +138,12 @@ let wait_for_denunciation_injection node client oph_promise =
 
    The test is successful if the double baking evidence can be found
    in the last baked block. *)
-let double_bake protocol =
-  Test.register
+let double_bake =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "%s: double baking with accuser" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "double"; "baking"; "accuser"; "node"]
-  @@ fun () ->
+    ~title:"double baking with accuser"
+    ~tags:["double"; "baking"; "accuser"; "node"]
+  @@ fun protocol ->
   (* Step 1 and 2 *)
   (* Note: we start all nodes with [--private] to prevent the [connect address]
      command from [node_2] to [node_3] from failing due to an "already connected"
@@ -213,4 +213,4 @@ let double_bake protocol =
   if is_operation_in_operations ops denunciation_oph then unit
   else Test.fail "Double baking evidence was not found"
 
-let register protocol = double_bake protocol
+let register ~protocols = double_bake ~protocols

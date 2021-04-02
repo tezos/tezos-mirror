@@ -36,12 +36,12 @@
 (* Test.
    Call `tezos-client rpc list` and check that return code is 0.
  *)
-let test_rpc_list ~protocol =
-  Test.register
+let test_rpc_list =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "(%s) (Mockup) RPC list" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "mockup"; "client"; "rpc"]
-  @@ fun () ->
+    ~title:"(Mockup) RPC list"
+    ~tags:["mockup"; "client"; "rpc"]
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.rpc_list client in
   Lwt.return_unit
@@ -49,12 +49,12 @@ let test_rpc_list ~protocol =
 (* Test.
    Call `tezos-client rpc /chains/<chain_id>/blocks/<block_id>/header/shell` and check that return code is 0.
  *)
-let test_rpc_header_shell ~protocol =
-  Test.register
+let test_rpc_header_shell =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "(%s) (Mockup) RPC header/shell" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "mockup"; "client"; "rpc"]
-  @@ fun () ->
+    ~title:"(Mockup) RPC header/shell"
+    ~tags:["mockup"; "client"; "rpc"]
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.shell_header client in
   Lwt.return_unit
@@ -84,12 +84,12 @@ let test_balances_after_transfer giver amount receiver =
 (* Test.
    Transfer some tz and check balance changes are as expected.
  *)
-let test_transfer ~protocol =
-  Test.register
+let test_transfer =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "(%s) (Mockup) Transfer" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "mockup"; "client"; "transfer"]
-  @@ fun () ->
+    ~title:"(Mockup) Transfer"
+    ~tags:["mockup"; "client"; "transfer"]
+  @@ fun protocol ->
   let (giver, amount, receiver) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
   let* giver_balance_before = Client.get_balance_for ~account:giver client in
@@ -112,14 +112,12 @@ let test_transfer ~protocol =
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
-let test_simple_baking_event ~protocol =
-  Test.register
+let test_simple_baking_event =
+  Protocol.register_test
     ~__FILE__
-    ~title:
-      (sf "(%s) (Mockup) Transfer (asynchronous)" (Protocol.name protocol))
-    ~tags:
-      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
-  @@ fun () ->
+    ~title:"(Mockup) Transfer (asynchronous)"
+    ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+  @@ fun protocol ->
   let (giver, amount, receiver) = transfer_data in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
@@ -133,16 +131,12 @@ let test_simple_baking_event ~protocol =
   Log.info "Baking pending operations..." ;
   Client.bake_for ~key:giver client
 
-let test_same_transfer_twice ~protocol =
-  Test.register
+let test_same_transfer_twice =
+  Protocol.register_test
     ~__FILE__
-    ~title:
-      (sf
-         "(%s) (Mockup) Same transfer twice (asynchronous)"
-         (Protocol.name protocol))
-    ~tags:
-      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
-  @@ fun () ->
+    ~title:"(Mockup) Same transfer twice (asynchronous)"
+    ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+  @@ fun protocol ->
   let (giver, amount, receiver) = transfer_data in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
@@ -162,16 +156,12 @@ let test_same_transfer_twice ~protocol =
       mempool2 ;
   return ()
 
-let test_transfer_same_participants ~protocol =
-  Test.register
+let test_transfer_same_participants =
+  Protocol.register_test
     ~__FILE__
-    ~title:
-      (sf
-         "(%s) (Mockup) Transfer same participants (asynchronous)"
-         (Protocol.name protocol))
-    ~tags:
-      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
-  @@ fun () ->
+    ~title:"(Mockup) Transfer same participants (asynchronous)"
+    ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+  @@ fun protocol ->
   let (giver, amount, receiver) = transfer_data in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
@@ -203,16 +193,12 @@ let test_transfer_same_participants ~protocol =
     Test.fail "Expected thrashpool to have one operation." ;
   return ()
 
-let test_multiple_baking ~protocol =
-  Test.register
+let test_multiple_baking =
+  Protocol.register_test
     ~__FILE__
-    ~title:
-      (sf
-         "(%s) (Mockup) Multi transfer/multi baking (asynchronous)"
-         (Protocol.name protocol))
-    ~tags:
-      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
-  @@ fun () ->
+    ~title:"(Mockup) Multi transfer/multi baking (asynchronous)"
+    ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
+  @@ fun protocol ->
   let (alice, _amount, bob) = transfer_data and baker = "bootstrap3" in
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
@@ -384,15 +370,12 @@ let test_migration_constants ~migrate_from ~migrate_to =
         Test.fail "Protocol constants mismatch" ))
 
 (** Test. Reproduce the scenario of https://gitlab.com/tezos/tezos/-/issues/1143 *)
-let test_origination_from_unrevealed_fees ~protocol =
-  Test.register
+let test_origination_from_unrevealed_fees =
+  Protocol.register_test
     ~__FILE__
-    ~title:
-      (sf
-         "(%s) (Mockup) origination fees from unrevealed"
-         (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "mockup"; "client"; "transfer"]
-  @@ fun () ->
+    ~title:"(Mockup) origination fees from unrevealed"
+    ~tags:["mockup"; "client"; "transfer"]
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* () =
     Client.import_secret_key
@@ -425,15 +408,15 @@ let test_origination_from_unrevealed_fees ~protocol =
   in
   return ()
 
-let register protocol =
-  test_rpc_list ~protocol ;
-  test_same_transfer_twice ~protocol ;
-  test_transfer_same_participants ~protocol ;
-  test_transfer ~protocol ;
-  test_simple_baking_event ~protocol ;
-  test_multiple_baking ~protocol ;
-  test_rpc_header_shell ~protocol ;
-  test_origination_from_unrevealed_fees ~protocol
+let register ~protocols =
+  test_rpc_list ~protocols ;
+  test_same_transfer_twice ~protocols ;
+  test_transfer_same_participants ~protocols ;
+  test_transfer ~protocols ;
+  test_simple_baking_event ~protocols ;
+  test_multiple_baking ~protocols ;
+  test_rpc_header_shell ~protocols ;
+  test_origination_from_unrevealed_fees ~protocols
 
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to

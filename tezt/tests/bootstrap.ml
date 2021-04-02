@@ -90,7 +90,7 @@ let bootstrapped_event =
 
    b) Otherwise, we check that both nodes synchronize. In full mode, we also check
    that the savepoint is higher than when Node 2 was killed. *)
-let check_bootstrap_with_history_modes protocol hmode1 hmode2 =
+let check_bootstrap_with_history_modes hmode1 hmode2 =
   (* Number of calls to [tezos-client bake for] once the protocol is activated,
      before we kill [node_2]. *)
   let bakes_before_kill = 9 in
@@ -103,24 +103,18 @@ let check_bootstrap_with_history_modes protocol hmode1 hmode2 =
   let bakes_during_kill = 150 in
   let hmode1s = Node.show_history_mode hmode1 in
   let hmode2s = Node.show_history_mode hmode2 in
-  Test.register
+  Protocol.register_test
     ~__FILE__
-    ~title:
-      (Format.sprintf
-         "%s: node synchronization (%s / %s)"
-         (Protocol.name protocol)
-         hmode1s
-         hmode2s)
+    ~title:(Format.sprintf "node synchronization (%s / %s)" hmode1s hmode2s)
     ~tags:
-      [ Protocol.tag protocol;
-        "bootstrap";
+      [ "bootstrap";
         "node";
         "sync";
         "activate";
         "bake";
         "primary_" ^ hmode1s;
         "secondary_" ^ hmode2s ]
-  @@ fun () ->
+  @@ fun protocol ->
   (* Initialize nodes and client. *)
   let* node_1 =
     Node.init [Synchronisation_threshold 0; Connections 1; History_mode hmode1]
@@ -203,15 +197,15 @@ let check_rpc_force_bootstrapped () =
   let* () = bootstrapped_promise in
   unit
 
-let register protocol =
-  check_bootstrap_with_history_modes protocol Archive Archive ;
-  check_bootstrap_with_history_modes protocol Archive Full ;
-  check_bootstrap_with_history_modes protocol Archive Rolling ;
-  check_bootstrap_with_history_modes protocol Full Archive ;
-  check_bootstrap_with_history_modes protocol Full Full ;
-  check_bootstrap_with_history_modes protocol Full Rolling ;
-  check_bootstrap_with_history_modes protocol Rolling Archive ;
-  check_bootstrap_with_history_modes protocol Rolling Rolling ;
-  check_bootstrap_with_history_modes protocol Rolling Full
+let register ~protocols =
+  check_bootstrap_with_history_modes Archive Archive ~protocols ;
+  check_bootstrap_with_history_modes Archive Full ~protocols ;
+  check_bootstrap_with_history_modes Archive Rolling ~protocols ;
+  check_bootstrap_with_history_modes Full Archive ~protocols ;
+  check_bootstrap_with_history_modes Full Full ~protocols ;
+  check_bootstrap_with_history_modes Full Rolling ~protocols ;
+  check_bootstrap_with_history_modes Rolling Archive ~protocols ;
+  check_bootstrap_with_history_modes Rolling Rolling ~protocols ;
+  check_bootstrap_with_history_modes Rolling Full ~protocols
 
 let register_protocol_independent () = check_rpc_force_bootstrapped ()

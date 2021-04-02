@@ -42,12 +42,12 @@ let wait_for_accepted_peer_ids node =
    `--peer` option and by setting an expected peer_id. To check that the nodes
    are connected, we activate the protocol and check that the block 1 has been
    propagated. *)
-let check_peer_option protocol =
-  Test.register
+let check_peer_option =
+  Protocol.register_test
     ~__FILE__
     ~title:"check peer option"
     ~tags:["p2p"; "cli"; "peer"]
-  @@ fun () ->
+  @@ fun protocol ->
   let* node_1 = Node.init [Synchronisation_threshold 0] in
   let* client = Client.init ~node:node_1 () in
   let* () = Client.activate_protocol ~protocol client in
@@ -170,4 +170,6 @@ module Maintenance = struct
   let tests () = test_expected_connections ()
 end
 
-let register protocol = Maintenance.tests () ; check_peer_option protocol
+let register_protocol_independent () = Maintenance.tests ()
+
+let register ~protocols = check_peer_option ~protocols

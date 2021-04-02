@@ -480,20 +480,20 @@ let init ~protocol =
       counters = Hashtbl.create 11;
     }
 
-let test_ordering ~protocol =
-  Test.register
+let test_ordering =
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "baking ordering (%s)" (Protocol.name protocol))
-    ~tags:["baking"; "ordering"; Protocol.tag protocol]
-    (fun () ->
-      let* state = init ~protocol in
-      Log.info "Testing ordering by counter" ;
-      let* mempool =
-        single_baker_increasing_fees state ~account:Constant.bootstrap1
-      in
-      let* () = bake_and_check state ~mempool in
-      Log.info "Testing ordering by fees" ;
-      let* mempool = distinct_bakers_increasing_fees state in
-      bake_and_check state ~mempool)
+    ~title:"baking ordering"
+    ~tags:["baking"; "ordering"]
+  @@ fun protocol ->
+  let* state = init ~protocol in
+  Log.info "Testing ordering by counter" ;
+  let* mempool =
+    single_baker_increasing_fees state ~account:Constant.bootstrap1
+  in
+  let* () = bake_and_check state ~mempool in
+  Log.info "Testing ordering by fees" ;
+  let* mempool = distinct_bakers_increasing_fees state in
+  bake_and_check state ~mempool
 
-let register protocol = test_ordering ~protocol
+let register ~protocols = test_ordering ~protocols
