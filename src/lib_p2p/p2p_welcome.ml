@@ -68,7 +68,7 @@ let rec worker_loop st =
       Events.(emit incoming_error) (err, "system")
       >>= fun () ->
       (* These are temporary system errors, giving some time for the system to
-         recover *)
+       recover *)
       Lwt_unix.sleep 5. >>= fun () -> worker_loop st
   | Error
       ( Exn
@@ -83,16 +83,15 @@ let rec worker_loop st =
               | ETIMEDOUT (* Connection timed out *)
               | EHOSTDOWN (* Host is down *)
               | EHOSTUNREACH (* No route to host *)
-              (* Ugly hack to catch EPROTO and ENONET, Protocol error, which are not
-       defined in the Unix module (which is 20 years late on the POSIX
-       standard). A better solution is to use the package ocaml-unix-errno or
-       redo the work *)
+              (* Ugly hack to catch EPROTO and ENONET, Protocol error, which
+                 are not defined in the Unix module (which is 20 years late on
+                 the POSIX standard). A better solution is to use the package
+                 ocaml-unix-errno or redo the work *)
               | EUNKNOWNERR (71 | 64)
-              (* On Linux EPROTO is 71, ENONET is 64
-       On BSD systems, accept cannot raise EPROTO.
-       71 is EREMOTE   for openBSD, NetBSD, Darwin, which is irrelevant here
-       64 is EHOSTDOWN for openBSD, NetBSD, Darwin, which is already caught
-    *)
+              (* On Linux EPROTO is 71, ENONET is 64 On BSD systems, accept
+                 cannot raise EPROTO.  71 is EREMOTE   for openBSD, NetBSD,
+                 Darwin, which is irrelevant here 64 is EHOSTDOWN for openBSD,
+                 NetBSD, Darwin, which is already caught *)
                 ),
               _,
               _ ))
@@ -120,14 +119,6 @@ let create ?addr ~backlog connect_handler port =
       create_listening_socket ~backlog ?addr port
       >>= fun socket ->
       let canceler = Lwt_canceler.create () in
-      Lwt_canceler.on_cancel canceler (fun () ->
-          Lwt_utils_unix.safe_close socket
-          >>= function
-          | Error trace ->
-              Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
-              Lwt.return_unit
-          | Ok () ->
-              Lwt.return_unit) ;
       let st =
         {
           socket;
@@ -136,6 +127,15 @@ let create ?addr ~backlog connect_handler port =
           worker = Lwt.return_unit;
         }
       in
+      Lwt_canceler.on_cancel canceler (fun () ->
+          st.worker
+          >>= fun () ->
+          Lwt_utils_unix.safe_close socket
+          >>= function
+          | Error trace ->
+              Events.(emit unexpected_error_closing_socket) trace
+          | Ok () ->
+              Lwt.return_unit) ;
       Lwt.return st)
     (fun exn ->
       Events.(emit incoming_connection_error) (Error_monad.Exn exn)
