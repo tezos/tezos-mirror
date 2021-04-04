@@ -41,10 +41,10 @@ The voting procedure works as follows:
 - `Cooldown period`: The only purpose of this period is to let some
   time elapse before the promotion period.
 - `Promotion period`: delegates can cast one vote to promote or not
-   the proposal using the `ballot` operation.  At the end of a
-   promotion period if participation reaches the quorum and the
-   proposal has a super-majority in favor, we proceed to adoption
-   period. Otherwise we go back to a proposal period.
+  the proposal using the `ballot` operation.  At the end of a
+  promotion period if participation reaches the quorum and the
+  proposal has a super-majority in favor, we proceed to adoption
+  period. Otherwise we go back to a proposal period.
 - `Adoption period`: at the end of the period the proposal is activated
   as the new protocol and we go back to a proposal period.
 
