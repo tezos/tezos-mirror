@@ -122,10 +122,19 @@ let encoding =
           "index"
           ~description:
             "The voting period's index. Starts at 0 with the first block of \
-             protocol alpha."
+             the Alpha family of protocols."
           int32)
-       (req "kind" kind_encoding)
-       (req "start_position" int32))
+       (req
+          ~description:
+            "One of the several kinds of periods in the voting procedure."
+          "kind"
+          kind_encoding)
+       (req
+          ~description:
+            "The relative position of the first level of the period with \
+             respect to the first level of the Alpha family of protocols."
+          "start_position"
+          int32))
 
 let info_encoding =
   let open Data_encoding in
@@ -135,9 +144,19 @@ let info_encoding =
     (fun (voting_period, position, remaining) ->
       {voting_period; position; remaining})
     (obj3
-       (req "voting_period" encoding)
-       (req "position" int32)
-       (req "remaining" int32))
+       (req
+          ~description:"The voting period to which the block belongs."
+          "voting_period"
+          encoding)
+       (req
+          ~description:"The position of the block within the voting period."
+          "position"
+          int32)
+       (req
+          ~description:
+            "The number of blocks remaining till the end of the voting period."
+          "remaining"
+          int32))
 
 include Compare.Make (struct
   type nonrec t = t
