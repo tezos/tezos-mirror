@@ -86,7 +86,6 @@ module Types = struct
        with a known head. Because the chain validator does not handle
        directly these messages, this is done through callbacks. *)
     synchronisation_state : Synchronisation_heuristic.t;
-    mutable current_status : Synchronisation_heuristic.status option;
     (* This should be true if after updating the synchronisatio_state,
        the status was [Synchronized] at least once. When this flag is
        true, the node starts its mempool. *)
@@ -142,6 +141,9 @@ let shutdown_child nv active_chains =
 let update_synchronisation_state w
     ((block, peer_id) : Block_header.t * P2p_peer.Id.t) =
   let nv = Worker.state w in
+  let old_status =
+    Synchronisation_heuristic.get_status nv.synchronisation_state
+  in
   Synchronisation_heuristic.update
     nv.synchronisation_state
     (block.shell.timestamp, peer_id) ;
@@ -152,9 +154,7 @@ let update_synchronisation_state w
       Lwt.wakeup_later nv.bootstrapped_wakener () ;
       Worker.record_event w Bootstrapped
   | _ -> ()) ;
-  if nv.current_status <> Some status then (
-    nv.current_status <- Some status ;
-    Worker.record_event w (Sync_status status))
+  if old_status <> status then Worker.record_event w (Sync_status status)
 
 (* The synchronisation state is updated only for blocks known as
    valid. Assume:
@@ -549,6 +549,9 @@ let on_launch w _ parameters =
       ~threshold:parameters.limits.synchronisation.threshold
       ~latency:parameters.limits.synchronisation.latency
   in
+  Worker.record_event
+    w
+    (Sync_status (Synchronisation_heuristic.get_status synchronisation_state)) ;
   let bootstrapped =
     match Synchronisation_heuristic.get_status synchronisation_state with
     | Synchronised _ -> true
@@ -579,7 +582,6 @@ let on_launch w _ parameters =
       bootstrapped_waiter;
       bootstrapped;
       synchronisation_state;
-      current_status = None;
       active_peers = P2p_peer.Error_table.create 50;
       (* TODO use [2 * max_connection] *)
       child = None;
