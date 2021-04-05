@@ -58,7 +58,21 @@ Changelog
   partially solves issue: `tezos#1027 <https://gitlab.com/tezos/tezos/-/issues/1027>`__
   `tezos!2386 <https://gitlab.com/tezos/tezos/-/merge_requests/2386>`__
 
+- Remove deprecated RPCs and deprecated fields in RPC answers related
+  to voting periods. (MR `tezos!2763
+  <https://gitlab.com/tezos/tezos/-/merge_requests/2763>`__, addresses
+  issue `tezos#1204 <https://gitlab.com/tezos/tezos/-/issues/1204>__.)
+  
 RPC changes
 ~~~~~~~~~~~
 
 The RPC ``../<block_id>/required_endorsements`` has been removed.
+
+The deprecated RPC ``../<block_id>/votes/current_period_kind`` has
+been removed. The deprecated fields ``level`` and
+``voting_period_kind`` in the return value of
+``../<block_id>/metadata`` have been removed. Similarly, the
+deprecated fields ``voting_period`` and ``voting_period_position`` in
+the return value of ``../<block_id>/helpers/current_level`` have been
+removed.
+
