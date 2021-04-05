@@ -92,6 +92,18 @@ let register state ~client ~dst =
 
 let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
     =
+  let is_expected_period (voting_period : (string * Ezjsonm.value) list)
+      period_name =
+    match Stdlib.List.assoc_opt "voting_period" voting_period with
+    | Some (`O obj) -> (
+      match Stdlib.List.assoc_opt "kind" obj with
+      | Some (`String p) ->
+          String.equal p period_name
+      | _ ->
+          false )
+    | _ ->
+        false
+  in
   let client = baker.Tezos_client.Keyed.client in
   let period_name = Tezos_protocol.Voting_period.to_string period in
   Helpers.wait_for state ~attempts ~seconds:0.5 (fun nth ->
@@ -99,9 +111,9 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
         state
         ~client
         `Get
-        ~path:"/chains/main/blocks/head/votes/current_period_kind"
+        ~path:"/chains/main/blocks/head/votes/current_period"
       >>= function
-      | `String p when String.equal p period_name ->
+      | `O voting_period when is_expected_period voting_period period_name ->
           return (`Done (nth - 1))
       | _ ->
           Asynchronous_result.map_option keep_alive_delegate ~f:(fun dst ->
