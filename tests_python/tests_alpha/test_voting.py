@@ -42,19 +42,13 @@ class TestManualBaking:
         assert period_info["position"] == 1
         assert period_info["remaining"] == 2
 
-    def test_level_info_period_offset(self, client: Client):
+    def test_level_info_offset(self, client: Client):
         level = client.get_current_level(offset=1)
         assert level["level_position"] == 1
-        assert level["voting_period"] == 0
-        assert level["voting_period_position"] == 1
         level = client.get_current_level(offset=4)
         assert level["level_position"] == 4
-        assert level["voting_period"] == 1
-        assert level["voting_period_position"] == 0
         level = client.get_current_level(offset=10)
         assert level["level_position"] == 10
-        assert level["voting_period"] == 2
-        assert level["voting_period_position"] == 2
 
     def test_bake_two_blocks(self, client: Client):
         utils.bake(client)
@@ -150,29 +144,17 @@ class TestManualBaking:
 
     def test_bake_last_block_of_proposal_period(self, client: Client):
         utils.bake(client)
+        level = client.get_current_level()
         period_info = client.get_current_period()
         metadata = client.get_metadata()
-        meta_level = metadata["level"]
         level_info = metadata["level_info"]
         meta_period_info = metadata["voting_period_info"]
-        expected_commitment = meta_level["expected_commitment"]
-        deprecated_period_kind = metadata["voting_period_kind"]
-        period_index = metadata["level"]["voting_period"]
-        period_position = metadata["level"]["voting_period_position"]
-        level = client.get_current_level()
-        # check if metadata has the same value as the level and voting period,
-        # see inline comment in alpha apply.ml. This is tested here because the
-        # level of metadata and current level use the compatibility encoding
-        # that contains the voting period information
-        assert meta_level == level
+        expected_commitment = level["expected_commitment"]
         assert level["level"] == level_info["level"]
         assert level["level_position"] == level_info["level_position"]
         assert level["cycle"] == level_info["cycle"]
         assert level["cycle_position"] == level_info["cycle_position"]
         assert expected_commitment == level_info["expected_commitment"]
-        assert period_index == period_info["voting_period"]["index"]
-        assert deprecated_period_kind == "exploration"
-        assert period_position == period_info["position"]
         assert level["level_position"] == 7
         assert period_info["voting_period"]["index"] == 1
         assert period_info["voting_period"]["kind"] == "proposal"
@@ -222,49 +204,29 @@ class TestManualBaking:
         proto = session['protos'][1]
         client.submit_ballot(f'bootstrap{4}', proto, 'nay')
 
-    def test_level_info_period_offset2(self, client: Client):
+    def test_level_info_offset2(self, client: Client):
         level = client.get_current_level(offset=-1)
         assert level["level_position"] == 9
-        assert level["voting_period"] == 2
-        assert level["voting_period_position"] == 1
         level = client.get_current_level(offset=-4)
         assert level["level_position"] == 6
-        assert level["voting_period"] == 1
-        assert level["voting_period_position"] == 2
         level = client.get_current_level(offset=-10)
         assert level["level_position"] == 0
-        assert level["voting_period"] == 0
-        assert level["voting_period_position"] == 0
 
     def test_bake_first_block_of_new_proposal_period(self, client: Client):
         utils.bake(client)
         # Because of the current hack in proposal here we make sure we get the
         # correct value
+        level = client.get_current_level()
         period_info = client.get_current_period()
         metadata = client.get_metadata()
-        meta_level = metadata["level"]
         level_info = metadata["level_info"]
         meta_period_info = metadata["voting_period_info"]
-        expected_commitment = meta_level["expected_commitment"]
-        period_kind = metadata["voting_period_kind"]
-        period_index = metadata["level"]["voting_period"]
-        period_position = metadata["level"]["voting_period_position"]
-        level = client.get_current_level()
-        deprecated_kind = client.get_current_period_kind()
-        # check if metadata has the same value as the level and voting period,
-        # see inline comment in alpha apply.ml. This is tested here because the
-        # level of metadata and current level use the compatibility encoding
-        # that contains the voting period information
-        assert meta_level == level
+        expected_commitment = level["expected_commitment"]
         assert level["level"] == level_info["level"]
         assert level["level_position"] == level_info["level_position"]
         assert level["cycle"] == level_info["cycle"]
         assert level["cycle_position"] == level_info["cycle_position"]
         assert expected_commitment == level_info["expected_commitment"]
-        assert period_index == period_info["voting_period"]["index"]
-        assert period_kind == "proposal"
-        assert period_kind == deprecated_kind
-        assert period_position == period_info["position"]
         assert level["level_position"] == 11
         assert period_info["voting_period"]["index"] == 2
         assert period_info["voting_period"]["kind"] == "exploration"

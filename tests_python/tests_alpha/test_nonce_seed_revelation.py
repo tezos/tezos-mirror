@@ -64,11 +64,12 @@ class TestNonceSeedRevelation:
         # protocol, but because it is a protocol transition block, it
         # doesn't have the "cycle" and "cycle_position" metadata (unlike
         # the remaining blocks)
-        assert blocks[1]['metadata']['level']['cycle'] == 0
-        assert blocks[1]['metadata']['level']['cycle_position'] == 1
-        assert blocks[BLOCKS_PER_CYCLE]['metadata']['level']['cycle'] == 1
+        assert blocks[1]['metadata']['level_info']['cycle'] == 0
+        assert blocks[1]['metadata']['level_info']['cycle_position'] == 1
+        assert blocks[BLOCKS_PER_CYCLE]['metadata']['level_info']['cycle'] == 1
         assert (
-            blocks[BLOCKS_PER_CYCLE]['metadata']['level']['cycle_position'] == 0
+            blocks[BLOCKS_PER_CYCLE]['metadata']['level_info']['cycle_position']
+            == 0
         )
 
     def test_collect_seed_nonce_hashes(self, session):
