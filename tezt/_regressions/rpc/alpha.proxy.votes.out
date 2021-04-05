@@ -13,10 +13,6 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 { "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
   "position": 1, "remaining": 2 }
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period_kind
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-"proposal"
-
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_proposal
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 null
@@ -60,10 +56,6 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
   "position": 0, "remaining": 3 }
-
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period_kind
-protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-"exploration"
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_proposal
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK

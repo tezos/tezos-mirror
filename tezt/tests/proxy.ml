@@ -118,7 +118,6 @@ let test_cache_at_most_once protocol =
       (["helpers"; "levels_in_current_cycle"], []);
       (["votes"; "ballot_list"], []);
       (["votes"; "ballots"], []);
-      (["votes"; "current_period_kind"], []);
       (["votes"; "current_proposal"], []);
       (["votes"; "current_quorum"], []);
       (["votes"; "listings"], []);
@@ -215,18 +214,22 @@ let test_context_suffix_no_rpc ?query_string path protocol =
 
 let test_context_suffix_no_rpc protocol =
   let paths =
-    [ (["helpers"; "baking_rights"], []);
-      (["helpers"; "baking_rights"], [("all", "true")]);
-      (["context"; "delegates"], []);
-      (["context"; "nonces"; "3"], []);
-      (["helpers"; "endorsing_rights"], []);
-      (["votes"; "ballot_list"], []);
-      (["votes"; "ballots"], []);
-      (["votes"; "current_period_kind"], []);
-      (["votes"; "current_proposal"], []);
-      (["votes"; "current_quorum"], []);
-      (["votes"; "listings"], []);
-      (["votes"; "proposals"], []) ]
+    ( match protocol with
+    | Protocol.Alpha ->
+        []
+    | _ ->
+        [(["votes"; "current_period_kind"], [])] )
+    @ [ (["helpers"; "baking_rights"], []);
+        (["helpers"; "baking_rights"], [("all", "true")]);
+        (["context"; "delegates"], []);
+        (["context"; "nonces"; "3"], []);
+        (["helpers"; "endorsing_rights"], []);
+        (["votes"; "ballot_list"], []);
+        (["votes"; "ballots"], []);
+        (["votes"; "current_proposal"], []);
+        (["votes"; "current_quorum"], []);
+        (["votes"; "listings"], []);
+        (["votes"; "proposals"], []) ]
   in
   List.iter
     (fun (sub_path, query_string) ->
@@ -429,30 +432,34 @@ module Location = struct
   (** Check the output of [rpc get] on a number on RPC between two
       clients are equivalent. One of them is a vanilla client ([--mode client]) while the
       other client uses an alternative mode ([--mode proxy]). *)
-  let check_equivalence alt_mode {vanilla; alternative} =
+  let check_equivalence protocol alt_mode {vanilla; alternative} =
     let alt_mode_string = alt_mode_to_string alt_mode in
     let compared =
       let add_rpc_path_prefix rpc_path =
         "chains" :: chain_id :: "blocks" :: block_id :: rpc_path
       in
-      [ (add_rpc_path_prefix ["context"; "constants"], []);
-        (add_rpc_path_prefix ["helpers"; "baking_rights"], []);
-        (add_rpc_path_prefix ["helpers"; "baking_rights"], [("all", "true")]);
-        (add_rpc_path_prefix ["helpers"; "current_level"], []);
-        (add_rpc_path_prefix ["minimal_valid_time"], []);
-        (add_rpc_path_prefix ["context"; "constants"], []);
-        (add_rpc_path_prefix ["context"; "constants"; "errors"], []);
-        (add_rpc_path_prefix ["context"; "delegates"], []);
-        (add_rpc_path_prefix ["context"; "nonces"; "3"], []);
-        (add_rpc_path_prefix ["helpers"; "endorsing_rights"], []);
-        (add_rpc_path_prefix ["helpers"; "levels_in_current_cycle"], []);
-        (add_rpc_path_prefix ["votes"; "ballot_list"], []);
-        (add_rpc_path_prefix ["votes"; "ballots"], []);
-        (add_rpc_path_prefix ["votes"; "current_period_kind"], []);
-        (add_rpc_path_prefix ["votes"; "current_proposal"], []);
-        (add_rpc_path_prefix ["votes"; "current_quorum"], []);
-        (add_rpc_path_prefix ["votes"; "listings"], []);
-        (add_rpc_path_prefix ["votes"; "proposals"], []) ]
+      ( match protocol with
+      | Protocol.Alpha ->
+          []
+      | _ ->
+          [(add_rpc_path_prefix ["votes"; "current_period_kind"], [])] )
+      @ [ (add_rpc_path_prefix ["context"; "constants"], []);
+          (add_rpc_path_prefix ["helpers"; "baking_rights"], []);
+          (add_rpc_path_prefix ["helpers"; "baking_rights"], [("all", "true")]);
+          (add_rpc_path_prefix ["helpers"; "current_level"], []);
+          (add_rpc_path_prefix ["minimal_valid_time"], []);
+          (add_rpc_path_prefix ["context"; "constants"], []);
+          (add_rpc_path_prefix ["context"; "constants"; "errors"], []);
+          (add_rpc_path_prefix ["context"; "delegates"], []);
+          (add_rpc_path_prefix ["context"; "nonces"; "3"], []);
+          (add_rpc_path_prefix ["helpers"; "endorsing_rights"], []);
+          (add_rpc_path_prefix ["helpers"; "levels_in_current_cycle"], []);
+          (add_rpc_path_prefix ["votes"; "ballot_list"], []);
+          (add_rpc_path_prefix ["votes"; "ballots"], []);
+          (add_rpc_path_prefix ["votes"; "current_proposal"], []);
+          (add_rpc_path_prefix ["votes"; "current_quorum"], []);
+          (add_rpc_path_prefix ["votes"; "listings"], []);
+          (add_rpc_path_prefix ["votes"; "proposals"], []) ]
     in
     let perform (rpc_path, query_string) =
       let* (vanilla_out, vanilla_err) = rpc_get ~query_string vanilla rpc_path
@@ -525,7 +532,7 @@ module Location = struct
     let* (node, alternative) = init ~protocol () in
     let* vanilla = Client.init ~node () in
     let clients = {vanilla; alternative} in
-    check_equivalence alt_mode clients
+    check_equivalence protocol alt_mode clients
 end
 
 let register protocol =
