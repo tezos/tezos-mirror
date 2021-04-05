@@ -17,7 +17,7 @@ TIMEOUT = 60
 class TestNonceSeedRevelation:
     """Test baker injection of nonce revelations.
 
-    See http://tezos.gitlab.io/008/proof_of_stake.html
+    See http://tezos.gitlab.io/alpha/proof_of_stake.html
 
     Runs a node and a baker. The baker bakes two full cycles.
     We collect nonce hashes from the first cycle. And check
