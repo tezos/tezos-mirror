@@ -34,22 +34,35 @@ let cleanup model_name =
   in
   List.iter Files.unlink_if_present files
 
+let rec retry ?max_tries closure =
+  Lwt.catch closure (fun e ->
+      match max_tries with
+      | None ->
+          retry closure
+      | Some k ->
+          if k <= 0 then raise e else retry ~max_tries:(k - 1) closure)
+
 let main () =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
   let inference_root = Files.(working_dir // inference_results_dir) in
-  let* () =
-    let model_name = "interpreter" in
-    cleanup model_name ;
-    Snoop.infer_parameters
-      ~model_name
-      ~workload_data:Files.(working_dir // benchmark_results_dir)
-      ~regression_method:Snoop.(Lasso {positive = true})
-      ~dump_csv:Files.(inference_root // solution_csv model_name)
-      ~solution:Files.(inference_root // solution_bin model_name)
-      ~report:Files.(inference_root // report_tex model_name)
-      ~graph:Files.(inference_root // dep_graph model_name)
-      snoop
+  let models =
+    [ "interpreter";
+      "gas_translator_model";
+      "size_translator_model";
+      "micheline" ]
   in
-  (* TODO: translator, encoding *)
-  return ()
+  Lwt_list.iter_s
+    (fun model_name ->
+      cleanup model_name ;
+      retry ~max_tries:5 (fun () ->
+          Snoop.infer_parameters
+            ~model_name
+            ~workload_data:Files.(working_dir // benchmark_results_dir)
+            ~regression_method:Snoop.(Lasso {positive = true})
+            ~dump_csv:Files.(inference_root // solution_csv model_name)
+            ~solution:Files.(inference_root // solution_bin model_name)
+            ~report:Files.(inference_root // report_tex model_name)
+            ~graph:Files.(inference_root // dep_graph model_name)
+            snoop))
+    models
