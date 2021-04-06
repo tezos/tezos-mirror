@@ -43,6 +43,12 @@ current block. However, this minimal injection time is not 1 minute
 after the previous block's timestamp as before, instead it is 30
 seconds after.
 
+The values of the ``BLOCKS_PER_*`` constants has doubled in order to
+match the reduced block times, as follows: ``BLOCKS_PER_CYCLE =
+8192``, ``BLOCKS_PER_COMMITMENT = 64``, ``BLOCKS_PER_ROLL_SNAPSHOT =
+512``, and ``BLOCKS_PER_VOTING_PERIOD = 40960``.
+
+
 
 
 Changelog
@@ -54,7 +60,7 @@ Changelog
 
 - Fix handling of potential integer overflow in `Time_repr` addition `Protocol/time_repr: check for potential overflow on addition <https://gitlab.com/tezos/tezos/-/merge_requests/2660>`_
 
-- Emmy*, new block delay formula
+- Emmy*, new block delay formula;
   partially solves issue: `tezos#1027 <https://gitlab.com/tezos/tezos/-/issues/1027>`__
   `tezos!2386 <https://gitlab.com/tezos/tezos/-/merge_requests/2386>`__
 
@@ -69,6 +75,11 @@ Changelog
 - Realign voting periods with cycles, solves issue `tezos#1151
   <https://gitlab.com/tezos/tezos/-/issues/1151>`__
   `<https://gitlab.com/tezos/tezos/-/merge_requests/2838>`__
+  
+- Emmy*, double ``blocks_per_*`` constants;
+  partially solves issue: `tezos#1027 <https://gitlab.com/tezos/tezos/-/issues/1027>`__
+  `tezos!2531 <https://gitlab.com/tezos/tezos/-/merge_requests/2531>`__
+
 
 RPC changes
 ~~~~~~~~~~~
