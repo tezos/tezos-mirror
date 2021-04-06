@@ -15,6 +15,7 @@
             tezos-stdlib-unix
             tezos-validation
             tezos-test-services
+	    lib-test
             alcotest-lwt
             crowbar)
  (flags (:standard -open Tezos_base__TzPervasives
