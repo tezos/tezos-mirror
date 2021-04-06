@@ -553,7 +553,7 @@ let commands () =
            data_parameter
       @@ stop )
       (fun () typ cctxt ->
-        Plugin.RPC.normalize_type
+        Plugin.RPC.Scripts.normalize_type
           cctxt
           (cctxt#chain, cctxt#block)
           ~ty:typ.expanded
