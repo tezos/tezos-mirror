@@ -60,7 +60,8 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the voting period (index, kind, starting position) and \
-         related information (position, remaining) of the next block."
+         related information (position, remaining) of the next block.Useful \
+         to craft operations that will be valid in the next block."
       ~query:RPC_query.empty
       ~output:Voting_period.info_encoding
       RPC_path.(path / "successor_period")
@@ -108,9 +109,9 @@ let register () =
   register0 S.ballots (fun ctxt () () -> Vote.get_ballots ctxt) ;
   register0 S.ballot_list (fun ctxt () () -> Vote.get_ballot_list ctxt >|= ok) ;
   register0 S.current_period (fun ctxt () () ->
-      Voting_period.get_rpc_fixed_current_info ctxt) ;
+      Voting_period.get_rpc_current_info ctxt) ;
   register0 S.successor_period (fun ctxt () () ->
-      Voting_period.get_rpc_fixed_succ_info ctxt) ;
+      Voting_period.get_rpc_succ_info ctxt) ;
   register0 S.current_quorum (fun ctxt () () -> Vote.get_current_quorum ctxt) ;
   register0 S.proposals (fun ctxt () () -> Vote.get_proposals ctxt) ;
   register0 S.listings (fun ctxt () () -> Vote.get_listings ctxt >|= ok) ;

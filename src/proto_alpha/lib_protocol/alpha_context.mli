@@ -1090,9 +1090,9 @@ module Voting_period : sig
 
   val pp_info : Format.formatter -> info -> unit
 
-  val get_rpc_fixed_current_info : context -> info tzresult Lwt.t
+  val get_rpc_current_info : context -> info tzresult Lwt.t
 
-  val get_rpc_fixed_succ_info : context -> info tzresult Lwt.t
+  val get_rpc_succ_info : context -> info tzresult Lwt.t
 end
 
 module Vote : sig

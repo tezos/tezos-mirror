@@ -56,17 +56,20 @@
        - position  = n - (n + 1) = -1
        - remaining = blocks_per_voting_period
 
-  In order to have the correct value for the RPCs a fix has been applied in
-  [voting_service] by calling a specific function
-  [voting_period_storage.get_rpc_fixed_current_info].
+  To work around this issue, two RPCs were added 
+  `Voting_period_storage.get_rpc_current_info`, which returns the correct 
+  info also for the last context of a period, and 
+  `Voting_period_storage.get_rpc_succ_info`, which can be used at the last 
+  context of a period to craft operations that will be valid for the first 
+  block of the new period.
 
   This odd behaviour could be fixed if [Amendment.may_start_new_voting_period]
-  was called when we start validating a block instead that at the end.
+  was called when we start validating the first block of a voting period instead
+  that at the end of the validation of the last block of a voting period.
   This should be carefully done because the voting period listing depends on
   the rolls and it might break some invariant.
 
   When this is implemented one should:
-  - remove the function [voting_period_storage.get_rpc_fixed_current_info]
   - edit the function [reset_current] and [inc_current] to use the
     current level and not the next one.
   - remove the storage for pred_kind
@@ -142,7 +145,7 @@ let is_last_block ctxt =
   get_current_remaining ctxt
   >|=? fun remaining -> Compare.Int32.(remaining = 0l)
 
-let get_rpc_fixed_current_info ctxt =
+let get_rpc_current_info ctxt =
   get_current_info ctxt
   >>=? fun ({voting_period; position; _} as voting_period_info) ->
   if Compare.Int32.(position = Int32.minus_one) then
@@ -170,7 +173,7 @@ let get_rpc_fixed_current_info ctxt =
     ({voting_period; remaining; position} : Voting_period_repr.info)
   else return voting_period_info
 
-let get_rpc_fixed_succ_info ctxt =
+let get_rpc_succ_info ctxt =
   get_current ctxt
   >|=? fun voting_period ->
   let blocks_per_voting_period =

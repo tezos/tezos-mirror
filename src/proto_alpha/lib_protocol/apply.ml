@@ -1583,7 +1583,7 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
       (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
       (Gas.block_level ctxt)
   in
-  Voting_period.get_rpc_fixed_current_info ctxt
+  Voting_period.get_rpc_current_info ctxt
   >|=? fun voting_period_info ->
   let level_info = Level.current ctxt in
   let receipt =

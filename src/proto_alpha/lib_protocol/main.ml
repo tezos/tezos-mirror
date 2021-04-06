@@ -211,7 +211,7 @@ let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
 let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
   match mode with
   | Partial_construction _ ->
-      Alpha_context.Voting_period.get_rpc_fixed_current_info ctxt
+      Alpha_context.Voting_period.get_rpc_current_info ctxt
       >>=? fun voting_period_info ->
       let level_info = Alpha_context.Level.current ctxt in
       let baker = Signature.Public_key_hash.zero in
@@ -242,7 +242,7 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
         ~priority:block_header.protocol_data.contents.priority
         ~endorsing_power:included_endorsements
       >>?= fun () ->
-      Alpha_context.Voting_period.get_rpc_fixed_current_info ctxt
+      Alpha_context.Voting_period.get_rpc_current_info ctxt
       >|=? fun voting_period_info ->
       let level_info = Alpha_context.Level.current ctxt in
       let ctxt = Alpha_context.finalize ctxt in
