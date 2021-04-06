@@ -10,7 +10,7 @@ Ledger support
 It is possible and advised to use a hardware wallet to manage your
 keys, Tezos' client supports Ledger Nano devices provided that you have
 a Tezos app installed.
-The apps are developed by Obsidian Systems and they provide a comprehensive
+The apps were developed by Obsidian Systems and they provide a comprehensive
 `tutorial on how to install it.
 <https://github.com/obsidiansystems/ledger-app-tezos>`_
 
