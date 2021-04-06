@@ -1,5 +1,5 @@
 (executables
- (names test
+ (names test_shell
         test_locator
         test_synchronisation_heuristic_fuzzy)
  (libraries tezos-base
@@ -34,14 +34,14 @@
 
 (rule
  (alias buildtest)
- (deps test.exe
+ (deps test_shell.exe
        test_locator.exe
        test_synchronisation_heuristic_fuzzy.exe)
  (action (progn)))
 
 (rule
  (alias runtest_shell)
- (action (run %{exe:test.exe})))
+ (action (run %{exe:test_shell.exe})))
 
 (rule
  (alias runtest_locator)
