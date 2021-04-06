@@ -467,6 +467,18 @@ class Client:
         ]
         return client_output.CheckSignMessageResult(self.run(cmd)).check
 
+    def reveal(
+        self,
+        account: str,
+        args: List[str] = None,
+    ) -> client_output.RevealResult:
+        cmd = ['reveal', 'key', 'for', account]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return client_output.RevealResult(res)
+
     def transfer(
         self,
         amount: float,

@@ -35,6 +35,22 @@ class EndorseResult:
         self.operation_hash = match.groups()[0]
 
 
+class RevealResult:
+    """Result of a 'reveal key for' operation."""
+
+    def __init__(self, client_output: str):
+        pattern = r"Operation hash is '?(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.operation_hash = match.groups()[0]
+        pattern = r"Fee to the baker: ꜩ(.*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.fees = float(match.groups()[0])
+
+
 class TransferResult:
     """Result of a 'transfer' operation."""
 
