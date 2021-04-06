@@ -78,3 +78,13 @@ val of_option_gen : 'a option QCheck.Gen.t -> 'a QCheck.Gen.t
     Be careful: if [None] is always returned, this hangs forever!
 *)
 val of_option_arb : 'a option QCheck.arbitrary -> 'a QCheck.arbitrary
+
+(** [uint16] generates an unsigned int16 arbitrary
+
+    - Generation of values is delegated to {!int_range} *)
+val uint16 : int QCheck.arbitrary
+
+(** [int16] generates a signed int16 arbitrary
+
+    - Generation of values is delegated to {!int_range} *)
+val int16 : int QCheck.arbitrary

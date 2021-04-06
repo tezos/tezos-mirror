@@ -82,3 +82,7 @@ let of_option_arb QCheck.{gen; print; small; shrink; collect; stats} =
     List.map (fun (s, f_opt) -> (s, fun a -> f_opt (Some a))) stats
   in
   QCheck.make ?print ?small ?shrink ?collect ~stats gen
+
+let uint16 = QCheck.(0 -- 65535)
+
+let int16 = QCheck.(-32768 -- 32767)
