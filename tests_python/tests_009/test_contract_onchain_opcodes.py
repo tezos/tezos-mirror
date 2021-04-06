@@ -301,7 +301,7 @@ class TestContractOnchainOpcodes:
             line.rstrip('\n')
             for line in open(
                 f'{paths.TEZOS_HOME}'
-                + '/tests_python/tests_alpha/'
+                + '/tests_python/tests_009/'
                 + 'test_slice_fails_params.txt'
             )
         ],
@@ -326,7 +326,7 @@ class TestContractOnchainOpcodes:
             line.rstrip('\n')
             for line in open(
                 f'{paths.TEZOS_HOME}'
-                + '/tests_python/tests_alpha/'
+                + '/tests_python/tests_009/'
                 + 'test_slice_success_params.txt'
             )
         ],
