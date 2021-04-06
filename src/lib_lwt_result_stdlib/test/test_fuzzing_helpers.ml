@@ -46,20 +46,21 @@ module Fn = struct
         lambda "(fun _ _ -> true)" (fun _ _ -> true);
         lambda "(fun x y -> x < y)" (fun x y -> x < y) ]
 
+  let basic_int = Crowbar.(choose [int; const 0; const 1])
+
   let arith =
-    Crowbar.choose
-      [ lambda "(fun x _ -> x)" (fun x _ -> x);
-        lambda "(fun _ y -> y)" (fun _ y -> y);
-        lambda "(fun x _ -> 2 * x)" (fun x _ -> 2 * x);
-        lambda "(fun _ _ -> 0)" (fun _ _ -> 0);
-        lambda "(fun x y -> x + y)" (fun x y -> x + y);
-        lambda "(fun _ y -> 2 * y)" (fun _ y -> 2 * y);
-        lambda "(fun _ y -> y + 1)" (fun _ y -> y + 1);
+    let open Crowbar in
+    choose
+      [ with_printer
+          (fun fmt l ->
+            let k = l 0 0 in
+            let u = l 1 0 - k in
+            let v = l 0 1 - k in
+            Format.fprintf fmt "(fun x y -> (%d * x) + (%d * y) + %d)" u v k)
+          (map [basic_int; basic_int; basic_int] (fun u v k x y ->
+               (u * x) + (v * y) + k));
         lambda "(fun x y -> min x y)" (fun x y -> min x y);
-        lambda "(fun x y -> max x y)" (fun x y -> max x y);
-        lambda "(fun x y -> (5 * x) + (112 * y))" (fun x y ->
-            (5 * x) + (112 * y));
-        Crowbar.(map [int] (fun n _ _ -> n)) ]
+        lambda "(fun x y -> max x y)" (fun x y -> max x y) ]
 
   (* combinators *)
   let e cond ok error x y = if cond x y then Ok (ok x y) else Error (error x y)
