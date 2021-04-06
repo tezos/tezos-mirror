@@ -237,8 +237,11 @@ let list url (cctxt : #Client_context.full) =
   let open RPC_description in
   let collected_args = ref [] in
   let collect arg =
-    if not (arg.RPC_arg.descr <> None && List.mem arg !collected_args) then
-      collected_args := arg :: !collected_args
+    if
+      not
+        ( arg.RPC_arg.descr <> None
+        && List.mem ~equal:RPC_arg.eq_descr arg !collected_args )
+    then collected_args := arg :: !collected_args
   in
   let display_paragraph ppf description =
     Format.fprintf

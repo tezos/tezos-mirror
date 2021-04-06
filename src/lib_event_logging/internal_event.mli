@@ -66,7 +66,7 @@ module Level : sig
 
   val encoding : t Data_encoding.t
 
-  val compare : t -> t -> int
+  include Compare.S with type t := t
 end
 
 (** Sections are a simple way of classifying events at the time of
@@ -87,6 +87,8 @@ module Section : sig
   val to_string_list : t -> string list
 
   val pp : Format.formatter -> t -> unit
+
+  include Compare.S with type t := t
 end
 
 (** All the section that has been registered. Currently, sections are registered

@@ -735,7 +735,7 @@ module Make_legacy (I : Dump_interface_legacy) = struct
 
   let check_version v =
     fail_when
-      (List.mem v.version compatible_versions |> not)
+      (List.mem ~equal:String.equal v.version compatible_versions |> not)
       (Invalid_snapshot_version (v.version, compatible_versions))
 
   let serialize_tree ~maybe_flush ~written buf =

@@ -192,7 +192,7 @@ let notify_new_block w block =
   let nv = Worker.state w in
   Option.iter
     (fun id ->
-      List.assoc id (Worker.list table)
+      List.assoc ~equal:Chain_id.equal id (Worker.list table)
       |> Option.iter (fun w ->
              let nv = Worker.state w in
              Lwt_watcher.notify nv.valid_block_input block))
@@ -784,7 +784,10 @@ let child w =
   Option.bind
     (Worker.state w).child
     (fun ({parameters = {chain_store; _}; _}, _) ->
-      List.assoc (Store.Chain.chain_id chain_store) (Worker.list table))
+      List.assoc
+        ~equal:Chain_id.equal
+        (Store.Chain.chain_id chain_store)
+        (Worker.list table))
 
 let assert_fitness_increases ?(force = false) w distant_header =
   let pv = Worker.state w in

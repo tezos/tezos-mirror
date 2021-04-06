@@ -312,25 +312,29 @@ let signal_names =
     (Sys.sigxcpu, "SIGXCPU");
     (Sys.sigxfsz, "SIGXFSZ") ]
 
-let signal_name n = List.assoc n signal_names
+let signal_name n = List.assoc ~equal:Int.equal n signal_names
 
 (* Associate a value to a list of values  *)
 module Assoc = struct
-  let add k v t =
-    match List.assoc_opt k t with
+  let add ~equal k v t =
+    match List.assoc ~equal k t with
     | None ->
         (k, [v]) :: t
     | Some l ->
-        (k, v :: l) :: List.remove_assoc k t
+        (k, v :: l) :: List.remove_assoc ~equal k t
 
   let iter f t = List.iter f t
 end
 
 (* [group_by f h l] for all elements [e] of [l] groups all [g e] that have the same value
    for [f e]  *)
-let group_by f g l =
+let group_by ~equal f g l =
   let rec aux l res =
-    match l with [] -> res | h :: t -> aux t (Assoc.add (f h) (g h) res)
+    match l with
+    | [] ->
+        res
+    | h :: t ->
+        aux t (Assoc.add ~equal (f h) (g h) res)
   in
   aux l []
 
@@ -369,7 +373,9 @@ let pp_trace plural ppf err =
 
 (* Print the trace of multiple detached process, grouped by identical traces *)
 let pp_grouped ppf plist pp_trace =
-  let grouped = group_by (fun (_, _, res) -> res) (fun p -> p) plist in
+  let grouped =
+    group_by ~equal:Stdlib.( = ) (fun (_, _, res) -> res) (fun p -> p) plist
+  in
   Assoc.iter
     (fun (err, plist) ->
       Format.fprintf

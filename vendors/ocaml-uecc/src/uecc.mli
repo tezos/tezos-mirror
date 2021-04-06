@@ -34,6 +34,8 @@ val equal : 'a key -> 'a key -> bool
 (** [equal k1 k2] is [true] if [k1] is represented by the same bytes
     as [k2], and [false] otherwise. *)
 
+val compare : 'a key -> 'a key -> int
+
 val neuterize : 'a key -> public key
 (** [neuterize k] is [k] if [k] is public, or is the associated public
     key of [k] if [k] is secret. *)

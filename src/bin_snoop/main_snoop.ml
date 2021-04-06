@@ -101,7 +101,7 @@ and infer_cmd_one_shot model_name workload_data solver
   | Measure.Measurement
       ((module Bench), {bench_opts = _; workload_data; date = _}) ->
       let model =
-        match List.assoc_opt model_name Bench.models with
+        match List.assoc_opt ~equal:String.equal model_name Bench.models with
         | Some m ->
             m
         | None ->

@@ -33,6 +33,8 @@ module type Entity = sig
   val to_source : t -> string tzresult Lwt.t
 
   val name : string
+
+  include Compare.S with type t := t
 end
 
 module type Alias = sig

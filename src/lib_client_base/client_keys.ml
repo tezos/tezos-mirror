@@ -52,9 +52,8 @@ let () =
 
 module Public_key_hash = struct
   include Client_aliases.Alias (struct
-    type t = Signature.Public_key_hash.t
-
-    let encoding = Signature.Public_key_hash.encoding
+    (* includes t, Compare, encoding *)
+    include Signature.Public_key_hash
 
     let of_source s = Lwt.return (Signature.Public_key_hash.of_b58check s)
 
@@ -97,6 +96,12 @@ let make_pk_uri (x : Uri.t) : pk_uri tzresult Lwt.t =
       return x
 
 type sk_uri = Uri.t
+
+module CompareUri = Compare.Make (struct
+  type t = Uri.t
+
+  let compare = Uri.compare
+end)
 
 let make_sk_uri (x : Uri.t) : sk_uri tzresult Lwt.t =
   match Uri.scheme x with
@@ -158,6 +163,8 @@ module Secret_key = Client_aliases.Alias (struct
 
   type t = sk_uri
 
+  include (CompareUri : Compare.S with type t := t)
+
   let of_source s = make_sk_uri @@ Uri.of_string s
 
   let to_source t = return (Uri.to_string t)
@@ -169,6 +176,14 @@ module Public_key = Client_aliases.Alias (struct
   let name = "public_key"
 
   type t = pk_uri * Signature.Public_key.t option
+
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare (apk, aso) (bpk, bso) =
+      Compare.or_else (CompareUri.compare apk bpk) (fun () ->
+          Option.compare Signature.Public_key.compare aso bso)
+  end)
 
   let of_source s =
     make_pk_uri @@ Uri.of_string s >>=? fun pk_uri -> return (pk_uri, None)
@@ -209,6 +224,17 @@ module Sapling_key = Client_aliases.Alias (struct
 
   type t = sapling_key
 
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare a b =
+      Compare.or_else (CompareUri.compare a.sk b.sk) (fun () ->
+          Compare.or_else (Stdlib.compare a.path b.path) (fun () ->
+              Tezos_sapling.Core.Client.Viewing_key.compare_index
+                a.address_index
+                b.address_index))
+  end)
+
   let encoding =
     let open Data_encoding in
     conv
@@ -233,11 +259,9 @@ module Sapling_key = Client_aliases.Alias (struct
 end)
 
 module PVSS_public_key = Client_aliases.Alias (struct
+  include Pvss_secp256k1.Public_key (* t, Compare, encoding *)
+
   let name = "PVSS public key"
-
-  type t = Pvss_secp256k1.Public_key.t
-
-  let encoding = Pvss_secp256k1.Public_key.encoding
 
   let of_source s = Lwt.return (Pvss_secp256k1.Public_key.of_b58check s)
 
@@ -248,6 +272,8 @@ module PVSS_secret_key = Client_aliases.Alias (struct
   let name = "PVSS secret key"
 
   type t = pvss_sk_uri
+
+  include CompareUri
 
   let encoding = uri_encoding
 

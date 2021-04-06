@@ -80,7 +80,10 @@ struct
     let rec loop n =
       protect (fun () -> f ())
       >>= function
-      | Error trace as e when List.mem (Exn Lwt_unix.Timeout) trace ->
+      | Error trace as e
+        when List.exists
+               (function Exn Lwt_unix.Timeout -> true | _ -> false)
+               trace ->
           if n = 0 then Lwt.return e
           else
             Events.(emit signer_timeout) (pred n) >>= fun () -> loop (pred n)

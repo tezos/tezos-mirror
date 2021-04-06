@@ -64,7 +64,9 @@ let all_benchmarks_with_all_of (tags : string list) : Benchmark.t list =
   String_table.to_seq bench_table
   |> Seq.map snd |> List.of_seq
   |> List.filter (fun b ->
-         List.for_all (fun tag -> List.mem tag (Benchmark.tags b)) tags)
+         List.for_all
+           (fun tag -> List.mem ~equal:String.equal tag (Benchmark.tags b))
+           tags)
   |> List.sort (fun b1 b2 ->
          String.compare (Benchmark.name b1) (Benchmark.name b2))
 
@@ -91,7 +93,9 @@ let all_benchmarks_with_any_of (tags : string list) : Benchmark.t list =
   String_table.to_seq bench_table
   |> Seq.map snd |> List.of_seq
   |> List.filter (fun b ->
-         List.exists (fun tag -> List.mem tag (Benchmark.tags b)) tags)
+         List.exists
+           (fun tag -> List.mem ~equal:String.equal tag (Benchmark.tags b))
+           tags)
   |> List.sort (fun b1 b2 ->
          String.compare (Benchmark.name b1) (Benchmark.name b2))
 

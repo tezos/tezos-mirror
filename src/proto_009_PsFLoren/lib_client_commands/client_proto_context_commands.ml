@@ -1429,7 +1429,7 @@ let commands network () =
                 List.iter
                   (fun (p : Protocol_hash.t) ->
                     if
-                      List.mem p known_protos
+                      List.mem ~equal:Protocol_hash.equal p known_protos
                       || Environment.Protocol_hash.Map.mem p known_proposals
                     then ()
                     else
@@ -1636,7 +1636,13 @@ let commands network () =
                             Protocol_hash.pp
                             p
                             w
-                            (if List.mem p known_protos then "" else "not "))
+                            ( if
+                              List.mem
+                                ~equal:Protocol_hash.equal
+                                p
+                                known_protos
+                            then ""
+                            else "not " ))
                         ranks ;
                       pp_close_box ppf ())
                 >>= fun () -> return_unit

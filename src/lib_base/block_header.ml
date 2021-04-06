@@ -176,7 +176,10 @@ let get_forced_protocol_upgrade ~user_activated_upgrades =
 
 let get_voted_protocol_overrides ~user_activated_protocol_overrides proto_hash
     =
-  List.assoc_opt proto_hash user_activated_protocol_overrides
+  List.assoc_opt
+    ~equal:Protocol_hash.equal
+    proto_hash
+    user_activated_protocol_overrides
 
 let () =
   Data_encoding.Registration.register shell_header_encoding ;

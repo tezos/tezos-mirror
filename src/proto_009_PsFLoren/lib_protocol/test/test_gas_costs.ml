@@ -239,7 +239,9 @@ let test_cost_reprs_are_all_positive list () =
   List.iter_es
     (fun (cost_name, cost) ->
       if S.(cost > S.zero) then return_unit
-      else if S.equal cost S.zero && List.mem cost_name free then return_unit
+      else if
+        S.equal cost S.zero && List.mem ~equal:String.equal cost_name free
+      then return_unit
       else
         fail
           (Exn

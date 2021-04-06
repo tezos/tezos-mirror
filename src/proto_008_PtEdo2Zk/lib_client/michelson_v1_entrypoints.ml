@@ -119,7 +119,7 @@ let list_contract_unreachables cctxt ~chain ~block ~contract =
 let list_contract_entrypoints cctxt ~chain ~block ~contract =
   list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
   >>=? fun (_, entrypoints) ->
-  if not @@ List.mem_assoc "default" entrypoints then
+  if not @@ List.mem_assoc ~equal:String.equal "default" entrypoints then
     contract_entrypoint_type
       cctxt
       ~chain
@@ -148,7 +148,7 @@ let list_entrypoints cctxt ~chain ~block (program : Script.expr) =
     (chain, block)
     ~script:program
   >>=? fun (_, entrypoints) ->
-  if not @@ List.mem_assoc "default" entrypoints then
+  if not @@ List.mem_assoc ~equal:String.equal "default" entrypoints then
     script_entrypoint_type cctxt ~chain ~block program ~entrypoint:"default"
     >>= function
     | Ok (Some ty) ->

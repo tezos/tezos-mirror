@@ -90,12 +90,13 @@ let print_type_map ppf (parsed, type_map) =
       items
   and print_item ppf loc =
     (let ( >?? ) = Option.bind in
-     List.assoc loc parsed.Michelson_v1_parser.expansion_table
+     List.assoc ~equal:Int.equal loc parsed.Michelson_v1_parser.expansion_table
      >?? fun ({start = {point = s; _}; stop = {point = e; _}}, locs) ->
-     let locs = List.sort compare locs in
+     let locs = List.sort Stdlib.compare locs in
      List.hd locs
      >?? fun hd_loc ->
-     List.assoc hd_loc type_map >?? fun (bef, aft) -> Some (s, e, bef, aft))
+     List.assoc ~equal:Int.equal hd_loc type_map
+     >?? fun (bef, aft) -> Some (s, e, bef, aft))
     |> Option.iter (fun (s, e, bef, aft) ->
            Format.fprintf
              ppf
@@ -154,11 +155,14 @@ let report_errors ppf (parsed, errs) =
       let find_location loc =
         let oloc =
           WithExceptions.Option.get ~loc:__LOC__
-          @@ List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
+          @@ List.assoc
+               ~equal:Int.equal
+               loc
+               parsed.Michelson_v1_parser.unexpansion_table
         in
         fst
           ( WithExceptions.Option.get ~loc:__LOC__
-          @@ List.assoc oloc parsed.expansion_table )
+          @@ List.assoc ~equal:Int.equal oloc parsed.expansion_table )
       in
       match errs with
       | top :: errs ->
@@ -197,11 +201,14 @@ let report_errors ppf (parsed, errs) =
          let find_location loc =
            let oloc =
              WithExceptions.Option.get ~loc:__LOC__
-             @@ List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
+             @@ List.assoc
+                  ~equal:Int.equal
+                  loc
+                  parsed.Michelson_v1_parser.unexpansion_table
            in
            fst
              ( WithExceptions.Option.get ~loc:__LOC__
-             @@ List.assoc oloc parsed.expansion_table )
+             @@ List.assoc ~equal:Int.equal oloc parsed.expansion_table )
          in
          let loc =
            match err with

@@ -59,11 +59,13 @@ module High_watermark = struct
         let hash = Blake2B.hash_bytes [bytes] in
         let chain_id = Chain_id.of_bytes_exn (Bytes.sub bytes 1 4) in
         let level = get_level () in
-        ( match List.assoc_opt chain_id all with
+        ( match List.assoc_opt ~equal:Chain_id.equal chain_id all with
         | None ->
             return_none
         | Some marks -> (
-          match List.assoc_opt pkh marks with
+          match
+            List.assoc_opt ~equal:Signature.Public_key_hash.equal pkh marks
+          with
           | None ->
               return_none
           | Some (previous_level, _, None) ->
@@ -134,7 +136,8 @@ let check_magic_byte magic_bytes data =
       return_unit
   | Some magic_bytes ->
       let byte = TzEndian.get_uint8 data 0 in
-      if Bytes.length data > 1 && List.mem byte magic_bytes then return_unit
+      if Bytes.length data > 1 && List.mem ~equal:Int.equal byte magic_bytes
+      then return_unit
       else failwith "magic byte 0x%02X not allowed" byte
 
 let check_authorization cctxt pkh data require_auth signature =

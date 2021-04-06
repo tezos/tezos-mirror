@@ -92,9 +92,15 @@ let build_rpc_directory state =
   register2 Worker_services.Peer_validators.S.state (fun chain peer_id () () ->
       Chain_directory.get_chain_id state chain
       >>= fun chain_id ->
+      let equal (acid, apid) (bcid, bpid) =
+        Chain_id.equal acid bcid && P2p_peer.Id.equal apid bpid
+      in
       let w =
         WithExceptions.Option.to_exn ~none:Not_found
-        @@ List.assoc (chain_id, peer_id) (Peer_validator.running_workers ())
+        @@ List.assoc
+             ~equal
+             (chain_id, peer_id)
+             (Peer_validator.running_workers ())
       in
       return
         {
@@ -118,7 +124,10 @@ let build_rpc_directory state =
       >>= fun chain_id ->
       let w =
         WithExceptions.Option.to_exn ~none:Not_found
-        @@ List.assoc chain_id (Chain_validator.running_workers ())
+        @@ List.assoc
+             ~equal:Chain_id.equal
+             chain_id
+             (Chain_validator.running_workers ())
       in
       return
         {
@@ -133,7 +142,10 @@ let build_rpc_directory state =
       >>= fun chain_id ->
       let w =
         WithExceptions.Option.to_exn ~none:Not_found
-        @@ List.assoc chain_id (Chain_validator.running_workers ())
+        @@ List.assoc
+             ~equal:Chain_id.equal
+             chain_id
+             (Chain_validator.running_workers ())
       in
       return (Chain_validator.ddb_information w)) ;
   !dir

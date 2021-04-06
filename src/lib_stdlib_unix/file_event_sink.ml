@@ -91,9 +91,9 @@ module Event_filter = struct
     | Name_matches re ->
         Re.execp re name
     | Level_in l ->
-        List.mem level l
+        List.mem ~equal:Internal_event.Level.equal level l
     | Section_in l ->
-        List.mem section l
+        List.mem ~equal:Internal_event.Section.equal section l
 
   let rec pp fmt filter =
     let open Format in
@@ -588,14 +588,14 @@ module Query = struct
       | None ->
           fun _ -> true
       | Some l ->
-          fun name -> List.mem name l
+          fun name -> List.mem ~equal:String.equal name l
     in
     let section_matches =
       match only_sections with
       | None ->
           fun _ -> true
       | Some l ->
-          fun name -> List.mem name l
+          fun name -> List.mem ~equal:(Option.equal String.equal) name l
     in
     configure uri
     >>=? fun {path = sink_path; _} ->

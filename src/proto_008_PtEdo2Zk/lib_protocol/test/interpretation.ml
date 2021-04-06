@@ -114,7 +114,10 @@ let test_stack_overflow () =
   | Ok _ ->
       Alcotest.fail "expected an error"
   | Error lst
-    when List.mem Script_interpreter.Michelson_too_many_recursive_calls lst ->
+    when List.mem
+           ~equal:( = )
+           Script_interpreter.Michelson_too_many_recursive_calls
+           lst ->
       return ()
   | Error _ ->
       Alcotest.failf "Unexpected error (%s)" __LOC__

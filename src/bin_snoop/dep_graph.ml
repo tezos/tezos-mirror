@@ -381,9 +381,9 @@ let to_graph (solved : string Solver.solved list) =
   g
 
 let find_model_or_generic model_name model_list =
-  match List.assoc_opt model_name model_list with
+  match List.assoc_opt ~equal:String.equal model_name model_list with
   | None ->
-      List.assoc_opt "*" model_list
+      List.assoc_opt ~equal:String.equal "*" model_list
   | res ->
       res
 

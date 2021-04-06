@@ -221,6 +221,8 @@ module Raw = struct
     (* diversifier_index is 11 bytes long but we treat is as 8 byte long int64 *)
     type index = R.diversifier_index
 
+    let compare_index = R.compare_diversifier_index
+
     (* partial function to convert an 11 byte index to a 8 byte int64 *)
     let index_to_int64 idx =
       let b = R.of_diversifier_index idx in

@@ -248,7 +248,7 @@ let decrypt_list (cctxt : #Client_context.io_wallet) keys =
     (fun (name, sk_uri) ->
       if
         Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme
-        && (keys = [] || List.mem name keys)
+        && (keys = [] || List.mem ~equal:String.equal name keys)
       then decrypt cctxt ~name sk_uri >>=? fun _ -> return_unit
       else return_unit)
     sks

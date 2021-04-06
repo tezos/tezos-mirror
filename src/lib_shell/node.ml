@@ -168,8 +168,13 @@ let store_known_protocols store =
         | Some protocol -> (
             let hash = Protocol.hash protocol in
             if not (Protocol_hash.equal hash protocol_hash) then
-              if List.mem protocol_hash test_protocol_hashes then
-                Lwt.return_unit (* noop. test protocol should not be stored *)
+              if
+                List.mem
+                  ~equal:Protocol_hash.equal
+                  protocol_hash
+                  test_protocol_hashes
+              then Lwt.return_unit
+                (* noop. test protocol should not be stored *)
               else
                 Node_event.(emit store_protocol_incorrect_hash) protocol_hash
             else

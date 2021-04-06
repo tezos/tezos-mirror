@@ -265,7 +265,7 @@ module Make (Proto : Registered_protocol.T) = struct
                 let op = {Proto.shell = op.shell; protocol_data} in
                 let allowed_pass = Proto.acceptable_passes op in
                 fail_unless
-                  (List.mem pass allowed_pass)
+                  (List.mem ~equal:Int.equal pass allowed_pass)
                   (invalid_block
                      (Unallowed_pass {operation = op_hash; pass; allowed_pass}))
                 >>=? fun () -> return op))

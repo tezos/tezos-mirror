@@ -36,6 +36,8 @@ type parsed = {
   unexpansion_table : (int * int) list;
 }
 
+let compare_parsed = Stdlib.compare
+
 (* Unexpanded toplevel expression should be a sequence *)
 let expand_all source ast errors =
   let (unexpanded, loc_table) = extract_locations ast in
@@ -45,7 +47,7 @@ let expand_all source ast errors =
   let (expanded, unexpansion_table) = extract_locations expanded in
   let expansion_table =
     let sorted =
-      List.sort (fun (_, a) (_, b) -> compare a b) unexpansion_table
+      List.sort (fun (_, a) (_, b) -> Stdlib.compare a b) unexpansion_table
     in
     let grouped =
       let rec group = function
@@ -65,8 +67,8 @@ let expand_all source ast errors =
         (fun (l, ploc) (l', elocs) ->
           assert (l = l') ;
           (l, (ploc, elocs)))
-        (List.sort compare loc_table)
-        (List.sort compare grouped)
+        (List.sort Stdlib.compare loc_table)
+        (List.sort Stdlib.compare grouped)
     with
     | Ok v ->
         v

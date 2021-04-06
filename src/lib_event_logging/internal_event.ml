@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -82,11 +83,17 @@ module Level = struct
          (fun l -> (to_string l, l))
          [Debug; Info; Notice; Warning; Error; Fatal])
 
-  let compare = compare
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare = Stdlib.compare
+  end)
 end
 
 module Section : sig
   type t
+
+  include Compare.S with type t := t
 
   val empty : t
 
@@ -103,6 +110,12 @@ module Section : sig
   val pp : Format.formatter -> t -> unit
 end = struct
   type t = {path : string list; lwt_log_section : Lwt_log_core.section}
+
+  include Compare.Make (struct
+    type nonrec t = t
+
+    let compare = Stdlib.compare
+  end)
 
   let empty = {path = []; lwt_log_section = Lwt_log_core.Section.make ""}
 

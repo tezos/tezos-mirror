@@ -101,6 +101,8 @@ module type Viewing_key = sig
       the following addresses can be derived with [index_succ] **)
   type index
 
+  val compare_index : index -> index -> int
+
   val default_index : index
 
   val index_succ : index -> index

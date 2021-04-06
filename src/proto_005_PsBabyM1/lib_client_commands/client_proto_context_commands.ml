@@ -384,7 +384,9 @@ let commands () =
                         Protocol_hash.pp
                         p
                         w
-                        (if List.mem p known_protos then "" else "not "))
+                        ( if List.mem ~equal:Protocol_hash.equal p known_protos
+                        then ""
+                        else "not " ))
                     ranks ;
                   pp_close_box ppf ())
             >>= fun () -> return_unit

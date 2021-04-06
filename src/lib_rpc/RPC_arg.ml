@@ -26,3 +26,6 @@
 type ('i, 'j) eq = ('i, 'j) Resto.eq = Eq : ('a, 'a) eq
 
 include Resto.Arg
+
+let eq_descr a b =
+  String.equal a.name b.name && Option.equal String.equal a.descr b.descr

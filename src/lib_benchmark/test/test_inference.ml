@@ -95,10 +95,12 @@ module T () = struct
       (Inference.Lasso {alpha = 1.0; normalize = false; positive = false})
 
   let const =
-    List.assoc fv_const mapping |> WithExceptions.Option.get ~loc:__LOC__
+    List.assoc ~equal:Free_variable.equal fv_const mapping
+    |> WithExceptions.Option.get ~loc:__LOC__
 
   let quadratic_term =
-    List.assoc fv_quad mapping |> WithExceptions.Option.get ~loc:__LOC__
+    List.assoc ~equal:Free_variable.equal fv_quad mapping
+    |> WithExceptions.Option.get ~loc:__LOC__
 end
 
 (* ------------------------------------------------------------------------- *)

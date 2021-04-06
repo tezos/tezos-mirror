@@ -1893,7 +1893,7 @@ let find_command tree initial_arguments =
     | (TPrefix {stop = None; prefix}, ([] | ("-h" | "--help") :: _)) ->
         fail (Unterminated_command (initial_arguments, gather_assoc prefix))
     | (TPrefix {prefix; _}, hd_arg :: tl) -> (
-      match List.assoc hd_arg prefix with
+      match List.assoc ~equal:String.equal hd_arg prefix with
       | None ->
           fail (Command_not_found (List.rev acc, gather_assoc prefix))
       | Some tree' ->
@@ -2069,7 +2069,7 @@ let complete_tree cctxt tree index args =
           | _ ->
               complete_next_tree cctxt this_tree )
       | (TPrefix {prefix; _}, hd :: tl) -> (
-        match List.assoc hd prefix with
+        match List.assoc ~equal:String.equal hd prefix with
         | None ->
             return_nil
         | Some p ->

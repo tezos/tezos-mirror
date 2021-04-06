@@ -210,8 +210,9 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
             failwith
               "--sources MUST be specified when --mode light is specified"
         | (`Mode_light, Some sources_config) ->
-            ( if List.mem rpc_config.endpoint sources_config.uris then
-              return_unit
+            ( if
+              List.mem ~equal:Uri.equal rpc_config.endpoint sources_config.uris
+            then return_unit
             else
               failwith
                 "Value of --endpoint is %a. Therefore, this URI MUST be in \

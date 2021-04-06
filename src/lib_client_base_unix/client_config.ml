@@ -535,7 +535,7 @@ let client_mode_arg () =
       mode_strings
       all_modes
     >>?= fun modes_and_strings ->
-    match List.assoc_opt str modes_and_strings with
+    match List.assoc_opt ~equal:String.equal str modes_and_strings with
     | None ->
         fail @@ Invalid_mode_arg str
     | Some mode ->

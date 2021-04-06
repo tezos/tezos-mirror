@@ -47,7 +47,7 @@ let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz3" 36
 open Uecc
 
 module Public_key = struct
-  type t = public key
+  type t = Uecc.public Uecc.key
 
   let name = "P256.Public_key"
 
@@ -82,7 +82,7 @@ module Public_key = struct
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare = compare
+    let compare = Uecc.compare
   end)
 
   include Helpers.MakeRaw (struct

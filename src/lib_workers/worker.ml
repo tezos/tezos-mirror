@@ -518,7 +518,10 @@ struct
     lwt_emit w (Logger.WorkerEvent (evt, Event.level evt))
     >>= fun () ->
     if Event.level evt >= w.limits.backlog_level then
-      List.assoc (Event.level evt) w.event_log
+      List.assoc
+        ~equal:Internal_event.Level.equal
+        (Event.level evt)
+        w.event_log
       |> Option.iter (fun ring -> Ringo.Ring.add ring evt) ;
     Lwt.return_unit
 

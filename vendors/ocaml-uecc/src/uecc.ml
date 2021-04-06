@@ -69,6 +69,12 @@ let equal : type a. a key -> a key -> bool = fun k1 k2 ->
   | Pk pk, Pk pk2 ->
       Bytes.equal pk pk2
 
+let compare : type a. a key -> a key -> int = fun k1 k2 ->
+  match k1, k2 with
+  | Sk sk, Sk sk2 -> Bytes.compare sk sk2
+  | Pk pk, Pk pk2 ->
+      Bytes.compare pk pk2
+
 let neuterize : type a. a key -> public key = function
   | Pk pk -> Pk pk
   | Sk sk ->
