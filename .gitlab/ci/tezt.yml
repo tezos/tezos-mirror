@@ -1,9 +1,7 @@
 # We use `scripts/run-tezt-tests-ci.sh` to split the Tezt tests into ranges:
 
 tezt:run-1-33:
-  extends: .test_template
-  before_script:
-    - make
+  extends: .integration_template
   script:
     - sh scripts/run-tezt-tests-ci.sh 1 33
   artifacts:
@@ -13,9 +11,7 @@ tezt:run-1-33:
     when: on_failure
 
 tezt:run-34-66:
-  extends: .test_template
-  before_script:
-    - make
+  extends: .integration_template
   script:
     - sh scripts/run-tezt-tests-ci.sh 34 66
   artifacts:
@@ -25,9 +21,7 @@ tezt:run-34-66:
     when: on_failure
 
 tezt:run-67-end:
-  extends: .test_template
-  before_script:
-    - make
+  extends: .integration_template
   script:
     - sh scripts/run-tezt-tests-ci.sh 67
   artifacts:
@@ -35,7 +29,6 @@ tezt:run-67-end:
       - tezt.log
     expire_in: 1 day
     when: on_failure
-
 
 tezt:manual:migration:
   extends: .test_template
@@ -46,9 +39,9 @@ tezt:manual:migration:
     - block_hash=$(echo mainnet.roll.* | sed -r 's/mainnet\.roll\.[0-9_-]+\.(.*)\.[0-9]+\.chain\.xz/\1/g')
     - cat mainnet.roll.* | xz -d -v -T0 > mainnet.rolling
 
-    - make
     - scripts/prepare_migration_test.sh auto mainnet.rolling "$block_hash"
   script:
+    - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi
     - dune exec ./tezt/manual_tests/main.exe -- migration --color --log-buffer-size 5000 --log-file tezt-migration.log
   artifacts:
     when: always

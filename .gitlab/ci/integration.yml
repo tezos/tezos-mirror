@@ -1,8 +1,14 @@
-# definition for the environment to run all integration tests
+# Definition for the environment to run all integration tests.
+# This is also used by Tezt tests.
+# In general we do not have to run make, which takes a while,
+# because the binaries have been produced by the build job and are
+# in the cache. But if they are not, we need to build them.
+# Ideally we should also check that the baker / accuser / endorser
+# exist (some tests use them) but their actual name depend on the protocol.
 .integration_template:
   extends: .test_template
   before_script:
-    - make
+    - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi
 
 integration:proto:sandbox:
   extends: .integration_template
