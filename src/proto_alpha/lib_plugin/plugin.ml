@@ -703,12 +703,6 @@ module RPC = struct
                 [unparse_comparable_ty t],
                 unparse_type_annot tname )
 
-      (* Uncomment when rebasing on top of Baking account *)
-      (* | Baker_hash_key tname ->
-       *     Prim (-1, T_baker_hash, [], unparse_type_annot tname)
-       * | Pvss_key_key tname ->
-       *     Prim (-1, T_pvss_key, [], unparse_type_annot tname) *)
-
       let unparse_memo_size memo_size =
         let z = Alpha_context.Sapling.Memo_size.unparse_to_z memo_size in
         Int (-1, z)
@@ -805,14 +799,6 @@ module RPC = struct
               ( T_sapling_state,
                 [unparse_memo_size memo_size],
                 unparse_type_annot tname )
-
-      (* Uncomment when rebasing on top of Baking account *)
-      (* | Baker_hash_t tname ->
-       *     return (T_baker_hash, [], unparse_type_annot tname)
-       * | Pvss_key_t tname ->
-       *     return (T_pvss_key, [], unparse_type_annot tname)
-       * | Baker_operation_t tname ->
-       *     return (T_baker_operation, [], unparse_type_annot tname) *)
     end
 
     let register () =
