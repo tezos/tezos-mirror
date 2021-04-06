@@ -28,7 +28,6 @@ open Tezos_shell_services
 (** The module type of a proxy environment. Modules of this type should be
     prepared protocol-side and registered here to become available to the
     proxy facility. *)
-
 module type Proxy_sig = sig
   val protocol_hash : Protocol_hash.t
 
@@ -59,6 +58,13 @@ module type Proxy_sig = sig
     Block_services.chain ->
     Block_services.block ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
+
+  (** The [time_between_blocks] constant for the given block, if any. *)
+  val time_between_blocks :
+    RPC_context.json ->
+    Block_services.chain ->
+    Block_services.block ->
+    int64 option tzresult Lwt.t
 
   (** Functions used to implement the light mode *)
   include Light_proto.PROTO_RPCS

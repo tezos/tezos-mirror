@@ -30,7 +30,9 @@
 type mode =
   | Light_client of Light.sources  (** [tezos-client --mode light] is running *)
   | Proxy_client  (** [tezos-client --mode proxy] is running *)
-  | Proxy_server  (** [tezos-proxy-server] is running *)
+  | Proxy_server of int option
+      (** [tezos-proxy-server] is running and the [int option] value
+          is the value of argument [--sym-block-caching-time] *)
 
 (** [build_directory printer rpc_context env mode] returns the directory
     of RPCs that is served locally by the client's light and proxy modes and

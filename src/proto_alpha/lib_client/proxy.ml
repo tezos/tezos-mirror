@@ -161,6 +161,15 @@ let initial_context
     ["version"]
     (Bytes.of_string version_value)
 
+let time_between_blocks (rpc_context : RPC_context.json)
+    (chain : Tezos_shell_services.Block_services.chain)
+    (block : Tezos_shell_services.Block_services.block) =
+  let open Protocol in
+  let rpc_context = new Protocol_client_context.wrap_rpc_context rpc_context in
+  Constants_services.all rpc_context (chain, block) >>=? fun constants ->
+  let times = constants.parametric.time_between_blocks in
+  return @@ Option.map Alpha_context.Period.to_seconds (List.hd times)
+
 let init_env_rpc_context (_printer : Tezos_client_base.Client_context.printer)
     (proxy_builder :
       Tezos_proxy.Proxy_proto.proto_rpc ->
@@ -186,6 +195,8 @@ let () =
     let hash = Protocol_client_context.Alpha_block_services.hash
 
     let init_env_rpc_context = init_env_rpc_context
+
+    let time_between_blocks = time_between_blocks
 
     include Light.M
   end in

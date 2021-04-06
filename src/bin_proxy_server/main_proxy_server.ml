@@ -118,15 +118,12 @@ let main_promise (config_file : string option)
       load_config_from_file config_file >>=? return_some )
   >>=? fun (config_from_file : Proxy_server_config.t option) ->
   let open Proxy_server_config in
-  to_runtime
-    ( match config_from_file with
-    | None ->
-        (* No config file: all data comes from command line arguments *)
-        config_args
-    | Some config_from_file ->
-        (* Config file specified: override it with command line arguments *)
-        union_right_bias config_from_file config_args )
-  >>? fun {endpoint; rpc_server_address; rpc_server_port; rpc_server_tls; _} ->
+  get_runtime config_from_file config_args
+  >>=? fun { endpoint;
+             rpc_server_address;
+             rpc_server_port;
+             rpc_server_tls;
+             sym_block_caching_time } ->
   let open Tezos_rpc_http in
   let open Tezos_rpc_http_client_unix in
   let logger =
@@ -155,7 +152,7 @@ let main_promise (config_file : string option)
     Tezos_proxy.Proxy_services.build_directory
       printer
       http_ctxt
-      Tezos_proxy.Proxy_services.Proxy_server
+      (Tezos_proxy.Proxy_services.Proxy_server sym_block_caching_time)
       proxy_env
   in
   let server_args : Proxy_server_main_run.args =
