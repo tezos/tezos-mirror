@@ -23,14 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let pp_bracketted_list elem_enc ppf l =
+let pp_first_element elem_enc ppf l =
   let open Format in
   pp_print_string ppf "[ " ;
-  pp_print_list
-    ~pp_sep:(fun ppf () -> pp_print_char ppf ';' ; pp_print_space ppf ())
-    elem_enc
-    ppf
-    l ;
+  ( match l with
+  | [] ->
+      ()
+  | [element] ->
+      elem_enc ppf element
+  | element :: _ ->
+      elem_enc ppf element ;
+      pp_print_string ppf "; ..." ) ;
   pp_print_string ppf " ]"
 
 module P2p_protocol = struct
@@ -84,8 +87,8 @@ module P2p_protocol = struct
       ~name:"advertise_sending_failed"
       ~msg:"sending advertise to {peer} failed: {trace}"
       ~level:Warning
-      ~pp2:pp_print_error_first
       ("peer", P2p_peer.Id.encoding)
+      ~pp2:pp_print_error_first
       ("trace", Error_monad.trace_encoding)
 
   let swap_succeeded =
@@ -102,8 +105,8 @@ module P2p_protocol = struct
       ~name:"swap_interrupted"
       ~msg:"swap to {point} was interrupted: {trace}"
       ~level:Debug
-      ~pp2:pp_print_error_first
       ("point", P2p_point.Id.encoding)
+      ~pp2:pp_print_error_first
       ("trace", Error_monad.trace_encoding)
 
   let swap_failed =
@@ -112,8 +115,8 @@ module P2p_protocol = struct
       ~name:"swap_failed"
       ~msg:"swap to {point} failed: {trace}"
       ~level:Info
-      ~pp2:pp_print_error_first
       ("point", P2p_point.Id.encoding)
+      ~pp2:pp_print_error_first
       ("trace", Error_monad.trace_encoding)
 
   let swap_ack_received =
@@ -160,8 +163,8 @@ module P2p_connect_handler = struct
       ~name:"disconnected"
       ~msg:"disconnected: {peer} ({point})"
       ~level:Debug
-      ~pp2:P2p_connection.Id.pp
       ("peer", P2p_peer.Id.encoding)
+      ~pp2:P2p_connection.Id.pp
       ("point", P2p_connection.Id.encoding)
 
   let peer_rejected =
@@ -229,8 +232,8 @@ module P2p_connect_handler = struct
       ~name:"authentication_error"
       ~msg:"authentication error for {point}: {errors}"
       ~level:Debug
-      ~pp2:pp_print_error_first
       ("point", P2p_point.Id.encoding)
+      ~pp2:pp_print_error_first
       ("errors", Error_monad.trace_encoding)
 
   let connection_rejected_by_peers =
@@ -241,11 +244,12 @@ module P2p_connect_handler = struct
         "connection to {point} rejected by peer {peer}. Reason {reason}. Peer \
          list received: {points}"
       ~level:Debug
-      ~pp2:P2p_peer.Id.pp_short
-      ~pp3:P2p_rejection.pp_short
       ("point", P2p_point.Id.encoding)
+      ~pp2:P2p_peer.Id.pp_short
       ("peer", P2p_peer.Id.encoding)
+      ~pp3:P2p_rejection.pp_short
       ("reason", P2p_rejection.encoding)
+      ~pp4:(pp_first_element P2p_point.Id.pp)
       ("points", Data_encoding.list P2p_point.Id.encoding)
 
   let connection_error =
@@ -254,8 +258,8 @@ module P2p_connect_handler = struct
       ~name:"connection_error"
       ~msg:"connection to {point} rejected by peer : {errors}"
       ~level:Debug
-      ~pp2:pp_print_error_first
       ("point", P2p_point.Id.encoding)
+      ~pp2:pp_print_error_first
       ("errors", Error_monad.trace_encoding)
 
   let connect_status =
@@ -273,8 +277,8 @@ module P2p_connect_handler = struct
       ~name:"connect_error"
       ~msg:"connection error for point {point}, disconnecting: {errors}"
       ~level:Debug
-      ~pp2:pp_print_error_first
       ("point", P2p_point.Id.encoding)
+      ~pp2:pp_print_error_first
       ("errors", Error_monad.trace_encoding)
 
   let authenticate_reject_protocol_mismatch =
@@ -283,14 +287,14 @@ module P2p_connect_handler = struct
       ~name:"authenticate_reject_protocol_mismatch"
       ~msg:"no common protocol with {peer}"
       ~level:Debug
-      ~pp5:(pp_bracketted_list Distributed_db_version.pp)
-      ~pp7:(pp_bracketted_list P2p_version.pp)
       ("point", P2p_point.Id.encoding)
       ("peer", P2p_peer.Id.encoding)
       ("local_chain", Distributed_db_version.Name.encoding)
       ("remote_chain", Distributed_db_version.Name.encoding)
+      ~pp5:(pp_first_element Distributed_db_version.pp)
       ("local_db_versions", Data_encoding.list Distributed_db_version.encoding)
       ("remote_db_version", Distributed_db_version.encoding)
+      ~pp7:(pp_first_element P2p_version.pp)
       ("local_p2p_version", Data_encoding.list P2p_version.encoding)
       ("remote_p2p_version", P2p_version.encoding)
 end
@@ -473,8 +477,8 @@ module P2p_socket = struct
       ~name:"nack_point_with_list"
       ~msg:"nack point {point} with point list {points}"
       ~level:Debug
-      ~pp2:(pp_bracketted_list P2p_point.Id.pp)
       ("point", P2p_connection.Id.encoding)
+      ~pp2:(pp_first_element P2p_point.Id.pp)
       ("points", Data_encoding.list P2p_point.Id.encoding)
 
   let nack_point_no_point =
@@ -543,8 +547,8 @@ module P2p_socket = struct
       ~name:"socket_send_message"
       ~level:Debug
       ~msg:"sending message to {peer}: {content}"
-      ~pp2:Data_encoding.Json.pp
       ("peer", P2p_peer.Id.encoding)
+      ~pp2:Data_encoding.Json.pp
       ("content", Data_encoding.json)
 end
 
@@ -571,10 +575,10 @@ module P2p_io_scheduler = struct
         "unexpected error in connection ({direction}: \
          {connection_id},{name}): {error}"
       ~level:Error
-      ~pp4:pp_print_error_first
       ("direction", Data_encoding.string)
       ("connection_id", Data_encoding.int31)
       ("name", Data_encoding.string)
+      ~pp4:pp_print_error_first
       ("error", Error_monad.trace_encoding)
 
   let wait_quota =
@@ -679,9 +683,9 @@ module P2p_pool = struct
       ~name:"get_points"
       ~msg:"getting points from {medium} of {source}: {point_list}"
       ~level:Debug
-      ~pp3:(pp_bracketted_list P2p_point.Id.pp)
       ("medium", Data_encoding.string)
       ("source", P2p_peer.Id.encoding)
+      ~pp3:(pp_first_element P2p_point.Id.pp)
       ("point_list", Data_encoding.list P2p_point.Id.encoding)
 
   let create_pool =
@@ -690,7 +694,7 @@ module P2p_pool = struct
       ~name:"create_pool"
       ~msg:"create pool: known points {point_list}"
       ~level:Debug
-      ~pp1:(pp_bracketted_list P2p_point.Id.pp)
+      ~pp1:(pp_first_element P2p_point.Id.pp)
       ("point_list", Data_encoding.list P2p_point.Id.encoding)
 
   let parse_error =
@@ -763,8 +767,8 @@ module Discovery = struct
       ~name:"unexpected_error"
       ~msg:"unexpected error in {worker} worker: {error}"
       ~level:Error
-      ~pp2:pp_print_error_first
       ("worker", Data_encoding.string)
+      ~pp2:pp_print_error_first
       ("error", Error_monad.trace_encoding)
 
   let unexpected_exit =
@@ -878,8 +882,8 @@ module P2p = struct
       ~name:"sending_message_error"
       ~level:Debug
       ~msg:"error sending message to {peer}: {error}"
-      ~pp2:pp_print_error_first
       ("peer", P2p_peer.Id.encoding)
+      ~pp2:pp_print_error_first
       ("error", Error_monad.trace_encoding)
 
   let message_trysent =
@@ -896,8 +900,8 @@ module P2p = struct
       ~name:"trysending_message_error"
       ~level:Debug
       ~msg:"error trysending message to {peer}: {error}"
-      ~pp2:pp_print_error_first
       ("peer", P2p_peer.Id.encoding)
+      ~pp2:pp_print_error_first
       ("error", Error_monad.trace_encoding)
 
   let broadcast =
