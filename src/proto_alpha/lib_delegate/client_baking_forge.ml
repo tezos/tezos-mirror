@@ -402,7 +402,7 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block
       let new_size = total_size + size in
       let new_gas = Gas.Arith.(add total_gas gas) in
       if new_size > max_size || Gas.Arith.(new_gas > hard_gas_limit_per_block)
-      then (new_size, new_gas, (good_ops, op :: bad_ops))
+      then (total_size, total_gas, (good_ops, op :: bad_ops))
       else (new_size, new_gas, (op :: good_ops, bad_ops)))
     (0, Gas.Arith.zero, ([], []))
     manager_operations
