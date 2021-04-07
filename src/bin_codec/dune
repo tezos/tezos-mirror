@@ -25,9 +25,6 @@
             (select void_for_linking-008-PtEdo2Zk from
               (tezos-client-008-PtEdo2Zk -> void_for_linking-008-PtEdo2Zk.empty)
               (-> void_for_linking-008-PtEdo2Zk.empty))
-            (select void_for_linking-009-PsFLorBA from
-              (tezos-client-009-PsFLorBA -> void_for_linking-009-PsFLorBA.empty)
-              (-> void_for_linking-009-PsFLorBA.empty))
             (select void_for_linking-009-PsFLoren from
               (tezos-client-009-PsFLoren -> void_for_linking-009-PsFLoren.empty)
               (-> void_for_linking-009-PsFLoren.empty))
@@ -49,7 +46,6 @@
    (write-file void_for_linking-006-PsCARTHA.empty "")
    (write-file void_for_linking-007-PsDELPH1.empty "")
    (write-file void_for_linking-008-PtEdo2Zk.empty "")
-   (write-file void_for_linking-009-PsFLorBA.empty "")
    (write-file void_for_linking-009-PsFLoren.empty "")
 )))
 
