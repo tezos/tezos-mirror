@@ -94,6 +94,16 @@ val uint16 : int QCheck.arbitrary
     - Generation of values is delegated to {!int_range} *)
 val int16 : int QCheck.arbitrary
 
+(** [uint8] generates an unsigned int8 arbitrary
+
+    - Generation of values is delegated to {!int_range} *)
+val uint8 : int QCheck.arbitrary
+
+(** [int8] generates a signed int8 arbitrary
+
+    - Generation of values is delegated to {!int_range} *)
+val int8 : int QCheck.arbitrary
+
 (** [of_option_shrink shrink_opt] returns a shrinker from an optional one.
     This is typically useful when extracting a shrinker from an [arbitrary]
     to compose a bigger shrinker.
