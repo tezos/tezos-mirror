@@ -2,6 +2,11 @@
 
 set -e
 
+function create_opam_switch() {
+    [ -n "$1" ] || { echo "create_opam_switch expects a non-empty argument"; return 1; }
+    opam switch create "$1" --repositories=tezos ocaml-base-compiler.$ocaml_version
+}
+
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
 
@@ -13,18 +18,37 @@ else
     dev=
 fi
 
+# $OPAMSWITCH variable makes the following commands fail if the switch referred
+# to by it does not exist. Since we're going to create it later, for now let's
+# pretend it's not set.
+opamswitch="$OPAMSWITCH"
+unset OPAMSWITCH
+
 opam repository set-url tezos --dont-select $opam_repository || \
     opam repository add tezos --dont-select $opam_repository > /dev/null 2>&1
 
 opam update --repositories --development
 
-if [ ! -d "$src_dir/_opam" ] ; then
-    opam switch create "$src_dir" --repositories=tezos ocaml-base-compiler.$ocaml_version
-fi
+OPAMSWITCH="$opamswitch"
 
-if [ ! -d "$src_dir/_opam" ] ; then
-    echo "Failed to create the opam switch"
-    exit 1
+# If $OPAMSWITCH is set to a non-existent switch, such a switch should be created.
+if [ -n "$OPAMSWITCH" ]; then
+    if ! opam switch "$OPAMSWITCH" 2> /dev/null; then
+        echo "Creating local switch $OPAMSWITCH..."
+        create_opam_switch "$OPAMSWITCH"
+    else
+        echo "$OPAMSWITCH already exists. Installing dependencies."
+    fi
+    eval `opam env --switch="$OPAMSWITCH" --set-switch`
+else
+    if [ ! -d "$src_dir/_opam" ] ; then
+        create_opam_switch "$src_dir"
+    fi
+
+    if [ ! -d "$src_dir/_opam" ] ; then
+        echo "Failed to create the opam switch"
+        exit 1
+    fi
 fi
 
 eval $(opam env --shell=sh)
