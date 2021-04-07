@@ -650,7 +650,7 @@ let compute_minimal_valid_time constants ~priority ~endorsing_power
 
 let filter_and_apply_operations cctxt state endorsements_map ~chain ~block
     block_info ~priority ?protocol_data
-    ((operations : packed_operation list list), overflowing_operations) =
+    ((operations : packed_operation list list), _overflowing_operations) =
   (* Retrieve the minimal valid time for when the block can be baked with 0 endorsements *)
   Delegate_services.Minimal_valid_time.get cctxt (chain, block) priority 0
   >>=? fun min_valid_timestamp ->
@@ -662,6 +662,32 @@ let filter_and_apply_operations cctxt state endorsements_map ~chain ~block
         -% t event "baking_local_validation_start"
         -% a Block_hash.Logging.tag block_info.Client_baking_blocks.hash)
   >>= fun () ->
+  let quota : Environment.Updater.quota list = Main.validation_passes in
+  let endorsements =
+    retain_operations_up_to_quota
+      (WithExceptions.Option.get
+         ~loc:__LOC__
+         (List.nth operations endorsements_index))
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth quota endorsements_index )
+  in
+  let votes =
+    retain_operations_up_to_quota
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations votes_index )
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota votes_index)
+  in
+  let anonymous =
+    retain_operations_up_to_quota
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations anonymous_index )
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota anonymous_index)
+  in
+  let managers =
+    (* Managers are already trimmed *)
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth operations managers_index
+  in
   begin_construction
     ~timestamp:min_valid_timestamp
     ?protocol_data
@@ -695,21 +721,6 @@ let filter_and_apply_operations cctxt state endorsements_map ~chain ~block
             state.index <- index ;
             return inc)
   >>=? fun initial_inc ->
-  let endorsements =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.nth operations endorsements_index
-  in
-  let votes =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth operations votes_index
-  in
-  let anonymous =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.nth operations anonymous_index
-  in
-  let managers =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.nth operations managers_index
-  in
   let validate_operation inc op =
     protect (fun () -> add_operation inc op)
     >>= function
@@ -759,43 +770,18 @@ let filter_and_apply_operations cctxt state endorsements_map ~chain ~block
       ops
     >>= fun (inc, ops) -> Lwt.return (inc, List.rev ops)
   in
-  (* First pass : we filter out invalid operations by applying them in the correct order *)
+  (* Apply operations and filter the invalid ones *)
   filter_valid_operations initial_inc endorsements
   >>= fun (inc, endorsements) ->
   filter_valid_operations inc votes
   >>= fun (inc, votes) ->
   filter_valid_operations inc anonymous
   >>= fun (manager_inc, anonymous) ->
-  filter_valid_operations manager_inc (managers @ overflowing_operations)
+  filter_valid_operations manager_inc managers
   >>= fun (inc, managers) ->
   finalize_construction inc
   >>=? fun _ ->
-  let quota : Environment.Updater.quota list = Main.validation_passes in
-  let {Constants.hard_gas_limit_per_block; _} = state.constants.parametric in
-  let votes =
-    retain_operations_up_to_quota
-      votes
-      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota votes_index)
-  in
-  let anonymous =
-    retain_operations_up_to_quota
-      anonymous
-      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota anonymous_index)
-  in
-  (* We found a valid subset of managers, trim them *)
-  let (accepted_managers, _overflowing_managers) =
-    trim_manager_operations
-      ~max_size:
-        ( WithExceptions.Option.get ~loc:__LOC__
-        @@ List.nth quota managers_index )
-          .max_size
-      ~hard_gas_limit_per_block
-      managers
-  in
-  (* Second pass : make sure we only keep valid operations *)
-  filter_valid_operations manager_inc accepted_managers
-  >>= fun (_, accepted_managers) ->
-  let operations = [endorsements; votes; anonymous; accepted_managers] in
+  let operations = [endorsements; votes; anonymous; managers] in
   (* Construct a context with the valid operations and a correct timestamp *)
   let current_endorsing_power =
     compute_endorsing_power endorsements_map endorsements
@@ -1146,7 +1132,7 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
     cctxt
     ~chain
     ~applied:true
-    ~branch_delayed:true
+    ~branch_delayed:false
     ~refused:false
     ~branch_refused:false
     ()
