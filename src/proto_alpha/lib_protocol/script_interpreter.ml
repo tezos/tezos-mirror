@@ -712,26 +712,37 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
  fun ks ->
   match ks with
   | KNil ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KCons (_, _) ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KReturn _ ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KUndip (_, _) ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KLoop_in (_, _) ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KLoop_in_left (_, _) ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KIter (_, _, _) ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KList_mapping (_, _, _, _, _) ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KList_mapped (_, _, _, _, _) ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KMap_mapping (_, _, _, _) ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KMap_mapped (_, _, _, _, _) ->
+      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
 
 (*
