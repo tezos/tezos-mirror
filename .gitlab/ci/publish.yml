@@ -44,6 +44,8 @@ publish:docker_manual:
     - when: never
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  tags:
+    -  gitlab-org-docker
 
 build_release:docker_amd64:
   extends: .build_docker_release_template
