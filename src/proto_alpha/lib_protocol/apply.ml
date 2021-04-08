@@ -1513,7 +1513,7 @@ let check_minimal_valid_time ctxt ~priority ~endorsing_power =
        })
 
 let finalize_application ctxt protocol_data delegate migration_balance_updates
-    =
+    implicit_operations_results =
   let included_endorsements = included_endorsements ctxt in
   check_minimal_valid_time
     ctxt
@@ -1587,6 +1587,7 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
         consumed_gas;
         deactivated;
         balance_updates;
+        implicit_operations_results;
       }
   in
   (ctxt, receipt)

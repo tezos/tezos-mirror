@@ -110,6 +110,8 @@ type validation_state = {
   ctxt : Alpha_context.t;
   op_count : int;
   migration_balance_updates : Alpha_context.Receipt.balance_updates;
+  implicit_operations_results :
+    Apply_results.packed_successful_manager_operation_result list;
 }
 
 let current_context {ctxt; _} = return (Alpha_context.finalize ctxt).context
@@ -121,13 +123,22 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
   let fitness = predecessor_fitness in
   let timestamp = block_header.shell.timestamp in
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
-  >>=? fun (ctxt, migration_balance_updates) ->
+  >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
   >|=? fun (ctxt, baker) ->
   let mode =
     Partial_application {block_header; baker = Signature.Public_key.hash baker}
   in
-  {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
+  {
+    mode;
+    chain_id;
+    ctxt;
+    op_count = 0;
+    migration_balance_updates;
+    implicit_operations_results =
+      Apply_results.pack_migration_operation_results
+        migration_operation_results;
+  }
 
 let begin_application ~chain_id ~predecessor_context:ctxt
     ~predecessor_timestamp ~predecessor_fitness
@@ -136,13 +147,22 @@ let begin_application ~chain_id ~predecessor_context:ctxt
   let fitness = predecessor_fitness in
   let timestamp = block_header.shell.timestamp in
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
-  >>=? fun (ctxt, migration_balance_updates) ->
+  >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
   >|=? fun (ctxt, baker) ->
   let mode =
     Application {block_header; baker = Signature.Public_key.hash baker}
   in
-  {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
+  {
+    mode;
+    chain_id;
+    ctxt;
+    op_count = 0;
+    migration_balance_updates;
+    implicit_operations_results =
+      Apply_results.pack_migration_operation_results
+        migration_operation_results;
+  }
 
 let begin_construction ~chain_id ~predecessor_context:ctxt
     ~predecessor_timestamp ~predecessor_level:pred_level
@@ -151,7 +171,7 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
   let level = Int32.succ pred_level in
   let fitness = pred_fitness in
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
-  >>=? fun (ctxt, migration_balance_updates) ->
+  >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
   ( match protocol_data with
   | None ->
       Apply.begin_partial_construction ctxt
@@ -170,7 +190,16 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
       in
       (mode, ctxt) )
   >|=? fun (mode, ctxt) ->
-  {mode; chain_id; ctxt; op_count = 0; migration_balance_updates}
+  {
+    mode;
+    chain_id;
+    ctxt;
+    op_count = 0;
+    migration_balance_updates;
+    implicit_operations_results =
+      Apply_results.pack_migration_operation_results
+        migration_operation_results;
+  }
 
 let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
     (operation : Alpha_context.packed_operation) =
@@ -208,7 +237,12 @@ let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
       let op_count = op_count + 1 in
       ({data with ctxt; op_count}, Operation_metadata result)
 
-let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
+let finalize_block
+    { mode;
+      ctxt;
+      op_count;
+      migration_balance_updates;
+      implicit_operations_results } =
   match mode with
   | Partial_construction _ ->
       Alpha_context.Voting_period.get_rpc_current_info ctxt
@@ -234,6 +268,7 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
             consumed_gas = Alpha_context.Gas.Arith.zero;
             deactivated = [];
             balance_updates = migration_balance_updates;
+            implicit_operations_results;
           } )
   | Partial_application {block_header; baker} ->
       let included_endorsements = Alpha_context.included_endorsements ctxt in
@@ -256,6 +291,7 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
             consumed_gas = Alpha_context.Gas.Arith.zero;
             deactivated = [];
             balance_updates = migration_balance_updates;
+            implicit_operations_results;
           } )
   | Application
       {baker; block_header = {protocol_data = {contents = protocol_data; _}; _}}
@@ -265,6 +301,7 @@ let finalize_block {mode; ctxt; op_count; migration_balance_updates} =
         protocol_data
         baker
         migration_balance_updates
+        implicit_operations_results
       >|=? fun (ctxt, receipt) ->
       let level = Alpha_context.Level.current ctxt in
       let priority = protocol_data.priority in

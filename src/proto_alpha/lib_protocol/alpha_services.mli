@@ -46,4 +46,11 @@ module Parse = Helpers_services.Parse
 module Voting = Voting_services
 module Sapling = Sapling_services
 
+module Liquidity_baking : sig
+  val get_cpmm_address :
+    'a #RPC_context.simple ->
+    'a ->
+    Alpha_context.Contract.t shell_tzresult Lwt.t
+end
+
 val register : unit -> unit

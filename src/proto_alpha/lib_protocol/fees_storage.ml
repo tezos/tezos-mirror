@@ -81,6 +81,19 @@ let record_paid_storage_space c contract =
     ( Tez_repr.(cost_per_byte *? Z.to_int64 to_be_paid)
     >|? fun to_burn -> (c, size, to_be_paid, to_burn) )
 
+let record_paid_storage_space_subsidy c contract =
+  match Raw_context.storage_space_to_pay c with
+  | Some _ ->
+      assert false
+  | None ->
+      Contract_storage.used_storage_space c contract
+      >>=? fun size ->
+      Contract_storage.set_paid_storage_space_and_return_fees_to_pay
+        c
+        contract
+        size
+      >>=? fun (to_be_paid, c) -> return (c, size, to_be_paid)
+
 let burn_storage_fees c ~storage_limit ~payer =
   let origination_size = Constants_storage.origination_size c in
   let (c, storage_space_to_pay, allocated_contracts) =

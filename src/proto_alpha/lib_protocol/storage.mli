@@ -483,7 +483,36 @@ module Ramp_up : sig
        and type t := Raw_context.t
 end
 
-module Pending_migration_balance_updates :
-  Single_data_storage
-    with type value = Receipt_repr.balance_updates
-     and type t := Raw_context.t
+module Pending_migration : sig
+  module Balance_updates :
+    Single_data_storage
+      with type value = Receipt_repr.balance_updates
+       and type t := Raw_context.t
+
+  module Operation_results :
+    Single_data_storage
+      with type value = Migration_repr.origination_result list
+       and type t := Raw_context.t
+
+  val save :
+    ?balance_updates:Receipt_repr.balance_updates ->
+    ?operation_results:Migration_repr.origination_result list ->
+    Raw_context.t ->
+    Raw_context.t tzresult Lwt.t
+
+  val remove :
+    Raw_context.t ->
+    ( Raw_context.t
+    * Receipt_repr.balance_updates
+    * Migration_repr.origination_result list )
+    tzresult
+    Lwt.t
+end
+
+module Liquidity_baking : sig
+  (** Constant product market maker contract that receives liquidity baking subsidy. **)
+  module Cpmm_address :
+    Single_data_storage
+      with type t := Raw_context.t
+       and type value = Contract_repr.t
+end

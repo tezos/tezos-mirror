@@ -131,6 +131,8 @@ val gas_consumed : since:t -> until:t -> Gas_limit_repr.Arith.fp
 
 val block_gas_level : t -> Gas_limit_repr.Arith.fp
 
+val storage_space_to_pay : t -> Z.t option
+
 val init_storage_space_to_pay : t -> t
 
 val update_storage_space_to_pay : t -> Z.t -> t

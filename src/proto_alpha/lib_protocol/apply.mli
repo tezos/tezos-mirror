@@ -123,6 +123,7 @@ val finalize_application :
   Block_header.contents ->
   public_key_hash ->
   Receipt.balance_updates ->
+  packed_successful_manager_operation_result list ->
   (t * block_metadata, error trace) result Lwt.t
 
 val apply_manager_contents_list :

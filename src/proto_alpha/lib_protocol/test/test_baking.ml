@@ -231,7 +231,7 @@ let test_rewards_formulas_equivalence () =
     ~timestamp:b.header.shell.timestamp
     ~fitness:b.header.shell.fitness
   >>= wrap
-  >>=? fun (ctxt, _) ->
+  >>=? fun (ctxt, _, _) ->
   let block_priorities = 0 -- 64 in
   let endorsing_power = 0 -- endorsers_per_block in
   let ranges = List.product block_priorities endorsing_power in

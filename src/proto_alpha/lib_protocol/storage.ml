@@ -1217,13 +1217,68 @@ module Ramp_up = struct
          end)
 end
 
-module Pending_migration_balance_updates =
-  Make_single_data_storage (Registered) (Raw_context)
-    (struct
-      let name = ["pending_migration_balance_updates"]
-    end)
-    (struct
-      type t = Receipt_repr.balance_updates
+module Pending_migration = struct
+  module Balance_updates =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["pending_migration_balance_updates"]
+      end)
+      (struct
+        type t = Receipt_repr.balance_updates
 
-      let encoding = Receipt_repr.balance_updates_encoding
-    end)
+        let encoding = Receipt_repr.balance_updates_encoding
+      end)
+
+  module Operation_results =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["pending_migration_operation_results"]
+      end)
+      (struct
+        type t = Migration_repr.origination_result list
+
+        let encoding = Migration_repr.origination_result_list_encoding
+      end)
+
+  let save ?(balance_updates = []) ?(operation_results = []) ctxt =
+    Balance_updates.init ctxt balance_updates
+    >>=? fun ctxt -> Operation_results.init ctxt operation_results
+
+  let remove ctxt =
+    let balance_updates ctxt =
+      Balance_updates.find ctxt
+      >>=? function
+      | Some balance_updates ->
+          Balance_updates.remove ctxt
+          >>= fun ctxt ->
+          (* When applying balance updates in a migration, we must attach receipts.
+         The balance updates returned from here will be applied in the first
+         block of the new protocol. *)
+          return (ctxt, balance_updates)
+      | None ->
+          return (ctxt, [])
+    in
+    let operation_results ctxt =
+      Operation_results.find ctxt
+      >>=? function
+      | Some operation_results ->
+          Operation_results.remove ctxt
+          >>= fun ctxt -> return (ctxt, operation_results)
+      | None ->
+          return (ctxt, [])
+    in
+    balance_updates ctxt
+    >>=? fun (ctxt, balance_updates) ->
+    operation_results ctxt
+    >>=? fun (ctxt, operation_results) ->
+    return (ctxt, balance_updates, operation_results)
+end
+
+module Liquidity_baking = struct
+  module Cpmm_address =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["liquidity_baking_cpmm_address"]
+      end)
+      (Contract_repr)
+end

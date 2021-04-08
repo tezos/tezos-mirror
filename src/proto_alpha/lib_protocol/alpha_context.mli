@@ -1373,6 +1373,9 @@ module Fees : sig
   val record_paid_storage_space :
     context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
 
+  val record_paid_storage_space_subsidy :
+    context -> Contract.t -> (context * Z.t * Z.t) tzresult Lwt.t
+
   val start_counting_storage_fees : context -> context
 
   val burn_storage_fees :
@@ -1563,6 +1566,15 @@ end
 
 val max_operations_ttl : int
 
+module Migration : sig
+  type origination_result = {
+    balance_updates : Receipt.balance_updates;
+    originated_contracts : Contract.t list;
+    storage_size : Z.t;
+    paid_storage_size_diff : Z.t;
+  }
+end
+
 val prepare_first_block :
   Context.t ->
   typecheck:(context ->
@@ -1579,7 +1591,9 @@ val prepare :
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
-  (context * Receipt.balance_updates) tzresult Lwt.t
+  (context * Receipt.balance_updates * Migration.origination_result list)
+  tzresult
+  Lwt.t
 
 val finalize : ?commit_message:string -> context -> Updater.validation_result
 
@@ -1644,4 +1658,8 @@ module Parameters : sig
   }
 
   val encoding : t Data_encoding.t
+end
+
+module Liquidity_baking : sig
+  val get_cpmm_address : context -> Contract.t tzresult Lwt.t
 end

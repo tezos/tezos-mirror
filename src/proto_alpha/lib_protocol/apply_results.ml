@@ -76,10 +76,33 @@ type _ successful_manager_operation_result =
     }
       -> Kind.delegation successful_manager_operation_result
 
+let migration_origination_result_to_successful_manager_operation_result
+    ({ balance_updates;
+       originated_contracts;
+       storage_size;
+       paid_storage_size_diff } :
+      Migration.origination_result) =
+  Origination_result
+    {
+      lazy_storage_diff = None;
+      balance_updates;
+      originated_contracts;
+      consumed_gas = Gas.Arith.zero;
+      storage_size;
+      paid_storage_size_diff;
+    }
+
 type packed_successful_manager_operation_result =
   | Successful_manager_result :
       'kind successful_manager_operation_result
       -> packed_successful_manager_operation_result
+
+let pack_migration_operation_results results =
+  List.map
+    (fun el ->
+      Successful_manager_result
+        (migration_origination_result_to_successful_manager_operation_result el))
+    results
 
 type 'kind manager_operation_result =
   | Applied of 'kind successful_manager_operation_result
@@ -397,6 +420,32 @@ let internal_operation_result_encoding :
         Internal_operation_result (op, res))
   in
   def "operation.alpha.internal_operation_result"
+  @@ union
+       [ make Manager_result.reveal_case;
+         make Manager_result.transaction_case;
+         make Manager_result.origination_case;
+         make Manager_result.delegation_case ]
+
+let successful_manager_operation_result_encoding :
+    packed_successful_manager_operation_result Data_encoding.t =
+  let make (type kind)
+      (Manager_result.MCase res_case : kind Manager_result.case) =
+    let (Operation.Encoding.Manager_operations.MCase op_case) =
+      res_case.op_case
+    in
+    case
+      (Tag op_case.tag)
+      ~title:op_case.name
+      (merge_objs (obj1 (req "kind" (constant op_case.name))) res_case.encoding)
+      (fun res ->
+        match res_case.select res with
+        | Some res ->
+            Some ((), res_case.proj res)
+        | None ->
+            None)
+      (fun ((), res) -> Successful_manager_result (res_case.inj res))
+  in
+  def "operation.alpha.successful_manager_operation_result"
   @@ union
        [ make Manager_result.reveal_case;
          make Manager_result.transaction_case;
@@ -1235,6 +1284,7 @@ type block_metadata = {
   consumed_gas : Gas.Arith.fp;
   deactivated : Signature.Public_key_hash.t list;
   balance_updates : Receipt.balance_updates;
+  implicit_operations_results : packed_successful_manager_operation_result list;
 }
 
 let block_metadata_encoding =
@@ -1247,21 +1297,24 @@ let block_metadata_encoding =
               nonce_hash;
               consumed_gas;
               deactivated;
-              balance_updates } ->
-         ( baker,
-           level_info,
-           voting_period_info,
-           nonce_hash,
-           consumed_gas,
-           deactivated,
-           balance_updates ))
-       (fun ( baker,
-              level_info,
-              voting_period_info,
-              nonce_hash,
-              consumed_gas,
-              deactivated,
-              balance_updates ) ->
+              balance_updates;
+              implicit_operations_results } ->
+         ( ( baker,
+             level_info,
+             voting_period_info,
+             nonce_hash,
+             consumed_gas,
+             deactivated,
+             balance_updates ),
+           implicit_operations_results ))
+       (fun ( ( baker,
+                level_info,
+                voting_period_info,
+                nonce_hash,
+                consumed_gas,
+                deactivated,
+                balance_updates ),
+              implicit_operations_results ) ->
          {
            baker;
            level_info;
@@ -1270,12 +1323,18 @@ let block_metadata_encoding =
            consumed_gas;
            deactivated;
            balance_updates;
+           implicit_operations_results;
          })
-       (obj7
-          (req "baker" Signature.Public_key_hash.encoding)
-          (req "level_info" Level.encoding)
-          (req "voting_period_info" Voting_period.info_encoding)
-          (req "nonce_hash" (option Nonce_hash.encoding))
-          (req "consumed_gas" Gas.Arith.n_fp_encoding)
-          (req "deactivated" (list Signature.Public_key_hash.encoding))
-          (req "balance_updates" Receipt.balance_updates_encoding))
+       (merge_objs
+          (obj7
+             (req "baker" Signature.Public_key_hash.encoding)
+             (req "level_info" Level.encoding)
+             (req "voting_period_info" Voting_period.info_encoding)
+             (req "nonce_hash" (option Nonce_hash.encoding))
+             (req "consumed_gas" Gas.Arith.n_fp_encoding)
+             (req "deactivated" (list Signature.Public_key_hash.encoding))
+             (req "balance_updates" Receipt.balance_updates_encoding))
+          (obj1
+             (req
+                "implicit_operations_results"
+                (list successful_manager_operation_result_encoding))))

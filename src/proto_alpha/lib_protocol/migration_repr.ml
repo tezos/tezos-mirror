@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021 Tocqueville Group, Inc. <contact@tezos.com>            *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,27 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This is the genesis protocol: initialise the state *)
-val prepare_first_block :
-  Context.t ->
-  typecheck:(Raw_context.t ->
-            Script_repr.t ->
-            ((Script_repr.t * Lazy_storage_diff.diffs option) * Raw_context.t)
-            Error_monad.tzresult
-            Lwt.t) ->
-  level:int32 ->
-  timestamp:Time.t ->
-  fitness:Fitness.t ->
-  (Raw_context.t, Error_monad.error Error_monad.trace) Pervasives.result Lwt.t
+type origination_result = {
+  balance_updates : Receipt_repr.balance_updates;
+  originated_contracts : Contract_repr.t list;
+  storage_size : Z.t;
+  paid_storage_size_diff : Z.t;
+}
 
-val prepare :
-  Context.t ->
-  level:Int32.t ->
-  predecessor_timestamp:Time.t ->
-  timestamp:Time.t ->
-  fitness:Fitness.t ->
-  ( Raw_context.t
-  * Receipt_repr.balance_updates
-  * Migration_repr.origination_result list )
-  Error_monad.tzresult
-  Lwt.t
+let origination_result_list_encoding =
+  let open Data_encoding in
+  def "operation.alpha.origination_result"
+  @@ list
+       (conv
+          (function
+            | { balance_updates;
+                originated_contracts;
+                storage_size;
+                paid_storage_size_diff } ->
+                ( balance_updates,
+                  originated_contracts,
+                  storage_size,
+                  paid_storage_size_diff ))
+          (fun ( balance_updates,
+                 originated_contracts,
+                 storage_size,
+                 paid_storage_size_diff ) ->
+            {
+              balance_updates;
+              originated_contracts;
+              storage_size;
+              paid_storage_size_diff;
+            })
+          (obj4
+             (dft "balance_updates" Receipt_repr.balance_updates_encoding [])
+             (dft "originated_contracts" (list Contract_repr.encoding) [])
+             (dft "storage_size" z Z.zero)
+             (dft "paid_storage_size_diff" z Z.zero)))
