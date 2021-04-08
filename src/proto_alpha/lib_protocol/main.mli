@@ -47,6 +47,7 @@ type validation_state = {
   ctxt : Alpha_context.t;
   op_count : int;
   migration_balance_updates : Alpha_context.Receipt.balance_updates;
+  liquidity_baking_escape_ema : Int32.t;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
 }

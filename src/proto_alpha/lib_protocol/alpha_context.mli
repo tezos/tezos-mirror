@@ -540,6 +540,7 @@ module Constants : sig
     delay_per_missing_endorsement : Period.t;
     liquidity_baking_subsidy : Tez.t;
     liquidity_baking_sunset_duration : int32;
+    liquidity_baking_escape_ema_threshold : int32;
   }
 
   val parametric_encoding : parametric Data_encoding.t
@@ -593,6 +594,8 @@ module Constants : sig
   val liquidity_baking_subsidy : context -> Tez.t
 
   val liquidity_baking_sunset_duration : context -> int32
+
+  val liquidity_baking_escape_ema_threshold : context -> int32
 
   (** All constants: fixed and parametric *)
   type t = {fixed : fixed; parametric : parametric}
@@ -779,7 +782,7 @@ module Sapling : sig
   (**
     Returns a [state] with fields filled accordingly.
     [id] should only be used by [extract_lazy_storage_updates].
-  *)
+   *)
   val empty_state : ?id:Id.t -> memo_size:Memo_size.t -> unit -> state
 
   type transaction = Sapling.UTXO.transaction
@@ -790,7 +793,7 @@ module Sapling : sig
 
   (**
     Tries to fetch a state from the storage.
-  *)
+   *)
   val state_from_id : context -> Id.t -> (state * context) tzresult Lwt.t
 
   val rpc_arg : Id.t RPC_arg.t
@@ -1188,6 +1191,7 @@ module Block_header : sig
     priority : int;
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
+    liquidity_baking_escape_vote : bool;
   }
 
   type protocol_data = {contents : contents; signature : Signature.t}
@@ -1669,8 +1673,11 @@ end
 module Liquidity_baking : sig
   val get_cpmm_address : context -> Contract.t tzresult Lwt.t
 
+  type escape_ema = Int32.t
+
   val on_subsidy_allowed :
     context ->
+    escape_vote:bool ->
     (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
-    (context * 'a list) tzresult Lwt.t
+    (context * 'a list * escape_ema) tzresult Lwt.t
 end

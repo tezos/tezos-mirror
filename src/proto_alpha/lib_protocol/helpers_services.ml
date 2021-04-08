@@ -852,13 +852,14 @@ module Forge = struct
         ~description:"Forge the protocol-specific part of a block header"
         ~query:RPC_query.empty
         ~input:
-          (obj3
+          (obj4
              (req "priority" uint16)
              (opt "nonce_hash" Nonce_hash.encoding)
              (dft
                 "proof_of_work_nonce"
                 (Fixed.bytes Alpha_context.Constants.proof_of_work_nonce_size)
-                empty_proof_of_work_nonce))
+                empty_proof_of_work_nonce)
+             (dft "liquidity_baking_escape_vote" bool false))
         ~output:(obj1 (req "protocol_data" bytes))
         RPC_path.(path / "protocol_data")
   end
@@ -872,11 +873,21 @@ module Forge = struct
              (shell, proto))) ;
     register0_noctxt
       S.protocol_data
-      (fun () (priority, seed_nonce_hash, proof_of_work_nonce) ->
+      (fun ()
+           ( priority,
+             seed_nonce_hash,
+             proof_of_work_nonce,
+             liquidity_baking_escape_vote )
+           ->
         return
           (Data_encoding.Binary.to_bytes_exn
              Block_header.contents_encoding
-             {priority; seed_nonce_hash; proof_of_work_nonce}))
+             {
+               priority;
+               seed_nonce_hash;
+               proof_of_work_nonce;
+               liquidity_baking_escape_vote;
+             }))
 
   module Manager = struct
     let[@coq_axiom_with_reason "cast on e"] operations ctxt block ~branch
@@ -1030,13 +1041,17 @@ module Forge = struct
     Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
 
   let protocol_data ctxt block ~priority ?seed_nonce_hash
-      ?(proof_of_work_nonce = empty_proof_of_work_nonce) () =
+      ?(proof_of_work_nonce = empty_proof_of_work_nonce)
+      ~liquidity_baking_escape_vote () =
     RPC_context.make_call0
       S.protocol_data
       ctxt
       block
       ()
-      (priority, seed_nonce_hash, proof_of_work_nonce)
+      ( priority,
+        seed_nonce_hash,
+        proof_of_work_nonce,
+        liquidity_baking_escape_vote )
 end
 
 module Parse = struct

@@ -43,6 +43,7 @@ module Baker : sig
     ?minimal_nanotez_per_gas_unit:Q.t ->
     ?minimal_nanotez_per_byte:Q.t ->
     ?max_priority:int ->
+    ?per_block_vote_file:string ->
     chain:Chain_services.chain ->
     context_path:string ->
     keep_alive:bool ->

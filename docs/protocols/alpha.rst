@@ -58,6 +58,8 @@ Liquidity Baking
 
 The liquidity baking subsidy shuts off automatically at six months from protocol activation if not renewed in a future upgrade. The sunset duration is included in constants and sunset level calculated during stitching.
 
+At any time bakers can vote to shut off the liquidity baking subsidy by setting a boolean flag in protocol_data. An exponential moving average (ema) of this escape flag is calculated with a window size of 1000 blocks and the subsidy permanently shuts off if the ema is ever over a threshold included in constants (half the window size with precision of 1000 added for integer computation).
+
 - `TZIP <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft-liquidity_baking.md>`_
 - MR:
   :gl:`tezos!2765`

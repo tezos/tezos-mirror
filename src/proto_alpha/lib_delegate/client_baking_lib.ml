@@ -29,7 +29,7 @@ open Alpha_context
 let bake_block (cctxt : #Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
     ?max_priority ?(minimal_timestamp = false) ?mempool ?context_path ?src_sk
-    ~chain ~head delegate =
+    ~liquidity_baking_escape_vote ~chain ~head delegate =
   ( match src_sk with
   | None ->
       Client_keys.get_key cctxt delegate
@@ -60,6 +60,7 @@ let bake_block (cctxt : #Protocol_client_context.full) ?minimal_fees
     ?seed_nonce_hash
     ?mempool
     ?context_path
+    ~liquidity_baking_escape_vote
     ~chain
     ~priority:(`Auto (delegate, max_priority))
     ~delegate_pkh:delegate

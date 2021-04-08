@@ -62,6 +62,8 @@ let constants_mainnet =
       (* level after protocol activation when liquidity baking shuts off *)
       (* set to six months (half of 365 days at 2 blocks per minute) *)
       liquidity_baking_sunset_duration = 525600l;
+      (* 1/2 window size of 2000 blocks with precision of 1000 for integer computation *)
+      liquidity_baking_escape_ema_threshold = 1_000_000l;
     }
 
 let constants_sandbox =

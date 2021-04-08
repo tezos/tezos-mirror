@@ -170,6 +170,8 @@ let check_tzBTC ~typecheck current_level ?test_fa12_admin ctxt f =
         return (ctxt, [])
 
 let init_common ~typecheck ?test_fa12_admin ctxt =
+  Storage.Liquidity_baking.Escape_ema.init ctxt 0l
+  >>=? fun ctxt ->
   let current_level =
     Raw_level_repr.to_int32 (Level_storage.current ctxt).level
   in

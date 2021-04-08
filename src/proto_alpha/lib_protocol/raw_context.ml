@@ -880,6 +880,7 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
               else c.delay_per_missing_endorsement );
             liquidity_baking_subsidy = Tez_repr.of_mutez_exn 2_500_000L;
             liquidity_baking_sunset_duration = 525600l;
+            liquidity_baking_escape_ema_threshold = 1_000_000l;
           }
       in
       add_constants ctxt constants

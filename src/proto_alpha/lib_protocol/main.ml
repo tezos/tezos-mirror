@@ -110,6 +110,7 @@ type validation_state = {
   ctxt : Alpha_context.t;
   op_count : int;
   migration_balance_updates : Alpha_context.Receipt.balance_updates;
+  liquidity_baking_escape_ema : Int32.t;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
 }
@@ -125,7 +126,10 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
-  >|=? fun (ctxt, baker, liquidity_baking_operations_results) ->
+  >|=? fun ( ctxt,
+             baker,
+             liquidity_baking_operations_results,
+             liquidity_baking_escape_ema ) ->
   let mode =
     Partial_application {block_header; baker = Signature.Public_key.hash baker}
   in
@@ -135,6 +139,7 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
     ctxt;
     op_count = 0;
     migration_balance_updates;
+    liquidity_baking_escape_ema;
     implicit_operations_results =
       Apply_results.pack_migration_operation_results
         migration_operation_results
@@ -150,7 +155,10 @@ let begin_application ~chain_id ~predecessor_context:ctxt
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
-  >|=? fun (ctxt, baker, liquidity_baking_operations_results) ->
+  >|=? fun ( ctxt,
+             baker,
+             liquidity_baking_operations_results,
+             liquidity_baking_escape_ema ) ->
   let mode =
     Application {block_header; baker = Signature.Public_key.hash baker}
   in
@@ -160,6 +168,7 @@ let begin_application ~chain_id ~predecessor_context:ctxt
     ctxt;
     op_count = 0;
     migration_balance_updates;
+    liquidity_baking_escape_ema;
     implicit_operations_results =
       Apply_results.pack_migration_operation_results
         migration_operation_results
@@ -176,29 +185,45 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
   >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
   ( match protocol_data with
   | None ->
-      Apply.begin_partial_construction ctxt
-      >|=? fun (ctxt, liquidity_baking_operations_results) ->
+      let escape_vote = false in
+      Apply.begin_partial_construction ctxt ~escape_vote
+      >|=? fun ( ctxt,
+                 liquidity_baking_operations_results,
+                 liquidity_baking_escape_ema ) ->
       let mode = Partial_construction {predecessor} in
-      (mode, ctxt, liquidity_baking_operations_results)
+      ( mode,
+        ctxt,
+        liquidity_baking_operations_results,
+        liquidity_baking_escape_ema )
   | Some proto_header ->
       Apply.begin_full_construction
         ctxt
         predecessor_timestamp
         proto_header.contents
-      >|=? fun (ctxt, protocol_data, baker, liquidity_baking_operations_results)
-               ->
+      >|=? fun ( ctxt,
+                 protocol_data,
+                 baker,
+                 liquidity_baking_operations_results,
+                 liquidity_baking_escape_ema ) ->
       let mode =
         let baker = Signature.Public_key.hash baker in
         Full_construction {predecessor; baker; protocol_data}
       in
-      (mode, ctxt, liquidity_baking_operations_results) )
-  >|=? fun (mode, ctxt, liquidity_baking_operations_results) ->
+      ( mode,
+        ctxt,
+        liquidity_baking_operations_results,
+        liquidity_baking_escape_ema ) )
+  >|=? fun ( mode,
+             ctxt,
+             liquidity_baking_operations_results,
+             liquidity_baking_escape_ema ) ->
   {
     mode;
     chain_id;
     ctxt;
     op_count = 0;
     migration_balance_updates;
+    liquidity_baking_escape_ema;
     implicit_operations_results =
       Apply_results.pack_migration_operation_results
         migration_operation_results
@@ -246,6 +271,7 @@ let finalize_block
       ctxt;
       op_count;
       migration_balance_updates;
+      liquidity_baking_escape_ema;
       implicit_operations_results } =
   match mode with
   | Partial_construction _ ->
@@ -272,6 +298,7 @@ let finalize_block
             consumed_gas = Alpha_context.Gas.Arith.zero;
             deactivated = [];
             balance_updates = migration_balance_updates;
+            liquidity_baking_escape_ema;
             implicit_operations_results;
           } )
   | Partial_application {block_header; baker} ->
@@ -295,6 +322,7 @@ let finalize_block
             consumed_gas = Alpha_context.Gas.Arith.zero;
             deactivated = [];
             balance_updates = migration_balance_updates;
+            liquidity_baking_escape_ema;
             implicit_operations_results;
           } )
   | Application
@@ -305,6 +333,7 @@ let finalize_block
         protocol_data
         baker
         migration_balance_updates
+        liquidity_baking_escape_ema
         implicit_operations_results
       >|=? fun (ctxt, receipt) ->
       let level = Alpha_context.Level.current ctxt in

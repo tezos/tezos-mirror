@@ -3,7 +3,7 @@
 Liquidity Baking
 ================
 
-Liquidity baking incentivizes large amounts of decentralized liquidity provision between tez and tzBTC by minting a small amount of tez every block and depositing it inside of a constant product market making smart-contract.
+Liquidity baking incentivizes large amounts of decentralized liquidity provision between tez and tzBTC by minting a small amount of tez every block and depositing it inside of a constant product market making smart-contract. It includes an escape hatch mechanism as a contingency.
 
 Contracts
 ~~~~~~~~~
@@ -27,3 +27,15 @@ At every block in the chain, a small amount of tez is minted and credited to the
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
 
 As a safety precaution, the subsidy expires automatically after 6 months but it can be renewed periodically by protocol amendment.
+
+Escape hatch
+~~~~~~~~~~~~
+
+In addition to the 6 months sunset, an escape hatch is included. At every block, the baker producing the block can choose to include a flag that requests ending the subsidy. The context maintains an exponential moving average of that flag calculated as such with integer arithmetic:
+
+``e[0] = 0``
+``e[n+1] = (1999 * e[n] // 2000) + (1000 if flag[n] else 0)``
+
+If at any block ``e[n] >= 1000000`` then it means that an exponential moving average with a window size on the order of two thousand blocks has had roughly a majority of blocks demanding the end of the subsidy. If that is the case, the subsidy is permanently halted (though it can be reactivated by a protocol upgrade).
+
+For indicative purposes, if a fraction ``f`` of blocks start signalling the flag, the threshold is reached after roughly ``2*(log(1-1/(2f)) / log(0.999))`` blocks, about 1387 blocks if everyone signals, 1964 blocks if 80% do, 3590 blocks if 60% do, etc. Recall for comparison that assuming two blocks per minute there are 2880 blocks per day.

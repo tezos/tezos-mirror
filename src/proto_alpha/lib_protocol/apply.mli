@@ -94,7 +94,13 @@ type error += Inconsistent_sources
 type error += (* `Permanent *) Failing_noop_error
 
 val begin_partial_construction :
-  t -> (t * packed_successful_manager_operation_result list) tzresult Lwt.t
+  t ->
+  escape_vote:bool ->
+  ( t
+  * packed_successful_manager_operation_result list
+  * Liquidity_baking.escape_ema )
+  tzresult
+  Lwt.t
 
 val begin_full_construction :
   t ->
@@ -103,7 +109,8 @@ val begin_full_construction :
   ( t
   * Block_header.contents
   * public_key
-  * packed_successful_manager_operation_result list )
+  * packed_successful_manager_operation_result list
+  * Liquidity_baking.escape_ema )
   tzresult
   Lwt.t
 
@@ -112,7 +119,11 @@ val begin_application :
   Chain_id.t ->
   Block_header.t ->
   Time.t ->
-  (t * public_key * packed_successful_manager_operation_result list) tzresult
+  ( t
+  * public_key
+  * packed_successful_manager_operation_result list
+  * Liquidity_baking.escape_ema )
+  tzresult
   Lwt.t
 
 val apply_operation :
@@ -130,6 +141,7 @@ val finalize_application :
   Block_header.contents ->
   public_key_hash ->
   Receipt.balance_updates ->
+  Liquidity_baking.escape_ema ->
   packed_successful_manager_operation_result list ->
   (t * block_metadata, error trace) result Lwt.t
 

@@ -1275,6 +1275,13 @@ module Pending_migration = struct
 end
 
 module Liquidity_baking = struct
+  module Escape_ema =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["liquidity_baking_escape_ema"]
+      end)
+      (Int32)
+
   module Sunset_level =
     Make_single_data_storage (Registered) (Raw_context)
       (struct

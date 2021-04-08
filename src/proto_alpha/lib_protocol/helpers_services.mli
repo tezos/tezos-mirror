@@ -286,6 +286,7 @@ module Forge : sig
     priority:int ->
     ?seed_nonce_hash:Nonce_hash.t ->
     ?proof_of_work_nonce:bytes ->
+    liquidity_baking_escape_vote:bool ->
     unit ->
     bytes shell_tzresult Lwt.t
 end

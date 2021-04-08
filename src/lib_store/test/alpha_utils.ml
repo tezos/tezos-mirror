@@ -227,8 +227,14 @@ module Forge = struct
     Bytes.create Constants.proof_of_work_nonce_size
 
   let make_contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ~priority ~seed_nonce_hash () =
-    Block_header.{priority; proof_of_work_nonce; seed_nonce_hash}
+      ?(liquidity_baking_escape_vote = false) ~priority ~seed_nonce_hash () =
+    Block_header.
+      {
+        priority;
+        proof_of_work_nonce;
+        seed_nonce_hash;
+        liquidity_baking_escape_vote;
+      }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash
       ~proto_level =
@@ -312,8 +318,15 @@ module Forge = struct
 
   (* compatibility only, needed by incremental *)
   let contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?(priority = 0) ?seed_nonce_hash () =
-    {Block_header.priority; proof_of_work_nonce; seed_nonce_hash}
+      ?(liquidity_baking_escape_vote = false) ?(priority = 0) ?seed_nonce_hash
+      () =
+    Block_header.
+      {
+        priority;
+        proof_of_work_nonce;
+        seed_nonce_hash;
+        liquidity_baking_escape_vote;
+      }
 end
 
 (********* Genesis creation *************)

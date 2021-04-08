@@ -1445,9 +1445,10 @@ let endorsement_rights_of_pred_level ctxt =
   | Some pred_level ->
       Baking.endorsement_rights ctxt pred_level
 
-let apply_liquidity_baking_subsidy ctxt =
+let apply_liquidity_baking_subsidy ctxt ~escape_vote =
   Liquidity_baking.on_subsidy_allowed
     ctxt
+    ~escape_vote
     (fun ctxt liquidity_baking_cpmm_contract ->
       let ctxt =
         (* We set a gas limit of 1/20th the block limit, which is ~10x actual usage here in Granada. Gas consumed is reported in the Transaction receipt, but not counted towards the block limit. The gas limit is reset to unlimited at the end of this function.*)
@@ -1574,16 +1575,23 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
   endorsement_rights_of_pred_level ctxt
   >>=? fun rights ->
   let ctxt = init_endorsements ctxt rights in
-  apply_liquidity_baking_subsidy ctxt
-  >|=? fun (ctxt, liquidity_baking_operations_results) ->
-  (ctxt, protocol_data, delegate_pk, liquidity_baking_operations_results)
+  let escape_vote = protocol_data.liquidity_baking_escape_vote in
+  apply_liquidity_baking_subsidy ctxt ~escape_vote
+  >|=? fun ( ctxt,
+             liquidity_baking_operations_results,
+             liquidity_baking_escape_ema ) ->
+  ( ctxt,
+    protocol_data,
+    delegate_pk,
+    liquidity_baking_operations_results,
+    liquidity_baking_escape_ema )
 
-let begin_partial_construction ctxt =
+let begin_partial_construction ctxt ~escape_vote =
   let ctxt = Fitness.increase ctxt in
   endorsement_rights_of_pred_level ctxt
   >>=? fun rights ->
   let ctxt = init_endorsements ctxt rights in
-  apply_liquidity_baking_subsidy ctxt
+  apply_liquidity_baking_subsidy ctxt ~escape_vote
 
 let begin_application ctxt chain_id block_header pred_timestamp =
   let priority = block_header.Block_header.protocol_data.contents.priority in
@@ -1611,9 +1619,18 @@ let begin_application ctxt chain_id block_header pred_timestamp =
   endorsement_rights_of_pred_level ctxt
   >>=? fun rights ->
   let ctxt = init_endorsements ctxt rights in
-  apply_liquidity_baking_subsidy ctxt
-  >|=? fun (ctxt, liquidity_baking_operations_results) ->
-  (ctxt, delegate_pk, liquidity_baking_operations_results)
+  let escape_vote =
+    block_header.Block_header.protocol_data.contents
+      .liquidity_baking_escape_vote
+  in
+  apply_liquidity_baking_subsidy ctxt ~escape_vote
+  >|=? fun ( ctxt,
+             liquidity_baking_operations_results,
+             liquidity_baking_escape_ema ) ->
+  ( ctxt,
+    delegate_pk,
+    liquidity_baking_operations_results,
+    liquidity_baking_escape_ema )
 
 let check_minimal_valid_time ctxt ~priority ~endorsing_power =
   let predecessor_timestamp = Timestamp.predecessor ctxt in
@@ -1635,7 +1652,7 @@ let check_minimal_valid_time ctxt ~priority ~endorsing_power =
        })
 
 let finalize_application ctxt protocol_data delegate migration_balance_updates
-    implicit_operations_results =
+    liquidity_baking_escape_ema implicit_operations_results =
   let included_endorsements = included_endorsements ctxt in
   check_minimal_valid_time
     ctxt
@@ -1709,6 +1726,7 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
         consumed_gas;
         deactivated;
         balance_updates;
+        liquidity_baking_escape_ema;
         implicit_operations_results;
       }
   in

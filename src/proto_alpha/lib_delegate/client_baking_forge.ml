@@ -141,9 +141,14 @@ let generate_seed_nonce () =
       nonce
 
 let forge_block_header (cctxt : #Protocol_client_context.full) ~chain block
-    delegate_sk shell priority seed_nonce_hash =
+    delegate_sk shell priority seed_nonce_hash ~liquidity_baking_escape_vote =
   Client_baking_pow.mine cctxt chain block shell (fun proof_of_work_nonce ->
-      {Block_header.priority; seed_nonce_hash; proof_of_work_nonce})
+      {
+        Block_header.priority;
+        seed_nonce_hash;
+        proof_of_work_nonce;
+        liquidity_baking_escape_vote;
+      })
   >>=? fun contents ->
   let unsigned_header =
     Data_encoding.Binary.to_bytes_exn
@@ -158,7 +163,8 @@ let forge_block_header (cctxt : #Protocol_client_context.full) ~chain block
     ~watermark:(Block_header chain_id)
     unsigned_header
 
-let forge_faked_protocol_data ~priority ~seed_nonce_hash =
+let forge_faked_protocol_data ~priority ~seed_nonce_hash
+    ~liquidity_baking_escape_vote =
   Alpha_context.Block_header.
     {
       contents =
@@ -166,6 +172,7 @@ let forge_faked_protocol_data ~priority ~seed_nonce_hash =
           priority;
           seed_nonce_hash;
           proof_of_work_nonce = Client_baking_pow.empty_proof_of_work_nonce;
+          liquidity_baking_escape_vote;
         };
       signature = Signature.zero;
     }
@@ -184,7 +191,8 @@ let assert_valid_operations_hash shell_header operations =
     (failure "Client_baking_forge.inject_block: inconsistent header.")
 
 let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
-    ~priority ~delegate_pkh ~delegate_sk ~level operations =
+    ~priority ~delegate_pkh ~delegate_sk ~level operations
+    ~liquidity_baking_escape_vote =
   assert_valid_operations_hash shell_header operations
   >>=? fun () ->
   let block = `Hash (shell_header.Tezos_base.Block_header.predecessor, 0) in
@@ -196,6 +204,7 @@ let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
     shell_header
     priority
     seed_nonce_hash
+    ~liquidity_baking_escape_vote
   >>=? fun signed_header ->
   (* Record baked blocks to prevent double baking  *)
   let open Client_baking_highwatermarks in
@@ -859,8 +868,8 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     ?(sort = best_effort) ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) ?timestamp
-    ?mempool ?context_path ?seed_nonce_hash ~chain ~priority ~delegate_pkh
-    ~delegate_sk block =
+    ?mempool ?context_path ?seed_nonce_hash ~liquidity_baking_escape_vote
+    ~chain ~priority ~delegate_pkh ~delegate_sk block =
   Alpha_services.Constants.all cctxt (chain, block)
   >>=? fun constants ->
   (* making the arguments usable *)
@@ -882,7 +891,12 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
   unopt_timestamp ?force timestamp minimal_timestamp
   >>=? fun timestamp ->
   (* get basic building blocks *)
-  let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
+  let protocol_data =
+    forge_faked_protocol_data
+      ~priority
+      ~seed_nonce_hash
+      ~liquidity_baking_escape_vote
+  in
   classify_operations
     cctxt
     ~chain
@@ -1058,6 +1072,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     ~delegate_sk
     ~level
     operations
+    ~liquidity_baking_escape_vote
   >>= function
   | Ok hash ->
       return hash
@@ -1076,7 +1091,13 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
 let shell_prevalidation (cctxt : #Protocol_client_context.full) ~chain ~block
     ~timestamp seed_nonce_hash operations
     ((_, (bi, priority, delegate)) as _slot) =
-  let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
+  let liquidity_baking_escape_vote = false in
+  let protocol_data =
+    forge_faked_protocol_data
+      ~priority
+      ~seed_nonce_hash
+      ~liquidity_baking_escape_vote
+  in
   Alpha_block_services.Helpers.Preapply.block
     cctxt
     ~chain
@@ -1261,7 +1282,8 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
     with consistent operations that went through the client-side
     validation *)
 let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
-    ((slot_timestamp, (bi, priority, delegate)) as slot) =
+    ((slot_timestamp, (bi, priority, delegate)) as slot)
+    ~liquidity_baking_escape_vote =
   let chain = `Hash bi.Client_baking_blocks.chain_id in
   let block = `Hash (bi.hash, 0) in
   Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
@@ -1329,7 +1351,10 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
           slot
       else
         let protocol_data =
-          forge_faked_protocol_data ~priority ~seed_nonce_hash
+          forge_faked_protocol_data
+            ~priority
+            ~seed_nonce_hash
+            ~liquidity_baking_escape_vote
         in
         filter_and_apply_operations
           cctxt
@@ -1444,11 +1469,66 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
                 operations
                 slot )
 
+type per_block_votes = {liquidity_baking_escape_vote : bool option}
+
+let per_block_votes_encoding =
+  let open Data_encoding in
+  def "per_block_votes.alpha"
+  @@ conv
+       (fun {liquidity_baking_escape_vote} -> liquidity_baking_escape_vote)
+       (fun liquidity_baking_escape_vote -> {liquidity_baking_escape_vote})
+       (obj1 (opt "liquidity_baking_escape_vote" Data_encoding.bool))
+
+let read_liquidity_baking_escape_vote per_block_vote_file =
+  match per_block_vote_file with
+  | None ->
+      return false
+  | Some vote_file -> (
+      lwt_log_notice
+        Tag.DSL.(
+          fun f ->
+            f "Reading per block vote file path: %s" -% s event vote_file)
+      >>= fun () ->
+      Lwt_utils_unix.Json.read_file vote_file
+      >|= Result.to_option
+      >>= function
+      | Some votes_json -> (
+          lwt_log_notice (fun f -> f "Per block vote file found.")
+          >>= fun () ->
+          match
+            Data_encoding.Json.destruct per_block_votes_encoding votes_json
+          with
+          | exception _ ->
+              lwt_log_notice (fun f -> f "Per block vote file JSON malformed.")
+              >>= fun () -> return false
+          | votes -> (
+              lwt_log_notice (fun f -> f "Per block vote file JSON decoded.")
+              >>= fun () ->
+              match votes.liquidity_baking_escape_vote with
+              | None ->
+                  return false
+              | Some liquidity_baking_escape_vote -> (
+                  lwt_log_notice (fun f ->
+                      f "Reading liquidity baking escape vote.")
+                  >>= fun () ->
+                  match liquidity_baking_escape_vote with
+                  | true ->
+                      lwt_log_notice (fun f ->
+                          f "liquidity baking escape vote = true")
+                      >>= fun () -> return true
+                  | false ->
+                      lwt_log_notice (fun f ->
+                          f "liquidity baking escape vote = false")
+                      >>= fun () -> return false ) ) )
+      | None ->
+          lwt_log_notice (fun f -> f "Per block vote file not found.")
+          >>= fun () -> return false )
+
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
     [state.best_slot]. *)
-let bake (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
-    ~chain state =
+let bake ?per_block_vote_file (cctxt : #Protocol_client_context.full)
+    ~user_activated_upgrades ~chain state =
   ( match state.best_slot with
   | None ->
       assert false (* unreachable *)
@@ -1457,7 +1537,15 @@ let bake (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
   >>=? fun slot ->
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
-  build_block cctxt ~user_activated_upgrades state seed_nonce_hash slot
+  read_liquidity_baking_escape_vote per_block_vote_file
+  >>=? fun liquidity_baking_escape_vote ->
+  build_block
+    cctxt
+    ~user_activated_upgrades
+    state
+    seed_nonce_hash
+    slot
+    ~liquidity_baking_escape_vote
   >>=? function
   | Some (head, priority, shell_header, operations, delegate, seed_nonce_hash)
     -> (
@@ -1488,6 +1576,7 @@ let bake (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
         ~delegate_sk
         ~level
         operations
+        ~liquidity_baking_escape_vote
       >>= function
       | Error errs ->
           lwt_log_error
@@ -1681,7 +1770,8 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
     the [delegates] *)
 let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
-    ?max_priority ~chain ~context_path delegates block_stream =
+    ?max_priority ?per_block_vote_file ~chain ~context_path delegates
+    block_stream =
   let state_maker bi =
     Alpha_services.Constants.all cctxt (chain, `Head 0)
     >>=? fun constants ->
@@ -1731,7 +1821,7 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
           timeout )
   in
   let timeout_k cctxt state () =
-    bake cctxt ~user_activated_upgrades ~chain state
+    bake ?per_block_vote_file cctxt ~user_activated_upgrades ~chain state
     >>= function
     | Error err ->
         if state.retry_counter = 0 then (

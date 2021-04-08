@@ -162,7 +162,9 @@ let protocol_parameters_json t : Ezjsonm.t =
            ( "liquidity_baking_subsidy"
            , string "2500000" );
            ( "liquidity_baking_sunset_duration"
-           , int 525600 ); ]
+           , int 525600 );
+           ( "liquidity_baking_escape_ema_threshold"
+           , int 1000000 ); ]
       | _ -> [] in
     let legacy_parameters =
       match subkind with

@@ -80,6 +80,7 @@ type parametric = {
   delay_per_missing_endorsement : Period_repr.t;
   liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_sunset_duration : int32;
+  liquidity_baking_escape_ema_threshold : int32;
 }
 
 val parametric_encoding : parametric Data_encoding.encoding

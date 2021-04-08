@@ -145,8 +145,14 @@ module Forge = struct
     Bytes.create Constants.proof_of_work_nonce_size
 
   let make_contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ~priority ~seed_nonce_hash () =
-    Block_header.{priority; proof_of_work_nonce; seed_nonce_hash}
+      ?(liquidity_baking_escape_vote = false) ~priority ~seed_nonce_hash () =
+    Block_header.
+      {
+        priority;
+        proof_of_work_nonce;
+        seed_nonce_hash;
+        liquidity_baking_escape_vote;
+      }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
     Tezos_base.Block_header.
@@ -183,8 +189,8 @@ module Forge = struct
     in
     Block_header.{shell; protocol_data = {contents; signature}}
 
-  let forge_header ?(policy = By_priority 0) ?timestamp ?(operations = []) pred
-      =
+  let forge_header ?(policy = By_priority 0) ?timestamp ?(operations = [])
+      ?liquidity_baking_escape_vote pred =
     dispatch_policy policy pred
     >>=? fun (pkh, priority, _timestamp) ->
     Alpha_services.Delegate.Minimal_valid_time.get rpc_ctxt pred priority 0
@@ -216,13 +222,21 @@ module Forge = struct
         ~fitness
         ~operations_hash
     in
-    let contents = make_contents ~priority ~seed_nonce_hash () in
+    let contents =
+      make_contents ~priority ~seed_nonce_hash ?liquidity_baking_escape_vote ()
+    in
     {baker = pkh; shell; contents}
 
   (* compatibility only, needed by incremental *)
   let contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?(priority = 0) ?seed_nonce_hash () =
-    {Block_header.priority; proof_of_work_nonce; seed_nonce_hash}
+      ?(priority = 0) ?seed_nonce_hash ?(liquidity_baking_escape_vote = false)
+      () =
+    {
+      Block_header.priority;
+      proof_of_work_nonce;
+      seed_nonce_hash;
+      liquidity_baking_escape_vote;
+    }
 end
 
 (********* Genesis creation *************)
@@ -442,7 +456,8 @@ let apply header ?(operations = []) pred =
   apply_with_metadata header ~operations pred
   >>=? fun (t, _metadata) -> return t
 
-let bake_with_metadata ?policy ?timestamp ?operation ?operations pred =
+let bake_with_metadata ?policy ?timestamp ?operation ?operations
+    ?liquidity_baking_escape_vote pred =
   let operations =
     match (operation, operations) with
     | (Some op, Some ops) ->
@@ -454,13 +469,25 @@ let bake_with_metadata ?policy ?timestamp ?operation ?operations pred =
     | (None, None) ->
         None
   in
-  Forge.forge_header ?timestamp ?policy ?operations pred
+  Forge.forge_header
+    ?timestamp
+    ?policy
+    ?operations
+    ?liquidity_baking_escape_vote
+    pred
   >>=? fun header ->
   Forge.sign_header header
   >>=? fun header -> apply_with_metadata header ?operations pred
 
-let bake ?policy ?timestamp ?operation ?operations pred =
-  bake_with_metadata ?policy ?timestamp ?operation ?operations pred
+let bake ?policy ?timestamp ?operation ?operations
+    ?liquidity_baking_escape_vote pred =
+  bake_with_metadata
+    ?policy
+    ?timestamp
+    ?operation
+    ?operations
+    ?liquidity_baking_escape_vote
+    pred
   >>=? fun (t, _metadata) -> return t
 
 (********** Cycles ****************)
@@ -468,13 +495,16 @@ let bake ?policy ?timestamp ?operation ?operations pred =
 (* This function is duplicated from Context to avoid a cyclic dependency *)
 let get_constants b = Alpha_services.Constants.all rpc_ctxt b
 
-let bake_n ?policy n b =
-  List.fold_left_es (fun b _ -> bake ?policy b) b (1 -- n)
+let bake_n ?policy ?liquidity_baking_escape_vote n b =
+  List.fold_left_es
+    (fun b _ -> bake ?policy ?liquidity_baking_escape_vote b)
+    b
+    (1 -- n)
 
-let bake_n_with_all_balance_updates ?policy n b =
+let bake_n_with_all_balance_updates ?policy ?liquidity_baking_escape_vote n b =
   List.fold_left_es
     (fun (b, balance_updates_rev) _ ->
-      bake_with_metadata ?policy b
+      bake_with_metadata ?policy ?liquidity_baking_escape_vote b
       >>=? fun (b, metadata) ->
       let balance_updates_rev =
         List.rev_append metadata.balance_updates balance_updates_rev

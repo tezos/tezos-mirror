@@ -27,8 +27,8 @@
     -------
     Component:    liquidity baking
     Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^liquidity baking$"
-    Subject:      Test liquidity baking subsidies and CPMM storage updates,
-                  and sunset shut off.
+    Subject:      Test liquidity baking subsidies, CPMM storage updates,
+                  sunset shut off, and escape hatch shut off.
 *)
 
 open Protocol
@@ -81,6 +81,86 @@ let liquidity_baking_sunset_level n () =
     liquidity_baking
     old_balance
     expected_credit
+  >>=? fun () -> return_unit
+
+(* Test that subsidy shuts off at correct escape level alternating baking [n_vote_false] blocks with liquidity_baking_escape_vote = false and [n_vote_true] blocks with it true followed by [bake_after_escape] blocks with it false. *)
+(* Escape level is roughly 2*(log(1-1/(2*percent_flagging)) / log(0.999)) *)
+let liquidity_baking_escape_hatch n_vote_false n_vote_true escape_level
+    bake_after_escape () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk)
+  >>=? fun liquidity_baking ->
+  Context.Contract.balance (B blk) liquidity_baking
+  >>=? fun old_balance ->
+  let rec bake_escaping blk i =
+    if i < escape_level then
+      Block.bake_n n_vote_false blk
+      >>=? fun blk ->
+      Block.bake_n ~liquidity_baking_escape_vote:true n_vote_true blk
+      >>=? fun blk -> bake_escaping blk (i + n_vote_false + n_vote_true)
+    else return blk
+  in
+  bake_escaping blk 0
+  >>=? fun blk ->
+  Block.bake_n bake_after_escape blk
+  >>=? fun blk ->
+  Context.get_liquidity_baking_subsidy (B blk)
+  >>=? fun liquidity_baking_subsidy ->
+  Tez.(liquidity_baking_subsidy *? Int64.of_int escape_level)
+  >>?= fun expected_balance ->
+  Assert.balance_was_credited
+    ~loc:__LOC__
+    (B blk)
+    liquidity_baking
+    old_balance
+    expected_balance
+  >>=? fun () -> return_unit
+
+(* 100% of blocks have liquidity_baking_escape_vote = true *)
+let liquidity_baking_escape_hatch_100 n () =
+  liquidity_baking_escape_hatch 0 1 1387 n ()
+
+(* 80% of blocks have liquidity_baking_escape_vote = true *)
+let liquidity_baking_escape_hatch_80 n () =
+  liquidity_baking_escape_hatch 1 4 1964 n ()
+
+(* 60% of blocks have liquidity_baking_escape_vote = true *)
+let liquidity_baking_escape_hatch_60 n () =
+  liquidity_baking_escape_hatch 2 3 3590 n ()
+
+(* 50% of blocks have liquidity_baking_escape_vote = true.
+   Escape hatch should not be activated. *)
+let liquidity_baking_escape_hatch_50 n () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk)
+  >>=? fun liquidity_baking ->
+  Context.get_constants (B blk)
+  >>=? fun csts ->
+  let sunset = csts.parametric.liquidity_baking_sunset_duration in
+  Context.Contract.balance (B blk) liquidity_baking
+  >>=? fun old_balance ->
+  let rec bake_50_percent_escaping blk i =
+    if i < Int32.to_int sunset + n then
+      Block.bake blk
+      >>=? fun blk ->
+      Block.bake ~liquidity_baking_escape_vote:true blk
+      >>=? fun blk -> bake_50_percent_escaping blk (i + 2)
+    else return blk
+  in
+  bake_50_percent_escaping blk 0
+  >>=? fun blk ->
+  Context.get_liquidity_baking_subsidy (B blk)
+  >>=? fun liquidity_baking_subsidy ->
+  Tez.(liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
+  >>?= fun expected_balance ->
+  Assert.balance_was_credited
+    ~loc:__LOC__
+    (B blk)
+    liquidity_baking
+    old_balance
+    expected_balance
   >>=? fun () -> return_unit
 
 let liquidity_baking_storage n () =
@@ -175,6 +255,66 @@ let tests =
        longer"
       `Quick
       (liquidity_baking_sunset_level 100);
+    Test_services.tztest
+      "test liquidity baking escape hatch with 100% of bakers flagging when \
+       baking one block longer"
+      `Quick
+      (liquidity_baking_escape_hatch_100 1);
+    Test_services.tztest
+      "test liquidity baking escape hatch with 100% of bakers flagging when \
+       baking two blocks longer"
+      `Quick
+      (liquidity_baking_escape_hatch_100 2);
+    Test_services.tztest
+      "test liquidity baking escape hatch with 100% of bakers flagging when \
+       baking 100 blocks longer"
+      `Quick
+      (liquidity_baking_escape_hatch_100 100);
+    Test_services.tztest
+      "test liquidity baking escape hatch with 80% of bakers flagging when \
+       baking one block longer"
+      `Quick
+      (liquidity_baking_escape_hatch_80 1);
+    Test_services.tztest
+      "test liquidity baking escape hatch with 80% of bakers flagging when \
+       baking two blocks longer"
+      `Quick
+      (liquidity_baking_escape_hatch_80 2);
+    Test_services.tztest
+      "test liquidity baking escape hatch with 80% of bakers flagging when \
+       baking 100 blocks longer"
+      `Quick
+      (liquidity_baking_escape_hatch_80 100);
+    Test_services.tztest
+      "test liquidity baking escape hatch with 60% of bakers flagging when \
+       baking one block longer"
+      `Quick
+      (liquidity_baking_escape_hatch_60 1);
+    Test_services.tztest
+      "test liquidity baking escape hatch with 60% of bakers flagging when \
+       baking two blocks longer"
+      `Quick
+      (liquidity_baking_escape_hatch_60 2);
+    Test_services.tztest
+      "test liquidity baking escape hatch with 60% of bakers flagging when \
+       baking 100 blocks longer"
+      `Quick
+      (liquidity_baking_escape_hatch_60 100);
+    Test_services.tztest
+      "test liquidity baking shuts off at sunset level with escape hatch at \
+       50% and baking one block longer"
+      `Quick
+      (liquidity_baking_escape_hatch_50 1);
+    Test_services.tztest
+      "test liquidity baking shuts off at sunset level with escape hatch at \
+       50% and baking two blocks longer"
+      `Quick
+      (liquidity_baking_escape_hatch_50 2);
+    Test_services.tztest
+      "test liquidity baking shuts off at sunset level with escape hatch at \
+       50% and baking 100 blocks longer"
+      `Quick
+      (liquidity_baking_escape_hatch_50 100);
     Test_services.tztest
       "test liquidity baking storage is updated"
       `Quick

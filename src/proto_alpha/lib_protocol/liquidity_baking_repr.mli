@@ -25,9 +25,14 @@
 
 val get_cpmm_address : Raw_context.t -> Contract_repr.t tzresult Lwt.t
 
+type escape_ema = Int32.t
+
+(** Checks if below EMA threshold (after updating), sunset level, and if CPMM
+    contract exists. *)
 val on_subsidy_allowed :
   Raw_context.t ->
+  escape_vote:bool ->
   (Raw_context.t ->
   Contract_repr.t ->
   (Raw_context.t * 'a list) tzresult Lwt.t) ->
-  (Raw_context.t * 'a list) tzresult Lwt.t
+  (Raw_context.t * 'a list * escape_ema) tzresult Lwt.t
