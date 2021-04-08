@@ -125,7 +125,7 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
-  >|=? fun (ctxt, baker) ->
+  >|=? fun (ctxt, baker, liquidity_baking_operations_results) ->
   let mode =
     Partial_application {block_header; baker = Signature.Public_key.hash baker}
   in
@@ -137,7 +137,8 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
     migration_balance_updates;
     implicit_operations_results =
       Apply_results.pack_migration_operation_results
-        migration_operation_results;
+        migration_operation_results
+      @ liquidity_baking_operations_results;
   }
 
 let begin_application ~chain_id ~predecessor_context:ctxt
@@ -149,7 +150,7 @@ let begin_application ~chain_id ~predecessor_context:ctxt
   Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
   >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
   Apply.begin_application ctxt chain_id block_header predecessor_timestamp
-  >|=? fun (ctxt, baker) ->
+  >|=? fun (ctxt, baker, liquidity_baking_operations_results) ->
   let mode =
     Application {block_header; baker = Signature.Public_key.hash baker}
   in
@@ -161,7 +162,8 @@ let begin_application ~chain_id ~predecessor_context:ctxt
     migration_balance_updates;
     implicit_operations_results =
       Apply_results.pack_migration_operation_results
-        migration_operation_results;
+        migration_operation_results
+      @ liquidity_baking_operations_results;
   }
 
 let begin_construction ~chain_id ~predecessor_context:ctxt
@@ -175,21 +177,22 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
   ( match protocol_data with
   | None ->
       Apply.begin_partial_construction ctxt
-      >|=? fun ctxt ->
+      >|=? fun (ctxt, liquidity_baking_operations_results) ->
       let mode = Partial_construction {predecessor} in
-      (mode, ctxt)
+      (mode, ctxt, liquidity_baking_operations_results)
   | Some proto_header ->
       Apply.begin_full_construction
         ctxt
         predecessor_timestamp
         proto_header.contents
-      >|=? fun (ctxt, protocol_data, baker) ->
+      >|=? fun (ctxt, protocol_data, baker, liquidity_baking_operations_results)
+               ->
       let mode =
         let baker = Signature.Public_key.hash baker in
         Full_construction {predecessor; baker; protocol_data}
       in
-      (mode, ctxt) )
-  >|=? fun (mode, ctxt) ->
+      (mode, ctxt, liquidity_baking_operations_results) )
+  >|=? fun (mode, ctxt, liquidity_baking_operations_results) ->
   {
     mode;
     chain_id;
@@ -198,7 +201,8 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
     migration_balance_updates;
     implicit_operations_results =
       Apply_results.pack_migration_operation_results
-        migration_operation_results;
+        migration_operation_results
+      @ liquidity_baking_operations_results;
   }
 
 let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)

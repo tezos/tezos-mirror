@@ -77,4 +77,6 @@ val quorum_max : Raw_context.t -> int32
 
 val min_proposal_quorum : Raw_context.t -> int32
 
+val liquidity_baking_subsidy : Raw_context.t -> Tez_repr.t
+
 val parametric : Raw_context.t -> Constants_repr.parametric

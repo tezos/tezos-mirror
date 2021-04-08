@@ -60,6 +60,7 @@ module Protocol_constants_overrides = struct
     min_proposal_quorum : int32 option;
     initial_endorsers : int option;
     delay_per_missing_endorsement : Period.t option;
+    liquidity_baking_subsidy : Tez.t option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
@@ -95,7 +96,8 @@ module Protocol_constants_overrides = struct
                 c.min_proposal_quorum,
                 c.initial_endorsers,
                 c.delay_per_missing_endorsement,
-                c.minimal_block_delay ),
+                c.minimal_block_delay,
+                c.liquidity_baking_subsidy ),
               (c.chain_id, c.timestamp) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
@@ -122,7 +124,8 @@ module Protocol_constants_overrides = struct
                    min_proposal_quorum,
                    initial_endorsers,
                    delay_per_missing_endorsement,
-                   minimal_block_delay ),
+                   minimal_block_delay,
+                   liquidity_baking_subsidy ),
                  (chain_id, timestamp) ) ) ) ->
         {
           preserved_cycles;
@@ -151,6 +154,7 @@ module Protocol_constants_overrides = struct
           initial_endorsers;
           delay_per_missing_endorsement;
           minimal_block_delay;
+          liquidity_baking_subsidy;
           chain_id;
           timestamp;
         })
@@ -179,13 +183,14 @@ module Protocol_constants_overrides = struct
                (opt "cost_per_byte" Tez.encoding)
                (opt "hard_storage_limit_per_operation" z))
             (merge_objs
-               (obj6
+               (obj7
                   (opt "quorum_min" int32)
                   (opt "quorum_max" int32)
                   (opt "min_proposal_quorum" int32)
                   (opt "initial_endorsers" uint16)
                   (opt "delay_per_missing_endorsement" Period.encoding)
-                  (opt "minimal_block_delay" Period.encoding))
+                  (opt "minimal_block_delay" Period.encoding)
+                  (opt "liquidity_baking_subsidy" Tez.encoding))
                (obj2
                   (opt "chain_id" Chain_id.encoding)
                   (opt "initial_timestamp" Time.Protocol.encoding)))))
@@ -236,6 +241,7 @@ module Protocol_constants_overrides = struct
         initial_endorsers = Some parametric.initial_endorsers;
         delay_per_missing_endorsement =
           Some parametric.delay_per_missing_endorsement;
+        liquidity_baking_subsidy = Some parametric.liquidity_baking_subsidy;
         (* Bastard, additional parameters. *)
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
@@ -269,6 +275,7 @@ module Protocol_constants_overrides = struct
       min_proposal_quorum = None;
       initial_endorsers = None;
       delay_per_missing_endorsement = None;
+      liquidity_baking_subsidy = None;
       chain_id = None;
       timestamp = None;
     }
@@ -451,6 +458,12 @@ module Protocol_constants_overrides = struct
             override_value = o.delay_per_missing_endorsement;
             pp = Period.pp;
           };
+        O
+          {
+            name = "liquidity_baking_subsidy";
+            override_value = o.liquidity_baking_subsidy;
+            pp = Tez.pp;
+          };
         O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
         O
           {
@@ -547,7 +560,11 @@ module Protocol_constants_overrides = struct
           delay_per_missing_endorsement =
             Option.value
               ~default:c.delay_per_missing_endorsement
-              o.delay_per_missing_endorsement
+              o.delay_per_missing_endorsement;
+          liquidity_baking_subsidy =
+            Option.value
+              ~default:c.liquidity_baking_subsidy
+              o.liquidity_baking_subsidy
             (* Notice that the chain_id and the timestamp are not used here as they are not protocol constants... *);
         }
         : Constants.parametric )

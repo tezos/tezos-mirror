@@ -38,6 +38,7 @@ type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
 type update_origin =
   | Block_application  (** Update from a block application *)
   | Protocol_migration  (** Update from a protocol migration *)
+  | Subsidy  (** Update from an inflationary subsidy  *)
 
 (** A list of balance updates. Duplicates may happen. *)
 type balance_updates = (balance * balance_update * update_origin) list

@@ -24,3 +24,10 @@
 (*****************************************************************************)
 
 val get_cpmm_address : Raw_context.t -> Contract_repr.t tzresult Lwt.t
+
+val on_cpmm_exists :
+  Raw_context.t ->
+  (Raw_context.t ->
+  Contract_repr.t ->
+  (Raw_context.t * 'a list) tzresult Lwt.t) ->
+  (Raw_context.t * 'a list) tzresult Lwt.t

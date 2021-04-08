@@ -116,6 +116,7 @@ type parametric = {
   min_proposal_quorum : int32;
   initial_endorsers : int;
   delay_per_missing_endorsement : Period_repr.t;
+  liquidity_baking_subsidy : Tez_repr.t;
 }
 
 let parametric_encoding =
@@ -147,7 +148,8 @@ let parametric_encoding =
             c.min_proposal_quorum,
             c.initial_endorsers,
             c.delay_per_missing_endorsement,
-            c.minimal_block_delay ) ) ))
+            c.minimal_block_delay,
+            c.liquidity_baking_subsidy ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -173,7 +175,8 @@ let parametric_encoding =
                min_proposal_quorum,
                initial_endorsers,
                delay_per_missing_endorsement,
-               minimal_block_delay ) ) ) ->
+               minimal_block_delay,
+               liquidity_baking_subsidy ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -201,6 +204,7 @@ let parametric_encoding =
         initial_endorsers;
         delay_per_missing_endorsement;
         minimal_block_delay;
+        liquidity_baking_subsidy;
       })
     (merge_objs
        (obj10
@@ -230,13 +234,14 @@ let parametric_encoding =
              (req "endorsement_reward" (list Tez_repr.encoding))
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z))
-          (obj6
+          (obj7
              (req "quorum_min" int32)
              (req "quorum_max" int32)
              (req "min_proposal_quorum" int32)
              (req "initial_endorsers" uint16)
              (req "delay_per_missing_endorsement" Period_repr.encoding)
-             (req "minimal_block_delay" Period_repr.encoding))))
+             (req "minimal_block_delay" Period_repr.encoding)
+             (req "liquidity_baking_subsidy" Tez_repr.encoding))))
 
 type t = {fixed : fixed; parametric : parametric}
 

@@ -16,6 +16,8 @@ The main novelties in the Alpha protocol are:
 
 - an upgrade of the consensus algorithm Emmy+ to Emmy*, which brings smaller block times and faster finality
 
+- a 2.5 tez per block subsidy to a CPMM contract to generate liquidity between tez and tzBTC
+
 .. contents:: Here is the complete list of changes:
 
 Emmy*
@@ -46,28 +48,32 @@ seconds after.
 The values of the ``BLOCKS_PER_*`` constants has doubled in order to
 match the reduced block times, as follows: ``BLOCKS_PER_CYCLE =
 8192``, ``BLOCKS_PER_COMMITMENT = 64``, ``BLOCKS_PER_ROLL_SNAPSHOT =
-512``, and ``BLOCKS_PER_VOTING_PERIOD = 40960``.
+512``, and ``BLOCKS_PER_VOTING_PERIOD = 40960``. This partially solves issue: `tezos#1027 <https://gitlab.com/tezos/tezos/-/issues/1027>`__
+ `tezos!2531 <https://gitlab.com/tezos/tezos/-/merge_requests/2531>`__
 
+Liquidity Baking
+----------------
 
+2.5 tez per block is credited to a constant product market making (CPMM) contract, the contract's ``%default`` entrypoint is called to update its storage, and the credit is included in block metadata as a balance update with a new ``update_origin`` type, ``Subsidy``.
 
-
-Changelog
----------
-
-- RPC: replace `deposit` by `deposits` in `frozen_balance` RPC.
-
-.. contents:: Summary of changes
-
-- Fix handling of potential integer overflow in `Time_repr` addition `Protocol/time_repr: check for potential overflow on addition <https://gitlab.com/tezos/tezos/-/merge_requests/2660>`_
-
-- Emmy*, new block delay formula;
-  partially solves issue: `tezos#1027 <https://gitlab.com/tezos/tezos/-/issues/1027>`__
-  `tezos!2386 <https://gitlab.com/tezos/tezos/-/merge_requests/2386>`__
+More detailed docs for liquidity baking can be found :ref:`here<liquidity_baking_alpha>`.
+  
+RPC changes
+-----------
 
 - Remove deprecated RPCs and deprecated fields in RPC answers related
   to voting periods. (MR `tezos!2763
   <https://gitlab.com/tezos/tezos/-/merge_requests/2763>`__, addresses
   issue `tezos#1204 <https://gitlab.com/tezos/tezos/-/issues/1204>__.)
+
+- The RPC ``../<block_id>/required_endorsements`` has been removed.
+
+- Replace `deposit` by `deposits` in `frozen_balance` RPC.
+
+Minor changes
+-------------
+
+- Fix handling of potential integer overflow in `Time_repr` addition `Protocol/time_repr: check for potential overflow on addition <https://gitlab.com/tezos/tezos/-/merge_requests/2660>`_
 
 - Increased the max operation time to live (`max_op_ttl`) from 60 to
   120
@@ -75,24 +81,7 @@ Changelog
 - Realign voting periods with cycles, solves issue `tezos#1151
   <https://gitlab.com/tezos/tezos/-/issues/1151>`__
   `<https://gitlab.com/tezos/tezos/-/merge_requests/2838>`__
-  
-- Emmy*, double ``blocks_per_*`` constants;
-  partially solves issue: `tezos#1027 <https://gitlab.com/tezos/tezos/-/issues/1027>`__
-  `tezos!2531 <https://gitlab.com/tezos/tezos/-/merge_requests/2531>`__
 
 - If gas remains for an operation after it gets executed, the remaining
   gas also gets consumed in the block;
   `tezos!2880 <https://gitlab.com/tezos/tezos/-/merge_requests/2880>`__
-
-RPC changes
-~~~~~~~~~~~
-
-The RPC ``../<block_id>/required_endorsements`` has been removed.
-
-The deprecated RPC ``../<block_id>/votes/current_period_kind`` has
-been removed. The deprecated fields ``level`` and
-``voting_period_kind`` in the return value of
-``../<block_id>/metadata`` have been removed. Similarly, the
-deprecated fields ``voting_period`` and ``voting_period_position`` in
-the return value of ``../<block_id>/helpers/current_level`` have been
-removed.

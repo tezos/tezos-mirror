@@ -127,4 +127,8 @@ let min_proposal_quorum c =
   let constants = Raw_context.constants c in
   constants.min_proposal_quorum
 
+let liquidity_baking_subsidy c =
+  let constants = Raw_context.constants c in
+  constants.liquidity_baking_subsidy
+
 let parametric c = Raw_context.constants c

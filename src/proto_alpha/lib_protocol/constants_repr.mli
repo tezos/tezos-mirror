@@ -78,6 +78,7 @@ type parametric = {
   min_proposal_quorum : int32;
   initial_endorsers : int;
   delay_per_missing_endorsement : Period_repr.t;
+  liquidity_baking_subsidy : Tez_repr.t;
 }
 
 val parametric_encoding : parametric Data_encoding.encoding

@@ -538,6 +538,7 @@ module Constants : sig
     min_proposal_quorum : int32;
     initial_endorsers : int;
     delay_per_missing_endorsement : Period.t;
+    liquidity_baking_subsidy : Tez.t;
   }
 
   val parametric_encoding : parametric Data_encoding.t
@@ -587,6 +588,8 @@ module Constants : sig
   val quorum_max : context -> int32
 
   val min_proposal_quorum : context -> int32
+
+  val liquidity_baking_subsidy : context -> Tez.t
 
   (** All constants: fixed and parametric *)
   type t = {fixed : fixed; parametric : parametric}
@@ -989,7 +992,7 @@ module Receipt : sig
 
   type balance_update = Debited of Tez.t | Credited of Tez.t
 
-  type update_origin = Block_application | Protocol_migration
+  type update_origin = Block_application | Protocol_migration | Subsidy
 
   type balance_updates = (balance * balance_update * update_origin) list
 
@@ -1662,4 +1665,9 @@ end
 
 module Liquidity_baking : sig
   val get_cpmm_address : context -> Contract.t tzresult Lwt.t
+
+  val on_cpmm_exists :
+    context ->
+    (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
+    (context * 'a list) tzresult Lwt.t
 end

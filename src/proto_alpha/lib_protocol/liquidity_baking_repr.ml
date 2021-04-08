@@ -24,3 +24,14 @@
 (*****************************************************************************)
 
 let get_cpmm_address = Storage.Liquidity_baking.Cpmm_address.get
+
+let on_cpmm_exists ctxt f =
+  get_cpmm_address ctxt
+  >>=? fun cpmm_contract ->
+  Contract_storage.exists ctxt cpmm_contract
+  >>=? function
+  | false ->
+      (* do nothing if the cpmm is not found *)
+      return (ctxt, [])
+  | true ->
+      f ctxt cpmm_contract

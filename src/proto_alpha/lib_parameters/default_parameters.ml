@@ -57,6 +57,8 @@ let constants_mainnet =
       min_proposal_quorum = 5_00l;
       initial_endorsers = 192;
       delay_per_missing_endorsement = Period.of_seconds_exn 4L;
+      (* liquidity_baking_subsidy is 1/16th of total rewards for a block of priority 0 with all endorsements *)
+      liquidity_baking_subsidy = Tez.of_mutez_exn 2_500_000L;
     }
 
 let constants_sandbox =

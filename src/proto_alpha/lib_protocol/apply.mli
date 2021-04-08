@@ -93,20 +93,27 @@ type error += Inconsistent_sources
 
 type error += (* `Permanent *) Failing_noop_error
 
-val begin_partial_construction : t -> (t, error trace) result Lwt.t
+val begin_partial_construction :
+  t -> (t * packed_successful_manager_operation_result list) tzresult Lwt.t
 
 val begin_full_construction :
   t ->
   Time.t ->
   Block_header.contents ->
-  (t * Block_header.contents * public_key, error trace) result Lwt.t
+  ( t
+  * Block_header.contents
+  * public_key
+  * packed_successful_manager_operation_result list )
+  tzresult
+  Lwt.t
 
 val begin_application :
   t ->
   Chain_id.t ->
   Block_header.t ->
   Time.t ->
-  (t * public_key, error trace) result Lwt.t
+  (t * public_key * packed_successful_manager_operation_result list) tzresult
+  Lwt.t
 
 val apply_operation :
   t ->

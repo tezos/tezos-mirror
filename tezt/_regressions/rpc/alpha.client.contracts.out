@@ -2,7 +2,10 @@ tezt/_regressions/rpc/alpha.client.contracts.out
 
 ./tezos-client rpc get /chains/main/blocks/head/context/contracts
 [ "[PUBLIC_KEY_HASH]",
+  "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
   "[PUBLIC_KEY_HASH]",
+  "[CONTRACT_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]

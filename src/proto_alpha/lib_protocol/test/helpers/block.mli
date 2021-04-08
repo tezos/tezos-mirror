@@ -101,6 +101,7 @@ val genesis :
   ?time_between_blocks:Period.t list ->
   ?minimal_block_delay:Period.t ->
   ?delay_per_missing_endorsement:Period.t ->
+  ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   (Account.t * Tez.tez) list ->
   block tzresult Lwt.t
 
@@ -132,6 +133,14 @@ val bake :
 
 (** Bakes [n] blocks. *)
 val bake_n : ?policy:baker_policy -> int -> t -> block tzresult Lwt.t
+
+(** Version of bake_n that returns a list of all balance updates included
+    in the metadata of baked blocks. **)
+val bake_n_with_all_balance_updates :
+  ?policy:baker_policy ->
+  int ->
+  t ->
+  (block * Alpha_context.Receipt.balance_updates) tzresult Lwt.t
 
 val current_cycle : t -> Cycle.t tzresult Lwt.t
 
