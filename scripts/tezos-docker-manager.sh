@@ -704,21 +704,21 @@ if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 case $(basename "$0") in
     delphinet.sh)
         docker_base_dir="$HOME/.tezos-delphinet"
-        docker_image=tezos/tezos:v8.2
+        docker_image=tezos/tezos:v8.3
         docker_compose_base_name=delphinet
         default_port=9732
         network=delphinet
         ;;
     edonet.sh)
         docker_base_dir="$HOME/.tezos-edonet"
-        docker_image=tezos/tezos:v8.2
+        docker_image=tezos/tezos:v8.3
         docker_compose_base_name=edonet
         default_port=9732
         network=edonet
         ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
-        docker_image=tezos/tezos:v8.2
+        docker_image=tezos/tezos:v8.3
         docker_compose_base_name="mainnet"
         default_port=9732
         network=mainnet
