@@ -42,14 +42,19 @@ module Request = struct
   include Request
 
   type _ t =
-    | Validated : Store.Block.t -> Event.update t
+    | Validated : {
+        peer : P2p_peer_id.t option;
+        (* The peer who sent the block if it was not injected locally. *)
+        block : Store.Block.t;
+      }
+        -> Event.update t
     | Notify_branch : P2p_peer.Id.t * Block_locator.t -> unit t
     | Notify_head : P2p_peer.Id.t * Block_header.t * Mempool.t -> unit t
     | Disconnection : P2p_peer.Id.t -> unit t
 
   let view (type a) (req : a t) : view =
     match req with
-    | Validated block -> Hash (Store.Block.hash block)
+    | Validated {block; _} -> Hash (Store.Block.hash block)
     | Notify_branch (peer_id, _) -> PeerId peer_id
     | Notify_head (peer_id, _, _) -> PeerId peer_id
     | Disconnection peer_id -> PeerId peer_id
@@ -138,15 +143,14 @@ let shutdown_child nv active_chains =
    - [peer_id] is not us.
 
    - [block] is known as valid. *)
-let update_synchronisation_state w
-    ((block, peer_id) : Block_header.t * P2p_peer.Id.t) =
+let update_synchronisation_state w block peer_id =
   let nv = Worker.state w in
   let old_status =
     Synchronisation_heuristic.get_status nv.synchronisation_state
   in
   Synchronisation_heuristic.update
     nv.synchronisation_state
-    (block.shell.timestamp, peer_id) ;
+    (block.Block_header.shell.timestamp, peer_id) ;
   let status = Synchronisation_heuristic.get_status nv.synchronisation_state in
   (match status with
   | Synchronised _ when nv.bootstrapped = false ->
@@ -165,13 +169,11 @@ let check_and_update_synchronisation_state w (block, peer_id) : unit Lwt.t =
   let hash = Block_header.hash block in
   Store.Block.is_known_valid nv.parameters.chain_store hash
   >>= fun known_valid ->
-  if known_valid then (
-    update_synchronisation_state w (block, peer_id) ;
-    Lwt.return_unit)
-  else Lwt.return_unit
+  if known_valid then update_synchronisation_state w block peer_id ;
+  Lwt.return_unit
 
 (* Called for every validated block. *)
-let notify_new_block w block =
+let notify_new_block w peer block =
   let nv = Worker.state w in
   Option.iter
     (fun id ->
@@ -182,18 +184,13 @@ let notify_new_block w block =
     nv.parameters.parent ;
   Lwt_watcher.notify nv.valid_block_input block ;
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
-  Worker.Queue.push_request_now w (Validated block)
-
-(* Called for every validated block coming from a remote peer_id. *)
-let notify_new_foreign_block w peer_id block =
-  notify_new_block w block ;
-  update_synchronisation_state w (Store.Block.header block, peer_id)
+  Worker.Queue.push_request_now w (Validated {peer; block})
 
 let with_activated_peer_validator w peer_id f =
   let nv = Worker.state w in
   P2p_peer.Error_table.find_or_make nv.active_peers peer_id (fun () ->
       Peer_validator.create
-        ~notify_new_block:(notify_new_foreign_block w peer_id)
+        ~notify_new_block:(notify_new_block w (Some peer_id))
         ~notify_termination:(fun _pv ->
           P2p_peer.Error_table.remove nv.active_peers peer_id)
         nv.parameters.peer_validator_limits
@@ -400,7 +397,8 @@ let may_instantiate_prevalidator nv ~head =
       (nv.parameters.prevalidator_limits, nv.chain_db)
   else Lwt.return_unit
 
-let on_validation_request w start_testchain active_chains spawn_child block =
+let on_validation_request w peer start_testchain active_chains spawn_child block
+    =
   let nv = Worker.state w in
   let chain_store = nv.parameters.chain_store in
   Store.Chain.current_head chain_store >>= fun head ->
@@ -426,6 +424,9 @@ let on_validation_request w start_testchain active_chains spawn_child block =
            therefore it must not be broadcasted *)
         return Event.Ignored_head
     | Some previous ->
+        Option.iter
+          (update_synchronisation_state w (Store.Block.header block))
+          peer ;
         broadcast_head w ~previous block >>= fun () ->
         may_update_protocol_level chain_store ~prev:previous ~block
         >>=? fun () ->
@@ -470,8 +471,14 @@ let on_disconnection w peer_id =
 let on_request (type a) w start_testchain active_chains spawn_child
     (req : a Request.t) : a tzresult Lwt.t =
   match req with
-  | Request.Validated block ->
-      on_validation_request w start_testchain active_chains spawn_child block
+  | Request.Validated {peer; block} ->
+      on_validation_request
+        w
+        peer
+        start_testchain
+        active_chains
+        spawn_child
+        block
   | Request.Notify_branch (peer_id, locator) ->
       on_notify_branch w peer_id locator
   | Request.Notify_head (peer_id, header, mempool) ->
@@ -480,7 +487,7 @@ let on_request (type a) w start_testchain active_chains spawn_child
 
 let on_completion (type a) w (req : a Request.t) (update : a) request_status =
   match req with
-  | Request.Validated block ->
+  | Request.Validated {block; _} ->
       let fitness = Store.Block.fitness block in
       let request = Request.Hash (Store.Block.hash block) in
       let level = Store.Block.level block in
@@ -762,7 +769,7 @@ let validate_block w ?force hash block operations =
   assert_checkpoint w (hash, block.Block_header.shell.level) >>=? fun () ->
   Block_validator.validate
     ~canceler:(Worker.canceler w)
-    ~notify_new_block:(notify_new_block w)
+    ~notify_new_block:(notify_new_block w None)
     nv.parameters.block_validator
     nv.chain_db
     hash
