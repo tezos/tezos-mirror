@@ -187,6 +187,15 @@ be documented here either.
 
 - Fixed a bug that caused some file descriptors to be leaked to external processes.
 
+# Version 8.3
+
+## Baker / Endorser / Accuser
+
+- Fixed a bug where the baker would not consider all of the operations
+  when a costly one was encountered.
+
+- Fixed a bug where the most profitable operations would not be applied first.
+
 # Version 8.2
 
 ## Node
