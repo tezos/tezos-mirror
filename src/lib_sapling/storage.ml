@@ -301,7 +301,7 @@ module Make_Storage (C : Core_sig.Validator) = struct
 
     let add e ((pos, map) : t) : t =
       let map = Map.add pos e map in
-      let pos = Int32.rem pos size in
+      let pos = Int32.rem (Int32.succ pos) size in
       (pos, map)
 
     let mem e ((_, map) : t) =
