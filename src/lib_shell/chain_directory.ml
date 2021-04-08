@@ -155,7 +155,7 @@ let rpc_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       match Validator.get validator (Store.Chain.chain_id chain_store) with
       | Error _ -> Lwt.fail Not_found
       | Ok chain_validator ->
-          return (Chain_validator.force_bootstrapped chain_validator b)) ;
+          Chain_validator.force_bootstrapped chain_validator b >>= return) ;
   (* blocks *)
   register0 S.Blocks.list (fun chain q () ->
       list_blocks chain ?length:q#length ?min_date:q#min_date q#heads) ;

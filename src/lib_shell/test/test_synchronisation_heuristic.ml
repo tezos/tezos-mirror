@@ -48,6 +48,7 @@
    executed. *)
 
 open Synchronisation_heuristic
+open Core
 
 let prn = function
   | Synchronised {is_chain_stuck = true} -> "Synchronised (stuck)"

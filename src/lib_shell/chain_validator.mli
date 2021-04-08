@@ -74,7 +74,7 @@ val bootstrapped : t -> unit Lwt.t
 
 val is_bootstrapped : t -> bool
 
-val force_bootstrapped : t -> bool -> unit
+val force_bootstrapped : t -> bool -> unit Lwt.t
 
 val prevalidator : t -> Prevalidator.t option
 
