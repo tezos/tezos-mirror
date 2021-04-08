@@ -19,6 +19,7 @@ depends: [
   "tezos-protocol-009-PsFLoren-parameters"
   "tezos-protocol-plugin-009-PsFLoren"
   "alcotest-lwt" { with-test & >= "1.1.0" }
+  "ppx_inline_test"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
