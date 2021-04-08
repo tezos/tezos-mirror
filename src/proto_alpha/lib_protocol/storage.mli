@@ -510,6 +510,11 @@ module Pending_migration : sig
 end
 
 module Liquidity_baking : sig
+  (** Level at which liquidity baking automatically shuts off.
+      Set in stitching to six months from activation. **)
+  module Sunset_level :
+    Single_data_storage with type t := Raw_context.t and type value = Int32.t
+
   (** Constant product market maker contract that receives liquidity baking subsidy. **)
   module Cpmm_address :
     Single_data_storage

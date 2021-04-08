@@ -1299,21 +1299,21 @@ let block_metadata_encoding =
               deactivated;
               balance_updates;
               implicit_operations_results } ->
-         ( ( baker,
-             level_info,
-             voting_period_info,
-             nonce_hash,
-             consumed_gas,
-             deactivated,
-             balance_updates ),
+         ( baker,
+           level_info,
+           voting_period_info,
+           nonce_hash,
+           consumed_gas,
+           deactivated,
+           balance_updates,
            implicit_operations_results ))
-       (fun ( ( baker,
-                level_info,
-                voting_period_info,
-                nonce_hash,
-                consumed_gas,
-                deactivated,
-                balance_updates ),
+       (fun ( baker,
+              level_info,
+              voting_period_info,
+              nonce_hash,
+              consumed_gas,
+              deactivated,
+              balance_updates,
               implicit_operations_results ) ->
          {
            baker;
@@ -1325,16 +1325,14 @@ let block_metadata_encoding =
            balance_updates;
            implicit_operations_results;
          })
-       (merge_objs
-          (obj7
-             (req "baker" Signature.Public_key_hash.encoding)
-             (req "level_info" Level.encoding)
-             (req "voting_period_info" Voting_period.info_encoding)
-             (req "nonce_hash" (option Nonce_hash.encoding))
-             (req "consumed_gas" Gas.Arith.n_fp_encoding)
-             (req "deactivated" (list Signature.Public_key_hash.encoding))
-             (req "balance_updates" Receipt.balance_updates_encoding))
-          (obj1
-             (req
-                "implicit_operations_results"
-                (list successful_manager_operation_result_encoding))))
+       (obj8
+          (req "baker" Signature.Public_key_hash.encoding)
+          (req "level_info" Level.encoding)
+          (req "voting_period_info" Voting_period.info_encoding)
+          (req "nonce_hash" (option Nonce_hash.encoding))
+          (req "consumed_gas" Gas.Arith.n_fp_encoding)
+          (req "deactivated" (list Signature.Public_key_hash.encoding))
+          (req "balance_updates" Receipt.balance_updates_encoding)
+          (req
+             "implicit_operations_results"
+             (list successful_manager_operation_result_encoding)))

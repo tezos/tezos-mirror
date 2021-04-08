@@ -27,7 +27,8 @@
     -------
     Component:    liquidity baking
     Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^liquidity baking$"
-    Subject:      Test liquidity baking subsidies and CPMM storage updates.
+    Subject:      Test liquidity baking subsidies and CPMM storage updates,
+                  and sunset shut off.
 *)
 
 open Protocol
@@ -46,6 +47,33 @@ let liquidity_baking_subsidies n () =
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
   Tez.(liquidity_baking_subsidy *? Int64.(of_int n))
+  >>?= fun expected_credit ->
+  Assert.balance_was_credited
+    ~loc:__LOC__
+    (B blk)
+    liquidity_baking
+    old_balance
+    expected_credit
+  >>=? fun () -> return_unit
+
+(* Test that [n] blocks after the liquidity baking sunset, the subsidy is not applied anymore.
+   More precisely, after the sunset, the total amount credited to the subsidy is only proportional
+   to the sunset duration and in particular it does not depend on [n]. *)
+let liquidity_baking_sunset_level n () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk)
+  >>=? fun liquidity_baking ->
+  Context.get_constants (B blk)
+  >>=? fun csts ->
+  let sunset = csts.parametric.liquidity_baking_sunset_duration in
+  Context.Contract.balance (B blk) liquidity_baking
+  >>=? fun old_balance ->
+  Block.bake_n (Int32.to_int sunset + n) blk
+  >>=? fun blk ->
+  Context.get_liquidity_baking_subsidy (B blk)
+  >>=? fun liquidity_baking_subsidy ->
+  Tez.(liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
   >>?= fun expected_credit ->
   Assert.balance_was_credited
     ~loc:__LOC__
@@ -88,15 +116,16 @@ let liquidity_baking_storage n () =
     (to_string expected_storage)
   >>=? fun () -> return_unit
 
-let liquidity_baking_balance_update n () =
+let liquidity_baking_balance_update () =
   Context.init 1
   >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk)
   >>=? fun liquidity_baking ->
   Context.get_constants (B blk)
   >>=? fun csts ->
+  let sunset = csts.parametric.liquidity_baking_sunset_duration in
   let subsidy = csts.parametric.liquidity_baking_subsidy in
-  Block.bake_n_with_all_balance_updates n blk
+  Block.bake_n_with_all_balance_updates Int32.(to_int (add sunset 100l)) blk
   >>=? fun (_blk, balance_updates) ->
   let liquidity_baking_updates =
     List.filter
@@ -123,7 +152,7 @@ let liquidity_baking_balance_update n () =
   Assert.equal_int
     ~loc:__LOC__
     (Int64.to_int (Tez.to_mutez credits))
-    (n * Int64.to_int (Tez.to_mutez subsidy))
+    ((Int32.to_int sunset - 1) * Int64.to_int (Tez.to_mutez subsidy))
   >>=? fun () -> return_unit
 
 let tests =
@@ -132,10 +161,25 @@ let tests =
       `Quick
       (liquidity_baking_subsidies 64);
     Test_services.tztest
+      "test liquidity baking shuts off at sunset level when baking one block \
+       longer"
+      `Quick
+      (liquidity_baking_sunset_level 1);
+    Test_services.tztest
+      "test liquidity baking shuts off at sunset level when baking two blocks \
+       longer"
+      `Quick
+      (liquidity_baking_sunset_level 2);
+    Test_services.tztest
+      "test liquidity baking shuts off at sunset level when baking 100 blocks \
+       longer"
+      `Quick
+      (liquidity_baking_sunset_level 100);
+    Test_services.tztest
       "test liquidity baking storage is updated"
       `Quick
       (liquidity_baking_storage 64);
     Test_services.tztest
       "test liquidity baking balance updates"
       `Quick
-      (liquidity_baking_balance_update 64) ]
+      liquidity_baking_balance_update ]

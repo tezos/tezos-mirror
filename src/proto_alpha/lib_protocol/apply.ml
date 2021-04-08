@@ -1446,7 +1446,7 @@ let endorsement_rights_of_pred_level ctxt =
       Baking.endorsement_rights ctxt pred_level
 
 let apply_liquidity_baking_subsidy ctxt =
-  Liquidity_baking.on_cpmm_exists
+  Liquidity_baking.on_subsidy_allowed
     ctxt
     (fun ctxt liquidity_baking_cpmm_contract ->
       let ctxt =

@@ -25,7 +25,7 @@
 
 val get_cpmm_address : Raw_context.t -> Contract_repr.t tzresult Lwt.t
 
-val on_cpmm_exists :
+val on_subsidy_allowed :
   Raw_context.t ->
   (Raw_context.t ->
   Contract_repr.t ->

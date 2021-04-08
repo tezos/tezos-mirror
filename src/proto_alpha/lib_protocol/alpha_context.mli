@@ -539,6 +539,7 @@ module Constants : sig
     initial_endorsers : int;
     delay_per_missing_endorsement : Period.t;
     liquidity_baking_subsidy : Tez.t;
+    liquidity_baking_sunset_duration : int32;
   }
 
   val parametric_encoding : parametric Data_encoding.t
@@ -590,6 +591,8 @@ module Constants : sig
   val min_proposal_quorum : context -> int32
 
   val liquidity_baking_subsidy : context -> Tez.t
+
+  val liquidity_baking_sunset_duration : context -> int32
 
   (** All constants: fixed and parametric *)
   type t = {fixed : fixed; parametric : parametric}
@@ -1666,7 +1669,7 @@ end
 module Liquidity_baking : sig
   val get_cpmm_address : context -> Contract.t tzresult Lwt.t
 
-  val on_cpmm_exists :
+  val on_subsidy_allowed :
     context ->
     (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
     (context * 'a list) tzresult Lwt.t

@@ -25,3 +25,5 @@ Subsidy
 At every block in the chain, a small amount of tez is minted and credited to the CPMM contract, and the CPMM's ``%default`` entrypoint is called to update the ``xtz_pool`` balance in its storage. The amount that is minted and sent to the CPMM contract is 1/16th of the rewards for a block of priority 0 with all endorsements; currently these rewards are 40 tez per block so the amount that is sent to the CPMM contract is 2.5 tez per block.
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
+
+As a safety precaution, the subsidy expires automatically after 6 months but it can be renewed periodically by protocol amendment.

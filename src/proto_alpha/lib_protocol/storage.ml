@@ -1275,6 +1275,13 @@ module Pending_migration = struct
 end
 
 module Liquidity_baking = struct
+  module Sunset_level =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["liquidity_baking_sunset_level"]
+      end)
+      (Int32)
+
   module Cpmm_address =
     Make_single_data_storage (Registered) (Raw_context)
       (struct

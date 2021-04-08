@@ -160,7 +160,9 @@ let protocol_parameters_json t : Ezjsonm.t =
          [ ( "minimal_block_delay"
            , string (Int.to_string t.minimal_block_delay) );
            ( "liquidity_baking_subsidy"
-           , string "2500000" ); ]
+           , string "2500000" );
+           ( "liquidity_baking_sunset_duration"
+           , int 525600 ); ]
       | _ -> [] in
     let legacy_parameters =
       match subkind with

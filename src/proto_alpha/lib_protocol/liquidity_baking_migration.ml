@@ -173,6 +173,13 @@ let init_common ~typecheck ?test_fa12_admin ctxt =
   let current_level =
     Raw_level_repr.to_int32 (Level_storage.current ctxt).level
   in
+  Storage.Liquidity_baking.Sunset_level.init
+    ctxt
+    Int32.(
+      add
+        current_level
+        (Constants_storage.liquidity_baking_sunset_duration ctxt))
+  >>=? fun ctxt ->
   check_tzBTC
     ~typecheck
     current_level

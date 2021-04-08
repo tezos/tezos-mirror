@@ -606,6 +606,7 @@ def _test_create_mockup_init_show_roundtrip(
                 "preserved_cycles": 3,
                 "minimal_block_delay": "1",
                 "liquidity_baking_subsidy": "2500000",
+                "liquidity_baking_sunset_duration": 1024,
             }
         ),
     ],

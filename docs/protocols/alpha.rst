@@ -56,8 +56,14 @@ Liquidity Baking
 
 2.5 tez per block is credited to a constant product market making (CPMM) contract, the contract's ``%default`` entrypoint is called to update its storage, and the credit is included in block metadata as a balance update with a new ``update_origin`` type, ``Subsidy``.
 
+The liquidity baking subsidy shuts off automatically at six months from protocol activation if not renewed in a future upgrade. The sunset duration is included in constants and sunset level calculated during stitching.
+
+- `TZIP <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft-liquidity_baking.md>`_
+- MR:
+  :gl:`tezos!2765`
+
 More detailed docs for liquidity baking can be found :ref:`here<liquidity_baking_alpha>`.
-  
+
 RPC changes
 -----------
 
