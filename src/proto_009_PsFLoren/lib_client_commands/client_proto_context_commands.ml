@@ -249,7 +249,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
            ?storage_limit
            destination) )
   >>=? fun operation ->
-  return (Injection.Annotated_manager_operation operation)
+  return (Annotated_manager_operation.Annotated_manager_operation operation)
 
 let commands network () =
   let open Clic in
@@ -837,7 +837,9 @@ let commands network () =
             >>=? fun (source, src_pk, src_sk) ->
             List.mapi_ep prepare operations
             >>=? fun contents ->
-            let (Manager_list contents) = Injection.manager_of_list contents in
+            let (Manager_list contents) =
+              Annotated_manager_operation.manager_of_list contents
+            in
             Injection.inject_manager_operation
               cctxt
               ~chain:cctxt#chain
@@ -846,9 +848,9 @@ let commands network () =
               ~dry_run
               ~verbose_signing
               ~source
-              ?fee
-              ?gas_limit
-              ?storage_limit
+              ~fee:(Limit.of_option fee)
+              ~gas_limit:(Limit.of_option gas_limit)
+              ~storage_limit:(Limit.of_option storage_limit)
               ?counter
               ~src_pk
               ~src_sk

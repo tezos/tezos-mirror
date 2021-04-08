@@ -11,6 +11,8 @@
             tezos-signer-backends
             tezos-protocol-009-PsFLoren-parameters
             tezos-protocol-plugin-009-PsFLoren)
+ (inline_tests)
+ (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services

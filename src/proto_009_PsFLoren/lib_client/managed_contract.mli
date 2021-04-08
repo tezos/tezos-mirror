@@ -40,7 +40,7 @@ val build_delegate_operation :
   ?fee:Tez.t ->
   Contract.t ->
   public_key_hash option ->
-  Kind.transaction Injection.annotated_manager_operation tzresult Lwt.t
+  Kind.transaction Annotated_manager_operation.t tzresult Lwt.t
 
 (** Set the delegate of a manageable contract.
     For a contract with a `do`entrypoint, it builds the lambda that set
@@ -78,7 +78,7 @@ val build_transaction_operation :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:counter ->
   unit ->
-  Kind.transaction Injection.annotated_manager_operation tzresult Lwt.t
+  Kind.transaction Annotated_manager_operation.t tzresult Lwt.t
 
 (** Perform a transfer on behalf of a managed contract .
     For a contract with a `do`entrypoint, it builds the lambda that
