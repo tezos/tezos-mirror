@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Test_fuzzing_tests
+open Lib_test.Qcheck_helpers
 
 module ListWithBase = struct
   type 'a elt = 'a
@@ -36,26 +37,39 @@ module ListWithBase = struct
 
   let name = "List"
 
-  let pp = Crowbar.(pp_list pp_int)
+  let pp = Format.pp_print_list Format.pp_print_int
 end
 
-(* Internal consistency *)
-module IterFold = TestIterFold (ListWithBase)
-module RevMapRevMap = TestRevMapRevMap (ListWithBase)
+module type F = functor (S : module type of ListWithBase) -> sig
+  val tests : QCheck.Test.t list
+end
 
-(* consistency w.r.t. Stdlib *)
-module ExistForall = TestExistForallAgainstStdlibList (ListWithBase)
-module Filter = TestFilterAgainstStdlibList (ListWithBase)
-module Filterp = TestFilterpAgainstStdlibList (ListWithBase)
-module Filtermap = TestFiltermapAgainstStdlibList (ListWithBase)
-module Filtermapp = TestFiltermappAgainstStdlibList (ListWithBase)
-module Fold = TestFoldAgainstStdlibList (ListWithBase)
-module FoldRight = TestFoldRightAgainstStdlibList (ListWithBase)
-module Iter = TestIterAgainstStdlibList (ListWithBase)
-module Iteri = TestIteriAgainstStdlibList (ListWithBase)
-module Iterp = TestIterMonotoneAgainstStdlibList (ListWithBase)
-module Map = TestMapAgainstStdlibList (ListWithBase)
-module Mapp = TestMappAgainstStdlibList (ListWithBase)
-module Find = TestFindStdlibList (ListWithBase)
-module Partition = TestPartitionStdlibList (ListWithBase)
-module Double = TestDoubleTraversorsStdlibList (ListWithBase)
+let wrap (name, (module Test : F)) =
+  let module M = Test (ListWithBase) in
+  (name, qcheck_wrap M.tests)
+
+let () =
+  let name = "Test_fuzzing_list" in
+  let tests =
+    [ (* Test internal consistency *)
+      ("TestIterFold", (module TestIterFold : F));
+      ("TestRevMapRevMap", (module TestRevMapRevMap : F));
+      (* Test consistency with Stdlib *)
+      ("ExistForall", (module TestExistForallAgainstStdlibList : F));
+      ("Filter", (module TestFilterAgainstStdlibList : F));
+      ("Filterp", (module TestFilterpAgainstStdlibList : F));
+      ("Filtermap", (module TestFiltermapAgainstStdlibList : F));
+      ("Filtermapp", (module TestFiltermappAgainstStdlibList : F));
+      ("Fold", (module TestFoldAgainstStdlibList : F));
+      ("FoldRight", (module TestFoldRightAgainstStdlibList : F));
+      ("Iter", (module TestIterAgainstStdlibList : F));
+      ("Iteri", (module TestIteriAgainstStdlibList : F));
+      ("Iterp", (module TestIterMonotoneAgainstStdlibList : F));
+      ("Map", (module TestMapAgainstStdlibList : F));
+      ("Mapp", (module TestMappAgainstStdlibList : F));
+      ("Find", (module TestFindStdlibList : F));
+      ("Partition", (module TestPartitionStdlibList : F));
+      ("Double", (module TestDoubleTraversorsStdlibList : F)) ]
+  in
+  let tests = List.map wrap tests in
+  Alcotest.run name tests
