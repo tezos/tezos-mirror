@@ -3,6 +3,7 @@
  (names test_rustzcash
         test_keys
         test_merkle
+        test_roots
         test_sapling)
  (deps vectors.csv vectors-zip32.csv)
  (libraries tezos-sapling
