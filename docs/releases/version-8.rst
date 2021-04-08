@@ -1,6 +1,6 @@
 .. _version-8:
 
-Version 8.2
+Version 8.3
 ===========
 
 Version 8.0 contains a new version (V1) of the protocol
@@ -25,6 +25,9 @@ Version 8.2 replaces `PtEdoTez` by `PtEdo2Zk` and provides RPCs to
 with constraining the size of p2p messages at low level and updating
 some external dependencies.
 
+Version 8.3 fixes a couple of issues that caused the baker to not include
+some operations.
+
 Update Instructions
 -------------------
 
@@ -35,12 +38,23 @@ See :ref:`instructions to set up Rust<setup_rust>`.
 To update from sources::
 
   git fetch
-  git checkout v8.2
+  git checkout v8.3
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v8.2`` Docker images of Tezos.
+If you are using Docker instead, use the ``v8.3`` Docker images of Tezos.
+
+Changelog — Version 8.3
+-----------------------
+
+Baker / Endorser / Accuser
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fixed a bug where the baker would not consider all of the operations
+  when a costly one was encountered.
+
+- Fixed a bug where the most profitable operations would not be applied first.
 
 Changelog — Version 8.2
 -----------------------
