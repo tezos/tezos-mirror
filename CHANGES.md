@@ -17,6 +17,9 @@
 - Fixes the operation ordering in the baker so that the most
   profitable operations are applied first.
 
+- Fixed a bug where the baker would not consider all of the operations
+  when a costly one was encountered.
+
 ## Miscellaneous
 
 - Update external opam dependencies. In particular, switch to `hacl-star.0.3.0-1`
