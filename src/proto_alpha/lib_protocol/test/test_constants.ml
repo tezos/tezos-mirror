@@ -36,8 +36,38 @@ let test_constants_consistency () =
     Block.check_constants_consistency
     [constants_mainnet; constants_sandbox; constants_test]
 
+let test_max_operations_ttl () =
+  let open Protocol in
+  (* max_operatios_ttl is hard-coded for mainnet to avoid any
+     recomputation and is not reconfigured for other networks. *)
+  let minimal_block_delay =
+    Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
+      .minimal_block_delay
+  in
+  let time_between_blocks =
+    Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
+      .time_between_blocks
+  in
+  Context.init ~time_between_blocks ~minimal_block_delay 1
+  >>=? fun (b, _) ->
+  Context.get_constants (Context.B b)
+  >>=? fun constants ->
+  Environment.wrap_tzresult
+    (Alpha_context.Period.mult
+       (Int32.of_int Alpha_context.max_operations_ttl)
+       constants.parametric.minimal_block_delay)
+  >>?= fun result ->
+  Assert.equal
+    ~loc:__LOC__
+    (fun x y -> Alpha_context.Period.compare x y = 0)
+    "max_operations_ttl"
+    Alpha_context.Period.pp
+    Alpha_context.Period.one_hour
+    result
+
 let tests =
   [ Test_services.tztest
       "constants consistency"
       `Quick
-      test_constants_consistency ]
+      test_constants_consistency;
+    Test_services.tztest "max_operations_ttl" `Quick test_max_operations_ttl ]
