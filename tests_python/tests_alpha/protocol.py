@@ -3,6 +3,7 @@ from tools import constants, utils
 HASH = constants.ALPHA
 DAEMON = constants.ALPHA_DAEMON
 PARAMETERS = constants.ALPHA_PARAMETERS
+FOLDER = constants.ALPHA_FOLDER
 
 PREV_HASH = constants.EDO
 PREV_DAEMON = constants.EDO_DAEMON

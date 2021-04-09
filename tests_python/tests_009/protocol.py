@@ -3,6 +3,7 @@ from tools import constants, utils
 HASH = constants.FLORENCE
 DAEMON = constants.FLORENCE_DAEMON
 PARAMETERS = constants.FLORENCE_PARAMETERS
+FOLDER = constants.FLORENCE_FOLDER
 
 PREV_HASH = constants.EDO
 PREV_DAEMON = constants.EDO_DAEMON
