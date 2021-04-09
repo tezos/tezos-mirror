@@ -3,6 +3,7 @@ from tools import constants, utils
 HASH = constants.EDO
 DAEMON = constants.EDO_DAEMON
 PARAMETERS = constants.EDO_PARAMETERS
+FOLDER = constants.EDO_FOLDER
 
 
 def activate(

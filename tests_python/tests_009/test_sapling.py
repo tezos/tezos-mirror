@@ -7,9 +7,8 @@ from tools.utils import assert_run_failure
 from . import contract_paths
 from . import protocol
 
-PROTO = "009_PsFLoren"
 CONTRACT_PATH = path.join(
-    paths.TEZOS_HOME, 'src', f'proto_{PROTO}', 'lib_protocol', 'test'
+    paths.TEZOS_HOME, 'src', protocol.FOLDER, 'lib_protocol', 'test'
 )
 TX_AMOUNT = 100.0
 
