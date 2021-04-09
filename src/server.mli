@@ -119,6 +119,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
     val invalid_cors_response : string -> Cohttp.Response.t * Cohttp_lwt.Body.t
 
     val handle_error :
+      Cohttp.Header.t ->
       Media.medias ->
       [< `Cannot_parse_body of string
       | `Cannot_parse_path of string list * Resto.Arg.descr * string

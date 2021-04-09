@@ -119,7 +119,11 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
                      error
                      a )
         | Error err ->
-            Lwt.return_ok @@ Server.Handlers.handle_error server.medias err
+            Lwt.return_ok
+            @@ Server.Handlers.handle_error
+                 (Cohttp.Header.init ())
+                 server.medias
+                 err
 
       let call ?headers ?body (meth : Cohttp.Code.meth) uri =
         let path = uri |> Uri.path |> Resto.Utils.decode_split_path in
@@ -134,7 +138,11 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
         >>= function
         | Ok a -> Lwt.return a
         | Error err ->
-            Lwt.return @@ Server.Handlers.handle_error server.medias err
+            Lwt.return
+            @@ Server.Handlers.handle_error
+                 (Cohttp.Header.init ())
+                 server.medias
+                 err
     end : Client.CALL )
 
   let launch ?(cors = Cors.default) ?(agent = Server.Agent.default_agent)

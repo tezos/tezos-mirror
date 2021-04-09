@@ -149,7 +149,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       in
       (Response.make ~headers ~status:`Forbidden (), Cohttp_lwt.Body.empty)
 
-    let handle_error medias
+    let handle_error headers medias
         (error :
           [< `Cannot_parse_body of string
           | `Cannot_parse_path of string list * Resto.Arg.descr * string
@@ -163,9 +163,9 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
       let open Resto.Arg in
       match error with
       | `Not_implemented ->
-          (Response.make ~status:`Not_implemented (), Cohttp_lwt.Body.empty)
+          ( Response.make ~status:`Not_implemented ~headers (),
+            Cohttp_lwt.Body.empty )
       | `Method_not_allowed methods ->
-          let headers = Header.init () in
           let headers =
             Header.add_multi
               headers
@@ -175,7 +175,6 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           ( Response.make ~status:`Method_not_allowed ~headers (),
             Cohttp_lwt.Body.empty )
       | `Cannot_parse_path (context, arg, value) ->
-          let headers = Header.init () in
           let headers = Header.add headers "content-type" "text/plain" in
           ( Response.make ~status:`Bad_request ~headers (),
             Format.kasprintf
@@ -186,7 +185,6 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
               value
               arg.name )
       | `Cannot_parse_body s ->
-          let headers = Header.init () in
           let headers = Header.add headers "content-type" "text/plain" in
           ( Response.make ~status:`Bad_request ~headers (),
             Format.kasprintf
@@ -194,7 +192,6 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
               "Failed to parse the request body: %s"
               s )
       | `Cannot_parse_query s ->
-          let headers = Header.init () in
           let headers = Header.add headers "content-type" "text/plain" in
           ( Response.make ~status:`Bad_request ~headers (),
             Format.kasprintf
@@ -205,13 +202,13 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
           let accepted_encoding =
             Media_type.acceptable_encoding medias.Media.media_types
           in
-          ( Response.make ~status:`Not_acceptable (),
+          ( Response.make ~status:`Not_acceptable ~headers (),
             Cohttp_lwt.Body.of_string accepted_encoding )
       | `Unsupported_media_type _ ->
-          ( Response.make ~status:`Unsupported_media_type (),
+          ( Response.make ~status:`Unsupported_media_type ~headers (),
             Cohttp_lwt.Body.empty )
       | `Not_found ->
-          (Response.make ~status:`Not_found (), Cohttp_lwt.Body.empty)
+          (Response.make ~status:`Not_found ~headers (), Cohttp_lwt.Body.empty)
 
     let handle_rpc_answer con_string ?headers output answer =
       match answer with
@@ -457,7 +454,14 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     >>= function
     | Ok answer -> Lwt.return answer
     | Error err ->
-        lwt_return_response @@ Handlers.handle_error server.medias err
+        let headers = Header.init () in
+        let headers =
+          Cors.add_allow_origin
+            headers
+            server.cors
+            (Header.get req_headers "origin")
+        in
+        lwt_return_response @@ Handlers.handle_error headers server.medias err
 
   (* Promise a running RPC server. *)
 
