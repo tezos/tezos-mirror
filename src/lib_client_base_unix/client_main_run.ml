@@ -182,6 +182,24 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
             failwith
               "--sources MUST be specified when --mode light is specified"
         | (`Mode_light, Some sources_config) ->
+            ( if List.mem rpc_config.endpoint sources_config.uris then
+              return_unit
+            else
+              failwith
+                "Value of --endpoint is %a. Therefore, this URI MUST be in \
+                 field 'uris' of --sources (whose value is: %a). If you did \
+                 not specify --endpoint, it is being defaulted; you may \
+                 hereby specify --endpoint %a to fix this error."
+                Uri.pp
+                rpc_config.endpoint
+                (Format.pp_print_list Uri.pp)
+                sources_config.uris
+                (* By the check done in Light.mk_sources_config, sources_config.uris
+                   cannot be empty, but we don't rely on this here. Hence the use
+                   of pp_print_option. *)
+                (Format.pp_print_option Uri.pp)
+                (List.hd sources_config.uris) )
+            >>=? fun () ->
             let rpc_builder endpoint =
               ( new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
                   {rpc_config with endpoint}
