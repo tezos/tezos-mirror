@@ -71,10 +71,15 @@ be documented here either.
   predecessor, and check that the result is the same as what is
   currently stored. This is mostly useful for debugging and
   benchmarking purposes.
+  
+- Reduced the maximum allowed timestamp drift to 5 seconds.
 
 ## Client
 
 ## Baker / Endorser / Accuser
+
+- Optimized the performance of the baker to reduce the number of RPC
+  calls to the node while waiting for endorsements.
 
 ## Protocol Compiler And Environment
 

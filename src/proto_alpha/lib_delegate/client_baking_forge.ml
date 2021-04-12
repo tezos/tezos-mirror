@@ -33,6 +33,34 @@ end)
 
 open Logging
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = [Protocol.name; "baking"; "forge"]
+
+  let endorsement_received =
+    declare_2
+      ~section
+      ~level:Info
+      ~name:"endorsement_received"
+      ~msg:"received endorsement for slot {slot} (power: {power})"
+      ~pp1:Format.pp_print_int
+      ("slot", Data_encoding.int31)
+      ~pp2:Format.pp_print_int
+      ("power", Data_encoding.int31)
+
+  let expected_validity_time =
+    declare_2
+      ~section
+      ~name:"expected_validity_time"
+      ~level:Info
+      ~msg:"expected validity time: {time} (endorsing power: {power})"
+      ~pp1:Timestamp.pp
+      ("time", Timestamp.encoding)
+      ~pp2:Format.pp_print_int
+      ("power", Data_encoding.int31)
+end
+
 (* The index of the different components of the protocol's validation passes *)
 (* TODO: ideally, we would like this to be more abstract and possibly part of
    the protocol, while retaining the generality of lists *)
@@ -154,28 +182,6 @@ let assert_valid_operations_hash shell_header operations =
        operations_hash
        shell_header.Tezos_base.Block_header.operations_hash)
     (failure "Client_baking_forge.inject_block: inconsistent header.")
-
-let compute_endorsing_power cctxt ~chain ~block operations =
-  Shell_services.Chain.chain_id cctxt ~chain ()
-  >>=? fun chain_id ->
-  List.fold_left_es
-    (fun sum -> function
-      | { Alpha_context.protocol_data =
-            Operation_data {contents = Single (Endorsement_with_slot _); _};
-          _ } as op -> (
-          Delegate_services.Endorsing_power.get
-            cctxt
-            (chain, block)
-            op
-            chain_id
-          >>= function
-          | Error _ ->
-              (* Filters invalid endorsements *)
-              return sum
-          | Ok power ->
-              return (sum + power) ) | _ -> return sum)
-    0
-    operations
 
 let inject_block cctxt ?(force = false) ?seed_nonce_hash ~chain ~shell_header
     ~priority ~delegate_pkh ~delegate_sk ~level operations =
@@ -604,8 +610,46 @@ let error_of_op (result : error Preapply_result.t) op =
       | None ->
           None ) )
 
-let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
-    ?protocol_data
+let compute_endorsement_powers cctxt constants ~chain ~block =
+  Delegate_services.Endorsing_rights.get
+    cctxt
+    ~levels:[block.Client_baking_blocks.level]
+    (chain, `Hash (block.hash, 0))
+  >>=? fun endorsing_rights ->
+  let slots_arr = Array.make constants.Constants.endorsers_per_block 0 in
+  (* Populate the array *)
+  List.iter
+    (fun {Delegate_services.Endorsing_rights.slots; _} ->
+      let endorsing_power = List.length slots in
+      List.iter (fun slot -> slots_arr.(slot) <- endorsing_power) slots)
+    endorsing_rights ;
+  return slots_arr
+
+let compute_endorsing_power endorsement_powers operations =
+  List.fold_left
+    (fun sum -> function
+      | { Alpha_context.protocol_data =
+            Operation_data
+              {contents = Single (Endorsement_with_slot {slot; _}); _};
+          _ } -> (
+        try
+          let endorsement_power = endorsement_powers.(slot) in
+          sum + endorsement_power
+        with _ -> sum ) | _ -> sum)
+    0
+    operations
+
+let compute_minimal_valid_time constants ~priority ~endorsing_power
+    ~predecessor_timestamp =
+  Environment.wrap_tzresult
+    (Baking.minimal_valid_time
+       constants
+       ~priority
+       ~endorsing_power
+       ~predecessor_timestamp)
+
+let filter_and_apply_operations cctxt state endorsements_map ~chain ~block
+    block_info ~priority ?protocol_data
     ((operations : packed_operation list list), overflowing_operations) =
   (* Retrieve the minimal valid time for when the block can be baked with 0 endorsements *)
   Delegate_services.Minimal_valid_time.get cctxt (chain, block) priority 0
@@ -753,14 +797,15 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
   >>= fun (_, accepted_managers) ->
   let operations = [endorsements; votes; anonymous; accepted_managers] in
   (* Construct a context with the valid operations and a correct timestamp *)
-  compute_endorsing_power cctxt ~chain ~block endorsements
-  >>=? fun current_endorsing_power ->
-  Delegate_services.Minimal_valid_time.get
-    cctxt
-    (chain, block)
-    priority
-    current_endorsing_power
-  >>=? fun expected_validity ->
+  let current_endorsing_power =
+    compute_endorsing_power endorsements_map endorsements
+  in
+  compute_minimal_valid_time
+    state.constants.parametric
+    ~priority
+    ~endorsing_power:current_endorsing_power
+    ~predecessor_timestamp:block_info.timestamp
+  >>?= fun expected_validity ->
   (* Finally, we construct a block with the minimal possible timestamp
      given the endorsing power *)
   begin_construction
@@ -830,25 +875,32 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) ?timestamp
     ?mempool ?context_path ?seed_nonce_hash ~chain ~priority ~delegate_pkh
     ~delegate_sk block =
+  Alpha_services.Constants.all cctxt (chain, block)
+  >>=? fun constants ->
   (* making the arguments usable *)
   unopt_operations cctxt chain mempool operations
   >>=? fun operations_arg ->
-  compute_endorsing_power cctxt ~chain ~block operations_arg
-  >>=? fun endorsing_power ->
+  Client_baking_blocks.info cctxt ~chain block
+  >>=? fun block_info ->
+  compute_endorsement_powers
+    cctxt
+    constants.parametric
+    ~chain
+    ~block:block_info
+  >>=? fun endorsement_powers ->
+  let endorsing_power =
+    compute_endorsing_power endorsement_powers operations_arg
+  in
   decode_priority cctxt chain block ~priority ~endorsing_power
   >>=? fun (priority, minimal_timestamp) ->
   unopt_timestamp ?force timestamp minimal_timestamp
   >>=? fun timestamp ->
   (* get basic building blocks *)
   let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
-  Alpha_services.Constants.all cctxt (chain, block)
-  >>=? fun Constants.
-             { parametric = {hard_gas_limit_per_block; endorsers_per_block; _};
-               _ } ->
   classify_operations
     cctxt
     ~chain
-    ~hard_gas_limit_per_block
+    ~hard_gas_limit_per_block:constants.parametric.hard_gas_limit_per_block
     ~block
     ~minimal_fees
     ~minimal_nanotez_per_gas_unit
@@ -861,7 +913,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
     List.sub
       ( WithExceptions.Option.get ~loc:__LOC__
       @@ List.nth operations endorsements_index )
-      endorsers_per_block
+      constants.parametric.endorsers_per_block
   in
   let votes =
     retain_operations_up_to_quota
@@ -909,10 +961,6 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
       assert best_effort ;
       Context.init ~readonly:true context_path
       >>= fun index ->
-      Client_baking_blocks.info cctxt ~chain block
-      >>=? fun bi ->
-      Alpha_services.Constants.all cctxt (chain, `Head 0)
-      >>=? fun constants ->
       Client_baking_files.resolve_location cctxt ~chain `Nonce
       >>=? fun nonces_location ->
       let state =
@@ -929,20 +977,27 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           retry_counter = default_retry_counter;
         }
       in
+      compute_endorsement_powers
+        cctxt
+        constants.parametric
+        ~chain
+        ~block:block_info
+      >>=? fun endorsement_powers ->
       filter_and_apply_operations
         cctxt
         state
+        endorsement_powers
         ~chain
         ~block
         ~priority
         ~protocol_data
-        bi
+        block_info
         (operations, overflowing_ops)
       >>=? fun ( final_context,
                  (validation_result, _),
                  operations,
                  min_valid_timestamp ) ->
-      let current_protocol = bi.next_protocol in
+      let current_protocol = block_info.next_protocol in
       let context =
         Shell_context.unwrap_disk_context validation_result.context
       in
@@ -954,8 +1009,8 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           ~timestamp:min_valid_timestamp
           validation_result
           operations
-          bi.predecessor_block_metadata_hash
-          bi.predecessor_operations_metadata_hash
+          block_info.predecessor_block_metadata_hash
+          block_info.predecessor_operations_metadata_hash
         >>= function
         | Error _ as errs ->
             Lwt.return errs
@@ -1085,8 +1140,8 @@ let filter_outdated_endorsements expected_level ops =
 (** [fetch_operations] retrieve the operations present in the
     mempool. If no endorsements are present in the initial set, it
     waits until it's able to build a valid block. *)
-let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
-    (_, (head, priority, _delegate)) =
+let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
+    endorsement_powers (_, (head, priority, _delegate)) =
   Alpha_block_services.Mempool.monitor_operations
     cctxt
     ~chain
@@ -1096,6 +1151,21 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
     ~branch_refused:false
     ()
   >>=? fun (operation_stream, _stop) ->
+  let notify_endorsement_arrival operations =
+    List.iter_s
+      (function
+        | { Alpha_context.protocol_data =
+              Operation_data
+                {contents = Single (Endorsement_with_slot {slot; _}); _};
+            _ } -> (
+          try
+            let endorsing_power = endorsement_powers.(slot) in
+            Events.(emit endorsement_received (slot, endorsing_power))
+          with _ -> Lwt.return_unit )
+        | _ ->
+            Lwt.return_unit)
+      operations
+  in
   (* Hypothesis : the first call to the stream returns instantly, even if the mempool is empty. *)
   Lwt_stream.get operation_stream
   >>= function
@@ -1103,25 +1173,47 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
       (* New head received : aborting block construction *)
       return_none
   | Some current_mempool ->
-      let block = `Hash (head.Client_baking_blocks.hash, 0) in
       let operations =
-        ref (filter_outdated_endorsements head.level current_mempool)
+        ref
+          (filter_outdated_endorsements
+             head.Client_baking_blocks.level
+             current_mempool)
       in
+      notify_endorsement_arrival !operations
+      >>= fun () ->
+      let current_endorsing_power =
+        ref (compute_endorsing_power endorsement_powers !operations)
+      in
+      let previous_endorsing_power = ref 0 in
+      let previous_expected_validity_time = ref None in
       (* Actively request our peers' for missing operations *)
       Shell_services.Mempool.request_operations cctxt ~chain ()
       >>=? fun () ->
-      let compute_minimal_valid_time () =
-        compute_endorsing_power cctxt ~chain ~block !operations
-        >>=? fun current_endorsing_power ->
-        Delegate_services.Minimal_valid_time.get
-          cctxt
-          (chain, block)
-          priority
-          current_endorsing_power
-      in
       let compute_timeout () =
-        compute_minimal_valid_time ()
+        let compute_minimal_valid_time () =
+          compute_minimal_valid_time
+            state.constants.parametric
+            ~priority
+            ~endorsing_power:!current_endorsing_power
+            ~predecessor_timestamp:head.timestamp
+          >>?= fun expected_validity ->
+          Events.(
+            emit
+              expected_validity_time
+              (expected_validity, !current_endorsing_power))
+          >>= fun () -> return expected_validity
+        in
+        ( match !previous_expected_validity_time with
+        | None ->
+            compute_minimal_valid_time ()
+        | Some _
+          when Compare.Int.(
+                 !current_endorsing_power > !previous_endorsing_power) ->
+            compute_minimal_valid_time ()
+        | Some previous_expected_validity_time ->
+            return previous_expected_validity_time )
         >>=? fun expected_validity ->
+        previous_expected_validity_time := Some expected_validity ;
         match Client_baking_scheduling.sleep_until expected_validity with
         | None ->
             return_unit
@@ -1146,6 +1238,13 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
         | `Event (Some op_list) ->
             last_get_event := None ;
             let op_list = filter_outdated_endorsements head.level op_list in
+            notify_endorsement_arrival op_list
+            >>= fun () ->
+            let added_endorsing_power =
+              compute_endorsing_power endorsement_powers op_list
+            in
+            current_endorsing_power :=
+              added_endorsing_power + !current_endorsing_power ;
             operations := op_list @ !operations ;
             loop ()
         | `Timeout ->
@@ -1157,8 +1256,12 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain
                 (List.flatten (Lwt_stream.get_available operation_stream))
             in
             operations := remaining_operations @ !operations ;
-            compute_minimal_valid_time ()
-            >>=? fun expected_validity ->
+            compute_minimal_valid_time
+              state.constants.parametric
+              ~priority
+              ~endorsing_power:!current_endorsing_power
+              ~predecessor_timestamp:head.timestamp
+            >>?= fun expected_validity ->
             return_some (!operations, expected_validity)
         | `Event None ->
             (* Got new head while waiting:
@@ -1192,7 +1295,9 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
         -% s Client_keys.Logging.tag name
         -% a timestamp_tag (Time.System.of_protocol_exn slot_timestamp))
   >>= fun () ->
-  fetch_operations cctxt ~chain slot
+  compute_endorsement_powers cctxt state.constants.parametric ~chain ~block:bi
+  >>=? fun endorsement_powers ->
+  fetch_operations cctxt ~chain state endorsement_powers slot
   >>=? function
   | None ->
       lwt_log_notice
@@ -1243,6 +1348,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
         filter_and_apply_operations
           cctxt
           state
+          endorsement_powers
           ~chain
           ~block
           ~priority
