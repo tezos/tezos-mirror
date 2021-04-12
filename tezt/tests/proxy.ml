@@ -116,6 +116,9 @@ let test_cache_at_most_once protocol =
       (["context"; "nonces"; "3"], []);
       (["helpers"; "endorsing_rights"], []);
       (["helpers"; "levels_in_current_cycle"], []);
+      (["votes"; "current_period"], []);
+      (["votes"; "successor_period"], []);
+      (["votes"; "total_voting_power"], []);
       (["votes"; "ballot_list"], []);
       (["votes"; "ballots"], []);
       (["votes"; "current_proposal"], []);
@@ -224,6 +227,9 @@ let test_context_suffix_no_rpc protocol =
         (["context"; "delegates"], []);
         (["context"; "nonces"; "3"], []);
         (["helpers"; "endorsing_rights"], []);
+        (["votes"; "current_period"], []);
+        (["votes"; "successor_period"], []);
+        (["votes"; "total_voting_power"], []);
         (["votes"; "ballot_list"], []);
         (["votes"; "ballots"], []);
         (["votes"; "current_proposal"], []);
@@ -454,6 +460,9 @@ module Location = struct
           (add_rpc_path_prefix ["context"; "nonces"; "3"], []);
           (add_rpc_path_prefix ["helpers"; "endorsing_rights"], []);
           (add_rpc_path_prefix ["helpers"; "levels_in_current_cycle"], []);
+          (add_rpc_path_prefix ["votes"; "current_period"], []);
+          (add_rpc_path_prefix ["votes"; "successor_period"], []);
+          (add_rpc_path_prefix ["votes"; "total_voting_power"], []);
           (add_rpc_path_prefix ["votes"; "ballot_list"], []);
           (add_rpc_path_prefix ["votes"; "ballots"], []);
           (add_rpc_path_prefix ["votes"; "current_proposal"], []);
