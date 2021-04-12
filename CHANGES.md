@@ -76,6 +76,9 @@ be documented here either.
 
 ## Baker / Endorser / Accuser
 
+- Optimized the performance of the baker to reduce the number of RPC
+  calls to the node while waiting for endorsements.
+
 ## Protocol Compiler And Environment
 
 ## Codec
