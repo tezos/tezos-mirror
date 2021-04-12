@@ -71,6 +71,8 @@ be documented here either.
   predecessor, and check that the result is the same as what is
   currently stored. This is mostly useful for debugging and
   benchmarking purposes.
+  
+- Reduced the maximum allowed timestamp drift to 5 seconds.
 
 ## Client
 
