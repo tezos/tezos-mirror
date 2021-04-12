@@ -78,6 +78,11 @@ RPC changes
 
 - Replace `deposit` by `deposits` in `frozen_balance` RPC.
 
+- All the protocol-specific RPCs under the ``helpers`` path have been
+moved from the protocol to the `recently introduced <tezos!2446>`_ RPC
+plugin. This change should not be visible for end-users but improves
+the maintainability of these RPCs.
+
 Minor changes
 -------------
 
