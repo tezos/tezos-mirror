@@ -3,13 +3,17 @@ import pytest
 from tools import utils, paths, constants
 
 PARAMS = constants.NODE_PARAMS
-BATCH = 100
+
+# Defines the number of blocks to bake in the following test. This
+# constant should be higher than max_opttl and should be a multiple of
+# the cycle length (8 in sandboxed mode)
+BATCH = 160
 
 HOME = paths.TEZOS_HOME
 
 GROUP = [1, 2, 3, 4, 5]
 
-EXPECTED_LEVEL = 101
+EXPECTED_LEVEL = BATCH + 1
 
 
 def check_expected_values(head):
