@@ -76,6 +76,19 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       Storage.Block_priority.init ctxt 0
       >>=? fun ctxt -> Vote_storage.update_listings ctxt
   | Edo_008 ->
+      (* Only the starting position of the voting period is shifted by
+       one level into the future, so that voting periods are again
+       aligned with cycles. The period kind does not change, as a new
+       voting period has just started. *)
+      Voting_period_storage.get_current ctxt
+      >>=? fun voting_period ->
+      Storage.Vote.Current_period.update
+        ctxt
+        {
+          voting_period with
+          start_position = Int32.succ voting_period.start_position;
+        }
+      >>=? fun ctxt ->
       (* Add balance updates receipts to be attached on the first block of this
          protocol - see [[prepare]] function below. Any balance updates attached
          in the migration should use the [[Receipt_repr.Migration]] constructor.
