@@ -36,7 +36,10 @@ test-static-libs-patch:
     name: "$CI_JOB_NAME-$CI_COMMIT_SHA"
     paths:
       - test_results
+    reports:
+      junit: test_results/*.xml
     expire_in: 1 day
+    when: always
 
 # this section is updated using the script scripts/update_unit_test.sh
 ##BEGIN_UNITTEST##
