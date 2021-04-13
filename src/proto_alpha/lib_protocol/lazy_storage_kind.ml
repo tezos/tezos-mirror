@@ -262,12 +262,13 @@ module Temp_ids = struct
     match kind with
     | Big_map ->
         let big_map = Big_map.Id.Temp.next temp_ids.big_map in
-        ({temp_ids with big_map}, (big_map :> Big_map.Id.t))
+        ({temp_ids with big_map}, (temp_ids.big_map :> Big_map.Id.t))
     | Sapling_state ->
         let sapling_state =
           Sapling_state.Id.Temp.next temp_ids.sapling_state
         in
-        ({temp_ids with sapling_state}, (sapling_state :> Sapling_state.Id.t))
+        ( {temp_ids with sapling_state},
+          (temp_ids.sapling_state :> Sapling_state.Id.t) )
    [@@coq_axiom_with_reason "gadt"]
 
   let fold_s :
