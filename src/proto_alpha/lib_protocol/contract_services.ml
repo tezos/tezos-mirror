@@ -145,6 +145,53 @@ module S = struct
       ~output:Script.expr_encoding
       RPC_path.(big_map_root /: Big_map.Id.rpc_arg /: Script_expr_hash.rpc_arg)
 
+  type big_map_get_all_query = {offset : int option; length : int option}
+
+  let rpc_arg_uint : int RPC_arg.t =
+    let int_of_string s =
+      int_of_string_opt s
+      |> Option.to_result
+           ~none:(Format.sprintf "Cannot parse integer value %s" s)
+      >>? fun i ->
+      if Compare.Int.(i < 0) then
+        Error (Format.sprintf "Negative integer: %d" i)
+      else Ok i
+    in
+    RPC_arg.make
+      ~name:"uint"
+      ~descr:"A non-negative integer (greater than or equal to 0)."
+      ~destruct:int_of_string
+      ~construct:string_of_int
+      ()
+
+  let big_map_get_all_query : big_map_get_all_query RPC_query.t =
+    let open RPC_query in
+    query (fun offset length -> {offset; length})
+    |+ opt_field
+         ~descr:
+           "Skip the first [offset] values. Useful in combination with \
+            [length] for pagination."
+         "offset"
+         rpc_arg_uint
+         (fun t -> t.offset)
+    |+ opt_field
+         ~descr:
+           "Only retrieve [length] values. Useful in combination with \
+            [offset] for pagination."
+         "length"
+         rpc_arg_uint
+         (fun t -> t.length)
+    |> seal
+
+  let big_map_get_all =
+    RPC_service.get_service
+      ~description:
+        "Get the (optionally paginated) list of values in a big map. Order of \
+         values is unspecified, but is guaranteed to be consistent."
+      ~query:big_map_get_all_query
+      ~output:(list Script.expr_encoding)
+      RPC_path.(big_map_root /: Big_map.Id.rpc_arg)
+
   let info =
     RPC_service.get_service
       ~description:"Access the complete status of a contract."
@@ -249,6 +296,37 @@ let[@coq_axiom_with_reason "gadt"] register () =
             >>=? fun (value, ctxt) ->
             unparse_data ctxt Readable value_type value
             >|=? fun (value, _ctxt) -> Some (Micheline.strip_locations value) )
+  in
+  let do_big_map_get_all ?offset ?length ctxt id =
+    let open Script_ir_translator in
+    let ctxt = Gas.set_unlimited ctxt in
+    Big_map.exists ctxt id
+    >>=? fun (ctxt, types) ->
+    match types with
+    | None ->
+        raise Not_found
+    | Some (_, value_type) ->
+        parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
+        >>?= fun (Ex_ty value_type, ctxt) ->
+        Big_map.list_values ?offset ?length ctxt id
+        >>=? fun (ctxt, values) ->
+        Lwt_list.fold_left_s
+          (fun acc value ->
+            acc
+            >>?= fun (ctxt, rev_values) ->
+            parse_data
+              ctxt
+              ~legacy:true
+              ~allow_forged:true
+              value_type
+              (Micheline.root value)
+            >>=? fun (value, ctxt) ->
+            unparse_data ctxt Readable value_type value
+            >|=? fun (value, ctxt) ->
+            (ctxt, Micheline.strip_locations value :: rev_values))
+          (Ok (ctxt, []))
+          values
+        >|=? fun (_ctxt, rev_values) -> List.rev rev_values
   in
   register_field S.balance Contract.get_balance ;
   opt_register1 S.manager_key (fun ctxt contract () () ->
@@ -378,6 +456,8 @@ let[@coq_axiom_with_reason "gadt"] register () =
               do_big_map_get ctxt id key >|=? Option.some )) ;
   opt_register2 S.big_map_get (fun ctxt id key () () ->
       do_big_map_get ctxt id key) ;
+  register1 S.big_map_get_all (fun ctxt id {offset; length} () ->
+      do_big_map_get_all ?offset ?length ctxt id) ;
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract
       >>=? fun balance ->

@@ -426,13 +426,15 @@ struct
     consume_mem_gas s key
     >>?= fun s -> C.mem s key >|= fun exists -> ok (C.project s, exists)
 
-  let get s i =
+  let get_unprojected s i =
     consume_read_gas C.get s i
     >>=? fun s ->
     C.get s (data_key i)
     >>=? fun b ->
     let key () = C.absolute_key s (data_key i) in
-    Lwt.return (of_bytes ~key b >|? fun v -> (C.project s, v))
+    Lwt.return (of_bytes ~key b >|? fun v -> (s, v))
+
+  let get s i = get_unprojected s i >|=? fun (s, v) -> (C.project s, v)
 
   let find s i =
     let key = data_key i in
@@ -490,6 +492,47 @@ struct
   let add_or_remove s i v =
     match v with None -> remove s i | Some v -> add s i v
 
+  (** Because big map values are not stored under some common key,
+      we have no choice but to fold over all nodes with a path of length
+      [I.path_length] to retrieve actual keys and then paginate.
+
+      While this is inefficient and will traverse the whole tree ([O(n)]), there
+      currently isn't a better decent alternative.
+
+      Once https://gitlab.com/tezos/tezos/-/merge_requests/2771 which flattens paths is done,
+      {!C.list} could be used instead here. *)
+  let list_values ?(offset = 0) ?(length = max_int) s =
+    let root = [] in
+    let depth = `Eq I.path_length in
+    C.fold
+      s
+      root
+      ~depth
+      ~init:(ok (s, [], offset, length))
+      ~f:(fun file tree acc ->
+        match (C.Tree.kind tree, acc) with
+        | (`Tree, Ok (s, rev_values, offset, length)) -> (
+            if Compare.Int.(length <= 0) then
+              (* Keep going until the end, we have no means of short-circuiting *)
+              Lwt.return acc
+            else if Compare.Int.(offset > 0) then
+              (* Offset (first element) not reached yet *)
+              let offset = pred offset in
+              Lwt.return (Ok (s, rev_values, offset, length))
+            else
+              (* Nominal case *)
+              match I.of_path file with
+              | None ->
+                  assert false
+              | Some key ->
+                  get_unprojected s key
+                  >|=? fun (s, value) ->
+                  (s, value :: rev_values, 0, pred length) )
+        | _ ->
+            Lwt.return acc)
+    >|=? fun (s, rev_values, _offset, _length) ->
+    (C.project s, List.rev rev_values)
+
   let fold_keys_unaccounted s ~init ~f =
     C.fold ~depth:(`Eq I.path_length) s [] ~init ~f:(fun file tree acc ->
         match C.Tree.kind tree with
@@ -530,11 +573,19 @@ module Make_indexed_carbonated_data_storage : functor
   (C : Raw_context.T)
   (I : INDEX)
   (V : VALUE)
-  ->
-  Non_iterable_indexed_carbonated_data_storage
-    with type t = C.t
-     and type key = I.t
-     and type value = V.t =
+  -> sig
+  include
+    Non_iterable_indexed_carbonated_data_storage
+      with type t = C.t
+       and type key = I.t
+       and type value = V.t
+
+  val list_values :
+    ?offset:int ->
+    ?length:int ->
+    C.t ->
+    (Raw_context.t * V.t list) tzresult Lwt.t
+end =
   Make_indexed_carbonated_data_storage_INTERNAL
 
 module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :

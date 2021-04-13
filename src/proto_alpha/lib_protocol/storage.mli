@@ -242,11 +242,20 @@ module Big_map : sig
 
   val rpc_arg : id RPC_arg.t
 
-  module Contents :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Script_expr_hash.t
-       and type value = Script_repr.expr
-       and type t := key
+  module Contents : sig
+    include
+      Non_iterable_indexed_carbonated_data_storage
+        with type key = Script_expr_hash.t
+         and type value = Script_repr.expr
+         and type t := key
+
+    (** HACK *)
+    val list_values :
+      ?offset:int ->
+      ?length:int ->
+      Raw_context.t * id ->
+      (Raw_context.t * Script_repr.expr list) tzresult Lwt.t
+  end
 
   module Total_bytes :
     Indexed_data_storage
