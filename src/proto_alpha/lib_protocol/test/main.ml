@@ -61,5 +61,6 @@ let () =
       ("failing_noop operation", Test_failing_noop.tests);
       ("storage description", Test_storage.tests);
       ("time", Test_time_repr.tests);
-      ("constants", Test_constants.tests) ]
+      ("constants", Test_constants.tests);
+      ("level module", Test_level_module.tests) ]
   |> Lwt_main.run
