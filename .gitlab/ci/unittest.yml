@@ -30,16 +30,18 @@ test-static-libs-patch:
     key: "$CI_COMMIT_REF_SLUG"
     policy: pull
 
-# this section is updated using the script scripts/update_unit_test.sh
-##BEGIN_UNITTEST##
-unit:alltest:
+.unit_test_template:
   extends: .test_template
   artifacts:
-    name: "alltest-${CI_COMMIT_SHA}"
+    name: "$CI_JOB_NAME-$CI_COMMIT_SHA"
     paths:
       - test_results
     expire_in: 1 day
-#    when: on_failure
+
+# this section is updated using the script scripts/update_unit_test.sh
+##BEGIN_UNITTEST##
+unit:alltest:
+  extends: .unit_test_template
   script:
     - scripts/test_wrapper.sh src/bin_client client
     - scripts/test_wrapper.sh src/bin_snoop/latex snoop_latex

@@ -23,13 +23,7 @@ rm "$tmp"0*
 
 cat >> "$tmp" <<EOF
 unit:alltest:
-  extends: .test_template
-  artifacts:
-    name: "alltest-\${CI_COMMIT_SHA}"
-    paths:
-      - test_results
-    expire_in: 1 day
-#    when: on_failure
+  extends: .unit_test_template
   script:
 EOF
 
