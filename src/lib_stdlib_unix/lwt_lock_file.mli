@@ -23,9 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Simple abstraction over Unix lockfiles *)
+
 open Error_monad
 
-val create :
-  ?close_on_exec:bool -> ?unlink_on_exit:bool -> string -> unit tzresult Lwt.t
+(** [try_with_lock ?close_on_exec ?unlink_on_exit ~when_locked
+    ~filename f] tries to take a lock on file [filename] and calls [f]
+    if the lock was successfully taken. If the lock was previously
+    taken, [when_locked] is called instead and [f] is ignored.
 
-val is_locked : string -> bool tzresult Lwt.t
+    This function may fail with an I/O exception wrapped in the error
+    monad if something unexpected happened. *)
+val try_with_lock :
+  when_locked:(unit -> 'a tzresult Lwt.t) ->
+  filename:string ->
+  (unit -> 'a tzresult Lwt.t) ->
+  'a tzresult Lwt.t

@@ -64,9 +64,10 @@ module Term = struct
               fail (Node_snapshot_command.Invalid_sandbox_file filename)
           | Ok json -> return_some ("sandbox_parameter", json)))
       >>=? fun sandbox_parameters ->
-      Lwt_lock_file.is_locked (Node_data_version.lock_file data_dir)
-      >>=? fun is_locked ->
-      fail_when is_locked Locked_directory >>=? fun () ->
+      Lwt_lock_file.try_with_lock
+        ~when_locked:(fun () -> fail Locked_directory)
+        ~filename:(Node_data_version.lock_file data_dir)
+      @@ fun () ->
       let context_dir = Node_data_version.context_dir data_dir in
       let store_dir = Node_data_version.store_dir data_dir in
       let patch_context =

@@ -192,10 +192,12 @@ module Term = struct
           in
           Node_config_file.write args.config_file node_config >>=? fun () ->
           Node_data_version.ensure_data_dir ~bare:true data_dir >>=? fun () ->
-          Lwt_lock_file.create
-            ~unlink_on_exit:true
-            (Node_data_version.lock_file data_dir)
-          >>=? fun () ->
+          (* Lock only on snapshot import *)
+          Lwt_lock_file.try_with_lock
+            ~when_locked:(fun () ->
+              failwith "Data directory is locked by another process")
+            ~filename:(Node_data_version.lock_file data_dir)
+          @@ fun () ->
           (match
              (node_config.blockchain_network.genesis_parameters, sandbox_file)
            with

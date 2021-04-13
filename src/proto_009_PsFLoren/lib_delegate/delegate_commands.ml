@@ -61,11 +61,15 @@ let pidfile_arg =
     ~placeholder:"filename"
     (Clic.parameter (fun _ s -> return s))
 
-let may_lock_pidfile = function
-  | None -> return_unit
+let may_lock_pidfile pidfile_opt f =
+  match pidfile_opt with
+  | None -> f ()
   | Some pidfile ->
-      trace (failure "Failed to create the pidfile: %s" pidfile)
-      @@ Lwt_lock_file.create ~unlink_on_exit:true pidfile
+      Lwt_lock_file.try_with_lock
+        ~when_locked:(fun () ->
+          failwith "Failed to create the pidfile: %s" pidfile)
+        ~filename:pidfile
+        f
 
 let block_param t =
   Clic.param
@@ -264,7 +268,7 @@ let baker_commands () =
            node_path
            delegates
            cctxt ->
-        may_lock_pidfile pidfile >>=? fun () ->
+        may_lock_pidfile pidfile @@ fun () ->
         Tezos_signer_backends.Encrypted.decrypt_list
           cctxt
           (List.map fst delegates)
@@ -296,7 +300,7 @@ let endorser_commands () =
       (args3 pidfile_arg endorsement_delay_arg keep_alive_arg)
       (prefixes ["run"] @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun (pidfile, endorsement_delay, keep_alive) delegates cctxt ->
-        may_lock_pidfile pidfile >>=? fun () ->
+        may_lock_pidfile pidfile @@ fun () ->
         Tezos_signer_backends.Encrypted.decrypt_list
           cctxt
           (List.map fst delegates)
@@ -334,7 +338,7 @@ let accuser_commands () =
       (args3 pidfile_arg preserved_levels_arg keep_alive_arg)
       (prefixes ["run"] @@ stop)
       (fun (pidfile, preserved_levels, keep_alive) cctxt ->
-        may_lock_pidfile pidfile >>=? fun () ->
+        may_lock_pidfile pidfile @@ fun () ->
         Client_daemon.Accuser.run
           cctxt
           ~chain:cctxt#chain
