@@ -25,7 +25,7 @@
 
 open Level_repr
 
-let from_raw_with_era cycle_eras ?offset l =
+let from_raw_with_eras cycle_eras ?offset l =
   let l =
     match offset with
     | None ->
@@ -37,7 +37,7 @@ let from_raw_with_era cycle_eras ?offset l =
 
 let from_raw c ?offset l =
   let cycle_eras = Raw_context.cycle_eras c in
-  from_raw_with_era cycle_eras ?offset l
+  from_raw_with_eras cycle_eras ?offset l
 
 let root c =
   let first_cycle_era = List.hd (Raw_context.cycle_eras c) in
@@ -62,43 +62,23 @@ let previous ctxt =
   | Some p ->
       p
 
-let first_level_in_cycle_with_era cycle_eras cycle =
-  let first_level_in_cycle' first_cycle_in_era cycle_era =
-    let cycle_position = Cycle_repr.diff cycle first_cycle_in_era in
-    let first_level_offset =
-      Int32.mul cycle_era.blocks_per_cycle cycle_position
-    in
-    from_raw_with_era
-      cycle_eras
-      ~offset:first_level_offset
-      cycle_era.first_level
-  in
-  let rec aux first_cycle_in_era = function
-    | first_cycle_era :: (second_cycle_era :: _ as tail) ->
-        let number_of_cycles_in_era =
-          Int32.div
-            (Raw_level_repr.diff
-               second_cycle_era.first_level
-               first_cycle_era.first_level)
-            first_cycle_era.blocks_per_cycle
-          |> Int32.to_int
-        in
-        let next_first_cycle_in_era =
-          Cycle_repr.add first_cycle_in_era number_of_cycles_in_era
-        in
-        if Compare.Int32.(Cycle_repr.diff cycle next_first_cycle_in_era >= 0l)
-        then aux next_first_cycle_in_era tail
-        else first_level_in_cycle' first_cycle_in_era first_cycle_era
-    | [cycle_era] ->
-        first_level_in_cycle' first_cycle_in_era cycle_era
+let first_level_in_cycle_with_eras cycle_eras cycle =
+  let rec aux = function
+    | {first_level; first_cycle; blocks_per_cycle; _} :: tail ->
+        if Cycle_repr.(cycle >= first_cycle) then
+          (* cycle is in the current era *)
+          let cycle_position = Cycle_repr.diff cycle first_cycle in
+          let first_level_offset = Int32.mul blocks_per_cycle cycle_position in
+          from_raw_with_eras cycle_eras ~offset:first_level_offset first_level
+        else aux tail
     | [] ->
         assert false
   in
-  aux Cycle_repr.root cycle_eras
+  aux cycle_eras
 
 let first_level_in_cycle ctxt cycle =
   let cycle_eras = Raw_context.cycle_eras ctxt in
-  first_level_in_cycle_with_era cycle_eras cycle
+  first_level_in_cycle_with_eras cycle_eras cycle
 
 let last_level_in_cycle ctxt c =
   match pred ctxt (first_level_in_cycle ctxt (Cycle_repr.succ c)) with

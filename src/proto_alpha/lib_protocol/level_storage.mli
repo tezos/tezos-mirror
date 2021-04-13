@@ -63,5 +63,5 @@ val may_snapshot_rolls : Raw_context.t -> bool
 
 (* exported for unit testing only *)
 
-val first_level_in_cycle_with_era :
+val first_level_in_cycle_with_eras :
   Level_repr.cycle_era list -> Cycle_repr.t -> Level_repr.t

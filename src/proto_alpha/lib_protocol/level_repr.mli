@@ -26,20 +26,20 @@
 (** A cycle era is a chunk of cycles having the same number of levels
    per cycle and the same number of blocks per commitment. *)
 type cycle_era = {
-  first_level : Raw_level_repr.t;
-      (** The first level at which a new value for blocks_per_cycle is used. *)
+  first_level : Raw_level_repr.t;  (** The first level of a cycle era. *)
+  first_cycle : Cycle_repr.t;  (** The first cycle of a cycle era. *)
   blocks_per_cycle : int32;
       (** The value of the blocks_per_cycle constant used during the cycle
-       period starting with first_level. *)
+       era starting with first_level. *)
   blocks_per_commitment : int32;
       (** The value of the blocks_per_commitment constant used during the
-       cycle period starting with first_level. *)
+       cycle era starting with first_level. *)
 }
 
 (** Invariants regarding cycle eras:
-   - the first level are increasing, meaning that the first era is the oldest
-     era, and the last era is the current era
-   - the last era therefore contains the same constants as in Constants
+   - the first levels and the first cycles are decreasing, meaning that the 
+     first era is the current era, and the last era is the oldest era
+   - the first era therefore contains the same constants as in Constants
    - the first level of an era is the first level of a cycle
 *)
 
