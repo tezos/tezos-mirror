@@ -61,10 +61,14 @@ module Common = struct
 
   let randomized_byte ?pos v encoding =
     let bytes = Data_encoding.Binary.(to_bytes_exn encoding v) in
-    let b = Random.bits () in
-    let random_pos = Random.int (Bytes.length bytes - 1) in
-    let pos = Option.value ~default:random_pos pos in
-    Bytes.set_int8 bytes pos b ;
+    let rec aux () =
+      let b = Random.bits () in
+      let random_pos = Random.int (Bytes.length bytes) in
+      let pos = Option.value ~default:random_pos pos in
+      if b = Bytes.get_int8 bytes pos then aux ()
+      else Bytes.set_int8 bytes pos b
+    in
+    aux () ;
     Data_encoding.Binary.(of_bytes_exn encoding bytes)
 
   type wallet = {
