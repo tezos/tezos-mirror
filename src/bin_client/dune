@@ -68,6 +68,20 @@
             (select void_for_linking-baking-009-PsFLoren from
               (tezos-baking-009-PsFLoren-commands.registration -> void_for_linking-baking-009-PsFLoren.empty)
               (-> void_for_linking-baking-009-PsFLoren.empty))
+
+            (select void_for_linking-007-PsDELPH1-protocol-plugin from
+              (tezos-protocol-plugin-007-PsDELPH1 -> void_for_linking-007-PsDELPH1-protocol-plugin.empty)
+              (-> void_for_linking-007-PsDELPH1-protocol-plugin.empty))
+            (select void_for_linking-008-PtEdo2Zk-protocol-plugin from
+              (tezos-protocol-plugin-008-PtEdo2Zk -> void_for_linking-008-PtEdo2Zk-protocol-plugin.empty)
+              (-> void_for_linking-008-PtEdo2Zk-protocol-plugin.empty))
+            (select void_for_linking-009-PsFLoren-protocol-plugin from
+              (tezos-protocol-plugin-009-PsFLoren -> void_for_linking-009-PsFLoren-protocol-plugin.empty)
+              (-> void_for_linking-009-PsFLoren-protocol-plugin.empty))
+            (select void_for_linking-alpha-protocol-plugin from
+              (tezos-protocol-plugin-alpha -> void_for_linking-alpha-protocol-plugin.empty)
+              (-> void_for_linking-alpha-protocol-plugin.empty))
+
             tezos-stdlib-unix
             tezos-client-base-unix
             tezos-signer-backends.unix)
@@ -102,6 +116,10 @@
    (write-file void_for_linking-baking-alpha.empty "")
    (write-file void_for_linking-baking-008-PtEdo2Zk.empty "")
    (write-file void_for_linking-baking-009-PsFLoren.empty "")
+   (write-file void_for_linking-007-PsDELPH1-protocol-plugin.empty "")
+   (write-file void_for_linking-008-PtEdo2Zk-protocol-plugin.empty "")
+   (write-file void_for_linking-009-PsFLoren-protocol-plugin.empty "")
+   (write-file void_for_linking-alpha-protocol-plugin.empty "")
 )))
 
 (install
