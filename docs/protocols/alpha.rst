@@ -66,6 +66,10 @@ Changelog
 - Increased the max operation time to live (`max_op_ttl`) from 60 to
   120
 
+- Realign voting periods with cycles, solves issue `tezos#1151
+  <https://gitlab.com/tezos/tezos/-/issues/1151>`__
+  `<https://gitlab.com/tezos/tezos/-/merge_requests/2838>`__
+
 RPC changes
 ~~~~~~~~~~~
 
