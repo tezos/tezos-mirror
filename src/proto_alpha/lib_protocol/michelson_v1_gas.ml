@@ -32,7 +32,7 @@ module S = Saturation_repr
 module Cost_of = struct
   module S_syntax = struct
     (* This is a good enough approximation. S.numbits 0 = 0 *)
-    let log2 x = S.safe_int (1 + Z.numbits (S.to_z x))
+    let log2 x = S.safe_int (1 + S.numbits x)
 
     let ( + ) = S.add
 

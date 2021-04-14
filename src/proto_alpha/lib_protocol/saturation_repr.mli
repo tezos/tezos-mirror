@@ -96,6 +96,10 @@ val max : 'a t -> 'a t -> 'a t
 
 val compare : 'a t -> 'b t -> int
 
+(** [numbits x] returns the number of bits used in the binary representation
+    of [x]. *)
+val numbits : 'a t -> int
+
 (** [shift_right x y] behaves like a logical shift of [x] by [y] bits
    to the right. [y] must be between 0 and 63. *)
 val shift_right : 'a t -> int -> 'a t
