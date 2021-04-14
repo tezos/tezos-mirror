@@ -6,7 +6,6 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-base"
   "tezos-micheline"

@@ -7,7 +7,6 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "bls12-381"
-  "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-stdlib"
   "data-encoding" { >= "0.3" & < "0.4" }
