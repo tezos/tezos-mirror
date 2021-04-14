@@ -9,7 +9,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-base"
-  "tezos-embedded-protocol-alpha"
+  "tezos-protocol-alpha"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

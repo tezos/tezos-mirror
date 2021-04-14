@@ -9,7 +9,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-base"
-  "tezos-embedded-protocol-009-PsFLoren"
+  "tezos-protocol-009-PsFLoren"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

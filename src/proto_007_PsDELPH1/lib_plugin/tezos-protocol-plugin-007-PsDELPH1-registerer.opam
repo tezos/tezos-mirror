@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
-  "tezos-base"
+  "tezos-embedded-protocol-007-PsDELPH1"
   "tezos-protocol-plugin-007-PsDELPH1"
   "tezos-shell"
 ]

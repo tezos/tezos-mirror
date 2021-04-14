@@ -25,7 +25,6 @@
 
 open Protocol
 open Alpha_context
-module Proto = Registerer.Registered
 
 module Mempool = struct
   type nanotez = Q.t

@@ -2,21 +2,21 @@
  (name tezos_protocol_plugin_alpha)
  (public_name tezos-protocol-plugin-alpha)
  (libraries tezos-base
-            tezos-embedded-protocol-alpha
             tezos-protocol-alpha)
- (modules (:standard) \ Registerer)
+ (modules (:standard) \ Plugin_registerer)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_embedded_protocol_alpha
                    -open Tezos_protocol_alpha)))
 
 (library
  (name tezos_protocol_plugin_alpha_registerer)
  (public_name tezos-protocol-plugin-alpha-registerer)
  (libraries tezos-base
+            tezos-embedded-protocol-alpha
             tezos-protocol-plugin-alpha
             tezos-shell)
- (modules Registerer)
+ (modules Plugin_registerer)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_protocol_alpha
                    -open Tezos_protocol_plugin_alpha
                    -open Tezos_shell)))
 
