@@ -15,6 +15,7 @@ def client(sandbox):
 
 @pytest.mark.vote
 @pytest.mark.incremental
+@pytest.mark.skip(reason="requires to install a custom CA")
 class TestTLS:
     """Test voting protocol with manual baking, 4 blocks per voting period."""
 
