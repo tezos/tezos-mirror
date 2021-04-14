@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Prevalidator_filters.register
-    (module Tezos_protocol_plugin_007_PsDELPH1.Plugin)
+module Plugin = struct
+  module Proto = Registerer.Registered
+  include Plugin
+end
+
+let () = Prevalidator_filters.register (module Plugin)
