@@ -188,6 +188,7 @@ daemons_upgrade_alpha: tezos-sandbox tezos-client tezos-admin-client tezos-node 
 
 # The following tests (node synchronization) cannot be run in parallel
 # because they don't support --base-port.
+# They are also not run in the CI, probably because an equivalent Tezt test exists.
 
 .PHONY: node_synchronization_archive_full
 node_synchronization_archive_full: tezos-sandbox tezos-client tezos-node
