@@ -9,8 +9,8 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-base"
-  "irmin" { >= "2.5.0" }
-  "irmin-pack" { >= "2.5.0" }
+  "irmin" { >= "2.5.3" }
+  "irmin-pack" { >= "2.5.3" }
   "digestif" {>= "0.7.3"}
   "tezos-shell-services"
   "tezos-stdlib-unix"
