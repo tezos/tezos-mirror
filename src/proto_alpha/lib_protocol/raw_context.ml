@@ -395,6 +395,8 @@ let set_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
 
 let set_gas_unlimited ctxt = update_unlimited_operation_gas ctxt true
 
+let gas_exhausted_error _ctxt = error Operation_quota_exceeded
+
 let consume_gas ctxt cost =
   match Gas_limit_repr.raw_consume (remaining_operation_gas ctxt) cost with
   | Some gas_counter ->

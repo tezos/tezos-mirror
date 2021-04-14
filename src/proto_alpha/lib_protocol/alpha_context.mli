@@ -173,7 +173,9 @@ module Cycle : sig
 end
 
 module Gas : sig
-  module Arith : Fixed_point_repr.Safe
+  module Arith :
+    Fixed_point_repr.Safe
+      with type 'a t = Saturation_repr.may_saturate Saturation_repr.t
 
   type t = private Unaccounted | Limited of {remaining : Arith.fp}
 
@@ -181,7 +183,7 @@ module Gas : sig
 
   val pp : Format.formatter -> t -> unit
 
-  type cost
+  type cost = Saturation_repr.may_saturate Saturation_repr.t
 
   val cost_encoding : cost Data_encoding.encoding
 
@@ -231,6 +233,15 @@ module Gas : sig
   (** Consumes operation gas. May fail if not enough gas remains for the
       operation *)
   val consume : context -> cost -> context tzresult
+
+  (** Returns the current gas counter. *)
+  val remaining_operation_gas : context -> Arith.fp
+
+  (** Update gas counter in the context. *)
+  val update_remaining_operation_gas : context -> Arith.fp -> context
+
+  (** Triggers an error in case of gas exhaustion. *)
+  val gas_exhausted_error : context -> 'a tzresult
 
   (** Checks that enough operation gas remains for the given cost *)
   val check_enough : context -> cost -> unit tzresult
