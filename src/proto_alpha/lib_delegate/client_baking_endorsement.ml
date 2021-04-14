@@ -142,7 +142,7 @@ let forge_endorsement (cctxt : #Protocol_client_context.full) ?async ~chain
     ~block ~src_sk src_pk =
   let src_pkh = Signature.Public_key.hash src_pk in
   Alpha_block_services.metadata cctxt ~chain ~block ()
-  >>=? fun {protocol_data = {level = {level; _}; _}; _} ->
+  >>=? fun {protocol_data = {level_info = {level; _}; _}; _} ->
   Shell_services.Blocks.hash cctxt ~chain ~block ()
   >>=? fun hash ->
   inject_endorsement cctxt ?async ~chain ~block hash level src_sk src_pkh

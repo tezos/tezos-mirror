@@ -183,9 +183,7 @@ val kind_equal_list :
 
 type block_metadata = {
   baker : Signature.Public_key_hash.t;
-  level : Level.compat_t;
   level_info : Level.t;
-  voting_period_kind : Voting_period.kind;
   voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;
   consumed_gas : Gas.Arith.fp;

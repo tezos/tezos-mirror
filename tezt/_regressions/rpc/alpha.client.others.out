@@ -34,7 +34,6 @@ tezt/_regressions/rpc/alpha.client.others.out
 
 ./tezos-client rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
 { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
-  "voting_period": 0, "voting_period_position": 0,
   "expected_commitment": false }
 
 ./tezos-client rpc get /chains/main/blocks/head/helpers/endorsing_rights

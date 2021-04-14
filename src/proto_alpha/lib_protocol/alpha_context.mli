@@ -619,21 +619,6 @@ module Level : sig
   val levels_in_current_cycle : context -> ?offset:int32 -> unit -> level list
 
   val last_allowed_fork_level : context -> Raw_level.t
-
-  type compat_t = {
-    level : Raw_level.t;
-    level_position : int32;
-    cycle : Cycle.t;
-    cycle_position : int32;
-    voting_period : int32;
-    voting_period_position : int32;
-    expected_commitment : bool;
-  }
-
-  val compat_encoding : compat_t Data_encoding.t
-
-  val to_deprecated_type :
-    t -> voting_period_index:int32 -> voting_period_position:int32 -> compat_t
 end
 
 module Fitness : sig
@@ -1105,11 +1090,9 @@ module Voting_period : sig
 
   val pp_info : Format.formatter -> info -> unit
 
-  val get_current_info : context -> info tzresult Lwt.t
+  val get_rpc_current_info : context -> info tzresult Lwt.t
 
-  val get_rpc_fixed_current_info : context -> info tzresult Lwt.t
-
-  val get_rpc_fixed_succ_info : context -> info tzresult Lwt.t
+  val get_rpc_succ_info : context -> info tzresult Lwt.t
 end
 
 module Vote : sig

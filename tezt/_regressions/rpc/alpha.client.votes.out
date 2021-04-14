@@ -10,9 +10,6 @@ tezt/_regressions/rpc/alpha.client.votes.out
 { "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
   "position": 1, "remaining": 2 }
 
-./tezos-client rpc get /chains/main/blocks/head/votes/current_period_kind
-"proposal"
-
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_proposal
 null
 
@@ -47,9 +44,6 @@ null
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_period
 { "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
   "position": 0, "remaining": 3 }
-
-./tezos-client rpc get /chains/main/blocks/head/votes/current_period_kind
-"exploration"
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/current_proposal
 "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"

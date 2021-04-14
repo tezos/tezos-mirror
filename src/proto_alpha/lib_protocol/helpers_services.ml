@@ -1125,7 +1125,7 @@ module S = struct
          located `offset` blocks after in the chain (or before when \
          negative). For instance, the next block if `offset` is 1."
       ~query:level_query
-      ~output:Level.compat_encoding
+      ~output:Level.encoding
       RPC_path.(path / "current_level")
 
   let levels_in_current_cycle =
@@ -1143,33 +1143,7 @@ let register () =
   Parse.register () ;
   let open Services_registration in
   register0 S.current_level (fun ctxt q () ->
-      let level =
-        Level.from_raw ctxt ~offset:q.offset (Level.current ctxt).level
-      in
-      Alpha_context.Voting_period.get_rpc_fixed_current_info ctxt
-      >|=? fun {voting_period; remaining; _} ->
-      let blocks_per_voting_period = Constants.blocks_per_voting_period ctxt in
-      let div_rem = Int32.(rem q.offset blocks_per_voting_period) in
-      let index_offset =
-        Int32.(
-          add
-            (div q.offset blocks_per_voting_period)
-            (if Compare.Int32.(div_rem > remaining) then 1l else 0l))
-      in
-      let voting_period_index = Int32.add voting_period.index index_offset in
-      let start_position =
-        Int32.(
-          add
-            voting_period.start_position
-            (mul index_offset blocks_per_voting_period))
-      in
-      let voting_period_position =
-        Int32.(sub level.level_position start_position)
-      in
-      Level.to_deprecated_type
-        level
-        ~voting_period_index
-        ~voting_period_position) ;
+      Level.from_raw ctxt ~offset:q.offset (Level.current ctxt).level |> return) ;
   register0 S.levels_in_current_cycle (fun ctxt q () ->
       let levels = Level.levels_in_current_cycle ctxt ~offset:q.offset () in
       match levels with
