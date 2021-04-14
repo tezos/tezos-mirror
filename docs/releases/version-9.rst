@@ -1,6 +1,6 @@
 .. _version-9:
 
-Version 9.0~rc1
+Version 9.0~rc2
 ===============
 
 The first release candidate for version 9.0 contains a new version
@@ -15,19 +15,51 @@ join the Florencenet test network, which runs Florence. To join
 Florencenet, simply configure your node with ``tezos-node config
 init --network florencenet``.
 
+The second release candidate notably fixes a performance regression
+and allows to bypass the cap on the connection count. It also
+includes the fixes that were released in version 8.3.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v9.0-rc1
+  git checkout v9.0-rc2
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v9.0`` Docker images of Tezos.
+If you are using Docker instead, use the ``v9.0-rc2`` Docker images of Tezos.
+
+Changelog — Version 9.0~rc2
+---------------------------
+
+Node
+~~~~
+
+- Fixed a performance regression of the storage backend.
+  This in particular impacted RPCs that query the context.
+  This regression was introduced in 9.0~rc1.
+
+- Removed protocol ``PsFLorBA``, the variant of Florence with baking accounts,
+  which was rejected in favor of ``PsFLoren``.
+
+- The cap on the number of expected connections that was introduced in 9.0~rc1
+  can now be bypassed with ``--disable-config-validation``.
+
+Baker
+~~~~~
+
+- Added the fixes to the baker that were released in 8.3 but that were not
+  present in 9.0~rc1 (which was published before 8.3).
+
+Client
+~~~~~~
+
+- Improved operation injection to better deal with cases where
+  parameters (fees, gas limit, ...) are partially given by the user.
 
 Changelog — Version 9.0~rc1
 ---------------------------
