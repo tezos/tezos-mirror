@@ -502,6 +502,33 @@ let originate_contract ?node ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
   | Some hash ->
       return hash
 
+let spawn_hash_data ?hooks ~data ~typ client =
+  let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
+  spawn_command ?hooks client cmd
+
+let hash_data ?expect_failure ?hooks ~data ~typ client =
+  let* output =
+    spawn_hash_data ?hooks ~data ~typ client
+    |> Process.check_and_read_stdout ?expect_failure
+  in
+  let parse_line line =
+    match line =~** rex "(.*): (.*)" with
+    | None ->
+        Log.warn
+          "Unparsable output line of `hash data %s of type %s`: %s"
+          data
+          typ
+          line ;
+        None
+    | Some _ as x ->
+        x
+  in
+  (* Filtering avoids the last line (after the trailing \n).
+     We don't want to produce a warning about an empty line. *)
+  let lines = String.split_on_char '\n' output |> List.filter (( <> ) "") in
+  let key_value_list = List.map parse_line lines |> List.filter_map Fun.id in
+  Lwt.return key_value_list
+
 let spawn_normalize_data ?mode ?(legacy = false) ~data ~typ client =
   let mode_to_string = function
     | Readable ->
