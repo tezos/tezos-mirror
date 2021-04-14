@@ -35,9 +35,6 @@
 open Alpha_context
 open Script_typed_ir
 
-type execution_trace =
-  (Script.location * Gas.t * (Script.expr * string option) list) list
-
 type error +=
   | Reject of Script.location * Script.expr * execution_trace option
 
@@ -67,94 +64,6 @@ type step_constants = {
   amount : Tez.t;
   chain_id : Chain_id.t;
 }
-
-(** The interpreter uses a control stack with specific cases for loops
-    and DIP. See the details in the implementation file. *)
-type (_, _, _, _) continuation =
-  | KNil : ('r, 'f, 'r, 'f) continuation
-  | KCons :
-      ('a, 's, 'b, 't) kinstr * ('b, 't, 'r, 'f) continuation
-      -> ('a, 's, 'r, 'f) continuation
-  | KReturn :
-      's * ('a, 's, 'r, 'f) continuation
-      -> ('a, end_of_stack, 'r, 'f) continuation
-  | KUndip :
-      'b * ('b, 'a * 's, 'r, 'f) continuation
-      -> ('a, 's, 'r, 'f) continuation
-  | KLoop_in :
-      ('a, 's, bool, 'a * 's) kinstr * ('a, 's, 'r, 'f) continuation
-      -> (bool, 'a * 's, 'r, 'f) continuation
-  | KLoop_in_left :
-      ('a, 's, ('a, 'b) Script_typed_ir.union, 's) kinstr
-      * ('b, 's, 'r, 'f) continuation
-      -> (('a, 'b) Script_typed_ir.union, 's, 'r, 'f) continuation
-  | KIter :
-      ('a, 'b * 's, 'b, 's) kinstr * 'a list * ('b, 's, 'r, 'f) continuation
-      -> ('b, 's, 'r, 'f) continuation
-  | KList_enter_body :
-      ('a, 'c * 's, 'b, 'c * 's) kinstr
-      * 'a list
-      * 'b list
-      * int
-      * ('b Script_typed_ir.boxed_list, 'c * 's, 'r, 'f) continuation
-      -> ('c, 's, 'r, 'f) continuation
-  | KList_exit_body :
-      ('a, 'c * 's, 'b, 'c * 's) kinstr
-      * 'a list
-      * 'b list
-      * int
-      * ('b Script_typed_ir.boxed_list, 'c * 's, 'r, 'f) continuation
-      -> ('b, 'c * 's, 'r, 'f) continuation
-  | KMap_enter_body :
-      ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
-      * ('a * 'b) list
-      * ('a, 'c) Script_typed_ir.map
-      * (('a, 'c) Script_typed_ir.map, 'd * 's, 'r, 'f) continuation
-      -> ('d, 's, 'r, 'f) continuation
-  | KMap_exit_body :
-      ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
-      * ('a * 'b) list
-      * ('a, 'c) Script_typed_ir.map
-      * 'a
-      * (('a, 'c) Script_typed_ir.map, 'd * 's, 'r, 'f) continuation
-      -> ('c, 'd * 's, 'r, 'f) continuation
-
-type ('a, 's, 'b, 'f, 'c, 'u) logging_function =
-  ('a, 's, 'b, 'f) Script_typed_ir.kinstr ->
-  context ->
-  Script.location ->
-  ('c, 'u) Script_typed_ir.stack_ty ->
-  'c * 'u ->
-  unit
-
-(** [STEP_LOGGER] is the module type of logging
-    modules as passed to the Michelson interpreter.
-    Note that logging must be performed by side-effects
-    on an underlying log structure. *)
-module type STEP_LOGGER = sig
-  (** [log_interp] is called at each call of the internal
-      function [interp]. [interp] is called when starting
-      the interpretation of a script and subsequently
-      at each [Exec] instruction. *)
-  val log_interp : ('a, 's, 'b, 'f, 'c, 'u) logging_function
-
-  (** [log_entry] is called {i before} executing
-      each instruction but {i after} gas for
-      this instruction has been successfully consumed. *)
-  val log_entry : ('a, 's, 'b, 'f, 'a, 's) logging_function
-
-  val log_control : ('a, 's, 'b, 'f) continuation -> unit
-
-  (** [log_exit] is called {i after} executing each
-      instruction. *)
-  val log_exit : ('a, 's, 'b, 'f, 'c, 'u) logging_function
-
-  (** [get_log] allows to obtain an execution trace, if
-      any was produced. *)
-  val get_log : unit -> execution_trace option tzresult Lwt.t
-end
-
-type logger = (module STEP_LOGGER)
 
 val step :
   logger option ->
@@ -212,21 +121,6 @@ module Internals : sig
   (** During the evaluation, the gas level in the context is outdated.
       See comments in the implementation file for more details. *)
   type outdated_context = OutDatedContext of context [@@unboxed]
-
-  (** [run logger (ctxt, step_constants) local_gas_counter i k ks accu
-     stack] evaluates instruction [k] (having [i] as predecessor)
-     under the control flow stack [ks] and the A-stack represented by
-     [accu] and [stack]. *)
-  val run :
-    logger option ->
-    outdated_context * step_constants ->
-    local_gas_counter ->
-    ('c, 'u, 'd, 'v) kinstr ->
-    ('a, 's, 'b, 't) kinstr ->
-    ('b, 't, 'r, 'f) continuation ->
-    'a ->
-    's ->
-    ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
   (** [next logger (ctxt, step_constants) local_gas_counter ks accu
       stack] is an internal function which interprets the continuation

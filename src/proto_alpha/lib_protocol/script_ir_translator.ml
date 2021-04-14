@@ -4836,7 +4836,9 @@ and parse_instr :
       >>?= fun (Eq, _, ctxt) ->
       parse_var_annot loc annot
       >>?= fun annot ->
-      let instr = {csize = 0; apply = (fun kinfo k -> IExec (kinfo, k))} in
+      let instr =
+        {csize = 0; apply = (fun kinfo k -> IExec (kinfo, None, k))}
+      in
       ( typed ctxt loc instr (Item_t (ret, rest, annot))
         : ((a, s) judgement * context) tzresult Lwt.t )
   | ( Prim (loc, I_APPLY, [], annot),
@@ -4956,7 +4958,10 @@ and parse_instr :
       (if legacy then ok_unit else check_packable ~legacy:false loc v)
       >>?= fun () ->
       let instr =
-        {csize = 0; apply = (fun kinfo k -> IFailwith (kinfo, loc, v, k))}
+        {
+          csize = 0;
+          apply = (fun kinfo k -> IFailwith (kinfo, loc, v, None, k));
+        }
       in
       let descr aft = {loc; instr; bef = stack_ty; aft} in
       log_stack ctxt loc stack_ty Bot_t
@@ -5120,7 +5125,7 @@ and parse_instr :
       parse_var_annot loc annot
       >>?= fun annot ->
       let instr =
-        {csize = 0; apply = (fun kinfo k -> IMul_teznat (kinfo, k))}
+        {csize = 0; apply = (fun kinfo k -> IMul_teznat (kinfo, None, k))}
       in
       typed ctxt loc instr (Item_t (Mutez_t tname, rest, annot))
   | ( Prim (loc, I_MUL, [], annot),
@@ -5129,7 +5134,7 @@ and parse_instr :
       parse_var_annot loc annot
       >>?= fun annot ->
       let instr =
-        {csize = 0; apply = (fun kinfo k -> IMul_nattez (kinfo, k))}
+        {csize = 0; apply = (fun kinfo k -> IMul_nattez (kinfo, None, k))}
       in
       typed ctxt loc instr (Item_t (Mutez_t tname, rest, annot))
   (* boolean operations *)
@@ -5408,7 +5413,9 @@ and parse_instr :
       >>?= fun annot ->
       merge_type_annot ~legacy tn1 tn2
       >>?= fun tname ->
-      let instr = {csize = 0; apply = (fun kinfo k -> ILsl_nat (kinfo, k))} in
+      let instr =
+        {csize = 0; apply = (fun kinfo k -> ILsl_nat (kinfo, None, k))}
+      in
       typed ctxt loc instr (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_LSR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
@@ -5416,7 +5423,9 @@ and parse_instr :
       >>?= fun annot ->
       merge_type_annot ~legacy tn1 tn2
       >>?= fun tname ->
-      let instr = {csize = 0; apply = (fun kinfo k -> ILsr_nat (kinfo, k))} in
+      let instr =
+        {csize = 0; apply = (fun kinfo k -> ILsr_nat (kinfo, None, k))}
+      in
       typed ctxt loc instr (Item_t (Nat_t tname, rest, annot))
   | ( Prim (loc, I_OR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->

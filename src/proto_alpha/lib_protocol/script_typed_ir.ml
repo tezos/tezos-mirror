@@ -278,8 +278,8 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IIf_none :
       ('a option, 'b * 's) kinfo
       (* Notice that the continuations of the following two
-         instructions should have a shared suffix to avoid code
-         duplication. *)
+     instructions should have a shared suffix to avoid code
+     duplication. *)
       * ('b, 's, 'r, 'f) kinstr
       * ('a, 'b * 's, 'r, 'f) kinstr
       -> ('a option, 'b * 's, 'r, 'f) kinstr
@@ -473,10 +473,10 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       (Tez.t, Tez.t * 's) kinfo * (Tez.t, 's, 'r, 'f) kinstr
       -> (Tez.t, Tez.t * 's, 'r, 'f) kinstr
   | IMul_teznat :
-      (Tez.t, n num * 's) kinfo * (Tez.t, 's, 'r, 'f) kinstr
+      (Tez.t, n num * 's) kinfo * logger option * (Tez.t, 's, 'r, 'f) kinstr
       -> (Tez.t, n num * 's, 'r, 'f) kinstr
   | IMul_nattez :
-      (n num, Tez.t * 's) kinfo * (Tez.t, 's, 'r, 'f) kinstr
+      (n num, Tez.t * 's) kinfo * logger option * (Tez.t, 's, 'r, 'f) kinstr
       -> (n num, Tez.t * 's, 'r, 'f) kinstr
   | IEdiv_teznat :
       (Tez.t, n num * 's) kinfo
@@ -565,10 +565,10 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ((n num, n num) pair option, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
   | ILsl_nat :
-      (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
+      (n num, n num * 's) kinfo * logger option * (n num, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
   | ILsr_nat :
-      (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
+      (n num, n num * 's) kinfo * logger option * (n num, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
   | IOr_nat :
       (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
@@ -615,7 +615,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('a, 'c * 't, 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
   | IExec :
-      ('a, ('a, 'b) lambda * 's) kinfo * ('b, 's, 'r, 'f) kinstr
+      ('a, ('a, 'b) lambda * 's) kinfo
+      * logger option
+      * ('b, 's, 'r, 'f) kinstr
       -> ('a, ('a, 'b) lambda * 's, 'r, 'f) kinstr
   | IApply :
       ('a, ('a * 't, 'b) lambda * 's) kinfo
@@ -628,7 +630,11 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (('b, 'c) lambda, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IFailwith :
-      ('a, 's) kinfo * Script.location * 'a ty * ('b, 't, 'r, 'f) kinstr
+      ('a, 's) kinfo
+      * Script.location
+      * 'a ty
+      * logger option
+      * ('b, 't, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | INop : ('a, 's) kinfo * ('a, 's, 'r, 'f) kinstr -> ('a, 's, 'r, 'f) kinstr
   (*
@@ -883,7 +889,20 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * 'a comparable_ty
       * ('a ticket option, 's, 'r, 'f) kinstr
       -> ('a ticket * 'a ticket, 's, 'r, 'f) kinstr
+  (* Internal control instructions
+     =============================
+
+     The following instructions are not available in the source language.
+     They are used by the internals of the interpreter.
+  *)
   | IHalt : ('a, 's) kinfo -> ('a, 's, 'a, 's) kinstr
+  | ILog :
+      ('a, 's) kinfo * logging_event * logger * ('a, 's, 'r, 'f) kinstr
+      -> ('a, 's, 'r, 'f) kinstr
+
+and logging_event =
+  | LogEntry : logging_event
+  | LogExit : ('b, 'u) kinfo -> logging_event
 
 and ('arg, 'ret) lambda =
   | Lam :
@@ -891,6 +910,161 @@ and ('arg, 'ret) lambda =
       -> ('arg, 'ret) lambda
 
 and 'arg typed_contract = 'arg ty * address
+
+(*
+
+  Control stack
+  =============
+
+  The control stack is a list of [kinstr].
+
+  Since [kinstr] denotes a list  of instructions, the control stack
+  can be seen as a list of instruction sequences, each representing a
+  form of delimited continuation (i.e. a control stack fragment). The
+  [continuation] GADT ensures that the input and output stack types of the
+  continuations are consistent.
+
+  Loops have a special treatment because their control stack is reused
+  as is for the next iteration. This avoids the reallocation of a
+  control stack cell at each iteration.
+
+  To implement [step] as a tail-recursive function, we implement
+  higher-order iterators (i.e. MAPs and ITERs) using internal instructions
+. Roughly speaking, these instructions help in decomposing the execution
+  of [I f c] (where [I] is an higher-order iterator over a container [c])
+  into three phases: to start the iteration, to execute [f] if there are
+  elements to be processed in [c], and to loop.
+
+  Dip also has a dedicated constructor in the control stack.  This
+  allows the stack prefix to be restored after the execution of the
+  [Dip]'s body.
+
+  Following the same style as in [kinstr], [continuation] has four
+  arguments, two for each stack types. More precisely, with
+
+            [('bef_top, 'bef, 'aft_top, 'aft) continuation]
+
+  we encode the fact that the stack before executing the continuation
+  has type [('bef_top * 'bef)] and that the stack after this execution
+  has type [('aft_top * 'aft)].
+
+*)
+and (_, _, _, _) continuation =
+  (* This continuation returns immediately. *)
+  | KNil : ('r, 'f, 'r, 'f) continuation
+  (* This continuation starts with the next instruction to execute. *)
+  | KCons :
+      ('a, 's, 'b, 't) kinstr * ('b, 't, 'r, 'f) continuation
+      -> ('a, 's, 'r, 'f) continuation
+  (* This continuation represents a call frame: it stores the caller's
+     stack of type ['s] and the continuation which expects the callee's
+     result on top of the stack. *)
+  | KReturn :
+      's * ('a, 's, 'r, 'f) continuation
+      -> ('a, end_of_stack, 'r, 'f) continuation
+  (* This continuation comes right after a [Dip i] to restore the topmost
+     element ['b] of the stack after having executed [i] in the substack
+     of type ['a * 's]. *)
+  | KUndip :
+      'b * ('b, 'a * 's, 'r, 'f) continuation
+      -> ('a, 's, 'r, 'f) continuation
+  (* This continuation is executed at each iteration of a loop with
+     a Boolean condition. *)
+  | KLoop_in :
+      ('a, 's, bool, 'a * 's) kinstr * ('a, 's, 'r, 'f) continuation
+      -> (bool, 'a * 's, 'r, 'f) continuation
+  (* This continuation is executed at each iteration of a loop with
+     a condition encoded by a sum type. *)
+  | KLoop_in_left :
+      ('a, 's, ('a, 'b) union, 's) kinstr * ('b, 's, 'r, 'f) continuation
+      -> (('a, 'b) union, 's, 'r, 'f) continuation
+  (* This continuation is executed at each iteration of a traversal.
+     (Used in List, Map and Big_map.) *)
+  | KIter :
+      ('a, 'b * 's, 'b, 's) kinstr * 'a list * ('b, 's, 'r, 'f) continuation
+      -> ('b, 's, 'r, 'f) continuation
+  (* This continuation represents each step of a List.map. *)
+  | KList_enter_body :
+      ('a, 'c * 's, 'b, 'c * 's) kinstr
+      * 'a list
+      * 'b list
+      * int
+      * ('b boxed_list, 'c * 's, 'r, 'f) continuation
+      -> ('c, 's, 'r, 'f) continuation
+  (* This continuation represents what is done after each step of a List.map. *)
+  | KList_exit_body :
+      ('a, 'c * 's, 'b, 'c * 's) kinstr
+      * 'a list
+      * 'b list
+      * int
+      * ('b boxed_list, 'c * 's, 'r, 'f) continuation
+      -> ('b, 'c * 's, 'r, 'f) continuation
+  (* This continuation represents each step of a Map.map. *)
+  | KMap_enter_body :
+      ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
+      * ('a * 'b) list
+      * ('a, 'c) map
+      * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
+      -> ('d, 's, 'r, 'f) continuation
+  (* This continuation represents what is done after each step of a Map.map. *)
+  | KMap_exit_body :
+      ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
+      * ('a * 'b) list
+      * ('a, 'c) map
+      * 'a
+      * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
+      -> ('c, 'd * 's, 'r, 'f) continuation
+  (* This continuation instruments the execution with a [logger]. *)
+  | KLog :
+      ('a, 's, 'r, 'f) continuation * logger
+      -> ('a, 's, 'r, 'f) continuation
+
+(*
+
+    Execution instrumentation
+    =========================
+
+   One can observe the context and the stack at some specific points
+   of an execution step. This feature is implemented by calling back
+   some [logging_function]s defined in a record of type [logger]
+   passed as argument to the step function.
+
+   A [logger] is typically embedded in an [KLog] continuation by the
+   client to trigger an evaluation instrumented with some logging. The
+   logger is then automatically propagated to the logging instruction
+   [ILog] as well as to any instructions that need to generate a
+   backtrace when it fails (e.g., [IFailwith], [IMul_teznat], ...).
+
+*)
+and ('a, 's, 'b, 'f, 'c, 'u) logging_function =
+  ('a, 's, 'b, 'f) kinstr ->
+  context ->
+  Script.location ->
+  ('c, 'u) stack_ty ->
+  'c * 'u ->
+  unit
+
+and execution_trace =
+  (Script.location * Gas.t * (Script.expr * string option) list) list
+
+and logger = {
+  log_interp : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
+      (** [log_interp] is called at each call of the internal function
+          [interp]. [interp] is called when starting the interpretation of
+          a script and subsequently at each [Exec] instruction. *)
+  log_entry : 'a 's 'b 'f. ('a, 's, 'b, 'f, 'a, 's) logging_function;
+      (** [log_entry] is called {i before} executing each instruction but
+          {i after} gas for this instruction has been successfully
+          consumed. *)
+  log_control : 'a 's 'b 'f. ('a, 's, 'b, 'f) continuation -> unit;
+      (** [log_control] is called {i before} the interpretation of the
+          current continuation. *)
+  log_exit : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
+      (** [log_exit] is called {i after} executing each instruction. *)
+  get_log : unit -> execution_trace option tzresult Lwt.t;
+      (** [get_log] allows to obtain an execution trace, if any was
+          produced. *)
+}
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 and 'ty ty =
@@ -1125,9 +1299,9 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | ISub_tez (kinfo, _) ->
       kinfo
-  | IMul_teznat (kinfo, _) ->
+  | IMul_teznat (kinfo, _, _) ->
       kinfo
-  | IMul_nattez (kinfo, _) ->
+  | IMul_nattez (kinfo, _, _) ->
       kinfo
   | IEdiv_teznat (kinfo, _) ->
       kinfo
@@ -1177,9 +1351,9 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | IEdiv_natnat (kinfo, _) ->
       kinfo
-  | ILsl_nat (kinfo, _) ->
+  | ILsl_nat (kinfo, _, _) ->
       kinfo
-  | ILsr_nat (kinfo, _) ->
+  | ILsr_nat (kinfo, _, _) ->
       kinfo
   | IOr_nat (kinfo, _) ->
       kinfo
@@ -1201,13 +1375,13 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | IDip (kinfo, _, _, _) ->
       kinfo
-  | IExec (kinfo, _) ->
+  | IExec (kinfo, _, _) ->
       kinfo
   | IApply (kinfo, _, _) ->
       kinfo
   | ILambda (kinfo, _, _) ->
       kinfo
-  | IFailwith (kinfo, _, _, _) ->
+  | IFailwith (kinfo, _, _, _, _) ->
       kinfo
   | INop (kinfo, _) ->
       kinfo
@@ -1337,6 +1511,336 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | IHalt kinfo ->
       kinfo
+  | ILog (kinfo, _, _, _) ->
+      kinfo
+
+type kinstr_rewritek = {
+  apply : 'b 'u 'r 'f. ('b, 'u, 'r, 'f) kinstr -> ('b, 'u, 'r, 'f) kinstr;
+}
+
+let kinstr_rewritek :
+    type a s r f. (a, s, r, f) kinstr -> kinstr_rewritek -> (a, s, r, f) kinstr
+    =
+ fun i f ->
+  match i with
+  | IDrop (kinfo, k) ->
+      IDrop (kinfo, f.apply k)
+  | IDup (kinfo, k) ->
+      IDup (kinfo, f.apply k)
+  | ISwap (kinfo, k) ->
+      ISwap (kinfo, f.apply k)
+  | IConst (kinfo, x, k) ->
+      IConst (kinfo, x, f.apply k)
+  | ICons_pair (kinfo, k) ->
+      ICons_pair (kinfo, f.apply k)
+  | ICar (kinfo, k) ->
+      ICar (kinfo, f.apply k)
+  | ICdr (kinfo, k) ->
+      ICdr (kinfo, f.apply k)
+  | IUnpair (kinfo, k) ->
+      IUnpair (kinfo, f.apply k)
+  | ICons_some (kinfo, k) ->
+      ICons_some (kinfo, f.apply k)
+  | ICons_none (kinfo, ty, k) ->
+      ICons_none (kinfo, ty, f.apply k)
+  | IIf_none (kinfo, kl, kr) ->
+      IIf_none (kinfo, f.apply kl, f.apply kr)
+  | ICons_left (kinfo, k) ->
+      ICons_left (kinfo, f.apply k)
+  | ICons_right (kinfo, k) ->
+      ICons_right (kinfo, f.apply k)
+  | IIf_left (kinfo, kl, kr) ->
+      IIf_left (kinfo, f.apply kl, f.apply kr)
+  | ICons_list (kinfo, k) ->
+      ICons_list (kinfo, f.apply k)
+  | INil (kinfo, k) ->
+      INil (kinfo, f.apply k)
+  | IIf_cons (kinfo, kl, kr) ->
+      IIf_cons (kinfo, f.apply kl, f.apply kr)
+  | IList_map (kinfo, body, k) ->
+      IList_map (kinfo, f.apply body, f.apply k)
+  | IList_iter (kinfo, body, k) ->
+      IList_iter (kinfo, f.apply body, f.apply k)
+  | IList_size (kinfo, k) ->
+      IList_size (kinfo, f.apply k)
+  | IEmpty_set (kinfo, ty, k) ->
+      IEmpty_set (kinfo, ty, f.apply k)
+  | ISet_iter (kinfo, body, k) ->
+      ISet_iter (kinfo, f.apply body, f.apply k)
+  | ISet_mem (kinfo, k) ->
+      ISet_mem (kinfo, f.apply k)
+  | ISet_update (kinfo, k) ->
+      ISet_update (kinfo, f.apply k)
+  | ISet_size (kinfo, k) ->
+      ISet_size (kinfo, f.apply k)
+  | IEmpty_map (kinfo, cty, ty, k) ->
+      IEmpty_map (kinfo, cty, ty, f.apply k)
+  | IMap_map (kinfo, body, k) ->
+      IMap_map (kinfo, f.apply body, f.apply k)
+  | IMap_iter (kinfo, body, k) ->
+      IMap_iter (kinfo, f.apply body, f.apply k)
+  | IMap_mem (kinfo, k) ->
+      IMap_mem (kinfo, f.apply k)
+  | IMap_get (kinfo, k) ->
+      IMap_get (kinfo, f.apply k)
+  | IMap_update (kinfo, k) ->
+      IMap_update (kinfo, f.apply k)
+  | IMap_get_and_update (kinfo, k) ->
+      IMap_get_and_update (kinfo, f.apply k)
+  | IMap_size (kinfo, k) ->
+      IMap_size (kinfo, f.apply k)
+  | IEmpty_big_map (kinfo, cty, ty, k) ->
+      IEmpty_big_map (kinfo, cty, ty, f.apply k)
+  | IBig_map_mem (kinfo, k) ->
+      IBig_map_mem (kinfo, f.apply k)
+  | IBig_map_get (kinfo, k) ->
+      IBig_map_get (kinfo, f.apply k)
+  | IBig_map_update (kinfo, k) ->
+      IBig_map_update (kinfo, f.apply k)
+  | IBig_map_get_and_update (kinfo, k) ->
+      IBig_map_get_and_update (kinfo, f.apply k)
+  | IConcat_string (kinfo, k) ->
+      IConcat_string (kinfo, f.apply k)
+  | IConcat_string_pair (kinfo, k) ->
+      IConcat_string_pair (kinfo, f.apply k)
+  | ISlice_string (kinfo, k) ->
+      ISlice_string (kinfo, f.apply k)
+  | IString_size (kinfo, k) ->
+      IString_size (kinfo, f.apply k)
+  | IConcat_bytes (kinfo, k) ->
+      IConcat_bytes (kinfo, f.apply k)
+  | IConcat_bytes_pair (kinfo, k) ->
+      IConcat_bytes_pair (kinfo, f.apply k)
+  | ISlice_bytes (kinfo, k) ->
+      ISlice_bytes (kinfo, f.apply k)
+  | IBytes_size (kinfo, k) ->
+      IBytes_size (kinfo, f.apply k)
+  | IAdd_seconds_to_timestamp (kinfo, k) ->
+      IAdd_seconds_to_timestamp (kinfo, f.apply k)
+  | IAdd_timestamp_to_seconds (kinfo, k) ->
+      IAdd_timestamp_to_seconds (kinfo, f.apply k)
+  | ISub_timestamp_seconds (kinfo, k) ->
+      ISub_timestamp_seconds (kinfo, f.apply k)
+  | IDiff_timestamps (kinfo, k) ->
+      IDiff_timestamps (kinfo, f.apply k)
+  | IAdd_tez (kinfo, k) ->
+      IAdd_tez (kinfo, f.apply k)
+  | ISub_tez (kinfo, k) ->
+      ISub_tez (kinfo, f.apply k)
+  | IMul_teznat (kinfo, logger, k) ->
+      IMul_teznat (kinfo, logger, f.apply k)
+  | IMul_nattez (kinfo, logger, k) ->
+      IMul_nattez (kinfo, logger, f.apply k)
+  | IEdiv_teznat (kinfo, k) ->
+      IEdiv_teznat (kinfo, f.apply k)
+  | IEdiv_tez (kinfo, k) ->
+      IEdiv_tez (kinfo, f.apply k)
+  | IOr (kinfo, k) ->
+      IOr (kinfo, f.apply k)
+  | IAnd (kinfo, k) ->
+      IAnd (kinfo, f.apply k)
+  | IXor (kinfo, k) ->
+      IXor (kinfo, f.apply k)
+  | INot (kinfo, k) ->
+      INot (kinfo, f.apply k)
+  | IIs_nat (kinfo, k) ->
+      IIs_nat (kinfo, f.apply k)
+  | INeg_nat (kinfo, k) ->
+      INeg_nat (kinfo, f.apply k)
+  | INeg_int (kinfo, k) ->
+      INeg_int (kinfo, f.apply k)
+  | IAbs_int (kinfo, k) ->
+      IAbs_int (kinfo, f.apply k)
+  | IInt_nat (kinfo, k) ->
+      IInt_nat (kinfo, f.apply k)
+  | IAdd_intint (kinfo, k) ->
+      IAdd_intint (kinfo, f.apply k)
+  | IAdd_intnat (kinfo, k) ->
+      IAdd_intnat (kinfo, f.apply k)
+  | IAdd_natint (kinfo, k) ->
+      IAdd_natint (kinfo, f.apply k)
+  | IAdd_natnat (kinfo, k) ->
+      IAdd_natnat (kinfo, f.apply k)
+  | ISub_int (kinfo, k) ->
+      ISub_int (kinfo, f.apply k)
+  | IMul_intint (kinfo, k) ->
+      IMul_intint (kinfo, f.apply k)
+  | IMul_intnat (kinfo, k) ->
+      IMul_intnat (kinfo, f.apply k)
+  | IMul_natint (kinfo, k) ->
+      IMul_natint (kinfo, f.apply k)
+  | IMul_natnat (kinfo, k) ->
+      IMul_natnat (kinfo, f.apply k)
+  | IEdiv_intint (kinfo, k) ->
+      IEdiv_intint (kinfo, f.apply k)
+  | IEdiv_intnat (kinfo, k) ->
+      IEdiv_intnat (kinfo, f.apply k)
+  | IEdiv_natint (kinfo, k) ->
+      IEdiv_natint (kinfo, f.apply k)
+  | IEdiv_natnat (kinfo, k) ->
+      IEdiv_natnat (kinfo, f.apply k)
+  | ILsl_nat (kinfo, logger, k) ->
+      ILsl_nat (kinfo, logger, f.apply k)
+  | ILsr_nat (kinfo, logger, k) ->
+      ILsr_nat (kinfo, logger, f.apply k)
+  | IOr_nat (kinfo, k) ->
+      IOr_nat (kinfo, f.apply k)
+  | IAnd_nat (kinfo, k) ->
+      IAnd_nat (kinfo, f.apply k)
+  | IAnd_int_nat (kinfo, k) ->
+      IAnd_int_nat (kinfo, f.apply k)
+  | IXor_nat (kinfo, k) ->
+      IXor_nat (kinfo, f.apply k)
+  | INot_nat (kinfo, k) ->
+      INot_nat (kinfo, f.apply k)
+  | INot_int (kinfo, k) ->
+      INot_int (kinfo, f.apply k)
+  | IIf (kinfo, kl, kr) ->
+      IIf (kinfo, f.apply kl, f.apply kr)
+  | ILoop (kinfo, kbody, k) ->
+      ILoop (kinfo, f.apply kbody, f.apply k)
+  | ILoop_left (kinfo, kl, kr) ->
+      ILoop_left (kinfo, f.apply kl, f.apply kr)
+  | IDip (kinfo, kinfo', body, k) ->
+      IDip (kinfo, kinfo', f.apply body, f.apply k)
+  | IExec (kinfo, logger, k) ->
+      IExec (kinfo, logger, f.apply k)
+  | IApply (kinfo, ty, k) ->
+      IApply (kinfo, ty, f.apply k)
+  | ILambda (kinfo, l, k) ->
+      ILambda (kinfo, l, f.apply k)
+  | IFailwith (kinfo, i, ty, logger, k) ->
+      IFailwith (kinfo, i, ty, logger, f.apply k)
+  | INop (kinfo, k) ->
+      INop (kinfo, f.apply k)
+  | ICompare (kinfo, ty, k) ->
+      ICompare (kinfo, ty, f.apply k)
+  | IEq (kinfo, k) ->
+      IEq (kinfo, f.apply k)
+  | INeq (kinfo, k) ->
+      INeq (kinfo, f.apply k)
+  | ILt (kinfo, k) ->
+      ILt (kinfo, f.apply k)
+  | IGt (kinfo, k) ->
+      IGt (kinfo, f.apply k)
+  | ILe (kinfo, k) ->
+      ILe (kinfo, f.apply k)
+  | IGe (kinfo, k) ->
+      IGe (kinfo, f.apply k)
+  | IAddress (kinfo, k) ->
+      IAddress (kinfo, f.apply k)
+  | IContract (kinfo, ty, code, k) ->
+      IContract (kinfo, ty, code, f.apply k)
+  | ITransfer_tokens (kinfo, k) ->
+      ITransfer_tokens (kinfo, f.apply k)
+  | IImplicit_account (kinfo, k) ->
+      IImplicit_account (kinfo, f.apply k)
+  | ICreate_contract (kinfo, ty1, ty2, code, annot, k) ->
+      ICreate_contract (kinfo, ty1, ty2, code, annot, f.apply k)
+  | ISet_delegate (kinfo, k) ->
+      ISet_delegate (kinfo, f.apply k)
+  | INow (kinfo, k) ->
+      INow (kinfo, f.apply k)
+  | IBalance (kinfo, k) ->
+      IBalance (kinfo, f.apply k)
+  | ILevel (kinfo, k) ->
+      ILevel (kinfo, f.apply k)
+  | ICheck_signature (kinfo, k) ->
+      ICheck_signature (kinfo, f.apply k)
+  | IHash_key (kinfo, k) ->
+      IHash_key (kinfo, f.apply k)
+  | IPack (kinfo, ty, k) ->
+      IPack (kinfo, ty, f.apply k)
+  | IUnpack (kinfo, ty, k) ->
+      IUnpack (kinfo, ty, f.apply k)
+  | IBlake2b (kinfo, k) ->
+      IBlake2b (kinfo, f.apply k)
+  | ISha256 (kinfo, k) ->
+      ISha256 (kinfo, f.apply k)
+  | ISha512 (kinfo, k) ->
+      ISha512 (kinfo, f.apply k)
+  | ISource (kinfo, k) ->
+      ISource (kinfo, f.apply k)
+  | ISender (kinfo, k) ->
+      ISender (kinfo, f.apply k)
+  | ISelf (kinfo, ty, s, k) ->
+      ISelf (kinfo, ty, s, f.apply k)
+  | ISelf_address (kinfo, k) ->
+      ISelf_address (kinfo, f.apply k)
+  | IAmount (kinfo, k) ->
+      IAmount (kinfo, f.apply k)
+  | ISapling_empty_state (kinfo, s, k) ->
+      ISapling_empty_state (kinfo, s, f.apply k)
+  | ISapling_verify_update (kinfo, k) ->
+      ISapling_verify_update (kinfo, f.apply k)
+  | IDig (kinfo, n, p, k) ->
+      IDig (kinfo, n, p, f.apply k)
+  | IDug (kinfo, n, p, k) ->
+      IDug (kinfo, n, p, f.apply k)
+  | IDipn (kinfo, n, p, k1, k2) ->
+      IDipn (kinfo, n, p, f.apply k1, f.apply k2)
+  | IDropn (kinfo, n, p, k) ->
+      IDropn (kinfo, n, p, f.apply k)
+  | IChainId (kinfo, k) ->
+      IChainId (kinfo, f.apply k)
+  | INever (kinfo, k) ->
+      INever (kinfo, f.apply k)
+  | IVoting_power (kinfo, k) ->
+      IVoting_power (kinfo, f.apply k)
+  | ITotal_voting_power (kinfo, k) ->
+      ITotal_voting_power (kinfo, f.apply k)
+  | IKeccak (kinfo, k) ->
+      IKeccak (kinfo, f.apply k)
+  | ISha3 (kinfo, k) ->
+      ISha3 (kinfo, f.apply k)
+  | IAdd_bls12_381_g1 (kinfo, k) ->
+      IAdd_bls12_381_g1 (kinfo, f.apply k)
+  | IAdd_bls12_381_g2 (kinfo, k) ->
+      IAdd_bls12_381_g2 (kinfo, f.apply k)
+  | IAdd_bls12_381_fr (kinfo, k) ->
+      IAdd_bls12_381_fr (kinfo, f.apply k)
+  | IMul_bls12_381_g1 (kinfo, k) ->
+      IMul_bls12_381_g1 (kinfo, f.apply k)
+  | IMul_bls12_381_g2 (kinfo, k) ->
+      IMul_bls12_381_g2 (kinfo, f.apply k)
+  | IMul_bls12_381_fr (kinfo, k) ->
+      IMul_bls12_381_fr (kinfo, f.apply k)
+  | IMul_bls12_381_z_fr (kinfo, k) ->
+      IMul_bls12_381_z_fr (kinfo, f.apply k)
+  | IMul_bls12_381_fr_z (kinfo, k) ->
+      IMul_bls12_381_fr_z (kinfo, f.apply k)
+  | IInt_bls12_381_fr (kinfo, k) ->
+      IInt_bls12_381_fr (kinfo, f.apply k)
+  | INeg_bls12_381_g1 (kinfo, k) ->
+      INeg_bls12_381_g1 (kinfo, f.apply k)
+  | INeg_bls12_381_g2 (kinfo, k) ->
+      INeg_bls12_381_g2 (kinfo, f.apply k)
+  | INeg_bls12_381_fr (kinfo, k) ->
+      INeg_bls12_381_fr (kinfo, f.apply k)
+  | IPairing_check_bls12_381 (kinfo, k) ->
+      IPairing_check_bls12_381 (kinfo, f.apply k)
+  | IComb (kinfo, n, p, k) ->
+      IComb (kinfo, n, p, f.apply k)
+  | IUncomb (kinfo, n, p, k) ->
+      IUncomb (kinfo, n, p, f.apply k)
+  | IComb_get (kinfo, n, p, k) ->
+      IComb_get (kinfo, n, p, f.apply k)
+  | IComb_set (kinfo, n, p, k) ->
+      IComb_set (kinfo, n, p, f.apply k)
+  | IDup_n (kinfo, n, p, k) ->
+      IDup_n (kinfo, n, p, f.apply k)
+  | ITicket (kinfo, k) ->
+      ITicket (kinfo, f.apply k)
+  | IRead_ticket (kinfo, k) ->
+      IRead_ticket (kinfo, f.apply k)
+  | ISplit_ticket (kinfo, k) ->
+      ISplit_ticket (kinfo, f.apply k)
+  | IJoin_tickets (kinfo, ty, k) ->
+      IJoin_tickets (kinfo, ty, f.apply k)
+  | IHalt kinfo ->
+      IHalt kinfo
+  | ILog (kinfo, event, logger, k) ->
+      ILog (kinfo, event, logger, k)
 
 let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty =
  fun s ->
