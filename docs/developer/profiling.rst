@@ -82,18 +82,17 @@ Performance profiling
 
      This will write ``perf.data`` after having stopped the node with ``Ctrl-C``.
 
-  In both cases, the ``-F`` argument specifies the frequency of sampling of data.
+  In both cases, the ``-F`` argument specifies the frequency of sampling of data (in hertz).
   If too much data is generated, use a smaller value. If data is not precise
   enough, try using a higher value.
 
 - display the result with ``perf report``, or use a more advanced
   visualizer (recommended). Such visualizers include:
 
-   - `flamegraph <https://github.com/brendangregg/FlameGraph>`_ (command line)
-   - `gprof2dot <https://github.com/jrfonseca/gprof2dot>`_ generates callgraphs (command line)
-   - `hotspot <https://github.com/KDAB/hotspot>`_ (GUI)
-
-  `This flamegraph <https://gitlab.com/tezos/tezos/uploads/f8f8cece73da52b54fd9c79364e656e1/flame.svg>`_
-  and `this callgraph <https://gitlab.com/tezos/tezos/uploads/8640f489ad8002271fe41bbd0c34dfdc/callgraph.svg>`_
-  are examples of data obtained with these visualizers when running ``tezos-node``.
-
+   - `flamegraph <https://github.com/brendangregg/FlameGraph>`_: command-line
+     tool for generating flamegraphs
+     (`example <https://gitlab.com/tezos/tezos/uploads/f8f8cece73da52b54fd9c79364e656e1/flame.svg>`_ for tezos-node)
+   - `gprof2dot <https://github.com/jrfonseca/gprof2dot>`_: command-line
+     tool for generating callgraphs
+     (`example <https://gitlab.com/tezos/tezos/uploads/8640f489ad8002271fe41bbd0c34dfdc/callgraph.svg>`_ for tezos-node)
+   - `hotspot <https://github.com/KDAB/hotspot>`_: a GUI for the `perf` tool
