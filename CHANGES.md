@@ -71,7 +71,7 @@ be documented here either.
   predecessor, and check that the result is the same as what is
   currently stored. This is mostly useful for debugging and
   benchmarking purposes.
-  
+
 - Reduced the maximum allowed timestamp drift to 5 seconds.
 
 ## Client
@@ -95,6 +95,30 @@ be documented here either.
 
 ## Miscellaneous
 
+# Version 9.0~rc2
+
+## Node
+
+- Fixed a performance regression of the storage backend.
+  This in particular impacted RPCs that query the context.
+  This regression was introduced in 9.0~rc1.
+
+- Removed protocol `PsFLorBA`, the variant of Florence with baking accounts,
+  which was rejected in favor of `PsFLoren`.
+
+- The cap on the number of expected connections that was introduced in 9.0~rc1
+  can now be bypassed with `--disable-config-validation`.
+
+## Baker
+
+- Added the fixes to the baker that were released in 8.3 but that were not
+  present in 9.0~rc1 (which was published before 8.3).
+
+## Client
+
+- Improved operation injection to better deal with cases where
+  parameters (fees, gas limit, ...) are partially given by the user.
+
 # Version 9.0~rc1
 
 ## Node
@@ -110,8 +134,7 @@ be documented here either.
   Their corresponding aliases for `--network` are `edo2net` and `florencenet`.
 
 - Capped the number of expected connections to `100` on the
-  command-line interface. This limitation can be bypassed with the
-  option `--disable-config-validation`.
+  command-line interface.
 
 - Fixed a bug that caused the execution of the prevalidator when the node was not
   bootstrapped.
