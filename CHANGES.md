@@ -76,6 +76,12 @@ be documented here either.
 
 ## Client
 
+- Changed to 5 the recommended number of blocks after which an operation can be
+  considered final. Under normal network conditions and an attacker with less
+  than 33% of stake, an operation can be considered final with
+  quasi-certainty if there are at least 5 blocks built on top of it.
+  See Emmy* TZIP for more detailed explanations.
+
 ## Baker / Endorser / Accuser
 
 - Optimized the performance of the baker to reduce the number of RPC

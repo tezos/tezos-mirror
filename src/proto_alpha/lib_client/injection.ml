@@ -29,6 +29,12 @@ open Alpha_context
 open Apply_results
 open Protocol_client_context
 
+(* Under normal network conditions and an attacker with less
+   than 33% of stake, an operation can be considered final with
+   quasi-certainty if there are at least 5 blocks built on top of it.
+   See Emmy* TZIP for more detailed explanations. *)
+let num_confirmation_blocks = 5
+
 let get_branch (rpc_config : #Protocol_client_context.full) ~chain
     ~(block : Block_services.block) branch =
   let branch = Option.value ~default:0 branch in
@@ -792,12 +798,13 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
         cctxt#message
           "@[<v 0>NOT waiting for the operation to be included.@,\
            Use command@,\
-          \  tezos-client wait for %a to be included --confirmations 30 \
+          \  tezos-client wait for %a to be included --confirmations %d \
            --branch %a@,\
            and/or an external block explorer to make sure that it has been \
            included.@]"
           Operation_hash.pp
           oph
+          num_confirmation_blocks
           Block_hash.pp
           op.shell.branch
         >>= fun () -> return result
@@ -845,7 +852,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     | None ->
         Lwt.return_unit
     | Some number ->
-        if number >= 30 then
+        if number >= num_confirmation_blocks then
           cctxt#message
             "The operation was included in a block %d blocks ago."
             number
@@ -854,12 +861,13 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
             "@[<v 0>The operation has only been included %d blocks ago.@,\
              We recommend to wait more.@,\
              Use command@,\
-            \  tezos-client wait for %a to be included --confirmations 30 \
+            \  tezos-client wait for %a to be included --confirmations %d \
              --branch %a@,\
              and/or an external block explorer.@]"
             number
             Operation_hash.pp
             oph
+            num_confirmation_blocks
             Block_hash.pp
             op.shell.branch )
     >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
