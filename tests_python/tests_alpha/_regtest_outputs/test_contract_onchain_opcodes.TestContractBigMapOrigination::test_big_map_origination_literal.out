@@ -33,8 +33,8 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 146 bytes
         Updated big_maps:
-          New map(0) of type (big_map int int)
-          Set map(0)[0] to 0
+          New map(4) of type (big_map int int)
+          Set map(4)[0] to 0
         Paid storage size diff: 146 bytes
         Consumed gas: 1899.428
         Balance updates:

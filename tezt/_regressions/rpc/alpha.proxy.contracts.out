@@ -345,7 +345,7 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
                             "args": [ { "prim": "operation" } ] },
                           { "prim": "PAIR" } ] ] } ] ] } ],
       "storage":
-        { "prim": "Pair", "args": [ { "int": "0" }, { "int": "1" } ] } } }
+        { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } } }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -559,11 +559,11 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
                       { "prim": "PAIR" },
                       { "prim": "NIL", "args": [ { "prim": "operation" } ] },
                       { "prim": "PAIR" } ] ] } ] ] } ],
-  "storage": { "prim": "Pair", "args": [ { "int": "0" }, { "int": "1" } ] } }
+  "storage": { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-{ "prim": "Pair", "args": [ { "int": "0" }, { "int": "1" } ] }
+{ "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] }
 
 ./tezos-client --mode proxy rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
