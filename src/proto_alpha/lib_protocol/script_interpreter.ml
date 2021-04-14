@@ -275,7 +275,7 @@ type (_, _, _, _) continuation =
       ('a, 'b * 's, 'b, 's) kinstr * 'a list * ('b, 's, 'r, 'f) continuation
       -> ('b, 's, 'r, 'f) continuation
   (* This continuation represents each step of a List.map. *)
-  | KList_mapping :
+  | KList_enter_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
       * 'b list
@@ -283,7 +283,7 @@ type (_, _, _, _) continuation =
       * ('b boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('c, 's, 'r, 'f) continuation
   (* This continuation represents what is done after each step of a List.map. *)
-  | KList_mapped :
+  | KList_exit_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
       * 'b list
@@ -291,14 +291,14 @@ type (_, _, _, _) continuation =
       * ('b boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('b, 'c * 's, 'r, 'f) continuation
   (* This continuation represents each step of a Map.map. *)
-  | KMap_mapping :
+  | KMap_enter_body :
       ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * ('a * 'b) list
       * ('a, 'c) map
       * (('a, 'c) map, 'd * 's, 'r, 'f) continuation
       -> ('d, 's, 'r, 'f) continuation
   (* This continuation represents what is done after each step of a Map.map. *)
-  | KMap_mapped :
+  | KMap_exit_body :
       ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * ('a * 'b) list
       * ('a, 'c) map
@@ -732,16 +732,16 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
   | KIter (_, _, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
-  | KList_mapping (_, _, _, _, _) ->
+  | KList_enter_body (_, _, _, _, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
-  | KList_mapped (_, _, _, _, _) ->
+  | KList_exit_body (_, _, _, _, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
-  | KMap_mapping (_, _, _, _) ->
+  | KMap_enter_body (_, _, _, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
-  | KMap_mapped (_, _, _, _, _) ->
+  | KMap_exit_body (_, _, _, _, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
 
@@ -1055,7 +1055,7 @@ and next :
       | x :: xs ->
           let ks = KIter (body, xs, ks) in
           (step [@ocaml.tailcall]) logger g gas body ks x (accu, stack) ) )
-  | KList_mapping (body, xs, ys, len, ks) -> (
+  | KList_enter_body (body, xs, ys, len, ks) -> (
     match consume_control gas ks0 with
     | None ->
         Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
@@ -1065,17 +1065,17 @@ and next :
           let ys = {elements = List.rev ys; length = len} in
           next logger g gas ks ys (accu, stack)
       | x :: xs ->
-          let ks = KList_mapped (body, xs, ys, len, ks) in
+          let ks = KList_exit_body (body, xs, ys, len, ks) in
           (step [@ocaml.tailcall]) logger g gas body ks x (accu, stack) ) )
-  | KList_mapped (body, xs, ys, len, ks) -> (
+  | KList_exit_body (body, xs, ys, len, ks) -> (
     match consume_control gas ks0 with
     | None ->
         Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
     | Some gas ->
-        let ks = KList_mapping (body, xs, accu :: ys, len, ks) in
+        let ks = KList_enter_body (body, xs, accu :: ys, len, ks) in
         let (accu, stack) = stack in
         next logger g gas ks accu stack )
-  | KMap_mapping (body, xs, ys, ks) -> (
+  | KMap_enter_body (body, xs, ys, ks) -> (
     match consume_control gas ks0 with
     | None ->
         Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
@@ -1084,17 +1084,17 @@ and next :
       | [] ->
           next logger g gas ks ys (accu, stack)
       | (xk, xv) :: xs ->
-          let ks = KMap_mapped (body, xs, ys, xk, ks) in
+          let ks = KMap_exit_body (body, xs, ys, xk, ks) in
           let res = (xk, xv) in
           let stack = (accu, stack) in
           (step [@ocaml.tailcall]) logger g gas body ks res stack ) )
-  | KMap_mapped (body, xs, ys, yk, ks) -> (
+  | KMap_exit_body (body, xs, ys, yk, ks) -> (
     match consume_control gas ks0 with
     | None ->
         Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
     | Some gas ->
         let ys = map_update yk (Some accu) ys in
-        let ks = KMap_mapping (body, xs, ys, ks) in
+        let ks = KMap_enter_body (body, xs, ys, ks) in
         let (accu, stack) = stack in
         next logger g gas ks accu stack )
 
@@ -1189,7 +1189,7 @@ and step :
           let xs = accu.elements in
           let ys = [] in
           let len = accu.length in
-          let ks = KList_mapping (body, xs, ys, len, KCons (k, ks)) in
+          let ks = KList_enter_body (body, xs, ys, len, KCons (k, ks)) in
           let (accu, stack) = stack in
           (next [@ocaml.tailcall]) logger g gas ks accu stack
       | IList_size (_, k) ->
@@ -1231,7 +1231,7 @@ and step :
           let map = accu in
           let xs = List.rev (map_fold (fun k v a -> (k, v) :: a) map []) in
           let ys = empty_map (map_key_ty map) in
-          let ks = KMap_mapping (body, xs, ys, KCons (k, ks)) in
+          let ks = KMap_enter_body (body, xs, ys, KCons (k, ks)) in
           let (accu, stack) = stack in
           (next [@ocaml.tailcall]) logger g gas ks accu stack
       | IMap_iter (_, body, k) ->

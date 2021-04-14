@@ -91,27 +91,27 @@ type (_, _, _, _) continuation =
   | KIter :
       ('a, 'b * 's, 'b, 's) kinstr * 'a list * ('b, 's, 'r, 'f) continuation
       -> ('b, 's, 'r, 'f) continuation
-  | KList_mapping :
+  | KList_enter_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
       * 'b list
       * int
       * ('b Script_typed_ir.boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('c, 's, 'r, 'f) continuation
-  | KList_mapped :
+  | KList_exit_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
       * 'b list
       * int
       * ('b Script_typed_ir.boxed_list, 'c * 's, 'r, 'f) continuation
       -> ('b, 'c * 's, 'r, 'f) continuation
-  | KMap_mapping :
+  | KMap_enter_body :
       ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * ('a * 'b) list
       * ('a, 'c) Script_typed_ir.map
       * (('a, 'c) Script_typed_ir.map, 'd * 's, 'r, 'f) continuation
       -> ('d, 's, 'r, 'f) continuation
-  | KMap_mapped :
+  | KMap_exit_body :
       ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * ('a * 'b) list
       * ('a, 'c) Script_typed_ir.map
