@@ -105,15 +105,17 @@ struct
     if size > Proto.max_operation_data_length then
       error (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
-      match
-        Data_encoding.Binary.of_bytes_opt
-          Proto.operation_data_encoding
-          raw.Operation.proto
-      with
-      | None ->
-          error Parse_error
-      | Some protocol_data ->
-          ok {hash; raw; protocol_data}
+      try
+        match
+          Data_encoding.Binary.of_bytes_opt
+            Proto.operation_data_encoding
+            raw.Operation.proto
+        with
+        | None ->
+            error Parse_error
+        | Some protocol_data ->
+            ok {hash; raw; protocol_data}
+      with _ -> error Parse_error
 
   let compare op1 op2 =
     Proto.compare_operations
