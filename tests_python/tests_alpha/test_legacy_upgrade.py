@@ -2,22 +2,22 @@ import pytest
 from tools import utils, paths
 
 # Defines the number of blocks to bake in the following test. This
-# constant should be higher than max_opttl and should be a multiple of
+# constant should be higher than max_op_ttl and should be a multiple of
 # the cycle length (8 in sandboxed mode)
 BATCH = 160
 
 EXPECTED_LEVEL = BATCH + 1
 
 # FIXME: How to get this value?
-MAX_OPTTL = 120
+MAX_OP_TTL = 120
 
 # checkpoint = lafl(head)
 EXPECTED_CHECKPOINT = EXPECTED_LEVEL - 16
 # savepoint = checkpoint (legacy's Full limitations)
 EXPECTED_SAVEPOINT = EXPECTED_LEVEL - 16
 EXPECTED_CABOOSE = 0
-# savepoint - maxopttl(cp)
-EXPECTED_ROLLING_CABOOSE = EXPECTED_SAVEPOINT - MAX_OPTTL
+# savepoint - max_op_ttl(cp)
+EXPECTED_ROLLING_CABOOSE = EXPECTED_SAVEPOINT - MAX_OP_TTL
 
 EXPECTED_SERVICE_ERROR = 'Did not find service'
 EXPECTED_COMMAND_ERROR = 'Command failed : Unable to find block'
@@ -196,7 +196,7 @@ class TestLegacy:
         checkpoint = sandbox.client(2).get_checkpoint()['block']['level']
         assert checkpoint == (expected_head - 2 * 8)
         savepoint = sandbox.client(2).get_savepoint()
-        assert savepoint == (checkpoint - MAX_OPTTL)
+        assert savepoint == (checkpoint - MAX_OP_TTL)
         caboose = sandbox.client(2).get_caboose()
         assert caboose == 0
 
@@ -209,6 +209,6 @@ class TestLegacy:
         checkpoint = sandbox.client(3).get_checkpoint()['block']['level']
         assert checkpoint == (expected_head - 2 * 8)
         savepoint = sandbox.client(3).get_savepoint()
-        assert savepoint == (checkpoint - MAX_OPTTL)
+        assert savepoint == (checkpoint - MAX_OP_TTL)
         caboose = sandbox.client(3).get_caboose()
         assert caboose == savepoint

@@ -306,7 +306,7 @@ class TestMultiNodeSnapshot:
 
     # For the rolling nodes
     # The caboose of rolling mode were no dragged yet as
-    # (checkpoint - maxopttl(head)) < savepoint
+    # (checkpoint - max_op_ttl(head)) < savepoint
     def test_node_2_consistency_2(self, sandbox, session):
         node_id = 2
         restart(sandbox, node_id)
@@ -315,8 +315,8 @@ class TestMultiNodeSnapshot:
         savepoint_when_imported = session['snapshot_level']
         expected_savepoint = savepoint_when_imported
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_caboose = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -341,8 +341,8 @@ class TestMultiNodeSnapshot:
         savepoint_when_imported = session['snapshot_level']
         expected_savepoint = savepoint_when_imported
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_caboose = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -367,8 +367,8 @@ class TestMultiNodeSnapshot:
         savepoint_when_imported = session['snapshot_level']
         expected_savepoint = savepoint_when_imported
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_caboose = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -408,8 +408,8 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level - 2 * 8  # lafl(head)
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
         expected_caboose = 0
         utils.node_consistency_after_import(
             node_id,
@@ -429,8 +429,8 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level - 2 * 8  # lafl(head)
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
         expected_caboose = 0
         utils.node_consistency_after_import(
             node_id,
@@ -451,8 +451,8 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level - 2 * 8  # lafl(head)
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
         expected_caboose = expected_savepoint
         utils.node_consistency_after_import(
             node_id,
@@ -476,8 +476,8 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level - 2 * 8  # lafl(head)
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
         expected_caboose = expected_savepoint
         utils.node_consistency_after_import(
             node_id,
@@ -501,8 +501,8 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level - 2 * 8  # lafl(head)
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
         expected_caboose = expected_savepoint
         utils.node_consistency_after_import(
             node_id,
@@ -638,9 +638,9 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
+        max_op_ttl = head['metadata']['max_operations_ttl']
         expected_savepoint = expected_checkpoint
-        expected_caboose = expected_checkpoint - maxopttl
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -663,9 +663,9 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
+        max_op_ttl = head['metadata']['max_operations_ttl']
         expected_savepoint = expected_checkpoint
-        expected_caboose = expected_checkpoint - maxopttl
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -688,9 +688,9 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
+        max_op_ttl = head['metadata']['max_operations_ttl']
         expected_savepoint = expected_checkpoint
-        expected_caboose = expected_checkpoint - maxopttl
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
