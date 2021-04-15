@@ -2,21 +2,21 @@
  (name tezos_protocol_plugin_007_PsDELPH1)
  (public_name tezos-protocol-plugin-007-PsDELPH1)
  (libraries tezos-base
-            tezos-embedded-protocol-007-PsDELPH1
             tezos-protocol-007-PsDELPH1)
- (modules (:standard) \ Registerer)
+ (modules (:standard) \ Plugin_registerer)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_embedded_protocol_007_PsDELPH1
                    -open Tezos_protocol_007_PsDELPH1)))
 
 (library
  (name tezos_protocol_plugin_007_PsDELPH1_registerer)
  (public_name tezos-protocol-plugin-007-PsDELPH1-registerer)
  (libraries tezos-base
+            tezos-embedded-protocol-007-PsDELPH1
             tezos-protocol-plugin-007-PsDELPH1
             tezos-shell)
- (modules Registerer)
+ (modules Plugin_registerer)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_protocol_007_PsDELPH1
                    -open Tezos_protocol_plugin_007_PsDELPH1
                    -open Tezos_shell)))
 

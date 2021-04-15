@@ -2,21 +2,21 @@
  (name tezos_protocol_plugin_008_PtEdo2Zk)
  (public_name tezos-protocol-plugin-008-PtEdo2Zk)
  (libraries tezos-base
-            tezos-embedded-protocol-008-PtEdo2Zk
             tezos-protocol-008-PtEdo2Zk)
- (modules (:standard) \ Registerer)
+ (modules (:standard) \ Plugin_registerer)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_embedded_protocol_008_PtEdo2Zk
                    -open Tezos_protocol_008_PtEdo2Zk)))
 
 (library
  (name tezos_protocol_plugin_008_PtEdo2Zk_registerer)
  (public_name tezos-protocol-plugin-008-PtEdo2Zk-registerer)
  (libraries tezos-base
+            tezos-embedded-protocol-008-PtEdo2Zk
             tezos-protocol-plugin-008-PtEdo2Zk
             tezos-shell)
- (modules Registerer)
+ (modules Plugin_registerer)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_protocol_008_PtEdo2Zk
                    -open Tezos_protocol_plugin_008_PtEdo2Zk
                    -open Tezos_shell)))
 
