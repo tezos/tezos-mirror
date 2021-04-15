@@ -31,7 +31,23 @@ To update from sources::
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v9.0-rc2`` Docker images of Tezos.
+If you are using Docker instead, use the ``v9-0-rc2`` Docker images of Tezos.
+
+Known Issues
+------------
+
+If you are using ``tezos-docker-manager.sh``, the script currently tries
+to download the wrong Docker images (``v9.0-rc2`` instead of ``v9-0-rc2``).
+To workaround this issue, after downloading the script you can run::
+
+  sed -i -e 's/v9.0-rc2/v9-0-rc2/' <FILENAME>
+
+Replace ``<FILENAME>`` by ``mainnet.sh``, ``florencenet.sh`` or ``edo2net.sh``
+depending on your use case. For instance, to use the script to run Mainnet::
+
+  wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/v9.0-rc2/scripts/tezos-docker-manager.sh
+  chmod +x mainnet.sh
+  sed -i -e 's/v9.0-rc2/v9-0-rc2/' mainnet.sh
 
 Changelog — Version 9.0~rc2
 ---------------------------
