@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_shell_services
+
 (** The module type of a proxy environment. Modules of this type should be
     prepared protocol-side and registered here to become available to the
     proxy facility. *)
@@ -36,8 +38,8 @@ module type Proxy_sig = sig
   (** The protocol's /chains/<chain>/blocks/<block_id>/hash RPC *)
   val hash :
     #RPC_context.simple ->
-    ?chain:Tezos_shell_services.Block_services.chain ->
-    ?block:Tezos_shell_services.Block_services.block ->
+    ?chain:Block_services.chain ->
+    ?block:Block_services.block ->
     unit ->
     Block_hash.t tzresult Lwt.t
 
@@ -52,8 +54,8 @@ module type Proxy_sig = sig
     Tezos_client_base.Client_context.printer ->
     (Proxy_proto.proto_rpc -> Proxy_getter.proxy_m Lwt.t) ->
     RPC_context.json ->
-    Tezos_shell_services.Block_services.chain ->
-    Tezos_shell_services.Block_services.block ->
+    Block_services.chain ->
+    Block_services.block ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
 
   (** Functions used to implement the light mode *)
@@ -72,6 +74,6 @@ val get_registered_proxy :
   #RPC_context.simple ->
   [< `Mode_light | `Mode_proxy] ->
   Protocol_hash.t option ->
-  Tezos_shell_services.Block_services.chain ->
-  Tezos_shell_services.Block_services.block ->
+  Block_services.chain ->
+  Block_services.block ->
   proxy_environment tzresult Lwt.t

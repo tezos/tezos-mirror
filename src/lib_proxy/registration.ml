@@ -23,11 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_shell_services
+
 let check_client_node_proto_agree (rpc_context : #RPC_context.simple)
-    (proto_hash : Protocol_hash.t)
-    (chain : Tezos_shell_services.Block_services.chain)
-    (block : Tezos_shell_services.Block_services.block) : unit tzresult Lwt.t =
-  Tezos_shell_services.Block_services.protocols rpc_context ~chain ~block ()
+    (proto_hash : Protocol_hash.t) (chain : Block_services.chain)
+    (block : Block_services.block) : unit tzresult Lwt.t =
+  Block_services.protocols rpc_context ~chain ~block ()
   >>=? fun {current_protocol; _} ->
   if Protocol_hash.equal current_protocol proto_hash then return_unit
   else
@@ -39,10 +40,9 @@ let check_client_node_proto_agree (rpc_context : #RPC_context.simple)
       current_protocol
 
 let get_node_protocol (rpc_context : #RPC_context.simple)
-    (chain : Tezos_shell_services.Block_services.chain)
-    (block : Tezos_shell_services.Block_services.block) :
+    (chain : Block_services.chain) (block : Block_services.block) :
     Protocol_hash.t tzresult Lwt.t =
-  Tezos_shell_services.Block_services.protocols rpc_context ~chain ~block ()
+  Block_services.protocols rpc_context ~chain ~block ()
   >>=? fun {current_protocol; _} -> return current_protocol
 
 module type Proxy_sig = sig
@@ -54,8 +54,8 @@ module type Proxy_sig = sig
   (** The protocol's /chains/<chain>/blocks/<block_id>/hash RPC *)
   val hash :
     #RPC_context.simple ->
-    ?chain:Tezos_shell_services.Block_services.chain ->
-    ?block:Tezos_shell_services.Block_services.block ->
+    ?chain:Block_services.chain ->
+    ?block:Block_services.block ->
     unit ->
     Block_hash.t tzresult Lwt.t
 
@@ -64,8 +64,8 @@ module type Proxy_sig = sig
     Tezos_client_base.Client_context.printer ->
     (Proxy_proto.proto_rpc -> Proxy_getter.proxy_m Lwt.t) ->
     RPC_context.json ->
-    Tezos_shell_services.Block_services.chain ->
-    Tezos_shell_services.Block_services.block ->
+    Block_services.chain ->
+    Block_services.block ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
 
   include Light_proto.PROTO_RPCS
@@ -93,10 +93,8 @@ let register_proxy_context m =
 
 let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
     (rpc_context : #RPC_context.simple) (mode : [< `Mode_light | `Mode_proxy])
-    (protocol_hash_opt : Protocol_hash.t option)
-    (chain : Tezos_shell_services.Block_services.chain)
-    (block : Tezos_shell_services.Block_services.block) :
-    proxy_environment tzresult Lwt.t =
+    (protocol_hash_opt : Protocol_hash.t option) (chain : Block_services.chain)
+    (block : Block_services.block) : proxy_environment tzresult Lwt.t =
   let mode_str =
     match mode with `Mode_light -> "light mode" | `Mode_proxy -> "proxy"
   in
