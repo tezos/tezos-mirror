@@ -79,8 +79,18 @@ Metadata
 encoding block_metadata_.
 It is advised to stop relying on deprecated fields and use the new ones.
 
-Baking right
-~~~~~~~~~~~~
+Current_level
+~~~~~~~~~~~~~
+
+``<block_id>/helpers/current_level`` reflects the changes described
+later for the encoding block_metadata_, two fields becoming
+deprecated, namely ``voting_period`` and ``voting_period_position``.
+It is advised to stop relying on the deprecated fields and use the new
+dedicated RPCs (see voting_).
+
+
+Baking rights
+~~~~~~~~~~~~~
 
 The RPC ``<block_id>/helpers/baking_rights`` when querying for whole
 cycles now returns priorities up to 8 instead of 64.
@@ -149,8 +159,11 @@ months) to 25 cycles (~2 months and 10 days).
 The duration of the testchain is also reduced to 5 cycles to match the
 new duration of voting periods.
 
-The function freeze_listings, which updates the voting weight of
+The function ``update_listings``, which updates the voting weight of
 each delegate, is now called also at the end of the testing period.
+
+Voting periods now end at the last but one block of a cycle, instead
+at the end of a cycle.
 
 
 Smart contracts/Michelson

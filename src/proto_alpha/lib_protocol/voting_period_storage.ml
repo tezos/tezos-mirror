@@ -79,6 +79,11 @@
   https://gitlab.com/metastatedev/tezos/-/merge_requests/333
  *)
 
+(* Voting periods start at the first block of a cycle. More formally,
+   the invariant of start_position with respect to cycle_position is:
+     cycle_position mod blocks_per_cycle ==
+     position_in_period mod blocks_per_cycle *)
+
 let set_current = Storage.Vote.Current_period.update
 
 let get_current = Storage.Vote.Current_period.get

@@ -145,9 +145,10 @@ _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
 
-_`Voting period` Any of the ``proposal``, ``exploration``,
-    ``cooldown``, ``promotion`` or ``adoption`` stages in the voting
-    procedure when ammending the `economic protocol`_.
+_`Voting period`
+    Any of the ``proposal``, ``exploration``, ``cooldown``,
+    ``promotion`` or ``adoption`` stages in the voting procedure when
+    ammending the `economic protocol`_.
 
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains
