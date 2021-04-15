@@ -1,35 +1,26 @@
-
-This file lists the changes added to each version of tezos-node,
-tezos-client, and the other Tezos binaries. The changes to the Tezos
-protocol are documented in the `docs/protocols/` directory; in
-particular in `docs/protocols/alpha.rst`.
-
-# Development Version
-
-When you make a commit on master, you can add an item in one of the
-following subsections (node, client, ...) to document your commit or
-the set of related commits. This will ensure that this change is not
-forgotten in the final changelog.  By having your commits update this
-file you also make it easy to find the commits which are related to
-your changes using `git blame`.
-
-Only describe changes which affect users (bug fixes and new features),
-not refactorings or tests. Changes to the documentation do not need to
-be documented here either.
+# Version 9.0~rc2
 
 ## Node
 
+- Fixed a performance regression of the storage backend.
+  This in particular impacted RPCs that query the context.
+  This regression was introduced in 9.0~rc1.
+
+- Removed protocol `PsFLorBA`, the variant of Florence with baking accounts,
+  which was rejected in favor of `PsFLoren`.
+
+- The cap on the number of expected connections that was introduced in 9.0~rc1
+  can now be bypassed with `--disable-config-validation`.
+
+## Baker
+
+- Added the fixes to the baker that were released in 8.3 but that were not
+  present in 9.0~rc1 (which was published before 8.3).
+
 ## Client
 
-## Baker / Endorser / Accuser
-
-## Protocol Compiler And Environment
-
-## Codec
-
-## Docker Images
-
-## Miscellaneous
+- Improved operation injection to better deal with cases where
+  parameters (fees, gas limit, ...) are partially given by the user.
 
 # Version 9.0~rc1
 
@@ -46,8 +37,7 @@ be documented here either.
   Their corresponding aliases for `--network` are `edo2net` and `florencenet`.
 
 - Capped the number of expected connections to `100` on the
-  command-line interface. This limitation can be bypassed with the
-  option `--disable-config-validation`.
+  command-line interface.
 
 - Fixed a bug that caused the execution of the prevalidator when the node was not
   bootstrapped.
@@ -107,6 +97,8 @@ be documented here either.
 
 - Added support for all protocol constants in Mockup mode.
 
+- Mockup mode now uses Alpha instead of an arbitrary protocol when none is specified. It also warns that it takes this default behavior.
+
 ## Baker / Endorser / Accuser
 
 - Added the `--version` flag.
@@ -131,6 +123,15 @@ be documented here either.
   instead of the first 5 bits).
 
 - Fixed a bug that caused some file descriptors to be leaked to external processes.
+
+# Version 8.3
+
+## Baker / Endorser / Accuser
+
+- Fixed a bug where the baker would not consider all of the operations
+  when a costly one was encountered.
+
+- Fixed a bug where the most profitable operations would not be applied first.
 
 # Version 8.2
 
