@@ -132,3 +132,26 @@ let last_allowed_fork_level c =
       Raw_level_repr.root
   | Some cycle ->
       (first_level_in_cycle c cycle).level
+
+let era_of_level cycle_eras level =
+  let rec aux = function
+    | era :: ({first_level = first_level_of_next_era} :: _ as tail) ->
+        (* invariant: level >= first_level *)
+        if Raw_level_repr.(level < first_level_of_next_era) then era
+        else aux tail
+    | [era] ->
+        era
+    | [] ->
+        assert false
+  in
+  aux cycle_eras
+
+let last_of_a_cycle ctxt level =
+  let cycle_eras = Raw_context.cycle_eras ctxt in
+  let current_era = era_of_level cycle_eras level.level in
+  Compare.Int32.(
+    Int32.succ level.cycle_position = current_era.blocks_per_cycle)
+
+let dawn_of_a_new_cycle ctxt =
+  let level = current ctxt in
+  if last_of_a_cycle ctxt level then Some level.cycle else None

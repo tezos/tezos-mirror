@@ -1435,7 +1435,7 @@ let may_snapshot_roll ctxt =
   else return ctxt
 
 let may_start_new_cycle ctxt =
-  match Baking.dawn_of_a_new_cycle ctxt with
+  match Level.dawn_of_a_new_cycle ctxt with
   | None ->
       return (ctxt, [], [])
   | Some last_cycle ->
