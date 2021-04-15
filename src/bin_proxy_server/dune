@@ -1,0 +1,94 @@
+; See src/bin_node/dune to understand in detail how this file abuses
+; the alternative dependency mechanism of dune to implement optional
+; dependencies.
+
+(executables
+ (names main_proxy_server)
+ (public_names tezos-proxy-server)
+ (package tezos-proxy-server)
+ (libraries tezos-base
+            tezos-base.unix
+            cmdliner
+            lwt-exit
+            tezos-proxy
+            tezos-rpc-http-client-unix
+            tezos-rpc-http-server
+            tezos-shell-services
+            tezos-version
+
+            (select void_for_linking-genesis from
+              (tezos-client-genesis -> void_for_linking-genesis.empty)
+              (-> void_for_linking-genesis.empty))
+            (select void_for_linking-genesis-carthagenet from
+              (tezos-client-genesis-carthagenet -> void_for_linking-genesis-carthagenet.empty)
+              (-> void_for_linking-genesis-carthagenet.empty))
+
+            (select void_for_linking-000-Ps9mPmXa from
+              (tezos-client-000-Ps9mPmXa -> void_for_linking-000-Ps9mPmXa.empty)
+              (-> void_for_linking-000-Ps9mPmXa.empty))
+            (select void_for_linking-001-PtCJ7pwo from
+              (tezos-client-001-PtCJ7pwo -> void_for_linking-001-PtCJ7pwo.empty)
+              (-> void_for_linking-001-PtCJ7pwo.empty))
+            (select void_for_linking-002-PsYLVpVv from
+              (tezos-client-002-PsYLVpVv -> void_for_linking-002-PsYLVpVv.empty)
+              (-> void_for_linking-002-PsYLVpVv.empty))
+            (select void_for_linking-003-PsddFKi3 from
+              (tezos-client-003-PsddFKi3 -> void_for_linking-003-PsddFKi3.empty)
+              (-> void_for_linking-003-PsddFKi3.empty))
+            (select void_for_linking-004-Pt24m4xi from
+              (tezos-client-004-Pt24m4xi -> void_for_linking-004-Pt24m4xi.empty)
+              (-> void_for_linking-004-Pt24m4xi.empty))
+            (select void_for_linking-005-PsBabyM1 from
+              (tezos-client-005-PsBabyM1 -> void_for_linking-005-PsBabyM1.empty)
+              (-> void_for_linking-005-PsBabyM1.empty))
+            (select void_for_linking-006-PsCARTHA from
+              (tezos-client-006-PsCARTHA -> void_for_linking-006-PsCARTHA.empty)
+              (-> void_for_linking-006-PsCARTHA.empty))
+            (select void_for_linking-007-PsDELPH1 from
+              (tezos-client-007-PsDELPH1 -> void_for_linking-007-PsDELPH1.empty)
+              (-> void_for_linking-007-PsDELPH1.empty))
+            (select void_for_linking-008-PtEdo2Zk from
+              (tezos-client-008-PtEdo2Zk -> void_for_linking-008-PtEdo2Zk.empty)
+              (-> void_for_linking-008-PtEdo2Zk.empty))
+            (select void_for_linking-009-PsFLoren from
+              (tezos-client-009-PsFLoren -> void_for_linking-009-PsFLoren.empty)
+              (-> void_for_linking-009-PsFLoren.empty))
+
+            (select void_for_linking-alpha from
+              (tezos-client-alpha -> void_for_linking-alpha.empty)
+              (-> void_for_linking-alpha.empty))
+            (select void_for_linking-demo-counter from
+              (tezos-client-demo-counter -> void_for_linking-demo-counter.empty)
+              (-> void_for_linking-demo-counter.empty)))
+
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base
+                   -open Tezos_stdlib_unix
+                   -linkall)))
+
+(rule
+ (action
+  (progn
+   (write-file void_for_linking-genesis.empty "")
+   (write-file void_for_linking-genesis-carthagenet.empty "")
+   (write-file void_for_linking-000-Ps9mPmXa.empty "")
+   (write-file void_for_linking-001-PtCJ7pwo.empty "")
+   (write-file void_for_linking-002-PsYLVpVv.empty "")
+   (write-file void_for_linking-003-PsddFKi3.empty "")
+   (write-file void_for_linking-004-Pt24m4xi.empty "")
+   (write-file void_for_linking-005-PsBabyM1.empty "")
+   (write-file void_for_linking-006-PsCARTHA.empty "")
+   (write-file void_for_linking-007-PsDELPH1.empty "")
+   (write-file void_for_linking-008-PtEdo2Zk.empty "")
+   (write-file void_for_linking-009-PsFLoren.empty "")
+   (write-file void_for_linking-alpha.empty "")
+   (write-file void_for_linking-demo-counter.empty "")
+   (write-file void_for_linking-baking-alpha.empty "")
+   (write-file void_for_linking-baking-008-PtEdo2Zk.empty "")
+   (write-file void_for_linking-baking-009-PsFLoren.empty "")
+)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
