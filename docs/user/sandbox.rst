@@ -36,7 +36,7 @@ it will listen on port ``19739`` and ``18739``:
 
 ::
 
-    ./src/bin_node/tezos-sandboxed-node.sh 9 --connections 1
+    ./src/bin_node/tezos-sandboxed-node.sh 9
 
 You might replace ``1`` or ``9`` by any number in between if you want to
 run more than two nodes.
