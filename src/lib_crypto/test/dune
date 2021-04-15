@@ -18,6 +18,7 @@
             alcotest
             alcotest-lwt
             crowbar)
+ (package tezos-crypto)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
                    -open Tezos_error_monad.TzLwtreslib
