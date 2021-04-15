@@ -15,6 +15,9 @@ GROUP2 = [0, 1, 2, 3, 4, 5]
 GROUP_FULL = [1, 3]
 GROUP_ROLLING = [2, 4, 5]
 SNAPSHOT_DIR = tempfile.mkdtemp(prefix='tezos-snapshots.')
+BLOCKS_PER_CYCLE = 8
+PRESERVED_CYCLES = 2
+RETAINED_CYCLES = 8
 
 
 def clean(node):
@@ -268,7 +271,10 @@ class TestMultiNodeSnapshot:
         node_id = 1
         restart(sandbox, node_id)
         expected_level = session['head_level']
-        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        # last allowed fork level of the head
+        expected_checkpoint = (
+            expected_level - PRESERVED_CYCLES * BLOCKS_PER_CYCLE
+        )
         savepoint_when_imported = session['snapshot_level']
         expected_savepoint = savepoint_when_imported
         expected_caboose = 0
@@ -288,7 +294,10 @@ class TestMultiNodeSnapshot:
         node_id = 3
         restart(sandbox, node_id)
         expected_level = session['head_level']
-        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        # last allowed fork level of the head
+        expected_checkpoint = (
+            expected_level - PRESERVED_CYCLES * BLOCKS_PER_CYCLE
+        )
         savepoint_when_imported = session['snapshot_level']
         expected_savepoint = savepoint_when_imported
         expected_caboose = 0
@@ -306,17 +315,20 @@ class TestMultiNodeSnapshot:
 
     # For the rolling nodes
     # The caboose of rolling mode were no dragged yet as
-    # (checkpoint - maxopttl(head)) < savepoint
+    # (checkpoint - max_op_ttl(head)) < savepoint
     def test_node_2_consistency_2(self, sandbox, session):
         node_id = 2
         restart(sandbox, node_id)
         expected_level = session['head_level']
-        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        # last allowed fork level of the head
+        expected_checkpoint = (
+            expected_level - PRESERVED_CYCLES * BLOCKS_PER_CYCLE
+        )
         savepoint_when_imported = session['snapshot_level']
         expected_savepoint = savepoint_when_imported
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_caboose = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_caboose = max(expected_checkpoint - max_op_ttl, 0)
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -337,12 +349,15 @@ class TestMultiNodeSnapshot:
         node_id = 4
         restart(sandbox, node_id)
         expected_level = session['head_level']
-        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        # last allowed fork level of the head
+        expected_checkpoint = (
+            expected_level - PRESERVED_CYCLES * BLOCKS_PER_CYCLE
+        )
         savepoint_when_imported = session['snapshot_level']
         expected_savepoint = savepoint_when_imported
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_caboose = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_caboose = max(expected_checkpoint - max_op_ttl, 0)
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -363,12 +378,15 @@ class TestMultiNodeSnapshot:
         node_id = 5
         restart(sandbox, node_id)
         expected_level = session['head_level']
-        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        # last allowed fork level of the head
+        expected_checkpoint = (
+            expected_level - PRESERVED_CYCLES * BLOCKS_PER_CYCLE
+        )
         savepoint_when_imported = session['snapshot_level']
         expected_savepoint = savepoint_when_imported
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_caboose = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_caboose = max(expected_checkpoint - max_op_ttl, 0)
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -406,10 +424,13 @@ class TestMultiNodeSnapshot:
         node_id = 1
         restart(sandbox, node_id)
         expected_level = session['head_level']
-        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
-        head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        # last allowed fork level of the head
+        expected_checkpoint = (
+            expected_level - PRESERVED_CYCLES * BLOCKS_PER_CYCLE
+        )
+        expected_savepoint = expected_checkpoint - (
+            RETAINED_CYCLES * BLOCKS_PER_CYCLE
+        )
         expected_caboose = 0
         utils.node_consistency_after_import(
             node_id,
@@ -427,10 +448,13 @@ class TestMultiNodeSnapshot:
         node_id = 3
         restart(sandbox, node_id)
         expected_level = session['head_level']
-        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
-        head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        # last allowed fork level of the head
+        expected_checkpoint = (
+            expected_level - PRESERVED_CYCLES * BLOCKS_PER_CYCLE
+        )
+        expected_savepoint = expected_checkpoint - (
+            RETAINED_CYCLES * BLOCKS_PER_CYCLE
+        )
         expected_caboose = 0
         utils.node_consistency_after_import(
             node_id,
@@ -449,11 +473,16 @@ class TestMultiNodeSnapshot:
         node_id = 2
         restart(sandbox, node_id)
         expected_level = session['head_level']
-        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        # last allowed fork level of the head
+        expected_checkpoint = (
+            expected_level - PRESERVED_CYCLES * BLOCKS_PER_CYCLE
+        )
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
-        expected_caboose = expected_savepoint
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - (
+            RETAINED_CYCLES * BLOCKS_PER_CYCLE
+        )
+        expected_caboose = max(expected_checkpoint - max_op_ttl, 0)
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -474,11 +503,16 @@ class TestMultiNodeSnapshot:
         node_id = 4
         restart(sandbox, node_id)
         expected_level = session['head_level']
-        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        # last allowed fork level of the head
+        expected_checkpoint = (
+            expected_level - PRESERVED_CYCLES * BLOCKS_PER_CYCLE
+        )
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
-        expected_caboose = expected_savepoint
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - (
+            RETAINED_CYCLES * BLOCKS_PER_CYCLE
+        )
+        expected_caboose = max(expected_checkpoint - max_op_ttl, 0)
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -499,11 +533,16 @@ class TestMultiNodeSnapshot:
         node_id = 5
         restart(sandbox, node_id)
         expected_level = session['head_level']
-        expected_checkpoint = expected_level - 2 * 8  # lafl(head)
+        # last allowed fork level of the head
+        expected_checkpoint = (
+            expected_level - PRESERVED_CYCLES * BLOCKS_PER_CYCLE
+        )
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
-        expected_caboose = expected_savepoint
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - (
+            RETAINED_CYCLES * BLOCKS_PER_CYCLE
+        )
+        expected_caboose = max(expected_checkpoint - max_op_ttl, 0)
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -638,9 +677,9 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
+        max_op_ttl = head['metadata']['max_operations_ttl']
         expected_savepoint = expected_checkpoint
-        expected_caboose = expected_checkpoint - maxopttl
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -663,9 +702,9 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
+        max_op_ttl = head['metadata']['max_operations_ttl']
         expected_savepoint = expected_checkpoint
-        expected_caboose = expected_checkpoint - maxopttl
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -688,9 +727,9 @@ class TestMultiNodeSnapshot:
         expected_level = session['head_level']
         expected_checkpoint = expected_level
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
+        max_op_ttl = head['metadata']['max_operations_ttl']
         expected_savepoint = expected_checkpoint
-        expected_caboose = expected_checkpoint - maxopttl
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,

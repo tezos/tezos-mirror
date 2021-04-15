@@ -62,7 +62,10 @@ Changelog
   to voting periods. (MR `tezos!2763
   <https://gitlab.com/tezos/tezos/-/merge_requests/2763>`__, addresses
   issue `tezos#1204 <https://gitlab.com/tezos/tezos/-/issues/1204>__.)
-  
+
+- Increased the max operation time to live (`max_op_ttl`) from 60 to
+  120
+
 RPC changes
 ~~~~~~~~~~~
 
@@ -75,4 +78,3 @@ been removed. The deprecated fields ``level`` and
 deprecated fields ``voting_period`` and ``voting_period_position`` in
 the return value of ``../<block_id>/helpers/current_level`` have been
 removed.
-

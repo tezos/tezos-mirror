@@ -96,8 +96,11 @@ let check_bootstrap_with_history_modes protocol hmode1 hmode2 =
   let bakes_before_kill = 9 in
   (* Number of calls to [tezos-client bake for] while [node_2] is not
      running. This number is high enough so that it is bigger than the
-     Last-Allowed-Fork-Level *)
-  let bakes_during_kill = 100 in
+     Last-Allowed-Fork-Level or the caboose.
+
+     Since the caboose depends on [max_op_ttl] which is set to [120]
+     with the consensus algorithm Emmy* we bake [150] blocks. *)
+  let bakes_during_kill = 150 in
   let hmode1s = Node.show_history_mode hmode1 in
   let hmode2s = Node.show_history_mode hmode2 in
   Test.register

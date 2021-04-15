@@ -1548,6 +1548,8 @@ module Global : sig
   val set_block_priority : context -> int -> context tzresult Lwt.t
 end
 
+val max_operations_ttl : int
+
 val prepare_first_block :
   Context.t ->
   typecheck:(context ->

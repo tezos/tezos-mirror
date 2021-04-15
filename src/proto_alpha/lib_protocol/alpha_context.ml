@@ -248,6 +248,15 @@ let prepare_first_block = Init_storage.prepare_first_block
 
 let prepare = Init_storage.prepare
 
+(* The rationale behind the value of this constant is that an
+   operation should be considered as alive for about one hour:
+
+   minimal_block_delay context *  max_operations_ttl = 3600
+
+   To avoid an unecessary computation, we have hard-coded the value of
+   this constant.  *)
+let max_operations_ttl = 120
+
 let finalize ?commit_message:message c =
   let fitness = Fitness.from_int64 (Fitness.current c) in
   let context = Raw_context.recover c in
@@ -255,7 +264,7 @@ let finalize ?commit_message:message c =
     Updater.context;
     fitness;
     message;
-    max_operations_ttl = 60;
+    max_operations_ttl;
     last_allowed_fork_level =
       Raw_level.to_int32 @@ Level.last_allowed_fork_level c;
   }

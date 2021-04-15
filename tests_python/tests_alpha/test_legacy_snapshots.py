@@ -3,13 +3,17 @@ import pytest
 from tools import utils, paths, constants
 
 PARAMS = constants.NODE_PARAMS
-BATCH = 100
+
+# Defines the number of blocks to bake in the following test. This
+# constant should be higher than max_op_ttl and should be a multiple
+# of the cycle length (8 in sandboxed mode)
+BATCH = 160
 
 HOME = paths.TEZOS_HOME
 
 GROUP = [1, 2, 3, 4, 5]
 
-EXPECTED_LEVEL = 101
+EXPECTED_LEVEL = BATCH + 1
 
 
 def check_expected_values(head):
@@ -141,9 +145,9 @@ class TestLegacy:
         expected_level = session['head_level']
         expected_checkpoint = expected_level
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
+        max_op_ttl = head['metadata']['max_operations_ttl']
         expected_savepoint = expected_checkpoint
-        expected_caboose = expected_checkpoint - maxopttl
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -167,9 +171,9 @@ class TestLegacy:
         expected_level = session['head_level']
         expected_checkpoint = expected_level
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
+        max_op_ttl = head['metadata']['max_operations_ttl']
         expected_savepoint = expected_checkpoint
-        expected_caboose = expected_checkpoint - maxopttl
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -193,9 +197,9 @@ class TestLegacy:
         expected_level = session['head_level']
         expected_checkpoint = expected_level
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
+        max_op_ttl = head['metadata']['max_operations_ttl']
         expected_savepoint = expected_checkpoint
-        expected_caboose = expected_checkpoint - maxopttl
+        expected_caboose = expected_checkpoint - max_op_ttl
         utils.node_consistency_after_import(
             node_id,
             sandbox,
@@ -232,8 +236,8 @@ class TestLegacy:
         expected_level = session['head_level']
         expected_checkpoint = expected_level - 2 * 8  # lafl(head)
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
         expected_caboose = 0
         utils.node_consistency_after_import(
             node_id,
@@ -254,8 +258,8 @@ class TestLegacy:
         expected_level = session['head_level']
         expected_checkpoint = expected_level - 2 * 8  # lafl(head)
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
         expected_caboose = 0
         utils.node_consistency_after_import(
             node_id,
@@ -277,8 +281,8 @@ class TestLegacy:
         expected_level = session['head_level']
         expected_checkpoint = expected_level - 2 * 8  # lafl(head)
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
         expected_caboose = expected_savepoint
         utils.node_consistency_after_import(
             node_id,
@@ -303,8 +307,8 @@ class TestLegacy:
         expected_level = session['head_level']
         expected_checkpoint = expected_level - 2 * 8  # lafl(head)
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
         expected_caboose = expected_savepoint
         utils.node_consistency_after_import(
             node_id,
@@ -329,8 +333,8 @@ class TestLegacy:
         expected_level = session['head_level']
         expected_checkpoint = expected_level - 2 * 8  # lafl(head)
         head = sandbox.client(node_id).get_head()
-        maxopttl = head['metadata']['max_operations_ttl']
-        expected_savepoint = expected_checkpoint - maxopttl
+        max_op_ttl = head['metadata']['max_operations_ttl']
+        expected_savepoint = expected_checkpoint - max_op_ttl
         expected_caboose = expected_savepoint
         utils.node_consistency_after_import(
             node_id,

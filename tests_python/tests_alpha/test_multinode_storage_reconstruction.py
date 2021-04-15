@@ -9,7 +9,8 @@ CEMENTED_LIMIT = 2 * 8 - 1
 # The whole store is cemented
 BATCH_1 = 48
 # 2 cycles are pruned in full 5 mode
-BATCH_2 = 96
+# This constant is above MAX_OP_TTL
+BATCH_2 = 144
 
 SNAPSHOT_1 = f'snapshot_block_{BATCH_1}.full'
 SNAPSHOT_2 = f'snapshot_block_{BATCH_2}.full'
