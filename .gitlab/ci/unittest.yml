@@ -30,16 +30,36 @@ test-static-libs-patch:
     key: "$CI_COMMIT_REF_SLUG"
     policy: pull
 
-# this section is updated using the script scripts/update_unit_test.sh
-##BEGIN_UNITTEST##
-unit:alltest:
+.unit_test_template:
   extends: .test_template
   artifacts:
-    name: "alltest-${CI_COMMIT_SHA}"
+    name: "$CI_JOB_NAME-$CI_COMMIT_SHA"
     paths:
       - test_results
     expire_in: 1 day
-#    when: on_failure
+
+# this section is updated using the script scripts/update_unit_test.sh
+##BEGIN_UNITTEST##
+unit:008_PtEdo2Zk:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
+    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_protocol 008_PtEdo2Zk_lib_protocol
+
+unit:009_PsFLoren:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_client 009_PsFLoren_lib_client
+    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_protocol 009_PsFLoren_lib_protocol
+
+unit:alpha:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
+    - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
+
+unit:non-proto:
+  extends: .unit_test_template
   script:
     - scripts/test_wrapper.sh src/bin_client client
     - scripts/test_wrapper.sh src/bin_snoop/latex snoop_latex
@@ -67,12 +87,6 @@ unit:alltest:
     - scripts/test_wrapper.sh src/lib_stdlib stdlib
     - scripts/test_wrapper.sh src/lib_store/legacy_store store_legacy_store
     - scripts/test_wrapper.sh src/lib_store store
-    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
-    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_protocol 008_PtEdo2Zk_lib_protocol
-    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_client 009_PsFLoren_lib_client
-    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_protocol 009_PsFLoren_lib_protocol
-    - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
-    - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
     - scripts/test_wrapper.sh src/tooling src_tooling
     - scripts/test_wrapper.sh vendors/ocaml-bls12-381 ocaml-bls12-381
     - scripts/test_wrapper.sh vendors/ocaml-ledger-wallet ocaml-ledger-wallet
