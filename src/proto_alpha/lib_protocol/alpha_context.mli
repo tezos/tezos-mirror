@@ -621,6 +621,8 @@ module Level : sig
   val last_allowed_fork_level : context -> Raw_level.t
 
   val dawn_of_a_new_cycle : context -> Cycle.t option
+
+  val may_snapshot_rolls : context -> bool
 end
 
 module Fitness : sig

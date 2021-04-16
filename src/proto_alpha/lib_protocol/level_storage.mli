@@ -54,3 +54,7 @@ val last_allowed_fork_level : Raw_context.t -> Raw_level_repr.t
    level of [cycle] and [None] if the level is not the last level of a
    cycle. *)
 val dawn_of_a_new_cycle : Raw_context.t -> Cycle_repr.t option
+
+(** Returns [true] if the rolls should be snapshot at the current
+   level. *)
+val may_snapshot_rolls : Raw_context.t -> bool

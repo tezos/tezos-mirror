@@ -155,3 +155,12 @@ let last_of_a_cycle ctxt level =
 let dawn_of_a_new_cycle ctxt =
   let level = current ctxt in
   if last_of_a_cycle ctxt level then Some level.cycle else None
+
+let may_snapshot_rolls ctxt =
+  let level = current ctxt in
+  let blocks_per_roll_snapshot =
+    Constants_storage.blocks_per_roll_snapshot ctxt
+  in
+  Compare.Int32.equal
+    (Int32.rem level.cycle_position blocks_per_roll_snapshot)
+    (Int32.pred blocks_per_roll_snapshot)
