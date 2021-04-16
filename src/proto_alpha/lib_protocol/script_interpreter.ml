@@ -716,14 +716,14 @@ let use_gas_counter_in_ctxt ctxt local_gas_counter f =
 
 *)
 
-let update_and_check gas_counter cost =
-  let gas_counter = gas_counter - cost in
+let update_and_check gas_counter (cost : Gas.cost) =
+  let gas_counter = gas_counter - (cost :> int) in
   if Compare.Int.(gas_counter < 0) then None else Some gas_counter
   [@@ocaml.inline always]
 
 let consume local_gas_counter k accu stack =
   let cost = cost_of_instr k accu stack in
-  update_and_check local_gas_counter (cost :> int)
+  update_and_check local_gas_counter cost
   [@@ocaml.inline always]
 
 let consume' ctxt local_gas_counter cost =
@@ -736,7 +736,7 @@ let consume' ctxt local_gas_counter cost =
 
 let consume_control local_gas_counter ks =
   let cost = cost_of_control ks in
-  update_and_check local_gas_counter (cost :> int)
+  update_and_check local_gas_counter cost
   [@@ocaml.inline always]
 
 let log_entry (logger : logger) ctxt gas k accu stack =
@@ -1157,7 +1157,7 @@ and step :
             (S.zero |> S.may_saturate)
             accu.elements
         in
-        consume' ctxt gas (Interp_costs.concat_string total_length :> int)
+        consume' ctxt gas (Interp_costs.concat_string total_length)
         >>?= fun gas ->
         let s = String.concat "" ss.elements in
         (step [@ocaml.tailcall]) g gas k ks s stack
@@ -1190,7 +1190,7 @@ and step :
             (S.zero |> S.may_saturate)
             accu.elements
         in
-        consume' ctxt gas (Interp_costs.concat_string total_length :> int)
+        consume' ctxt gas (Interp_costs.concat_string total_length)
         >>?= fun gas ->
         let s = Bytes.concat Bytes.empty ss.elements in
         (step [@ocaml.tailcall]) g gas k ks s stack
