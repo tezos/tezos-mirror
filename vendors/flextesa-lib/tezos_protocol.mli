@@ -35,14 +35,10 @@ end
 module Voting_period : sig
   type t =
     [ `Proposal
-    | `Testing_vote
-    | `Testing
     | `Exploration
     | `Cooldown
-    | `Promotion_vote
-    | `Promotion ]
-
-  val to_string : t -> string
+    | `Promotion
+    | `Adoption ]
 end
 
 module Protocol_kind : sig
@@ -80,6 +76,7 @@ val default : unit -> t
 val protocol_parameters_json : t -> Ezjsonm.t
 val sandbox : t -> string
 val protocol_parameters : t -> string
+val voting_period_to_string : t -> Voting_period.t -> string
 val expected_pow : t -> int
 val id : t -> string
 val bootstrap_accounts : t -> Account.t list

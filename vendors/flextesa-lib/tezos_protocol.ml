@@ -54,23 +54,10 @@ end
 module Voting_period = struct
   type t =
     [ `Proposal
-    | `Testing_vote
-    | `Testing
-    | `Exploration (* Replaces Testing_vote after 008 *)
-    | `Cooldown (* Replaces Testing after 008 *)
-    | `Promotion_vote
-    | `Promotion (* Replaces Promotion_vote after 008 *) ]
-
-  let to_string (p : t) =
-    (* This has to mimic: src/proto_alpha/lib_protocol/voting_period_repr.ml *)
-    match p with
-    | `Promotion -> "promotion"
-    | `Promotion_vote -> "promotion_vote"
-    | `Exploration -> "exploration"
-    | `Testing_vote -> "testing_vote"
-    | `Proposal -> "proposal"
-    | `Testing -> "testing"
-    | `Cooldown -> "cooldown"
+    | `Exploration
+    | `Cooldown
+    | `Promotion
+    | `Adoption ]
 end
 
 module Protocol_kind = struct
@@ -85,6 +72,15 @@ module Protocol_kind = struct
     ; ("Edo", `Edo)
     ; ("Florence", `Florence)
     ; ("Alpha", `Alpha) ]
+
+  let ( < ) k1 k2 =
+    let rec aux = function
+      | [] -> assert false
+      | (_, k) :: rest ->
+          if Poly.equal k k2 then false
+          else if Poly.equal k k1 then true
+          else aux rest
+    in aux names
 
   let default = `Alpha
 
@@ -229,6 +225,17 @@ let protocol_parameters_json t : Ezjsonm.t =
             common @ extra_post_babylon_stuff sk
         | `Athens -> common )
 
+let voting_period_to_string t (p : Voting_period.t) =
+  (* This has to mimic: src/proto_alpha/lib_protocol/voting_period_repr.ml *)
+  match p with
+  | `Promotion ->
+      if Protocol_kind.(t.kind < `Florence) then "promotion_vote" else "promotion"
+  | `Exploration ->
+      if Protocol_kind.(t.kind < `Florence) then "testing_vote" else "exploration"
+  | `Proposal -> "proposal"
+  | `Cooldown ->
+      if Protocol_kind.(t.kind < `Florence) then "testing" else "cooldown"
+  | `Adoption -> "adoption"
 let sandbox {dictator; _} =
   let pk = Account.pubkey dictator in
   Ezjsonm.to_string (`O [("genesis_pubkey", `String pk)])

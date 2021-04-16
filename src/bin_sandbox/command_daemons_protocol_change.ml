@@ -4,8 +4,8 @@ open Console
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
 
-let wait_for_voting_period ?level_within_period state ~client ~attempts period
-    =
+let wait_for_voting_period ?level_within_period state ~protocol ~client
+    ~attempts period =
   let is_expected_period (voting_period : (string * Ezjsonm.value) list)
       period_name =
     match Stdlib.List.assoc_opt "voting_period" voting_period with
@@ -18,7 +18,7 @@ let wait_for_voting_period ?level_within_period state ~client ~attempts period
     | _ ->
         false
   in
-  let period_name = Tezos_protocol.Voting_period.to_string period in
+  let period_name = Tezos_protocol.voting_period_to_string protocol period in
   let message =
     sprintf
       "Waiting for voting period: `%s`%s"
@@ -327,6 +327,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   >>= fun () ->
   wait_for_voting_period
     state
+    ~protocol
     ~client:client_0
     ~attempts:waiting_attempts
     `Proposal
@@ -379,6 +380,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
       | Some (acc, client, _) ->
           wait_for_voting_period
             state
+            ~protocol
             ~client:client_0
             ~attempts:waiting_attempts
             `Proposal
@@ -387,9 +389,10 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   >>= fun () ->
   wait_for_voting_period
     state
+    ~protocol
     ~client:client_0
     ~attempts:waiting_attempts
-    `Testing_vote
+    `Exploration
   >>= fun _ ->
   List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
       Tezos_client.successful_client_cmd
@@ -414,9 +417,10 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   >>= fun () ->
   wait_for_voting_period
     state
+    ~protocol
     ~client:client_0
     ~attempts:waiting_attempts
-    `Promotion_vote
+    `Promotion
   >>= fun _ ->
   let protocol_switch_will_happen =
     match test_variant with
@@ -448,6 +452,7 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
   >>= fun () ->
   wait_for_voting_period
     state
+    ~protocol
     ~client:client_0
     ~attempts:waiting_attempts
     `Proposal
