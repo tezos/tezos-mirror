@@ -11,7 +11,7 @@ protocol before activating it.
 Delegates take part in the amendment procedure with an influence
 proportional to their stake, one roll one vote.
 
-The procedure consists of five `voting periods`, each of 20480 blocks
+The procedure consists of five `voting periods`, each of 40960 blocks
 (5 cycles, or ~two weeks), for a total of approximately 2 months and a half.
 Voting periods align with cycles: a voting period starts at the first
 block of a cycle.

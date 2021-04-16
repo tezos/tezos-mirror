@@ -89,7 +89,7 @@ let encoding =
        (req
           "expected_commitment"
           ~description:
-            "Tells wether the baker of this block has to commit a seed nonce \
+            "Tells whether the baker of this block has to commit a seed nonce \
              hash."
           bool))
 
@@ -102,17 +102,88 @@ let root_level first_level =
     expected_commitment = false;
   }
 
-let level_from_raw ~first_level ~blocks_per_cycle ~blocks_per_commitment level
-    =
-  let raw_level = Raw_level_repr.to_int32 level in
-  let first_level = Raw_level_repr.to_int32 first_level in
-  let level_position =
-    Compare.Int32.max 0l (Int32.sub raw_level first_level)
+type cycle_era = {
+  first_level : Raw_level_repr.t;
+  blocks_per_cycle : int32;
+  blocks_per_commitment : int32;
+}
+
+let cycle_era_encoding =
+  let open Data_encoding in
+  conv
+    (fun {first_level; blocks_per_cycle; blocks_per_commitment} ->
+      (first_level, blocks_per_cycle, blocks_per_commitment))
+    (fun (first_level, blocks_per_cycle, blocks_per_commitment) ->
+      {first_level; blocks_per_cycle; blocks_per_commitment})
+    (obj3
+       (req
+          "first_level"
+          ~description:
+            "The first level at which a new value for blocks_per_cycle is used."
+          Raw_level_repr.encoding)
+       (req
+          "blocks_per_cycle"
+          ~description:
+            "The value of the blocks_per_cycle constant used during the cycle \
+             period starting with first_level."
+          int32)
+       (req
+          "blocks_per_commitment"
+          ~description:
+            "The value of the blocks_per_commitment constant used during the \
+             cycle period starting with first_level."
+          int32))
+
+(* This function returns the cycle and the cycle era to which [level]
+   belongs. *)
+let cycle_and_cycle_era_from_raw ~cycle_eras level =
+  let rec aux first_cycle_in_period = function
+    | {first_level; blocks_per_cycle}
+      :: ({first_level = next_first_level; _} :: _ as tail)
+      when Compare.Int32.(Raw_level_repr.diff level next_first_level >= 0l) ->
+        let number_of_cycles =
+          Int32.div
+            (Raw_level_repr.diff next_first_level first_level)
+            blocks_per_cycle
+          |> Int32.to_int
+        in
+        let next_first_cycle_in_period =
+          Cycle_repr.add first_cycle_in_period number_of_cycles
+        in
+        aux next_first_cycle_in_period tail
+    | ({first_level; blocks_per_cycle} as cycle_era) :: _ ->
+        let level_position = Raw_level_repr.diff level first_level in
+        let cycle_position = Int32.div level_position blocks_per_cycle in
+        let cycle =
+          Cycle_repr.add first_cycle_in_period (Int32.to_int cycle_position)
+        in
+        (cycle, cycle_era)
+    | [] ->
+        assert false
   in
-  let cycle =
-    Cycle_repr.of_int32_exn (Int32.div level_position blocks_per_cycle)
+  aux Cycle_repr.root cycle_eras
+
+(* precondition: [cycle_eras] is not empty *)
+let level_from_raw ~cycle_eras level =
+  let ( cycle,
+        { first_level = first_level_in_cycle_era;
+          blocks_per_cycle;
+          blocks_per_commitment } ) =
+    cycle_and_cycle_era_from_raw ~cycle_eras level
   in
+  (* the level position relative to the start of the cycle period *)
+  let level_position = Raw_level_repr.diff level first_level_in_cycle_era in
   let cycle_position = Int32.rem level_position blocks_per_cycle in
+  assert (Compare.Int32.(level_position >= 0l)) ;
+  let first_level =
+    match cycle_eras with
+    | [] ->
+        assert false
+    | {first_level; _} :: _ ->
+        first_level
+  in
+  (* the level position relative to the start of the cycle period *)
+  let level_position = Raw_level_repr.diff level first_level in
   let expected_commitment =
     Compare.Int32.(
       Int32.rem cycle_position blocks_per_commitment

@@ -29,10 +29,10 @@ let constants_mainnet =
   Constants.
     {
       preserved_cycles = 5;
-      blocks_per_cycle = 4096l;
-      blocks_per_commitment = 32l;
-      blocks_per_roll_snapshot = 256l;
-      blocks_per_voting_period = 20480l;
+      blocks_per_cycle = 8192l;
+      blocks_per_commitment = 64l;
+      blocks_per_roll_snapshot = 512l;
+      blocks_per_voting_period = 40960l;
       time_between_blocks = List.map Period.of_seconds_exn [60L; 40L];
       minimal_block_delay = Period.of_seconds_exn 30L;
       endorsers_per_block = 256;

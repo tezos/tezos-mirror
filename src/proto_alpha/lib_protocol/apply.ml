@@ -1424,18 +1424,8 @@ let apply_operation ctxt chain_id mode pred_block baker hash operation =
   let ctxt = Contract.unset_origination_nonce ctxt in
   (ctxt, {contents = result})
 
-let may_snapshot_roll ctxt =
-  let level = Level.current ctxt in
-  let blocks_per_roll_snapshot = Constants.blocks_per_roll_snapshot ctxt in
-  if
-    Compare.Int32.equal
-      (Int32.rem level.cycle_position blocks_per_roll_snapshot)
-      (Int32.pred blocks_per_roll_snapshot)
-  then Roll.snapshot_rolls ctxt
-  else return ctxt
-
 let may_start_new_cycle ctxt =
-  match Baking.dawn_of_a_new_cycle ctxt with
+  match Level.dawn_of_a_new_cycle ctxt with
   | None ->
       return (ctxt, [], [])
   | Some last_cycle ->
@@ -1560,7 +1550,8 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
       Nonce.record_hash ctxt {nonce_hash; delegate; rewards; fees} )
   >>=? fun ctxt ->
   (* end of cycle *)
-  may_snapshot_roll ctxt
+  ( if Level.may_snapshot_rolls ctxt then Roll.snapshot_rolls ctxt
+  else return ctxt )
   >>=? fun ctxt ->
   may_start_new_cycle ctxt
   >>=? fun (ctxt, balance_updates, deactivated) ->

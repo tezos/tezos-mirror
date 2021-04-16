@@ -438,14 +438,6 @@ let check_fitness_gap ctxt (block : Block_header.t) =
     error (Invalid_fitness_gap (max_fitness_gap ctxt, gap))
   else ok_unit
 
-let last_of_a_cycle ctxt (l : Level.t) =
-  Compare.Int32.(
-    Int32.succ l.Level.cycle_position = Constants.blocks_per_cycle ctxt)
-
-let dawn_of_a_new_cycle ctxt =
-  let level = Level.current ctxt in
-  if last_of_a_cycle ctxt level then Some level.cycle else None
-
 (* The minimal threshold on the endorsing power for the fast-path case
    is 60% of the maximal endorsing power. *)
 let fastpath_endorsing_power_threshold maximal_endorsing_power =

@@ -127,8 +127,6 @@ val check_proof_of_work_stamp : context -> Block_header.t -> unit tzresult
     and the given block is within the protocol parameters *)
 val check_fitness_gap : context -> Block_header.t -> unit tzresult
 
-val dawn_of_a_new_cycle : context -> Cycle.t option
-
 val earlier_predecessor_timestamp : context -> Level.t -> Timestamp.t tzresult
 
 (** Since Emmy+

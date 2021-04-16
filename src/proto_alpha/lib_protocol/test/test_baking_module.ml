@@ -33,16 +33,6 @@
 open Protocol
 open Alpha_context
 
-let prepare_context (b : Block.t) =
-  Alpha_context.prepare
-    b.context
-    ~level:b.header.shell.level
-    ~predecessor_timestamp:b.header.shell.timestamp
-    ~timestamp:b.header.shell.timestamp
-    ~fitness:b.header.shell.fitness
-  >|= (fun e -> Environment.wrap_tzresult e)
-  >>=? fun (ctxt, _) -> return ctxt
-
 let minimal_time ~bd ~dp ~md ~p = if p = 0 then md else bd + (p * dp)
 
 let emmystar_delay ~te ~ie ~md ~bd ~dp ~de ~p ~e =

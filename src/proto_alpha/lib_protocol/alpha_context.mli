@@ -529,14 +529,6 @@ module Constants : sig
 
   val preserved_cycles : context -> int
 
-  val blocks_per_cycle : context -> int32
-
-  val blocks_per_commitment : context -> int32
-
-  val blocks_per_roll_snapshot : context -> int32
-
-  val blocks_per_voting_period : context -> int32
-
   val time_between_blocks : context -> Period.t list
 
   val minimal_block_delay : context -> Period.t
@@ -619,6 +611,10 @@ module Level : sig
   val levels_in_current_cycle : context -> ?offset:int32 -> unit -> level list
 
   val last_allowed_fork_level : context -> Raw_level.t
+
+  val dawn_of_a_new_cycle : context -> Cycle.t option
+
+  val may_snapshot_rolls : context -> bool
 end
 
 module Fitness : sig
