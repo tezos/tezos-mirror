@@ -40,6 +40,19 @@ type ex_ty = Ex_ty : 'a ty -> ex_ty
 
 type ex_stack_ty = Ex_stack_ty : ('a, 's) stack_ty -> ex_stack_ty
 
+(*
+
+   The following type represents an instruction parameterized by its
+   continuation. During the elaboration of the typed term, a sequence
+   of instructions in Micheline is read from left to right: hence, the
+   elaboration needs to wait for the next instruction to be elaborated
+   to be able to construct the current instruction.
+
+   In addition, we maintain the value of
+   `number_of_generated_growing_types` in the field [csize] to accelerate
+   a little bit the evaluation of this quantity.
+
+*)
 type ('a, 's, 'b, 'u) cinstr = {
   csize : int;
   apply :
