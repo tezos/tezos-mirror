@@ -2251,7 +2251,7 @@ let run_descr logger (ctxt, sc) descr accu stack =
   >>=? fun (accu, stack, ctxt, gas) ->
   return (accu, stack, update_context gas ctxt)
 
-let step_descr log_now logger g descr accu stack =
+let step_descr ~log_now logger g descr accu stack =
   ( if log_now then
     match logger with
     | None ->
@@ -2264,7 +2264,7 @@ let step_descr log_now logger g descr accu stack =
   run_descr logger g descr accu stack
 
 let interp logger g (Lam (code, _)) arg =
-  step_descr true logger g code arg ((), ())
+  step_descr ~log_now:true logger g code arg ((), ())
   >|=? fun (ret, _, ctxt) -> (ret, ctxt)
 
 let kstep logger ctxt step_constants kinstr accu stack =
@@ -2281,7 +2281,7 @@ let kstep logger ctxt step_constants kinstr accu stack =
   return (accu, stack, update_context gas ctxt)
 
 let step logger ctxt step_constants descr stack =
-  step_descr false logger (ctxt, step_constants) descr stack
+  step_descr ~log_now:false logger (ctxt, step_constants) descr stack
 
 (*
 
