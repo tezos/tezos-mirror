@@ -499,6 +499,23 @@ class TestContracts:
     @pytest.mark.parametrize(
         "contract,error_pattern",
         [
+            # Even though the interpreter uses a nonempty stack internally,
+            # the typechecker should not be able to observe it.
+            ("stack_bottom_unfailwithable.tz", r'ill-typed script'),
+            ("stack_bottom_unrightable.tz", r'ill-typed script'),
+            ("stack_bottom_unleftable.tz", r'ill-typed script'),
+            ("stack_bottom_ungetable.tz", r'ill-typed script'),
+            ("stack_bottom_unpairable.tz", r'ill-typed script'),
+            ("stack_bottom_undug2able.tz", r'ill-typed script'),
+            ("stack_bottom_undugable.tz", r'ill-typed script'),
+            ("stack_bottom_undig2able.tz", r'ill-typed script'),
+            ("stack_bottom_undigable.tz", r'ill-typed script'),
+            ("stack_bottom_undip2able.tz", r'ill-typed script'),
+            ("stack_bottom_undipable.tz", r'ill-typed script'),
+            ("stack_bottom_undup2able.tz", r'ill-typed script'),
+            ("stack_bottom_undropable.tz", r'ill-typed script'),
+            ("stack_bottom_unpopable.tz", r'ill-typed script'),
+            ("stack_bottom_unpopable_in_lambda.tz", r'ill-typed script'),
             # operations cannot be PACKed
             (
                 "pack_operation.tz",

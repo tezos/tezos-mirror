@@ -7,39 +7,36 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (remaining gas: 1039987.606 units remaining)
+  - location: 12 (remaining gas: 1039987.606 units remaining)
     [ (Pair "bar" {} None)  	 ]
-  - location: 12 (remaining gas: 1039987.526 units remaining)
+  - location: 12 (remaining gas: 1039987.556 units remaining)
     [ "bar"  	@parameter
       (Pair {} None)  	@storage ]
-  - location: 15 (remaining gas: 1039987.371 units remaining)
+  - location: 13 (remaining gas: 1039987.511 units remaining)
+    [ (Pair {} None)  	@storage ]
+  - location: 15 (remaining gas: 1039987.461 units remaining)
     [ {}  	 ]
-  - location: 16 (remaining gas: 1039987.291 units remaining)
+  - location: 16 (remaining gas: 1039987.411 units remaining)
     [ {}  	
       {}  	 ]
-  - location: -1 (remaining gas: 1039987.246 units remaining)
-    [ {}  	
-      {}  	 ]
-  - location: 13 (remaining gas: 1039987.246 units remaining)
+  - location: 13 (remaining gas: 1039987.411 units remaining)
     [ "bar"  	@parameter
       {}  	
       {}  	 ]
-  - location: 17 (remaining gas: 1039987.136 units remaining)
+  - location: 17 (remaining gas: 1039987.331 units remaining)
     [ False  	
       {}  	 ]
-  - location: 18 (remaining gas: 1039987.061 units remaining)
+  - location: 18 (remaining gas: 1039987.286 units remaining)
     [ (Some False)  	
       {}  	 ]
-  - location: 19 (remaining gas: 1039986.991 units remaining)
+  - location: 19 (remaining gas: 1039987.246 units remaining)
     [ {}  	
       (Some False)  	 ]
-  - location: 20 (remaining gas: 1039986.916 units remaining)
+  - location: 20 (remaining gas: 1039987.201 units remaining)
     [ (Pair {} (Some False))  	 ]
-  - location: 21 (remaining gas: 1039986.841 units remaining)
+  - location: 21 (remaining gas: 1039987.156 units remaining)
     [ {}  	
       (Pair {} (Some False))  	 ]
-  - location: 23 (remaining gas: 1039986.766 units remaining)
-    [ (Pair {} {} (Some False))  	 ]
-  - location: -1 (remaining gas: 1039986.721 units remaining)
+  - location: 23 (remaining gas: 1039987.111 units remaining)
     [ (Pair {} {} (Some False))  	 ]
 

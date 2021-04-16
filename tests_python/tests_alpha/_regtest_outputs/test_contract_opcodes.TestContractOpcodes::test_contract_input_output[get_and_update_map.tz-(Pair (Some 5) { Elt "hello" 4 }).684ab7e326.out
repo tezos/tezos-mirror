@@ -7,35 +7,28 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (remaining gas: 1039988.977 units remaining)
+  - location: 13 (remaining gas: 1039988.977 units remaining)
     [ (Pair "hi" (Some 5) { Elt "hello" 4 })  	 ]
-  - location: 13 (remaining gas: 1039988.867 units remaining)
+  - location: 13 (remaining gas: 1039988.927 units remaining)
     [ "hi"  	@parameter
       (Pair (Some 5) { Elt "hello" 4 })  	@storage ]
-  - location: 16 (remaining gas: 1039988.712 units remaining)
+  - location: 14 (remaining gas: 1039988.882 units remaining)
+    [ (Pair (Some 5) { Elt "hello" 4 })  	@storage ]
+  - location: 16 (remaining gas: 1039988.832 units remaining)
     [ (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 15 (remaining gas: 1039988.667 units remaining)
-    [ (Some 5)  	
-      { Elt "hello" 4 }  	 ]
-  - location: 14 (remaining gas: 1039988.667 units remaining)
+  - location: 14 (remaining gas: 1039988.832 units remaining)
     [ "hi"  	@parameter
       (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: -1 (remaining gas: 1039988.622 units remaining)
-    [ "hi"  	@parameter
-      (Some 5)  	
-      { Elt "hello" 4 }  	 ]
-  - location: 17 (remaining gas: 1039988.432 units remaining)
+  - location: 17 (remaining gas: 1039988.672 units remaining)
     [ None  	
       { Elt "hello" 4 ; Elt "hi" 5 }  	 ]
-  - location: 18 (remaining gas: 1039988.357 units remaining)
+  - location: 18 (remaining gas: 1039988.627 units remaining)
     [ (Pair None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: 19 (remaining gas: 1039988.282 units remaining)
+  - location: 19 (remaining gas: 1039988.582 units remaining)
     [ {}  	
       (Pair None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: 21 (remaining gas: 1039988.207 units remaining)
-    [ (Pair {} None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: -1 (remaining gas: 1039988.162 units remaining)
+  - location: 21 (remaining gas: 1039988.537 units remaining)
     [ (Pair {} None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
 

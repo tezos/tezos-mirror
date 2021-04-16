@@ -45,7 +45,7 @@ Contract memorized as level.
 Injected block [BLOCK_HASH]
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
-Estimated gas: 2226.375 units (will add 100 for safety)
+Estimated gas: 2226.210 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -70,7 +70,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 4
       Storage size: 40 bytes
-      Consumed gas: 2226.375
+      Consumed gas: 2226.210
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ500
         [CONTRACT_HASH] ... +ꜩ500
@@ -87,7 +87,7 @@ Injected block [BLOCK_HASH]
 Injected block [BLOCK_HASH]
 4
 Node is bootstrapped.
-Estimated gas: 2226.369 units (will add 100 for safety)
+Estimated gas: 2226.204 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -112,7 +112,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 7
       Storage size: 40 bytes
-      Consumed gas: 2226.369
+      Consumed gas: 2226.204
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ500
         [CONTRACT_HASH] ... +ꜩ500

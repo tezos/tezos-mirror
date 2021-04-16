@@ -8,35 +8,28 @@ big_map diff
   New map(4) of type (big_map string nat)
   Set map(4)["hello"] to 5
 trace
-  - location: 11 (remaining gas: 1039975.271 units remaining)
+  - location: 13 (remaining gas: 1039975.271 units remaining)
     [ (Pair "hello" (Some 5) { Elt "hello" 4 })  	 ]
-  - location: 13 (remaining gas: 1039975.161 units remaining)
+  - location: 13 (remaining gas: 1039975.221 units remaining)
     [ "hello"  	@parameter
       (Pair (Some 5) { Elt "hello" 4 })  	@storage ]
-  - location: 16 (remaining gas: 1039975.006 units remaining)
+  - location: 14 (remaining gas: 1039975.176 units remaining)
+    [ (Pair (Some 5) { Elt "hello" 4 })  	@storage ]
+  - location: 16 (remaining gas: 1039975.126 units remaining)
     [ (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 15 (remaining gas: 1039974.961 units remaining)
-    [ (Some 5)  	
-      { Elt "hello" 4 }  	 ]
-  - location: 14 (remaining gas: 1039974.961 units remaining)
+  - location: 14 (remaining gas: 1039975.126 units remaining)
     [ "hello"  	@parameter
       (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: -1 (remaining gas: 1039974.916 units remaining)
-    [ "hello"  	@parameter
-      (Some 5)  	
-      { Elt "hello" 4 }  	 ]
-  - location: 17 (remaining gas: 1039961.963 units remaining)
+  - location: 17 (remaining gas: 1039962.203 units remaining)
     [ (Some 4)  	
       { Elt "hello" 5 }  	 ]
-  - location: 18 (remaining gas: 1039961.888 units remaining)
+  - location: 18 (remaining gas: 1039962.158 units remaining)
     [ (Pair (Some 4) { Elt "hello" 5 })  	 ]
-  - location: 19 (remaining gas: 1039961.813 units remaining)
+  - location: 19 (remaining gas: 1039962.113 units remaining)
     [ {}  	
       (Pair (Some 4) { Elt "hello" 5 })  	 ]
-  - location: 21 (remaining gas: 1039961.738 units remaining)
-    [ (Pair {} (Some 4) { Elt "hello" 5 })  	 ]
-  - location: -1 (remaining gas: 1039961.693 units remaining)
+  - location: 21 (remaining gas: 1039962.068 units remaining)
     [ (Pair {} (Some 4) { Elt "hello" 5 })  	 ]
 

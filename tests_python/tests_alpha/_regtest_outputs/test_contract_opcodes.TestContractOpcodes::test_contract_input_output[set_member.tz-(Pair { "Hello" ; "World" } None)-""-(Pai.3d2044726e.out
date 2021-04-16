@@ -7,62 +7,55 @@ emitted operations
 big_map diff
   
 trace
-  - location: 10 (remaining gas: 1039980.147 units remaining)
+  - location: 11 (remaining gas: 1039980.147 units remaining)
     [ (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: 11 (remaining gas: 1039980.067 units remaining)
+  - location: 11 (remaining gas: 1039980.097 units remaining)
     [ (Pair "" { "Hello" ; "World" } None)  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: 12 (remaining gas: 1039979.987 units remaining)
+  - location: 12 (remaining gas: 1039980.047 units remaining)
     [ (Pair "" { "Hello" ; "World" } None)  	
       (Pair "" { "Hello" ; "World" } None)  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: 13 (remaining gas: 1039979.907 units remaining)
+  - location: 13 (remaining gas: 1039979.997 units remaining)
     [ ""  	@parameter
       (Pair "" { "Hello" ; "World" } None)  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: 17 (remaining gas: 1039979.722 units remaining)
+  - location: 14 (remaining gas: 1039979.952 units remaining)
+    [ (Pair "" { "Hello" ; "World" } None)  	
+      (Pair "" { "Hello" ; "World" } None)  	 ]
+  - location: 17 (remaining gas: 1039979.902 units remaining)
     [ (Pair { "Hello" ; "World" } None)  	@storage
       (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: 18 (remaining gas: 1039979.642 units remaining)
+  - location: 18 (remaining gas: 1039979.852 units remaining)
     [ { "Hello" ; "World" }  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: -1 (remaining gas: 1039979.597 units remaining)
-    [ { "Hello" ; "World" }  	
-      (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: 15 (remaining gas: 1039979.552 units remaining)
-    [ { "Hello" ; "World" }  	
-      (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: 14 (remaining gas: 1039979.552 units remaining)
+  - location: 14 (remaining gas: 1039979.852 units remaining)
     [ ""  	@parameter
       { "Hello" ; "World" }  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: 19 (remaining gas: 1039979.442 units remaining)
+  - location: 19 (remaining gas: 1039979.772 units remaining)
     [ False  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: 20 (remaining gas: 1039979.367 units remaining)
+  - location: 20 (remaining gas: 1039979.727 units remaining)
     [ (Some False)  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
-  - location: 24 (remaining gas: 1039979.182 units remaining)
+  - location: 21 (remaining gas: 1039979.682 units remaining)
+    [ (Pair "" { "Hello" ; "World" } None)  	 ]
+  - location: 24 (remaining gas: 1039979.632 units remaining)
     [ (Pair { "Hello" ; "World" } None)  	@storage ]
-  - location: 25 (remaining gas: 1039979.102 units remaining)
+  - location: 25 (remaining gas: 1039979.582 units remaining)
     [ { "Hello" ; "World" }  	 ]
-  - location: -1 (remaining gas: 1039979.057 units remaining)
-    [ { "Hello" ; "World" }  	 ]
-  - location: 22 (remaining gas: 1039979.012 units remaining)
-    [ { "Hello" ; "World" }  	 ]
-  - location: 21 (remaining gas: 1039979.012 units remaining)
+  - location: 21 (remaining gas: 1039979.582 units remaining)
     [ (Some False)  	
       { "Hello" ; "World" }  	 ]
-  - location: 26 (remaining gas: 1039978.942 units remaining)
+  - location: 26 (remaining gas: 1039979.542 units remaining)
     [ { "Hello" ; "World" }  	
       (Some False)  	 ]
-  - location: 27 (remaining gas: 1039978.867 units remaining)
+  - location: 27 (remaining gas: 1039979.497 units remaining)
     [ (Pair { "Hello" ; "World" } (Some False))  	 ]
-  - location: 28 (remaining gas: 1039978.792 units remaining)
+  - location: 28 (remaining gas: 1039979.452 units remaining)
     [ {}  	
       (Pair { "Hello" ; "World" } (Some False))  	 ]
-  - location: 30 (remaining gas: 1039978.717 units remaining)
-    [ (Pair {} { "Hello" ; "World" } (Some False))  	 ]
-  - location: -1 (remaining gas: 1039978.672 units remaining)
+  - location: 30 (remaining gas: 1039979.407 units remaining)
     [ (Pair {} { "Hello" ; "World" } (Some False))  	 ]
 
