@@ -226,11 +226,6 @@ type ('arg, 'storage) script = {
 
    References
    ==========
-
-   [1]: http://www.complang.tuwien.ac.at/projects/interpreters.html
-
-   References
-   ==========
    [1]: http://www.complang.tuwien.ac.at/projects/interpreters.html
 
 *)
