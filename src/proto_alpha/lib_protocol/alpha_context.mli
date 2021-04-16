@@ -529,14 +529,6 @@ module Constants : sig
 
   val preserved_cycles : context -> int
 
-  val blocks_per_cycle : context -> int32
-
-  val blocks_per_commitment : context -> int32
-
-  val blocks_per_roll_snapshot : context -> int32
-
-  val blocks_per_voting_period : context -> int32
-
   val time_between_blocks : context -> Period.t list
 
   val minimal_block_delay : context -> Period.t
