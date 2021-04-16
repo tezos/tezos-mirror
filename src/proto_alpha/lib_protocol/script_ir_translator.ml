@@ -2604,7 +2604,7 @@ type _ dipn_proof_argument =
 
 type _ dropn_proof_argument =
   | Dropn_proof_argument :
-      ( ('rest, 'rest, 'bef, 'aft) stack_prefix_preservation_witness
+      ( ('rest, 'rest, 'bef, 'bef) stack_prefix_preservation_witness
       * 'rest stack_ty
       * 'aft stack_ty )
       -> 'bef dropn_proof_argument
@@ -7004,7 +7004,7 @@ let big_map_get_and_update ctxt key value map =
   big_map_update_by_hash ctxt key_hash key value map
   >>=? fun (map', ctxt) ->
   big_map_get_by_hash ctxt key_hash map
-  >>=? fun (old_value, ctxt) -> return (old_value, map', ctxt)
+  >>=? fun (old_value, ctxt) -> return ((old_value, map'), ctxt)
 
 (* ---------------- Lazy storage---------------------------------------------*)
 

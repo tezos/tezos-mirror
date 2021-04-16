@@ -150,7 +150,7 @@ val big_map_get_and_update :
   'key ->
   'value option ->
   ('key, 'value) Script_typed_ir.big_map ->
-  ('value option * ('key, 'value) Script_typed_ir.big_map * context) tzresult
+  (('value option * ('key, 'value) Script_typed_ir.big_map) * context) tzresult
   Lwt.t
 
 val ty_eq :

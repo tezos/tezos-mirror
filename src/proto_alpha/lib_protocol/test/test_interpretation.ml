@@ -56,23 +56,8 @@ let run_script ctx ?(step_constants = default_step_constants) contract
     ~internal:false
   >>=?? fun res -> return res
 
-module Logger : STEP_LOGGER = struct
-  let log_interp _ctxt _descr _stack = ()
-
-  let log_entry _ctxt _descr _stack = ()
-
-  let log_exit _ctxt _descr _stack = ()
-
-  let get_log () = Lwt.return (Ok None)
-end
-
 let run_step ctxt code param =
-  Script_interpreter.step
-    (module Logger)
-    ctxt
-    default_step_constants
-    code
-    param
+  Script_interpreter.step None ctxt default_step_constants code param
 
 (** Runs a script with an ill-typed parameter and verifies that a
     Bad_contract_parameter error is returned. *)
@@ -103,7 +88,7 @@ let read_file filename =
   let s = really_input_string ch (in_channel_length ch) in
   close_in ch ; s
 
-(* Check that too many recursive calls of the Michelson interpreter result in an error *)
+(* Confront the Michelson interpreter to deep recursions. *)
 let test_stack_overflow () =
   test_context ()
   >>=? fun ctxt ->
@@ -116,7 +101,7 @@ let test_stack_overflow () =
     in
     aux n (descr Nop)
   in
-  run_step ctxt (enorme_et_seq 10_001) ()
+  run_step ctxt (enorme_et_seq 100_000) ()
   >>= function
   | Ok _ ->
       Alcotest.fail "expected an error"

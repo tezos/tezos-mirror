@@ -441,7 +441,7 @@ and ('bef, 'aft) instr =
       * ('fbef, 'faft) descr
       -> ('bef, 'aft) instr
   | Dropn :
-      int * ('rest, 'rest, 'bef, _) stack_prefix_preservation_witness
+      int * ('rest, 'rest, 'bef, 'bef) stack_prefix_preservation_witness
       -> ('bef, 'rest) instr
   | ChainId : ('rest, Chain_id.t * 'rest) instr
   | Never : (never * 'rest, 'aft) instr
@@ -537,19 +537,33 @@ and ('value, 'before, 'after) comb_set_gadt_witness =
       ('value, 'before, 'after) comb_set_gadt_witness
       -> ('value, 'a * 'before, 'a * 'after) comb_set_gadt_witness
 
-and ('before, 'after) dup_n_gadt_witness =
+(*
+
+   [dup_n_gadt_witness ('s, 't)] ensures that the n-th element of ['s]
+   is of type ['t].
+
+   This relational predicate is defined by induction on [n].
+
+*)
+and (_, _) dup_n_gadt_witness =
   | Dup_n_zero : ('a * 'rest, 'a) dup_n_gadt_witness
   | Dup_n_succ :
-      ('before, 'b) dup_n_gadt_witness
-      -> ('a * 'before, 'b) dup_n_gadt_witness
+      ('stack, 'b) dup_n_gadt_witness
+      -> ('a * 'stack, 'b) dup_n_gadt_witness
 
-(* Type witness for operations that work deep in the stack ignoring
+(*
+
+   Type witness for operations that work deep in the stack ignoring
    (and preserving) a prefix.
 
    The two right parameters are the shape of the stack with the (same)
-   prefix before and after the transformation. The two left
-   parameters are the shape of the stack without the prefix before and
-   after. The inductive definition makes it so by construction. *)
+   prefix before and after the transformation. The two left parameters
+   are the shape of the stack without the prefix before and after.
+
+   This relational predicate is defined by induction on the common
+   prefix of the two topmost stacks.
+
+*)
 and ('bef, 'aft, 'bef_suffix, 'aft_suffix) stack_prefix_preservation_witness =
   | Prefix :
       ('fbef, 'faft, 'bef, 'aft) stack_prefix_preservation_witness
@@ -562,3 +576,72 @@ and ('bef, 'aft) descr = {
   aft : 'aft stack_ty;
   instr : ('bef, 'aft) instr;
 }
+
+let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty =
+ fun s ->
+  match s with
+  | Unit_key _ ->
+      Unit_t None
+  | Never_key _ ->
+      Never_t None
+  | Int_key _ ->
+      Int_t None
+  | Nat_key _ ->
+      Nat_t None
+  | Signature_key _ ->
+      Signature_t None
+  | String_key _ ->
+      String_t None
+  | Bytes_key _ ->
+      Bytes_t None
+  | Mutez_key _ ->
+      Mutez_t None
+  | Bool_key _ ->
+      Bool_t None
+  | Key_hash_key _ ->
+      Key_hash_t None
+  | Key_key _ ->
+      Key_t None
+  | Timestamp_key _ ->
+      Timestamp_t None
+  | Chain_id_key _ ->
+      Chain_id_t None
+  | Address_key _ ->
+      Address_t None
+  | Pair_key ((a, _), (b, _), _) ->
+      Pair_t
+        ( (ty_of_comparable_ty a, None, None),
+          (ty_of_comparable_ty b, None, None),
+          None )
+  | Union_key ((a, _), (b, _), _) ->
+      Union_t
+        ((ty_of_comparable_ty a, None), (ty_of_comparable_ty b, None), None)
+  | Option_key (t, _) ->
+      Option_t (ty_of_comparable_ty t, None)
+
+let unlist_ty : type a. a boxed_list ty -> a ty = function
+  | List_t (a, _) ->
+      a
+  | _ ->
+      (* FIXME: This is not robust to evolutions. *)
+      (* because of the concrete implementations of the type
+        constructors occurring in the definition of [ty]: *)
+      assert false
+
+let unset_ty : type a. a set ty -> a ty = function
+  | Set_t (a, _) ->
+      ty_of_comparable_ty a
+  | _ ->
+      (* FIXME: This is not robust to evolutions. *)
+      (* because of the concrete implementations of the type
+        constructors occurring in the definition of [ty]: *)
+      assert false
+
+let unmap_ty : type k v. (k, v) map ty -> k ty * v ty = function
+  | Map_t (k, v, _) ->
+      (ty_of_comparable_ty k, v)
+  | _ ->
+      (* FIXME: This is not robust to evolutions. *)
+      (* because of the concrete implementations of the type
+        constructors occurring in the definition of [ty]: *)
+      assert false
