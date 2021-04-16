@@ -277,7 +277,8 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let ss = accu in
       Interp_costs.concat_string_precheck ss
   | ISlice_string _ ->
-      let (_, (s, _)) = stack in
+      let _offset = accu in
+      let (_length, (s, _)) = stack in
       Interp_costs.slice_string s
   | IConcat_bytes_pair _ ->
       let x = accu and (y, _) = stack in
