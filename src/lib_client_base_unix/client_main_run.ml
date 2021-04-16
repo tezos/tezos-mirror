@@ -129,6 +129,34 @@ let setup_remote_signer (module C : M) client_config
     | None ->
         () )
 
+(** Warn the user if there are duplicate URIs in the sources (may or may
+    not be a misconfiguration). *)
+let warn_if_duplicates_light_sources (printer : unix_logger) uris =
+  let module UriMap = Map.Make (Uri) in
+  let uri_duplicates =
+    List.fold_left
+      (fun map uri ->
+        UriMap.update
+          uri
+          (fun nb -> Option.fold ~none:1 ~some:succ nb |> Option.some)
+          map)
+      UriMap.empty
+      uris
+    |> UriMap.filter (fun _uri nb -> nb > 1)
+  in
+  if not (UriMap.is_empty uri_duplicates) then
+    printer#warning
+      "The following URIs are duplicated in the light mode --sources argument \
+       (this will increase their weight in the consensus check). If this is \
+       not intentional, please fix your configuration: [%a]"
+      Format.(
+        pp_print_list
+          ~pp_sep:(fun ppf () -> pp_print_string ppf "; ")
+          (fun ppf (uri, nb) ->
+            fprintf ppf "%a (%i occurrences)" Uri.pp uri nb))
+      (UriMap.bindings uri_duplicates)
+  else Lwt.return_unit
+
 let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
   (* Make sure that base_dir is not a mockup. *)
   Tezos_mockup.Persistence.M.classify_base_dir base_dir
@@ -200,6 +228,8 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
                 (Format.pp_print_option Uri.pp)
                 (List.hd sources_config.uris) )
             >>=? fun () ->
+            warn_if_duplicates_light_sources printer sources_config.uris
+            >>= fun () ->
             let rpc_builder endpoint =
               ( new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
                   {rpc_config with endpoint}
