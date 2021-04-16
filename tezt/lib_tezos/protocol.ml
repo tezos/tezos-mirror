@@ -25,11 +25,11 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Edo | Alpha
+type t = Edo | Florence | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
-let name = function Alpha -> "Alpha" | Edo -> "Edo"
+let name = function Alpha -> "Alpha" | Edo -> "Edo" | Florence -> "Florence"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -39,6 +39,8 @@ let hash = function
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Edo ->
       "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
+  | Florence ->
+      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i"
 
 let default_constants = Constants_sandbox
 
@@ -53,7 +55,13 @@ let parameter_file ?(constants = default_constants) protocol =
         "test"
   in
   let directory =
-    match protocol with Alpha -> "proto_alpha" | Edo -> "proto_008_PtEdo2Zk"
+    match protocol with
+    | Alpha ->
+        "proto_alpha"
+    | Edo ->
+        "proto_008_PtEdo2Zk"
+    | Florence ->
+        "proto_009_PsFLoren"
   in
   sf "src/%s/parameters/%s-parameters.json" directory name
 
@@ -62,8 +70,16 @@ let accuser = function
       "./tezos-accuser-alpha"
   | Edo ->
       "./tezos-accuser-008-PtEdo2Zk"
+  | Florence ->
+      "./tezos-accuser-009-PsFLoren"
 
-let daemon_name = function Alpha -> "alpha" | Edo -> "008-PtEdo2Zk"
+let daemon_name = function
+  | Alpha ->
+      "alpha"
+  | Edo ->
+      "008-PtEdo2Zk"
+  | Florence ->
+      "009-PsFLoren"
 
 let encoding_prefix = daemon_name
 
@@ -92,11 +108,23 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
   in
   Lwt.return overriden_parameters
 
-let next_protocol = function Edo -> Some Alpha | Alpha -> None
+let next_protocol = function
+  | Edo ->
+      Some Florence
+  | Florence ->
+      Some Alpha
+  | Alpha ->
+      None
 
-let previous_protocol = function Alpha -> Some Edo | Edo -> None
+let previous_protocol = function
+  | Alpha ->
+      Some Florence
+  | Florence ->
+      Some Edo
+  | Edo ->
+      None
 
-let all = [Alpha; Edo]
+let all = [Alpha; Edo; Florence]
 
 let current_mainnet = Edo
 
