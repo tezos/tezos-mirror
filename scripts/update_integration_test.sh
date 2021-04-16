@@ -18,10 +18,10 @@ for PROTO_DIR in $(find tests_python/ -maxdepth 1 -mindepth 1 -iname 'tests_*' |
 
     # Add fast python integration tests grouped in one job
     cat >> "$tmp" <<EOF
-integration:${PROTO_DIR_BASE}_fast:
+integration:${PROTO_DIR_BASE}_batch:
   extends: .integration_python_template
   script:
-    - poetry run pytest "${PROTO_DIR##tests_python/}" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/${PROTO_DIR_BASE}_fast.xml" 2>&1 | tee "tmp/${PROTO_DIR_BASE}_fast.out" | tail
+    - poetry run pytest "${PROTO_DIR##tests_python/}" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/${PROTO_DIR_BASE}_batch.xml" 2>&1 | tee "tmp/${PROTO_DIR_BASE}_batch.out" | tail
   stage: test
 
 EOF
