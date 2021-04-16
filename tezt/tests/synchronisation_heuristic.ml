@@ -47,14 +47,14 @@ let wait_for_sync node =
    synchronize themselves. Then we restart all the nodes and check
    they are all in the state mode `sync`. *)
 
-let check_node_synchronization_state protocol =
+let check_node_synchronization_state =
   let n = 4 in
   let blocks_to_bake = 5 in
-  Test.register
+  Protocol.register_test
     ~__FILE__
-    ~title:(sf "%s: check synchronization state" (Protocol.name protocol))
-    ~tags:[Protocol.tag protocol; "bootstrap"; "node"; "sync"]
-  @@ fun () ->
+    ~title:"check synchronization state"
+    ~tags:["bootstrap"; "node"; "sync"]
+  @@ fun protocol ->
   let* main_node = Node.init ~name:"main_node" [] in
   let* nodes =
     Lwt_list.map_p
@@ -129,12 +129,12 @@ let check_is_prevalidator_closed node =
    - node 3 has a synchronisation heuristic that is too high to successfully
      bootstrap in this test scenario: its validator is expected to not have
      started. *)
-let check_prevalidator_start protocol =
-  Test.register
+let check_prevalidator_start =
+  Protocol.register_test
     ~__FILE__
     ~title:"Check prevalidator start"
     ~tags:["bootstrap"; "node"; "prevalidator"]
-  @@ fun () ->
+  @@ fun protocol ->
   let init_node threshold = Node.init [Synchronisation_threshold threshold] in
   let* node1 = init_node 0 in
   let* node2 = init_node 1 in
@@ -170,6 +170,6 @@ let check_prevalidator_start protocol =
   let* () = check_is_prevalidator_closed node3 in
   unit
 
-let register protocol =
-  check_node_synchronization_state protocol ;
-  check_prevalidator_start protocol
+let register ~protocols =
+  check_node_synchronization_state ~protocols ;
+  check_prevalidator_start ~protocols

@@ -49,13 +49,14 @@ let hooks = Regression.scrubbing_hooks
     Call `tezos-client hash data ... of type ...` with data on which
     it must return 0. In addition, regression is activated.
     to check that returned values remain constant over time. *)
-let test_good_hash_data ~protocol =
-  Regression.register
+let test_good_hash_data ~protocols =
+  Protocol.register_regression_test
     ~__FILE__
     ~title:"hash data ... of type ... (good)"
     ~tags:["hash"; "data"; "mockup"]
     ~output_file:("hash_data" // "good")
-  @@ fun () ->
+    ~protocols
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =
     let min_int64 = Int64.to_string Int64.min_int in
@@ -144,13 +145,14 @@ let test_good_hash_data ~protocol =
 (** Test.
     Call `tezos-client hash data ... of type ...` with data on which it
     must fail (non-zero exit code). *)
-let test_bad_hash_data ~protocol =
-  Regression.register
+let test_bad_hash_data ~protocols =
+  Protocol.register_regression_test
     ~__FILE__
     ~title:"hash data ... of type ... (bad)"
     ~tags:["hash"; "data"; "mockup"]
     ~output_file:("hash_data" // "bad")
-  @@ fun () ->
+    ~protocols
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =
     [ ("True", "int");
@@ -173,12 +175,12 @@ let test_bad_hash_data ~protocol =
 
     We therefore do not do regression on this test, because
     the manpage changes slowly over time. *)
-let test_ugly_hash_data ~protocol =
-  Test.register
+let test_ugly_hash_data =
+  Protocol.register_test
     ~__FILE__
     ~title:"hash data ... of type ... (ugly)"
     ~tags:["hash"; "data"; "mockup"]
-  @@ fun () ->
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =
     [("[]", "list(int"); ("{}", "list('a)"); ("\"ABC\n123\"", "string")]
@@ -189,7 +191,7 @@ let test_ugly_hash_data ~protocol =
   in
   Lwt_list.iter_s hash_data data_n_type
 
-let register protocol =
-  test_good_hash_data ~protocol ;
-  test_bad_hash_data ~protocol ;
-  test_ugly_hash_data ~protocol
+let register ~protocols =
+  test_good_hash_data ~protocols ;
+  test_bad_hash_data ~protocols ;
+  test_ugly_hash_data ~protocols

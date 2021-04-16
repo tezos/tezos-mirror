@@ -62,14 +62,14 @@ let client_mode_tag_to_mode client_mode_tag node : Client.mode =
 
 (* A helper to register a RPC test environment with a node and a client for the
    given protocol version. *)
-let check_rpc ~group_name ~protocol ~client_mode_tag
+let check_rpc ~group_name ~protocols ~client_mode_tag
     ~(rpcs :
        (string * (Client.t -> unit Lwt.t) * Protocol.parameter_overrides option)
        list) () =
   let client_mode_suffix = client_mode_tag_to_suffix client_mode_tag in
   List.iter
     (fun (sub_group, rpc, parameter_overrides) ->
-      Regression.register
+      Protocol.register_regression_test
         ~__FILE__
         ~title:
           (sf
@@ -80,7 +80,8 @@ let check_rpc ~group_name ~protocol ~client_mode_tag
         ~tags:["rpc"; group_name; sub_group]
         ~output_file:
           ("rpc" // sf "%s.%s.%s" group_name client_mode_suffix sub_group)
-      @@ fun () ->
+        ~protocols
+      @@ fun protocol ->
       (* Initialize a node with alpha protocol and data to be used for RPC calls.
          The log of the node is not captured in the regression output. *)
       let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
@@ -480,7 +481,7 @@ let register () =
   let register_alpha client_mode_tag =
     check_rpc
       ~group_name:"alpha"
-      ~protocol:Protocol.Alpha
+      ~protocols:[Protocol.Alpha]
       ~client_mode_tag
       ~rpcs:
         [ ("contracts", test_contracts, None);
@@ -497,7 +498,7 @@ let register () =
   let register_current_mainnet client_mode_tag =
     check_rpc
       ~group_name:"current"
-      ~protocol:Protocol.current_mainnet
+      ~protocols:[Protocol.current_mainnet]
       ~client_mode_tag
       ~rpcs:
         [ ("contracts", test_contracts, None);

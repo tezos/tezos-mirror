@@ -44,7 +44,6 @@ emitted by the node. This allows fine-grained tests. In particular, as
 much as possible, a test in `tezt` should avoid the use of `timeouts`
 and instead, should rely on `events` if possible.
 
-
 ## API Documentation
 
 The `tezt` and `tezt-tezos` APIs are documented in the
