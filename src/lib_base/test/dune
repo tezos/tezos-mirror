@@ -7,7 +7,6 @@
    tezos-base
    tezos-base.unix
    data-encoding
-   crowbar
    qcheck-alcotest
    lib-test
  )
