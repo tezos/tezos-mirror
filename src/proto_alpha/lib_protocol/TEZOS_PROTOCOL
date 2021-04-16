@@ -72,7 +72,6 @@
         "Alpha_context",
 
         "Script_typed_ir",
-        "Script_typed_cps_ir",
         "Script_tc_errors",
         "Michelson_v1_gas",
         "Script_ir_annot",
