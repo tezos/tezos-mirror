@@ -153,4 +153,34 @@ let test_level_from_raw () =
         test_cases)
     [test_case_1; test_case_2; test_case_3]
 
-let tests = [Test_services.tztest "level_from_raw" `Quick test_level_from_raw]
+let test_first_level_in_cycle () =
+  let cycle_eras = fst test_case_3 in
+  let test_cases =
+    (* cycle, level *)
+    [ (0l, 1);
+      (1l, 9);
+      (2l, 17);
+      (3l, 33);
+      (4l, 49);
+      (5l, 55);
+      (6l, 61);
+      (7l, 67) ]
+  in
+  let f (input_cycle, level) =
+    let input_cycle = Cycle_repr.of_int32_exn input_cycle in
+    let level_res =
+      Level_storage.first_level_in_cycle_with_era cycle_eras input_cycle
+    in
+    Assert.equal_int
+      ~loc:__LOC__
+      (Int32.to_int (Raw_level_repr.to_int32 level_res.level))
+      level
+  in
+  List.iter_es f test_cases
+
+let tests =
+  [ Test_services.tztest "level_from_raw" `Quick test_level_from_raw;
+    Test_services.tztest
+      "first_level_in_cycle"
+      `Quick
+      test_first_level_in_cycle ]
