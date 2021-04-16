@@ -1,3 +1,7 @@
+# Version 9.0
+
+- Fixed a bug where the mempool could crash with an assertion failure.
+
 # Version 9.0~rc2
 
 ## Node
@@ -73,6 +77,44 @@
   Additionally, the implementation allows for more concurrency internally: it
   allows RPC requests to be treated even if a request is currently being
   treated. This leads to some improved response times on some RPC requests.
+
+- Added a way to optionally specify an expected peer identity for all
+  command line options accepting a point as argument (such as
+  `--peer`). This identity can be given using the usual b58
+  format. The RPC `patch /network/points/<point> {"peer_id": <peer_id>}` set
+  the expected identity and `get /network/points/<point>` tells whether an
+  expected `peer_id` has been set.
+
+- Added a checking of the well-formedness of addresses in the config files when
+  the node starts. If this check fails, the node stops with an explanation.
+
+- Fixed the targeted number of connections which did not respect the
+  constraints expressed with --connections settings.
+
+- RPC: the semantics of ban and unban has changed:
+  + instead of just affecting the banned/unbanned point, they affect all associated
+    cryptographic identities;
+  + additionally, ban now removes the cryptographic identity / point from the whitelist,
+    which was not previously the case.
+
+- RPC: the following RPCs are now deprecated:
+  + GET: `/network/peers/<peer_id>/ban`
+  + GET: `/network/peers/<peer_id>/unban`
+  + GET: `/network/peers/<peer_id>/trust`
+  + GET: `/network/peers/<peer_id>/untrust`
+  + GET: `/network/points/<point>/ban`
+  + GET: `/network/points/<point>/unban`
+  + GET: `/network/points/<point>/trust`
+  + GET: `/network/points/<point>/untrust`
+- RPC: the following RPCs are added and replace those above:
+  + PATCH: `/network/peers/<peer_id>` payload `{ acl: [ban,trust,open] }`
+  + PATCH: `/network/point/<point>` payload `{ acl: [ban,trust,open], peer_id: <peer_id> }`
+  where
+    - `{acl : ban}`: blacklist the given address/peer and remove it from
+      the whitelist if present
+    - `{acl: trust}`: trust a given address/peer permanently and remove it
+      from the blacklist if present.
+    - `{acl: open}`: removes an address/peer from the blacklist and whitelist.
 
 ## Client
 
@@ -259,44 +301,6 @@
 
 - Added RPC `DELETE /network/greylist` to clear the greylist tables.
   RPC `GET /network/greylist/clear` is now deprecated.
-
-- Added a way to optionally specify an expected peer identity for all
-  command line options accepting a point as argument (such as
-  `--peer`). This identity can be given using the usual b58
-  format. The RPC `patch /network/points/<point> {"peer_id": <peer_id>}` set
-  the expected identity and `get /network/points/<point>` tells whether an
-  expected `peer_id` has been set.
-
-- Added a checking of the well-formedness of addresses in the config files when
-  the node starts. If this check fails, the node stops with an explanation.
-
-- Fixed the targeted number of connections which did not respect the
-  constraints expressed with --connections settings.
-
-- RPC: the semantics of ban and unban has changed:
-  + instead of just affecting the banned/unbanned point, they affect all associated
-    cryptographic identities;
-  + additionally, ban now removes the cryptographic identity / point from the whitelist,
-    which was not previously the case.
-
-- RPC: the following RPCs are now deprecated:
-  + GET: `/network/peers/<peer_id>/ban`
-  + GET: `/network/peers/<peer_id>/unban`
-  + GET: `/network/peers/<peer_id>/trust`
-  + GET: `/network/peers/<peer_id>/untrust`
-  + GET: `/network/points/<point>/ban`
-  + GET: `/network/points/<point>/unban`
-  + GET: `/network/points/<point>/trust`
-  + GET: `/network/points/<point>/untrust`
-- RPC: the following RPCs are added and replace those above:
-  + PATCH: `/network/peers/<peer_id>` payload `{ acl: [ban,trust,open] }`
-  + PATCH: `/network/point/<point>` payload `{ acl: [ban,trust,open], peer_id: <peer_id> }`
-  where
-    - `{acl : ban}`: blacklist the given address/peer and remove it from
-      the whitelist if present
-    - `{acl: trust}`: trust a given address/peer permanently and remove it
-      from the blacklist if present.
-    - `{acl: open}`: removes an address/peer from the blacklist and whitelist.
 
 ## Client
 
