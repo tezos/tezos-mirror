@@ -555,8 +555,8 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       Interp_costs.chain_id
   | ICreate_contract _ ->
       Interp_costs.create_contract
-  | INever _ ->
-      Gas.free
+  | INever _ -> (
+    match accu with _ -> . )
   | IVoting_power _ ->
       Interp_costs.voting_power
   | ITotal_voting_power _ ->
