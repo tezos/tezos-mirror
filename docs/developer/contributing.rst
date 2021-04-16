@@ -67,19 +67,22 @@ There are many ways to use Git, here is ours.
 
 We mostly use merge requests (aka MRs) for contributing to the master branch,
 meaning that nobody should be pushing into the master branch directly. Once a
-merge request is ready, it is reviewed and approved, then merged using the ``--
-fast-forward`` option of Git in order to
-maintain a linear history without merge commits.
+merge request is ready, it is reviewed and approved, then merged with a merge commit.
 
-For that to work, merge requests must be direct suffixes
-of the master branch. So whenever ``origin/master`` changes, you have to
-rebase your branch on it, so that your patches always sit on top of
-master. When that happens, you may have to edit your patches during the
-rebase, and then use ``push -f`` in your branch to rewrite the history.
+We maintain a `semi-linear history <https://docs.gitlab.com/ee/user/project/merge_requests/reviewing_and_managing_merge_requests.html#semi-linear-history-merge-requests>`_,
+which means that merge requests are only
+merged if they are direct suffixes of the master branch.
+This means that merge requests are rebased on top of ``master`` before they are merged.
+This can only be done automatically if there is no conflict though.
+So whenever ``origin/master`` changes, you should make sure that your branch
+can still be rebased on it. In case of conflict, you need to rebase manually
+(pull ``master``, checkout your branch and run ``git rebase master``).
+You may have to edit your patches during the rebase.
+Then use ``push -f`` in your branch to rewrite the history.
 Being proficient with interactive rebases is mandatory to avoid
 mistakes and wasting time.
 
-This Git strategy is an instance of the `git rebase workflow <https://www.atlassian.com/git/articles/git-team-workflows-merge-or-rebase>`_.
+This Git strategy is a variant of the `git rebase workflow <https://www.atlassian.com/git/articles/git-team-workflows-merge-or-rebase>`_.
 
 .. _mr_workflow:
 
@@ -283,6 +286,42 @@ any subitems represent the longer description of that commit)::
 **Beware**: For MRs touching
 ``src/proto_alpha/lib_protocol``, see :ref:`protocol MRs <protocol_mr>`.
 
+Merge Request "Assignees" Field
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Merge requests targeted at ``tezos/tezos master`` should in general
+have exactly one assignee. The assignee is someone from which an
+action is required to get the merge request moving. Example actions include:
+
+- review;
+- respond to a comment thread;
+- update the code;
+- rebase (in particular in case of conflicts);
+- merge;
+- find someone else who can get the merge request moving.
+
+The assignee will thus often be one of the reviewers (if he needs to review
+or respond to a comment) or one of the merge request authors (if they need
+to update the code or respond to a comment).
+
+If a merge request has no assignee, it is implicitly the role of the
+:ref:`merge dispatcher <merge_dispatcher>` to assign it to someone.
+
+Even though merge requests could require action from several people
+to be merged, we avoid assigning more than one to avoid diluting responsibility.
+
+Merge Request "Reviewers" Field
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The reviewer field of GitLab can be used to suggest reviewers.
+Fill it when creating your merge requests so that the
+:ref:`merge dispatcher <merge_dispatcher>`
+knows who to contact if more reviews are needed.
+Anybody can suggest additional reviewers.
+In particular it is one of the role of the merge dispatcher to suggest reviewers.
+If you don't know who would be a good candidate to review your merge
+request, you can leave the field blank; but it may slow down the reviewing process.
+
 .. _adding_new_dependencies:
 
 Special case: MRs that introduce a new dependency
@@ -342,6 +381,25 @@ At Tezos all the code is peer reviewed before getting committed in the
 master branch by the :ref:`merge team <merge_team>`.
 Briefly, a code review is a discussion between two or
 more developers about changes to the code to address an issue.
+
+Merge Request Approvals
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Two approvals from different merge team members are required for merge
+requests to be merged. After their review, the second approver will also
+typically merge unless there is another merge in progress.
+
+Both approvals must correspond to different thorough reviews
+but merge team members may trust the reviews of other developers and
+approve without reviewing thoroughly, especially for less critical
+parts of the code. Good comments from reviewers help the merge team to decide
+to approve a merge request without doing a full review.
+
+For this reason, if you make a partial review, for instance if you only
+reviewed part of the code, or only the general design, it is good practice
+to say so in a comment, so that other reviewers know what is left to review.
+If you manually tested the merge request or ran some benchmarks,
+you can add a comment with the results.
 
 Author Perspective
 ~~~~~~~~~~~~~~~~~~
