@@ -74,6 +74,13 @@ be documented here either.
 
 - Reduced the maximum allowed timestamp drift to 5 seconds.
 
+- The file descriptor sink, which can be used to output node events
+  to a file using JSON format, now outputs events with an additional
+  field `"hostname"`. This field can be used to identify the node
+  when aggregating events from multiple nodes. Its default value
+  is the hostname of the device the node is running on, and it can
+  be customized with environment variable `TEZOS_NODE_HOSTNAME`.
+
 ## Client
 
 - Changed to 5 the recommended number of blocks after which an operation can be
