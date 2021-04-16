@@ -850,7 +850,7 @@ let rec next :
     | None ->
         Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
     | Some gas ->
-        next g gas ks accu stack' )
+        (next [@ocaml.tailcall]) g gas ks accu stack' )
   | KLoop_in_left (ki, ks') -> (
     match consume_control gas ks0 with
     | None ->
@@ -866,7 +866,7 @@ let rec next :
     | None ->
         Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
     | Some gas ->
-        next g gas ks x (accu, stack) )
+        (next [@ocaml.tailcall]) g gas ks x (accu, stack) )
   | KIter (body, xs, ks) -> (
     match consume_control gas ks0 with
     | None ->
@@ -874,7 +874,7 @@ let rec next :
     | Some gas -> (
       match xs with
       | [] ->
-          next g gas ks accu stack
+          (next [@ocaml.tailcall]) g gas ks accu stack
       | x :: xs ->
           let ks = KIter (body, xs, ks) in
           (step [@ocaml.tailcall]) g gas body ks x (accu, stack) ) )
@@ -886,7 +886,7 @@ let rec next :
       match xs with
       | [] ->
           let ys = {elements = List.rev ys; length = len} in
-          next g gas ks ys (accu, stack)
+          (next [@ocaml.tailcall]) g gas ks ys (accu, stack)
       | x :: xs ->
           let ks = KList_exit_body (body, xs, ys, len, ks) in
           (step [@ocaml.tailcall]) g gas body ks x (accu, stack) ) )
@@ -897,7 +897,7 @@ let rec next :
     | Some gas ->
         let ks = KList_enter_body (body, xs, accu :: ys, len, ks) in
         let (accu, stack) = stack in
-        next g gas ks accu stack )
+        (next [@ocaml.tailcall]) g gas ks accu stack )
   | KMap_enter_body (body, xs, ys, ks) -> (
     match consume_control gas ks0 with
     | None ->
@@ -905,7 +905,7 @@ let rec next :
     | Some gas -> (
       match xs with
       | [] ->
-          next g gas ks ys (accu, stack)
+          (next [@ocaml.tailcall]) g gas ks ys (accu, stack)
       | (xk, xv) :: xs ->
           let ks = KMap_exit_body (body, xs, ys, xk, ks) in
           let res = (xk, xv) in
@@ -919,7 +919,7 @@ let rec next :
         let ys = map_update yk (Some accu) ys in
         let ks = KMap_enter_body (body, xs, ys, ks) in
         let (accu, stack) = stack in
-        next g gas ks accu stack )
+        (next [@ocaml.tailcall]) g gas ks accu stack )
 
 and step :
     type a s b t r f.
@@ -945,7 +945,7 @@ and step :
         let k = log_next_kinstr logger k in
         (step [@ocaml.tailcall]) g gas k ks accu stack
     | IHalt _ ->
-        next g gas ks accu stack
+        (next [@ocaml.tailcall]) g gas ks accu stack
     (* stack ops *)
     | IDrop (_, k) ->
         let (accu, stack) = stack in
