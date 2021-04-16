@@ -122,7 +122,7 @@ type ('key, 'value) big_map_overlay = {
 
 and 'elt boxed_list = {elements : 'elt list; length : int}
 
-and ('arg, 'storage) script = {
+type ('arg, 'storage) script = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage : 'storage;
