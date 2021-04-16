@@ -47,7 +47,9 @@ type operation = packed_internal_operation * Lazy_storage.diffs option
 
 type 'a ticket = {ticketer : address; contents : 'a; amount : n num}
 
-type end_of_stack = unit * unit
+type empty_cell = EmptyCell
+
+type end_of_stack = empty_cell * empty_cell
 
 type _ comparable_ty =
   | Unit_key : type_annot option -> unit comparable_ty
@@ -1117,7 +1119,7 @@ and ('top_ty, 'resty) stack_ty =
   | Item_t :
       'ty ty * ('ty2, 'rest) stack_ty * var_annot option
       -> ('ty, 'ty2 * 'rest) stack_ty
-  | Bot_t : (unit, unit) stack_ty
+  | Bot_t : (empty_cell, empty_cell) stack_ty
 
 and ('key, 'value) big_map = {
   id : Big_map.Id.t option;

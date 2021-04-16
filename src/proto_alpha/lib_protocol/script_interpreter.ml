@@ -1433,7 +1433,7 @@ and step :
               log_kinstr logger code.kinstr
         in
         let ks = KReturn (stack, KCons (k, ks)) in
-        (step [@ocaml.tailcall]) g gas code ks arg ((), ())
+        (step [@ocaml.tailcall]) g gas code ks arg (EmptyCell, EmptyCell)
     | IApply (_, capture_ty, k) ->
         let capture = accu in
         let (lam, stack) = stack in
@@ -2264,7 +2264,7 @@ let step_descr ~log_now logger g descr accu stack =
   run_descr logger g descr accu stack
 
 let interp logger g (Lam (code, _)) arg =
-  step_descr ~log_now:true logger g code arg ((), ())
+  step_descr ~log_now:true logger g code arg (EmptyCell, EmptyCell)
   >|=? fun (ret, _, ctxt) -> (ret, ctxt)
 
 let kstep logger ctxt step_constants kinstr accu stack =

@@ -104,7 +104,7 @@ let test_stack_overflow () =
     in
     aux n (IHalt kinfo)
   in
-  run_step ctxt (descr (enorme_et_seq 100_000)) () ()
+  run_step ctxt (descr (enorme_et_seq 100_000)) EmptyCell EmptyCell
   >>= function
   | Ok _ ->
       Alcotest.fail "expected an error"
