@@ -93,8 +93,9 @@ let register_proxy_context m =
 
 let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
     (rpc_context : #RPC_context.simple) (mode : [< `Mode_light | `Mode_proxy])
-    (protocol_hash_opt : Protocol_hash.t option) (chain : Block_services.chain)
-    (block : Block_services.block) : proxy_environment tzresult Lwt.t =
+    ?(chain = `Main) ?(block = `Head 0)
+    (protocol_hash_opt : Protocol_hash.t option) :
+    proxy_environment tzresult Lwt.t =
   let mode_str =
     match mode with `Mode_light -> "light mode" | `Mode_proxy -> "proxy"
   in

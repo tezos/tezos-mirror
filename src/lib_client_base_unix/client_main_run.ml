@@ -240,9 +240,9 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
         printer
         rpc_context
         mode
+        ~chain
+        ~block
         protocol
-        chain
-        block
       >>=? fun proxy_env ->
       get_mode () >>=? fun mode ->
       return
