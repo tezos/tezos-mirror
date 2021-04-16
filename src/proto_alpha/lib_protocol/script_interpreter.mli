@@ -104,7 +104,7 @@ val kstep :
 (** Internal interpretation loop
     ============================
 
-    The following types and the following function are exposed
+    The following types and the following functions are exposed
     in the interface to allow the inference of a gas model in
     snoop.
 

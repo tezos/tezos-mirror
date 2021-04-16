@@ -27,66 +27,63 @@
 (*
 
   This module implements an interpreter for Michelson. It takes the
-  form of a [step] function that interprets script instructions in a
-  dedicated abstract machine.
+   form of a [step] function that interprets script instructions in a
+   dedicated abstract machine.
 
   The interpreter is written in a small-step style: an execution
-  [step] only interprets a single instruction by updating the
-  configuration of a dedicated abstract machine.
+   [step] only interprets a single instruction by updating the
+   configuration of a dedicated abstract machine.
 
   This abstract machine has two components:
 
   - a stack to control which instructions must be executed ; and
 
   - a stack of values where instructions get their inputs and put
-    their outputs.
+   their outputs.
 
-  In addition, the machine has access to effectful primitives to interact
-  with the execution environment (e.g. the Tezos node). These primitives
-  live in the [Lwt+State+Error] monad. Hence, this interpreter produces
-  a computation in the [Lwt+State+Error] monad.
+  In addition, the machine has access to effectful primitives to
+   interact with the execution environment (e.g. the Tezos
+   node). These primitives live in the [Lwt+State+Error] monad. Hence,
+   this interpreter produces a computation in the [Lwt+State+Error]
+   monad.
 
   This interpreter enjoys the following properties:
 
   - The interpreter is tail-recursive, hence it is robust to stack
-    overflow. This property is checked by the compiler thanks to the
-    [@ocaml.tailcall] annotation of each recursive call.
+   overflow. This property is checked by the compiler thanks to the
+   [@ocaml.tailcall] annotation of each recursive call.
 
-  - The interpreter is type-preserving. Thanks to GADTs, the
-    typing rules of Michelson are statically checked by the OCaml
-    typechecker: a Michelson program cannot go wrong.
+  - The interpreter is type-preserving. Thanks to GADTs, the typing
+   rules of Michelson are statically checked by the OCaml typechecker:
+   a Michelson program cannot go wrong.
 
-  - The interpreter is tagless. Thanks to GADTs, the exact shape
-    of the stack is known statically so the interpreter does not
-    have to check that the input stack has the shape expected by
-    the instruction to be executed.
+  - The interpreter is tagless. Thanks to GADTs, the exact shape of
+   the stack is known statically so the interpreter does not have to
+   check that the input stack has the shape expected by the
+   instruction to be executed.
 
   Outline
   =======
 
   This file is organized as follows:
 
-  1. Runtime errors:
-     The standard incantations to register the errors
-     that can be produced by this module's functions.
+  1. Runtime errors: The standard incantations to register the errors
+   that can be produced by this module's functions.
 
-  2. Gas accounting:
-     The function [cost_of_instr] assigns a gas consumption
-     to an instruction and a stack of values according to
-     the cost model. This function is used in the interpretation
-     loop. Several auxiliary functions are given to deal with
-     gas accounting.
+  2. Gas accounting: The function [cost_of_instr] assigns a gas
+   consumption to an instruction and a stack of values according to
+   the cost model. This function is used in the interpretation
+   loop. Several auxiliary functions are given to deal with gas
+   accounting.
 
-  3. Logging:
-     One can instrument the interpreter with logging functions.
+  3. Logging: One can instrument the interpreter with logging
+   functions.
 
-  4. Interpretation loop:
-     This is the main functionality of this module, aka the
-     [step] function.
+  4. Interpretation loop: This is the main functionality of this
+   module, aka the [step] function.
 
-  5. Interface functions:
-     This part of the module builds high-level functions
-     on top the more basic [step] function.
+  5. Interface functions: This part of the module builds high-level
+   functions on top of the more basic [step] function.
 
   Implementation details are explained along the file.
 
@@ -712,7 +709,8 @@ let use_gas_counter_in_ctxt ctxt local_gas_counter f =
 
    [consume'] is used in the implementation of [IConcat_string]
    and [IConcat_bytes] because in that special cases, the cost
-   is expressed with respect to the final result of the concatenation.
+   is expressed with respect to a non-constant-time computation
+   on the inputs.
 
 *)
 
@@ -2094,11 +2092,11 @@ and transfer :
   return (res, ctxt, gas)
 
 (** [create_contract (ctxt, sc) gas storage_ty param_ty code root_name
-   delegate credit init] creates an origination operation for a
-   contract represented by [code], with some [root_name], some initial
-   [credit] (taken to contract being executed), and an initial storage
-   [init] of type [storage_ty]. The type of the new contract argument
-   is [param_ty]. *)
+    delegate credit init] creates an origination operation for a
+    contract represented by [code], with some [root_name], some initial
+    [credit] (taken to contract being executed), and an initial storage
+    [init] of type [storage_ty]. The type of the new contract argument
+    is [param_ty]. *)
 and create_contract :
     type a b.
     outdated_context * step_constants ->
