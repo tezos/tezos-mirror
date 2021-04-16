@@ -25,7 +25,7 @@
 
 open Level_repr
 
-let from_raw c ?offset l =
+let from_raw_with_era cycle_eras ?offset l =
   let l =
     match offset with
     | None ->
@@ -33,8 +33,11 @@ let from_raw c ?offset l =
     | Some o ->
         Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o))
   in
-  let cycle_eras = Raw_context.cycle_eras c in
   Level_repr.level_from_raw ~cycle_eras l
+
+let from_raw c ?offset l =
+  let cycle_eras = Raw_context.cycle_eras c in
+  from_raw_with_era cycle_eras ?offset l
 
 let root c =
   let first_cycle_era = List.hd (Raw_context.cycle_eras c) in
@@ -59,14 +62,16 @@ let previous ctxt =
   | Some p ->
       p
 
-let first_level_in_cycle ctxt cycle =
-  let cycle_eras = Raw_context.cycle_eras ctxt in
+let first_level_in_cycle_with_era cycle_eras cycle =
   let first_level_in_cycle' first_cycle_in_era cycle_era =
     let cycle_position = Cycle_repr.diff cycle first_cycle_in_era in
     let first_level_offset =
       Int32.mul cycle_era.blocks_per_cycle cycle_position
     in
-    from_raw ctxt ~offset:first_level_offset cycle_era.first_level
+    from_raw_with_era
+      cycle_eras
+      ~offset:first_level_offset
+      cycle_era.first_level
   in
   let rec aux first_cycle_in_era = function
     | first_cycle_era :: (second_cycle_era :: _ as tail) ->
@@ -90,6 +95,10 @@ let first_level_in_cycle ctxt cycle =
         assert false
   in
   aux Cycle_repr.root cycle_eras
+
+let first_level_in_cycle ctxt cycle =
+  let cycle_eras = Raw_context.cycle_eras ctxt in
+  first_level_in_cycle_with_era cycle_eras cycle
 
 let last_level_in_cycle ctxt c =
   match pred ctxt (first_level_in_cycle ctxt (Cycle_repr.succ c)) with
