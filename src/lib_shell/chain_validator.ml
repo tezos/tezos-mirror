@@ -74,7 +74,6 @@ module Types = struct
     (* inherit bootstrap status from parent chain validator *)
     db : Distributed_db.t;
     chain_store : Store.chain_store;
-    chain_db : Distributed_db.chain_db;
     block_validator : Block_validator.t;
     block_validator_process : Block_validator_process.t;
     global_valid_block_input : Store.Block.t Lwt_watcher.input;
@@ -87,6 +86,7 @@ module Types = struct
 
   type state = {
     parameters : parameters;
+    chain_db : Distributed_db.chain_db;
     (* This state should be updated everytime a block is validated or
        when we receive a message [Current_head] or [Current_branch]
        with a known head. Because the chain validator does not handle
@@ -215,7 +215,7 @@ let with_activated_peer_validator w peer_id f =
           P2p_peer.Error_table.remove nv.active_peers peer_id)
         nv.parameters.peer_validator_limits
         nv.parameters.block_validator
-        nv.parameters.chain_db
+        nv.chain_db
         peer_id)
   >>=? fun pv ->
   match Peer_validator.status pv with
@@ -363,9 +363,9 @@ let broadcast_head w ~previous block =
               Lwt.return (Store.Block.equal predecessor previous))
     >>= fun successor ->
     if successor then (
-      Distributed_db.Advertise.current_head nv.parameters.chain_db block ;
+      Distributed_db.Advertise.current_head nv.chain_db block ;
       Lwt.return_unit )
-    else Distributed_db.Advertise.current_branch nv.parameters.chain_db
+    else Distributed_db.Advertise.current_branch nv.chain_db
 
 let safe_get_prevalidator_filter hash =
   match Prevalidator_filters.find hash with
@@ -431,7 +431,7 @@ let may_instantiate_prevalidator nv ~head =
     instantiate_prevalidator
       nv
       head
-      (nv.parameters.prevalidator_limits, nv.parameters.chain_db)
+      (nv.parameters.prevalidator_limits, nv.chain_db)
   else Lwt.return_unit
 
 let on_validation_request w start_testchain active_chains spawn_child block =
@@ -546,7 +546,7 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
 
 let on_close w =
   let nv = Worker.state w in
-  Distributed_db.deactivate nv.parameters.chain_db
+  Distributed_db.deactivate nv.chain_db
   >>= fun () ->
   let pvs =
     P2p_peer.Error_table.fold_promises
@@ -606,9 +606,25 @@ let on_launch w _ parameters =
     | Not_synchronised ->
         false
   in
+  let notify_branch peer_id locator =
+    Worker.Queue.push_request_now w (Notify_branch (peer_id, locator))
+  in
+  let notify_head peer_id header ops =
+    Worker.Queue.push_request_now w (Notify_head (peer_id, header, ops))
+  in
+  let disconnection peer_id =
+    Worker.Queue.push_request_now w (Disconnection peer_id)
+  in
+  let chain_db =
+    Distributed_db.activate
+      parameters.db
+      parameters.chain_store
+      {notify_branch; notify_head; disconnection}
+  in
   let nv =
     {
       parameters;
+      chain_db;
       valid_block_input;
       new_head_input;
       bootstrapped_wakener;
@@ -631,19 +647,6 @@ let on_launch w _ parameters =
           >>= fun head -> may_instantiate_prevalidator nv ~head)
         (fun exc -> ignore exc)) ;
   if nv.bootstrapped then Lwt.wakeup_later nv.bootstrapped_wakener () ;
-  Distributed_db.set_callback
-    parameters.chain_db
-    {
-      notify_branch =
-        (fun peer_id locator ->
-          Worker.Queue.push_request_now w (Notify_branch (peer_id, locator)));
-      notify_head =
-        (fun peer_id header ops ->
-          Worker.Queue.push_request_now w (Notify_head (peer_id, header, ops)));
-      disconnection =
-        (fun peer_id ->
-          Worker.Queue.push_request_now w (Disconnection peer_id));
-    } ;
   return nv
 
 let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
@@ -723,7 +726,6 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
       global_valid_block_input;
       global_chains_input;
       db;
-      chain_db = Distributed_db.activate db chain_store;
       chain_store;
       limits;
     }
@@ -775,7 +777,7 @@ let prevalidator w =
   prevalidator
 
 let chain_db w =
-  let {parameters = {chain_db; _}; _} = Worker.state w in
+  let {chain_db; _} = Worker.state w in
   chain_db
 
 let child w =
@@ -786,7 +788,7 @@ let child w =
 
 let assert_fitness_increases ?(force = false) w distant_header =
   let pv = Worker.state w in
-  let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
+  let chain_store = Distributed_db.chain_store pv.chain_db in
   Store.Chain.current_head chain_store
   >>= fun current_head ->
   fail_when
@@ -799,7 +801,7 @@ let assert_fitness_increases ?(force = false) w distant_header =
 
 let assert_checkpoint w ((hash, _) as block_descr) =
   let pv = Worker.state w in
-  let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
+  let chain_store = Distributed_db.chain_store pv.chain_db in
   Store.Chain.is_acceptable_block chain_store block_descr
   >>= fun acceptable ->
   fail_unless acceptable (Validation_errors.Checkpoint_error (hash, None))
@@ -816,7 +818,7 @@ let validate_block w ?force hash block operations =
     ~canceler:(Worker.canceler w)
     ~notify_new_block:(notify_new_block w)
     nv.parameters.block_validator
-    nv.parameters.chain_db
+    nv.chain_db
     hash
     block
     operations
@@ -856,7 +858,7 @@ let last_events = Worker.last_events
 
 let ddb_information t =
   let state = Worker.state t in
-  let ddb = state.parameters.chain_db in
+  let ddb = state.chain_db in
   Distributed_db.information ddb
 
 let sync_status w =

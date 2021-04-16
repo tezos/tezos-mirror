@@ -43,7 +43,7 @@ type chain_db = {
   operation_db : Distributed_db_requester.Raw_operation.t;
   block_header_db : Distributed_db_requester.Raw_block_header.t;
   operations_db : Distributed_db_requester.Raw_operations.t;
-  mutable callback : callback;
+  callback : callback;
   active_peers : P2p_peer.Set.t ref;
   active_connections : connection P2p_peer.Table.t;
 }
