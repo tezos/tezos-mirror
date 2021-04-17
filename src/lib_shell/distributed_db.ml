@@ -58,8 +58,6 @@ type db = {
   disk : Store.t;
   active_chains : P2p_reader.chain_db Chain_id.Table.t;
   protocol_db : Distributed_db_requester.Raw_protocol.t;
-  block_input : (Block_hash.t * Block_header.t) Lwt_watcher.input;
-  operation_input : (Operation_hash.t * Operation.t) Lwt_watcher.input;
 }
 
 type chain_db = {global_db : db; reader_chain_db : P2p_reader.chain_db}
@@ -120,19 +118,7 @@ let create disk p2p =
   in
   let active_chains = Chain_id.Table.create ~random:true 17 in
   let p2p_readers = P2p_peer.Table.create ~random:true 17 in
-  let block_input = Lwt_watcher.create_input () in
-  let operation_input = Lwt_watcher.create_input () in
-  let db =
-    {
-      p2p;
-      p2p_readers;
-      disk;
-      active_chains;
-      protocol_db;
-      block_input;
-      operation_input;
-    }
-  in
+  let db = {p2p; p2p_readers; disk; active_chains; protocol_db} in
   db
 
 let activate
@@ -165,14 +151,10 @@ let activate
         (* whenever a new chain is activated, requesters are created for all
            resources managed by this chain *)
         let operation_db =
-          Distributed_db_requester.Raw_operation.create
-            ~global_input:global_db.operation_input
-            p2p_request
-            chain_store
+          Distributed_db_requester.Raw_operation.create p2p_request chain_store
         in
         let block_header_db =
           Distributed_db_requester.Raw_block_header.create
-            ~global_input:global_db.block_input
             p2p_request
             chain_store
         in
@@ -311,11 +293,6 @@ let commit_protocol db h p =
   >>= fun res ->
   Distributed_db_requester.Raw_protocol.clear_or_cancel db.protocol_db h ;
   return (res <> None)
-
-let watch_block_header {block_input; _} = Lwt_watcher.create_stream block_input
-
-let watch_operation {operation_input; _} =
-  Lwt_watcher.create_stream operation_input
 
 (** This functor is used to export [Requester.REQUESTER] modules outside of this
     module. Thanks to the [Kind] module, requesters are accessed using
