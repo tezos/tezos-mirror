@@ -403,7 +403,7 @@ let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
     ~(problem : Inference.problem) ~(solution : Inference.solution)
     ~overrides_map ~short ?report_folder document =
   let (Measure.Measurement ((module Bench), _)) = measure in
-  let name = Bench.name in
+  let name = Bench.name ^ "_" ^ model_name in
   let figs_file =
     match report_folder with
     | None ->

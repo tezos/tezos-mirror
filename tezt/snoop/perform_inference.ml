@@ -50,7 +50,8 @@ let main () =
     [ "interpreter";
       "gas_translator_model";
       "size_translator_model";
-      "micheline" ]
+      "micheline";
+      "micheline_bytes" ]
   in
   Lwt_list.iter_s
     (fun model_name ->
