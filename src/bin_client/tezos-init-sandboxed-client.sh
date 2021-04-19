@@ -101,6 +101,10 @@ add_sandboxed_bootstrap_identities() {
 
 activate_alpha() {
 
+    # Calling `date` with 'AAA+1' is a small tweak to speed-up
+    # the block baking process. Having a one-hour back timestamp
+    # avoids having to wait for at least [time_between_block] to
+    # produce new blocks.
     ${client} \
         -block genesis \
         activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
