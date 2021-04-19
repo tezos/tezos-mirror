@@ -95,8 +95,10 @@ module Event = struct
     | Could_not_switch_testchain _ ->
         Internal_event.Error
     | Notify_head _ ->
+        Internal_event.Debug
+    | Notify_branch _ ->
         Internal_event.Info
-    | Disconnection _ | Notify_branch _ | Bootstrapped ->
+    | Disconnection _ | Bootstrapped ->
         Internal_event.Notice
     | Sync_status sync_status -> (
       match sync_status with
