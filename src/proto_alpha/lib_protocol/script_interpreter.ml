@@ -1075,7 +1075,7 @@ let rec next :
  fun ((ctxt, _) as g) gas ks0 accu stack ->
   match ks0 with
   | KLog (ks, logger) ->
-      log logger g gas ks accu stack
+      (log [@ocaml.tailcall]) logger g gas ks accu stack
   | KNil ->
       Lwt.return (Ok (accu, stack, ctxt, gas))
   | KCons (k, ks) ->
