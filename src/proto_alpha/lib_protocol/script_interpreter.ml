@@ -1660,7 +1660,7 @@ and step :
     | ILoop_left (_, bl, br) ->
         let ks = KLoop_in_left (bl, KCons (br, ks)) in
         (next [@ocaml.tailcall]) g gas ks accu stack
-    | IDip (_, _, b, k) ->
+    | IDip (_, b, k) ->
         let ign = accu in
         let ks = KUndip (ign, KCons (k, ks)) in
         let (accu, stack) = stack in

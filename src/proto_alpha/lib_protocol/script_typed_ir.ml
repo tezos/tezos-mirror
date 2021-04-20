@@ -611,7 +611,6 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> (('a, 'b) union, 's, 'r, 'f) kinstr
   | IDip :
       ('a, 'b * 's) kinfo
-      * ('c, 't) kinfo
       * ('b, 's, 'c, 't) kinstr
       * ('a, 'c * 't, 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
@@ -1375,7 +1374,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | ILoop_left (kinfo, _, _) ->
       kinfo
-  | IDip (kinfo, _, _, _) ->
+  | IDip (kinfo, _, _) ->
       kinfo
   | IExec (kinfo, _, _) ->
       kinfo
@@ -1711,8 +1710,8 @@ let kinstr_rewritek :
       ILoop (kinfo, f.apply kbody, f.apply k)
   | ILoop_left (kinfo, kl, kr) ->
       ILoop_left (kinfo, f.apply kl, f.apply kr)
-  | IDip (kinfo, kinfo', body, k) ->
-      IDip (kinfo, kinfo', f.apply body, f.apply k)
+  | IDip (kinfo, body, k) ->
+      IDip (kinfo, f.apply body, f.apply k)
   | IExec (kinfo, logger, k) ->
       IExec (kinfo, logger, f.apply k)
   | IApply (kinfo, ty, k) ->

@@ -4906,7 +4906,7 @@ and parse_instr :
                   let binfo = {iloc = descr.loc; kstack_ty = descr.bef} in
                   let kinfoh = {iloc = descr.loc; kstack_ty = descr.aft} in
                   let b = descr.instr.apply binfo (IHalt kinfoh) in
-                  IDip (kinfo, kinfoh, b, k));
+                  IDip (kinfo, b, k));
             }
           in
           typed ctxt loc instr (Item_t (v, descr.aft, stack_annot))
