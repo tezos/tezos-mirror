@@ -4664,7 +4664,7 @@ and parse_instr :
              stack_annot ))
   (* control *)
   | (Seq (loc, []), stack) ->
-      let instr = {csize = 0; apply = (fun kinfo k -> INop (kinfo, k))} in
+      let instr = {csize = 0; apply = (fun _kinfo k -> k)} in
       typed ctxt loc instr stack
   | (Seq (_, [single]), stack) ->
       non_terminal_recursion ?type_logger tc_context ctxt ~legacy single stack
