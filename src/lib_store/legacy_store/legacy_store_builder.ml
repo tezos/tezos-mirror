@@ -224,6 +224,8 @@ let run () =
         (* commit_genesis is done by [Legacy_state.init] *)
         | External_validation.Terminate ->
             ok "exiting" >>=? fun () -> exit 0
+        | External_validation.Reconfigure_event_logging _ ->
+            (* noop *) ok "noop"
         | External_validation.Validate
             {
               chain_id;
