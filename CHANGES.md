@@ -220,6 +220,9 @@ be documented here either.
       from the blacklist if present.
     - `{acl: open}`: removes an address/peer from the blacklist and whitelist.
 
+- Added RPC `DELETE /network/greylist` to clear the greylist tables.
+  RPC `GET /network/greylist/clear` is now deprecated.
+
 ## Client
 
 - Fixed the return code of errors in the client calls to be non-zero.
@@ -243,7 +246,8 @@ be documented here either.
 
 - Added support for all protocol constants in Mockup mode.
 
-- Mockup mode now uses Alpha instead of an arbitrary protocol when none is specified. It also warns that it takes this default behavior.
+- Mockup mode now uses Alpha instead of an arbitrary protocol when none is specified.
+  It also warns that it takes this default behavior.
 
 ## Baker / Endorser / Accuser
 
@@ -293,7 +297,7 @@ be documented here either.
 
 ## Baker / Endorser / Accuser
 
-- Replace PtEdoTez by PtEdo2Zk.
+- Replace `PtEdoTez` by `PtEdo2Zk`.
 
 ## Miscellaneous
 
@@ -303,9 +307,6 @@ be documented here either.
 # Version 8.1
 
 ## Node
-
-- Mind the previously forgotten item about snapshots in the section
-  "Version 8.0rc2 > Node"
 
 - Fix a performance regression affecting serialization of tz3
   signatures by reverting the P256 implementation to `uecc`.
@@ -402,9 +403,6 @@ be documented here either.
   upper bound of 2 instead of a lower bound of 2 when `--connections`
   was explicitely specified while the synchronisation threshold itself
   was not specified.
-
-- Added RPC `DELETE /network/greylist` to clear the greylist tables.
-  RPC `GET /network/greylist/clear` is now deprecated.
 
 ## Client
 
