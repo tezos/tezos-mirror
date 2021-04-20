@@ -4429,6 +4429,17 @@ and parse_instr :
              rest,
              None ))
       >>=? fun (judgement, ctxt) ->
+      let make_instr ibody =
+        {
+          csize = 0;
+          apply =
+            (fun kinfo k ->
+              let hinfo = {iloc = loc; kstack_ty = rest} in
+              let binfo = kinfo_of_descr ibody in
+              let ibody = ibody.instr.apply binfo (IHalt hinfo) in
+              IMap_iter (kinfo, ibody, k));
+        }
+      in
       match judgement with
       | Typed ({aft; _} as ibody) ->
           let invalid_iter_body () =
@@ -4442,33 +4453,10 @@ and parse_instr :
                invalid_iter_body
                ( merge_stacks ~legacy loc ctxt 1 aft rest
                >>? fun (Eq, rest, ctxt) ->
-               let instr =
-                 {
-                   csize = 0;
-                   apply =
-                     (fun kinfo k ->
-                       let hinfo = {iloc = loc; kstack_ty = rest} in
-                       let binfo = kinfo_of_descr ibody in
-                       let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-                       IMap_iter (kinfo, ibody, k));
-                 }
-               in
-               ( typed_no_lwt ctxt loc instr rest
+               ( typed_no_lwt ctxt loc (make_instr ibody) rest
                  : ((a, s) judgement * context) tzresult ) )
       | Failed {descr} ->
-          let instr =
-            {
-              csize = 0;
-              apply =
-                (fun kinfo k ->
-                  let ibody = descr rest in
-                  let hinfo = {iloc = loc; kstack_ty = rest} in
-                  let binfo = kinfo_of_descr ibody in
-                  let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-                  IMap_iter (kinfo, ibody, k));
-            }
-          in
-          typed ctxt loc instr rest )
+          typed ctxt loc (make_instr (descr rest)) rest )
   | ( Prim (loc, I_MEM, [], annot),
       Item_t (vk, Item_t (Map_t (ck, _, _), rest, _), _) ) ->
       let k = ty_of_comparable_ty ck in
