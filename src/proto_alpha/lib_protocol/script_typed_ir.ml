@@ -620,10 +620,10 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('b, 's, 'r, 'f) kinstr
       -> ('a, ('a, 'b) lambda * 's, 'r, 'f) kinstr
   | IApply :
-      ('a, ('a * 't, 'b) lambda * 's) kinfo
+      ('a, ('a * 'b, 'c) lambda * 's) kinfo
       * 'a ty
-      * (('t, 'b) lambda, 's, 'r, 'f) kinstr
-      -> ('a, ('a * 't, 'b) lambda * 's, 'r, 'f) kinstr
+      * (('b, 'c) lambda, 's, 'r, 'f) kinstr
+      -> ('a, ('a * 'b, 'c) lambda * 's, 'r, 'f) kinstr
   | ILambda :
       ('a, 's) kinfo
       * ('b, 'c) lambda
