@@ -200,7 +200,9 @@ type ('arg, 'storage) script = {
    IHalt : ('a, 's) kinfo -> ('a, 's, 'a, 's) kinstr
 
    Each instruction is decorated by some metadata (typically to hold
-   locations). The type for these metadata is [kinfo].
+   locations). The type for these metadata is [kinfo]: such a value is
+   only used for logging and error reporting and has no impact on the
+   operational semantics.
 
    Notations:
    ----------
@@ -757,27 +759,67 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> (Sapling.transaction, Sapling.state * 's, 'r, 'f) kinstr
   | IDig :
       ('a, 's) kinfo
+      (*
+         There is a prefix of length [n] common to the input stack
+         of type ['a * 's] and an intermediary stack of type ['d * 'u].
+      *)
       * int
+        (*
+         Under this common prefix, the input stack has type ['b * 'c * 't] and
+         the intermediary stack type ['c * 't] because we removed the ['b] from
+         the input stack. This value of type ['b] is pushed on top of the
+         stack passed to the continuation.
+      *)
       * ('b, 'c * 't, 'c, 't, 'a, 's, 'd, 'u) stack_prefix_preservation_witness
       * ('b, 'd * 'u, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IDug :
       ('a, 'b * 's) kinfo
+      (*
+         The input stack has type ['a * 'b * 's].
+
+         There is a prefix of length [n] common to its substack
+         of type ['b * 's] and the output stack of type ['d * 'u].
+      *)
       * int
+        (*
+         Under this common prefix, the first stack has type ['c * 't]
+         and the second has type ['a * 'c * 't] because we have pushed
+         the topmost element of this input stack under the common prefix.
+      *)
       * ('c, 't, 'a, 'c * 't, 'b, 's, 'd, 'u) stack_prefix_preservation_witness
       * ('d, 'u, 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
   | IDipn :
       ('a, 's) kinfo
+      (*
+         The body of Dipn is applied under a prefix of size [n]...
+      *)
       * int
+        (*
+         ... the relation between the types of the input and output stacks
+         is characterized by the following witness.
+         (See forthcoming comments about [stack_prefix_preservation_witness].)
+      *)
       * ('c, 't, 'd, 'v, 'a, 's, 'b, 'u) stack_prefix_preservation_witness
       * ('c, 't, 'd, 'v) kinstr
       * ('b, 'u, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IDropn :
       ('a, 's) kinfo
+      (*
+         The input stack enjoys a prefix of length [n]...
+      *)
       * int
+        (*
+         ... and the following value witnesses that under this prefix
+         the stack has type ['b * 'u].
+      *)
       * ('b, 'u, 'b, 'u, 'a, 's, 'a, 's) stack_prefix_preservation_witness
+      (*
+         This stack is passed to the continuation since we drop the
+         entire prefix.
+      *)
       * ('b, 'u, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IChainId :
@@ -1136,6 +1178,30 @@ and ('a, 's, 'r, 'f) kdescr = {
 
 and ('a, 's) kinfo = {iloc : Script.location; kstack_ty : ('a, 's) stack_ty}
 
+(*
+
+   Several instructions work under an arbitrary deep stack prefix
+   (e.g, IDipn, IDropn, etc). To convince the typechecker that
+   these instructions are well-typed, we must provide a witness
+   to statically characterize the relationship between the input
+   and the output stacks. The inhabitants of the following GADT
+   act as such witnesses.
+
+   More precisely, a value [w] of type
+
+   [(c, t, d, v, a, s, b, u) stack_prefix_preservation_witness]
+
+   proves that there is a common prefix between an input stack
+   of type [a * s] and an output stack of type [b * u]. This prefix
+   is as deep as the number of [KPrefix] application in [w]. When
+   used with an operation parameterized by a natural number [n]
+   characterizing the depth at which the operation must be applied,
+   [w] is the Peano encoding of [n].
+
+   When this prefix is removed from the two stacks, the input stack
+   has type [c * t] while the output stack has type [d * v].
+
+*)
 and (_, _, _, _, _, _, _, _) stack_prefix_preservation_witness =
   | KPrefix :
       ('y, 'u) kinfo

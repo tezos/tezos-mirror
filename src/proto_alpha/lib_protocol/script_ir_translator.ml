@@ -59,6 +59,14 @@ type ('a, 's, 'b, 'u) cinstr = {
     'r 'f. ('a, 's) kinfo -> ('b, 'u, 'r, 'f) kinstr -> ('a, 's, 'r, 'f) kinstr;
 }
 
+(*
+
+   While a [Script_typed_ir.descr] contains a fully defined
+   instruction, [descr] contains a [cinstr], that is an instruction
+   parameterized by the next instruction, as explained in the previous
+   comment.
+
+*)
 type ('a, 's, 'b, 'u) descr = {
   loc : Script.location;
   bef : ('a, 's) stack_ty;
