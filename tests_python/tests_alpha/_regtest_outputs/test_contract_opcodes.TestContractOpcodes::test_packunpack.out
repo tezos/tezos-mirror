@@ -38,22 +38,18 @@ trace
       0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
   - location: 25 (remaining gas: 1039947.590 units remaining)
     [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 26 (remaining gas: 1039947.545 units remaining)
-    [ 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003  	 ]
-  - location: 31 (remaining gas: 1039783.071 units remaining)
+  - location: 31 (remaining gas: 1039783.116 units remaining)
     [ (Some (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 }))  	@unpacked ]
-  - location: 40 (remaining gas: 1039783.041 units remaining)
+  - location: 40 (remaining gas: 1039783.086 units remaining)
     [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	@unpacked.some ]
-  - location: 45 (remaining gas: 1039782.996 units remaining)
-    [ (Pair (Pair "toto" { 3 ; 7 ; 9 ; 1 }) { 1 ; 2 ; 3 })  	@unpacked.some ]
-  - location: 46 (remaining gas: 1039782.951 units remaining)
+  - location: 46 (remaining gas: 1039783.041 units remaining)
     [  ]
-  - location: 47 (remaining gas: 1039782.906 units remaining)
+  - location: 47 (remaining gas: 1039782.996 units remaining)
     [ Unit  	 ]
-  - location: 48 (remaining gas: 1039782.861 units remaining)
+  - location: 48 (remaining gas: 1039782.951 units remaining)
     [ {}  	
       Unit  	 ]
-  - location: 50 (remaining gas: 1039782.816 units remaining)
+  - location: 50 (remaining gas: 1039782.906 units remaining)
     [ (Pair {} Unit)  	 ]
 
 Runtime error in contract [CONTRACT_HASH]:

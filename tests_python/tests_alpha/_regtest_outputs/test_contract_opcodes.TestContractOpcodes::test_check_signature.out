@@ -104,18 +104,14 @@ trace
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF"
             "hello")  	 ]
-  - location: 23 (remaining gas: 1039661.613 units remaining)
-    [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
-            "edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF"
-            "hello")  	 ]
-  - location: 28 (remaining gas: 1039661.563 units remaining)
+  - location: 28 (remaining gas: 1039661.608 units remaining)
     [ (Pair "edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF"
             "hello")  	@storage ]
-  - location: 29 (remaining gas: 1039661.518 units remaining)
+  - location: 29 (remaining gas: 1039661.563 units remaining)
     [ {}  	
       (Pair "edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF"
             "hello")  	@storage ]
-  - location: 31 (remaining gas: 1039661.473 units remaining)
+  - location: 31 (remaining gas: 1039661.518 units remaining)
     [ (Pair {}
             "edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF"
             "hello")  	 ]
