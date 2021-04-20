@@ -2238,30 +2238,22 @@ and log_next_kinstr :
   in
   kinstr_rewritek i {apply}
 
-let run_descr logger (ctxt, sc) descr accu stack =
+let step_descr ~log_now logger (ctxt, sc) descr accu stack =
   let gas = (Gas.gas_counter ctxt :> int) in
   ( match logger with
   | None ->
       step (outdated ctxt, sc) gas descr.kinstr KNil accu stack
   | Some logger ->
+      ( if log_now then
+        let kinfo = kinfo_of_kinstr descr.kinstr in
+        logger.log_interp descr.kinstr ctxt kinfo.iloc descr.kbef (accu, stack)
+      ) ;
       let log =
         ILog (kinfo_of_kinstr descr.kinstr, LogEntry, logger, descr.kinstr)
       in
       step (outdated ctxt, sc) gas log KNil accu stack )
   >>=? fun (accu, stack, ctxt, gas) ->
   return (accu, stack, update_context gas ctxt)
-
-let step_descr ~log_now logger g descr accu stack =
-  ( if log_now then
-    match logger with
-    | None ->
-        ()
-    | Some logger ->
-        let kinfo = kinfo_of_kinstr descr.kinstr in
-        let ctxt = fst g in
-        logger.log_interp descr.kinstr ctxt kinfo.iloc descr.kbef (accu, stack)
-  ) ;
-  run_descr logger g descr accu stack
 
 let interp logger g (Lam (code, _)) arg =
   step_descr ~log_now:true logger g code arg (EmptyCell, EmptyCell)
