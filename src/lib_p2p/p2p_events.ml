@@ -457,6 +457,15 @@ module P2p_welcome = struct
       ~pp1:pp_print_error_first
       ("error", Error_monad.trace_encoding)
 
+  let unexpected_error_closing_socket =
+    declare_1
+      ~section
+      ~name:"unexpected_error_closing_socket"
+      ~msg:"unexpected error while closing socket: {error}"
+      ~level:Error
+      ~pp1:pp_print_error_first
+      ("error", Error_monad.trace_encoding)
+
   let incoming_connection_error =
     declare_1
       ~section
