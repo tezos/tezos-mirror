@@ -56,7 +56,7 @@ Liquidity Baking
 
 2.5 tez per block is credited to a constant product market making (CPMM) contract, the contract's ``%default`` entrypoint is called to update its storage, and the credit is included in block metadata as a balance update with a new ``update_origin`` type, ``Subsidy``.
 
-The liquidity baking subsidy shuts off automatically at six months from protocol activation if not renewed in a future upgrade. The sunset duration is included in constants and sunset level calculated during stitching.
+The liquidity baking subsidy shuts off automatically at a fixed level if not renewed in a future upgrade. The sunset level is included in constants.
 
 At any time bakers can vote to shut off the liquidity baking subsidy by setting a boolean flag in protocol_data. An exponential moving average (ema) of this escape flag is calculated with a window size of 1000 blocks and the subsidy permanently shuts off if the ema is ever over a threshold included in constants (half the window size with precision of 1000 added for integer computation).
 

@@ -117,7 +117,7 @@ type parametric = {
   initial_endorsers : int;
   delay_per_missing_endorsement : Period_repr.t;
   liquidity_baking_subsidy : Tez_repr.t;
-  liquidity_baking_sunset_duration : int32;
+  liquidity_baking_sunset_level : int32;
   liquidity_baking_escape_ema_threshold : int32;
 }
 
@@ -152,7 +152,7 @@ let parametric_encoding =
             c.delay_per_missing_endorsement,
             c.minimal_block_delay,
             c.liquidity_baking_subsidy,
-            c.liquidity_baking_sunset_duration,
+            c.liquidity_baking_sunset_level,
             c.liquidity_baking_escape_ema_threshold ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
@@ -181,7 +181,7 @@ let parametric_encoding =
                delay_per_missing_endorsement,
                minimal_block_delay,
                liquidity_baking_subsidy,
-               liquidity_baking_sunset_duration,
+               liquidity_baking_sunset_level,
                liquidity_baking_escape_ema_threshold ) ) ) ->
       {
         preserved_cycles;
@@ -211,7 +211,7 @@ let parametric_encoding =
         delay_per_missing_endorsement;
         minimal_block_delay;
         liquidity_baking_subsidy;
-        liquidity_baking_sunset_duration;
+        liquidity_baking_sunset_level;
         liquidity_baking_escape_ema_threshold;
       })
     (merge_objs
@@ -250,7 +250,7 @@ let parametric_encoding =
              (req "delay_per_missing_endorsement" Period_repr.encoding)
              (req "minimal_block_delay" Period_repr.encoding)
              (req "liquidity_baking_subsidy" Tez_repr.encoding)
-             (req "liquidity_baking_sunset_duration" int32)
+             (req "liquidity_baking_sunset_level" int32)
              (req "liquidity_baking_escape_ema_threshold" int32))))
 
 type t = {fixed : fixed; parametric : parametric}

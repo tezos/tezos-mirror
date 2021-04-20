@@ -539,7 +539,7 @@ module Constants : sig
     initial_endorsers : int;
     delay_per_missing_endorsement : Period.t;
     liquidity_baking_subsidy : Tez.t;
-    liquidity_baking_sunset_duration : int32;
+    liquidity_baking_sunset_level : int32;
     liquidity_baking_escape_ema_threshold : int32;
   }
 
@@ -593,7 +593,7 @@ module Constants : sig
 
   val liquidity_baking_subsidy : context -> Tez.t
 
-  val liquidity_baking_sunset_duration : context -> int32
+  val liquidity_baking_sunset_level : context -> int32
 
   val liquidity_baking_escape_ema_threshold : context -> int32
 

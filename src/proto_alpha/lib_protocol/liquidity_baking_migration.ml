@@ -177,10 +177,7 @@ let init_common ~typecheck ?test_fa12_admin ctxt =
   in
   Storage.Liquidity_baking.Sunset_level.init
     ctxt
-    Int32.(
-      add
-        current_level
-        (Constants_storage.liquidity_baking_sunset_duration ctxt))
+    (Constants_storage.liquidity_baking_sunset_level ctxt)
   >>=? fun ctxt ->
   check_tzBTC
     ~typecheck

@@ -161,7 +161,7 @@ let protocol_parameters_json t : Ezjsonm.t =
            , string (Int.to_string t.minimal_block_delay) );
            ( "liquidity_baking_subsidy"
            , string "2500000" );
-           ( "liquidity_baking_sunset_duration"
+           ( "liquidity_baking_sunset_level"
            , int 525600 );
            ( "liquidity_baking_escape_ema_threshold"
            , int 1000000 ); ]

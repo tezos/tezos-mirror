@@ -607,7 +607,7 @@ def _test_create_mockup_init_show_roundtrip(
                 "minimal_block_delay": "1",
                 "liquidity_baking_escape_ema_threshold": 1000000,
                 "liquidity_baking_subsidy": "2500000",
-                "liquidity_baking_sunset_duration": 1024,
+                "liquidity_baking_sunset_level": 1024,
             }
         ),
     ],

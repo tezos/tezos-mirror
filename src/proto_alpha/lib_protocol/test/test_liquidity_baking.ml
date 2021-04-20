@@ -58,7 +58,7 @@ let liquidity_baking_subsidies n () =
 
 (* Test that [n] blocks after the liquidity baking sunset, the subsidy is not applied anymore.
    More precisely, after the sunset, the total amount credited to the subsidy is only proportional
-   to the sunset duration and in particular it does not depend on [n]. *)
+   to the sunset level and in particular it does not depend on [n]. *)
 let liquidity_baking_sunset_level n () =
   Context.init 1
   >>=? fun (blk, _contracts) ->
@@ -66,7 +66,7 @@ let liquidity_baking_sunset_level n () =
   >>=? fun liquidity_baking ->
   Context.get_constants (B blk)
   >>=? fun csts ->
-  let sunset = csts.parametric.liquidity_baking_sunset_duration in
+  let sunset = csts.parametric.liquidity_baking_sunset_level in
   Context.Contract.balance (B blk) liquidity_baking
   >>=? fun old_balance ->
   Block.bake_n (Int32.to_int sunset + n) blk
@@ -138,7 +138,7 @@ let liquidity_baking_escape_hatch_50 n () =
   >>=? fun liquidity_baking ->
   Context.get_constants (B blk)
   >>=? fun csts ->
-  let sunset = csts.parametric.liquidity_baking_sunset_duration in
+  let sunset = csts.parametric.liquidity_baking_sunset_level in
   Context.Contract.balance (B blk) liquidity_baking
   >>=? fun old_balance ->
   let rec bake_50_percent_escaping blk i =
@@ -203,7 +203,7 @@ let liquidity_baking_balance_update () =
   >>=? fun liquidity_baking ->
   Context.get_constants (B blk)
   >>=? fun csts ->
-  let sunset = csts.parametric.liquidity_baking_sunset_duration in
+  let sunset = csts.parametric.liquidity_baking_sunset_level in
   let subsidy = csts.parametric.liquidity_baking_subsidy in
   Block.bake_n_with_all_balance_updates Int32.(to_int (add sunset 100l)) blk
   >>=? fun (_blk, balance_updates) ->

@@ -26,12 +26,14 @@ At every block in the chain, a small amount of tez is minted and credited to the
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
 
-As a safety precaution, the subsidy expires automatically after 6 months but it can be renewed periodically by protocol amendment.
+As a safety precaution, the subsidy expires automatically at a given
+level called the liquidity baking sunset level. The sunset level can
+be renewed periodically by protocol amendment.
 
 Escape hatch
 ~~~~~~~~~~~~
 
-In addition to the 6 months sunset, an escape hatch is included. At every block, the baker producing the block can choose to include a flag that requests ending the subsidy. The context maintains an exponential moving average of that flag calculated as such with integer arithmetic:
+In addition to the sunset mechanism, an escape hatch is included. At every block, the baker producing the block can choose to include a flag that requests ending the subsidy. The context maintains an exponential moving average of that flag calculated as such with integer arithmetic:
 
 ``e[0] = 0``
 ``e[n+1] = (1999 * e[n] // 2000) + (1000 if flag[n] else 0)``

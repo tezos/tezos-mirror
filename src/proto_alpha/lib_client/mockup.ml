@@ -61,7 +61,7 @@ module Protocol_constants_overrides = struct
     initial_endorsers : int option;
     delay_per_missing_endorsement : Period.t option;
     liquidity_baking_subsidy : Tez.t option;
-    liquidity_baking_sunset_duration : int32 option;
+    liquidity_baking_sunset_level : int32 option;
     liquidity_baking_escape_ema_threshold : int32 option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
@@ -100,7 +100,7 @@ module Protocol_constants_overrides = struct
                 c.delay_per_missing_endorsement,
                 c.minimal_block_delay,
                 c.liquidity_baking_subsidy,
-                c.liquidity_baking_sunset_duration,
+                c.liquidity_baking_sunset_level,
                 c.liquidity_baking_escape_ema_threshold ),
               (c.chain_id, c.timestamp) ) ) ))
       (fun ( ( preserved_cycles,
@@ -130,7 +130,7 @@ module Protocol_constants_overrides = struct
                    delay_per_missing_endorsement,
                    minimal_block_delay,
                    liquidity_baking_subsidy,
-                   liquidity_baking_sunset_duration,
+                   liquidity_baking_sunset_level,
                    liquidity_baking_escape_ema_threshold ),
                  (chain_id, timestamp) ) ) ) ->
         {
@@ -161,7 +161,7 @@ module Protocol_constants_overrides = struct
           delay_per_missing_endorsement;
           minimal_block_delay;
           liquidity_baking_subsidy;
-          liquidity_baking_sunset_duration;
+          liquidity_baking_sunset_level;
           liquidity_baking_escape_ema_threshold;
           chain_id;
           timestamp;
@@ -199,7 +199,7 @@ module Protocol_constants_overrides = struct
                   (opt "delay_per_missing_endorsement" Period.encoding)
                   (opt "minimal_block_delay" Period.encoding)
                   (opt "liquidity_baking_subsidy" Tez.encoding)
-                  (opt "liquidity_baking_sunset_duration" int32)
+                  (opt "liquidity_baking_sunset_level" int32)
                   (opt "liquidity_baking_escape_ema_threshold" int32))
                (obj2
                   (opt "chain_id" Chain_id.encoding)
@@ -252,8 +252,8 @@ module Protocol_constants_overrides = struct
         delay_per_missing_endorsement =
           Some parametric.delay_per_missing_endorsement;
         liquidity_baking_subsidy = Some parametric.liquidity_baking_subsidy;
-        liquidity_baking_sunset_duration =
-          Some parametric.liquidity_baking_sunset_duration;
+        liquidity_baking_sunset_level =
+          Some parametric.liquidity_baking_sunset_level;
         liquidity_baking_escape_ema_threshold =
           Some parametric.liquidity_baking_escape_ema_threshold;
         (* Bastard, additional parameters. *)
@@ -290,7 +290,7 @@ module Protocol_constants_overrides = struct
       initial_endorsers = None;
       delay_per_missing_endorsement = None;
       liquidity_baking_subsidy = None;
-      liquidity_baking_sunset_duration = None;
+      liquidity_baking_sunset_level = None;
       liquidity_baking_escape_ema_threshold = None;
       chain_id = None;
       timestamp = None;
@@ -482,8 +482,8 @@ module Protocol_constants_overrides = struct
           };
         O
           {
-            name = "liquidity_baking_sunset_duration";
-            override_value = o.liquidity_baking_sunset_duration;
+            name = "liquidity_baking_sunset_level";
+            override_value = o.liquidity_baking_sunset_level;
             pp = pp_print_int32;
           };
         O
@@ -593,10 +593,10 @@ module Protocol_constants_overrides = struct
             Option.value
               ~default:c.liquidity_baking_subsidy
               o.liquidity_baking_subsidy;
-          liquidity_baking_sunset_duration =
+          liquidity_baking_sunset_level =
             Option.value
-              ~default:c.liquidity_baking_sunset_duration
-              o.liquidity_baking_sunset_duration;
+              ~default:c.liquidity_baking_sunset_level
+              o.liquidity_baking_sunset_level;
           liquidity_baking_escape_ema_threshold =
             Option.value
               ~default:c.liquidity_baking_escape_ema_threshold

@@ -79,7 +79,7 @@ val min_proposal_quorum : Raw_context.t -> int32
 
 val liquidity_baking_subsidy : Raw_context.t -> Tez_repr.t
 
-val liquidity_baking_sunset_duration : Raw_context.t -> int32
+val liquidity_baking_sunset_level : Raw_context.t -> int32
 
 val liquidity_baking_escape_ema_threshold : Raw_context.t -> int32
 
