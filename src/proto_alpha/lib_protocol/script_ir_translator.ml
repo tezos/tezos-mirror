@@ -3707,7 +3707,7 @@ and parse_instr :
       parse_var_type_annot loc annot
       >>?= fun (annot, ty_name) ->
       let const =
-        {csize = 1; apply = (fun kinfo k -> IConst (kinfo, (), k))}
+        {csize = 0; apply = (fun kinfo k -> IConst (kinfo, (), k))}
       in
       typed ctxt loc const (Item_t (Unit_t ty_name, stack, annot))
   (* options *)
@@ -3822,7 +3822,7 @@ and parse_instr :
       make_proof_argument n stack_ty
       >>?= fun (Comb_proof_argument (witness, after_ty), _none) ->
       let comb =
-        {csize = 0; apply = (fun kinfo k -> IComb (kinfo, n, witness, k))}
+        {csize = 1; apply = (fun kinfo k -> IComb (kinfo, n, witness, k))}
       in
       typed ctxt loc comb after_ty
   | (Prim (loc, I_UNPAIR, [n], annot), stack_ty) ->
@@ -4853,7 +4853,7 @@ and parse_instr :
         code
       >>=? fun (lambda, ctxt) ->
       let instr =
-        {csize = 0; apply = (fun kinfo k -> ILambda (kinfo, lambda, k))}
+        {csize = 1; apply = (fun kinfo k -> ILambda (kinfo, lambda, k))}
       in
       typed ctxt loc instr (Item_t (Lambda_t (arg, ret, None), stack, annot))
   | ( Prim (loc, I_EXEC, [], annot),
