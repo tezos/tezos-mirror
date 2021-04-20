@@ -3742,8 +3742,9 @@ and parse_instr :
               (fun kinfo k ->
                 let btinfo = kinfo_of_descr ibt
                 and bfinfo = kinfo_of_descr ibf in
-                IIf_none
-                  (kinfo, ibt.instr.apply btinfo k, ibf.instr.apply bfinfo k));
+                let branch_if_none = ibt.instr.apply btinfo k
+                and branch_if_some = ibf.instr.apply bfinfo k in
+                IIf_none {kinfo; branch_if_none; branch_if_some});
           }
         in
         {loc; instr = ifnone; bef; aft = ibt.aft}
@@ -4056,8 +4057,9 @@ and parse_instr :
             csize = 0;
             apply =
               (fun kinfo k ->
-                IIf_left
-                  (kinfo, ibt.instr.apply infobt k, ibf.instr.apply infobf k));
+                let branch_if_left = ibt.instr.apply infobt k
+                and branch_if_right = ibf.instr.apply infobf k in
+                IIf_left {kinfo; branch_if_left; branch_if_right});
           }
         in
         {loc; instr; bef; aft = ibt.aft}
@@ -4110,8 +4112,9 @@ and parse_instr :
             csize = 0;
             apply =
               (fun kinfo k ->
-                IIf_cons
-                  (kinfo, ibt.instr.apply infobt k, ibf.instr.apply infobf k));
+                let branch_if_cons = ibt.instr.apply infobt k
+                and branch_if_nil = ibf.instr.apply infobf k in
+                IIf_cons {kinfo; branch_if_nil; branch_if_cons});
           }
         in
         {loc; instr; bef; aft = ibt.aft}
@@ -4709,7 +4712,9 @@ and parse_instr :
             csize = 0;
             apply =
               (fun kinfo k ->
-                IIf (kinfo, ibt.instr.apply infobt k, ibf.instr.apply infobf k));
+                let branch_if_true = ibt.instr.apply infobt k
+                and branch_if_false = ibf.instr.apply infobf k in
+                IIf {kinfo; branch_if_true; branch_if_false});
           }
         in
         {loc; instr; bef; aft = ibt.aft}
@@ -5723,7 +5728,7 @@ and parse_instr :
           apply =
             (fun kinfo k ->
               ICreate_contract
-                (kinfo, storage_type, arg_type, lambda, root_name, k));
+                {kinfo; storage_type; arg_type; lambda; root_name; k});
         }
       in
       typed

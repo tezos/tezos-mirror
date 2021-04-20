@@ -1205,13 +1205,13 @@ and step :
         (step [@ocaml.tailcall]) g gas k ks (Some accu) stack
     | ICons_none (_, _, k) ->
         (step [@ocaml.tailcall]) g gas k ks None (accu, stack)
-    | IIf_none (_, bt, bf) -> (
+    | IIf_none {branch_if_none; branch_if_some} -> (
       match accu with
       | None ->
           let (accu, stack) = stack in
-          (step [@ocaml.tailcall]) g gas bt ks accu stack
+          (step [@ocaml.tailcall]) g gas branch_if_none ks accu stack
       | Some v ->
-          (step [@ocaml.tailcall]) g gas bf ks v stack )
+          (step [@ocaml.tailcall]) g gas branch_if_some ks v stack )
     (* pairs *)
     | ICons_pair (_, k) ->
         let (b, stack) = stack in
@@ -1230,12 +1230,12 @@ and step :
         (step [@ocaml.tailcall]) g gas k ks (L accu) stack
     | ICons_right (_, k) ->
         (step [@ocaml.tailcall]) g gas k ks (R accu) stack
-    | IIf_left (_, bl, br) -> (
+    | IIf_left {branch_if_left; branch_if_right} -> (
       match accu with
       | L v ->
-          (step [@ocaml.tailcall]) g gas bl ks v stack
+          (step [@ocaml.tailcall]) g gas branch_if_left ks v stack
       | R v ->
-          (step [@ocaml.tailcall]) g gas br ks v stack )
+          (step [@ocaml.tailcall]) g gas branch_if_right ks v stack )
     (* lists *)
     | ICons_list (_, k) ->
         let (tl, stack) = stack in
@@ -1245,14 +1245,14 @@ and step :
         let stack = (accu, stack) in
         let accu = list_empty in
         (step [@ocaml.tailcall]) g gas k ks accu stack
-    | IIf_cons (_, bc, bn) -> (
+    | IIf_cons {branch_if_cons; branch_if_nil} -> (
       match accu.elements with
       | [] ->
           let (accu, stack) = stack in
-          (step [@ocaml.tailcall]) g gas bn ks accu stack
+          (step [@ocaml.tailcall]) g gas branch_if_nil ks accu stack
       | hd :: tl ->
           let tl = {elements = tl; length = accu.length - 1} in
-          (step [@ocaml.tailcall]) g gas bc ks hd (tl, stack) )
+          (step [@ocaml.tailcall]) g gas branch_if_cons ks hd (tl, stack) )
     | IList_map (_, body, k) ->
         let xs = accu.elements in
         let ys = [] in
@@ -1650,10 +1650,10 @@ and step :
         let res = Script_int.lognot x in
         (step [@ocaml.tailcall]) g gas k ks res stack
     (* control *)
-    | IIf (_, bt, bf) ->
+    | IIf {branch_if_true; branch_if_false} ->
         let (res, stack) = stack in
-        if accu then (step [@ocaml.tailcall]) g gas bt ks res stack
-        else (step [@ocaml.tailcall]) g gas bf ks res stack
+        if accu then (step [@ocaml.tailcall]) g gas branch_if_true ks res stack
+        else (step [@ocaml.tailcall]) g gas branch_if_false ks res stack
     | ILoop (_, body, k) ->
         let ks = KLoop_in (body, KCons (k, ks)) in
         (next [@ocaml.tailcall]) g gas ks accu stack
@@ -1779,7 +1779,7 @@ and step :
         let res = (Unit_t None, (contract, "default")) in
         (step [@ocaml.tailcall]) g gas k ks res stack
     | ICreate_contract
-        (_, storage_type, param_type, Lam (_, code), root_name, k) ->
+        {storage_type; arg_type; lambda = Lam (_, code); root_name; k} ->
         (* Removed the instruction's arguments manager, spendable and delegatable *)
         let delegate = accu in
         let (credit, (init, stack)) = stack in
@@ -1787,7 +1787,7 @@ and step :
           g
           gas
           storage_type
-          param_type
+          arg_type
           code
           root_name
           delegate

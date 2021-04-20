@@ -272,13 +272,14 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | ICons_none :
       ('a, 's) kinfo * 'b ty * ('b option, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
-  | IIf_none :
-      ('a option, 'b * 's) kinfo
+  | IIf_none : {
+      kinfo : ('a option, 'b * 's) kinfo;
       (* Notice that the continuations of the following two
-     instructions should have a shared suffix to avoid code
-     duplication. *)
-      * ('b, 's, 'r, 'f) kinstr
-      * ('a, 'b * 's, 'r, 'f) kinstr
+         instructions should have a shared suffix to avoid code
+         duplication. *)
+      branch_if_none : ('b, 's, 'r, 'f) kinstr;
+      branch_if_some : ('a, 'b * 's, 'r, 'f) kinstr;
+    }
       -> ('a option, 'b * 's, 'r, 'f) kinstr
   (*
      Unions
@@ -290,11 +291,12 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | ICons_right :
       ('b, 's) kinfo * (('a, 'b) union, 's, 'r, 'f) kinstr
       -> ('b, 's, 'r, 'f) kinstr
-  | IIf_left :
-      (('a, 'b) union, 's) kinfo
+  | IIf_left : {
+      kinfo : (('a, 'b) union, 's) kinfo;
       (* See remark in IIf_none. *)
-      * ('a, 's, 'r, 'f) kinstr
-      * ('b, 's, 'r, 'f) kinstr
+      branch_if_left : ('a, 's, 'r, 'f) kinstr;
+      branch_if_right : ('b, 's, 'r, 'f) kinstr;
+    }
       -> (('a, 'b) union, 's, 'r, 'f) kinstr
   (*
      Lists
@@ -306,11 +308,12 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | INil :
       ('a, 's) kinfo * ('b boxed_list, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
-  | IIf_cons :
-      ('a boxed_list, 'b * 's) kinfo
+  | IIf_cons : {
+      kinfo : ('a boxed_list, 'b * 's) kinfo;
       (* See remark in IIf_none. *)
-      * ('a, 'a boxed_list * ('b * 's), 'r, 'f) kinstr
-      * ('b, 's, 'r, 'f) kinstr
+      branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'r, 'f) kinstr;
+      branch_if_nil : ('b, 's, 'r, 'f) kinstr;
+    }
       -> ('a boxed_list, 'b * 's, 'r, 'f) kinstr
   | IList_map :
       ('a boxed_list, 'c * 's) kinfo
@@ -589,11 +592,12 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      Control
      -------
   *)
-  | IIf :
-      (bool, 'a * 's) kinfo
+  | IIf : {
+      kinfo : (bool, 'a * 's) kinfo;
       (* See remark in IIf_none. *)
-      * ('a, 's, 'r, 'f) kinstr
-      * ('a, 's, 'r, 'f) kinstr
+      branch_if_true : ('a, 's, 'r, 'f) kinstr;
+      branch_if_false : ('a, 's, 'r, 'f) kinstr;
+    }
       -> (bool, 'a * 's, 'r, 'f) kinstr
   | ILoop :
       (bool, 'a * 's) kinfo
@@ -683,13 +687,14 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IImplicit_account :
       (public_key_hash, 's) kinfo * (unit typed_contract, 's, 'r, 'f) kinstr
       -> (public_key_hash, 's, 'r, 'f) kinstr
-  | ICreate_contract :
-      (public_key_hash option, Tez.t * ('a * 's)) kinfo
-      * 'a ty
-      * 'b ty
-      * ('b * 'a, operation boxed_list * 'a) lambda
-      * field_annot option
-      * (operation, address * 's, 'r, 'f) kinstr
+  | ICreate_contract : {
+      kinfo : (public_key_hash option, Tez.t * ('a * 's)) kinfo;
+      storage_type : 'a ty;
+      arg_type : 'b ty;
+      lambda : ('b * 'a, operation boxed_list * 'a) lambda;
+      root_name : field_annot option;
+      k : (operation, address * 's, 'r, 'f) kinstr;
+    }
       -> (public_key_hash option, Tez.t * ('a * 's), 'r, 'f) kinstr
   | ISet_delegate :
       (public_key_hash option, 's) kinfo * (operation, 's, 'r, 'f) kinstr
@@ -1212,19 +1217,19 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | ICons_none (kinfo, _, _) ->
       kinfo
-  | IIf_none (kinfo, _, _) ->
+  | IIf_none {kinfo; _} ->
       kinfo
   | ICons_left (kinfo, _) ->
       kinfo
   | ICons_right (kinfo, _) ->
       kinfo
-  | IIf_left (kinfo, _, _) ->
+  | IIf_left {kinfo; _} ->
       kinfo
   | ICons_list (kinfo, _) ->
       kinfo
   | INil (kinfo, _) ->
       kinfo
-  | IIf_cons (kinfo, _, _) ->
+  | IIf_cons {kinfo; _} ->
       kinfo
   | IList_map (kinfo, _, _) ->
       kinfo
@@ -1364,7 +1369,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | INot_int (kinfo, _) ->
       kinfo
-  | IIf (kinfo, _, _) ->
+  | IIf {kinfo; _} ->
       kinfo
   | ILoop (kinfo, _, _) ->
       kinfo
@@ -1404,7 +1409,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | IImplicit_account (kinfo, _) ->
       kinfo
-  | ICreate_contract (kinfo, _, _, _, _, _) ->
+  | ICreate_contract {kinfo; _} ->
       kinfo
   | ISet_delegate (kinfo, _) ->
       kinfo
@@ -1540,20 +1545,26 @@ let kinstr_rewritek :
       ICons_some (kinfo, f.apply k)
   | ICons_none (kinfo, ty, k) ->
       ICons_none (kinfo, ty, f.apply k)
-  | IIf_none (kinfo, kl, kr) ->
-      IIf_none (kinfo, f.apply kl, f.apply kr)
+  | IIf_none {kinfo; branch_if_none; branch_if_some} ->
+      let branch_if_none = f.apply branch_if_none
+      and branch_if_some = f.apply branch_if_some in
+      IIf_none {kinfo; branch_if_none; branch_if_some}
   | ICons_left (kinfo, k) ->
       ICons_left (kinfo, f.apply k)
   | ICons_right (kinfo, k) ->
       ICons_right (kinfo, f.apply k)
-  | IIf_left (kinfo, kl, kr) ->
-      IIf_left (kinfo, f.apply kl, f.apply kr)
+  | IIf_left {kinfo; branch_if_left; branch_if_right} ->
+      let branch_if_left = f.apply branch_if_left
+      and branch_if_right = f.apply branch_if_right in
+      IIf_left {kinfo; branch_if_left; branch_if_right}
   | ICons_list (kinfo, k) ->
       ICons_list (kinfo, f.apply k)
   | INil (kinfo, k) ->
       INil (kinfo, f.apply k)
-  | IIf_cons (kinfo, kl, kr) ->
-      IIf_cons (kinfo, f.apply kl, f.apply kr)
+  | IIf_cons {kinfo; branch_if_cons; branch_if_nil} ->
+      let branch_if_nil = f.apply branch_if_nil
+      and branch_if_cons = f.apply branch_if_cons in
+      IIf_cons {kinfo; branch_if_cons; branch_if_nil}
   | IList_map (kinfo, body, k) ->
       IList_map (kinfo, f.apply body, f.apply k)
   | IList_iter (kinfo, body, k) ->
@@ -1692,8 +1703,10 @@ let kinstr_rewritek :
       INot_nat (kinfo, f.apply k)
   | INot_int (kinfo, k) ->
       INot_int (kinfo, f.apply k)
-  | IIf (kinfo, kl, kr) ->
-      IIf (kinfo, f.apply kl, f.apply kr)
+  | IIf {kinfo; branch_if_true; branch_if_false} ->
+      let branch_if_true = f.apply branch_if_true
+      and branch_if_false = f.apply branch_if_false in
+      IIf {kinfo; branch_if_true; branch_if_false}
   | ILoop (kinfo, kbody, k) ->
       ILoop (kinfo, f.apply kbody, f.apply k)
   | ILoop_left (kinfo, kl, kr) ->
@@ -1732,8 +1745,9 @@ let kinstr_rewritek :
       ITransfer_tokens (kinfo, f.apply k)
   | IImplicit_account (kinfo, k) ->
       IImplicit_account (kinfo, f.apply k)
-  | ICreate_contract (kinfo, ty1, ty2, code, annot, k) ->
-      ICreate_contract (kinfo, ty1, ty2, code, annot, f.apply k)
+  | ICreate_contract {kinfo; storage_type; arg_type; lambda; root_name; k} ->
+      let k = f.apply k in
+      ICreate_contract {kinfo; storage_type; arg_type; lambda; root_name; k}
   | ISet_delegate (kinfo, k) ->
       ISet_delegate (kinfo, f.apply k)
   | INow (kinfo, k) ->
