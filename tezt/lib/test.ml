@@ -378,6 +378,8 @@ let register ~__FILE__ ~title ~tags body =
     list := {file; title; tags; body; time = 0.} :: !list
 
 let run () =
+  (* Now that all tests are registered, put them in registration order. *)
+  list := List.rev !list ;
   (* Check command-line options. *)
   let all_files_exist =
     check_existence "--file" known_files Cli.options.files_to_run
