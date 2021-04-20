@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,12 +32,15 @@ type mode =
   | Proxy_client  (** [tezos-client --mode proxy] is running *)
   | Proxy_server  (** [tezos-proxy-server] is running *)
 
-(** [build_directory printer rpc_context mode env] returns the directory
-    of RPCs that is served locally by the proxy mode
-    and the light mode. [printer] is used for logging. [rpc_context] is
-    used to perform RPCs to distant endpoints. [mode] specifies whether
-    to use the proxy mode or the light mode. [env] is a protocol-specific
-    module used to create the context passed when executing a RPC. *)
+(** [build_directory printer rpc_context env mode] returns the directory
+    of RPCs that is served locally by the client's light and proxy modes and
+    by the proxy server. Parameters are:
+    
+    - [printer] is used for logging.
+    - [rpc_context] is used to perform RPCs to distant endpoints.
+    - [mode] specifies whether [tezos-client] (light or proxy mode)
+      or [tezos-proxy-server] is running.
+    - [env] is a protocol-specific module used to create the context passed when executing a RPC. *)
 val build_directory :
   Tezos_client_base.Client_context.printer ->
   RPC_context.json ->
