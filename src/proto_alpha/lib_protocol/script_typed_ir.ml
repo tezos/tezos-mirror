@@ -825,9 +825,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IChainId :
       ('a, 's) kinfo * (Chain_id.t, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
-  | INever :
-      (never, 's) kinfo * ('b, 'u, 'r, 'f) kinstr
-      -> (never, 's, 'r, 'f) kinstr
+  | INever : (never, 's) kinfo -> (never, 's, 'r, 'f) kinstr
   | IVoting_power :
       (public_key_hash, 's) kinfo * (n num, 's, 'r, 'f) kinstr
       -> (public_key_hash, 's, 'r, 'f) kinstr
@@ -1522,7 +1520,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | IChainId (kinfo, _) ->
       kinfo
-  | INever (kinfo, _) ->
+  | INever kinfo ->
       kinfo
   | IVoting_power (kinfo, _) ->
       kinfo
@@ -1859,8 +1857,8 @@ let kinstr_rewritek :
       IDropn (kinfo, n, p, f.apply k)
   | IChainId (kinfo, k) ->
       IChainId (kinfo, f.apply k)
-  | INever (kinfo, k) ->
-      INever (kinfo, f.apply k)
+  | INever kinfo ->
+      INever kinfo
   | IVoting_power (kinfo, k) ->
       IVoting_power (kinfo, f.apply k)
   | ITotal_voting_power (kinfo, k) ->

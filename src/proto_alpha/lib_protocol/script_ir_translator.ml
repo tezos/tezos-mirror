@@ -4982,7 +4982,7 @@ and parse_instr :
   | (Prim (loc, I_NEVER, [], annot), Item_t (Never_t _, _rest, _)) ->
       error_unexpected_annot loc annot
       >>?= fun () ->
-      let instr = {csize = 0; apply = (fun kinfo k -> INever (kinfo, k))} in
+      let instr = {csize = 0; apply = (fun kinfo _k -> INever kinfo)} in
       let descr aft = {loc; instr; bef = stack_ty; aft} in
       log_stack ctxt loc stack_ty Bot_t
       >>?= fun () -> return ctxt (Failed {descr})
