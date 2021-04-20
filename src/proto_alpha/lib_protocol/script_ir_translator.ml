@@ -4953,15 +4953,14 @@ and parse_instr :
       error_unexpected_annot loc result_annot
       >>?= fun () ->
       make_proof_argument n tc_context stack
-      >>=? fun (Dipn_proof_argument (n', new_ctxt, descr, aft)) ->
-      (* TODO: which context should be used in the next line? new_ctxt or the old ctxt? *)
+      >>=? fun (Dipn_proof_argument (n', ctxt, descr, aft)) ->
       let kinfo = {iloc = descr.loc; kstack_ty = descr.bef} in
       let kinfoh = {iloc = descr.loc; kstack_ty = descr.aft} in
       let b = descr.instr.apply kinfo (IHalt kinfoh) in
       let res =
         {csize = 0; apply = (fun kinfo k -> IDipn (kinfo, n, n', b, k))}
       in
-      typed new_ctxt loc res aft
+      typed ctxt loc res aft
   | (Prim (loc, I_DIP, (([] | _ :: _ :: _ :: _) as l), _), _) ->
       (* Technically, the arities 1 and 2 are allowed but the error only mentions 2.
             However, DIP {code} is equivalent to DIP 1 {code} so hinting at an arity of 2 makes sense. *)
