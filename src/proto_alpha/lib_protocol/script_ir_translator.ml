@@ -4152,9 +4152,9 @@ and parse_instr :
         (Item_t (elt, starting_rest, elt_annot))
       >>=? fun (judgement, ctxt) ->
       match judgement with
-      | Typed ({aft = Item_t (ret, rest, _); _} as ibody) ->
+      | Typed ({aft = Item_t (ret, rest, _); _} as kibody) ->
           let invalid_map_body () =
-            serialize_stack_for_error ctxt ibody.aft
+            serialize_stack_for_error ctxt kibody.aft
             >|? fun (aft, _ctxt) -> Invalid_map_body (loc, aft)
           in
           Lwt.return
@@ -4167,14 +4167,14 @@ and parse_instr :
                    csize = 1;
                    apply =
                      (fun kinfo k ->
-                       let binfo = kinfo_of_descr ibody in
+                       let binfo = kinfo_of_descr kibody in
                        let hinfo =
                          {
                            iloc = loc;
                            kstack_ty = Item_t (ret, rest, ret_annot);
                          }
                        in
-                       let ibody = ibody.instr.apply binfo (IHalt hinfo) in
+                       let ibody = kibody.instr.apply binfo (IHalt hinfo) in
                        IList_map (kinfo, ibody, k));
                  }
                in
