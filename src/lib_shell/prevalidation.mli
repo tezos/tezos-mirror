@@ -53,6 +53,22 @@ module Classification : sig
   (** [clear classes] resets the state of all fields of [classes],
     * except for [refused] *)
   val clear : t -> unit
+
+  (** [is_in_mempool oph classes] indicates whether [oph] is present
+      in field [in_mempool] of [classes]. *)
+  val is_in_mempool : Operation_hash.t -> t -> bool
+
+  (** [is_applied oph classes] indicates whether [oph] is present
+      in field [applied] of [classes]. *)
+  val is_applied : Operation_hash.t -> t -> bool
+
+  (** [remove_applied oph classes] removes operation of hash [oph]
+      from fields [applied] and [in_mempool] of [classes]. *)
+  val remove_applied : Operation_hash.t -> t -> unit
+
+  (** [remove_not_applied oph classes] removes operation of hash [oph]
+      from all fields of [classes] except from [applied]. *)
+  val remove_not_applied : Operation_hash.t -> t -> unit
 end
 
 (** The requester used by [Prevalidator], backed by [Distributed_db]. *)

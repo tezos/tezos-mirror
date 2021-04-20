@@ -937,6 +937,19 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~output:encoding
           RPC_path.(path / "pending_operations")
 
+      let ban_operation path =
+        RPC_service.post_service
+          ~description:
+            "Remove an operation from the mempool if present, reverting its \
+             effect if it was applied. Add it to the set of banned operations \
+             to prevent it from being fetched/processed/injected in the \
+             future. Note: If the baker has already received the operation, \
+             then it's necessary to restart it to flush the operation from it."
+          ~query:RPC_query.empty
+          ~input:Operation_hash.encoding
+          ~output:unit
+          RPC_path.(path / "ban_operation")
+
       let mempool_query =
         let open RPC_query in
         query (fun applied refused branch_refused branch_delayed ->

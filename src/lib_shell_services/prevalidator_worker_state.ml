@@ -32,6 +32,7 @@ module Request = struct
     | Inject : Operation.t -> unit t
     | Arrived : Operation_hash.t * Operation.t -> unit t
     | Advertise : unit t
+    | Ban : Operation_hash.t -> unit t
 
   type view = View : _ t -> view
 
@@ -91,6 +92,14 @@ module Request = struct
           (obj1 (req "request" (constant "leftover")))
           (function View Leftover -> Some () | _ -> None)
           (fun () -> View Leftover);
+        case
+          (Tag 6)
+          ~title:"Ban"
+          (obj2
+             (req "request" (constant "ban"))
+             (req "operation_hash" Operation_hash.encoding))
+          (function View (Ban oph) -> Some ((), oph) | _ -> None)
+          (fun ((), oph) -> View (Ban oph));
       ]
 
   let pp ppf (View r) =
@@ -120,6 +129,69 @@ module Request = struct
     | Arrived (oph, _) ->
         Format.fprintf ppf "operation %a arrived" Operation_hash.pp oph
     | Advertise -> Format.fprintf ppf "advertising pending operations"
+    | Ban oph -> Format.fprintf ppf "banning operation %a" Operation_hash.pp oph
+end
+
+module Operation_encountered = struct
+  type situation = Injected | Arrived | Notified of P2p_peer_id.t | Other
+
+  type t = situation * Operation_hash.t
+
+  let encoding =
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          (Tag 0)
+          ~title:"injected"
+          (obj2
+             (req "situation" (constant "injected"))
+             (req "operation" Operation_hash.encoding))
+          (function (Injected, oph) -> Some ((), oph) | _ -> None)
+          (fun ((), oph) -> (Injected, oph));
+        case
+          (Tag 1)
+          ~title:"arrived"
+          (obj2
+             (req "situation" (constant "arrived"))
+             (req "operation" Operation_hash.encoding))
+          (function (Arrived, oph) -> Some ((), oph) | _ -> None)
+          (fun ((), oph) -> (Arrived, oph));
+        case
+          (Tag 2)
+          ~title:"notified"
+          (obj3
+             (req "situation" (constant "notified"))
+             (req "operation" Operation_hash.encoding)
+             (req "peer" P2p_peer_id.encoding))
+          (function (Notified peer, oph) -> Some ((), oph, peer) | _ -> None)
+          (fun ((), oph, peer) -> (Notified peer, oph));
+        case
+          (Tag 3)
+          ~title:"other"
+          (obj3
+             (req "situation" (constant "other"))
+             (req "operation" Operation_hash.encoding)
+             (req "peer" P2p_peer_id.encoding))
+          (function (Notified peer, oph) -> Some ((), oph, peer) | _ -> None)
+          (fun ((), oph, peer) -> (Notified peer, oph));
+      ]
+
+  let situation_pp ppf = function
+    | Injected -> Format.fprintf ppf "injected"
+    | Arrived -> Format.fprintf ppf "arrived"
+    | Notified pid -> Format.fprintf ppf "notified from %a" P2p_peer_id.pp pid
+    | Other -> Format.fprintf ppf "encountered"
+
+  let pp ppf (situation, oph) =
+    Format.fprintf
+      ppf
+      "operation %a: %a"
+      situation_pp
+      situation
+      Operation_hash.pp
+      oph
 end
 
 module Event = struct
@@ -133,6 +205,7 @@ module Event = struct
     | Operation_included of Operation_hash.t
     | Operations_not_flushed of int
     | Operation_not_fetched of Operation_hash.t
+    | Banned_operation_encountered of Operation_encountered.t
 
   type view = t
 
@@ -147,10 +220,12 @@ module Event = struct
     | Request (View (Inject _), _, _) -> Internal_event.Notice
     | Request (View (Arrived _), _, _) -> Internal_event.Debug
     | Request (View Advertise, _, _) -> Internal_event.Debug
+    | Request (View (Ban _), _, _) -> Internal_event.Notice
     | Invalid_mempool_filter_configuration | Unparsable_operation _
     | Processing_n_operations _ | Fetching_operation _ | Operation_included _
     | Operations_not_flushed _ | Operation_not_fetched _ ->
         Internal_event.Debug
+    | Banned_operation_encountered _ -> Internal_event.Notice
 
   let encoding =
     let open Data_encoding in
@@ -218,6 +293,14 @@ module Event = struct
           (obj1 (req "operation_not_fetched" Operation_hash.encoding))
           (function Operation_not_fetched oph -> Some oph | _ -> None)
           (fun oph -> Operation_not_fetched oph);
+        case
+          (Tag 9)
+          ~title:"banned_operation_encountered"
+          (obj1
+             (req "banned_operation_encountered" Operation_encountered.encoding))
+          (function
+            | Banned_operation_encountered op_enc -> Some op_enc | _ -> None)
+          (fun op_enc -> Banned_operation_encountered op_enc);
       ]
 
   let pp ppf = function
@@ -237,6 +320,8 @@ module Event = struct
           oph
     | Operations_not_flushed n ->
         Format.fprintf ppf "%d operations were not washed by the flush" n
+    | Banned_operation_encountered op_enc ->
+        Format.fprintf ppf "banned %a" Operation_encountered.pp op_enc
     | Request (view, {pushed; treated; completed}, None) ->
         Format.fprintf
           ppf

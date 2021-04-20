@@ -84,6 +84,7 @@ type types_state_shell = {
   mutable mempool : Mempool.t;
   mutable advertisement : [`Pending of Mempool.t | `None];
   mutable filter_config : Data_encoding.json Protocol_hash.Map.t;
+  mutable banned_operations : Operation_hash.Set.t;
 }
 
 module type T = sig
@@ -289,7 +290,7 @@ type t = (module T)
 
    Operations are identified uniquely by their hash. Given an
    operation hash, the status can be either: [`Fetching; `Pending;
-   `Classified].
+   `Classified; `Banned].
 
      - An operation is [`Fetching] if we only know its hash but we did
    not receive yet the corresponding operation.
@@ -301,9 +302,14 @@ type t = (module T)
    corresponding operation and was classified according to the
    classification given above.
 
+     - We may also ban an operation locally (through an RPC). A
+   [`Banned] operation is removed from all other fields, and is
+   ignored when it is received in any form (its hash, the
+   corresponding operation, or a direct injection from the node).
+
      The prevalidator ensures that an operation cannot be at the same
    time in two of the following fields: [fetching; pending;
-   in_mempool].
+   in_mempool; banned_operations].
 
    Propagation of operations:
 
@@ -494,12 +500,17 @@ module Make
       outdated ;
     Lwt.return new_mempool
 
-  let already_handled shell oph =
-    Operation_hash.Map.mem oph shell.classification.refused.map
-    || Operation_hash.Map.mem oph shell.pending
-    || Operation_hash.Set.mem oph shell.fetching
-    || Operation_hash.Set.mem oph shell.live_operations
-    || Operation_hash.Set.mem oph shell.classification.in_mempool
+  let already_handled ?(situation = Operation_encountered.Other) w shell oph =
+    if Operation_hash.Set.mem oph shell.banned_operations then (
+      Lwt.ignore_result
+        (Worker.log_event w (Banned_operation_encountered (situation, oph))) ;
+      true)
+    else
+      Operation_hash.Map.mem oph shell.classification.refused.map
+      || Operation_hash.Map.mem oph shell.pending
+      || Operation_hash.Set.mem oph shell.fetching
+      || Operation_hash.Set.mem oph shell.live_operations
+      || Operation_hash.Set.mem oph shell.classification.in_mempool
 
   let validation_result (state : types_state) =
     {
@@ -766,7 +777,7 @@ module Make
             pv.fetching <- Operation_hash.Set.remove oph pv.fetching))
       to_fetch
 
-  let rpc_directory =
+  let build_rpc_directory w =
     lazy
       (let dir : state RPC_directory.t ref = ref RPC_directory.empty in
        let module Proto_services = Block_services.Make (Proto) (Proto) in
@@ -795,6 +806,19 @@ module Make
              pv.shell.filter_config <-
                Protocol_hash.Map.add Proto.hash obj pv.shell.filter_config ;
              return ()) ;
+       (* Ban an operation (from its given hash): remove it from the
+          mempool if present. Add it to the set pv.banned_operations
+          to prevent it from being fetched/processed/injected in the
+          future.
+          Note: If the baker has already received the operation, then
+          it's necessary to restart it manually to flush the operation
+          from it. *)
+       dir :=
+         RPC_directory.register
+           !dir
+           (Proto_services.S.Mempool.ban_operation RPC_path.open_root)
+           (fun _pv () oph ->
+             Worker.Queue.push_request_and_wait w (Request.Ban oph)) ;
        dir :=
          RPC_directory.register
            !dir
@@ -968,8 +992,9 @@ module Make
       | Ok b -> b
       | Error _ -> false
 
-    let on_operation_arrived w (pv : state) oph op =
-      if already_handled pv.shell oph then return_unit
+    let on_arrived w (pv : state) oph op =
+      if already_handled ~situation:Operation_encountered.Arrived w pv.shell oph
+      then return_unit
       else if
         not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
       then (
@@ -998,10 +1023,11 @@ module Make
               oph ;
             return_unit
 
-    let on_inject _w (pv : state) op =
+    let on_inject w (pv : state) op =
       let oph = Operation.hash op in
-      if already_handled pv.shell oph then return_unit
-        (* FIXME : is this an error ? *)
+      if
+        already_handled ~situation:Operation_encountered.Injected w pv.shell oph
+      then return_unit (* FIXME : is this an error ? *)
       else
         pv.validation_state >>?= fun validation_state ->
         Prevalidation.parse op >>?= fun parsed_op ->
@@ -1029,7 +1055,13 @@ module Make
       in
       let to_fetch =
         Operation_hash.Set.filter
-          (fun oph -> not (already_handled pv oph))
+          (fun oph ->
+            not
+              (already_handled
+                 ~situation:(Operation_encountered.Notified peer)
+                 w
+                 pv
+                 oph))
           all_ophs
       in
       fetch_operations w pv ~peer to_fetch
@@ -1084,6 +1116,114 @@ module Make
             ~mempool
             pv.predecessor
 
+    (** Recomputes the [validation_state] by replaying the list of
+        [applied] operations.
+
+        This should be called when the list of [applied] operations
+        is modified in a way that is not easily transmitted to the
+        [validation_state], and/or might make this list invalid.
+        E.g. a banned operation has been removed from this list, but
+        we could not simply revert its effect on the state; moreover
+        operations that were initially applied after the banned
+        operation might no longer be classified as [`Applied].
+
+        Applied operations are removed from fields [applied] and
+        [in_mempool], and sent back to [pending]. The [validation_state]
+        is reset to the chain head, and the field [mempool.known_valid]
+        is cleared. Previously applied operations are then classified
+        anew, in the order they were initially applied. *)
+    let reclassify_applied_operations w pv =
+      (* List of previously applied operations, in the order they should
+         be reclassified (since [applied] operations are stored in reverse
+         order of application: cf "General description of the mempool"
+         comment). *)
+      let previously_applied = List.rev pv.shell.classification.applied in
+      (* Previously applied operations are removed from [applied] and
+         [in_mempool], and added instead to [pending]. *)
+      pv.shell.classification.applied <- [] ;
+      let (in_mempool_without_applied, pending_with_applied) =
+        List.fold_left
+          (fun (in_mempool, pending) (oph, op) ->
+            ( Operation_hash.Set.remove oph in_mempool,
+              Operation_hash.Map.add oph op pending ))
+          (pv.shell.classification.in_mempool, pv.shell.pending)
+          previously_applied
+      in
+      pv.shell.classification.in_mempool <- in_mempool_without_applied ;
+      pv.shell.pending <- pending_with_applied ;
+      (* The [validation_state] is reset to the chain head. *)
+      let chain_store =
+        Distributed_db.chain_store pv.shell.parameters.chain_db
+      in
+      Prevalidation.create
+        chain_store
+        ~predecessor:pv.shell.predecessor
+        ~live_blocks:pv.shell.live_blocks
+        ~live_operations:pv.shell.live_operations
+        ~timestamp:(Time.System.to_protocol pv.shell.timestamp)
+        ()
+      >>=? fun validation_state ->
+      (* The field [mempool.known_valid] is cleared. *)
+      let mempool =
+        Mempool.{known_valid = []; pending = pv.shell.mempool.pending}
+      in
+      (* Previously applied operations are classified anew. *)
+      let reclassify_operation (acc_validation_state, acc_mempool) (oph, op) =
+        pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
+        classify_operation w pv acc_validation_state acc_mempool op oph
+      in
+      List.fold_left_s
+        reclassify_operation
+        (validation_state, mempool)
+        previously_applied
+      >>= fun (new_validation_state, new_mempool) ->
+      pv.validation_state <- Ok new_validation_state ;
+      pv.shell.mempool <-
+        {
+          known_valid = List.rev new_mempool.known_valid;
+          pending = new_mempool.pending;
+        } ;
+      Store.Chain.set_mempool
+        chain_store
+        ~head:(Store.Block.hash pv.shell.predecessor)
+        pv.shell.mempool
+
+    let remove_from_advertisement oph = function
+      | `Pending mempool -> `Pending (Mempool.remove oph mempool)
+      | `None -> `None
+
+    let on_ban w pv oph_to_ban =
+      Distributed_db.Operation.clear_or_cancel
+        pv.shell.parameters.chain_db
+        oph_to_ban ;
+      pv.shell.advertisement <-
+        remove_from_advertisement oph_to_ban pv.shell.advertisement ;
+      pv.shell.banned_operations <-
+        Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
+      if Classification.is_in_mempool oph_to_ban pv.shell.classification then
+        if Classification.is_applied oph_to_ban pv.shell.classification then (
+          Classification.remove_applied oph_to_ban pv.shell.classification ;
+          (* To revert the effect of the banned operation's application on the
+             [validation_state], we have to reset it to the chain head and
+             reclassify the other applied operations.
+             Note: [oph_to_ban] has not been removed from
+             [pv.shell.mempool.known_valid], because
+             {!reclassify_applied_operations} will empty it anyway. *)
+          reclassify_applied_operations w pv)
+        else (
+          Classification.remove_not_applied oph_to_ban pv.shell.classification ;
+          pv.shell.mempool <- Mempool.remove oph_to_ban pv.shell.mempool ;
+          Store.Chain.set_mempool
+            (Distributed_db.chain_store pv.shell.parameters.chain_db)
+            ~head:(Store.Block.hash pv.shell.predecessor)
+            pv.shell.mempool)
+      else (
+        pv.shell.pending <-
+          Operation_hash.Map.remove oph_to_ban pv.shell.pending ;
+        pv.shell.fetching <-
+          Operation_hash.Set.remove oph_to_ban pv.shell.fetching ;
+        return_unit)
+
     let on_request : type r. worker -> r Request.t -> r tzresult Lwt.t =
      fun w request ->
       let pv = Worker.state w in
@@ -1104,10 +1244,11 @@ module Make
           (* unprocessed ops are handled just below *)
           return_unit
       | Request.Inject op -> on_inject w pv op
-      | Request.Arrived (oph, op) -> on_operation_arrived w pv oph op
+      | Request.Arrived (oph, op) -> on_arrived w pv oph op
       | Request.Advertise ->
           on_advertise pv.shell ;
-          return_unit)
+          return_unit
+      | Request.Ban oph -> on_ban w pv oph)
       >>=? fun r ->
       handle_unprocessed w pv >>= fun () -> return r
 
@@ -1158,6 +1299,7 @@ module Make
           advertisement = `None;
           filter_config =
             Protocol_hash.Map.empty (* TODO: initialize from config file *);
+          banned_operations = Operation_hash.Set.empty;
         }
       in
       let pv =
@@ -1165,7 +1307,7 @@ module Make
           shell;
           validation_state;
           operation_stream = Lwt_watcher.create_input ();
-          rpc_directory;
+          rpc_directory = build_rpc_directory w;
         }
       in
       fetch_operations w pv.shell fetching ;

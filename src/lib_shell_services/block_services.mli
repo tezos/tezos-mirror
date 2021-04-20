@@ -595,6 +595,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ('a, 'b) RPC_path.t ->
         ([`GET], 'a, 'b, unit, unit, Mempool.t) RPC_service.t
 
+      val ban_operation :
+        ('a, 'b) RPC_path.t ->
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) RPC_service.t
+
       val monitor_operations :
         ('a, 'b) RPC_path.t ->
         ( [`GET],

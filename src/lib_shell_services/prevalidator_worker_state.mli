@@ -32,6 +32,7 @@ module Request : sig
     | Inject : Operation.t -> unit t
     | Arrived : Operation_hash.t * Operation.t -> unit t
     | Advertise : unit t
+    | Ban : Operation_hash.t -> unit t
 
   type view = View : _ t -> view
 
@@ -40,6 +41,28 @@ module Request : sig
   val encoding : view Data_encoding.t
 
   val pp : Format.formatter -> view -> unit
+end
+
+(** Indicates how an operation hash has been encountered:
+    + [Injected]         : The corresponding operation has been directly
+                           injected into the node.
+    + [Notified peer_id] : The hash is present in a mempool advertised by
+                           [peer_id].
+    + [Arrived]          : The node was fetching and has just received the
+                           corresponding operation.
+
+    [Other] serves as default value for an argument, but in practice it is
+    not used atm (June 2021).
+
+    This module is used in {!Event.Banned_operation_encountered}. *)
+module Operation_encountered : sig
+  type situation = Injected | Arrived | Notified of P2p_peer_id.t | Other
+
+  type t = situation * Operation_hash.t
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
 end
 
 module Event : sig
@@ -53,6 +76,7 @@ module Event : sig
     | Operation_included of Operation_hash.t
     | Operations_not_flushed of int
     | Operation_not_fetched of Operation_hash.t
+    | Banned_operation_encountered of Operation_encountered.t
 
   type view = t
 
