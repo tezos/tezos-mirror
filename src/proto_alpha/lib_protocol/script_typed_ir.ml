@@ -120,7 +120,7 @@ type ('key, 'value) big_map_overlay = {
   size : int;
 }
 
-and 'elt boxed_list = {elements : 'elt list; length : int}
+type 'elt boxed_list = {elements : 'elt list; length : int}
 
 type ('arg, 'storage) script = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
