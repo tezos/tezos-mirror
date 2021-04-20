@@ -107,17 +107,12 @@ let test_stack_overflow () =
   run_step ctxt (descr (enorme_et_seq 100_000)) EmptyCell EmptyCell
   >>= function
   | Ok _ ->
-      Alcotest.fail "expected an error"
+      return_unit
   | Error trace ->
       let trace_string =
         Format.asprintf "%a" Environment.Error_monad.pp_trace trace
       in
-      let expect =
-        "Too many recursive calls were needed for interpretation of a \
-         Michelson script"
-      in
-      if Astring.String.is_infix ~affix:expect trace_string then return_unit
-      else Alcotest.failf "Unexpected error (%s) at %s" trace_string __LOC__
+      Alcotest.failf "Unexpected error (%s) at %s" trace_string __LOC__
 
 (** Test the encoding/decoding of script_interpreter.ml specific errors *)
 let test_json_roundtrip name testable enc v =
@@ -165,6 +160,8 @@ let tests =
       "test bad contract error"
       `Quick
       test_bad_contract_parameter;
-    Test_services.tztest "test stack overflow error" `Slow test_stack_overflow
-  ]
+    Test_services.tztest
+      "check robustness overflow error"
+      `Slow
+      test_stack_overflow ]
   @ error_encoding_tests
