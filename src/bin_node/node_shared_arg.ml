@@ -777,16 +777,17 @@ let read_and_patch_config_file ?(may_override_network = false)
               number of people proportional to the number of peers we
               are connected with. Because a heuristic is used, we only
               need to be synchronised with a sufficiently large number
-              of our peers. (x/4) is enough if the
-              `synchronisation-threshold` is not set. *)
+              of our peers. To avoid the lack of connections when x is
+              1, we define the minimum to 1 manually. (x/4) is enough
+              if the `synchronisation-threshold` is not set. *)
             ( Some (max (x / 4) 2),
-              Some (x / 2),
+              Some (if x = 1 then x else x / 2),
               Some x,
               Some (3 * x / 2),
               peer_table_size )
         | Some threshold ->
             ( Some threshold,
-              Some (x / 2),
+              Some (if x = 1 then x else x / 2),
               Some x,
               Some (3 * x / 2),
               peer_table_size ) )

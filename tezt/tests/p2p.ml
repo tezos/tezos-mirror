@@ -62,6 +62,35 @@ let check_peer_option =
   and* _ = Node.wait_for_level node_2 1 in
   unit
 
+(* Test.
+
+   We create one node with the `--connections` option set to 1 and another one
+   with no specification. Then, we use the `--peer` option to let the p2p
+   maintenance of the first node establishes a connection with the other node.
+   To check the nodes are connected, we activate the protocol and check that
+   the block 1 has been propagated. *)
+
+let test_one_connection =
+  let nb_connection = 1 in
+  Protocol.register_test
+    ~__FILE__
+    ~title:"check --connection=1 option"
+    ~tags:["p2p"; "cli"; "connections"]
+  @@ fun protocol ->
+  let* node_1 = Node.init [Synchronisation_threshold 0] in
+  let* client = Client.init ~node:node_1 () in
+  let* () = Client.activate_protocol ~protocol client in
+  let node_2 = Node.create [Connections nb_connection] in
+  let wait = wait_for_accepted_peer_ids node_2 in
+  let* () = Node.identity_generate node_2 in
+  let* () = Node.config_init node_2 [] in
+  let* () = Node.add_peer_with_id node_2 node_1 in
+  let* () = Node.run node_2 [] in
+  let* () = wait in
+  let* _ = Node.wait_for_level node_1 1
+  and* _ = Node.wait_for_level node_2 1 in
+  unit
+
 (* [wait_pred] waits until [pred arg] is true. An active wait with Lwt
    cooperation points is used. *)
 let rec wait_pred ~pred ~arg =
@@ -172,4 +201,6 @@ end
 
 let register_protocol_independent () = Maintenance.tests ()
 
-let register ~protocols = check_peer_option ~protocols
+let register ~protocols =
+  check_peer_option ~protocols ;
+  test_one_connection ~protocols

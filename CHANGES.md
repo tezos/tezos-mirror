@@ -82,6 +82,9 @@ be documented here either.
 
 - Fixed a bug where the mempool could crash with an assertion failure.
 
+- Fixed a bug that caused the lack of connection in private network
+  with `--connections` set to 1.
+
 ## Client
 
 - Changed to 5 the recommended number of blocks after which an operation can be
