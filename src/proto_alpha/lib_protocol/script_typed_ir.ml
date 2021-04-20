@@ -377,9 +377,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (('a, 'b) map, 's, 'r, 'f) kinstr
       -> ('a, 'b option * (('a, 'b) map * 's), 'r, 'f) kinstr
   | IMap_get_and_update :
-      ('a, 'v option * (('a, 'v) map * 'rest)) kinfo
-      * ('v option, ('a, 'v) map * 'rest, 'r, 'f) kinstr
-      -> ('a, 'v option * (('a, 'v) map * 'rest), 'r, 'f) kinstr
+      ('a, 'b option * (('a, 'b) map * 's)) kinfo
+      * ('b option, ('a, 'b) map * 's, 'r, 'f) kinstr
+      -> ('a, 'b option * (('a, 'b) map * 's), 'r, 'f) kinstr
   | IMap_size :
       (('a, 'b) map, 's) kinfo * (n num, 's, 'r, 'f) kinstr
       -> (('a, 'b) map, 's, 'r, 'f) kinstr
@@ -404,9 +404,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (('a, 'b) big_map, 's, 'r, 'f) kinstr
       -> ('a, 'b option * (('a, 'b) big_map * 's), 'r, 'f) kinstr
   | IBig_map_get_and_update :
-      ('a, 'v option * (('a, 'v) big_map * 'rest)) kinfo
-      * ('v option, ('a, 'v) big_map * 'rest, 'r, 'f) kinstr
-      -> ('a, 'v option * (('a, 'v) big_map * 'rest), 'r, 'f) kinstr
+      ('a, 'b option * (('a, 'b) big_map * 's)) kinfo
+      * ('b option, ('a, 'b) big_map * 's, 'r, 'f) kinstr
+      -> ('a, 'b option * (('a, 'b) big_map * 's), 'r, 'f) kinstr
   (*
      Strings
      -------
