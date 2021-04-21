@@ -1,3 +1,11 @@
+Version 9.0
+===========
+
+Node
+----
+
+-  Fixed a bug where the mempool could crash with an assertion failure.
+
 Version 9.0~rc2
 ===============
 

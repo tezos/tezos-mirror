@@ -85,8 +85,6 @@ Node
    hostname of the device the node is running on, and it can be
    customized with environment variable ``TEZOS_NODE_HOSTNAME``.
 
--  Fixed a bug where the mempool could crash with an assertion failure.
-
 -  Fixed a bug that caused the lack of connection in private network
    with ``--connections`` set to 1.
 
@@ -116,6 +114,14 @@ Docker Images
 
 Miscellaneous
 -------------
+
+Version 9.0
+===========
+
+Node
+----
+
+-  Fixed a bug where the mempool could crash with an assertion failure.
 
 Version 9.0~rc2
 ===============
