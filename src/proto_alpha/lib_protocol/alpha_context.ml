@@ -128,9 +128,11 @@ module Gas = struct
   type error +=
     | Operation_quota_exceeded = Raw_context.Operation_quota_exceeded
 
-  let check_limit = Raw_context.check_gas_limit
+  let check_limit_is_valid = Raw_context.check_gas_limit_is_valid
 
   let set_limit = Raw_context.set_gas_limit
+
+  let consume_limit_in_block = Raw_context.consume_gas_limit_in_block
 
   let set_unlimited = Raw_context.set_gas_unlimited
 

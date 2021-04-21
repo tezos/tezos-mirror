@@ -213,7 +213,9 @@ module Gas : sig
 
   val ( +@ ) : cost -> cost -> cost
 
-  val check_limit : context -> 'a Arith.t -> unit tzresult
+  val check_limit_is_valid : context -> 'a Arith.t -> unit tzresult
+
+  val consume_limit_in_block : context -> 'a Arith.t -> context tzresult
 
   val set_limit : context -> 'a Arith.t -> context
 
