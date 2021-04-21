@@ -271,6 +271,10 @@ class Client:
         params = ['hash', 'script', contract]
         return self.run(params)
 
+    def get_script_hash(self, contract: str) -> str:
+        params = ['get', 'contract', 'script', 'hash', 'for', contract]
+        return self.run(params)
+
     def gen_key(self, alias: str, args: List[str] = None) -> str:
         cmd = ['gen', 'keys', alias]
         if args is None:
