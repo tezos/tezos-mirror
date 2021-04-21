@@ -46,6 +46,8 @@ open Test_tez
 
 let ten_tez = Tez.of_int 10
 
+let gas_limit = Alpha_context.Gas.Arith.integral_of_int_exn 3000
+
 (** Groups ten transactions between the same parties. *)
 let test_multiple_transfers () =
   Context.init 3
@@ -53,7 +55,9 @@ let test_multiple_transfers () =
   let (c1, c2, c3) =
     match contracts with [c1; c2; c3] -> (c1, c2, c3) | _ -> assert false
   in
-  List.map_es (fun _ -> Op.transaction (B blk) c1 c2 Tez.one) (1 -- 10)
+  List.map_es
+    (fun _ -> Op.transaction ~gas_limit (B blk) c1 c2 Tez.one)
+    (1 -- 10)
   >>=? fun ops ->
   Op.combine_operations ~source:c1 (B blk) ops
   >>=? fun operation ->
@@ -96,6 +100,7 @@ let test_multiple_origination_and_delegation () =
   List.map_es
     (fun i ->
       Op.origination
+        ~gas_limit
         ~delegate:delegate_pkh
         ~counter:(Z.of_int i)
         ~fee:Tez.zero
@@ -175,11 +180,11 @@ let test_failing_operation_in_the_middle () =
   let (c1, c2) =
     match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
   in
-  Op.transaction ~fee:Tez.zero (B blk) c1 c2 Tez.one
+  Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.one
   >>=? fun op1 ->
-  Op.transaction ~fee:Tez.zero (B blk) c1 c2 Tez.max_tez
+  Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.max_tez
   >>=? fun op2 ->
-  Op.transaction ~fee:Tez.zero (B blk) c1 c2 Tez.one
+  Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.one
   >>=? fun op3 ->
   let operations = [op1; op2; op3] in
   Op.combine_operations ~source:c1 (B blk) operations
@@ -315,9 +320,9 @@ let test_wrong_signature_in_the_middle () =
   | (_, []) | (_, [_]) ->
       assert false
   | (blk, c1 :: c2 :: _) ->
-      Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one
+      Op.transaction ~gas_limit ~fee:Tez.one (B blk) c1 c2 Tez.one
       >>=? fun op1 ->
-      Op.transaction ~fee:Tez.one (B blk) c2 c1 Tez.one
+      Op.transaction ~gas_limit ~fee:Tez.one (B blk) c2 c1 Tez.one
       >>=? fun op2 ->
       Incremental.begin_construction blk
       >>=? fun inc ->
@@ -327,13 +332,13 @@ let test_wrong_signature_in_the_middle () =
       Incremental.add_operation inc op2
       >>=? fun inc ->
       (* Cook transactions for actual test *)
-      Op.transaction ~fee:Tez.one (I inc) c1 c2 Tez.one
+      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one
       >>=? fun op1 ->
-      Op.transaction ~fee:Tez.one (I inc) c1 c2 Tez.one
+      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one
       >>=? fun op2 ->
-      Op.transaction ~fee:Tez.one (I inc) c1 c2 Tez.one
+      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one
       >>=? fun op3 ->
-      Op.transaction ~fee:Tez.one (I inc) c2 c1 Tez.one
+      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
       >>=? fun spurious_operation ->
       let operations = [op1; op2; op3] in
       Op.combine_operations ~spurious_operation ~source:c1 (I inc) operations
