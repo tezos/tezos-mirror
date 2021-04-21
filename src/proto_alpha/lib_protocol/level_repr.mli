@@ -36,12 +36,21 @@ type cycle_era = {
        cycle era starting with first_level. *)
 }
 
-(** Invariants regarding cycle eras:
-   - the first levels and the first cycles are decreasing, meaning that the 
-     first era is the current era, and the last era is the oldest era
+(** Stores the cycles eras of the Alpha family of protocols *)
+type cycle_eras
+
+val cycle_eras_encoding : cycle_eras Data_encoding.t
+
+(** Preconditions on the input list of cycle eras:
+   - the list is not empty
+   - the first levels and the first cycles are decreasing, meaning that the
+     first era in the list is the current era, and the last era in the list
+     is the oldest era
+   Invariants: 
    - the first era therefore contains the same constants as in Constants
    - the first level of an era is the first level of a cycle
 *)
+val create_cycle_eras : cycle_era list -> cycle_eras tzresult
 
 type t = private {
   level : Raw_level_repr.t;
@@ -70,10 +79,26 @@ val pp : Format.formatter -> level -> unit
 
 val pp_full : Format.formatter -> level -> unit
 
-val root_level : Raw_level_repr.t -> level
+(** Returns the first level of the oldest era *)
+val root_level : cycle_eras -> level
 
-val cycle_era_encoding : cycle_era Data_encoding.t
-
-val level_from_raw : cycle_eras:cycle_era list -> Raw_level_repr.t -> level
+(** Returns the annotated level corresponding to a raw level and an
+   offset. A positive offset corresponds to a higher level. *)
+val from_raw :
+  cycle_eras:cycle_eras -> ?offset:int32 -> Raw_level_repr.t -> level
 
 val diff : level -> level -> int32
+
+(** Returns the current era *)
+val current_era : cycle_eras -> cycle_era
+
+(** Returns the first level of the given cycle. *)
+val first_level_in_cycle : cycle_eras:cycle_eras -> Cycle_repr.t -> level
+
+(** Returns true if the given level is the last of a cycle. *)
+val last_of_cycle : cycle_eras:cycle_eras -> level -> bool
+
+(**/**)
+
+(* exported for unit testing only *)
+type error += Invalid_cycle_eras

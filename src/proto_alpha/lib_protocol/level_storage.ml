@@ -25,23 +25,11 @@
 
 open Level_repr
 
-let from_raw_with_eras cycle_eras ?offset l =
-  let l =
-    match offset with
-    | None ->
-        l
-    | Some o ->
-        Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o))
-  in
-  Level_repr.level_from_raw ~cycle_eras l
-
 let from_raw c ?offset l =
   let cycle_eras = Raw_context.cycle_eras c in
-  from_raw_with_eras cycle_eras ?offset l
+  Level_repr.from_raw ~cycle_eras ?offset l
 
-let root c =
-  let first_cycle_era = List.hd (Raw_context.cycle_eras c) in
-  Level_repr.root_level first_cycle_era.first_level
+let root c = Raw_context.cycle_eras c |> Level_repr.root_level
 
 let succ c (l : Level_repr.t) = from_raw c (Raw_level_repr.succ l.level)
 
@@ -62,23 +50,9 @@ let previous ctxt =
   | Some p ->
       p
 
-let first_level_in_cycle_with_eras cycle_eras cycle =
-  let rec aux = function
-    | {first_level; first_cycle; blocks_per_cycle; _} :: tail ->
-        if Cycle_repr.(cycle >= first_cycle) then
-          (* cycle is in the current era *)
-          let cycle_position = Cycle_repr.diff cycle first_cycle in
-          let first_level_offset = Int32.mul blocks_per_cycle cycle_position in
-          from_raw_with_eras cycle_eras ~offset:first_level_offset first_level
-        else aux tail
-    | [] ->
-        assert false
-  in
-  aux cycle_eras
-
 let first_level_in_cycle ctxt cycle =
   let cycle_eras = Raw_context.cycle_eras ctxt in
-  first_level_in_cycle_with_eras cycle_eras cycle
+  Level_repr.first_level_in_cycle cycle_eras cycle
 
 let last_level_in_cycle ctxt c =
   match pred ctxt (first_level_in_cycle ctxt (Cycle_repr.succ c)) with
@@ -122,24 +96,9 @@ let last_allowed_fork_level c =
   | Some cycle ->
       (first_level_in_cycle c cycle).level
 
-let era_of_level cycle_eras level =
-  let rec aux = function
-    | era :: ({first_level = first_level_of_next_era} :: _ as tail) ->
-        (* invariant: level >= first_level *)
-        if Raw_level_repr.(level < first_level_of_next_era) then era
-        else aux tail
-    | [era] ->
-        era
-    | [] ->
-        assert false
-  in
-  aux cycle_eras
-
 let last_of_a_cycle ctxt level =
   let cycle_eras = Raw_context.cycle_eras ctxt in
-  let current_era = era_of_level cycle_eras level.level in
-  Compare.Int32.(
-    Int32.succ level.cycle_position = current_era.blocks_per_cycle)
+  Level_repr.last_of_cycle cycle_eras level
 
 let dawn_of_a_new_cycle ctxt =
   let level = current ctxt in
