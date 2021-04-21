@@ -2046,6 +2046,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       check_history_mode chain_store ~rolling >>=? fun () ->
       retrieve_export_block chain_store block
       >>=? fun (export_block, pred_block, lowest_block_level_needed) ->
+      (* The number of additional cycles to export is fixed as the
+         snasphot content must not rely on the local configuration. *)
       let export_mode = History_mode.Rolling (Some {offset = 0}) in
       Event.(
         emit export_info (export_mode, Store.Block.descriptor export_block))
@@ -2116,6 +2118,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       check_history_mode chain_store ~rolling >>=? fun () ->
       retrieve_export_block chain_store block
       >>=? fun (export_block, pred_block, _lowest_block_level_needed) ->
+      (* The number of additional cycles to export is fixed as the
+         snasphot content must not rely on the local configuration. *)
       let export_mode = History_mode.Full (Some {offset = 0}) in
       Event.(
         emit export_info (export_mode, Store.Block.descriptor export_block))
@@ -3244,7 +3248,11 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       ({hash = Block_header.hash block_data.block_header; contents; metadata}
         : Block_repr.block)
     in
-    (* Set the history mode with the default offset *)
+    (* Set the history mode with the default additional cycle
+       offset. This is necessary as the snapshot content does not rely
+       on a given offset. If the node was configured to run with the
+       non default number of additional cycles, it will be
+       automatically updated when running the node. *)
     (let open History_mode in
     match snapshot_metadata.history_mode with
     | Archive -> assert false
