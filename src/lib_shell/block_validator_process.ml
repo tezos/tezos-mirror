@@ -370,6 +370,9 @@ module External_validator_process = struct
            | Unix.Unix_error (ENOENT, _, _) ->
                (* The file does not exist *)
                Lwt.return_unit
+           | Unix.Unix_error (EACCES, _, _) ->
+               (* We ignore failing on EACCES as no file was created *)
+               Lwt.return_unit
            | exn ->
                Lwt.fail exn)
      in
@@ -383,7 +386,7 @@ module External_validator_process = struct
            ~canceler
            ~max_requests:1
            ~socket_path
-         >>= fun process_socket -> Lwt_unix.accept process_socket)
+         >>=? fun process_socket -> Lwt_unix.accept process_socket >>= return)
        (fun () ->
          (* As the external validation process is now started, we can
             unlink the named socket. Indeed, the file descriptor will
@@ -393,10 +396,10 @@ module External_validator_process = struct
             trigger the clean up procedure if some sockets related
             errors are thrown. *)
          clean_process_fd socket_path)
-     >>= fun (process_socket, _) ->
+     >>=? fun (process_socket, _) ->
      Lwt_exit.unregister_clean_up_callback process_fd_cleaner ;
-     Lwt.return (process, process_socket))
-    >>= fun (process, process_socket) ->
+     return (process, process_socket))
+    >>=? fun (process, process_socket) ->
     let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
     let process_stdout = Lwt_io.of_fd ~mode:Input process_socket in
     Events.(emit validator_started process#pid)
@@ -440,7 +443,7 @@ module External_validator_process = struct
       | Running ->
           return (process, process_stdin, process_stdout)
       | Exited status ->
-          Lwt_canceler.cancel canceler
+          Error_monad.cancel_with_exceptions canceler
           >>= fun () ->
           vp.validator_process <- None ;
           Events.(emit process_exited_abnormally status)
@@ -573,7 +576,7 @@ module External_validator_process = struct
                   Events.(emit process_exited_abnormally status)
                   >>= fun () -> process#terminate ; Lwt.return_unit)
         >>= fun () ->
-        Lwt_canceler.cancel canceler
+        Error_monad.cancel_with_exceptions canceler
         >>= fun () ->
         vp.validator_process <- None ;
         Lwt.return_unit

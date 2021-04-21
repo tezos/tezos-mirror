@@ -191,7 +191,7 @@ let commands () =
       (fun () (cctxt : Protocol_client_context.full) ->
         Program.load cctxt
         >>=? fun list ->
-        Lwt_list.iter_s (fun (n, _) -> cctxt#message "%s" n) list
+        List.iter_s (fun (n, _) -> cctxt#message "%s" n) list
         >>= fun () -> return_unit);
     command
       ~group

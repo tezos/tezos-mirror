@@ -73,7 +73,7 @@ let conn_meta_config : metadata P2p_params.conn_meta_config =
 
 let rec listen ?port addr =
   let tentative_port =
-    match port with None -> 1024 + Random.int 8192 | Some port -> port
+    match port with None -> 49152 + Random.int 16384 | Some port -> port
   in
   let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
   let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
@@ -96,9 +96,10 @@ let sync ch =
   >>=? fun () -> Process.Channel.pop ch >>=? fun () -> return_unit
 
 let rec sync_nodes nodes =
-  iter_p (fun p -> Process.receive p) nodes
+  List.iter_ep (fun p -> Process.receive p) nodes
   >>=? fun () ->
-  iter_p (fun p -> Process.send p ()) nodes >>=? fun () -> sync_nodes nodes
+  List.iter_ep (fun p -> Process.send p ()) nodes
+  >>=? fun () -> sync_nodes nodes
 
 let sync_nodes nodes =
   sync_nodes nodes
@@ -327,20 +328,21 @@ end
 module Low_level = struct
   let simple_msg = Rand.generate (1 lsl 4)
 
-  let client _ch sched addr port =
+  let client ch sched addr port =
     let msg = Bytes.create (Bytes.length simple_msg) in
     raw_connect sched addr port
     >>= fun fd ->
     P2p_io_scheduler.read_full fd msg
     >>=? fun () ->
     tzassert (Bytes.compare simple_msg msg = 0) __POS__
-    >>=? fun () -> P2p_io_scheduler.close fd
+    >>=? fun () -> sync ch >>=? fun () -> P2p_io_scheduler.close fd
 
-  let server _ch sched socket =
+  let server ch sched socket =
     raw_accept sched socket
     >>= fun (fd, _point) ->
     P2p_io_scheduler.write fd simple_msg
-    >>=? fun () -> P2p_io_scheduler.close fd >>=? fun _ -> return_unit
+    >>=? fun () ->
+    sync ch >>=? fun () -> P2p_io_scheduler.close fd >>=? fun _ -> return_unit
 
   let run _dir = run_nodes client server
 end
@@ -362,7 +364,7 @@ module Nack = struct
         log_notice "Error: %a" pp_print_error err ;
         false
 
-  let server _ch sched socket =
+  let server ch sched socket =
     accept sched socket
     >>=? fun (info, auth_fd) ->
     tzassert info.incoming __POS__
@@ -371,14 +373,13 @@ module Nack = struct
     >>= fun id2 ->
     tzassert (P2p_peer.Id.compare info.peer_id id2.peer_id = 0) __POS__
     >>=? fun () ->
-    P2p_socket.nack auth_fd P2p_rejection.No_motive []
-    >>= fun () -> return_unit
+    P2p_socket.nack auth_fd P2p_rejection.No_motive [] >>= fun () -> sync ch
 
-  let client _ch sched addr port =
+  let client ch sched addr port =
     connect sched addr port id2
     >>=? fun auth_fd ->
     P2p_socket.accept ~canceler auth_fd encoding
-    >>= fun conn -> tzassert (is_rejected conn) __POS__
+    >>= fun conn -> tzassert (is_rejected conn) __POS__ >>=? fun () -> sync ch
 
   let run _dir = run_nodes client server
 end
@@ -390,20 +391,19 @@ end
 module Nacked = struct
   let encoding = Data_encoding.bytes
 
-  let server _ch sched socket =
+  let server ch sched socket =
     accept sched socket
     >>=? fun (_info, auth_fd) ->
     P2p_socket.accept ~canceler auth_fd encoding
-    >>= fun conn -> tzassert (Nack.is_rejected conn) __POS__
+    >>= fun conn ->
+    tzassert (Nack.is_rejected conn) __POS__ >>=? fun () -> sync ch
 
-  let client _ch sched addr port =
+  let client ch sched addr port =
     connect sched addr port id2
     >>=? fun auth_fd ->
-    P2p_socket.nack auth_fd P2p_rejection.No_motive []
-    >>= fun () -> return_unit
+    P2p_socket.nack auth_fd P2p_rejection.No_motive [] >>= fun () -> sync ch
 
-  (* This test is skipped because its result on the CI is not deterministic *)
-  let run _dir = return_unit
+  let run _dir = run_nodes client server
 end
 
 (** Spawns a client and a server. A client tries to connect to a
@@ -494,9 +494,15 @@ end
 module Oversized_message = struct
   let encoding = Data_encoding.bytes
 
-  let simple_msg = Rand.generate (1 lsl 17)
+  let rec rand_gen () =
+    try Rand.generate (1 lsl 17)
+    with _ ->
+      log_error "Not enough entropy, retrying to generate random data" ;
+      rand_gen ()
 
-  let simple_msg2 = Rand.generate (1 lsl 17)
+  let simple_msg = rand_gen ()
+
+  let simple_msg2 = rand_gen ()
 
   let server ch sched socket =
     accept sched socket
@@ -662,7 +668,18 @@ let spec =
                    ~rules:
                      "test.p2p.connection -> debug; p2p.connection -> debug"
                    ())),
-        " Log up to debug msgs" ) ]
+        " Log up to debug msgs" );
+      ( "-vvv",
+        Unit
+          (fun () ->
+            log_config :=
+              Some
+                (Lwt_log_sink_unix.create_cfg
+                   ~rules:
+                     "test.p2p.connection -> debug; p2p.connection ->  debug; \
+                      p2p.io-scheduler ->  debug "
+                   ())),
+        " Log up to debug msgs even in io_scheduler" ) ]
 
 let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
 

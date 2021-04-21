@@ -1,0 +1,108 @@
+tezt/_regressions/encoding/alpha.receipt.balance_updates.out
+
+./tezos-codec encode alpha.receipt.balance_updates from '[
+  {
+    "kind": "contract",
+    "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+    "change": "0",
+    "origin": "block"
+  }
+]'
+0000002000000002298c03ed7d454a101eb7022bc95f7e5f41ac78000000000000000000
+
+./tezos-codec decode alpha.receipt.balance_updates from 0000002000000002298c03ed7d454a101eb7022bc95f7e5f41ac78000000000000000000
+[ { "kind": "contract", "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+    "change": "0", "origin": "block" } ]
+
+./tezos-codec encode alpha.receipt.balance_updates from '[
+  {
+    "kind": "contract",
+    "contract": "KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat",
+    "change": "-1",
+    "origin": "block"
+  }
+]'
+00000020000138560805b4c8d7b7fbbafad5c59dbfa3878ca70500ffffffffffffffff00
+
+./tezos-codec decode alpha.receipt.balance_updates from 00000020000138560805b4c8d7b7fbbafad5c59dbfa3878ca70500ffffffffffffffff00
+[ { "kind": "contract", "contract": "KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat",
+    "change": "-1", "origin": "block" } ]
+
+./tezos-codec encode alpha.receipt.balance_updates from '[
+  {
+    "kind": "freezer",
+    "category": "deposits",
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+    "cycle": 5,
+    "change": "-1",
+    "origin": "block"
+  }
+]'
+00000023030002298c03ed7d454a101eb7022bc95f7e5f41ac7800000005ffffffffffffffff00
+
+./tezos-codec decode alpha.receipt.balance_updates from 00000023030002298c03ed7d454a101eb7022bc95f7e5f41ac7800000005ffffffffffffffff00
+[ { "kind": "freezer", "category": "deposits",
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "cycle": 5,
+    "change": "-1", "origin": "block" } ]
+
+./tezos-codec encode alpha.receipt.balance_updates from '[
+  {
+    "kind": "freezer",
+    "category": "fees",
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+    "cycle": 2147483647,
+    "change": "1",
+    "origin": "block"
+  }
+]'
+00000023020002298c03ed7d454a101eb7022bc95f7e5f41ac787fffffff000000000000000100
+
+./tezos-codec decode alpha.receipt.balance_updates from 00000023020002298c03ed7d454a101eb7022bc95f7e5f41ac787fffffff000000000000000100
+[ { "kind": "freezer", "category": "fees",
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "cycle": 2147483647,
+    "change": "1", "origin": "block" } ]
+
+./tezos-codec encode alpha.receipt.balance_updates from '[
+  {
+    "kind": "freezer",
+    "category": "rewards",
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+    "cycle": 0,
+    "change": "0",
+    "origin": "block"
+  }
+]'
+00000023010002298c03ed7d454a101eb7022bc95f7e5f41ac7800000000000000000000000000
+
+./tezos-codec decode alpha.receipt.balance_updates from 00000023010002298c03ed7d454a101eb7022bc95f7e5f41ac7800000000000000000000000000
+[ { "kind": "freezer", "category": "rewards",
+    "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "cycle": 0,
+    "change": "0", "origin": "block" } ]
+
+./tezos-codec encode alpha.receipt.balance_updates from '[
+  {
+    "kind": "contract",
+    "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+    "change": "0",
+    "origin": "migration"
+  }
+]'
+0000002000000002298c03ed7d454a101eb7022bc95f7e5f41ac78000000000000000001
+
+./tezos-codec decode alpha.receipt.balance_updates from 0000002000000002298c03ed7d454a101eb7022bc95f7e5f41ac78000000000000000001
+[ { "kind": "contract", "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+    "change": "0", "origin": "migration" } ]
+
+./tezos-codec encode alpha.receipt.balance_updates from '[
+  {
+    "kind": "contract",
+    "contract": "KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat",
+    "change": "-1",
+    "origin": "migration"
+  }
+]'
+00000020000138560805b4c8d7b7fbbafad5c59dbfa3878ca70500ffffffffffffffff01
+
+./tezos-codec decode alpha.receipt.balance_updates from 00000020000138560805b4c8d7b7fbbafad5c59dbfa3878ca70500ffffffffffffffff01
+[ { "kind": "contract", "contract": "KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat",
+    "change": "-1", "origin": "migration" } ]

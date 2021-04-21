@@ -78,10 +78,12 @@ let test_eval1 () =
     Subst
       (struct
         let subst x =
-          try List.assoc x [(fv_v1, 88.); (fv_v2, 4.); (fv_const, -10.)]
-          with e ->
-            Format.eprintf "failed to get %a@." Free_variable.pp x ;
-            raise e
+          match List.assoc x [(fv_v1, 88.); (fv_v2, 4.); (fv_const, -10.)] with
+          | Some v ->
+              v
+          | None ->
+              Format.eprintf "failed to get %a@." Free_variable.pp x ;
+              raise Not_found
       end)
       (Eval)
   in
@@ -93,7 +95,13 @@ let test_eval2 () =
   let module Subst =
     Subst
       (struct
-        let subst x = List.assoc x [(fv_v1, 2.); (fv_v2, 4.); (fv_const, -10.)]
+        let subst x =
+          match List.assoc x [(fv_v1, 2.); (fv_v2, 4.); (fv_const, -10.)] with
+          | Some v ->
+              v
+          | None ->
+              Format.eprintf "failed to get %a@." Free_variable.pp x ;
+              raise Not_found
       end)
       (Eval)
   in

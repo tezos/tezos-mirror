@@ -44,7 +44,8 @@ let update_config_with_user_activated config_file level protocol =
             list
               dict
               [ [ ("level", int level);
-                  ("replacement_protocol", string protocol) ] ] ) ])
+                  ("replacement_protocol", string (Protocol.hash protocol)) ]
+              ] ) ])
   in
   let config_json = JSON.parse_file config_file in
   let config_json =
@@ -144,7 +145,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
   Log.info "Bake and wait until migration is finished" ;
   let* () = bake_with_foundation client in
   let* _until_mig = Node.wait_for_level node migration_level in
-  let* levels_in_current_cycle = RPC.get_levels_in_curent_cycle client in
+  let* levels_in_current_cycle = RPC.get_levels_in_current_cycle client in
   let last_block_of_cycle =
     JSON.(levels_in_current_cycle |-> "last" |> as_int)
   in
@@ -166,7 +167,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
       after_cycle
   else unit
 
-let protocol = Constant.alpha.hash
+let protocol = Protocol.Alpha
 
 let context = "~/tezos-node-test"
 

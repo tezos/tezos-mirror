@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -33,7 +33,7 @@ type config = {
   listening_addr : P2p_addr.t option;
   discovery_port : P2p_addr.port option;
   discovery_addr : Ipaddr.V4.t option;
-  trusted_points : P2p_point.Id.t list;
+  trusted_points : (P2p_point.Id.t * P2p_peer.Id.t option) list;
   peers_file : string;
   private_mode : bool;
   identity : P2p_identity.t;
@@ -62,6 +62,9 @@ type limits = {
   outgoing_message_queue_size : int option;
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
+  peer_greylist_size : int;
+  ip_greylist_size_in_kilobytes : int;
+  ip_greylist_cleanup_delay : Time.System.Span.t;
   swap_linger : Time.System.Span.t;
   binary_chunks_size : int option;
 }
@@ -86,6 +89,9 @@ let create_connection_pool config limits meta_cfg log triggers =
       private_mode = config.private_mode;
       max_known_points = limits.max_known_points;
       max_known_peer_ids = limits.max_known_peer_ids;
+      peer_greylist_size = limits.peer_greylist_size;
+      ip_greylist_size_in_kilobytes = limits.ip_greylist_size_in_kilobytes;
+      ip_greylist_cleanup_delay = limits.ip_greylist_cleanup_delay;
     }
   in
   P2p_pool.create pool_cfg meta_cfg ~log triggers
@@ -140,11 +146,10 @@ let create_maintenance_worker limits pool connect_handler config triggers log =
   let maintenance_config =
     {
       P2p_maintenance.maintenance_idle_time = limits.maintenance_idle_time;
-      greylist_timeout = limits.greylist_timeout;
       private_mode = config.private_mode;
       min_connections = limits.min_connections;
       max_connections = limits.max_connections;
-      expected_connections = limits.max_connections;
+      expected_connections = limits.expected_connections;
     }
   in
   let discovery = may_create_discovery_worker limits config pool in
@@ -262,7 +267,7 @@ module Real = struct
   let shutdown net () =
     lwt_log_notice "Shutting down the p2p's welcome worker..."
     >>= fun () ->
-    Lwt_utils.may ~f:P2p_welcome.shutdown net.welcome
+    Option.iter_s P2p_welcome.shutdown net.welcome
     >>= fun () ->
     lwt_log_notice "Shutting down the p2p's network maintenance worker..."
     >>= fun () ->

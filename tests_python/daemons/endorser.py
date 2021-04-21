@@ -1,7 +1,7 @@
 from typing import List
 import os
 import subprocess
-from . import utils
+from process import process_utils
 
 
 # Timeout before killing an endorser which doesn't react to SIGTERM
@@ -11,12 +11,14 @@ TERM_TIMEOUT = 10
 class Endorser(subprocess.Popen):
     """Fork an endorser linked to a client"""
 
-    def __init__(self,
-                 endorser: str,
-                 rpc_port: int,
-                 base_dir: str,
-                 params: List[str] = None,
-                 log_file: str = None):
+    def __init__(
+        self,
+        endorser: str,
+        rpc_port: int,
+        base_dir: str,
+        params: List[str] = None,
+        log_file: str = None,
+    ):
         """Create a new Popen instance for the endorser process.
 
         Args:
@@ -37,11 +39,12 @@ class Endorser(subprocess.Popen):
         endpoint = f'http://127.0.0.1:{rpc_port}'
         cmd = [endorser, '-base-dir', base_dir, '-endpoint', endpoint]
         cmd.extend(params)
-        cmd_string = utils.format_command(cmd)
+        cmd_string = process_utils.format_command(cmd)
         print(cmd_string)
-        stdout, stderr = utils.prepare_log(cmd, log_file)
-        subprocess.Popen.__init__(self, cmd, stdout=stdout,
-                                  stderr=stderr)  # type: ignore
+        stdout, stderr = process_utils.prepare_log(cmd, log_file)
+        subprocess.Popen.__init__(
+            self, cmd, stdout=stdout, stderr=stderr
+        )  # type: ignore
 
     def terminate_or_kill(self):
         self.terminate()

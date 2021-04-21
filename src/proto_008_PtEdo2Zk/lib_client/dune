@@ -6,6 +6,7 @@
             tezos-shell-services
             tezos-client-base
             tezos-mockup-registration
+            tezos-proxy
             tezos-rpc
             tezos-signer-backends
             tezos-protocol-008-PtEdo2Zk-parameters

@@ -16,8 +16,11 @@ import ed25519
 import pyblake2
 import requests
 from client.client import Client
-from client.client_output import (BakeForResult, RunScriptResult,
-                                  InvalidClientOutput)
+from client.client_output import (
+    BakeForResult,
+    RunScriptResult,
+    InvalidClientOutput,
+)
 
 from . import constants
 
@@ -32,6 +35,7 @@ def retry(timeout: float, attempts: float):  # pylint: disable=unused-argument
     Returns:
         True iff an attempt was successful.
     """
+
     def decorator_retry(func):
         def wrapper(*args, **kwargs):
             nonlocal timeout, attempts
@@ -43,35 +47,43 @@ def retry(timeout: float, attempts: float):  # pylint: disable=unused-argument
                 time.sleep(timeout)
                 attempts -= 1
             return True
+
         return wrapper
+
     return decorator_retry
 
 
-@retry(timeout=1., attempts=10)
-def check_block_contains_operations(client: Client,
-                                    operation_hashes: List[str]) -> bool:
+@retry(timeout=1.0, attempts=10)
+def check_block_contains_operations(
+    client: Client, operation_hashes: List[str]
+) -> bool:
     res = client.rpc('get', '/chains/main/blocks/head/operation_hashes')
-    flatten = (res[0] + res[1] + res[2] + res[3] if res is not None and
-               len(res) == 4 else [])
+    flatten = (
+        res[0] + res[1] + res[2] + res[3]
+        if res is not None and len(res) == 4
+        else []
+    )
     return all(oh in flatten for oh in operation_hashes)
 
 
-@retry(timeout=1., attempts=20)
-def check_mempool_contains_operations(client: Client,
-                                      operation_hashes: List[str]) -> bool:
+@retry(timeout=1.0, attempts=20)
+def check_mempool_contains_operations(
+    client: Client, operation_hashes: List[str]
+) -> bool:
     mempool = client.get_mempool()['applied']
     res = {x['hash'] for x in mempool}
     return set(operation_hashes).issubset(res)
 
 
-@retry(timeout=1., attempts=20)
-def check_protocol(client: Client, proto: str,
-                   params: List[str] = None) -> bool:
+@retry(timeout=1.0, attempts=20)
+def check_protocol(
+    client: Client, proto: str, params: List[str] = None
+) -> bool:
     res = client.rpc('get', '/chains/main/blocks/head/metadata', params=params)
     return res['next_protocol'] == proto
 
 
-@retry(timeout=1., attempts=20)
+@retry(timeout=1.0, attempts=20)
 def check_two_chains(client: Client) -> bool:
     main_id = client.rpc('get', 'chains/main/chain_id')
     try:
@@ -81,24 +93,25 @@ def check_two_chains(client: Client) -> bool:
         return False
 
 
-@retry(timeout=2., attempts=10)
+@retry(timeout=2.0, attempts=10)
 def check_level(client: Client, level, chain: str = 'main') -> bool:
     return client.get_level(chain=chain) == level
 
 
-@retry(timeout=2., attempts=10)
-def check_level_greater_than(client: Client,
-                             level,
-                             chain: str = 'main') -> bool:
+@retry(timeout=2.0, attempts=10)
+def check_level_greater_than(
+    client: Client, level, chain: str = 'main'
+) -> bool:
     return client.get_level(chain=chain) >= level
 
 
-@retry(timeout=2., attempts=20)
-def check_operation_in_receipt(client: Client,
-                               operation_hash: str,
-                               check_previous=None) -> bool:
-    extra_param = (['--check-previous', str(check_previous)] if
-                   check_previous else [])
+@retry(timeout=2.0, attempts=20)
+def check_operation_in_receipt(
+    client: Client, operation_hash: str, check_previous=None
+) -> bool:
+    extra_param = (
+        ['--check-previous', str(check_previous)] if check_previous else []
+    )
     receipt = client.get_receipt(operation_hash, extra_param)
     # TODO deal with case where operation isn't included yet
     return receipt.block_hash is not None
@@ -117,32 +130,32 @@ def check_is_bootstrapped(client: Client, chain: str = 'main') -> bool:
 
 
 def get_block_at_level(client: Client, level: int) -> dict:
-    """ Return the block at a given level, level must be less or equal
-        than the current head. If the level is higher than the
-        current, it will fail"""
+    """Return the block at a given level, level must be less or equal
+    than the current head. If the level is higher than the
+    current, it will fail"""
     block = client.rpc('get', f'/chains/main/blocks/{level}')
     return block
 
 
 def get_block_header_at_level(client: Client, level: int) -> dict:
-    """ Return the block header at a given level, level must be less
-        or equal than the current head. If the level is higher than
-        the current, it will fail"""
+    """Return the block header at a given level, level must be less
+    or equal than the current head. If the level is higher than
+    the current, it will fail"""
     block = client.rpc('get', f'/chains/main/blocks/{level}/header')
     return block
 
 
 def get_block_metadata_at_level(client: Client, level: int) -> dict:
-    """ Return the block metadata at a given level, level must be less
-        or equal than the current head. If the level is higher than
-        the current, it will fail"""
+    """Return the block metadata at a given level, level must be less
+    or equal than the current head. If the level is higher than
+    the current, it will fail"""
     block = client.rpc('get', f'/chains/main/blocks/{level}/metadata')
     return block
 
 
 def get_block_hash(client: Client, level: int) -> str:
     """Return block hash at given level, level must be less or equal
-       than the current head"""
+    than the current head"""
     block_hash = get_block_at_level(client, level)['hash']
     assert isinstance(block_hash, str)
     return str(block_hash)
@@ -193,28 +206,43 @@ def check_logs_counts(logs: List[str], pattern: str) -> int:
     return count
 
 
-def activate_alpha(client, parameters=None, timestamp=None,
-                   activate_in_the_past=False,
-                   proto=constants.ALPHA):
+def activate_protocol(
+    client, proto, parameters=None, timestamp=None, activate_in_the_past=False
+):
     """Activates a protocol.
 
     If `activate_in_the_past` is True, protocol is activated with a timestamp
     one year in the past."""
     if parameters is None:
-        parameters = constants.PARAMETERS
+        parameters = constants.ALPHA_PARAMETERS
     delay = None
     if activate_in_the_past:
         delay = datetime.timedelta(seconds=3600 * 24 * 365)
-    client.activate_protocol_json(proto, parameters, timestamp=timestamp,
-                                  delay=delay)
+    client.activate_protocol_json(
+        proto, parameters, timestamp=timestamp, delay=delay
+    )
+
+
+def activate_alpha(
+    client, parameters=None, timestamp=None, activate_in_the_past=False
+):
+    activate_protocol(
+        client, constants.ALPHA, parameters, timestamp, activate_in_the_past
+    )
 
 
 def pprint(json_data: dict) -> None:
     print(json.dumps(json_data, indent=4, sort_keys=True))
 
 
-def rpc(server: str, port: int, verb: str, path: str, data: Any = None,
-        headers: dict = None):
+def rpc(
+    server: str,
+    port: int,
+    verb: str,
+    path: str,
+    data: Any = None,
+    headers: dict = None,
+):
     """Calls a REST API
 
     Simple wrapper over `requests` methods.
@@ -303,8 +331,10 @@ def hex_sig_to_b58(hexsig: str) -> str:
     Returns:
         str: b58check encoding of signature
     """
+
     def sha256(data):
         return hashlib.sha256(data).digest()
+
     bytes_sig = bytes.fromhex(hexsig)
     # Before translating to b58check encoding, we add a prefix at the beginning
     # of the sig, and a checksum at the end
@@ -327,12 +357,11 @@ def sign_operation(encoded_operation: str, secret_key: str) -> str:
 
 
 def mutez_of_tez(tez: float):
-    return int(tez*1000000)
+    return int(tez * 1000000)
 
 
 @contextlib.contextmanager
-def assert_run_failure(pattern: str,
-                       mode: str = 'stderr'):
+def assert_run_failure(pattern: str, mode: str = 'stderr'):
     """Context manager that checks enclosed code fails with expected error.
 
     This context manager checks the contextualized code (in the [with]
@@ -374,11 +403,16 @@ def assert_run_failure(pattern: str,
         assert False, assert_msg
 
 
-def assert_storage_contains(client: Client,
-                            contract: str,
-                            expected_storage: str) -> None:
+def assert_storage_contains(
+    client: Client, contract: str, expected_storage: str
+) -> None:
     actual_storage = client.get_storage(contract)
-    assert actual_storage == expected_storage
+    equal = actual_storage == expected_storage
+    assert equal, (
+        f"failed: actual_storage == expected_storage\n"
+        f"Actual storage: {actual_storage}\n"
+        f"Expected storage: {expected_storage}"
+    )
 
 
 def contract_name_of_file(contract_path: str) -> str:
@@ -386,66 +420,77 @@ def contract_name_of_file(contract_path: str) -> str:
 
 
 def bake(client: Client) -> BakeForResult:
-    return client.bake('bootstrap1',
-                       ['--max-priority', '512',
-                        '--minimal-timestamp',
-                        '--minimal-fees', '0',
-                        '--minimal-nanotez-per-byte', '0',
-                        '--minimal-nanotez-per-gas-unit', '0'])
+    return client.bake(
+        'bootstrap1',
+        [
+            '--max-priority',
+            '512',
+            '--minimal-timestamp',
+            '--minimal-fees',
+            '0',
+            '--minimal-nanotez-per-byte',
+            '0',
+            '--minimal-nanotez-per-gas-unit',
+            '0',
+        ],
+    )
 
 
-def init_with_transfer(client: Client,
-                       contract: str,
-                       initial_storage: str,
-                       amount: float,
-                       sender: str,
-                       contract_name: str = None):
+def init_with_transfer(
+    client: Client,
+    contract: str,
+    initial_storage: str,
+    amount: float,
+    sender: str,
+    contract_name: str = None,
+):
     if contract_name is None:
         contract_name = contract_name_of_file(contract)
-    client.originate(contract_name, amount,
-                     sender, contract,
-                     ['-init', initial_storage, '--burn-cap', '10'])
+    client.originate(
+        contract_name,
+        amount,
+        sender,
+        contract,
+        ['-init', initial_storage, '--burn-cap', '10'],
+    )
     bake(client)
 
 
-def assert_balance(client: Client,
-                   account: str,
-                   expected_balance: float) -> None:
+def assert_balance(
+    client: Client, account: str, expected_balance: float
+) -> None:
     actual_balance = client.get_balance(account)
     assert actual_balance == expected_balance
 
 
-def assert_run_script_success(client: Client,
-                              contract: str,
-                              param: str,
-                              storage: str) -> RunScriptResult:
-    return client.run_script(contract, param, storage, None, True)
+def assert_run_script_success(
+    client: Client, contract: str, param: str, storage: str
+) -> RunScriptResult:
+    return client.run_script(contract, param, storage, trace_stack=True)
 
 
-def assert_run_script_failwith(client: Client,
-                               contract: str,
-                               param: str,
-                               storage: str) -> None:
+def assert_run_script_failwith(
+    client: Client, contract: str, param: str, storage: str
+) -> None:
 
     pattern = 'script reached FAILWITH instruction'
     with assert_run_failure(pattern):
-        client.run_script(contract, param, storage, None, True)
+        client.run_script(contract, param, storage, trace_stack=True)
 
 
 def assert_typecheck_data_failure(
-        client: Client,
-        data: str,
-        typ: str,
-        err: str = 'ill-typed data') -> None:
+    client: Client, data: str, typ: str, err: str = 'ill-typed data'
+) -> None:
     with assert_run_failure(err):
         client.typecheck_data(data, typ)
 
 
 def assert_typecheck_failure(
-        client: Client,
-        script: str,
-        err: str = 'ill-typed script',
-        file: bool = True) -> None:
+    client: Client,
+    script: str,
+    err: str = 'ill-typed script',
+    file: bool = True,
+) -> None:
     with assert_run_failure(err):
         client.typecheck(script, file=file)
 
@@ -453,18 +498,21 @@ def assert_typecheck_failure(
 def client_output_converter(pre):
     """Remove variable substrings from client output for regression testing.
 
-       This function is used to remove strings from client output that
-       are likely to change from one run to another, but whose content
-       is (presumably) not important to the regression test. This
-       includes timestamps, hashes, counters, nonces, etc.
+    This function is used to remove strings from client output that
+    are likely to change from one run to another, but whose content
+    is (presumably) not important to the regression test. This
+    includes timestamps, hashes, counters, nonces, etc.
 
-       For example, a timestamp such as 2019-09-23T10:59:00Z is
-       replaced by [TIMESTAMP].
+    For example, a timestamp such as 2019-09-23T10:59:00Z is
+    replaced by [TIMESTAMP].
     """
 
     # Scrub constants
-    pre = re.sub(r'"proof_of_work_nonce": "\w{16}"',
-                 '"proof_of_work_nonce": "[NONCE]"', pre)
+    pre = re.sub(
+        r'"proof_of_work_nonce": "\w{16}"',
+        '"proof_of_work_nonce": "[NONCE]"',
+        pre,
+    )
     pre = re.sub(r'"context": "\w{52}"', '"context": "[CONTEXT]"', pre)
     pre = re.sub(r'"level": \d+', '"level": [LEVEL]', pre)
     pre = re.sub(r'"priority": \d+', '"priority": "[PRIORITY]"', pre)
@@ -475,19 +523,22 @@ def client_output_converter(pre):
     pre = re.sub(r'\w{53}', '[OPERATION_HASH]', pre)
     pre = re.sub(r'\w{51}', '[BLOCK_HASH]', pre)
     pre = re.sub(r'tz\w{34}', '[CONTRACT_HASH]', pre)
-    pre = re.sub(r'fees\(\[CONTRACT_HASH\],\d+\)',
-                 'fees([CONTRACT_HASH],[CTR])', pre)
+    pre = re.sub(
+        r'fees\(\[CONTRACT_HASH\],\d+\)', 'fees([CONTRACT_HASH],[CTR])', pre
+    )
 
     # Scrub receipt
-    pre = re.sub(r"Operation hash is '\w+'",
-                 "Operation hash is '[OPERATION_HASH]'", pre)
+    pre = re.sub(
+        r"Operation hash is '\w+'", "Operation hash is '[OPERATION_HASH]'", pre
+    )
     pre = re.sub(r'wait for \w+', 'wait for [OPERATION_HASH]', pre)
     pre = re.sub(r'--branch \w+', '--branch [BRANCH_HASH]', pre)
     pre = re.sub(r'KT\w{34}', '[CONTRACT_HASH]', pre)
     pre = re.sub(r'To: KT\w{34} \.\.\.', 'To: [CONTRACT_HASH] ...', pre)
     pre = re.sub(r'Injected block \w{12}', 'Injected block [BLOCK_HASH]', pre)
-    pre = re.sub(r'Expected counter: \w+',
-                 'Expected counter: [EXPECTED_COUNTER]', pre)
+    pre = re.sub(
+        r'Expected counter: \w+', 'Expected counter: [EXPECTED_COUNTER]', pre
+    )
 
     # Scrub timestamps
     pre = re.sub(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', '[TIMESTAMP]', pre)
@@ -498,17 +549,18 @@ def client_output_converter(pre):
 def client_always_output_converter(pre):
     """Remove strings we always want to convert"""
 
-    pre = re.sub(r'Runtime error in contract \w+:',
-                 'Runtime error in contract [CONTRACT_HASH]:', pre)
+    pre = re.sub(
+        r'Runtime error in contract \w+:',
+        'Runtime error in contract [CONTRACT_HASH]:',
+        pre,
+    )
 
     return pre
 
 
-def assert_transfer_failwith(client: Client,
-                             amount: float,
-                             sender: str,
-                             receiver: str,
-                             args) -> None:
+def assert_transfer_failwith(
+    client: Client, amount: float, sender: str, receiver: str, args
+) -> None:
     pattern = 'script reached FAILWITH instruction'
     with assert_run_failure(pattern):
         client.transfer(amount, sender, receiver, args)

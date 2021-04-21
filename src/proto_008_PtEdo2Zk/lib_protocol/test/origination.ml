@@ -37,7 +37,7 @@ let ten_tez = Tez.of_int 10
 let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let source = List.hd contracts in
+  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Context.Contract.balance (B b) source
   >>=? fun source_balance ->
   Op.origination (B b) source ~fee ~credit ~script:Op.dummy_script
@@ -81,7 +81,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) ()
     =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let contract = List.hd contracts in
+  let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Context.Contract.balance (B b) contract
   >>=? fun balance ->
   Op.origination (B b) contract ~fee ~credit ~script:Op.dummy_script
@@ -163,8 +163,12 @@ let pay_fee () =
 let not_tez_in_contract_to_pay_fee () =
   Context.init 2
   >>=? fun (b, contracts) ->
-  let contract_1 = List.nth contracts 0 in
-  let contract_2 = List.nth contracts 1 in
+  let contract_1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  let contract_2 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
+  in
   Incremental.begin_construction b
   >>=? fun inc ->
   (* transfer everything but one tez from 1 to 2 and check balance of 1 *)
@@ -203,7 +207,7 @@ let not_tez_in_contract_to_pay_fee () =
 let register_contract_get_endorser () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let contract = List.hd contracts in
+  let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Incremental.begin_construction b
   >>=? fun inc ->
   Context.get_endorser (I inc)
@@ -216,7 +220,7 @@ let register_contract_get_endorser () =
 (*******************)
 
 let n_originations n ?credit ?fee () =
-  fold_left_s
+  List.fold_left_es
     (fun new_contracts _ ->
       register_origination ?fee ?credit ()
       >|=? fun (_b, _source, new_contract) -> new_contract :: new_contracts)
@@ -236,7 +240,7 @@ let multiple_originations () =
 let counter () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let contract = List.hd contracts in
+  let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Incremental.begin_construction b
   >>=? fun inc ->
   Op.origination (I inc) ~credit:Tez.one contract ~script:Op.dummy_script
@@ -256,14 +260,14 @@ let counter () =
 (******************************************************)
 
 let tests =
-  [ Test.tztest "balances_simple" `Quick balances_simple;
-    Test.tztest "balances_credit" `Quick balances_credit;
-    Test.tztest "balances_credit_fee" `Quick balances_credit_fee;
-    Test.tztest "balances_undelegatable" `Quick balances_undelegatable;
-    Test.tztest "pay_fee" `Quick pay_fee;
-    Test.tztest
+  [ Test_services.tztest "balances_simple" `Quick balances_simple;
+    Test_services.tztest "balances_credit" `Quick balances_credit;
+    Test_services.tztest "balances_credit_fee" `Quick balances_credit_fee;
+    Test_services.tztest "balances_undelegatable" `Quick balances_undelegatable;
+    Test_services.tztest "pay_fee" `Quick pay_fee;
+    Test_services.tztest
       "not enough tez in contract to pay fee"
       `Quick
       not_tez_in_contract_to_pay_fee;
-    Test.tztest "multiple originations" `Quick multiple_originations;
-    Test.tztest "counter" `Quick counter ]
+    Test_services.tztest "multiple originations" `Quick multiple_originations;
+    Test_services.tztest "counter" `Quick counter ]

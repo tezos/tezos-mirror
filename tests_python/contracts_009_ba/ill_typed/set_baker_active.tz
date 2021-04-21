@@ -1,0 +1,11 @@
+# Here we are checking we don't accept baker_operation as return value of
+# non-baking contracts
+parameter unit;
+storage unit;
+code {
+       NIL baker_operation ;
+       PUSH bool True ;
+       SET_BAKER_ACTIVE ;
+       CONS ;
+       PAIR
+     }

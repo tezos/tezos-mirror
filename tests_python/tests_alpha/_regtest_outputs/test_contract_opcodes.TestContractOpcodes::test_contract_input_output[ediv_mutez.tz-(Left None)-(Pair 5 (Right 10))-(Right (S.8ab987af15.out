@@ -1,0 +1,36 @@
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[ediv_mutez.tz-(Left None)-(Pair 5 (Right 10))-(Right (Some (Pair 0 5)))]
+
+storage
+  (Right (Some (Pair 0 5)))
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 18 (remaining gas: 1039982.170 units remaining)
+    [ (Pair (Pair 5 (Right 10)) (Left None))  	 ]
+  - location: 19 (remaining gas: 1039982.090 units remaining)
+    [ (Pair 5 (Right 10))  	@parameter ]
+  - location: 20 (remaining gas: 1039982.010 units remaining)
+    [ 5  	
+      (Right 10)  	 ]
+  - location: 21 (remaining gas: 1039981.940 units remaining)
+    [ (Right 10)  	
+      5  	 ]
+  - location: 32 (remaining gas: 1039981.810 units remaining)
+    [ 5  	
+      10  	 ]
+  - location: 33 (remaining gas: 1039981.480 units remaining)
+    [ (Some (Pair 0 5))  	 ]
+  - location: 34 (remaining gas: 1039981.405 units remaining)
+    [ (Right (Some (Pair 0 5)))  	 ]
+  - location: -1 (remaining gas: 1039981.360 units remaining)
+    [ (Right (Some (Pair 0 5)))  	 ]
+  - location: 39 (remaining gas: 1039981.285 units remaining)
+    [ {}  	
+      (Right (Some (Pair 0 5)))  	 ]
+  - location: 41 (remaining gas: 1039981.210 units remaining)
+    [ (Pair {} (Right (Some (Pair 0 5))))  	 ]
+  - location: -1 (remaining gas: 1039981.165 units remaining)
+    [ (Pair {} (Right (Some (Pair 0 5))))  	 ]
+

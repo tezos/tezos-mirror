@@ -26,17 +26,16 @@ fi
 if [ ! -x "$(command -v rustup)" ] && \
    [[ ! -x "$(command -v rustc)" || ! -x "$(command -v cargo)" ]]; then
     echo "The Rust compiler is not installed. Please install Rust $recommended_rust_version."
-    echo "See instructions at: https://tezos.gitlab.io/introduction/howtoget.html#environment"
+    echo "See instructions at: https://tezos.gitlab.io/introduction/howtoget.html#setup-rust"
     exit 1
 fi
 
 if ! [[ "$(rustc --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
     echo "\
-Wrong Rust version, run the following commands in your favorite shell:
-$ rustup toolchain install $rust_version
-$ rustup override set $rust_version
-or force it by setting the variable RUST_VERSION to your installed version
-if you know what you are doing"
+Wrong Rust version. This is probably because you have used `rustup
+override` in the past. Run the following command from your
+favorite shell, and retry to install the dependencies:
+$ rustup override unset"
     exit 1
 fi
 

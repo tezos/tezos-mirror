@@ -12,16 +12,19 @@
 (library
  (name tezos_mockup)
  (public_name tezos-mockup)
- (modules local_services RPC_client persistence)
+ (modules files local_services persistence RPC_client migration)
  (libraries
    tezos-base
    tezos-client-base
+   tezos-mockup-proxy
+   resto-cohttp-self-serving-client
    tezos-rpc
    tezos-p2p-services
    tezos-p2p ; for registering the relevant RPCs
    tezos-protocol-environment
    tezos-stdlib-unix
    tezos-rpc-http
+   tezos-rpc-http-client
    tezos-mockup-registration)
  (flags (:standard
   -open Tezos_base__TzPervasives

@@ -162,31 +162,62 @@ module P2p_connect_handler = struct
       ~level:Notice
       ()
 
+  let authenticate_start =
+    declare_2
+      ~section
+      ~name:"authenticate_start"
+      ~msg:"start authentication for point {point} ({direction})"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("direction", Data_encoding.string)
+
   let authenticate =
     declare_3
       ~section
       ~name:"authenticate"
-      ~msg:"authenticate: {point} {type} -> {state}"
+      ~msg:"authentication for point {point}. direction:{direction} -> {state}"
       ~level:Debug
       ("point", P2p_point.Id.encoding)
-      ("type", Data_encoding.(option string))
-      ("state", Data_encoding.(option string))
+      ("direction", Data_encoding.string)
+      ("state", Data_encoding.string)
 
   let authenticate_status =
     declare_3
       ~section
       ~name:"authenticate_status"
-      ~msg:"authenticate: {point} {type} -> {peer}"
+      ~msg:"authentication status for point {point} {type} -> {peer}"
       ~level:Debug
       ("type", Data_encoding.string)
       ("point", P2p_point.Id.encoding)
       ("peer", P2p_peer.Id.encoding)
 
+  let authenticate_status_peer_id_correct =
+    declare_2
+      ~section
+      ~name:"authenticate_status_peer_id_correct"
+      ~msg:"expected peer id {peer} for this point {point}"
+      ~level:Notice
+      ("point", P2p_point.Id.encoding)
+      ("peer", P2p_peer.Id.encoding)
+
+  let authenticate_status_peer_id_incorrect =
+    declare_4
+      ~section
+      ~name:"authenticate_status_peer_id_incorrect"
+      ~msg:
+        "authenticate failed: {point} {type}. Expected '{expected_peer_id}', \
+         got '{peer_id}'"
+      ~level:Warning
+      ("type", Data_encoding.string)
+      ("point", P2p_point.Id.encoding)
+      ("expected_peer_id", P2p_peer.Id.encoding)
+      ("peer_id", P2p_peer.Id.encoding)
+
   let authenticate_error =
     declare_2
       ~section
       ~name:"authentication_error"
-      ~msg:"authenticate: {point} {errors}"
+      ~msg:"authentication error for {point}: {errors}"
       ~level:Debug
       ~pp2:pp_print_error_first
       ("point", P2p_point.Id.encoding)
@@ -221,19 +252,18 @@ module P2p_connect_handler = struct
     declare_2
       ~section
       ~name:"connect_status"
-      ~msg:"connect: {point} {state}"
+      ~msg:"connection status for {point}: {state}"
       ~level:Debug
       ("state", Data_encoding.string)
       ("point", P2p_point.Id.encoding)
 
   let connect_error =
-    declare_3
+    declare_2
       ~section
       ~name:"connect_error"
-      ~msg:"connect: {point} {state} : {errors}"
+      ~msg:"connection error for point {point}, disconnecting: {errors}"
       ~level:Debug
-      ~pp3:pp_print_error_first
-      ("state", Data_encoding.string)
+      ~pp2:pp_print_error_first
       ("point", P2p_point.Id.encoding)
       ("errors", Error_monad.trace_encoding)
 
@@ -367,7 +397,7 @@ module P2p_maintainance = struct
       ~section
       ~name:"maintenance_ended"
       ~msg:"maintenance step ended"
-      ~level:Debug
+      ~level:Info
       ()
 
   let too_few_connections =
@@ -506,6 +536,15 @@ module P2p_io_scheduler = struct
       ~level:Debug
       ("connection_id", Data_encoding.int31)
 
+  let close_error =
+    declare_2
+      ~section
+      ~name:"close_connection_error"
+      ~msg:"close {connection_id} failed with {error}"
+      ~level:Warning
+      ("connection_id", Data_encoding.int31)
+      ("error", Error_monad.error_encoding)
+
   let close =
     declare_1
       ~section
@@ -519,7 +558,7 @@ module P2p_io_scheduler = struct
       ~section
       ~name:"shutdown_connection"
       ~msg:"shutdown {name}"
-      ~level:Debug
+      ~level:Info
       ("name", Data_encoding.string)
 
   let shutdown_scheduler =
@@ -527,6 +566,54 @@ module P2p_io_scheduler = struct
       ~section
       ~name:"shutdown_scheduler"
       ~msg:"shutdown scheduler"
-      ~level:Debug
+      ~level:Info
       ()
+end
+
+module P2p_pool = struct
+  include Internal_event.Simple
+
+  let section = ["p2p"; "pool"]
+
+  let get_points =
+    declare_3
+      ~section
+      ~name:"get_points"
+      ~msg:"getting points from {medium} of {source}: {point_list}"
+      ~level:Debug
+      ("medium", Data_encoding.string)
+      ("source", P2p_peer.Id.encoding)
+      ("point_list", Data_encoding.list P2p_point.Id.encoding)
+
+  let create_pool =
+    declare_1
+      ~section
+      ~name:"create_pool"
+      ~msg:"create pool: known points {point_list}"
+      ~level:Debug
+      ("point_list", Data_encoding.list P2p_point.Id.encoding)
+
+  let parse_error =
+    declare_1
+      ~section
+      ~name:"parse_error_peers"
+      ~msg:"failed to parse peers file: {error}"
+      ~level:Error
+      ("error", Error_monad.trace_encoding)
+
+  let saving_metadata =
+    declare_1
+      ~section
+      ~name:"save_metadata"
+      ~msg:"saving metadata in {file}"
+      ~level:Info
+      ("file", Data_encoding.string)
+
+  let save_peers_error =
+    declare_1
+      ~section
+      ~name:"save_error_peers"
+      ~msg:"failed to save peers file: {error}"
+      ~level:Error
+      ("error", Error_monad.trace_encoding)
 end

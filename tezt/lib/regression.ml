@@ -35,6 +35,55 @@ let capture line =
   | Some channel ->
       output_string channel line ; output_string channel "\n"
 
+let hooks =
+  Process.
+    {
+      on_spawn =
+        (fun command arguments ->
+          let message = Log.quote_shell_command command arguments in
+          capture "" ; capture message);
+      on_log = capture;
+    }
+
+(* Replace variables that may change between different runs by constants *)
+let replace_variables string =
+  let replacements =
+    [ ("tz[123]\\w{33}", "[PUBLIC_KEY_HASH]");
+      ("edpk\\w{50}", "[PUBLIC_KEY]");
+      ("KT1\\w{33}", "[CONTRACT_HASH]");
+      ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]") ]
+  in
+  List.fold_left
+    (fun string (replace, by) ->
+      replace_string ~all:true (rex replace) ~by string)
+    string
+    replacements
+
+let scrubbing_hooks =
+  Process.
+    {
+      on_spawn =
+        (fun command arguments ->
+          (* remove arguments that shouldn't be captured in regression output *)
+          let (arguments, _) =
+            List.fold_left
+              (fun (acc, scrub_next) arg ->
+                if scrub_next then (acc, false)
+                else
+                  match arg with
+                  (* scrub client global options *)
+                  | "--base-dir" | "-d" | "--endpoint" | "-E" ->
+                      (acc, true)
+                  | _ ->
+                      (acc @ [replace_variables arg], false))
+              ([], (* scrub_next *) false)
+              arguments
+          in
+          let message = Log.quote_shell_command command arguments in
+          capture "" ; capture message);
+      on_log = (fun output -> replace_variables output |> capture);
+    }
+
 (* Run [f] and capture the output of ran processes into the [output_file]. *)
 let run_and_capture_output ~output_file (f : unit -> 'a Lwt.t) =
   let rec create_parent filename =
@@ -43,18 +92,10 @@ let run_and_capture_output ~output_file (f : unit -> 'a Lwt.t) =
       create_parent parent ;
       if not (Sys.file_exists parent) then Unix.mkdir parent 0o755 )
   in
-  Process.on_spawn :=
-    Some
-      (fun command arguments ->
-        let message = Log.quote_shell_command command arguments in
-        capture "" ; capture message) ;
-  Process.on_log := Some capture ;
   create_parent output_file ;
   let channel = open_out output_file in
   capture_output := Option.some channel ;
   Lwt.finalize f (fun () ->
-      Process.on_spawn := None ;
-      Process.on_log := None ;
       capture_output := None ;
       close_out channel ;
       unit)

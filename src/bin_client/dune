@@ -48,6 +48,9 @@
             (select void_for_linking-008-PtEdo2Zk from
               (tezos-client-008-PtEdo2Zk-commands-registration -> void_for_linking-008-PtEdo2Zk.empty)
               (-> void_for_linking-008-PtEdo2Zk.empty))
+            (select void_for_linking-009-PsFLoren from
+              (tezos-client-009-PsFLoren-commands-registration -> void_for_linking-009-PsFLoren.empty)
+              (-> void_for_linking-009-PsFLoren.empty))
 
             (select void_for_linking-alpha from
               (tezos-client-alpha-commands-registration -> void_for_linking-alpha.empty)
@@ -59,15 +62,12 @@
             (select void_for_linking-baking-alpha from
               (tezos-baking-alpha-commands.registration -> void_for_linking-baking-alpha.empty)
               (-> void_for_linking-baking-alpha.empty))
-            (select void_for_linking-baking-006-PsCARTHA from
-              (tezos-baking-006-PsCARTHA-commands.registration -> void_for_linking-baking-006-PsCARTHA.empty)
-              (-> void_for_linking-baking-006-PsCARTHA.empty))
-            (select void_for_linking-baking-007-PsDELPH1 from
-              (tezos-baking-007-PsDELPH1-commands.registration -> void_for_linking-baking-007-PsDELPH1.empty)
-              (-> void_for_linking-baking-007-PsDELPH1.empty))
             (select void_for_linking-baking-008-PtEdo2Zk from
               (tezos-baking-008-PtEdo2Zk-commands.registration -> void_for_linking-baking-008-PtEdo2Zk.empty)
               (-> void_for_linking-baking-008-PtEdo2Zk.empty))
+            (select void_for_linking-baking-009-PsFLoren from
+              (tezos-baking-009-PsFLoren-commands.registration -> void_for_linking-baking-009-PsFLoren.empty)
+              (-> void_for_linking-baking-009-PsFLoren.empty))
             tezos-stdlib-unix
             tezos-client-base-unix
             tezos-signer-backends.unix)
@@ -96,12 +96,12 @@
    (write-file void_for_linking-006-PsCARTHA.empty "")
    (write-file void_for_linking-007-PsDELPH1.empty "")
    (write-file void_for_linking-008-PtEdo2Zk.empty "")
+   (write-file void_for_linking-009-PsFLoren.empty "")
    (write-file void_for_linking-alpha.empty "")
    (write-file void_for_linking-demo-counter.empty "")
    (write-file void_for_linking-baking-alpha.empty "")
-   (write-file void_for_linking-baking-006-PsCARTHA.empty "")
-   (write-file void_for_linking-baking-007-PsDELPH1.empty "")
    (write-file void_for_linking-baking-008-PtEdo2Zk.empty "")
+   (write-file void_for_linking-baking-009-PsFLoren.empty "")
 )))
 
 (install

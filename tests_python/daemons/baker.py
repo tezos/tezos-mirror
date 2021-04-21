@@ -1,7 +1,7 @@
 from typing import List
 import os
 import subprocess
-from . import utils
+from process import process_utils
 
 
 # Timeout before killing a baker which doesn't react to SIGTERM
@@ -11,14 +11,16 @@ TERM_TIMEOUT = 10
 class Baker(subprocess.Popen):
     """Fork a baker process linked to a node and a client"""
 
-    def __init__(self,
-                 baker: str,
-                 rpc_port: int,
-                 base_dir: str,
-                 node_dir: str,
-                 account: str,
-                 params: List[str] = None,
-                 log_file: str = None):
+    def __init__(
+        self,
+        baker: str,
+        rpc_port: int,
+        base_dir: str,
+        node_dir: str,
+        account: str,
+        params: List[str] = None,
+        log_file: str = None,
+    ):
         """Create a new Popen instance for the baker process.
 
         Args:
@@ -41,11 +43,12 @@ class Baker(subprocess.Popen):
         cmd = [baker, '-base-dir', base_dir, '-endpoint', endpoint]
         cmd.extend(params)
         cmd.extend(['run', 'with', 'local', 'node', node_dir, account])
-        cmd_string = utils.format_command(cmd)
+        cmd_string = process_utils.format_command(cmd)
         print(cmd_string)
-        stdout, stderr = utils.prepare_log(cmd, log_file)
-        subprocess.Popen.__init__(self, cmd, stdout=stdout,
-                                  stderr=stderr)  # type: ignore
+        stdout, stderr = process_utils.prepare_log(cmd, log_file)
+        subprocess.Popen.__init__(
+            self, cmd, stdout=stdout, stderr=stderr
+        )  # type: ignore
 
     def terminate_or_kill(self):
         self.terminate()

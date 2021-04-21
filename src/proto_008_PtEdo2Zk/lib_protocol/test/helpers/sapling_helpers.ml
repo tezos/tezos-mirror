@@ -101,7 +101,6 @@ module Common = struct
     let rcm = Tezos_sapling.Core.Client.Rcm.random () in
     let position = 10L in
     Tezos_sapling.Core.Client.Nullifier.compute addr vk ~amount rcm ~position
-    |> TzOption.unopt_assert ~loc:__POS__
 
   let gen_cm_cipher ~memo_size () =
     let open Tezos_sapling.Core.Client in
@@ -112,9 +111,7 @@ module Common = struct
     in
     let amount = 10L in
     let rcm = Tezos_sapling.Core.Client.Rcm.random () in
-    let cm =
-      Commitment.compute addr ~amount rcm |> TzOption.unopt_assert ~loc:__POS__
-    in
+    let cm = Commitment.compute addr ~amount rcm in
     let cipher =
       let payload_enc =
         Data_encoding.Binary.to_bytes_exn
@@ -241,7 +238,7 @@ module Alpha_context_helpers = struct
       List.map
         (fun i ->
           Tezos_sapling.Forge.Input.get cs (Int64.of_int i) w.vk
-          |> Option.unopt_assert ~loc:__POS__
+          |> WithExceptions.Option.get ~loc:__LOC__
           |> snd)
         is
     in
@@ -417,11 +414,16 @@ module Interpreter_helpers = struct
           Tezos_sapling.Core.Wallet.Viewing_key.(new_address vk index)
         in
         let outputs =
-          List.init number_outputs (fun _ ->
+          List.init ~when_negative_length:() number_outputs (fun _ ->
               Tezos_sapling.Forge.make_output
                 new_addr
                 amount_output
                 (Bytes.create memo_size))
+          |> function
+          | Error () ->
+              assert false (* starts at 2 and increases *)
+          | Ok outputs ->
+              outputs
         in
         let tr_hex =
           to_hex

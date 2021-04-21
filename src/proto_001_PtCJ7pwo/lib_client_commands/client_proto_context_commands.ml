@@ -76,7 +76,7 @@ let commands () =
       (fun () (cctxt : Alpha_client_context.full) ->
         list_contract_labels cctxt ~chain:`Main ~block:cctxt#block
         >>=? fun contracts ->
-        Lwt_list.iter_s
+        List.iter_s
           (fun (alias, hash, kind) -> cctxt#message "%s%s%s" hash kind alias)
           contracts
         >>= fun () -> return_unit);

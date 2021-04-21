@@ -1,0 +1,53 @@
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[set_car.tz-(Pair "hello" 0)-"abc"-(Pair "abc" 0)]
+
+storage
+  (Pair "abc" 0)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039985.257 units remaining)
+    [ (Pair "abc" "hello" 0)  	 ]
+  - location: 9 (remaining gas: 1039985.177 units remaining)
+    [ (Pair "abc" "hello" 0)  	
+      (Pair "abc" "hello" 0)  	 ]
+  - location: 10 (remaining gas: 1039985.097 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      (Pair "abc" "hello" 0)  	 ]
+  - location: 13 (remaining gas: 1039984.942 units remaining)
+    [ "abc"  	@parameter ]
+  - location: 12 (remaining gas: 1039984.897 units remaining)
+    [ "abc"  	@parameter ]
+  - location: 11 (remaining gas: 1039984.897 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      "abc"  	@parameter ]
+  - location: 15 (remaining gas: 1039984.787 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      (Pair "hello" 0)  	@storage
+      "abc"  	@parameter ]
+  - location: 16 (remaining gas: 1039984.707 units remaining)
+    [ "hello"  	
+      (Pair "hello" 0)  	@storage
+      "abc"  	@parameter ]
+  - location: 17 (remaining gas: 1039984.632 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      "abc"  	@parameter ]
+  - location: 18 (remaining gas: 1039984.552 units remaining)
+    [ 0  	@storage.n
+      "abc"  	@parameter ]
+  - location: 19 (remaining gas: 1039984.482 units remaining)
+    [ "abc"  	@parameter
+      0  	@storage.n ]
+  - location: 20 (remaining gas: 1039984.407 units remaining)
+    [ (Pair "abc" 0)  	@storage ]
+  - location: -1 (remaining gas: 1039984.362 units remaining)
+    [ (Pair "abc" 0)  	@storage ]
+  - location: 21 (remaining gas: 1039984.287 units remaining)
+    [ {}  	
+      (Pair "abc" 0)  	@storage ]
+  - location: 23 (remaining gas: 1039984.212 units remaining)
+    [ (Pair {} "abc" 0)  	 ]
+  - location: -1 (remaining gas: 1039984.167 units remaining)
+    [ (Pair {} "abc" 0)  	 ]
+

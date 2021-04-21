@@ -141,13 +141,10 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                (Format.asprintf "%a" Micheline_parser.print_location loc))
     in
     let parsed_locations parsed loc =
-      try
-        let oloc =
-          List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
-        in
-        let (ploc, _) = List.assoc oloc parsed.expansion_table in
-        Some ploc
-      with Not_found -> None
+      let ( >?? ) = Option.bind in
+      List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
+      >?? fun oloc ->
+      List.assoc oloc parsed.expansion_table >?? fun (ploc, _) -> Some ploc
     in
     let print_source ppf (parsed, _hilights) (* TODO *) =
       let lines =

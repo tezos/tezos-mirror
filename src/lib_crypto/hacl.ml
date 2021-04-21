@@ -357,6 +357,8 @@ module type SIGNATURE = sig
 
   val pk_of_bytes : Bytes.t -> public key option
 
+  val pk_of_bytes_without_validation : Bytes.t -> public key option
+
   val neuterize : 'a key -> public key
 
   val keypair : unit -> public key * secret key
@@ -390,6 +392,8 @@ module Ed25519 : SIGNATURE = struct
 
   let pk_of_bytes pk =
     if Bytes.length pk <> pk_size then None else Some (Pk (Bytes.copy pk))
+
+  let pk_of_bytes_without_validation = pk_of_bytes
 
   let blit_to_bytes : type a. a key -> ?pos:int -> Bytes.t -> unit =
    fun key ?(pos = 0) buf ->
@@ -473,14 +477,6 @@ module P256 : SIGNATURE = struct
 
   let uncompressed_from_raw pk cpk = Hacl.P256.compress_n pk cpk
 
-  let raw_from_compressed buf pk =
-    if not (Hacl.P256.decompress_c buf pk) then
-      failwith "P256.raw_from_compressed: failure"
-
-  let raw_from_uncompressed buf pk =
-    if not (Hacl.P256.decompress_n buf pk) then
-      failwith "P256.raw_from_uncompressed failure"
-
   let compare : type a. a key -> a key -> int =
    fun a b ->
     (* TODO re-group once coverage ppx is updated *)
@@ -497,25 +493,27 @@ module P256 : SIGNATURE = struct
         Pk pk
     | Sk sk ->
         let pk = Bytes.create pk_size_raw in
-        let pk_computed_ok = pk_of_sk sk pk in
-        if not (pk_computed_ok && valid_pk pk) then
-          failwith "P256.neuterize: failure" ;
-        Pk pk
+        if pk_of_sk sk pk then Pk pk else failwith "P256.neuterize: failure"
 
   (* This function accepts a buffer representing a public key in either the
    * compressed or the uncompressed form. *)
-  let pk_of_bytes : Bytes.t -> public key option =
+  let pk_of_bytes_without_validation : Bytes.t -> public key option =
    fun buf ->
     let pk = Bytes.create pk_size_raw in
     match Bytes.length buf with
     | len when len = pk_size ->
-        raw_from_compressed buf pk ;
-        if valid_pk pk then Some (Pk pk) else None
+        let decompress_ok = Hacl.P256.decompress_c buf pk in
+        if decompress_ok then Some (Pk pk) else None
     | len when len = pk_size_uncompressed ->
-        raw_from_uncompressed buf pk ;
-        if valid_pk pk then Some (Pk pk) else None
+        let decompress_ok = Hacl.P256.decompress_n buf pk in
+        if decompress_ok then Some (Pk pk) else None
     | _ ->
         None
+
+  let pk_of_bytes : Bytes.t -> public key option =
+   fun buf ->
+    Option.bind (pk_of_bytes_without_validation buf) (fun (Pk pk) ->
+        if valid_pk pk then Some (Pk pk) else None)
 
   let sk_of_bytes : Bytes.t -> secret key option =
    fun buf ->
@@ -581,12 +579,5 @@ module P256 : SIGNATURE = struct
 
   let verify ~pk:(Pk pk) ~msg ~signature =
     if Bytes.length signature <> size then false
-    else
-      (* Temporary: use [Uecc] verify function to prevent performance
-         regression. *)
-      match Uecc.pk_of_bytes pk with
-      | Some pk ->
-          Uecc.verify pk ~msg ~signature
-      | None ->
-          false
+    else Hacl.P256.verify pk msg signature
 end

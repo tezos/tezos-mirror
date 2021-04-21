@@ -51,7 +51,8 @@ let script_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
   Alpha_services.Helpers.Scripts.entrypoint_type
     cctxt
     (chain, block)
-    (program, entrypoint)
+    ~script:program
+    ~entrypoint
   >>= function
   | Ok ty ->
       return_some ty
@@ -98,10 +99,11 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
       cctxt#message
         "@[<v 2>No entrypoint named %s%a%a@]@."
         entrypoint
-        (Option.pp ~default:"" (fun ppf ->
+        (Format.pp_print_option (fun ppf ->
              Format.fprintf ppf " for contract %a" Contract.pp))
         contract
-        (Option.pp ~default:"" (fun ppf -> Format.fprintf ppf " for script %s"))
+        (Format.pp_print_option (fun ppf ->
+             Format.fprintf ppf " for script %s"))
         script_name
       >>= fun () -> return_unit
   | Error errs ->
@@ -134,11 +136,17 @@ let list_contract_entrypoints cctxt ~chain ~block ~contract =
   else return entrypoints
 
 let list_unreachables cctxt ~chain ~block (program : Script.expr) =
-  Alpha_services.Helpers.Scripts.list_entrypoints cctxt (chain, block) program
+  Alpha_services.Helpers.Scripts.list_entrypoints
+    cctxt
+    (chain, block)
+    ~script:program
   >>=? fun (unreachables, _) -> return unreachables
 
 let list_entrypoints cctxt ~chain ~block (program : Script.expr) =
-  Alpha_services.Helpers.Scripts.list_entrypoints cctxt (chain, block) program
+  Alpha_services.Helpers.Scripts.list_entrypoints
+    cctxt
+    (chain, block)
+    ~script:program
   >>=? fun (_, entrypoints) ->
   if not @@ List.mem_assoc "default" entrypoints then
     script_entrypoint_type cctxt ~chain ~block program ~entrypoint:"default"
@@ -170,10 +178,10 @@ let print_entrypoints_list (cctxt : #Client_context.printer)
       else
         cctxt#message
           "@[<v 2>Entrypoints%a%a: @,%a@]@."
-          (Option.pp ~default:"" (fun ppf ->
+          (Format.pp_print_option (fun ppf ->
                Format.fprintf ppf " for contract %a" Contract.pp))
           contract
-          (Option.pp ~default:"" (fun ppf ->
+          (Format.pp_print_option (fun ppf ->
                Format.fprintf ppf " for script %s"))
           script_name
           (Format.pp_print_list
@@ -214,10 +222,10 @@ let print_unreachables (cctxt : #Client_context.printer)
         | _ ->
             cctxt#message
               "@[<v 2>Unreachable paths in the argument%a%a: @[%a@]@."
-              (Option.pp ~default:"" (fun ppf ->
+              (Format.pp_print_option (fun ppf ->
                    Format.fprintf ppf " of contract %a" Contract.pp))
               contract
-              (Option.pp ~default:"" (fun ppf ->
+              (Format.pp_print_option (fun ppf ->
                    Format.fprintf ppf " of script %s"))
               script_name
               (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf ->

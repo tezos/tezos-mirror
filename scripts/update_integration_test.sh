@@ -9,51 +9,64 @@ src_dir="$(dirname "$script_dir")"
 
 tmp=$(mktemp)
 
-csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_INTEGRATION_PYTHON##/+1
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/integration.yml" /##BEGIN_INTEGRATION_PYTHON##/+1
 mv "$tmp"00 "$tmp"
 rm "$tmp"0*
 
-for test in $(find tests_python/tests/ -name 'test_*.py' | LC_COLLATE=C sort); do
-    case "$test" in
-      */multibranch/*)
-        # skip multibranch tests for now
-        ;;
-      *)
-        testname=${test##*/test_}
-        testname=${testname%%.py}
-        cat >> $tmp <<EOF
-integration:$testname:
-  <<: *integration_python_definition
+for PROTO_DIR in $(find tests_python/ -maxdepth 1 -mindepth 1 -iname 'tests_*' | LC_COLLATE=C sort); do
+    PROTO_DIR_BASE=${PROTO_DIR##tests_python/tests_}
+
+    # Add fast python integration tests grouped in one job
+    cat >> "$tmp" <<EOF
+integration:${PROTO_DIR_BASE}_fast:
+  extends: .integration_python_template
   script:
-    - poetry run pytest ${test#tests_python/} -s --log-dir=tmp
+    - poetry run pytest ${PROTO_DIR##tests_python/} -m "not slow" -s --log-dir=tmp 2>&1 | tee tmp/${PROTO_DIR_BASE}_fast.out | tail
   stage: test
 
 EOF
-    esac
+
+    # Add slow python integration tests, one per job
+    slow_tests=$(cd "$PROTO_DIR";
+                 for i in $(poetry run pytest -m slow --collect-only -qq); do
+                     echo "${i%%\:\:*}" ;
+                 done | grep ^tests_.*\.py | uniq | LC_COLLATE=C sort)
+
+    for test in $slow_tests; do
+     case "$test" in
+       */multibranch/*)
+         # skip multibranch tests for now
+         ;;
+       *)
+
+        testname=${test##*/test_}
+        testname=${testname%%.py}
+
+        cat >> "$tmp" <<EOF
+integration:${PROTO_DIR_BASE}_${testname}:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest ${test} -s --log-dir=tmp 2>&1 | tee tmp/${PROTO_DIR_BASE}_${testname}.out | tail
+  stage: test
+
+EOF
+     esac
+    done
+
 done
 
 cat >> $tmp <<EOF
-integration:examples_forge_transfer:
-  <<: *integration_python_definition
+integration:examples:
+  extends: .integration_python_template
   script:
     - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/forge_transfer.py
-  stage: test
-
-integration:examples_example:
-  <<: *integration_python_definition
-  script:
     - PYTHONPATH=\$PYTHONPATH:./ poetry run python examples/example.py
-  stage: test
-
-integration:examples_test_example:
-  <<: *integration_python_definition
-  script:
     - PYTHONPATH=./ poetry run pytest examples/test_example.py
   stage: test
 EOF
 
-csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" %##END_INTEGRATION_PYTHON##%
+csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/integration.yml" %##END_INTEGRATION_PYTHON##%
 cat "$tmp"00 >> "$tmp"
 rm "$tmp"0*
 
-mv $tmp "$src_dir/.gitlab-ci.yml"
+mv $tmp "$src_dir/.gitlab/ci/integration.yml"

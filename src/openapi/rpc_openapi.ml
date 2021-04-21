@@ -140,7 +140,7 @@ let rec convert_element (element : Json_schema.element) : Openapi.Schema.t =
     | Ext_ref _uri ->
         assert (element.enum = None) ;
         assert false
-    | String {pattern; min_length; max_length} ->
+    | String {pattern; min_length; max_length; _} ->
         assert (min_length <= 0) ;
         assert (max_length = None) ;
         let enum =

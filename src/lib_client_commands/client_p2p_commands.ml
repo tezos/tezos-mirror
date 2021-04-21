@@ -72,17 +72,17 @@ let commands () =
         let (incoming, outgoing) =
           List.partition (fun c -> c.P2p_connection.Info.incoming) conns
         in
-        Lwt_list.iter_s
+        List.iter_s
           (fun conn -> cctxt#message "  %a" pp_connection_info conn)
           incoming
         >>= fun () ->
-        Lwt_list.iter_s
+        List.iter_s
           (fun conn -> cctxt#message "  %a" pp_connection_info conn)
           outgoing
         >>= fun () ->
         cctxt#message "KNOWN PEERS"
         >>= fun () ->
-        Lwt_list.iter_s
+        List.iter_s
           (fun (p, pi) ->
             cctxt#message
               "  %a  %.0f %a %a %s"
@@ -98,7 +98,7 @@ let commands () =
         >>= fun () ->
         cctxt#message "KNOWN POINTS"
         >>= fun () ->
-        Lwt_list.iter_s
+        List.iter_s
           (fun (p, pi) ->
             match pi.P2p_point.Info.state with
             | Running peer_id ->
@@ -179,8 +179,8 @@ let commands () =
       no_options
       (prefixes ["ban"; "address"] @@ addr_parameter @@ stop)
       (fun () (address, _port) (cctxt : #Client_context.full) ->
-        P2p_services.Points.ban cctxt (address, 0)
-        >>=? fun () ->
+        P2p_services.Points.patch cctxt (address, 0) (Some `Ban, None)
+        >>=? fun _ ->
         cctxt#message "Address %a:* is now banned." P2p_addr.pp address
         >>= fun () -> return_unit);
     command
@@ -189,8 +189,8 @@ let commands () =
       no_options
       (prefixes ["unban"; "address"] @@ addr_parameter @@ stop)
       (fun () (address, _port) (cctxt : #Client_context.full) ->
-        P2p_services.Points.unban cctxt (address, 0)
-        >>=? fun () ->
+        P2p_services.Points.patch cctxt (address, 0) (Some `Open, None)
+        >>=? fun _ ->
         cctxt#message "Address %a:* is now unbanned." P2p_addr.pp address
         >>= fun () -> return_unit);
     command
@@ -201,8 +201,8 @@ let commands () =
       no_options
       (prefixes ["trust"; "address"] @@ addr_parameter @@ stop)
       (fun () (address, port) (cctxt : #Client_context.full) ->
-        P2p_services.Points.trust cctxt (address, port)
-        >>=? fun () ->
+        P2p_services.Points.patch cctxt (address, port) (Some `Trust, None)
+        >>=? fun _ ->
         cctxt#message "Address %a:%d is now trusted." P2p_addr.pp address port
         >>= fun () -> return_unit);
     command
@@ -211,8 +211,8 @@ let commands () =
       no_options
       (prefixes ["untrust"; "address"] @@ addr_parameter @@ stop)
       (fun () (address, port) (cctxt : #Client_context.full) ->
-        P2p_services.Points.untrust cctxt (address, port)
-        >>=? fun () ->
+        P2p_services.Points.patch cctxt (address, port) (Some `Open, None)
+        >>=? fun _ ->
         cctxt#message
           "Address %a:%d is now untrusted."
           P2p_addr.pp
@@ -255,8 +255,8 @@ let commands () =
       @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop )
       (fun () peer (cctxt : #Client_context.full) ->
-        P2p_services.Peers.ban cctxt peer
-        >>=? fun () ->
+        P2p_services.Peers.patch cctxt peer (Some `Ban)
+        >>=? fun _ ->
         cctxt#message "The peer %a is now banned." P2p_peer.Id.pp_short peer
         >>= fun () -> return_unit);
     command
@@ -267,8 +267,8 @@ let commands () =
       @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop )
       (fun () peer (cctxt : #Client_context.full) ->
-        P2p_services.Peers.unban cctxt peer
-        >>=? fun () ->
+        P2p_services.Peers.patch cctxt peer (Some `Open)
+        >>=? fun _ ->
         cctxt#message "The peer %a is now unbanned." P2p_peer.Id.pp_short peer
         >>= fun () -> return_unit);
     command
@@ -281,8 +281,8 @@ let commands () =
       @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop )
       (fun () peer (cctxt : #Client_context.full) ->
-        P2p_services.Peers.trust cctxt peer
-        >>=? fun () ->
+        P2p_services.Peers.patch cctxt peer (Some `Trust)
+        >>=? fun _ ->
         cctxt#message "The peer %a is now trusted." P2p_peer.Id.pp_short peer
         >>= fun () -> return_unit);
     command
@@ -293,8 +293,8 @@ let commands () =
       @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop )
       (fun () peer (cctxt : #Client_context.full) ->
-        P2p_services.Peers.untrust cctxt peer
-        >>=? fun () ->
+        P2p_services.Peers.patch cctxt peer (Some `Open)
+        >>=? fun _ ->
         cctxt#message "The peer %a is now untrusted." P2p_peer.Id.pp_short peer
         >>= fun () -> return_unit);
     command

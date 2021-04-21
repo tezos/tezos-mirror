@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -119,6 +119,18 @@ val add_argument : t -> argument -> unit
     where [<PORT>] is the P2P port of [peer]. *)
 val add_peer : t -> t -> unit
 
+(** Add a [--peer] argument to a node.
+
+    Usage: [add_peer node peer]
+
+    Same as [add_argument node (Peer "127.0.0.1:<PORT>#<ID>")]
+    where [<PORT>] is the P2P port and [<ID>] is the identity of [peer]. *)
+val add_peer_with_id : t -> t -> unit Lwt.t
+
+(** [point_and_id node] ["127.0.0.1:<PORT>#<ID>"] where [<PORT>] is the P2P
+    port  and [<ID>] is the identity of [node]. *)
+val point_and_id : t -> string Lwt.t
+
 (** Get the name of a node. *)
 val name : t -> string
 
@@ -157,7 +169,11 @@ val spawn_config_init : t -> argument list -> Process.t
 
     The resulting promise is fulfilled as soon as the node has been spawned.
     It continues running in the background. *)
-val run : t -> argument list -> unit Lwt.t
+val run :
+  ?on_terminate:(Unix.process_status -> unit) ->
+  t ->
+  argument list ->
+  unit Lwt.t
 
 (** {2 Events} *)
 

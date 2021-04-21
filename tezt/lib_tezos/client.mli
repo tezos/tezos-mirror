@@ -26,10 +26,25 @@
 (** Run Tezos client commands. *)
 
 (** Mode of the client *)
-type mode = Client of Node.t option | Mockup
+type mode = Client of Node.t option | Mockup | Proxy of Node.t
+
+(** The synchronization mode of the client.
+
+    - [Asynchronous] mode is when transfer doesn't bake the block.
+    - [Synchronous] is the default mode (no flag passed to [create mockup]). *)
+type mockup_sync_mode = Asynchronous | Synchronous
+
+(** The mode argument of the client's 'normalize data' command *)
+type normalize_mode = Readable | Optimized | Optimized_legacy
 
 (** Tezos client states. *)
 type t
+
+(** Get the base directory of a client.
+
+    The base directory is the location where clients store their
+    configuration files. It corresponds to the [--base-dir] option. *)
+val base_dir : t -> string
 
 (** Create a client.
 
@@ -63,6 +78,11 @@ val create_with_mode :
   mode ->
   t
 
+(** Change the client's mode. This function is required for example because
+    we wanna keep a client's wallet. This is impossible if we created
+    a new client from scratch. *)
+val set_mode : mode -> t -> unit
+
 (** {2 RPC calls} *)
 
 (** Paths for RPCs.
@@ -80,12 +100,22 @@ type query_string = (string * string) list
 (** HTTP methods for RPCs. *)
 type meth = GET | PUT | POST | PATCH
 
+(** [rpc_path_query_to_string ["key1", "value1"; "key2", "value2")] ["seg1"; "seg2"]]
+    returns [/seg1/seg2?key1=value1&key2=value2] where seg1, seg2, key1, key2,
+    value1, and value2 have been appropriately encoded *)
+val rpc_path_query_to_string : ?query_string:query_string -> path -> string
+
 (** Use the client to call an RPC.
 
-    Run [tezos-client rpc meth path?query_string with data].
-    Fail the test if the RPC call failed. *)
+    Run [rpc meth path?query_string with data].
+    Fail the test if the RPC call failed.
+    [env] can be used to customize environment variables, e.g.
+    [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")] to enable
+    logging. *)
 val rpc :
   ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?env:string String_map.t ->
   ?data:JSON.u ->
   ?query_string:query_string ->
   meth ->
@@ -96,6 +126,8 @@ val rpc :
 (** Same as [rpc], but do not wait for the process to exit. *)
 val spawn_rpc :
   ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?env:string String_map.t ->
   ?data:JSON.u ->
   ?query_string:query_string ->
   meth ->
@@ -108,6 +140,14 @@ val rpc_list : ?node:Node.t -> t -> string Lwt.t
 
 (** Same as [rpc_list], but do not wait for the process to exit. *)
 val spawn_rpc_list : ?node:Node.t -> t -> Process.t
+
+(** Run [tezos-client rpc /chains/<chain>/blocks/<block>/header/shell]. *)
+val shell_header :
+  ?node:Node.t -> ?chain:string -> ?block:string -> t -> string Lwt.t
+
+(** Same as [shell_header], but do not wait for the process to exit. *)
+val spawn_shell_header :
+  ?node:Node.t -> ?chain:string -> ?block:string -> t -> Process.t
 
 (** {2 Admin Client Commands} *)
 
@@ -152,22 +192,24 @@ val spawn_import_secret_key : ?node:Node.t -> t -> Constant.key -> Process.t
     between each block so that peers do not reject them for being in the future). *)
 val activate_protocol :
   ?node:Node.t ->
-  ?protocol:Constant.protocol ->
+  protocol:Protocol.t ->
   ?fitness:int ->
   ?key:string ->
   ?timestamp:string ->
   ?timestamp_delay:float ->
+  ?parameter_file:string ->
   t ->
   unit Lwt.t
 
 (** Same as [activate_protocol], but do not wait for the process to exit. *)
 val spawn_activate_protocol :
   ?node:Node.t ->
-  ?protocol:Constant.protocol ->
+  protocol:Protocol.t ->
   ?fitness:int ->
   ?key:string ->
   ?timestamp:string ->
   ?timestamp_delay:float ->
+  ?parameter_file:string ->
   t ->
   Process.t
 
@@ -175,16 +217,47 @@ val spawn_activate_protocol :
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val bake_for :
-  ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> unit Lwt.t
+  ?node:Node.t ->
+  ?protocol:Protocol.t ->
+  ?key:string ->
+  ?minimal_timestamp:bool ->
+  ?mempool:string ->
+  ?force:bool ->
+  ?context_path:string ->
+  t ->
+  unit Lwt.t
 
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :
-  ?node:Node.t -> ?key:string -> ?minimal_timestamp:bool -> t -> Process.t
+  ?node:Node.t ->
+  ?protocol:Protocol.t ->
+  ?key:string ->
+  ?minimal_timestamp:bool ->
+  ?mempool:string ->
+  ?force:bool ->
+  ?context_path:string ->
+  t ->
+  Process.t
+
+(** Run [tezos-client show address]. *)
+val show_address : ?show_secret:bool -> alias:string -> t -> Account.key Lwt.t
+
+(** Same as [show_address], but do not wait for the process to exit. *)
+val spawn_show_address : ?show_secret:bool -> alias:string -> t -> Process.t
+
+(** A helper to run [tezos-client gen keys] followed by
+    [tezos-client show address] to get the generated key. *)
+val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
 
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
   ?node:Node.t ->
-  amount:int ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  amount:Tez.t ->
   giver:string ->
   receiver:string ->
   t ->
@@ -193,11 +266,42 @@ val transfer :
 (** Same as [transfer], but do not wait for the process to exit. *)
 val spawn_transfer :
   ?node:Node.t ->
-  amount:int ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  amount:Tez.t ->
   giver:string ->
   receiver:string ->
   t ->
   Process.t
+
+(** Run [tezos-client set delegate for <src> to <delegate>]. *)
+val set_delegate :
+  ?node:Node.t ->
+  ?wait:string ->
+  src:string ->
+  delegate:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [set_delegate], but do not wait for the process to exit. *)
+val spawn_set_delegate :
+  ?node:Node.t ->
+  ?wait:string ->
+  src:string ->
+  delegate:string ->
+  t ->
+  Process.t
+
+(** Run [tezos-client withdraw delegate from <src>]. *)
+val withdraw_delegate :
+  ?node:Node.t -> ?wait:string -> src:string -> t -> unit Lwt.t
+
+(** Same as [withdraw_delegate], but do not wait for the process to exit. *)
+val spawn_withdraw_delegate :
+  ?node:Node.t -> ?wait:string -> src:string -> t -> Process.t
 
 (** Run [tezos-client get balance for]. *)
 val get_balance_for : ?node:Node.t -> account:string -> t -> float Lwt.t
@@ -205,21 +309,23 @@ val get_balance_for : ?node:Node.t -> account:string -> t -> float Lwt.t
 (** Same as [get_balance_for], but do not wait for the process to exit. *)
 val spawn_get_balance_for : ?node:Node.t -> account:string -> t -> Process.t
 
-(** Run [tezos-client create mockup].
-
-    Default [protocol] is {!Constant.alpha}. *)
-val create_mockup : ?protocol:Constant.protocol -> t -> unit Lwt.t
+(** Run [tezos-client create mockup]. *)
+val create_mockup :
+  ?sync_mode:mockup_sync_mode -> protocol:Protocol.t -> t -> unit Lwt.t
 
 (** Same as [create_mockup], but do not wait for the process to exit. *)
-val spawn_create_mockup : ?protocol:Constant.protocol -> t -> Process.t
+val spawn_create_mockup :
+  ?sync_mode:mockup_sync_mode -> protocol:Protocol.t -> t -> Process.t
 
 (** Run [tezos-client submit proposals for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
-val submit_proposals : ?key:string -> proto_hash:string -> t -> unit Lwt.t
+val submit_proposals :
+  ?key:string -> ?wait:string -> proto_hash:string -> t -> unit Lwt.t
 
 (** Same as [submit_proposals], but do not wait for the process to exit. *)
-val spawn_submit_proposals : ?key:string -> proto_hash:string -> t -> Process.t
+val spawn_submit_proposals :
+  ?key:string -> ?wait:string -> proto_hash:string -> t -> Process.t
 
 type ballot = Nay | Pass | Yay
 
@@ -227,11 +333,69 @@ type ballot = Nay | Pass | Yay
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val submit_ballot :
-  ?key:string -> proto_hash:string -> ballot -> t -> unit Lwt.t
+  ?key:string -> ?wait:string -> proto_hash:string -> ballot -> t -> unit Lwt.t
 
 (** Same as [submit_ballot], but do not wait for the process to exit. *)
 val spawn_submit_ballot :
-  ?key:string -> proto_hash:string -> ballot -> t -> Process.t
+  ?key:string -> ?wait:string -> proto_hash:string -> ballot -> t -> Process.t
+
+(** Run [tezos-client originate contract alias transferring amount from src
+    running prg]. Returns the originated contract hash *)
+val originate_contract :
+  ?node:Node.t ->
+  ?wait:string ->
+  ?init:string ->
+  ?burn_cap:Tez.t ->
+  alias:string ->
+  amount:Tez.t ->
+  src:string ->
+  prg:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [originate_contract], but do not wait for the process to exit. *)
+val spawn_originate_contract :
+  ?node:Node.t ->
+  ?wait:string ->
+  ?init:string ->
+  ?burn_cap:Tez.t ->
+  alias:string ->
+  amount:Tez.t ->
+  src:string ->
+  prg:string ->
+  t ->
+  Process.t
+
+(** Run [tezos-client normalize data .. of type ...]*)
+val normalize_data :
+  ?mode:normalize_mode ->
+  ?legacy:bool ->
+  data:string ->
+  typ:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [normalize_data], but do not wait for the process to exit. *)
+val spawn_normalize_data :
+  ?mode:normalize_mode ->
+  ?legacy:bool ->
+  data:string ->
+  typ:string ->
+  t ->
+  Process.t
+
+(** Run [tezos-client list mockup protocols]. *)
+val list_mockup_protocols : t -> string list Lwt.t
+
+(** Same as [list_mockup_protocols], but do not wait for the process to exit
+    and do not process stdout. *)
+val spawn_list_mockup_protocols : t -> Process.t
+
+(** Run [tezos-client migrate mockup to]. *)
+val migrate_mockup : next_protocol:Protocol.t -> t -> unit Lwt.t
+
+(** Same as [migrate_mockup], but do not wait for the process to exit. *)
+val spawn_migrate_mockup : next_protocol:Protocol.t -> t -> Process.t
 
 (** {2 High-Level Functions} *)
 
@@ -250,13 +414,16 @@ val init :
 (** Create a client with mode [Mockup] and run [create mockup].
 
     Contrary to [init], this does not import any secret key, because
-    [tezos-client create mockup] already initializes the mockup with bootstrap keys. *)
+   [tezos-client create mockup] already initializes the mockup with bootstrap
+   keys.
+*)
 val init_mockup :
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
-  ?protocol:Constant.protocol ->
+  ?sync_mode:mockup_sync_mode ->
+  protocol:Protocol.t ->
   unit ->
   t Lwt.t

@@ -28,20 +28,28 @@ let rec read_partial_context context path depth =
   if depth = 0 then Lwt.return Block_services.Cut
   else
     (* try to read as file *)
-    Context.get context path
+    Context.find context path
     >>= function
     | Some v ->
         Lwt.return (Block_services.Key v)
     | None ->
         (* try to read as directory *)
-        Context.fold context path ~init:[] ~f:(fun k acc ->
-            match k with
-            | `Key k | `Dir k ->
+        Context.fold
+          ~depth:(`Eq 1)
+          context
+          path
+          ~init:TzString.Map.empty
+          ~f:(fun k _ acc ->
+            match path @ k with
+            | [] ->
+                (* This is an invariant of {!Context.fold} *)
+                assert false
+            | khd :: ktl as k ->
                 read_partial_context context k (depth - 1)
                 >>= fun v ->
-                let k = List.nth k (List.length k - 1) in
-                Lwt.return ((k, v) :: acc))
-        >>= fun l -> Lwt.return (Block_services.Dir (List.rev l))
+                let k = List.last khd ktl in
+                Lwt.return (TzString.Map.add k v acc))
+        >|= fun map -> Block_services.Dir map
 
 let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
   let dir : (State.Chain.t * Block_hash.t * Block_header.t) RPC_directory.t ref
@@ -207,12 +215,15 @@ let build_raw_rpc_directory ~user_activated_upgrades
     Lwt.catch
       (fun () ->
         State.Block.all_operations_metadata block
-        >>= fun ops_metadata ->
-        return
+        >|= fun ops_metadata ->
+        List.map2_e
+          ~when_different_lengths:()
           (List.map2
-             (List.map2 (convert_with_metadata chain_id))
-             ops
-             ops_metadata))
+             ~when_different_lengths:()
+             (convert_with_metadata chain_id))
+          ops
+          ops_metadata
+        |> function Ok v -> Ok v | Error () -> raise Not_found)
       (fun _ ->
         return (List.map (List.map (convert_without_metadata chain_id)) ops))
   in
@@ -225,9 +236,13 @@ let build_raw_rpc_directory ~user_activated_upgrades
           Lwt.catch
             (fun () ->
               State.Block.operations_metadata block i
-              >>= fun ops_metadata ->
-              return
-                (List.map2 (convert_with_metadata chain_id) ops ops_metadata))
+              >|= fun ops_metadata ->
+              List.map2
+                ~when_different_lengths:()
+                (convert_with_metadata chain_id)
+                ops
+                ops_metadata
+              |> function Ok v -> Ok v | Error () -> raise Not_found)
             (fun _ ->
               return ((List.map (convert_without_metadata chain_id)) ops)))
         (fun _ -> raise Not_found)) ;
@@ -237,12 +252,14 @@ let build_raw_rpc_directory ~user_activated_upgrades
         (fun () ->
           State.Block.operations block i
           >>= fun (ops, _path) ->
-          let op = List.nth ops j in
+          let op = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth ops j in
           Lwt.catch
             (fun () ->
               State.Block.operations_metadata block i
               >>= fun metadata ->
-              let op_metadata = List.nth metadata j in
+              let op_metadata =
+                WithExceptions.Option.get ~loc:__LOC__ @@ List.nth metadata j
+              in
               return (convert_with_metadata chain_id op op_metadata))
             (fun _ -> return (convert_without_metadata chain_id op)))
         (fun _ -> raise Not_found)) ;
@@ -257,7 +274,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
           State.Block.operation_hashes block i
           >|= fun (ops, _) -> List.nth ops j)
         (fun _ -> raise Not_found)
-      >>= fun op -> return op) ;
+      >>= fail_opt) ;
   (* operation_metadata_hashes *)
   register0 S.Operation_metadata_hashes.root (fun block () () ->
       State.Block.all_operations_metadata_hash block >>= fail_opt) ;
@@ -274,7 +291,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
     (fun block i j () () ->
       State.Block.operations_metadata_hashes block i
       >>= fun hashes ->
-      Lwt.return (Option.map (fun hashes -> List.nth hashes j) hashes)
+      Lwt.return @@ Option.bind hashes (fun hashes -> List.nth hashes j)
       >>= fail_opt) ;
   (* context *)
   register1 S.Context.read (fun block path q () ->
@@ -287,7 +304,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
       >>=? fun context ->
       Context.mem context path
       >>= fun mem ->
-      Context.dir_mem context path
+      Context.mem_tree context path
       >>= fun dir_mem ->
       if not (mem || dir_mem) then Lwt.fail Not_found
       else read_partial_context context path depth >>= fun dir -> return dir) ;
@@ -372,7 +389,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
         ~timestamp:(Time.System.to_protocol (Systime_os.now ()))
         ()
       >>=? fun state ->
-      fold_left_s
+      List.fold_left_es
         (fun (state, acc) op ->
           Next_proto.apply_operation state op
           >>=? fun (state, result) ->

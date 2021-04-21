@@ -151,11 +151,11 @@ let check_property prop () =
       failwith "gas_consume_commutes: protocol error"
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "Gas.free is a neutral element"
       `Quick
       (check_property (loop_check free_neutral 1000));
-    Test.tztest
+    Test_services.tztest
       "Gas.consume commutes"
       `Quick
       (check_property (loop_check consume_commutes 1000)) ]

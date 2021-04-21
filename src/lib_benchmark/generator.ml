@@ -23,6 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A [probe] implements an instrumented [apply] function.
+    The implementation of [apply] is meant to record in a side-effecting way
+    the result of a benchmark for the given closure. [get] allows to retrieve
+    the results. *)
+type 'aspect probe = {
+  apply : 'a. 'aspect -> (unit -> 'a) -> 'a;
+  aspects : unit -> 'aspect list;
+  get : 'aspect -> float list;
+}
+
 (** The type of benchmarks. The piece of code being measured is [closure].
     Some benchmark requires to set-up/cleanup artifacts when being run,
     in that case use [With_context] with a proper implementation of the
@@ -37,6 +47,12 @@ type 'workload benchmark =
       workload : 'workload;
       closure : 'context -> unit;
       with_context : 'a. ('context -> 'a) -> 'a;
+    }
+      -> 'workload benchmark
+  | With_probe : {
+      workload : 'aspect -> 'workload;
+      probe : 'aspect probe;
+      closure : 'aspect probe -> unit;
     }
       -> 'workload benchmark
 

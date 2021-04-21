@@ -10,7 +10,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-stdlib"
-  "data-encoding" { = "0.2" }
+  "data-encoding" { >= "0.3" & < "0.4" }
   "tezos-error-monad"
   "tezos-lwt-result-stdlib"
   "tezos-rpc"

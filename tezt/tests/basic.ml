@@ -26,16 +26,23 @@
 (* This example is included in the documentation (docs/developers/tezt.rst).
    It is part of the tests to ensure we keep it up-to-date. *)
 
-let check_node_initialization history_mode =
+let check_node_initialization protocol history_mode =
   Test.register
     ~__FILE__
     ~title:
-      (sf "node initialization (%s mode)" (Node.show_history_mode history_mode))
-    ~tags:["basic"; "node"; Node.show_history_mode history_mode]
+      (sf
+         "%s: node initialization (%s mode)"
+         (Protocol.name protocol)
+         (Node.show_history_mode history_mode))
+    ~tags:
+      [ Protocol.tag protocol;
+        "basic";
+        "node";
+        Node.show_history_mode history_mode ]
   @@ fun () ->
   let* node = Node.init [History_mode history_mode] in
   let* client = Client.init ~node () in
-  let* () = Client.activate_protocol client in
+  let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
   let* () = repeat 10 (fun () -> Client.bake_for client) in
   Log.info "Baked 10 blocks." ;
@@ -46,7 +53,7 @@ let check_node_initialization history_mode =
   Log.info "Identity is not empty." ;
   return ()
 
-let register () =
-  check_node_initialization Archive ;
-  check_node_initialization Full ;
-  check_node_initialization Rolling
+let register protocol =
+  check_node_initialization protocol Archive ;
+  check_node_initialization protocol Full ;
+  check_node_initialization protocol Rolling

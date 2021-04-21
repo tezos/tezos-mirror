@@ -25,8 +25,8 @@
 
 open Test_fuzzing_tests
 
-module IntSet : Lwtreslib.Set.S with type elt = int = struct
-  include Lwtreslib.Set.Make (Int)
+module IntSet : Support.Lib.Set.S with type elt = int = struct
+  include Support.Lib.Set.Make (Int)
 end
 
 module SetWithBase = struct
@@ -41,7 +41,8 @@ module SetWithBase = struct
   type _alias_t = IntSet.t
 
   module IntSet :
-    Lwtreslib.Set.S with type elt := _alias_elt and type t := _alias_t = struct
+    Support.Lib.Set.S with type elt := _alias_elt and type t := _alias_t =
+  struct
     include IntSet
   end
 
@@ -50,6 +51,8 @@ module SetWithBase = struct
   let of_list : int list -> _alias_t = of_list
 
   let to_list : _alias_t -> int list = elements
+
+  let pp fmt s = Crowbar.(pp_list pp_int) fmt (to_list s)
 end
 
 module Iterp = TestIterMonotoneAgainstStdlibList (SetWithBase)

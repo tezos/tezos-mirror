@@ -531,8 +531,9 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         let gas_limit = c.gas_limit in
         let size =
           if first then
-            Data_encoding.Binary.fixed_length_exn
-              Tezos_base.Operation.shell_header_encoding
+            ( WithExceptions.Option.get ~loc:__LOC__
+            @@ Data_encoding.Binary.fixed_length
+                 Tezos_base.Operation.shell_header_encoding )
             + Data_encoding.Binary.length
                 Operation.contents_encoding
                 (Contents op)
@@ -779,7 +780,7 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     >>= fun () ->
     Lwt.return (originated_contracts result.contents)
     >>=? fun contracts ->
-    Lwt_list.iter_s
+    List.iter_s
       (fun c -> cctxt#message "New contract %a originated." Contract.pp c)
       contracts
     >>= fun () ->

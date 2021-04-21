@@ -60,7 +60,11 @@ let string_of_sockaddr addr =
 
 let id t = t.id
 
-let socket proto kind arg = create (Lwt_unix.socket proto kind arg)
+let socket proto kind arg =
+  create
+    (let fd = Lwt_unix.socket proto kind arg in
+     Lwt_unix.set_close_on_exec fd ;
+     fd)
 
 let close t =
   Events.(emit close_fd) (t.id, t.nread, t.nwrit)

@@ -3,18 +3,20 @@
         test_p2p_pool
         test_p2p_io_scheduler
         test_p2p_peerset
-        test_p2p_ipv6set
         test_p2p_banned_peers
+		  test_p2p_node
         )
  (libraries tezos-base
             tezos-stdlib-unix
             tezos-p2p
+            tezos-p2p-services
             alcotest-lwt)
  (flags (:standard -linkall
                    -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib
-                   -open Tezos_p2p)))
+                   -open Tezos_p2p
+                   -open Tezos_p2p_services)))
 
 (rule
  (alias buildtest)
@@ -22,21 +24,24 @@
        test_p2p_pool.exe
        test_p2p_io_scheduler.exe
        test_p2p_peerset.exe
-       test_p2p_ipv6set.exe
        test_p2p_banned_peers.exe
+		 test_p2p_node.exe
        )
  (action (progn)))
 
 (rule
  (alias runtest_p2p_socket)
+ (locks /ports/49152-65535)
  (action (run %{exe:test_p2p_socket.exe} -v)))
 
 (rule
  (alias runtest_p2p_pool)
+ (locks /ports/49152-65535)
  (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5 -v)))
 
 (rule
  (alias runtest_p2p_io_scheduler)
+ (locks /ports/49152-65535)
  (action (run %{exe:test_p2p_io_scheduler.exe}
               --delay 5 --clients 8
               --max-upload-speed 262144 ;; 1 << 18 = 256kB
@@ -45,26 +50,25 @@
 
 (rule
  (alias runtest_p2p_socket_ipv4)
+ (locks /ports/49152-65535)
  (action (run %{exe:test_p2p_socket.exe} -v
               --addr "::ffff:127.0.0.1")))
 
 (rule
  (alias runtest_p2p_pool_ipv4)
+ (locks /ports/49152-65535)
  (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5 -v
               --addr "::ffff:127.0.0.1")))
 
 (rule
  (alias runtest_p2p_io_scheduler_ipv4)
+ (locks /ports/49152-65535)
  (action (run %{exe:test_p2p_io_scheduler.exe}
               --delay 5 --clients 8
               --max-upload-speed 262144 ;; 1 << 18 = 256kB
               --max-download-speed 1048576 ;; 1 << 20 = 1MB
               --addr "::ffff:127.0.0.1"
               )))
-
-(rule
- (alias runtest_p2p_ipv6set)
- (action (run %{exe:test_p2p_ipv6set.exe} -v)))
 
 (rule
  (alias runtest_p2p_peerset)
@@ -75,14 +79,19 @@
  (action (run %{exe:test_p2p_banned_peers.exe} -v)))
 
 (rule
+ (alias runtest_p2p_node)
+ (locks /ports/49152-65535)
+ (action (run %{exe:test_p2p_node.exe})))
+
+(rule
  (alias runtest)
  (package tezos-p2p)
  (deps (alias runtest_p2p_socket_ipv4)
        (alias runtest_p2p_pool_ipv4)
        (alias runtest_p2p_io_scheduler_ipv4)
        (alias runtest_p2p_peerset)
-       (alias runtest_p2p_ipv6set)
        (alias runtest_p2p_banned_peers)
+		 (alias runtest_p2p_node)
        )
  (action (progn)))
 

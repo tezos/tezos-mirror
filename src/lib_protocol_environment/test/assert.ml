@@ -38,6 +38,14 @@ let default_printer _ = ""
 let equal ?(eq = ( = )) ?(prn = default_printer) ?(msg = "") x y =
   if not (eq x y) then fail (prn x) (prn y) msg
 
+let equal_bytes ?msg s1 s2 = equal ?msg ~prn:(fun s -> Bytes.to_string s) s1 s2
+
+let equal_bytes_option ?msg o1 o2 =
+  let prn = function None -> "None" | Some s -> Bytes.to_string s in
+  equal ?msg ~prn o1 o2
+
+let equal_bool ?msg b1 b2 = equal ?msg ~prn:(fun s -> string_of_bool s) b1 b2
+
 let equal_string_option ?msg o1 o2 =
   let prn = function None -> "None" | Some s -> s in
   equal ?msg ~prn o1 o2

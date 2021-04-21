@@ -264,15 +264,22 @@ run it locally:
    tezos-client run script ./src/bin_client/test/contracts/attic/id.tz \
                 on storage '"hello"' and input '"world"'
 
+.. _configure_logging:
 
-Debugging
----------
+Logging
+-------
 
-It is possible to set independent log levels for different logging
-sections in Tezos, as well as specifying an output file for logging. See
-the description of log parameters above as well as documentation under
-the DEBUG section displayed by `tezos-node run –-help`.
+It is possible to set independent log levels for different components in the Tezos node, as well as specifying an output file for logging.
+This can be done in two different ways:
 
+- by defining log parameters in the configuration file (see :ref:`node-conf`)
+- by setting the environment variable ``TEZOS_LOG`` before starting the node.
+
+The list of the Tezos components that can be logged and the syntax for the logging options can be found in the DEBUG section displayed by ``tezos-node run --help``:
+
+.. literalinclude:: ../api/tezos-node-run.txt
+    :start-after: DEBUG
+    :end-before: OPTIONS
 
 .. _tezos-admin-client:
 
@@ -328,3 +335,21 @@ indicates a recommended course of action.
 +-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
 | 255         | like 127 but an error and an error occurred during exit (e.g., ``kill -9``)      | check output/logs, clean-up leftover files                       |
 +-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
+
+Failing_noop operation
+----------------------
+
+Starting with protocol 009 a `Failing_noop` operation is added. This operation
+is not executable in the protocol and will always fail when injected. It allows
+to sign an arbitrary string that cannot be misinterpreted in the protocol.
+
+The client has commands to sign a message with a given key or to check that
+message has been signed by a given key. These commands create a `failing_noop`
+operation from the message that is being signed or checked.
+
+::
+
+   tezos-client sign message "hello world" for <account>
+
+   tezos-client check that message "hello world" was signed by <account> to
+   produce <signature>

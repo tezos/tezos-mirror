@@ -1,0 +1,1266 @@
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[dig_eq.tz-Unit-(Pair 2 (Pair 3 (Pair 12 (Pair 16 (Pair 10 (Pair 14 (Pair 19 (Pair 9 (Pair 18 (Pair 6 (Pair 8 (Pair 11 (Pair 4 (Pair 13 (Pair 15 (Pair 5 1))))))))))))))))-Unit]
+
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 23 (remaining gas: 1039861.200 units remaining)
+    [ (Pair (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) Unit)  	 ]
+  - location: 24 (remaining gas: 1039861.060 units remaining)
+    [ (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 25 (remaining gas: 1039860.920 units remaining)
+    [ (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 27 (remaining gas: 1039860.720 units remaining)
+    [ 2  	
+      (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 30 (remaining gas: 1039860.420 units remaining)
+    [ 3  	
+      (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 29 (remaining gas: 1039860.350 units remaining)
+    [ 3  	
+      (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 28 (remaining gas: 1039860.350 units remaining)
+    [ 2  	
+      3  	
+      (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 34 (remaining gas: 1039860.042 units remaining)
+    [ 12  	
+      (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 33 (remaining gas: 1039859.972 units remaining)
+    [ 12  	
+      (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 31 (remaining gas: 1039859.972 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 38 (remaining gas: 1039859.660 units remaining)
+    [ 16  	
+      (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 37 (remaining gas: 1039859.590 units remaining)
+    [ 16  	
+      (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 35 (remaining gas: 1039859.590 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 42 (remaining gas: 1039859.274 units remaining)
+    [ 10  	
+      (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 41 (remaining gas: 1039859.204 units remaining)
+    [ 10  	
+      (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 39 (remaining gas: 1039859.204 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 46 (remaining gas: 1039858.884 units remaining)
+    [ 14  	
+      (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 45 (remaining gas: 1039858.814 units remaining)
+    [ 14  	
+      (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 43 (remaining gas: 1039858.814 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 50 (remaining gas: 1039858.490 units remaining)
+    [ 19  	
+      (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 49 (remaining gas: 1039858.420 units remaining)
+    [ 19  	
+      (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 47 (remaining gas: 1039858.420 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 54 (remaining gas: 1039858.092 units remaining)
+    [ 9  	
+      (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 53 (remaining gas: 1039858.022 units remaining)
+    [ 9  	
+      (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 51 (remaining gas: 1039858.022 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 58 (remaining gas: 1039857.690 units remaining)
+    [ 18  	
+      (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 57 (remaining gas: 1039857.620 units remaining)
+    [ 18  	
+      (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 55 (remaining gas: 1039857.620 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 62 (remaining gas: 1039857.284 units remaining)
+    [ 6  	
+      (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 61 (remaining gas: 1039857.214 units remaining)
+    [ 6  	
+      (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 59 (remaining gas: 1039857.214 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 66 (remaining gas: 1039856.874 units remaining)
+    [ 8  	
+      (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 65 (remaining gas: 1039856.804 units remaining)
+    [ 8  	
+      (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 63 (remaining gas: 1039856.804 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 70 (remaining gas: 1039856.460 units remaining)
+    [ 11  	
+      (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 69 (remaining gas: 1039856.390 units remaining)
+    [ 11  	
+      (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 67 (remaining gas: 1039856.390 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 74 (remaining gas: 1039856.042 units remaining)
+    [ 4  	
+      (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 73 (remaining gas: 1039855.972 units remaining)
+    [ 4  	
+      (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 71 (remaining gas: 1039855.972 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 78 (remaining gas: 1039855.620 units remaining)
+    [ 13  	
+      (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 77 (remaining gas: 1039855.550 units remaining)
+    [ 13  	
+      (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 75 (remaining gas: 1039855.550 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 82 (remaining gas: 1039855.194 units remaining)
+    [ 15  	
+      (Pair 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 81 (remaining gas: 1039855.124 units remaining)
+    [ 15  	
+      (Pair 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 79 (remaining gas: 1039855.124 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      (Pair 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 86 (remaining gas: 1039854.764 units remaining)
+    [ 5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 85 (remaining gas: 1039854.694 units remaining)
+    [ 5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 83 (remaining gas: 1039854.694 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: -1 (remaining gas: 1039854.624 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 87 (remaining gas: 1039854.464 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 89 (remaining gas: 1039854.300 units remaining)
+    [ 3  	
+      2  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 91 (remaining gas: 1039854.132 units remaining)
+    [ 12  	
+      3  	
+      2  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 93 (remaining gas: 1039853.960 units remaining)
+    [ 16  	
+      12  	
+      3  	
+      2  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 95 (remaining gas: 1039853.784 units remaining)
+    [ 10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 97 (remaining gas: 1039853.604 units remaining)
+    [ 14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 99 (remaining gas: 1039853.420 units remaining)
+    [ 19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 101 (remaining gas: 1039853.232 units remaining)
+    [ 9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 103 (remaining gas: 1039853.040 units remaining)
+    [ 18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 105 (remaining gas: 1039852.844 units remaining)
+    [ 6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 107 (remaining gas: 1039852.644 units remaining)
+    [ 8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 109 (remaining gas: 1039852.440 units remaining)
+    [ 11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 111 (remaining gas: 1039852.232 units remaining)
+    [ 4  	
+      11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 113 (remaining gas: 1039852.020 units remaining)
+    [ 13  	
+      4  	
+      11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 115 (remaining gas: 1039851.804 units remaining)
+    [ 15  	
+      13  	
+      4  	
+      11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 117 (remaining gas: 1039851.584 units remaining)
+    [ 5  	
+      15  	
+      13  	
+      4  	
+      11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 119 (remaining gas: 1039851.360 units remaining)
+    [ 1  	
+      5  	
+      15  	
+      13  	
+      4  	
+      11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 121 (remaining gas: 1039851.200 units remaining)
+    [ 1  	
+      5  	
+      15  	
+      13  	
+      4  	
+      11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 123 (remaining gas: 1039851.036 units remaining)
+    [ 5  	
+      1  	
+      15  	
+      13  	
+      4  	
+      11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 125 (remaining gas: 1039850.868 units remaining)
+    [ 15  	
+      5  	
+      1  	
+      13  	
+      4  	
+      11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 127 (remaining gas: 1039850.696 units remaining)
+    [ 13  	
+      15  	
+      5  	
+      1  	
+      4  	
+      11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 129 (remaining gas: 1039850.520 units remaining)
+    [ 4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      11  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 131 (remaining gas: 1039850.340 units remaining)
+    [ 11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      8  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 133 (remaining gas: 1039850.156 units remaining)
+    [ 8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      6  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 135 (remaining gas: 1039849.968 units remaining)
+    [ 6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      18  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 137 (remaining gas: 1039849.776 units remaining)
+    [ 18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      9  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 139 (remaining gas: 1039849.580 units remaining)
+    [ 9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      19  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 141 (remaining gas: 1039849.380 units remaining)
+    [ 19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      14  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 143 (remaining gas: 1039849.176 units remaining)
+    [ 14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      10  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 145 (remaining gas: 1039848.968 units remaining)
+    [ 10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      16  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 147 (remaining gas: 1039848.756 units remaining)
+    [ 16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      12  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 149 (remaining gas: 1039848.540 units remaining)
+    [ 12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      3  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 151 (remaining gas: 1039848.320 units remaining)
+    [ 3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      2  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 153 (remaining gas: 1039848.096 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      5  	
+      1  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 159 (remaining gas: 1039847.676 units remaining)
+    [ (Pair 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 158 (remaining gas: 1039847.606 units remaining)
+    [ (Pair 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 156 (remaining gas: 1039847.606 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      15  	
+      (Pair 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 163 (remaining gas: 1039847.250 units remaining)
+    [ (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 162 (remaining gas: 1039847.180 units remaining)
+    [ (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 160 (remaining gas: 1039847.180 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      13  	
+      (Pair 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 167 (remaining gas: 1039846.828 units remaining)
+    [ (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 166 (remaining gas: 1039846.758 units remaining)
+    [ (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 164 (remaining gas: 1039846.758 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      4  	
+      (Pair 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 171 (remaining gas: 1039846.410 units remaining)
+    [ (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 170 (remaining gas: 1039846.340 units remaining)
+    [ (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 168 (remaining gas: 1039846.340 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      11  	
+      (Pair 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 175 (remaining gas: 1039845.996 units remaining)
+    [ (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 174 (remaining gas: 1039845.926 units remaining)
+    [ (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 172 (remaining gas: 1039845.926 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      8  	
+      (Pair 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 179 (remaining gas: 1039845.586 units remaining)
+    [ (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 178 (remaining gas: 1039845.516 units remaining)
+    [ (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 176 (remaining gas: 1039845.516 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      6  	
+      (Pair 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 183 (remaining gas: 1039845.180 units remaining)
+    [ (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 182 (remaining gas: 1039845.110 units remaining)
+    [ (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 180 (remaining gas: 1039845.110 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      18  	
+      (Pair 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 187 (remaining gas: 1039844.778 units remaining)
+    [ (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 186 (remaining gas: 1039844.708 units remaining)
+    [ (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 184 (remaining gas: 1039844.708 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      9  	
+      (Pair 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 191 (remaining gas: 1039844.380 units remaining)
+    [ (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 190 (remaining gas: 1039844.310 units remaining)
+    [ (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 188 (remaining gas: 1039844.310 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      19  	
+      (Pair 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 195 (remaining gas: 1039843.986 units remaining)
+    [ (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 194 (remaining gas: 1039843.916 units remaining)
+    [ (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 192 (remaining gas: 1039843.916 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      14  	
+      (Pair 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 199 (remaining gas: 1039843.596 units remaining)
+    [ (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 198 (remaining gas: 1039843.526 units remaining)
+    [ (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 196 (remaining gas: 1039843.526 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      10  	
+      (Pair 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 203 (remaining gas: 1039843.210 units remaining)
+    [ (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 202 (remaining gas: 1039843.140 units remaining)
+    [ (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 200 (remaining gas: 1039843.140 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      16  	
+      (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 207 (remaining gas: 1039842.828 units remaining)
+    [ (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 206 (remaining gas: 1039842.758 units remaining)
+    [ (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 204 (remaining gas: 1039842.758 units remaining)
+    [ 2  	
+      3  	
+      12  	
+      (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 211 (remaining gas: 1039842.450 units remaining)
+    [ (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 210 (remaining gas: 1039842.380 units remaining)
+    [ (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 208 (remaining gas: 1039842.380 units remaining)
+    [ 2  	
+      3  	
+      (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 214 (remaining gas: 1039842.080 units remaining)
+    [ (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 213 (remaining gas: 1039842.010 units remaining)
+    [ (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 212 (remaining gas: 1039842.010 units remaining)
+    [ 2  	
+      (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 215 (remaining gas: 1039841.870 units remaining)
+    [ (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: -1 (remaining gas: 1039841.800 units remaining)
+    [ (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	
+      (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)  	@parameter ]
+  - location: 218 (remaining gas: 1039839.070 units remaining)
+    [ 0  	 ]
+  - location: 219 (remaining gas: 1039838.930 units remaining)
+    [ True  	 ]
+  - location: -1 (remaining gas: 1039838.860 units remaining)
+    [ True  	 ]
+  - location: 221 (remaining gas: 1039838.670 units remaining)
+    [  ]
+  - location: -1 (remaining gas: 1039838.600 units remaining)
+    [  ]
+  - location: 226 (remaining gas: 1039838.460 units remaining)
+    [ Unit  	 ]
+  - location: 227 (remaining gas: 1039838.320 units remaining)
+    [ {}  	
+      Unit  	 ]
+  - location: 229 (remaining gas: 1039838.180 units remaining)
+    [ (Pair {} Unit)  	 ]
+  - location: -1 (remaining gas: 1039838.110 units remaining)
+    [ (Pair {} Unit)  	 ]
+

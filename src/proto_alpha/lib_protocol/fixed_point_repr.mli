@@ -34,9 +34,9 @@ module type Safe = sig
 
   type integral = integral_tag t
 
-  val integral : Z.t -> integral
+  val integral_exn : Z.t -> integral
 
-  val integral_of_int : int -> integral
+  val integral_of_int_exn : int -> integral
 
   val integral_to_z : integral -> Z.t
 
@@ -90,9 +90,3 @@ module type Full = sig
 
   val unsafe_fp : Z.t -> fp
 end
-
-module type Decimals = sig
-  val decimals : int
-end
-
-module Make (Arg : Decimals) : Full

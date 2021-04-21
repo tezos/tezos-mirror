@@ -29,7 +29,7 @@ module Set = Id.Set
 module Table = Id.Table
 
 module Error_table :
-  Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.S_LWT with type key = Table.key
+  Tezos_error_monad.TzLwtreslib.Hashtbl.S_ES with type key = Table.key
 
 module Filter : sig
   type t = Accepted | Running | Disconnected

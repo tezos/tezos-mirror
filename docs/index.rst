@@ -25,7 +25,7 @@ The source code of Tezos is placed under the MIT Open Source License.
 Latest Release
 --------------
 
-The current version of Tezos is :ref:`version-7`.
+The current version of Tezos is :ref:`version-8`.
 
 The Community
 -------------
@@ -36,9 +36,8 @@ The Community
 - Several community-built block explorers are available:
 
     - https://tzstats.com
-    - https://tezos.id
     - https://tezblock.io
-    - https://teztracker.everstake.one
+    - https://teztracker.com/
     - https://tzkt.io (Baking focused Explorer)
     - https://arronax.io
     - https://mininax.io
@@ -105,24 +104,60 @@ in the :ref:`introduction <howtoget>`.
    user/key-management
    user/sandbox
    user/mockup
+   user/proxy
    user/history_modes
    user/snapshots
    user/various
-   user/glossary
    user/multinetwork
 
 .. toctree::
    :maxdepth: 2
-   :caption: White doc:
+   :caption: Shell doc:
 
-   whitedoc/the_big_picture
-   whitedoc/p2p
-   whitedoc/validation
-   whitedoc/sync
-   whitedoc/micheline
-   whitedoc/michelson
-   whitedoc/proof_of_stake
-   whitedoc/voting
+   shell/the_big_picture
+   shell/validation
+   shell/sync
+   shell/p2p
+   shell/p2p_api
+   shell/micheline
+   shell/cli-commands
+   shell/rpc
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 008 Edo doc:
+
+   008/michelson
+   008/proof_of_stake
+   008/sapling
+   008/voting
+   008/glossary
+   008/cli-commands
+   008/rpc
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 009 Florence doc:
+
+   009/michelson
+   009/proof_of_stake
+   009/sapling
+   009/voting
+   009/glossary
+   009/cli-commands
+   009/rpc
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Alpha Development Protocol doc:
+
+   alpha/michelson
+   alpha/proof_of_stake
+   alpha/sapling
+   alpha/voting
+   alpha/glossary
+   alpha/cli-commands
+   alpha/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -144,16 +179,21 @@ in the :ref:`introduction <howtoget>`.
    developer/contributing
    developer/merge_team
    developer/guidelines
+   README
 
 .. toctree::
    :maxdepth: 2
    :caption: Protocols:
 
+   protocols/naming
    protocols/003_PsddFKi3
    protocols/004_Pt24m4xi
    protocols/005_babylon
    protocols/006_carthage
+   protocols/007_delphi
    protocols/008_edo
+   protocols/009_florence
+   protocols/alpha
 
 .. toctree::
    :maxdepth: 2
@@ -167,23 +207,19 @@ in the :ref:`introduction <howtoget>`.
    releases/january-2020
    releases/version-7
    releases/version-8
+   releases/version-9
 
 .. toctree::
    :maxdepth: 2
    :caption: APIs:
 
-   README
    api/api-inline
-   api/cli-commands
-   api/rpc
    api/openapi
    api/errors
-   api/p2p
 
 
 Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`

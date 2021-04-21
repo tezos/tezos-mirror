@@ -71,14 +71,18 @@
             (select void_for_linking-008-PtEdo2Zk from
               (tezos-embedded-protocol-008-PtEdo2Zk -> void_for_linking-008-PtEdo2Zk.empty)
               (-> void_for_linking-008-PtEdo2Zk.empty))
-            (select void_for_linking-007-PsDELPH1-protocol-plugin-registerer from
-              (tezos-protocol-plugin-007-PsDELPH1-registerer -> void_for_linking-007-PsDELPH1-protocol-plugin-registerer.empty)
-              (-> void_for_linking-007-PsDELPH1-protocol-plugin-registerer.empty))
             (select void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer from
               (tezos-protocol-plugin-008-PtEdo2Zk-registerer -> void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer.empty)
               (-> void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer.empty))
+            (select void_for_linking-009-PsFLoren-protocol-plugin-registerer from
+              (tezos-protocol-plugin-009-PsFLoren-registerer -> void_for_linking-009-PsFLoren-protocol-plugin-registerer.empty)
+              (-> void_for_linking-009-PsFLoren-protocol-plugin-registerer.empty))
+            (select void_for_linking-alpha-protocol-plugin-registerer from
+              (tezos-protocol-plugin-alpha-registerer -> void_for_linking-alpha-protocol-plugin-registerer.empty)
+              (-> void_for_linking-alpha-protocol-plugin-registerer.empty))
              cmdliner
-             tls)
+             tls
+             lwt-exit)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_base
                    -open Tezos_stdlib_unix
@@ -113,8 +117,10 @@
    (write-file void_for_linking-007-PsDELPH1.empty "")
    (write-file void_for_linking-008-PtEdoTez.empty "")
    (write-file void_for_linking-008-PtEdo2Zk.empty "")
-   (write-file void_for_linking-007-PsDELPH1-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-009-PsFLoren.empty "")
+   (write-file void_for_linking-alpha-protocol-plugin-registerer.empty "")
    (write-file void_for_linking-008-PtEdo2Zk-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-009-PsFLoren-protocol-plugin-registerer.empty "")
 )))
 
 (install

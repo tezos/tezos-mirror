@@ -14,7 +14,8 @@
             tezos-storage
             tezos-rpc-http
             tezos-rpc
-            lwt-canceler)
+            lwt-canceler
+            lwt-exit)
  (library_flags (:standard -linkall))
  (modules (:standard \
                      delegate_commands

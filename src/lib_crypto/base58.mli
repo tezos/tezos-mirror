@@ -81,6 +81,8 @@ module Prefix : sig
 
   val p256_encrypted_secret_key : string
 
+  val secp256k1_encrypted_scalar : string
+
   val generic_signature : string
 
   val chain_id : string
@@ -158,7 +160,7 @@ val decode : ?alphabet:Alphabet.t -> string -> data option
 (** {2 Completion of partial Base58Check value} *)
 
 (** Register a (global) resolver for a previously
-    registered kind af data. *)
+    registered kind of data. *)
 val register_resolver : 'a encoding -> (string -> 'a list Lwt.t) -> unit
 
 (** Try to complete a prefix of a Base58Check encoded data, by using

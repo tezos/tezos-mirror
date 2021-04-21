@@ -4,8 +4,8 @@ from launchers.sandbox import Sandbox
 
 
 def scenario():
-    """ a private tezos network, initialized with network parameters
-        and some accounts. """
+    """a private tezos network, initialized with network parameters
+    and some accounts."""
     with Sandbox(paths.TEZOS_HOME, constants.IDENTITIES) as sandbox:
         # Launch node running protocol alpha
         sandbox.add_node(0, params=constants.NODE_PARAMS)
@@ -18,7 +18,7 @@ def scenario():
         # Wait for second node to update its protocol to alpha, if not
         # it may not know yet the `wait_for_inclusion` operation which is
         # protocol specific
-        time.sleep(15)
+        time.sleep(20)
         # first client tells node 0 to transfer money for an account to another
         # receipt is an object representing the client answer
         receipt = sandbox.client(0).transfer(500, 'bootstrap1', 'bootstrap3')

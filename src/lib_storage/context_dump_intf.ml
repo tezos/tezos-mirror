@@ -35,7 +35,7 @@ module type Dump_interface = sig
 
   type hash
 
-  type contents := string
+  type contents := bytes
 
   type step := string
 
@@ -141,7 +141,7 @@ module type Dump_interface = sig
 
   val update_context : context -> tree -> context
 
-  val add_string : batch -> string -> tree Lwt.t
+  val add_bytes : batch -> bytes -> tree Lwt.t
 
   val add_dir : batch -> (step * hash) list -> tree option Lwt.t
 end

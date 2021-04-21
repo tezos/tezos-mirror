@@ -1,0 +1,41 @@
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[get_and_update_map.tz-(Pair None { Elt "1" 1 ;             Elt "2" 2 })-"1"-(Pair (Some 1) { Elt "2" 2 })1]
+
+storage
+  (Pair (Some 1) { Elt "2" 2 })
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 11 (remaining gas: 1039988.563 units remaining)
+    [ (Pair "1" None { Elt "1" 1 ; Elt "2" 2 })  	 ]
+  - location: 13 (remaining gas: 1039988.453 units remaining)
+    [ "1"  	@parameter
+      (Pair None { Elt "1" 1 ; Elt "2" 2 })  	@storage ]
+  - location: 16 (remaining gas: 1039988.298 units remaining)
+    [ None  	
+      { Elt "1" 1 ; Elt "2" 2 }  	 ]
+  - location: 15 (remaining gas: 1039988.253 units remaining)
+    [ None  	
+      { Elt "1" 1 ; Elt "2" 2 }  	 ]
+  - location: 14 (remaining gas: 1039988.253 units remaining)
+    [ "1"  	@parameter
+      None  	
+      { Elt "1" 1 ; Elt "2" 2 }  	 ]
+  - location: -1 (remaining gas: 1039988.208 units remaining)
+    [ "1"  	@parameter
+      None  	
+      { Elt "1" 1 ; Elt "2" 2 }  	 ]
+  - location: 17 (remaining gas: 1039988.018 units remaining)
+    [ (Some 1)  	
+      { Elt "2" 2 }  	 ]
+  - location: 18 (remaining gas: 1039987.943 units remaining)
+    [ (Pair (Some 1) { Elt "2" 2 })  	 ]
+  - location: 19 (remaining gas: 1039987.868 units remaining)
+    [ {}  	
+      (Pair (Some 1) { Elt "2" 2 })  	 ]
+  - location: 21 (remaining gas: 1039987.793 units remaining)
+    [ (Pair {} (Some 1) { Elt "2" 2 })  	 ]
+  - location: -1 (remaining gas: 1039987.748 units remaining)
+    [ (Pair {} (Some 1) { Elt "2" 2 })  	 ]
+

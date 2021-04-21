@@ -38,7 +38,7 @@ type t = {
 }
 
 let rec worker_loop st =
-  let (Connect_handler pool) = st.connect_handler in
+  let (Connect_handler connect_handler) = st.connect_handler in
   Lwt_unix.yield ()
   >>= fun () ->
   protect ~canceler:st.canceler (fun () -> P2p_fd.accept st.socket >>= return)
@@ -51,7 +51,7 @@ let rec worker_loop st =
         | Lwt_unix.ADDR_INET (addr, port) ->
             (Ipaddr_unix.V6.of_inet_addr_exn addr, port)
       in
-      P2p_connect_handler.accept pool fd point ;
+      P2p_connect_handler.accept connect_handler fd point ;
       worker_loop st
   (* Unix errors related to the failure to create one connection,
      No reason to abort just now, but we want to stress out that we
@@ -147,6 +147,6 @@ let activate st =
       "welcome"
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop st)
-      ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
+      ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
 
-let shutdown st = Lwt_canceler.cancel st.canceler >>= fun () -> st.worker
+let shutdown st = Error_monad.cancel_with_exceptions st.canceler

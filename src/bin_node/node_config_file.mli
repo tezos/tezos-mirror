@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -43,8 +43,12 @@ type blockchain_network = {
 (** List of built-in networks with their alias. *)
 val builtin_blockchain_networks : (string * blockchain_network) list
 
+(** Data encoding for custom blockchain configuration. *)
+val blockchain_network_encoding : blockchain_network Data_encoding.t
+
 type t = {
   data_dir : string;
+  disable_config_validation : bool;
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
@@ -95,6 +99,7 @@ val default_p2p : p2p
 val default_config : t
 
 val update :
+  ?disable_config_validation:bool ->
   ?data_dir:string ->
   ?min_connections:int ->
   ?expected_connections:int ->
@@ -132,17 +137,32 @@ val read : string -> t tzresult Lwt.t
     is a data directory. *)
 val write : string -> t -> unit tzresult Lwt.t
 
-val resolve_listening_addrs : string -> (P2p_addr.t * int) list Lwt.t
+type error += Failed_to_parse_address of (string * string)
 
-val resolve_discovery_addrs : string -> (Ipaddr.V4.t * int) list Lwt.t
+(** [resolve_listening_addrs listening_addr] parses [listening_addr]
+   and returns a list of [points].  The default port is
+   [default_p2p_port]. Fails if the address could not be parsed. *)
+val resolve_listening_addrs : string -> P2p_point.Id.t list tzresult Lwt.t
 
-val resolve_rpc_listening_addrs : string -> (P2p_addr.t * int) list Lwt.t
+(** [resolve_discovery_addrs disco_addrs] parses [disco_addr] and
+   returns a list of [points]. [disco_addrs] must resolves to Ipv4
+   addresses otherwise it fails. The default port is
+   [default_discovery_port]. Fails if the address could not be
+   parsed. *)
+val resolve_discovery_addrs : string -> (Ipaddr.V4.t * int) list tzresult Lwt.t
 
-val resolve_bootstrap_addrs : string list -> (P2p_addr.t * int) list Lwt.t
+(** [resolve_rpc_listening_addrs rpc_addrs] parses [rpc_addr] and
+   returns a list of [points]. The default port is
+   [default_rpc_port]. Fails if the address could not be parsed. *)
+val resolve_rpc_listening_addrs : string -> P2p_point.Id.t list tzresult Lwt.t
+
+(** [resolve_boostrap_addrs bs_addrs] parses [bs_addrs] and returns
+   for each [addr] a list of [points]. The default port is
+   [default_p2p_port]. Fails if the address could not be parsed. *)
+val resolve_bootstrap_addrs :
+  string list -> (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t
 
 val encoding : t Data_encoding.t
-
-val check : t -> unit Lwt.t
 
 (** Return [p2p.bootstrap_peers] if not [None],
     [network.default_bootstrap_peers] otherwise. *)

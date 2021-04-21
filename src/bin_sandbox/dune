@@ -46,7 +46,7 @@
          )))
 
 (rule
-  (alias runtest_sandbox_user_activated_upgrade)
+  (alias runtest_sandbox_user_activated_upgrade_next)
   (locks /tcp-port/40000_range)
   (action
     (run %{exe:main.exe} mini-net
@@ -56,22 +56,73 @@
          --number-of-b 2
          --with-timestamp
          --until 20
-         --protocol-hash PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb
-         --protocol-kind Carthage
+         --protocol-hash PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
+         --protocol-kind Edo
          --tezos-client %{bin:tezos-client}
          --tezos-node %{bin:tezos-node}
-         --tezos-baker %{bin:tezos-baker-006-PsCARTHA}
-         --tezos-endorser %{bin:tezos-endorser-006-PsCARTHA}
-         --tezos-accuser %{bin:tezos-accuser-006-PsCARTHA}
+         --tezos-baker %{bin:tezos-baker-008-PtEdo2Zk}
+         --tezos-endorser %{bin:tezos-endorser-008-PtEdo2Zk}
+         --tezos-accuser %{bin:tezos-accuser-008-PtEdo2Zk}
+         --hard-fork 10:PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
+         --hard-fork-baker %{bin:tezos-baker-009-PsFLoren}
+         --hard-fork-endorser %{bin:tezos-endorser-009-PsFLoren}
+         --hard-fork-accuser %{bin:tezos-accuser-009-PsFLoren}
+         )))
+
+(rule
+  (alias runtest_sandbox_user_activated_upgrade_alpha)
+  (locks /tcp-port/40000_range)
+  (action
+    (run %{exe:main.exe} mini-net
+         --root-path %{env:ROOT_PATH=/tmp/flextesa-hard-fork/}
+         --base-port 40_000
+         --size 2
+         --number-of-b 2
+         --with-timestamp
+         --until 20
+         --protocol-hash PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
+         --protocol-kind Edo
+         --tezos-client %{bin:tezos-client}
+         --tezos-node %{bin:tezos-node}
+         --tezos-baker %{bin:tezos-baker-008-PtEdo2Zk}
+         --tezos-endorser %{bin:tezos-endorser-008-PtEdo2Zk}
+         --tezos-accuser %{bin:tezos-accuser-008-PtEdo2Zk}
          --hard-fork 10:ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
          --hard-fork-baker %{bin:tezos-baker-alpha}
          --hard-fork-endorser %{bin:tezos-endorser-alpha}
          --hard-fork-accuser %{bin:tezos-accuser-alpha}
          )))
 
+(rule
+  (alias runtest_sandbox_daemons_upgrade_next)
+  (locks /tcp-port/50000_range)
+  (action
+    (run %{exe:main.exe} daemons-upgrade
+         %{lib:tezos-protocol-009-PsFLoren:raw/TEZOS_PROTOCOL}
+         --root-path %{env:ROOT_PATH=/tmp/flextesa-daemons-upgrade/}
+         --base-port 50_000
+         --extra-dummy-proposals-batch-size 2
+         --extra-dummy-proposals-batch-levels 3,5
+         --size 2
+         --number-of-b 2
+         --time-betw 3
+         --blocks-per-vot 14
+         --with-timestamp
+         --protocol-hash PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
+         --protocol-kind Edo
+         --tezos-client %{bin:tezos-client}
+         --tezos-admin %{bin:tezos-admin-client}
+         --tezos-node %{bin:tezos-node}
+         --first-baker %{bin:tezos-baker-008-PtEdo2Zk}
+         --first-endorser %{bin:tezos-endorser-008-PtEdo2Zk}
+         --first-accuser %{bin:tezos-accuser-008-PtEdo2Zk}
+         --second-baker %{bin:tezos-baker-009-PsFLoren}
+         --second-endorser %{bin:tezos-endorser-009-PsFLoren}
+         --second-accuser %{bin:tezos-accuser-009-PsFLoren}
+         )))
 
 (rule
-  (alias runtest_sandbox_daemons_upgrade)
+  (alias runtest_sandbox_daemons_upgrade_alpha)
   (locks /tcp-port/50000_range)
   (action
     (run %{exe:main.exe} daemons-upgrade
@@ -85,14 +136,14 @@
          --time-betw 3
          --blocks-per-vot 14
          --with-timestamp
-         --protocol-hash PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb
-         --protocol-kind Carthage
+         --protocol-hash PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
+         --protocol-kind Edo
          --tezos-client %{bin:tezos-client}
          --tezos-admin %{bin:tezos-admin-client}
          --tezos-node %{bin:tezos-node}
-         --first-baker %{bin:tezos-baker-006-PsCARTHA}
-         --first-endorser %{bin:tezos-endorser-006-PsCARTHA}
-         --first-accuser %{bin:tezos-accuser-006-PsCARTHA}
+         --first-baker %{bin:tezos-baker-008-PtEdo2Zk}
+         --first-endorser %{bin:tezos-endorser-008-PtEdo2Zk}
+         --first-accuser %{bin:tezos-accuser-008-PtEdo2Zk}
          --second-baker %{bin:tezos-baker-alpha}
          --second-endorser %{bin:tezos-endorser-alpha}
          --second-accuser %{bin:tezos-accuser-alpha}
@@ -176,7 +227,9 @@
   (alias runtest_sandbox_accusations_simple_double_baking)
   (alias runtest_sandbox_accusations_simple_double_endorsing)
   (alias runtest_sandbox_voting_demo_noops)
-  (alias runtest_sandbox_user_activated_upgrade)
-  (alias runtest_sandbox_daemons_upgrade)
+  (alias runtest_sandbox_user_activated_upgrade_next)
+  (alias runtest_sandbox_user_activated_upgrade_alpha)
+  (alias runtest_sandbox_daemons_upgrade_next)
+  (alias runtest_sandbox_daemons_upgrade_alpha)
   (alias runtest_sandbox_node_synchronization))
  (action (progn)))

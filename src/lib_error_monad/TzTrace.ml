@@ -30,9 +30,13 @@ let make err = [err]
 
 let cons err trace = err :: trace
 
+let cons_list err errs = err :: errs
+
 (* This is temporary. Eventually, the traces might have a more structured
    semantic. *)
 let conp trace _trace = trace
+
+let conp_list tr _trs = tr
 
 let pp_print pp_error ppf = function
   | [] ->

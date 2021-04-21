@@ -61,6 +61,8 @@ module Public_key = struct
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
+  let of_bytes_without_validation = of_bytes_opt
+
   let size _ = compressed_size
 
   type Base58.data += Data of t
@@ -286,18 +288,8 @@ let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
 let zero = of_bytes_exn (Bytes.make size '\000')
 
-let sign ?watermark sk msg =
-  let msg =
-    Blake2B.to_bytes @@ Blake2B.hash_bytes
-    @@ match watermark with None -> [msg] | Some prefix -> [prefix; msg]
-  in
-  match sign sk msg with
-  | None ->
-      (* Will never happen in practice. This can only happen in case
-         of RNG error. *)
-      invalid_arg "P256.sign: internal error"
-  | Some signature ->
-      signature
+(* this doesn't work for uecc *)
+let sign ?watermark:_ _ _ = assert false
 
 let check ?watermark pk signature msg =
   let msg =
@@ -306,19 +298,29 @@ let check ?watermark pk signature msg =
   in
   verify pk ~msg ~signature
 
+(* this doesn't work for uecc *)
 let generate_key ?(seed = Hacl.Rand.gen 32) () =
-  let seedlen = Bytes.length seed in
-  if seedlen < 32 then
-    invalid_arg
-      (Printf.sprintf
-         "P256.generate_key: seed must be at least 32 bytes long (was %d)"
-         seedlen) ;
-  match sk_of_bytes seed with
-  | None ->
-      invalid_arg "P256.generate_key: invalid seed (very rare!)"
-  | Some (sk, pk) ->
-      let pkh = Public_key.hash pk in
-      (pkh, pk, sk)
+  let open Data_encoding in
+  let (pkh, pk, sk) = P256_hacl.generate_key ~seed () in
+  let sk =
+    Binary.(
+      of_bytes_exn
+        Secret_key.encoding
+        (to_bytes_exn P256_hacl.Secret_key.encoding sk))
+  in
+  let pk =
+    Binary.(
+      of_bytes_exn
+        Public_key.encoding
+        (to_bytes_exn P256_hacl.Public_key.encoding pk))
+  in
+  let pkh =
+    Binary.(
+      of_bytes_exn
+        Public_key_hash.encoding
+        (to_bytes_exn P256_hacl.Public_key_hash.encoding pkh))
+  in
+  (pkh, pk, sk)
 
 let deterministic_nonce sk msg =
   let key = Secret_key.to_bytes sk in

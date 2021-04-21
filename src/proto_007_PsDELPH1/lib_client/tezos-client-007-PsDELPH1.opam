@@ -14,8 +14,8 @@ depends: [
   "tezos-shell-services"
   "tezos-client-base-unix"
   "tezos-mockup-registration"
+  "tezos-proxy"
   "tezos-signer-backends"
-  "tezos-protocol-007-PsDELPH1-parameters"
   "tezos-protocol-plugin-007-PsDELPH1"
   "alcotest-lwt" { with-test & >= "1.1.0" }
 ]

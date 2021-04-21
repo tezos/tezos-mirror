@@ -49,7 +49,9 @@ let keys_of_implicit_account cctxt source =
 let viewing_key_of_string s =
   let exception Unknown_sapling_address in
   let encoding = Viewing_key.address_b58check_encoding in
-  Option.unopt_exn Unknown_sapling_address (Base58.simple_decode encoding s)
+  WithExceptions.Option.to_exn
+    ~none:Unknown_sapling_address
+    (Base58.simple_decode encoding s)
 
 (** All signatures are done with an anti-replay string.
     In Tezos' protocol this string is set to be chain_id + KT1. **)
@@ -713,7 +715,9 @@ let commands () =
           path
         >>= fun () ->
         (* TODO must pass contract address for now *)
-        let (_, contract) = Option.unopt_assert ~loc:__POS__ contract_opt in
+        let (_, contract) =
+          WithExceptions.Option.get ~loc:__LOC__ contract_opt
+        in
         Context.Client_state.register
           cctxt
           ~default_memo_size
@@ -809,7 +813,7 @@ let commands () =
       (fun () (cctxt : Protocol_client_context.full) ->
         Sapling_key.load cctxt
         >>=? fun l ->
-        iter_s
+        List.iter_es
           (fun (s, _) -> cctxt#message "%s" s >>= fun () -> return_unit)
           (List.sort (fun (s1, _) (s2, _) -> String.compare s1 s2) l));
     shield_cmd;

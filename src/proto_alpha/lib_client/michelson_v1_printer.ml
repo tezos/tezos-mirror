@@ -78,7 +78,10 @@ let print_execution_trace ppf trace =
     ppf
     trace
 
-let print_big_map_diff ppf diff =
+let print_big_map_diff ppf lazy_storage_diff =
+  let diff =
+    Contract.Legacy_big_map_diff.of_lazy_storage_diff lazy_storage_diff
+  in
   let pp_map ppf id =
     if Compare.Z.(id < Z.zero) then
       Format.fprintf ppf "temp(%s)" (Z.to_string (Z.neg id))
@@ -89,9 +92,9 @@ let print_big_map_diff ppf diff =
     "@[<v 0>%a@]"
     (Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf ->
        function
-       | Contract.Clear id ->
+       | Contract.Legacy_big_map_diff.Clear id ->
            Format.fprintf ppf "Clear %a" pp_map id
-       | Contract.Alloc {big_map; key_type; value_type} ->
+       | Contract.Legacy_big_map_diff.Alloc {big_map; key_type; value_type} ->
            Format.fprintf
              ppf
              "New %a of type (big_map %a %a)"
@@ -101,9 +104,10 @@ let print_big_map_diff ppf diff =
              key_type
              print_expr
              value_type
-       | Contract.Copy {src; dst} ->
+       | Contract.Legacy_big_map_diff.Copy {src; dst} ->
            Format.fprintf ppf "Copy %a to %a" pp_map src pp_map dst
-       | Contract.Update {big_map; diff_key; diff_value; _} ->
+       | Contract.Legacy_big_map_diff.Update {big_map; diff_key; diff_value; _}
+         ->
            Format.fprintf
              ppf
              "%s %a[%a]%a"
@@ -115,7 +119,7 @@ let print_big_map_diff ppf diff =
              (fun ppf -> function None -> () | Some x ->
                    Format.fprintf ppf " to %a" print_expr x)
              diff_value))
-    diff
+    (diff :> Contract.Legacy_big_map_diff.item list)
 
 let inject_types type_map parsed =
   let rec inject_expr = function
@@ -130,17 +134,19 @@ let inject_types type_map parsed =
     | Bytes (loc, value) ->
         Bytes (inject_loc `after loc, value)
   and inject_loc which loc =
-    try
-      let stack =
-        let locs =
-          List.assoc loc parsed.Michelson_v1_parser.expansion_table
-          |> snd |> List.sort compare
-        in
-        let (bef, aft) = List.assoc (List.hd locs) type_map in
-        match which with `before -> bef | `after -> aft
-      in
-      {comment = Some (Format.asprintf "%a" print_stack stack)}
-    with Not_found -> {comment = None}
+    let comment =
+      let ( >?? ) = Option.bind in
+      List.assoc loc parsed.Michelson_v1_parser.expansion_table
+      >?? fun (_, locs) ->
+      let locs = List.sort compare locs in
+      List.hd locs
+      >?? fun head_loc ->
+      List.assoc head_loc type_map
+      >?? fun (bef, aft) ->
+      let stack = match which with `before -> bef | `after -> aft in
+      Some (Format.asprintf "%a" print_stack stack)
+    in
+    {comment}
   in
   inject_expr (root parsed.unexpanded)
 
@@ -165,15 +171,16 @@ let unparse ?type_map parse expanded =
           | Bytes (loc, value) ->
               Bytes (inject_loc `after loc, value)
         and inject_loc which loc =
-          try
-            let stack =
-              let (bef, aft) =
-                List.assoc (List.assoc loc unexpansion_table) type_map
-              in
-              match which with `before -> bef | `after -> aft
-            in
-            {comment = Some (Format.asprintf "%a" print_stack stack)}
-          with Not_found -> {comment = None}
+          let comment =
+            let ( >?? ) = Option.bind in
+            List.assoc loc unexpansion_table
+            >?? fun loc ->
+            List.assoc loc type_map
+            >?? fun (bef, aft) ->
+            let stack = match which with `before -> bef | `after -> aft in
+            Some (Format.asprintf "%a" print_stack stack)
+          in
+          {comment}
         in
         unexpanded |> root |> inject_expr
         |> Format.asprintf "%a" Micheline_printer.print_expr

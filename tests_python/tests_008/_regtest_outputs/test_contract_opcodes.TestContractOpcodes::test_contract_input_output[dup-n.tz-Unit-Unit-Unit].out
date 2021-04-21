@@ -1,0 +1,285 @@
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[dup-n.tz-Unit-Unit-Unit]
+
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 6 (remaining gas: 1039948.940 units remaining)
+    [ (Pair Unit Unit)  	 ]
+  - location: 7 (remaining gas: 1039948.800 units remaining)
+    [  ]
+  - location: 8 (remaining gas: 1039948.660 units remaining)
+    [ 5  	 ]
+  - location: 11 (remaining gas: 1039948.520 units remaining)
+    [ 4  	
+      5  	 ]
+  - location: 14 (remaining gas: 1039948.380 units remaining)
+    [ 3  	
+      4  	
+      5  	 ]
+  - location: 17 (remaining gas: 1039948.240 units remaining)
+    [ 2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 20 (remaining gas: 1039948.100 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 23 (remaining gas: 1039947.979 units remaining)
+    [ 1  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 25 (remaining gas: 1039947.839 units remaining)
+    [ 1  	
+      1  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 30 (remaining gas: 1039947.509 units remaining)
+    [ 0  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 31 (remaining gas: 1039947.369 units remaining)
+    [ True  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 1039947.299 units remaining)
+    [ True  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 33 (remaining gas: 1039947.109 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 1039947.039 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 38 (remaining gas: 1039946.917 units remaining)
+    [ 2  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 40 (remaining gas: 1039946.777 units remaining)
+    [ 2  	
+      2  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 45 (remaining gas: 1039946.447 units remaining)
+    [ 0  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 46 (remaining gas: 1039946.307 units remaining)
+    [ True  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 1039946.237 units remaining)
+    [ True  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 48 (remaining gas: 1039946.047 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 1039945.977 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 53 (remaining gas: 1039945.854 units remaining)
+    [ 3  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 55 (remaining gas: 1039945.714 units remaining)
+    [ 3  	
+      3  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 60 (remaining gas: 1039945.384 units remaining)
+    [ 0  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 61 (remaining gas: 1039945.244 units remaining)
+    [ True  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 1039945.174 units remaining)
+    [ True  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 63 (remaining gas: 1039944.984 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 1039944.914 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 68 (remaining gas: 1039944.789 units remaining)
+    [ 4  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 70 (remaining gas: 1039944.649 units remaining)
+    [ 4  	
+      4  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 75 (remaining gas: 1039944.319 units remaining)
+    [ 0  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 76 (remaining gas: 1039944.179 units remaining)
+    [ True  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 1039944.109 units remaining)
+    [ True  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 78 (remaining gas: 1039943.919 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 1039943.849 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 83 (remaining gas: 1039943.723 units remaining)
+    [ 5  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 85 (remaining gas: 1039943.583 units remaining)
+    [ 5  	
+      5  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 90 (remaining gas: 1039943.253 units remaining)
+    [ 0  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 91 (remaining gas: 1039943.113 units remaining)
+    [ True  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 1039943.043 units remaining)
+    [ True  	
+      1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 93 (remaining gas: 1039942.853 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: -1 (remaining gas: 1039942.783 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	 ]
+  - location: 98 (remaining gas: 1039942.603 units remaining)
+    [  ]
+  - location: 100 (remaining gas: 1039942.463 units remaining)
+    [ Unit  	 ]
+  - location: 101 (remaining gas: 1039942.323 units remaining)
+    [ {}  	
+      Unit  	 ]
+  - location: 103 (remaining gas: 1039942.183 units remaining)
+    [ (Pair {} Unit)  	 ]
+  - location: -1 (remaining gas: 1039942.113 units remaining)
+    [ (Pair {} Unit)  	 ]
+

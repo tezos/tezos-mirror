@@ -5,7 +5,7 @@
                    -open Tezos_crypto
                    -open Data_encoding
                    -open Tezos_error_monad
-                   -open Tezos_lwt_result_stdlib.Lwtreslib
+                   -open Tezos_error_monad.TzLwtreslib
                    -open Tezos_rpc
                    -open Tezos_clic
                    -open Tezos_micheline
@@ -15,7 +15,6 @@
             tezos-crypto
             data-encoding
             tezos-error-monad
-            tezos-lwt-result-stdlib
             tezos-event-logging
             tezos-rpc
             tezos-clic
@@ -25,7 +24,9 @@
             lwt
             ipaddr))
 
+(ocamllex point_parser)
+
 (rule
  (alias runtest_lint)
  (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps} --ignore point_parser.ml)))

@@ -255,8 +255,8 @@ struct
         H.empty
     | [x] ->
         H.leaf x
-    | _ :: _ :: _ ->
-        let last = TzList.last_exn xs in
+    | _ :: one :: rest ->
+        let last = List.last one rest in
         let n = List.length xs in
         let a = Array.make (n + 1) (H.leaf last) in
         List.iteri (fun i x -> a.(i) <- H.leaf x) xs ;
@@ -285,8 +285,8 @@ struct
         invalid_arg "compute_path"
     | [_] ->
         Op
-    | _ :: _ :: _ ->
-        let last = TzList.last_exn xs in
+    | _ :: one :: rest ->
+        let last = List.last one rest in
         let n = List.length xs in
         if i < 0 || n <= i then invalid_arg "compute_path" ;
         let a = Array.make (n + 1) (H.leaf last) in

@@ -60,10 +60,6 @@ let include_ mode oc file =
      modules (by opposition to records). This simplifies the presentation of the
      generated Coq for the environment. *)
   Printf.fprintf oc "[@@coq_plain_module]\n" ;
-  if unit = "Result" then
-    Printf.fprintf
-      oc
-      "type ('a, 'b) result = ('a, 'b) Result.result =  Ok of 'a | Error of 'b\n" ;
   if List.mem unit opened_modules then Printf.fprintf oc "open %s\n" unit
 
 let () =

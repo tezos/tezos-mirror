@@ -5,19 +5,24 @@
             tezos-sapling
             tezos-protocol-environment-sigs
             tezos-protocol-environment-structs
-            tezos-micheline)
+            tezos-micheline
+            tezos-storage.memory)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline))
  (wrapped false)
  (modules Tezos_protocol_environment
           Environment_V0
           Environment_V1
+          Environment_V2
           Environment_context
+          Environment_context_intf
           Environment_protocol_T
           Environment_protocol_T_V0
           Environment_protocol_T_V1
+          Environment_protocol_T_V2
           Dummy_context
-          Memory_context))
+          Memory_context
+          Proxy_context))
 
 (library
  (name tezos_shell_context)

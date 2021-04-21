@@ -255,7 +255,7 @@ let prepare_endorsement ~(max_past : int64) ()
     in
     get_delegates cctxt state
     >>=? fun delegates ->
-    filter_p (allowed_to_endorse cctxt bi) delegates
+    List.filter_ep (allowed_to_endorse cctxt bi) delegates
     >>=? fun delegates ->
     state.pending <- Some {time; block = bi; delegates} ;
     return_unit
@@ -293,7 +293,7 @@ let create (cctxt : #Protocol_client_context.full) ?(max_past = 110L) ~delay
   in
   let timeout_k cctxt state (block, delegates) =
     state.pending <- None ;
-    iter_s
+    List.iter_es
       (fun delegate ->
         endorse_for_delegate cctxt block delegate
         >>= function

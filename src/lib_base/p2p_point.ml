@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -53,58 +53,42 @@ module Id = struct
 
   let is_global (addr, _) = not @@ Ipaddr.V6.is_private addr
 
-  let check_port port =
-    if
-      TzString.mem_char port '[' || TzString.mem_char port ']'
-      || TzString.mem_char port ':'
-    then invalid_arg "Utils.parse_addr_port (invalid character in port)"
+  include Point_parser
 
-  let parse_addr_port s =
-    let len = String.length s in
-    if len = 0 then ("", "")
-    else if s.[0] = '[' then (
-      (* inline IPv6 *)
-      match String.rindex_opt s ']' with
-      | None ->
-          invalid_arg "Utils.parse_addr_port (missing ']')"
-      | Some pos ->
-          let addr = String.sub s 1 (pos - 1) in
-          let port =
-            if pos = len - 1 then ""
-            else if s.[pos + 1] <> ':' then
-              invalid_arg "Utils.parse_addr_port (unexpected char after ']')"
-            else String.sub s (pos + 2) (len - pos - 2)
-          in
-          check_port port ; (addr, port) )
-    else
-      match String.rindex_opt s ']' with
-      | Some _pos ->
-          invalid_arg "Utils.parse_addr_port (unexpected char ']')"
-      | None -> (
-        match String.index s ':' with
-        | exception _ ->
-            (s, "")
-        | pos -> (
-          match String.index_from s (pos + 1) ':' with
-          | exception _ ->
-              let addr = String.sub s 0 pos in
-              let port = String.sub s (pos + 1) (len - pos - 1) in
-              check_port port ; (addr, port)
-          | _pos ->
-              invalid_arg
-                "Utils.parse_addr_port: IPv6 addresses must be bracketed" ) )
+  let parse_addr_port_id addr = parse_full_addr (Lexing.from_string addr)
+
+  let addr_port_id_to_string {addr; port; peer_id} =
+    match (port, peer_id) with
+    | (None, None) ->
+        addr
+    | (None, Some peer_id) ->
+        addr ^ "#" ^ P2p_peer_id.to_b58check peer_id
+    | (Some port, None) ->
+        addr ^ ":" ^ string_of_int port
+    | (Some port, Some peer_id) ->
+        addr ^ ":" ^ string_of_int port ^ "#" ^ P2p_peer_id.to_b58check peer_id
 
   let of_string_exn ?default_port str =
-    let (addr, port) = parse_addr_port str in
-    let port =
-      if port = "" then
-        TzOption.unopt_exn
-          (Invalid_argument "P2p_point.of_string_exn: no port")
-          default_port
-      else int_of_string port
+    let {addr; port; _} =
+      match parse_addr_port_id str with
+      | Ok r ->
+          r
+      | Error err ->
+          invalid_arg
+            (Format.asprintf
+               "Parsing of '%s' failed: %s.@."
+               str
+               (string_of_parsing_error err))
     in
-    if port < 0 && port > (1 lsl 16) - 1 then
-      invalid_arg "port must be between 0 and 65535" ;
+    let port =
+      match (port, default_port) with
+      | (Some port, _) ->
+          port
+      | (None, Some port) ->
+          port
+      | (None, None) ->
+          invalid_arg "P2p_point.of_string_exn: no port"
+    in
     match Ipaddr.of_string_exn addr with
     | V4 addr ->
         (Ipaddr.v6_of_v4 addr, port)
@@ -299,6 +283,7 @@ module Info = struct
     last_disconnection : (P2p_peer_id.t * Time.System.t) option;
     last_seen : (P2p_peer_id.t * Time.System.t) option;
     last_miss : Time.System.t option;
+    expected_peer_id : P2p_peer_id.t option;
   }
 
   let encoding =
@@ -317,28 +302,31 @@ module Info = struct
                 last_established_connection;
                 last_disconnection;
                 last_seen;
-                last_miss } ->
+                last_miss;
+                expected_peer_id } ->
            let p2p_peer_id = State.of_p2p_peer_id state in
-           ( trusted,
-             reconnection_time,
-             state,
-             p2p_peer_id,
-             last_failed_connection,
-             last_rejected_connection,
-             last_established_connection,
-             last_disconnection,
-             last_seen,
-             last_miss ))
-         (fun ( trusted,
-                reconnection_time,
-                state,
-                p2p_peer_id,
-                last_failed_connection,
-                last_rejected_connection,
-                last_established_connection,
-                last_disconnection,
-                last_seen,
-                last_miss ) ->
+           ( ( trusted,
+               reconnection_time,
+               state,
+               p2p_peer_id,
+               last_failed_connection,
+               last_rejected_connection,
+               last_established_connection,
+               last_disconnection,
+               last_seen,
+               last_miss ),
+             expected_peer_id ))
+         (fun ( ( trusted,
+                  reconnection_time,
+                  state,
+                  p2p_peer_id,
+                  last_failed_connection,
+                  last_rejected_connection,
+                  last_established_connection,
+                  last_disconnection,
+                  last_seen,
+                  last_miss ),
+                expected_peer_id ) ->
            let state = State.of_peerid_state state p2p_peer_id in
            {
              trusted;
@@ -350,24 +338,29 @@ module Info = struct
              last_disconnection;
              last_seen;
              last_miss;
+             expected_peer_id;
            })
-         (obj10
-            (req "trusted" bool)
-            (opt "greylisted_until" Time.System.encoding)
-            (req "state" State.encoding)
-            (opt "p2p_peer_id" P2p_peer_id.encoding)
-            (opt "last_failed_connection" Time.System.encoding)
-            (opt
-               "last_rejected_connection"
-               (tup2 P2p_peer_id.encoding Time.System.encoding))
-            (opt
-               "last_established_connection"
-               (tup2 P2p_peer_id.encoding Time.System.encoding))
-            (opt
-               "last_disconnection"
-               (tup2 P2p_peer_id.encoding Time.System.encoding))
-            (opt "last_seen" (tup2 P2p_peer_id.encoding Time.System.encoding))
-            (opt "last_miss" Time.System.encoding))
+         (merge_objs
+            (obj10
+               (req "trusted" bool)
+               (opt "greylisted_until" Time.System.encoding)
+               (req "state" State.encoding)
+               (opt "p2p_peer_id" P2p_peer_id.encoding)
+               (opt "last_failed_connection" Time.System.encoding)
+               (opt
+                  "last_rejected_connection"
+                  (tup2 P2p_peer_id.encoding Time.System.encoding))
+               (opt
+                  "last_established_connection"
+                  (tup2 P2p_peer_id.encoding Time.System.encoding))
+               (opt
+                  "last_disconnection"
+                  (tup2 P2p_peer_id.encoding Time.System.encoding))
+               (opt
+                  "last_seen"
+                  (tup2 P2p_peer_id.encoding Time.System.encoding))
+               (opt "last_miss" Time.System.encoding))
+            (obj1 (opt "expected_peer_id" P2p_peer_id.encoding)))
 end
 
 module Pool_event = struct

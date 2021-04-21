@@ -13,6 +13,7 @@ Code organization
 
 It contains the following python packages.
 
+- ``process`` defining utility functions for interacting with processes
 - ``daemons`` defines classes to run Tezos node and daemons,
 - ``client`` mainly defines the ``Client`` class, that provides a programmatic interface to a client,
 - ``codec`` defines a `Codec`` class, that provides a interface for `tezos-codec` binary,
@@ -22,11 +23,12 @@ It contains the following python packages.
 - ``tests`` contains ``pytest`` tests,
 - ``scripts`` contains utility scripts.
 
-They are organized in three layers.
+They are organized in four layers.
 
-1. ``daemons``, ``client`` and ``codec``,
-2. ``launchers``,
-3. ``tests``, ``examples``, ``tools``.
+1. ``process``
+2. ``daemons``, ``client`` and ``codec``,
+3. ``launchers``,
+4. ``tests``, ``examples``, ``tools``.
 
 Installation
 ------------
@@ -355,7 +357,7 @@ Adding a test
 - By imitation, choose an existing test that looks similar,
 - use the proper tags,
 - say briefly what the test is supposed to test in the class docstring,
-- *Run the linters* and typechecker `make lint_all`, and `make typecheck`
+- *Run the linters* and typechecker `make lint`, and `make typecheck`
   in `tests_python/`, or simple `make test-python-lint` from the Tezos home
   directory. Note that linting and typechecking are enforced by the CI
   in the build stage.

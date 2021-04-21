@@ -9,7 +9,7 @@ depends: [
   "dune" { >= "2.0" }
   "tezos-base"
   "tezos-rpc-http"
-  "resto-cohttp-client" { = "0.5" }
+  "resto-cohttp-client" { >= "0.6" & < "0.7" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

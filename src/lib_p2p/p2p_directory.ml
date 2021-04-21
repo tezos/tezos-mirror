@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -48,6 +49,7 @@ let info_of_point_info i =
       last_disconnection = last_disconnection i;
       last_seen = last_seen i;
       last_miss = last_miss i;
+      expected_peer_id = P2p_point_state.get_expected_peer_id i;
     }
 
 let info_of_peer_info pool i =
@@ -227,11 +229,7 @@ let build_rpc_directory net =
           | None ->
               RPC_answer.return []
           | Some gi ->
-              let rev = false and max = max_int in
-              let evts =
-                P2p_peer_state.Info.fold gi ~init:[] ~f:(fun a e -> e :: a)
-              in
-              let evts = (if rev then List.rev_sub else List.sub) evts max in
+              let evts = P2p_peer_state.Info.events gi in
               if not q#monitor then RPC_answer.return evts
               else
                 let (stream, stopper) = P2p_peer_state.Info.watch gi in
@@ -245,6 +243,37 @@ let build_rpc_directory net =
                     Lwt.return_some evts )
                 in
                 RPC_answer.return_stream {next; shutdown} ))
+  in
+  let dir =
+    RPC_directory.opt_register1
+      dir
+      P2p_services.Peers.S.patch
+      (fun peer_id () acl ->
+        match P2p.pool net with
+        | None ->
+            return_none
+        | Some pool ->
+            ( match acl with
+            | None ->
+                Lwt.return_unit
+            | Some `Ban ->
+                (* ban *)
+                P2p_pool.Peers.untrust pool peer_id ;
+                P2p_pool.Peers.ban pool peer_id
+            | Some `Trust ->
+                (* trust *)
+                P2p_pool.Peers.trust pool peer_id ;
+                Lwt.return_unit
+            | Some `Open ->
+                (* unban, untrust *)
+                P2p_pool.Peers.unban pool peer_id ;
+                P2p_pool.Peers.untrust pool peer_id ;
+                Lwt.return_unit )
+            >>= fun () ->
+            return
+            @@ Option.map
+                 (info_of_peer_info pool)
+                 (P2p_pool.Peers.info pool peer_id))
   in
   let dir =
     RPC_directory.gen_register1
@@ -339,6 +368,41 @@ let build_rpc_directory net =
             @@ Option.map info_of_point_info (P2p_pool.Points.info pool point))
   in
   let dir =
+    RPC_directory.opt_register1
+      dir
+      P2p_services.Points.S.patch
+      (fun point () (acl, peer_id) ->
+        match P2p.pool net with
+        | None ->
+            return_none
+        | Some pool ->
+            ( match peer_id with
+            | None ->
+                Lwt.return_unit
+            | Some peer_id ->
+                P2p_pool.set_expected_peer_id pool point peer_id )
+            >>= (fun () ->
+                  match acl with
+                  | None ->
+                      Lwt.return_unit
+                  | Some `Ban ->
+                      (* ban and untrust *)
+                      P2p_pool.Points.untrust pool point ;
+                      P2p_pool.Points.ban pool point
+                  | Some `Trust ->
+                      (* trust ( and implicitely unban ) *)
+                      P2p_pool.Points.trust pool point ;
+                      Lwt.return_unit
+                  | Some `Open ->
+                      (* unban and untrust *)
+                      P2p_pool.Points.unban pool point ;
+                      P2p_pool.Points.untrust pool point ;
+                      Lwt.return_unit)
+            >>= fun () ->
+            return
+            @@ Option.map info_of_point_info (P2p_pool.Points.info pool point))
+  in
+  let dir =
     RPC_directory.gen_register1
       dir
       P2p_services.Points.S.events
@@ -351,11 +415,7 @@ let build_rpc_directory net =
           | None ->
               RPC_answer.return []
           | Some gi ->
-              let rev = false and max = max_int in
-              let evts =
-                P2p_point_state.Info.fold gi ~init:[] ~f:(fun a e -> e :: a)
-              in
-              let evts = (if rev then List.rev_sub else List.sub) evts max in
+              let evts = P2p_point_state.Info.events gi in
               if not q#monitor then RPC_answer.return evts
               else
                 let (stream, stopper) = P2p_point_state.Info.watch gi in
@@ -433,10 +493,18 @@ let build_rpc_directory net =
   in
   (* Network : Greylist *)
   let dir =
-    RPC_directory.register dir P2p_services.ACL.S.clear (fun () () () ->
+    RPC_directory.register0 dir P2p_services.ACL.S.clear (fun () () ->
         match P2p.pool net with
         | None ->
             fail P2p_errors.P2p_layer_disabled
+        | Some pool ->
+            P2p_pool.acl_clear pool ; return_unit)
+  in
+  let dir =
+    RPC_directory.register0 dir P2p_services.ACL.S.clear_delete (fun () () ->
+        match P2p.pool net with
+        | None ->
+            failwith "The P2P layer is disabled."
         | Some pool ->
             P2p_pool.acl_clear pool ; return_unit)
   in

@@ -47,20 +47,29 @@
 
 type t
 
-(** [create size] is a set of four ACLs (see above) with the peer_id
-    greylist being a LRU cache of size [size]. *)
-val create : int -> t
+(** [create ~peer_id_size ~ip_size] is a set of four ACLs (see above)
+   with the peer_id greylist being a LRU cache of size [peer_id_size]
+   and the IP address greylist a bloom filter of size [ip_size]
+   (expressed in KiB). Elements are (probabilistically) kept in the
+   bloom filter for [ip_cleanup_delay], the cleanup happens in a
+   discrete way in sixteen steps. *)
+val create :
+  peer_id_size:int -> ip_size:int -> ip_cleanup_delay:Time.System.Span.t -> t
 
 (** [banned_addr t addr] is [true] if [addr] is blacklisted or
     greylisted. *)
 val banned_addr : t -> P2p_addr.t -> bool
 
+(** [unban_addr t addr] remove the address from both the blacklist
+    of banned addresses and the greylist of addresses *)
 val unban_addr : t -> P2p_addr.t -> unit
 
 (** [banned_peer t peer_id] is [true] if peer with id [peer_id] is
     blacklisted or greylisted. *)
 val banned_peer : t -> P2p_peer.Id.t -> bool
 
+(** [unban_peer t peer] remove the peer from both the blacklist
+    of banned peers and the greylist of peers *)
 val unban_peer : t -> P2p_peer.Id.t -> unit
 
 (** [clear t] clears all four ACLs. *)
@@ -68,13 +77,30 @@ val clear : t -> unit
 
 module IPGreylist : sig
   (** [add t addr] adds [addr] to the address greylist. *)
-  val add : t -> P2p_addr.t -> Time.System.t -> unit
+  val add : t -> P2p_addr.t -> unit
 
-  (** [remove_old t ~older_than] removes all banned peers older than the
-      given time. *)
-  val remove_old : t -> older_than:Time.System.t -> unit
+  (** [clear t] removes all address greylistings. *)
+  val clear : t -> unit
 
+  (** [gc t] removes some address greylistings (the oldest have a
+     higher probability to be removed, yet due to the underlying
+     probabilistic structure, recent greylistings can be dropped). *)
+  val gc : t -> unit
+
+  (** [mem t addr] tells if [addr] is greylisted, but may return a
+     false positive due to the underlying probabilistic structure. *)
   val mem : t -> P2p_addr.t -> bool
+
+  (** [fill_percentage t] returns the percentage (in the [0,1] interval)
+      of bloom filter cells which are nonzero. *)
+  val fill_percentage : t -> float
+
+  (** [life_expectancy_histogram t] returns the life expectancy
+      distribution of cells (measured in [gc] calls) stored as
+      an array: the value at index [k] stores the number
+      of cells that are [k] calls to [gc] away from being
+      removed from the greylist. *)
+  val life_expectancy_histogram : t -> int array
 
   val encoding : P2p_addr.t list Data_encoding.t
 end
@@ -106,27 +132,5 @@ end
 (** / *)
 
 module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t
-
-module IpSet : sig
-  type t
-
-  val empty : t
-
-  val add : Ipaddr.V6.t -> Time.System.t -> t -> t
-
-  val add_prefix : Ipaddr.V6.Prefix.t -> Time.System.t -> t -> t
-
-  val remove : Ipaddr.V6.t -> t -> t
-
-  val remove_prefix : Ipaddr.V6.Prefix.t -> t -> t
-
-  val mem : Ipaddr.V6.t -> t -> bool
-
-  val fold : (Ipaddr.V6.Prefix.t -> Time.System.t -> 'a -> 'a) -> t -> 'a -> 'a
-
-  val pp : Format.formatter -> t -> unit
-
-  val remove_old : t -> older_than:Time.System.t -> t
-end
 
 module IpTable : Hashtbl.S with type key = Ipaddr.V6.t

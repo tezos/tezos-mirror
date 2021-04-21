@@ -15,6 +15,7 @@ depends: [
   "tezos-shell-context"
   "tezos-stdlib-unix"
   "tezos-storage"
+  "lwt-exit"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

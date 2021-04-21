@@ -40,9 +40,17 @@ let () =
       at '<dir>/tezos-validation-socket-<pid>' where <pid> is the
       tezos-validator's process identifier. By default, the validator will
       communicate through its standard input and output.|}
-        ) ]
+        );
+        ( "--version",
+          Unit
+            (fun () ->
+              Format.printf "%s\n" Tezos_version.Bin_version.version_string ;
+              Stdlib.exit 0),
+          " Display version information" ) ]
   in
-  let usage_msg = Format.sprintf "tezos-validator [--socket-dir <dir>]" in
+  let usage_msg =
+    Format.sprintf "tezos-validator [--version] [--socket-dir <dir>]"
+  in
   Arg.parse
     args
     (fun s -> raise (Arg.Bad (Format.sprintf "Unexpected argument: %s" s)))

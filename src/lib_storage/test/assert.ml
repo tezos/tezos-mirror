@@ -46,6 +46,12 @@ let equal_string_option ?msg o1 o2 =
 
 let is_none ?(msg = "") x = if x <> None then fail "None" "Some _" msg
 
+let equal_bytes_option ?msg o1 o2 =
+  let prn = function None -> "None" | Some s -> Bytes.to_string s in
+  equal ?msg ~prn o1 o2
+
+let equal_bool ?msg b1 b2 = equal ?msg ~prn:(fun s -> string_of_bool s) b1 b2
+
 let make_equal_list eq prn ?(msg = "") x y =
   let rec iter i x y =
     match (x, y) with
@@ -55,7 +61,15 @@ let make_equal_list eq prn ?(msg = "") x y =
           let fm = Printf.sprintf "%s (at index %d)" msg i in
           fail (prn hd_x) (prn hd_y) fm
     | (_ :: _, []) | ([], _ :: _) ->
-        let fm = Printf.sprintf "%s (lists of different sizes)" msg in
+        let fm =
+          Fmt.str
+            "%s (lists of different sizes: %a vs. %a)"
+            msg
+            Fmt.(Dump.list string)
+            (List.map prn x)
+            Fmt.(Dump.list string)
+            (List.map prn y)
+        in
         fail_msg "%s" fm
     | ([], []) ->
         ()
@@ -86,6 +100,26 @@ let equal_key_dir_list ?msg l1 l2 =
     l1
     l2
 
+let equal_context_hash ?msg l1 l2 =
+  equal ?msg ~eq:Context_hash.( = ) ~prn:Context_hash.to_b58check l1 l2
+
 let equal_context_hash_list ?msg l1 l2 =
   let pr_persist hash = Printf.sprintf "[%s]" @@ Context_hash.to_string hash in
   make_equal_list ?msg Context_hash.( = ) pr_persist l1 l2
+
+let equal_raw_tree ?(msg = "") r1 r2 =
+  let rec aux r1 r2 =
+    match (r1, r2) with
+    | (`Value v1, `Value v2) ->
+        equal_string ~msg (Bytes.to_string v1) (Bytes.to_string v2) ;
+        true
+    | (`Tree t1, `Tree t2) ->
+        if not (TzString.Map.equal aux t1 t2) then fail "<tree>" "<tree>" msg ;
+        true
+    | (`Tree _, `Value v) ->
+        fail "<tree>" (Bytes.to_string v) msg
+    | (`Value v, `Tree _) ->
+        fail "<tree>" (Bytes.to_string v) msg
+  in
+  let (_ : bool) = aux r1 r2 in
+  ()

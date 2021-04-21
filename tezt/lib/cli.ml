@@ -40,11 +40,12 @@ type options = {
   tests_to_run : string list;
   tags_to_run : string list;
   tags_not_to_run : string list;
-  list : bool;
+  list : [`Ascii_art | `Tsv] option;
   global_timeout : float option;
   test_timeout : float option;
   reset_regressions : bool;
   loop : bool;
+  time : bool;
 }
 
 let options =
@@ -61,11 +62,12 @@ let options =
   let tests_to_run = ref [] in
   let tags_to_run = ref [] in
   let tags_not_to_run = ref [] in
-  let list = ref false in
+  let list = ref None in
   let global_timeout = ref None in
   let test_timeout = ref None in
   let reset_regressions = ref false in
   let loop = ref false in
+  let time = ref false in
   let set_log_level = function
     | "quiet" ->
         log_level := Quiet
@@ -133,8 +135,14 @@ let options =
           " If a test fails, continue with the remaining tests instead of \
            stopping. Aborting manually with Ctrl+C still stops everything." );
         ("-k", Arg.Set keep_going, " Same as --keep-going.");
-        ("--list", Arg.Set list, " List tests instead of running them.");
-        ("-l", Arg.Set list, " Same as --list.");
+        ( "--list",
+          Arg.Unit (fun () -> list := Some `Ascii_art),
+          " List tests instead of running them." );
+        ("-l", Arg.Unit (fun () -> list := Some `Ascii_art), " Same as --list.");
+        ( "--list-tsv",
+          Arg.Unit (fun () -> list := Some `Tsv),
+          " List tests instead of running them but one-per-line, as \
+           tab-separated-values." );
         ( "--file",
           Arg.String (fun file -> files_to_run := file :: !files_to_run),
           "<FILE> Only run tests implemented in source file FILE (see \
@@ -167,7 +175,11 @@ let options =
            repeated until one of them fails or if you interrupt with Ctrl+C. \
            This is useful to reproduce non-deterministic failures. When used \
            in conjunction with --keep-going, tests are repeated even if they \
-           fail, until you interrupt them with Ctrl+C." ) ]
+           fail, until you interrupt them with Ctrl+C." );
+        ( "--time",
+          Arg.Set time,
+          " Print a summary of the time taken by each test. Ignored if a test \
+           failed." ) ]
   in
   let usage =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
@@ -221,4 +233,5 @@ let options =
     test_timeout = !test_timeout;
     reset_regressions = !reset_regressions;
     loop = !loop;
+    time = !time;
   }

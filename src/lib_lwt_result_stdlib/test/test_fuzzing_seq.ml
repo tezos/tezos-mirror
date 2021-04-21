@@ -28,13 +28,15 @@ open Test_fuzzing_tests
 module SeqWithBase = struct
   type 'a elt = 'a
 
-  include Lwtreslib.Seq
+  include Support.Lib.Seq
 
   let of_list = List.to_seq
 
   let to_list = List.of_seq
 
   let name = "Seq"
+
+  let pp fmt s = Crowbar.(pp_list pp_int) fmt (to_list s)
 end
 
 (* Internal consistency *)

@@ -166,15 +166,19 @@ module Event_filter = struct
 
   let level_at_least lvl =
     List.fold_left
-      (function
-        | None -> (
-            function l when l = lvl -> Some [l] | _ -> None )
-        | Some s ->
-            fun l -> Some (l :: s))
-      None
+      (fun acc l ->
+        match acc with
+        | [] ->
+            if l = lvl then [l] else []
+        | _ :: _ as acc ->
+            l :: acc)
+      []
       levels_in_order
-    |> TzOption.unopt_exn (Failure "level_at_least not found")
-    |> level_in
+    |> function
+    | [] ->
+        raise (Failure "level_at_least not found")
+    | _ :: _ as levels ->
+        level_in levels
 end
 
 type t = {
@@ -235,21 +239,21 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         Uri.get_query_param' uri "name" |> Option.value ~default:[]
       in
       let levels =
-        TzOption.(
-          Uri.get_query_param uri "level-at-least"
-          >>= Internal_event.Level.of_string
-          >>= fun l ->
-          (* some (fun all more -> all [Event_filter.level_at_least l ; more ]) *)
-          Some [Event_filter.level_at_least l])
-        |> Option.value ~default:[]
+        let ( >?? ) = Option.bind in
+        Uri.get_query_param uri "level-at-least"
+        >?? Internal_event.Level.of_string
+        |> Option.fold ~none:[] ~some:(fun l ->
+               [Event_filter.level_at_least l])
       in
       let sections =
         let somes =
           Uri.get_query_param' uri "section"
-          |> Option.value ~default:[]
-          |> List.map (fun s ->
-                 Internal_event.Section.make_sanitized
-                   (String.split_on_char '.' s))
+          |> Option.fold
+               ~none:[]
+               ~some:
+                 (List.map (fun s ->
+                      Internal_event.Section.make_sanitized
+                        (String.split_on_char '.' s)))
         in
         let none =
           match Uri.get_query_param uri "no-section" with
@@ -347,12 +351,11 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         return_unit
 
   let close {lwt_bad_citizen_hack; _} =
-    iter_s
+    List.iter_es
       (fun (f, j) ->
         output_json f j ~pp:(fun fmt () ->
             Format.fprintf fmt "Destacking: %s" f))
       !lwt_bad_citizen_hack
-    >>=? fun () -> return_unit
 end
 
 let () = Internal_event.All_sinks.register (module Sink_implementation)

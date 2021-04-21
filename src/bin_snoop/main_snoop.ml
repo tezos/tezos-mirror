@@ -69,6 +69,9 @@ let benchmark_cmd (bench_name : string)
   match bench with
   | Tezos_benchmark.Benchmark.Ex bench ->
       let workload_data = Measure.perform_benchmark bench_opts.options bench in
+      Option.iter
+        (fun filename -> Measure.to_csv ~filename ~bench ~workload_data)
+        bench_opts.csv_export ;
       Measure.save
         ~filename:bench_opts.save_file
         ~options:bench_opts.options

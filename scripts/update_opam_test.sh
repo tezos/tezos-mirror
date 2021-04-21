@@ -14,7 +14,7 @@ tmp=$(mktemp)
 packages=$(echo "$packages" | LC_COLLATE=C sort)
 
 (
-  csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" /##BEGIN_OPAM##/+1
+  csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/opam.yml" /##BEGIN_OPAM##/+1
   cat "$tmp"00
   rm "$tmp"0*
 
@@ -24,17 +24,17 @@ packages=$(echo "$packages" | LC_COLLATE=C sort)
   for package in $packages; do
       cat <<EOF
 opam:$package:
-  <<: *opam_definition
+  extends: .opam_template
   variables:
     package: $package
 
 EOF
   done
 
-  csplit --quiet --prefix="$tmp" "$src_dir/.gitlab-ci.yml" %##END_OPAM##%
+  csplit --quiet --prefix="$tmp" "$src_dir/.gitlab/ci/opam.yml" %##END_OPAM##%
   cat "$tmp"00
   rm "$tmp"0*
 ) > $tmp
 
-mv $tmp "$src_dir/.gitlab-ci.yml"
+mv $tmp "$src_dir/.gitlab/ci/opam.yml"
 

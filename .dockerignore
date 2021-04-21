@@ -28,8 +28,10 @@ scripts/create_genesis/src
 
 docs/introduction/readme.rst
 docs/api/errors.rst
-docs/api/rpc.rst
-docs/api/p2p.rst
+docs/0*/rpc.rst
+docs/alpha/rpc.rst
+docs/shell/rpc.rst
+docs/shell/p2p_api.rst
 
 src/bin_client/test/LOG.*
 _coverage_output/*.coverage

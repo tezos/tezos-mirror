@@ -14,7 +14,8 @@
             tezos-protocol-updater
             tezos-requester
             tezos-workers
-            tezos-validation)
+            tezos-validation
+            lwt-exit)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_base
                    -open Tezos_storage

@@ -1,0 +1,45 @@
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_mem_string.tz-(Pair { Elt "bar" 4 ; Elt "foo" 11 } None)-"foo"-(Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some True))]
+
+storage
+  (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some True))
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 11 (remaining gas: 1039986.278 units remaining)
+    [ (Pair "foo" { Elt "bar" 4 ; Elt "foo" 11 } None)  	 ]
+  - location: 12 (remaining gas: 1039986.138 units remaining)
+    [ "foo"  	@parameter
+      (Pair { Elt "bar" 4 ; Elt "foo" 11 } None)  	@storage ]
+  - location: 15 (remaining gas: 1039985.838 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: 16 (remaining gas: 1039985.698 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 }  	
+      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: -1 (remaining gas: 1039985.628 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 }  	
+      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: 13 (remaining gas: 1039985.628 units remaining)
+    [ "foo"  	@parameter
+      { Elt "bar" 4 ; Elt "foo" 11 }  	
+      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: 17 (remaining gas: 1039985.488 units remaining)
+    [ True  	
+      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: 18 (remaining gas: 1039985.348 units remaining)
+    [ (Some True)  	
+      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: 19 (remaining gas: 1039985.218 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 }  	
+      (Some True)  	 ]
+  - location: 20 (remaining gas: 1039985.078 units remaining)
+    [ (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some True))  	 ]
+  - location: 21 (remaining gas: 1039984.938 units remaining)
+    [ {}  	
+      (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some True))  	 ]
+  - location: 23 (remaining gas: 1039984.798 units remaining)
+    [ (Pair {} { Elt "bar" 4 ; Elt "foo" 11 } (Some True))  	 ]
+  - location: -1 (remaining gas: 1039984.728 units remaining)
+    [ (Pair {} { Elt "bar" 4 ; Elt "foo" 11 } (Some True))  	 ]
+

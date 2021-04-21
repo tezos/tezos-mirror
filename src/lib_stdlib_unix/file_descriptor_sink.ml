@@ -71,9 +71,9 @@ end) : Internal_event.SINK with type t = t = struct
 
   let configure uri =
     let level_at_least =
-      TzOption.(
-        Uri.get_query_param uri "level-at-least"
-        >>= Internal_event.Level.of_string)
+      let ( >?? ) = Option.bind in
+      Uri.get_query_param uri "level-at-least"
+      >?? Internal_event.Level.of_string
       |> Option.value ~default:Internal_event.Level.default
     in
     let fail_parsing fmt =
@@ -174,7 +174,7 @@ end) : Internal_event.SINK with type t = t = struct
     else return_unit
 
   let close {lwt_bad_citizen_hack; output; format; _} =
-    iter_s
+    List.iter_es
       (fun event_json -> output_one output format event_json)
       !lwt_bad_citizen_hack
     >>=? fun () -> Lwt_unix.close output >>= fun () -> return_unit

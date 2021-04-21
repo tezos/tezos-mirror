@@ -56,7 +56,8 @@ let build_rpc_directory state =
         (* NOTE: it is technically possible to use the Prevalidator interface to
          * register multiple Prevalidator for a single chain (using distinct
          * protocols). However, this is never done. *)
-        List.find (fun (c, _, _) -> Chain_id.equal c chain_id) workers
+        WithExceptions.Option.to_exn ~none:Not_found
+        @@ List.find (fun (c, _, _) -> Chain_id.equal c chain_id) workers
       in
       let status = Prevalidator.status t in
       let pending_requests = Prevalidator.pending_requests t in
@@ -92,7 +93,8 @@ let build_rpc_directory state =
       Chain_directory.get_chain_id state chain
       >>= fun chain_id ->
       let w =
-        List.assoc (chain_id, peer_id) (Peer_validator.running_workers ())
+        WithExceptions.Option.to_exn ~none:Not_found
+        @@ List.assoc (chain_id, peer_id) (Peer_validator.running_workers ())
       in
       return
         {
@@ -114,7 +116,10 @@ let build_rpc_directory state =
   register1 Worker_services.Chain_validators.S.state (fun chain () () ->
       Chain_directory.get_chain_id state chain
       >>= fun chain_id ->
-      let w = List.assoc chain_id (Chain_validator.running_workers ()) in
+      let w =
+        WithExceptions.Option.to_exn ~none:Not_found
+        @@ List.assoc chain_id (Chain_validator.running_workers ())
+      in
       return
         {
           Worker_types.status = Chain_validator.status w;
@@ -126,6 +131,9 @@ let build_rpc_directory state =
   register1 Worker_services.Chain_validators.S.ddb_state (fun chain () () ->
       Chain_directory.get_chain_id state chain
       >>= fun chain_id ->
-      let w = List.assoc chain_id (Chain_validator.running_workers ()) in
+      let w =
+        WithExceptions.Option.to_exn ~none:Not_found
+        @@ List.assoc chain_id (Chain_validator.running_workers ())
+      in
       return (Chain_validator.ddb_information w)) ;
   !dir

@@ -112,7 +112,7 @@ let transfer_to_itself_and_check_balances ~loc b ?(fee = Tez.zero) contract
    a destination contract with the amount "n" times.
 *)
 let n_transactions n b ?fee source dest amount =
-  fold_left_s
+  List.fold_left_es
     (fun b _ ->
       transfer_and_check_balances ~loc:__LOC__ b ?fee source dest amount
       >|=? fun (b, _) -> b)
@@ -128,8 +128,12 @@ let ten_tez = Tez.of_int 10
 let register_two_contracts () =
   Context.init 2
   >|=? fun (b, contracts) ->
-  let contract_1 = List.nth contracts 0 in
-  let contract_2 = List.nth contracts 1 in
+  let contract_1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  let contract_2 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
+  in
   (b, contract_1, contract_2)
 
 (** compute half of the balance and divided by nth
@@ -187,7 +191,7 @@ let transfer_zero_tez () =
 let transfer_zero_implicit () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let dest = List.nth contracts 0 in
+  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let account = Account.new_account () in
   Incremental.begin_construction b
   >>=? fun i ->
@@ -210,7 +214,9 @@ let transfer_zero_implicit () =
 let transfer_to_originate_with_fee () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let contract = List.nth contracts 0 in
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
   Incremental.begin_construction b
   >>=? fun b ->
   two_nth_of_balance b contract 10L
@@ -254,7 +260,9 @@ let transfer_amount_of_contract_balance () =
 let transfers_to_self () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let contract = List.nth contracts 0 in
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
   Incremental.begin_construction b
   >>=? fun b ->
   two_nth_of_balance b contract 3L
@@ -303,7 +311,9 @@ let missing_transaction () =
 let transfer_from_implicit_to_implicit_contract () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let bootstrap_contract = List.nth contracts 0 in
+  let bootstrap_contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
   let account_a = Account.new_account () in
   let account_b = Account.new_account () in
   Incremental.begin_construction b
@@ -344,8 +354,12 @@ let transfer_from_implicit_to_implicit_contract () =
 let transfer_from_implicit_to_originated_contract () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let bootstrap_contract = List.nth contracts 0 in
-  let contract = List.nth contracts 0 in
+  let bootstrap_contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
   let account = Account.new_account () in
   let src = Contract.implicit_contract account.Account.pkh in
   Incremental.begin_construction b
@@ -446,7 +460,7 @@ let build_a_chain () =
   register_two_contracts ()
   >>=? fun (b, contract_1, contract_2) ->
   let ten = Tez.of_int 10 in
-  fold_left_s
+  List.fold_left_es
     (fun b _ ->
       Incremental.begin_construction b
       >>=? fun b ->
@@ -468,7 +482,7 @@ let build_a_chain () =
 let empty_implicit () =
   Context.init 1
   >>=? fun (b, contracts) ->
-  let dest = List.nth contracts 0 in
+  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let account = Account.new_account () in
   Incremental.begin_construction b
   >>=? fun incr ->
@@ -531,9 +545,15 @@ let balance_too_low fee () =
 let balance_too_low_two_transfers fee () =
   Context.init 3
   >>=? fun (b, contracts) ->
-  let contract_1 = List.nth contracts 0 in
-  let contract_2 = List.nth contracts 1 in
-  let contract_3 = List.nth contracts 2 in
+  let contract_1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  let contract_2 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
+  in
+  let contract_3 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 2
+  in
   Incremental.begin_construction b
   >>=? fun i ->
   Context.Contract.balance (I i) contract_1
@@ -677,81 +697,84 @@ let random_multi_transactions () =
 
 let tests =
   [ (* single transfer *)
-    Test.tztest "single transfer" `Quick block_with_a_single_transfer;
-    Test.tztest
+    Test_services.tztest "single transfer" `Quick block_with_a_single_transfer;
+    Test_services.tztest
       "single transfer with fee"
       `Quick
       block_with_a_single_transfer_with_fee;
     (* transfer zero tez *)
-    Test.tztest "single transfer zero tez" `Quick transfer_zero_tez;
-    Test.tztest
+    Test_services.tztest "single transfer zero tez" `Quick transfer_zero_tez;
+    Test_services.tztest
       "transfer zero tez from implicit contract"
       `Quick
       transfer_zero_implicit;
     (* transfer to originated contract *)
-    Test.tztest
+    Test_services.tztest
       "transfer to originated contract paying transaction fee"
       `Quick
       transfer_to_originate_with_fee;
     (* transfer by the balance of contract *)
-    Test.tztest
+    Test_services.tztest
       "transfer the amount from source contract balance"
       `Quick
       transfer_amount_of_contract_balance;
     (* transfer to itself *)
-    Test.tztest "transfers to itself" `Quick transfers_to_self;
+    Test_services.tztest "transfers to itself" `Quick transfers_to_self;
     (* missing operation *)
-    Test.tztest "missing transaction" `Quick missing_transaction;
+    Test_services.tztest "missing transaction" `Quick missing_transaction;
     (* transfer from/to implicit/originated contracts*)
-    Test.tztest
+    Test_services.tztest
       "transfer from an implicit to implicit contract "
       `Quick
       transfer_from_implicit_to_implicit_contract;
-    Test.tztest
+    Test_services.tztest
       "transfer from an implicit to an originated contract"
       `Quick
       transfer_from_implicit_to_originated_contract;
     (* Slow tests *)
-    Test.tztest
+    Test_services.tztest
       "block with multiple transfers"
       `Slow
       block_with_multiple_transfers;
     (* TODO increase the number of transaction times *)
-    Test.tztest
+    Test_services.tztest
       "block with multiple transfer paying fee"
       `Slow
       block_with_multiple_transfers_pay_fee;
-    Test.tztest
+    Test_services.tztest
       "block with multiple transfer without paying fee"
       `Slow
       block_with_multiple_transfers_with_without_fee;
     (* build the chain *)
-    Test.tztest "build a chain" `Quick build_a_chain;
+    Test_services.tztest "build a chain" `Quick build_a_chain;
     (* Erroneous *)
-    Test.tztest "empty implicit" `Quick empty_implicit;
-    Test.tztest
+    Test_services.tztest "empty implicit" `Quick empty_implicit;
+    Test_services.tztest
       "balance too low - transfer zero"
       `Quick
       (balance_too_low Tez.zero);
-    Test.tztest "balance too low" `Quick (balance_too_low Tez.one);
-    Test.tztest
+    Test_services.tztest "balance too low" `Quick (balance_too_low Tez.one);
+    Test_services.tztest
       "balance too low (max fee)"
       `Quick
       (balance_too_low Tez.max_tez);
-    Test.tztest
+    Test_services.tztest
       "balance too low with two transfers - transfer zero"
       `Quick
       (balance_too_low_two_transfers Tez.zero);
-    Test.tztest
+    Test_services.tztest
       "balance too low with two transfers"
       `Quick
       (balance_too_low_two_transfers Tez.one);
-    Test.tztest "invalid_counter" `Quick invalid_counter;
-    Test.tztest
+    Test_services.tztest "invalid_counter" `Quick invalid_counter;
+    Test_services.tztest
       "add the same operation twice"
       `Quick
       add_the_same_operation_twice;
-    Test.tztest "ownership sender" `Quick ownership_sender;
+    Test_services.tztest "ownership sender" `Quick ownership_sender;
     (* Random tests *)
-    Test.tztest "random transfer" `Quick random_transfer;
-    Test.tztest "random multi transfer" `Quick random_multi_transactions ]
+    Test_services.tztest "random transfer" `Quick random_transfer;
+    Test_services.tztest
+      "random multi transfer"
+      `Quick
+      random_multi_transactions ]

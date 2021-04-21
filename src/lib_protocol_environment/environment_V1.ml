@@ -131,7 +131,7 @@ struct
   module Int64 = Int64
   module Buffer = Buffer
   module Format = Format
-  module Option = Tezos_base.TzPervasives.Option
+  module Option = Option
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest
@@ -153,173 +153,12 @@ struct
   module Uri = Uri
 
   module Data_encoding = struct
-    open Data_encoding
-
-    type nonrec json = json
-
-    type nonrec json_schema = json_schema
-
-    type nonrec 'a t = 'a t
-
-    type nonrec 'a encoding = 'a encoding
-
-    let classify = classify
-
-    let splitted = splitted
-
-    let null = null
-
-    let empty = empty
-
-    let unit = unit
-
-    let constant = constant
-
-    let int8 = int8
-
-    let uint8 = uint8
-
-    let int16 = int16
-
-    let uint16 = uint16
-
-    let int31 = int31
-
-    let int32 = int32
-
-    let int64 = int64
-
-    let n = n
-
-    let z = z
-
-    let bool = bool
-
-    let string = string
-
-    let bytes = bytes
-
-    let option = option
-
-    let string_enum = string_enum
-
-    module Fixed = Fixed
-    module Variable = Variable
-    module Bounded = Bounded
-
-    let dynamic_size = dynamic_size
-
-    let json = json
-
-    let json_schema = json_schema
-
-    type nonrec 'a field = 'a field
-
-    let req = req
-
-    let opt = opt
-
-    let varopt = varopt
-
-    let dft = dft
-
-    let obj1 = obj1
-
-    let obj2 = obj2
-
-    let obj3 = obj3
-
-    let obj4 = obj4
-
-    let obj5 = obj5
-
-    let obj6 = obj6
-
-    let obj7 = obj7
-
-    let obj8 = obj8
-
-    let obj9 = obj9
-
-    let obj10 = obj10
-
-    let tup1 = tup1
-
-    let tup2 = tup2
-
-    let tup3 = tup3
-
-    let tup4 = tup4
-
-    let tup5 = tup5
-
-    let tup6 = tup6
-
-    let tup7 = tup7
-
-    let tup8 = tup8
-
-    let tup9 = tup9
-
-    let tup10 = tup10
-
-    let merge_objs = merge_objs
-
-    let merge_tups = merge_tups
-
-    let array = array
-
-    let list = list
-
-    let assoc = assoc
-
-    type nonrec case_tag = case_tag = Tag of int | Json_only
-
-    type nonrec 't case = 't case
-
-    let case = case
+    include Data_encoding
 
     type tag_size = [`Uint8 | `Uint16]
 
-    let union = union
-
     let def name ?title ?description encoding =
       def (Param.name ^ "." ^ name) ?title ?description encoding
-
-    let conv = conv
-
-    let mu = mu
-
-    type nonrec 'a lazy_t = 'a lazy_t
-
-    let lazy_encoding = lazy_encoding
-
-    let force_decode = force_decode
-
-    let force_bytes = force_bytes
-
-    let make_lazy = make_lazy
-
-    let apply_lazy = apply_lazy
-
-    module Json = Json
-
-    module Binary = struct
-      include Binary
-
-      let read = read_opt
-
-      let write = write_opt
-
-      let of_bytes = of_bytes_opt
-
-      (* Also remove ?buffer_size by eta-expanding. *)
-      let to_bytes encoding value = to_bytes_opt encoding value
-
-      let to_bytes_exn encoding value = to_bytes_exn encoding value
-    end
-
-    let check_size = check_size
   end
 
   module Time = Time.Protocol
@@ -726,6 +565,7 @@ struct
     include Local_monad
     include Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
               (Local_monad)
+    include Error_monad_traversors
 
     type 'err trace = 'err TzTrace.trace
   end
@@ -780,6 +620,8 @@ struct
 
     let return x = Lwt.return (`Ok x)
 
+    let return_chunked x = Lwt.return (`OkChunk x)
+
     let return_stream x = Lwt.return (`OkStream x)
 
     let not_found = Lwt.return (`Not_found None)
@@ -795,7 +637,7 @@ struct
           handler p q i
           >>= function
           | `Ok o ->
-              RPC_answer.return o
+              RPC_answer.return_chunked o
           | `OkStream s ->
               RPC_answer.return_stream s
           | `Created s ->
@@ -1052,12 +894,37 @@ struct
   module Context = struct
     include Context
 
-    let fold_keys s k ~init ~f =
-      let rec loop k acc =
-        fold s k ~init:acc ~f:(fun file acc ->
-            match file with `Key k -> f k acc | `Dir k -> loop k acc)
-      in
-      loop k init
+    let set = add
+
+    let get = find
+
+    let dir_mem = mem_tree
+
+    let remove_rec = remove
+
+    let copy ctxt ~from ~to_ =
+      find_tree ctxt from
+      >>= function
+      | None ->
+          Lwt.return_none
+      | Some sub_tree ->
+          add_tree ctxt to_ sub_tree >>= Lwt.return_some
+
+    let fold_keys s root ~init ~f =
+      Context.fold s root ~init ~f:(fun k v acc ->
+          let k = root @ k in
+          match Tree.kind v with `Value -> f k acc | `Tree -> Lwt.return acc)
+
+    type key_or_dir = [`Key of string list | `Dir of string list]
+
+    let fold t root ~init ~f =
+      fold ~depth:(`Eq 1) t root ~init ~f:(fun k v acc ->
+          let k = root @ k in
+          match Tree.kind v with
+          | `Value ->
+              f (`Key k) acc
+          | `Tree ->
+              f (`Dir k) acc)
 
     let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 

@@ -242,11 +242,18 @@ let fv_to_string fv = Format.asprintf "%a" Free_variable.pp fv
 
 let to_list_of_rows (m : Scikit.Matrix.t) : float list list =
   let (lines, cols) = Scikit.Matrix.shape m in
-  List.init lines (fun l -> List.init cols (fun c -> Scikit.Matrix.get m l c))
+  let init n f =
+    List.init ~when_negative_length:() n f
+    |> (* lines/column count cannot be negative *)
+       WithExceptions.Result.get_ok ~loc:__LOC__
+  in
+  init lines (fun l -> init cols (fun c -> Scikit.Matrix.get m l c))
 
 let of_list_of_rows (m : float list list) : Scikit.Matrix.t =
   let lines = List.length m in
-  let cols = List.length (List.hd m) in
+  let cols =
+    List.length (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd m)
+  in
   let mat = Scikit.Matrix.create ~lines ~cols in
   List.iteri
     (fun l row -> List.iteri (fun c elt -> Scikit.Matrix.set mat l c elt) row)
@@ -255,7 +262,12 @@ let of_list_of_rows (m : float list list) : Scikit.Matrix.t =
 
 let model_matrix_to_csv (m : Scikit.Matrix.t) (nmap : NMap.t) : Csv.csv =
   let (_, cols) = Scikit.Matrix.shape m in
-  let names = List.init cols (fun i -> fv_to_string (NMap.nth_exn nmap i)) in
+  let names =
+    List.init ~when_negative_length:() cols (fun i ->
+        fv_to_string (NMap.nth_exn nmap i))
+    |> (* number of column cannot be negative *)
+       WithExceptions.Result.get_ok ~loc:__LOC__
+  in
   let rows = to_list_of_rows m in
   let rows = List.map (List.map string_of_float) rows in
   names :: rows

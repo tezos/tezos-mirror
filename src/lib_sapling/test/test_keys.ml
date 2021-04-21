@@ -12,40 +12,26 @@ let test_keys () =
       assert (nk = v.nk) ;
       let ivk = R.crh_ivk ak nk in
       assert (ivk = v.ivk) ;
-      let pkd =
-        TzOption.unopt_assert ~loc:__POS__ (R.ivk_to_pkd ivk v.default_d)
-      in
+      let pkd = R.ivk_to_pkd ivk v.default_d in
       assert (pkd = v.default_pk_d) ;
       assert (R.check_diversifier v.default_d) ;
       let nf =
-        TzOption.unopt_assert
-          ~loc:__POS__
-          (R.compute_nf
-             v.default_d
-             pkd
-             ~amount:v.note_v
-             v.note_r
-             ak
-             nk
-             ~position:v.note_pos)
+        R.compute_nf
+          v.default_d
+          pkd
+          ~amount:v.note_v
+          v.note_r
+          ak
+          nk
+          ~position:v.note_pos
       in
       assert (nf = v.note_nf) ;
-      let cm =
-        TzOption.unopt_assert
-          ~loc:__POS__
-          (R.compute_cm v.default_d pkd ~amount:v.note_v v.note_r)
-      in
+      let cm = R.compute_cm v.default_d pkd ~amount:v.note_v v.note_r in
       assert (cm = v.note_cm) ;
       let esk = R.to_esk @@ R.generate_r () in
-      let epk =
-        TzOption.unopt_assert ~loc:__POS__ (R.ka_derivepublic v.default_d esk)
-      in
-      let ka1 =
-        TzOption.unopt_assert ~loc:__POS__ (R.ka_agree_sender pkd esk)
-      in
-      let ka2 =
-        TzOption.unopt_assert ~loc:__POS__ (R.ka_agree_receiver epk ivk)
-      in
+      let epk = R.ka_derivepublic v.default_d esk in
+      let ka1 = R.ka_agree_sender pkd esk in
+      let ka2 = R.ka_agree_receiver epk ivk in
       assert (ka1 = ka2))
     vectors
 
@@ -106,14 +92,14 @@ let test_zip32 () =
   assert (xsk.parent_fvk_tag = ba_of_hex "00000000") ;
   assert (xsk.child_index = ba_of_hex "00000000") ;
   assert (xsk.chain_code = v.c) ;
-  assert (xsk.expsk.ask = TzOption.unopt_assert ~loc:__POS__ v.ask) ;
-  assert (xsk.expsk.nsk = TzOption.unopt_assert ~loc:__POS__ v.nsk) ;
+  assert (xsk.expsk.ask = Stdlib.Option.get v.ask) ;
+  assert (xsk.expsk.nsk = Stdlib.Option.get v.nsk) ;
   assert (xsk.expsk.ovk = v.ovk) ;
   assert (xsk.dk = v.dk) ;
   let xfvk = of_sk xsk in
   assert (xfvk = v.xfvk) ;
   let (_j, address) = new_address xfvk default_index in
-  assert (address.diversifier = TzOption.unopt_assert ~loc:__POS__ v.d0) ;
+  assert (address.diversifier = Stdlib.Option.get v.d0) ;
   (* TODO continue test with derivation once implemented *)
   ()
 

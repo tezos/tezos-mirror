@@ -40,7 +40,7 @@ exception Error of error list
 
 let rec listen ?port addr =
   let tentative_port =
-    match port with None -> 1024 + Random.int 8192 | Some port -> port
+    match port with None -> 49152 + Random.int 16384 | Some port -> port
   in
   let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
   let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
@@ -124,9 +124,9 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   accept_n main_socket n
   >>=? fun conns ->
   let conns = List.map (P2p_io_scheduler.register sched) conns in
-  Lwt_list.iter_p receive conns
+  List.iter_p receive conns
   >>= fun () ->
-  iter_p P2p_io_scheduler.close conns
+  List.iter_ep P2p_io_scheduler.close conns
   >>=? fun () ->
   log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
   return_unit
@@ -202,7 +202,7 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
         >>= fun () ->
         client ?max_upload_speed ?write_queue_size addr port time n)
   in
-  Error_monad.map_s client (1 -- n)
+  List.map_es client (1 -- n)
   >>=? fun client_nodes -> Process.wait_all (server_node :: client_nodes)
 
 let () = Random.self_init ()

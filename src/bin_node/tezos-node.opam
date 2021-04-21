@@ -32,9 +32,12 @@ depends: [
   "tezos-embedded-protocol-006-PsCARTHA"
   "tezos-embedded-protocol-007-PsDELPH1"
   "tezos-embedded-protocol-008-PtEdo2Zk"
-  "tezos-protocol-plugin-007-PsDELPH1-registerer"
+  "tezos-embedded-protocol-009-PsFLoren"
   "tezos-protocol-plugin-008-PtEdo2Zk-registerer"
+  "tezos-protocol-plugin-009-PsFLoren-registerer"
+  "tezos-protocol-plugin-alpha-registerer"
   "cmdliner"
+  "lwt-exit"
   "tls" { >= "0.10" < "0.11" } # remove the upper bond when the compatibility with hacl-star is restored
   "cstruct"
 ]

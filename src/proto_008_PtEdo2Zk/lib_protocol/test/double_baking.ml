@@ -34,29 +34,41 @@ open Alpha_context
 (****************************************************************)
 
 let get_first_different_baker baker bakers =
-  List.find
-    (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
-    bakers
+  WithExceptions.Option.get ~loc:__LOC__
+  @@ List.find
+       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
+       bakers
 
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
   >|=? fun bakers ->
-  let baker_1 = List.hd bakers in
-  get_first_different_baker baker_1 (List.tl bakers)
+  let baker_1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
+  get_first_different_baker
+    baker_1
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.tl bakers)
   |> fun baker_2 -> (baker_1, baker_2)
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt
   >|=? fun endorsers ->
-  let endorser_1 = (List.hd endorsers).delegate in
-  let endorser_2 = (List.hd (List.tl endorsers)).delegate in
+  let endorser_1 =
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers).delegate
+  in
+  let endorser_2 =
+    ( WithExceptions.Option.get ~loc:__LOC__
+    @@ List.hd (WithExceptions.Option.get ~loc:__LOC__ @@ List.tl endorsers) )
+      .delegate
+  in
   (endorser_1, endorser_2)
 
 (** Bake two block at the same level using the same policy (i.e. same
     baker) *)
 let block_fork ?policy contracts b =
   let (contract_a, contract_b) =
-    (List.hd contracts, List.hd (List.tl contracts))
+    ( WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts,
+      WithExceptions.Option.get ~loc:__LOC__
+      @@ List.hd (WithExceptions.Option.get ~loc:__LOC__ @@ List.tl contracts)
+    )
   in
   Op.transaction (B b) contract_a contract_b Alpha_context.Tez.one_cent
   >>=? fun operation ->
@@ -74,7 +86,9 @@ let valid_double_baking_evidence () =
   >>=? fun (b, contracts) ->
   Context.get_bakers (B b)
   >>=? fun bakers ->
-  let priority_0_baker = List.hd bakers in
+  let priority_0_baker =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers
+  in
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
   Op.double_baking (B blk_a) blk_a.header blk_b.header
@@ -82,7 +96,7 @@ let valid_double_baking_evidence () =
   Block.bake ~policy:(Excluding [priority_0_baker]) ~operation blk_a
   >>=? fun blk ->
   (* Check that the frozen deposit, the fees and rewards are removed *)
-  iter_s
+  List.iter_es
     (fun kind ->
       let contract =
         Alpha_context.Contract.implicit_contract priority_0_baker
@@ -156,7 +170,7 @@ let too_late_double_baking_evidence () =
   >>=? fun Constants.{parametric = {preserved_cycles; _}; _} ->
   block_fork ~policy:(By_priority 0) contracts b
   >>=? fun (blk_a, blk_b) ->
-  fold_left_s
+  List.fold_left_es
     (fun blk _ -> Block.bake_until_cycle_end blk)
     blk_a
     (1 -- (preserved_cycles + 1))
@@ -218,20 +232,20 @@ let wrong_signer () =
           false)
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "valid double baking evidence"
       `Quick
       valid_double_baking_evidence;
     (* Should fail*)
-    Test.tztest "same blocks" `Quick same_blocks;
-    Test.tztest "different levels" `Quick different_levels;
-    Test.tztest
+    Test_services.tztest "same blocks" `Quick same_blocks;
+    Test_services.tztest "different levels" `Quick different_levels;
+    Test_services.tztest
       "too early double baking evidence"
       `Quick
       too_early_double_baking_evidence;
-    Test.tztest
+    Test_services.tztest
       "too late double baking evidence"
       `Quick
       too_late_double_baking_evidence;
-    Test.tztest "different delegates" `Quick different_delegates;
-    Test.tztest "wrong delegate" `Quick wrong_signer ]
+    Test_services.tztest "different delegates" `Quick different_delegates;
+    Test_services.tztest "wrong delegate" `Quick wrong_signer ]

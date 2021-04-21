@@ -9,6 +9,8 @@ depends: [
   "dune" { >= "2.0" }
   "tezos-protocol-compiler"
   "alcotest-lwt" { with-test & >= "1.1.0" }
+  "astring" { with-test }
+  "crowbar" { with-test }
   "tezos-alpha-test-helpers" { with-test }
   "tezos-stdlib-unix" { with-test }
   "tezos-protocol-environment" { with-test }

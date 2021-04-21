@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let mockup_dirname = "mockup"
-
-let context_file = "context.json"
-
 let rpc_context_encoding :
     Tezos_protocol_environment.rpc_context Data_encoding.t =
   let open Data_encoding in
@@ -79,7 +75,7 @@ let get_registered_mockup :
     | Some protocol_hash -> (
       match
         List.find_opt
-          (fun (module Mockup : Registration.Mockup_sig) ->
+          (fun (module Mockup : Registration.MOCKUP) ->
             Protocol_hash.equal protocol_hash Mockup.protocol_hash)
           mockup_environments
       with
@@ -128,9 +124,7 @@ let mockup_context_from_persisted pm_env =
   >>=? fun mockup -> return (mockup, (pm_env.chain_id, pm_env.rpc_context))
 
 let get_mockup_context_from_disk ~base_dir ~protocol_hash =
-  let file =
-    Filename.concat base_dir (Filename.concat mockup_dirname context_file)
-  in
+  let file = (Files.Context.get ~dirname:base_dir :> string) in
   if not (Sys.file_exists file) then
     failwith "get_mockup_context_from_disk: file %s not found" file
   else
@@ -162,8 +156,7 @@ let get_mockup_context_from_disk ~base_dir ~protocol_hash =
         failwith "get_mockup_context_from_disk: could not read %s" file
 
 let overwrite_mockup ~protocol_hash ~chain_id ~rpc_context ~base_dir =
-  let mockup_dir = Filename.concat base_dir mockup_dirname in
-  let context_file = Filename.concat mockup_dir context_file in
+  let context_file = (Files.Context.get ~dirname:base_dir :> string) in
   if not (Sys.file_exists context_file) then
     failwith "overwrite_mockup: file %s does not exist" context_file
   else
@@ -198,21 +191,26 @@ let pp_base_dir_class ppf bclass =
 let is_directory_empty dir = Array.length (Sys.readdir dir) = 0
 
 let classify_base_dir base_dir =
-  if not (Sys.file_exists base_dir) then Base_dir_does_not_exist
-  else if not (Sys.is_directory base_dir) then Base_dir_is_file
-  else if is_directory_empty base_dir then Base_dir_is_empty
+  if not (Sys.file_exists base_dir) then return Base_dir_does_not_exist
+  else if not (Sys.is_directory base_dir) then return Base_dir_is_file
+  else if is_directory_empty base_dir then return Base_dir_is_empty
   else
-    let mockup_dir = Filename.concat base_dir mockup_dirname in
-    let context_file = Filename.concat mockup_dir context_file in
-    if
-      Sys.file_exists mockup_dir
-      && Sys.is_directory mockup_dir
-      && Sys.file_exists context_file
-    then Base_dir_is_mockup
-    else Base_dir_is_nonempty
+    let dirname = base_dir in
+    Files.exists_mockup_directory ~dirname
+    >>= function
+    | true -> (
+        Files.Context.exists ~dirname
+        >>= function
+        | true ->
+            return Base_dir_is_mockup
+        | false ->
+            return Base_dir_is_nonempty )
+    | false ->
+        return Base_dir_is_nonempty
 
 let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
-    ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json =
+    ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json
+    ~asynchronous =
   let base_dir = cctxt#get_base_dir in
   let create_base_dir () =
     Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir
@@ -220,17 +218,20 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     cctxt#message "Created mockup client base dir in %s" base_dir
     >>= fun () -> return_unit
   in
-  ( match classify_base_dir base_dir with
-  | Base_dir_does_not_exist | Base_dir_is_empty ->
-      create_base_dir ()
-  | Base_dir_is_file ->
-      failwith "%s is a file" base_dir
-  | Base_dir_is_mockup ->
-      failwith "%s is already initialized as a mockup directory" base_dir
-  | Base_dir_is_nonempty ->
-      failwith
-        "%s is not empty, please specify a fresh base directory"
-        base_dir )
+  classify_base_dir base_dir
+  >>=? (function
+         | Base_dir_does_not_exist | Base_dir_is_empty ->
+             create_base_dir ()
+         | Base_dir_is_file ->
+             failwith "%s is a file" base_dir
+         | Base_dir_is_mockup ->
+             failwith
+               "%s is already initialized as a mockup directory"
+               base_dir
+         | Base_dir_is_nonempty ->
+             failwith
+               "%s is not empty, please specify a fresh base directory"
+               base_dir)
   >>=? fun () ->
   init_mockup_context_by_protocol_hash
     ~cctxt
@@ -238,10 +239,19 @@ let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     ~constants_overrides_json
     ~bootstrap_accounts_json
   >>=? fun (_mockup_env, (chain_id, rpc_context)) ->
-  let mockup_dir = Filename.concat base_dir mockup_dirname in
+  let mockup_dir = (Files.get_mockup_directory ~dirname:base_dir :> string) in
   Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
   >>= fun () ->
-  let context_file = Filename.concat mockup_dir context_file in
+  let context_file = (Files.Context.get ~dirname:base_dir :> string) in
   Persistent_mockup_environment.(
     to_json {protocol_hash; chain_id; rpc_context})
   |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file
+  >>=? fun () ->
+  if asynchronous then
+    (* Setup a local persistent mempool *)
+    let mempool_file = (Files.Mempool.get ~dirname:base_dir :> string) in
+    cctxt#message "creating persistent mempool file at %s" mempool_file
+    >>= fun () ->
+    Lwt_io.with_file ~mode:Lwt_io.Output mempool_file (fun oc ->
+        Lwt_io.write oc "[]" >|= ok)
+  else return_unit

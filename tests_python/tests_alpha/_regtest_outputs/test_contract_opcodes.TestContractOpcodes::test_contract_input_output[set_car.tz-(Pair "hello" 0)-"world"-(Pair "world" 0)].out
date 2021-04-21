@@ -1,0 +1,53 @@
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[set_car.tz-(Pair "hello" 0)-"world"-(Pair "world" 0)]
+
+storage
+  (Pair "world" 0)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039985.237 units remaining)
+    [ (Pair "world" "hello" 0)  	 ]
+  - location: 9 (remaining gas: 1039985.157 units remaining)
+    [ (Pair "world" "hello" 0)  	
+      (Pair "world" "hello" 0)  	 ]
+  - location: 10 (remaining gas: 1039985.077 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      (Pair "world" "hello" 0)  	 ]
+  - location: 13 (remaining gas: 1039984.922 units remaining)
+    [ "world"  	@parameter ]
+  - location: 12 (remaining gas: 1039984.877 units remaining)
+    [ "world"  	@parameter ]
+  - location: 11 (remaining gas: 1039984.877 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      "world"  	@parameter ]
+  - location: 15 (remaining gas: 1039984.767 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      (Pair "hello" 0)  	@storage
+      "world"  	@parameter ]
+  - location: 16 (remaining gas: 1039984.687 units remaining)
+    [ "hello"  	
+      (Pair "hello" 0)  	@storage
+      "world"  	@parameter ]
+  - location: 17 (remaining gas: 1039984.612 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      "world"  	@parameter ]
+  - location: 18 (remaining gas: 1039984.532 units remaining)
+    [ 0  	@storage.n
+      "world"  	@parameter ]
+  - location: 19 (remaining gas: 1039984.462 units remaining)
+    [ "world"  	@parameter
+      0  	@storage.n ]
+  - location: 20 (remaining gas: 1039984.387 units remaining)
+    [ (Pair "world" 0)  	@storage ]
+  - location: -1 (remaining gas: 1039984.342 units remaining)
+    [ (Pair "world" 0)  	@storage ]
+  - location: 21 (remaining gas: 1039984.267 units remaining)
+    [ {}  	
+      (Pair "world" 0)  	@storage ]
+  - location: 23 (remaining gas: 1039984.192 units remaining)
+    [ (Pair {} "world" 0)  	 ]
+  - location: -1 (remaining gas: 1039984.147 units remaining)
+    [ (Pair {} "world" 0)  	 ]
+

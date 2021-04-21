@@ -1,0 +1,23 @@
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[concat_hello.tz-{}-{}-{}]
+
+storage
+  {}
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039992.286 units remaining)
+    [ (Pair {} {})  	 ]
+  - location: 9 (remaining gas: 1039992.146 units remaining)
+    [ {}  	@parameter ]
+  - location: 10 (remaining gas: 1039991.586 units remaining)
+    [ {}  	 ]
+  - location: 16 (remaining gas: 1039991.446 units remaining)
+    [ {}  	
+      {}  	 ]
+  - location: 18 (remaining gas: 1039991.306 units remaining)
+    [ (Pair {} {})  	 ]
+  - location: -1 (remaining gas: 1039991.236 units remaining)
+    [ (Pair {} {})  	 ]
+

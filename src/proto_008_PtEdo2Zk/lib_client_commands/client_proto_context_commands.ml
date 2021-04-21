@@ -216,11 +216,11 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
   >>=? fun amount ->
   tez_of_opt_string_exn index "fee" batch.fee
   >>=? fun batch_fee ->
-  let fee = Option.first_some batch_fee fee in
-  let arg = Option.first_some batch.arg arg in
-  let gas_limit = Option.first_some batch.gas_limit gas_limit in
-  let storage_limit = Option.first_some batch.storage_limit storage_limit in
-  let entrypoint = Option.first_some batch.entrypoint entrypoint in
+  let fee = Option.either batch_fee fee in
+  let arg = Option.either batch.arg arg in
+  let gas_limit = Option.either batch.gas_limit gas_limit in
+  let storage_limit = Option.either batch.storage_limit storage_limit in
+  let entrypoint = Option.either batch.entrypoint entrypoint in
   parse_arg_transfer arg
   >>=? fun parameters ->
   ( match Contract.is_implicit source with
@@ -277,7 +277,7 @@ let commands network () =
       (fun () (cctxt : Protocol_client_context.full) ->
         list_contract_labels cctxt ~chain:cctxt#chain ~block:cctxt#block
         >>=? fun contracts ->
-        Lwt_list.iter_s
+        List.iter_s
           (fun (alias, hash, kind) -> cctxt#message "%s%s%s" hash kind alias)
           contracts
         >>= fun () -> return_unit);
@@ -394,7 +394,7 @@ let commands network () =
               let {Michelson_v1_parser.source; _} =
                 Michelson_v1_printer.unparse_toplevel code
               in
-              cctxt#answer "%a" Format.pp_print_text source >>= return ));
+              cctxt#answer "%s" source >>= return ));
     command
       ~group
       ~desc:"Get the type of an entrypoint of a contract."
@@ -849,7 +849,7 @@ let commands network () =
                 >>=? fun (_, src_pk, src_sk) -> return (source, src_pk, src_sk)
             )
             >>=? fun (source, src_pk, src_sk) ->
-            mapi_p prepare operations
+            List.mapi_ep prepare operations
             >>=? fun contents ->
             let (Manager_list contents) = Injection.manager_of_list contents in
             Injection.inject_manager_operation

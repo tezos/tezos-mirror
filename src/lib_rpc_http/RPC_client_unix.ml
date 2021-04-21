@@ -52,7 +52,7 @@ module Attempt_logging = Internal_event.Make (struct
   let level _ = Internal_event.Error
 end)
 
-include RPC_client.Make (struct
+module RetryClient : Cohttp_lwt.S.Client = struct
   include Cohttp_lwt_unix.Client
 
   let clone_body = function
@@ -81,4 +81,6 @@ include RPC_client.Make (struct
           Lwt.return (response, ansbody)
     in
     call_and_retry_on_502 1 0.
-end)
+end
+
+include RPC_client.Make (Resto_cohttp_client.Client.OfCohttp (RetryClient))

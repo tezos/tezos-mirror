@@ -35,7 +35,7 @@ let test_context () =
 let test_context_with_nat_nat_big_map () =
   Context.init 3
   >>=? fun (b, contracts) ->
-  let source = List.hd contracts in
+  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Op.origination (B b) source ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
   Block.bake ~operation b
@@ -726,7 +726,7 @@ let test_optimal_comb () =
           v
       >>=? fun (unparsed, ctxt) ->
       let (unparsed_canonical, unparsed_size) = size_of_micheline unparsed in
-      Error_monad.iter_s (fun other_repr ->
+      List.iter_es (fun other_repr ->
           let (other_repr_canonical, other_repr_size) =
             size_of_micheline other_repr
           in
@@ -768,20 +768,29 @@ let test_optimal_comb () =
   >>=? fun _ctxt -> return_unit
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "test typecheck stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
-    Test.tztest
+    Test_services.tztest
       "test unparsing stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
-    Test.tztest "test comb type parsing" `Quick test_parse_comb_type;
-    Test.tztest "test comb type unparsing" `Quick test_unparse_comb_type;
-    Test.tztest
+    Test_services.tztest "test comb type parsing" `Quick test_parse_comb_type;
+    Test_services.tztest
+      "test comb type unparsing"
+      `Quick
+      test_unparse_comb_type;
+    Test_services.tztest
       "test comb comparable type unparsing"
       `Quick
       test_unparse_comb_comparable_type;
-    Test.tztest "test comb data parsing" `Quick test_parse_comb_data;
-    Test.tztest "test comb data unparsing" `Quick test_unparse_comb_data;
-    Test.tztest "test optimal comb data unparsing" `Quick test_optimal_comb ]
+    Test_services.tztest "test comb data parsing" `Quick test_parse_comb_data;
+    Test_services.tztest
+      "test comb data unparsing"
+      `Quick
+      test_unparse_comb_data;
+    Test_services.tztest
+      "test optimal comb data unparsing"
+      `Quick
+      test_optimal_comb ]

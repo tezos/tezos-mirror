@@ -157,7 +157,7 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
 let list_contract_labels cctxt ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block)
   >>=? fun contracts ->
-  rev_map_s
+  List.rev_map_es
     (fun h ->
       ( match Contract.is_implicit h with
       | Some m -> (

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -132,8 +133,12 @@ let () =
          proposed %a alternative peers."
         P2p_rejection.pp
         motive
-        (Option.pp ~default:"no" (fun ppf l ->
-             Format.pp_print_int ppf @@ List.length l))
+        (fun ppf alt_points ->
+          match alt_points with
+          | None ->
+              Format.pp_print_string ppf "no"
+          | Some l ->
+              Format.pp_print_int ppf @@ List.length l)
         alt_points)
     Data_encoding.(
       obj2
@@ -261,6 +266,13 @@ type error += Peer_banned of P2p_peer.Id.t
 
 type error += P2p_layer_disabled
 
+type error +=
+  | Identity_check_failure of {
+      point : P2p_point.Id.t;
+      expected_peer_id : P2p_peer.Id.t;
+      received_peer_id : P2p_peer.Id.t;
+    }
+
 let () =
   (* Pending connection *)
   register_error_kind
@@ -379,4 +391,34 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "P2P layer disabled.")
     Data_encoding.empty
     (function P2p_layer_disabled -> Some () | _ -> None)
-    (fun () -> P2p_layer_disabled)
+    (fun () -> P2p_layer_disabled) ;
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_connect_handler.identity_check_failure"
+    ~title:"Unexpected peer identity"
+    ~description:
+      "Peer announced an identity which does not match the one specified on \
+       the command-line."
+    ~pp:(fun ppf (point, expected_peer_id, received_peer_id) ->
+      Format.fprintf
+        ppf
+        "For point `%a`: Expected peer identity `%a` and received peer \
+         identity `%a`."
+        P2p_point.Id.pp
+        point
+        P2p_peer.Id.pp
+        expected_peer_id
+        P2p_peer.Id.pp
+        received_peer_id)
+    Data_encoding.(
+      obj3
+        (req "point" P2p_point.Id.encoding)
+        (req "expected_peer_id" P2p_peer.Id.encoding)
+        (req "received_peer_id" P2p_peer.Id.encoding))
+    (function
+      | Identity_check_failure {point; expected_peer_id; received_peer_id} ->
+          Some (point, expected_peer_id, received_peer_id)
+      | _ ->
+          None)
+    (fun (point, expected_peer_id, received_peer_id) ->
+      Identity_check_failure {point; expected_peer_id; received_peer_id})

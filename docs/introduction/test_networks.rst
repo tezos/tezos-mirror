@@ -13,7 +13,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Carthage for Carthagenet), the protocol
+network is activated (such as Edo for Edo2net), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -28,16 +28,46 @@ You can obtain the key to these accounts from a faucet to claim the funds.
 All networks share the same faucet: https://faucet.tzalpha.net/.
 The keys obtained from this faucet can be used in all test networks.
 
-Delphinet
----------
+Florencenet
+-----------
 
-- Built-in :ref:`multinetwork` alias: ``delphinet`` (available since version 7.4)
-- Run Docker image: ``wget -O delphinet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+- Built-in network alias: ``florencenet`` (see :ref:`builtin_networks`)
 
-Delphinet is a test network running the Delphi protocol.
-Delphinet will run until Delphi is either rejected or replaced by another protocol on Mainnet.
+  * Available on ``master``, will be available in version 9.0
 
-On Delphinet, the following constants differ from Mainnet:
+- Run Docker image: ``wget -O florencenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+
+Florencenet is a test network running the PsFLoren protocol.
+Florencenet will run until Florence is rejected or replaced by another protocol on Mainnet.
+
+On Florencenet, the following constants differ from Mainnet:
+
+- ``preserved_cycles`` is 3 instead of 5;
+- ``blocks_per_cycle`` is 2048 instead of 4096;
+- ``blocks_per_voting_period`` is 1024 instead of 32768;
+- ``time_between_blocks`` is ``[ 30, 20 ]`` instead of ``[ 60, 40 ]``;
+- ``test_chain_duration`` is 0 instead of 1966080;
+- ``delay_per_missing_endorsement`` is 4 instead of 8.
+
+This results in a faster chain than Mainnet:
+
+- 2 blocks per minute;
+- a cycle should last about 17 hours;
+- a voting period lasts half a cycle and should thus last about 8 hours.
+
+Edo2net
+-------
+
+- Built-in network alias: ``edo2net`` (see :ref:`builtin_networks`)
+
+  * Available since version 8.3
+
+- Run Docker image: ``wget -O edo2net.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+
+Edo2net is a test network running the Edo2Zk protocol.
+Edo2net will run until Edo is replaced by another protocol on Mainnet.
+
+On Edo2net, the following constants differ from Mainnet:
 
 - ``preserved_cycles`` is 3 instead of 5;
 - ``blocks_per_cycle`` is 2048 instead of 4096;
@@ -65,6 +95,13 @@ P is activated, the previous test network will end and P-net will continue on it
 Old Networks
 ============
 
+Delphinet
+---------
+
+Delphinet was a test network running the Delphi protocol.
+Following the activation of the Edo protocol replacing Delphi on Mainnet,
+Delphinet stopped being maintained on Febuary 28th, 2021.
+
 Dalphanet
 ---------
 
@@ -76,27 +113,9 @@ It was available in experimental branch ``dalpha-release``.
 Carthagenet
 -----------
 
-- Built-in :ref:`multinetwork` alias: ``carthagenet``
-- Run Docker image: ``wget -O carthagenet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
-
-Carthagenet is a test network running the Carthage protocol.
+Carthagenet was a test network running the Carthage protocol.
 Following the activation of the Delphi protocol replacing Carthage on Mainnet,
-Carthagenet will stop being maintained on December 12th, 2020.
-
-On Carthagenet, the following constants differ from Mainnet:
-
-- ``preserved_cycles`` is 3 instead of 5;
-- ``blocks_per_cycle`` is 2048 instead of 4096;
-- ``blocks_per_voting_period`` is 2048 instead of 32768;
-- ``time_between_blocks`` is ``[ 30, 40 ]`` instead of ``[ 60, 40 ]``;
-- ``test_chain_duration`` is 43200 instead of 1966080;
-- ``quorum_min`` is 3000 (i.e. 30%) instead of 2000 (i.e. 20%).
-
-This results in a faster chain than Mainnet:
-
-- 2 blocks per minute;
-- a cycle should last about 17 hours;
-- a voting period lasts 1 cycle and should thus also last about 17 hours.
+Carthagenet stopped being maintained on December 12th, 2020.
 
 Babylonnet
 ----------

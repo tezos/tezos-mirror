@@ -15,33 +15,41 @@ class ClientRegression(client.Client):
     If the command fails, the stderr output is also written.
     """
 
-    def __init__(self,
-                 client_path: str,
-                 admin_client_path: str,
-                 host: Optional[str] = None,
-                 base_dir: Optional[str] = None,
-                 rpc_port: Optional[int] = None,
-                 use_tls: Optional[bool] = None,
-                 endpoint: Optional[str] = 'http://127.0.0.1:8732',
-                 disable_disclaimer: bool = True):
+    def __init__(
+        self,
+        client_path: str,
+        admin_client_path: str,
+        host: Optional[str] = None,
+        base_dir: Optional[str] = None,
+        rpc_port: Optional[int] = None,
+        use_tls: Optional[bool] = None,
+        endpoint: Optional[str] = 'http://127.0.0.1:8732',
+        mode: Optional[str] = None,
+        disable_disclaimer: bool = True,
+    ):
         self.regtest = None
-        super().__init__(client_path,
-                         admin_client_path,
-                         host,
-                         base_dir,
-                         rpc_port,
-                         use_tls,
-                         endpoint,
-                         disable_disclaimer)
+        super().__init__(
+            client_path=client_path,
+            admin_client_path=admin_client_path,
+            host=host,
+            base_dir=base_dir,
+            rpc_port=rpc_port,
+            use_tls=use_tls,
+            endpoint=endpoint,
+            mode=mode,
+            disable_disclaimer=disable_disclaimer,
+        )
 
     def set_regtest(self, regtest):
         self.regtest = regtest
 
-    def run(self,
-            params: List[str],
-            admin: bool = False,
-            check: bool = True,
-            trace: bool = False):
+    def run(
+        self,
+        params: List[str],
+        admin: bool = False,
+        check: bool = True,
+        trace: bool = False,
+    ):
         stderr_output = ''
         caught_exc = None
         try:

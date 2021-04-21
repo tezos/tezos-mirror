@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type block_header_data = MBytes.t
+type block_header_data = bytes
 
 type block_header = {
   shell : Block_header.shell_header;
@@ -76,12 +76,12 @@ module Fitness = struct
   type error += Invalid_fitness2
 
   let int64_to_bytes i =
-    let b = MBytes.create 8 in
-    MBytes.set_int64 b 0 i ; b
+    let b = Bytes.make 8 '0' in
+    TzEndian.set_int64 b 0 i ; b
 
   let int64_of_bytes b =
-    if Compare.Int.(MBytes.length b <> 8) then fail Invalid_fitness2
-    else return (MBytes.get_int64 b 0)
+    if Compare.Int.(Bytes.length b <> 8) then fail Invalid_fitness2
+    else return (TzEndian.get_int64 b 0)
 
   let from_int64 fitness = [int64_to_bytes fitness]
 

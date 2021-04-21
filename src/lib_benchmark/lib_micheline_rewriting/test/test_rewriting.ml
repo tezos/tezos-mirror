@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Micheline
+    Invocation:   dune build @src/lib_benchmark/lib_micheline_rewriting/runtest_test_rewriting
+    Subject:      Rewriting
+*)
+
 open Tezos_micheline_rewriting
 open Tezos_protocol_alpha.Protocol
 
@@ -105,16 +112,6 @@ let rewrite_contract : Script_repr.expr -> Script_repr.expr =
     Micheline.map_node (fun _ -> Michelson.default_label) (fun h -> h) node
   in
   let focuses = Michelson_rewriter.all_matches pattern node in
-  Printf.printf "number of matches: %d\n%!" (List.length focuses) ;
-  List.iter
-    (fun path ->
-      Format.printf "context found: %s\n%!" (Michelson_path.to_string path))
-    focuses ;
-  (* let focuses = Michelson_pattern.focus_matches pattern matches in
-   * Printf.printf "number of focused matches: %d\n%!" (List.length focuses) ;
-   * List.iter (fun path ->
-   *     Printf.printf "focus found: %s\n%!" (Michelson_path.to_string path)
-   *   ) focuses ; *)
   match focuses with
   | [] ->
       assert false
@@ -234,29 +231,150 @@ let multisig_script : Script_repr.expr =
   | Error _err ->
       Stdlib.failwith "Error while parsing script"
 
-let _ =
-  Printf.printf "Original script:\n%!" ;
-  (* Michelson_v1_printer.print_expr Format.std_formatter multisig_script ; *)
+let original_script_oracle =
+  "{ parameter\n\
+  \    (pair (pair :payload\n\
+  \             (nat %counter)\n\
+  \             (or :action\n\
+  \                (pair :transfer (mutez %amount) (contract %dest unit))\n\
+  \                (or (option %delegate key_hash)\n\
+  \                    (pair %change_keys (nat %threshold) (list %keys key)))))\n\
+  \          (list %sigs (option signature))) ;\n\
+  \  storage (pair (nat %stored_counter) (pair (nat %threshold) (list %keys \
+   key))) ;\n\
+  \  code { UNPAIR ;\n\
+  \         SWAP ;\n\
+  \         DUP ;\n\
+  \         DIP { SWAP } ;\n\
+  \         DIP { UNPAIR ;\n\
+  \               DUP ;\n\
+  \               SELF ;\n\
+  \               ADDRESS ;\n\
+  \               PAIR ;\n\
+  \               PACK ;\n\
+  \               DIP { UNPAIR @counter ; DIP { SWAP } } ;\n\
+  \               SWAP } ;\n\
+  \         UNPAIR @stored_counter ;\n\
+  \         DIP { SWAP } ;\n\
+  \         { { COMPARE ; EQ } ; IF {} { { UNIT ; FAILWITH } } } ;\n\
+  \         DIP { SWAP } ;\n\
+  \         UNPAIR @threshold @keys ;\n\
+  \         DIP { PUSH @valid nat 0 ;\n\
+  \               SWAP ;\n\
+  \               ITER { DIP { SWAP } ;\n\
+  \                      SWAP ;\n\
+  \                      IF_CONS\n\
+  \                        { { IF_NONE\n\
+  \                              { SWAP ; DROP }\n\
+  \                              { SWAP ;\n\
+  \                                DIP { SWAP ;\n\
+  \                                      DIP 2 { DUP 2 } ;\n\
+  \                                      { DUP 3 ;\n\
+  \                                        DIP { CHECK_SIGNATURE } ;\n\
+  \                                        SWAP ;\n\
+  \                                        IF { DROP } { FAILWITH } } ;\n\
+  \                                      PUSH nat 1 ;\n\
+  \                                      ADD @valid } } } }\n\
+  \                        { { UNIT ; FAILWITH } } ;\n\
+  \                      SWAP } } ;\n\
+  \         { { COMPARE ; LE } ; IF {} { { UNIT ; FAILWITH } } } ;\n\
+  \         DROP ;\n\
+  \         DROP ;\n\
+  \         DIP { UNPAIR ; PUSH nat 1 ; ADD @new_counter ; PAIR } ;\n\
+  \         NIL operation ;\n\
+  \         SWAP ;\n\
+  \         IF_LEFT\n\
+  \           { UNPAIR ; UNIT ; TRANSFER_TOKENS ; CONS }\n\
+  \           { IF_LEFT\n\
+  \               { SET_DELEGATE ; CONS }\n\
+  \               { DIP { SWAP ; CAR } ; SWAP ; PAIR ; SWAP } } ;\n\
+  \         PAIR } }"
+
+let original_script =
   let script =
     Micheline_printer.printable
       Michelson_v1_primitives.string_of_prim
       multisig_script
   in
-  Micheline_printer.print_expr_unwrapped Format.std_formatter script ;
-  Printf.printf "\n%!"
+  Format.asprintf "%a" Micheline_printer.print_expr_unwrapped script
 
-let _ = Format.printf "Pattern: %a\n" Michelson_pattern.pp pattern
+let () = assert (original_script_oracle = original_script)
+
+let pattern_oracle = "Seq(_ :: _ :: _ :: [> [ADDRESS]([]) <] :: _)"
+
+let pattern = Format.asprintf "%a" Michelson_pattern.pp pattern
+
+let () = assert (pattern_oracle = pattern)
 
 (* let rewritten_original = update_contract_script multisig_script *)
 let rewritten_new = rewrite_contract multisig_script
 
-let _ =
-  Printf.printf "Rewritten script:\n%!" ;
-  (* Michelson_v1_printer.print_expr Format.std_formatter multisig_script ; *)
+let rewritten_script_oracle =
+  "{ parameter\n\
+  \    (pair (pair :payload\n\
+  \             (nat %counter)\n\
+  \             (or :action\n\
+  \                (pair :transfer (mutez %amount) (contract %dest unit))\n\
+  \                (or (option %delegate key_hash)\n\
+  \                    (pair %change_keys (nat %threshold) (list %keys key)))))\n\
+  \          (list %sigs (option signature))) ;\n\
+  \  storage (pair (nat %stored_counter) (pair (nat %threshold) (list %keys \
+   key))) ;\n\
+  \  code { UNPAIR ;\n\
+  \         SWAP ;\n\
+  \         DUP ;\n\
+  \         DIP { SWAP } ;\n\
+  \         DIP { UNPAIR ;\n\
+  \               DUP ;\n\
+  \               SELF ;\n\
+  \               { ADDRESS ; CHAIN_ID ; PAIR } ;\n\
+  \               PAIR ;\n\
+  \               PACK ;\n\
+  \               DIP { UNPAIR @counter ; DIP { SWAP } } ;\n\
+  \               SWAP } ;\n\
+  \         UNPAIR @stored_counter ;\n\
+  \         DIP { SWAP } ;\n\
+  \         { { COMPARE ; EQ } ; IF {} { { UNIT ; FAILWITH } } } ;\n\
+  \         DIP { SWAP } ;\n\
+  \         UNPAIR @threshold @keys ;\n\
+  \         DIP { PUSH @valid nat 0 ;\n\
+  \               SWAP ;\n\
+  \               ITER { DIP { SWAP } ;\n\
+  \                      SWAP ;\n\
+  \                      IF_CONS\n\
+  \                        { { IF_NONE\n\
+  \                              { SWAP ; DROP }\n\
+  \                              { SWAP ;\n\
+  \                                DIP { SWAP ;\n\
+  \                                      DIP 2 { DUP 2 } ;\n\
+  \                                      { DUP 3 ;\n\
+  \                                        DIP { CHECK_SIGNATURE } ;\n\
+  \                                        SWAP ;\n\
+  \                                        IF { DROP } { FAILWITH } } ;\n\
+  \                                      PUSH nat 1 ;\n\
+  \                                      ADD @valid } } } }\n\
+  \                        { { UNIT ; FAILWITH } } ;\n\
+  \                      SWAP } } ;\n\
+  \         { { COMPARE ; LE } ; IF {} { { UNIT ; FAILWITH } } } ;\n\
+  \         DROP ;\n\
+  \         DROP ;\n\
+  \         DIP { UNPAIR ; PUSH nat 1 ; ADD @new_counter ; PAIR } ;\n\
+  \         NIL operation ;\n\
+  \         SWAP ;\n\
+  \         IF_LEFT\n\
+  \           { UNPAIR ; UNIT ; TRANSFER_TOKENS ; CONS }\n\
+  \           { IF_LEFT\n\
+  \               { SET_DELEGATE ; CONS }\n\
+  \               { DIP { SWAP ; CAR } ; SWAP ; PAIR ; SWAP } } ;\n\
+  \         PAIR } }"
+
+let rewritten_script =
   let script =
     Micheline_printer.printable
       Michelson_v1_primitives.string_of_prim
       rewritten_new
   in
-  Micheline_printer.print_expr_unwrapped Format.std_formatter script ;
-  Printf.printf "\n%!"
+  Format.asprintf "%a" Micheline_printer.print_expr_unwrapped script
+
+(** Test that the rewritten script is as expected. *)
+let () = assert (rewritten_script_oracle = rewritten_script)

@@ -24,3 +24,5 @@
 (*****************************************************************************)
 
 include Pvss.PVSS
+
+val generate_keys : ?seed:Bytes.t -> unit -> Public_key.t * Secret_key.t

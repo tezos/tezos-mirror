@@ -274,12 +274,12 @@ let cursor_at_lwt cursor k acc f =
    the separator '/', which immediately precedes '0' *)
 let zero_char_str = String.make 1 (Char.chr (Char.code '/' + 1))
 
-let next_key_after_subdirs = function
+let next_key_after_subdirs l =
+  match List.rev l with
   | [] ->
       [zero_char_str]
-  | _ :: _ as path ->
-      List.sub path (List.length path - 1)
-      @ [List.last_exn path ^ zero_char_str]
+  | last :: firsts ->
+      List.rev @@ ((last ^ zero_char_str) :: firsts)
 
 module Hashtbl = Hashtbl.MakeSeeded (struct
   type t = string list

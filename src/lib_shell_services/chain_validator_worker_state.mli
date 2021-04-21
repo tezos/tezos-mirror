@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 module Request : sig
-  type view = Block_hash.t
+  type view = Hash of Block_hash.t | PeerId of P2p_peer.Id.t
 
   val encoding : view Data_encoding.encoding
 
@@ -50,6 +50,9 @@ module Event : sig
         level : Int32.t;
         timestamp : Time.Protocol.t;
       }
+    | Notify_branch of P2p_peer.Id.t
+    | Notify_head of P2p_peer.Id.t
+    | Disconnection of P2p_peer.Id.t
     | Could_not_switch_testchain of error list
     | Bootstrapped
     | Sync_status of synchronisation_status
@@ -59,6 +62,8 @@ module Event : sig
         max_head_time : Time.Protocol.t;
         most_recent_validation : Time.Protocol.t;
       }
+    | Request_failure of
+        Request.view * Worker_types.request_status * error list
 
   type view = t
 

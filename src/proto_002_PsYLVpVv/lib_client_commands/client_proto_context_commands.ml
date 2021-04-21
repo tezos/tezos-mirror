@@ -89,7 +89,7 @@ let commands () =
       (fun () (cctxt : Alpha_client_context.full) ->
         list_contract_labels cctxt ~chain:`Main ~block:cctxt#block
         >>=? fun contracts ->
-        Lwt_list.iter_s
+        List.iter_s
           (fun (alias, hash, kind) -> cctxt#message "%s%s%s" hash kind alias)
           contracts
         >>= fun () -> return_unit);
@@ -171,7 +171,7 @@ let commands () =
               let {Michelson_v1_parser.source} =
                 Michelson_v1_printer.unparse_toplevel code
               in
-              cctxt#answer "%a" Format.pp_print_text source >>= return ));
+              cctxt#answer "%s" source >>= return ));
     command
       ~group
       ~desc:"Get the manager of a contract."

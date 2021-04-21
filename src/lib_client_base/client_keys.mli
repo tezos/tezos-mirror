@@ -33,6 +33,8 @@ type sk_uri = private Uri.t
 
 type sapling_uri = private Uri.t
 
+type pvss_sk_uri = private Uri.t
+
 val pk_uri_parameter : unit -> (pk_uri, 'a) Clic.parameter
 
 val pk_uri_param :
@@ -70,6 +72,11 @@ type sapling_key = {
 }
 
 module Sapling_key : Client_aliases.Alias with type t = sapling_key
+
+module PVSS_public_key :
+  Client_aliases.Alias with type t = Pvss_secp256k1.Public_key.t
+
+module PVSS_secret_key : Client_aliases.Alias with type t = pvss_sk_uri
 
 module Logging : sig
   val tag : string Tag.def
@@ -229,3 +236,5 @@ val make_pk_uri : Uri.t -> pk_uri tzresult Lwt.t
 val make_sk_uri : Uri.t -> sk_uri tzresult Lwt.t
 
 val make_sapling_uri : Uri.t -> sapling_uri
+
+val make_pvss_sk_uri : Uri.t -> pvss_sk_uri tzresult Lwt.t

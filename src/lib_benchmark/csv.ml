@@ -46,7 +46,13 @@ let concat (csv1 : csv) (csv2 : csv) : csv =
     else if not (all_equal lengths2) then
       let msg = "Csv.concat: first argument has uneven # of lines" in
       Stdlib.failwith msg
-    else List.map2 (fun line1 line2 -> line1 @ line2) csv1 csv2
+    else
+      List.map2
+        ~when_different_lengths:()
+        (fun line1 line2 -> line1 @ line2)
+        csv1
+        csv2
+      |> (* see top if condition *) WithExceptions.Result.get_ok ~loc:__LOC__
 
 let export ~filename ?(separator = ',') ?(linebreak = '\n') (data : csv) =
   Format.eprintf "Exporting to %s@." filename ;
@@ -104,8 +110,7 @@ let append_columns ~filename ?(separator = ',') ?(linebreak = '\n')
     with Sys_error _ | Empty_csv_file ->
       (* If the target file does not exist or is empty, we create a dummy
          CSV matrix with the expected dimensions. *)
-      let length_data = List.length data in
-      List.init length_data (fun _ -> [])
+      List.map (fun _ -> []) data
   in
   let csv_data = concat file_data data in
   export ~filename ~separator ~linebreak csv_data

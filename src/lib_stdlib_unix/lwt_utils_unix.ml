@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -135,8 +136,13 @@ let safe_close fd =
     (fun () -> Lwt_unix.close fd >>= fun () -> return_unit)
     (fun exc -> fail (Exn exc))
 
-let create_file ?(perm = 0o644) name content =
-  Lwt_unix.openfile name Unix.[O_TRUNC; O_CREAT; O_WRONLY] perm
+let create_file ?(close_on_exec = true) ?(perm = 0o644) name content =
+  let flags =
+    let open Unix in
+    let flags = [O_TRUNC; O_CREAT; O_WRONLY] in
+    if close_on_exec then O_CLOEXEC :: flags else flags
+  in
+  Lwt_unix.openfile name flags perm
   >>= fun fd ->
   Lwt.try_bind
     (fun () -> Lwt_unix.write_string fd content 0 (String.length content))
@@ -243,3 +249,60 @@ let rec retry ?(log = fun _ -> Lwt.return_unit) ?(n = 5) ?(sleep = 1.) f =
         >>= fun () ->
         Lwt_unix.sleep sleep >>= fun () -> retry ~log ~n:(n - 1) ~sleep f
       else Lwt.return x
+
+type 'action io_error = {
+  action : 'action;
+  unix_code : Unix.error;
+  caller : string;
+  arg : string;
+}
+
+let with_open_file ~flags ?(perm = 0o640) filename task =
+  Lwt.catch
+    (fun () ->
+      Lwt_unix.openfile filename flags perm >>= fun x -> Lwt.return (Ok x))
+    (function
+      | Unix.Unix_error (unix_code, caller, arg) ->
+          Lwt.return (Error {action = `Open; unix_code; caller; arg})
+      | exn ->
+          raise exn)
+  >>= function
+  | Error _ as x ->
+      Lwt.return x
+  | Ok fd ->
+      task fd
+      >>= fun res ->
+      Lwt.catch
+        (fun () -> Lwt_unix.close fd >>= fun () -> return res)
+        (function
+          | Unix.Unix_error (unix_code, caller, arg) ->
+              Lwt.return (Error {action = `Close; unix_code; caller; arg})
+          | exn ->
+              raise exn)
+
+let with_open_out ?(overwrite = true) file task =
+  let flags =
+    let open Unix in
+    if overwrite then [O_WRONLY; O_CREAT; O_TRUNC; O_CLOEXEC]
+    else [O_WRONLY; O_CREAT; O_CLOEXEC]
+  in
+  with_open_file ~flags file task
+
+let with_open_in file task =
+  with_open_file ~flags:[O_RDONLY; O_CLOEXEC] file task
+
+(* This is to avoid file corruption *)
+let with_atomic_open_out ?(overwrite = true) ?temp_dir filename f =
+  let temp_file =
+    Filename.temp_file ?temp_dir (Filename.basename filename) ".tmp"
+  in
+  with_open_out ~overwrite temp_file f
+  >>=? fun res ->
+  Lwt.catch
+    (fun () ->
+      Lwt_unix.rename temp_file filename >>= fun () -> Lwt.return (Ok res))
+    (function
+      | Unix.Unix_error (unix_code, caller, arg) ->
+          Lwt.return (Error {action = `Rename; unix_code; caller; arg})
+      | exn ->
+          raise exn)

@@ -57,6 +57,23 @@ let of_string_exn str =
   | Some t ->
       t
 
+let of_string str =
+  try Ok (of_string_exn str) with
+  | Invalid_argument s ->
+      Error s
+  | Failure s ->
+      Error s
+  | _ ->
+      Error "P2p_point.of_string"
+
 let to_string saddr = Format.asprintf "%a" pp saddr
+
+let rpc_arg =
+  RPC_arg.make
+    ~name:"addr"
+    ~descr:"A network address (ipv4 or [ipv6])."
+    ~destruct:of_string
+    ~construct:to_string
+    ()
 
 let () = Data_encoding.Registration.register ~pp encoding

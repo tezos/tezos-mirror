@@ -66,7 +66,7 @@ only to bake for increasing levels.
 This prevents signing blocks at levels below the latest
 block signed.
 
-If you have tried the app on some network (Zeronet, Mainnet,...) and want to
+If you have tried the app on some network and want to
 use it on another network you might need to reset this level with the command::
 
    tezos-client setup ledger to bake for my_ledger

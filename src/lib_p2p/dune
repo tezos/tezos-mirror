@@ -7,11 +7,11 @@
             tezos-base
             tezos-stdlib
             tezos-stdlib-unix
-	    tezos-p2p-services)
+            tezos-p2p-services)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib
-		   -open Tezos_p2p_services)))
+                   -open Tezos_p2p_services)))
 
 (rule
  (alias runtest_lint)

@@ -59,7 +59,7 @@ let commands () =
       (fun () (cctxt : Alpha_client_context.full) ->
         list_contracts cctxt
         >>=? fun contracts ->
-        iter_s
+        List.iter_es
           (fun (prefix, alias, contract) ->
             cctxt#message
               "%s%s: %s"

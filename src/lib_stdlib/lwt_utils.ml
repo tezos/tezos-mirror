@@ -25,8 +25,6 @@
 
 open Lwt.Infix
 
-let may ~f = Option.fold ~none:Lwt.return_unit ~some:f
-
 let never_ending () = fst (Lwt.wait ())
 
 (* A worker launcher, takes a cancel callback to call upon *)

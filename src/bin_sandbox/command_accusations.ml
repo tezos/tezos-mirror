@@ -317,7 +317,7 @@ let find_endorsement_in_mempool state ~client =
           Jqo.field o ~k:"contents"
           |> Jqo.list_exists ~f:(fun op ->
                  (* Dbg.e EF.(ef_json "op" op) ; *)
-                 Jqo.field op ~k:"kind" = `String "endorsement"))
+                 Jqo.field op ~k:"kind" = `String "endorsement_with_slot"))
       >>= function
       | None ->
           return (`Not_done (sprintf "No endorsement so far"))
@@ -417,20 +417,14 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
   >>= fun head_hash_json ->
   let double_endorsement =
     let transform_endorsement endorsement =
-      let branch = Jqo.field ~k:"branch" endorsement in
-      let signature = Jqo.field ~k:"signature" endorsement in
-      let contents =
-        match Jqo.field ~k:"contents" endorsement with
-        | `A [one] ->
-            one
-        | _ ->
-            assert false
-      in
-      `O
-        [("branch", branch); ("operations", contents); ("signature", signature)]
+      match Jqo.field ~k:"contents" endorsement with
+      | `A [one] ->
+          (Jqo.field ~k:"endorsement" one, Jqo.field ~k:"slot" one)
+      | _ ->
+          assert false
     in
-    let inlined_endorsement_1 = transform_endorsement endorsement_0 in
-    let inlined_endorsement_2 = transform_endorsement endorsement_1 in
+    let (inlined_endorsement_1, slot) = transform_endorsement endorsement_0 in
+    let (inlined_endorsement_2, _) = transform_endorsement endorsement_1 in
     `O
       [ ("branch", head_hash_json);
         ( "contents",
@@ -438,7 +432,8 @@ let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
             [ `O
                 [ ("kind", `String "double_endorsement_evidence");
                   ("op1", inlined_endorsement_1);
-                  ("op2", inlined_endorsement_2) ] ] ) ]
+                  ("op2", inlined_endorsement_2);
+                  ("slot", slot) ] ] ) ]
   in
   Interactive_test.Pauser.generic
     state

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -86,7 +86,7 @@ type config = {
   discovery_addr : Ipaddr.V4.t option;
       (** When local peer discovery is enabled, precise on which
       IP address messages are broadcast (default: [255.255.255.255]). *)
-  trusted_points : P2p_point.Id.t list;
+  trusted_points : (P2p_point.Id.t * P2p_peer.Id.t option) list;
       (** List of hard-coded known peers to bootstrap the network from. *)
   peers_file : string;
       (** The path to the JSON file where the metadata associated to
@@ -139,6 +139,12 @@ type limits = {
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
       (** Optional limitation of internal hashtables (max, target) *)
+  peer_greylist_size : int;
+      (** The number of peer_ids kept in the peer_id greylist. *)
+  ip_greylist_size_in_kilobytes : int;
+      (** The size of the IP address greylist in kilobytes. *)
+  ip_greylist_cleanup_delay : Time.System.Span.t;
+      (** The time an IP address is kept in the greylist. *)
   swap_linger : Time.System.Span.t;
       (** Peer swapping does not occur more than once during a timespan of
       [swap_linger]. *)

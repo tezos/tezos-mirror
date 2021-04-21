@@ -229,7 +229,7 @@ let cast_cost_to_z (c : Alpha_context.Gas.cost) : Z.t =
   |> Data_encoding.Binary.of_bytes_exn Data_encoding.z
 
 let check_cost_reprs_are_all_positive list () =
-  iter_s
+  List.iter_es
     (fun (cost_name, cost) ->
       if Z.gt cost Z.zero then return_unit
       else if Z.equal cost Z.zero && List.mem cost_name free then return_unit
@@ -246,19 +246,19 @@ let check_costs_are_all_positive list () =
   check_cost_reprs_are_all_positive list ()
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "Positivity of interpreter costs"
       `Quick
       (check_costs_are_all_positive all_interpreter_costs);
-    Test.tztest
+    Test_services.tztest
       "Positivity of typechecking costs"
       `Quick
       (check_costs_are_all_positive all_parsing_costs);
-    Test.tztest
+    Test_services.tztest
       "Positivity of unparsing costs"
       `Quick
       (check_costs_are_all_positive all_unparsing_costs);
-    Test.tztest
+    Test_services.tztest
       "Positivity of io costs"
       `Quick
       (check_cost_reprs_are_all_positive all_io_costs) ]

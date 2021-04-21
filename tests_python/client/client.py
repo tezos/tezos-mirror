@@ -3,21 +3,13 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
-import sys
 from typing import Any, List, Optional, Tuple
 
+from process.process_utils import format_command
 from . import client_output
-
-
-def format_command(cmd: List[str]) -> str:
-    # TODO the displayed command may not be 'shell' ready, for instance
-    # Michelson string parameters may requires additional quotes
-    color_code = '\033[34m'
-    endc = '\033[0m'
-    cmd_str = " ".join(cmd)
-    return f'{color_code}# {cmd_str}{endc}'
 
 
 class Client:
@@ -41,16 +33,18 @@ class Client:
           - this works for the current tests but should be more generic
     """
 
-    def __init__(self,
-                 client_path: str,
-                 admin_client_path: str,
-                 host: Optional[str] = None,
-                 base_dir: Optional[str] = None,
-                 rpc_port: Optional[int] = None,
-                 use_tls: Optional[bool] = None,
-                 endpoint: Optional[str] = 'http://127.0.0.1:8732',
-                 disable_disclaimer: bool = True,
-                 mode: str = None):
+    def __init__(
+        self,
+        client_path: str,
+        admin_client_path: str,
+        host: Optional[str] = None,
+        base_dir: Optional[str] = None,
+        rpc_port: Optional[int] = None,
+        use_tls: Optional[bool] = None,
+        endpoint: Optional[str] = 'http://127.0.0.1:8732',
+        disable_disclaimer: bool = True,
+        mode: str = None,
+    ):
         """
         Args:
             client (str): path to the client executable file
@@ -63,15 +57,18 @@ class Client:
             use_tls (bool): use TLS
             endpoint (str): the RPC endpoint
             disable_disclaimer (bool): disable disclaimer
-            mode (str): the mode to use, one of "client" or "mockup"
+            mode (str): the mode to use, one of "client", "mockup", or
+                        "proxy", default=None (equivalent to "client").
         Returns:
             A Client instance.
         """
         assert os.path.isfile(client_path), f"{client_path} is not a file"
-        assert os.path.isfile(admin_client_path), (f"{admin_client_path} is "
-                                                   f"not a file")
-        assert base_dir is None or os.path.isdir(base_dir), (f'{base_dir} not '
-                                                             f'a dir')
+        assert os.path.isfile(admin_client_path), (
+            f"{admin_client_path} is " f"not a file"
+        )
+        assert base_dir is None or os.path.isdir(base_dir), (
+            f'{base_dir} not ' f'a dir'
+        )
 
         self.host = host
         self._disable_disclaimer = disable_disclaimer
@@ -97,9 +94,14 @@ class Client:
             client.extend(connectivity_options)
         elif mode == "mockup":
             client.extend(['-mode', mode])
+        elif mode == "proxy":
+            client.extend(['-mode', mode])
+            client.extend(connectivity_options)
         else:
-            msg = f"Unexpected mode: {mode}." + \
-                  "Expected one of 'client' or 'mockup'."
+            msg = (
+                f"Unexpected mode: {mode}."
+                + "Expected one of 'client', 'mockup', or 'proxy'."
+            )
             assert False, msg
         admin_client = [admin_client_path, '-base-dir', base_dir]
 
@@ -109,13 +111,15 @@ class Client:
         self._admin_client = admin_client
         self.rpc_port = rpc_port
 
-    def run_generic(self,
-                    params: List[str],
-                    admin: bool = False,
-                    check: bool = True,
-                    trace: bool = False,
-                    stdin: str = "",
-                    ) -> Tuple[str, str, int]:
+    def run_generic(
+        self,
+        params: List[str],
+        admin: bool = False,
+        check: bool = True,
+        trace: bool = False,
+        stdin: str = "",
+        env_change: dict = None,
+    ) -> Tuple[str, str, int]:
         """Run an arbitrary command
 
         Args:
@@ -126,6 +130,7 @@ class Client:
             trace (bool): use '-l' option to trace RPCs
             stdin (string): string that will be passed as standard
                             input to the process
+            env_change (dict): overrides to environment variables
         Returns:
             (stdout of command, stderr of command, return code)
 
@@ -140,11 +145,17 @@ class Client:
         print(format_command(cmd))
 
         new_env = os.environ.copy()
+        if env_change is not None:
+            new_env.update(env_change)
         if self._disable_disclaimer:
             new_env["TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER"] = "Y"
         process = subprocess.Popen(
-            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, env=new_env)
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=new_env,
+        )
         outstream, errstream = process.communicate(input=stdin.encode())
         stdout = outstream.decode('utf-8')
         stderr = errstream.decode('utf-8')
@@ -155,29 +166,30 @@ class Client:
         if check:
             if process.returncode != 0:
                 raise subprocess.CalledProcessError(
-                    process.returncode, cmd, stdout, stderr)
+                    process.returncode, cmd, stdout, stderr
+                )
         # `+ ""` makes pylint happy. It can't infer stdout/stderr can't
         # be `None` thanks to the `capture_output=True` option.
         return (stdout + "", stderr + "", process.returncode)
 
-    def run(self,
-            params: List[str],
-            admin: bool = False,
-            check: bool = True,
-            trace: bool = False) -> str:
+    def run(
+        self,
+        params: List[str],
+        admin: bool = False,
+        check: bool = True,
+        trace: bool = False,
+    ) -> str:
         """Like 'run_generic' but returns just stdout."""
         (stdout, _, _) = self.run_generic(params, admin, check, trace)
         return stdout
 
-    def rpc(self,
-            verb: str,
-            path: str,
-            data: Any = None,
-            params: List[str] = None) -> Any:
+    def rpc(
+        self, verb: str, path: str, data: Any = None, params: List[str] = None
+    ) -> Any:
         """Run an arbitrary RPC command
 
         Args:
-            verb (str): either `get`, `post` or `put`
+            verb (str): either `get`, `post`, `put`, `patch` or `delete`
             path (str): rpc path
             data (dict): json data for post
             params (list): any additional parameters to pass to the client
@@ -187,7 +199,7 @@ class Client:
 
         See `run` for more details.
         """
-        assert verb in {'put', 'get', 'post'}
+        assert verb in {'put', 'get', 'post', 'delete', 'patch'}
         params = [] if params is None else params
         params = params + ['rpc', verb, path]
         if data is not None:
@@ -195,8 +207,9 @@ class Client:
         compl_pr = self.run(params)
         return client_output.extract_rpc_answer(compl_pr)
 
-    def remember_contract(self, alias: str, contract_address: str,
-                          force: bool = False):
+    def remember_contract(
+        self, alias: str, contract_address: str, force: bool = False
+    ):
         params = ["remember", "contract", alias, contract_address]
         if force:
             params.append("--force")
@@ -206,28 +219,48 @@ class Client:
         assert os.path.isfile(contract), f'{contract} is not a file'
         return self.run(['remember', 'script', alias, f'file:{contract}'])
 
-    def typecheck(self, contract: str, file: bool = True) -> str:
+    def typecheck(self, contract: str, file: bool = True, legacy=False) -> str:
         if file:
             assert os.path.isfile(contract), f'{contract} is not a file'
-        return self.run(['typecheck', 'script', contract])
+        params = ['typecheck', 'script', contract]
+        if legacy:
+            params += ['--legacy']
+        return self.run(params)
 
-    def typecheck_data(self, data: str, typ: str) -> str:
-        return self.run(['typecheck', 'data', data, 'against', 'type', typ])
+    def typecheck_data(self, data: str, typ: str, legacy=False) -> str:
+        params = ['typecheck', 'data', data, 'against', 'type', typ]
+        if legacy:
+            params += ['--legacy']
+        return self.run(params)
 
-    def run_script(self,
-                   contract: str,
-                   storage: str,
-                   inp: str,
-                   amount: float = None,
-                   trace_stack: bool = False,
-                   gas: int = None,
-                   file: bool = True) -> client_output.RunScriptResult:
+    def run_script(
+        self,
+        contract: str,
+        storage: str,
+        inp: str,
+        amount: float = None,
+        balance: float = None,
+        trace_stack: bool = False,
+        gas: int = None,
+        file: bool = True,
+    ) -> client_output.RunScriptResult:
         if file:
             assert os.path.isfile(contract), f'{contract} is not a file'
-        cmd = ['run', 'script', contract, 'on', 'storage', storage, 'and',
-               'input', inp]
+        cmd = [
+            'run',
+            'script',
+            contract,
+            'on',
+            'storage',
+            storage,
+            'and',
+            'input',
+            inp,
+        ]
         if amount is not None:
-            cmd += ['-z', str(amount)]
+            cmd += ['-z', '%.6f' % amount]
+        if balance is not None:
+            cmd += ['--balance', '%.6f' % balance]
         if trace_stack:
             cmd += ['--trace-stack']
         if gas is not None:
@@ -251,23 +284,23 @@ class Client:
         output = self.run(cmd)
         assert not output
 
-    def show_address(self,
-                     name: str,
-                     show_secret: bool = False
-                     ) -> client_output.ShowAddressResult:
+    def show_address(
+        self, name: str, show_secret: bool = False
+    ) -> client_output.ShowAddressResult:
         cmd = ['show', 'address', name]
         if show_secret:
             cmd += ['--show-secret']
         return client_output.ShowAddressResult(self.run(cmd))
 
-    def activate_protocol(self,
-                          protocol: str,
-                          parameter_file: str,
-                          fitness: str = '1',
-                          key: str = 'activator',
-                          timestamp: str = None,
-                          delay: datetime.timedelta = None,
-                          ) -> client_output.ActivationResult:
+    def activate_protocol(
+        self,
+        protocol: str,
+        parameter_file: str,
+        fitness: str = '1',
+        key: str = 'activator',
+        timestamp: str = None,
+        delay: datetime.timedelta = None,
+    ) -> client_output.ActivationResult:
         assert os.path.isfile(parameter_file), f'{parameter_file} not a file'
         if timestamp is None:
             if delay is None:
@@ -275,27 +308,44 @@ class Client:
             utc_now = datetime.datetime.utcnow() - delay
             timestamp = utc_now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        cmd = ['-block', 'genesis', 'activate', 'protocol', protocol, 'with',
-               'fitness', str(fitness), 'and', 'key', key, 'and', 'parameters',
-               parameter_file, '--timestamp', timestamp]
+        cmd = [
+            '-block',
+            'genesis',
+            'activate',
+            'protocol',
+            protocol,
+            'with',
+            'fitness',
+            str(fitness),
+            'and',
+            'key',
+            key,
+            'and',
+            'parameters',
+            parameter_file,
+            '--timestamp',
+            timestamp,
+        ]
         return client_output.ActivationResult(self.run(cmd))
 
-    def activate_protocol_json(self,
-                               protocol: str,
-                               parameters: dict,
-                               fitness: str = '1',
-                               key: str = 'activator',
-                               timestamp: str = None,
-                               delay: datetime.timedelta = None,
-                               ) -> client_output.ActivationResult:
+    def activate_protocol_json(
+        self,
+        protocol: str,
+        parameters: dict,
+        fitness: str = '1',
+        key: str = 'activator',
+        timestamp: str = None,
+        delay: datetime.timedelta = None,
+    ) -> client_output.ActivationResult:
         if delay is None:
             delay = datetime.timedelta(seconds=0)
         with tempfile.NamedTemporaryFile(mode='w+', delete=False) as params:
             param_json = json.dumps(parameters)
             params.write(param_json)
             params.close()
-            return self.activate_protocol(protocol, params.name, fitness,
-                                          key, timestamp, delay)
+            return self.activate_protocol(
+                protocol, params.name, fitness, key, timestamp, delay
+            )
 
     def show_voting_period(self) -> str:
         return self.run(['show', 'voting', 'period'])
@@ -312,27 +362,46 @@ class Client:
     def untrust_peer(self, port: int) -> dict:
         return self.rpc('get', f'/network/points/127.0.0.1:{port}/untrust')
 
+    def get_expected_peer_id(self, port: int) -> dict:
+        path = f'/network/points/127.0.0.1:{port}'
+        return self.rpc('get', path)["expected_peer_id"]
+
+    def set_expected_peer_id(self, port: int, peer_id) -> dict:
+        path = f'/network/points/127.0.0.1:{port}'
+        return self.rpc('patch', path, data={"peer_id": peer_id})
+
     def endorse(self, account: str) -> client_output.EndorseResult:
         res = self.run(['endorse', 'for', account])
         return client_output.EndorseResult(res)
 
-    def bake(self,
-             account: str,
-             args: List[str] = None) -> client_output.BakeForResult:
+    def bake(
+        self, account: str, args: List[str] = None
+    ) -> client_output.BakeForResult:
         cmd = ['bake', 'for', account]
         if args is None:
             args = []
         cmd += args
         return client_output.BakeForResult(self.run(cmd))
 
-    def originate(self,
-                  contract_name: str,
-                  amount: float,
-                  sender: str,
-                  contract: str,
-                  args: List[str] = None) -> client_output.OriginationResult:
-        cmd = ['originate', 'contract', contract_name, 'transferring',
-               str(amount), 'from', sender, 'running', contract]
+    def originate(
+        self,
+        contract_name: str,
+        amount: float,
+        sender: str,
+        contract: str,
+        args: List[str] = None,
+    ) -> client_output.OriginationResult:
+        cmd = [
+            'originate',
+            'contract',
+            contract_name,
+            'transferring',
+            str(amount),
+            'from',
+            sender,
+            'running',
+            contract,
+        ]
         if args is None:
             args = []
         cmd += args
@@ -369,28 +438,55 @@ class Client:
         cmd = ['normalize', 'type', typ]
         return self.run(cmd)
 
-    def sign(self, data: str, identity: str) -> str:
-        cmd = ['sign', 'bytes', data, 'for', identity]
-        return client_output.SignatureResult(self.run(cmd)).sig
-
-    def activate_account(self,
-                         manager: str,
-                         contract: str):
+    def activate_account(self, manager: str, contract: str):
         cmd = ['activate', 'account', manager, 'with', contract]
         return self.run(cmd)
 
-    def cmd_batch(self,
-                  source: str,
-                  json_ops: str) -> List[str]:
+    def cmd_batch(self, source: str, json_ops: str) -> List[str]:
         return ['multiple', 'transfers', 'from', source, 'using', json_ops]
 
-    def transfer(self,
-                 amount: float,
-                 giver: str,
-                 receiver: str,
-                 args: List[str] = None,
-                 chain: str = None
-                 ) -> client_output.TransferResult:
+    def sign_message(self, data: str, identity: str, block=None) -> str:
+        cmd = ['sign', 'message', data, 'for', identity]
+        if block is not None:
+            cmd += ["--block", block]
+        return client_output.SignMessageResult(self.run(cmd)).signature
+
+    def check_message(self, data: str, identity: str, signature: str) -> bool:
+        cmd = [
+            'check',
+            'that',
+            'message',
+            data,
+            'was',
+            'signed',
+            'by',
+            identity,
+            'to',
+            'produce',
+            signature,
+        ]
+        return client_output.CheckSignMessageResult(self.run(cmd)).check
+
+    def reveal(
+        self,
+        account: str,
+        args: List[str] = None,
+    ) -> client_output.RevealResult:
+        cmd = ['reveal', 'key', 'for', account]
+        if args is None:
+            args = []
+        cmd += args
+        res = self.run(cmd)
+        return client_output.RevealResult(res)
+
+    def transfer(
+        self,
+        amount: float,
+        giver: str,
+        receiver: str,
+        args: List[str] = None,
+        chain: str = None,
+    ) -> client_output.TransferResult:
         cmd = ['transfer', str(amount), 'from', giver, 'to', receiver]
         if chain is not None:
             cmd = ['--chain', chain] + cmd
@@ -401,11 +497,9 @@ class Client:
         res = self.run(cmd)
         return client_output.TransferResult(res)
 
-    def transfer_json(self,
-                      amount: int,
-                      giver: str,
-                      receiver: str,
-                      args: List[str] = None) -> client_output.TransferResult:
+    def transfer_json(
+        self, amount: int, giver: str, receiver: str, args: List[str] = None
+    ) -> client_output.TransferResult:
         json_obj = [{"destination": receiver, "amount": str(amount)}]
         json_ops = json.dumps(json_obj, separators=(',', ':'))
         if args is None:
@@ -414,10 +508,9 @@ class Client:
         res = self.run(cmd)
         return client_output.TransferResult(res)
 
-    def call(self,
-             source: str,
-             destination: str,
-             args: List[str] = None) -> client_output.TransferResult:
+    def call(
+        self, source: str, destination: str, args: List[str] = None
+    ) -> client_output.TransferResult:
         cmd = ['call', destination, 'from', source]
         if args is None:
             args = []
@@ -425,11 +518,9 @@ class Client:
         res = self.run(cmd)
         return client_output.TransferResult(res)
 
-    def set_delegate(self,
-                     account1: str,
-                     account2: str,
-                     args: List[str] = None
-                     ) -> client_output.SetDelegateResult:
+    def set_delegate(
+        self, account1: str, account2: str, args: List[str] = None
+    ) -> client_output.SetDelegateResult:
         cmd = ['set', 'delegate', 'for', account1, 'to', account2]
         if args is None:
             args = []
@@ -437,10 +528,9 @@ class Client:
         res = self.run(cmd)
         return client_output.SetDelegateResult(res)
 
-    def get_delegate(self,
-                     account1: str,
-                     args: List[str] = None
-                     ) -> client_output.GetDelegateResult:
+    def get_delegate(
+        self, account1: str, args: List[str] = None
+    ) -> client_output.GetDelegateResult:
         cmd = ['get', 'delegate', 'for', account1]
         if args is None:
             args = []
@@ -449,19 +539,21 @@ class Client:
         return client_output.GetDelegateResult(res)
 
     def get_contract_entrypoint_type(
-            self,
-            entrypoint: str,
-            contract_name: str) \
-            -> client_output .GetContractEntrypointTypeResult:
-        cmd = ['get', 'contract', 'entrypoint', 'type',
-               'of', entrypoint,
-               'for', contract_name]
+        self, entrypoint: str, contract_name: str
+    ) -> client_output.GetContractEntrypointTypeResult:
+        cmd = [
+            'get',
+            'contract',
+            'entrypoint',
+            'type',
+            'of',
+            entrypoint,
+            'for',
+            contract_name,
+        ]
         return client_output.GetContractEntrypointTypeResult(self.run(cmd))
 
-    def withdraw_delegate(
-            self,
-            account1: str,
-            args: List[str] = None) -> str:
+    def withdraw_delegate(self, account1: str, args: List[str] = None) -> str:
         cmd = ['withdraw', 'delegate', 'from', account1]
         if args is None:
             args = []
@@ -482,21 +574,32 @@ class Client:
 
     def get_mutez_balance(self, account) -> float:
         res = self.run(['get', 'balance', 'for', account])
-        return int(client_output.extract_balance(res)*1000000)
+        return int(client_output.extract_balance(res) * 1000000)
 
     def get_timestamp(self) -> str:
         res = self.run(['get', 'timestamp'])
         return res[:-1]
 
+    def get_block_timestamp(
+        self, params: List[str] = None, chain: str = 'main', block: str = 'head'
+    ) -> datetime.datetime:
+        assert chain in {'main', 'test'}
+        rpc_res = self.rpc(
+            'get', f'/chains/{chain}/blocks/{block}/header/shell', params=params
+        )
+        timestamp = rpc_res['timestamp']
+
+        rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
+        timestamp_date = datetime.datetime.strptime(timestamp, rfc3399_format)
+        timestamp_date = timestamp_date.replace(tzinfo=datetime.timezone.utc)
+
+        return timestamp_date
+
     def get_now(self) -> str:
         """Returns the timestamp of next-to-last block,
         offset by time_between_blocks"""
-        rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
-        timestamp = self.rpc(
-            'get', '/chains/main/blocks/head~1/header'
-            )['timestamp']
-        timestamp_date = datetime.datetime.strptime(timestamp, rfc3399_format)
-        timestamp_date = timestamp_date.replace(tzinfo=datetime.timezone.utc)
+
+        timestamp_date = self.get_block_timestamp(block='head~1')
 
         constants = self.rpc(
             'get', '/chains/main/blocks/head/context/constants'
@@ -507,11 +610,12 @@ class Client:
 
         now_date = timestamp_date + delta
 
+        rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
         return now_date.strftime(rfc3399_format)
 
-    def get_receipt(self,
-                    operation: str,
-                    args: List[str] = None) -> client_output.GetReceiptResult:
+    def get_receipt(
+        self, operation: str, args: List[str] = None
+    ) -> client_output.GetReceiptResult:
         cmd = ['get', 'receipt', 'for', operation]
         if args is None:
             args = []
@@ -531,14 +635,19 @@ class Client:
 
     def mempool_is_empty(self) -> bool:
         rpc_res = self.rpc('get', '/chains/main/mempool/pending_operations')
-        return rpc_res['applied'] == [] and \
-            rpc_res['refused'] == [] and \
-            rpc_res['branch_refused'] == [] and \
-            rpc_res['branch_delayed'] == [] and \
-            rpc_res['unprocessed'] == []
+        return (
+            rpc_res['applied'] == []
+            and rpc_res['refused'] == []
+            and rpc_res['branch_refused'] == []
+            and rpc_res['branch_delayed'] == []
+            and rpc_res['unprocessed'] == []
+        )
 
     def get_head(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head')
+
+    def get_header(self, block='head') -> dict:
+        return self.rpc('get', f'/chains/main/blocks/{block}/header')
 
     def get_block(self, block_hash) -> dict:
         return self.rpc('get', f'/chains/main/blocks/{block_hash}')
@@ -553,17 +662,25 @@ class Client:
         return self.run(['show', 'known', 'contract', contract]).strip()
 
     def get_known_addresses(self) -> client_output.GetAddressesResult:
-        return client_output.GetAddressesResult(self.run(
-            ['list', 'known', 'addresses']
-        ))
+        return client_output.GetAddressesResult(
+            self.run(['list', 'known', 'addresses'])
+        )
+
+    def get_current_period(self) -> dict:
+        return self.rpc('get', 'chains/main/blocks/head/votes/current_period')
 
     def get_current_period_kind(self) -> dict:
-        return self.rpc('get',
-                        'chains/main/blocks/head/votes/current_period_kind')
+        return self.rpc(
+            'get', 'chains/main/blocks/head/votes/current_period_kind'
+        )
+
+    def get_succ_period(self) -> dict:
+        return self.rpc('get', 'chains/main/blocks/head/votes/successor_period')
 
     def get_current_proposal(self) -> dict:
-        return self.rpc('get',
-                        '/chains/main/blocks/head/votes/current_proposal')
+        return self.rpc(
+            'get', '/chains/main/blocks/head/votes/current_proposal'
+        )
 
     def get_current_quorum(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head/votes/current_quorum')
@@ -574,9 +691,12 @@ class Client:
     def get_proposals(self) -> dict:
         return self.rpc('get', '/chains/main/blocks/head/votes/proposals')
 
-    def get_metadata(self, params: List[str] = None) -> dict:
-        return self.rpc('get', '/chains/main/blocks/head/metadata',
-                        params=params)
+    def get_metadata(
+        self, params: List[str] = None, chain: str = 'main', block: str = 'head'
+    ) -> dict:
+        return self.rpc(
+            'get', f'/chains/{chain}/blocks/{block}/metadata', params=params
+        )
 
     def get_protocol(self, params: List[str] = None) -> str:
         metadata = self.get_metadata(params=params)
@@ -586,15 +706,25 @@ class Client:
         metadata = self.get_metadata(params=params)
         return metadata['next_protocol']
 
+    def get_current_level(self, offset=0) -> dict:
+        return self.rpc(
+            'get',
+            '/chains/main/blocks/head/helpers/current_level'
+            + '?offset='
+            + str(offset),
+        )
+
     def get_period_position(self) -> str:
-        rpc_res = self.rpc(
-            'get', '/chains/main/blocks/head/helpers/current_level?offset=1')
+        rpc_res = self.get_current_level(offset=1)
         return rpc_res['voting_period_position']
 
-    def get_level(self, params: List[str] = None, chain: str = 'main') -> int:
+    def get_level(
+        self, params: List[str] = None, chain: str = 'main', block: str = 'head'
+    ) -> int:
         assert chain in {'main', 'test'}
-        rpc_res = self.rpc('get', f'/chains/{chain}/blocks/head/header/shell',
-                           params=params)
+        rpc_res = self.rpc(
+            'get', f'/chains/{chain}/blocks/{block}/header/shell', params=params
+        )
         return int(rpc_res['level'])
 
     def get_checkpoint(self) -> dict:
@@ -609,11 +739,13 @@ class Client:
         rpc_res = self.get_checkpoint()
         return rpc_res['caboose']
 
-    def wait_for_inclusion(self,
-                           operation_hash: str,
-                           branch: str = None,
-                           check_previous: int = None,
-                           args=None) -> client_output.WaitForResult:
+    def wait_for_inclusion(
+        self,
+        operation_hash: str,
+        branch: str = None,
+        check_previous: int = None,
+        args=None,
+    ) -> client_output.WaitForResult:
         cmd = ['wait', 'for', operation_hash, 'to', 'be', 'included']
         if check_previous is not None:
             cmd += ['--check-previous', str(check_previous)]
@@ -631,21 +763,23 @@ class Client:
         cmd = ['list', 'protocols']
         return client_output.extract_protocols(self.run(cmd, admin=True))
 
+    def environment_protocol(self, proto) -> str:
+        cmd = ['protocol', 'environment', proto]
+        return client_output.extract_environment_protocol(
+            self.run(cmd, admin=True)
+        )
+
     def list_understood_protocols(self) -> List[str]:
         cmd = ['list', 'understood', 'protocols']
         return client_output.extract_protocols(self.run(cmd, admin=True))
 
-    def submit_proposals(self,
-                         account: str,
-                         protos: List[str]
-                         ) -> client_output.SubmitProposalsResult:
+    def submit_proposals(
+        self, account: str, protos: List[str]
+    ) -> client_output.SubmitProposalsResult:
         cmd = ['submit', 'proposals', 'for', account] + protos
         return client_output.SubmitProposalsResult(self.run(cmd))
 
-    def submit_ballot(self,
-                      account: str,
-                      proto: str,
-                      vote: str) -> str:
+    def submit_ballot(self, account: str, proto: str, vote: str) -> str:
         return self.run(['submit', 'ballot', 'for', account, proto, vote])
 
     def bootstrapped(self) -> str:
@@ -665,159 +799,381 @@ class Client:
         if self._is_tmp_dir:
             shutil.rmtree(self.base_dir)
 
-    def deploy_msig(self, msig_name: str,
-                    amount: float, src: str,
-                    threshold: int, keys: List[str],
-                    args: List[str] = None
-                    ) -> client_output.OriginationResult:
-        cmd = ['deploy', 'multisig', msig_name,
-               'transferring', str(amount), 'from', src, 'with',
-               'threshold', str(threshold), 'on', 'public', 'keys']
+    def deploy_msig(
+        self,
+        msig_name: str,
+        amount: float,
+        src: str,
+        threshold: int,
+        keys: List[str],
+        args: List[str] = None,
+    ) -> client_output.OriginationResult:
+        cmd = [
+            'deploy',
+            'multisig',
+            msig_name,
+            'transferring',
+            str(amount),
+            'from',
+            src,
+            'with',
+            'threshold',
+            str(threshold),
+            'on',
+            'public',
+            'keys',
+        ]
         cmd += keys
         if args is None:
             args = []
         cmd += args
         return client_output.OriginationResult(self.run(cmd))
 
-    def msig_sign_transfer(self, msig_name: str,
-                           amount: float, dest: str,
-                           secret_key: str) -> str:
-        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
-               'transferring', str(amount), 'to', dest,
-               'using', 'secret', 'key', secret_key]
+    def msig_sign_transfer(
+        self, msig_name: str, amount: float, dest: str, secret_key: str
+    ) -> str:
+        cmd = [
+            'sign',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'transferring',
+            str(amount),
+            'to',
+            dest,
+            'using',
+            'secret',
+            'key',
+            secret_key,
+        ]
         res = self.run(cmd)
         return res[:-1]
 
-    def msig_sign_withdraw(self, msig_name: str,
-                           amount: float, dest: str,
-                           secret_key: str) -> str:
-        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
-               'transferring', str(amount), 'to', dest,
-               'using', 'secret', 'key', secret_key]
+    def msig_sign_withdraw(
+        self, msig_name: str, amount: float, dest: str, secret_key: str
+    ) -> str:
+        cmd = [
+            'sign',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'transferring',
+            str(amount),
+            'to',
+            dest,
+            'using',
+            'secret',
+            'key',
+            secret_key,
+        ]
         return self.run(cmd)
 
-    def msig_sign_set_delegate(self, msig_name: str,
-                               delegate: str,
-                               secret_key: str) -> str:
-        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
-               'setting', 'delegate', 'to', delegate,
-               'using', 'secret', 'key', secret_key]
+    def msig_sign_set_delegate(
+        self, msig_name: str, delegate: str, secret_key: str
+    ) -> str:
+        cmd = [
+            'sign',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'setting',
+            'delegate',
+            'to',
+            delegate,
+            'using',
+            'secret',
+            'key',
+            secret_key,
+        ]
         res = self.run(cmd)
         return res[:-1]
 
-    def msig_sign_withdrawing_delegate(self, msig_name: str,
-                                       secret_key: str) -> str:
-        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
-               'withdrawing', 'delegate',
-               'using', 'secret', 'key', secret_key]
+    def msig_sign_withdrawing_delegate(
+        self, msig_name: str, secret_key: str
+    ) -> str:
+        cmd = [
+            'sign',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'withdrawing',
+            'delegate',
+            'using',
+            'secret',
+            'key',
+            secret_key,
+        ]
         res = self.run(cmd)
         return res[:-1]
 
-    def msig_sign_setting_threshold(self, msig_name: str,
-                                    secret_key: str, threshold: int,
-                                    public_keys: List[str]) -> str:
-        cmd = ['sign', 'multisig', 'transaction', 'on', msig_name,
-               'using', 'secret', 'key', secret_key, 'setting', 'threshold',
-               'to', str(threshold), 'and', 'public', 'keys', 'to']
+    def msig_sign_setting_threshold(
+        self,
+        msig_name: str,
+        secret_key: str,
+        threshold: int,
+        public_keys: List[str],
+    ) -> str:
+        cmd = [
+            'sign',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'using',
+            'secret',
+            'key',
+            secret_key,
+            'setting',
+            'threshold',
+            'to',
+            str(threshold),
+            'and',
+            'public',
+            'keys',
+            'to',
+        ]
         cmd += public_keys
         res = self.run(cmd)
         return res[:-1]
 
-    def sign_bytes(self, to_sign: bytes,
-                   key: str) -> client_output.SignBytesResult:
-        cmd = ['sign', 'bytes', str(to_sign), 'for', key]
-        return client_output.SignBytesResult(self.run(cmd))
+    def sign_bytes_of_string(self, data: str, identity: str) -> str:
+        cmd = ['sign', 'bytes', data, 'for', identity]
+        return client_output.SignBytesResult(self.run(cmd)).signature
 
-    def msig_prepare_transfer(self, msig_name: str,
-                              amount: float, dest: str,
-                              args: List[str] = None):
-        cmd = ['prepare', 'multisig', 'transaction', 'on',
-               msig_name, 'transferring', str(amount), 'to', dest]
+    def sign_bytes(self, to_sign: bytes, key: str) -> str:
+        return self.sign_bytes_of_string(str(to_sign), key)
+
+    def msig_prepare_transfer(
+        self, msig_name: str, amount: float, dest: str, args: List[str] = None
+    ):
+        cmd = [
+            'prepare',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'transferring',
+            str(amount),
+            'to',
+            dest,
+        ]
         if args is None:
             args = []
         cmd += args
         return self.run(cmd)[:-1]
 
-    def msig_prepare_set_delegate(self, msig_name: str,
-                                  delegate: str,
-                                  args: List[str] = None):
-        cmd = ['prepare', 'multisig', 'transaction', 'on',
-               msig_name, 'setting', 'delegate', 'to', delegate]
+    def msig_prepare_set_delegate(
+        self, msig_name: str, delegate: str, args: List[str] = None
+    ):
+        cmd = [
+            'prepare',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'setting',
+            'delegate',
+            'to',
+            delegate,
+        ]
         if args is None:
             args = []
         cmd += args
         return self.run(cmd)[:-1]
 
-    def msig_prepare_withdrawing_delegate(self, msig_name: str,
-                                          args: List[str] = None):
-        cmd = ['prepare', 'multisig', 'transaction', 'on',
-               msig_name, 'withdrawing', 'delegate']
+    def msig_prepare_withdrawing_delegate(
+        self, msig_name: str, args: List[str] = None
+    ):
+        cmd = [
+            'prepare',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'withdrawing',
+            'delegate',
+        ]
         if args is None:
             args = []
         cmd += args
         return self.run(cmd)[:-1]
 
-    def msig_prepare_setting_threshold(self, msig_name: str,
-                                       threshold: int,
-                                       public_keys: List[str],
-                                       args: List[str] = None):
-        cmd = ['prepare', 'multisig', 'transaction', 'on',
-               msig_name, 'setting', 'threshold',
-               'to', str(threshold), 'and', 'public', 'keys', 'to']
+    def msig_prepare_setting_threshold(
+        self,
+        msig_name: str,
+        threshold: int,
+        public_keys: List[str],
+        args: List[str] = None,
+    ):
+        cmd = [
+            'prepare',
+            'multisig',
+            'transaction',
+            'on',
+            msig_name,
+            'setting',
+            'threshold',
+            'to',
+            str(threshold),
+            'and',
+            'public',
+            'keys',
+            'to',
+        ]
         cmd += public_keys
         if args is None:
             args = []
         cmd += args
         return self.run(cmd)[:-1]
 
-    def msig_transfer(self, msig_name: str,
-                      amount: float, dest: str,
-                      src: str, signatures: List[str],
-                      args: List[str] = None) -> str:
-        cmd = ['from', 'multisig', 'contract', msig_name,
-               'transfer', str(amount), 'to', dest,
-               'on', 'behalf', 'of', src, 'with', 'signatures'] + signatures
+    def msig_transfer(
+        self,
+        msig_name: str,
+        amount: float,
+        dest: str,
+        src: str,
+        signatures: List[str],
+        args: List[str] = None,
+    ) -> str:
+        cmd = [
+            'from',
+            'multisig',
+            'contract',
+            msig_name,
+            'transfer',
+            str(amount),
+            'to',
+            dest,
+            'on',
+            'behalf',
+            'of',
+            src,
+            'with',
+            'signatures',
+        ] + signatures
         if args is None:
             args = []
         cmd += args
         return self.run(cmd)
 
-    def msig_set_delegate(self, msig_name: str,
-                          delegate: str,
-                          src: str, signatures: List[str],
-                          args: List[str] = None) -> str:
-        cmd = ['set', 'delegate', 'of', 'multisig', 'contract', msig_name,
-               'to', delegate,
-               'on', 'behalf', 'of', src, 'with', 'signatures'] + signatures
+    def msig_set_delegate(
+        self,
+        msig_name: str,
+        delegate: str,
+        src: str,
+        signatures: List[str],
+        args: List[str] = None,
+    ) -> str:
+        cmd = [
+            'set',
+            'delegate',
+            'of',
+            'multisig',
+            'contract',
+            msig_name,
+            'to',
+            delegate,
+            'on',
+            'behalf',
+            'of',
+            src,
+            'with',
+            'signatures',
+        ] + signatures
         if args is None:
             args = []
         cmd += args
         return self.run(cmd)
 
-    def msig_withdrawing_delegate(self, msig_name: str,
-                                  src: str, signatures: List[str],
-                                  args: List[str] = None) -> str:
-        cmd = ['withdraw', 'delegate', 'of', 'multisig', 'contract', msig_name,
-               'on', 'behalf', 'of', src, 'with', 'signatures'] + signatures
+    def msig_withdrawing_delegate(
+        self,
+        msig_name: str,
+        src: str,
+        signatures: List[str],
+        args: List[str] = None,
+    ) -> str:
+        cmd = [
+            'withdraw',
+            'delegate',
+            'of',
+            'multisig',
+            'contract',
+            msig_name,
+            'on',
+            'behalf',
+            'of',
+            src,
+            'with',
+            'signatures',
+        ] + signatures
         if args is None:
             args = []
         cmd += args
         return self.run(cmd)
 
-    def msig_run_transaction(self, msig_name: str,
-                             transaction: bytes,
-                             src: str,
-                             signatures: List[str]) -> str:
-        cmd = ['run', 'transaction', str(transaction), 'on',
-               'multisig', 'contract', msig_name,
-               'on', 'behalf', 'of', src, 'with',
-               'signatures'] + signatures
+    def msig_run_transaction(
+        self,
+        msig_name: str,
+        transaction: bytes,
+        src: str,
+        signatures: List[str],
+    ) -> str:
+        cmd = [
+            'run',
+            'transaction',
+            str(transaction),
+            'on',
+            'multisig',
+            'contract',
+            msig_name,
+            'on',
+            'behalf',
+            'of',
+            src,
+            'with',
+            'signatures',
+        ] + signatures
         return self.run(cmd)
 
-    def check_node_listening(self,
-                             timeout: float = 1,
-                             attempts: int = 20) -> bool:
-        """ Checks whether the node is responsive, by polling it
+    def msig_set_threshold(
+        self,
+        msig_name: str,
+        threshold: int,
+        public_keys: List[str],
+        src: str,
+        signatures: List[str],
+        args: List[str] = None,
+    ) -> str:
+        cmd = [
+            'set',
+            'threshold',
+            'of',
+            'multisig',
+            'contract',
+            msig_name,
+            'to',
+            str(threshold),
+            'and',
+            'public',
+            'keys',
+            'to',
+        ]
+        cmd += public_keys
+        cmd += ['on', 'behalf', 'of', src, 'with', 'signatures']
+        cmd += signatures
+        if args is None:
+            args = []
+        cmd += args
+        return self.run(cmd)
+
+    def check_node_listening(
+        self, timeout: float = 1, attempts: int = 20
+    ) -> bool:
+        """Checks whether the node is responsive, by polling it
         using the `version` rpc.
 
         Args:
@@ -845,17 +1201,219 @@ class Client:
         cmd = ['list', 'mockup', 'protocols']
         return client_output.ListMockupProtocols(self.run(cmd))
 
-    def create_mockup(self,
-                      protocol: str,
-                      check: bool = True,
-                      protocol_constants_file: str = None,
-                      bootstrap_accounts_file: str = None)\
-            -> client_output.CreateMockup:
+    def create_mockup(
+        self,
+        protocol: str,
+        check: bool = True,
+        protocol_constants_file: str = None,
+        bootstrap_accounts_file: str = None,
+    ) -> client_output.CreateMockup:
         cmd = ['--protocol', protocol, 'create', 'mockup']
         if protocol_constants_file is not None:
             cmd += ["--protocol-constants", protocol_constants_file]
         if bootstrap_accounts_file is not None:
             cmd += ["--bootstrap-accounts", bootstrap_accounts_file]
-        (stdout, stderr, exit_code) = self.run_generic(cmd,
-                                                       check=check)
+        (stdout, stderr, exit_code) = self.run_generic(cmd, check=check)
         return client_output.CreateMockup(stdout, stderr, exit_code)
+
+    def get_block_metadata_hash(self) -> str:
+        return self.rpc('get', '/chains/main/blocks/head/metadata_hash')
+
+    def get_operations_metadata_hash(self) -> str:
+        return self.rpc(
+            'get', '/chains/main/blocks/head/operations_metadata_hash'
+        )
+
+    def sapling_gen_key(
+        self, key_name: str, force: bool = False, args: List[str] = None
+    ) -> client_output.SaplingGenKeyResult:
+
+        cmd = ['sapling', 'gen', 'key', key_name, '--unencrypted']
+        args = args or []
+        if force:
+            args += ['--force']
+        cmd += args
+        return client_output.SaplingGenKeyResult(self.run(cmd))
+
+    def sapling_use_key_for_contract(
+        self,
+        key_name: str,
+        contract_name: str,
+        memo_size: int = None,
+    ) -> None:
+        cmd = [
+            'sapling',
+            'use',
+            'key',
+            key_name,
+            'for',
+            'contract',
+            contract_name,
+        ]
+        if memo_size is not None:
+            cmd += ['--memo-size', str(memo_size)]
+        self.run(cmd)
+
+    def sapling_gen_address(
+        self, key_name: str, index: int = None, args: List[str] = None
+    ) -> client_output.SaplingGenAddressResult:
+        args = args or []
+        cmd = ['sapling', 'gen', 'address', key_name]
+        if index is not None:
+            cmd += ['--address-index', str(index)]
+        cmd += args
+        return client_output.SaplingGenAddressResult(self.run(cmd))
+
+    def sapling_import_key(
+        self,
+        key_name: str,
+        mnemonic: List[str],
+        force: bool = False,
+        args: List[str] = None,
+    ) -> None:
+
+        mnemonic_str = " ".join(mnemonic)
+        cmd = [
+            'sapling',
+            'import',
+            'key',
+            key_name,
+            '--unencrypted',
+            '--mnemonic',
+            mnemonic_str,
+        ]
+        args = args or []
+        if force:
+            cmd += ['--force']
+        cmd += args
+        self.run(cmd)
+
+    def sapling_derive_key(
+        self,
+        source_key_name: str,
+        target_key_name: str,
+        contract_name: str,
+        index: int,
+        force: bool = False,
+    ) -> client_output.SaplingDeriveKeyResult:
+
+        cmd = [
+            'sapling',
+            'derive',
+            'key',
+            target_key_name,
+            'from',
+            source_key_name,
+            'at',
+            'index',
+            str(index),
+            '--for-contract',
+            contract_name,
+            '--unencrypted',
+        ]
+        if force:
+            cmd += ['--force']
+        return client_output.SaplingDeriveKeyResult(self.run(cmd))
+
+    def sapling_get_balance(
+        self, key_name: str, contract_name: str, args: List[str] = None
+    ) -> client_output.SaplingGetBalanceResult:
+
+        cmd = [
+            'sapling',
+            'get',
+            'balance',
+            'for',
+            key_name,
+            'in',
+            'contract',
+            contract_name,
+        ]
+        args = args or []
+        cmd += args
+        return client_output.SaplingGetBalanceResult(self.run(cmd))
+
+    def sapling_shield(
+        self,
+        amount: float,
+        src: str,
+        dest: str,
+        contract: str,
+        args: List[str] = None,
+    ) -> None:
+        cmd = [
+            'sapling',
+            'shield',
+            str(amount),
+            'from',
+            src,
+            'to',
+            dest,
+            'using',
+            contract,
+        ]
+        args = args or []
+        cmd += args
+        self.run(cmd)
+
+    def sapling_unshield(
+        self,
+        amount: float,
+        src: str,
+        dest: str,
+        contract: str,
+        args: List[str] = None,
+    ) -> None:
+        cmd = [
+            'sapling',
+            'unshield',
+            str(amount),
+            'from',
+            src,
+            'to',
+            dest,
+            'using',
+            contract,
+        ]
+        args = args or []
+        cmd += args
+        self.run(cmd)
+
+    def sapling_forge_transaction(
+        self,
+        amount: float,
+        src: str,
+        dest: str,
+        contract: str,
+        file: str,
+        args: List[str] = None,
+    ) -> None:
+        cmd = [
+            'sapling',
+            'forge',
+            'transaction',
+            str(amount),
+            'from',
+            src,
+            'to',
+            dest,
+            'using',
+            contract,
+            '--file',
+            file,
+        ]
+        args = args or []
+        cmd += args
+        self.run(cmd)
+
+    def sapling_submit(
+        self, file: str, fee_payer: str, contract: str, args: List[str] = None
+    ) -> None:
+        cmd = ['sapling', 'submit', file, 'from', fee_payer, 'using', contract]
+        args = args or []
+        cmd += args
+        self.run(cmd)
+
+    def sapling_list_keys(self) -> List[str]:
+        cmd = ['sapling', 'list', 'keys']
+        return self.run(cmd).strip().split("\n")

@@ -24,6 +24,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* The expected output of a normal run of Tezt is the log of the tests.
+   So these should be on stdout.
+   However, for some commands (especially those that are expected to be parsed
+   by scripts such as --list-tsv), the expected output contains no logs, only data.
+   For those commands, we thus log to stderr instead. We don't expect much logs
+   except maybe warnings like "leftover files from a previous run". *)
+let channel =
+  (* The use of a pattern with all fields ensures that we will update this if we
+     add new commands that should log to stderr. *)
+  let { Cli.color = _;
+        log_level = _;
+        log_file = _;
+        log_buffer_size = _;
+        commands = _;
+        temporary_file_mode = _;
+        keep_going = _;
+        files_to_run = _;
+        tests_to_run = _;
+        tags_to_run = _;
+        tags_not_to_run = _;
+        list;
+        global_timeout = _;
+        test_timeout = _;
+        reset_regressions = _;
+        loop = _;
+        time = _ } =
+    Cli.options
+  in
+  match list with None -> stdout | Some (`Ascii_art | `Tsv) -> stderr
+
 (* In theory we could simply escape spaces, backslashes, double quotes and single quotes.
    But 'some long argument' is arguably more readable than some\ long\ argument.
    We use this quoting method if the string contains no single quote. *)
@@ -207,10 +237,10 @@ let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color message =
             ( if level = Error then
               Log_buffer.iter
               @@ fun line ->
-              log_line_to ~use_colors:Cli.options.color line stdout ) ;
+              log_line_to ~use_colors:Cli.options.color line channel ) ;
             Log_buffer.reset () ;
-            log_line_to ~use_colors:Cli.options.color line stdout ;
-            flush stdout
+            log_line_to ~use_colors:Cli.options.color line channel ;
+            flush channel
         | ((Quiet | Error | Warn | Report | Info), _) ->
             Log_buffer.push line
       in

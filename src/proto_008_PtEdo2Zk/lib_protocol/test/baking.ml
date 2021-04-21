@@ -103,11 +103,11 @@ let test_rewards_retrieval () =
   let block_priorities = 0 -- 10 in
   let included_endorsements = 0 -- endorsers_per_block in
   let ranges = List.product block_priorities included_endorsements in
-  iter_s
+  List.iter_es
     (fun (priority, endorsing_power) ->
       (* bake block at given priority and with given endorsing_power *)
       let real_endorsers = List.sub endorsers endorsing_power in
-      map_p
+      List.map_ep
         (fun endorser ->
           Op.endorsement ~delegate:endorser.delegate (B good_b) ()
           >|=? fun operation -> Operation.pack operation)
@@ -148,7 +148,7 @@ let test_rewards_retrieval () =
           accumulated_frozen_balance )
       >>=? fun () ->
       (* check the each endorser was rewarded the right amount *)
-      iter_p
+      List.iter_ep
         (fun endorser ->
           balance_update endorser.delegate good_b b
           >>=? fun endorser_frozen_balance ->
@@ -175,7 +175,7 @@ let test_rewards_formulas () =
   let block_priorities = 0 -- 2 in
   let included_endorsements = 0 -- endorsers_per_block in
   let ranges = List.product block_priorities included_endorsements in
-  iter_p
+  List.iter_ep
     (fun (priority, endorsing_power) ->
       Context.get_baking_reward (B b) ~priority ~endorsing_power
       >>=? fun reward ->
@@ -215,7 +215,7 @@ let test_rewards_formulas_equivalence () =
   let block_priorities = 0 -- 64 in
   let endorsing_power = 0 -- endorsers_per_block in
   let ranges = List.product block_priorities endorsing_power in
-  iter_p
+  List.iter_ep
     (fun (block_priority, endorsing_power) ->
       Baking.baking_reward
         ctxt
@@ -256,7 +256,7 @@ let test_voting_power_cache () =
   >>=? fun (block, _contracts) ->
   Context.get_bakers (B block)
   >>=? fun bakers ->
-  let baker = List.hd bakers in
+  let baker = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
   let assert_voting_power n block =
     get_voting_power block baker
     >>=? fun voting_power ->
@@ -276,21 +276,21 @@ let test_voting_power_cache () =
   >>=? fun block -> assert_voting_power 500 block
 
 let tests =
-  [ Test.tztest "cycle" `Quick test_cycle;
-    Test.tztest
+  [ Test_services.tztest "cycle" `Quick test_cycle;
+    Test_services.tztest
       "test rewards are correctly accounted for"
       `Slow
       test_rewards_retrieval;
-    Test.tztest
+    Test_services.tztest
       "test rewards formula for various input values"
       `Quick
       test_rewards_formulas;
-    Test.tztest
+    Test_services.tztest
       "check equivalence of rewards formulas"
       `Quick
       test_rewards_formulas_equivalence;
-    Test.tztest
+    Test_services.tztest
       "test_bake_n_cycles for 12 cycles"
       `Quick
       (test_bake_n_cycles 12);
-    Test.tztest "voting_power" `Quick test_voting_power_cache ]
+    Test_services.tztest "voting_power" `Quick test_voting_power_cache ]

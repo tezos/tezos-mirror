@@ -702,23 +702,23 @@ command="$1"
 if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 
 case $(basename "$0") in
-    delphinet.sh)
-        docker_base_dir="$HOME/.tezos-delphinet"
-        docker_image=tezos/tezos:v8.3
-        docker_compose_base_name=delphinet
+    florencenet.sh)
+        docker_base_dir="$HOME/.tezos-florencenet"
+        docker_image=tezos/tezos:v9.0
+        docker_compose_base_name=florencenet
         default_port=9732
-        network=delphinet
+        network=florencenet
         ;;
-    edonet.sh)
-        docker_base_dir="$HOME/.tezos-edonet"
-        docker_image=tezos/tezos:v8.3
-        docker_compose_base_name=edonet
+    edo2net.sh)
+        docker_base_dir="$HOME/.tezos-edo2net"
+        docker_image=tezos/tezos:v9.0
+        docker_compose_base_name=edo2net
         default_port=9732
-        network=edonet
+        network=edo2net
         ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
-        docker_image=tezos/tezos:v8.3
+        docker_image=tezos/tezos:v9.0
         docker_compose_base_name="mainnet"
         default_port=9732
         network=mainnet

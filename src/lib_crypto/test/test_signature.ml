@@ -28,7 +28,9 @@ let test_size () =
   in
   let expected =
     (* add 1 for the tag of union encoding *)
-    Data_encoding.Binary.fixed_length_exn Ed25519.Public_key.encoding + 1
+    ( WithExceptions.Option.get ~loc:__LOC__
+    @@ Data_encoding.Binary.fixed_length Ed25519.Public_key.encoding )
+    + 1
   in
   assert (Compare.Int.(expected = length)) ;
   let length =
@@ -37,7 +39,9 @@ let test_size () =
   in
   let expected =
     (* add 1 for the tag of union encoding *)
-    Data_encoding.Binary.fixed_length_exn P256.Public_key.encoding + 1
+    ( WithExceptions.Option.get ~loc:__LOC__
+    @@ Data_encoding.Binary.fixed_length P256.Public_key.encoding )
+    + 1
   in
   assert (Compare.Int.(expected = length)) ;
   let length =
@@ -46,10 +50,27 @@ let test_size () =
   in
   let expected =
     (* add 1 for the tag of union encoding *)
-    Data_encoding.Binary.fixed_length_exn Secp256k1.Public_key.encoding + 1
+    ( WithExceptions.Option.get ~loc:__LOC__
+    @@ Data_encoding.Binary.fixed_length Secp256k1.Public_key.encoding )
+    + 1
   in
   assert (Compare.Int.(expected = length))
 
-let size = [("size", `Quick, test_size)]
+let test_of_bytes_without_validation () =
+  List.iter
+    (fun algo ->
+      let (_pkh, pk, _sk) = Signature.generate_key ~algo () in
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding pk
+      in
+      let pk2 = Signature.Public_key.of_bytes_without_validation bytes in
+      assert (Some pk = pk2))
+    [Ed25519; Secp256k1; P256]
 
-let () = Alcotest.run "hacl" [("size", size)]
+let size =
+  [ ("size", `Quick, test_size);
+    ( "test_of_bytes_without_validation",
+      `Quick,
+      test_of_bytes_without_validation ) ]
+
+let () = Alcotest.run "signature" [("size", size)]

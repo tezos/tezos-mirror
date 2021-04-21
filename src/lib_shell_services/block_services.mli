@@ -58,7 +58,15 @@ val live_blocks_path : ('a, 'b) RPC_path.t -> ('a, 'b) RPC_path.t
 
 type operation_list_quota = {max_size : int; max_op : int option}
 
-type raw_context = Key of Bytes.t | Dir of (string * raw_context) list | Cut
+(** The low-level storage exposed as a tree *)
+type raw_context =
+  | Key of Bytes.t  (** A leaf, containing a value *)
+  | Dir of raw_context TzString.Map.t
+      (** A directory, mapping keys to nested [raw_context]s *)
+  | Cut
+      (** An omitted piece, because it is too deep compared to the maximum
+          depth requested in the
+          /chains/<chain_id>/blocks/<block_id/context/raw/bytes RPC *)
 
 val pp_raw_context : Format.formatter -> raw_context -> unit
 

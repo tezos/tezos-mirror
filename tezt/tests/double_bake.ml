@@ -138,11 +138,11 @@ let wait_for_denunciation_injection node client oph_promise =
 
    The test is successful if the double baking evidence can be found
    in the last baked block. *)
-let double_bake () =
+let double_bake protocol =
   Test.register
     ~__FILE__
-    ~title:"double baking with accuser"
-    ~tags:["double"; "baking"; "accuser"; "node"]
+    ~title:(sf "%s: double baking with accuser" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "double"; "baking"; "accuser"; "node"]
   @@ fun () ->
   (* Step 1 and 2 *)
   (* Note: we start all nodes with [--private] to prevent the [connect address]
@@ -156,7 +156,7 @@ let double_bake () =
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  let* () = Client.activate_protocol client_1 in
+  let* () = Client.activate_protocol ~protocol client_1 in
   Log.info "Activated protocol." ;
   let common_ancestor = 0 in
   let bootstrap1_key = Constant.bootstrap1.identity in
@@ -186,7 +186,7 @@ let double_bake () =
   (* Step 6 *)
   let* node_3 = Node.init [Bootstrap_threshold 0; Private_mode] in
   let* client_3 = Client.init ~node:node_3 () in
-  let* accuser_3 = Accuser.init node_3 in
+  let* accuser_3 = Accuser.init ~protocol node_3 in
   let denunciation = wait_for_denunciation accuser_3 in
   let denunciation_injection =
     wait_for_denunciation_injection node_3 client_3 denunciation
@@ -213,4 +213,4 @@ let double_bake () =
   if is_operation_in_operations ops denunciation_oph then unit
   else Test.fail "Double baking evidence was not found"
 
-let register () = double_bake ()
+let register protocol = double_bake protocol

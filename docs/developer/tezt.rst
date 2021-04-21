@@ -29,7 +29,7 @@ How to Run Tests
 
 If you just want to run tests and see whether they succeed, run::
 
-    make tezt
+    make test-tezt
 
 If you need more control, get the list of command-line options as follows::
 
@@ -194,8 +194,8 @@ Let's review what our basic test in the previous section does.
   or ``sf`` (a short-hand for ``Printf.sprintf``).
 
 - Then, we define a function ``check_node_initialization`` which registers one test.
-  It is parameterized by the history mode, so it is easy to run this test
-  with all three modes (this is what ``register`` does).
+  It is parameterized by a protocol and the history mode, so it is easy to run this test
+  on all protocols with all three modes.
 
 - Function ``Test.register`` registers a test.
   The ``~__FILE__`` argument gives the source filename so that one can select this

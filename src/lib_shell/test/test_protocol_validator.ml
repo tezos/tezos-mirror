@@ -23,13 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Unit tests for protocol_validator. Currently only tests that
-   events are emitted. *)
-
+(** Testing
+    -------
+    Component:    Shell
+    Invocation:   dune exec src/lib_shell/test/test.exe test "protocol validator"
+    Subject:      Unit tests for protocol_validator. Currently only tests that
+                  events are emitted.
+*)
 open Shell_test_helpers
 
 (** A [Alcotest_protocol_validator] extends [Test_services] with protocol
-   validator-specific testables and helpers *)
+    validator-specific testables and helpers *)
 module Alcotest_protocol_validator = struct
   include Test_services
 
@@ -64,8 +68,8 @@ let section =
 let filter = Some section
 
 (** [wrap f _switch] wraps a test function [f] by setting up a Mock_sink if
-   necessary, initializing a mock p2p network, an empty chain state and a
-   validator.  It passes the validator to the test function [f] *)
+    necessary, initializing a mock p2p network, an empty chain state and a
+    validator. It passes the validator to the test function [f]. *)
 let wrap f _switch () =
   with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
@@ -88,9 +92,9 @@ let wrap f _switch () =
 
 (** Start tests *)
 
-(** [pushing_validator_protocol] tests that requesting the validation of a
-   protocol emits a pushing_validation_request event *)
-let pushing_validator_protocol vl _switch () =
+(** Requesting the validation of a protocol emits a
+    pushing_validation_request event. *)
+let test_pushing_validator_protocol vl _switch () =
   (* Let's validate a phony protocol *)
   let pt = Protocol.{expected_env = V0; components = []} in
   Protocol_validator.validate vl Protocol_hash.zero pt
@@ -112,10 +116,10 @@ let pushing_validator_protocol vl _switch () =
     ) ;
   Lwt.return_unit
 
-(** [previously_validated_protocol] tests that requesting the validation of a
-   protocol that is already validated (e.g. the genesis protocol) emits a
-   previously_validated_protocol event *)
-let previously_validated_protocol vl _switch () =
+(** [previously_validated_protocol] tests that requesting the
+    validation of a protocol that is already validated (e.g. the
+    genesis protocol) emits a previously_validated_protocol event. *)
+let test_previously_validated_protocol vl _switch () =
   (* Let's request the re-validation of the genesis protocol *)
   let phony_pt = Protocol.{expected_env = V0; components = []} in
   Protocol_validator.validate vl genesis_protocol_hash phony_pt
@@ -135,9 +139,9 @@ let previously_validated_protocol vl _switch () =
     ) ;
   Lwt.return_unit
 
-(** [fetching_protocol] tests that requesting the fetch of a protocol emits a
-   fetching_protocol event *)
-let fetching_protocol vl _switch () =
+(** [fetching_protocol] tests that requesting the fetch of a protocol
+    emits a fetching_protocol event. *)
+let test_fetching_protocol vl _switch () =
   (* Let's
    fetch a phony protocol, and timeout immediately *)
   Protocol_validator.fetch_and_compile_protocol
@@ -164,10 +168,12 @@ let tests =
   [ Alcotest_lwt.test_case
       "pushing_validator_protocol"
       `Quick
-      (wrap pushing_validator_protocol);
+      (wrap test_pushing_validator_protocol);
     Alcotest_lwt.test_case
       "previously_validated_protocol"
       `Quick
-      (wrap previously_validated_protocol);
-    Alcotest_lwt.test_case "fetching_protocol" `Quick (wrap fetching_protocol)
-  ]
+      (wrap test_previously_validated_protocol);
+    Alcotest_lwt.test_case
+      "fetching_protocol"
+      `Quick
+      (wrap test_fetching_protocol) ]

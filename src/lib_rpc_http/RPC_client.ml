@@ -110,7 +110,7 @@ module type S = sig
     (content, content) RPC_context.rest_result Lwt.t
 end
 
-module Make (Client : Cohttp_lwt.S.Client) = struct
+module Make (Client : Resto_cohttp_client.Client.CALL) = struct
   module Client = Resto_cohttp_client.Client.Make (RPC_encoding) (Client)
 
   module type LOGGER = Client.LOGGER
@@ -278,6 +278,9 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
     | `Forbidden body ->
         handle_error meth uri body (fun v -> `Forbidden v)
     | `Not_found body ->
+        (* The client's proxy mode matches on the `Not_found returned here,
+           to detect that a local RPC is unavailable at generic_json_call,
+           and hence that delegation to the endpoint must be done. *)
         handle_error meth uri body (fun v -> `Not_found v)
     | `Gone body ->
         handle_error meth uri body (fun v -> `Gone v)
@@ -293,6 +296,10 @@ module Make (Client : Cohttp_lwt.S.Client) = struct
     | `Gone None ->
         fail (RPC_context.Gone {meth; uri})
     | `Not_found None ->
+        (* The client's proxy mode matches on the error raised here,
+           to detect that a local RPC is unavailable at call_service and
+           call_streamed_service, and hence that delegation
+           to the endpoint must be done. *)
         fail (RPC_context.Not_found {meth; uri})
     | `Conflict (Some err)
     | `Error (Some err)

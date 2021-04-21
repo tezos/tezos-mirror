@@ -76,7 +76,9 @@ let parse_block s =
     | 0 ->
         ([s], ' ')
     | 1 ->
-        let delim = List.assoc 1 counts in
+        let delim =
+          WithExceptions.Option.get ~loc:__LOC__ @@ List.assoc 1 counts
+        in
         (String.split delim s, delim)
     | _ ->
         raise Exit
@@ -194,7 +196,7 @@ let operation_list_quota_encoding =
     (fun (max_size, max_op) -> {max_size; max_op})
     (obj2 (req "max_size" int31) (opt "max_op" int31))
 
-type raw_context = Key of Bytes.t | Dir of (string * raw_context) list | Cut
+type raw_context = Key of Bytes.t | Dir of raw_context TzString.Map.t | Cut
 
 let rec pp_raw_context ppf = function
   | Cut ->
@@ -207,7 +209,7 @@ let rec pp_raw_context ppf = function
         "{@[<v 1>@,%a@]@,}"
         (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (s, t) ->
              Format.fprintf ppf "%s : %a" s pp_raw_context t))
-        l
+        (TzString.Map.bindings l)
 
 let raw_context_encoding =
   mu "raw_context" (fun encoding ->
@@ -222,8 +224,14 @@ let raw_context_encoding =
             (Tag 1)
             (assoc encoding)
             ~title:"Dir"
-            (function Dir k -> Some k | _ -> None)
-            (fun k -> Dir k);
+            (function
+              | Dir map -> Some (TzString.Map.bindings map) | _ -> None)
+            (fun bindings ->
+              Dir
+                (List.fold_left
+                   (fun wip_map (k, v) -> TzString.Map.add k v wip_map)
+                   TzString.Map.empty
+                   bindings));
           case
             (Tag 2)
             null

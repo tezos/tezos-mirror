@@ -1,0 +1,65 @@
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[contains_all.tz-None-(Pair {} {})-(Some True)]
+
+storage
+  (Some True)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 11 (remaining gas: 1039957.180 units remaining)
+    [ (Pair (Pair {} {}) None)  	 ]
+  - location: 12 (remaining gas: 1039957.040 units remaining)
+    [ (Pair {} {})  	@parameter ]
+  - location: 13 (remaining gas: 1039956.900 units remaining)
+    [ (Pair {} {})  	@parameter
+      (Pair {} {})  	@parameter ]
+  - location: 14 (remaining gas: 1039956.760 units remaining)
+    [ {}  	
+      (Pair {} {})  	@parameter ]
+  - location: 17 (remaining gas: 1039956.460 units remaining)
+    [ {}  	 ]
+  - location: 16 (remaining gas: 1039956.390 units remaining)
+    [ {}  	 ]
+  - location: 15 (remaining gas: 1039956.390 units remaining)
+    [ {}  	
+      {}  	 ]
+  - location: 18 (remaining gas: 1039956.090 units remaining)
+    [ {}  	
+      {}  	
+      {}  	 ]
+  - location: 20 (remaining gas: 1039955.960 units remaining)
+    [ {}  	
+      {}  	
+      {}  	 ]
+  - location: 21 (remaining gas: 1039955.400 units remaining)
+    [ {}  	
+      {}  	 ]
+  - location: 34 (remaining gas: 1039955.260 units remaining)
+    [ True  	
+      {}  	
+      {}  	 ]
+  - location: 37 (remaining gas: 1039955.130 units remaining)
+    [ {}  	
+      True  	
+      {}  	 ]
+  - location: 38 (remaining gas: 1039954.990 units remaining)
+    [ (Pair {} True)  	
+      {}  	 ]
+  - location: 39 (remaining gas: 1039954.860 units remaining)
+    [ {}  	
+      (Pair {} True)  	 ]
+  - location: 40 (remaining gas: 1039954.300 units remaining)
+    [ (Pair {} True)  	 ]
+  - location: 64 (remaining gas: 1039954.160 units remaining)
+    [ True  	 ]
+  - location: 65 (remaining gas: 1039954.020 units remaining)
+    [ (Some True)  	 ]
+  - location: 66 (remaining gas: 1039953.880 units remaining)
+    [ {}  	
+      (Some True)  	 ]
+  - location: 68 (remaining gas: 1039953.740 units remaining)
+    [ (Pair {} (Some True))  	 ]
+  - location: -1 (remaining gas: 1039953.670 units remaining)
+    [ (Pair {} (Some True))  	 ]
+

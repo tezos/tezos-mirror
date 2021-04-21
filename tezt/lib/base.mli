@@ -83,6 +83,18 @@ val ( =~! ) : string -> rex -> bool
 (** Match a regular expression with one capture group. *)
 val ( =~* ) : string -> rex -> string option
 
+(** [replace_string ~all rex ~by s] iterates on [s], and replaces every
+    occurrence of [rex] with [by]. If [all = false], then only the first
+    occurrence of [rex] is replaced. *)
+val replace_string :
+  ?pos:int ->    (* Default: 0 *)
+  ?len:int ->
+  ?all:bool ->   (* Default: true. Otherwise only replace first occurrence *)
+  rex ->         (* matched groups *)
+  by:string ->   (* replacement string *)
+  string ->      (* string to replace in *)
+  string
+
 (** {2 Asynchronous Promises} *)
 
 (** Register a promise so that [wait_for_async] handles it.
@@ -106,13 +118,18 @@ val repeat : int -> (unit -> unit Lwt.t) -> unit Lwt.t
 
 (** {2 Input/Output} *)
 
-(* Open file, use function to write output then close the output. In case of
+(** Open file, use function to write output then close the output. In case of
    error while writing, the channel is closed before raising the exception *)
 val with_open_out : string -> (out_channel -> unit) ->unit
 
-(* Open file, use function to read input then close the input. In case of
-   error while reading, the channel is closed before raising the exception *)
+(** Open file, use function to read input then close the input. In case of
+   error while reading, the channel is closed before raising the exception **)
 val with_open_in : string -> (in_channel -> 'a) -> 'a
 
-(** Read all contents from an input channel. *)
-val read_all : Lwt_io.input_channel -> string Lwt.t
+(** [read_file filename] returns the full contents of file [filename] *)
+val read_file : string -> string Lwt.t
+
+(** {2 Common structures} *)
+
+module String_map : Map.S with type key = string
+module String_set : Set.S with type elt = string

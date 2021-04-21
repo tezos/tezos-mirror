@@ -35,6 +35,22 @@ class EndorseResult:
         self.operation_hash = match.groups()[0]
 
 
+class RevealResult:
+    """Result of a 'reveal key for' operation."""
+
+    def __init__(self, client_output: str):
+        pattern = r"Operation hash is '?(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.operation_hash = match.groups()[0]
+        pattern = r"Fee to the baker: ꜩ(.*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.fees = float(match.groups()[0])
+
+
 class TransferResult:
     """Result of a 'transfer' operation."""
 
@@ -102,8 +118,9 @@ class RunScriptResult:
         match = re.search(pattern_str, client_output)
         if match is not None:
             compiled_pattern = re.compile(r"  ((New|Set|Del|Unset).*?)\n")
-            for match_diff in compiled_pattern.finditer(client_output,
-                                                        match.end(0)):
+            for match_diff in compiled_pattern.finditer(
+                client_output, match.end(0)
+            ):
                 self.big_map_diff.append([match_diff.group(1)])
 
         self.client_output = client_output
@@ -213,8 +230,8 @@ Raw Sha512 hash: ?(\w*)'''
         self.sha512 = match.groups()[4]
 
 
-class SignatureResult:
-    """Result of a 'sign bytes' command."""
+class SignBytesResult:
+    """Result of a 'sign bytes ...' command."""
 
     def __init__(self, client_output: str):
 
@@ -222,7 +239,19 @@ class SignatureResult:
         match = re.search(pattern, client_output)
         if match is None:
             raise InvalidClientOutput(client_output)
-        self.sig = match.groups()[0]
+        self.signature = match.groups()[0]
+
+
+class SignMessageResult:
+    """Result of a 'sign message ...' command."""
+
+    def __init__(self, client_output: str):
+
+        pattern = r'Signature: ?(\w*)\n'
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.signature = match.groups()[0]
 
 
 class SetDelegateResult:
@@ -257,15 +286,54 @@ class GetDelegateResult:
             self.delegate = self.address
 
 
-class SignBytesResult:
-    """Result of a 'sign bytes' command."""
+class SaplingGenKeyResult:
+    """Result of a 'sapling gen key' operation."""
 
     def __init__(self, client_output: str):
-        pattern = r"Signature: ?(\w+)"
-        match = re.search(pattern, client_output[:-1])
+        pattern = (
+            r'It is important to save this mnemonic in a secure '
+            r'place:\n\n([\w\s]+)\n\nThe mnemonic'
+        )
+        match = re.search(pattern, client_output)
         if match is None:
             raise InvalidClientOutput(client_output)
-        self.signature = match.groups()[0]
+        self.mnemonic = match.groups()[0].split()
+
+
+class SaplingGenAddressResult:
+    """Result of a 'sapling gen address' operation."""
+
+    def __init__(self, client_output: str):
+        address_match = re.search(r"Generated address:\n(\w+)\n", client_output)
+        if address_match is None:
+            raise InvalidClientOutput(client_output)
+        self.address = address_match.groups()[0]
+        index_match = re.search(r"at index (\d+)", client_output)
+        if index_match is None:
+            raise InvalidClientOutput(client_output)
+        self.index = int(index_match.groups()[0])
+
+
+class SaplingDeriveKeyResult:
+    """Result of a 'sapling derive key' operation."""
+
+    def __init__(self, client_output: str):
+        path_match = re.search(r"with path (\S+)", client_output)
+        if path_match is None:
+            raise InvalidClientOutput(client_output)
+        self.path = path_match.groups()[0]
+
+
+class SaplingGetBalanceResult:
+    """Result of a 'sapling get balance' query."""
+
+    def __init__(self, client_output: str):
+        balance_match = re.search(
+            r"Total Sapling funds ([\d\.]+)", client_output
+        )
+        if balance_match is None:
+            raise InvalidClientOutput(client_output)
+        self.balance = float(balance_match.groups()[0])
 
 
 def extract_rpc_answer(client_output: str) -> dict:
@@ -296,8 +364,20 @@ def extract_protocols(client_output: str) -> List[str]:
     return client_output.split()
 
 
-class PointInfo:
+def extract_environment_protocol(client_output: str) -> str:
+    """Extract environment protocol version from the output of
+    'protocol_environment' operation."""
+    try:
+        pattern = r"Protocol \S* uses environment (V\d)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        return match.groups()[0]
+    except Exception as exception:
+        raise InvalidClientOutput(client_output) from exception
 
+
+class PointInfo:
     def __init__(self, peer_id=None, is_connected=None, is_trusted=None):
         self.peer_id = peer_id
         self.is_connected = is_connected
@@ -330,7 +410,7 @@ def parse_point(line):
     point_id = groups[1]
     peer_id = groups[2]
     if peer_id and peer_id.startswith('(last seen: '):
-        peer_id = peer_id[12: 42]
+        peer_id = peer_id[12:42]
     res = (point_id, peer_id, is_connected, is_trusted)
     return res
 
@@ -344,13 +424,13 @@ class P2pStatResult:
         lines = client_output.splitlines()
         j = lines.index('KNOWN PEERS')
         k = lines.index('KNOWN POINTS')
-        self.peers = [parse_peer(line) for line in lines[j+1:k]]
-        points_list = (parse_point(line) for line in lines[k+1:])
+        self.peers = [parse_peer(line) for line in lines[j + 1 : k]]
+        points_list = (parse_point(line) for line in lines[k + 1 :])
         for addr, peer_id, is_connected, is_trusted in points_list:
             self.points[addr] = PointInfo(peer_id, is_connected, is_trusted)
 
 
-class GetContractEntrypointTypeResult():
+class GetContractEntrypointTypeResult:
     """Result of a 'get contract entrypoint type of' command."""
 
     def __init__(self, client_output: str):
@@ -372,7 +452,7 @@ class ListMockupProtocols:
 @unique
 class CreateMockupResult(Enum):
     """
-        Possible behaviors of `tezos-client create mockup`
+    Possible behaviors of `tezos-client create mockup`
     """
 
     ALREADY_INITIALIZED = auto()
@@ -404,12 +484,21 @@ class CreateMockup:
         #   aka, where to look for the pattern
         # - the result to set in self.create_mockup_result
         outputs = [
-            (r"^  \S+ is not empty, please specify a fresh base directory$",
-             client_stderr, CreateMockupResult.DIR_NOT_EMPTY),
-            (r"^  \S+ is already initialized as a mockup directory$",
-             client_stderr, CreateMockupResult.ALREADY_INITIALIZED),
-            (r"^Created mockup client base dir in \S+$", client_stdout,
-             CreateMockupResult.OK),
+            (
+                r"^  \S+ is not empty, please specify a fresh base directory$",
+                client_stderr,
+                CreateMockupResult.DIR_NOT_EMPTY,
+            ),
+            (
+                r"^  \S+ is already initialized as a mockup directory$",
+                client_stderr,
+                CreateMockupResult.ALREADY_INITIALIZED,
+            ),
+            (
+                r"^Created mockup client base dir in \S+$",
+                client_stdout,
+                CreateMockupResult.OK,
+            ),
         ]
 
         for outp in outputs:
@@ -422,3 +511,15 @@ class CreateMockup:
                 if exit_code != expected_exit_code:
                     raise InvalidExitCode(exit_code)
                 return
+
+
+class CheckSignMessageResult:
+    """Result of a 'check that message...' command."""
+
+    def __init__(self, client_output: str):
+
+        pattern = r'Signature check successful *\n'
+        match = re.search(pattern, client_output)
+        if match is None:
+            raise InvalidClientOutput(client_output)
+        self.check = True

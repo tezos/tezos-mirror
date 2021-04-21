@@ -28,8 +28,7 @@
 
 (** Tezos - Versioned (key x value) store (over Irmin) *)
 
-module Path = Irmin.Path.String_list
-module Metadata = Irmin.Metadata.None
+open Tezos_storage_encoding.Context
 
 let reporter () =
   let report src level ~over k msgf =
@@ -75,140 +74,6 @@ let () =
                 () ))
         args
 
-module Hash : sig
-  include Irmin.Hash.S
-
-  val to_context_hash : t -> Context_hash.t
-
-  val of_context_hash : Context_hash.t -> t
-end = struct
-  module H = Digestif.Make_BLAKE2B (struct
-    let digest_size = 32
-  end)
-
-  type t = H.t
-
-  let of_context_hash s = H.of_raw_string (Context_hash.to_string s)
-
-  let to_context_hash h = Context_hash.of_string_exn (H.to_raw_string h)
-
-  let pp ppf t = Context_hash.pp ppf (to_context_hash t)
-
-  let of_string x =
-    match Context_hash.of_b58check x with
-    | Ok x ->
-        Ok (of_context_hash x)
-    | Error err ->
-        Error
-          (`Msg
-            (Format.asprintf
-               "Failed to read b58check_encoding data: %a"
-               Error_monad.pp_print_error
-               err))
-
-  let short_hash t = Irmin.Type.(short_hash string (H.to_raw_string t))
-
-  let t : t Irmin.Type.t =
-    Irmin.Type.map
-      ~cli:(pp, of_string)
-      Irmin.Type.(string_of (`Fixed H.digest_size))
-      ~short_hash
-      H.of_raw_string
-      H.to_raw_string
-
-  let hash_size = H.digest_size
-
-  let hash = H.digesti_string
-end
-
-module Node = struct
-  module M = Irmin.Private.Node.Make (Hash) (Path) (Metadata)
-
-  module V1 = struct
-    module Hash = Irmin.Hash.V1 (Hash)
-
-    type kind = [`Node | `Contents of Metadata.t]
-
-    type entry = {kind : kind; name : M.step; node : Hash.t}
-
-    (* Irmin 1.4 uses int64 to store string lengths *)
-    let step_t =
-      let pre_hash = Irmin.Type.(pre_hash (string_of `Int64)) in
-      Irmin.Type.like M.step_t ~pre_hash
-
-    let metadata_t =
-      let some = "\255\000\000\000\000\000\000\000" in
-      let none = "\000\000\000\000\000\000\000\000" in
-      Irmin.Type.(map (string_of (`Fixed 8)))
-        (fun s ->
-          match s.[0] with
-          | '\255' ->
-              None
-          | '\000' ->
-              Some ()
-          | _ ->
-              assert false)
-        (function Some _ -> some | None -> none)
-
-    (* Irmin 1.4 uses int64 to store list lengths *)
-    let entry_t : entry Irmin.Type.t =
-      let open Irmin.Type in
-      record "Tree.entry" (fun kind name node ->
-          let kind = match kind with None -> `Node | Some m -> `Contents m in
-          {kind; name; node})
-      |+ field "kind" metadata_t (function
-             | {kind = `Node; _} ->
-                 None
-             | {kind = `Contents m; _} ->
-                 Some m)
-      |+ field "name" step_t (fun {name; _} -> name)
-      |+ field "node" Hash.t (fun {node; _} -> node)
-      |> sealr
-
-    let entries_t : entry list Irmin.Type.t =
-      Irmin.Type.(list ~len:`Int64 entry_t)
-
-    let import_entry (s, v) =
-      match v with
-      | `Node h ->
-          {name = s; kind = `Node; node = h}
-      | `Contents (h, m) ->
-          {name = s; kind = `Contents m; node = h}
-
-    let import t = List.map import_entry (M.list t)
-
-    let pre_hash entries = Irmin.Type.pre_hash entries_t entries
-  end
-
-  include M
-
-  let pre_hash_v1 x = V1.pre_hash (V1.import x)
-
-  let t = Irmin.Type.(like t ~pre_hash:pre_hash_v1)
-end
-
-module Commit = struct
-  module M = Irmin.Private.Commit.Make (Hash)
-  module V1 = Irmin.Private.Commit.V1 (M)
-  include M
-
-  let pre_hash_v1 t = Irmin.Type.pre_hash V1.t (V1.import t)
-
-  let t = Irmin.Type.like t ~pre_hash:pre_hash_v1
-end
-
-module Contents = struct
-  type t = string
-
-  let pre_hash_v1 x =
-    let ty = Irmin.Type.(pair (string_of `Int64) unit) in
-    Irmin.Type.(pre_hash ty) (x, ())
-
-  let t = Irmin.Type.(like ~pre_hash:pre_hash_v1 string)
-
-  let merge = Irmin.Merge.(idempotent (Irmin.Type.option t))
-end
-
 module Conf = struct
   let entries = 32
 
@@ -216,23 +81,33 @@ module Conf = struct
 end
 
 module Store =
-  Irmin_pack.Make_ext (Conf) (Irmin.Metadata.None) (Contents)
-    (Irmin.Path.String_list)
-    (Irmin.Branch.String)
+  Irmin_pack.Make_ext
+    (struct
+      let io_version = `V1
+    end)
+    (Conf)
+    (Metadata)
+    (Contents)
+    (Path)
+    (Branch)
     (Hash)
     (Node)
     (Commit)
+
 module P = Store.Private
 
 type index = {
   path : string;
   repo : Store.Repo.t;
   patch_context : (context -> context tzresult Lwt.t) option;
+  readonly : bool;
 }
 
 and context = {index : index; parents : Store.Commit.t list; tree : Store.tree}
 
 type t = context
+
+module type S = Tezos_storage_sigs.Context.S
 
 (*-- Version Access and Update -----------------------------------------------*)
 
@@ -262,11 +137,19 @@ let restore_integrity ?ppf index =
            "unable to fix the corrupted context: %d bad entries detected"
            n)
 
+let sync index =
+  if index.readonly then Store.sync index.repo ;
+  Lwt.return ()
+
 let exists index key =
+  sync index
+  >>= fun () ->
   Store.Commit.of_hash index.repo (Hash.of_context_hash key)
   >|= function None -> false | Some _ -> true
 
 let checkout index key =
+  sync index
+  >>= fun () ->
   Store.Commit.of_hash index.repo (Hash.of_context_hash key)
   >>= function
   | None ->
@@ -287,12 +170,12 @@ let unshallow context =
   Store.Tree.list context.tree []
   >>= fun children ->
   P.Repo.batch context.index.repo (fun x y _ ->
-      Lwt_list.iter_s
+      List.iter_s
         (fun (s, k) ->
-          match k with
-          | `Contents ->
+          match Store.Tree.destruct k with
+          | `Contents _ ->
               Lwt.return ()
-          | `Node ->
+          | `Node _ ->
               Store.Tree.get_tree context.tree [s]
               >>= fun tree ->
               Store.save_tree ~clear:true context.index.repo x y tree
@@ -333,73 +216,55 @@ type key = string list
 
 type value = bytes
 
-let mem ctxt key =
-  Store.Tree.mem ctxt.tree (data_key key) >>= fun v -> Lwt.return v
+type tree = Store.tree
 
-let dir_mem ctxt key =
-  Store.Tree.mem_tree ctxt.tree (data_key key) >>= fun v -> Lwt.return v
+module Tree = Tezos_storage_helpers.Context.Make_tree (Store)
 
-let raw_get ctxt key =
-  Store.Tree.find ctxt.tree key >|= Option.map Bytes.of_string
+let mem ctxt key = Tree.mem ctxt.tree (data_key key)
 
-let get t key = raw_get t (data_key key)
+let mem_tree ctxt key = Tree.mem_tree ctxt.tree (data_key key)
 
-let raw_set ctxt key data =
-  let data = Bytes.to_string data in
-  Store.Tree.add ctxt.tree key data >>= fun tree -> Lwt.return {ctxt with tree}
+let raw_find ctxt key = Tree.find ctxt.tree key
 
-let set t key data = raw_set t (data_key key) data
+let list ctxt ?offset ?length key =
+  Tree.list ctxt.tree ?offset ?length (data_key key)
 
-let raw_del ctxt key =
-  Store.Tree.remove ctxt.tree key >>= fun tree -> Lwt.return {ctxt with tree}
+let find ctxt key = raw_find ctxt (data_key key)
 
-let remove_rec ctxt key =
-  Store.Tree.remove ctxt.tree (data_key key)
-  >>= fun tree -> Lwt.return {ctxt with tree}
+let raw_add ctxt key data =
+  Tree.add ctxt.tree key data >|= fun tree -> {ctxt with tree}
 
-let copy ctxt ~from ~to_ =
-  Store.Tree.find_tree ctxt.tree (data_key from)
-  >>= function
-  | None ->
-      Lwt.return_none
-  | Some sub_tree ->
-      Store.Tree.add_tree ctxt.tree (data_key to_) sub_tree
-      >>= fun tree -> Lwt.return_some {ctxt with tree}
+let add ctxt key data = raw_add ctxt (data_key key) data
 
-type key_or_dir = [`Key of key | `Dir of key]
+let raw_remove ctxt k =
+  Tree.remove ctxt.tree k >|= fun tree -> {ctxt with tree}
 
-let fold ctxt key ~init ~f =
-  Store.Tree.list ctxt.tree (data_key key)
-  >>= fun keys ->
-  Lwt_list.fold_left_s
-    (fun acc (name, kind) ->
-      let key =
-        match kind with
-        | `Contents ->
-            `Key (key @ [name])
-        | `Node ->
-            `Dir (key @ [name])
-      in
-      f key acc)
-    init
-    keys
+let remove ctxt key = raw_remove ctxt (data_key key)
+
+let find_tree ctxt key = Tree.find_tree ctxt.tree (data_key key)
+
+let add_tree ctxt key tree =
+  Tree.add_tree ctxt.tree (data_key key) tree >|= fun tree -> {ctxt with tree}
+
+let fold ?depth ctxt key ~init ~f =
+  Tree.fold ?depth ctxt.tree (data_key key) ~init ~f
 
 (*-- Predefined Fields -------------------------------------------------------*)
 
 let get_protocol v =
-  raw_get v current_protocol_key
+  raw_find v current_protocol_key
   >>= function
   | None ->
       assert false
   | Some data ->
       Lwt.return (Protocol_hash.of_bytes_exn data)
 
-let set_protocol v key =
+let add_protocol v key =
   let key = Protocol_hash.to_bytes key in
-  raw_set v current_protocol_key key
+  raw_add v current_protocol_key key
 
 let get_test_chain v =
-  raw_get v current_test_chain_key
+  raw_find v current_test_chain_key
   >>= function
   | None ->
       Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
@@ -414,17 +279,17 @@ let get_test_chain v =
     | Ok r ->
         Lwt.return r )
 
-let set_test_chain v id =
+let add_test_chain v id =
   let id = Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding id in
-  raw_set v current_test_chain_key id
+  raw_add v current_test_chain_key id
 
-let del_test_chain v = raw_del v current_test_chain_key
+let remove_test_chain v = raw_remove v current_test_chain_key
 
 let fork_test_chain v ~protocol ~expiration =
-  set_test_chain v (Forking {protocol; expiration})
+  add_test_chain v (Forking {protocol; expiration})
 
-let get_predecessor_block_metadata_hash v =
-  raw_get v current_predecessor_block_metadata_hash_key
+let find_predecessor_block_metadata_hash v =
+  raw_find v current_predecessor_block_metadata_hash_key
   >>= function
   | None ->
       Lwt.return_none
@@ -439,14 +304,14 @@ let get_predecessor_block_metadata_hash v =
     | Some r ->
         Lwt.return_some r )
 
-let set_predecessor_block_metadata_hash v hash =
+let add_predecessor_block_metadata_hash v hash =
   let data =
     Data_encoding.Binary.to_bytes_exn Block_metadata_hash.encoding hash
   in
-  raw_set v current_predecessor_block_metadata_hash_key data
+  raw_add v current_predecessor_block_metadata_hash_key data
 
-let get_predecessor_ops_metadata_hash v =
-  raw_get v current_predecessor_ops_metadata_hash_key
+let find_predecessor_ops_metadata_hash v =
+  raw_find v current_predecessor_ops_metadata_hash_key
   >>= function
   | None ->
       Lwt.return_none
@@ -463,22 +328,20 @@ let get_predecessor_ops_metadata_hash v =
     | Some r ->
         Lwt.return_some r )
 
-let set_predecessor_ops_metadata_hash v hash =
+let add_predecessor_ops_metadata_hash v hash =
   let data =
     Data_encoding.Binary.to_bytes_exn
       Operation_metadata_list_list_hash.encoding
       hash
   in
-  raw_set v current_predecessor_ops_metadata_hash_key data
+  raw_add v current_predecessor_ops_metadata_hash_key data
 
 (*-- Initialisation ----------------------------------------------------------*)
 
-let init ?patch_context ?mapsize:_ ?readonly root =
+let init ?patch_context ?mapsize:_ ?(readonly = false) root =
   Store.Repo.v
-    (Irmin_pack.config ?readonly ?index_log_size:!index_log_size root)
-  >>= fun repo ->
-  let v = {path = root; repo; patch_context} in
-  Lwt.return v
+    (Irmin_pack.config ~readonly ?index_log_size:!index_log_size root)
+  >|= fun repo -> {path = root; repo; patch_context; readonly}
 
 let close index = Store.Repo.close index.repo
 
@@ -493,9 +356,9 @@ let commit_genesis index ~chain_id ~time ~protocol =
   | Some patch_context ->
       patch_context ctxt )
   >>=? fun ctxt ->
-  set_protocol ctxt protocol
+  add_protocol ctxt protocol
   >>= fun ctxt ->
-  set_test_chain ctxt Not_running
+  add_test_chain ctxt Not_running
   >>= fun ctxt ->
   raw_commit ~time ~message:"Genesis" ctxt
   >>= fun commit ->
@@ -805,12 +668,12 @@ module Dumpable_context = struct
   let context_tree ctxt = ctxt.tree
 
   let tree_hash tree =
-    tree |> Store.Tree.destruct
-    |> function
+    let hash = Store.Tree.hash tree in
+    match Store.Tree.destruct tree with
     | `Node _ ->
-        `Node (Store.Tree.hash tree)
-    | `Contents (b, _) ->
-        `Blob (Store.Contents.hash b)
+        `Node hash
+    | `Contents _ ->
+        `Blob hash
 
   type binding = {
     key : string;
@@ -826,11 +689,16 @@ module Dumpable_context = struct
     >>= fun keys ->
     keys
     |> List.sort (fun (a, _) (b, _) -> String.compare a b)
-    |> Lwt_list.map_s (fun (key, value_kind) ->
-           Store.Tree.get_tree tree [key]
-           >|= fun value ->
-           let value_hash = tree_hash value in
-           {key; value; value_kind; value_hash})
+    |> List.map_s (fun (key, value) ->
+           Store.Tree.kind value []
+           >|= function
+           | None ->
+               (* The value must exist in the tree, because we're
+                  iterating over existing keys *)
+               assert false
+           | Some value_kind ->
+               let value_hash = tree_hash value in
+               {key; value; value_kind; value_hash})
     >|= fun bindings -> Store.Tree.clear tree ; bindings
 
   module Hashtbl = Hashtbl.MakeSeeded (struct
@@ -853,7 +721,7 @@ module Dumpable_context = struct
     let rec aux : type a. tree -> (unit -> a) -> a Lwt.t =
      fun tree k ->
       bindings tree
-      >>= Lwt_list.map_s (fun {key; value; value_hash; value_kind} ->
+      >>= List.map_s (fun {key; value; value_hash; value_kind} ->
               let kv = (key, value_hash) in
               if visited value_hash then Lwt.return kv
               else
@@ -876,42 +744,29 @@ module Dumpable_context = struct
 
   let update_context context tree = {context with tree}
 
-  let add_blob_hash (Batch (repo, _, _)) tree key hash =
-    Store.Contents.of_hash repo hash
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some v ->
-        Store.Tree.add tree key v >>= Lwt.return_some
-
-  let add_node_hash (Batch (repo, _, _)) tree key hash =
-    Store.Tree.of_hash repo hash
+  let add_hash (Batch (repo, _, _)) tree key hash =
+    let irmin_hash =
+      match hash with `Blob hash -> `Contents (hash, ()) | `Node _ as n -> n
+    in
+    Store.Tree.of_hash repo irmin_hash
     >>= function
     | None ->
         Lwt.return_none
     | Some t ->
         Store.Tree.add_tree tree key (t :> tree) >>= Lwt.return_some
 
-  let add_string (Batch (_, t, _)) string =
+  let add_bytes (Batch (_, t, _)) b =
     (* Save the contents in the store *)
-    Store.save_contents t string >|= fun _ -> Store.Tree.of_contents string
+    Store.save_contents t b >|= fun _ -> Store.Tree.of_contents b
 
   let add_dir batch l =
     let rec fold_list sub_tree = function
       | [] ->
           Lwt.return_some sub_tree
       | (step, hash) :: tl -> (
-        match hash with
-        | `Blob hash -> (
-            add_blob_hash batch sub_tree [step] hash
-            >>= function
-            | None -> Lwt.return_none | Some sub_tree -> fold_list sub_tree tl
-            )
-        | `Node hash -> (
-            add_node_hash batch sub_tree [step] hash
-            >>= function
-            | None -> Lwt.return_none | Some sub_tree -> fold_list sub_tree tl
-            ) )
+          add_hash batch sub_tree [step] hash
+          >>= function
+          | None -> Lwt.return_none | Some sub_tree -> fold_list sub_tree tl )
     in
     fold_list Store.Tree.empty l
     >>= function
@@ -951,9 +806,9 @@ let get_protocol_data_from_header index block_header =
   >>= fun protocol_hash ->
   get_test_chain context
   >>= fun test_chain_status ->
-  get_predecessor_block_metadata_hash context
+  find_predecessor_block_metadata_hash context
   >>= fun predecessor_block_metadata_hash ->
-  get_predecessor_ops_metadata_hash context
+  find_predecessor_ops_metadata_hash context
   >>= fun predecessor_ops_metadata_hash ->
   data_node_hash context
   >>= fun data_key ->
@@ -980,9 +835,9 @@ let validate_context_hash_consistency_and_commit ~data_hash
     Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding test_chain
   in
   let tree = Store.Tree.empty in
-  Store.Tree.add tree current_protocol_key (Bytes.to_string protocol_value)
+  Store.Tree.add tree current_protocol_key protocol_value
   >>= fun tree ->
-  Store.Tree.add tree current_test_chain_key (Bytes.to_string test_chain_value)
+  Store.Tree.add tree current_test_chain_key test_chain_value
   >>= fun tree ->
   ( match predecessor_block_metadata_hash with
   | Some predecessor_block_metadata_hash ->
@@ -992,7 +847,7 @@ let validate_context_hash_consistency_and_commit ~data_hash
       Store.Tree.add
         tree
         current_predecessor_block_metadata_hash_key
-        (Bytes.to_string predecessor_block_metadata_hash_value)
+        predecessor_block_metadata_hash_value
   | None ->
       Lwt.return tree )
   >>= fun tree ->
@@ -1005,15 +860,15 @@ let validate_context_hash_consistency_and_commit ~data_hash
       Store.Tree.add
         tree
         current_predecessor_ops_metadata_hash_key
-        (Bytes.to_string predecessor_ops_metadata_hash_value)
+        predecessor_ops_metadata_hash_value
   | None ->
       Lwt.return tree )
   >>= fun tree ->
   let info =
     Irmin.Info.v ~date:(Time.Protocol.to_seconds timestamp) ~author message
   in
-  let data_tree = Store.Tree.shallow index.repo data_hash in
-  Store.Tree.add_tree tree ["data"] data_tree
+  let data_tree = Store.Tree.shallow index.repo (`Node data_hash) in
+  Store.Tree.add_tree tree current_data_key data_tree
   >>= fun node ->
   let node = Store.Tree.hash node in
   let commit = P.Commit.Val.v ~parents ~node ~info in
@@ -1025,13 +880,13 @@ let validate_context_hash_consistency_and_commit ~data_hash
       let parent = Store.of_private_commit index.repo commit in
       {index; tree = Store.Tree.empty; parents = [parent]}
     in
-    set_test_chain ctxt test_chain
+    add_test_chain ctxt test_chain
     >>= fun ctxt ->
-    set_protocol ctxt protocol_hash
+    add_protocol ctxt protocol_hash
     >>= fun ctxt ->
     ( match predecessor_block_metadata_hash with
     | Some predecessor_block_metadata_hash ->
-        set_predecessor_block_metadata_hash
+        add_predecessor_block_metadata_hash
           ctxt
           predecessor_block_metadata_hash
     | None ->
@@ -1039,11 +894,11 @@ let validate_context_hash_consistency_and_commit ~data_hash
     >>= fun ctxt ->
     ( match predecessor_ops_metadata_hash with
     | Some predecessor_ops_metadata_hash ->
-        set_predecessor_ops_metadata_hash ctxt predecessor_ops_metadata_hash
+        add_predecessor_ops_metadata_hash ctxt predecessor_ops_metadata_hash
     | None ->
         Lwt.return ctxt )
     >>= fun ctxt ->
-    let data_t = Store.Tree.shallow index.repo data_hash in
+    let data_t = Store.Tree.shallow index.repo (`Node data_hash) in
     Store.Tree.add_tree ctxt.tree current_data_key data_t
     >>= fun new_tree ->
     Store.Commit.v ctxt.index.repo ~info ~parents new_tree
@@ -1112,7 +967,10 @@ let () =
 
 let dump_contexts idx datas ~filename =
   let file_init () =
-    Lwt_unix.openfile filename Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o666
+    Lwt_unix.openfile
+      filename
+      Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC; O_CLOEXEC]
+      0o666
     >>= return
   in
   Lwt.catch file_init (function
@@ -1127,7 +985,7 @@ let dump_contexts idx datas ~filename =
 
 let restore_contexts idx ~filename k_store_pruned_block pipeline_validation =
   let file_init () =
-    Lwt_unix.openfile filename Lwt_unix.[O_RDONLY] 0o600 >>= return
+    Lwt_unix.openfile filename Lwt_unix.[O_RDONLY; O_CLOEXEC] 0o600 >>= return
   in
   Lwt.catch file_init (function
       | Unix.Unix_error (e, _, _) ->

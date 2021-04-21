@@ -289,12 +289,12 @@ Docker
 ~~~~~~
 
 The docker image runs the daemons by default for all your keys.
-Assuming you run on Carthagenet, to know if you baked, just run::
+Assuming you run on Edo2net, to know if you baked, just run::
 
-    ./carthagenet.sh baker log
-    ./carthagenet.sh endorser log
+    ./edo2net.sh baker log
+    ./edo2net.sh endorser log
 
-(replace ``carthagenet.sh`` with ``mainnet.sh`` for Mainnet).
+(replace ``edo2net.sh`` with ``mainnet.sh`` for Mainnet).
 You should see lines such as::
 
     Injected block BLxzbB7PBW1axq for bootstrap5 after BLSrg4dXzL2aqq  (level 1381, slot 0, fitness 00::0000000000005441, operations 21)

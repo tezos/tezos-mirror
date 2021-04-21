@@ -96,11 +96,11 @@ let begin_partial_application ~chain_id ~ancestor_context
 let version_number = "\001"
 
 let int64_to_bytes i =
-  let b = MBytes.create 8 in
-  MBytes.set_int64 b 0 i ; b
+  let b = Bytes.make 8 '0' in
+  TzEndian.set_int64 b 0 i ; b
 
 let fitness_from_level level =
-  [MBytes.of_string version_number; int64_to_bytes level]
+  [Bytes.of_string version_number; int64_to_bytes level]
 
 let begin_construction ~chain_id:_ ~predecessor_context:context
     ~predecessor_timestamp:_ ~predecessor_level ~predecessor_fitness

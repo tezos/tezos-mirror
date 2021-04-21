@@ -1,0 +1,312 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(* This module creates simple p2p nodes. The others parts of the shell are
+   disabled.
+   The function [detach_nodes] creates a network of nodes.
+   The message [Ping] is the unique none p2p message usde by nodes.
+   The function [sync] is used to create a barrier for all the nodes of a
+   network. *)
+
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["test"; "p2p"; "node"]
+
+  let process_timeout =
+    declare_0
+      ~section
+      ~name:"process_timeout"
+      ~msg:"Process timeout"
+      ~level:Debug
+      ()
+
+  let node_ready =
+    declare_1
+      ~section
+      ~name:"node_ready"
+      ~msg:"Node ready (port: {port})@."
+      ~level:Info
+      ("port", Data_encoding.uint16)
+
+  let sync_iteration =
+    declare_1
+      ~section
+      ~name:"sync_iteration"
+      ~msg:"Sync iteration {iteration}."
+      ~level:Debug
+      ("iteration", Data_encoding.int31)
+
+  let shutting_down =
+    declare_0
+      ~section
+      ~name:"shutting_down"
+      ~msg:"Shuting done..."
+      ~level:Info
+      ()
+
+  let bye = declare_0 ~section ~name:"bye" ~msg:"Bye." ~level:Info ()
+end
+
+type message = Ping
+
+let msg_config : message P2p_params.message_config =
+  {
+    encoding =
+      [ P2p_params.Encoding
+          {
+            tag = 0x10;
+            title = "Ping";
+            encoding = Data_encoding.empty;
+            wrap = (function () -> Ping);
+            unwrap = (function Ping -> Some ());
+            max_length = None;
+          } ];
+    chain_name = Distributed_db_version.Name.of_string "SANDBOXED_TEZOS";
+    distributed_db_versions = Distributed_db_version.[zero; one];
+  }
+
+type metadata = Metadata
+
+let metadata_encoding =
+  Data_encoding.conv (fun _ -> ()) (fun _ -> Metadata) Data_encoding.empty
+
+let peer_meta_config : metadata P2p_params.peer_meta_config =
+  {
+    peer_meta_encoding = metadata_encoding;
+    peer_meta_initial = (fun _ -> Metadata);
+    score = (fun Metadata -> 0.);
+  }
+
+let conn_meta_config : metadata P2p_params.conn_meta_config =
+  {
+    conn_meta_encoding = metadata_encoding;
+    conn_meta_value = (fun () -> Metadata);
+    private_node = (fun _ -> false);
+  }
+
+type t = {
+  iteration : int ref;
+  channel : (unit, unit) Process.Channel.t;
+  connect_handler : (message, metadata, metadata) P2p_connect_handler.t;
+  pool : (message, metadata, metadata) Tezos_p2p.P2p_pool.t;
+  watcher : P2p_connection.P2p_event.t Lwt_watcher.input;
+  trigger : P2p_trigger.t;
+  points : P2p_point.Id.t list;
+  trusted_points : P2p_point.Id.t list;
+}
+
+(** Syncing inside the detached process *)
+let sync (node : t) =
+  incr node.iteration ;
+  Event.(emit sync_iteration) !(node.iteration)
+  >>= fun () ->
+  Process.Channel.push node.channel ()
+  >>=? fun () -> Process.Channel.pop node.channel
+
+(** Syncing from the main process everyone until one node fails to sync  *)
+let rec sync_nodes nodes =
+  List.iter_ep (fun p -> Process.receive p) nodes
+  >>=? fun () ->
+  List.iter_ep (fun p -> Process.send p ()) nodes
+  >>=? fun () -> sync_nodes nodes
+
+let sync_nodes nodes =
+  sync_nodes nodes
+  >>= function
+  | Ok () | Error (Exn End_of_file :: _) ->
+      return_unit
+  | Error _ as err ->
+      Lwt.return err
+
+(**Detach a process with a p2p_pool and a welcome worker.  *)
+let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
+    ?max_connections ?max_incoming_connections ?p2p_versions
+    ?(msg_config = msg_config) canceler f trusted_points all_points addr port =
+  let trusted_points =
+    List.filter
+      (fun p -> not (P2p_point.Id.equal (addr, port) p))
+      trusted_points
+  in
+  let proof_of_work_target = Crypto_box.make_pow_target 0. in
+  let identity = P2p_identity.generate_with_pow_target_0 () in
+  let private_mode = false in
+  let nb_points = List.length trusted_points in
+  let unopt = Option.value ~default:nb_points in
+  let connect_handler_cfg =
+    P2p_connect_handler.
+      {
+        identity;
+        proof_of_work_target;
+        listening_port = Some port;
+        private_mode;
+        reconnection_config = P2p_point_state.Info.default_reconnection_config;
+        min_connections = unopt min_connections;
+        max_connections = unopt max_connections;
+        max_incoming_connections = unopt max_incoming_connections;
+        connection_timeout = Time.System.Span.of_seconds_exn 10.;
+        authentication_timeout = Time.System.Span.of_seconds_exn 2.;
+        incoming_app_message_queue_size = None;
+        incoming_message_queue_size = None;
+        outgoing_message_queue_size = None;
+        binary_chunks_size = None;
+      }
+  in
+  let pool_config =
+    P2p_pool.
+      {
+        identity;
+        trusted_points = List.map (fun p -> (p, None)) trusted_points;
+        peers_file = "/dev/null";
+        private_mode;
+        max_known_points = None;
+        max_known_peer_ids = None;
+        peer_greylist_size = 10;
+        ip_greylist_size_in_kilobytes = 1024;
+        ip_greylist_cleanup_delay = Time.System.Span.of_seconds_exn 60.;
+      }
+  in
+  Process.detach
+    ~prefix:
+      (Format.asprintf
+         "%s%a:%d: "
+         prefix
+         P2p_peer.Id.pp_short
+         identity.peer_id
+         port)
+    ~canceler
+    (fun channel ->
+      let timer ti =
+        Lwt_unix.sleep ti >>= fun () -> Event.(emit process_timeout) ()
+      in
+      with_timeout
+        ~canceler
+        (Option.fold ~some:timer ~none:(Lwt_utils.never_ending ()) timeout)
+        (fun _canceler ->
+          let iteration = ref 0 in
+          let sched =
+            P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) ()
+          in
+          let trigger = P2p_trigger.create () in
+          let watcher = Lwt_watcher.create_input () in
+          let log event = Lwt_watcher.notify watcher event in
+          P2p_pool.create pool_config peer_meta_config ~log trigger
+          >>= fun pool ->
+          let answerer = lazy (P2p_protocol.create_private ()) in
+          let connect_handler =
+            P2p_connect_handler.create
+              ?p2p_versions
+              connect_handler_cfg
+              pool
+              msg_config
+              conn_meta_config
+              sched
+              trigger
+              ~log
+              ~answerer
+          in
+          Lwt_list.map_p
+            (fun point ->
+              P2p_pool.Points.info pool point
+              |> Option.iter (fun info ->
+                     P2p_point_state.set_private info false) ;
+              Lwt.return_unit)
+            trusted_points
+          >>= fun _ ->
+          P2p_welcome.create ~backlog:10 connect_handler ~addr port
+          >>= fun welcome ->
+          P2p_welcome.activate welcome ;
+          Event.(emit node_ready) port
+          >>= fun () ->
+          let node =
+            {
+              iteration;
+              channel;
+              connect_handler;
+              pool;
+              watcher;
+              trigger;
+              trusted_points;
+              points = all_points;
+            }
+          in
+          sync node
+          >>=? fun () ->
+          (* Sync interaction 1 *)
+          f node
+          >>=? fun () ->
+          Event.(emit shutting_down) ()
+          >>= fun () ->
+          P2p_welcome.shutdown welcome
+          >>= fun () ->
+          P2p_pool.destroy pool
+          >>= fun () ->
+          P2p_io_scheduler.shutdown sched
+          >>= fun () -> Event.(emit bye) () >>= fun () -> return_unit))
+
+(**Detach one process per id in [points], each with a p2p_pool and a
+   welcome worker.
+
+   Most arguments are the same as for [detach_node] but they are
+  function that specify the value of the argument for a given position
+  in the list of points, allowing to specify the characteristics of
+  each detached node.
+
+  *)
+let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
+    ?max_incoming_connections ?p2p_versions ?msg_config
+    ?(trusted = fun _ points -> points) run_node points =
+  let canceler = Lwt_canceler.create () in
+  Lwt_list.mapi_s
+    (fun n _ ->
+      let prefix = Option.map (fun f -> f n) prefix in
+      let p2p_versions = Option.map (fun f -> f n) p2p_versions in
+      let msg_config = Option.map (fun f -> f n) msg_config in
+      let min_connections = Option.map (fun f -> f n) min_connections in
+      let max_connections = Option.map (fun f -> f n) max_connections in
+      let max_incoming_connections =
+        Option.map (fun f -> f n) max_incoming_connections
+      in
+      let ((addr, port), other_points) = List.select n points in
+      detach_node
+        ?prefix
+        ?p2p_versions
+        ?timeout
+        ?min_connections
+        ?max_connections
+        ?max_incoming_connections
+        ?msg_config
+        canceler
+        (run_node n)
+        (trusted n points)
+        other_points
+        addr
+        port)
+    points
+  >>= fun nodes ->
+  Lwt.return @@ Error_monad.all_e nodes
+  >>=? fun nodes ->
+  Lwt.ignore_result (sync_nodes nodes) ;
+  Process.wait_all nodes

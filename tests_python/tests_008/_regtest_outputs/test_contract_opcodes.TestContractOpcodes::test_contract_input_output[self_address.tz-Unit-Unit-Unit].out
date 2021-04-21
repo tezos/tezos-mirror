@@ -1,0 +1,54 @@
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[self_address.tz-Unit-Unit-Unit]
+
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 6 (remaining gas: 1039983.390 units remaining)
+    [ (Pair Unit Unit)  	 ]
+  - location: 7 (remaining gas: 1039983.250 units remaining)
+    [  ]
+  - location: 8 (remaining gas: 1039983.110 units remaining)
+    [ { DROP ; SELF_ADDRESS }  	 ]
+  - location: 14 (remaining gas: 1039982.970 units remaining)
+    [ Unit  	
+      { DROP ; SELF_ADDRESS }  	 ]
+  - location: 11 (remaining gas: 1039982.810 units remaining)
+    [ Unit  	@arg ]
+  - location: 12 (remaining gas: 1039982.670 units remaining)
+    [  ]
+  - location: 13 (remaining gas: 1039982.530 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self ]
+  - location: -1 (remaining gas: 1039982.460 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self ]
+  - location: 15 (remaining gas: 1039982.460 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
+  - location: 16 (remaining gas: 1039982.320 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self
+      "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
+  - location: 17 (remaining gas: 1039982.180 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self.address
+      "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
+  - location: 20 (remaining gas: 1039981.782 units remaining)
+    [ 0  	 ]
+  - location: 21 (remaining gas: 1039981.642 units remaining)
+    [ True  	 ]
+  - location: -1 (remaining gas: 1039981.572 units remaining)
+    [ True  	 ]
+  - location: 23 (remaining gas: 1039981.382 units remaining)
+    [  ]
+  - location: -1 (remaining gas: 1039981.312 units remaining)
+    [  ]
+  - location: 28 (remaining gas: 1039981.172 units remaining)
+    [ Unit  	 ]
+  - location: 29 (remaining gas: 1039981.032 units remaining)
+    [ {}  	
+      Unit  	 ]
+  - location: 31 (remaining gas: 1039980.892 units remaining)
+    [ (Pair {} Unit)  	 ]
+  - location: -1 (remaining gas: 1039980.822 units remaining)
+    [ (Pair {} Unit)  	 ]
+

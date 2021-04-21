@@ -230,8 +230,6 @@ let check_tags tags =
          must be at most 32 character long.\n" ;
       exit 1
 
-module String_set = Set.Make (String)
-
 let known_files = ref String_set.empty
 
 let known_titles = ref String_set.empty
@@ -255,75 +253,119 @@ let check_existence kind known specified =
       List.iter (Printf.eprintf "Unknown %s: %s\n" kind) unknown ;
       false
 
+(* Field [time] contains the cumulated time taken by all successful runs of this test. *)
 type test = {
   file : string;
   title : string;
   tags : string list;
   body : unit -> unit Lwt.t;
+  mutable time : float;
 }
 
 (* List of tests added using [add] and that match command-line filters. *)
 let list : test list ref = ref []
 
-let list_tests () =
-  let file_header = "FILE" in
-  let title_header = "TITLE" in
-  let tags_header = "TAGS" in
-  let list =
-    List.map
-      (fun {file; title; tags; _} -> (file, title, String.concat ", " tags))
-      !list
-  in
-  (* Compute the size of each column. *)
-  let (file_size, title_size, tags_size) =
-    List.fold_left
-      (fun (max_file, max_title, max_tags) (file, title, tags) ->
-        ( max max_file (String.length file),
-          max max_title (String.length title),
-          max max_tags (String.length tags) ))
-      ( String.length file_header,
-        String.length title_header,
-        String.length tags_header )
-      list
-  in
-  (* Prepare the line separator. *)
-  let line =
-    "+"
-    ^ String.make (file_size + 2) '-'
-    ^ "+"
-    ^ String.make (title_size + 2) '-'
-    ^ "+"
-    ^ String.make (tags_size + 2) '-'
-    ^ "+\n"
-  in
-  (* Print the header row. *)
-  print_string line ;
-  let center size header =
-    let padding = size - String.length header in
-    let left_padding = padding / 2 in
-    let right_padding = padding - left_padding in
-    String.make left_padding ' ' ^ header ^ String.make right_padding ' '
-  in
-  Printf.printf
-    "| %s | %s | %s |\n"
-    (center file_size file_header)
-    (center title_size title_header)
-    (center tags_size tags_header) ;
-  print_string line ;
-  (* Print rows. *)
-  let pad size text =
-    let padding = size - String.length text in
-    text ^ String.make padding ' '
-  in
-  List.iter
-    (fun (file, title, tags) ->
+let list_tests format =
+  match format with
+  | `Tsv ->
+      List.iter
+        (fun {file; title; tags; _} ->
+          Printf.printf "%s\t%s\t%s\n%!" file title (String.concat " " tags))
+        !list
+  | `Ascii_art ->
+      let file_header = "FILE" in
+      let title_header = "TITLE" in
+      let tags_header = "TAGS" in
+      let list =
+        List.map
+          (fun {file; title; tags; _} ->
+            (file, title, String.concat ", " tags))
+          !list
+      in
+      (* Compute the size of each column. *)
+      let (file_size, title_size, tags_size) =
+        List.fold_left
+          (fun (max_file, max_title, max_tags) (file, title, tags) ->
+            ( max max_file (String.length file),
+              max max_title (String.length title),
+              max max_tags (String.length tags) ))
+          ( String.length file_header,
+            String.length title_header,
+            String.length tags_header )
+          list
+      in
+      (* Prepare the line separator. *)
+      let line =
+        "+"
+        ^ String.make (file_size + 2) '-'
+        ^ "+"
+        ^ String.make (title_size + 2) '-'
+        ^ "+"
+        ^ String.make (tags_size + 2) '-'
+        ^ "+\n"
+      in
+      (* Print the header row. *)
+      print_string line ;
+      let center size header =
+        let padding = size - String.length header in
+        let left_padding = padding / 2 in
+        let right_padding = padding - left_padding in
+        String.make left_padding ' ' ^ header ^ String.make right_padding ' '
+      in
       Printf.printf
         "| %s | %s | %s |\n"
-        (pad file_size file)
-        (pad title_size title)
-        (pad tags_size tags))
-    list ;
-  if list <> [] then print_string line ;
+        (center file_size file_header)
+        (center title_size title_header)
+        (center tags_size tags_header) ;
+      print_string line ;
+      (* Print rows. *)
+      let pad size text =
+        let padding = size - String.length text in
+        text ^ String.make padding ' '
+      in
+      List.iter
+        (fun (file, title, tags) ->
+          Printf.printf
+            "| %s | %s | %s |\n"
+            (pad file_size file)
+            (pad title_size title)
+            (pad tags_size tags))
+        list ;
+      if list <> [] then print_string line ;
+      ()
+
+let display_time_summary () =
+  let sum_time = List.fold_left (fun acc {time; _} -> acc +. time) 0. in
+  let total_time = sum_time !list in
+  let tests_by_file =
+    List.fold_left
+      (fun acc test ->
+        String_map.add
+          test.file
+          ( test
+          :: (String_map.find_opt test.file acc |> Option.value ~default:[]) )
+          acc)
+      String_map.empty
+      !list
+  in
+  let show_time seconds =
+    let seconds = int_of_float seconds in
+    if seconds < 60 then Printf.sprintf "%ds" seconds
+    else Printf.sprintf "%dmin %ds" (seconds / 60) (seconds mod 60)
+  in
+  let print_time prefix title time =
+    Printf.printf
+      "%s[%d%% - %s] %s\n"
+      prefix
+      (int_of_float (time *. 100. /. total_time))
+      (show_time time)
+      title
+  in
+  let print_time_for_file file tests =
+    print_time "" file (sum_time tests) ;
+    List.iter (fun {title; time; _} -> print_time "- " title time) tests
+  in
+  String_map.iter print_time_for_file tests_by_file ;
   ()
 
 let register ~__FILE__ ~title ~tags body =
@@ -333,7 +375,7 @@ let register ~__FILE__ ~title ~tags body =
   register_title title ;
   List.iter register_tag tags ;
   if test_should_be_run ~file ~title ~tags then
-    list := {file; title; tags; body} :: !list
+    list := {file; title; tags; body; time = 0.} :: !list
 
 let run () =
   (* Check command-line options. *)
@@ -365,17 +407,24 @@ let run () =
              Cli.options.tests_to_run
          @ Cli.options.tags_to_run
          @ List.map (sf "/%s") Cli.options.tags_not_to_run )) ;
-    if not Cli.options.list then
+    if Cli.options.list = None then
       prerr_endline
         "You can use --list to get the list of tests and their tags." ) ;
   (* Actually run the tests (or list them). *)
-  ( if Cli.options.list then list_tests ()
-  else
-    let rec run iteration =
-      List.iter
-        (fun {title; body; _} -> really_run ~iteration title body)
-        !list ;
-      if Cli.options.loop then run (iteration + 1)
-    in
-    run 1 ) ;
-  if !a_test_failed then exit 1
+  match Cli.options.list with
+  | Some format ->
+      list_tests format
+  | None ->
+      let rec run iteration =
+        let run_and_measure_time test =
+          let start = Unix.gettimeofday () in
+          really_run ~iteration test.title test.body ;
+          let time = Unix.gettimeofday () -. start in
+          test.time <- test.time +. time
+        in
+        List.iter run_and_measure_time !list ;
+        if Cli.options.loop then run (iteration + 1)
+      in
+      run 1 ;
+      if !a_test_failed then exit 1 ;
+      if Cli.options.time then display_time_summary ()

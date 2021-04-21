@@ -25,10 +25,6 @@
 
 open Client_keys
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "client.signer.ledger"
-end)
-
 type error += NoLedgerSupport
 
 let () =

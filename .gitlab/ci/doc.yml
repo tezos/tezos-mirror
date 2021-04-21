@@ -1,0 +1,43 @@
+---
+
+documentation:build:
+  extends: .runtime_build_test_dependencies_template
+  interruptible: true
+  stage: build
+  except:
+    - master
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
+  script:
+    - make -C docs html
+  artifacts:
+    paths:
+      - docs
+    expire_in: 1 week
+
+documentation:linkcheck:
+  extends: .runtime_build_test_dependencies_template
+  stage: doc
+  before_script:
+    - . ./scripts/version.sh
+  dependencies:
+    - documentation:build
+  rules:
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /doc/'
+      when: on_success
+    - changes:
+        - /docs
+      when: on_success
+    - when: never
+  script:
+    - make -C docs redirectcheck
+    - make -C docs linkcheck
+    - make -C docs sanitycheck
+  allow_failure: true
+  interruptible: true

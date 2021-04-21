@@ -34,22 +34,30 @@ open Alpha_context
 (****************************************************************)
 
 let get_first_different_baker baker bakers =
-  List.find
-    (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
-    bakers
+  WithExceptions.Option.get ~loc:__LOC__
+  @@ List.find
+       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
+       bakers
 
 let get_first_different_bakers ctxt =
   Context.get_bakers ctxt
   >|=? fun bakers ->
-  let baker_1 = List.hd bakers in
-  get_first_different_baker baker_1 (List.tl bakers)
+  let baker_1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
+  get_first_different_baker
+    baker_1
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.tl bakers)
   |> fun baker_2 -> (baker_1, baker_2)
 
 let get_first_different_endorsers ctxt =
   Context.get_endorsers ctxt
   >|=? fun endorsers ->
-  let endorser_1 = List.hd endorsers in
-  let endorser_2 = List.hd (List.tl endorsers) in
+  let endorser_1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers
+  in
+  let endorser_2 =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.hd (WithExceptions.Option.get ~loc:__LOC__ @@ List.tl endorsers)
+  in
   (endorser_1, endorser_2)
 
 let block_fork b =
@@ -90,7 +98,7 @@ let valid_double_endorsement_evidence () =
   Block.bake ~policy:(By_account baker) ~operation blk_a
   >>=? fun blk ->
   (* Check that the frozen deposit, the fees and rewards are removed *)
-  iter_s
+  List.iter_es
     (fun kind ->
       let contract = Alpha_context.Contract.implicit_contract delegate in
       Assert.balance_is ~loc:__LOC__ (B blk) contract ~kind Tez.zero)
@@ -159,7 +167,7 @@ let too_late_double_endorsement_evidence () =
   >>=? fun endorsement_a ->
   Op.endorsement ~delegate (B blk_b) ()
   >>=? fun endorsement_b ->
-  fold_left_s
+  List.fold_left_es
     (fun blk _ -> Block.bake_until_cycle_end blk)
     blk_a
     (1 -- (preserved_cycles + 1))
@@ -213,10 +221,14 @@ let different_delegates () =
 let wrong_delegate () =
   Context.init ~endorsers_per_block:1 2
   >>=? fun (b, contracts) ->
-  Error_monad.map_s (Context.Contract.manager (B b)) contracts
+  List.map_es (Context.Contract.manager (B b)) contracts
   >>=? fun accounts ->
-  let pkh1 = (List.nth accounts 0).Account.pkh in
-  let pkh2 = (List.nth accounts 1).Account.pkh in
+  let pkh1 =
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 0).Account.pkh
+  in
+  let pkh2 =
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 1).Account.pkh
+  in
   block_fork b
   >>=? fun (blk_a, blk_b) ->
   Context.get_endorser (B blk_a)
@@ -241,21 +253,21 @@ let wrong_delegate () =
           false)
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "valid double endorsement evidence"
       `Quick
       valid_double_endorsement_evidence;
-    Test.tztest
+    Test_services.tztest
       "invalid double endorsement evidence"
       `Quick
       invalid_double_endorsement;
-    Test.tztest
+    Test_services.tztest
       "too early double endorsement evidence"
       `Quick
       too_early_double_endorsement_evidence;
-    Test.tztest
+    Test_services.tztest
       "too late double endorsement evidence"
       `Quick
       too_late_double_endorsement_evidence;
-    Test.tztest "different delegates" `Quick different_delegates;
-    Test.tztest "wrong delegate" `Quick wrong_delegate ]
+    Test_services.tztest "different delegates" `Quick different_delegates;
+    Test_services.tztest "wrong delegate" `Quick wrong_delegate ]

@@ -4,6 +4,7 @@
             alcotest-lwt)
  (flags (:standard -open Tezos_error_monad
                    -open Tezos_stdlib
+                   -open Tezos_error_monad.TzLwtreslib
                    -open Tezos_crypto
                    -open Tezos_client_base
                    -open Tezos_signer_backends)))

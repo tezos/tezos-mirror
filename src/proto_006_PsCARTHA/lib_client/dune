@@ -5,7 +5,6 @@
             tezos-protocol-006-PsCARTHA
             tezos-shell-services
             tezos-client-base
-            tezos-mockup-registration
             tezos-rpc
             tezos-signer-backends
             tezos-protocol-006-PsCARTHA-parameters)

@@ -68,15 +68,17 @@ let fake_ctx () =
           match distributed with
           | false ->
               distributed <- true ;
-              return (List.nth passwords 0)
+              return
+                (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth passwords 0)
           | true ->
               i <- (if i = nb_passwds - 1 then 0 else succ i) ;
               distributed <- false ;
-              return (List.nth passwords i))
+              return
+                (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth passwords i))
   end
 
 let make_sk_uris =
-  map_p (fun path ->
+  List.map_ep (fun path ->
       Client_keys.make_sk_uri (Uri.make ~scheme:"encrypted" ~path ()))
 
 let ed25519_sks =
@@ -120,12 +122,12 @@ let sk_testable =
 
 let test_vectors () =
   let open Encrypted in
-  iter_s
+  List.iter_es
     (fun (sks, encrypted_sks) ->
       let ctx = fake_ctx () in
       let sks = List.map Signature.Secret_key.of_b58check_exn sks in
       encrypted_sks
-      >>=? map_s (decrypt ctx)
+      >>=? List.map_es (decrypt ctx)
       >>=? fun decs ->
       assert (decs = sks) ;
       return_unit)
@@ -157,7 +159,7 @@ let test_random algo =
     process is repeated 10 times.
 *)
 let test_random _switch () =
-  iter_s test_random Signature.[Ed25519; Secp256k1; P256]
+  List.iter_es test_random Signature.[Ed25519; Secp256k1; P256]
   >>= function
   | Ok _ -> Lwt.return_unit | Error _ -> Lwt.fail_with "test_random"
 

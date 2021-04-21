@@ -36,17 +36,31 @@
 (* Test.
    Call `tezos-client rpc list` and check that return code is 0.
  *)
-let test_rpc_list protocol =
+let test_rpc_list ~protocol =
   Test.register
     ~__FILE__
-    ~title:"rpc list (mockup)"
-    ~tags:["mockup"; "client"; "rpc"]
+    ~title:(sf "(%s) (Mockup) RPC list" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "mockup"; "client"; "rpc"]
   @@ fun () ->
   let* client = Client.init_mockup ~protocol () in
   let* _ = Client.rpc_list client in
   Lwt.return_unit
 
-let transfer_data = (Constant.bootstrap1.alias, 1, Constant.bootstrap2.alias)
+(* Test.
+   Call `tezos-client rpc /chains/<chain_id>/blocks/<block_id>/header/shell` and check that return code is 0.
+ *)
+let test_rpc_header_shell ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:(sf "(%s) (Mockup) RPC header/shell" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "mockup"; "client"; "rpc"]
+  @@ fun () ->
+  let* client = Client.init_mockup ~protocol () in
+  let* _ = Client.shell_header client in
+  Lwt.return_unit
+
+let transfer_data =
+  (Constant.bootstrap1.alias, Tez.one, Constant.bootstrap2.alias)
 
 let test_balances_after_transfer giver amount receiver =
   let (giver_balance_before, giver_balance_after) = giver in
@@ -70,11 +84,11 @@ let test_balances_after_transfer giver amount receiver =
 (* Test.
    Transfer some tz and check balance changes are as expected.
  *)
-let test_transfer ~(protocol : Constant.protocol) =
+let test_transfer ~protocol =
   Test.register
     ~__FILE__
-    ~title:(Printf.sprintf "transfer (mockup / %s)" protocol.tag)
-    ~tags:["mockup"; "client"; "transfer"; protocol.tag]
+    ~title:(sf "(%s) (Mockup) Transfer" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "mockup"; "client"; "transfer"]
   @@ fun () ->
   let (giver, amount, receiver) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -82,7 +96,11 @@ let test_transfer ~(protocol : Constant.protocol) =
   let* receiver_balance_before =
     Client.get_balance_for ~account:receiver client
   in
-  Log.info "About to transfer %d from %s to %s" amount giver receiver ;
+  Log.info
+    "About to transfer %s from %s to %s"
+    (Tez.to_string amount)
+    giver
+    receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   let* giver_balance_after = Client.get_balance_for ~account:giver client in
   let* receiver_balance_after =
@@ -90,11 +108,284 @@ let test_transfer ~(protocol : Constant.protocol) =
   in
   test_balances_after_transfer
     (giver_balance_before, giver_balance_after)
-    (float_of_int amount)
+    (Tez.to_float amount)
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
-let register () =
-  test_rpc_list Constant.alpha ;
-  test_transfer ~protocol:Constant.alpha ;
-  test_transfer ~protocol:Constant.carthage
+let test_simple_baking_event ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf "(%s) (Mockup) Transfer (asynchronous)" (Protocol.name protocol))
+    ~tags:
+      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
+  @@ fun () ->
+  let (giver, amount, receiver) = transfer_data in
+  let* client =
+    Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
+  in
+  Log.info
+    "Transferring %s from %s to %s"
+    (Tez.to_string amount)
+    giver
+    receiver ;
+  let* () = Client.transfer ~amount ~giver ~receiver client in
+  Log.info "Baking pending operations..." ;
+  Client.bake_for ~key:giver client
+
+let test_same_transfer_twice ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "(%s) (Mockup) Same transfer twice (asynchronous)"
+         (Protocol.name protocol))
+    ~tags:
+      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
+  @@ fun () ->
+  let (giver, amount, receiver) = transfer_data in
+  let* client =
+    Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
+  in
+  let mempool_file = Client.base_dir client // "mockup" // "mempool.json" in
+  Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
+  let* () = Client.transfer ~amount ~giver ~receiver client in
+  let* mempool1 = read_file mempool_file in
+  Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
+  let* () = Client.transfer ~amount ~giver ~receiver client in
+  let* mempool2 = read_file mempool_file in
+  Log.info "Checking that mempool is unchanged" ;
+  if mempool1 <> mempool2 then
+    Test.fail
+      "Expected mempool to stay unchanged\n--\n%s--\n %s"
+      mempool1
+      mempool2 ;
+  return ()
+
+let test_transfer_same_participants ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "(%s) (Mockup) Transfer same participants (asynchronous)"
+         (Protocol.name protocol))
+    ~tags:
+      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
+  @@ fun () ->
+  let (giver, amount, receiver) = transfer_data in
+  let* client =
+    Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
+  in
+  let base_dir = Client.base_dir client in
+  let mempool_file = base_dir // "mockup" // "mempool.json" in
+  let thrashpool_file = base_dir // "mockup" // "trashpool.json" in
+  Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
+  let* () = Client.transfer ~amount ~giver ~receiver client in
+  let* mempool1 = read_file mempool_file in
+  let amount = Tez.(amount + one) in
+  Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
+  (* The next process is expected to fail *)
+  let process = Client.spawn_transfer ~amount ~giver ~receiver client in
+  let* status = Process.wait process in
+  if status = Unix.WEXITED 0 then
+    Test.fail "Last transfer was successful but was expected to fail ..." ;
+  let* mempool2 = read_file mempool_file in
+  Log.info "Checking that mempool is unchanged" ;
+  if mempool1 <> mempool2 then
+    Test.fail
+      "Expected mempool to stay unchanged\n--\n%s\n--\n %s"
+      mempool1
+      mempool2 ;
+  Log.info
+    "Checking that last operation was discarded into a newly created trashpool" ;
+  let* str = read_file thrashpool_file in
+  if String.equal str "" then
+    Test.fail "Expected thrashpool to have one operation." ;
+  return ()
+
+let test_multiple_baking ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "(%s) (Mockup) Multi transfer/multi baking (asynchronous)"
+         (Protocol.name protocol))
+    ~tags:
+      ["mockup"; "client"; "transfer"; Protocol.tag protocol; "asynchronous"]
+  @@ fun () ->
+  let (alice, _amount, bob) = transfer_data and baker = "bootstrap3" in
+  let* client =
+    Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
+  in
+  Lwt_list.iteri_s
+    (fun i amount ->
+      let amount = Tez.of_int amount in
+      let* () = Client.transfer ~amount ~giver:alice ~receiver:bob client in
+      let* () = Client.transfer ~amount ~giver:bob ~receiver:alice client in
+      let* () = Client.bake_for ~key:baker client in
+      let* alice_balance = Client.get_balance_for ~account:alice client in
+      let* bob_balance = Client.get_balance_for ~account:bob client in
+      Log.info
+        "%d. Balances\n  - Alice :: %f\n  - Bob ::   %f"
+        i
+        alice_balance
+        bob_balance ;
+      if alice_balance <> bob_balance then
+        Test.fail
+          "Unexpected balances for Alice (%f) and Bob (%f). They should be \
+           equal."
+          alice_balance
+          bob_balance ;
+      return ())
+    (range 1 10)
+
+let perform_migration ~protocol ~next_protocol ~pre_migration ~post_migration =
+  let* client = Client.init_mockup ~protocol () in
+  let* pre_result = pre_migration client in
+  Log.info
+    "Migrating from %s to %s"
+    (Protocol.hash protocol)
+    (Protocol.hash next_protocol) ;
+  let* () = Client.migrate_mockup ~next_protocol client in
+  post_migration client pre_result
+
+let get_candidates_to_migration () =
+  let* mockup_protocols =
+    let transient = Client.create_with_mode Client.Mockup in
+    Client.list_mockup_protocols transient
+  in
+  (* Find all registered mockup protocols which declare a next protocol *)
+  let result =
+    List.filter_map
+      (fun (protocol : Protocol.t) ->
+        match Protocol.next_protocol protocol with
+        | None ->
+            None
+        | Some next ->
+            let next_hash = Protocol.hash next in
+            if
+              List.exists
+                (String.equal (Protocol.hash protocol))
+                mockup_protocols
+              && List.exists (String.equal next_hash) mockup_protocols
+            then Some (protocol, next)
+            else None)
+      Protocol.all
+  in
+  return result
+
+(* Test mockup migration. *)
+let test_migration ?(migration_spec : (Protocol.t * Protocol.t) option)
+    ~pre_migration ~post_migration ~info () =
+  Test.register
+    ~__FILE__
+    ~title:(sf "(Mockup) Migration (%s)" info)
+    ~tags:["mockup"; "migration"]
+    (fun () ->
+      match migration_spec with
+      | None -> (
+          Log.info "Searching for protocols to migrate..." ;
+          let* protocols = get_candidates_to_migration () in
+          match protocols with
+          | [] ->
+              Test.fail "No protocol can be tested for migration!"
+          | (protocol, next_protocol) :: _ ->
+              perform_migration
+                ~protocol
+                ~next_protocol
+                ~pre_migration
+                ~post_migration )
+      | Some (protocol, next_protocol) ->
+          perform_migration
+            ~protocol
+            ~next_protocol
+            ~pre_migration
+            ~post_migration)
+
+let test_migration_transfer ?migration_spec () =
+  let (giver, amount, receiver) = transfer_data in
+  test_migration
+    ?migration_spec
+    ~pre_migration:(fun client ->
+      Log.info
+        "About to transfer %s from %s to %s"
+        (Tez.to_string amount)
+        giver
+        receiver ;
+      let* giver_balance_before =
+        Client.get_balance_for ~account:giver client
+      in
+      let* receiver_balance_before =
+        Client.get_balance_for ~account:receiver client
+      in
+      let* () = Client.transfer ~amount ~giver ~receiver client in
+      return (giver_balance_before, receiver_balance_before))
+    ~post_migration:
+      (fun client (giver_balance_before, receiver_balance_before) ->
+      let* giver_balance_after =
+        Client.get_balance_for ~account:giver client
+      in
+      let* receiver_balance_after =
+        Client.get_balance_for ~account:receiver client
+      in
+      test_balances_after_transfer
+        (giver_balance_before, giver_balance_after)
+        (Tez.to_float amount)
+        (receiver_balance_before, receiver_balance_after) ;
+      return ())
+    ~info:"transfer"
+    ()
+
+(** Test. Reproduce the scenario of https://gitlab.com/tezos/tezos/-/issues/1143 *)
+let test_origination_from_unrevealed_fees ~protocol =
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "(%s) (Mockup) origination fees from unrevealed"
+         (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "mockup"; "client"; "transfer"]
+  @@ fun () ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    Client.import_secret_key
+      client
+      {
+        identity = "";
+        alias = "originator";
+        secret =
+          "unencrypted:edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy";
+      }
+  in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 999999)
+      ~giver:"bootstrap1"
+      ~receiver:"originator"
+      client
+  in
+  let* _ =
+    Client.originate_contract
+      ~wait:"none"
+      ~alias:"contract_name"
+      ~amount:Tez.zero
+      ~src:"originator"
+      ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
+      ~init:"None"
+      ~burn_cap:(Tez.of_int 20)
+      client
+  in
+  return ()
+
+let register protocol =
+  test_rpc_list ~protocol ;
+  test_same_transfer_twice ~protocol ;
+  test_transfer_same_participants ~protocol ;
+  test_transfer ~protocol ;
+  test_simple_baking_event ~protocol ;
+  test_multiple_baking ~protocol ;
+  test_rpc_header_shell ~protocol ;
+  test_origination_from_unrevealed_fees ~protocol
+
+let register_protocol_independent () = test_migration_transfer ()

@@ -163,10 +163,6 @@ let may_update_checkpoint chain_state checkpoint history_mode =
           State.Chain.set_checkpoint_then_purge_rolling chain_state checkpoint
       )
 
-module Local_logging = Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "node.worker"
-end)
-
 (* These protocols are linked with the node and
    do not have their actual hash on purpose. *)
 let test_protocol_hashes =
@@ -244,7 +240,7 @@ let check_and_fix_storage_consistency state vp =
   in
   State.Chain.all state
   >>= fun chains ->
-  let rec check_block n chain_state block =
+  let rec check_block to_be_cleaned n chain_state block =
     fail_unless (n > 0) Validation_errors.Bad_data_dir
     >>=? fun () ->
     Lwt.catch
@@ -258,20 +254,25 @@ let check_and_fix_storage_consistency state vp =
     >>=? fun is_context_known ->
     if is_context_known then
       (* Found a known context for the block: setting as consistent head *)
-      Chain.set_head chain_state block >>=? fun _ -> return_unit
+      Chain.set_head chain_state block
+      >>=? fun _ ->
+      (* Make sure to remove the block only after updating the head *)
+      List.iter_es State.Block.remove to_be_cleaned
     else
       (* Did not find a known context. Need to backtrack the head up *)
       let header = State.Block.header block in
       State.Block.read chain_state header.shell.predecessor
       >>=? fun pred ->
-      check_block (n - 1) chain_state pred
-      >>=? fun () ->
-      (* Make sure to remove the block only after updating the head *)
-      State.Block.remove block
+      (check_block [@ocaml.tailcall])
+        (block :: to_be_cleaned)
+        (n - 1)
+        chain_state
+        pred
   in
   Seq.iter_es
     (fun chain_state ->
-      Chain.head chain_state >>= fun block -> check_block 500 chain_state block)
+      Chain.head chain_state
+      >>= fun block -> check_block [] 500 chain_state block)
     chains
 
 let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess

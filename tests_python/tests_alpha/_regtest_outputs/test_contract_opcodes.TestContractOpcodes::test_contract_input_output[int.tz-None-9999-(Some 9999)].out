@@ -1,0 +1,25 @@
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[int.tz-None-9999-(Some 9999)]
+
+storage
+  (Some 9999)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 1039993.690 units remaining)
+    [ (Pair 9999 None)  	 ]
+  - location: 8 (remaining gas: 1039993.610 units remaining)
+    [ 9999  	@parameter ]
+  - location: 9 (remaining gas: 1039993.535 units remaining)
+    [ 9999  	 ]
+  - location: 10 (remaining gas: 1039993.460 units remaining)
+    [ (Some 9999)  	 ]
+  - location: 11 (remaining gas: 1039993.385 units remaining)
+    [ {}  	
+      (Some 9999)  	 ]
+  - location: 13 (remaining gas: 1039993.310 units remaining)
+    [ (Pair {} (Some 9999))  	 ]
+  - location: -1 (remaining gas: 1039993.265 units remaining)
+    [ (Pair {} (Some 9999))  	 ]
+

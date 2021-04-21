@@ -1,0 +1,25 @@
+tezt/_regressions/encoding/current.voting_period.kind.out
+
+./tezos-codec encode 008-PtEdo2Zk.voting_period.kind from '"promotion_vote"'
+03
+
+./tezos-codec decode 008-PtEdo2Zk.voting_period.kind from 03
+"promotion_vote"
+
+./tezos-codec encode 008-PtEdo2Zk.voting_period.kind from '"proposal"'
+00
+
+./tezos-codec decode 008-PtEdo2Zk.voting_period.kind from 00
+"proposal"
+
+./tezos-codec encode 008-PtEdo2Zk.voting_period.kind from '"testing_vote"'
+01
+
+./tezos-codec decode 008-PtEdo2Zk.voting_period.kind from 01
+"testing_vote"
+
+./tezos-codec encode 008-PtEdo2Zk.voting_period.kind from '"testing"'
+02
+
+./tezos-codec decode 008-PtEdo2Zk.voting_period.kind from 02
+"testing"

@@ -158,7 +158,7 @@ let assert_valid_operations_hash shell_header operations =
 let compute_endorsing_power cctxt ~chain ~block operations =
   Shell_services.Chain.chain_id cctxt ~chain ()
   >>=? fun chain_id ->
-  fold_left_s
+  List.fold_left_es
     (fun sum -> function
       | { Alpha_context.protocol_data =
             Operation_data {contents = Single (Endorsement _); _};
@@ -263,17 +263,11 @@ type manager_content = {
   counter : counter;
 }
 
-let rec fold_left_e f acc = function
-  | [] ->
-      Ok acc
-  | x :: xs ->
-      f acc x >>? fun acc -> (fold_left_e [@ocaml.tailcall]) f acc xs
-
 let get_manager_content op =
   let {protocol_data = Operation_data {contents; _}; _} = op in
   let open Operation in
   let l = to_list (Contents_list contents) in
-  fold_left_e
+  List.fold_left_e
     (fun ((first_source, first_counter, total_fee, total_gas) as acc) ->
        function
       | Contents (Manager_operation {source; counter; fee; gas_limit; _}) ->
@@ -447,7 +441,8 @@ let classify_operations (cctxt : #Protocol_client_context.full) ~chain ~block
     (* Retrieve the optimist maximum paying manager operations *)
     let manager_operations = t.(managers_index) in
     let {Environment.Updater.max_size; _} =
-      List.nth Main.validation_passes managers_index
+      WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth Main.validation_passes managers_index
     in
     let ordered_operations =
       sort_manager_operations
@@ -540,20 +535,20 @@ let decode_priority cctxt chain block ~priority ~endorsing_power =
         ~delegates:[src_pkh]
         (chain, block)
       >>=? fun possibilities ->
-      try
-        let {Alpha_services.Delegate.Baking_rights.priority = prio; _} =
-          List.find
-            (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
-            possibilities
-        in
-        Alpha_services.Delegate.Minimal_valid_time.get
-          cctxt
-          (chain, block)
-          prio
-          endorsing_power
-        >>=? fun minimal_timestamp -> return (prio, minimal_timestamp)
-      with Not_found ->
-        failwith "No slot found at level %a" Raw_level.pp level )
+      match
+        List.find
+          (fun p -> p.Alpha_services.Delegate.Baking_rights.level = level)
+          possibilities
+      with
+      | None ->
+          failwith "No slot found at level %a" Raw_level.pp level
+      | Some {Alpha_services.Delegate.Baking_rights.priority = prio; _} ->
+          Alpha_services.Delegate.Minimal_valid_time.get
+            cctxt
+            (chain, block)
+            prio
+            endorsing_power
+          >>=? fun minimal_timestamp -> return (prio, minimal_timestamp) )
 
 let unopt_timestamp ?(force = false) timestamp minimal_timestamp =
   let timestamp =
@@ -628,22 +623,28 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
   let quota : Environment.Updater.quota list = Main.validation_passes in
   let endorsements =
     retain_operations_up_to_quota
-      (List.nth operations endorsements_index)
-      (List.nth quota endorsements_index)
+      (WithExceptions.Option.get
+         ~loc:__LOC__
+         (List.nth operations endorsements_index))
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth quota endorsements_index )
   in
   let votes =
     retain_operations_up_to_quota
-      (List.nth operations votes_index)
-      (List.nth quota votes_index)
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations votes_index )
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota votes_index)
   in
   let anonymous =
     retain_operations_up_to_quota
-      (List.nth operations anonymous_index)
-      (List.nth quota anonymous_index)
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations anonymous_index )
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota anonymous_index)
   in
   let managers =
     (* Managers are already trimmed *)
-    List.nth operations managers_index
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth operations managers_index
   in
   begin_construction
     ~timestamp:min_valid_timestamp
@@ -715,7 +716,7 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
         >>= fun () -> Lwt.return_none )
   in
   let filter_valid_operations inc ops =
-    Lwt_list.fold_left_s
+    List.fold_left_s
       (fun (inc, acc) op ->
         validate_operation inc op
         >>= function
@@ -755,7 +756,7 @@ let filter_and_apply_operations cctxt state ~chain ~block block_info ~priority
     state.index
     block_info
   >>=? fun inc ->
-  fold_left_s
+  List.fold_left_es
     (fun inc op -> add_operation inc op >>=? fun (inc, _receipt) -> return inc)
     inc
     (List.flatten operations)
@@ -786,15 +787,14 @@ let finalize_block_header shell_header ~timestamp validation_result operations
             return context
         | Running {expiration; _} ->
             if Time.Protocol.(expiration <= timestamp) then
-              Context.set_test_chain context Not_running
-              >>= fun context -> return context
+              Context.add_test_chain context Not_running >>= return
             else return context
         | Forking _ ->
             fail Forking_test_chain)
   >>=? fun context ->
   ( match predecessor_block_metadata_hash with
   | Some predecessor_block_metadata_hash ->
-      Context.set_predecessor_block_metadata_hash
+      Context.add_predecessor_block_metadata_hash
         context
         predecessor_block_metadata_hash
   | None ->
@@ -802,7 +802,7 @@ let finalize_block_header shell_header ~timestamp validation_result operations
   >>= fun context ->
   ( match predecessor_ops_metadata_hash with
   | Some predecessor_ops_metadata_hash ->
-      Context.set_predecessor_ops_metadata_hash
+      Context.add_predecessor_ops_metadata_hash
         context
         predecessor_ops_metadata_hash
   | None ->
@@ -856,20 +856,28 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
   (* Ensure that we retain operations up to the quota *)
   let quota : Environment.Updater.quota list = Main.validation_passes in
   let endorsements =
-    List.sub (List.nth operations endorsements_index) endorsers_per_block
+    List.sub
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations endorsements_index )
+      endorsers_per_block
   in
   let votes =
     retain_operations_up_to_quota
-      (List.nth operations votes_index)
-      (List.nth quota votes_index)
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations votes_index )
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota votes_index)
   in
   let anonymous =
     retain_operations_up_to_quota
-      (List.nth operations anonymous_index)
-      (List.nth quota anonymous_index)
+      ( WithExceptions.Option.get ~loc:__LOC__
+      @@ List.nth operations anonymous_index )
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth quota anonymous_index)
   in
   (* Size/Gas check already occurred in classify operations *)
-  let managers = List.nth operations managers_index in
+  let managers =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth operations managers_index
+  in
   let operations = [endorsements; votes; anonymous; managers] in
   ( match context_path with
   | None ->

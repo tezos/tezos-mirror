@@ -268,7 +268,7 @@ let commands network : Client_context.full Clic.command list =
             (fun (ka, _) (kb, _) -> String.compare ka kb)
             (registered_signers ())
         in
-        Lwt_list.iter_s
+        List.iter_s
           (fun (n, (module S : SIGNER)) ->
             cctxt#message
               "@[<v 2>Scheme `%s`: %s@,@[<hov 0>%a@]@]"
@@ -479,7 +479,7 @@ let commands network : Client_context.full Clic.command list =
         (fun () (cctxt : #Client_context.full) ->
           list_keys cctxt
           >>=? fun l ->
-          iter_s
+          List.iter_es
             (fun (name, pkh, pk, sk) ->
               Public_key_hash.to_source pkh
               >>=? fun v ->
@@ -679,4 +679,66 @@ let commands network : Client_context.full Clic.command list =
                 "Tezos address added: %a"
                 Signature.Public_key_hash.pp
                 pkh
-              >>= fun () -> return_unit) ]
+              >>= fun () -> return_unit);
+      command
+        ~group
+        ~desc:"Generate a pair of PVSS keys."
+        (args1 (Secret_key.force_switch ()))
+        ( prefixes ["pvss"; "gen"; "keys"]
+        @@ PVSS_secret_key.fresh_alias_param @@ stop )
+        (fun force name (cctxt : Client_context.full) ->
+          PVSS_secret_key.of_fresh cctxt force name
+          >>=? fun name ->
+          let (pk, sk) = Pvss_secp256k1.generate_keys () in
+          PVSS_public_key.add ~force cctxt name pk
+          >>=? fun () ->
+          Tezos_signer_backends.Encrypted.encrypt_pvss_key cctxt sk
+          >>=? fun sk_uri -> PVSS_secret_key.add ~force cctxt name sk_uri);
+      command
+        ~group
+        ~desc:"List PVSS keys."
+        no_options
+        (prefixes ["pvss"; "list"; "keys"] @@ stop)
+        (fun () (cctxt : #Client_context.full) ->
+          PVSS_public_key.load cctxt
+          >>=? fun keys ->
+          List.iter_es
+            (fun (s, pk) ->
+              cctxt#message "%s: %a" s Pvss_secp256k1.Public_key.pp pk
+              >>= fun () -> return_unit)
+            (List.sort (fun (s1, _) (s2, _) -> String.compare s1 s2) keys));
+      command
+        ~group
+        ~desc:"Forget one pair of PVSS keys."
+        (args1
+           (Clic.switch
+              ~long:"force"
+              ~short:'f'
+              ~doc:"you got to use the force for that"
+              ()))
+        ( prefixes ["pvss"; "forget"; "keys"]
+        @@ PVSS_public_key.alias_param @@ stop )
+        (fun force (name, _key) (cctxt : #Client_context.full) ->
+          fail_unless
+            force
+            (failure "this can only be used with option --force")
+          >>=? fun () ->
+          PVSS_public_key.del cctxt name
+          >>=? fun () -> PVSS_secret_key.del cctxt name);
+      command
+        ~group
+        ~desc:"Forget all PVSS keys."
+        (args1
+           (Clic.switch
+              ~long:"force"
+              ~short:'f'
+              ~doc:"you got to use the force for that"
+              ()))
+        (prefixes ["pvss"; "forget"; "all"; "keys"] @@ stop)
+        (fun force (cctxt : #Client_context.full) ->
+          fail_unless
+            force
+            (failure "this can only be used with option --force")
+          >>=? fun () ->
+          PVSS_public_key.set cctxt []
+          >>=? fun () -> PVSS_secret_key.set cctxt []) ]

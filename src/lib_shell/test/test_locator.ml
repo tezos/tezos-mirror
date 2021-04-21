@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Shell
+    Invocation:   dune exec src/lib_shell/test/test_locator.exe test_locator
+    Subject:      Checks operations on locators.
+*)
+
 open Filename.Infix
 
 (** Basic blocks *)
@@ -110,7 +117,7 @@ let zero = Bytes.create 0
 (* adds n blocks on top of an initialized chain *)
 let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =
   State.Block.read_opt chain genesis_hash
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >>= fun genesis ->
   State.Block.context_exn genesis
   >>= fun empty_context ->
@@ -167,7 +174,7 @@ let make_empty_chain (chain : State.Chain.t) n : Block_hash.t Lwt.t =
 let make_multiple_protocol_chain (chain : State.Chain.t) ~(chain_length : int)
     ~fork_points =
   State.Block.read_opt chain genesis_hash
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >>= fun genesis ->
   State.Block.context_exn genesis
   >>= fun empty_context ->
@@ -209,13 +216,17 @@ let make_multiple_protocol_chain (chain : State.Chain.t) ~(chain_length : int)
             };
         }
       in
+      let block_metadata = zero in
+      let block_metadata_hash =
+        Option.some @@ Block_metadata_hash.hash_bytes [block_metadata]
+      in
       State.Block.store
         chain
         header
         zero
         []
         []
-        None
+        block_metadata_hash
         None
         empty_result
         ~forking_testchain:false
@@ -281,13 +292,13 @@ let print_block b =
 
 let print_block_h chain bh =
   State.Block.read_opt chain bh
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >|= fun b -> print_block b
 
 (* returns the predecessor at distance one, reading the header *)
 let linear_predecessor chain (bh : Block_hash.t) : Block_hash.t option Lwt.t =
   State.Block.read_opt chain bh
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >>= fun b ->
   State.Block.predecessor b
   >|= function None -> None | Some pred -> Some (State.Block.hash pred)
@@ -315,10 +326,10 @@ let linear_predecessor_n (chain : State.Chain.t) (bh : Block_hash.t)
     in
     loop bh distance
 
-(* Tests that the linear predecessor defined above and the
-   exponential predecessor implemented in State.predecessor_n
-   return the same block and it is the block at the distance
-   requested *)
+(** Tests that the linear predecessor defined above and the exponential
+    predecessor implemented in State.predecessor_n return the same
+    block and it is the block at the distance requested
+*)
 let test_pred (base_dir : string) : unit tzresult Lwt.t =
   let size_chain = 1000 in
   init_chain base_dir
@@ -329,7 +340,7 @@ let test_pred (base_dir : string) : unit tzresult Lwt.t =
     linear_predecessor_n chain head distance
     >>= fun lin_res ->
     State.Block.read_opt chain head
-    >|= Option.unopt_assert ~loc:__POS__
+    >|= WithExceptions.Option.get ~loc:__LOC__
     >>= fun head_block ->
     State.Block.predecessor_n head_block distance
     >>= fun exp_res ->
@@ -342,11 +353,11 @@ let test_pred (base_dir : string) : unit tzresult Lwt.t =
         (* check that the two results are the same *)
         assert (lin_res = exp_res) ;
         State.Block.read_opt chain lin_res
-        >|= Option.unopt_assert ~loc:__POS__
+        >|= WithExceptions.Option.get ~loc:__LOC__
         >>= fun pred ->
         let level_pred = Int32.to_int (State.Block.level pred) in
         State.Block.read_opt chain head
-        >|= Option.unopt_assert ~loc:__POS__
+        >|= WithExceptions.Option.get ~loc:__LOC__
         >>= fun head ->
         let level_start = Int32.to_int (State.Block.level head) in
         (* check distance using the level *)
@@ -390,16 +401,17 @@ let compute_size_chain size_locator =
   let repeats = 10. in
   int_of_float (repeats *. (2. ** float (size_locator + 1)))
 
-(* test if the linear and exponential locator are the same and outputs
-   their timing.
-   Run the test with:
-   $ dune build @runbench_locator
-   Copy the output to a file timing.dat and plot it with:
-   $ generate_locator_plot.sh timing.dat
-*)
 (*
    chain 1 year   518k   covered by locator 150
    chain 2 months 86k    covered by locator 120
+*)
+
+(** Test if the linear and exponential locator are the same and outputs
+    their timing.
+    Run the test with:
+    $ dune build @runbench_locator
+    Copy the output to a file timing.dat and plot it with:
+    $ generate_locator_plot.sh timing.dat
 *)
 let test_locator base_dir =
   let size_chain = 80000 in
@@ -442,13 +454,14 @@ let test_locator base_dir =
     let (_, l_exp) = (l_exp : Block_locator.t :> _ * _) in
     let (_, l_lin) = (l_lin : Block_locator.t :> _ * _) in
     let _ = Printf.printf "%10i %f %f\n" max_size t_exp t_lin in
-    List.iter2
-      (fun hn ho ->
-        if not (Block_hash.equal hn ho) then
-          Assert.fail_msg "Invalid locator %i" max_size)
-      l_exp
-      l_lin ;
-    return_unit
+    Lwt.return
+    @@ List.iter2
+         ~when_different_lengths:(TzTrace.make @@ Exn (Failure __LOC__))
+         (fun hn ho ->
+           if not (Block_hash.equal hn ho) then
+             Assert.fail_msg "Invalid locator %i" max_size)
+         l_exp
+         l_lin
   in
   let stop = locator_limit + 20 in
   let rec loop size =
@@ -462,12 +475,22 @@ let test_protocol_locator base_dir =
   >>= fun chain ->
   let chain_length = 200 in
   let fork_points = [1; 10; 50; 66; 150] in
+  (* further_points = List.tl fork_points @ [chain_length] *)
+  let further_points = [10; 50; 66; 150; chain_length] in
   let fork_points_assoc =
     List.map2
+      ~when_different_lengths:()
       (fun x y -> (x, y))
       fork_points
-      (List.tl fork_points @ [chain_length])
-    |> List.mapi (fun i x -> (i + 1, x))
+      further_points
+    >|? List.mapi (fun i x -> (i + 1, x))
+  in
+  let fork_points_assoc =
+    match fork_points_assoc with
+    | Ok fork_points_assoc ->
+        fork_points_assoc
+    | Error () ->
+        assert false
   in
   make_multiple_protocol_chain chain ~chain_length ~fork_points
   >>= fun head_hash ->
@@ -485,7 +508,7 @@ let test_protocol_locator base_dir =
           let open Block_locator in
           let steps = to_steps seed locator in
           let has_lower_bound = ref false in
-          iter_s
+          List.iter_es
             (fun {block; predecessor; _} ->
               State.Block.read chain block
               >>=? fun block ->
@@ -545,7 +568,7 @@ let test_protocol_locator base_dir =
   >>=? fun pred ->
   State.Chain.set_checkpoint_then_purge_rolling chain (State.Block.header pred)
   >>=? fun () ->
-  iter_s
+  List.iter_es
     (fun i ->
       State.compute_protocol_locator chain ~proto_level:i seed
       >>= function
@@ -565,7 +588,7 @@ let test_protocol_locator base_dir =
       let has_lower_bound = ref false in
       let inf = 170 in
       let sup = 200 in
-      iter_s
+      List.iter_es
         (fun {block; predecessor; _} ->
           State.Block.read chain block
           >>=? fun block ->
@@ -588,11 +611,15 @@ let test_protocol_locator base_dir =
           return_unit)
         steps
       >>=? fun () ->
-      let last_hash = (List.hd steps).predecessor in
+      let last_hash =
+        (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd steps).predecessor
+      in
       Assert.is_true
         ~msg:"last block in locator is the checkpoint"
         (Block_hash.equal last_hash (State.Block.hash pred)) ;
-      let first_hash = (List.hd (List.rev steps)).block in
+      let first_hash =
+        (WithExceptions.Option.get ~loc:__LOC__ @@ List.last_opt steps).block
+      in
       Assert.is_true
         ~msg:"first block in locator is the head"
         (Block_hash.equal first_hash head_hash) ;
@@ -612,7 +639,7 @@ let tests =
   [ wrap "test pred" test_pred;
     wrap "test protocol locator" test_protocol_locator ]
 
-let bench = [wrap "test locator" test_locator]
+let bench = [wrap "locator" test_locator]
 
 let tests =
   try if Sys.argv.(1) = "--no-bench" then tests else tests @ bench

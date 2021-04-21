@@ -2,11 +2,15 @@
  (name tezos_clic)
  (public_name tezos-clic)
  (flags (:standard -open Tezos_stdlib
-                   -open Tezos_error_monad))
+                   -open Tezos_error_monad
+                   -open Tezos_error_monad.TzLwtreslib
+                   ))
  (libraries tezos-stdlib
             lwt
             re
-            tezos-error-monad))
+            tezos-error-monad
+            tezos-lwt-result-stdlib
+            ))
 
 (rule
  (alias runtest_lint)

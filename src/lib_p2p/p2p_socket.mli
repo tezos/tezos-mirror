@@ -77,7 +77,7 @@ val private_node : ('msg, 'meta) t -> bool
     to implement the session establishment protocol. Session establishment
     proceeds in three synchronous, symmetric, steps. First two steps are
     implemented by [authenticate]. Third step is implemented by either [accept]
-    or [kick].
+    or [nack].
 
     1. Hosts send each other an authentication message. The message contains
        notably a public key, a nonce, and proof of work stamp computed from
@@ -88,7 +88,7 @@ val private_node : ('msg, 'meta) t -> bool
     2. Hosts send each other a ['meta] message.
 
     3. Each host send either an [Ack] message ([accept] function) or an [Nack]
-       message ([kick] function). If both hosts send an [Ack], the connection
+       message ([nack] function). If both hosts send an [Ack], the connection
        is established and they can start to read/write ['msg].
 
     Note that [P2p_errors.Decipher_error] can be raised from all functions

@@ -6,6 +6,8 @@ How to use Tezos
 This How To illustrates the use of the various Tezos binaries as well
 as some concepts about the network.
 
+.. _tezos_binaries:
+
 The Binaries
 ------------
 
@@ -21,26 +23,46 @@ After a successful compilation, you should have the following binaries:
 
 The daemons are suffixed with the name of the protocol they are
 bound to. For instance, ``tezos-baker-006-PsCARTHA`` is the baker
-for the Carthage protocol. See also the `Node Protocol`_ section below.
+for the Carthage protocol, and ``tezos-baker-alpha`` is the baker
+of the development protocol. See also the `Node Protocol`_ section below.
 
 
-Read The Friendly Manual
-------------------------
+Read The Manual
+---------------
 
 The manual of each binary can be obtained with the command ``man`` and
-the verbosity can be increased with ``-v``.
-To use one specific command, type the command without arguments to see
-possible completions and options.
-It is also possible to search a keyword in the manual with ``man
-keyword``.
-The full documentation is also available online :ref:`client_manual`.
+the verbosity can be increased with ``-v``::
 
-::
+    tezos-client man -v 3
 
-   tezos-client man -v 3
-   tezos-client transfer
+It is also possible to search a keyword in the manual with ``man <keyword>``::
+
    tezos-client man set
 
+To use one specific command, type the command without arguments to see
+possible completions and options::
+
+   tezos-client transfer
+
+However, beware that the commands available on the client depend on the specific
+protocol run by the node. For instance, ``transfer`` is not available when
+the node runs the genesis protocol, which may happen for a few minutes when
+launching a node for the first time, or when the client is not connected to a
+node. In the last case, the above command generates a warning::
+
+    Warning:
+      Failed to acquire the protocol version from the node
+
+To get the manual of a command for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol``, e.g.::
+
+    tezos-client --protocol ProtoALphaALph man transfer
+
+Note that you can get the list of protocols known to the client with::
+
+    tezos-client list understood protocols
+
+The full command line documentation of the Tezos client is also available
+online: :ref:`client_manual`.
 
 Node
 ----
@@ -67,7 +89,7 @@ network.
 
 Other than passively observing the network, your node can also inject
 its own new operations when instructed by the ``tezos-client`` and even
-send new blocks when guided by the ``tezos-baker-alpha``.
+send new blocks when guided by the ``tezos-baker-*``.
 The node has also a view of the multiple chains that may exist
 concurrently and selects the best one based on its fitness (see
 :ref:`proof-of-stake`).
@@ -115,8 +137,8 @@ genesis protocol and then goes through all previous protocols until it
 finally switches to the current protocol.
 
 Throughout the documentation, `Alpha` refers to the protocol in the
-``src/proto_alpha`` directory of the ``master`` branch, which is a
-copy of the protocol active on Mainnet.  The Alpha protocol is used by
+``src/proto_alpha`` directory of the ``master`` branch, that is, a protocol under development, which serves as a basis to propose replacements
+for the currently active protocol. The Alpha protocol is used by
 default in :ref:`sandbox mode<sandboxed-mode>` and in the various test
 suites. Its git history is also more detailed.
 
@@ -152,11 +174,25 @@ internet. With the following command, it is available uniquely on the
 
    tezos-node run --rpc-addr 127.0.0.1
 
-The node listens by default on port ``9732`` so it is advisable to
-open incoming connections to that port.
-You can read more about the :ref:`node configuration <node-conf>` and
-its :ref:`private mode <private-mode>`.
+Node configuration
+~~~~~~~~~~~~~~~~~~
 
+Many options of the node can be configured when running the node:
+
+- RPC parameters (e.g. the port number for listening to RPC requests using option ``--rpc-addr``)
+- The directory where the node stores local data (using option ``--data-dir``)
+- Network parameters (e.g. the number of connections to peers, using option ``--connections``)
+- Validator and mempool parameters
+- :ref:`Logging options <configure_logging>`.
+
+The list of configurable options can be obtained using the following command::
+
+    tezos-node run --help
+
+You can read more about the :ref:`node configuration <node-conf>` and its :ref:`private mode <private-mode>`.
+
+The node listens to connections from peers on port ``9732``, so it's advisable to
+open incoming connections to that port.
 
 Client
 ------
@@ -174,8 +210,8 @@ chain (time is in UTC so it may differ from your local time)::
 
    tezos-client get timestamp
 
-Beware that the commands available on the client depend on the specific
-protocol run by the node. For instance, `get timestamp` isn't available when
+However, recall that the commands available on the client depend on the specific
+protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
@@ -222,8 +258,8 @@ For more advanced key management we offer :ref:`ledger support
 Get Free Tez
 ~~~~~~~~~~~~
 
-To test the networks and help users get familiar with the
-system, on Zeronet and Carthagenet test networks you can obtain free tez from a
+To test the networks and help users get familiar with the system, on
+:doc:`test networks<test_networks>` you can obtain free tez from a
 `faucet <https://faucet.tzalpha.net>`__.
 
 This will provide a wallet in the form of a JSON file
@@ -232,18 +268,18 @@ command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
-If you use the ``alphanet.sh`` script (renamed as ``carthagenet.sh``
-to run Carthagenet test network for instance), you should prefix the file
+If you use the ``tezos-docker-manager.sh`` script (renamed as ``edo2net.sh``
+to run the Edo2net test network for instance), you should prefix the file
 with ``container:`` in order to copy it into the docker image:
-``./carthagenet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"``
+``./edo2net.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"``
 
 Let's check the balance of the new account with::
 
     tezos-client get balance for alice
 
-Please preserve the JSON file. After each reset of Zeronet or
-when Carthagenet test network is replaced by a test network for the next protocol,
-you will have to reactivate the wallet.
+Please preserve the JSON file. It will be necessary in order to
+reactivate the wallet when migrating between test networks, e.g., from
+one protocol to the next, or in the event the test network is reset.
 
 Please drink carefully and don't abuse the faucet: it only contains
 30,000 wallets for a total amount of ꜩ760,000,000.
@@ -467,7 +503,7 @@ usage. Otherwise, you can force a low fee operation using the
 `--force-low-fee`, with the risk that no baker will include it.
 
 More test contracts can be found in directory
-:src:`tests_python/contracts/`.
+:src:`tests_python/contracts_007/`.
 Advanced documentation of the smart contract language is available
 :ref:`here<michelson>`.
 
@@ -521,7 +557,7 @@ constants in Tezos, which may differ between Mainnet and other
      "proof_of_work_nonce_size": 8,
      "nonce_length": 32,
      "max_anon_ops_per_block": 132,
-     "max_operation_data_length": 16384,
+     "max_operation_data_length": 32768,
      "preserved_cycles": 5,
      "blocks_per_cycle": 4096,
      "blocks_per_commitment": 32,

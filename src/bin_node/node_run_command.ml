@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -119,6 +119,14 @@ module Event = struct
       ~level:Notice
       ("peer_id", P2p_peer.Id.encoding)
 
+  let disabled_config_validation =
+    declare_0
+      ~section
+      ~name:"disabled_config_validation"
+      ~msg:"disabled node configuration validation"
+      ~level:Warning
+      ()
+
   let starting_rpc_server =
     declare_3
       ~section
@@ -192,12 +200,18 @@ let init_identity_file (config : Node_config_file.t) =
 let init_node ?sandbox ?checkpoint ~identity ~singleprocess
     (config : Node_config_file.t) =
   (* TODO "WARN" when pow is below our expectation. *)
+  ( match config.disable_config_validation with
+  | true ->
+      Event.(emit disabled_config_validation) ()
+  | false ->
+      Lwt.return_unit )
+  >>= fun () ->
   ( match config.p2p.discovery_addr with
   | None ->
       Event.(emit disabled_discovery_addr) () >>= fun () -> return (None, None)
   | Some addr -> (
       Node_config_file.resolve_discovery_addrs addr
-      >>= function
+      >>=? function
       | [] ->
           failwith "Cannot resolve P2P discovery address: %S" addr
       | (addr, port) :: _ ->
@@ -208,7 +222,7 @@ let init_node ?sandbox ?checkpoint ~identity ~singleprocess
       Event.(emit disabled_listen_addr) () >>= fun () -> return (None, None)
   | Some addr -> (
       Node_config_file.resolve_listening_addrs addr
-      >>= function
+      >>=? function
       | [] ->
           failwith "Cannot resolve P2P listening address: %S" addr
       | (addr, port) :: _ ->
@@ -224,7 +238,7 @@ let init_node ?sandbox ?checkpoint ~identity ~singleprocess
   | _ ->
       Node_config_file.resolve_bootstrap_addrs
         (Node_config_file.bootstrap_peers config)
-      >>= fun trusted_points ->
+      >>=? fun trusted_points ->
       let p2p_config : P2p.config =
         {
           listening_addr;
@@ -341,14 +355,14 @@ let launch_rpc_server (config : Node_config_file.t) node (addr, port) =
           Lwt.return (error_exn exn))
 
 let init_rpc (config : Node_config_file.t) node =
-  fold_right_s
+  List.fold_right_es
     (fun addr acc ->
       Node_config_file.resolve_rpc_listening_addrs addr
-      >>= function
+      >>=? function
       | [] ->
           failwith "Cannot resolve listening address: %S" addr
       | addrs ->
-          fold_right_s
+          List.fold_right_es
             (fun x a ->
               launch_rpc_server config node x >>=? fun o -> return (o :: a))
             addrs
@@ -377,6 +391,8 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
     ~configuration:config.internal_events
     ()
   >>= fun () ->
+  Node_config_validation.check config
+  >>=? fun () ->
   init_identity_file config
   >>=? fun identity ->
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
@@ -412,7 +428,7 @@ let run ?verbosity ?sandbox ?checkpoint ~singleprocess
       ~after:[node_downer]
       (fun _ ->
         Event.(emit shutting_down_rpc_server) ()
-        >>= fun () -> Lwt_list.iter_p RPC_server.shutdown rpc)
+        >>= fun () -> List.iter_p RPC_server.shutdown rpc)
   in
   Event.(emit node_is_ready) ()
   >>= fun () ->
@@ -463,13 +479,13 @@ let process sandbox verbosity checkpoint singleprocess args =
           (fun () -> run ?sandbox ?verbosity ?checkpoint ~singleprocess config)
           (function
             | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-                Lwt_list.fold_right_s
+                List.fold_right_es
                   (fun addr acc ->
                     Node_config_file.resolve_rpc_listening_addrs addr
-                    >>= fun x -> Lwt.return (x @ acc))
+                    >>=? fun x -> return (x @ acc))
                   config.rpc.listen_addrs
                   []
-                >>= fun addrlist -> fail (RPC_Port_already_in_use addrlist)
+                >>=? fun addrlist -> fail (RPC_Port_already_in_use addrlist)
             | exn ->
                 Lwt.return (error_exn exn))
     | true ->
@@ -503,12 +519,13 @@ module Term = struct
     let open Cmdliner in
     let doc =
       "Run the daemon in sandbox mode. P2P to non-localhost addresses are \
-       disabled, and constants of the economic protocol can be altered with \
-       an optional JSON file which overrides the $(b,genesis_parameters) \
-       field of the network configuration. $(b,IMPORTANT): Using sandbox mode \
-       affects the node state and subsequent runs of Tezos node must also use \
-       sandbox mode. In order to run the node in normal mode afterwards, a \
-       full reset must be performed (by removing the node's data directory)."
+       disabled, and constants of the economic protocol can be altered with a \
+       JSON file which overrides the $(b,genesis_parameters) field of the \
+       network configuration (e.g. scripts/sandbox.json). $(b,IMPORTANT): \
+       Using sandbox mode affects the node state and subsequent runs of Tezos \
+       node must also use sandbox mode. In order to run the node in normal \
+       mode afterwards, a full reset must be performed (by removing the \
+       node's data directory)."
     in
     Arg.(
       value
@@ -575,7 +592,7 @@ module Manpage = struct
            one of $(i," ^ log_sections
         ^ ") and level is one of $(i,fatal), $(i,error), $(i,warn), \
            $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
-           wildcard in sections, i.e. $(b, client* -> debug). The rules are \
+           wildcard in sections, i.e. $(b, node* -> debug). The rules are \
            matched left to right, therefore the leftmost rule is highest \
            priority ." ) ]
 

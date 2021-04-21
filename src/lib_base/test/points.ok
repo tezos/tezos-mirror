@@ -1,0 +1,14 @@
+foo.com
+foo64.com
+foo-64.com
+foo.com:8444
+foo.com#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
+foo.com:8444#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
+www.foo.com:8444#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
+foo.bar.com#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
+_:8444#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
+:8444#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
+_:8444
+:8444
+_#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
+#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4

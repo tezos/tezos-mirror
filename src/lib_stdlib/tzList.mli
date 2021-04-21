@@ -64,12 +64,6 @@ val rev_sub : 'a list -> int -> 'a list
 (** [sub l n] is [l] capped to max [n] elements *)
 val sub : 'a list -> int -> 'a list
 
-(** Like [List.hd], but [Some hd] or [None] if empty *)
-val hd_opt : 'a list -> 'a option
-
-(** Last elt of list, or raise Not_found if empty *)
-val last_exn : 'a list -> 'a
-
 (** [merge_filter2 ~compare ~f l1 l2] merges two lists ordered by [compare]
     and whose items can be merged with [f]. Item is discarded or kept whether
     [f] returns [Some] or [None] *)

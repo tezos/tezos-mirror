@@ -8,6 +8,7 @@
  (libraries tezos-sapling
             str
             tezos-stdlib-unix
+            tezos-test-services
             alcotest-lwt)
  (flags (:standard -open Tezos_sapling
                    -open Tezos_crypto

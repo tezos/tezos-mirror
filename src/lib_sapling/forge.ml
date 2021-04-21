@@ -40,7 +40,6 @@ module Input = struct
         ~amount:forge_input.amount
         forge_input.rcm
         ~position:forge_input.pos
-      |> TzOption.unopt_assert ~loc:__POS__
     in
     S.mem_nullifier state nf
 
@@ -75,10 +74,7 @@ let dummy_input anti_replay ctx dummy_witness root =
   let sk = Core.Spending_key.of_seed seed in
   let vk = Core.Viewing_key.of_sk sk in
   let addr = Core.Viewing_key.dummy_address () in
-  let nf =
-    Core.Nullifier.compute addr vk ~amount:0L rcm ~position:0L
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let nf = Core.Nullifier.compute addr vk ~amount:0L rcm ~position:0L in
   let ar = Core.Proving.ar_random () in
   (* The proof is considered valid even with a dummy witness if the amount
        given is 0. *)
@@ -94,20 +90,22 @@ let dummy_input anti_replay ctx dummy_witness root =
       ~root
       ~witness:dummy_witness
   in
-  let signature =
-    Core.Proving.spend_sig sk ar cv nf rk proof_i anti_replay
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let signature = Core.Proving.spend_sig sk ar cv nf rk proof_i anti_replay in
   Core.UTXO.{cv; nf; rk; proof_i; signature}
 
 let create_dummy_inputs n state anti_replay ctx =
+  (* assertion already checked by callers *)
+  assert (n >= 0) ;
   (* In order to get a valid witness we simply use the one of the first element *)
   let not_empty = S.mem state 0L in
-  if n > 0 && not_empty then
+  if not_empty then
     (* Doesn't make sense to create dummy_inputs with an empty storage *)
     let dummy_witness = S.get_witness state 0L in
     let root = S.get_root state in
-    List.init n (fun _ -> dummy_input anti_replay ctx dummy_witness root)
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ (* n is checked above *)
+       List.init ~when_negative_length:() n (fun _ ->
+           dummy_input anti_replay ctx dummy_witness root)
   else []
 
 let dummy_output pctx ~memo_size =
@@ -125,6 +123,16 @@ let dummy_output pctx ~memo_size =
 let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
     (forge_inputs : Input.t list) (forge_outputs : output list)
     (sp : Core.Spending_key.t) (anti_replay : string) (state : S.state) =
+  if number_dummy_inputs < 0 then
+    raise
+      (Invalid_argument
+         "Tezos_sapling.Forge.forge_transaction: number_dummy_inputs is \
+          negative") ;
+  if number_dummy_outputs < 0 then
+    raise
+      (Invalid_argument
+         "Tezos_sapling.Forge.forge_transaction: number_dummy_outputs is \
+          negative") ;
   let memo_size = S.get_memo_size state in
   List.iter
     (fun forge_output ->
@@ -159,11 +167,9 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
                 ~amount:i.amount
                 i.rcm
                 ~position:i.pos
-              |> TzOption.unopt_assert ~loc:__POS__
             in
             let signature =
               Core.Proving.spend_sig sp ar cv nf rk proof_i anti_replay
-              |> TzOption.unopt_assert ~loc:__POS__
             in
             Core.UTXO.{cv; nf; rk; proof_i; signature})
           forge_inputs
@@ -211,17 +217,14 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
       in
       let inputs = real_inputs @ dummy_inputs in
       let dummy_outputs =
-        List.init number_dummy_outputs (fun _ -> dummy_output ctx ~memo_size)
+        WithExceptions.Result.get_ok ~loc:__LOC__
+        @@ (* checked at entrance of function *)
+           List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
+               dummy_output ctx ~memo_size)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =
-        TzOption.unopt_assert ~loc:__POS__
-        @@ Core.Proving.make_binding_sig
-             ctx
-             inputs
-             outputs
-             ~balance
-             anti_replay
+        Core.Proving.make_binding_sig ctx inputs outputs ~balance anti_replay
       in
       Core.UTXO.{inputs; outputs; binding_sig; balance; root})
 
@@ -232,6 +235,16 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
 let forge_shield_transaction ?(number_dummy_inputs = 0)
     ?(number_dummy_outputs = 0) (forge_outputs : output list) (balance : int64)
     (anti_replay : string) (state : S.state) =
+  if number_dummy_inputs < 0 then
+    raise
+      (Invalid_argument
+         "Tezos_sapling.Forge.forge_shield_transaction: number_dummy_inputs \
+          is negative") ;
+  if number_dummy_outputs < 0 then
+    raise
+      (Invalid_argument
+         "Tezos_sapling.Forge.forge_shield_transaction: number_dummy_outputs \
+          is negative") ;
   let memo_size = S.get_memo_size state in
   List.iter
     (fun forge_output ->
@@ -276,16 +289,18 @@ let forge_shield_transaction ?(number_dummy_inputs = 0)
         create_dummy_inputs number_dummy_inputs state anti_replay ctx
       in
       let dummy_outputs =
-        List.init number_dummy_outputs (fun _ -> dummy_output ctx ~memo_size)
+        WithExceptions.Result.get_ok ~loc:__LOC__
+        @@ (* checked at entrance of function *)
+           List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
+               dummy_output ctx ~memo_size)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =
-        TzOption.unopt_assert ~loc:__POS__
-        @@ Core.Proving.make_binding_sig
-             ctx
-             []
-             outputs
-             ~balance:balance_outputs
-             anti_replay
+        Core.Proving.make_binding_sig
+          ctx
+          []
+          outputs
+          ~balance:balance_outputs
+          anti_replay
       in
       Core.UTXO.{inputs = dummy_inputs; outputs; binding_sig; balance; root})

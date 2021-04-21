@@ -98,11 +98,14 @@ module Tested_terms () = struct
       lazy_terms
 
   let check_correctness () =
-    Error_monad.iter2_p
+    List.iter2_e
+      ~when_different_lengths:
+        (TzTrace.make
+           (Exn (Failure "min costs and full costs have different lengths")))
       (fun min full ->
-        if Z.leq min full then return_unit
+        if Z.leq min full then ok_unit
         else
-          failwith
+          generic_error
             "Script_repr: inconsistent costs %a vs %a@."
             Z.pp_print
             min
@@ -110,6 +113,8 @@ module Tested_terms () = struct
             full)
       minimal_costs
       full_costs
+
+  let check_correctness () = Lwt.return @@ check_correctness ()
 end
 
 let check_property () =
@@ -117,7 +122,7 @@ let check_property () =
   T.check_correctness ()
 
 let tests =
-  [ Test.tztest
+  [ Test_services.tztest
       "Script_repr.minimal_deserialize_cost is a lower bound for full \
        deserialization cost"
       `Quick

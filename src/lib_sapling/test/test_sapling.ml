@@ -1,4 +1,5 @@
 open Tezos_error_monad.Error_monad
+open Tezos_test_services
 module R = Rustzcash
 
 let test_get_memo_size () =
@@ -9,9 +10,7 @@ let test_get_memo_size () =
   let rcm = Rcm.random () in
   let memo = Bytes.empty in
   let esk = DH.esk_random () in
-  let cv =
-    TzOption.unopt_assert ~loc:__POS__ (CV.of_bytes (Hacl.Rand.gen 32))
-  in
+  let cv = Stdlib.Option.get (CV.of_bytes (Hacl.Rand.gen 32)) in
   let cm = Commitment.of_bytes_exn (Hacl.Rand.gen 32) in
   let epk = DH.derive_ephemeral address esk in
   let cipher = Ciphertext.encrypt 0L address vk rcm memo (cv, cm, epk) esk in
@@ -27,20 +26,14 @@ let test_proof_raw () =
   let rcm = Rcm.random () in
   let xfvk = Viewing_key.of_sk xsk in
   let (_, address) = Viewing_key.(new_address xfvk default_index) in
-  let nf =
-    TzOption.unopt_assert ~loc:__POS__
-    @@ Nullifier.compute address xfvk ~amount:vlue rcm ~position:pos
-  in
-  let cm =
-    TzOption.unopt_assert ~loc:__POS__
-    @@ Commitment.compute address ~amount:vlue rcm
-  in
+  let nf = Nullifier.compute address xfvk ~amount:vlue rcm ~position:pos in
+  let cm = Commitment.compute address ~amount:vlue rcm in
   let esk = DH.esk_random () in
   let epk = DH.derive_ephemeral address esk in
   let tree = T.add T.empty [cm] in
   let root_alt = T.get_root tree in
   let root = root_alt in
-  let witness = TzOption.unopt_assert ~loc:__POS__ @@ T.get_witness tree 0L in
+  let witness = Stdlib.Option.get @@ T.get_witness tree 0L in
   let tohash = Bytes.make 32 '1' in
   let hash =
     Blake2B.(
@@ -48,9 +41,7 @@ let test_proof_raw () =
   in
   let sighash = R.to_sighash hash in
   let ar = R.to_ar @@ R.generate_r () in
-  let signature =
-    TzOption.unopt_assert ~loc:__POS__ (R.spend_sig xsk.expsk.ask ar sighash)
-  in
+  let signature = R.spend_sig xsk.expsk.ask ar sighash in
   R.init_params () ;
   let ctx_prove = R.proving_ctx_init () in
   let ctx_verif = R.verification_ctx_init () in
@@ -65,7 +56,6 @@ let test_proof_raw () =
       ~amount:vlue
       ~root
       ~witness
-    |> TzOption.unopt_assert ~loc:__POS__
   in
   let check_spend =
     R.check_spend ctx_verif cv_spend root nf rk zkproof_spend signature sighash
@@ -79,12 +69,8 @@ let test_proof_raw () =
       address.pkd
       rcm
       ~amount:vlue
-    |> TzOption.unopt_assert ~loc:__POS__
   in
-  let bindingsig =
-    TzOption.unopt_assert ~loc:__POS__
-    @@ R.make_binding_sig ctx_prove ~balance:Int64.zero sighash
-  in
+  let bindingsig = R.make_binding_sig ctx_prove ~balance:Int64.zero sighash in
   let check_output =
     R.check_output ctx_verif cv_output cm epk zkproof_output
   in
@@ -116,10 +102,7 @@ let test_full_transaction () =
   let (_, addr3) = Viewing_key.(new_address xfvk3 default_index) in
   (* creation of the first note *)
   let rcm_1 = Rcm.random () in
-  let cm_1 =
-    Commitment.compute addr1 ~amount:10L rcm_1
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let cm_1 = Commitment.compute addr1 ~amount:10L rcm_1 in
   (* insertion of the first note in the merkle tree (ie. 1 created 10 out of thin air) *)
   let t_1 = T.add T.empty [cm_1] in
   (* ---------------1 transfers 10 to B--------------------- *)
@@ -130,25 +113,19 @@ let test_full_transaction () =
   (* randomness for the created commitment which will belong to 2 *)
   (* commitment for 2 *)
   let rcm_2 = Rcm.random () in
-  let cm_2 =
-    Commitment.compute addr2 ~amount:10L rcm_2
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let cm_2 = Commitment.compute addr2 ~amount:10L rcm_2 in
   (* root of the current state of the blockchain *)
   let root_1 = T.get_root t_1 in
   (* witness to show that what we spend (cm_1) belongs to the
      current state of the blockchain in pos 0 *)
-  let witness_1 = TzOption.unopt_assert ~loc:__POS__ @@ T.get_witness t_1 0L in
+  let witness_1 = Stdlib.Option.get @@ T.get_witness t_1 0L in
   (* randomness to randomize the signature key *)
   let ar_1 = Proving.ar_random () in
   (* randomness for the key exchange done with 2 *)
   let esk_1 = DH.esk_random () in
   let epk_1 = DH.derive_ephemeral addr2 esk_1 in
   (* nullifier to 'destroy' cm_1 *)
-  let nf_1 =
-    Nullifier.compute addr1 xfvk1 ~amount:10L rcm_1 ~position:0L
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let nf_1 = Nullifier.compute addr1 xfvk1 ~amount:10L rcm_1 ~position:0L in
   R.init_params () ;
   (* Creation of a context to kep track of some info *)
   let ctx_prove_1 = R.proving_ctx_init () in
@@ -173,10 +150,7 @@ let test_full_transaction () =
   (* Hash of the spend description *)
   let sighash_2 = UTXO.hash_input cv_spend_1 nf_1 rk_1 zkproof_spend_1 key in
   (* Signature of the input *)
-  let signature_1 =
-    R.spend_sig xsk1.expsk.ask ar_1 sighash_2
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let signature_1 = R.spend_sig xsk1.expsk.ask ar_1 sighash_2 in
   (* encryption of the ciphertext *)
   let nonce_1 = Crypto_box.random_nonce () in
   let plaintext =
@@ -218,10 +192,7 @@ let test_full_transaction () =
      sends the 10 he had to 2.
      The context ctx_prove has to be given in argument when we compute the
      output and spend proofs *)
-  let bindingsig_1 =
-    TzOption.unopt_assert ~loc:__POS__
-    @@ R.make_binding_sig ctx_prove_1 ~balance:0L sighash_1
-  in
+  let bindingsig_1 = R.make_binding_sig ctx_prove_1 ~balance:0L sighash_1 in
   (* The context can now be freed *)
   let () = R.proving_ctx_free ctx_prove_1 in
   (* 1 puts on the blockchain:
@@ -263,28 +234,19 @@ let test_full_transaction () =
 
   (* 2 gets the root and the witness for position 1 (ie. for cm_2) from the new merkle tree *)
   let root_2 = T.get_root t_2 in
-  let witness_2 = TzOption.unopt_assert ~loc:__POS__ @@ T.get_witness t_2 1L in
+  let witness_2 = Stdlib.Option.get @@ T.get_witness t_2 1L in
   (* 2 gets a pkd and d from 3 and computes as before the necessary stuff *)
   let ar_2 = Proving.ar_random () in
   let esk_2 = DH.esk_random () in
   let epk_2 = DH.derive_ephemeral addr3 esk_2 in
-  let nf_2 =
-    Nullifier.compute addr2 xfvk2 ~amount:10L rcm_2 ~position:1L
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let nf_2 = Nullifier.compute addr2 xfvk2 ~amount:10L rcm_2 ~position:1L in
   let ctx_prove_2 = R.proving_ctx_init () in
   let sighash_3 = R.to_sighash @@ Bytes.create 32 in
   let sighash_4 = R.to_sighash @@ Bytes.create 32 in
   (* Bytes.fill sighash_4 '1' ; *)
-  let signature_2 =
-    R.spend_sig xsk2.expsk.ask ar_2 sighash_4
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let signature_2 = R.spend_sig xsk2.expsk.ask ar_2 sighash_4 in
   let rcm_3 = Rcm.random () in
-  let cm_3 =
-    Commitment.compute addr3 ~amount:5L rcm_3
-    |> TzOption.unopt_assert ~loc:__POS__
-  in
+  let cm_3 = Commitment.compute addr3 ~amount:5L rcm_3 in
   (* the shared secret is here unnecessary since in our example 3 won't spend money
      It has to be done in real though *)
   let (cv_spend_2, rk_2, zkproof_spend_2) =
@@ -298,7 +260,6 @@ let test_full_transaction () =
       ~amount:10L
       ~root:root_2
       ~witness:witness_2
-    |> TzOption.unopt_assert ~loc:__POS__
   in
   let (cv_output_2, zkproof_output_2) =
     R.output_proof
@@ -308,14 +269,10 @@ let test_full_transaction () =
       addr3.pkd
       rcm_3
       ~amount:5L
-    |> TzOption.unopt_assert ~loc:__POS__
   in
   (* Here we put 5, meaning 5 is getting out of the shielded pos_in
                                              A regular transaction will give 5 to an address *)
-  let bindingsig_2 =
-    TzOption.unopt_assert ~loc:__POS__
-    @@ R.make_binding_sig ctx_prove_2 ~balance:5L sighash_3
-  in
+  let bindingsig_2 = R.make_binding_sig ctx_prove_2 ~balance:5L sighash_3 in
   let () = R.proving_ctx_free ctx_prove_2 in
   (* The validator checks and updates the state *)
   let ctx_verif_2 = R.verification_ctx_init () in
@@ -358,9 +315,7 @@ let test_forge () =
   Example.Validator.verify_update t1 state key
   >>=? fun (_, state) ->
   let forge_input_opt = Forge.Input.get state 0L vk1 in
-  let (_msg, forge_input) =
-    TzOption.unopt_assert ~loc:__POS__ forge_input_opt
-  in
+  let (_msg, forge_input) = Stdlib.Option.get @@ forge_input_opt in
   let forge_output = Forge.make_output addr2 10L Bytes.empty in
   let transaction =
     Forge.forge_transaction [forge_input] [forge_output] sk1 key state
@@ -475,25 +430,12 @@ let test_replay () =
   Example.Validator.verify_update t1 state wrong_string
   >>= function Error _ -> return_unit | _ -> assert false
 
-(* Wraps an alcotest so that it prints correctly errors from the Error_monad. *)
-let tztest name speed f =
-  Alcotest_lwt.test_case name speed (fun _sw () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
-      | Error err ->
-          Tezos_stdlib_unix.Internal_event_unix.close ()
-          >>= fun () ->
-          Format.printf "@.%a@." pp_print_error err ;
-          Lwt.fail Alcotest.Test_error)
-
 let tests =
   [ Alcotest_lwt.test_case_sync "test_get_memo_size" `Quick test_get_memo_size;
     Alcotest_lwt.test_case_sync "full_transaction" `Quick test_full_transaction;
     Alcotest_lwt.test_case_sync "proof_raw" `Quick test_proof_raw;
-    tztest "forge" `Quick test_forge;
-    tztest "simple_client" `Quick test_simple_client;
-    tztest "anti-replay" `Quick test_replay ]
+    Test_services.tztest "forge" `Quick test_forge;
+    Test_services.tztest "simple_client" `Quick test_simple_client;
+    Test_services.tztest "anti-replay" `Quick test_replay ]
 
 let () = Alcotest_lwt.run "sapling" [("sapling", tests)] |> Lwt_main.run

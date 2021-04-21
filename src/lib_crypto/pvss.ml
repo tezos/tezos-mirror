@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* We reshadow the List module with Stdlib's because there are many safe uses of
+   double-list traversors *)
+module List = Stdlib.List
 module H = Blake2B
 
 (** Polynomial ring (ℤ/qℤ)[X] *)

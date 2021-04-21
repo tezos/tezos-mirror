@@ -6,16 +6,15 @@
             tezos-shell-services
             tezos-client-base
             tezos-mockup-registration
+            tezos-proxy
             tezos-rpc
             tezos-signer-backends
-            tezos-protocol-007-PsDELPH1-parameters
             tezos-protocol-plugin-007-PsDELPH1)
  (library_flags (:standard -linkall))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_shell_services
                    -open Tezos_client_base
                    -open Tezos_protocol_007_PsDELPH1
-                   -open Tezos_protocol_007_PsDELPH1_parameters
                    -open Tezos_rpc)))
 
 (rule

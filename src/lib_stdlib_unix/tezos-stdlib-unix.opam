@@ -9,8 +9,9 @@ depends: [
   "tezos-tooling" { with-test }
   "base-unix"
   "dune" { >= "2.0" }
-  "data-encoding" { = "0.2" }
+  "data-encoding" { >= "0.3" & < "0.4" }
   "tezos-error-monad"
+  "tezos-lwt-result-stdlib"
   "tezos-event-logging"
   "tezos-stdlib"
   "re" { >= "1.7.2" }

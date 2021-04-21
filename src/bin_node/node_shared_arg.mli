@@ -24,10 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type net_config
+
 type t = {
+  disable_config_validation : bool;
   data_dir : string option;
   config_file : string;
-  network : Node_config_file.blockchain_network option;
+  network : net_config option;
   connections : int option;
   max_download_speed : int option;
   max_upload_speed : int option;

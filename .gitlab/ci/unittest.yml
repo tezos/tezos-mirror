@@ -1,0 +1,87 @@
+test-script-gen-genesis:
+  extends: .runtime_build_test_dependencies_template
+  stage: test
+  except:
+    - master
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
+  before_script:
+    - cd scripts/gen-genesis
+  script:
+    - dune build gen_genesis.exe
+  interruptible: true
+
+test-static-libs-patch:
+  extends: .runtime_build_test_dependencies_template
+  stage: test
+  except:
+    - master
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
+  script:
+    - git apply packaging/build/static_libs.patch
+
+.test_template:
+  extends: .build_template
+  stage: test
+  retry: 2
+  # avoid pushing cache for testing stage
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    policy: pull
+
+# this section is updated using the script scripts/update_unit_test.sh
+##BEGIN_UNITTEST##
+unit:alltest:
+  extends: .test_template
+  artifacts:
+    name: "alltest-${CI_COMMIT_SHA}"
+    paths:
+      - test_results
+    expire_in: 1 day
+#    when: on_failure
+  script:
+    - scripts/test_wrapper.sh src/bin_client client
+    - scripts/test_wrapper.sh src/bin_snoop/latex snoop_latex
+    - scripts/test_wrapper.sh src/lib_base base
+    - scripts/test_wrapper.sh src/lib_benchmark/lib_micheline_rewriting benchmark_lib_micheline_rewriting
+    - scripts/test_wrapper.sh src/lib_benchmark benchmark
+    - scripts/test_wrapper.sh src/lib_clic clic
+    - scripts/test_wrapper.sh src/lib_client_base client_base
+    - scripts/test_wrapper.sh src/lib_client_base_unix client_base_unix
+    - scripts/test_wrapper.sh src/lib_crypto crypto
+    - scripts/test_wrapper.sh src/lib_error_monad error_monad
+    - scripts/test_wrapper.sh src/lib_lwt_result_stdlib lwt_result_stdlib
+    - scripts/test_wrapper.sh src/lib_micheline micheline
+    - scripts/test_wrapper.sh src/lib_mockup mockup
+    - scripts/test_wrapper.sh src/lib_p2p p2p
+    - scripts/test_wrapper.sh src/lib_protocol_compiler protocol_compiler
+    - scripts/test_wrapper.sh src/lib_protocol_environment protocol_environment
+    - scripts/test_wrapper.sh src/lib_proxy proxy
+    - scripts/test_wrapper.sh src/lib_requester requester
+    - scripts/test_wrapper.sh src/lib_sapling sapling
+    - scripts/test_wrapper.sh src/lib_shell shell
+    - scripts/test_wrapper.sh src/lib_signer_backends signer_backends
+    - scripts/test_wrapper.sh src/lib_signer_backends/unix signer_backends_unix
+    - scripts/test_wrapper.sh src/lib_stdlib stdlib
+    - scripts/test_wrapper.sh src/lib_storage storage
+    - scripts/test_wrapper.sh src/proto_006_PsCARTHA/lib_client 006_PsCARTHA_lib_client
+    - scripts/test_wrapper.sh src/proto_007_PsDELPH1/lib_client 007_PsDELPH1_lib_client
+    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
+    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_protocol 008_PtEdo2Zk_lib_protocol
+    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_client 009_PsFLoren_lib_client
+    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_protocol 009_PsFLoren_lib_protocol
+    - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
+    - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
+    - scripts/test_wrapper.sh src/tooling src_tooling
+    - scripts/test_wrapper.sh vendors/ocaml-bls12-381 ocaml-bls12-381
+    - scripts/test_wrapper.sh vendors/ocaml-ledger-wallet ocaml-ledger-wallet
+    - scripts/test_wrapper.sh vendors/ocaml-lmdb ocaml-lmdb
+    - scripts/test_wrapper.sh vendors/ocaml-uecc ocaml-uecc
+##END_UNITTEST##
+
+unit:protocol_compiles:
+  extends: .test_template
+  script:
+    - dune build @runtest_compile_protocol
+

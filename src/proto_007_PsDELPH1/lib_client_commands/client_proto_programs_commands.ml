@@ -35,17 +35,9 @@ let group =
 open Tezos_micheline
 open Client_proto_programs
 open Client_proto_args
-open Client_proto_contracts
 
 let commands () =
   let open Clic in
-  let show_types_switch =
-    switch
-      ~long:"details"
-      ~short:'v'
-      ~doc:"show the types of each instruction"
-      ()
-  in
   let emacs_mode_switch =
     switch
       ~long:"emacs"
@@ -53,50 +45,8 @@ let commands () =
       ~doc:"output in `michelson-mode.el` compatible format"
       ()
   in
-  let trace_stack_switch =
-    switch ~long:"trace-stack" ~doc:"show the stack after each step" ()
-  in
   let zero_loc_switch =
     switch ~short:'z' ~long:"zero-loc" ~doc:"replace location with \"0\"" ()
-  in
-  let amount_arg =
-    Client_proto_args.tez_arg
-      ~parameter:"amount"
-      ~doc:"amount of the transfer in \xEA\x9C\xA9"
-      ~default:"0.05"
-  in
-  let source_arg =
-    ContractAlias.destination_arg
-      ~name:"source"
-      ~doc:"name of the source (i.e. SENDER) contract for the transaction"
-      ()
-  in
-  let payer_arg =
-    ContractAlias.destination_arg
-      ~name:"payer"
-      ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
-      ()
-  in
-  let custom_gas_flag =
-    arg
-      ~long:"gas"
-      ~short:'G'
-      ~doc:"Initial quantity of gas for typechecking and execution"
-      ~placeholder:"gas"
-      (parameter (fun _ctx str ->
-           try
-             let v = Z.of_string str in
-             assert (Compare.Z.(v >= Z.zero)) ;
-             return (Alpha_context.Gas.Arith.integral v)
-           with _ -> failwith "invalid gas limit (must be a positive number)"))
-  in
-  let resolve_max_gas cctxt block = function
-    | None ->
-        Alpha_services.Constants.all cctxt (cctxt#chain, block)
-        >>=? fun {parametric = {hard_gas_limit_per_operation; _}; _} ->
-        return hard_gas_limit_per_operation
-    | Some gas ->
-        return gas
   in
   let parse_expr expr =
     Lwt.return @@ Micheline_parser.no_parsing_error
@@ -179,7 +129,7 @@ let commands () =
       (fun () (cctxt : Protocol_client_context.full) ->
         Program.load cctxt
         >>=? fun list ->
-        Lwt_list.iter_s (fun (n, _) -> cctxt#message "%s" n) list
+        List.iter_s (fun (n, _) -> cctxt#message "%s" n) list
         >>= fun () -> return_unit);
     command
       ~group
@@ -207,205 +157,6 @@ let commands () =
         cctxt#message "%s\n" source >>= fun () -> return_unit);
     command
       ~group
-      ~desc:"Ask the node to run a script."
-      (args7
-         trace_stack_switch
-         amount_arg
-         source_arg
-         payer_arg
-         no_print_source_flag
-         custom_gas_flag
-         entrypoint_arg)
-      ( prefixes ["run"; "script"]
-      @@ Program.source_param
-      @@ prefixes ["on"; "storage"]
-      @@ param ~name:"storage" ~desc:"the storage data" data_parameter
-      @@ prefixes ["and"; "input"]
-      @@ param ~name:"input" ~desc:"the input data" data_parameter
-      @@ stop )
-      (fun (trace_exec, amount, source, payer, no_print_source, gas, entrypoint)
-           program
-           storage
-           input
-           cctxt ->
-        let source = Option.map snd source in
-        let payer = Option.map snd payer in
-        Lwt.return @@ Micheline_parser.no_parsing_error program
-        >>=? fun program ->
-        let show_source = not no_print_source in
-        if trace_exec then
-          trace
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~amount
-            ~program
-            ~storage
-            ~input
-            ?source
-            ?payer
-            ?gas
-            ?entrypoint
-            ()
-          >>= fun res ->
-          print_trace_result cctxt ~show_source ~parsed:program res
-        else
-          run
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~amount
-            ~program
-            ~storage
-            ~input
-            ?source
-            ?payer
-            ?gas
-            ?entrypoint
-            ()
-          >>= fun res ->
-          print_run_result cctxt ~show_source ~parsed:program res);
-    command
-      ~group
-      ~desc:"Ask the node to typecheck a script."
-      (args4
-         show_types_switch
-         emacs_mode_switch
-         no_print_source_flag
-         custom_gas_flag)
-      (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
-      (fun (show_types, emacs_mode, no_print_source, original_gas)
-           program
-           cctxt ->
-        match program with
-        | (program, []) ->
-            resolve_max_gas cctxt cctxt#block original_gas
-            >>=? fun original_gas ->
-            typecheck_program
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~gas:original_gas
-              program
-            >>= fun res ->
-            print_typecheck_result
-              ~emacs:emacs_mode
-              ~show_types
-              ~print_source_on_error:(not no_print_source)
-              program
-              res
-              cctxt
-        | res_with_errors when emacs_mode ->
-            cctxt#message
-              "(@[<v 0>(types . ())@ (errors . %a)@])"
-              Michelson_v1_emacs.report_errors
-              res_with_errors
-            >>= fun () -> return_unit
-        | (parsed, errors) ->
-            cctxt#message
-              "%a"
-              (fun ppf () ->
-                Michelson_v1_error_reporter.report_errors
-                  ~details:(not no_print_source)
-                  ~parsed
-                  ~show_source:(not no_print_source)
-                  ppf
-                  errors)
-              ()
-            >>= fun () -> cctxt#error "syntax error in program");
-    command
-      ~group
-      ~desc:"Ask the node to typecheck a data expression."
-      (args2 no_print_source_flag custom_gas_flag)
-      ( prefixes ["typecheck"; "data"]
-      @@ param ~name:"data" ~desc:"the data to typecheck" data_parameter
-      @@ prefixes ["against"; "type"]
-      @@ param ~name:"type" ~desc:"the expected type" data_parameter
-      @@ stop )
-      (fun (no_print_source, custom_gas) data ty cctxt ->
-        resolve_max_gas cctxt cctxt#block custom_gas
-        >>=? fun original_gas ->
-        Client_proto_programs.typecheck_data
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          ~gas:original_gas
-          ~data
-          ~ty
-          ()
-        >>= function
-        | Ok gas ->
-            cctxt#message
-              "@[<v 0>Well typed@,Gas remaining: %a@]"
-              Alpha_context.Gas.pp
-              gas
-            >>= fun () -> return_unit
-        | Error errs ->
-            cctxt#warning
-              "%a"
-              (Michelson_v1_error_reporter.report_errors
-                 ~details:false
-                 ~show_source:(not no_print_source)
-                 ?parsed:None)
-              errs
-            >>= fun () -> cctxt#error "ill-typed data");
-    command
-      ~group
-      ~desc:
-        "Ask the node to pack a data expression.\n\
-         The returned hash is the same as what Michelson instruction `PACK` \
-         would have produced.\n\
-         Also displays the result of hashing this packed data with `BLAKE2B`, \
-         `SHA256` or `SHA512` instruction."
-      (args1 custom_gas_flag)
-      ( prefixes ["hash"; "data"]
-      @@ param ~name:"data" ~desc:"the data to hash" data_parameter
-      @@ prefixes ["of"; "type"]
-      @@ param ~name:"type" ~desc:"type of the data" data_parameter
-      @@ stop )
-      (fun custom_gas data typ cctxt ->
-        resolve_max_gas cctxt cctxt#block custom_gas
-        >>=? fun original_gas ->
-        Alpha_services.Helpers.Scripts.pack_data
-          cctxt
-          (cctxt#chain, cctxt#block)
-          (data.expanded, typ.expanded, Some original_gas)
-        >>= function
-        | Ok (bytes, remaining_gas) ->
-            let hash = Script_expr_hash.hash_bytes [bytes] in
-            cctxt#message
-              "Raw packed data: 0x%a@,\
-               Script-expression-ID-Hash: %a@,\
-               Raw Script-expression-ID-Hash: 0x%a@,\
-               Ledger Blake2b hash: %s@,\
-               Raw Sha256 hash: 0x%a@,\
-               Raw Sha512 hash: 0x%a@,\
-               Gas remaining: %a"
-              Hex.pp
-              (Hex.of_bytes bytes)
-              Script_expr_hash.pp
-              hash
-              Hex.pp
-              (Hex.of_bytes (Script_expr_hash.to_bytes hash))
-              (Base58.raw_encode Blake2B.(hash_bytes [bytes] |> to_string))
-              Hex.pp
-              (Hex.of_bytes (Environment.Raw_hashes.sha256 bytes))
-              Hex.pp
-              (Hex.of_bytes (Environment.Raw_hashes.sha512 bytes))
-              Alpha_context.Gas.pp
-              remaining_gas
-            >>= fun () -> return_unit
-        | Error errs ->
-            cctxt#warning
-              "%a"
-              (Michelson_v1_error_reporter.report_errors
-                 ~details:false
-                 ~show_source:false
-                 ?parsed:None)
-              errs
-            >>= fun () -> cctxt#error "ill-formed data");
-    command
-      ~group
       ~desc:
         "Parse a byte sequence (in hexadecimal notation) as a data \
          expression, as per Michelson instruction `UNPACK`."
@@ -431,21 +182,6 @@ let commands () =
         | Some expr ->
             cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
             >>= fun () -> return_unit);
-    command
-      ~group
-      ~desc:
-        "Sign a raw sequence of bytes and display it using the format \
-         expected by Michelson instruction `CHECK_SIGNATURE`."
-      no_options
-      ( prefixes ["sign"; "bytes"]
-      @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
-      @@ prefixes ["for"]
-      @@ Client_keys.Secret_key.source_param @@ stop )
-      (fun () bytes sk cctxt ->
-        Client_keys.sign cctxt sk bytes
-        >>=? fun signature ->
-        cctxt#message "Signature: %a" Signature.pp signature
-        >>= fun () -> return_unit);
     command
       ~group
       ~desc:
@@ -558,62 +294,6 @@ let commands () =
                   errors)
               ()
             >>= fun () -> cctxt#error "syntax error in program");
-    command
-      ~group
-      ~desc:
-        "Ask the node to list the unreachable paths in a script's parameter \
-         type."
-      (args2 emacs_mode_switch no_print_source_flag)
-      ( prefixes ["get"; "script"; "unreachable"; "paths"; "for"]
-      @@ Program.source_param @@ stop )
-      (fun (emacs_mode, no_print_source) program cctxt ->
-        match program with
-        | (program, []) ->
-            list_unreachables
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              program
-            >>= fun entrypoints ->
-            print_unreachables
-              ~emacs:emacs_mode
-              ~show_source:(not no_print_source)
-              ~parsed:program
-              cctxt
-              entrypoints
-        | res_with_errors when emacs_mode ->
-            cctxt#message
-              "(@[<v 0>(entrypoints . ())@ (errors . %a)@])"
-              Michelson_v1_emacs.report_errors
-              res_with_errors
-            >>= fun () -> return_unit
-        | (parsed, errors) ->
-            cctxt#message
-              "%a"
-              (fun ppf () ->
-                Michelson_v1_error_reporter.report_errors
-                  ~details:(not no_print_source)
-                  ~parsed
-                  ~show_source:(not no_print_source)
-                  ppf
-                  errors)
-              ()
-            >>= fun () -> cctxt#error "syntax error in program");
-    command
-      ~group
-      ~desc:"Ask the node to expand the Michelson macros in a script."
-      no_options
-      (prefixes ["expand"; "macros"; "in"] @@ Program.source_param @@ stop)
-      (fun () program (cctxt : Protocol_client_context.full) ->
-        Lwt.return @@ Micheline_parser.no_parsing_error program
-        >>=? fun program ->
-        cctxt#message
-          "%a"
-          (fun ppf () ->
-            ( Michelson_v1_printer.print_expr_unwrapped ppf program.expanded
-              : unit ))
-          ()
-        >>= fun () -> return_unit);
     command
       ~desc:
         "Conversion of Michelson script from Micheline, JSON or binary to \

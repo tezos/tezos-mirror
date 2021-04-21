@@ -71,11 +71,12 @@ type options = {
   tests_to_run : string list;
   tags_to_run : string list;
   tags_not_to_run : string list;
-  list : bool;
+  list : [`Ascii_art | `Tsv] option;
   global_timeout : float option;
   test_timeout : float option;
   reset_regressions : bool;
   loop : bool;
+  time : bool;
 }
 
 (** Values for command-line options. *)

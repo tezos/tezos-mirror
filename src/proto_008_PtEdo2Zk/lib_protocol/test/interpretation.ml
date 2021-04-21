@@ -148,7 +148,7 @@ let error_encoding_tests =
   in
   List.map
     (fun (name, e) ->
-      Test.tztest
+      Test_services.tztest
         (Format.asprintf "test error encoding: %s" name)
         `Quick
         (test_json_roundtrip_err name e))
@@ -163,6 +163,10 @@ let error_encoding_tests =
       ("Cannot_serialize_storage", Cannot_serialize_storage) ]
 
 let tests =
-  [ Test.tztest "test bad contract error" `Quick test_bad_contract_parameter;
-    Test.tztest "test stack overflow error" `Slow test_stack_overflow ]
+  [ Test_services.tztest
+      "test bad contract error"
+      `Quick
+      test_bad_contract_parameter;
+    Test_services.tztest "test stack overflow error" `Slow test_stack_overflow
+  ]
   @ error_encoding_tests

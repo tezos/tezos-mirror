@@ -9,8 +9,10 @@
             tezos-mockup
             tezos-mockup-registration
             tezos-mockup-commands
+            tezos-proxy
             tezos-signer-backends.unix
-            tezos-shell-services)
+            tezos-shell-services
+            lwt-exit)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_rpc_http
                    -open Tezos_rpc_http_client_unix

@@ -28,13 +28,19 @@
 
 (** Tezos - Versioned, block indexed (key x value) store *)
 
-(** A block-indexed (key x value) store directory.  *)
-type index
+(** {2 Generic interface} *)
 
-(** A (key x value) store for a given block. *)
-type t
+module type S = sig
+  (** @inline *)
+  include Tezos_storage_sigs.Context.S
+end
+
+include S
 
 type context = t
+
+(** A block-indexed (key x value) store directory.  *)
+type index
 
 (** Open or initialize a versioned store at a given path. *)
 val init :
@@ -46,6 +52,10 @@ val init :
 
 (** Close the index. Does not fail when the context is already closed. *)
 val close : index -> unit Lwt.t
+
+(** Sync the context with disk. Only useful for read-only instances.
+    Does not fail when the context is not in read-only mode. *)
+val sync : index -> unit Lwt.t
 
 val compute_testchain_chain_id : Block_hash.t -> Chain_id.t
 
@@ -60,33 +70,6 @@ val commit_genesis :
 
 val commit_test_chain_genesis :
   context -> Block_header.t -> Block_header.t Lwt.t
-
-(** {2 Generic interface} *)
-
-(** [key] indicates a path in a context. *)
-type key = string list
-
-type value = bytes
-
-val mem : context -> key -> bool Lwt.t
-
-val dir_mem : context -> key -> bool Lwt.t
-
-val get : context -> key -> value option Lwt.t
-
-val set : context -> key -> value -> t Lwt.t
-
-val remove_rec : context -> key -> t Lwt.t
-
-(** [copy] returns None if the [from] key is not bound *)
-val copy : context -> from:key -> to_:key -> context option Lwt.t
-
-type key_or_dir = [`Key of key | `Dir of key]
-
-(** [fold] iterates over elements under a path (not recursive). Iteration order
-    is nondeterministic. *)
-val fold :
-  context -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
 (** {2 Accessing and Updating Versions} *)
 
@@ -116,13 +99,13 @@ val set_master : index -> Context_hash.t -> unit Lwt.t
 
 val get_protocol : context -> Protocol_hash.t Lwt.t
 
-val set_protocol : context -> Protocol_hash.t -> context Lwt.t
+val add_protocol : context -> Protocol_hash.t -> context Lwt.t
 
 val get_test_chain : context -> Test_chain_status.t Lwt.t
 
-val set_test_chain : context -> Test_chain_status.t -> context Lwt.t
+val add_test_chain : context -> Test_chain_status.t -> context Lwt.t
 
-val del_test_chain : context -> context Lwt.t
+val remove_test_chain : context -> context Lwt.t
 
 val fork_test_chain :
   context ->
@@ -132,16 +115,16 @@ val fork_test_chain :
 
 val clear_test_chain : index -> Chain_id.t -> unit Lwt.t
 
-val get_predecessor_block_metadata_hash :
+val find_predecessor_block_metadata_hash :
   context -> Block_metadata_hash.t option Lwt.t
 
-val set_predecessor_block_metadata_hash :
+val add_predecessor_block_metadata_hash :
   context -> Block_metadata_hash.t -> context Lwt.t
 
-val get_predecessor_ops_metadata_hash :
+val find_predecessor_ops_metadata_hash :
   context -> Operation_metadata_list_list_hash.t option Lwt.t
 
-val set_predecessor_ops_metadata_hash :
+val add_predecessor_ops_metadata_hash :
   context -> Operation_metadata_list_list_hash.t -> context Lwt.t
 
 (** {2 Context dumping} *)

@@ -33,6 +33,7 @@
  (public_name tezos-rpc-http-server)
  (libraries tezos-base
             resto-cohttp-server
+            resto-acl
             tezos-rpc-http)
  (modules RPC_server)
  (flags (:standard -open Tezos_base__TzPervasives

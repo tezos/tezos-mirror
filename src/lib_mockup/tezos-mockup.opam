@@ -15,7 +15,11 @@ depends: [
   "tezos-p2p-services"
   "tezos-p2p"
   "tezos-protocol-environment"
+  "tezos-mockup-proxy"
   "tezos-mockup-registration"
+  "tezos-mockup-registration" { with-test }
+  "tezos-test-services" { with-test }
+  "resto-cohttp-self-serving-client" { >= "0.6" & < "0.7" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

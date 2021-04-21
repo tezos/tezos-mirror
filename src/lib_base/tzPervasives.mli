@@ -38,21 +38,13 @@ include module type of Tezos_clic
 include module type of Tezos_crypto
 
 module Data_encoding = Data_encoding
-module Seq = Tezos_lwt_result_stdlib.Lwtreslib.Seq
-module Map = Tezos_lwt_result_stdlib.Lwtreslib.Map
-module Set = Tezos_lwt_result_stdlib.Lwtreslib.Set
-module Hashtbl = Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl
 
-module Option : sig
-  include module type of Option
-
-  include module type of Tezos_stdlib.TzOption
-end
+include module type of Tezos_error_monad.TzLwtreslib
 
 module List : sig
-  include module type of List
-
   include module type of Tezos_stdlib.TzList
+
+  include module type of Tezos_error_monad.TzLwtreslib.List
 end
 
 module String : sig
@@ -61,7 +53,7 @@ module String : sig
   include module type of Tezos_stdlib.TzString
 
   module Hashtbl :
-    Tezos_lwt_result_stdlib.Lwtreslib.Hashtbl.SeededS with type key = t
+    Tezos_error_monad.TzLwtreslib.Hashtbl.SeededS with type key = t
 end
 
 module Time = Time

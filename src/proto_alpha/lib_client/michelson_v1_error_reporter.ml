@@ -97,6 +97,7 @@ let collect_error_locations errs =
         acc
     | Environment.Ecoproto_error
         ( Invalid_arity (loc, _, _, _)
+        | Invalid_seq_arity (loc, _, _)
         | Inconsistent_type_annotations (loc, _, _)
         | Unexpected_annotation loc
         | Ungrouped_annotations loc
@@ -104,8 +105,9 @@ let collect_error_locations errs =
         | Invalid_namespace (loc, _, _, _)
         | Invalid_primitive (loc, _, _)
         | Invalid_kind (loc, _, _)
+        | Invalid_never_expr loc
         | Duplicate_field (loc, _)
-        | Unexpected_big_map loc
+        | Unexpected_lazy_storage loc
         | Unexpected_operation loc
         | Fail_not_in_tail_position loc
         | Undefined_binop (loc, _, _, _)
@@ -119,7 +121,10 @@ let collect_error_locations errs =
         | Invalid_contract (loc, _)
         | Comparable_type_expected (loc, _)
         | Overflow (loc, _)
-        | Reject (loc, _, _) )
+        | Reject (loc, _, _)
+        | Pair_bad_argument loc
+        | Unpair_bad_argument loc
+        | Dup_n_bad_argument loc )
       :: rest ->
         collect (loc :: acc) rest
     | _ :: rest ->
@@ -141,13 +146,10 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                (Format.asprintf "%a" Micheline_parser.print_location loc))
     in
     let parsed_locations parsed loc =
-      try
-        let oloc =
-          List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
-        in
-        let (ploc, _) = List.assoc oloc parsed.expansion_table in
-        Some ploc
-      with Not_found -> None
+      let ( >?? ) = Option.bind in
+      List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
+      >?? fun oloc ->
+      List.assoc oloc parsed.expansion_table >?? fun (ploc, _) -> Some ploc
     in
     let print_source ppf (parsed, _hilights) (* TODO *) =
       let lines =
@@ -312,8 +314,12 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           (Michelson_v1_primitives.string_of_prim prim) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Environment.Ecoproto_error (Unexpected_big_map loc) :: rest ->
-        Format.fprintf ppf "%abig_map type not expected here" print_loc loc ;
+    | Environment.Ecoproto_error (Unexpected_lazy_storage loc) :: rest ->
+        Format.fprintf
+          ppf
+          "%abig_map or sapling_state type not expected here"
+          print_loc
+          loc ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error (Unexpected_operation loc) :: rest ->
@@ -413,6 +419,14 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               (Michelson_v1_primitives.string_of_prim name)
               exp
               got
+        | Invalid_seq_arity (loc, exp, got) ->
+            Format.fprintf
+              ppf
+              "%asequence expects at least %d elements but is given %d."
+              print_loc
+              loc
+              exp
+              got
         | Invalid_namespace (loc, name, exp, got) ->
             let human_namespace = function
               | Michelson_v1_primitives.Instr_namespace ->
@@ -467,6 +481,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                    let (a, n) = human_kind k in
                    a ^ " " ^ n)
                  exp)
+        | Invalid_never_expr loc ->
+            Format.fprintf
+              ppf
+              "@[%athis expression should have type never but type never has \
+               no inhabitant."
+              print_loc
+              loc
         | Duplicate_map_keys (_, expr) ->
             Format.fprintf
               ppf
@@ -599,16 +620,50 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               loc
               size
               maximum_size
+        | Pair_bad_argument loc ->
+            Format.fprintf
+              ppf
+              "%aPAIR expects an argument of at least 2."
+              print_loc
+              loc
+        | Unpair_bad_argument loc ->
+            Format.fprintf
+              ppf
+              "%aUNPAIR expects an argument of at least 2."
+              print_loc
+              loc
+        | Dup_n_bad_argument loc ->
+            Format.fprintf
+              ppf
+              "%aDUP n expects an argument of at least 1 (passed 0)."
+              print_loc
+              loc
         | Self_in_lambda loc ->
             Format.fprintf
               ppf
               "%aThe SELF instruction cannot appear in a lambda."
               print_loc
               loc
+        | Non_dupable_type (loc, ty) ->
+            Format.fprintf
+              ppf
+              "%aDUP used on the non-dupable type %a."
+              print_loc
+              loc
+              print_ty
+              ty
+        | Unexpected_ticket loc ->
+            Format.fprintf
+              ppf
+              "%aTicket in unauthorized position (type error)."
+              print_loc
+              loc
         | Bad_stack_length ->
             Format.fprintf ppf "Bad stack length."
         | Bad_stack_item lvl ->
             Format.fprintf ppf "Bad stack item %d." lvl
+        | Unexpected_forged_value loc ->
+            Format.fprintf ppf "%aUnexpected forged value." print_loc loc
         | Invalid_constant (loc, got, exp) ->
             Format.fprintf
               ppf

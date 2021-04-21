@@ -10,9 +10,8 @@ depends: [
   "dune" { >= "2.0" }
   "tezos-stdlib"
   "tezos-crypto"
-  "data-encoding" { = "0.2" }
+  "data-encoding" { >= "0.3" & < "0.4" }
   "tezos-error-monad"
-  "tezos-lwt-result-stdlib"
   "tezos-event-logging"
   "tezos-micheline"
   "tezos-rpc"

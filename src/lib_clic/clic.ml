@@ -93,6 +93,13 @@ type ('a, 'ctx) params =
   | Seq :
       string * string * ('p, 'ctx) parameter
       -> ('p list -> 'ctx -> unit tzresult Lwt.t, 'ctx) params
+  | NonTerminalSeq :
+      string
+      * string
+      * ('p, 'ctx) parameter
+      * string list
+      * ('a -> 'b, 'ctx) params
+      -> ('p list -> 'a -> 'b, 'ctx) params
 
 type (_, _) options =
   | Argument : {
@@ -248,6 +255,9 @@ let print_highlight highlight_strings formatter str =
   print_string (List.map Re.Str.regexp_string highlight_strings)
 
 let print_commandline ppf (highlights, options, args) =
+  let print_suffix =
+    Format.(pp_print_list ~pp_sep:pp_print_space (print_highlight highlights))
+  in
   let rec print : type a ctx. Format.formatter -> (a, ctx) params -> unit =
    fun ppf -> function
     | Stop ->
@@ -256,6 +266,19 @@ let print_commandline ppf (highlights, options, args) =
         Format.fprintf ppf "[@{<arg>%s@}...]" n
     | Seq (n, _, _) ->
         Format.fprintf ppf "[@{<arg>%s@}...] %a" n print_options_brief options
+    | NonTerminalSeq (n, _, _, suffix, Stop) when not (has_args options) ->
+        Format.fprintf ppf "[@{<arg>%s@}...] @{<kwd>%a@}" n print_suffix suffix
+    | NonTerminalSeq (n, _, _, suffix, next) ->
+        Format.fprintf
+          ppf
+          "[@{<arg>%s@}...] @{<kwd>%a@} %a %a"
+          n
+          print_suffix
+          suffix
+          print
+          next
+          print_options_brief
+          options
     | Prefix (n, Stop) when not (has_args options) ->
         Format.fprintf ppf "@{<kwd>%a@}" (print_highlight highlights) n
     | Prefix (n, next) ->
@@ -286,6 +309,13 @@ let rec print_params_detailed :
           ()
       | _ ->
           Format.fprintf ppf "@,%a" print_options_detailed spec )
+  | NonTerminalSeq (n, desc, _, _, next) -> (
+      Format.fprintf ppf "@{<arg>%s@}: %a" n print_desc (trim desc) ;
+      match spec with
+      | NoArgs ->
+          ()
+      | _ ->
+          Format.fprintf ppf "@,%a" (print_params_detailed spec) next )
   | Prefix (_, next) ->
       print_params_detailed spec ppf next
   | Param (n, desc, _, Stop) -> (
@@ -312,6 +342,8 @@ let contains_params_args :
     | Stop ->
         has_args args
     | Seq (_, _, _) ->
+        true
+    | NonTerminalSeq (_, _, _, _, _) ->
         true
     | Prefix (_, next) ->
         help next
@@ -799,7 +831,9 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
      @{<kwd>command@} [@{<opt>command options@}]@}@}@,\
      @{<command>@{<commandline>%s @{<opt>--help@} (for global options)@}@}@,\
      @{<command>@{<commandline>%s [@{<opt>global options@}] @{<kwd>command@} \
-     @{<opt>--help@} (for command options)@}@}@}@,\
+     @{<opt>--help@} (for command options)@}@}@,\
+     @{<command>@{<commandline>%s @{<opt>--version@} (for version \
+     information)@}@}@}@,\
      @,\
      @{<title>To browse the documentation@}@,\
      @{<list>@{<command>@{<commandline>%s [@{<opt>global options@}] \
@@ -809,6 +843,7 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
      @,\
      @{<title>Global options (must come before the command)@}@,\
      @{<commanddoc>%a@}%a%a@}@."
+    executable_name
     executable_name
     executable_name
     executable_name
@@ -929,11 +964,20 @@ let rec make_arities_dict :
       | Constant _c ->
           make_arities_dict rest acc )
 
+type error += Version : error
+
 type error += Help : 'a command option -> error
 
 let check_help_flag ?command = function
   | ("-h" | "--help") :: _ ->
       fail (Help command)
+  | _ ->
+      return_unit
+
+let check_version_flag = function
+  (* No "-v", it is taken by man output verbosity *)
+  | "--version" :: _ ->
+      fail Version
   | _ ->
       return_unit
 
@@ -947,6 +991,8 @@ let add_occurrence long value acc =
 let make_args_dict_consume ?command spec args =
   let rec make_args_dict completing arities acc args =
     check_help_flag ?command args
+    >>=? fun () ->
+    check_version_flag args
     >>=? fun () ->
     match args with
     | [] ->
@@ -1482,6 +1528,15 @@ let seq_of_param param =
   | _ ->
       invalid_arg "Clic.seq_of_param"
 
+let non_terminal_seq ~suffix param next =
+  match (suffix, param Stop) with
+  | ([], _) ->
+      invalid_arg "Clic.non_terminal_seq: empty suffix"
+  | (_, Param (n, desc, parameter, Stop)) ->
+      NonTerminalSeq (n, desc, parameter, suffix, next)
+  | _ ->
+      invalid_arg "Clic.non_terminal_seq"
+
 let prefix keyword next = Prefix (keyword, next)
 
 let rec fixed = function [] -> Stop | n :: r -> Prefix (n, fixed r)
@@ -1522,6 +1577,16 @@ let rec search_params_prefix : type a arg. string -> (a, arg) params -> bool =
       false
   | Seq _ ->
       false
+  | NonTerminalSeq (_, _, _, suffix, next) ->
+      List.exists
+        (fun keyword ->
+          match string_contains ~needle:prefix ~haystack:keyword with
+          | None ->
+              false
+          | Some _ ->
+              true)
+        suffix
+      || search_params_prefix prefix next
 
 let search_command keyword (Command {params; _}) =
   search_params_prefix keyword params
@@ -1558,6 +1623,39 @@ let exec (type ctx)
               >>=? fun v -> do_seq (succ i) (v :: acc) rest
         in
         do_seq i [] seq >>=? fun parsed -> cb parsed ctx
+    | (NonTerminalSeq (_, _, {converter; _}, suffix, next), seq) ->
+        let rec do_seq i acc = function
+          | [] ->
+              return (List.rev acc, [])
+          | p :: rest as params ->
+              (* try to match suffix first *)
+              let rec match_suffix = function
+                | (param :: params, suffix :: suffixes) when param = suffix ->
+                    match_suffix (params, suffixes)
+                | (params, []) ->
+                    (* all of the suffix parts have been matched *)
+                    (params, true)
+                | (_, _) ->
+                    (params, false)
+              in
+              let (unmatched_rest, matched) = match_suffix (params, suffix) in
+              if matched then return (List.rev acc, unmatched_rest)
+              else
+                (* if suffix is not match, try to continue with the sequence *)
+                Lwt.catch
+                  (fun () ->
+                    converter ctx p
+                    >>=? fun v -> do_seq (succ i) (v :: acc) rest)
+                  (function
+                    | err -> (
+                      match err with
+                      | Failure msg ->
+                          Error_monad.failwith "%s" msg
+                      | exn ->
+                          fail (Exn exn) ))
+        in
+        do_seq i [] seq
+        >>=? fun (parsed, rest) -> exec (succ i) ctx next (cb parsed) rest
     | (Prefix (n, next), p :: rest) when n = p ->
         exec (succ i) ctx next cb rest
     | (Param (_, _, {converter; _}, next), p :: rest) ->
@@ -1592,6 +1690,15 @@ and 'arg param_level = {
   tree : 'arg tree;
 }
 
+and 'arg non_terminal_seq_level = {
+  stop : 'arg command option;
+  autocomplete : ('arg -> string list tzresult Lwt.t) option;
+  tree : 'arg tree;
+  name : string;
+  desc : string;
+  suffix : string list;
+}
+
 and 'ctx tree =
   | TPrefix : 'ctx level -> 'ctx tree
   | TParam : 'ctx param_level -> 'ctx tree
@@ -1599,6 +1706,7 @@ and 'ctx tree =
   | TSeq :
       'ctx command * ('ctx -> string list tzresult Lwt.t) option
       -> 'ctx tree
+  | TNonTerminalSeq : 'ctx non_terminal_seq_level -> 'ctx tree
   | TEmpty : 'ctx tree
 
 let has_options : type ctx. ctx command -> bool =
@@ -1613,38 +1721,49 @@ let has_options : type ctx. ctx command -> bool =
 
 let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
  fun root (Command {params; conv; _} as command) ->
-  let access_autocomplete :
-      type p ctx.
-      (p, ctx) parameter -> (ctx -> string list tzresult Lwt.t) option =
-   fun {autocomplete; _} -> autocomplete
-  in
   let rec insert_tree :
       type a ictx. (ctx -> ictx) -> ctx tree -> (a, ictx) params -> ctx tree =
    fun conv t c ->
     let insert_tree t c = insert_tree conv t c in
-    let map_autocomplete autocomplete =
-      Option.map (fun a c -> a (conv c)) autocomplete
+    let rec suffix_to_params suffix next =
+      match suffix with
+      | suffix :: suffixes ->
+          Prefix (suffix, suffix_to_params suffixes next)
+      | [] ->
+          next
     in
+    let suffix_to_tree suffix next =
+      insert_tree TEmpty (suffix_to_params suffix next)
+    in
+    let conv_autocomplete = Option.map (fun a c -> a (conv c)) in
     match (t, c) with
     | (TEmpty, Stop) ->
         TStop command
     | (TEmpty, Seq (_, _, {autocomplete; _})) ->
-        TSeq (command, map_autocomplete autocomplete)
-    | (TEmpty, Param (_, _, param, next)) ->
-        let autocomplete = access_autocomplete param in
-        let autocomplete = map_autocomplete autocomplete in
+        TSeq (command, conv_autocomplete autocomplete)
+    | (TEmpty, Param (_, _, {autocomplete; _}, next)) ->
+        let autocomplete = conv_autocomplete autocomplete in
         TParam {tree = insert_tree TEmpty next; stop = None; autocomplete}
+    | (TEmpty, NonTerminalSeq (name, desc, {autocomplete; _}, suffix, next)) ->
+        let autocomplete = conv_autocomplete autocomplete in
+        let tree = suffix_to_tree suffix next in
+        TNonTerminalSeq {stop = None; tree; autocomplete; suffix; name; desc}
     | (TEmpty, Prefix (n, next)) ->
         TPrefix {stop = None; prefix = [(n, insert_tree TEmpty next)]}
-    | (TStop cmd, Param (_, _, param, next)) ->
-        let autocomplete = access_autocomplete param in
-        let autocomplete = map_autocomplete autocomplete in
+    | (TStop cmd, Param (_, _, {autocomplete; _}, next)) ->
+        let autocomplete = conv_autocomplete autocomplete in
         if not (has_options cmd) then
           TParam
             {tree = insert_tree TEmpty next; stop = Some cmd; autocomplete}
         else raise (Failure "Command cannot have both prefix and options")
     | (TStop cmd, Prefix (n, next)) ->
         TPrefix {stop = Some cmd; prefix = [(n, insert_tree TEmpty next)]}
+    | (TStop cmd, NonTerminalSeq (name, desc, {autocomplete; _}, suffix, next))
+      ->
+        let autocomplete = conv_autocomplete autocomplete in
+        let tree = suffix_to_tree suffix next in
+        TNonTerminalSeq
+          {stop = Some cmd; tree; autocomplete; suffix; name; desc}
     | (TParam t, Param (_, _, _, next)) ->
         TParam {t with tree = insert_tree t.tree next}
     | (TPrefix ({prefix; _} as l), Prefix (n, next)) ->
@@ -1663,6 +1782,18 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
         TParam {l with stop = Some command}
     | (TParam t, Prefix (_n, next)) ->
         TParam {t with tree = insert_tree t.tree next}
+    | (TNonTerminalSeq t, NonTerminalSeq (n, desc, _, suffix, next)) ->
+        if
+          n <> t.name || desc <> t.desc || t.suffix <> suffix
+          (* we should match the parameter too but this would require a bit of refactoring*)
+        then
+          raise
+            (Failure
+               "Command cannot have different non_terminal_seq_level at the \
+                same position")
+        else
+          let params = suffix_to_params suffix next in
+          TNonTerminalSeq {t with tree = insert_tree t.tree params}
     | (_, _) ->
         Stdlib.failwith
           (Format.asprintf
@@ -1686,7 +1817,7 @@ let rec gather_commands ?(acc = []) tree =
       gather_assoc
         ~acc:(match stop with None -> acc | Some c -> c :: acc)
         prefix
-  | TParam {tree; stop; _} ->
+  | TParam {tree; stop; _} | TNonTerminalSeq {tree; stop; _} ->
       gather_commands
         tree
         ~acc:(match stop with None -> acc | Some c -> c :: acc)
@@ -1699,6 +1830,7 @@ let find_command tree initial_arguments =
     match (tree, arguments) with
     | ( ( TStop _
         | TSeq _
+        | TNonTerminalSeq {stop = Some _; _}
         | TPrefix {stop = Some _; _}
         | TParam {stop = Some _; _} ),
         ("-h" | "--help") :: _ ) -> (
@@ -1733,15 +1865,39 @@ let find_command tree initial_arguments =
           make_args_dict_filter ~command spec remaining
           >|=? fun (dict, remaining) ->
           (command, dict, List.rev_append acc remaining)
+    | (TNonTerminalSeq {stop = None; _}, ([] | ("-h" | "--help") :: _)) ->
+        fail (Unterminated_command (initial_arguments, gather_commands tree))
+    | (TNonTerminalSeq {stop = Some c; _}, []) ->
+        return (c, empty_args_dict, initial_arguments)
+    | ( (TNonTerminalSeq {tree; suffix; _} as nts),
+        (parameter :: arguments' as remaining) ) ->
+        (* try to match suffix first *)
+        let rec match_suffix matched_acc = function
+          | (param :: params, suffix :: suffixes) when param = suffix ->
+              match_suffix (param :: matched_acc) (params, suffixes)
+          | (_, []) ->
+              (* all of the suffix parts have been matched *)
+              true
+          | (_, _) ->
+              false
+        in
+        let matched = match_suffix [] (remaining, suffix) in
+        if matched then
+          (* continue with the nested tree *)
+          traverse tree remaining acc
+        else
+          (* continue traversing with the current node (non-terminal sequence) *)
+          traverse nts arguments' (parameter :: acc)
     | (TPrefix {stop = Some cmd; _}, []) ->
         return (cmd, empty_args_dict, initial_arguments)
     | (TPrefix {stop = None; prefix}, ([] | ("-h" | "--help") :: _)) ->
         fail (Unterminated_command (initial_arguments, gather_assoc prefix))
-    | (TPrefix {prefix; _}, hd_arg :: tl) ->
-        ( try return (List.assoc hd_arg prefix)
-          with Not_found ->
-            fail (Command_not_found (List.rev acc, gather_assoc prefix)) )
-        >>=? fun tree' -> traverse tree' tl (hd_arg :: acc)
+    | (TPrefix {prefix; _}, hd_arg :: tl) -> (
+      match List.assoc hd_arg prefix with
+      | None ->
+          fail (Command_not_found (List.rev acc, gather_assoc prefix))
+      | Some tree' ->
+          traverse tree' tl (hd_arg :: acc) )
     | (TParam {stop = None; _}, ([] | ("-h" | "--help") :: _)) ->
         fail (Unterminated_command (initial_arguments, gather_commands tree))
     | (TParam {stop = Some c; _}, []) ->
@@ -1864,6 +2020,10 @@ let complete_next_tree cctxt = function
   | TSeq (command, autocomplete) ->
       complete_func autocomplete cctxt
       >|=? fun completions -> completions @ list_command_args command
+  | TNonTerminalSeq {autocomplete; suffix; _} ->
+      complete_func autocomplete cctxt
+      >|=? fun completions ->
+      completions @ [WithExceptions.Option.get ~loc:__LOC__ @@ List.hd suffix]
   | TParam {autocomplete; _} ->
       complete_func autocomplete cctxt
   | TStop command ->
@@ -1878,14 +2038,47 @@ let complete_tree cctxt tree index args =
       match (tree, args) with
       | (TSeq _, _) ->
           complete_next_tree cctxt tree
+      | ((TNonTerminalSeq {tree; suffix; _} as this_tree), _ :: _tl) -> (
+          let rec args_starting_from_suffix ind matched_args = function
+            | ((s :: s_rest as suffix), a :: a_rest) ->
+                if s = a then
+                  args_starting_from_suffix
+                    ind
+                    (matched_args @ [a])
+                    (s_rest, a_rest)
+                else if List.length matched_args = 0 then
+                  (* Suffix not found on args head, check the rest of the args *)
+                  args_starting_from_suffix
+                    (ind - 1)
+                    matched_args
+                    (suffix, a_rest)
+                else
+                  (* After there is a suffix match, the rest of the suffix has
+                     to be matched in the following args, unless it's empty. *)
+                  None
+            | (unmatched_suffix, args)
+            (* Partial or full suffix match found *)
+              when List.length unmatched_suffix < List.length suffix ->
+                Some (matched_args @ args, ind)
+            | _ ->
+                None
+          in
+          match args_starting_from_suffix ind [] (suffix, args) with
+          | Some (args, ind) ->
+              help tree args ind
+          | _ ->
+              complete_next_tree cctxt this_tree )
       | (TPrefix {prefix; _}, hd :: tl) -> (
-        try help (List.assoc hd prefix) tl (ind - 1)
-        with Not_found -> return_nil )
+        match List.assoc hd prefix with
+        | None ->
+            return_nil
+        | Some p ->
+            help p tl (ind - 1) )
       | (TParam {tree; _}, _ :: tl) ->
           help tree tl (ind - 1)
       | (TStop (Command {options = Argument {spec; _}; conv; _}), args) ->
           complete_options (fun _ _ -> return_nil) args spec ind (conv cctxt)
-      | ((TParam _ | TPrefix _), []) | (TEmpty, _) ->
+      | ((TParam _ | TPrefix _ | TNonTerminalSeq _), []) | (TEmpty, _) ->
           return_nil
   in
   help tree args index
@@ -1934,7 +2127,22 @@ let parse_global_options global_options ctx args =
 let dispatch commands ctx args =
   let tree = make_dispatch_tree commands in
   match args with
-  | [] | [("-h" | "--help")] ->
+  | []
+    when match tree with
+         | TPrefix {stop; _} ->
+             stop = None
+         | TParam {stop; _} ->
+             stop = None
+         | TStop _ ->
+             false
+         | TSeq (_, _) ->
+             false
+         | TNonTerminalSeq {stop; _} ->
+             stop = None
+         | TEmpty ->
+             true ->
+      fail (Help None)
+  | [("-h" | "--help")] ->
       fail (Help None)
   | _ ->
       find_command tree args

@@ -1,3 +1,4 @@
 {
-    "modules": ["Main"]
+    "modules": ["Main"],
+    "expected_env_version": 1
 }

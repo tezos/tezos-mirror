@@ -11,6 +11,7 @@ depends: [
   "tezos-base"
   "tezos-benchmark"
   "tezos-benchmark-examples"
+  "tezos-shell-benchmarks"
   "tezos-stdlib-unix"
   "tezos-clic"
   "pyml"

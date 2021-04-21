@@ -87,7 +87,8 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
     let block = `Hash (hash, 0) in
     let predecessor = header.Tezos_base.Block_header.predecessor in
     let pred_block =
-      Option.unopt_exn Not_found @@ Block_hash.Table.find blocks predecessor
+      WithExceptions.Option.to_exn ~none:Not_found
+      @@ Block_hash.Table.find blocks predecessor
     in
     match pred_block with
     | Some (block_with_op, n) ->
@@ -216,7 +217,13 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
           let head_level = head_shell.Block_header.level in
           return Int32.(to_int (sub head_level branch_level))
       | None ->
-          return predecessors )
+          Shell_services.Blocks.Header.shell_header ctxt ~chain ()
+          >>=? fun head_header ->
+          let head_level = Int32.to_int head_header.level in
+          let block_hook = min predecessors (head_level - 1) in
+          (* this assertion ensures that the RPC call right below does not fail *)
+          assert (head_level - (block_hook + 1) >= 0) ;
+          return block_hook )
       >>=? fun block_hook ->
       Block_services.Empty.hash
         ctxt

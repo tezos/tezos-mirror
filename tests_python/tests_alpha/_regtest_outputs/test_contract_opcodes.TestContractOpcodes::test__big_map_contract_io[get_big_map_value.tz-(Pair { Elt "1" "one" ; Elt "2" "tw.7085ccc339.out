@@ -1,0 +1,51 @@
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test__big_map_contract_io[get_big_map_value.tz-(Pair { Elt "1" "one" ; Elt "2" "two" } None)-"1"-(Pair 0 (Some "one"))-big_map_diff2]
+
+storage
+  (Pair 0 (Some "one"))
+emitted operations
+  
+big_map diff
+  New map(0) of type (big_map string string)
+  Set map(0)["2"] to "two"
+  Set map(0)["1"] to "one"
+trace
+  - location: 11 (remaining gas: 1039965.019 units remaining)
+    [ (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None)  	 ]
+  - location: 12 (remaining gas: 1039964.939 units remaining)
+    [ (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None)  	
+      (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None)  	 ]
+  - location: 13 (remaining gas: 1039964.859 units remaining)
+    [ "1"  	@parameter
+      (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None)  	 ]
+  - location: 17 (remaining gas: 1039964.674 units remaining)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } None)  	@storage ]
+  - location: 18 (remaining gas: 1039964.594 units remaining)
+    [ { Elt "1" "one" ; Elt "2" "two" }  	 ]
+  - location: -1 (remaining gas: 1039964.549 units remaining)
+    [ { Elt "1" "one" ; Elt "2" "two" }  	 ]
+  - location: 19 (remaining gas: 1039964.469 units remaining)
+    [ { Elt "1" "one" ; Elt "2" "two" }  	
+      { Elt "1" "one" ; Elt "2" "two" }  	 ]
+  - location: -1 (remaining gas: 1039964.424 units remaining)
+    [ { Elt "1" "one" ; Elt "2" "two" }  	
+      { Elt "1" "one" ; Elt "2" "two" }  	 ]
+  - location: 14 (remaining gas: 1039964.424 units remaining)
+    [ "1"  	@parameter
+      { Elt "1" "one" ; Elt "2" "two" }  	
+      { Elt "1" "one" ; Elt "2" "two" }  	 ]
+  - location: 20 (remaining gas: 1039955.562 units remaining)
+    [ (Some "one")  	
+      { Elt "1" "one" ; Elt "2" "two" }  	 ]
+  - location: 21 (remaining gas: 1039955.492 units remaining)
+    [ { Elt "1" "one" ; Elt "2" "two" }  	
+      (Some "one")  	 ]
+  - location: 22 (remaining gas: 1039955.417 units remaining)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } (Some "one"))  	 ]
+  - location: 23 (remaining gas: 1039955.342 units remaining)
+    [ {}  	
+      (Pair { Elt "1" "one" ; Elt "2" "two" } (Some "one"))  	 ]
+  - location: 25 (remaining gas: 1039955.267 units remaining)
+    [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } (Some "one"))  	 ]
+  - location: -1 (remaining gas: 1039955.222 units remaining)
+    [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } (Some "one"))  	 ]
+

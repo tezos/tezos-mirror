@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -74,3 +75,10 @@ type error += Point_banned of P2p_point.Id.t
 type error += Peer_banned of P2p_peer.Id.t
 
 type error += P2p_layer_disabled
+
+type error +=
+  | Identity_check_failure of {
+      point : P2p_point.Id.t;
+      expected_peer_id : P2p_peer.Id.t;
+      received_peer_id : P2p_peer.Id.t;
+    }

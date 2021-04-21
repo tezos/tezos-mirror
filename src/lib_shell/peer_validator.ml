@@ -161,7 +161,7 @@ let validate_new_head w hash (header : Block_header.t) =
   let block_received = {Event.peer = pv.peer_id; hash} in
   Worker.log_event w (Fetching_operations_for_head block_received)
   >>= fun () ->
-  map_p
+  List.map_ep
     (fun i ->
       Worker.protect w (fun () ->
           Distributed_db.Operations.fetch
@@ -400,7 +400,7 @@ let on_close w =
 let on_launch _ name parameters =
   let chain_state = Distributed_db.chain_state parameters.chain_db in
   State.Block.read_opt chain_state (State.Chain.genesis chain_state).block
-  >|= Option.unopt_assert ~loc:__POS__
+  >|= WithExceptions.Option.get ~loc:__LOC__
   >>= fun genesis ->
   let rec pv =
     {

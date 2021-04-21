@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -106,14 +106,14 @@ let blockchain_network_mainnet =
           "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA" ) ]
     ~default_bootstrap_peers:["boot.tzbeta.net"; giganode_1; giganode_2]
 
-let blockchain_network_delphinet =
+let blockchain_network_edo2net =
   make_blockchain_network
-    ~alias:"delphinet"
+    ~alias:"edo2net"
     {
-      time = Time.Protocol.of_notation_exn "2020-09-04T07:08:53Z";
+      time = Time.Protocol.of_notation_exn "2021-02-11T14:00:00Z";
       block =
         Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesis355e8bjkYPv";
+          "BLockGenesisGenesisGenesisGenesisGenesisdae8bZxCCxh";
       protocol =
         Protocol_hash.of_b58check_exn
           "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
@@ -127,46 +127,45 @@ let blockchain_network_delphinet =
                 `String
                   "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ) ];
       }
-    ~chain_name:"TEZOS_DELPHINET_2020-09-04T07:08:53Z"
+    ~chain_name:"TEZOS_EDO2NET_2021-02-11T14:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~default_bootstrap_peers:
-      [ "delphinet.tezos.co.il";
-        "delphinet.smartpy.io";
-        "delphinet.kaml.fr";
-        "13.53.41.201" ]
-
-let blockchain_network_edonet =
-  make_blockchain_network
-    ~alias:"edonet"
-    {
-      time = Time.Protocol.of_notation_exn "2020-11-30T12:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesis2431bbUwV2a";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [ ( "genesis_pubkey",
-                `String
-                  "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ) ];
-      }
-    ~chain_name:"TEZOS_EDONET_2020-11-30T12:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~default_bootstrap_peers:
-      [ "51.75.246.56:9733";
-        "edonet.tezos.co.il";
-        "46.245.179.161:9733";
-        "edonet.smartpy.io";
+      [ "edonet.tezos.co.il";
         "188.40.128.216:29732";
         "51.79.165.131";
-        "edonet.boot.tezostaquito.io";
-        "95.216.228.228:9733" ]
+        "edo2net.kaml.fr";
+        "edonet2.smartpy.io";
+        "edonetb.boot.tezostaquito.io" ]
+
+let blockchain_network_florencenet =
+  make_blockchain_network
+    ~alias:"florencenet"
+    {
+      time = Time.Protocol.of_notation_exn "2021-03-04T20:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BMFCHw1mv3A71KpTuGD3MoFnkHk9wvTYjUzuR9QqiUumKGFG6pM";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n" ) ];
+      }
+    ~chain_name:"TEZOS_FLORENCENOBANET_2021-03-04T20:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:
+      [ "florencenoba.tznode.net";
+        "florencenobanet.kaml.fr";
+        "florencenobanet.tezos.co.il";
+        "florencenobanet.boot.tez.ie";
+        "florencenobanet.smartpy.io:9733" ]
 
 let blockchain_network_sandbox =
   make_blockchain_network
@@ -260,8 +259,9 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
 let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
-    (9, blockchain_network_delphinet);
-    (11, blockchain_network_edonet) ]
+    (12, blockchain_network_edo2net);
+    (13, blockchain_network_florencenet)
+    (* 14 was Florencenet with Baking Accounts. *) ]
   |> List.map (fun (tag, network) ->
          match network.alias with
          | None ->
@@ -308,6 +308,7 @@ let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
 
 type t = {
   data_dir : string;
+  disable_config_validation : bool;
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
@@ -346,10 +347,14 @@ and shell = {
 }
 
 let default_p2p_limits : P2p.limits =
+  let greylist_timeout =
+    Time.System.Span.of_seconds_exn 86400.
+    (* one day *)
+  in
   {
     connection_timeout = Time.System.Span.of_seconds_exn 10.;
     authentication_timeout = Time.System.Span.of_seconds_exn 5.;
-    greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *);
+    greylist_timeout;
     maintenance_idle_time =
       Time.System.Span.of_seconds_exn 120. (* two minutes *);
     min_connections = 10;
@@ -367,6 +372,10 @@ let default_p2p_limits : P2p.limits =
     outgoing_message_queue_size = None;
     max_known_points = Some (400, 300);
     max_known_peer_ids = Some (400, 300);
+    peer_greylist_size = 1023 (* historical value *);
+    ip_greylist_size_in_kilobytes =
+      2 * 1024 (* two megabytes has shown good properties in simulation *);
+    ip_greylist_cleanup_delay = greylist_timeout;
     swap_linger = Time.System.Span.of_seconds_exn 30.;
     binary_chunks_size = None;
   }
@@ -396,6 +405,8 @@ let default_shell =
     history_mode = None;
   }
 
+let default_disable_config_validation = false
+
 let default_config =
   {
     data_dir = default_data_dir;
@@ -405,6 +416,7 @@ let default_config =
     internal_events = Internal_event_unix.Configuration.default;
     shell = default_shell;
     blockchain_network = blockchain_network_mainnet;
+    disable_config_validation = default_disable_config_validation;
   }
 
 let limit : P2p.limits Data_encoding.t =
@@ -429,6 +441,9 @@ let limit : P2p.limits Data_encoding.t =
            outgoing_message_queue_size;
            max_known_points;
            max_known_peer_ids;
+           peer_greylist_size;
+           ip_greylist_size_in_kilobytes;
+           ip_greylist_cleanup_delay;
            swap_linger;
            binary_chunks_size } ->
       ( ( ( connection_timeout,
@@ -449,7 +464,12 @@ let limit : P2p.limits Data_encoding.t =
             incoming_message_queue_size,
             outgoing_message_queue_size,
             max_known_points ) ),
-        (max_known_peer_ids, greylist_timeout, maintenance_idle_time) ))
+        ( max_known_peer_ids,
+          peer_greylist_size,
+          ip_greylist_size_in_kilobytes,
+          ip_greylist_cleanup_delay,
+          greylist_timeout,
+          maintenance_idle_time ) ))
     (fun ( ( ( connection_timeout,
                authentication_timeout,
                min_connections,
@@ -468,7 +488,12 @@ let limit : P2p.limits Data_encoding.t =
                incoming_message_queue_size,
                outgoing_message_queue_size,
                max_known_points ) ),
-           (max_known_peer_ids, greylist_timeout, maintenance_idle_time) ) ->
+           ( max_known_peer_ids,
+             peer_greylist_size,
+             ip_greylist_size_in_kilobytes,
+             ip_greylist_cleanup_delay,
+             greylist_timeout,
+             maintenance_idle_time ) ) ->
       {
         connection_timeout;
         authentication_timeout;
@@ -489,6 +514,9 @@ let limit : P2p.limits Data_encoding.t =
         outgoing_message_queue_size;
         max_known_points;
         max_known_peer_ids;
+        peer_greylist_size;
+        ip_greylist_size_in_kilobytes;
+        ip_greylist_cleanup_delay;
         swap_linger;
         binary_chunks_size;
       })
@@ -569,11 +597,28 @@ let limit : P2p.limits Data_encoding.t =
              (opt "incoming-message-queue-size" int31)
              (opt "outgoing-message-queue-size" int31)
              (opt "max_known_points" (tup2 uint16 uint16))))
-       (obj3
+       (obj6
           (opt
              "max_known_peer_ids"
-             ~description:"max and target size for the known address table."
+             ~description:
+               "The max and target size for the known address table."
              (tup2 uint16 uint16))
+          (dft
+             "peer_greylist_size"
+             ~description:
+               "The number of peer_ids kept in the peer_id greylist."
+             uint16
+             default_p2p_limits.peer_greylist_size)
+          (dft
+             "ip_greylist_size_in_kilobytes"
+             ~description:"The size of the IP address greylist (in kilobytes)."
+             uint16
+             default_p2p_limits.ip_greylist_size_in_kilobytes)
+          (dft
+             "ip_greylist_cleanup_delay"
+             ~description:"The time an IP address is kept in the greylist."
+             Time.System.Span.encoding
+             default_p2p_limits.ip_greylist_cleanup_delay)
           (dft
              "greylist-timeout"
              ~description:"GC delay for the greylists tables, in seconds."
@@ -989,22 +1034,61 @@ let shell =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {data_dir; rpc; p2p; log; internal_events; shell; blockchain_network} ->
-      (data_dir, rpc, p2p, log, internal_events, shell, blockchain_network))
-    (fun (data_dir, rpc, p2p, log, internal_events, shell, blockchain_network) ->
-      {data_dir; rpc; p2p; log; internal_events; shell; blockchain_network})
-    (obj7
+    (fun { data_dir;
+           disable_config_validation;
+           rpc;
+           p2p;
+           log;
+           internal_events;
+           shell;
+           blockchain_network } ->
+      ( data_dir,
+        disable_config_validation,
+        rpc,
+        p2p,
+        log,
+        internal_events,
+        shell,
+        blockchain_network ))
+    (fun ( data_dir,
+           disable_config_validation,
+           rpc,
+           p2p,
+           log,
+           internal_events,
+           shell,
+           blockchain_network ) ->
+      {
+        disable_config_validation;
+        data_dir;
+        rpc;
+        p2p;
+        log;
+        internal_events;
+        shell;
+        blockchain_network;
+      })
+    (obj8
        (dft
           "data-dir"
           ~description:"Location of the data dir on disk."
           string
           default_data_dir)
        (dft
+          "disable-config-validation"
+          ~description:"Disable the node configuration validation."
+          bool
+          default_disable_config_validation)
+       (dft
           "rpc"
           ~description:"Configuration of rpc parameters"
           rpc
           default_rpc)
-       (req "p2p" ~description:"Configuration of network parameters" p2p)
+       (dft
+          "p2p"
+          ~description:"Configuration of network parameters"
+          p2p
+          default_p2p)
        (dft
           "log"
           ~description:
@@ -1069,46 +1153,6 @@ module Event = struct
       ~msg:"failed to convert {addr} to an ipv4 address"
       ~pp1:(fun ppf -> Format.fprintf ppf "%S")
       ("addr", Data_encoding.string)
-
-  let cannot_resolve_listening_addr =
-    Internal_event.Simple.declare_1
-      ~section
-      ~level
-      ~name:"cannot_resolve_listening_addr"
-      ~msg:"failed to resolve {addr}"
-      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
-      ("addr", Data_encoding.string)
-
-  let cannot_parse_listening_addr =
-    Internal_event.Simple.declare_2
-      ~section
-      ~level
-      ~name:"cannot_parse_listening_addr"
-      ~msg:"failed to parse {addr}: {msg}"
-      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
-      ("addr", Data_encoding.string)
-      ~pp2:(fun ppf -> Format.fprintf ppf "%s")
-      ("msg", Data_encoding.string)
-
-  let cannot_resolve_discovery_addr =
-    Internal_event.Simple.declare_1
-      ~section
-      ~level
-      ~name:"cannot_resolve_discovery_addr"
-      ~msg:"failed to resolve {addr}"
-      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
-      ("addr", Data_encoding.string)
-
-  let cannot_parse_discovery_addr =
-    Internal_event.Simple.declare_2
-      ~section
-      ~level
-      ~name:"cannot_parse_discovery_addr"
-      ~msg:"failed to parse {addr}: {msg}"
-      ~pp1:(fun ppf -> Format.fprintf ppf "%S")
-      ("addr", Data_encoding.string)
-      ~pp2:(fun ppf -> Format.fprintf ppf "%s")
-      ("msg", Data_encoding.string)
 end
 
 let string_of_json_encoding_error exn =
@@ -1141,13 +1185,17 @@ let write fp cfg =
 let to_string cfg =
   Data_encoding.Json.to_string (Data_encoding.Json.construct encoding cfg)
 
-let update ?data_dir ?min_connections ?expected_connections ?max_connections
-    ?max_download_speed ?max_upload_speed ?binary_chunks_size ?peer_table_size
-    ?expected_pow ?bootstrap_peers ?listen_addr ?discovery_addr
-    ?(rpc_listen_addrs = []) ?(private_mode = false) ?(disable_mempool = false)
+let update ?(disable_config_validation = false) ?data_dir ?min_connections
+    ?expected_connections ?max_connections ?max_download_speed
+    ?max_upload_speed ?binary_chunks_size ?peer_table_size ?expected_pow
+    ?bootstrap_peers ?listen_addr ?discovery_addr ?(rpc_listen_addrs = [])
+    ?(private_mode = false) ?(disable_mempool = false)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
     ?latency cfg =
+  let disable_config_validation =
+    cfg.disable_config_validation || disable_config_validation
+  in
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir
   >>=? fun () ->
@@ -1165,13 +1213,13 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       max_connections =
         Option.value ~default:cfg.p2p.limits.max_connections max_connections;
       max_download_speed =
-        Option.first_some max_download_speed cfg.p2p.limits.max_download_speed;
+        Option.either max_download_speed cfg.p2p.limits.max_download_speed;
       max_upload_speed =
-        Option.first_some max_upload_speed cfg.p2p.limits.max_upload_speed;
+        Option.either max_upload_speed cfg.p2p.limits.max_upload_speed;
       max_known_points =
-        Option.first_some peer_table_size cfg.p2p.limits.max_known_points;
+        Option.either peer_table_size cfg.p2p.limits.max_known_points;
       max_known_peer_ids =
-        Option.first_some peer_table_size cfg.p2p.limits.max_known_peer_ids;
+        Option.either peer_table_size cfg.p2p.limits.max_known_peer_ids;
       binary_chunks_size = Option.map (fun x -> x lsl 10) binary_chunks_size;
     }
   in
@@ -1180,8 +1228,8 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       expected_pow = Option.value ~default:cfg.p2p.expected_pow expected_pow;
       bootstrap_peers =
         Option.value ~default:cfg.p2p.bootstrap_peers bootstrap_peers;
-      listen_addr = Option.first_some listen_addr cfg.p2p.listen_addr;
-      discovery_addr = Option.first_some discovery_addr cfg.p2p.discovery_addr;
+      listen_addr = Option.either listen_addr cfg.p2p.listen_addr;
+      discovery_addr = Option.either discovery_addr cfg.p2p.discovery_addr;
       private_mode = cfg.p2p.private_mode || private_mode;
       limits;
       disable_mempool = cfg.p2p.disable_mempool || disable_mempool;
@@ -1193,7 +1241,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
       listen_addrs = unopt_list ~default:cfg.rpc.listen_addrs rpc_listen_addrs;
       cors_origins = unopt_list ~default:cfg.rpc.cors_origins cors_origins;
       cors_headers = unopt_list ~default:cfg.rpc.cors_headers cors_headers;
-      tls = Option.first_some rpc_tls cfg.rpc.tls;
+      tls = Option.either rpc_tls cfg.rpc.tls;
     }
   and log : Lwt_log_sink_unix.cfg =
     {cfg.log with output = Option.value ~default:cfg.log.output log_output}
@@ -1218,7 +1266,7 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
            }
          in
          {cfg.shell.chain_validator_limits with synchronisation});
-      history_mode = Option.first_some history_mode cfg.shell.history_mode;
+      history_mode = Option.either history_mode cfg.shell.history_mode;
     }
   in
   (* If --network is specified it overrides the "network" entry of the
@@ -1226,7 +1274,32 @@ let update ?data_dir ?min_connections ?expected_connections ?max_connections
   let blockchain_network =
     Option.value ~default:cfg.blockchain_network network
   in
-  return {cfg with data_dir; p2p; rpc; log; shell; blockchain_network}
+  return
+    {
+      cfg with
+      disable_config_validation;
+      data_dir;
+      p2p;
+      rpc;
+      log;
+      shell;
+      blockchain_network;
+    }
+
+type Error_monad.error += Failed_to_parse_address of (string * string)
+
+let () =
+  (* Parsing of an address failed with an explanation *)
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"node_config_file.parsing_address_failed"
+    ~title:"Parsing of an address failed"
+    ~description:"Parsing an address failed with an explanation."
+    ~pp:(fun ppf (addr, explanation) ->
+      Format.fprintf ppf "Failed to parse address '%s': %s@." addr explanation)
+    Data_encoding.(obj2 (req "addr" string) (req "explanation" string))
+    (function Failed_to_parse_address s -> Some s | _ -> None)
+    (fun s -> Failed_to_parse_address s)
 
 let to_ipv4 ipv6_l =
   let convert_or_warn (ipv6, port) =
@@ -1234,33 +1307,62 @@ let to_ipv4 ipv6_l =
     match ipv4 with
     | None ->
         Event.(emit cannot_convert_to_ipv4) (Ipaddr.V6.to_string ipv6)
-        >>= fun () -> Lwt.return_none
+        >>= fun () -> return_none
     | Some ipv4 ->
-        Lwt.return_some (ipv4, port)
+        return_some (ipv4, port)
   in
-  Lwt_list.filter_map_s convert_or_warn ipv6_l
+  List.filter_map_es convert_or_warn ipv6_l
 
-let resolve_addr ~default_addr ?default_port ?(passive = false) peer =
-  let (addr, port) = P2p_point.Id.parse_addr_port peer in
-  let node = if addr = "" || addr = "_" then default_addr else addr
-  and service =
-    match (port, default_port) with
-    | ("", None) ->
-        invalid_arg ""
-    | ("", Some default_port) ->
-        string_of_int default_port
-    | (port, _) ->
-        port
-  in
-  Lwt_utils_unix.getaddrinfo ~passive ~node ~service
+(* Parse an address.
 
-let resolve_addrs ~default_addr ?default_port ?passive peers =
-  Lwt_list.fold_left_s
-    (fun a peer ->
-      resolve_addr ~default_addr ?default_port ?passive peer
-      >>= fun points -> Lwt.return (List.rev_append points a))
+   - [peer] is a string representing the peer.
+
+   - if [no_peer_id_expected] is true, then parsing a representation
+   containing a peer id will result in an error.
+
+   - [default_addr] is the used if no hostname or IP is given or if
+   the hostname "_" is used.
+
+   - [default_port] is the used if port is given. *)
+let resolve_addr ~default_addr ?(no_peer_id_expected = true) ?default_port
+    ?(passive = false) peer :
+    (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t =
+  match P2p_point.Id.parse_addr_port_id peer with
+  | (Error (P2p_point.Id.Bad_id_format _) | Ok {peer_id = Some _; _})
+    when no_peer_id_expected ->
+      fail
+        (Failed_to_parse_address
+           (peer, "no peer identity should be specified here"))
+  | Error err ->
+      fail
+        (Failed_to_parse_address
+           (peer, P2p_point.Id.string_of_parsing_error err))
+  | Ok {addr; port; peer_id} ->
+      ( match (port, default_port) with
+      | (None, None) ->
+          return (string_of_int default_p2p_port)
+      | (None, Some default_port) ->
+          return (string_of_int default_port)
+      | (Some port, _) ->
+          return (string_of_int port) )
+      >>=? fun service ->
+      let node = if addr = "" || addr = "_" then default_addr else addr in
+      Lwt_utils_unix.getaddrinfo ~passive ~node ~service
+      >>= fun l -> return (List.map (fun point -> (point, peer_id)) l)
+
+let resolve_addrs ?default_port ?passive addrs ?no_peer_id_expected
+    ~default_addr =
+  List.fold_left_es
+    (fun a addr ->
+      resolve_addr
+        ~default_addr
+        ?default_port
+        ?passive
+        ?no_peer_id_expected
+        addr
+      >>=? fun points -> return (List.rev_append points a))
     []
-    peers
+    addrs
 
 let resolve_discovery_addrs discovery_addr =
   resolve_addr
@@ -1268,7 +1370,7 @@ let resolve_discovery_addrs discovery_addr =
     ~default_port:default_discovery_port
     ~passive:true
     discovery_addr
-  >>= fun addrs -> to_ipv4 addrs
+  >>=? fun addrs -> to_ipv4 (List.map fst addrs)
 
 let resolve_listening_addrs listen_addr =
   resolve_addr
@@ -1276,6 +1378,7 @@ let resolve_listening_addrs listen_addr =
     ~default_port:default_p2p_port
     ~passive:true
     listen_addr
+  >|=? List.map fst
 
 let resolve_rpc_listening_addrs listen_addr =
   resolve_addr
@@ -1283,84 +1386,14 @@ let resolve_rpc_listening_addrs listen_addr =
     ~default_port:default_rpc_port
     ~passive:true
     listen_addr
+  >|=? List.map fst
 
 let resolve_bootstrap_addrs peers =
-  resolve_addrs ~default_addr:"::" ~default_port:default_p2p_port peers
-
-let check_listening_addrs config =
-  match config.p2p.listen_addr with
-  | None ->
-      Lwt.return_unit
-  | Some addr ->
-      Lwt.catch
-        (fun () ->
-          resolve_listening_addrs addr
-          >>= function
-          | [] ->
-              Event.(emit cannot_resolve_listening_addr) addr
-          | _ :: _ ->
-              Lwt.return_unit)
-        (function
-          | Invalid_argument msg ->
-              Event.(emit cannot_parse_listening_addr) (addr, msg)
-          | exn ->
-              Lwt.fail exn)
-
-let check_discovery_addr config =
-  match config.p2p.discovery_addr with
-  | None ->
-      Lwt.return_unit
-  | Some addr ->
-      Lwt.catch
-        (fun () ->
-          resolve_discovery_addrs addr
-          >>= function
-          | [] ->
-              Event.(emit cannot_resolve_discovery_addr) addr
-          | _ :: _ ->
-              Lwt.return_unit)
-        (function
-          | Invalid_argument msg ->
-              Event.(emit cannot_parse_discovery_addr) (addr, msg)
-          | exn ->
-              Lwt.fail exn)
-
-let check_rpc_listening_addr config =
-  Lwt_list.iter_p
-    (fun addr ->
-      Lwt.catch
-        (fun () ->
-          resolve_rpc_listening_addrs addr
-          >>= function
-          | [] ->
-              Format.eprintf "Warning: failed to resolve %S\n@." addr ;
-              Lwt.return_unit
-          | _ :: _ ->
-              Lwt.return_unit)
-        (function
-          | Invalid_argument msg ->
-              Format.eprintf "Warning: failed to parse %S:   %s\n@." addr msg ;
-              Lwt.return_unit
-          | exn ->
-              Lwt.fail exn))
-    config.rpc.listen_addrs
-
-let check_bootstrap_peer addr =
-  Lwt.catch
-    (fun () ->
-      resolve_bootstrap_addrs [addr]
-      >>= function
-      | [] ->
-          Format.eprintf "Warning: cannot resolve %S\n@." addr ;
-          Lwt.return_unit
-      | _ :: _ ->
-          Lwt.return_unit)
-    (function
-      | Invalid_argument msg ->
-          Format.eprintf "Warning: failed to parse %S:   %s\n@." addr msg ;
-          Lwt.return_unit
-      | exn ->
-          Lwt.fail exn)
+  resolve_addrs
+    ~no_peer_id_expected:false
+    ~default_addr:"::"
+    ~default_port:default_p2p_port
+    peers
 
 let bootstrap_peers config =
   match config.p2p.bootstrap_peers with
@@ -1368,66 +1401,3 @@ let bootstrap_peers config =
       config.blockchain_network.default_bootstrap_peers
   | Some peers ->
       peers
-
-let check_bootstrap_peers config =
-  Lwt_list.iter_p check_bootstrap_peer (bootstrap_peers config)
-
-let fail fmt = Format.kasprintf (fun s -> prerr_endline s ; exit 1) fmt
-
-let check_connections config =
-  if config.p2p.limits.min_connections > config.p2p.limits.expected_connections
-  then
-    fail
-      "Error: The minimum number of connections is greater than the expected \
-       number of connections"
-      config.p2p.limits.min_connections
-      config.p2p.limits.expected_connections ;
-  if config.p2p.limits.expected_connections > config.p2p.limits.max_connections
-  then
-    fail
-      "Error: The expected number of connections is greater than the maximum \
-       number of connections"
-      config.p2p.limits.expected_connections
-      config.p2p.limits.max_connections ;
-  ( match config.p2p.limits.max_known_peer_ids with
-  | None ->
-      ()
-  | Some (max_known_peer_ids, target_known_peer_ids) ->
-      if target_known_peer_ids > max_known_peer_ids then
-        fail
-          "Error: The target number of known peer ids is greater than the \
-           maximum number of known peer ids."
-          target_known_peer_ids
-          max_known_peer_ids ;
-      if config.p2p.limits.max_connections > target_known_peer_ids then
-        fail
-          "Error: The target number of known peer ids is lower than the \
-           maximum number of connections."
-          target_known_peer_ids
-          max_known_peer_ids ) ;
-  match config.p2p.limits.max_known_points with
-  | None ->
-      ()
-  | Some (max_known_points, target_known_points) ->
-      if target_known_points > max_known_points then
-        fail
-          "Error: The target number of known points is greater than the \
-           maximum number of known points."
-          target_known_points
-          max_known_points ;
-      if config.p2p.limits.max_connections > target_known_points then
-        fail
-          "Error: The target number of known points is lower than the maximum \
-           number of connections."
-          target_known_points
-          max_known_points
-
-let check config =
-  check_listening_addrs config
-  >>= fun () ->
-  check_rpc_listening_addr config
-  >>= fun () ->
-  check_discovery_addr config
-  >>= fun () ->
-  check_bootstrap_peers config
-  >>= fun () -> check_connections config ; Lwt.return_unit

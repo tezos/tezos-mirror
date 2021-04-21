@@ -1,0 +1,21 @@
+(library
+ (name tezos_shell_benchmarks)
+ (public_name tezos-shell-benchmarks)
+ (libraries
+  tezos-base
+  tezos-benchmark
+  tezos-storage
+  tezos-shell-context
+  tezos-micheline)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_stdlib
+                   -open Tezos_base
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_error_monad
+                   -open Tezos_benchmark
+                   -open Tezos_crypto)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

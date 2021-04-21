@@ -34,13 +34,23 @@ module type GEN = sig
 end
 
 module SeqGen = struct
-  include Lwtreslib.Seq
+  include Support.Lib.Seq
 
   let rec down n : int t =
    fun () -> if n < 0 then Nil else Cons (n, down (pred n))
 
   let rec up n i : int t =
    fun () -> if i > n then Nil else Cons (i, up n (succ i))
+
+  let up n = up n 0
+end
+
+module ListGen = struct
+  include Support.Lib.List
+
+  let rec down n : int t = if n < 0 then [] else n :: down (pred n)
+
+  let rec up n i : int t = if i > n then [] else i :: up n (succ i)
 
   let up n = up n 0
 end
@@ -208,6 +218,7 @@ struct
 end
 
 module SeqIterTest = MakeItererTest (SeqGen)
+module ListIterTest = MakeItererTest (ListGen)
 
 module MakeFolderTest (M : sig
   include GEN
@@ -243,6 +254,7 @@ struct
 end
 
 module SeqFoldTest = MakeFolderTest (SeqGen)
+module ListFoldTest = MakeFolderTest (ListGen)
 
 module MakeMapperTest (M : sig
   include GEN
@@ -277,11 +289,15 @@ struct
 end
 
 module SeqMapTest = MakeMapperTest (SeqGen)
+module ListMapTest = MakeMapperTest (ListGen)
 
 let () =
   Alcotest_lwt.run
     "traversor-generic"
     [ ("seq-iter", SeqIterTest.tests);
       ("seq-fold", SeqFoldTest.tests);
-      ("seq-map", SeqMapTest.tests) ]
+      ("seq-map", SeqMapTest.tests);
+      ("list-iter", ListIterTest.tests);
+      ("list-fold", ListFoldTest.tests);
+      ("list-map", ListMapTest.tests) ]
   |> Lwt_main.run

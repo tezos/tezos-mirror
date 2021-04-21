@@ -167,7 +167,11 @@ let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
           Matrix.set timings i 0 qty)
         samples ;
       let columns = Array.to_list columns in
-      let named_columns = List.combine vars columns in
+      let named_columns =
+        List.combine ~when_different_lengths:() vars columns
+        |> (* [columns = Array.to_list (Array.init (List.length vars))] *)
+           WithExceptions.Result.get_ok ~loc:__LOC__
+      in
       Ok (named_columns, timings)
 
 let column_is_constant (m : Matrix.t) =
@@ -189,10 +193,12 @@ let prune_problem problem : (Free_variable.t * Matrix.t) list * Matrix.t =
   | Inference.Non_degenerate {input; output; nmap; _} ->
       let (_, cols) = Matrix.shape input in
       let named_columns =
-        List.init cols (fun c ->
+        List.init ~when_negative_length:() cols (fun c ->
             let name = Inference.NMap.nth_exn nmap c in
             let col = Matrix.column input c in
             (name, col))
+        |> (* column count cannot be negative *)
+           WithExceptions.Result.get_ok ~loc:__LOC__
       in
       let columns =
         List.filter
@@ -241,12 +247,12 @@ let validator (problem : Inference.problem) (solution : Inference.solution) =
 
 let empirical (workload_data : (Sparse_vec.String.t * float) list) :
     (int * (col:int -> unit Plot.t), string) result =
-  Result.bind (empirical_data workload_data)
-  @@ fun (columns, timings) ->
-  Result.bind (plot_scatter "Empirical" columns [timings])
-  @@ fun plots ->
+  empirical_data workload_data
+  >>? fun (columns, timings) ->
+  plot_scatter "Empirical" columns [timings]
+  >>? fun plots ->
   let nrows = List.length plots in
-  Result.ok (nrows, fun ~col -> plot_stacked 0 col plots)
+  Ok (nrows, fun ~col -> plot_stacked 0 col plots)
 
 let eval_mset (mset : Free_variable.Sparse_vec.t)
     (eval : Free_variable.t -> float) =
@@ -262,7 +268,9 @@ let validator_empirical workload_data (problem : Inference.problem)
     (solution : Inference.solution) :
     (int * (col:int -> unit Plot.t), string) result =
   let {Inference.mapping; _} = solution in
-  let valuation name = List.assoc name mapping in
+  let valuation name =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.assoc name mapping
+  in
   let predicted =
     match problem with
     | Inference.Degenerate {predicted; _} ->

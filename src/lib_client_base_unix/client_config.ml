@@ -26,6 +26,29 @@
 
 (* Tezos Command line interface - Configuration and Arguments Parsing *)
 
+type cli_args = {
+  chain : Chain_services.chain;
+  block : Shell_services.block;
+  confirmations : int option;
+  password_filename : string option;
+  protocol : Protocol_hash.t option;
+  print_timings : bool;
+  log_requests : bool;
+  client_mode : client_mode;
+}
+
+and client_mode = [`Mode_client | `Mode_mockup | `Mode_proxy]
+
+let all_modes = [`Mode_client; `Mode_mockup; `Mode_proxy]
+
+let client_mode_to_string = function
+  | `Mode_client ->
+      "client"
+  | `Mode_mockup ->
+      "mockup"
+  | `Mode_proxy ->
+      "proxy"
+
 type error += Invalid_endpoint_arg of string
 
 type error += Suppressed_arg of {args : string list; by : string}
@@ -42,7 +65,7 @@ type error += Invalid_remote_signer_argument of string
 
 type error += Invalid_wait_arg of string
 
-type error += Invalid_mockup_arg of string
+type error += Invalid_mode_arg of string
 
 let () =
   register_error_kind
@@ -135,14 +158,21 @@ let () =
     (fun s -> Invalid_wait_arg s) ;
   register_error_kind
     `Branch
-    ~id:"invalidMockupArgument"
-    ~title:"Invalid Mockup Argument"
-    ~description:"Mockup argument could not be parsed"
+    ~id:"invalidModeArgument"
+    ~title:"Invalid Mode Argument"
+    ~description:"Mode argument could not be parsed"
     ~pp:(fun ppf s ->
-      Format.fprintf ppf "%s is not \"default\", nor \"directory:<path>\"." s)
+      let enclose s = "\"" ^ s ^ "\"" in
+      let pp_mode s = enclose @@ client_mode_to_string s in
+      let mode_strings = List.map pp_mode all_modes in
+      Format.fprintf
+        ppf
+        "Value \"%s\" is invalid. It should be one of: %s"
+        s
+        (String.concat " or " mode_strings))
     Data_encoding.(obj1 (req "value" string))
-    (function Invalid_mockup_arg s -> Some s | _ -> None)
-    (fun s -> Invalid_mockup_arg s)
+    (function Invalid_mode_arg s -> Some s | _ -> None)
+    (fun s -> Invalid_mode_arg s)
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
@@ -254,19 +284,6 @@ module Cfg_file = struct
       (Data_encoding.Json.construct encoding cfg)
 end
 
-type cli_args = {
-  chain : Chain_services.chain;
-  block : Shell_services.block;
-  confirmations : int option;
-  password_filename : string option;
-  protocol : Protocol_hash.t option;
-  print_timings : bool;
-  log_requests : bool;
-  client_mode : client_mode;
-}
-
-and client_mode = Mode_client | Mode_mockup
-
 let default_cli_args =
   {
     chain = default_chain;
@@ -276,7 +293,7 @@ let default_cli_args =
     protocol = None;
     print_timings = false;
     log_requests = false;
-    client_mode = Mode_client;
+    client_mode = `Mode_client;
   }
 
 open Clic
@@ -473,19 +490,27 @@ let password_filename_arg () =
     (string_parameter ())
 
 let client_mode_arg () =
+  let mode_strings = List.map client_mode_to_string all_modes in
   let parse_client_mode (str : string) : client_mode tzresult Lwt.t =
-    if str = "client" then return Mode_client
-    else if str = "mockup" then return Mode_mockup
-    else fail (Invalid_mockup_arg str)
+    List.combine
+      ~when_different_lengths:(TzTrace.make @@ Exn (Failure __LOC__))
+      mode_strings
+      all_modes
+    >>?= fun modes_and_strings ->
+    match List.assoc_opt str modes_and_strings with
+    | None ->
+        fail @@ Invalid_mode_arg str
+    | Some mode ->
+        return mode
   in
   default_arg
     ~short:'M'
     ~long:"mode"
-    ~placeholder:"client|mockup"
+    ~placeholder:(String.concat "|" mode_strings)
     ~doc:"how to interact with the node"
-    ~default:"client"
+    ~default:(client_mode_to_string `Mode_client)
     (parameter
-       ~autocomplete:(fun _ -> return ["client"; "mockup"])
+       ~autocomplete:(fun _ -> return mode_strings)
        (fun _ param -> parse_client_mode param))
 
 let read_config_file config_file =
@@ -508,7 +533,9 @@ let read_config_file config_file =
 
 let fail_on_non_mockup_dir (cctxt : #Client_context.full) =
   let base_dir = cctxt#get_base_dir in
-  match Tezos_mockup.Persistence.classify_base_dir base_dir with
+  let open Tezos_mockup.Persistence in
+  classify_base_dir base_dir
+  >>=? function
   | Base_dir_does_not_exist
   | Base_dir_is_file
   | Base_dir_is_nonempty
@@ -566,11 +593,13 @@ let config_show_mockup (cctxt : #Client_context.full)
     mockup_bootstrap_accounts
     bootstrap_accounts_string
   >>= fun () ->
+  Mockup.default_protocol_constants cctxt
+  >>=? fun protocol_constants ->
   cctxt#message
     "@[<v>Default value of --%s:@,%a@]"
     mockup_protocol_constants
     (json_pp Mockup.protocol_constants_encoding)
-    Mockup.default_protocol_constants
+    protocol_constants
   >>= return
 
 (* The implementation of ["config"; "init"] when --mode is "client" *)
@@ -612,10 +641,12 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
     mockup_bootstrap_accounts
     bootstrap_accounts_file
   >>= fun () ->
+  Mockup.default_protocol_constants cctxt
+  >>=? fun protocol_constants ->
   let string_to_write =
     Data_encoding.Json.construct
       Mockup.protocol_constants_encoding
-      Mockup.default_protocol_constants
+      protocol_constants
   in
   Lwt_utils_unix.Json.write_file protocol_constants_file string_to_write
   >>=? fun () ->
@@ -644,9 +675,9 @@ let commands config_file cfg (client_mode : client_mode)
       (fixed ["config"; "show"])
       (fun () (cctxt : #Client_context.full) ->
         match client_mode with
-        | Mode_client ->
+        | `Mode_client | `Mode_proxy ->
             config_show_client cctxt config_file cfg
-        | Mode_mockup ->
+        | `Mode_mockup ->
             config_show_mockup cctxt protocol_hash_opt base_dir);
     command
       ~group
@@ -703,9 +734,9 @@ let commands config_file cfg (client_mode : client_mode)
       (fun (config_file, bootstrap_accounts_file, protocol_constants_file)
            cctxt ->
         match client_mode with
-        | Mode_client ->
+        | `Mode_client | `Mode_proxy ->
             config_init_client config_file cfg
-        | Mode_mockup ->
+        | `Mode_mockup ->
             config_init_mockup
               cctxt
               protocol_hash_opt
@@ -759,9 +790,10 @@ let default_parsed_config_args =
  *)
 let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
   let open Tezos_mockup.Persistence in
-  let base_dir_class = classify_base_dir base_dir in
+  classify_base_dir base_dir
+  >>=? fun base_dir_class ->
   match client_mode with
-  | Mode_client -> (
+  | `Mode_client | `Mode_proxy -> (
     match base_dir_class with
     | Base_dir_is_mockup ->
         failwith
@@ -780,7 +812,7 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
           base_dir_class
     | _ ->
         return_unit )
-  | Mode_mockup -> (
+  | `Mode_mockup -> (
       let warn_might_not_work explain =
         ctx#warning
           "@[<hv>Base directory %s %a@ Some commands (e.g., transfer) might \
@@ -837,13 +869,12 @@ let build_endpoint addr port tls =
   let updatecomp updatef ov uri =
     match ov with Some x -> updatef uri (Some x) | None -> uri
   in
+  let scheme = Option.map (function true -> "https" | false -> "http") tls in
   let url = default_endpoint in
   url
   |> updatecomp Uri.with_host addr
   |> updatecomp Uri.with_port port
-  |> updatecomp
-       Uri.with_scheme
-       Option.(tls >>| function true -> "https" | false -> "http")
+  |> updatecomp Uri.with_scheme scheme
 
 let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options (global_options ()) ctx argv
@@ -868,19 +899,19 @@ let parse_config_args (ctx : #Client_context.full) argv =
       let base_dir = default_base_dir in
       unless
         (* Mockup mode will create the base directory on need *)
-        (client_mode = Mode_mockup || Sys.file_exists base_dir)
+        (client_mode = `Mode_mockup || Sys.file_exists base_dir)
         (fun () -> Lwt_utils_unix.create_dir base_dir >>= return)
       >>=? fun () -> return base_dir
   | Some dir -> (
     match client_mode with
-    | Mode_client ->
+    | `Mode_client | `Mode_proxy ->
         if not (Sys.file_exists dir) then
           failwith
             "Specified --base-dir does not exist. Please create the directory \
              and try again."
         else if Sys.is_directory dir then return dir
         else failwith "Specified --base-dir must be a directory"
-    | Mode_mockup ->
+    | `Mode_mockup ->
         (* In mockup mode base dir may be created automatically. *)
         return dir ) )
   >>=? fun base_dir ->
@@ -931,10 +962,9 @@ let parse_config_args (ctx : #Client_context.full) argv =
   | Some endpt ->
       check_absence node_addr node_port tls >>=? fun _ -> return endpt
   | None -> (
-      let merge = Option.first_some in
-      let node_addr = merge node_addr cfg.node_addr in
-      let node_port = merge node_port cfg.node_port in
-      let tls = merge tls cfg.tls in
+      let node_addr = Option.either node_addr cfg.node_addr in
+      let node_port = Option.either node_port cfg.node_port in
+      let tls = Option.either tls cfg.tls in
       match cfg.endpoint with
       | Some endpt ->
           check_absence node_addr node_port tls >>=? fun _ -> return endpt
@@ -956,14 +986,14 @@ let parse_config_args (ctx : #Client_context.full) argv =
   Tezos_signer_backends_unix.Remote.read_base_uri_from_env ()
   >>=? fun remote_signer_env ->
   let remote_signer =
-    let open Option in
-    first_some remote_signer @@ first_some remote_signer_env cfg.remote_signer
+    Option.either remote_signer
+    @@ Option.either remote_signer_env cfg.remote_signer
   in
   let confirmations = Option.value ~default:cfg.confirmations confirmations in
   (* --password-filename has precedence over --config-file's
      "password-filename" json field *)
   let password_filename =
-    Option.first_some password_filename cfg.password_filename
+    Option.either password_filename cfg.password_filename
   in
   let cfg =
     {
@@ -983,8 +1013,9 @@ let parse_config_args (ctx : #Client_context.full) argv =
   if Sys.file_exists config_dir && not (Sys.is_directory config_dir) then (
     Format.eprintf "%s is not a directory.@." config_dir ;
     exit 1 ) ;
-  unless (client_mode = Mode_mockup) (fun () ->
-      Lwt_utils_unix.create_dir config_dir >>= return)
+  unless
+    (client_mode = `Mode_mockup)
+    (fun () -> Lwt_utils_unix.create_dir config_dir >>= return)
   >>=? fun () ->
   let parsed_args =
     {

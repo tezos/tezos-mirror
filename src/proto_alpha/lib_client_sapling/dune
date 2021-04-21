@@ -1,0 +1,23 @@
+(library
+ (name tezos_client_sapling_alpha)
+ (public_name tezos-client-sapling-alpha)
+ (libraries tezos-base
+            tezos-crypto
+            tezos-client-base
+            tezos-signer-backends
+            tezos-client-alpha
+            tezos-client-alpha-commands
+            tezos-protocol-alpha)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_client_base
+                   -open Tezos_client_alpha
+                   -open Tezos_client_alpha_commands
+                   -open Tezos_protocol_alpha
+                   -open Tezos_protocol_environment_alpha)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

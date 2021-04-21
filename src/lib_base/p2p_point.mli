@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,6 +27,15 @@
 module Id : sig
   type t = P2p_addr.t * P2p_addr.port
 
+  type addr_port_id = {
+    addr : string;
+        (** String representation of an address. This address can be an IPv4 or IPv6 or a domain. *)
+    port : int option;  (** If specified, a port number in 0-65535. *)
+    peer_id : P2p_peer_id.t option;
+        (** If specified, a [peer_id]. This field is given by the user to
+       ensure the identity of the node behind the address.  *)
+  }
+
   val compare : t -> t -> int
 
   val equal : t -> t -> bool
@@ -49,9 +58,27 @@ module Id : sig
 
   val is_global : t -> bool
 
-  val parse_addr_port : string -> string * string
-
   val rpc_arg : t RPC_arg.t
+
+  type parsing_error =
+    | Port_not_in_range of int
+    | Bad_id_format of string
+    | Bad_format
+
+  val string_of_parsing_error : parsing_error -> string
+
+  (** [parse_addr_port_id addr_port_id] splits the [addr_port_id] into
+     an [addr], a [port] and an [id] (as a b58 hash). Both [port] and
+     [id] are optional. This function checks that the [port] is
+     between 0-65535. The character ':' separates the [addr] and the
+     [port] while the character '#' separates the [addr] or the [port]
+     from the [id]. The function assumes that [addr] can be either an
+     Ipv6 address, an Ipv4 address or a domain. The address is
+     formatted so that it can be given to [Lwt.getaddrinfo]. This
+     means that square brackets around ipv6 addresses are removed. *)
+  val parse_addr_port_id : string -> (addr_port_id, parsing_error) result
+
+  val addr_port_id_to_string : addr_port_id -> string
 end
 
 module Map : Map.S with type key = Id.t
@@ -95,6 +122,7 @@ module Info : sig
     last_disconnection : (P2p_peer_id.t * Time.System.t) option;
     last_seen : (P2p_peer_id.t * Time.System.t) option;
     last_miss : Time.System.t option;
+    expected_peer_id : P2p_peer_id.t option;
   }
 
   val encoding : t Data_encoding.t

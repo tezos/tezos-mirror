@@ -1,0 +1,95 @@
+.build_template:
+  extends: .runtime_build_test_dependencies_template
+  stage: build
+  except:
+    - master
+    - tags@tezos/tezos
+    - /-release$/@tezos/tezos
+  before_script:
+    - . ./scripts/version.sh
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
+  interruptible: true
+
+check_opam_deps:
+  extends: .build_template
+  script:
+    - ./scripts/opam-check.sh
+  timeout: 10m # if it takes more than 10 minutes, then it'll just timeout after 1h
+
+check_opam_lint:
+  extends: .build_template
+  script:
+    - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
+
+check_linting:
+  extends: .build_template
+  script:
+    - make check-linting
+
+check_precommit_hook:
+  extends: .build_template
+  script:
+    - ./scripts/pre_commit/pre_commit.py --test-itself
+    - cd tests_python
+    - poetry run pylint ../scripts/pre_commit/pre_commit.py
+    - poetry run pycodestyle ../scripts/pre_commit/pre_commit.py
+    - poetry run mypy ../scripts/pre_commit/pre_commit.py
+
+check_python_linting:
+  extends: .build_template
+  script:
+    - make check-python-linting
+
+check_python_types:
+  extends: .build_template
+  script:
+    - make -C tests_python typecheck
+
+check_scripts_b58_prefix:
+  # Can be changed to a python image, but using the build docker image to keep
+  # in sync with the python version used for the tests
+  extends: .build_template
+  before_script:
+    - cd scripts/b58_prefix
+    - poetry install
+  script:
+    - poetry run pylint b58_prefix.py --disable=missing-docstring --disable=invalid-name
+    - poetry run pytest test_b58_prefix.py -v
+
+build:
+  extends: .build_template
+  script:
+    - . ./scripts/version.sh
+    - dune build @runtest_dune_template
+    - make all build-test
+    - opam clean
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - _build
+      - tezos-*
+  artifacts:
+    name: "build-$CI_COMMIT_REF_SLUG"
+    paths:
+      - tezos-*
+      - src/proto_*/parameters/*.json
+      - _build/default/src/lib_protocol_compiler/main_native.exe
+    expire_in: 1 day
+    when: on_success
+
+build_arm64:
+  extends: .build_template
+  when: manual
+  script:
+    - . ./scripts/version.sh
+    - dune build @all
+    - dune install --prefix install_root
+  artifacts:
+    name: "build-$CI_COMMIT_REF_SLUG"
+    paths:
+      - install_root/bin/tezos-*
+  tags:
+    - arm64
+

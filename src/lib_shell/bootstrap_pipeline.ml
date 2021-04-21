@@ -354,20 +354,20 @@ let headers_fetch_worker_loop pipeline =
   | Error (Distributed_db.Block_header.Timeout bh :: _) ->
       Bootstrap_pipeline_event.(emit header_request_timeout)
         (bh, pipeline.peer_id)
-      >>= fun () -> Lwt_canceler.cancel pipeline.canceler
+      >>= fun () -> Error_monad.cancel_with_exceptions pipeline.canceler
   | Error (Future_block_header {block; block_time; time} :: _) ->
       Bootstrap_pipeline_event.(emit locator_contains_future_block)
         (block, pipeline.peer_id, time, block_time)
-      >>= fun () -> Lwt_canceler.cancel pipeline.canceler
+      >>= fun () -> Error_monad.cancel_with_exceptions pipeline.canceler
   | Error (Too_short_locator _ :: _ as err) ->
       pipeline.errors <- pipeline.errors @ err ;
       Bootstrap_pipeline_event.(emit locator_too_short) ()
-      >>= fun () -> Lwt_canceler.cancel pipeline.canceler
+      >>= fun () -> Error_monad.cancel_with_exceptions pipeline.canceler
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       Bootstrap_pipeline_event.(emit unexpected_error_while_fetching_headers)
         err
-      >>= fun () -> Lwt_canceler.cancel pipeline.canceler
+      >>= fun () -> Error_monad.cancel_with_exceptions pipeline.canceler
 
 (** [operations_fetch_worker_loop] is a promise which fethches
    operations and store them with the corresponding header to a
@@ -381,13 +381,13 @@ let rec operations_fetch_worker_loop pipeline =
         protect ~canceler:pipeline.canceler (fun () ->
             Lwt_pipe.pop pipeline.fetched_headers >>= return)
         >>=? fun batch ->
-        map_p
+        List.map_ep
           (fun (hash, header) ->
             Bootstrap_pipeline_event.(emit fetching_operations)
               (hash, pipeline.peer_id)
             >>= fun () ->
             let operations =
-              map_p
+              List.map_ep
                 (fun i ->
                   protect ~canceler:pipeline.canceler (fun () ->
                       Distributed_db.Operations.fetch
@@ -406,7 +406,7 @@ let rec operations_fetch_worker_loop pipeline =
             return (hash, header, operations))
           batch
         >>=? fun operationss ->
-        iter_s
+        List.iter_es
           (fun (hash, header, operations) ->
             protect ~canceler:pipeline.canceler (fun () ->
                 Lwt_pipe.push pipeline.fetched_blocks (hash, header, operations)
@@ -423,12 +423,12 @@ let rec operations_fetch_worker_loop pipeline =
   | Error (Distributed_db.Operations.Timeout (bh, n) :: _) ->
       Bootstrap_pipeline_event.(emit request_operations_timeout)
         (bh, n, pipeline.peer_id)
-      >>= fun () -> Lwt_canceler.cancel pipeline.canceler
+      >>= fun () -> Error_monad.cancel_with_exceptions pipeline.canceler
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       Bootstrap_pipeline_event.(emit unexpected_error_while_fetching_headers)
         err
-      >>= fun () -> Lwt_canceler.cancel pipeline.canceler
+      >>= fun () -> Error_monad.cancel_with_exceptions pipeline.canceler
 
 (** [validation_work_loop] is a promise which validates blocks one by
    one using the [Block_validator.validate] function. Each validated
@@ -471,12 +471,12 @@ let rec validation_worker_loop pipeline =
         :: _ as err ) ->
       (* Propagate the error to the peer validator. *)
       pipeline.errors <- pipeline.errors @ err ;
-      Lwt_canceler.cancel pipeline.canceler
+      Error_monad.cancel_with_exceptions pipeline.canceler
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       Bootstrap_pipeline_event.(emit unexpected_error_while_fetching_headers)
         err
-      >>= fun () -> Lwt_canceler.cancel pipeline.canceler
+      >>= fun () -> Error_monad.cancel_with_exceptions pipeline.canceler
 
 (** The creation of the bootstrap starts three promises:
 
@@ -532,7 +532,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          hash)
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> headers_fetch_worker_loop pipeline)
-      ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
+      ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
   pipeline.operations_fetch_worker <-
     Lwt_utils.worker
       (Format.asprintf
@@ -543,7 +543,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          hash)
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> operations_fetch_worker_loop pipeline)
-      ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
+      ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
   pipeline.validation_worker <-
     Lwt_utils.worker
       (Format.asprintf
@@ -554,7 +554,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          hash)
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> validation_worker_loop pipeline)
-      ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
+      ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
   pipeline
 
 let wait_workers pipeline =
@@ -572,7 +572,7 @@ let wait pipeline =
       Lwt.return_error errors
 
 let cancel pipeline =
-  Lwt_canceler.cancel pipeline.canceler >>= fun () -> wait_workers pipeline
+  Lwt_canceler.cancel pipeline.canceler >>= fun _res -> wait_workers pipeline
 
 let length pipeline =
   Peer_validator_worker_state.Worker_state.

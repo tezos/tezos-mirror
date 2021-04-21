@@ -33,19 +33,27 @@ module Account : sig
 end
 
 module Voting_period : sig
-  type t = [`Proposal | `Testing_vote | `Testing | `Promotion_vote]
+  type t =
+    [ `Proposal
+    | `Testing_vote
+    | `Testing
+    | `Exploration
+    | `Cooldown
+    | `Promotion_vote
+    | `Promotion ]
 
   val to_string : t -> string
 end
 
 module Protocol_kind : sig
-  type t = [`Athens | `Babylon | `Carthage | `Delphi | `Alpha]
+  type t = [`Athens | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Alpha]
 
   val names : (string * t) list
   val cmdliner_term : docs:string -> unit -> t Cmdliner.Term.t
   val pp : t Fmt.t
 end
 
+(** [t] wraps bootstrap parameters for sandboxed protocols. *)
 type t =
   { id: string
   ; kind: Protocol_kind.t
@@ -65,7 +73,6 @@ type t =
   ; proof_of_work_threshold: int
   ; timestamp_delay: int option
   ; custom_protocol_parameters: Ezjsonm.t option }
-(** [t] wraps bootstrap parameters for sandboxed protocols. *)
 
 val compare : t -> t -> int
 val default : unit -> t

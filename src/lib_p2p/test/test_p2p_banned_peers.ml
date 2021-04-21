@@ -52,7 +52,12 @@ let peers = [foo; bar; baz]
     greylisted yet.
 *)
 let test_empty _ =
-  let empty = P2p_acl.create 10 in
+  let empty =
+    P2p_acl.create
+      ~peer_id_size:10
+      ~ip_size:1024
+      ~ip_cleanup_delay:(Time.System.Span.of_seconds_exn 60.)
+  in
   List.iter
     (fun (_peer, addr) ->
       assert_equal_bool ~msg:__LOC__ false (P2p_acl.banned_addr empty addr))
@@ -63,10 +68,13 @@ let test_empty _ =
     greylisted.
 *)
 let test_ban _ =
-  let set = P2p_acl.create 10 in
-  List.iter
-    (fun (_, addr) -> P2p_acl.IPGreylist.add set addr Ptime.epoch)
-    peers ;
+  let set =
+    P2p_acl.create
+      ~peer_id_size:10
+      ~ip_size:1024
+      ~ip_cleanup_delay:(Time.System.Span.of_seconds_exn 60.)
+  in
+  List.iter (fun (_, addr) -> P2p_acl.IPGreylist.add set addr) peers ;
   List.iter
     (fun (_, addr) ->
       assert_equal_bool ~msg:__LOC__ true (P2p_acl.banned_addr set addr))
@@ -78,17 +86,41 @@ let test_ban _ =
     [Ptime.max] date (e.g., far in the future).  All point should have
     been removed.
 *)
-let test_gc _ =
-  let set = P2p_acl.create 10 in
-  List.iter
-    (fun (_, addr) -> P2p_acl.IPGreylist.add set addr Ptime.epoch)
-    peers ;
+let test_clear _ =
+  let set =
+    P2p_acl.create
+      ~peer_id_size:10
+      ~ip_size:1024
+      ~ip_cleanup_delay:(Time.System.Span.of_seconds_exn 60.)
+  in
+  List.iter (fun (_, addr) -> P2p_acl.IPGreylist.add set addr) peers ;
   List.iter
     (fun (_peer, addr) ->
       assert_equal_bool ~msg:__LOC__ true (P2p_acl.banned_addr set addr))
     peers ;
   (* remove all peers *)
-  P2p_acl.IPGreylist.remove_old set ~older_than:Ptime.max ;
+  P2p_acl.IPGreylist.clear set ;
+  List.iter
+    (fun (_peer, addr) ->
+      assert_equal_bool ~msg:__LOC__ false (P2p_acl.banned_addr set addr))
+    peers ;
+  Lwt.return_unit
+
+(** From an empty ACL of size 10, peers [peers] are greylisted.
+    The GC is configured to run 16 times in 0.1 seconds. Since
+    16 is hardcoded as the number of GCs to evict a peer from the
+    table (see p2p_acl.ml), the table must be empty at the end. *)
+let test_gc _ =
+  let set =
+    P2p_acl.create
+      ~peer_id_size:10
+      ~ip_size:1024
+      ~ip_cleanup_delay:(Time.System.Span.of_seconds_exn (0.1 /. 16.))
+  in
+  List.iter (fun (_, addr) -> P2p_acl.IPGreylist.add set addr) peers ;
+  (* 1.0 is an overapproximation of 0.1 :) *)
+  Lwt_unix.sleep 1.0
+  >>= fun () ->
   List.iter
     (fun (_peer, addr) ->
       assert_equal_bool ~msg:__LOC__ false (P2p_acl.banned_addr set addr))
@@ -107,5 +139,8 @@ let () =
     [ ( "p2p.peerset",
         List.map
           wrap
-          [("empty", test_empty); ("ban", test_ban); ("gc", test_gc)] ) ]
+          [ ("empty", test_empty);
+            ("ban", test_ban);
+            ("clear", test_clear);
+            ("test_gc", test_gc) ] ) ]
   |> Lwt_main.run

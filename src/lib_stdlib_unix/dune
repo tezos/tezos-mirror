@@ -2,11 +2,13 @@
  (name tezos_stdlib_unix)
  (public_name tezos-stdlib-unix)
  (flags (:standard -open Tezos_error_monad
+                   -open Tezos_error_monad.TzLwtreslib
                    -open Tezos_event_logging
                    -open Tezos_stdlib
                    -open Data_encoding))
  (libraries data-encoding
             tezos-error-monad
+            tezos-lwt-result-stdlib
             tezos-event-logging
             tezos-stdlib
             lwt.unix

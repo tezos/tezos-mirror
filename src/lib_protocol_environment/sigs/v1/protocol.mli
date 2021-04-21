@@ -35,7 +35,7 @@ and component = {
   implementation : string;
 }
 
-and env_version = V0 | V1
+and env_version = V0 | V1 | V2
 
 val component_encoding : component Data_encoding.t
 

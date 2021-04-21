@@ -61,6 +61,8 @@ let lwt_assert_true str b = Lwt.return (assert_true str b)
 
 let lwt_assert_false str b = Lwt.return (assert_false str b)
 
+let lwt_check testable str a b = Lwt.return (Alcotest.check testable str a b)
+
 let lwt_impossible str = Lwt.return (impossible str)
 
 let lwt_fail str = Lwt.return (Alcotest.(check bool) str false true)

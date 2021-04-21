@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -44,7 +44,7 @@ type ('msg, 'peer, 'conn) t
 
 type config = {
   identity : P2p_identity.t;  (** Our identity. *)
-  trusted_points : P2p_point.Id.t list;
+  trusted_points : (P2p_point.Id.t * P2p_peer.Id.t option) list;
       (** List of hard-coded known peers to bootstrap the network from. *)
   peers_file : string;
       (** The path to the JSON file where the metadata associated to
@@ -63,6 +63,12 @@ type config = {
       connections indicated by the second integer. *)
   max_known_peer_ids : (int * int) option;
       (** Like [max_known_points], but for known peer_ids. *)
+  peer_greylist_size : int;
+      (** The number of peer_ids kept in the peer_id greylist. *)
+  ip_greylist_size_in_kilobytes : int;
+      (** The size of the IP address greylist. *)
+  ip_greylist_cleanup_delay : Time.System.Span.t;
+      (** The time an IP address is kept in the greylist. *)
 }
 
 val create :
@@ -87,15 +93,22 @@ val config : _ t -> config
 val active_connections : ('msg, 'peer, 'conn) t -> int
 
 (** If [point] doesn't belong to the table of known points,
-    [register_point t point] creates a [P2p_point_state.Info.t], triggers a
-    `New_point` event and signals the `new_point` condition. If table capacity
-    is exceeded, a GC of the table is triggered.
+   [register_point ?expected_peer_id t point] creates a
+   [P2p_point_state.Info.t], triggers a `New_point` event and signals
+   the `new_point` condition. If table capacity is exceeded, a GC of
+   the table is triggered.
 
-    If [point] is already known, the [P2p_point_state.Info.t] from the table
-    is returned. In either case, the trusted status of the returned
-    [P2p_point_state.Info.t] is set to [trusted]. *)
+    If [point] is already known, the [P2p_point_state.Info.t] from the
+   table is returned. In either case, the trusted status of the
+   returned [P2p_point_state.Info.t] is set to [trusted]. If an
+   [expected_peer_id] is given, it will be used during the next
+   connection attempt. If the provided peer_id is different the
+   connection will be refused. If we are already connected to a peer,
+   we check whether the current peer_id is the expected one otherwise
+   we disconnect from this point. *)
 val register_point :
   ?trusted:bool ->
+  ?expected_peer_id:P2p_peer.Id.t ->
   ('msg, 'peer, 'conn) t ->
   P2p_point.Id.t ->
   ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t
@@ -124,7 +137,7 @@ val register_list_of_new_points :
   source:P2p_peer.Id.t ->
   ('msg, 'peer, 'conn) t ->
   P2p_point.Id.t list ->
-  unit
+  unit Lwt.t
 
 (** If [peer] doesn't belong to the table of known peers,
     [register_peer t peer] creates a [P2p_peer.Info.t], triggers a
@@ -272,16 +285,18 @@ module Points : sig
   val remove_connected :
     ('msg, 'peer, 'conn) t -> 'd P2p_point_state.Info.t -> unit
 
-  (** [ban t point_id] marks the address of this point_id as blacked-listed.
-      it disconnects all connections to this address. This [port_id]'s port is
-      ignored. *)
-  val ban : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit Lwt.t
+  (** [ban t point_id] marks the address of this point_id as blacklisted.
+      It disconnects and bans all connections to this address. If [ban_peers]
+      is false the associated peers are disconnected but not banned.
+      The [point_id] port is ignored. *)
+  val ban :
+    ('msg, 'peer, 'conn) t -> ?ban_peers:bool -> P2p_point.Id.t -> unit Lwt.t
 
   (* TODO this isn't consistent with greylist functions where only an addr is
      provided). *)
 
-  (** [ban t point_id] removes this point address from the black list.
-      This [point_id]'s port is ignored. *)
+  (** [unban t point_id] removes this point address from the black list.
+      and unban all associated peers. The [point_id] port is ignored. *)
   val unban : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
 
   (** [banned t point_id] returns [true] if the point addr is in the black list.
@@ -292,8 +307,8 @@ module Points : sig
       Otherwise it calls [trusted] for this peer info. *)
   val get_trusted : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> bool
 
-  (** [trust t point_id] sets the point info for this point to trusted.
-      The point is registered first if not known (see [register_point]). *)
+  (** [trust t point_id] sets the point info for this point to trusted, and
+      [unban] it.  The point is registered first if not known (see [register_point]). *)
   val trust : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
 
   (** [untrust t point_id] sets the point info peer info for this point
@@ -310,18 +325,24 @@ val greylist_addr : ('msg, 'peer, 'conn) t -> P2p_addr.t -> unit
     and [peer]'s address to [pool]'s addr greylist. *)
 val greylist_peer : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t -> unit
 
-(** [gc_greylist ~older_than pool] removes addresses older than [older_than]
-    from the greylist. *)
-val gc_greylist : older_than:Time.System.t -> ('msg, 'peer, 'conn) t -> unit
+(** [clear_greylist] removes all addresses from the greylist. *)
+val clear_greylist : ('msg, 'peer, 'conn) t -> unit
+
+(** [gc_greylist] removes some addresses from the greylist (the oldest
+   have a higher probability to be removed, yet due to the underlying
+   probabilistic structure, recent greylistings can be dropped). *)
+val gc_greylist : ('msg, 'peer, 'conn) t -> unit
 
 (** [acl_clear pool] clears ACL tables. *)
 val acl_clear : ('msg, 'peer, 'conn) t -> unit
 
-(** [list_known_points ~ignore_private t] returns a list of point ids,
+(** [list_known_points ~ignore_private ?size t] returns a list of point ids,
     which are not banned, and if [ignore_private] is [true], public.
 
     It returns at most [size] point ids (default is 50) based on a
-    heuristic that selects a mix of 3/5 "good" and 2/5 random points. *)
+    heuristic that selects a mix of 3/5 "good" and 2/5 random points.
+
+    @raise [Invalid_argument] if [size < 0] *)
 val list_known_points :
   ignore_private:bool ->
   ?size:int ->
@@ -339,3 +360,13 @@ val score : ('msg, 'peer, 'conn) t -> 'peer -> float
 (** [add_to_id_points t point] adds [point] to the list of points for this
     peer. [point] is removed from the list of known points. *)
 val add_to_id_points : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
+
+(** [set_expected_peer_id t point peer] sets [peer] as an expected
+   peer_id to [point]. For any future connection with this point,
+   there is a check that the peer_id announced is the expected one. As
+   a side effect, if there is an active connection with [point] with
+   another peer_id, we disconnect from this point and the point is
+   greylisted. If the connection is not active but accepted, the point
+   is greylisted. *)
+val set_expected_peer_id :
+  ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t

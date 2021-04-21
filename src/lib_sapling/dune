@@ -6,7 +6,7 @@
 (library
  (name tezos_sapling)
  (public_name tezos-sapling)
- (libraries ctypes ctypes.foreign ctypes.stubs hex data-encoding tezos-crypto tezos-stdlib tezos-error-monad)
+ (libraries ctypes ctypes.foreign ctypes.stubs hex data-encoding tezos-crypto tezos-stdlib tezos-error-monad tezos-lwt-result-stdlib)
  (foreign_stubs
   (language c)
   (flags (-I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs))
@@ -14,7 +14,8 @@
  (c_library_flags (-L%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs -lrustzcash -lpthread))
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto
-                   -open Tezos_error_monad)))
+                   -open Tezos_error_monad
+                   -open Tezos_error_monad.TzLwtreslib)))
 
 (rule
  (alias runtest_lint)

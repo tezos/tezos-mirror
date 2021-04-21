@@ -33,7 +33,7 @@ let ten_tez = Tez.of_int 10
 let simple_reveal () =
   Context.init 1
   >>=? fun (blk, contracts) ->
-  let c = List.nth contracts 0 in
+  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   (* Create the contract *)
@@ -57,7 +57,7 @@ let simple_reveal () =
 let empty_account_on_reveal () =
   Context.init 1
   >>=? fun (blk, contracts) ->
-  let c = List.nth contracts 0 in
+  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   let amount = Tez.one_mutez in
@@ -89,7 +89,7 @@ let empty_account_on_reveal () =
 let not_enough_found_for_reveal () =
   Context.init 1
   >>=? fun (blk, contracts) ->
-  let c = List.nth contracts 0 in
+  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   (* Create the contract *)
@@ -113,9 +113,12 @@ let not_enough_found_for_reveal () =
           false)
 
 let tests =
-  [ Test.tztest "simple reveal" `Quick simple_reveal;
-    Test.tztest "empty account on reveal" `Quick empty_account_on_reveal;
-    Test.tztest
+  [ Test_services.tztest "simple reveal" `Quick simple_reveal;
+    Test_services.tztest
+      "empty account on reveal"
+      `Quick
+      empty_account_on_reveal;
+    Test_services.tztest
       "not enough found for reveal"
       `Quick
       not_enough_found_for_reveal ]

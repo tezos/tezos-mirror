@@ -36,3 +36,6 @@ end
     unreachable (because of the 'optimized' implementation of
     [sub] used internally. *)
 val cut : ?copy:bool -> int -> Bytes.t -> Bytes.t list
+
+(** [do_n_times n f] executes [f] [n] times. *)
+val do_n_times : int -> (unit -> unit) -> unit

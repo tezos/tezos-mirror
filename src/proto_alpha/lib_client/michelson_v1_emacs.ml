@@ -89,22 +89,23 @@ let print_type_map ppf (parsed, type_map) =
       (Format.pp_print_list ~pp_sep:Format.pp_print_space print_annot_expr)
       items
   and print_item ppf loc =
-    try
-      let ({start = {point = s; _}; stop = {point = e; _}}, locs) =
-        List.assoc loc parsed.Michelson_v1_parser.expansion_table
-      in
-      let locs = List.sort compare locs in
-      let (bef, aft) = List.assoc (List.hd locs) type_map in
-      Format.fprintf
-        ppf
-        "(@[<h>%d %d %a %a@])@,"
-        s
-        e
-        print_stack
-        bef
-        print_stack
-        aft
-    with Not_found -> ()
+    (let ( >?? ) = Option.bind in
+     List.assoc loc parsed.Michelson_v1_parser.expansion_table
+     >?? fun ({start = {point = s; _}; stop = {point = e; _}}, locs) ->
+     let locs = List.sort compare locs in
+     List.hd locs
+     >?? fun hd_loc ->
+     List.assoc hd_loc type_map >?? fun (bef, aft) -> Some (s, e, bef, aft))
+    |> Option.iter (fun (s, e, bef, aft) ->
+           Format.fprintf
+             ppf
+             "(@[<h>%d %d %a %a@])@,"
+             s
+             e
+             print_stack
+             bef
+             print_stack
+             aft)
   in
   Format.fprintf ppf "(@[<v 0>%a@])" print_expr_types (root parsed.unexpanded)
 
@@ -116,9 +117,11 @@ let first_error_location errs =
       | Unexpected_annotation loc
       | Ill_formed_type (_, _, loc)
       | Invalid_arity (loc, _, _, _)
+      | Invalid_seq_arity (loc, _, _)
       | Invalid_namespace (loc, _, _, _)
       | Invalid_primitive (loc, _, _)
       | Invalid_kind (loc, _, _)
+      | Invalid_never_expr loc
       | Fail_not_in_tail_position loc
       | Undefined_binop (loc, _, _, _)
       | Undefined_unop (loc, _, _)
@@ -152,9 +155,12 @@ let report_errors ppf (parsed, errs) =
     (fun ppf errs ->
       let find_location loc =
         let oloc =
-          List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
+          WithExceptions.Option.get ~loc:__LOC__
+          @@ List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
         in
-        fst (List.assoc oloc parsed.expansion_table)
+        fst
+          ( WithExceptions.Option.get ~loc:__LOC__
+          @@ List.assoc oloc parsed.expansion_table )
       in
       match errs with
       | top :: errs ->
@@ -192,9 +198,12 @@ let report_errors ppf (parsed, errs) =
     (Format.pp_print_list (fun ppf err ->
          let find_location loc =
            let oloc =
-             List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
+             WithExceptions.Option.get ~loc:__LOC__
+             @@ List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
            in
-           fst (List.assoc oloc parsed.expansion_table)
+           fst
+             ( WithExceptions.Option.get ~loc:__LOC__
+             @@ List.assoc oloc parsed.expansion_table )
          in
          let loc =
            match err with

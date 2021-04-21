@@ -110,4 +110,4 @@ module type S = sig
     (content, content) RPC_context.rest_result Lwt.t
 end
 
-module Make (Client : Cohttp_lwt.S.Client) : S
+module Make (Client : Resto_cohttp_client.Client.CALL) : S

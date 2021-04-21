@@ -60,6 +60,9 @@ type validation_process_error =
   | Missing_handshake
   | Inconsistent_handshake of string
   | Protocol_dynlink_failure of string
+  | Socket_path_too_long of string
+  | Socket_path_wrong_permission of string
+  | Cannot_run_external_validator of string
 
 type error +=
   | Invalid_block of {block : Block_hash.t; error : block_error}

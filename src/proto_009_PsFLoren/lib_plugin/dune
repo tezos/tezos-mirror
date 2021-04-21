@@ -1,0 +1,26 @@
+(library
+ (name tezos_protocol_plugin_009_PsFLoren)
+ (public_name tezos-protocol-plugin-009-PsFLoren)
+ (libraries tezos-base
+            tezos-protocol-009-PsFLoren)
+ (modules (:standard) \ Plugin_registerer)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_009_PsFLoren)))
+
+(library
+ (name tezos_protocol_plugin_009_PsFLoren_registerer)
+ (public_name tezos-protocol-plugin-009-PsFLoren-registerer)
+ (libraries tezos-base
+            tezos-embedded-protocol-009-PsFLoren
+            tezos-protocol-plugin-009-PsFLoren
+            tezos-shell)
+ (modules Plugin_registerer)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_protocol_009_PsFLoren
+                   -open Tezos_protocol_plugin_009_PsFLoren
+                   -open Tezos_shell)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

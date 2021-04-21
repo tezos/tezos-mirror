@@ -1,0 +1,9 @@
+(library
+ (name bare_functor_outputs)
+ (public_name tezos-lwt-result-stdlib.bare.functor-outputs)
+ (libraries lwt))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

@@ -105,15 +105,17 @@ struct
     if size > Proto.max_operation_data_length then
       error (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
-      match
-        Data_encoding.Binary.of_bytes_opt
-          Proto.operation_data_encoding
-          raw.Operation.proto
-      with
-      | None ->
-          error Parse_error
-      | Some protocol_data ->
-          ok {hash; raw; protocol_data}
+      try
+        match
+          Data_encoding.Binary.of_bytes_opt
+            Proto.operation_data_encoding
+            raw.Operation.proto
+        with
+        | None ->
+            error Parse_error
+        | Some protocol_data ->
+            ok {hash; raw; protocol_data}
+      with _ -> error Parse_error
 
   let compare op1 op2 =
     Proto.compare_operations
@@ -143,7 +145,7 @@ struct
       predecessor_context
       predecessor_header
       timestamp
-    >>=? fun predecessor_context ->
+    >>= fun predecessor_context ->
     ( match protocol_data with
     | None ->
         return_none
@@ -290,12 +292,12 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
   in
   Prevalidation.create ~protocol_data ~predecessor ~timestamp ()
   >>=? fun validation_state ->
-  Lwt_list.fold_left_s
+  List.fold_left_s
     (fun ( acc_validation_passes,
            acc_validation_result_rev,
            acc_validation_state )
          operations ->
-      Lwt_list.fold_left_s
+      List.fold_left_s
         (fun (acc_validation_result, acc_validation_state) op ->
           match Prevalidation.parse op with
           | Error _ ->
@@ -389,30 +391,32 @@ let preapply ~user_activated_upgrades ~user_activated_protocol_overrides
   >>=? (function
          | Protocol.V0 ->
              return context
-         | Protocol.V1 -> (
+         | Protocol.V1 | Protocol.V2 -> (
+             (* Block and operation metadata hashes may not be set on
+                the testchain genesis block and activation block, even
+                when they are using environment V1, they contain no
+                operations. *)
+             let is_from_genesis =
+               (State.Block.header predecessor).shell.validation_passes = 0
+             in
              State.Block.all_operations_metadata_hash predecessor
              >>= (function
-                   | None
-                     when (State.Block.header predecessor).shell
-                            .validation_passes > 0 ->
-                       fail
-                       @@ Missing_operation_metadata_hashes pred_block_hash
                    | None ->
-                       (* Operation metadata hash is not be set on testchain genesis
-                          block and activation block, even when they are using
-                          environment V1, they contain no operations. *)
-                       return context
+                       if is_from_genesis then return context
+                       else
+                         fail
+                         @@ Missing_operation_metadata_hashes pred_block_hash
                    | Some hash ->
-                       Context.set_predecessor_ops_metadata_hash context hash
+                       Context.add_predecessor_ops_metadata_hash context hash
                        >|= ok)
              >>=? fun context ->
              State.Block.metadata_hash predecessor
              >>= function
              | None ->
-                 (* Block metadata hash should always be set in environment V1. *)
-                 fail @@ Missing_block_metadata_hash pred_block_hash
+                 if is_from_genesis then return context
+                 else fail @@ Missing_operation_metadata_hashes pred_block_hash
              | Some predecessor_block_metadata_hash ->
-                 Context.set_predecessor_block_metadata_hash
+                 Context.add_predecessor_block_metadata_hash
                    context
                    predecessor_block_metadata_hash
                  >|= ok ))

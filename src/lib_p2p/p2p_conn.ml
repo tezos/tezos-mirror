@@ -57,7 +57,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       | Ok () ->
           worker_loop t callback
       | Error _ ->
-          Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit )
+          Error_monad.cancel_with_exceptions t.canceler )
   | Ok (_, Advertise points) ->
       callback.advertise request_info points
       >>= fun () -> worker_loop t callback
@@ -71,31 +71,30 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       callback.message request_info size msg
       >>= fun () -> worker_loop t callback
   | Ok (_, Disconnect) | Error (P2p_errors.Connection_closed :: _) ->
-      Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit
+      Error_monad.cancel_with_exceptions t.canceler
   | Error (P2p_errors.Decoding_error _ :: _) ->
       t.greylister () ;
-      Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit
+      Error_monad.cancel_with_exceptions t.canceler
   | Error (Canceled :: _) ->
       Lwt.return_unit
   | Error err ->
       Events.(emit unexpected_error) err
-      >>= fun () ->
-      Lwt_canceler.cancel t.canceler >>= fun () -> Lwt.return_unit
+      >>= fun () -> Error_monad.cancel_with_exceptions t.canceler
 
 let shutdown t =
   match t.worker with
   | None ->
       Lwt.return_unit
   | Some w ->
-      Lwt_canceler.cancel t.canceler >>= fun () -> w
+      Error_monad.cancel_with_exceptions t.canceler >>= fun () -> w
 
 let write_swap_ack t point peer_id =
   P2p_socket.write_now t.conn (Swap_ack (point, peer_id))
 
 let write_advertise t points = P2p_socket.write_now t.conn (Advertise points)
 
-let create conn point_info peer_info messages canceler ~greylister callback
-    negotiated_version =
+let create ~conn ~point_info ~peer_info ~messages ~canceler ~greylister
+    ~callback negotiated_version =
   let private_node = P2p_socket.private_node conn in
   let trusted_node =
     P2p_peer_state.Info.trusted peer_info
@@ -135,7 +134,7 @@ let create conn point_info peer_info messages canceler ~greylister callback
          "answerer"
          ~on_event:Internal_event.Lwt_worker_event.on_event
          ~run:(fun () -> worker_loop t (callback conn_info))
-         ~cancel:(fun () -> Lwt_canceler.cancel t.canceler)) ;
+         ~cancel:(fun () -> Error_monad.cancel_with_exceptions t.canceler)) ;
   t
 
 let pipe_exn_handler = function

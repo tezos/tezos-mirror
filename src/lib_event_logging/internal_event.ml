@@ -203,18 +203,18 @@ module All_sinks = struct
 
   let active : active list ref = ref []
 
-  let find_registered_exn scheme_to_find =
+  let find_registered scheme_to_find =
     List.find
       (function Registered {scheme; _} -> String.equal scheme scheme_to_find)
       !registered
 
   let register (type a) m =
     let module S = (val m : SINK with type t = a) in
-    match find_registered_exn S.uri_scheme with
-    | exception _ ->
+    match find_registered S.uri_scheme with
+    | None ->
         registered :=
           Registered {scheme = S.uri_scheme; definition = m} :: !registered
-    | _ ->
+    | Some _ ->
         (* This should be considered a programming error: *)
         Printf.ksprintf
           Stdlib.invalid_arg
@@ -270,10 +270,10 @@ module All_sinks = struct
           >>=? fun sink ->
           return (Active {scheme; configuration = uri; definition; sink})
         in
-        ( match find_registered_exn scheme_to_activate with
-        | Registered {scheme; definition} ->
+        ( match find_registered scheme_to_activate with
+        | Some (Registered {scheme; definition}) ->
             activate scheme definition
-        | exception _ ->
+        | None ->
             fail
               (Activation_error (Uri_scheme_not_registered (Uri.to_string uri)))
         )
@@ -286,7 +286,7 @@ module All_sinks = struct
       let module S = (val definition : SINK with type t = a) in
       S.close sink
     in
-    iter_s
+    List.iter_es
       (fun (Active {sink; definition; _}) -> close_one sink definition)
       !active
 
@@ -295,7 +295,7 @@ module All_sinks = struct
       let module S = (val definition : SINK with type t = a) in
       S.handle ?section sink def v
     in
-    iter_s
+    List.iter_es
       (function Active {sink; definition; _} -> handle sink definition)
       !active
 
@@ -384,9 +384,9 @@ module All_definitions = struct
   let add (type a) ev =
     let module E = (val ev : EVENT_DEFINITION with type t = a) in
     match List.find (function Definition (n, _) -> E.name = n) !all with
-    | _ ->
+    | Some _ ->
         raise (registration_exn "duplicate Event name: %S" E.name)
-    | exception _ ->
+    | None ->
         check_name_exn
           E.name
           (registration_exn "invalid event name: %S contains '%c'") ;
@@ -395,11 +395,7 @@ module All_definitions = struct
   let get () = !all
 
   let find match_name =
-    match List.find (function Definition (n, _) -> match_name n) !all with
-    | s ->
-        Some s
-    | exception _ ->
-        None
+    List.find (function Definition (n, _) -> match_name n) !all
 end
 
 module Make (E : EVENT_DEFINITION) : EVENT with type t = E.t = struct
@@ -553,7 +549,7 @@ module Simple = struct
      | Padded (encoding, _) ->
          pp_human_readable ~never_empty encoding fmt value
      | String_enum (table, _) -> (
-       match Hashtbl.find_opt table value with
+       match Stdlib.Hashtbl.find_opt table value with
        | None ->
            if never_empty then Format.pp_print_string fmt "N/A"
        | Some (name, _) ->

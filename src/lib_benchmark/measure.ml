@@ -42,7 +42,6 @@ type options = {
 
 type 'workload timed_workload = {workload : 'workload; qty : float}
 
-(* (workload * execution time) list *)
 type 'workload workload_data = 'workload timed_workload list
 
 type 'workload measurement = {
@@ -55,7 +54,7 @@ type packed_measurement =
   | Measurement : (_, 't) Benchmark.poly * 't measurement -> packed_measurement
 
 (* We can't deserialize the bytes before knowing the benchmark, which
-   contains the workload encoding. . *)
+   contains the workload encoding. *)
 type serialized_workload = {bench_name : string; measurement_bytes : Bytes.t}
 
 type workloads_stats = {
@@ -403,6 +402,44 @@ let load : filename:string -> packed_measurement =
      | Error err ->
          cant_load err )
 
+let to_csv :
+    type c t.
+    filename:string ->
+    bench:(c, t) Benchmark.poly ->
+    workload_data:t workload_data ->
+    unit =
+ fun ~filename ~bench ~workload_data ->
+  let (module Bench) = bench in
+  let lines =
+    List.map
+      (fun {workload; qty} -> (Bench.workload_to_vector workload, qty))
+      workload_data
+  in
+  let domain vec =
+    vec |> String.Map.to_seq |> Seq.map fst |> String.Set.of_seq
+  in
+  let names =
+    List.fold_left
+      (fun set (vec, _) -> String.Set.union (domain vec) set)
+      String.Set.empty
+      lines
+    |> String.Set.elements
+  in
+  let rows =
+    List.map
+      (fun (vec, qty) ->
+        let row =
+          List.map
+            (fun name -> string_of_float (Sparse_vec.String.get vec name))
+            names
+        in
+        row @ [string_of_float qty])
+      lines
+  in
+  let names = names @ ["timings"] in
+  let csv = names :: rows in
+  Csv.export ~filename csv
+
 (* ------------------------------------------------------------------------- *)
 (* Stats on execution times *)
 
@@ -473,13 +510,16 @@ let cull_outliers :
 
 module Stubs = Benchmark_utils.Stubs
 
-let make_sampler stabilize_gc flush_cache closure () =
+let reset_memory ~stabilize_gc ~flush_cache =
   if stabilize_gc then Stubs.stabilize_gc () ;
-  ( match flush_cache with
+  match flush_cache with
   | `Dont ->
       ()
   | `Cache_megabytes mb ->
-      Stubs.Cache.flush_cache Int64.(mul 1048576L (of_int mb)) ) ;
+      Stubs.Cache.flush_cache Int64.(mul 1048576L (of_int mb))
+
+let make_sampler ~stabilize_gc ~flush_cache closure () =
+  reset_memory ~stabilize_gc ~flush_cache ;
   let (_, dt) = Stubs.Time.duration closure in
   float_of_int dt
 
@@ -490,7 +530,7 @@ let compute_empirical_timing_distribution :
     stabilize_gc:bool ->
     float Stats.emp =
  fun ~closure ~nsamples ~flush_cache ~stabilize_gc ->
-  let sampler = make_sampler stabilize_gc flush_cache closure in
+  let sampler = make_sampler ~stabilize_gc ~flush_cache closure in
   Stats.empirical_of_generative ~nsamples (Stats.generative ~sampler)
 
 let determinizer_from_options options =
@@ -604,7 +644,25 @@ let perform_benchmark (type c t) (options : options)
                     ~stabilize_gc:options.stabilize_gc
                 in
                 let qty = determinizer qty_dist in
-                {workload; qty} :: workload_data))
+                {workload; qty} :: workload_data)
+        | Generator.With_probe {workload; probe; closure} ->
+            reset_memory
+              ~stabilize_gc:options.stabilize_gc
+              ~flush_cache:options.flush_cache ;
+            Tezos_stdlib.Utils.do_n_times options.nsamples (fun () ->
+                closure probe) ;
+            let aspects = probe.Generator.aspects () in
+            List.fold_left
+              (fun acc aspect ->
+                let results = probe.Generator.get aspect in
+                let qty_dist =
+                  Stats.empirical_of_raw_data (Array.of_list results)
+                in
+                let qty = determinizer qty_dist in
+                let workload = workload aspect in
+                {workload; qty} :: acc)
+              workload_data
+              aspects)
       []
       benchmarks
   in
@@ -615,3 +673,22 @@ let perform_benchmark (type c t) (options : options)
     pp_stats
     (collect_stats workload_data) ;
   workload_data
+
+(* ------------------------------------------------------------------------- *)
+(* Helpers for creating basic probes *)
+
+let make_timing_probe (type t) (module O : Compare.COMPARABLE with type t = t)
+    =
+  let table = Stdlib.Hashtbl.create 41 in
+  let module Set = Set.Make (O) in
+  {
+    Generator.apply =
+      (fun aspect closure ->
+        let (r, dt) = Stubs.Time.duration closure in
+        Stdlib.Hashtbl.add table aspect (float_of_int dt) ;
+        r);
+    aspects =
+      (fun () ->
+        Stdlib.Hashtbl.to_seq_keys table |> Set.of_seq |> Set.elements);
+    get = (fun aspect -> Stdlib.Hashtbl.find_all table aspect);
+  }

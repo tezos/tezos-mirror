@@ -129,44 +129,65 @@ let setup_remote_signer (module C : M) client_config
     | None ->
         () )
 
-let setup_http_rpc_client_config parsed_args base_dir rpc_config =
+let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
   (* Make sure that base_dir is not a mockup. *)
-  ( match Tezos_mockup.Persistence.classify_base_dir base_dir with
-  | Base_dir_is_mockup ->
-      failwith
-        "%s is setup as a mockup, yet mockup mode is not active"
-        base_dir
-  | _ ->
-      return_unit )
+  Tezos_mockup.Persistence.classify_base_dir base_dir
+  >>=? (function
+         | Base_dir_is_mockup ->
+             failwith
+               "%s is setup as a mockup, yet mockup mode is not active"
+               base_dir
+         | _ ->
+             return_unit)
   >>=? fun () ->
-  return
-  @@ new unix_full
-       ~chain:
-         ( match parsed_args with
-         | Some p ->
-             p.Client_config.chain
-         | None ->
-             Client_config.default_chain )
-       ~block:
-         ( match parsed_args with
-         | Some p ->
-             p.Client_config.block
-         | None ->
-             Client_config.default_block )
-       ~confirmations:
-         ( match parsed_args with
-         | Some p ->
-             p.Client_config.confirmations
-         | None ->
-             None )
-       ~password_filename:
-         ( match parsed_args with
-         | Some p ->
-             p.Client_config.password_filename
-         | None ->
-             None )
-       ~base_dir
-       ~rpc_config
+  let (chain, block, confirmations, password_filename, protocol) =
+    match parsed_args with
+    | None ->
+        ( Client_config.default_chain,
+          Client_config.default_block,
+          None,
+          None,
+          None )
+    | Some p ->
+        ( p.Client_config.chain,
+          p.Client_config.block,
+          p.Client_config.confirmations,
+          p.Client_config.password_filename,
+          p.Client_config.protocol )
+  in
+  match mode with
+  | `Mode_client ->
+      return
+      @@ new unix_full
+           ~chain
+           ~block
+           ~confirmations
+           ~password_filename
+           ~base_dir
+           ~rpc_config
+  | `Mode_proxy ->
+      let printer = new unix_logger ~base_dir in
+      let rpc_context =
+        new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+          rpc_config
+          Media_type.all_media_types
+      in
+      Tezos_proxy.Registration.get_registered_proxy
+        printer
+        rpc_context
+        protocol
+        chain
+        block
+      >>=? fun proxy_env ->
+      return
+      @@ new unix_proxy
+           ~chain
+           ~block
+           ~confirmations
+           ~password_filename
+           ~base_dir
+           ~rpc_config
+           ~proxy_env
 
 let setup_mockup_rpc_client_config
     (cctxt : Tezos_client_base.Client_context.full)
@@ -182,35 +203,40 @@ let setup_mockup_rpc_client_config
           ~constants_overrides_json:None
           ~bootstrap_accounts_json:None
   in
-  let base_dir_class = Tezos_mockup.Persistence.classify_base_dir base_dir in
-  ( match base_dir_class with
-  | Tezos_mockup.Persistence.Base_dir_is_empty
-  | Tezos_mockup.Persistence.Base_dir_is_file
-  | Tezos_mockup.Persistence.Base_dir_is_nonempty
-  | Tezos_mockup.Persistence.Base_dir_does_not_exist ->
-      let mem_only = true in
-      in_memory_mockup args >>=? fun res -> return (res, mem_only)
-  | Tezos_mockup.Persistence.Base_dir_is_mockup ->
-      let mem_only = false in
-      Tezos_mockup.Persistence.get_mockup_context_from_disk
-        ~base_dir
-        ~protocol_hash:args.protocol
-      >>=? fun res -> return (res, mem_only) )
+  Tezos_mockup.Persistence.classify_base_dir base_dir
+  >>=? (function
+         | Tezos_mockup.Persistence.Base_dir_is_empty
+         | Tezos_mockup.Persistence.Base_dir_is_file
+         | Tezos_mockup.Persistence.Base_dir_is_nonempty
+         | Tezos_mockup.Persistence.Base_dir_does_not_exist ->
+             let mem_only = true in
+             in_memory_mockup args >>=? fun res -> return (res, mem_only)
+         | Tezos_mockup.Persistence.Base_dir_is_mockup ->
+             let mem_only = false in
+             Tezos_mockup.Persistence.get_mockup_context_from_disk
+               ~base_dir
+               ~protocol_hash:args.protocol
+             >>=? fun res -> return (res, mem_only))
   >>=? fun ((mockup_env, (chain_id, rpc_context)), mem_only) ->
   return
     (new unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context)
 
 let setup_client_config (cctxt : Tezos_client_base.Client_context.full)
     (parsed_args : Client_config.cli_args option) base_dir rpc_config =
+  let client_or_proxy_fun =
+    setup_default_proxy_client_config parsed_args base_dir rpc_config
+  in
   match parsed_args with
   | None ->
-      setup_http_rpc_client_config parsed_args base_dir rpc_config
+      client_or_proxy_fun `Mode_client
   | Some args -> (
     match args.Client_config.client_mode with
-    | Client_config.Mode_client ->
-        setup_http_rpc_client_config parsed_args base_dir rpc_config
-    | Client_config.Mode_mockup ->
-        setup_mockup_rpc_client_config cctxt args base_dir )
+    | `Mode_client ->
+        client_or_proxy_fun `Mode_client
+    | `Mode_mockup ->
+        setup_mockup_rpc_client_config cctxt args base_dir
+    | `Mode_proxy ->
+        client_or_proxy_fun `Mode_proxy )
 
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
@@ -355,6 +381,10 @@ let main (module C : M) ~select_commands =
                  Clic.dispatch commands client_config remaining)
       >>= function
       | Ok () ->
+          Lwt.return 0
+      | Error [Clic.Version] ->
+          let version = Tezos_version.Bin_version.version_string in
+          Format.printf "%s\n" version ;
           Lwt.return 0
       | Error [Clic.Help command] ->
           Clic.usage

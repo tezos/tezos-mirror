@@ -1,23 +1,99 @@
 .. _version-8:
 
-Version 8.0~rc1
-===============
+Version 8.2
+===========
 
-Version 8.0~rc1 is the first release candidate of version 8.0.
-If it proves to be stable, it will become the next major release.
+Version 8.0 contains a new version (V1) of the protocol
+environment, which is the set of functions that protocols can call. Up
+to Delphi, all protocols used protocol environment V0. The new version
+(V1) is used by Edo, which is a proposal for the next protocol after
+Delphi. The release candidate also contains Edo itself as well as its
+daemons (baker, endorser and accuser) so that you can test it easily.
+
+We have also spawned a test network for Edo, named Edonet, that
+replaces Ebetanet, which was a test network for a beta version of
+Edo. The release candidate contains the necessary configuration to
+join Edonet: just configure your node with
+``tezos-node config init --network edonet``.
+
+Version 8.1 fixes a performance regression related to operations
+involving ``tz3`` addresses and several compilation problems in
+some contexts.
+
+Version 8.2 replaces `PtEdoTez` by `PtEdo2Zk` and provides RPCs to
+"normalize" Michelson expressions returned by the Edo protocol along
+with constraining the size of p2p messages at low level and updating
+some external dependencies.
 
 Update Instructions
 -------------------
 
+Starting from version 8.0, compiling Tezos requires the Rust compiler,
+version 1.44.0, and the Cargo package manager to be installed.
+See :ref:`instructions to set up Rust<setup_rust>`.
+
 To update from sources::
 
   git fetch
-  git checkout v8.0-rc1
+  git checkout v8.2
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v8.0-rc1`` Docker images of Tezos.
+If you are using Docker instead, use the ``v8.2`` Docker images of Tezos.
+
+Changelog — Version 8.2
+-----------------------
+
+Node
+~~~~
+
+- Override `PtEdoTez` activation by `PtEdo2Zk` in mainnet network.
+
+- Make size limits on p2p messages explicit in low-level encodings.
+
+- Add new RPCs for Edo: `helpers/scripts/normalize_{data,script,type}`
+  and a `XXX/normalized` variant to each protocol RPC `XXX`
+  outputting Michelson expressions.
+
+Baker / Endorser / Accuser
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Replace `PtEdoTez` by `PtEdo2Zk`.
+
+Miscellaneous
+~~~~~~~~~~~~~
+
+- Update external opam dependencies. In particular, switch to
+  `hacl-star.0.3.0-1` which performs better.
+
+Changelog — Version 8.1
+-----------------------
+
+Node
+~~~~
+
+- Fix a performance regression affecting serialization of tz3
+  signatures by reverting the P256 implementation to ``uecc``.
+
+- Fixup allowing nodes in ``--history-mode full`` to answer to all new
+  messages to the distributed database protocol.
+
+Client
+~~~~~~
+
+- As a consequence of moving back to ``uecc``, revert for now the
+  ability to sign with tz3 addresses.
+
+Miscellaneous
+~~~~~~~~~~~~~
+
+- Allow building from sources with older version of git (used to
+  require 2.18)
+
+- Downgrade ``mirage-crypto`` dependency to avoid failure on startup
+  with ``illegal instruction`` on some hardware.
+
 
 Changelog — Version 8.0
 -----------------------
@@ -25,7 +101,122 @@ Changelog — Version 8.0
 Node
 ~~~~
 
-- Fixed all known cases where the node would not stop when interrupted with Ctrl+C.
+- Added two new bootstrap peers for Mainnet and one for Edonet.
+
+- Fixes a bug where any event would allocate more memory than needed
+  when it were not to be printed.
+
+- Improved how the node stores buffered messages from peers to consume less memory.
+
+- Enforce loading of non-embedded protocols before starting the node
+  allowing the prevalidator to start correctly.
+
+- Optimized the I/O and CPU usage by removing an unnecessary access to
+  the context during block validation.
+
+Docker Images
+~~~~~~~~~~~~~
+
+- Bump up base image to ``alpine:12``. In particular, it changes rust and python
+  versions to 1.44.0 and 3.8.5 respectively.
+
+Changelog — Version 8.0~rc2
+---------------------------
+
+Node
+~~~~
+
+- Added a new version (version 1) of the protocol environment.
+  The environment is the set of functions and types that the protocol can use.
+  Protocols up to Delphi used environment version 0.
+  The Edo protocol uses environment version 1.
+
+- Added the Edo protocol: the node, client and codec now comes linked with Edo,
+  and the Edo daemons (baker, endorser and accuser) are available.
+
+- Added a built-in configuration for Edonet, a test network that runs Edo.
+  You can configure your node to use this test network with ``--network edonet``.
+
+- Removed the built-in configuration for Carthagenet, which ends its life on
+  December 12th 2020. You can no longer configure your node with ``--network carthagenet``.
+
+- Snapshots exported by a node using version 8 cannot be imported by a
+  node running version 7. This is because the new snapshots contain
+  additional information required by protocol Edo. On the other hand,
+  snapshots exported by a node using version 7 can be imported by a
+  node running version 8.
+
+- The bootstrap pipeline no longer tries to concurrently download
+  steps from other peers. The result is actually a more efficient
+  bootstrap, because those concurrent downloads resulted in multiple
+  attempts to download the same block headers. It
+  also resulted in more memory usage than necessary.
+
+- Added six messages to the distributed database protocol and bumped
+  its version from 0 to 1. These new messages allow to request for: a
+  peer's checkpoint, the branch of a given protocol and a block's
+  predecessor for a given offset. These messages are not yet used but
+  will be useful for future optimizations.
+
+- You can now specify the data directory using environment variable ``TEZOS_NODE_DIR``.
+  If you both set this environment variable and specify ``--data-dir``,
+  the latter will be used.
+
+- Added new RPC ``/config`` to query the configuration of a node.
+
+- Changed signal handling and exit codes for most binaries. The codes'
+  significance are detailed in [the user documentation](http://tezos.gitlab.io/user/various.html#tezos_binaries_signals_and_exit_codes).
+
+- Command ``tezos-node --version`` now exits with exit code 0 instead of 1.
+
+- Fixed the synchronisation threshold which was wrongly capped with an
+  upper bound of 2 instead of a lower bound of 2 when ``--connections``
+  was explicitely specified while the synchronisation threshold itself
+  was not specified.
+
+Client
+~~~~~~
+
+- Added client command ``import keys from mnemonic``, which allows to
+  import a key from a mnemonic following the BIP39 standard.
+
+- When the client asks for a password, it no longer tries to hide its
+  input if the client was not run from a terminal, which allows for
+  use in a script.
+
+- You can now specify the base directory using environment variable ``TEZOS_CLIENT_DIR``.
+  If you both set this environment variable and specify ``--base-dir``,
+  the latter will be used.
+
+- Fixed command ``set delegate for <SRC> to <DLGT>`` to accept public key hashes for
+  the ``<DLGT>`` field.
+
+- Fixed the ``rpc`` command that did not use the full path of the URL provided
+  to ``--endpoint``. Before this, ``--endpoint http://localhost:8732/node/rpc``
+  would have been equivalent to ``--endpoint http://localhost:8732``.
+
+- Fixed an issue where the client would try to sign with a key for which
+  the private counterpart was unknown even though a remote signer was connected.
+
+Baker / Endorser / Accuser
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fixed a crash (assertion error) that could happen at exit,
+  in particular if a baker were connected.
+
+Docker Images
+~~~~~~~~~~~~~
+
+- Docker images are now available for arm64. Image tags stay the same
+  but now refer to "multi-arch" manifests.
+
+Changelog — Version 8.0~rc1
+---------------------------
+
+Node
+~~~~
+
+- Fixed some cases where the node would not stop when interrupted with Ctrl+C.
 
 - The node's mempool relies on a new synchronisation heuristic. The
   node's behaviour, especially at startup, may differ slightly; log

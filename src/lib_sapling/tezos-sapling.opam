@@ -13,10 +13,11 @@ depends: [
   "hex"
   "ctypes"
   "ctypes-foreign"
-  "data-encoding"
+  "data-encoding" { >= "0.3" & < "0.4" }
   "tezos-crypto"
   "tezos-stdlib"
   "tezos-error-monad"
+  "tezos-test-services" { with-test }
   "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]

@@ -6,9 +6,6 @@
             tezos-protocol-006-PsCARTHA
             tezos-protocol-environment
             tezos-shell-services
-            tezos-mockup
-            tezos-mockup-registration
-            tezos-mockup-commands
             tezos-client-006-PsCARTHA
             tezos-client-commands
             tezos-rpc)

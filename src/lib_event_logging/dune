@@ -4,10 +4,12 @@
  (flags (:standard -open Tezos_stdlib
                    -open Data_encoding
                    -open Tezos_error_monad
+                   -open Tezos_error_monad.TzLwtreslib
                    ))
  (libraries tezos-stdlib
             data-encoding
             tezos-error-monad
+            tezos-lwt-result-stdlib
             lwt_log.core))
 
 (rule

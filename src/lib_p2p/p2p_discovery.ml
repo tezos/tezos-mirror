@@ -102,7 +102,9 @@ module Message = struct
   let encoding =
     Data_encoding.(tup3 (Fixed.string 10) P2p_peer.Id.encoding int16)
 
-  let length = Data_encoding.Binary.fixed_length_exn encoding
+  let length =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ Data_encoding.Binary.fixed_length encoding
 
   let key = "DISCOMAGIC"
 
@@ -124,6 +126,7 @@ module Answer = struct
     Lwt.catch
       (fun () ->
         let socket = Lwt_unix.socket PF_INET SOCK_DGRAM 0 in
+        Lwt_unix.set_close_on_exec socket ;
         Lwt_canceler.on_cancel st.canceler (fun () ->
             Lwt_utils_unix.safe_close socket
             >>= function
@@ -186,10 +189,10 @@ module Answer = struct
         Lwt.return_unit
     | Error err ->
         Events.(emit unexpected_error) ("answer", err)
-        >>= fun () -> Lwt_canceler.cancel st.canceler
+        >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
     | Ok () ->
         Events.(emit unexpected_exit) ()
-        >>= fun () -> Lwt_canceler.cancel st.canceler
+        >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
 
   let create my_peer_id pool ~trust_discovered_peers ~discovery_port =
     {
@@ -207,7 +210,7 @@ module Answer = struct
         "discovery_answer"
         ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
+        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
 end
 
 (* ************************************************************ *)
@@ -290,7 +293,7 @@ module Sender = struct
         Lwt.return_unit
     | Error err ->
         Events.(emit unexpected_error) ("sender", err)
-        >>= fun () -> Lwt_canceler.cancel st.canceler
+        >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
 
   let create my_peer_id pool ~listening_port ~discovery_port ~discovery_addr =
     {
@@ -310,7 +313,7 @@ module Sender = struct
         "discovery_sender"
         ~on_event:Internal_event.Lwt_worker_event.on_event
         ~run:(fun () -> worker_loop Config.initial st)
-        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler)
+        ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler)
 end
 
 (* ********************************************************************** *)
@@ -338,5 +341,5 @@ let wakeup t = Lwt_condition.signal t.sender.restart_discovery ()
 
 let shutdown t =
   Lwt.join
-    [ Lwt_canceler.cancel t.answer.canceler;
-      Lwt_canceler.cancel t.sender.canceler ]
+    [ Error_monad.cancel_with_exceptions t.answer.canceler;
+      Error_monad.cancel_with_exceptions t.sender.canceler ]

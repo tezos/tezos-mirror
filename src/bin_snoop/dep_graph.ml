@@ -209,7 +209,7 @@ module Solver = struct
         Format.eprintf
           "Root: %a@."
           Free_variable.pp
-          (Option.get (Fv_set.choose provides)))
+          (WithExceptions.Option.get ~loc:__LOC__ (Fv_set.choose provides)))
       roots ;
     (* Propagate iteratively. *)
     let state = {solved = []; unsolved = others} in

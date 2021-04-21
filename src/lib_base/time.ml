@@ -43,6 +43,12 @@ module Protocol = struct
   let to_ptime t =
     let days = Int64.to_int (Int64.div t 86_400L) in
     let ps = Int64.mul (Int64.rem t 86_400L) 1_000_000_000_000L in
+    let (days, ps) =
+      if ps < 0L then
+        (* [Ptime.Span.of_d_ps] only accepts picoseconds in the range 0L-86_399_999_999_999_999L. Subtract a day and add a day's worth of picoseconds if need be. *)
+        (Int.pred days, Int64.(add ps (mul 86_400L 1_000_000_000_000L)))
+      else (days, ps)
+    in
     match Option.bind (Ptime.Span.of_d_ps (days, ps)) Ptime.of_span with
     | None ->
         invalid_arg "Time.Protocol.to_ptime"
@@ -85,15 +91,15 @@ module Protocol = struct
                Data_encoding.Json.cannot_destruct "Time.Protocol.of_notation")
          string
 
-  let max_rfc3999 = of_ptime Ptime.max
+  let max_rfc3339 = of_ptime Ptime.max
 
-  let min_rfc3999 = of_ptime Ptime.min
+  let min_rfc3339 = of_ptime Ptime.min
 
   let as_string_encoding =
     let open Data_encoding in
     conv
       (fun i ->
-        if min_rfc3999 <= i && i <= max_rfc3999 then to_notation i
+        if min_rfc3339 <= i && i <= max_rfc3339 then to_notation i
         else Int64.to_string i)
       ( Json.wrap_error
       (* NOTE: this encoding is only used as a building block for a json
@@ -121,8 +127,8 @@ module Protocol = struct
 
   let rpc_arg =
     RPC_arg.make
-      ~name:(Format.asprintf "date")
-      ~descr:(Format.asprintf "A date in seconds from epoch")
+      ~name:"date"
+      ~descr:"A date in seconds from epoch"
       ~destruct:(function
         | "none" | "epoch" ->
             Ok epoch
@@ -154,8 +160,8 @@ module System = struct
 
     let multiply_exn f s =
       let open Ptime.Span in
-      TzOption.unopt_exn
-        (Failure "Time.System.Span.multiply_exn")
+      WithExceptions.Option.to_exn
+        ~none:(Failure "Time.System.Span.multiply_exn")
         (of_float_s (f *. Ptime.Span.to_float_s s))
 
     let of_seconds_exn f =
@@ -184,8 +190,8 @@ module System = struct
 
     let rpc_arg =
       RPC_arg.make
-        ~name:(Format.asprintf "timespan")
-        ~descr:(Format.asprintf "A span of time in seconds")
+        ~name:"timespan"
+        ~descr:"A span of time in seconds"
         ~destruct:(fun s ->
           match Ptime.Span.of_float_s (float_of_string s) with
           | Some t ->
@@ -284,8 +290,8 @@ module System = struct
 
   let rpc_arg =
     RPC_arg.make
-      ~name:(Format.asprintf "date")
-      ~descr:(Format.asprintf "A date in seconds from epoch")
+      ~name:"date"
+      ~descr:"A date in seconds from epoch"
       ~destruct:(function
         | "none" | "epoch" ->
             Ok Ptime.epoch

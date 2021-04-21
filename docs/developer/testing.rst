@@ -186,13 +186,13 @@ Typical use cases:
 Example tests:
  - Detecting unintended changes in the behavior of the node's Michelson
    interpreter (in
-   :src:`tests_python/tests/test_contract_opcodes.py`).  To execute it
+   :src:`tests_python/tests_alpha/test_contract_opcodes.py`).  To execute it
    locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py``
    in the Tezos root. To execute them on :ref:`your own machine
    <executing_gitlab_ci_locally>` using the GitLab CI system, run
    ``gitlab-runner exec docker integration:contract_opcodes``.
  - Setting up networks of nodes and ensuring their connection
-   (in :src:`tests_python/tests/test_p2p.py`).
+   (in :src:`tests_python/tests_alpha/test_p2p.py`).
    To execute it locally, run ``cd tests_python && poetry run pytest tests/test_p2p.py`` in
    the Tezos root. To execute them on :ref:`your own machine
    <executing_gitlab_ci_locally>` using the GitLab CI system, run
@@ -401,6 +401,25 @@ Known issues
 
    In that case, either delete the problematic files or re-launch the tests and re-generate the report.
 
+2. Instrumented code doesn't compile on certain pattern-matching constructs
+   with ``bisect_ppx <= 2.5.0``
+
+   ::
+
+        File "src/proto_008_PtEdoTez/lib_protocol/script_ir_translator.ml", line 1074, characters 13-14:
+        1074 |   | Lambda_t _
+
+        Error: This pattern matches values of type $5 ty
+            but a pattern was expected which matches values of type 'a ty
+            The type constructor $5 would escape its scope
+
+    This issue is solved in the development version of ``bisect_ppx``. It can
+    be obtained with
+
+    ::
+
+        opam pin add bisect_ppx.2.5.0 --dev-repo --yes
+
 Executing tests through the GitLab CI
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -433,7 +452,7 @@ Other
   For other types of tests, you need to manually modify the
   :src:`.gitlab-ci.yml`. Please refer to the `GitLab CI Pipeline
   Reference <https://docs.gitlab.com/ee/ci/>`_. A helpful tool for
-  this task is the `CI linter <https://gitlab.com/ci/lint>`_, and ``gitlab-runner``,
+  this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_, and ``gitlab-runner``,
   introduced in the :ref:`next section <executing_gitlab_ci_locally>`.
 
 A second way to run the tests is to trigger manually the job

@@ -87,8 +87,6 @@ module Make (X : PARAMETERS) = struct
 
   type status = Not_running | Running of session_status
 
-  module String_map = Map.Make (String)
-
   type event_handler =
     | Event_handler : {
         filter : JSON.t -> 'a option;
@@ -232,13 +230,16 @@ module Make (X : PARAMETERS) = struct
        forever. So we need to make sure that we open the file before we
        spawn the daemon. *)
     let* event_input = Lwt_io.(open_file ~mode:input) daemon.event_pipe in
+    let env =
+      String_map.singleton
+        "TEZOS_EVENTS_CONFIG"
+        ("file-descriptor-path://" ^ daemon.event_pipe)
+    in
     let process =
       Process.spawn
         ~name:daemon.name
         ~color:daemon.color
-        ~env:
-          [ ( "TEZOS_EVENTS_CONFIG",
-              "file-descriptor-path://" ^ daemon.event_pipe ) ]
+        ~env
         daemon.path
         arguments
     in

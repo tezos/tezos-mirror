@@ -18,6 +18,13 @@ Add the following to your `.emacs` file.
 ```elisp
 (load "~/tezos/tezos/emacs/michelson-mode.el" nil t)
 ```
+If you use the Spacemacs distribution, you can add the package in `dotspacemacs-additional-packages`, like:
+```elisp
+dotspacemacs-additional-packages '(
+  (michelson-mode :location (recipe :fetcher url
+                                   :url "https://gitlab.com/tezos/tezos/-/raw/master/emacs/michelson-mode.el")))
+```
+`quelpa` will be used under the hood to fetch and load the file.
 
 Before using the Emacs mode, you must configure the `michelson-client-command`.
 If you have compiled the Tezos Git repository,

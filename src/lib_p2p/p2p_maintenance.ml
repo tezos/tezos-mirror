@@ -37,7 +37,6 @@ type bounds = {
 
 type config = {
   maintenance_idle_time : Time.System.Span.t;
-  greylist_timeout : Time.System.Span.t;
   private_mode : bool;
   min_connections : int;
   max_connections : int;
@@ -109,7 +108,7 @@ let establish t contactable =
         P2p_connect_handler.connect t.connect_handler point)
     >|= function Ok _ -> succ count | Error _ -> count
   in
-  Lwt_list.fold_left_s try_to_connect 0 contactable
+  List.fold_left_s try_to_connect 0 contactable
 
 (* [connectable t start_time expected seen_points] selects at most
    [expected] connections candidates from the known points, not in [seen]
@@ -224,23 +223,11 @@ let random_connections pool n =
   in
   TzList.rev_sub candidates n
 
-(** GC peers from the greylist that has been greylisted for more than
-    [t.config.greylist_timeout] *)
-let trigger_greylist_gc t =
-  let now = Systime_os.now () in
-  let minus_greylist_timeout = Ptime.Span.neg t.config.greylist_timeout in
-  let time = Ptime.add_span now minus_greylist_timeout in
-  let older_than =
-    Option.unopt_exn (Failure "P2p_maintenance.maintain: time overflow") time
-  in
-  P2p_pool.gc_greylist t.pool ~older_than
-
 (** Maintenance step.
     1. trigger greylist gc
     2. tries *forever* to achieve a number of connections
        between `min_threshold` and `max_threshold`. *)
 let rec do_maintain t =
-  trigger_greylist_gc t ;
   let n_connected = P2p_pool.active_connections t.pool in
   if n_connected < t.bounds.min_threshold then
     too_few_connections t n_connected
@@ -268,7 +255,7 @@ and too_many_connections t n_connected =
   Events.(emit too_many_connections) n
   >>= fun () ->
   let connections = random_connections t.pool n in
-  Lwt_list.iter_p P2p_conn.disconnect connections >>= fun () -> do_maintain t
+  List.iter_p P2p_conn.disconnect connections >>= fun () -> do_maintain t
 
 let rec worker_loop t =
   (let n_connected = P2p_pool.active_connections t.pool in
@@ -335,7 +322,7 @@ let activate t =
       "maintenance"
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> worker_loop t)
-      ~cancel:(fun () -> Lwt_canceler.cancel t.canceler) ;
+      ~cancel:(fun () -> Error_monad.cancel_with_exceptions t.canceler) ;
   Option.iter P2p_discovery.activate t.discovery
 
 let maintain t =
@@ -344,9 +331,9 @@ let maintain t =
   wait
 
 let shutdown {canceler; discovery; maintain_worker; just_maintained; _} =
-  Lwt_canceler.cancel canceler
+  Error_monad.cancel_with_exceptions canceler
   >>= fun () ->
-  Lwt_utils.may ~f:P2p_discovery.shutdown discovery
+  Option.iter_s P2p_discovery.shutdown discovery
   >>= fun () ->
   maintain_worker
   >>= fun () ->

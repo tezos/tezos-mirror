@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# This script launches a sandbox node, activates Delphi, gets the RPC descriptions
+# This script launches a sandbox node, activates Edo, gets the RPC descriptions
 # as JSON, and converts this JSON into an OpenAPI specification.
 # You must compile the node and the client before running it.
 #
@@ -17,9 +17,9 @@ tezos_node=./tezos-node
 tezos_client=./tezos-client
 
 # Protocol configuration.
-protocol_hash=PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo
-protocol_parameters=src/proto_007_PsDELPH1/parameters/sandbox-parameters.json
-protocol_name=delphi
+protocol_hash=PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
+protocol_parameters=src/proto_008_PtEdo2Zk/parameters/sandbox-parameters.json
+protocol_name=edo
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
@@ -33,10 +33,12 @@ data_dir=$tmp/tezos-sandbox
 client_dir=$tmp/tezos-client
 api_json=$tmp/rpc-api.json
 proto_api_json=$tmp/proto-api.json
+mempool_api_json=$tmp/mempool-api.json
 
 # Generated files.
 openapi_json=docs/api/rpc-openapi.json
 proto_openapi_json=docs/api/$protocol_name-openapi.json
+mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
 
 # Get version number.
 version=$(ocaml scripts/print_version.ml)
@@ -69,6 +71,7 @@ sleep 1
 # Get the RPC descriptions.
 curl "http://localhost:$rpc_port/describe/?recurse=yes" > $api_json
 curl "http://localhost:$rpc_port/describe/chains/main/blocks/head?recurse=yes" > $proto_api_json
+curl "http://localhost:$rpc_port/describe/chains/main/mempool?recurse=yes" > $mempool_api_json
 
 # Kill the node.
 kill -9 "$node_pid"
@@ -78,4 +81,6 @@ dune exec src/openapi/rpc_openapi.exe -- $version $api_json > $openapi_json
 echo "Generated OpenAPI specification: $openapi_json"
 dune exec src/openapi/rpc_openapi.exe -- $version $proto_api_json > $proto_openapi_json
 echo "Generated OpenAPI specification: $proto_openapi_json"
+dune exec src/openapi/rpc_openapi.exe -- $version $mempool_api_json > $mempool_openapi_json
+echo "Generated OpenAPI specification: $mempool_openapi_json"
 echo "You can now clean up with: rm -rf $tmp"

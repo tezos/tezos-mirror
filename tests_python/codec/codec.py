@@ -4,13 +4,7 @@ import json
 import sys
 
 from typing import List
-
-
-def format_command(cmd: List[str]) -> str:
-    color_code = '\033[34m'
-    endc = '\033[0m'
-    cmd_str = " ".join(cmd)
-    return f'{color_code}# {cmd_str}{endc}'
+from process.process_utils import format_command
 
 
 class Codec:
@@ -22,6 +16,7 @@ class Codec:
     This class offers two commands `encode` and `decode`. The encoding
     name can be obtained using `tezos-codec list encodings`.
     """
+
     def __init__(self, codec_path: str):
         """
         Args:
@@ -31,9 +26,7 @@ class Codec:
 
         self._codec = codec_path
 
-    def run(self,
-            params: List[str],
-            check: bool = True) -> str:
+    def run(self, params: List[str], check: bool = True) -> str:
         """
         Args:
             params (list): list of parameters given to the tezos-codec,
@@ -44,10 +37,9 @@ class Codec:
 
         stdout = ""
         stderr = ""
-        completed_process = subprocess.run(cmd,
-                                           capture_output=True,
-                                           check=check,
-                                           text=True)
+        completed_process = subprocess.run(
+            cmd, capture_output=True, check=check, text=True
+        )
         stdout = completed_process.stdout
         stderr = completed_process.stderr
         if stdout:

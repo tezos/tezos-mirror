@@ -1,0 +1,2 @@
+tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_contract_fails
+

@@ -9,11 +9,13 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
   "tezos-base"
+  "tezos-client-base"
   "tezos-protocol-environment"
   "tezos-protocol-008-PtEdo2Zk"
   "tezos-shell-services"
   "tezos-client-base-unix"
   "tezos-mockup-registration"
+  "tezos-proxy"
   "tezos-signer-backends"
   "tezos-protocol-008-PtEdo2Zk-parameters"
   "tezos-protocol-plugin-008-PtEdo2Zk"

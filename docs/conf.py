@@ -108,6 +108,8 @@ html_css_files = [
     'css/custom.css',
 ]
 
+html_extra_path = ['404.html', '_redirects']
+
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
 #
@@ -183,5 +185,9 @@ linkcheck_anchors = False
 linkcheck_ignore = [
     r'https://www.reddit.com.*/',
     'https://www.michelson-lang.com/',
-    r'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/*'
+    r'https://gitlab.com/nomadic-labs/tezos/-/merge_requests/*',
+    r'http(s)?://localhost:\d+/?'
 ]
+
+# Python module index generation is broken, deactivate it.
+html_domain_indices = False

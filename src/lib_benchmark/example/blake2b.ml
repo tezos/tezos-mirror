@@ -102,4 +102,6 @@ let () = Registration.register (module Blake2b_bench)
 let () =
   Registration.register_for_codegen
     "blake2b_codegen"
-    (Model.For_codegen (List.assoc "blake2b" Blake2b_bench.models))
+    (Model.For_codegen
+       ( WithExceptions.Option.get ~loc:__LOC__
+       @@ List.assoc "blake2b" Blake2b_bench.models ))

@@ -14,6 +14,7 @@ Where <action> can be:
 * --check-ci: check formatting using git (for GitLab CI's verbose run).
 * --check-gitlab-ci-yml: check .gitlab-ci.yml has been updated.
 * --check-scripts: check the .sh files
+* --check-redirects: check docs/_build/_redirects.
 * --format: format all the files, see also \`make fmt\`.
 * --help: display this and return 0.
 
@@ -124,6 +125,29 @@ check_scripts () {
     exit $exit_code
 }
 
+check_redirects () {
+    if [[ ! -f docs/_build/_redirects ]]; then
+       say "check-redirects should be run after building the full documentation,"
+       say "i.e. by running 'make -C docs all'"
+       exit 1
+    fi
+
+    exit_code=0
+    while read old new code; do
+        re='^[0-9]+$'
+        if ! [[ $code =~ $re && $code -ge 300 ]] ; then
+            say "in docs/_redirects: redirect $old -> $new has erroneous status code \"$code\""
+            exit_code=1
+        fi
+        dest_local=docs/_build${new}
+        if [[ ! -f $dest_local ]]; then
+            say "in docs/_redirects: redirect $old -> $new, $dest_local does not exist"
+            exit_code=1
+        fi
+    done < docs/_build/_redirects
+    exit $exit_code
+}
+
 format_inplace () {
     ocamlformat --inplace "$@"
 }
@@ -174,6 +198,8 @@ case "$action" in
         check_clean=true ;;
     "--check-scripts" )
         action=check_scripts ;;
+    "--check-redirects" )
+        action=check_redirects ;;
     "--format" )
         on_files=true
         action=format_inplace ;;

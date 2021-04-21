@@ -25,34 +25,54 @@
 
 open Error_monad
 
-module type CONTEXT = sig
-  type t
+let err_implementation_mismatch ~expected ~got =
+  Fmt.invalid_arg
+    "Context implementation mismatch: expecting %s, got %s"
+    expected
+    got
 
-  type key = string list
+module type CONTEXT = Environment_context_intf.S
 
-  type value = Bytes.t
+module type VIEW = Environment_context_intf.VIEW
 
-  val mem : t -> key -> bool Lwt.t
+module type TREE = Environment_context_intf.TREE
 
-  val dir_mem : t -> key -> bool Lwt.t
+module Equality_witness : sig
+  type (_, _) eq = Refl : ('a, 'a) eq
 
-  val get : t -> key -> value option Lwt.t
+  type 'a t
 
-  val set : t -> key -> value -> t Lwt.t
+  val make : unit -> 'a t
 
-  val copy : t -> from:key -> to_:key -> t option Lwt.t
+  val eq : 'a t -> 'b t -> ('a, 'b) eq option
 
-  val remove_rec : t -> key -> t Lwt.t
+  val hash : 'a t -> int
+end = struct
+  type (_, _) eq = Refl : ('a, 'a) eq
 
-  type key_or_dir = [`Key of key | `Dir of key]
+  type _ equality = ..
 
-  val fold :
-    t -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  module type Inst = sig
+    type t
 
-  val set_protocol : t -> Protocol_hash.t -> t Lwt.t
+    type _ equality += Eq : t equality
+  end
 
-  val fork_test_chain :
-    t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
+  type 'a t = (module Inst with type t = 'a)
+
+  let make : type a. unit -> a t =
+   fun () ->
+    let module Inst = struct
+      type t = a
+
+      type _ equality += Eq : t equality
+    end in
+    (module Inst)
+
+  let eq : type a b. a t -> b t -> (a, b) eq option =
+   fun (module A) (module B) -> match A.Eq with B.Eq -> Some Refl | _ -> None
+
+  let hash : type a. a t -> int = fun (module A) -> Hashtbl.hash A.Eq
 end
 
 module Context = struct
@@ -60,49 +80,189 @@ module Context = struct
 
   type value = Bytes.t
 
-  type 'ctxt ops = (module CONTEXT with type t = 'ctxt)
+  type ('ctxt, 'tree) ops =
+    (module CONTEXT with type t = 'ctxt and type tree = 'tree)
 
   type _ kind = ..
 
-  type t = Context : {kind : 'a kind; ctxt : 'a; ops : 'a ops} -> t
+  type ('a, 'b) equality_witness =
+    'a Equality_witness.t * 'b Equality_witness.t
+
+  let equality_witness () = (Equality_witness.make (), Equality_witness.make ())
+
+  let equiv (a, b) (c, d) = (Equality_witness.eq a c, Equality_witness.eq b d)
+
+  type t =
+    | Context : {
+        kind : 'a kind;
+        impl_name : string;
+        ctxt : 'a;
+        ops : ('a, 'b) ops;
+        equality_witness : ('a, 'b) equality_witness;
+      }
+        -> t
 
   let mem (Context {ops = (module Ops); ctxt; _}) key = Ops.mem ctxt key
 
-  let set (Context {ops = (module Ops) as ops; ctxt; kind}) key value =
-    Ops.set ctxt key value
-    >>= fun ctxt -> Lwt.return (Context {ops; ctxt; kind})
+  let add (Context ({ops = (module Ops); ctxt; _} as c)) key value =
+    Ops.add ctxt key value >|= fun ctxt -> Context {c with ctxt}
 
-  let dir_mem (Context {ops = (module Ops); ctxt; _}) key =
-    Ops.dir_mem ctxt key
+  let find (Context {ops = (module Ops); ctxt; _}) key = Ops.find ctxt key
 
-  let get (Context {ops = (module Ops); ctxt; _}) key = Ops.get ctxt key
+  let remove (Context ({ops = (module Ops); ctxt; _} as c)) key =
+    Ops.remove ctxt key >|= fun ctxt -> Context {c with ctxt}
 
-  let copy (Context {ops = (module Ops) as ops; ctxt; kind}) ~from ~to_ =
-    Ops.copy ctxt ~from ~to_
-    >>= function
-    | Some ctxt ->
-        Lwt.return_some (Context {ops; ctxt; kind})
-    | None ->
-        Lwt.return_none
+  (* trees *)
+  type tree =
+    | Tree : {
+        ops : ('a, 'b) ops;
+        impl_name : string;
+        tree : 'b;
+        equality_witness : ('a, 'b) equality_witness;
+      }
+        -> tree
 
-  let remove_rec (Context {ops = (module Ops) as ops; ctxt; kind}) key =
-    Ops.remove_rec ctxt key
-    >>= fun ctxt -> Lwt.return (Context {ops; ctxt; kind})
+  let mem_tree (Context {ops = (module Ops); ctxt; _}) key =
+    Ops.mem_tree ctxt key
 
-  type key_or_dir = [`Key of key | `Dir of key]
+  let add_tree (Context ({ops = (module Ops); ctxt; _} as c)) key (Tree t) =
+    match equiv c.equality_witness t.equality_witness with
+    | (Some Refl, Some Refl) ->
+        Ops.add_tree ctxt key t.tree >|= fun ctxt -> Context {c with ctxt}
+    | _ ->
+        err_implementation_mismatch ~expected:c.impl_name ~got:t.impl_name
 
-  let fold (Context {ops = (module Ops); ctxt; _}) key ~init ~f =
-    Ops.fold ctxt key ~init ~f
+  let find_tree
+      (Context
+        {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) key
+      =
+    Ops.find_tree ctxt key
+    >|= Option.map (fun tree -> Tree {ops; tree; equality_witness; impl_name})
 
-  let set_protocol (Context {ops = (module Ops) as ops; ctxt; kind})
-      protocol_hash =
-    Ops.set_protocol ctxt protocol_hash
-    >>= fun ctxt -> Lwt.return (Context {ops; ctxt; kind})
+  let list
+      (Context
+        {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _})
+      ?offset ?length key =
+    Ops.list ctxt ?offset ?length key
+    >|= fun ls ->
+    List.fold_left
+      (fun acc (k, tree) ->
+        let v = Tree {ops; tree; equality_witness; impl_name} in
+        (k, v) :: acc)
+      []
+      (List.rev ls)
 
-  let fork_test_chain (Context {ops = (module Ops) as ops; ctxt; kind})
-      ~protocol ~expiration =
+  let fold ?depth
+      (Context
+        {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) key
+      ~init ~f =
+    Ops.fold ?depth ctxt key ~init ~f:(fun k v acc ->
+        let v = Tree {ops; tree = v; equality_witness; impl_name} in
+        f k v acc)
+
+  (* Tree *)
+  module Tree = struct
+    let pp ppf (Tree {ops = (module Ops); tree; _}) = Ops.Tree.pp ppf tree
+
+    let hash (Tree {ops = (module Ops); tree; _}) = Ops.Tree.hash tree
+
+    let kind (Tree {ops = (module Ops); tree; _}) = Ops.Tree.kind tree
+
+    let to_value (Tree {ops = (module Ops); tree; _}) = Ops.Tree.to_value tree
+
+    let of_value
+        (Context
+          {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) v
+        =
+      Ops.Tree.of_value ctxt v
+      >|= fun tree -> Tree {ops; tree; equality_witness; impl_name}
+
+    let equal (Tree {ops = (module Ops); tree; equality_witness; _}) (Tree t) =
+      match equiv equality_witness t.equality_witness with
+      | (Some Refl, Some Refl) ->
+          Ops.Tree.equal tree t.tree
+      | _ ->
+          false
+
+    let empty
+        (Context
+          {ops = (module Ops) as ops; equality_witness; ctxt; impl_name; _}) =
+      let empty = Ops.Tree.empty ctxt in
+      Tree {ops; equality_witness; tree = empty; impl_name}
+
+    let is_empty (Tree {ops = (module Ops); tree; _}) = Ops.Tree.is_empty tree
+
+    let mem (Tree {ops = (module Ops); tree; _}) key = Ops.Tree.mem tree key
+
+    let add (Tree ({ops = (module Ops); tree; _} as c)) key value =
+      Ops.Tree.add tree key value >|= fun tree -> Tree {c with tree}
+
+    let find (Tree {ops = (module Ops); tree; _}) key = Ops.Tree.find tree key
+
+    let mem_tree (Tree {ops = (module Ops); tree; _}) key =
+      Ops.Tree.mem_tree tree key
+
+    let add_tree (Tree ({ops = (module Ops); _} as c)) key (Tree t) =
+      match equiv c.equality_witness t.equality_witness with
+      | (Some Refl, Some Refl) ->
+          Ops.Tree.add_tree c.tree key t.tree
+          >|= fun tree -> Tree {c with tree}
+      | _ ->
+          err_implementation_mismatch ~expected:c.impl_name ~got:t.impl_name
+
+    let find_tree (Tree ({ops = (module Ops); tree; _} as c)) key =
+      Ops.Tree.find_tree tree key
+      >|= Option.map (fun tree -> Tree {c with tree})
+
+    let remove (Tree ({ops = (module Ops); tree; _} as c)) key =
+      Ops.Tree.remove tree key >|= fun tree -> Tree {c with tree}
+
+    let list
+        (Tree {ops = (module Ops) as ops; tree; equality_witness; impl_name})
+        ?offset ?length key =
+      Ops.Tree.list tree ?offset ?length key
+      >|= fun ls ->
+      List.fold_left
+        (fun acc (k, tree) ->
+          let v = Tree {ops; tree; equality_witness; impl_name} in
+          (k, v) :: acc)
+        []
+        (List.rev ls)
+
+    let fold ?depth
+        (Tree
+          {ops = (module Ops) as ops; tree = t; equality_witness; impl_name})
+        key ~init ~f =
+      Ops.Tree.fold ?depth t key ~init ~f:(fun k v acc ->
+          let v = Tree {ops; tree = v; equality_witness; impl_name} in
+          f k v acc)
+
+    let clear ?depth (Tree {ops = (module Ops); tree; _}) =
+      Ops.Tree.clear ?depth tree
+  end
+
+  (* misc *)
+
+  let set_protocol (Context ({ops = (module Ops); ctxt; _} as c)) protocol_hash
+      =
+    Ops.set_protocol ctxt protocol_hash >|= fun ctxt -> Context {c with ctxt}
+
+  let get_protocol (Context {ops = (module Ops); ctxt; _}) =
+    Ops.get_protocol ctxt
+
+  let fork_test_chain (Context ({ops = (module Ops); ctxt; _} as c)) ~protocol
+      ~expiration =
     Ops.fork_test_chain ctxt ~protocol ~expiration
-    >>= fun ctxt -> Lwt.return (Context {ops; ctxt; kind})
+    >|= fun ctxt -> Context {c with ctxt}
+end
+
+module Register (C : CONTEXT) = struct
+  type _ Context.kind += Context : C.t Context.kind
+
+  let equality_witness : (C.t, C.tree) Context.equality_witness =
+    Context.equality_witness ()
+
+  let ops = (module C : CONTEXT with type t = 'ctxt and type tree = 'tree)
 end
 
 type validation_result = {

@@ -169,7 +169,7 @@ module Make (I : Dump_interface) = struct
         pred_ops_metadata_hashes : Operation_metadata_hash.t list list option;
       }
     | Node of (string * I.hash) list
-    | Blob of string
+    | Blob of bytes
     | Proot of I.Pruned_block.t
     | Loot of I.Protocol_data.t
     | End
@@ -181,9 +181,9 @@ module Make (I : Dump_interface) = struct
     case
       ~title:"blob"
       (Tag (Char.code 'b'))
-      string
-      (function Blob string -> Some string | _ -> None)
-      (function string -> Blob string)
+      bytes
+      (function Blob b -> Some b | _ -> None)
+      (function b -> Blob b)
 
   let node_encoding =
     let open Data_encoding in
@@ -545,7 +545,7 @@ module Make (I : Dump_interface) = struct
             aux 0 [] starting_block_header
             >>=? fun protocol_datas ->
             (* Dump protocol data *)
-            Lwt_list.iter_s
+            List.iter_s
               (fun proto -> set_loot buf proto ; maybe_flush ())
               protocol_datas
             >>= fun () ->
@@ -566,7 +566,7 @@ module Make (I : Dump_interface) = struct
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
     (* Editing the repository *)
-    let add_blob t blob = I.add_string t blob >>= fun tree -> return tree in
+    let add_blob t blob = I.add_bytes t blob >>= fun tree -> return tree in
     let add_dir t keys =
       I.add_dir t keys
       >>= function

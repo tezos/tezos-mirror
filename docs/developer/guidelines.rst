@@ -60,25 +60,31 @@ At coarser levels, source file directories should be documented by Markdown file
 Source directories must instantiate the following ``README.md`` template::
 
   # Component Name
-  Summary line: One sentence about this component.
+  <!-- Summary line: One sentence about this component. -->
 
   ## Overview
+  <!--
   - Describe the purpose of this component and how the code in this directory
     works. If needed, design rationale for its API.
   - Describe the interaction of the code in this directory with the other
     components. This includes dependencies on other components, for instance.
   - Describe the security model and assumptions about the crates in this
     directory.
+  -->
 
   ## Implementation Details
+  <!--
   - Describe how the component is modeled.
   - Describe the code structure and implementation design rationale.
   - Other relevant implementation details (e.g. global invariants).
   - Testing specifics, if needed.
+  -->
 
   ## API Documentation
+  <!--
   - Link to the external API.
   - For the top-level source directory, link to the most important APIs within.
+  -->
 
 The rationale of this template is that a README file addresses two different kinds of developers:
 
@@ -86,6 +92,11 @@ The rationale of this template is that a README file addresses two different kin
    concepts and API, and not about its implementations details, and
 #. the developers and maintainers of the module, which are also concerned about
    implementation details.
+
+When filling in the template, you should keep untouched the guidelines within
+HTML comments (which are visible to the document maintainers but invisible to
+end-users), so that any maintainer can check how well the README instantiates
+the template, and address any gap if needed.
 
 Logging Levels
 --------------
@@ -114,10 +125,6 @@ administrator of possible problems and errors:
 - ``Error`` level are all those events that require an intervention of the node
   administrator or that signal some exceptional circumstance.
 
-It's also important to notice that from the node administrator's point of view,
-it is possible to choose a specific log level for a given component
-by setting the environment variable ``TEZOS_LOG`` accordingly while running the node.
-
 Code formatting
 ---------------
 
@@ -135,3 +142,12 @@ which is installed with
 ``ln -sr scripts/pre_commit/pre_commit.py .git/hooks/pre-commit``
 (see the header of `./scripts/pre_commit/pre_commit.py` and its `--help`
 for additional options).
+
+Coding conventions
+------------------
+
++Other than the formatting rules above, there are currently no coding
+conventions enforced in the codebase. However, Tezos developers should be aware
+of general `OCaml programming guidelines <http://caml.inria.fr/resources/doc/
+guides/guidelines.en.html>`_, which recommend formatting, naming conventions,
+and more.

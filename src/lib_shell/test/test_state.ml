@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Shell (state)
+    Invocation:   dune exec src/lib_shell/test/test.exe test "state"
+    Subject:      On states.
+*)
+
 module Proto = Shell_test_helpers.Genesis_proto
 
 let incr_fitness fitness =
@@ -89,7 +96,7 @@ let parsed_block ({shell; protocol_data} : Block_header.t) =
 let zero = Bytes.create 0
 
 let build_valid_chain state vtbl pred names =
-  Lwt_list.fold_left_s
+  List.fold_left_s
     (fun pred name ->
       State.Block.context_exn pred
       >>= fun predecessor_context ->
@@ -186,7 +193,8 @@ type state = {
   chain : State.Chain.t;
 }
 
-let vblock s k = Option.get @@ String.Hashtbl.find s.vblock k
+let vblock s k =
+  WithExceptions.Option.get ~loc:__LOC__ @@ String.Hashtbl.find s.vblock k
 
 exception Found of string
 
@@ -210,7 +218,9 @@ let build_example_tree chain =
   let c = ["A1"; "A2"; "A3"; "A4"; "A5"; "A6"; "A7"; "A8"] in
   build_valid_chain chain vtbl genesis c
   >>= fun () ->
-  let a3 = Option.get @@ String.Hashtbl.find vtbl "A3" in
+  let a3 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ String.Hashtbl.find vtbl "A3"
+  in
   let c = ["B1"; "B2"; "B3"; "B4"; "B5"; "B6"; "B7"; "B8"] in
   build_valid_chain chain vtbl a3 c >>= fun () -> Lwt.return vtbl
 
@@ -227,12 +237,13 @@ let wrap_state_init f base_dir =
   >>=? fun (state, chain, _index, _history_mode) ->
   build_example_tree chain >>= fun vblock -> f {state; chain; vblock}
 
+(** Initializes the store. *)
 let test_init (_ : state) = return_unit
 
 (** State.Block.read *)
 
 let test_read_block (s : state) =
-  Lwt_list.iter_s
+  List.iter_s
     (fun (name, vblock) ->
       let hash = State.Block.hash vblock in
       State.Block.read s.chain hash
@@ -431,6 +442,8 @@ let rec compare_path p1 p2 =
   | _ ->
       false
 
+(** Various path traversal checks on [chain_store] (using
+    [Store.Chain_traversal.path]). *)
 let test_path (s : state) =
   let check_path h1 h2 p2 =
     Chain_traversal.path (vblock s h1) (vblock s h2)
@@ -456,8 +469,8 @@ let test_path (s : state) =
 
 (****************************************************************************)
 
-(** Chain_traversal.common_ancestor *)
-
+(** Checks that two blocks admits some same ancestor (using
+    [Store.Chain_traversal.common_ancestor]). *)
 let test_ancestor s =
   let check_ancestor h1 h2 expected =
     Chain_traversal.common_ancestor (vblock s h1) (vblock s h2)
@@ -505,26 +518,30 @@ let seed =
   in
   {Block_locator.receiver_id; sender_id}
 
-(** Chain_traversal.block_locator *)
-
+(** Checks that the locator of some block (i.e., a number of
+    predecessors) corresponds to an expected length and value. *)
 let test_locator s =
   let check_locator length h1 expected =
     State.compute_locator s.chain ~max_size:length (vblock s h1) seed
     >>= fun l ->
     let (_, l) = (l : Block_locator.t :> _ * _) in
-    if List.length l <> List.length expected then
-      Assert.fail_msg
-        "Invalid locator length %s (found: %d, expected: %d)"
-        h1
-        (List.length l)
-        (List.length expected) ;
-    List.iter2
-      (fun h h2 ->
-        if not (Block_hash.equal h (State.Block.hash @@ vblock s h2)) then
-          Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
-      l
-      expected ;
-    Lwt.return_unit
+    match
+      List.iter2
+        ~when_different_lengths:()
+        (fun h h2 ->
+          if not (Block_hash.equal h (State.Block.hash @@ vblock s h2)) then
+            Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
+        l
+        expected
+    with
+    | Error () ->
+        Assert.fail_msg
+          "Invalid locator length %s (found: %d, expected: %d)"
+          h1
+          (List.length l)
+          (List.length expected)
+    | Ok () ->
+        Lwt.return_unit
   in
   check_locator 6 "A8" ["A7"; "A6"; "A5"; "A4"; "A3"; "A2"]
   >>= fun () ->
@@ -559,6 +576,8 @@ let compare s name heads l =
       then Assert.fail_msg "missing block in known_heads (%s: %s)" name bname)
     l
 
+(** Asserts that the initial chain heads of the example chain are A8
+    and B8, (using [Store.Chain.known_heads]). *)
 let test_known_heads s =
   Chain.known_heads s.chain
   >>= fun heads ->
@@ -567,8 +586,9 @@ let test_known_heads s =
 
 (****************************************************************************)
 
-(** Chain.head/set_head *)
-
+(** First, verifies that the chain head is set to genesis. Then, sets
+    chain head to A6 then checks if head is A6 (using
+    [Chain.head/set_head]). *)
 let test_head s =
   Chain.head s.chain
   >>= fun head ->
@@ -592,8 +612,13 @@ let test_head s =
 
 (****************************************************************************)
 
-(** Chain.mem *)
+(** Checks whether some block belongs (or not) to the current mainchain
+    (using Store.Chain.is_in_chain).
 
+    Genesis - A1 - A2 - A3 - A4 - A5 - A6 - A7 - A8
+                             \
+                              B1 - B2 - B3 - B4 - B5 - B6 - B7 - B8
+*)
 let test_mem s =
   let mem s x = Chain.mem s.chain (State.Block.hash @@ vblock s x) in
   let test_mem s x =
@@ -678,8 +703,9 @@ let test_mem s =
 
 (****************************************************************************)
 
-(** Chain_traversal.new_blocks *)
-
+(** Asserts the expected common ancestor and path as obtained by
+    [Store.Chain_traversal.new_blocks] for a series of block pairs in
+    the example chain. *)
 let test_new_blocks s =
   let test s head h expected_ancestor expected =
     let to_block = vblock s head and from_block = vblock s h in
@@ -696,28 +722,32 @@ let test_new_blocks s =
         head
         h
         expected_ancestor ;
-    if List.length blocks <> List.length expected then
-      Assert.fail_msg
-        "Invalid locator length %s (found: %d, expected: %d)"
-        h
-        (List.length blocks)
-        (List.length expected) ;
-    List.iter2
-      (fun h1 h2 ->
-        if
-          not
-            (Block_hash.equal
-               (State.Block.hash h1)
-               (State.Block.hash @@ vblock s h2))
-        then
-          Assert.fail_msg
-            "Invalid new blocks %s -> %s (expected: %s)"
-            head
-            h
-            h2)
-      blocks
-      expected ;
-    Lwt.return_unit
+    match
+      List.iter2
+        ~when_different_lengths:()
+        (fun h1 h2 ->
+          if
+            not
+              (Block_hash.equal
+                 (State.Block.hash h1)
+                 (State.Block.hash @@ vblock s h2))
+          then
+            Assert.fail_msg
+              "Invalid new blocks %s -> %s (expected: %s)"
+              head
+              h
+              h2)
+        blocks
+        expected
+    with
+    | Error () ->
+        Assert.fail_msg
+          "Invalid locator length %s (found: %d, expected: %d)"
+          h
+          (List.length blocks)
+          (List.length expected)
+    | Ok () ->
+        Lwt.return_unit
   in
   test s "A6" "A6" "A6" []
   >>= fun () ->

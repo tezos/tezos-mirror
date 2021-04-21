@@ -48,7 +48,7 @@ let commands () =
               ~name:"block"
               ~desc:"blocks to remove from invalid list") )
       (fun () blocks (cctxt : #Client_context.full) ->
-        iter_s
+        List.iter_es
           (fun block ->
             Shell_services.Invalid_blocks.delete cctxt block
             >>=? fun () ->
@@ -66,7 +66,7 @@ let commands () =
       (fun () (cctxt : #Client_context.full) ->
         Shell_services.Invalid_blocks.list cctxt ()
         >>=? fun invalid_blocks ->
-        iter_s
+        List.iter_es
           (fun {Chain_services.hash; _} ->
             Shell_services.Invalid_blocks.delete cctxt hash
             >>=? fun () ->

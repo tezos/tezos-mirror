@@ -1,0 +1,443 @@
+# definition for the environment to run all integration tests
+.integration_template:
+  extends: .test_template
+  before_script:
+    - make
+
+integration:proto:sandbox:
+  extends: .integration_template
+  script:
+    - dune build @runtest_sandbox
+
+integration:compiler-rejections:
+  extends: .integration_template
+  script:
+    - dune build @runtest_rejections
+
+############################################################
+## Stage: run scripts to check they are working properly  ##
+############################################################
+
+script:prepare_migration_test:
+  extends: .test_template
+  before_script:
+    - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
+    - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
+    - new_proto_version=$(printf "%03d" $((last_proto_version + 1)))
+    - make
+  script:
+    - ./scripts/prepare_migration_test.sh manual "next_$new_proto_version" 1
+  allow_failure: true # This test fails starting from 008 because bash thinks 008 is octal
+
+############################################################
+## Stage: run OCaml integration tests                     ##
+############################################################
+
+integration:sandboxes:voting:
+  extends: .integration_template
+  script:
+    - ROOT_PATH=$PWD/flextesa-voting-demo-noops dune build @src/bin_sandbox/runtest_sandbox_voting_demo_noops
+  artifacts:
+    paths:
+      - flextesa-voting-demo-noops
+    expire_in: 1 day
+    when: on_failure
+  allow_failure: true # This test uses too much resources for GitLab's workers
+
+integration:sandboxes:acc-baking:
+  extends: .integration_template
+  script:
+    - ROOT_PATH=$PWD/flextesa-acc-sdb dune build @src/bin_sandbox/runtest_sandbox_accusations_simple_double_baking
+  artifacts:
+    paths:
+      - flextesa-acc-sdb
+    expire_in: 1 day
+    when: on_failure
+
+integration:sandboxes:acc-endorsement:
+  extends: .integration_template
+  script:
+    - ROOT_PATH=$PWD/flextesa-acc-sde dune build @src/bin_sandbox/runtest_sandbox_accusations_simple_double_endorsing
+  artifacts:
+    paths:
+      - flextesa-acc-sde
+    expire_in: 1 day
+    when: on_failure
+
+integration:sandboxes:u-a-u:
+  extends: .integration_template
+  script:
+    - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_next
+    - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_alpha
+  artifacts:
+    paths:
+      - flextesa-hard-fork
+    expire_in: 1 day
+    when: on_failure
+
+integration:sandboxes:daemons-upgrade:
+  extends: .integration_template
+  script:
+    - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_next
+    - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_alpha
+  artifacts:
+    paths:
+      - flextesa-daemons-upgrade
+    expire_in: 1 day
+    when: on_failure
+
+############################################################
+## Stage: run python integration tests                    ##
+############################################################
+
+# definition for the environment to run all integration tests
+.integration_python_template:
+  extends: .test_template
+  dependencies:
+    - build
+  before_script:
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
+    - mkdir tests_python/tmp
+    - touch tests_python/tmp/empty__to_avoid_glob_failing
+    - cd tests_python
+  after_script:
+    - tail -n 100 tests_python/tmp/*
+  artifacts:
+    paths:
+      - tests_python/tmp/
+    expire_in: 7 day
+    when: always
+  # python scripts don't need the _build directory
+  # but only the binaries in the artifacts
+  cache: {}
+
+# this section is updated using the script scripts/update_integration_test.sh
+##BEGIN_INTEGRATION_PYTHON##
+integration:008_fast:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008 -m "not slow" -s --log-dir=tmp 2>&1 | tee tmp/008_fast.out | tail
+  stage: test
+
+integration:008_baker_endorser:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_baker_endorser.py -s --log-dir=tmp 2>&1 | tee tmp/008_baker_endorser.out | tail
+  stage: test
+
+integration:008_bootstrap:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_bootstrap.py -s --log-dir=tmp 2>&1 | tee tmp/008_bootstrap.out | tail
+  stage: test
+
+integration:008_contract:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_contract.py -s --log-dir=tmp 2>&1 | tee tmp/008_contract.out | tail
+  stage: test
+
+integration:008_contract_annotations:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_contract_annotations.py -s --log-dir=tmp 2>&1 | tee tmp/008_contract_annotations.out | tail
+  stage: test
+
+integration:008_contract_macros:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_contract_macros.py -s --log-dir=tmp 2>&1 | tee tmp/008_contract_macros.out | tail
+  stage: test
+
+integration:008_contract_onchain_opcodes:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_contract_onchain_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/008_contract_onchain_opcodes.out | tail
+  stage: test
+
+integration:008_contract_opcodes:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_contract_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/008_contract_opcodes.out | tail
+  stage: test
+
+integration:008_forge_block:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_forge_block.py -s --log-dir=tmp 2>&1 | tee tmp/008_forge_block.out | tail
+  stage: test
+
+integration:008_many_bakers:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_many_bakers.py -s --log-dir=tmp 2>&1 | tee tmp/008_many_bakers.out | tail
+  stage: test
+
+integration:008_many_nodes:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_many_nodes.py -s --log-dir=tmp 2>&1 | tee tmp/008_many_nodes.out | tail
+  stage: test
+
+integration:008_mempool:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_mempool.py -s --log-dir=tmp 2>&1 | tee tmp/008_mempool.out | tail
+  stage: test
+
+integration:008_multinode_snapshot:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_multinode_snapshot.py -s --log-dir=tmp 2>&1 | tee tmp/008_multinode_snapshot.out | tail
+  stage: test
+
+integration:008_multinode_storage_reconstruction:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_multinode_storage_reconstruction.py -s --log-dir=tmp 2>&1 | tee tmp/008_multinode_storage_reconstruction.out | tail
+  stage: test
+
+integration:008_rpc:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_008/test_rpc.py -s --log-dir=tmp 2>&1 | tee tmp/008_rpc.out | tail
+  stage: test
+
+integration:009_fast:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009 -m "not slow" -s --log-dir=tmp 2>&1 | tee tmp/009_fast.out | tail
+  stage: test
+
+integration:009_baker_endorser:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_baker_endorser.py -s --log-dir=tmp 2>&1 | tee tmp/009_baker_endorser.out | tail
+  stage: test
+
+integration:009_block_times_ideal_scenario:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_block_times_ideal_scenario.py -s --log-dir=tmp 2>&1 | tee tmp/009_block_times_ideal_scenario.out | tail
+  stage: test
+
+integration:009_bootstrap:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_bootstrap.py -s --log-dir=tmp 2>&1 | tee tmp/009_bootstrap.out | tail
+  stage: test
+
+integration:009_contract:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_contract.py -s --log-dir=tmp 2>&1 | tee tmp/009_contract.out | tail
+  stage: test
+
+integration:009_contract_annotations:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_contract_annotations.py -s --log-dir=tmp 2>&1 | tee tmp/009_contract_annotations.out | tail
+  stage: test
+
+integration:009_contract_macros:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_contract_macros.py -s --log-dir=tmp 2>&1 | tee tmp/009_contract_macros.out | tail
+  stage: test
+
+integration:009_contract_onchain_opcodes:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_contract_onchain_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/009_contract_onchain_opcodes.out | tail
+  stage: test
+
+integration:009_contract_opcodes:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_contract_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/009_contract_opcodes.out | tail
+  stage: test
+
+integration:009_forge_block:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_forge_block.py -s --log-dir=tmp 2>&1 | tee tmp/009_forge_block.out | tail
+  stage: test
+
+integration:009_many_bakers:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_many_bakers.py -s --log-dir=tmp 2>&1 | tee tmp/009_many_bakers.out | tail
+  stage: test
+
+integration:009_many_nodes:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_many_nodes.py -s --log-dir=tmp 2>&1 | tee tmp/009_many_nodes.out | tail
+  stage: test
+
+integration:009_mempool:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_mempool.py -s --log-dir=tmp 2>&1 | tee tmp/009_mempool.out | tail
+  stage: test
+
+integration:009_multinode_snapshot:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_multinode_snapshot.py -s --log-dir=tmp 2>&1 | tee tmp/009_multinode_snapshot.out | tail
+  stage: test
+
+integration:009_multinode_storage_reconstruction:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_multinode_storage_reconstruction.py -s --log-dir=tmp 2>&1 | tee tmp/009_multinode_storage_reconstruction.out | tail
+  stage: test
+
+integration:009_nonce_seed_revelation:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_nonce_seed_revelation.py -s --log-dir=tmp 2>&1 | tee tmp/009_nonce_seed_revelation.out | tail
+  stage: test
+
+integration:009_perf_endorsement:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_perf_endorsement.py -s --log-dir=tmp 2>&1 | tee tmp/009_perf_endorsement.out | tail
+  stage: test
+
+integration:009_rpc:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_rpc.py -s --log-dir=tmp 2>&1 | tee tmp/009_rpc.out | tail
+  stage: test
+
+integration:009_voting_full:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_009/test_voting_full.py -s --log-dir=tmp 2>&1 | tee tmp/009_voting_full.out | tail
+  stage: test
+
+integration:alpha_fast:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha -m "not slow" -s --log-dir=tmp 2>&1 | tee tmp/alpha_fast.out | tail
+  stage: test
+
+integration:alpha_baker_endorser:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_baker_endorser.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_baker_endorser.out | tail
+  stage: test
+
+integration:alpha_block_times_ideal_scenario:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_block_times_ideal_scenario.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_block_times_ideal_scenario.out | tail
+  stage: test
+
+integration:alpha_bootstrap:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_bootstrap.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_bootstrap.out | tail
+  stage: test
+
+integration:alpha_contract:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_contract.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_contract.out | tail
+  stage: test
+
+integration:alpha_contract_annotations:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_contract_annotations.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_contract_annotations.out | tail
+  stage: test
+
+integration:alpha_contract_macros:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_contract_macros.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_contract_macros.out | tail
+  stage: test
+
+integration:alpha_contract_onchain_opcodes:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_contract_onchain_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_contract_onchain_opcodes.out | tail
+  stage: test
+
+integration:alpha_contract_opcodes:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_contract_opcodes.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_contract_opcodes.out | tail
+  stage: test
+
+integration:alpha_forge_block:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_forge_block.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_forge_block.out | tail
+  stage: test
+
+integration:alpha_many_bakers:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_many_bakers.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_many_bakers.out | tail
+  stage: test
+
+integration:alpha_many_nodes:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_many_nodes.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_many_nodes.out | tail
+  stage: test
+
+integration:alpha_mempool:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_mempool.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_mempool.out | tail
+  stage: test
+
+integration:alpha_multinode_snapshot:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_multinode_snapshot.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_multinode_snapshot.out | tail
+  stage: test
+
+integration:alpha_multinode_storage_reconstruction:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_multinode_storage_reconstruction.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_multinode_storage_reconstruction.out | tail
+  stage: test
+
+integration:alpha_nonce_seed_revelation:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_nonce_seed_revelation.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_nonce_seed_revelation.out | tail
+  stage: test
+
+integration:alpha_perf_endorsement:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_perf_endorsement.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_perf_endorsement.out | tail
+  stage: test
+
+integration:alpha_rpc:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_rpc.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_rpc.out | tail
+  stage: test
+
+integration:alpha_voting_full:
+  extends: .integration_python_template
+  script:
+    - poetry run pytest tests_alpha/test_voting_full.py -s --log-dir=tmp 2>&1 | tee tmp/alpha_voting_full.out | tail
+  stage: test
+
+integration:examples:
+  extends: .integration_python_template
+  script:
+    - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/forge_transfer.py
+    - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/example.py
+    - PYTHONPATH=./ poetry run pytest examples/test_example.py
+  stage: test
+##END_INTEGRATION_PYTHON##

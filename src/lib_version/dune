@@ -7,5 +7,5 @@
 (rule
  (targets generated_git_info.ml)
  ; Ensures the hash update whenever a source file is modified ;
- (deps (source_tree %{workspace_root}) (:script get-git-info.mlt))
+ (deps (universe) (:script get-git-info.mlt))
  (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{script}))))

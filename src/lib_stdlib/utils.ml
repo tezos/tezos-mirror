@@ -49,3 +49,10 @@ let cut ?(copy = false) sz bytes =
       if start = 0 then acc else split_full_blocks start acc
     in
     split_full_blocks sz_full acc
+
+let rec do_n_times n f =
+  if n < 0 then invalid_arg "do_n_times"
+  else if n = 0 then ()
+  else (
+    f () ;
+    do_n_times (n - 1) f )

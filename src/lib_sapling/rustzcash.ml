@@ -25,7 +25,15 @@
    any function.
    Amounts are bounded by [-max_amount, +max_amount] so it fits in a int64.
    The positions we use are bounded by [ 0 ; 4294967295], which is an uint32, but
-   for simplicity they are stored in a int64. *)
+   for simplicity they are stored in a int64.
+   Functions in librustzcash return [false] when their arguments are malformed,
+   and return [true] otherwise (in which case result buffer contains the
+   result). Because we lean on the OCaml type system to enforce that arguments
+   are well-formed, we simply [assert] on the return value of the rust bindings.
+   *)
+
+(* Ctypes binding. We encapsulate the binding in a specific module *)
+module RS = Rustzcash_ctypes_bindings.Bindings (Rustzcash_ctypes_stubs)
 
 module T : Rustzcash_sig.T = struct
   type ask = Bytes.t
@@ -125,10 +133,12 @@ module T : Rustzcash_sig.T = struct
     x
 
   let to_nsk x =
+    (* A scalar of Jubjub *)
     assert (Bytes.length x = 32) ;
     x
 
   let to_ask x =
+    (* A scalar of Jubjub *)
     assert (Bytes.length x = 32) ;
     x
 
@@ -137,6 +147,7 @@ module T : Rustzcash_sig.T = struct
     x
 
   let to_ovk x =
+    (* Can be any random 32 bytes, 5.6.6 *)
     assert (Bytes.length x = 32) ;
     x
 
@@ -188,9 +199,12 @@ module T : Rustzcash_sig.T = struct
     assert (Bytes.length x = 64) ;
     x
 
+  let check_diversifier_bytes diversifier =
+    RS.check_diversifier (Ctypes.ocaml_bytes_start diversifier)
+
   let to_diversifier x =
     assert (Bytes.length x = 11) ;
-    x
+    if check_diversifier_bytes x then Some x else None
 
   let to_diversifier_index x =
     assert (Bytes.length x = 11) ;
@@ -210,6 +224,8 @@ module T : Rustzcash_sig.T = struct
 
   let to_ivk x =
     assert (Bytes.length x = 32) ;
+    (* The first 5 bits of the last byte must be zero because it is a number on 251 bits *)
+    assert (int_of_char (Bytes.get x (32 - 1)) <= 7) ;
     x
 
   let to_expanded_spending_key x =
@@ -365,9 +381,6 @@ let valid_position pos =
   let max_uint32 = 4294967295L in
   Compare.Int64.(pos >= 0L && pos <= max_uint32)
 
-(* Ctypes binding. We encapsulate the binding in a specific module *)
-module RS = Rustzcash_ctypes_bindings.Bindings (Rustzcash_ctypes_stubs)
-
 (* We don't load sprout's parameters.
    Parameters of type Rust `usize` are converted to OCaml `int` because they
    are only file paths. NULL is a void pointer.
@@ -425,7 +438,8 @@ let ivk_to_pkd ivk diversifier =
       (Ctypes.ocaml_bytes_start (of_diversifier diversifier))
       (Ctypes.ocaml_bytes_start pkd)
   in
-  if res then Some (to_pkd pkd) else None
+  assert res ;
+  to_pkd pkd
 
 let generate_r () =
   let res = Bytes.create 32 in
@@ -448,7 +462,8 @@ let compute_nf diversifier pk_d ~amount r ak nk ~position =
         (Unsigned.UInt64.of_int64 position)
         (Ctypes.ocaml_bytes_start nf)
     in
-    if res then Some (to_nullifier nf) else None
+    assert res ;
+    to_nullifier nf
 
 let compute_cm diversifier pk_d ~amount rcm =
   if not (valid_amount amount) then invalid_arg "amount"
@@ -462,7 +477,8 @@ let compute_cm diversifier pk_d ~amount rcm =
         (Ctypes.ocaml_bytes_start (of_rcm rcm))
         (Ctypes.ocaml_bytes_start cm)
     in
-    if res then Some (to_commitment cm) else None
+    assert res ;
+    to_commitment cm
 
 let ka_agree (p : Bytes.t) (sk : Bytes.t) =
   let ka = Bytes.create 32 in
@@ -472,7 +488,8 @@ let ka_agree (p : Bytes.t) (sk : Bytes.t) =
       (Ctypes.ocaml_bytes_start sk)
       (Ctypes.ocaml_bytes_start ka)
   in
-  if res then Some (to_symkey ka) else None
+  assert res ;
+  to_symkey ka
 
 let ka_agree_sender (p : pkd) (sk : esk) = ka_agree (of_pkd p) (of_esk sk)
 
@@ -486,7 +503,8 @@ let ka_derivepublic diversifier esk =
       (Ctypes.ocaml_bytes_start (of_esk esk))
       (Ctypes.ocaml_bytes_start epk)
   in
-  if res then Some (to_epk epk) else None
+  assert res ;
+  to_epk epk
 
 let spend_sig ask ar sighash =
   let signature = Bytes.create 64 in
@@ -497,7 +515,8 @@ let spend_sig ask ar sighash =
       (Ctypes.ocaml_bytes_start (of_sighash sighash))
       (Ctypes.ocaml_bytes_start signature)
   in
-  if res then Some (to_spend_sig signature) else None
+  assert res ;
+  to_spend_sig signature
 
 type proving_ctx = unit Ctypes_static.ptr
 
@@ -548,7 +567,8 @@ let spend_proof ctx ak nsk diversifier rcm ar ~amount ~root ~witness =
         (Ctypes.ocaml_bytes_start rk)
         (Ctypes.ocaml_bytes_start zkproof)
     in
-    if res then Some (to_cv cv, to_rk rk, to_spend_proof zkproof) else None
+    assert res ;
+    (to_cv cv, to_rk rk, to_spend_proof zkproof)
 
 let check_spend verification_ctx cv root nullifier rk spend_proof spend_sig
     sighash =
@@ -573,7 +593,8 @@ let make_binding_sig ctx ~balance sighash =
         (Ctypes.ocaml_bytes_start (of_sighash sighash))
         (Ctypes.ocaml_bytes_start binding_sig)
     in
-    if res then Some (to_binding_sig binding_sig) else None
+    assert res ;
+    to_binding_sig binding_sig
 
 let output_proof ctx esk diversifier pk_d rcm ~amount =
   if not (valid_amount amount) then invalid_arg "amount"
@@ -593,7 +614,8 @@ let output_proof ctx esk diversifier pk_d rcm ~amount =
         (Ctypes.ocaml_bytes_start cv)
         (Ctypes.ocaml_bytes_start zkproof)
     in
-    if res then Some (to_cv cv, to_output_proof zkproof) else None
+    assert res ;
+    (to_cv cv, to_output_proof zkproof)
 
 let check_output verification_ctx cv commitment epk output_proof =
   RS.sapling_check_output
@@ -638,7 +660,11 @@ let zip32_xfvk_address xfvk j =
     let pkd = Bytes.create 32 in
     Bytes.blit addr 0 diversifier 0 11 ;
     Bytes.blit addr 11 pkd 0 32 ;
-    Some (to_diversifier_index j_ret, to_diversifier diversifier, to_pkd pkd) )
+    let diversifier =
+      (* This value is returned from the lib, it is a valid diversifier *)
+      WithExceptions.Option.get ~loc:__LOC__ @@ to_diversifier diversifier
+    in
+    Some (to_diversifier_index j_ret, diversifier, to_pkd pkd) )
   else None
 
 let to_scalar input =
@@ -669,7 +695,8 @@ let zip32_xfvk_derive parent index =
       (Unsigned.UInt32.of_int32 index)
       (Ctypes.ocaml_bytes_start derived)
   in
-  if res then Some (to_zip32_full_viewing_key derived) else None
+  assert res ;
+  to_zip32_full_viewing_key derived
 
 exception Params_not_found of string list
 

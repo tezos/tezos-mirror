@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Synchronization state, prevalidator status
+   Invocation:   dune exec tezt/tests/main.exe -- -v --file synchronisation_heuristic.ml
+   Subject:      Check synchronization state and prevalidator status
+*)
+
 open Base
 
 let wait_for_sync node =
@@ -40,13 +47,13 @@ let wait_for_sync node =
    synchronize themselves. Then we restart all the nodes and check
    they are all in the state mode `sync`. *)
 
-let check_node_synchronization_state () =
+let check_node_synchronization_state protocol =
   let n = 4 in
   let blocks_to_bake = 5 in
   Test.register
     ~__FILE__
-    ~title:"Check synchronization state"
-    ~tags:["bootstrap"; "node"; "sync"]
+    ~title:(sf "%s: check synchronization state" (Protocol.name protocol))
+    ~tags:[Protocol.tag protocol; "bootstrap"; "node"; "sync"]
   @@ fun () ->
   let* main_node = Node.init ~name:"main_node" [] in
   let* nodes =
@@ -54,12 +61,13 @@ let check_node_synchronization_state () =
       (fun i -> Node.init ~name:("node" ^ string_of_int i) [])
       (range 1 n)
   in
-  Log.info "%d nodes initiated." (n + 1) ;
+  Log.info "%d nodes initialized." (n + 1) ;
   let* client = Client.init ~node:main_node () in
   let* () =
     Client.activate_protocol
-      client
+      ~protocol
       ~timestamp_delay:(float_of_int blocks_to_bake)
+      client
   in
   Log.info "Activated protocol." ;
   let* () = repeat blocks_to_bake (fun () -> Client.bake_for client) in
@@ -88,4 +96,80 @@ let check_node_synchronization_state () =
   in
   unit
 
-let register () = check_node_synchronization_state ()
+(* In order to check that the prevalidator is not alive, we cannot
+   rely on events because it's indecidable, thus we query a RPC that
+   is reachable only if the prevalidator is running. *)
+let check_is_prevalidator_started node =
+  let client = Client.create ~node () in
+  let process =
+    Client.spawn_rpc
+      GET
+      (String.split_on_char '/' "chains/main/mempool/filter")
+      client
+  in
+  Process.check ~expect_failure:false process
+
+let check_is_prevalidator_closed node =
+  let client = Client.create ~node () in
+  let process =
+    Client.spawn_rpc
+      GET
+      (String.split_on_char '/' "chains/main/mempool/filter")
+      client
+  in
+  Process.check ~expect_failure:true process
+
+(* This test starts 3 nodes and test whether or not their prevalidator
+   activates. They should not be activated until they are
+   bootstrapped. The first node activates alpha and bake a few
+   blocks. All nodes synchronize themselves and we check if their
+   validator are activated:
+   - node 1 and 2 have bootstrapped successfully at the end and their validator
+     is expected to have started,
+   - node 3 has a synchronisation heuristic that is too high to successfully
+     bootstrap in this test scenario: its validator is expected to not have
+     started. *)
+let check_prevalidator_start protocol =
+  Test.register
+    ~__FILE__
+    ~title:"Check prevalidator start"
+    ~tags:["bootstrap"; "node"; "prevalidator"]
+  @@ fun () ->
+  let init_node threshold = Node.init [Synchronisation_threshold threshold] in
+  let* node1 = init_node 0 in
+  let* node2 = init_node 1 in
+  let* node3 = init_node 10 in
+  let nodes = [node1; node2; node3] in
+  Log.info "%d nodes initialized." 3 ;
+  let waiter_sync =
+    Lwt_list.iter_p (fun node -> wait_for_sync node) [node1; node2]
+  in
+  let* client = Client.init ~node:node1 () in
+  let* () = Client.activate_protocol ~protocol client ~timestamp_delay:3600. in
+  Log.info "Activated protocol." ;
+  let* () = Client.bake_for ~minimal_timestamp:false client in
+  let connect node node' =
+    Log.info "%s connects to %s." (Node.name node) (Node.name node') ;
+    Client.Admin.connect_address client ~peer:node'
+  in
+  let* () = connect node1 node2 in
+  let* () = connect node2 node3 in
+  let* () = connect node1 node3 in
+  let* () =
+    Lwt_list.iter_p
+      (fun node ->
+        let* _ = Node.wait_for_level node 1 in
+        unit)
+      nodes
+  in
+  Log.info "Waiting for nodes to be synchronized." ;
+  let* () = waiter_sync in
+  Log.info "Asserting that the prevalidator started for node 2." ;
+  let* () = check_is_prevalidator_started node2 in
+  Log.info "Asserting that the prevalidator did not start for node 3." ;
+  let* () = check_is_prevalidator_closed node3 in
+  unit
+
+let register protocol =
+  check_node_synchronization_state protocol ;
+  check_prevalidator_start protocol

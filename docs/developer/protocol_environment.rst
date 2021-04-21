@@ -3,7 +3,7 @@
 Economic protocol sandboxing
 ============================
 
-In protocol Alpha, as in any sound future protocols, updates are approved by
+In the currently active protocol, as in any sound future protocols, updates are approved by
 voting. That way, the responsibility of switching to a new protocol code
 is the responsibility of voters, and one could argue that it is up to
 them to check that the code does not call, for instance, unsafe array

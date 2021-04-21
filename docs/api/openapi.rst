@@ -25,15 +25,20 @@ Shell RPCs
 The node provide some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `openapi/rpc-openapi.json (version 7.5) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- `openapi/rpc-openapi.json (version 8.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
-Delphi RPCs
--------------
+Edo RPCs
+--------
 
-The OpenAPI specification for RPCs which are specific
-to the Delphi protocol can be found at:
+The OpenAPI specification for RPCs which are specific to the Edo
+protocol can be found at:
 
-- `openapi/delphi-openapi.json (version 7.5) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/delphi-openapi.json>`_
+- `openapi/edo-openapi.json (version 8.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/edo-openapi.json>`_
+
+The OpenAPI specification for RPCs which are related to the mempool
+and specific to the Edo protocol can be found at:
+
+- `openapi/edo-mempool-openapi.json (version 8.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/edo-mempool-openapi.json>`_
 
 How to Generate
 ---------------

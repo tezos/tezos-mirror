@@ -1,0 +1,34 @@
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[bls12_381_fr_to_mutez.tz-0-0x10-16]
+
+storage
+  16
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 6 (remaining gas: 1039988.655 units remaining)
+    [ (Pair 0x1000000000000000000000000000000000000000000000000000000000000000 0)  	 ]
+  - location: 7 (remaining gas: 1039988.575 units remaining)
+    [ 0x1000000000000000000000000000000000000000000000000000000000000000  	@parameter ]
+  - location: 8 (remaining gas: 1039988.515 units remaining)
+    [ 16  	 ]
+  - location: 9 (remaining gas: 1039988.435 units remaining)
+    [ (Some 16)  	 ]
+  - location: 16 (remaining gas: 1039988.300 units remaining)
+    [ 16  	@some ]
+  - location: 10 (remaining gas: 1039988.255 units remaining)
+    [ 16  	@some ]
+  - location: 17 (remaining gas: 1039988.180 units remaining)
+    [ 1  	
+      16  	@some ]
+  - location: 20 (remaining gas: 1039987.817 units remaining)
+    [ 16  	 ]
+  - location: 21 (remaining gas: 1039987.742 units remaining)
+    [ {}  	
+      16  	 ]
+  - location: 23 (remaining gas: 1039987.667 units remaining)
+    [ (Pair {} 16)  	 ]
+  - location: -1 (remaining gas: 1039987.622 units remaining)
+    [ (Pair {} 16)  	 ]
+

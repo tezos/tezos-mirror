@@ -24,43 +24,59 @@
 (*****************************************************************************)
 
 module type CONTEXT = sig
-  type t
+  (** @inline *)
+  include Environment_context_intf.S
+end
 
-  type key = string list
+module type VIEW = sig
+  (** @inline *)
+  include Environment_context_intf.VIEW
+end
 
-  type value = Bytes.t
+module type TREE = sig
+  (** @inline *)
+  include Environment_context_intf.TREE
+end
 
-  val mem : t -> key -> bool Lwt.t
+module Equality_witness : sig
+  type (_, _) eq = Refl : ('a, 'a) eq
 
-  val dir_mem : t -> key -> bool Lwt.t
+  type 'a t
 
-  val get : t -> key -> value option Lwt.t
+  val make : unit -> 'a t
 
-  val set : t -> key -> value -> t Lwt.t
+  val eq : 'a t -> 'b t -> ('a, 'b) eq option
 
-  val copy : t -> from:key -> to_:key -> t option Lwt.t
-
-  val remove_rec : t -> key -> t Lwt.t
-
-  type key_or_dir = [`Key of key | `Dir of key]
-
-  val fold :
-    t -> key -> init:'a -> f:(key_or_dir -> 'a -> 'a Lwt.t) -> 'a Lwt.t
-
-  val set_protocol : t -> Protocol_hash.t -> t Lwt.t
-
-  val fork_test_chain :
-    t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
+  val hash : 'a t -> int
 end
 
 module Context : sig
-  type 'ctxt ops = (module CONTEXT with type t = 'ctxt)
+  type ('ctxt, 'tree) ops =
+    (module CONTEXT with type t = 'ctxt and type tree = 'tree)
 
-  type _ kind = ..
+  type _ kind = private ..
 
-  type t = Context : {kind : 'a kind; ctxt : 'a; ops : 'a ops} -> t
+  type ('a, 'b) equality_witness
+
+  type t =
+    | Context : {
+        kind : 'a kind;
+        impl_name : string;
+        ctxt : 'a;
+        ops : ('a, 'b) ops;
+        equality_witness : ('a, 'b) equality_witness;
+      }
+        -> t
 
   include CONTEXT with type t := t
+end
+
+module Register (C : CONTEXT) : sig
+  type _ Context.kind += Context : C.t Context.kind
+
+  val equality_witness : (C.t, C.tree) Context.equality_witness
+
+  val ops : (C.t, C.tree) Context.ops
 end
 
 type validation_result = {
@@ -78,3 +94,5 @@ type rpc_context = {
   block_header : Block_header.shell_header;
   context : Context.t;
 }
+
+val err_implementation_mismatch : expected:string -> got:string -> 'a

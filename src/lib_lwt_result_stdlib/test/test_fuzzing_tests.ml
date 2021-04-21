@@ -25,8 +25,7 @@
 
 open Traits
 open Test_fuzzing_helpers
-open Lwt.Infix
-open Lwtreslib.Seq.Monad
+open Support.Lib.Monad
 
 (* In the following, in order to reduce the time, output and complexity and
    testing, we only test for the most general case (i.e., when testing an
@@ -44,7 +43,7 @@ open Lwtreslib.Seq.Monad
    person debugging the code to write additional specialised tests. *)
 
 module TestIterFold (M : sig
-  include BASE with type 'a elt := int
+  include Traits.BASE with type 'a elt := int
 
   include Traits.ITER_SEQUENTIAL with type 'a elt := int and type 'a t := int t
 
@@ -156,8 +155,11 @@ struct
       [Fn.arith_es; one; many]
       (fun fn const input ->
         let input = M.of_list input in
-        let fn = MapEPOf.fn_es const fn in
-        eq_es (M.map_ep fn input >|=? M.rev) (M.rev_map_ep fn input))
+        let fn_ep = MapEPOf.fn_ep const fn in
+        eq_ep
+          ~pp:M.pp
+          (M.map_ep fn_ep input >|=? M.rev)
+          (M.rev_map_ep fn_ep input))
 end
 
 module TestIterAgainstStdlibList (M : sig
@@ -211,6 +213,61 @@ struct
           (let acc = ref init in
            M.iter_es (IterESOf.fn acc fn) (M.of_list input) >|=? fun () -> !acc)
           (Lwt.return_ok @@ with_stdlib_iter fn init input))
+end
+
+module TestIteriAgainstStdlibList (M : sig
+  include BASE with type 'a elt := int
+
+  include
+    Traits.ITERI_SEQUENTIAL with type 'a elt := int and type 'a t := int t
+end) =
+struct
+  let with_stdlib_iteri fn init input =
+    let acc = ref init in
+    Stdlib.List.iteri (IteriOf.fn acc fn) input ;
+    !acc
+
+  let () =
+    Crowbar.add_test
+      ~name:(Format.asprintf "%s.iteri, Stdlib.List.iteri" M.name)
+      [Fn.arith; one; many]
+      (fun fn init input ->
+        eq
+          (let acc = ref init in
+           M.iteri (IteriOf.fn acc fn) (M.of_list input) ;
+           !acc)
+          (with_stdlib_iteri fn init input))
+
+  let () =
+    Crowbar.add_test
+      ~name:(Format.asprintf "%s.iteri_e, Stdlib.List.iteri" M.name)
+      [Fn.arith; one; many]
+      (fun fn init input ->
+        eq_e
+          (let acc = ref init in
+           M.iteri_e (IteriEOf.fn acc fn) (M.of_list input) >|? fun () -> !acc)
+          (Ok (with_stdlib_iteri fn init input)))
+
+  let () =
+    Crowbar.add_test
+      ~name:(Format.asprintf "%s.iteri_s, Stdlib.List.iteri" M.name)
+      [Fn.arith; one; many]
+      (fun fn init input ->
+        eq_s
+          (let acc = ref init in
+           M.iteri_s (IteriSOf.fn acc fn) (M.of_list input) >|= fun () -> !acc)
+          (Lwt.return @@ with_stdlib_iteri fn init input))
+
+  let () =
+    Crowbar.add_test
+      ~name:(Format.asprintf "%s.iteri_es, Stdlib.List.iteri" M.name)
+      [Fn.arith; one; many]
+      (fun fn init input ->
+        eq_es
+          (let acc = ref init in
+           M.iteri_es (IteriESOf.fn acc fn) (M.of_list input)
+           >|=? fun () -> !acc)
+          (Lwt.return_ok @@ with_stdlib_iteri fn init input))
 end
 
 module TestIterMonotoneAgainstStdlibList (M : sig

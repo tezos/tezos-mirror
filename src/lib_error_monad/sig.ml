@@ -185,8 +185,32 @@ module type TRACE = sig
                | Ok handle -> Ok handle
                | Error error -> Error (cons error trace)
       ]
-  *)
+
+      When you are within the error monad itself, you should build traces using
+      the [record_trace], [trace], [record_trace_eval] and [trace_eval]
+      functions directly. You should rarely need to build traces manually using
+      [cons]. This here function can be useful in the case where you are at the
+      interface of the error monad. *)
   val cons : 'error -> 'error trace -> 'error trace
+
+  (** [cons_list error errors] is the sequential composition of all the errors
+      passed as parameters. It is equivalent to folding [cons] over
+      [List.rev error :: errors] but more efficient.
+
+      Note that [error] and [errors] are separated as parameters to enforce that
+      empty traces cannot be constructed. The recommended use is:
+{[
+   match all_errors with
+   | [] -> Ok () (* or something else depending on the context *)
+   | error :: errors -> Error (cons_list error errors)
+]}
+
+      When you are within the error monad itself, you should build traces using
+      the [record_trace], [trace], [record_trace_eval] and [trace_eval]
+      functions directly. You should rarely need to build traces manually using
+      [cons_list]. This here function can be useful in the case where you are at
+      the interface of the error monad. *)
+  val cons_list : 'error -> 'error list -> 'error trace
 
   (** [conp t1 t2] (construct parallel) construct a parallel trace. This is for
       tracing events/failure/things that happen concurrently, in parallel, or
@@ -200,8 +224,30 @@ module type TRACE = sig
          | Error trace, Ok _ | Ok _, Error trace -> Error trace
          | Error trace1, Error trace2 -> Error (conp trace1 trace2)
       ]
-  *)
+
+      When you are within the error monad itself, you should rarely need to
+      build traces manually using [conp]. The result-concurrent traversors will
+      return parallel traces when appropriate, and so will [join_e], [join_ep],
+      [both_e], [both_ep], [all_e] and [all_ep]. *)
   val conp : 'error trace -> 'error trace -> 'error trace
+
+  (** [conp_list trace traces] is the parallel composition of all the traces
+      passed as parameters. It is equivalent to [List.fold_left conp trace traces]
+      but more efficient.
+
+      Note that [trace] and [traces] are separated as parameters to enforce that
+      empty traces cannot be constructed. The recommended use is:
+{[
+   match all_traces with
+   | [] -> Ok () (* or something else depending on the context *)
+   | trace :: traces -> Error (conp_list trace traces)
+]}
+
+      When you are within the error monad itself, you should rarely need to
+      build traces manually using [conp]. The result-concurrent traversors will
+      return parallel traces when appropriate, and so will [join_e], [join_ep],
+      [both_e], [both_ep], [all_e] and [all_ep]. *)
+  val conp_list : 'err trace -> 'err trace list -> 'err trace
 
   (** [pp_print] pretty-prints a trace of errors *)
   val pp_print :
@@ -367,140 +413,6 @@ module type MONAD = sig
     ('trace -> unit) ->
     (unit -> (unit, 'trace) result Lwt.t) ->
     unit
-
-  (** {2 In-monad list iterators} *)
-
-  (** A {!List.iter} in the monad *)
-  val iter : ('a -> (unit, 'trace) result) -> 'a list -> (unit, 'trace) result
-
-  val iter_s :
-    ('a -> (unit, 'trace) result Lwt.t) ->
-    'a list ->
-    (unit, 'trace) result Lwt.t
-
-  val iter_p :
-    ('a -> (unit, 'err trace) result Lwt.t) ->
-    'a list ->
-    (unit, 'err trace) result Lwt.t
-
-  val iteri_p :
-    (int -> 'a -> (unit, 'err trace) result Lwt.t) ->
-    'a list ->
-    (unit, 'err trace) result Lwt.t
-
-  (** @raise [Invalid_argument] if provided two lists of different lengths. *)
-  val iter2_p :
-    ('a -> 'b -> (unit, 'err trace) result Lwt.t) ->
-    'a list ->
-    'b list ->
-    (unit, 'err trace) result Lwt.t
-
-  (** @raise [Invalid_argument] if provided two lists of different lengths. *)
-  val iteri2_p :
-    (int -> 'a -> 'b -> (unit, 'err trace) result Lwt.t) ->
-    'a list ->
-    'b list ->
-    (unit, 'err trace) result Lwt.t
-
-  (** A {!List.map} in the monad *)
-  val map : ('a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
-
-  val mapi :
-    (int -> 'a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
-
-  val map_s :
-    ('a -> ('b, 'trace) result Lwt.t) ->
-    'a list ->
-    ('b list, 'trace) result Lwt.t
-
-  val rev_map_s :
-    ('a -> ('b, 'trace) result Lwt.t) ->
-    'a list ->
-    ('b list, 'trace) result Lwt.t
-
-  val map_p :
-    ('a -> ('b, 'err trace) result Lwt.t) ->
-    'a list ->
-    ('b list, 'err trace) result Lwt.t
-
-  val mapi_s :
-    (int -> 'a -> ('b, 'trace) result Lwt.t) ->
-    'a list ->
-    ('b list, 'trace) result Lwt.t
-
-  val mapi_p :
-    (int -> 'a -> ('b, 'err trace) result Lwt.t) ->
-    'a list ->
-    ('b list, 'err trace) result Lwt.t
-
-  (** A {!List.map2} in the monad.
-
-      @raise [Invalid_argument] if provided two lists of different lengths. *)
-  val map2 :
-    ('a -> 'b -> ('c, 'trace) result) ->
-    'a list ->
-    'b list ->
-    ('c list, 'trace) result
-
-  (** @raise [Invalid_argument] if provided two lists of different lengths. *)
-  val mapi2 :
-    (int -> 'a -> 'b -> ('c, 'trace) result) ->
-    'a list ->
-    'b list ->
-    ('c list, 'trace) result
-
-  (** @raise [Invalid_argument] if provided two lists of different lengths. *)
-  val map2_s :
-    ('a -> 'b -> ('c, 'trace) result Lwt.t) ->
-    'a list ->
-    'b list ->
-    ('c list, 'trace) result Lwt.t
-
-  (** @raise [Invalid_argument] if provided two lists of different lengths. *)
-  val mapi2_s :
-    (int -> 'a -> 'b -> ('c, 'trace) result Lwt.t) ->
-    'a list ->
-    'b list ->
-    ('c list, 'trace) result Lwt.t
-
-  (** A {!List.filter_map} in the monad *)
-  val filter_map_s :
-    ('a -> ('b option, 'trace) result Lwt.t) ->
-    'a list ->
-    ('b list, 'trace) result Lwt.t
-
-  val filter_map_p :
-    ('a -> ('b option, 'err trace) result Lwt.t) ->
-    'a list ->
-    ('b list, 'err trace) result Lwt.t
-
-  (** A {!List.filter} in the monad *)
-  val filter :
-    ('a -> (bool, 'trace) result) -> 'a list -> ('a list, 'trace) result
-
-  val filter_s :
-    ('a -> (bool, 'trace) result Lwt.t) ->
-    'a list ->
-    ('a list, 'trace) result Lwt.t
-
-  val filter_p :
-    ('a -> (bool, 'err trace) result Lwt.t) ->
-    'a list ->
-    ('a list, 'err trace) result Lwt.t
-
-  (** A {!List.fold_left} in the monad *)
-  val fold_left_s :
-    ('a -> 'b -> ('a, 'trace) result Lwt.t) ->
-    'a ->
-    'b list ->
-    ('a, 'trace) result Lwt.t
-
-  (** A {!List.fold_right} in the monad *)
-  val fold_right_s :
-    ('a -> 'b -> ('b, 'trace) result Lwt.t) ->
-    'a list ->
-    'b ->
-    ('b, 'trace) result Lwt.t
 
   (** A few aliases for Lwt functions *)
   val join_p : unit Lwt.t list -> unit Lwt.t

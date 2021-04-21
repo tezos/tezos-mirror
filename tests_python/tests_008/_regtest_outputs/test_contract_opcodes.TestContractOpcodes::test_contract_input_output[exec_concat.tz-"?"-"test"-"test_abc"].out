@@ -1,0 +1,54 @@
+tests_008/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[exec_concat.tz-"?"-"test"-"test_abc"]
+
+storage
+  "test_abc"
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 6 (remaining gas: 1039986.418 units remaining)
+    [ (Pair "test" "?")  	 ]
+  - location: 7 (remaining gas: 1039986.278 units remaining)
+    [ "test"  	@parameter ]
+  - location: 8 (remaining gas: 1039986.138 units remaining)
+    [ { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	
+      "test"  	@parameter ]
+  - location: 22 (remaining gas: 1039986.008 units remaining)
+    [ "test"  	@parameter
+      { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	 ]
+  - location: 11 (remaining gas: 1039985.848 units remaining)
+    [ "test"  	@arg ]
+  - location: 12 (remaining gas: 1039985.708 units remaining)
+    [ "_abc"  	
+      "test"  	@arg ]
+  - location: 15 (remaining gas: 1039985.568 units remaining)
+    [ {}  	
+      "_abc"  	
+      "test"  	@arg ]
+  - location: 17 (remaining gas: 1039985.438 units remaining)
+    [ "_abc"  	
+      {}  	
+      "test"  	@arg ]
+  - location: 18 (remaining gas: 1039985.298 units remaining)
+    [ { "_abc" }  	
+      "test"  	@arg ]
+  - location: 19 (remaining gas: 1039985.168 units remaining)
+    [ "test"  	@arg
+      { "_abc" }  	 ]
+  - location: 20 (remaining gas: 1039985.028 units remaining)
+    [ { "test" ; "_abc" }  	 ]
+  - location: 21 (remaining gas: 1039984.848 units remaining)
+    [ "test_abc"  	 ]
+  - location: -1 (remaining gas: 1039984.778 units remaining)
+    [ "test_abc"  	 ]
+  - location: 23 (remaining gas: 1039984.778 units remaining)
+    [ "test_abc"  	 ]
+  - location: 24 (remaining gas: 1039984.638 units remaining)
+    [ {}  	
+      "test_abc"  	 ]
+  - location: 26 (remaining gas: 1039984.498 units remaining)
+    [ (Pair {} "test_abc")  	 ]
+  - location: -1 (remaining gas: 1039984.428 units remaining)
+    [ (Pair {} "test_abc")  	 ]
+

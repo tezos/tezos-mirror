@@ -70,6 +70,8 @@ let ( =~* ) s r =
   | Some group ->
       Some (Re.Group.get group 1)
 
+let replace_string = Re.replace_string
+
 let async_promises = ref []
 
 let async promise = async_promises := promise :: !async_promises
@@ -95,9 +97,9 @@ let with_open_in file read_f =
   try (let value = read_f chan in close_in chan; value)
   with x -> close_in chan; raise x
 
-let read_all io =
-  let stream = Lwt_io.read_lines io in
-  let buffer = Buffer.create 1024 in
-  let* () = Lwt_stream.iter (Buffer.add_string buffer) stream in
-  let result = Buffer.contents buffer in
-  Buffer.reset buffer ; return result
+let read_file filename =
+  let* ic = Lwt_io.open_file ~mode:Lwt_io.Input filename in
+  Lwt_io.read ic
+
+module String_map = Map.Make (String)
+module String_set = Set.Make (String)

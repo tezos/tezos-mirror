@@ -24,14 +24,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Shell
+    Invocation:   dune build @src/lib_shell/runtest
+    Subject:      Entrypoint
+*)
+
 let () =
   Alcotest_lwt.run
+    ~verbose:true
     "tezos-shell"
     [ ("store", Test_store.tests);
       ("state", Test_state.tests);
       ("store checkpoint", Test_store_checkpoint.tests);
       ("state checkpoint", Test_state_checkpoint.tests);
       ("synchronisation heuristic", Test_synchronisation_heuristic.tests);
+      ("consensus heuristic sync", Test_consensus_heuristic.tests);
+      ("consensus heuristic", Test_consensus_heuristic.tests_lwt);
       ("test protocol validator", Test_protocol_validator.tests);
       ("test validator", Test_validator.tests);
       ("test node", Test_node.tests) ]

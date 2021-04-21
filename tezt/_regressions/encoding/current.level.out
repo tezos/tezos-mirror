@@ -1,0 +1,14 @@
+tezt/_regressions/encoding/current.level.out
+
+./tezos-codec encode 008-PtEdo2Zk.level from '{
+  "level": 1331,
+  "level_position": 2147483647,
+  "cycle": 300,
+  "cycle_position": 600,
+  "expected_commitment": true
+}'
+000005337fffffff0000012c00000258ff
+
+./tezos-codec decode 008-PtEdo2Zk.level from 000005337fffffff0000012c00000258ff
+{ "level": 1331, "level_position": 2147483647, "cycle": 300,
+  "cycle_position": 600, "expected_commitment": true }

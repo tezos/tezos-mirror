@@ -146,7 +146,7 @@ module type T = sig
 
   val to_binding_sig : Bytes.t -> binding_sig
 
-  val to_diversifier : Bytes.t -> diversifier
+  val to_diversifier : Bytes.t -> diversifier option
 
   val to_diversifier_index : Bytes.t -> diversifier_index
 

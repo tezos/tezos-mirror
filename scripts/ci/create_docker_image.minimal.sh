@@ -16,7 +16,7 @@ cd "$src_dir"
 # identified by the prefix "minimal--" followed by the same
 # commit reference of the build image.
 
-image_name="${1:-tezos}"
+image_name="${1:-tezos-}"
 image_version="${2:-latest}"
 build_image="${3:-tezos_build}"
 base_image="${4:-registry.gitlab.com/tezos/opam-repository}"
@@ -29,7 +29,7 @@ echo "### Building minimal docker images..."
 echo
 
 docker build \
-  -t "$image_name-debug:$image_version" \
+  -t "${image_name}debug:$image_version" \
   --build-arg "BASE_IMAGE=$base_image" \
   --build-arg "BASE_IMAGE_VERSION=$base_version" \
   --build-arg "BASE_IMAGE_VERSION_NON_MIN=$base_build_version" \
@@ -40,11 +40,11 @@ docker build \
   "$src_dir"
 
 echo
-echo "### Successfully build docker image: $image_name-debug:$image_version"
+echo "### Successfully build docker image: ${image_name}debug:$image_version"
 echo
 
 docker build \
-  -t "$image_name-bare:$image_version" \
+  -t "${image_name}bare:$image_version" \
   --build-arg "BASE_IMAGE=$base_image" \
   --build-arg "BASE_IMAGE_VERSION=$base_version" \
   --build-arg "BUILD_IMAGE=${build_image}" \
@@ -56,11 +56,11 @@ docker build \
 
 
 echo
-echo "### Successfully build docker image: $image_name-bare:$image_version"
+echo "### Successfully build docker image: ${image_name}bare:$image_version"
 echo
 
 docker build \
-  -t "$image_name:$image_version" \
+  -t "${image_name%?}:$image_version" \
   --build-arg "BASE_IMAGE=$base_image" \
   --build-arg "BASE_IMAGE_VERSION=$base_version" \
   --build-arg "BUILD_IMAGE=${build_image}" \
@@ -70,5 +70,5 @@ docker build \
   "$src_dir"
 
 echo
-echo "### Successfully build docker image: $image_name:$image_version"
+echo "### Successfully build docker image: ${image_name%?}:$image_version"
 echo

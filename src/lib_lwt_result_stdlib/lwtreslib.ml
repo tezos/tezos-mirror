@@ -23,7 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Seq = Lib.Seq
-module Set = Lib.Set
-module Map = Lib.Map
-module Hashtbl = Lib.Hashtbl
+module Bare = struct
+  module Hashtbl = Bare_structs.Hashtbl
+  module List = Bare_structs.List
+  module Map = Bare_structs.Map
+  module Monad = Bare_structs.Monad
+  module Option = Bare_structs.Option
+  module Result = Bare_structs.Result
+  module Seq = Bare_structs.Seq
+  module Set = Bare_structs.Set
+  module WithExceptions = Bare_structs.WithExceptions
+end
+
+module Traced (Trace : Traced_sigs.Trace.S) =
+  Traced_structs.Structs.Make (Trace)

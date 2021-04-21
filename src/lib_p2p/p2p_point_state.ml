@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -68,6 +69,7 @@ module Info = struct
     mutable last_disconnection : (P2p_peer.Id.t * Time.System.t) option;
     mutable reconnection_info : reconnection_info option;
     events : Pool_event.t Ringo.Ring.t;
+    mutable expected_peer_id : P2p_peer.Id.t option;
     watchers : Pool_event.t Lwt_watcher.input;
   }
 
@@ -127,7 +129,7 @@ module Info = struct
             Time.System.Span.encoding
             default_reconnection_config.increase_cap))
 
-  let create ?(trusted = false) addr port =
+  let create ?(trusted = false) ?expected_peer_id addr port =
     {
       point = (addr, port);
       trusted;
@@ -140,6 +142,7 @@ module Info = struct
       events = Ringo.Ring.create log_size;
       reconnection_info = None;
       watchers = Lwt_watcher.create_input ();
+      expected_peer_id;
     }
 
   let point s = s.point
@@ -151,6 +154,8 @@ module Info = struct
   let unset_trusted gi = gi.trusted <- false
 
   let reset_reconnection_delay gi = gi.reconnection_info <- None
+
+  let get_expected_peer_id gi = gi.expected_peer_id
 
   let last_established_connection s = s.last_established_connection
 
@@ -201,7 +206,7 @@ module Info = struct
   let log_incoming_rejection ~timestamp point_info peer_id =
     log point_info ~timestamp (Rejecting_request peer_id)
 
-  let fold {events; _} ~init ~f = Ringo.Ring.fold events ~init ~f
+  let events {events; _} = Ringo.Ring.elements events
 
   let watch {watchers; _} = Lwt_watcher.create_stream watchers
 end
@@ -306,3 +311,8 @@ let set_disconnected ~timestamp ?(requested = false) reconnection_config
   in
   point_info.state <- Disconnected ;
   Info.log point_info ~timestamp event
+
+let set_expected_peer_id point_info id =
+  point_info.Info.expected_peer_id <- Some id
+
+let get_expected_peer_id point_info = point_info.Info.expected_peer_id

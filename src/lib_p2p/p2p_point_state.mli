@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -57,9 +58,16 @@ module Info : sig
   val reconnection_config_encoding : reconnection_config Data_encoding.encoding
 
   (** [create ~trusted addr port] is a freshly minted point_info. If
-      [trusted] is true, this point is considered trusted and will
-      be treated as such. *)
-  val create : ?trusted:bool -> P2p_addr.t -> P2p_addr.port -> 'conn point_info
+     [trusted] is true, this point is considered trusted and will be
+     treated as such. If [expected_peer_id] is specified, we check
+     during a connection that the [id] received is the same as the
+     [expected_peer_id]. *)
+  val create :
+    ?trusted:bool ->
+    ?expected_peer_id:P2p_peer.Id.t ->
+    P2p_addr.t ->
+    P2p_addr.port ->
+    'conn point_info
 
   (** [trusted pi] is [true] iff [pi] has is trusted,
       i.e. "whitelisted". *)
@@ -72,6 +80,9 @@ module Info : sig
   val set_trusted : 'conn point_info -> unit
 
   val unset_trusted : 'conn point_info -> unit
+
+  (** Return the [expected_peer_id] given to [create]. *)
+  val get_expected_peer_id : 'conn point_info -> P2p_peer.Id.t option
 
   val last_failed_connection : 'conn point_info -> Time.System.t option
 
@@ -107,8 +118,8 @@ module Info : sig
   (* [can_reconnect] Check if a point is greylisted w.r.t. the current time *)
   val can_reconnect : now:Time.System.t -> 'conn point_info -> bool
 
-  (* [reconnection_time] Return the time at which the node can try to 
-     reconnect with this point, Or None if the point is already in state 
+  (* [reconnection_time] Return the time at which the node can try to
+     reconnect with this point, Or None if the point is already in state
      running or can be recontacted immediately *)
   val reconnection_time : 'conn point_info -> Time.System.t option
 
@@ -117,7 +128,7 @@ module Info : sig
   val log_incoming_rejection :
     timestamp:Time.System.t -> 'conn point_info -> P2p_peer.Id.t -> unit
 
-  val fold : 'conn t -> init:'a -> f:('a -> Pool_event.t -> 'a) -> 'a
+  val events : 'conn t -> Pool_event.t list
 
   val watch : 'conn t -> Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
 end
@@ -149,3 +160,9 @@ val set_disconnected :
   Info.reconnection_config ->
   'conn Info.t ->
   unit
+
+(** [set_expected_peer_id point_info peer_id] associates an expected
+   [peer_id] to [point_info]. *)
+val set_expected_peer_id : 'conn Info.t -> P2p_peer.Id.t -> unit
+
+val get_expected_peer_id : 'conn Info.t -> P2p_peer.Id.t option

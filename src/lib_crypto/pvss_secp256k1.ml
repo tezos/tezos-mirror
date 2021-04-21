@@ -64,3 +64,22 @@ module G : Pvss.CYCLIC_GROUP = struct
 end
 
 include Pvss.MakePvss (G)
+
+let convert_encoding de1 de2 x =
+  Data_encoding.Binary.of_bytes_exn
+    de2
+    (Data_encoding.Binary.to_bytes_exn de1 x)
+
+let generate_keys ?(seed = Hacl.Rand.gen 32) () =
+  let s =
+    Secp256k1_group.Group.Scalar.of_bits_exn
+      (Bigstring.of_bytes seed |> Bigstring.to_string)
+  in
+  let sk =
+    convert_encoding
+      Secp256k1_group.Group.Scalar.encoding
+      Secret_key.encoding
+      s
+  in
+  let pk = Secret_key.to_public_key sk in
+  (pk, sk)

@@ -74,8 +74,7 @@ module Default_answerer = struct
       ~medium:"advertise"
       ~source:conn.peer_id
       config.pool
-      points ;
-    Lwt.return_unit
+      points
 
   let bootstrap config conn _request_info =
     let log = config.log in

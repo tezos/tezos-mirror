@@ -4,9 +4,10 @@
  (libraries hex
             zarith
             lwt)
+ (inline_tests)
+ (preprocess (pps ppx_inline_test))
  (flags :standard))
 
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i})))

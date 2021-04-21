@@ -453,13 +453,13 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     state
     ~baker:baker_0
     ~attempts:protocol.blocks_per_voting_period
-    `Testing_vote
+    `Exploration
     ~keep_alive_delegate:special_baker.key_name
-  >>= fun extra_bakes_waiting_for_testing_vote_period ->
+  >>= fun extra_bakes_waiting_for_exploration_period ->
   Counter_log.add
     level_counter
-    "wait-for-testing-vote-period"
-    extra_bakes_waiting_for_testing_vote_period ;
+    "wait-for-exploration-period"
+    extra_bakes_waiting_for_exploration_period ;
   Test_scenario.Queries.wait_for_all_levels_to_be
     state
     ~attempts:default_attempts
@@ -507,12 +507,12 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     ~baker:baker_0
     ~attempts:(1 + protocol.blocks_per_voting_period)
     ~keep_alive_delegate:special_baker.key_name
-    `Testing
-  >>= fun extra_bakes_waiting_for_testing_period ->
+    `Cooldown
+  >>= fun extra_bakes_waiting_for_cooldown_period ->
   Counter_log.add
     level_counter
-    "wait-for-testing-period"
-    extra_bakes_waiting_for_testing_period ;
+    "wait-for-cooldown-period"
+    extra_bakes_waiting_for_cooldown_period ;
   Test_scenario.Queries.wait_for_all_levels_to_be
     state
     ~attempts:default_attempts
@@ -528,81 +528,22 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     ~expect_clueless_client:clueless_winner
   >>= (function
         | `Proper_understanding ->
-            let chain = "test" in
-            Asynchronous_result.map_option with_ledger ~f:(fun _ ->
-                Interactive_test.Pauser.generic
-                  state
-                  EF.
-                    [ af "About to bake on the test chain.";
-                      haf
-                        "Please switch back to the Baking app and quit (`q`) \
-                         this prompt." ]
-                  ~force:true)
-            >>= fun (_ : unit option) ->
-            let testing_bakes = 5 in
-            Loop.n_times testing_bakes (fun ith ->
-                let baker =
-                  if ith % 2 = 0 then winner_baker_0 else winner_special_baker
-                in
-                Tezos_client.Keyed.bake
-                  ~chain
-                  state
-                  baker
-                  (sprintf
-                     "Baking on the test chain [%d/%d]"
-                     (ith + 1)
-                     testing_bakes))
-            >>= fun () ->
-            Test_scenario.Queries.wait_for_all_levels_to_be
-              state
-              ~chain
-              ~attempts:default_attempts
-              ~seconds:8.
-              nodes
-              (`At_least (Counter_log.sum level_counter + testing_bakes))
-            >>= fun () ->
             Interactive_test.Pauser.generic
               state
-              EF.[wf "Testing period, with proper winner-client, have fun."]
+              EF.[wf "Cooldown period, with proper winner-client, have fun."]
         | `Expected_misunderstanding ->
             Console.say
               state
-              EF.(wf "Winner-Client cannot bake on test chain (expected)")
+              EF.(wf "Winner-Client does know new protocol (expected)")
         | `Failure_to_understand ->
-            failf "Winner-Client cannot bake on test chain!")
-  >>= fun () ->
-  Helpers.wait_for state ~attempts:default_attempts ~seconds:0.3 (fun _ ->
-      Tezos_client.rpc
-        state
-        ~client:(client 1)
-        `Get
-        ~path:"/chains/main/blocks/head/metadata"
-      >>= fun metadata_json ->
-      try
-        match
-          Jqo.field metadata_json ~k:"test_chain_status"
-          |> Jqo.field ~k:"protocol"
-        with
-        | `String s when String.equal s winner_hash ->
-            return (`Done ())
-        | other ->
-            return
-              (`Not_done
-                (sprintf "Wrong protocol: %s" Ezjsonm.(to_string (wrap other))))
-      with e ->
-        return
-          (`Not_done
-            (sprintf
-               "Cannot get test-chain protocol: %s → %s"
-               (Exn.to_string e)
-               Ezjsonm.(to_string (wrap metadata_json)))))
+            failf "Winner-Client does know new protocol!")
   >>= fun () ->
   bake_until_voting_period
     state
     ~baker:baker_0
     ~attempts:(1 + protocol.blocks_per_voting_period)
     ~keep_alive_delegate:special_baker.key_name
-    `Promotion_vote
+    `Promotion
   >>= fun extra_bakes_waiting_for_promotion_period ->
   Counter_log.add
     level_counter
@@ -647,7 +588,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   >>= fun () ->
   let ballot_bakes = 1 in
   Loop.n_times ballot_bakes (fun _ ->
-      Tezos_client.Keyed.bake state baker_0 "Baking the promotion vote ballots")
+      Tezos_client.Keyed.bake state baker_0 "Baking the promotion ballots")
   >>= fun () ->
   Counter_log.add level_counter "bake-the-ballots" ballot_bakes ;
   Tezos_client.successful_client_cmd
@@ -666,6 +607,13 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
               ~default:(default_binary client_exec)
               client_exec.binary)
           (String.concat ~sep:", " client_protocols_result#out) ]
+  >>= fun () ->
+  ( match protocol.kind with
+  | `Alpha ->
+      Loop.n_times protocol.blocks_per_voting_period (fun _ ->
+          Tezos_client.Keyed.bake state baker_0 "Baking to Adoption period")
+  | _ ->
+      return () )
   >>= fun () ->
   Helpers.wait_for
     state

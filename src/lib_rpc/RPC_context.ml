@@ -123,7 +123,7 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
       fun s p q i ->
         RPC_directory.transparent_lookup dir s p q i
         >>= function
-        | `Ok v ->
+        | `Ok v | `OkChunk v ->
             return v
         | `OkStream {next; shutdown} -> (
             next ()
@@ -170,7 +170,7 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
             in
             let _ = loop () in
             return shutdown
-        | `Ok v ->
+        | `Ok v | `OkChunk v ->
             on_chunk v ;
             on_close () ;
             return (fun () -> ())

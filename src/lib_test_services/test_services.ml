@@ -37,3 +37,18 @@ let p2p_peer_id : P2p_peer.Id.t Alcotest.testable =
   Alcotest.testable P2p_peer.Id.pp P2p_peer.Id.equal
 
 let json : Data_encoding.json testable = of_pp Data_encoding.Json.pp
+
+(** Transorm a function running in the error monad into an Alcotest, taking
+    care of failing the test if the function results is an error.
+    Note that the given function must still take care of test assertions. *)
+let tztest name speed f =
+  Alcotest_lwt.test_case name speed (fun _sw () ->
+      f ()
+      >>= function
+      | Ok () ->
+          Lwt.return_unit
+      | Error err ->
+          Tezos_stdlib_unix.Internal_event_unix.close ()
+          >>= fun () ->
+          Format.printf "@\n%a@." pp_print_error err ;
+          Lwt.fail Alcotest.Test_error)

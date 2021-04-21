@@ -1,12 +1,12 @@
 (library
  (name tezos_lwt_result_stdlib)
  (public_name tezos-lwt-result-stdlib)
- (flags (:standard -open Tezos_error_monad))
- (libraries tezos-error-monad
-            lwt
-            tezos-lwt-result-stdlib.sigs
-            tezos-lwt-result-stdlib.functors
-            tezos-lwt-result-stdlib.lib))
+ (libraries lwt
+            tezos-lwt-result-stdlib.bare.sigs
+            tezos-lwt-result-stdlib.bare.structs
+            tezos-lwt-result-stdlib.traced.sigs
+            tezos-lwt-result-stdlib.traced.structs
+            ))
 
 (rule
  (alias runtest_lint)

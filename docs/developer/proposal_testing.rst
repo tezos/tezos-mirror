@@ -10,10 +10,10 @@ provide a short guide on how to read the migration code.
 We start by describing the branch that contains the protocol proposal that is
 under development.
 
-The branch ``proto-proposal``
------------------------------
+The branch ``master``
+---------------------
 
-The current proposal is developed in the branch ``proto-proposal``, which
+The current proposal is developed in the branch ``master``, which
 contains both the new protocol and its migration code from the current active
 protocol. The current protocol proposal under development is referred to as the
 `Alpha protocol`.
@@ -23,23 +23,27 @@ separated by marking them with the tag ``Migration:``. The first step when
 developing a new protocol is to revert the migration commits from the previous
 protocol. The rest of the commits are used as a base for current proposals.
 
-The commits in ``proto-proposal`` are mostly confined to the directory
-``src/proto_alpha``. Any change outside this directory is to adapt the client,
-the daemons or the test frameworks to the new protocol.
 
-Conversely, the commits in the ``master`` branch should never touch the
-directory ``src/proto_alpha/lib_protocol``.
+..
+   The commits in ``proto-proposal`` are mostly confined to the directory
+   ``src/proto_alpha``. Any change outside this directory is to adapt the client,
+   the daemons or the test frameworks to the new protocol.
+
+   Conversely, the commits in the ``master`` branch should never touch the
+   directory ``src/proto_alpha/lib_protocol``.
 
 We next describe how to run unit tests and how to activate the Alpha protocol in
 sandboxed node.
 
+Testing the protocol
+--------------------
 Unit tests and sandboxed mode
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The first step for tweaking and testing the current proposal is to checkout the
 latest code and run unit tests::
 
-  $ git checkout proto-proposal
+  $ git checkout master
   $ make
   $ make test
 
@@ -62,17 +66,35 @@ the shell (see :ref:`sandboxed-mode`)::
 
   $ tezos-client bake for bootstrap1 --minimal-timestamp
 
+Adding new protocol tests in OCaml
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Be sure you first read the :ref:`introduction on the testing ecosystem for Tezos <testing>`.
+In addition to system tests written in Python or written in OCaml with :ref:`Tezt <tezt>`,
+unit tests and integration tests for the protocol in OCaml can be found in `src/proto_alpha/lib_protocol/test`.
+It is strongly recommended to write unit tests and integration tests in addition to the
+system tests.
+To test a new component, create a new file in this directory and add the module in ``main.ml``.
+To print the errors of the ``Error`` monad correctly, alcotests must be wrapped into
+the function ``tztest`` defined in the module ``Test`` defined at the same level.
+
+Some helpers are available in the module `Tezos_alpha_test_helpers` defined in
+the subdirectory `helpers`. For instance, it contains context, operation and
+block fixtures that can be used in tests requiring these components.
+
+
+Testing migration code
+----------------------
 The remainder of the tutorial is organised as follows. Section `Manual migration
 testing`_ provides detailed indications on how to test a migration, and Section
 `Wrap up the manual migration procedure`_ summarises this indications by
 collecting all the steps needed to test the migration. Section `Automatic
 migration testing with Tezt`_ describes how to test a migration automatically by
-using a test within the Tezt framework, and Section `Wrap up the automatic
+using a test within the :ref:`Tezt <tezt>` framework, and Section `Wrap up the automatic
 migration procedure with Tezt`_ collects all the steps needed to automatically
 test the migration. To conclude, Section `Tips and tricks`_ indicates how to use
 the shell to inspect the context, and Section `Anatomy of migration code`_
 contains a primer on how to read and write migration code.
-
 
 Manual migration testing
 ------------------------
@@ -110,9 +132,9 @@ Checkout latest code and tweak migration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We start by checking out the latest code for the Alpha protocol in the
-``proto-proposal`` branch::
+``master`` branch::
 
-  $ git checkout proto-proposal
+  $ git checkout master
 
 Now we could tweak our migration by adding any desired feature. For instance, we
 could log the point at which migration takes place by editing the file
@@ -123,13 +145,13 @@ include the following lines::
   | Carthage_006 ->
       Logging.log_notice "\nSTITCHING!\n" ;
 
-After making sure that our ``proto-proposal`` branch contains all the migration
+After making sure that our ``master`` branch contains all the migration
 code that we want to test, we need to commit the changes locally::
 
   $ git commit -am 'My awesome feature'
 
 The next section summarises how to prepare the migration once we have tweaked
-the Alpha protocol in the branch ``proto-proposal``.
+the Alpha protocol.
 
 
 Prepare the migration
@@ -580,9 +602,9 @@ migration, both on the sandbox and on a context imported from Mainnet.
 Migration on the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Check latest code in branch ``proto-proposal``::
+Check latest code in branch ``master``::
 
-  $ git checkout proto-proposal
+  $ git checkout master
 
 Tweak migration by checking that
 ``src/proto_alpha/lib_protocol/init_storage.ml`` includes the following lines::
@@ -590,7 +612,7 @@ Tweak migration by checking that
   | Carthage_006 ->
       Logging.log_notice "\nSTITCHING!\n" ;
 
-Commit the feature back to branch ``proto-proposal``::
+Commit the feature back to branch ``master``::
 
   $ git commit -am 'My awesome feature'
 
@@ -646,9 +668,9 @@ You should see the ``STITCHING!`` message again!
 Migration on a context imported from Mainnet
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Check latest code in branch ``proto-proposal``::
+Check latest code in branch ``master``::
 
-  $ git checkout proto-proposal
+  $ git checkout master
 
 Tweak migration by checking that
 ``src/proto_alpha/lib_protocol/init_storage.ml`` includes the
@@ -657,7 +679,7 @@ following lines::
   | Carthage_006 ->
       Logging.log_notice "\nSTITCHING!\n" ;
 
-Commit the feature back to branch ``proto-proposal``::
+Commit the feature back to branch ``master``::
 
   $ git commit -am 'My awesome feature'
 
@@ -843,9 +865,9 @@ There is no need to prepare the migration again.
 Wrap up the automatic migration procedure with Tezt
 ---------------------------------------------------
 
-Check latest code in branch ``proto-proposal``::
+Check latest code in branch ``master``::
 
-  $ git checkout proto-proposal
+  $ git checkout master
 
 Tweak migration by checking that
 ``src/proto_alpha/lib_protocol/init_storage.ml`` includes the
@@ -854,7 +876,7 @@ following lines::
   | Carthage_006 ->
       Logging.log_notice "\nSTITCHING!\n" ;
 
-Commit the feature back to branch ``proto-proposal``::
+Commit the feature back to branch ``master``::
 
   $ git commit -am 'My awesome feature'
 

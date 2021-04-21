@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -114,13 +115,11 @@ module Points : sig
     P2p_point.Id.t ->
     (P2p_point.Pool_event.t list Lwt_stream.t * stopper) tzresult Lwt.t
 
-  val ban : #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
-
-  val unban : #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
-
-  val trust : #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
-
-  val untrust : #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
+  val patch :
+    #simple ->
+    P2p_point.Id.t ->
+    [`Ban | `Open | `Trust] option * P2p_peer.Id.t option ->
+    P2p_point.Info.t tzresult Lwt.t
 
   val banned : #simple -> P2p_point.Id.t -> bool tzresult Lwt.t
 
@@ -143,6 +142,18 @@ module Points : sig
         P2p_point.Info.t )
       RPC_service.t
 
+    val patch_input_encoding :
+      ([`Ban | `Open | `Trust] option * P2p_peer.Id.t option) Data_encoding.t
+
+    val patch :
+      ( [`PATCH],
+        unit,
+        unit * P2p_point.Id.t,
+        unit,
+        [`Ban | `Open | `Trust] option * P2p_peer.Id.t option,
+        P2p_point.Info.t )
+      RPC_service.service
+
     val events :
       ( [`GET],
         unit,
@@ -152,15 +163,19 @@ module Points : sig
         P2p_point.Pool_event.t list )
       RPC_service.t
 
+    (* DEPRECATED *)
     val ban :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
 
+    (* DEPRECATED *)
     val unban :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
 
+    (* DEPRECATED *)
     val trust :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
 
+    (* DEPRECATED *)
     val untrust :
       ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
 
@@ -188,13 +203,11 @@ module Peers : sig
     P2p_peer.Id.t ->
     (P2p_peer.Pool_event.t list Lwt_stream.t * stopper) tzresult Lwt.t
 
-  val ban : #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
-
-  val unban : #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
-
-  val trust : #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
-
-  val untrust : #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
+  val patch :
+    #simple ->
+    P2p_peer.Id.t ->
+    [`Ban | `Open | `Trust] option ->
+    (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t tzresult Lwt.t
 
   val banned : #simple -> P2p_peer.Id.t -> bool tzresult Lwt.t
 
@@ -228,6 +241,17 @@ module Peers : sig
         P2p_peer.Pool_event.t list )
       RPC_service.t
 
+    val patch_input_encoding : [`Ban | `Open | `Trust] option Data_encoding.t
+
+    val patch :
+      ( [`PATCH],
+        unit,
+        unit * Crypto_box.Public_key_hash.t,
+        unit,
+        [`Ban | `Open | `Trust] option,
+        (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t )
+      RPC_service.service
+
     val ban :
       ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) RPC_service.t
 
@@ -250,5 +274,7 @@ module ACL : sig
 
   module S : sig
     val clear : ([`GET], unit, unit, unit, unit, unit) RPC_service.t
+
+    val clear_delete : ([`DELETE], unit, unit, unit, unit, unit) RPC_service.t
   end
 end

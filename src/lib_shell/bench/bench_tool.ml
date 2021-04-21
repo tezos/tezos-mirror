@@ -25,9 +25,9 @@
 
 module Helpers_Nonce = Nonce
 open Protocol
-open Parameters_repr
-open Constants_repr
 open Alpha_context
+open Parameters
+open Constants
 
 (** Args *)
 
@@ -36,7 +36,7 @@ type args = {
   mutable seed : int;
   mutable accounts : int;
   mutable nb_commitments : int;
-  mutable params : Parameters_repr.t;
+  mutable params : Parameters.t;
 }
 
 let default_args =
@@ -70,7 +70,7 @@ let parse_param_file name =
   else
     Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file name
     >>=? fun json ->
-    match Data_encoding.Json.destruct Parameters_repr.encoding json with
+    match Data_encoding.Json.destruct Parameters.encoding json with
     | exception exn ->
         failwith "Parameters : Invalid JSON file - %a" Error_monad.pp_exn exn
     | param ->
@@ -152,7 +152,7 @@ let list_shuffle l =
 type gen_state = {
   mutable possible_transfers : (Account.t * Account.t) list;
   mutable remaining_transfers : (Account.t * Account.t) list;
-  mutable remaining_activations : (Account.t * Commitment_repr.t) list;
+  mutable remaining_activations : (Account.t * Commitment.t) list;
   mutable nonce_to_reveal : (Cycle.t * Raw_level.t * Nonce.t) list;
 }
 
@@ -160,7 +160,7 @@ let get_n_endorsements ctxt n =
   Context.get_endorsers ctxt
   >>=? fun endorsing_rights ->
   let endorsing_rights = List.sub endorsing_rights n in
-  map_s
+  List.map_es
     (fun {Delegate_services.Endorsing_rights.delegate; level; _} ->
       Op.endorsement ~delegate ~level ctxt ())
     endorsing_rights
@@ -182,7 +182,7 @@ let generate_and_add_random_endorsements inc =
   in
   let endorsements = List.sort_uniq compare endorsements in
   let endorsements = List.map Operation.pack endorsements in
-  fold_left_s Incremental.add_operation inc endorsements
+  List.fold_left_es Incremental.add_operation inc endorsements
 
 let regenerate_transfers = ref false
 
@@ -202,16 +202,18 @@ let generate_random_activation ({remaining_activations; _} as gen_state) inc =
 exception No_transfer_left
 
 let rec generate_random_transfer ({remaining_transfers; _} as gen_state) ctxt =
-  if remaining_transfers = [] then raise No_transfer_left ;
-  let (a1, a2) = List.hd remaining_transfers in
-  gen_state.remaining_transfers <- List.tl remaining_transfers ;
-  let open Account in
-  let c1 = Alpha_context.Contract.implicit_contract a1.pkh in
-  let c2 = Alpha_context.Contract.implicit_contract a2.pkh in
-  Context.Contract.balance ctxt c1
-  >>=? fun b1 ->
-  if Tez.(b1 < Tez.one) then generate_random_transfer gen_state ctxt
-  else Op.transaction ctxt c1 c2 Tez.one
+  match remaining_transfers with
+  | [] ->
+      raise No_transfer_left
+  | (a1, a2) :: remaining_transfers ->
+      gen_state.remaining_transfers <- remaining_transfers ;
+      let open Account in
+      let c1 = Alpha_context.Contract.implicit_contract a1.pkh in
+      let c2 = Alpha_context.Contract.implicit_contract a2.pkh in
+      Context.Contract.balance ctxt c1
+      >>=? fun b1 ->
+      if Tez.(b1 < Tez.one) then generate_random_transfer gen_state ctxt
+      else Op.transaction ctxt c1 c2 Tez.one
 
 let generate_random_operation (inc : Incremental.t) gen_state =
   let rnd = Random.int 100 in
@@ -244,7 +246,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
   (* Nonce *)
   Alpha_services.Helpers.current_level ~offset:1l Block.rpc_ctxt blk
   >|=? (function
-         | Level.{expected_commitment = true; cycle; level; _} ->
+         | {expected_commitment = true; cycle; level; _} ->
              if_debug (fun () ->
                  Format.printf "[DEBUG] Committing a nonce\n%!") ;
              let (hash, nonce) = Helpers_Nonce.generate () in
@@ -262,7 +264,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
         "[DEBUG] Generating %d random operations...\n%!"
         nb_operations) ;
   (* Generate random operations *)
-  fold_left_s
+  List.fold_left_es
     (fun inc _ ->
       try
         generate_random_operation inc gen_state
@@ -294,7 +296,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
                         %!"
                      @@ List.length l) ;
                  gen_state.nonce_to_reveal <- [] ;
-                 (* fold_left_s (fun inc (_, level, nonce) -> *)
+                 (* List.fold_left_es (fun inc (_, level, nonce) -> *)
                  (* Op.seed_nonce_revelation inc level nonce >>=? fun op ->
                   * Incremental.add_operation inc op *)
                  (* return *)
@@ -315,21 +317,20 @@ let init () =
   (* TODO : distribute the tokens randomly *)
   (* Right now, we split half of 80.000 rolls between generated accounts *)
   (* TODO : ensure we don't overflow with the underlying commitments *)
-  Tez_repr.(
-    Lwt.return @@ Environment.wrap_error
-    @@ args.params.Parameters_repr.constants.Constants_repr.tokens_per_roll
-       *? 80_000L
+  Tez.(
+    Lwt.return @@ Environment.wrap_tzresult
+    @@ (args.params.Parameters.constants.Constants.tokens_per_roll *? 80_000L)
     >>=? fun total_amount ->
-    Lwt.return @@ Environment.wrap_error @@ (total_amount /? 2L)
+    Lwt.return @@ Environment.wrap_tzresult @@ (total_amount /? 2L)
     >>=? fun amount ->
-    Lwt.return @@ Environment.wrap_error
+    Lwt.return @@ Environment.wrap_tzresult
     @@ (amount /? Int64.of_int args.accounts))
   >>=? fun initial_amount ->
   (* Ensure a deterministic run *)
   let new_seed () : Bytes.t =
     Bytes.(make 32 '\000' |> map (fun _ -> Random.int 0x100 |> char_of_int))
   in
-  map_s
+  List.map_es
     (fun _ ->
       return (Account.new_account ~seed:(new_seed ()) (), initial_amount))
     (1 -- args.accounts)
@@ -350,7 +351,9 @@ let init () =
   | x when x < 0 ->
       return ([], parameters)
   | x ->
-      map_s (fun _ -> Account.new_commitment ~seed:(new_seed ()) ()) (1 -- x)
+      List.map_es
+        (fun _ -> Account.new_commitment ~seed:(new_seed ()) ())
+        (1 -- x)
       >>=? fun commitments ->
       return
         (commitments, {parameters with commitments = List.map snd commitments})
@@ -378,7 +381,7 @@ let init () =
   in
   let parameters =
     {
-      Parameters_repr.bootstrap_accounts;
+      Parameters.bootstrap_accounts;
       bootstrap_contracts = [];
       commitments;
       constants;
@@ -389,7 +392,7 @@ let init () =
   Block.genesis_with_parameters parameters
   >>=? fun genesis ->
   if_debug_s (fun () ->
-      iter_s
+      List.iter_es
         (let open Account in
         fun (({pkh; _} as acc), _) ->
           let contract = Alpha_context.Contract.implicit_contract acc.pkh in
@@ -413,8 +416,8 @@ let init () =
         "[DEBUG] Constants : %a\n%!"
         Data_encoding.Json.pp
         (Data_encoding.Json.construct
-           Constants_repr.parametric_encoding
-           parameters.Parameters_repr.constants)) ;
+           Constants.parametric_encoding
+           parameters.Parameters.constants)) ;
   let print_block block =
     let open Block in
     Format.printf

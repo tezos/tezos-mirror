@@ -1,0 +1,8 @@
+parameter (set never);
+storage unit;
+code {
+       UNPAIR;
+       ITER { NEVER };
+       NIL operation;
+       PAIR
+     }

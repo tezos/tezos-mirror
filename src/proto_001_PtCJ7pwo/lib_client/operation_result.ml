@@ -48,8 +48,8 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
           ()
       | Some expr ->
           let expr =
-            Option.unopt_exn
-              (Failure "ill-serialized argument")
+            WithExceptions.Option.to_exn
+              ~none:(Failure "ill-serialized argument")
               (Data_encoding.force_decode expr)
           in
           Format.fprintf
@@ -75,12 +75,12 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
           Format.fprintf ppf "@,No script (accepts all transactions)"
       | Some {code; storage} ->
           let code =
-            Option.unopt_exn
-              (Failure "ill-serialized code")
+            WithExceptions.Option.to_exn
+              ~none:(Failure "ill-serialized code")
               (Data_encoding.force_decode code)
           and storage =
-            Option.unopt_exn
-              (Failure "ill-serialized storage")
+            WithExceptions.Option.to_exn
+              ~none:(Failure "ill-serialized storage")
               (Data_encoding.force_decode storage)
           in
           Format.fprintf

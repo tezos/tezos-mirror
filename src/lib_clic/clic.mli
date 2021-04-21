@@ -410,6 +410,22 @@ val seq_of_param :
   ('a -> 'ctx -> unit tzresult Lwt.t, 'ctx) params) ->
   ('a list -> 'ctx -> unit tzresult Lwt.t, 'ctx) params
 
+(** Take a sequence of parameters followed by suffix keywords and further
+    parameters. On execution, the suffix will be attempted to be matched before
+    the sequence's parameters. Because of this, care must be taken that the
+    sequence's parameters cannot be interpreted as the suffix keywords. For
+    example, it shouldn't be used with parameters that can be arbitrary strings
+    such as aliases.
+
+    Raises [Invalid_argument] when the given suffix is an empty list.
+ *)
+val non_terminal_seq :
+  suffix:string list ->
+  (('ctx -> unit tzresult Lwt.t, 'ctx) params ->
+  ('a -> 'ctx -> unit tzresult Lwt.t, 'ctx) params) ->
+  ('b -> 'c, 'ctx) params ->
+  ('a list -> 'b -> 'c, 'ctx) params
+
 (** Parameter that expects a string *)
 val string :
   name:string ->
@@ -492,8 +508,11 @@ val restore_formatter : Format.formatter -> formatter_state -> unit
 
 (** {2 Parsing and error reporting} *)
 
-(** Help error (not really an error), thrown by {!dispatch} and {!parse_initial_options}. *)
+(** Help error (not really an error), thrown by {!dispatch} and {!parse_global_options}. *)
 type error += Help : _ command option -> error
+
+(** Version error (not really an error), thrown by {!parse_global_options}. *)
+type error += Version : error
 
 (** Find and call the applicable command on the series of arguments.
     @raise [Failure] if the command list would be ambiguous. *)

@@ -8,10 +8,11 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "2.0" }
-  "data-encoding" { = "0.2" }
+  "data-encoding" { >= "0.3" & < "0.4" }
   "tezos-error-monad"
   "uutf"
   "alcotest-lwt" { with-test & >= "1.1.0" }
+  "ppx_inline_test"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

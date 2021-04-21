@@ -1,0 +1,63 @@
+tezt/_regressions/rpc/current.proxy.others.out
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/constants
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+{ "proof_of_work_nonce_size": 8, "nonce_length": 32,
+  "max_anon_ops_per_block": 132, "max_operation_data_length": 16384,
+  "max_proposals_per_delegate": 20, "preserved_cycles": 2,
+  "blocks_per_cycle": 8, "blocks_per_commitment": 4,
+  "blocks_per_roll_snapshot": 4, "blocks_per_voting_period": 64,
+  "time_between_blocks": [ "1", "0" ], "endorsers_per_block": 32,
+  "hard_gas_limit_per_operation": "1040000",
+  "hard_gas_limit_per_block": "10400000", "proof_of_work_threshold": "-1",
+  "tokens_per_roll": "8000000000", "michelson_maximum_type_size": 1000,
+  "seed_nonce_revelation_tip": "125000", "origination_size": 257,
+  "block_security_deposit": "512000000",
+  "endorsement_security_deposit": "64000000",
+  "baking_reward_per_endorsement": [ "1250000", "187500" ],
+  "endorsement_reward": [ "1250000", "833333" ], "cost_per_byte": "250",
+  "hard_storage_limit_per_operation": "60000",
+  "test_chain_duration": "1228800", "quorum_min": 2000, "quorum_max": 7000,
+  "min_proposal_quorum": 500, "initial_endorsers": 1,
+  "delay_per_missing_endorsement": "1" }
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+[ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "priority": 0, "estimated_time": "[TIMESTAMP]" },
+  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "priority": 2, "estimated_time": "[TIMESTAMP]" },
+  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "priority": 4, "estimated_time": "[TIMESTAMP]" },
+  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "priority": 6, "estimated_time": "[TIMESTAMP]" },
+  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "priority": 8, "estimated_time": "[TIMESTAMP]" } ]
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+{ "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
+  "voting_period": 0, "voting_period_position": 0,
+  "expected_commitment": false }
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/endorsing_rights
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+[ { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
+    "slots": [ 31, 24, 23, 19, 17, 13, 2 ],
+    "estimated_time": "[TIMESTAMP]" },
+  { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
+    "slots": [ 22, 20, 15, 11, 6, 4, 0 ],
+    "estimated_time": "[TIMESTAMP]" },
+  { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
+    "slots": [ 28, 25, 18, 10, 8, 7, 1 ],
+    "estimated_time": "[TIMESTAMP]" },
+  { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
+    "slots": [ 30, 27, 16, 12, 5, 3 ],
+    "estimated_time": "[TIMESTAMP]" },
+  { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
+    "slots": [ 29, 26, 21, 14, 9 ],
+    "estimated_time": "[TIMESTAMP]" } ]
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+{ "first": 1, "last": 8 }

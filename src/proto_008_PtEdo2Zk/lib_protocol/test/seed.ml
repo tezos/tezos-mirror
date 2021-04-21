@@ -119,7 +119,7 @@ let revelation_early_wrong_right_twice () =
   Op.seed_nonce_revelation
     (B b)
     level_commitment
-    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
+    (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   |> fun operation ->
   Block.bake ~policy ~operation b
   >>= fun e ->
@@ -139,7 +139,7 @@ let revelation_early_wrong_right_twice () =
   Op.seed_nonce_revelation
     (B b)
     level_commitment
-    (Option.unopt_exn Not_found @@ Nonce.get wrong_hash)
+    (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get wrong_hash)
   |> fun operation ->
   Block.bake ~operation b
   >>= fun e ->
@@ -153,7 +153,7 @@ let revelation_early_wrong_right_twice () =
   Op.seed_nonce_revelation
     (B b)
     level_commitment
-    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
+    (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   |> fun operation ->
   Block.get_next_baker ~policy b
   >>=? fun (baker_pkh, _, _) ->
@@ -194,7 +194,7 @@ let revelation_early_wrong_right_twice () =
   Op.seed_nonce_revelation
     (B b)
     level_commitment
-    (Option.unopt_exn Not_found @@ Nonce.get wrong_hash)
+    (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get wrong_hash)
   |> fun operation ->
   Block.bake ~operation ~policy b
   >>= fun e ->
@@ -205,7 +205,7 @@ let revelation_early_wrong_right_twice () =
           false)
   >>=? fun () ->
   (* bake [preserved_cycles] cycles excluding [id] *)
-  Error_monad.fold_left_s
+  List.fold_left_es
     (fun b _ -> Block.bake_until_cycle_end ~policy b)
     b
     (1 -- preserved_cycles)
@@ -273,7 +273,7 @@ let revelation_missing_and_late () =
   Op.seed_nonce_revelation
     (B b)
     level_commitment
-    (Option.unopt_exn Not_found @@ Nonce.get committed_hash)
+    (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   |> fun operation ->
   Block.bake ~operation b
   >>= fun e ->
@@ -284,12 +284,12 @@ let revelation_missing_and_late () =
           false)
 
 let tests =
-  [ Test.tztest "no commitment" `Quick no_commitment;
-    Test.tztest
+  [ Test_services.tztest "no commitment" `Quick no_commitment;
+    Test_services.tztest
       "revelation_early_wrong_right_twice"
       `Quick
       revelation_early_wrong_right_twice;
-    Test.tztest
+    Test_services.tztest
       "revelation_missing_and_late"
       `Quick
       revelation_missing_and_late ]

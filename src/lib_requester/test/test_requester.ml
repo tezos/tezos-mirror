@@ -301,7 +301,9 @@ let test_full_requester_fetch_timeout _ () =
   in
   do_timeout (Ptime.Span.of_int_s 0) "foo"
   >>= fun () ->
-  do_timeout (Option.unopt_exn Not_found (Ptime.Span.of_float_s 0.1)) "foo"
+  do_timeout
+    (WithExceptions.Option.to_exn ~none:Not_found (Ptime.Span.of_float_s 0.1))
+    "foo"
 
 (** Creates a requester. Clears registered requests, then asserts that
     [!Test_request.registered_requests] is empty. Fetches the key "baz".
@@ -318,7 +320,10 @@ let test_full_fetch_issues_request _ () =
     !Test_request.registered_requests ;
   let f1 =
     Test_Requester.fetch
-      ~timeout:(Option.unopt_exn Not_found (Ptime.Span.of_float_s 0.1))
+      ~timeout:
+        (WithExceptions.Option.to_exn
+           ~none:Not_found
+           (Ptime.Span.of_float_s 0.1))
       requester
       "baz"
       precheck_pass
@@ -335,7 +340,8 @@ let test_full_fetch_issues_request _ () =
     (tuple3 unit p2p_peer_id (list testable_test_key))
     "should have sent a request"
     ((), P2p_peer.Id.zero, ["baz"])
-    (List.hd !Test_request.registered_requests) ;
+    ( WithExceptions.Option.get ~loc:__LOC__
+    @@ List.hd !Test_request.registered_requests ) ;
   Lwt.cancel f1 ;
   Lwt.return_unit
 
@@ -425,7 +431,10 @@ let test_pending_timeout _ () =
     (Test_Requester.pending requester "foo") ;
   let f1 =
     Test_Requester.fetch
-      ~timeout:(Option.unopt_exn Not_found (Ptime.Span.of_float_s 0.001))
+      ~timeout:
+        (WithExceptions.Option.to_exn
+           ~none:Not_found
+           (Ptime.Span.of_float_s 0.001))
       requester
       "foo"
       precheck_pass

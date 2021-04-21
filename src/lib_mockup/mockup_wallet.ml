@@ -36,7 +36,7 @@ let default_bootstrap_accounts =
       "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm" ]
   in
   let basename = "bootstrap" in
-  Error_monad.mapi_s
+  List.mapi_es
     (fun i ukey ->
       Client_keys.make_sk_uri @@ Uri.of_string ("unencrypted:" ^ ukey)
       >>=? fun sk_uri ->
@@ -89,8 +89,9 @@ let populate (cctxt : #Tezos_client_base.Client_context.io_wallet)
       match Data_encoding.Json.destruct bootstrap_secrets_encoding json with
       | accounts ->
           return accounts
-      | exception _e ->
+      | exception e ->
           failwith
-            "cannot read definitions of bootstrap accounts in %s"
-            accounts_file ) )
-  >>=? Tezos_base.TzPervasives.iter_s (add_bootstrap_secret cctxt)
+            "cannot read definitions of bootstrap accounts in %s because: %s"
+            accounts_file
+            (Printexc.to_string e) ) )
+  >>=? List.iter_es (add_bootstrap_secret cctxt)

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,43 +27,47 @@
 (** Commands *)
 
 let show (args : Node_shared_arg.t) =
+  Internal_event_unix.init ()
+  >>= fun () ->
   if not @@ Sys.file_exists args.config_file then
     Format.eprintf
-      "\n\
-       Warning: no config file at %s,\n\
-      \         displaying the default configuration.\n\
-       @."
+      "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
+       displaying the default configuration@]@]@."
       args.config_file ;
   Node_shared_arg.read_and_patch_config_file args
-  >>=? fun cfg ->
-  Node_config_file.check cfg
-  >>= fun () ->
-  print_endline @@ Node_config_file.to_string cfg ;
+  >>=? fun config ->
+  print_endline @@ Node_config_file.to_string config ;
   return_unit
 
 let reset (args : Node_shared_arg.t) =
+  Internal_event_unix.init ()
+  >>= fun () ->
   if Sys.file_exists args.config_file then
     Format.eprintf
       "Ignoring previous configuration file: %s.@."
       args.config_file ;
   Node_shared_arg.read_and_patch_config_file args
-  >>=? fun cfg ->
-  Node_config_file.check cfg
-  >>= fun () -> Node_config_file.write args.config_file cfg
+  >>=? fun config ->
+  Node_config_validation.check config
+  >>=? fun () -> Node_config_file.write args.config_file config
 
 let init (args : Node_shared_arg.t) =
+  Internal_event_unix.init ()
+  >>= fun () ->
   if Sys.file_exists args.config_file then
-    failwith "Pre-existing config file at %s, use `reset`." args.config_file
+    failwith
+      "Pre-existing configuration file at %s, use `reset`."
+      args.config_file
   else
     Node_shared_arg.read_and_patch_config_file ~may_override_network:true args
-    >>=? fun cfg ->
-    Node_config_file.check cfg
-    >>= fun () ->
-    Node_config_file.write args.config_file cfg
+    >>=? fun config ->
+    Node_config_validation.check config
+    >>=? fun () ->
+    Node_config_file.write args.config_file config
     >>=? fun () ->
     let default = if args.network = None then " default" else "" in
     let alias =
-      match cfg.blockchain_network.alias with
+      match config.blockchain_network.alias with
       | None ->
           (* Cannot happen, as --network cannot take custom networks as arguments. *)
           ""
@@ -77,6 +82,8 @@ let init (args : Node_shared_arg.t) =
     return_unit
 
 let update (args : Node_shared_arg.t) =
+  Internal_event_unix.init ()
+  >>= fun () ->
   if not (Sys.file_exists args.config_file) then
     failwith
       "Missing configuration file at %s. Use `%s config init [options]` to \
@@ -85,14 +92,32 @@ let update (args : Node_shared_arg.t) =
       Sys.argv.(0)
   else
     Node_shared_arg.read_and_patch_config_file args
-    >>=? fun cfg ->
-    Node_config_file.check cfg
-    >>= fun () -> Node_config_file.write args.config_file cfg
+    >>=? fun config ->
+    Node_config_validation.check config
+    >>=? fun () -> Node_config_file.write args.config_file config
+
+let validate (args : Node_shared_arg.t) =
+  Internal_event_unix.init ()
+  >>= fun () ->
+  if not (Sys.file_exists args.config_file) then
+    Format.eprintf
+      "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
+       validating the default configuration@]@]@."
+      args.config_file ;
+  Node_shared_arg.read_and_patch_config_file args
+  >>=? fun config ->
+  Node_config_validation.check config
+  >>= function
+  (* Here we do not consider the node configuration file
+     being invalid as a failure. *)
+  | Error (Node_config_validation.Invalid_node_configuration :: _) | Ok () ->
+      return_unit
+  | err ->
+      Lwt.return err
 
 (** Main *)
-
 module Term = struct
-  type subcommand = Show | Reset | Init | Update
+  type subcommand = Show | Reset | Init | Update | Validate
 
   let process subcommand args =
     let res =
@@ -105,6 +130,8 @@ module Term = struct
           init args
       | Update ->
           update args
+      | Validate ->
+          validate args
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit res with
     | Ok () ->
@@ -122,6 +149,8 @@ module Term = struct
           `Ok Init
       | "update" ->
           `Ok Update
+      | "validate" ->
+          `Ok Validate
       | s ->
           `Error ("invalid argument: " ^ s)
     and printer ppf = function
@@ -133,11 +162,13 @@ module Term = struct
           Format.fprintf ppf "init"
       | Update ->
           Format.fprintf ppf "update"
+      | Validate ->
+          Format.fprintf ppf "validate"
     in
     let open Cmdliner.Arg in
     let doc =
       "Operation to perform. Possible values: $(b,show), $(b,reset), \
-       $(b,init), $(b,update)."
+       $(b,init), $(b,update), $(b,validate)."
     in
     value & pos 0 (parser, printer) Show & info [] ~docv:"OPERATION" ~doc
 
@@ -173,7 +204,10 @@ module Manpage = struct
       `P
         "$(b,update) is the main option to edit the configuration file of \
          Tezos. It will parse command line arguments and add or replace \
-         corresponding entries in the Tezos configuration file." ]
+         corresponding entries in the Tezos configuration file.";
+      `P
+        "$(b,validate) verifies that the configuration file parses correctly \
+         and performs some sanity checks on its values." ]
 
   let options =
     let schema = Data_encoding.Json.schema Node_config_file.encoding in

@@ -407,9 +407,11 @@ let test_vectors_p256 () =
           block)
       Vectors_p256.sigs
   in
-  List.iter2
+  List.iter2_e
+    ~when_different_lengths:()
     (fun (sk, pk) sigs ->
       List.iter2
+        ~when_different_lengths:()
         (fun msg s ->
           assert (verify ~pk ~msg ~signature:s) ;
           let signature = sign ~sk ~msg in
@@ -418,6 +420,11 @@ let test_vectors_p256 () =
         sigs)
     keys
     expected_sigs
+  |> function
+  | Ok () ->
+      ()
+  | Error () ->
+      failwith "unequal number of keys, messages, and signatures"
 
 let p256 =
   [ ("export", `Quick, test_export_p256);

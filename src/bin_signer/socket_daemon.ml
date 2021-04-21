@@ -149,4 +149,4 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
         >>= fun _ -> Lwt.return_unit) ;
     loop fd
   in
-  Lwt_list.map_p loop fds >>= return
+  List.map_p loop fds >>= return

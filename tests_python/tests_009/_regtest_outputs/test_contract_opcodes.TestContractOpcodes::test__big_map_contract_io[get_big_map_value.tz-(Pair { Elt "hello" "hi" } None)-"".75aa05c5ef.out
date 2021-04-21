@@ -1,0 +1,50 @@
+tests_009/test_contract_opcodes.py::TestContractOpcodes::test__big_map_contract_io[get_big_map_value.tz-(Pair { Elt "hello" "hi" } None)-""-(Pair 0 None)-big_map_diff1]
+
+storage
+  (Pair 0 None)
+emitted operations
+  
+big_map diff
+  New map(0) of type (big_map string string)
+  Set map(0)["hello"] to "hi"
+trace
+  - location: 11 (remaining gas: 1039970.497 units remaining)
+    [ (Pair "" { Elt "hello" "hi" } None)  	 ]
+  - location: 12 (remaining gas: 1039970.417 units remaining)
+    [ (Pair "" { Elt "hello" "hi" } None)  	
+      (Pair "" { Elt "hello" "hi" } None)  	 ]
+  - location: 13 (remaining gas: 1039970.337 units remaining)
+    [ ""  	@parameter
+      (Pair "" { Elt "hello" "hi" } None)  	 ]
+  - location: 17 (remaining gas: 1039970.152 units remaining)
+    [ (Pair { Elt "hello" "hi" } None)  	@storage ]
+  - location: 18 (remaining gas: 1039970.072 units remaining)
+    [ { Elt "hello" "hi" }  	 ]
+  - location: -1 (remaining gas: 1039970.027 units remaining)
+    [ { Elt "hello" "hi" }  	 ]
+  - location: 19 (remaining gas: 1039969.947 units remaining)
+    [ { Elt "hello" "hi" }  	
+      { Elt "hello" "hi" }  	 ]
+  - location: -1 (remaining gas: 1039969.902 units remaining)
+    [ { Elt "hello" "hi" }  	
+      { Elt "hello" "hi" }  	 ]
+  - location: 14 (remaining gas: 1039969.902 units remaining)
+    [ ""  	@parameter
+      { Elt "hello" "hi" }  	
+      { Elt "hello" "hi" }  	 ]
+  - location: 20 (remaining gas: 1039961.042 units remaining)
+    [ None  	
+      { Elt "hello" "hi" }  	 ]
+  - location: 21 (remaining gas: 1039960.972 units remaining)
+    [ { Elt "hello" "hi" }  	
+      None  	 ]
+  - location: 22 (remaining gas: 1039960.897 units remaining)
+    [ (Pair { Elt "hello" "hi" } None)  	 ]
+  - location: 23 (remaining gas: 1039960.822 units remaining)
+    [ {}  	
+      (Pair { Elt "hello" "hi" } None)  	 ]
+  - location: 25 (remaining gas: 1039960.747 units remaining)
+    [ (Pair {} { Elt "hello" "hi" } None)  	 ]
+  - location: -1 (remaining gas: 1039960.702 units remaining)
+    [ (Pair {} { Elt "hello" "hi" } None)  	 ]
+

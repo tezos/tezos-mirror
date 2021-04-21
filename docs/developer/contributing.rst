@@ -148,7 +148,8 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    changes with new features or other real changes.
 -  No peneloping: don't do something in a commit just to undo it two
    commits later.
--  Try as much as possible to make every patch compile, not only the last one.
+-  We expect every commit to compile and pass tests.
+   Obviously, we require tests to pass between each MR.
 -  Follow the format of commit names, `<Component>: <message>`, with
    message in indicative or imperative present mood e.g. ``Shell: fix
    bug #13`` rather than ``Shell: fixed bug #13``.
@@ -165,6 +166,8 @@ While working on your branch to prepare a Merge Request, make sure you respect t
 -  If you add new functions to an interface, don’t forget to
    document the function in the interface (in the corresponding .mli file; or,
    if there is no .mli file, directly in the .ml file)
+-  If your MR introduces new dependencies to opam packages, follow the
+   :ref:`additional instructions <adding_new_dependencies>`.
 -  Check whether your changes need to be reflected in changes to the
    corresponding README file (the one in the directory of the patched
    files). If your changes concern several directories, check all the
@@ -272,8 +275,22 @@ any subitems represent the longer description of that commit)::
     - fix relative unit test
     - add docstrings
 
-**Beware**: No MR targeting the ``master`` should touch
-``src/proto_alpha/lib_protocol`` (see :ref:`protocol MRs <protocol_mr>`)
+**Beware**: For MRs touching
+``src/proto_alpha/lib_protocol``, see :ref:`protocol MRs <protocol_mr>`.
+
+.. _adding_new_dependencies:
+
+Special case: MRs that introduce a new dependency
+-------------------------------------------------
+
+In the special case where your MR adds a new opam dependency or updates an
+existing opam dependency, you will need to follow
+:ref:`this additional dedicated guide <adding_new_opam_dependency>`.
+
+In the special case where your MR adds a new Python, Rust, Javascript, or other
+dependency, additional steps must also be followed. There is currently no
+dedicated guide. Do not hesitate to ask for help on the ``#devteam`` channel of
+the developer channel.
 
 .. _protocol_mr:
 
@@ -284,21 +301,12 @@ Because of the amendment procedure that governs the protocol, the
 workflow for protocol development is significantly different from
 master.
 
-All work on the protocol is done in the branch ``proto-proposal``, which
-is regularly rebased on master.
-Before a proposal, a new branch, e.g. ``proto-005-PsBabyM1``, is
-created from ``proto-proposal`` where the development continues.
-When and if ``proto-005-PsBabyM1`` is activated, it is then merged
-into master.
+Before a proposal, a new directory, e.g. ``proto-005-PsBabyM1``, is
+created from ``proto_alpha`` where the development continues.
 
-The hash of the protocol is computed from the directory
-``src/proto_alpha/lib_protocol``, so every change in this directory
-should happen in the branch ``proto-proposal``.
-MRs that touch the client or daemons in ``src/proto_alpha/`` should be
-merged in master, except if they depend on a new protocol feature, in
-this case they go to ``proto-proposal``.
-Make an effort to split your MR so that a maximum of code can be
-merged in master.
+The hash of each active or candidate protocol is computed from the directory
+``src/proto_0*/lib_protocol``, so every change in these directories
+is forbidden.
 
 The Migration
 ~~~~~~~~~~~~~
@@ -314,32 +322,6 @@ start a new development cycle is to remove the migration code.
 In order to facilitate this, *migration code is always in a different commit* with respect to the protocol features it migrates.
 When submitting an MR which contains migration code, **the author must also have tested the migration** (see :ref:`proposal_testing`) and write in the
 description what was tested and how so that **reviewers can reproduce it**.
-
-Shape of commits
-~~~~~~~~~~~~~~~~
-
-In order to ease rebasing and reworking the history, **we don't expect
-every commit to compile and pass tests**.
-We prefer to keep commits small and local to a component.
-Note that we do expect tests to pass between each MR.
-
-A typical MR for ``proto-proposal`` would look like this (each bullet is a
-commit, any subitems represent the longer description of that commit)::
-
-  * Tests_python: test that no block is produced during a weekend
-  * Flextesa: test that no block is produced during a weekend
-  * Proto/test: test that no block is produced during a weekend
-  * Proto/Baker: skip weekend when producing blocks
-  * Proto/Migration: migrate table of rights to remove weekends
-  * Proto: stop block production during weekends
-    + block submitted during a weekend fails application
-    + adapt computation of rights
-    + add RPC to check weekends
-
-Right after the change to the protocol, the code might not compile,
-because the baker is not fixed yet.
-After the baker commit, the test might not pass because of a change in
-behavior.
 
 
 .. _code_review:

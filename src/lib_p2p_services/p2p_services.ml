@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -116,11 +117,11 @@ let versions ctxt = make_call S.versions ctxt () () ()
 
 let events ctxt = make_streamed_call S.events ctxt () () ()
 
-let connect ctxt ~timeout peer_id =
+let connect ctxt ~timeout point_id =
   make_call1
     S.connect
     ctxt
-    peer_id
+    point_id
     (object
        method timeout = timeout
     end)
@@ -181,6 +182,30 @@ module Points = struct
         ~description:"Details about a given `IP:addr`."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg)
 
+    let patch_input_encoding =
+      let open Data_encoding in
+      obj2
+        (opt
+           "acl"
+           (string_enum [("ban", `Ban); ("trust", `Trust); ("open", `Open)]))
+        (opt "peer_id" P2p_peer.Id.encoding)
+
+    let patch =
+      RPC_service.patch_service
+        ~query:RPC_query.empty
+        ~input:patch_input_encoding
+        ~output:P2p_point.Info.encoding
+        ~description:
+          "Change the connectivity state of a given `IP:addr`. With `{acl : \
+           ban}`: blacklist the given address and remove it from the \
+           whitelist if present. With `{acl: open}`: removes an address from \
+           the blacklist and whitelist. With `{acl: trust}`: trust a given \
+           address permanently and remove it from the blacklist if present. \
+           With `{peer_id: <id>}` set the peerId of the point. Connections \
+           from this address can still be closed on authentication if the \
+           peer is greylisted. "
+        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg)
+
     let events =
       RPC_service.get_service
         ~query:monitor_query
@@ -213,15 +238,18 @@ module Points = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
         ~description:
-          "Blacklist the given address and remove it from the whitelist if \
-           present."
+          "DEPRECATED: Blacklist the given address and remove it from the \
+           whitelist if present. Use PATCH `/network/point/<point_id>` \
+           instead."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "ban")
 
     let unban =
       RPC_service.get_service
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
-        ~description:"Remove an address from the blacklist."
+        ~description:
+          "DEPRECATED: Remove an address from the blacklist. Use PATCH \
+           `/network/point/:peerid` instead."
         RPC_path.(
           root / "network" / "points" /: P2p_point.Id.rpc_arg / "unban")
 
@@ -230,9 +258,10 @@ module Points = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
         ~description:
-          "Trust a given address permanently and remove it from the blacklist \
-           if present. Connections from this address can still be closed on \
-           authentication if the peer is greylisted."
+          "DEPRECATED: Trust a given address permanently and remove it from \
+           the blacklist if present. Connections from this address can still \
+           be closed on authentication if the peer is greylisted. Use \
+           PATCH`/network/point/<point_id>` instead."
         RPC_path.(
           root / "network" / "points" /: P2p_point.Id.rpc_arg / "trust")
 
@@ -240,7 +269,9 @@ module Points = struct
       RPC_service.get_service
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
-        ~description:"Remove an address from the whitelist."
+        ~description:
+          "DEPRECATED: Remove an address from the whitelist. Use PATCH \
+           `/network/point/<point_id>` instead."
         RPC_path.(
           root / "network" / "points" /: P2p_point.Id.rpc_arg / "untrust")
 
@@ -248,7 +279,9 @@ module Points = struct
       RPC_service.get_service
         ~query:RPC_query.empty
         ~output:Data_encoding.bool
-        ~description:"Check is a given address is blacklisted or greylisted."
+        ~description:
+          "Check if a given address is blacklisted or greylisted. Port \
+           component is unused."
         RPC_path.(
           root / "network" / "points" /: P2p_point.Id.rpc_arg / "banned")
   end
@@ -277,13 +310,7 @@ module Points = struct
       end)
       ()
 
-  let ban ctxt peer_id = make_call1 S.ban ctxt peer_id () ()
-
-  let unban ctxt peer_id = make_call1 S.unban ctxt peer_id () ()
-
-  let trust ctxt peer_id = make_call1 S.trust ctxt peer_id () ()
-
-  let untrust ctxt peer_id = make_call1 S.untrust ctxt peer_id () ()
+  let patch ctxt peer_id input = make_call1 S.patch ctxt peer_id () input
 
   let banned ctxt peer_id = make_call1 S.banned ctxt peer_id () ()
 end
@@ -330,20 +357,46 @@ module Peers = struct
         ~description:"List the peers the node ever met."
         RPC_path.(root / "network" / "peers")
 
+    let patch_input_encoding =
+      let open Data_encoding in
+      obj1
+        (opt
+           "acl"
+           (string_enum [("ban", `Ban); ("trust", `Trust); ("open", `Open)]))
+
+    let patch =
+      RPC_service.patch_service
+        ~query:RPC_query.empty
+        ~output:
+          (P2p_peer.Info.encoding
+             Peer_metadata.encoding
+             Connection_metadata.encoding)
+        ~input:patch_input_encoding
+        ~description:
+          "Change the permissions of a given peer. With `{acl: ban}`: \
+           blacklist the given peer and remove it from the whitelist if \
+           present. With `{acl: open}`: removes the peer from the blacklist \
+           and whitelist. With `{acl: trust}`: trust the given peer \
+           permanently and remove it from the blacklist if present. The peer \
+           cannot be blocked (but its host IP still can)."
+        RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg)
+
     let ban =
       RPC_service.get_service
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
         ~description:
-          "Blacklist the given peer and remove it from the whitelist if \
-           present."
+          "DEPRECATED: Blacklist the given peer and remove it from the \
+           whitelist if present. Use PATCH `network/peers/<peer_id>` instead."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "ban")
 
     let unban =
       RPC_service.get_service
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
-        ~description:"Remove the given peer from the blacklist."
+        ~description:
+          "DEPRECATED: Remove the given peer from the blacklist. Use PATCH \
+           `network/peers/<peer_id>` instead."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "unban")
 
     let trust =
@@ -351,16 +404,18 @@ module Peers = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
         ~description:
-          "Whitelist a given peer permanently and remove it from the \
-           blacklist if present. The peer cannot be blocked (but its host IP \
-           still can)."
+          "DEPRECATED: Whitelist a given peer permanently and remove it from \
+           the blacklist if present. The peer cannot be blocked (but its host \
+           IP still can). Use PATCH `network/peers/<peer_id>` instead."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "trust")
 
     let untrust =
       RPC_service.get_service
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
-        ~description:"Remove a given peer from the whitelist."
+        ~description:
+          "DEPRECATED: Remove a given peer from the whitelist. Use PATCH \
+           `network/peers/<peer_id>` instead."
         RPC_path.(
           root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "untrust")
 
@@ -374,11 +429,11 @@ module Peers = struct
 
   let info ctxt peer_id = make_call1 S.info ctxt peer_id () ()
 
-  let events ctxt point =
+  let events ctxt peer =
     make_streamed_call
       S.events
       ctxt
-      ((), point)
+      ((), peer)
       (object
          method monitor = true
       end)
@@ -394,15 +449,9 @@ module Peers = struct
       end)
       ()
 
-  let ban ctxt point_id = make_call1 S.ban ctxt point_id () ()
+  let patch ctxt point_id input = make_call1 S.patch ctxt point_id () input
 
-  let unban ctxt point_id = make_call1 S.unban ctxt point_id () ()
-
-  let trust ctxt point_id = make_call1 S.trust ctxt point_id () ()
-
-  let untrust ctxt point_id = make_call1 S.untrust ctxt point_id () ()
-
-  let banned ctxt point_id = make_call1 S.banned ctxt point_id () ()
+  let banned ctxt peer_id = make_call1 S.banned ctxt peer_id () ()
 end
 
 module ACL = struct
@@ -411,9 +460,21 @@ module ACL = struct
       RPC_service.get_service
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
-        ~description:"Clear all greylists tables."
+        ~description:
+          "DEPRECATED: Clear all greylists tables. This will unban all \
+           addresses and peers automatically greylisted by the system. Use \
+           DELETE `/network/greylist` instead"
         RPC_path.(root / "network" / "greylist" / "clear")
+
+    let clear_delete =
+      RPC_service.delete_service
+        ~query:RPC_query.empty
+        ~output:Data_encoding.empty
+        ~description:
+          "Clear all greylists tables. This will unban all addresses and \
+           peers automatically greylisted by the system."
+        RPC_path.(root / "network" / "greylist")
   end
 
-  let clear ctxt = make_call S.clear ctxt () ()
+  let clear ctxt = make_call S.clear_delete ctxt () ()
 end

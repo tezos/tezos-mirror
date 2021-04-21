@@ -8,10 +8,11 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   ## ocaml should be in sync with `script/version.sh`
-  "ocaml" { >= "4.09.1" & < "4.11" }
+  "ocaml" { >= "4.10.2" & < "4.11" }
   "dune" { >= "2.0" }
   "base-unix"
   "tezos-base"
+  "tezos-version"
   "tezos-protocol-environment"
   "tezos-protocol-environment-sigs"
   "tezos-stdlib-unix"

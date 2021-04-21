@@ -24,7 +24,6 @@ def session() -> Iterator[dict]:
 
 @pytest.mark.incremental
 class TestExample:
-
     def test_wait_sync_proto(self, sandbox: Sandbox, session: dict):
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         clients = sandbox.all_clients()
@@ -39,21 +38,10 @@ class TestExample:
     @pytest.mark.timeout(5)
     def test_inclusion(self, sandbox: Sandbox, session: dict):
         operation_hash = session['operation_hash']
-        sandbox.client(0).wait_for_inclusion(operation_hash,
-                                             branch=session['head_hash'])
+        sandbox.client(0).wait_for_inclusion(
+            operation_hash, branch=session['head_hash']
+        )
 
-    # TODO The next test fails due to a bug. It runs
-    #
-    # tezos-client wait for ooA4Gaa1xnT7DT6C42acy4b6NsvjJfzVYyX5CaD6vft9Y4p9ktu
-    # to be included --check-previous 2
-    #
-    # Which calls the RPC
-    # /chains/main/blocks/BLjJu....SftfYu7pDGTZx~3/hash
-    #
-    # It fails with `Did not find service` if the previous block
-    # HEAD~3 doesn't exist yet which happens if the chain is too short.
-    #
-    @pytest.mark.skip
     @pytest.mark.timeout(5)
     def test_inclusion_check_previous(self, sandbox: Sandbox, session: dict):
         operation_hash = session['operation_hash']

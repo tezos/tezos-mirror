@@ -9,7 +9,11 @@
   tezos-stdlib
   tezos-error-monad
   data-encoding
+  ;; test
+  ppx_inline_test
   )
+ (inline_tests)
+ (preprocess (pps ppx_inline_test))
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_error_monad
                    -open Data_encoding)))

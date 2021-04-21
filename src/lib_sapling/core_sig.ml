@@ -359,7 +359,7 @@ module type Commitment = sig
 
   include T_encoding_bytes
 
-  val compute : viewing_key_address -> amount:int64 -> rcm -> t option
+  val compute : viewing_key_address -> amount:int64 -> rcm -> t
 
   val valid_position : int64 -> bool
 end
@@ -386,7 +386,7 @@ module type Nullifier = sig
     amount:int64 ->
     rcm ->
     position:int64 ->
-    t option
+    t
 end
 
 module type Rcm = sig
@@ -449,7 +449,7 @@ module type Client = sig
       UTXO.rk ->
       UTXO.spend_proof ->
       string ->
-      UTXO.spend_sig option
+      UTXO.spend_sig
 
     val spend_proof :
       t ->
@@ -478,7 +478,7 @@ module type Client = sig
       UTXO.output list ->
       balance:int64 ->
       string ->
-      UTXO.binding_sig option
+      UTXO.binding_sig
   end
 
   module Forge : sig

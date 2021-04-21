@@ -15,8 +15,8 @@ depends: [
   "dune-configurator" {build}
   "ff" {>= "0.4.0" & < "0.5.0"}
   "zarith" {>= "1.10" & < "2.0"}
-  "ctypes" {= "0.17.1"}
-  "ctypes-foreign" {= "0.4.0"}
+  "ctypes" {>= "0.18.0" & < "0.19.0"}
+  "ctypes-foreign"
   "alcotest" {with-test}
 ]
 build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]

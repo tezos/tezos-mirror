@@ -44,8 +44,9 @@ let test_baking_rights () =
   assert (List.length rights = max_priority + 1) ;
   (* filtering by delegate *)
   let d =
-    Contract.is_implicit (List.nth contracts 0)
-    |> Option.unopt_assert ~loc:__POS__
+    Contract.is_implicit
+      (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0)
+    |> WithExceptions.Option.get ~loc:__LOC__
   in
   get Block.rpc_ctxt b ~all:true ~delegates:[d]
   >>=? fun rights ->
@@ -68,4 +69,4 @@ let test_baking_rights () =
   assert (List.for_all (fun {level; _} -> level = espected_level) rights) ;
   return_unit
 
-let tests = [Test.tztest "baking_rights" `Quick test_baking_rights]
+let tests = [Test_services.tztest "baking_rights" `Quick test_baking_rights]

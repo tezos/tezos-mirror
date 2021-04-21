@@ -36,6 +36,12 @@ val register :
   ('p -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
+val register_chunked :
+  'prefix directory ->
+  ([< Resto.meth], 'prefix, 'p, 'q, 'i, 'o) RPC_service.t ->
+  ('p -> 'q -> 'i -> 'o tzresult Lwt.t) ->
+  'prefix directory
+
 val opt_register :
   'prefix directory ->
   ([< Resto.meth], 'prefix, 'p, 'q, 'i, 'o) RPC_service.t ->
@@ -57,6 +63,12 @@ val lwt_register :
 (** Registering handler in service tree. Curryfied variant.  *)
 
 val register0 :
+  unit directory ->
+  ('m, unit, unit, 'q, 'i, 'o) RPC_service.t ->
+  ('q -> 'i -> 'o tzresult Lwt.t) ->
+  unit directory
+
+val register0_chunked :
   unit directory ->
   ('m, unit, unit, 'q, 'i, 'o) RPC_service.t ->
   ('q -> 'i -> 'o tzresult Lwt.t) ->

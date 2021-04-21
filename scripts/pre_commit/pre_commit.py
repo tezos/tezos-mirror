@@ -58,53 +58,6 @@ _TEST_ITSELF = "--test-itself"
 _UNSTAGED = "--unstaged"
 
 
-def _find_python_data(tests_python_path: str)\
-        -> Optional[Tuple[List[List[str]], List[str]]]:
-    """
-    Args:
-        tests_python_path: the path of the directory `tezos/tests_python`
-    Returns:
-        A pair of:
-
-        1/ The commands to call on python files
-        2/ The directories to consider in `tezos/tests_python`
-           (relative to tests_python/)
-
-        or None if an error occured
-    """
-    makefile_path = os.path.join(tests_python_path, "Makefile")
-    if not os.path.isfile(makefile_path):
-        print(f"{makefile_path} not found", file=sys.stderr)
-        return None
-    # Alternatively we could use make itself to retrieve the variables' values
-    # (with a rule printing the value of a variable)
-    # This list shrinks in loop below. The last element matters (it's used
-    # to return the second element of the pair).
-    tags = ["TYPECHECK=", "LINT=", "LINT2=", "PACKAGES="]
-    result = []
-    with open(makefile_path, 'r') as handle:
-        for line in handle.readlines():
-            for (i, tag) in enumerate(tags):
-                if line.startswith(tag):
-                    result.append(line[len(tag):].strip())
-                    tags.pop(i)
-                    if not tags:
-                        # Success
-                        # Tools are all elements except the last one:
-                        tools = result[:-1]
-                        packages = result[-1]  # Take last
-                        # Here we rely on split() taking care of ignoring
-                        # successive whitespaces, as well as trailing ones.
-                        return ([t.split() for t in tools], packages.split())
-    print(
-        "Variables identified by prefixes"
-        f" that follow not found in {makefile_path}:",
-        file=sys.stderr)
-    for tag in tags:
-        print(f"  {tag}", file=sys.stderr)
-    return None
-
-
 def _git_diff(staged_or_modified: bool, extension: str) -> List[str]:
     """
     Args:
@@ -173,7 +126,7 @@ def _get_py_files(tests_python_path: str, staged_or_modified: bool,
         Returns: whether the file is relevant to being an argument to pytest
         """
         forbidden_suffixes = ["__init__.py", "conftest.py"]
-        if any([path.endswith(x) for x in forbidden_suffixes]):
+        if any((path.endswith(x) for x in forbidden_suffixes)):
             return False
         if not path.startswith(f"{tests_python_basename}/tests"):
             return False
@@ -259,39 +212,37 @@ def _call_pytest(tests_python_path: str, files: List[str]) -> int:
     return result
 
 
-def _call_py_linters(tests_python_path: str, files) -> int:
+def _call_py_linters(tests_python_path: str, files: List[str]) -> int:
     """
     Args:
         tests_python_path: the path of the directory `tezos/tests_python`
         files (list(str)): The files to lint
     Returns:
-        The maximum of return codes of calls to linters
+        The return code of calling linters, stopping at first failure
     """
-    py_data = _find_python_data(tests_python_path)
-    if not py_data:
-        return 1
-    tools, packages = py_data
     tests_python_basename = os.path.basename(tests_python_path)
-
-    # trim "tests_python/" from start of path
-    # because we execute within tests_python (this is required since
-    # the move to poetry).
-    files = [x[len(tests_python_basename) + len(os.sep):] for x in files]
-    # remove files that are not in 'packages' i.e. not in directories
-    # listed by tests_python/Makefile's PACKAGES variables
-    files = [x for x in files if any([x.startswith(p) for p in packages])]
-    if not files:  # Nothing to do
-        return 0
-
-    return_code = 0
-    for tool in tools:
-        cmd = tool + files
-        print(f"{tests_python_basename}> " + " ".join(cmd))
-        cmd_result = subprocess.run(cmd,
-                                    cwd=tests_python_basename,
-                                    check=False)
-        return_code = max(return_code, cmd_result.returncode)
-    return return_code
+    # Filter out files that are not under tests_python since this is the scope
+    # of the poetry sandbox
+    target_files = " ".join(
+        [
+            file[len(tests_python_basename) + len(os.sep):]
+            for file in files
+            if file.startswith(tests_python_basename)
+        ]
+    )
+    if not target_files:
+        return 0  # Nothing to do
+    # Run all analyses defined in Makefile for this hook
+    cmd = ["make", "pre_commit_targets"]
+    # We use the SRCS environment variable to pass the filenames that have
+    # changed as our analyses targets
+    completed_process = subprocess.run(
+        cmd,
+        cwd=tests_python_basename,
+        check=False,
+        env=dict(os.environ, SRCS=target_files),
+    )
+    return completed_process.returncode
 
 
 def _call_tezt(files: List[str], staged_or_modified: bool) -> int:
@@ -391,16 +342,6 @@ def _main_test_itself() -> int:
     tests_python_path = _get_tests_python_path()
     if not tests_python_path:
         return 1
-    py_data = _find_python_data(tests_python_path)
-    py_tools = None if py_data is None else py_data[0]
-    if py_tools is None:
-        return 1  # Error has been logged in _find_python_data
-    py_packages = py_data[1]  # type: ignore
-    if py_packages is None:
-        return 1  # Error has been logged in _find_python_data
-    # Success case
-    print(f"All {len(py_tools)} python tools found")
-    print(f"{len(py_packages)} python packages to lint found")
     return 0
 
 

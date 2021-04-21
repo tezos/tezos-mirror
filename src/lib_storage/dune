@@ -8,7 +8,10 @@
             digestif.c
             irmin
             irmin-pack
-            tezos-stdlib-unix)
+            tezos-stdlib-unix
+            tezos-storage.sigs
+            tezos-storage.helpers
+            tezos-storage.encoding)
  (flags (:standard -open Tezos_shell_services
                    -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix

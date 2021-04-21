@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let () = Additional_registrations.force_linking ()
+
 let commands = Commands.commands ()
 
 let home = try Sys.getenv "HOME" with Not_found -> "/tmp"
@@ -137,6 +139,10 @@ let main commands =
                  failwith "%s" (Printexc.to_string exn))
        >>= (function
              | Ok () ->
+                 Lwt.return 0
+             | Error [Clic.Version] ->
+                 let version = Tezos_version.Bin_version.version_string in
+                 Format.printf "%s\n" version ;
                  Lwt.return 0
              | Error [Clic.Help command] ->
                  Clic.usage

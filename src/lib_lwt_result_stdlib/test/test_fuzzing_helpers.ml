@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
-open Lwtreslib.Seq.Monad
+open Support.Lib.Monad
 
 let rec log_pause n =
   if n <= 0 then Lwt.return_unit
@@ -35,29 +34,32 @@ let rec log_pause n =
 (* Function generators *)
 
 module Fn = struct
-  let pred =
+  let lambda s l =
     let open Crowbar in
-    choose
-      [ const (fun x _ -> x > 0);
-        const (fun _ y -> y < 0);
-        const (fun _ _ -> false);
-        const (fun _ _ -> true);
-        const (fun x y -> x < y) ]
+    with_printer (fun fmt _ -> Format.pp_print_string fmt s) @@ const l
+
+  let pred =
+    Crowbar.choose
+      [ lambda "(fun x _ -> x > 0)" (fun x _ -> x > 0);
+        lambda "(fun _ y -> y < 0)" (fun _ y -> y < 0);
+        lambda "(fun _ _ -> false)" (fun _ _ -> false);
+        lambda "(fun _ _ -> true)" (fun _ _ -> true);
+        lambda "(fun x y -> x < y)" (fun x y -> x < y) ]
 
   let arith =
-    let open Crowbar in
-    choose
-      [ const (fun x _ -> x);
-        const (fun _ y -> y);
-        const (fun x _ -> 2 * x);
-        const (fun _ _ -> 0);
-        map [int] (fun n _ _ -> n);
-        const (fun x y -> x + y);
-        const (fun _ y -> 2 * y);
-        const (fun _ y -> y + 1);
-        const (fun x y -> min x y);
-        const (fun x y -> max x y);
-        const (fun x y -> (5 * x) + (112 * y)) ]
+    Crowbar.choose
+      [ lambda "(fun x _ -> x)" (fun x _ -> x);
+        lambda "(fun _ y -> y)" (fun _ y -> y);
+        lambda "(fun x _ -> 2 * x)" (fun x _ -> 2 * x);
+        lambda "(fun _ _ -> 0)" (fun _ _ -> 0);
+        lambda "(fun x y -> x + y)" (fun x y -> x + y);
+        lambda "(fun _ y -> 2 * y)" (fun _ y -> 2 * y);
+        lambda "(fun _ y -> y + 1)" (fun _ y -> y + 1);
+        lambda "(fun x y -> min x y)" (fun x y -> min x y);
+        lambda "(fun x y -> max x y)" (fun x y -> max x y);
+        lambda "(fun x y -> (5 * x) + (112 * y))" (fun x y ->
+            (5 * x) + (112 * y));
+        Crowbar.(map [int] (fun n _ _ -> n)) ]
 
   (* combinators *)
   let e cond ok error x y = if cond x y then Ok (ok x y) else Error (error x y)
@@ -91,6 +93,10 @@ module IterOf = struct
   let fn r fn y = r := fn !r y
 end
 
+module IteriOf = struct
+  let fn r fn i y = r := fn !r (fn i y)
+end
+
 module Iter2Of = struct
   let fn r fn x y = r := fn !r (fn x y)
 end
@@ -119,6 +125,14 @@ module IterEOf = struct
     Ok ()
 
   let fn_e r fn y = fn !r y >|? fun t -> r := t
+end
+
+module IteriEOf = struct
+  let fn r fn i y =
+    r := fn !r (fn i y) ;
+    Ok ()
+
+  let fn_e r fn i y = fn i y >>? fun z -> fn !r z >|? fun t -> r := t
 end
 
 module Iter2EOf = struct
@@ -183,6 +197,14 @@ module IterSOf = struct
   let fn_s r fn y = fn !r y >|= fun t -> r := t
 end
 
+module IteriSOf = struct
+  let fn r fn i y =
+    r := fn !r (fn i y) ;
+    Lwt.return_unit
+
+  let fn_s r fn i y = fn i y >>= fun z -> fn !r z >|= fun t -> r := t
+end
+
 module Iter2SOf = struct
   let fn r fn x y =
     r := fn x y ;
@@ -240,7 +262,7 @@ end
 module IterESOf = struct
   let fn r fn y =
     r := fn !r y ;
-    return_unit
+    unit_es
 
   let fn_e r fn y = Lwt.return @@ fn !r y >|=? fun t -> r := t
 
@@ -253,10 +275,30 @@ module IterESOf = struct
   let fn_es r fn y = fn !r y >|=? fun t -> r := t
 end
 
+module IteriESOf = struct
+  let fn r fn i y =
+    r := fn !r (fn i y) ;
+    unit_es
+
+  let fn_e r fn i y =
+    Lwt.return @@ fn i y
+    >>=? fun z -> Lwt.return @@ fn !r z >|=? fun t -> r := t
+
+  let fn_s r fn i y =
+    fn i y
+    >>= fun z ->
+    fn !r z
+    >|= fun t ->
+    r := t ;
+    Ok ()
+
+  let fn_es r fn i y = fn i y >>=? fun z -> fn !r z >|=? fun t -> r := t
+end
+
 module Iter2ESOf = struct
   let fn r fn x y =
     r := fn x y ;
-    return_unit
+    unit_es
 
   let fn_e r fn x y = Lwt.return @@ fn x y >|=? fun t -> r := t
 
@@ -313,6 +355,11 @@ module MapEPOf = struct
 
   let fn_es const fn elt =
     fn const elt >>= function Ok ok -> return ok | Error err -> fail err
+
+  let fn_ep const fn elt =
+    fn const elt
+    >>= function
+    | Ok ok -> return ok | Error err -> fail (Support.Test_trace.make err)
 end
 
 module Map2ESOf = struct
@@ -369,6 +416,50 @@ let eq_s ?pp a b =
 let eq_es ?pp a b =
   Lwt_main.run (a >>= fun a -> b >|= fun b -> Crowbar.check_eq ?pp a b)
 
+let eq_es_ep ?pp es ep =
+  Lwt_main.run
+    ( es
+    >>= fun es ->
+    ep
+    >|= fun ep ->
+    match (es, ep) with
+    | (Ok ok_es, Ok ok_ep) ->
+        eq ?pp ok_es ok_ep
+    | (Error error_es, Error trace_ep) ->
+        let trace_ep_has_error_es =
+          Support.Test_trace.fold
+            (fun has error -> has || error = error_es)
+            false
+            trace_ep
+        in
+        if trace_ep_has_error_es then ()
+        else
+          Crowbar.failf
+            "%d not in %a"
+            error_es
+            (Support.Test_trace.pp Crowbar.pp_int)
+            trace_ep
+    | (Ok _, Error _) ->
+        Crowbar.fail "Ok _ is not Error _"
+    | (Error _, Ok _) ->
+        Crowbar.fail "Error _ is not Ok _" )
+
+let eq_ep ?pp a b =
+  Lwt_main.run
+    ( a
+    >>= fun a ->
+    b
+    >|= fun b ->
+    match (a, b) with
+    | (Ok ok_es, Ok ok_ep) ->
+        eq ?pp ok_es ok_ep
+    | (Error _, Error _) ->
+        () (* Not as precise as we could be, but precise enough *)
+    | (Ok _, Error _) ->
+        Crowbar.fail "Ok _ is not Error _"
+    | (Error _, Ok _) ->
+        Crowbar.fail "Error _ is not Ok _" )
+
 module PP = struct
   let int = Format.pp_print_int
 
@@ -379,4 +470,6 @@ module PP = struct
   let list elt = Format.pp_print_list ~pp_sep:Format.pp_print_space elt
 
   let bool = Format.pp_print_bool
+
+  let trace = Support.Test_trace.pp
 end

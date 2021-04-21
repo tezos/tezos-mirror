@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Log = Internal_event.Legacy_logging.Make (struct
-  let name = "endorser.main"
-end)
-
 let () =
   Client_commands.register Protocol.hash
   @@ fun _network ->

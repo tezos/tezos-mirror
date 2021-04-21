@@ -1,0 +1,10 @@
+tezt/_regressions/encoding/alpha.fitness.out
+
+./tezos-codec encode alpha.fitness from '[
+  "01",
+  "000000000000000a"
+]'
+00000011000000010100000008000000000000000a
+
+./tezos-codec decode alpha.fitness from 00000011000000010100000008000000000000000a
+[ "01", "000000000000000a" ]

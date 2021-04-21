@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Legacy_logging.Make_semantic (struct
-  let name = "client.context.unix"
-end)
-
 class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
   object (self)
     method load_passwords =
@@ -157,6 +153,15 @@ class unix_logger ~base_dir : Client_context.printer =
     inherit Client_context.simple_printer log
   end
 
+class unix_io_wallet ~base_dir ~password_filename : Client_context.io_wallet =
+  object
+    inherit unix_wallet ~base_dir ~password_filename
+
+    inherit unix_logger ~base_dir
+
+    inherit unix_prompter
+  end
+
 class unix_ui : Client_context.ui =
   object
     method sleep f = Lwt_unix.sleep f
@@ -198,7 +203,7 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
     inherit unix_wallet ~base_dir ~password_filename:None
 
     inherit
-      Tezos_mockup.RPC_client.local_ctxt
+      Tezos_mockup.RPC_client.mockup_ctxt
         base_dir mem_only mockup_env chain_id rpc_context
 
     inherit unix_ui
@@ -208,4 +213,30 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
     method block = `Head 0
 
     method confirmations = None
+  end
+
+class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
+  ~rpc_config ~proxy_env : Client_context.full =
+  object
+    inherit unix_logger ~base_dir
+
+    inherit unix_prompter
+
+    inherit unix_wallet ~base_dir ~password_filename
+
+    inherit
+      Tezos_proxy.RPC_client.http_local_ctxt
+        (new unix_logger ~base_dir)
+        (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+           rpc_config
+           Media_type.all_media_types)
+        proxy_env
+
+    inherit unix_ui
+
+    method chain = chain
+
+    method block = block
+
+    method confirmations = confirmations
   end

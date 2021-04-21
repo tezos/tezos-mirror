@@ -94,7 +94,9 @@ let tezos_protocol_env =
     ( "Tezos_protocol_environment_sigs__V0",
       tezos_protocol_environment_sigs__V0_cmi );
     ( "Tezos_protocol_environment_sigs__V1",
-      tezos_protocol_environment_sigs__V1_cmi ) ]
+      tezos_protocol_environment_sigs__V1_cmi );
+    ( "Tezos_protocol_environment_sigs__V2",
+      tezos_protocol_environment_sigs__V2_cmi ) ]
 
 let register_env =
   let open Embedded_cmis in
@@ -165,14 +167,20 @@ let main {compile_ml; pack_objects; link_shared} =
       ("-output-dep", Arg.Set output_dep, " ...");
       ( "-build-dir",
         Arg.String (fun s -> build_dir := Some s),
-        "use custom build directory and preserve build artifacts" ) ]
+        "use custom build directory and preserve build artifacts" );
+      ( "--version",
+        Unit
+          (fun () ->
+            Format.printf "%s\n" Tezos_version.Bin_version.version_string ;
+            Stdlib.exit 0),
+        " Display version information" ) ]
   in
   let usage_msg =
     Printf.sprintf "Usage: %s [options] <srcdir>\nOptions are:" Sys.argv.(0)
   in
   Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
   let source_dir =
-    match List.rev !anonymous with
+    match !anonymous with
     | [protocol_dir] ->
         protocol_dir
     | _ ->

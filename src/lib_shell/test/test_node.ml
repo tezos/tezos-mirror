@@ -23,8 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Unit tests for node. Currently only tests that
-   events are emitted. *)
+(** Testing
+    -------
+    Component:    Shell (Node)
+    Invocation:   dune exec src/lib_shell/test/test.exe test "node"
+    Dependencies: src/lib_shell/test/shell_test_helpers.ml
+    Subject:      Unit tests for node. Currently only tests that
+                  events are emitted.
+*)
 
 let section = Some (Internal_event.Section.make_sanitized ["node"])
 
@@ -92,6 +98,9 @@ let default_p2p_limits : P2p.limits =
     max_known_peer_ids = Some (400, 300);
     swap_linger = Time.System.Span.of_seconds_exn 30.;
     binary_chunks_size = None;
+    peer_greylist_size = 1023;
+    ip_greylist_size_in_kilobytes = 256;
+    ip_greylist_cleanup_delay = Ptime.Span.of_int_s 3600;
   }
 
 let default_p2p = Some (default_p2p, default_p2p_limits)
@@ -136,6 +145,8 @@ let test_event msg (level1, section1, status1) (level2, section2, json2) =
            Data_encoding.Json.pp
            json2)
 
+(** Node creation in sandbox. Expects one event with status
+    [p2p_layer_disabled]. *)
 let node_sandbox_initialization_events sandbox_parameters config _switch () =
   Node.create
     ~sandboxed:true
@@ -161,10 +172,12 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
   test_event
     "Should have an p2p_layer_disabled"
     (Internal_event.Notice, section, "p2p_layer_disabled")
-    (List.nth evs 0) ;
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
   (* End tests *)
   Node.shutdown n
 
+(** Node creation. Expects two events with statuses
+    [bootstrapping] and [p2p_maintain_started]. *)
 let node_initialization_events _sandbox_parameters config _switch () =
   Node.create
     ~sandboxed:false
@@ -189,11 +202,11 @@ let node_initialization_events _sandbox_parameters config _switch () =
   test_event
     "Should have a p2p bootstrapping event"
     (Internal_event.Notice, section, "bootstrapping")
-    (List.nth evs 0) ;
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
   test_event
     "Should have a p2p_maintain_started event"
     (Internal_event.Notice, section, "p2p_maintain_started")
-    (List.nth evs 1) ;
+    (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 1) ;
   (* End tests *)
   Node.shutdown n
 

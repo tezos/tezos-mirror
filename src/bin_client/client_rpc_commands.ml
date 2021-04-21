@@ -77,7 +77,8 @@ let fill_in ?(show_optionals = true) input schema =
     | Combine ((One_of | Any_of), elts) ->
         let nb = List.length elts in
         input.int 0 (nb - 1) (Some "Select the schema to follow") path
-        >>= fun n -> element path (List.nth elts n)
+        >>= fun n ->
+        element path (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth elts n)
     | Combine ((All_of | Not), _) ->
         Lwt.fail Unsupported_construct
     | Def_ref name ->
@@ -85,29 +86,23 @@ let fill_in ?(show_optionals = true) input schema =
     | Id_ref _ | Ext_ref _ ->
         Lwt.fail Unsupported_construct
     | Array (elts, _) ->
-        let rec fill_loop acc n ls =
-          match ls with
-          | [] ->
-              Lwt.return acc
-          | elt :: elts ->
-              element (string_of_int n :: path) elt
-              >>= fun json -> fill_loop (json :: acc) (succ n) elts
-        in
-        fill_loop [] 0 elts >>= fun acc -> Lwt.return (`A (List.rev acc))
+        List.mapi_s (fun n elt -> element (string_of_int n :: path) elt) elts
+        >|= fun a -> `A a
     | Object {properties; _} ->
-        let properties =
-          if show_optionals then properties
-          else List.filter (fun (_, _, b, _) -> b) properties
-        in
-        let rec fill_loop acc ls =
-          match ls with
-          | [] ->
-              Lwt.return acc
-          | (n, elt, _, _) :: elts ->
-              element (n :: path) elt
-              >>= fun json -> fill_loop ((n, json) :: acc) elts
-        in
-        fill_loop [] properties >>= fun acc -> Lwt.return (`O (List.rev acc))
+        if show_optionals then
+          List.map_s
+            (fun (n, elt, _, _) ->
+              element (n :: path) elt >|= fun json -> (n, json))
+            properties
+          >|= fun o -> `O o
+        else
+          List.filter_map_s
+            (fun (n, elt, optional, _) ->
+              if optional then
+                element (n :: path) elt >|= fun json -> Some (n, json)
+              else Lwt.return_none)
+            properties
+          >|= fun o -> `O o
     | Monomorphic_array (elt, specs) ->
         let rec fill_loop acc min n max =
           if n > max then Lwt.return acc
@@ -432,26 +427,22 @@ let fill_in ?(show_optionals = true) schema =
 let display_answer (cctxt : #Client_context.full) = function
   | `Ok json ->
       cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json
-      >>= fun () -> return_unit
   | `Not_found _ ->
-      cctxt#message "No service found at this URL\n%!"
-      >>= fun () -> return_unit
+      cctxt#error "No service found at this URL\n%!"
   | `Gone _ ->
-      cctxt#message
+      cctxt#error
         "Requested data concerns a pruned block and target resource is no \
          longer available\n\
          %!"
-      >>= fun () -> return_unit
   | `Error (Some json) ->
-      cctxt#message
+      cctxt#error
         "@[<v 2>Command failed :@[ %a@]@]@."
         (Format.pp_print_list Error_monad.pp)
         (Data_encoding.Json.destruct
            (Data_encoding.list Error_monad.error_encoding)
            json)
-      >>= fun () -> return_unit
   | `Error None | `Unauthorized _ | `Forbidden _ | `Conflict _ ->
-      cctxt#message "Unexpected server answer\n%!" >>= fun () -> return_unit
+      cctxt#error "Unexpected server answer\n%!"
 
 let call ?body meth raw_url (cctxt : #Client_context.full) =
   let uri = Uri.of_string raw_url in
@@ -475,7 +466,8 @@ let call ?body meth raw_url (cctxt : #Client_context.full) =
               "This URL did not expect a JSON input but one was provided\n%!"
         )
         >>= fun () ->
-        cctxt#generic_json_call meth ?body uri >>=? display_answer cctxt
+        cctxt#generic_json_call meth ?body uri
+        >>=? fun answer -> display_answer cctxt answer >|= ok
     | Some {input = Some input; _} -> (
         ( match body with
         | None ->
@@ -484,13 +476,12 @@ let call ?body meth raw_url (cctxt : #Client_context.full) =
             Lwt.return (Ok body) )
         >>= function
         | Error msg ->
-            cctxt#error "%s" msg >>= fun () -> return_unit
+            cctxt#error "%s" msg
         | Ok body ->
-            cctxt#generic_json_call meth ~body uri >>=? display_answer cctxt )
-    )
+            cctxt#generic_json_call meth ~body uri
+            >>=? fun answer -> display_answer cctxt answer >|= ok ) )
   | _ ->
-      cctxt#message "No service found at this URL\n%!"
-      >>= fun () -> return_unit
+      cctxt#error "No service found at this URL\n%!"
 
 let call_with_json meth raw_url json (cctxt : #Client_context.full) =
   match Data_encoding.Json.from_string json with

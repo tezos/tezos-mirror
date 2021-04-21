@@ -30,53 +30,31 @@ tool.
 High-level description
 ----------------------
 
-``tezos-snoop`` is a tool for benchmarking and fitting statistical models
-predicting performance of any piece of code of interest. It relies on
-the ``tezos-benchmark`` library. Using ``tezos-benchmark`` requires to provide,
-for each benchmark, the following main items:
+``tezos-snoop`` is a tool for benchmarking and fitting statistical models which predict the performance of any piece of code of interest.
+
+More concretely, let us consider a piece of code for which we wish to predict its performance. To understand the performance profile of this piece of code, we must execute it with different arguments, varying the size of the problem to be solved. As "the size of the problem to be solved" is a long expression, we will use the shorter term *workload* for that.
+
+The notion of workload is abstract here, and indeed, it is not necessarily a scalar. Here are a few examples of workloads:
+
+- Timer benchmarks measure the latency of the timer itself and the associated workloads record nothing.
+- IO benchmarks measure the execution time of performing specific read and write patterns to the underlying key-value store and the associated workloads record the size of the storage as well as the parameters (bytes read/written, length of keys, etc) of these accesses.
+- Translator benchmarks measure the execution time of various pieces of ``Script_ir_translator`` (the *translator* for short, which handles typechecking/unparsing of code and data) as well as Micheline serialization, and corresponding workloads record the size of the typechecked/unparsed/(de)serialized terms.
+- Michelson benchmarks measure the execution time of the interpreter on specific programs and the associated workloads record the list of all executed instructions together with, for each instruction, the sizes of the operands as encountered on the stack.
+
+Once this notion of workload is clear, we can describe Snoop's user interface.
+
+Using ``tezos-benchmark`` requires to provide, for each benchmark, the following main items:
 
 - a type of execution ``workload``;
-- a statistical model, corresponding to a function which to each
-  ``workload`` associates an expression (possibly with free variables)
-  denoting the predicted execution time for that workload.
-  In simple cases, the model consists in a single expression
-  computing a predicted execution time for any given workload.
-- A family of pieces of code (ie closures) to be benchmarked, each associated
-  to its ``workload``. We assume that the execution time of each closure
-  has a well-defined distribution.
-  In most cases these closures correspond to executing a single piece of code
-  of interest with different inputs.
-
-The intuition here is that there is a piece of code for which we wish to predict
-performances. To understand the performance profile of this piece of code, we
-must execute it with arguments of varying sizes (the notion of 'size' is abstract
-here: it is not necessarily a scalar!). Each closure contains the application of
-this piece of a code to an argument of some definite size. The workload associated
-to the closure records this size.
+- a statistical model, corresponding to a function which to each ``workload`` associates an expression (possibly with free variables) denoting the predicted execution time for that workload. In simple cases, the model consists in *a single* expression computing a predicted execution time for any given workload.
+- A family of pieces of code (ie closures) to be benchmarked, each associated to its ``workload``. Thus, each closure contains the application of a piece of a code to arguments instantiating a specific workload. We assume that the execution time of each closure has a well-defined distribution. In most cases, these closures correspond to executing *a single* piece of code of interest with different inputs.
 
 From this input, ``tezos-benchmark`` can perform for you the following tasks:
+
 - perform the timing measurements;
 - infer the free parameters of the statistical model;
 - display the results of benchmarking and inference;
 - generate code from the model.
-
-The notion of workload might seem a bit abstract. Here are a few examples:
-
-- Timer benchmarks measure the latency of the timer itself and
-  the associated workloads record nothing.
-- IO benchmarks measure the execution time of performing specific read
-  and write patterns to the underlying key-value store and the associated
-  workloads record the size of the storage as well as the parameters
-  (bytes read/written, length of keys, etc) of these accesses.
-- Translator benchmarks measure the execution time of various pieces of
-  ``Script_ir_translator`` (the *translator* for short, which handles
-  typechecking/unparsing of code and data)
-  as well as Micheline serialization, and corresponding workloads record
-  the size of the typechecked/unparsed/(de)serialized terms.
-- Michelson benchmarks measure the execution time of the interpreter on specific
-  programs and the associated workloads record the list of all executed instructions
-  together with, for each instruction, the sizes of the operands as
-  encountered on the stack.
 
 Code organization
 -----------------
@@ -109,7 +87,7 @@ Defining benchmarks: the ``Generator`` module
 ---------------------------------------------
 
 The ``Generator.benchmark`` type defines the interface that each benchmark
-must implement. At the time of writing, this type specifies two ways
+must implement. At the time of writing, this type specifies three ways
 to provide a benchmark (but more could be easily added):
 
 .. code-block:: ocaml
@@ -121,6 +99,12 @@ to provide a benchmark (but more could be easily added):
          closure : 'context -> unit;
          with_context : 'a. ('context -> 'a) -> 'a;
        } -> 'workload benchmark
+     | With_probe : {
+         workload : 'aspect -> 'workload;
+         probe : 'aspect probe;
+         closure : 'aspect probe -> unit;
+       }
+         -> 'workload benchmark
 
 Plain benchmarks
 ~~~~~~~~~~~~~~~~
@@ -139,6 +123,42 @@ the closure. An example (which prompted the addition of this feature)
 is the case of storage benchmarks, where we need to create a directory
 and set up some files before executing a closure containing eg
 a read or write access, after which the directory must be removed.
+
+With_probe benchmarks
+~~~~~~~~~~~~~~~~~~~~~
+
+The ``With_probe`` constructor allows fine-grained benchmarking by
+inverting control: the user is in charge of calling the pieces of code
+to be benchmarked using the provided ``probe``. The definition of a
+probe consists in a small object with three methods:
+
+.. code-block:: ocaml
+
+   type 'aspect probe = {
+     apply : 'a. 'aspect -> (unit -> 'a) -> 'a;
+     aspects : unit -> 'aspect list;
+     get : 'aspect -> float list;
+   }
+
+The intended semantics of each method is as follows:
+
+- calling ``probe.apply aspect f`` executes ``f``, performing e.g. a
+  timing measurement of ``f``'s execution time and returns the result
+  of the evaluation. The measurement is associated to the specified
+  ``aspect`` in a side-effecting way.
+- ``probe.aspects`` returns the list of all aspects.
+- Finally, ``probe.get aspect`` returns all the measurements associated
+  to ``aspect``.
+
+Note that ``With_probe`` benchmarks do not come with a fixed workload,
+but rather with an aspect-indexed family of workloads. This reflects
+the fact that this kind of benchmark can measure in the same run
+several different pieces of code, each potentially associated to its
+own cost model.
+
+The function ``Measure.make_timing_probe`` provides a basic probe
+implementation. The unit test in ``src/lib_benchmark/test/test_probe.ml``
+contains an example.
 
 Defining a predictive model: the ``Model`` module
 -------------------------------------------------
@@ -534,7 +554,7 @@ library. The ``solution`` type is defined as follows:
 .. code-block:: ocaml
 
    type solution = {
-     mapping : (string * float) list;
+     mapping : (Free_variable.t * float) list;
      weights : Scikit.Matrix.t;
    }
 

@@ -114,6 +114,15 @@ let make_sapling_uri (x : Uri.t) : sapling_uri =
   | Some _ ->
       x
 
+type pvss_sk_uri = Uri.t
+
+let make_pvss_sk_uri (x : Uri.t) : pvss_sk_uri tzresult Lwt.t =
+  match Uri.scheme x with
+  | None ->
+      failwith "Error while parsing URI: PVSS_URI needs a scheme"
+  | Some _ ->
+      return x
+
 let pk_uri_parameter () =
   Clic.parameter (fun _ s -> make_pk_uri @@ Uri.of_string s)
 
@@ -221,6 +230,30 @@ module Sapling_key = Client_aliases.Alias (struct
   let to_source k =
     let open Data_encoding in
     return @@ Json.to_string (Json.construct encoding k)
+end)
+
+module PVSS_public_key = Client_aliases.Alias (struct
+  let name = "PVSS public key"
+
+  type t = Pvss_secp256k1.Public_key.t
+
+  let encoding = Pvss_secp256k1.Public_key.encoding
+
+  let of_source s = Lwt.return (Pvss_secp256k1.Public_key.of_b58check s)
+
+  let to_source t = return (Pvss_secp256k1.Public_key.to_b58check t)
+end)
+
+module PVSS_secret_key = Client_aliases.Alias (struct
+  let name = "PVSS secret key"
+
+  type t = pvss_sk_uri
+
+  let encoding = uri_encoding
+
+  let of_source s = make_pvss_sk_uri @@ Uri.of_string s
+
+  let to_source t = return (Uri.to_string t)
 end)
 
 module type SIGNER = sig
@@ -386,7 +419,7 @@ let join_keys keys1_opt keys2 =
 let raw_get_key (cctxt : #Client_context.wallet) pkh =
   Public_key_hash.rev_find_all cctxt pkh
   >>=? (fun names ->
-         fold_left_s
+         List.fold_left_es
            (fun keys_opt n ->
              Secret_key.find_opt cctxt n
              >>=? fun sk_uri ->
@@ -406,7 +439,10 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
            names
          >>=? function
          | None ->
-             failwith "no keys for the source contract manager"
+             failwith
+               "no keys for the source contract %a"
+               Signature.Public_key_hash.pp
+               pkh
          | Some keys ->
              return keys)
   >>= function
@@ -448,7 +484,7 @@ let get_public_key cctxt pkh =
 let get_keys (cctxt : #Client_context.wallet) =
   Secret_key.load cctxt
   >>=? fun sks ->
-  Lwt_list.filter_map_s
+  List.filter_map_s
     (fun (name, sk_uri) ->
       Public_key_hash.find cctxt name
       >>=? (fun pkh ->
@@ -469,7 +505,7 @@ let get_keys (cctxt : #Client_context.wallet) =
 let list_keys cctxt =
   Public_key_hash.load cctxt
   >>=? fun l ->
-  map_s
+  List.map_es
     (fun (name, pkh) ->
       raw_get_key cctxt pkh
       >>= function

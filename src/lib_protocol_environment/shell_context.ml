@@ -25,29 +25,40 @@
 
 open Tezos_protocol_environment
 open Context
+open Lwt.Infix
 
-let ( >>= ) = Lwt.( >>= )
+module C = struct
+  include Tezos_storage.Context
 
-type _ Context.kind += Shell : Tezos_storage.Context.t Context.kind
+  let set_protocol = add_protocol
+end
 
-let ops = (module Tezos_storage.Context : CONTEXT with type t = 'ctxt)
+include Environment_context.Register (C)
+
+let impl_name = "shell"
 
 let checkout index context_hash =
   Tezos_storage.Context.checkout index context_hash
-  >>= function
+  >|= function
   | Some ctxt ->
-      Lwt.return_some (Context.Context {ops; ctxt; kind = Shell})
+      Some
+        (Context.Context
+           {ops; ctxt; kind = Context; equality_witness; impl_name})
   | None ->
-      Lwt.return_none
+      None
 
 let checkout_exn index context_hash =
   Tezos_storage.Context.checkout_exn index context_hash
-  >>= fun ctxt -> Lwt.return (Context.Context {ops; ctxt; kind = Shell})
+  >|= fun ctxt ->
+  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
 
-let wrap_disk_context ctxt = Context.Context {ops; ctxt; kind = Shell}
+let wrap_disk_context ctxt =
+  Context.Context {ops; ctxt; kind = Context; equality_witness; impl_name}
 
 let unwrap_disk_context : t -> Tezos_storage.Context.t = function
-  | Context.Context {ctxt; kind = Shell; _} ->
+  | Context.Context {ctxt; kind = Context; _} ->
       ctxt
-  | _ ->
-      assert false
+  | Context.Context t ->
+      Environment_context.err_implementation_mismatch
+        ~expected:impl_name
+        ~got:t.impl_name

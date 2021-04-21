@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -27,7 +27,7 @@
 (* Testing
    -------
    Component: All
-   Invocation: make tezt
+   Invocation: make test-tezt
    Subject: This file is the entrypoint of all Tezt tests. It dispatches to
             other files.
  *)
@@ -37,11 +37,33 @@
    as functions to be called here. *)
 
 let () =
-  Basic.register () ;
-  Bootstrap.register () ;
-  Synchronisation_heuristic.register () ;
+  (* Tests that are relatively protocol-agnostic.
+     We can run them on all protocols, or only one if the CI would be too slow. *)
+  Basic.register Alpha ;
+  Bootstrap.register Alpha ;
+  Synchronisation_heuristic.register Alpha ;
+  Normalize.register Alpha ;
+  Double_bake.register Alpha ;
+  Mockup.register Protocol.current_mainnet ;
+  Mockup.register Alpha ;
+  Proxy.register Protocol.current_mainnet ;
+  Proxy.register Alpha ;
+  P2p.register Alpha ;
+  Protocol_limits.register Alpha ;
+  (* TODO: the "Baking" test does not have a documentation.
+     I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
+     test since it requires Alpha) or about baking (which would make it possible to run
+     on previous protocols, if not for a problem that was introduced in
+     Client.bake_for which causes the default key to be a baking account key). *)
+  Baking.register Alpha ;
+  (* Tests that are protocol-independent.
+     They do not take a protocol as a parameter and thus need to be registered only once. *)
+  Mockup.register_protocol_independent () ;
+  Bootstrap.register_protocol_independent () ;
+  Cli_tezos.register_protocol_independent () ;
+  (* Tests that are heavily protocol-dependent.
+     Those modules define different tests for different protocols in their [register]. *)
   Encoding.register () ;
-  Mockup.register () ;
-  Double_bake.register () ;
+  RPC_test.register () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

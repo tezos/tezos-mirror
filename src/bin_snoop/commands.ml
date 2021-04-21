@@ -48,6 +48,9 @@ module Benchmark_cmd = struct
 
   let set_save_file save_file options = {options with save_file}
 
+  let set_csv_export csv_export (options : Cmdline.benchmark_options) =
+    {options with csv_export}
+
   let set_storage_kind storage options = {options with storage}
 
   let set_bench_number bench_number options = {options with bench_number}
@@ -75,6 +78,7 @@ module Benchmark_cmd = struct
       options;
       save_file = "<This field /will/ be set by Clic>";
       storage = Memory;
+      csv_export = None;
     }
 
   let benchmark_options_to_string (options : Cmdline.benchmark_options) =
@@ -113,7 +117,8 @@ module Benchmark_cmd = struct
         cpu_affinity,
         bench_number,
         minor_heap_size,
-        config_dir ) bench_name save_file () =
+        config_dir,
+        csv_export ) bench_name save_file () =
     let options =
       default_benchmark_options.options
       |> lift_opt set_flush_cache cache
@@ -127,7 +132,8 @@ module Benchmark_cmd = struct
       |> set_config_dir config_dir
     in
     let options =
-      {default_benchmark_options with options} |> set_save_file save_file
+      {default_benchmark_options with options}
+      |> set_save_file save_file |> set_csv_export csv_export
     in
     commandline_outcome_ref :=
       Some (Benchmark {bench_name; bench_opts = options}) ;
@@ -234,7 +240,7 @@ module Benchmark_cmd = struct
         Clic.parameter (fun (_ : unit) parsed -> return parsed)
       in
       Clic.arg
-        ~doc:"Dumps results of benchmark to a file"
+        ~doc:"Dumps raw benchmark results to CSV"
         ~long:"dump-csv"
         ~placeholder:"filename"
         dump_csv_arg_param
@@ -279,7 +285,7 @@ module Benchmark_cmd = struct
 
   let options =
     let open Options in
-    Clic.args9
+    Clic.args10
       flush_cache_arg
       stabilize_gc_arg
       determinizer_arg
@@ -289,6 +295,7 @@ module Benchmark_cmd = struct
       bench_number_arg
       minor_heap_size_arg
       config_dir_arg
+      dump_csv_arg
 
   let benchmark_param =
     Clic.param
@@ -861,6 +868,10 @@ let (list_solvers, list_models) =
   match result with
   | Ok global_options ->
       global_options
+  | Error [Clic.Version] ->
+      let version = Tezos_version.Bin_version.version_string in
+      Format.printf "%s\n" version ;
+      exit 0
   | Error [Clic.Help command] ->
       Clic.usage
         Format.std_formatter

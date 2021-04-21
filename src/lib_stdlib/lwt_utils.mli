@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val may : f:('a -> unit Lwt.t) -> 'a option -> unit Lwt.t
-
 val never_ending : unit -> 'a Lwt.t
 
 (** [worker name ~on_event ~run ~cancel] internally calls [run ()] (which

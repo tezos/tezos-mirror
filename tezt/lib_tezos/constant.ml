@@ -32,32 +32,6 @@ let tezos_node = "./tezos-node"
 
 let tezos_codec = "./tezos-codec"
 
-let alpha_accuser = "./tezos-accuser-alpha"
-
-type protocol = {
-  hash : string;
-  parameter_file : string;
-  tag : string;
-  accuser : string option;
-}
-
-let alpha =
-  {
-    hash = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
-    parameter_file = "src/proto_alpha/parameters/sandbox-parameters.json";
-    tag = "alpha";
-    accuser = Some alpha_accuser;
-  }
-
-let carthage =
-  {
-    hash = "PsCARTHAGazKbHtnKfLzQg3kms52kSRpgnDY982a9oYsSXRLQEb";
-    parameter_file =
-      "src/proto_006_PsCARTHA/parameters/sandbox-parameters.json";
-    tag = "carthage";
-    accuser = Some "./tezos-accuser-006-PsCARTHA";
-  }
-
 type key = {identity : string; alias : string; secret : string}
 
 let activator =
@@ -111,3 +85,8 @@ let bootstrap5 =
 
 let all_secret_keys =
   [activator; bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
+
+(** The default burn for an implicit account. *)
+let implicit_account_burn =
+  (* as per the "origination_size" constant *)
+  Tez.of_mutez_int 257_000

@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Events = Store_events
 open Store_sigs
 
 module Make_value (V : ENCODED_VALUE) = struct
@@ -43,10 +44,8 @@ module Make_value (V : ENCODED_VALUE) = struct
     | Ok b ->
         b
     | Error we ->
-        Store_logging.log_error
-          "Exception while serializing value %a"
-          Data_encoding.Binary.pp_write_error
-          we ;
+        (* this debug event is asyncronous, and we don't have lwt here *)
+        Events.(emit__dont_wait__use_with_care serializing_error we) ;
         Bytes.create 0
 end
 
@@ -194,7 +193,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
       | [] ->
           list t prefix
           >>= fun prefixes ->
-          Lwt_list.map_p
+          List.map_p
             (function `Key prefix | `Dir prefix -> loop (i + 1) prefix [])
             prefixes
           >|= List.flatten
@@ -202,22 +201,20 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
           if i >= I.path_length then invalid_arg "IO.resolve" ;
           list t prefix
           >>= fun prefixes ->
-          Lwt_list.map_p
+          List.map_p
             (function
-              | `Key prefix | `Dir prefix -> (
-                match
-                  String.remove_prefix ~prefix:d (List.hd (List.rev prefix))
-                with
-                | None ->
-                    Lwt.return_nil
-                | Some _ ->
-                    loop (i + 1) prefix [] ))
+              | `Key prefix | `Dir prefix ->
+                  let open Option in
+                  bind (List.last_opt prefix) (fun last_prefix ->
+                      String.remove_prefix ~prefix:d last_prefix)
+                  |> fold ~none:Lwt.return_nil ~some:(fun _ ->
+                         loop (i + 1) prefix []))
             prefixes
           >|= List.flatten
       | "" :: ds ->
           list t prefix
           >>= fun prefixes ->
-          Lwt_list.map_p
+          List.map_p
             (function `Key prefix | `Dir prefix -> loop (i + 1) prefix ds)
             prefixes
           >|= List.flatten

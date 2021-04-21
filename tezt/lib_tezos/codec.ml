@@ -1,18 +1,20 @@
-let spawn_command ?(path = Constant.tezos_codec) arguments =
-  Process.spawn path arguments
+let spawn_command ?(path = Constant.tezos_codec) ?hooks arguments =
+  Process.spawn path ?hooks arguments
 
-let spawn_encode ?path ~name json =
-  spawn_command ?path ["encode"; name; "from"; JSON.encode_u json]
+let spawn_encode ?path ?hooks ~name json =
+  spawn_command ?path ?hooks ["encode"; name; "from"; JSON.encode_u json]
 
-let encode ?path ~name json =
-  spawn_encode ?path ~name json |> Process.check_and_read_stdout
+let encode ?path ?hooks ~name json =
+  spawn_encode ?path ?hooks ~name json |> Process.check_and_read_stdout
 
-let spawn_decode ?path ~name binary =
-  spawn_command ?path ["decode"; name; "from"; binary]
+let spawn_decode ?path ?hooks ~name binary =
+  spawn_command ?path ?hooks ["decode"; name; "from"; binary]
 
-let decode ?path ~name binary =
+let decode ?path ?hooks ~name binary =
   let* json =
-    spawn_decode ?path ~name binary |> Process.check_and_read_stdout
+    String.trim binary
+    |> spawn_decode ?path ?hooks ~name
+    |> Process.check_and_read_stdout
   in
   return (JSON.parse ~origin:("tezos-codec encode " ^ name) json)
 

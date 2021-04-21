@@ -41,9 +41,22 @@ end
 module Request = struct
   include Request
 
-  type _ t = Validated : State.Block.t -> Event.update t
+  type _ t =
+    | Validated : State.Block.t -> Event.update t
+    | Notify_branch : P2p_peer.Id.t * Block_locator.t -> unit t
+    | Notify_head : P2p_peer.Id.t * Block_header.t * Mempool.t -> unit t
+    | Disconnection : P2p_peer.Id.t -> unit t
 
-  let view (type a) (Validated block : a t) : view = State.Block.hash block
+  let view (type a) (req : a t) : view =
+    match req with
+    | Validated block ->
+        Hash (State.Block.hash block)
+    | Notify_branch (peer_id, _) ->
+        PeerId peer_id
+    | Notify_head (peer_id, _, _) ->
+        PeerId peer_id
+    | Disconnection peer_id ->
+        PeerId peer_id
 end
 
 type synchronisation_limits = {latency : int; threshold : int}
@@ -66,6 +79,7 @@ module Types = struct
     block_validator_process : Block_validator_process.t;
     global_valid_block_input : State.Block.t Lwt_watcher.input;
     global_chains_input : (Chain_id.t * bool) Lwt_watcher.input;
+    start_prevalidator : bool;
     prevalidator_limits : Prevalidator.limits;
     peer_validator_limits : Peer_validator.limits;
     limits : limits;
@@ -78,6 +92,7 @@ module Types = struct
        with a known head. Because the chain validator does not handle
        directly these messages, this is done through callbacks. *)
     synchronisation_state : Synchronisation_heuristic.t;
+    mutable current_status : Synchronisation_heuristic.status option;
     (* This should be true if after updating the synchronisatio_state,
        the status was [Synchronized] at least once. When this flag is
        true, the node starts its mempool. *)
@@ -117,9 +132,8 @@ let table = Worker.create_table Queue
 let shutdown w = Worker.shutdown w
 
 let shutdown_child nv active_chains =
-  Lwt_utils.may
-    ~f:
-      (fun ({parameters = {chain_state; global_chains_input; _}; _}, shutdown) ->
+  Option.iter_s
+    (fun ({parameters = {chain_state; global_chains_input; _}; _}, shutdown) ->
       Lwt_watcher.notify global_chains_input (State.Chain.id chain_state, false) ;
       Chain_id.Table.remove active_chains (State.Chain.id chain_state) ;
       State.update_chain_data nv.parameters.chain_state (fun _ chain_data ->
@@ -137,27 +151,23 @@ let shutdown_child nv active_chains =
    - [peer_id] is not us.
 
    - [block] is known as valid. *)
-let update_synchronisation_state =
-  (* Used to detect and log when the status changes. *)
-  let old_status = ref None in
-  fun w ((block, peer_id) : Block_header.t * P2p_peer.Id.t) ->
-    let nv = Worker.state w in
-    Synchronisation_heuristic.update
-      nv.synchronisation_state
-      (block.shell.timestamp, peer_id) ;
-    let status =
-      Synchronisation_heuristic.get_status nv.synchronisation_state
-    in
-    ( match status with
-    | Synchronised _ when nv.bootstrapped = false ->
-        nv.bootstrapped <- true ;
-        Lwt.wakeup_later nv.bootstrapped_wakener () ;
-        Worker.record_event w Bootstrapped
-    | _ ->
-        () ) ;
-    if !old_status <> Some status then (
-      old_status := Some status ;
-      Worker.record_event w (Sync_status status) )
+let update_synchronisation_state w
+    ((block, peer_id) : Block_header.t * P2p_peer.Id.t) =
+  let nv = Worker.state w in
+  Synchronisation_heuristic.update
+    nv.synchronisation_state
+    (block.shell.timestamp, peer_id) ;
+  let status = Synchronisation_heuristic.get_status nv.synchronisation_state in
+  ( match status with
+  | Synchronised _ when nv.bootstrapped = false ->
+      nv.bootstrapped <- true ;
+      Lwt.wakeup_later nv.bootstrapped_wakener () ;
+      Worker.record_event w Bootstrapped
+  | _ ->
+      () ) ;
+  if nv.current_status <> Some status then (
+    nv.current_status <- Some status ;
+    Worker.record_event w (Sync_status status) )
 
 (* The synchronisation state is updated only for blocks known as
    valid. Assume:
@@ -166,9 +176,14 @@ let update_synchronisation_state =
 let check_and_update_synchronisation_state w (block, peer_id) : unit Lwt.t =
   let nv = Worker.state w in
   let hash = Block_header.hash block in
-  State.Block.known_valid nv.parameters.chain_state hash
+  let chain_state = nv.parameters.chain_state in
+  State.Block.known_valid chain_state hash
   >>= fun known_valid ->
-  if known_valid then (
+  let known_valid_or_genesis =
+    known_valid
+    || Block_hash.equal (State.Chain.faked_genesis_hash chain_state) hash
+  in
+  if known_valid_or_genesis then (
     update_synchronisation_state w (block, peer_id) ;
     Lwt.return_unit )
   else Lwt.return_unit
@@ -178,7 +193,7 @@ let notify_new_block w block =
   let nv = Worker.state w in
   Option.iter
     (fun id ->
-      List.assoc_opt id (Worker.list table)
+      List.assoc id (Worker.list table)
       |> Option.iter (fun w ->
              let nv = Worker.state w in
              Lwt_watcher.notify nv.valid_block_input block))
@@ -341,6 +356,7 @@ let may_switch_test_chain w active_chains spawn_child block =
          adding the chain to the correct tables, ...) *)
       spawn_child
         ~parent:(State.Chain.id chain_state)
+        nv.parameters.start_prevalidator
         nv.parameters.peer_validator_limits
         nv.parameters.prevalidator_limits
         nv.parameters.block_validator
@@ -407,37 +423,47 @@ let safe_get_prevalidator_filter hash =
         let module Filter = Prevalidator_filters.No_filter (Proto) in
         return (module Filter : Prevalidator_filters.FILTER) )
 
-let may_instanciate_new_prevalidator nv ~prev ~block =
+let instantiate_prevalidator nv block (limits, chain_db) =
+  State.Block.protocol_hash block
+  >>=? (fun new_protocol ->
+         safe_get_prevalidator_filter new_protocol
+         >>=? fun (module Filter) ->
+         Prevalidator.create limits (module Filter) chain_db)
+  >>= function
+  | Error errs ->
+      Chain_validator_event.(emit prevalidator_reinstantiation_failure) errs
+      >>= fun () ->
+      nv.prevalidator <- None ;
+      Lwt.return_unit
+  | Ok prevalidator ->
+      nv.prevalidator <- Some prevalidator ;
+      Lwt.return_unit
+
+let may_flush_or_update_prevalidator nv ~prev ~block =
   match nv.prevalidator with
+  | None ->
+      return_unit
   | Some old_prevalidator ->
       let prev_proto_level = State.Block.protocol_level prev in
       let new_proto_level = State.Block.protocol_level block in
-      if Compare.Int.(prev_proto_level < new_proto_level) then (
-        State.Block.protocol_hash block
-        >>=? fun new_protocol ->
-        safe_get_prevalidator_filter new_protocol
-        >>=? fun (module Filter) ->
-        let (limits, chain_db) = Prevalidator.parameters old_prevalidator in
+      if Compare.Int.(prev_proto_level < new_proto_level) then
         (* TODO inject in the new prevalidator the operation
            from the previous one. *)
-        Prevalidator.create limits (module Filter) chain_db
-        >>= function
-        | Error errs ->
-            Chain_validator_event.(emit prevalidator_reinstantiation_failure)
-              errs
-            >>= fun () ->
-            nv.prevalidator <- None ;
-            Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit
-        | Ok prevalidator ->
-            nv.prevalidator <- Some prevalidator ;
-            Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit )
+        let parameters = Prevalidator.parameters old_prevalidator in
+        instantiate_prevalidator nv block parameters
+        >>= fun () ->
+        Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit
       else Prevalidator.flush old_prevalidator (State.Block.hash block)
-  | None ->
-      return_unit
 
-let on_request (type a) w start_testchain active_chains spawn_child
-    (req : a Request.t) : a tzresult Lwt.t =
-  let (Request.Validated block) = req in
+let may_instantiate_prevalidator nv ~head =
+  if nv.parameters.start_prevalidator && nv.bootstrapped then
+    instantiate_prevalidator
+      nv
+      head
+      (nv.parameters.prevalidator_limits, nv.parameters.chain_db)
+  else Lwt.return_unit
+
+let on_validation_request w start_testchain active_chains spawn_child block =
   let nv = Worker.state w in
   Chain.head nv.parameters.chain_state
   >>= fun head ->
@@ -467,7 +493,7 @@ let on_request (type a) w start_testchain active_chains spawn_child
     >>=? fun () ->
     broadcast_head w ~previous block
     >>= fun () ->
-    may_instanciate_new_prevalidator nv ~prev:previous ~block
+    may_flush_or_update_prevalidator nv ~prev:previous ~block
     >>=? fun () ->
     ( if start_testchain then
       may_switch_test_chain w active_chains spawn_child block
@@ -478,17 +504,70 @@ let on_request (type a) w start_testchain active_chains spawn_child
       return Event.Head_increment
     else return Event.Branch_switch
 
+let on_notify_branch w peer_id locator =
+  let (block, _) = (locator : Block_locator.t :> _ * _) in
+  check_and_update_synchronisation_state w (block, peer_id)
+  >>= fun () ->
+  with_activated_peer_validator w peer_id (fun pv ->
+      Peer_validator.notify_branch pv locator ;
+      return_unit)
+
+let on_notify_head w peer_id header mempool =
+  let nv = Worker.state w in
+  check_and_update_synchronisation_state w (header, peer_id)
+  >>= fun () ->
+  with_activated_peer_validator w peer_id (fun pv ->
+      Peer_validator.notify_head pv header ;
+      return_unit)
+  >>=? fun () ->
+  match nv.prevalidator with
+  | Some prevalidator ->
+      Prevalidator.notify_operations prevalidator peer_id mempool
+      >>= fun () -> return_unit
+  | None ->
+      return_unit
+
+let on_disconnection w peer_id =
+  let nv = Worker.state w in
+  match P2p_peer.Error_table.find nv.active_peers peer_id with
+  | None ->
+      return_unit
+  | Some pv ->
+      pv >>=? fun pv -> Peer_validator.shutdown pv >>= fun () -> return_unit
+
+let on_request (type a) w start_testchain active_chains spawn_child
+    (req : a Request.t) : a tzresult Lwt.t =
+  match req with
+  | Request.Validated block ->
+      on_validation_request w start_testchain active_chains spawn_child block
+  | Request.Notify_branch (peer_id, locator) ->
+      on_notify_branch w peer_id locator
+  | Request.Notify_head (peer_id, header, mempool) ->
+      on_notify_head w peer_id header mempool
+  | Request.Disconnection peer_id ->
+      on_disconnection w peer_id
+
 let on_completion (type a) w (req : a Request.t) (update : a) request_status =
-  let (Request.Validated block) = req in
-  let fitness = State.Block.fitness block in
-  let request = State.Block.hash block in
-  let level = State.Block.level block in
-  let timestamp = State.Block.timestamp block in
-  Worker.record_event
-    w
-    (Processed_block
-       {request; request_status; update; fitness; level; timestamp}) ;
-  Lwt.return_unit
+  match req with
+  | Request.Validated block ->
+      let fitness = State.Block.fitness block in
+      let request = Request.Hash (State.Block.hash block) in
+      let level = State.Block.level block in
+      let timestamp = State.Block.timestamp block in
+      Worker.record_event
+        w
+        (Processed_block
+           {request; request_status; update; fitness; level; timestamp}) ;
+      Lwt.return_unit
+  | Request.Notify_head (peer_id, _, _) ->
+      Worker.record_event w (Event.Notify_head peer_id) ;
+      Lwt.return_unit
+  | Request.Notify_branch (peer_id, _) ->
+      Worker.record_event w (Event.Notify_branch peer_id) ;
+      Lwt.return_unit
+  | Request.Disconnection peer_id ->
+      Worker.record_event w (Event.Disconnection peer_id) ;
+      Lwt.return_unit
 
 let on_close w =
   let nv = Worker.state w in
@@ -505,30 +584,16 @@ let on_close w =
       []
   in
   Lwt.join
-    ( Lwt_utils.may ~f:Prevalidator.shutdown nv.prevalidator
-    :: Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child
+    ( Option.iter_s Prevalidator.shutdown nv.prevalidator
+    :: Option.iter_s (fun (_, shutdown) -> shutdown ()) nv.child
     :: pvs )
-
-(* Copied from lwtreslib, which is not available in the v8 release branche. *)
-let rec list_iter_es f = function
-  | [] ->
-      return_unit
-  | h :: t ->
-      f h >>=? fun () -> (list_iter_es [@ocaml.tailcall]) f t
-
-(* Copied from lwtreslib, which is not available in the v8 release branche. *)
-let list_iter_es f = function
-  | [] ->
-      return_unit
-  | h :: t ->
-      Lwt.apply f h >>=? fun () -> (list_iter_es [@ocaml.tailcall]) f t
 
 let may_load_protocols parameters =
   let chain_state = Distributed_db.chain_state parameters.chain_db in
   let state = Distributed_db.state parameters.db in
   State.Chain.all_indexed_protocols chain_state
   >>= fun indexed_protocols ->
-  list_iter_es
+  List.iter_es
     (fun (_proto_level, (proto_hash, _activation_block)) ->
       if Registered_protocol.mem proto_hash then return_unit
       else
@@ -548,35 +613,9 @@ let may_load_protocols parameters =
               >>=? fun _ -> return_unit ))
     indexed_protocols
 
-let on_launch start_prevalidator w _ parameters =
+let on_launch w _ parameters =
   may_load_protocols parameters
   >>=? fun () ->
-  ( if start_prevalidator then
-    State.read_chain_data
-      parameters.chain_state
-      (fun _ {State.current_head; _} -> Lwt.return current_head)
-    >>= fun head ->
-    State.Block.protocol_hash head
-    >>=? fun head_protocol_hash ->
-    safe_get_prevalidator_filter head_protocol_hash
-    >>= function
-    | Ok (module Proto_filters) -> (
-        Prevalidator.create
-          parameters.prevalidator_limits
-          (module Proto_filters)
-          parameters.chain_db
-        >>= function
-        | Error errs ->
-            Chain_validator_event.(emit prevalidator_instantiation_failure)
-              errs
-            >>= fun () -> return_none
-        | Ok prevalidator ->
-            return_some prevalidator )
-    | Error errs ->
-        Chain_validator_event.(emit prevalidator_instantiation_failure) errs
-        >>= fun () -> return_none
-  else return_none )
-  >>=? fun prevalidator ->
   let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let (bootstrapped_waiter, bootstrapped_wakener) = Lwt.wait () in
@@ -601,95 +640,48 @@ let on_launch start_prevalidator w _ parameters =
       bootstrapped_waiter;
       bootstrapped;
       synchronisation_state;
+      current_status = None;
       active_peers = P2p_peer.Error_table.create 50;
       (* TODO use [2 * max_connection] *)
       child = None;
-      prevalidator;
+      prevalidator = None (* the prevalidator may be instantiated next *);
     }
   in
+  (* Start the prevalidator when the chain becomes bootstrapped *)
+  Lwt.on_success bootstrapped_waiter (fun () ->
+      (* ignore errors *)
+      Lwt.dont_wait
+        (fun () ->
+          Chain.head parameters.chain_state
+          >>= fun head -> may_instantiate_prevalidator nv ~head)
+        (fun exc -> ignore exc)) ;
   if nv.bootstrapped then Lwt.wakeup_later nv.bootstrapped_wakener () ;
   Distributed_db.set_callback
     parameters.chain_db
     {
       notify_branch =
         (fun peer_id locator ->
-          Error_monad.dont_wait
-            (fun exc ->
-              Format.eprintf
-                "Uncaught exception: %s\n%!"
-                (Printexc.to_string exc))
-            (fun trace ->
-              Format.eprintf
-                "Uncaught error: %a\n%!"
-                Error_monad.pp_print_error
-                trace)
-            (fun () ->
-              let (block, _) = (locator : Block_locator.t :> _ * _) in
-              check_and_update_synchronisation_state w (block, peer_id)
-              >>= fun () ->
-              with_activated_peer_validator w peer_id
-              @@ fun pv ->
-              Peer_validator.notify_branch pv locator ;
-              return_unit));
+          Worker.Queue.push_request_now w (Notify_branch (peer_id, locator)));
       notify_head =
-        (fun peer_id block ops ->
-          Error_monad.dont_wait
-            (fun exc ->
-              Format.eprintf
-                "Uncaught exception: %s\n%!"
-                (Printexc.to_string exc))
-            (fun trace ->
-              Format.eprintf
-                "Uncaught error: %a\n%!"
-                Error_monad.pp_print_error
-                trace)
-            (fun () ->
-              check_and_update_synchronisation_state w (block, peer_id)
-              >>= fun () ->
-              with_activated_peer_validator w peer_id (fun pv ->
-                  Peer_validator.notify_head pv block ;
-                  return_unit)
-              >>=? fun () ->
-              (* TODO notify prevalidator only if head is known ??? *)
-              match nv.prevalidator with
-              | Some prevalidator ->
-                  Prevalidator.notify_operations prevalidator peer_id ops
-                  >>= fun () -> return_unit
-              | None ->
-                  return_unit));
+        (fun peer_id header ops ->
+          Worker.Queue.push_request_now w (Notify_head (peer_id, header, ops)));
       disconnection =
         (fun peer_id ->
-          Error_monad.dont_wait
-            (fun exc ->
-              Format.eprintf
-                "Uncaught exception: %s\n%!"
-                (Printexc.to_string exc))
-            (fun trace ->
-              Format.eprintf
-                "Uncaught error: %a\n%!"
-                Error_monad.pp_print_error
-                trace)
-            (fun () ->
-              let nv = Worker.state w in
-              match P2p_peer.Error_table.find nv.active_peers peer_id with
-              | None ->
-                  return_unit
-              | Some pv ->
-                  pv >>=? fun pv -> Peer_validator.shutdown pv >>= return));
+          Worker.Queue.push_request_now w (Disconnection peer_id));
     } ;
   return nv
 
-let rec create ~start_prevalidator ~start_testchain ~active_chains ?parent
-    ~block_validator_process peer_validator_limits prevalidator_limits
+let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
+    start_prevalidator peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_chains_input db chain_state
     limits =
-  let spawn_child ~parent pvl pl bl gvbi gci db n l =
+  let spawn_child ~parent epv pvl pl bl gvbi gci db n l =
     create
-      ~start_prevalidator
       ~start_testchain
       ~active_chains
       ~parent
       ~block_validator_process
+      epv
       pvl
       pl
       bl
@@ -703,13 +695,41 @@ let rec create ~start_prevalidator ~start_testchain ~active_chains ?parent
   let module Handlers = struct
     type self = t
 
-    let on_launch = on_launch start_prevalidator
+    let on_launch = on_launch
 
     let on_request w = on_request w start_testchain active_chains spawn_child
 
     let on_close = on_close
 
-    let on_error _ _ _ errs = Lwt.return_error errs
+    let on_error w r st errs =
+      Worker.log_event w (Request_failure (r, st, errs))
+      >>= fun () ->
+      match r with
+      | Hash _ ->
+          (* If an error happens here, it means that the request
+            [Validated] failed. For this request, the payload
+            associated to the request was validated and therefore is
+            safe. The handler for such request does some I/Os, and
+            therefore a failure could be "No space left on device" for
+            example. If there is an error at this level, it certainly
+            requires a manual operation from the maintener of the
+            node. *)
+          Lwt.return_error errs
+      | PeerId _ ->
+          (* We do not crash the worker here mainly for one reason:
+            Such request comes from a remote peer. The payload for
+            this request may contain unsafe data. The current policy
+            with tzresult is not clear and there might be a non
+            serious error raised as a [tzresult] to say it was a bad
+            data. If if is the case, we do not want to crash the
+            worker.
+
+            With the current state of the code, it is possible that
+            this branch is not reachable. This would be possible to
+            see it if we relax the interface of [tezos-worker] to use
+            [('a, 'b) result] instead of [tzresult] and if each
+            request uses its own error type. *)
+          return_unit
 
     let on_completion = on_completion
 
@@ -719,6 +739,7 @@ let rec create ~start_prevalidator ~start_testchain ~active_chains ?parent
     {
       parent;
       peer_validator_limits;
+      start_prevalidator;
       prevalidator_limits;
       block_validator;
       block_validator_process;
@@ -751,10 +772,10 @@ let create ~start_prevalidator ~start_testchain ~active_chains
     state limits =
   (* hide the optional ?parent *)
   create
-    ~start_prevalidator
     ~start_testchain
     ~active_chains
     ~block_validator_process
+    start_prevalidator
     peer_validator_limits
     prevalidator_limits
     block_validator
@@ -784,7 +805,7 @@ let child w =
   Option.bind
     (Worker.state w).child
     (fun ({parameters = {chain_state; _}; _}, _) ->
-      List.assoc_opt (State.Chain.id chain_state) (Worker.list table))
+      List.assoc (State.Chain.id chain_state) (Worker.list table))
 
 let assert_fitness_increases ?(force = false) w distant_header =
   let pv = Worker.state w in

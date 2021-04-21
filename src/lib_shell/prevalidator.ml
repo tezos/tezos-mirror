@@ -215,7 +215,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         timestamp = state.timestamp;
         fetching = state.fetching;
         pending = domain state.pending;
-        applied = List.rev (List.map (fun (h, _) -> h) state.applied);
+        applied = List.rev_map (fun (h, _) -> h) state.applied;
         delayed =
           Operation_hash.Set.union
             (domain state.branch_delays)
@@ -263,8 +263,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       else
         State.Block.all_operations block
         >>= fun operations ->
-        Lwt_list.fold_left_s
-          (Lwt_list.fold_left_s (fun mempool op ->
+        List.fold_left_s
+          (List.fold_left_s (fun mempool op ->
                let h = Operation.hash op in
                Distributed_db.inject_operation chain_db h op
                >>= fun (_ : bool) ->
@@ -294,7 +294,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     >>= fun (ancestor, path) ->
     pop_blocks (State.Block.hash ancestor) from_block old_mempool
     >>= fun mempool ->
-    Lwt_list.fold_left_s push_block mempool path
+    List.fold_left_s push_block mempool path
     >>= fun new_mempool ->
     let (new_mempool, outdated) =
       Operation_hash.Map.partition
@@ -645,14 +645,14 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                    Operation_hash.Map.add oph (res, error) acc
              in
              let applied =
-               List.filter_map
+               List.rev_filter_map
                  (fun (hash, op) ->
                    match map_op op with
                    | Some op ->
                        Some (hash, op)
                    | None ->
                        None)
-                 (List.rev pv.applied)
+                 pv.applied
              in
              let filter f map =
                Operation_hash.Map.fold f map Operation_hash.Map.empty

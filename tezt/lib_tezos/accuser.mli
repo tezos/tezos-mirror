@@ -32,7 +32,7 @@ type t
 
     This function just creates the [t] value, it does not call [run].
 
-    The path to accuser binary is given by [path].
+    The path to accuser binary is chosen from the [protocol].
 
     The standard output and standard error output of the accuser will
     be logged with prefix [name] and color [color].
@@ -48,7 +48,7 @@ type t
     will be configured to be synchronised with the given node, and
     will communicate with it. *)
 val create :
-  ?path:string ->
+  protocol:Protocol.t ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
@@ -128,7 +128,7 @@ val wait_for :
     does not want to wait for the node to be ready, it is necessary to
     use [create] and then [run].
 
-    The path to accuser binary is given by [path].
+    The path to accuser binary is chosen from the [protocol].
 
     The standard output and standard error output of the accuser will
     be logged with prefix [name] and color [color].
@@ -144,7 +144,7 @@ val wait_for :
     will be configured to be synchronised with the given node, and
     will communicate with it. *)
 val init :
-  ?path:string ->
+  protocol:Protocol.t ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->

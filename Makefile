@@ -1,4 +1,3 @@
-
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 
 active_protocol_versions := $(shell cat active_protocol_versions)
@@ -93,32 +92,11 @@ $(addsuffix .test,${PACKAGES}): %.test:
 	@dune build \
 	    @$(patsubst %/$*.opam,%,$(shell find src vendors -name $*.opam))/runtest
 
-.PHONY: doc-html
-doc-html: all
-	@dune build @doc
-	@./tezos-client -protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-client.html
-	@./tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-admin-client.html
-	@./tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-signer.html
-	@./tezos-baker-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-baker-alpha.html
-	@./tezos-endorser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-endorser-alpha.html
-	@./tezos-accuser-alpha man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-accuser-alpha.html
-	@./tezos-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > docs/api/tezos-snoop.html
-	@mkdir -p $$(pwd)/docs/_build/api/odoc
-	@rm -rf $$(pwd)/docs/_build/api/odoc/*
-	@cp -r $$(pwd)/_build/default/_doc/* $$(pwd)/docs/_build/api/odoc/
-	@${MAKE} -C docs html
-	@echo '.toc {position: static}' >> $$(pwd)/docs/_build/api/odoc/_html/odoc.css
-	@echo '.content { margin-left: 4ex }' >> $$(pwd)/docs/_build/api/odoc/_html/odoc.css
-	@echo '@media (min-width: 745px) {.content {margin-left: 4ex}}' >> $$(pwd)/docs/_build/api/odoc/_html/odoc.css
-	@sed -e 's/@media only screen and (max-width: 95ex) {/@media only screen and (max-width: 744px) {/' $$(pwd)/docs/_build/api/odoc/_html/odoc.css > $$(pwd)/docs/_build/api/odoc/_html/odoc.css2
-	@mv $$(pwd)/docs/_build/api/odoc/_html/odoc.css2  $$(pwd)/docs/_build/api/odoc/_html/odoc.css
-
-.PHONY: dock-html-and-linkcheck
-doc-html-and-linkcheck: doc-html
-	@${MAKE} -C docs all
-
 .PHONY: coverage-report
 coverage-report:
+	# remove spurious empty output files which prevent bisect from generating
+	# the report
+	@find ${COVERAGE_OUTPUT} -size 0 -type f -delete
 	@bisect-ppx-report html -o ${COVERAGE_REPORT} --coverage-path ${COVERAGE_OUTPUT}
 	@echo "Report should be available in ${COVERAGE_REPORT}/index.html"
 
@@ -192,11 +170,16 @@ check-linting:
 	@dune build @runtest_lint
 
 check-python-linting:
-	@make -C tests_python lint_all
+	@make -C tests_python lint
 
-.PHONY: fmt
-fmt:
+.PHONY: fmt fmt-ocaml fmt-python
+fmt: fmt-ocaml fmt-python
+
+fmt-ocaml:
 	@src/tooling/lint.sh --format --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
+
+fmt-python:
+	@make -C tests_python fmt
 
 .PHONY: build-deps
 build-deps:

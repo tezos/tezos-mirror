@@ -162,8 +162,8 @@ type 'a encoding = {
 let prefix {prefix; _} = prefix
 
 let simple_decode ?alphabet {prefix; of_raw; _} s =
-  let open TzOption in
-  safe_decode ?alphabet s >>= TzString.remove_prefix ~prefix >>= of_raw
+  let ( >?? ) = Option.bind in
+  safe_decode ?alphabet s >?? TzString.remove_prefix ~prefix >?? of_raw
 
 let simple_encode ?alphabet {prefix; to_raw; _} d =
   safe_encode ?alphabet (prefix ^ to_raw d)
@@ -396,6 +396,9 @@ module Prefix = struct
   let secp256k1_encrypted_secret_key = "\009\237\241\174\150" (* spesk(88) *)
 
   let p256_encrypted_secret_key = "\009\048\057\115\171" (* p2esk(88) *)
+
+  (* 60 *)
+  let secp256k1_encrypted_scalar = "\001\131\036\086\248" (* seesk(93) *)
 
   (* 33 *)
   let secp256k1_public_key = "\003\254\226\086" (* sppk(55) *)

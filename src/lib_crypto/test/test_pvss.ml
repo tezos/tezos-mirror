@@ -30,6 +30,9 @@
     Subject:      On Publicly Verifiable Secret Sharing [Schoenmakers, 1999]
 *)
 
+(* We reshadow the List module with Stdlib's because there are many safe uses of
+   double-list traversors *)
+module List = Stdlib.List
 module Pvss = Pvss_secp256k1
 module Sp = Secp256k1_group
 

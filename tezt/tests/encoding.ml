@@ -23,6 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component: encoding tests
+   Invocation: dune exec tezt/tests/main.exe encoding
+
+               To only run the regression tests:
+               [dune exec tezt/tests/main.exe encoding regression]
+
+               Note that to reset the regression outputs, one can use
+               the [--reset-regressions] option. When doing so, it is
+               recommended to clear the output directory
+               [tezt/_regressions/encoding] first to remove unused files in case
+               some paths change.
+   Subject: Encoding regression tests capture the output of encoding/decoding
+            using the [tezos-codec] and compare it with the output from the
+            previous run. The test passes only if the outputs match exactly.
+
+            The other test checks that the [tezos-codec] can successfully dump
+            the list of encodings.
+*)
+
 let check_dump_encodings () =
   Test.register
     ~__FILE__
@@ -60,8 +81,10 @@ let rec equal_json (a : JSON.u) (b : JSON.u) =
 let check_sample ~name ~file =
   let* json_string = Tezos_stdlib_unix.Lwt_utils_unix.read_file file in
   let json = JSON.parse ~origin:json_string json_string in
-  let* binary = Codec.encode ~name (JSON.unannotate json) in
-  let* decoded_json = Codec.decode ~name binary in
+  let* binary =
+    Codec.encode ~hooks:Regression.hooks ~name (JSON.unannotate json)
+  in
+  let* decoded_json = Codec.decode ~hooks:Regression.hooks ~name binary in
   if not @@ equal_json (JSON.unannotate json) (JSON.unannotate decoded_json)
   then
     Test.fail
@@ -74,54 +97,90 @@ let check_sample ~name ~file =
 
 (** The given samples must be included in registered encodings. These can be
     found with [tezos-codec list encodings]. *)
-let check_samples_encoding ~group_name ~samples =
+let check_samples_encoding ~group_name ~protocol ~samples =
   List.iter
     (fun sample ->
       Regression.register
         ~__FILE__
         ~title:(sf "%s encoding regression test: %s" group_name sample)
         ~tags:["encoding"; group_name]
-        ~output_file:(sf "%s.%s" group_name sample)
+        ~output_file:("encoding" // sf "%s.%s" group_name sample)
       @@ fun () ->
       let base_path =
         "tezt" // "tests" // "encoding_samples" // group_name // sample
       in
       Sys.readdir base_path |> Array.to_list |> List.sort String.compare
       |> Lwt_list.iter_s (fun file ->
-             check_sample ~name:sample ~file:(base_path // file)))
+             check_sample
+               ~name:(Protocol.encoding_prefix protocol ^ "." ^ sample)
+               ~file:(base_path // file)))
     samples
 
 let register () =
   check_dump_encodings () ;
   check_samples_encoding
-    ~group_name:"protocol"
+    ~group_name:"alpha"
+    ~protocol:Alpha
     ~samples:
-      [ "alpha.block_header";
-        "alpha.block_header.raw";
-        "alpha.block_header.unsigned";
-        "alpha.contract";
-        "alpha.contract.big_map_diff";
-        "alpha.cycle";
-        "alpha.delegate.balance_updates";
-        "alpha.delegate.frozen_balance";
-        "alpha.delegate.frozen_balance_by_cycles";
-        "alpha.fitness";
-        "alpha.gas.cost";
-        "alpha.gas";
-        "alpha.level";
-        "alpha.nonce";
-        "alpha.operation.internal";
-        "alpha.operation";
-        "alpha.operation.raw";
-        "alpha.operation.unsigned";
-        "alpha.period";
-        "alpha.raw_level";
-        "alpha.roll";
-        "alpha.seed";
-        "alpha.tez";
-        "alpha.timestamp";
-        "alpha.vote.ballot";
-        "alpha.vote.ballots";
-        "alpha.vote.listings";
-        "alpha.voting_period.kind";
-        "alpha.voting_period" ]
+      [ "block_header";
+        "block_header.raw";
+        "block_header.unsigned";
+        "contract";
+        "contract.big_map_diff";
+        "cycle";
+        "delegate.frozen_balance";
+        "delegate.frozen_balance_by_cycles";
+        "fitness";
+        "gas.cost";
+        "gas";
+        "level";
+        "nonce";
+        "operation.internal";
+        "operation";
+        "operation.raw";
+        "operation.unsigned";
+        "period";
+        "raw_level";
+        "receipt.balance_updates";
+        "roll";
+        "seed";
+        "tez";
+        "timestamp";
+        "vote.ballot";
+        "vote.ballots";
+        "vote.listings";
+        "voting_period.kind";
+        "voting_period" ] ;
+  check_samples_encoding
+    ~group_name:"current"
+    ~protocol:Protocol.current_mainnet
+    ~samples:
+      [ "block_header";
+        "block_header.raw";
+        "block_header.unsigned";
+        "contract";
+        "contract.big_map_diff";
+        "cycle";
+        "delegate.balance_updates";
+        "delegate.frozen_balance";
+        "delegate.frozen_balance_by_cycles";
+        "fitness";
+        "gas.cost";
+        "gas";
+        "level";
+        "nonce";
+        "operation.internal";
+        "operation";
+        "operation.raw";
+        "operation.unsigned";
+        "period";
+        "raw_level";
+        "roll";
+        "seed";
+        "tez";
+        "timestamp";
+        "vote.ballot";
+        "vote.ballots";
+        "vote.listings";
+        "voting_period.kind";
+        "voting_period" ]

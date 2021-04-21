@@ -52,8 +52,6 @@
 type config = {
   maintenance_idle_time : Time.System.Span.t;
       (** How long to wait at most before running a maintenance loop. *)
-  greylist_timeout : Time.System.Span.t;
-      (** GC delay for the greylists tables. *)
   private_mode : bool;
       (** If [true], only open outgoing/accept incoming connections
       to/from peers whose addresses are in [trusted_peers], and inform
