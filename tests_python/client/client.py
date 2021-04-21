@@ -267,6 +267,10 @@ class Client:
             cmd += ['--gas', '%d' % gas]
         return client_output.RunScriptResult(self.run(cmd))
 
+    def hash_script(self, contract: str) -> str:
+        params = ['hash', 'script', contract]
+        return self.run(params)
+
     def gen_key(self, alias: str, args: List[str] = None) -> str:
         cmd = ['gen', 'keys', alias]
         if args is None:
