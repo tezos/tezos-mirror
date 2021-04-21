@@ -254,5 +254,7 @@ if [ -n "$commit" ]; then
 fi
 
 if $check_clean; then
+    echo "Files that differ but that shouldn't:"
     git diff --name-only HEAD --exit-code
+    echo "(none, everything looks good)"
 fi
