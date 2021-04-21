@@ -18,15 +18,16 @@
     - mkdir ~/.docker || true
     - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
   script:
+    - TAG_NAME=$(echo "${CI_COMMIT_REF_NAME}" | tr -c -- '-._\n[:alnum:]' '_')
     - ./scripts/create_docker_image.sh
         "${public_docker_image_name}"
-        "${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_SLUG}"
+        "${IMAGE_ARCH_PREFIX}${TAG_NAME}"
         "${build_deps_image_name}"
         "${build_deps_image_version}"
         "${CI_COMMIT_SHORT_SHA}"
-    - docker push "${public_docker_image_name%?}:${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_SLUG}"
-    - docker push "${public_docker_image_name}bare:${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_SLUG}"
-    - docker push "${public_docker_image_name}debug:${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_SLUG}"
+    - docker push "${public_docker_image_name%?}:${IMAGE_ARCH_PREFIX}${TAG_NAME}"
+    - docker push "${public_docker_image_name}bare:${IMAGE_ARCH_PREFIX}${TAG_NAME}"
+    - docker push "${public_docker_image_name}debug:${IMAGE_ARCH_PREFIX}${TAG_NAME}"
   interruptible: false
 
 publish:docker_manual:
@@ -44,6 +45,8 @@ publish:docker_manual:
     - when: never
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  tags:
+    -  gitlab-org-docker
 
 build_release:docker_amd64:
   extends: .build_docker_release_template
@@ -169,30 +172,31 @@ merge-manifest:
     - echo "{ \"experimental\":\"enabled\", \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
   script:
     - LAST_COMMIT_DATE_TIME=$(git log --pretty=format:"%cd" -1 --date="format:%Y%m%d%H%M%S" 2>&1)
-    - docker manifest create "${public_docker_image_name}bare:${CI_COMMIT_REF_SLUG}"
-      --amend "${public_docker_image_name}bare:amd64-${CI_COMMIT_REF_SLUG}"
-      --amend "${public_docker_image_name}bare:arm64-${CI_COMMIT_REF_SLUG}"
-    - docker manifest push "${public_docker_image_name}bare:${CI_COMMIT_REF_SLUG}"
-    - docker manifest create "${public_docker_image_name}bare:${CI_COMMIT_REF_SLUG}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-      --amend "${public_docker_image_name}bare:amd64-${CI_COMMIT_REF_SLUG}"
-      --amend "${public_docker_image_name}bare:arm64-${CI_COMMIT_REF_SLUG}"
-    - docker manifest push "${public_docker_image_name}bare:${CI_COMMIT_REF_SLUG}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-    - docker manifest create "${public_docker_image_name}debug:${CI_COMMIT_REF_SLUG}"
-      --amend "${public_docker_image_name}debug:amd64-${CI_COMMIT_REF_SLUG}"
-      --amend "${public_docker_image_name}debug:arm64-${CI_COMMIT_REF_SLUG}"
-    - docker manifest push "${public_docker_image_name}debug:${CI_COMMIT_REF_SLUG}"
-    - docker manifest create "${public_docker_image_name}debug:${CI_COMMIT_REF_SLUG}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-      --amend "${public_docker_image_name}debug:amd64-${CI_COMMIT_REF_SLUG}"
-      --amend "${public_docker_image_name}debug:arm64-${CI_COMMIT_REF_SLUG}"
-    - docker manifest push "${public_docker_image_name}debug:${CI_COMMIT_REF_SLUG}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-    - docker manifest create "${public_docker_image_name%?}:${CI_COMMIT_REF_SLUG}"
-      --amend "${public_docker_image_name%?}:amd64-${CI_COMMIT_REF_SLUG}"
-      --amend "${public_docker_image_name%?}:arm64-${CI_COMMIT_REF_SLUG}"
-    - docker manifest push "${public_docker_image_name%?}:${CI_COMMIT_REF_SLUG}"
-    - docker manifest create "${public_docker_image_name%?}:${CI_COMMIT_REF_SLUG}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-      --amend "${public_docker_image_name%?}:amd64-${CI_COMMIT_REF_SLUG}"
-      --amend "${public_docker_image_name%?}:arm64-${CI_COMMIT_REF_SLUG}"
-    - docker manifest push "${public_docker_image_name%?}:${CI_COMMIT_REF_SLUG}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - TAG_NAME=$(echo "${CI_COMMIT_REF_NAME}" | tr -c -- '-._\n[:alnum:]' '_')
+    - docker manifest create "${public_docker_image_name}bare:${TAG_NAME}"
+      --amend "${public_docker_image_name}bare:amd64-${TAG_NAME}"
+      --amend "${public_docker_image_name}bare:arm64-${TAG_NAME}"
+    - docker manifest push "${public_docker_image_name}bare:${TAG_NAME}"
+    - docker manifest create "${public_docker_image_name}bare:${TAG_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+      --amend "${public_docker_image_name}bare:amd64-${TAG_NAME}"
+      --amend "${public_docker_image_name}bare:arm64-${TAG_NAME}"
+    - docker manifest push "${public_docker_image_name}bare:${TAG_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker manifest create "${public_docker_image_name}debug:${TAG_NAME}"
+      --amend "${public_docker_image_name}debug:amd64-${TAG_NAME}"
+      --amend "${public_docker_image_name}debug:arm64-${TAG_NAME}"
+    - docker manifest push "${public_docker_image_name}debug:${TAG_NAME}"
+    - docker manifest create "${public_docker_image_name}debug:${TAG_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+      --amend "${public_docker_image_name}debug:amd64-${TAG_NAME}"
+      --amend "${public_docker_image_name}debug:arm64-${TAG_NAME}"
+    - docker manifest push "${public_docker_image_name}debug:${TAG_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+    - docker manifest create "${public_docker_image_name%?}:${TAG_NAME}"
+      --amend "${public_docker_image_name%?}:amd64-${TAG_NAME}"
+      --amend "${public_docker_image_name%?}:arm64-${TAG_NAME}"
+    - docker manifest push "${public_docker_image_name%?}:${TAG_NAME}"
+    - docker manifest create "${public_docker_image_name%?}:${TAG_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
+      --amend "${public_docker_image_name%?}:amd64-${TAG_NAME}"
+      --amend "${public_docker_image_name%?}:arm64-${TAG_NAME}"
+    - docker manifest push "${public_docker_image_name%?}:${TAG_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
   interruptible: false
 
 publish:doc:
