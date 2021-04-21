@@ -25,7 +25,7 @@ The source code of Tezos is placed under the MIT Open Source License.
 Latest Release
 --------------
 
-The current version of Tezos is :ref:`version-8`.
+The current version of Tezos is :ref:`version-9`.
 
 The Community
 -------------
