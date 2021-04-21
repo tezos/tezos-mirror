@@ -1497,6 +1497,25 @@ class TestScriptHashRegression:
 
 
 @pytest.mark.contract
+class TestScriptHashOrigination:
+    def test_contract_hash_with_origination(
+        self, client: Client, session: dict
+    ):
+        script = 'parameter unit; storage unit; code {CAR; NIL operation; PAIR}'
+        originate(
+            client,
+            session,
+            contract=script,
+            init_storage='Unit',
+            amount=1000,
+            contract_name='dummy_contract',
+        )
+        hash1 = client.hash_script(script)
+        hash2 = client.get_script_hash('dummy_contract')
+        assert hash1 == hash2
+
+
+@pytest.mark.contract
 @pytest.mark.regression
 class TestNormalize:
     """Regression tests for the "normalize data" command."""
