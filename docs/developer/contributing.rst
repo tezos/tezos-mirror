@@ -467,6 +467,9 @@ pitfalls a code reviewer should avoid.
   are more important than others. It gives an important guidance to the developer
   to improve their work incrementally.
 
+- When you consider that a fix is important but should not prevent the current MR to be merged (e.g., because it adds a sufficient amount of useful new features), you may suggest creating a follow-up issue.
+  If the place in the code that needs to be fixed later is clear, you may also suggest marking it with a :ref:`FIXME comment <fixme_comments>`.
+
 - Take the developer's opinion into consideration: Imposing a particular design
   choice out of personal preferences and without a real explanation will
   incentivize the developer to be a passive executor instead of a creative agent.
@@ -494,6 +497,8 @@ pitfalls a code reviewer should avoid.
   have a different reactions to it and impact on the quality of this work. This
   general remark is valid for any comment.
 
+.. _merge_bot:
+
 The Merge-Request Bot
 ---------------------
 
@@ -516,6 +521,7 @@ In particular, the Merge-Request Bot may complain about TODOs but they aren't
 strictly
 forbidden, if they alert the reader that some code is a short-term solution
 but could be improved in the future.
+However, consider using a :ref:`FIXME comment <fixme_comments>` instead, whenever possible, to ensure that the intended evolution is tracked by an issue.
 
 The code for the bot is at
 `smondet/merbocop <https://gitlab.com/smondet/merbocop>`__. It is of course

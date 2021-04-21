@@ -58,6 +58,20 @@ Constants and struct fields:
 
 - Purpose and definition of this data. If the unit is a measurement of time, include it, e.g., TIMEOUT_MS for timeout in milliseconds.
 
+.. _fixme_comments:
+
+FIXME comments
+~~~~~~~~~~~~~~
+
+During the :ref:`code review process <code_review>`, follow-up issues may be created, for instance to improve or generalize some piece of code.
+When the place of the future fix is known in advance (e.g. a given function), you should mark it with a FIXME comment of the form::
+
+    (* FIXME (<issue>): <one-line explanation>
+       <Add long explanation if the issue description is not the right place.>
+    *)
+
+Note that the reference to an existing issue is mandatory, and might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`.
+
 Documenting interfaces and implementations
 ------------------------------------------
 
