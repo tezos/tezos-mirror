@@ -25,6 +25,11 @@
 
 type additional_cycles = {offset : int}
 
+let pp_additional_cycles ppf {offset} =
+  Format.pp_print_string
+    ppf
+    (if offset = 0 then "" else Format.sprintf " + %d extra cycles" offset)
+
 type t = Archive | Full of additional_cycles | Rolling of additional_cycles
 
 let default_offset = 5
@@ -115,16 +120,9 @@ let equal hm1 hm2 =
 
 let pp ppf = function
   | Archive -> Format.fprintf ppf "Archive mode"
-  | Full {offset} ->
-      Format.fprintf
-        ppf
-        "Full mode%s"
-        (if offset = 0 then "" else Format.sprintf " + %d extra cycles" offset)
-  | Rolling {offset} ->
-      Format.fprintf
-        ppf
-        "Rolling mode%s"
-        (if offset = 0 then "" else Format.sprintf " + %d extra cycles" offset)
+  | Full offset -> Format.fprintf ppf "Full mode%a" pp_additional_cycles offset
+  | Rolling offset ->
+      Format.fprintf ppf "Rolling mode%a" pp_additional_cycles offset
 
 let pp_short ppf = function
   | Archive -> Format.fprintf ppf "archive"
