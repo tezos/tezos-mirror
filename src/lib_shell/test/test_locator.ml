@@ -476,12 +476,12 @@ let test_protocol_locator base_dir =
   let genesis = Store.Chain.genesis chain_store in
   Store.close_store store >>= fun () ->
   let open Filename.Infix in
-  let history_mode = History_mode.Rolling {offset = 0} in
+  let history_mode = History_mode.Rolling (Some {offset = 0}) in
   Store.may_switch_history_mode
     ~store_dir:(base_dir // "store")
     ~context_dir:(base_dir // "context")
     genesis
-    ~new_history_mode:(Rolling {offset = 0})
+    ~new_history_mode:(Rolling (Some {offset = 0}))
   >>=? fun () ->
   Shell_test_helpers.init_chain ~history_mode base_dir >>= fun store ->
   let chain_store = Store.main_chain_store store in

@@ -786,15 +786,21 @@ let fix_chain_config chain_dir block_store genesis caboose savepoint =
   else Lwt.return 0)
   >>= fun nb_cycles_metadata ->
   let nb_cycles = List.length cemented_blocks_files in
-  let offset = nb_cycles_metadata in
+  (* If the infered offset equals the default offset value then we
+     assume that "default" was the previous value. *)
+  let offset =
+    if nb_cycles_metadata = History_mode.default_additional_cycles.offset then
+      None
+    else Some {History_mode.offset = nb_cycles_metadata}
+  in
   let history_mode =
     (* Caboose is not genesis: we sure are in rolling*)
-    if fst caboose <> genesis.Genesis.block then History_mode.Rolling {offset}
+    if fst caboose <> genesis.Genesis.block then History_mode.Rolling offset
     else if
       (* Caboose is genesis and savepoint is not genesis: we can be in
          both rolling and full. We choose full as the less destructive. *)
       fst savepoint <> genesis.block
-    then Full {offset}
+    then Full offset
     else if
       (* Caboose is genesis and savepoint is genesis and there are as
          many cycles as metadata: we can be in any modes. We choose
@@ -804,7 +810,7 @@ let fix_chain_config chain_dir block_store genesis caboose savepoint =
     else
       (* Otherwise, the number of cemented data differs. We can be in
          full or rolling. We choose full as the less destructive. *)
-      Full {offset}
+      Full offset
   in
   let chain_config = {history_mode; genesis; expiration = None} in
   Stored_data.write_file (Naming.chain_config_file chain_dir) chain_config

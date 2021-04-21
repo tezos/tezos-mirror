@@ -2015,13 +2015,15 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                   return (filtered_table, Some floating_blocks))
 
   (* Ensures that the history mode requested to export is compatible
-     with the current storage *)
+     with the current storage. *)
   let check_history_mode chain_store ~rolling =
     match (Store.Chain.history_mode chain_store : History_mode.t) with
     | Archive | Full _ -> return_unit
     | Rolling _ when rolling -> return_unit
     | Rolling _ as stored ->
-        fail (Incompatible_history_mode {stored; requested = Full {offset = 0}})
+        fail
+          (Incompatible_history_mode
+             {stored; requested = Full (Some {offset = 0})})
 
   let export_floating_block_stream snapshot_exporter floating_block_stream =
     let f fd =
@@ -2044,7 +2046,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       check_history_mode chain_store ~rolling >>=? fun () ->
       retrieve_export_block chain_store block
       >>=? fun (export_block, pred_block, lowest_block_level_needed) ->
-      let export_mode = History_mode.Rolling {offset = 0} in
+      let export_mode = History_mode.Rolling (Some {offset = 0}) in
       Event.(
         emit export_info (export_mode, Store.Block.descriptor export_block))
       >>= fun () ->
@@ -2114,7 +2116,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       check_history_mode chain_store ~rolling >>=? fun () ->
       retrieve_export_block chain_store block
       >>=? fun (export_block, pred_block, _lowest_block_level_needed) ->
-      let export_mode = History_mode.Full {offset = 0} in
+      let export_mode = History_mode.Full (Some {offset = 0}) in
       Event.(
         emit export_info (export_mode, Store.Block.descriptor export_block))
       >>= fun () ->
@@ -3246,8 +3248,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     (let open History_mode in
     match snapshot_metadata.history_mode with
     | Archive -> assert false
-    | Rolling _ -> return (Rolling {offset = default_offset})
-    | Full _ -> return (Full {offset = default_offset}))
+    | Rolling _ -> return (Rolling None)
+    | Full _ -> return (Full None))
     >>=? fun history_mode ->
     Animation.display_progress
       ~every:100

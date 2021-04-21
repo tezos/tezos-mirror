@@ -112,13 +112,15 @@ let make_tests_bootstrapped speed patch_context =
     | `Slow ->
         History_mode.
           [
-            Full {offset = 0};
-            Full {offset = 3};
-            Full {offset = default_offset};
+            Full (Some {offset = 0});
+            Full (Some {offset = 3});
+            Full (Some default_additional_cycles);
             Archive;
-            Rolling {offset = default_offset};
+            Rolling (Some default_additional_cycles);
           ]
-    | `Quick -> History_mode.[Full {offset = 0}; Full {offset = default_offset}]
+    | `Quick ->
+        History_mode.
+          [Full (Some {offset = 0}); Full (Some default_additional_cycles)]
   in
   let nb_blocks_to_bake =
     match speed with
@@ -236,12 +238,14 @@ let make_tests_snapshoted speed patch_context =
     | `Slow ->
         History_mode.
           [
-            Full {offset = 0};
-            Full {offset = 3};
-            Full {offset = default_offset};
+            Full (Some {offset = 0});
+            Full (Some {offset = 3});
+            Full (Some default_additional_cycles);
             Archive;
           ]
-    | `Quick -> History_mode.[Full {offset = 0}; Full {offset = default_offset}]
+    | `Quick ->
+        History_mode.
+          [Full (Some {offset = 0}); Full (Some default_additional_cycles)]
   in
   let nb_blocks_to_bake =
     match speed with

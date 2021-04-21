@@ -426,7 +426,11 @@ let test_full_0_merge block_store =
      retaining them *)
   let cycle_length = 20 in
   let nb_cycles = 10 in
-  perform_n_cycles_merge ~cycle_length block_store (Full {offset = 0}) nb_cycles
+  perform_n_cycles_merge
+    ~cycle_length
+    block_store
+    (Full (Some {offset = 0}))
+    nb_cycles
   >>=? fun cycles ->
   let all_blocks = List.concat cycles in
   assert_presence_in_block_store
@@ -466,7 +470,11 @@ let test_full_0_merge block_store =
 let test_full_2_merge block_store =
   (* The total of blocks should be > 130 to prevent the cache from
      retaining them *)
-  perform_n_cycles_merge ~cycle_length:20 block_store (Full {offset = 2}) 10
+  perform_n_cycles_merge
+    ~cycle_length:20
+    block_store
+    (Full (Some {offset = 2}))
+    10
   >>=? fun cycles ->
   assert_presence_in_block_store
     ~with_metadata:false
@@ -512,7 +520,7 @@ let test_rolling_0_merge block_store =
   perform_n_cycles_merge
     ~cycle_length
     block_store
-    (Rolling {offset = 0})
+    (Rolling (Some {offset = 0}))
     nb_cycles
   >>=? fun cycles ->
   let all_blocks = List.concat cycles in
@@ -551,7 +559,11 @@ let test_rolling_0_merge block_store =
 let test_rolling_2_merge block_store =
   (* The total of blocks should be > 130 to prevent the cache from
      retaining them *)
-  perform_n_cycles_merge ~cycle_length:20 block_store (Rolling {offset = 2}) 10
+  perform_n_cycles_merge
+    ~cycle_length:20
+    block_store
+    (Rolling (Some {offset = 2}))
+    10
   >>=? fun cycles ->
   let expected_preserved_blocks = List.concat (List.sub (List.rev cycles) 3) in
   (* Last 3 cycles should have metadata *)
