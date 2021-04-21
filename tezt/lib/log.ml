@@ -121,7 +121,7 @@ module Color = struct
 
     let cyan = "\027[36m"
 
-    let white = "\027[37m"
+    let gray = "\027[37m"
   end
 
   module BG = struct
@@ -139,7 +139,7 @@ module Color = struct
 
     let cyan = "\027[46m"
 
-    let white = "\027[47m"
+    let gray = "\027[47m"
   end
 end
 

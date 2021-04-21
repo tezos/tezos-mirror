@@ -55,7 +55,8 @@ let run_node =
   @@ fun protocol ->
   Log.debug "Init node config" ;
   let* node_1 = Node.init ~runner ~path [Synchronisation_threshold 0] in
-  let* client = Client.init ~node:node_1 () in
+  let endpoint_1 = Client.(Node node_1) in
+  let* client = Client.init ~endpoint:endpoint_1 () in
   let* () = Client.activate_protocol ~protocol client in
   let node_2 = Node.create [Connections 1] in
   let wait = wait_for_accepted_peer_ids node_2 in

@@ -74,11 +74,17 @@ let double_bake =
   @@ fun protocol ->
   let* node_1 = Node.init ~runner ~path [Bootstrap_threshold 0; Private_mode]
   and* node_2 = Node.init ~runner ~path [Bootstrap_threshold 0; Private_mode] in
-  let* client_1 = Client.init ~node:node_1 ()
-  and* client_2 = Client.init ~node:node_2 () in
-  let* () = Client.Admin.trust_address client_1 ~node:node_1 ~peer:node_2
-  and* () = Client.Admin.trust_address client_2 ~node:node_2 ~peer:node_1 in
-  let* () = Client.Admin.connect_address client_1 ~node:node_1 ~peer:node_2 in
+  let endpoint_1 = Client.(Node node_1) and endpoint_2 = Client.(Node node_2) in
+  let* client_1 = Client.init ~endpoint:endpoint_1 ()
+  and* client_2 = Client.init ~endpoint:endpoint_2 () in
+  let* () =
+    Client.Admin.trust_address client_1 ~endpoint:endpoint_1 ~peer:node_2
+  and* () =
+    Client.Admin.trust_address client_2 ~endpoint:endpoint_2 ~peer:node_1
+  in
+  let* () =
+    Client.Admin.connect_address client_1 ~endpoint:endpoint_1 ~peer:node_2
+  in
   let* () = Client.activate_protocol ~protocol client_1 in
   Log.info "Activated protocol." ;
   let common_ancestor = 0 in
@@ -100,23 +106,32 @@ let double_bake =
   let* () = Node.run node_1 [Bootstrap_threshold 0] in
   let* () = Node.wait_for_ready node_1 in
   let* node_3 = Node.init ~runner ~path [Bootstrap_threshold 0; Private_mode] in
-  let* client_3 = Client.init ~node:node_3 () in
+  let endpoint_3 = Client.(Node node_3) in
+  let* client_3 = Client.init ~endpoint:endpoint_3 () in
   let* accuser_3 = Accuser.init ~protocol node_3 in
   let denunciation = wait_for_denunciation accuser_3 in
   let denunciation_injection =
     wait_for_denunciation_injection node_3 client_3 denunciation
   in
-  let* () = Client.Admin.trust_address client_1 ~node:node_1 ~peer:node_3
-  and* () = Client.Admin.trust_address client_3 ~node:node_3 ~peer:node_1
-  and* () = Client.Admin.trust_address client_2 ~node:node_2 ~peer:node_3
-  and* () = Client.Admin.trust_address client_3 ~node:node_3 ~peer:node_2 in
-  let* () = Client.Admin.connect_address client_1 ~node:node_1 ~peer:node_3
-  and* () = Client.Admin.connect_address client_2 ~node:node_2 ~peer:node_3 in
+  let* () =
+    Client.Admin.trust_address client_1 ~endpoint:endpoint_1 ~peer:node_3
+  and* () =
+    Client.Admin.trust_address client_3 ~endpoint:endpoint_3 ~peer:node_1
+  and* () =
+    Client.Admin.trust_address client_2 ~endpoint:endpoint_2 ~peer:node_3
+  and* () =
+    Client.Admin.trust_address client_3 ~endpoint:endpoint_3 ~peer:node_2
+  in
+  let* () =
+    Client.Admin.connect_address client_1 ~endpoint:endpoint_1 ~peer:node_3
+  and* () =
+    Client.Admin.connect_address client_2 ~endpoint:endpoint_2 ~peer:node_3
+  in
   let* level = Node.wait_for_level node_3 (common_ancestor + 2) in
   Log.info "Level of node3 is %d, waiting for denunciation operation..." level ;
   let* denunciation_oph = denunciation in
   let* _ = denunciation_injection in
-  let* () = Client.bake_for ~node:node_3 ~key:bootstrap1_key client_3 in
+  let* () = Client.bake_for ~endpoint:endpoint_3 ~key:bootstrap1_key client_3 in
   let* _ = Node.wait_for_level node_2 (common_ancestor + 4)
   and* _ = Node.wait_for_level node_3 (common_ancestor + 4) in
   let* ops = RPC.get_operations client_1 in

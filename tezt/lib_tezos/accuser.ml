@@ -37,7 +37,7 @@ module Parameters = struct
 
   let default_colors =
     Log.Color.
-      [|BG.yellow ++ FG.black; BG.yellow ++ FG.white; BG.yellow ++ FG.blue|]
+      [|BG.yellow ++ FG.black; BG.yellow ++ FG.gray; BG.yellow ++ FG.blue|]
 end
 
 open Parameters

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,60 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component: Client - normalize command
-   Invocation: dune exec tezt/tests/main.exe -- --file normalize.ml
-   Subject: Test the client's command 'normalize data .. of type ...'
-  *)
+(** A proxy server instance *)
+type t
 
-let data = "{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}"
+(** Get the RPC port of a proxy server. It's the port to
+    do request to. *)
+val rpc_port : t -> int
 
-let typ = "list (pair nat nat nat nat)"
+(** Get the runner associated to a proxy server.
 
-let normalize_modes =
-  let open Client in
-  [Readable; Optimized; Optimized_legacy]
+    Return [None] if the proxy server runs on the local machine. *)
+val runner : t -> Runner.t option
 
-let execute_all_modes client =
-  let legacy = true in
-  Lwt_list.map_s
-    (fun mode -> Client.normalize_data ~mode ~legacy ~data ~typ client)
-    normalize_modes
-
-let test_normalize_vanilla =
-  Protocol.register_test
-    ~__FILE__
-    ~title:(sf "normalize data")
-    ~tags:["normalize"; "data"]
-  @@ fun protocol ->
-  let* node = Node.init [] in
-  let* client = Client.init ~endpoint:(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
-  let* _ = execute_all_modes client in
-  Lwt.return_unit
-
-let test_normalize_mockup =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"normalize data (mockup)"
-    ~tags:["mockup"; "normalize"; "data"]
-  @@ fun protocol ->
-  let* client = Client.init_mockup ~protocol () in
-  let* _ = execute_all_modes client in
-  Lwt.return_unit
-
-let test_normalize_proxy =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"normalize data (proxy)"
-    ~tags:["proxy"; "normalize"; "data"]
-  @@ fun protocol ->
-  let* (_, client) = Proxy.init ~protocol () in
-  let* _ = execute_all_modes client in
-  Lwt.return_unit
-
-let register ~protocols =
-  test_normalize_vanilla ~protocols ;
-  test_normalize_mockup ~protocols ;
-  test_normalize_proxy ~protocols
+(** [init ?runner ?name ?rpc_port node] creates and starts a proxy server
+    that serves the given port and delegates its queries to [node]. *)
+val init :
+  ?runner:Runner.t -> ?name:string -> ?rpc_port:int -> Node.t -> t Lwt.t

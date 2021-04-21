@@ -159,7 +159,8 @@ let test_debug_level_misc =
   @@ fun protocol ->
   Log.info "Step 1: Start a node with event_level:debug, activate the protocol." ;
   let* node_1 = Node.init ~event_level:"debug" [Synchronisation_threshold 0] in
-  let* client_1 = Client.init ~node:node_1 () in
+  let endpoint_1 = Client.(Node node_1) in
+  let* client_1 = Client.init ~endpoint:endpoint_1 () in
   let* () = Client.activate_protocol ~protocol client_1 in
   let level = 1 in
   let* _ = Node.wait_for_level node_1 level in
@@ -318,9 +319,12 @@ let test_event_levels =
   and* node_3 =
     Node.init ~event_level:node_3_event_level [Synchronisation_threshold 0]
   in
-  let* client_1 = Client.init ~node:node_1 ()
-  and* client_2 = Client.init ~node:node_2 ()
-  and* client_3 = Client.init ~node:node_3 () in
+  let endpoint_1 = Client.(Node node_1)
+  and endpoint_2 = Client.(Node node_2)
+  and endpoint_3 = Client.(Node node_3) in
+  let* client_1 = Client.init ~endpoint:endpoint_1 ()
+  and* client_2 = Client.init ~endpoint:endpoint_2 ()
+  and* client_3 = Client.init ~endpoint:endpoint_3 () in
   Log.info
     "Step 2: Setup event handlers to ensure that nodes never send events with \
      level lower than their configuration." ;

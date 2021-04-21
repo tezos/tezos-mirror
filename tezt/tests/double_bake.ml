@@ -133,8 +133,8 @@ let double_bake =
      This means that we need to use [trust address] too. *)
   let* node_1 = Node.init [Bootstrap_threshold 0; Private_mode]
   and* node_2 = Node.init [Bootstrap_threshold 0; Private_mode] in
-  let* client_1 = Client.init ~node:node_1 ()
-  and* client_2 = Client.init ~node:node_2 () in
+  let* client_1 = Client.init ~endpoint:(Node node_1) ()
+  and* client_2 = Client.init ~endpoint:(Node node_2) () in
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
@@ -167,7 +167,7 @@ let double_bake =
   let* () = Node.wait_for_ready node_1 in
   (* Step 6 *)
   let* node_3 = Node.init [Bootstrap_threshold 0; Private_mode] in
-  let* client_3 = Client.init ~node:node_3 () in
+  let* client_3 = Client.init ~endpoint:(Node node_3) () in
   let* accuser_3 = Accuser.init ~protocol node_3 in
   let denunciation = wait_for_denunciation accuser_3 in
   let denunciation_injection =

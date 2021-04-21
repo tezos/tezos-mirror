@@ -42,37 +42,21 @@
    regression testing *)
 let hooks = Tezos_regression.hooks
 
-type client_mode_tag = Client | Light | Proxy
-
-let client_mode_tag_to_suffix = function
-  | Client -> "client"
-  | Light -> "light"
-  | Proxy -> "proxy"
-
-let create_client client_mode_tag : Client.t Lwt.t =
-  let node_args = Node.[Synchronisation_threshold 0; Connections 0] in
-  match client_mode_tag with
-  | Client ->
-      let* node = Node.init node_args in
-      let* client = Client.init ~node () in
-      Client.set_mode (Client (Some node)) client ;
-      return client
-  | Light ->
-      let* (client, _) = Client.init_light () in
-      return client
-  | Proxy ->
-      let* node = Node.init node_args in
-      let* client = Client.init ~node () in
-      Client.set_mode (Proxy node) client ;
-      return client
-
 (* A helper to register a RPC test environment with a node and a client for the
    given protocol version. *)
-let check_rpc ~group_name ~protocols ~client_mode_tag
+let check_rpc ~group_name ~protocols ~test_mode_tag
     ~(rpcs :
-       (string * (Client.t -> unit Lwt.t) * Protocol.parameter_overrides option)
+       (string
+       * (?endpoint:Client.endpoint -> Client.t -> unit Lwt.t)
+       * Protocol.parameter_overrides option)
        list) () =
-  let client_mode_suffix = client_mode_tag_to_suffix client_mode_tag in
+  let (client_mode_tag, title_tag) =
+    match test_mode_tag with
+    | `Client -> (`Client, "client")
+    | `Client_with_proxy_server -> (`Client, "proxy_server")
+    | `Light -> (`Light, "light")
+    | `Proxy -> (`Proxy, "proxy")
+  in
   List.iter
     (fun (sub_group, rpc, parameter_overrides) ->
       Protocol.register_regression_test
@@ -81,16 +65,14 @@ let check_rpc ~group_name ~protocols ~client_mode_tag
           (sf
              "%s (mode %s) RPC regression tests: %s"
              group_name
-             client_mode_suffix
+             title_tag
              sub_group)
         ~tags:["rpc"; group_name; sub_group]
-        ~output_file:
-          ("rpc" // sf "%s.%s.%s" group_name client_mode_suffix sub_group)
+        ~output_file:("rpc" // sf "%s.%s.%s" group_name title_tag sub_group)
         ~protocols
       @@ fun protocol ->
       (* Initialize a node with alpha protocol and data to be used for RPC calls.
          The log of the node is not captured in the regression output. *)
-      let* client = create_client client_mode_tag in
       let* parameter_file =
         match parameter_overrides with
         | None -> Lwt.return_none
@@ -98,31 +80,61 @@ let check_rpc ~group_name ~protocols ~client_mode_tag
             let* file = Protocol.write_parameter_file ~protocol overrides in
             Lwt.return_some file
       in
-      let* () = Client.activate_protocol ~protocol ?parameter_file client in
-      Log.info "Activated protocol." ;
-      let* _ = rpc client in
+      let bake =
+        match test_mode_tag with
+        | `Client_with_proxy_server ->
+            (* Because the proxy server doesn't support genesis. *)
+            true
+        | `Client | `Light | `Proxy -> false
+      in
+      let* client =
+        Client.init_activate_bake
+          ?parameter_file
+          ~bake
+          ~protocol
+          client_mode_tag
+          ()
+      in
+      let* endpoint =
+        match (Client.get_mode client, test_mode_tag) with
+        | (Client.Client (Some (Node node)), `Client)
+        | (Client.Light (_, Node node :: _), `Light)
+        | (Client.Proxy (Node node), `Proxy) ->
+            return Client.(Node node)
+        | (Client.Client (Some (Node node)), `Client_with_proxy_server) ->
+            let* proxy_server = Proxy_server.init node in
+            return Client.(Proxy_server proxy_server)
+        | _ -> Test.fail "Unexpected state"
+      in
+      let* _ = rpc ?endpoint:(Some endpoint) client in
       unit)
     rpcs
 
 (* Test the contracts RPC. *)
-let test_contracts client =
+let test_contracts ?endpoint client =
   let test_implicit_contract contract_id =
-    let* _ = RPC.Contracts.get ~hooks ~contract_id client in
-    let* _ = RPC.Contracts.get_balance ~hooks ~contract_id client in
-    let* _ = RPC.Contracts.get_counter ~hooks ~contract_id client in
-    let* _ = RPC.Contracts.get_manager_key ~hooks ~contract_id client in
+    let* _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
+    let* _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
+    let* _ = RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
+    in
     unit
   in
-  let* _contracts = RPC.Contracts.get_all ~hooks client in
-  let* contracts = RPC.Contracts.get_all_delegates ~hooks client in
+  let* _contracts = RPC.Contracts.get_all ?endpoint ~hooks client in
+  let* contracts = RPC.Contracts.get_all_delegates ?endpoint ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* () = test_implicit_contract bootstrap in
-  let* _ = RPC.Contracts.get_delegate ~hooks ~contract_id:bootstrap client in
+  let* _ =
+    RPC.Contracts.get_delegate ?endpoint ~hooks ~contract_id:bootstrap client
+  in
   Log.info "Test un-allocated implicit contract" ;
   let unallocated_implicit = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unallocated_implicit contracts) ;
-  let* _ = RPC.Contracts.get ~hooks ~contract_id:unallocated_implicit client in
+  let* _ =
+    RPC.Contracts.get ?endpoint ~hooks ~contract_id:unallocated_implicit client
+  in
   Log.info "Test non-delegated implicit contract" ;
   let simple_implicit = "simple" in
   let* simple_implicit_key =
@@ -143,7 +155,7 @@ let test_contracts client =
     Lwt_list.iter_s
       (fun rpc ->
         rpc
-          ?node:None
+          ?endpoint
           ?hooks:(Some hooks)
           ?chain:None
           ?block:None
@@ -178,6 +190,7 @@ let test_contracts client =
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
   let* _ =
     RPC.Contracts.get_delegate
+      ?endpoint
       ~hooks
       ~contract_id:delegated_implicit_key.public_key_hash
       client
@@ -186,7 +199,7 @@ let test_contracts client =
     Lwt_list.iter_s
       (fun rpc ->
         rpc
-          ?node:None
+          ?endpoint
           ?hooks:(Some hooks)
           ?chain:None
           ?block:None
@@ -200,14 +213,14 @@ let test_contracts client =
       ]
   in
   let test_originated_contract contract_id =
-    let* _ = RPC.Contracts.get ~hooks ~contract_id client in
-    let* _ = RPC.Contracts.get_balance ~hooks ~contract_id client in
+    let* _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
+    let* _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
     let* () =
-      RPC.Contracts.spawn_get_counter ~hooks ~contract_id client
+      RPC.Contracts.spawn_get_counter ?endpoint ~hooks ~contract_id client
       |> Process.check ~expect_failure:true
     in
     let* () =
-      RPC.Contracts.spawn_get_manager_key ~hooks ~contract_id client
+      RPC.Contracts.spawn_get_manager_key ?endpoint ~hooks ~contract_id client
       |> Process.check ~expect_failure:true
     in
     let big_map_key =
@@ -215,11 +228,18 @@ let test_contracts client =
         "{ \"key\": { \"int\": \"0\" }, \"type\": { \"prim\": \"int\" } }"
     in
     let* _ =
-      RPC.Contracts.big_map_get ~hooks ~contract_id ~data:big_map_key client
+      RPC.Contracts.big_map_get
+        ?endpoint
+        ~hooks
+        ~contract_id
+        ~data:big_map_key
+        client
     in
-    let* _ = RPC.Contracts.get_entrypoints ~hooks ~contract_id client in
-    let* _ = RPC.Contracts.get_script ~hooks ~contract_id client in
-    let* _ = RPC.Contracts.get_storage ~hooks ~contract_id client in
+    let* _ =
+      RPC.Contracts.get_entrypoints ?endpoint ~hooks ~contract_id client
+    in
+    let* _ = RPC.Contracts.get_script ?endpoint ~hooks ~contract_id client in
+    let* _ = RPC.Contracts.get_storage ?endpoint ~hooks ~contract_id client in
     unit
   in
   (* A smart contract without any big map or entrypoints *)
@@ -257,6 +277,7 @@ let test_contracts client =
   in
   let* _ =
     RPC.Contracts.big_map_get
+      ?endpoint
       ~hooks
       ~contract_id:originated_contract_advanced
       ~data:unique_big_map_key
@@ -268,6 +289,7 @@ let test_contracts client =
   in
   let* _ =
     RPC.Contracts.big_map_get
+      ?endpoint
       ~hooks
       ~contract_id:originated_contract_advanced
       ~data:duplicate_big_map_key
@@ -276,147 +298,243 @@ let test_contracts client =
   unit
 
 (* Test the delegates RPC for protocol Alpha. *)
-let test_delegates_alpha client =
-  let* _contracts = RPC.Contracts.get_all ~hooks client in
-  let* contracts = RPC.Contracts.get_all_delegates ~hooks client in
+let test_delegates_alpha ?endpoint client =
+  let* _contracts = RPC.Contracts.get_all ?endpoint ~hooks client in
+  let* contracts = RPC.Contracts.get_all_delegates ?endpoint ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
-  let* _ = RPC.Delegates.get ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_balance ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_deactivated ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_delegated_balance ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_delegated_contracts ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_frozen_balance ~hooks ~pkh:bootstrap client in
+  let* _ = RPC.Delegates.get ?endpoint ~hooks ~pkh:bootstrap client in
+  let* _ = RPC.Delegates.get_balance ?endpoint ~hooks ~pkh:bootstrap client in
   let* _ =
-    RPC.Delegates.get_frozen_balance_by_cycle ~hooks ~pkh:bootstrap client
+    RPC.Delegates.get_deactivated ?endpoint ~hooks ~pkh:bootstrap client
   in
-  let* _ = RPC.Delegates.get_grace_period ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_staking_balance ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_voting_power ~hooks ~pkh:bootstrap client in
+  let* _ =
+    RPC.Delegates.get_delegated_balance ?endpoint ~hooks ~pkh:bootstrap client
+  in
+  let* _ =
+    RPC.Delegates.get_delegated_contracts ?endpoint ~hooks ~pkh:bootstrap client
+  in
+  let* _ =
+    RPC.Delegates.get_frozen_balance ?endpoint ~hooks ~pkh:bootstrap client
+  in
+  let* _ =
+    RPC.Delegates.get_frozen_balance_by_cycle
+      ?endpoint
+      ~hooks
+      ~pkh:bootstrap
+      client
+  in
+  let* _ =
+    RPC.Delegates.get_grace_period ?endpoint ~hooks ~pkh:bootstrap client
+  in
+  let* _ =
+    RPC.Delegates.get_staking_balance ?endpoint ~hooks ~pkh:bootstrap client
+  in
+  let* _ =
+    RPC.Delegates.get_voting_power ?endpoint ~hooks ~pkh:bootstrap client
+  in
   Log.info "Test with a PKH that is not a registered baker contract" ;
   let unregistered_baker = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unregistered_baker contracts) ;
   let* _ =
-    RPC.Delegates.spawn_get ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.spawn_get ?endpoint ~hooks ~pkh:unregistered_baker client
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.spawn_get_balance ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.spawn_get_balance
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_deactivated ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.get_deactivated
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
   in
   let* _ =
     RPC.Delegates.spawn_get_delegated_balance
+      ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_delegated_contracts ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.get_delegated_contracts
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
   in
   let* _ =
-    RPC.Delegates.get_frozen_balance ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.get_frozen_balance
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
   in
   let* _ =
     RPC.Delegates.get_frozen_balance_by_cycle
+      ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
   in
   let* _ =
-    RPC.Delegates.spawn_get_grace_period ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.spawn_get_grace_period
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_staking_balance ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.get_staking_balance
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
   in
   let* _ =
-    RPC.Delegates.get_voting_power ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.get_voting_power
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
   in
   unit
 
 (* Test the delegates RPC for the current Mainnet protocol. *)
-let test_delegates_current_mainnet client =
-  let* _contracts = RPC.Contracts.get_all ~hooks client in
-  let* contracts = RPC.Contracts.get_all_delegates ~hooks client in
+let test_delegates_current_mainnet ?endpoint client =
+  let* _contracts = RPC.Contracts.get_all ?endpoint ~hooks client in
+  let* contracts = RPC.Contracts.get_all_delegates ?endpoint ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
-  let* _ = RPC.Delegates.get ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_balance ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_deactivated ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_delegated_balance ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_delegated_contracts ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_frozen_balance ~hooks ~pkh:bootstrap client in
+  let* _ = RPC.Delegates.get ?endpoint ~hooks ~pkh:bootstrap client in
+  let* _ = RPC.Delegates.get_balance ?endpoint ~hooks ~pkh:bootstrap client in
   let* _ =
-    RPC.Delegates.get_frozen_balance_by_cycle ~hooks ~pkh:bootstrap client
+    RPC.Delegates.get_deactivated ?endpoint ~hooks ~pkh:bootstrap client
   in
-  let* _ = RPC.Delegates.get_grace_period ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_staking_balance ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_voting_power ~hooks ~pkh:bootstrap client in
+  let* _ =
+    RPC.Delegates.get_delegated_balance ?endpoint ~hooks ~pkh:bootstrap client
+  in
+  let* _ =
+    RPC.Delegates.get_delegated_contracts ?endpoint ~hooks ~pkh:bootstrap client
+  in
+  let* _ =
+    RPC.Delegates.get_frozen_balance ?endpoint ~hooks ~pkh:bootstrap client
+  in
+  let* _ =
+    RPC.Delegates.get_frozen_balance_by_cycle
+      ?endpoint
+      ~hooks
+      ~pkh:bootstrap
+      client
+  in
+  let* _ =
+    RPC.Delegates.get_grace_period ?endpoint ~hooks ~pkh:bootstrap client
+  in
+  let* _ =
+    RPC.Delegates.get_staking_balance ?endpoint ~hooks ~pkh:bootstrap client
+  in
+  let* _ =
+    RPC.Delegates.get_voting_power ?endpoint ~hooks ~pkh:bootstrap client
+  in
   Log.info "Test with a PKH that is not a registered baker contract" ;
   let unregistered_baker = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unregistered_baker contracts) ;
   let* _ =
-    RPC.Delegates.spawn_get ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.spawn_get ?endpoint ~hooks ~pkh:unregistered_baker client
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.spawn_get_balance ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.spawn_get_balance
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_deactivated ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.get_deactivated
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
   in
   let* _ =
     RPC.Delegates.spawn_get_delegated_balance
+      ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_delegated_contracts ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.get_delegated_contracts
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
   in
   let* _ =
-    RPC.Delegates.get_frozen_balance ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.get_frozen_balance
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
   in
   let* _ =
     RPC.Delegates.get_frozen_balance_by_cycle
+      ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
   in
   let* _ =
-    RPC.Delegates.spawn_get_grace_period ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.spawn_get_grace_period
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_staking_balance ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.get_staking_balance
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
   in
   let* _ =
-    RPC.Delegates.get_voting_power ~hooks ~pkh:unregistered_baker client
+    RPC.Delegates.get_voting_power
+      ?endpoint
+      ~hooks
+      ~pkh:unregistered_baker
+      client
   in
   unit
 
 (* Test the votes RPC for protocol Alpha. *)
-let test_votes_alpha client =
+let test_votes_alpha ?endpoint client =
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
   let* () = Client.submit_proposals ~proto_hash client in
   let* () = Client.bake_for client in
   (* RPC calls *)
-  let* _ = RPC.Votes.get_ballot_list ~hooks client in
-  let* _ = RPC.Votes.get_ballots ~hooks client in
-  let* _ = RPC.Votes.get_current_period ~hooks client in
-  let* _ = RPC.Votes.get_current_proposal ~hooks client in
-  let* _ = RPC.Votes.get_current_quorum ~hooks client in
-  let* _ = RPC.Votes.get_listings ~hooks client in
-  let* _ = RPC.Votes.get_proposals ~hooks client in
-  let* _ = RPC.Votes.get_successor_period ~hooks client in
-  let* _ = RPC.Votes.get_total_voting_power ~hooks client in
+  let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_period ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_proposal ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_quorum ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_listings ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_proposals ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_successor_period ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
   (* bake to testing vote period and submit some ballots *)
   let* () = Client.bake_for client in
   let* () = Client.bake_for client in
@@ -425,35 +543,35 @@ let test_votes_alpha client =
   let* () = Client.submit_ballot ~key:"bootstrap3" ~proto_hash Pass client in
   let* () = Client.bake_for client in
   (* RPC calls again *)
-  let* _ = RPC.Votes.get_ballot_list ~hooks client in
-  let* _ = RPC.Votes.get_ballots ~hooks client in
-  let* _ = RPC.Votes.get_current_period ~hooks client in
-  let* _ = RPC.Votes.get_current_proposal ~hooks client in
-  let* _ = RPC.Votes.get_current_quorum ~hooks client in
-  let* _ = RPC.Votes.get_listings ~hooks client in
-  let* _ = RPC.Votes.get_proposals ~hooks client in
-  let* _ = RPC.Votes.get_successor_period ~hooks client in
-  let* _ = RPC.Votes.get_total_voting_power ~hooks client in
+  let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_period ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_proposal ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_quorum ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_listings ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_proposals ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_successor_period ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
   (* RPC calls again *)
   unit
 
 (* Test the votes RPC for the current Mainnet protocol. *)
-let test_votes_current_mainnet client =
+let test_votes_current_mainnet ?endpoint client =
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
   let* () = Client.submit_proposals ~proto_hash client in
   let* () = Client.bake_for client in
   (* RPC calls *)
-  let* _ = RPC.Votes.get_ballot_list ~hooks client in
-  let* _ = RPC.Votes.get_ballots ~hooks client in
-  let* _ = RPC.Votes.get_current_period ~hooks client in
-  let* _ = RPC.Votes.get_current_period_kind ~hooks client in
-  let* _ = RPC.Votes.get_current_proposal ~hooks client in
-  let* _ = RPC.Votes.get_current_quorum ~hooks client in
-  let* _ = RPC.Votes.get_listings ~hooks client in
-  let* _ = RPC.Votes.get_proposals ~hooks client in
-  let* _ = RPC.Votes.get_successor_period ~hooks client in
-  let* _ = RPC.Votes.get_total_voting_power ~hooks client in
+  let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_period ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_period_kind ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_proposal ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_quorum ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_listings ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_proposals ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_successor_period ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
   (* bake to testing vote period and submit some ballots *)
   let* () = Client.bake_for client in
   let* () = Client.bake_for client in
@@ -462,34 +580,35 @@ let test_votes_current_mainnet client =
   let* () = Client.submit_ballot ~key:"bootstrap3" ~proto_hash Pass client in
   let* () = Client.bake_for client in
   (* RPC calls again *)
-  let* _ = RPC.Votes.get_ballot_list ~hooks client in
-  let* _ = RPC.Votes.get_ballots ~hooks client in
-  let* _ = RPC.Votes.get_current_period ~hooks client in
-  let* _ = RPC.Votes.get_current_period_kind ~hooks client in
-  let* _ = RPC.Votes.get_current_proposal ~hooks client in
-  let* _ = RPC.Votes.get_current_quorum ~hooks client in
-  let* _ = RPC.Votes.get_listings ~hooks client in
-  let* _ = RPC.Votes.get_proposals ~hooks client in
-  let* _ = RPC.Votes.get_successor_period ~hooks client in
-  let* _ = RPC.Votes.get_total_voting_power ~hooks client in
+  let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_period ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_period_kind ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_proposal ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_current_quorum ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_listings ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_proposals ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_successor_period ?endpoint ~hooks client in
+  let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
   unit
 
 (* Test the various other RPCs. *)
-let test_others client =
-  let* _ = RPC.get_constants ~hooks client in
-  let* _ = RPC.get_baking_rights ~hooks client in
-  let* _ = RPC.get_current_level ~hooks client in
-  let* _ = RPC.get_endorsing_rights ~hooks client in
-  let* _ = RPC.get_levels_in_current_cycle ~hooks client in
+let test_others ?endpoint client =
+  let* _ = RPC.get_constants ?endpoint ~hooks client in
+  let* _ = RPC.get_baking_rights ?endpoint ~hooks client in
+  let* _ = RPC.get_current_level ?endpoint ~hooks client in
+  let* _ = RPC.get_endorsing_rights ?endpoint ~hooks client in
+  let* _ = RPC.get_levels_in_current_cycle ?endpoint ~hooks client in
   unit
 
 let start_with_acl address acl =
   let node = Node.create ~rpc_host:address [] in
+  let endpoint = Client.(Node node) in
   let* () = Node.config_init node [] in
   Node.Config_file.update node (JSON.update "rpc" (JSON.put ("acl", acl))) ;
   let* () = Node.identity_generate node in
   let* () = Node.run node [] in
-  Client.init ~node ()
+  Client.init ~endpoint ()
 
 (* Test access to RPC regulated with an ACL. *)
 let test_whitelist address () =
@@ -541,11 +660,11 @@ let test_blacklist address () =
   unit
 
 let register () =
-  let register_alpha client_mode_tag =
+  let register_alpha test_mode_tag =
     check_rpc
       ~group_name:"alpha"
       ~protocols:[Protocol.Alpha]
-      ~client_mode_tag
+      ~test_mode_tag
       ~rpcs:
         [
           ("contracts", test_contracts, None);
@@ -562,11 +681,11 @@ let register () =
         ]
       ()
   in
-  let register_current_mainnet client_mode_tag =
+  let register_current_mainnet test_mode_tag =
     check_rpc
       ~group_name:"current"
       ~protocols:[Protocol.current_mainnet]
-      ~client_mode_tag
+      ~test_mode_tag
       ~rpcs:
         [
           ("contracts", test_contracts, None);
@@ -583,7 +702,7 @@ let register () =
         ]
       ()
   in
-  let modes = [Client; Proxy; Light] in
+  let modes = [`Client; `Light; `Proxy; `Client_with_proxy_server] in
   List.iter
     (fun mode ->
       register_alpha mode ;

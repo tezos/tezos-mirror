@@ -456,7 +456,7 @@ let bake_and_check state ~mempool =
 
 let init ~protocol =
   let* sandbox_node = Node.init [Bootstrap_threshold 0; Private_mode] in
-  let* sandbox_client = Client.init ~node:sandbox_node () in
+  let* sandbox_client = Client.init ~endpoint:(Node sandbox_node) () in
   let* () = Client.activate_protocol ~protocol sandbox_client in
   Log.info "Activated protocol." ;
   return

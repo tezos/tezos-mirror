@@ -34,7 +34,7 @@
 
 let init ~protocol =
   let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
-  let* client = Client.init ~node () in
+  let* client = Client.init ~endpoint:(Node node) () in
   (* This configuration override is necessary to create "big" big maps
      (hundreds of entries) *)
   let* parameter_file =

@@ -115,8 +115,9 @@ let migration ?yes_node_path ?yes_wallet context protocol =
   let* node =
     Node.init ~rpc_port:19731 ~net_port:18731 ~data_dir [Connections 0]
   in
-  let* client = Client.init ~node () in
-  let* json = RPC.get_current_level ~node client in
+  let endpoint = Client.(Node node) in
+  let* client = Client.init ~endpoint () in
+  let* json = RPC.get_current_level ~endpoint client in
   let level = JSON.(json |-> "level" |> as_int) in
   let* () = Node.terminate node in
   Log.info "Updating node config with user_activated_upgrade" ;
@@ -128,6 +129,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
   let node =
     Node.create ?path:yes_node_path ~rpc_port:19731 ~net_port:18731 ~data_dir []
   in
+  let endpoint = Client.(Node node) in
   let* () = Node.run node [Connections 0] in
   let* () = Node.wait_for_ready node in
   Log.info "Creating yes-wallet dir" ;
@@ -139,7 +141,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
         Lwt.return base_dir
     | None -> Lwt.return @@ create_yes_wallet ()
   in
-  let client = Client.create ~base_dir ~node () in
+  let client = Client.create ~base_dir ~endpoint () in
   Log.info "Bake and wait until migration is finished" ;
   let* () = bake_with_foundation client in
   let* _until_mig = Node.wait_for_level node migration_level in

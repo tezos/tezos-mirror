@@ -30,6 +30,8 @@ let tezos_admin_client = "./tezos-admin-client"
 
 let tezos_node = "./tezos-node"
 
+let tezos_proxy_server = "./tezos-proxy-server"
+
 let tezos_codec = "./tezos-codec"
 
 type key = {identity : string; alias : string; secret : string}
