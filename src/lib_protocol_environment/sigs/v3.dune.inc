@@ -23,7 +23,6 @@
    v3/raw_hashes.mli
    v3/compare.mli
    v3/error_monad.mli
-   v3/logging.mli
    v3/time.mli
    v3/option.mli
    v3/tzEndian.mli

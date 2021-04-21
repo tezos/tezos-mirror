@@ -858,8 +858,6 @@ struct
       canonical_encoding_v0 ~variant:(Param.name ^ "." ^ variant) encoding
   end
 
-  module Logging = Internal_event.Legacy_logging.Make (Param)
-
   module Updater = struct
     type nonrec validation_result = validation_result = {
       context : Context.t;
