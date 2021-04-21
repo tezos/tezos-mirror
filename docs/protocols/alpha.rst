@@ -80,6 +80,9 @@ Changelog
   partially solves issue: `tezos#1027 <https://gitlab.com/tezos/tezos/-/issues/1027>`__
   `tezos!2531 <https://gitlab.com/tezos/tezos/-/merge_requests/2531>`__
 
+- If gas remains for an operation after it gets executed, the remaining
+  gas also gets consumed in the block;
+  `tezos!2880 <https://gitlab.com/tezos/tezos/-/merge_requests/2880>`__
 
 RPC changes
 ~~~~~~~~~~~
