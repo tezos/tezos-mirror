@@ -126,8 +126,10 @@ struct
         Stdlib.exit 1
     | 64 ->
         ()
-    | _ ->
-        Printf.eprintf "FAILURE: Unknown, unsupported architecture\n%!" ;
+    | n ->
+        Printf.eprintf
+          "FAILURE: Unknown, unsupported architecture (%d bits)\n%!"
+          n ;
         Stdlib.exit 1
 
   include Stdlib
