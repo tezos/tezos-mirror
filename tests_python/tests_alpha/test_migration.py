@@ -1,3 +1,4 @@
+from typing import Dict, List
 import time
 
 import pytest
@@ -14,16 +15,21 @@ PREV_DEPOSIT = protocol.PREV_PARAMETERS["block_security_deposit"]
 DEPOSIT = protocol.PARAMETERS["block_security_deposit"]
 
 PREV_DEPOSIT_RECEIPTS = [
-    {"kind": "contract", "contract": BAKER_PKH, "change": "-" + PREV_DEPOSIT},
+    {
+        "kind": "contract",
+        "contract": BAKER_PKH,
+        "change": "-" + PREV_DEPOSIT,
+        "origin": "block",
+    },
     {
         "kind": "freezer",
         "category": "deposits",
         "delegate": BAKER_PKH,
         "cycle": 0,
         "change": PREV_DEPOSIT,
+        "origin": "block",
     },
 ]
-# in protocol Alpha, the "origin" field is added
 DEPOSIT_RECEIPTS = [
     {
         "kind": "contract",
@@ -40,16 +46,7 @@ DEPOSIT_RECEIPTS = [
         "origin": "block",
     },
 ]
-
-
-MIGRATION_RECEIPTS = [
-    {
-        "kind": "contract",
-        "contract": 'tz1abmz7jiCV2GH2u81LRrGgAFFgvQgiDiaf',
-        "change": "100000000",
-        "origin": "migration",
-    },
-]
+MIGRATION_RECEIPTS: List[Dict[str, str]] = []
 
 
 # configure user-activate-upgrade at MIGRATION_LEVEL to test migration
@@ -110,7 +107,7 @@ class TestMigration:
         assert sandbox.client(0).get_head()['header']['proto'] == 1
         metadata = client.get_metadata()
         assert metadata['balance_updates'] == PREV_DEPOSIT_RECEIPTS
-        # PROTO_A is using env. V1, metadata hashes should be present
+        # PROTO_A is using env. V1+, metadata hashes should be present
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
 
@@ -120,7 +117,7 @@ class TestMigration:
         metadata = client.get_metadata()
         assert metadata['next_protocol'] == protocol.HASH
         assert metadata['balance_updates'] == PREV_DEPOSIT_RECEIPTS
-        # PROTO_B is using env. V1, metadata hashes should be present
+        # PROTO_B is using env. V1+, metadata hashes should be present
         _ops_metadata_hash = client.get_operations_metadata_hash()
         _block_metadata_hash = client.get_block_metadata_hash()
         assert sandbox.client(0).get_head()['header']['proto'] == 2

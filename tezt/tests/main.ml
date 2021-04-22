@@ -46,7 +46,7 @@ let () =
   Normalize.register ~protocols:[Alpha] ;
   Double_bake.register ~protocols:[Alpha] ;
   Mockup.register ~protocols:[Protocol.current_mainnet; Alpha] ;
-  Mockup.register_constant_migration ~migrate_from:Edo ~migrate_to:Alpha ;
+  Mockup.register_constant_migration ~migrate_from:Florence ~migrate_to:Alpha ;
   Proxy.register ~protocols:[Protocol.current_mainnet; Alpha] ;
   P2p.register ~protocols:[Alpha] ;
   Protocol_limits.register ~protocols:[Alpha] ;

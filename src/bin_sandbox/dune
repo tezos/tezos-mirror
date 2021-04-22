@@ -82,13 +82,13 @@
          --number-of-b 2
          --with-timestamp
          --until 20
-         --protocol-hash PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
-         --protocol-kind Edo
+         --protocol-hash PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
+         --protocol-kind Florence
          --tezos-client %{bin:tezos-client}
          --tezos-node %{bin:tezos-node}
-         --tezos-baker %{bin:tezos-baker-008-PtEdo2Zk}
-         --tezos-endorser %{bin:tezos-endorser-008-PtEdo2Zk}
-         --tezos-accuser %{bin:tezos-accuser-008-PtEdo2Zk}
+         --tezos-baker %{bin:tezos-baker-009-PsFLoren}
+         --tezos-endorser %{bin:tezos-endorser-009-PsFLoren}
+         --tezos-accuser %{bin:tezos-accuser-009-PsFLoren}
          --hard-fork 10:ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
          --hard-fork-baker %{bin:tezos-baker-alpha}
          --hard-fork-endorser %{bin:tezos-endorser-alpha}
@@ -138,14 +138,14 @@
          --time-betw 3
          --blocks-per-vot 14
          --with-timestamp
-         --protocol-hash PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
-         --protocol-kind Edo
+         --protocol-hash PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
+         --protocol-kind Florence
          --tezos-client %{bin:tezos-client}
          --tezos-admin %{bin:tezos-admin-client}
          --tezos-node %{bin:tezos-node}
-         --first-baker %{bin:tezos-baker-008-PtEdo2Zk}
-         --first-endorser %{bin:tezos-endorser-008-PtEdo2Zk}
-         --first-accuser %{bin:tezos-accuser-008-PtEdo2Zk}
+         --first-baker %{bin:tezos-baker-009-PsFLoren}
+         --first-endorser %{bin:tezos-endorser-009-PsFLoren}
+         --first-accuser %{bin:tezos-accuser-009-PsFLoren}
          --second-baker %{bin:tezos-baker-alpha}
          --second-endorser %{bin:tezos-endorser-alpha}
          --second-accuser %{bin:tezos-accuser-alpha}

@@ -112,12 +112,12 @@ class TestVotingFull:
             proposals = client.get_proposals()
             assert PROTO_B in [proto for (proto, _) in proposals]
 
-    def test_wait_for_testing_vote_period(self, sandbox: Sandbox):
+    def test_wait_for_exploration_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
         bake_until_next_voting_period(client, BAKER, OFFSET)
         clients = sandbox.all_clients()
         wait_until_level(clients, client.get_level())
-        assert_all_clients_in_period(clients, 'testing_vote')
+        assert_all_clients_in_period(clients, 'exploration')
 
     def test_delegates_vote_proto_b(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -131,14 +131,14 @@ class TestVotingFull:
         bake_until_next_voting_period(client, BAKER, OFFSET)
         clients = sandbox.all_clients()
         wait_until_level(clients, client.get_level())
-        assert_all_clients_in_period(clients, 'testing')
+        assert_all_clients_in_period(clients, 'cooldown')
 
-    def test_wait_for_promotion_vote_period(self, sandbox: Sandbox):
+    def test_wait_for_promotion_period(self, sandbox: Sandbox):
         client = sandbox.client(0)
         bake_until_next_voting_period(client, BAKER, OFFSET)
         clients = sandbox.all_clients()
         wait_until_level(clients, client.get_level())
-        assert_all_clients_in_period(clients, 'promotion_vote')
+        assert_all_clients_in_period(clients, 'promotion')
 
     def test_vote_in_promotion_phase(self, sandbox: Sandbox):
         client = sandbox.client(0)

@@ -130,25 +130,19 @@ let parametric_encoding =
           c.time_between_blocks,
           c.endorsers_per_block,
           c.hard_gas_limit_per_operation,
-          c.hard_gas_limit_per_block ),
-        ( ( c.proof_of_work_threshold,
-            c.tokens_per_roll,
+          c.hard_gas_limit_per_block,
+          c.proof_of_work_threshold ),
+        ( ( c.tokens_per_roll,
             c.michelson_maximum_type_size,
             c.seed_nonce_revelation_tip,
             c.origination_size,
             c.block_security_deposit,
             c.endorsement_security_deposit,
-            c.baking_reward_per_endorsement ),
-          ( c.endorsement_reward,
+            c.baking_reward_per_endorsement,
+            c.endorsement_reward,
             c.cost_per_byte,
-            c.hard_storage_limit_per_operation,
-            0L,
-            (* At this position in the encoding we used to have a test
-               chain duration but it is not used anymore and should be
-               removed when this encoding is updated. When the test
-               chain was removed, we did not want to change the
-               encoding for retrocompatibility. *)
-            c.quorum_min,
+            c.hard_storage_limit_per_operation ),
+          ( c.quorum_min,
             c.quorum_max,
             c.min_proposal_quorum,
             c.initial_endorsers,
@@ -162,20 +156,19 @@ let parametric_encoding =
              time_between_blocks,
              endorsers_per_block,
              hard_gas_limit_per_operation,
-             hard_gas_limit_per_block ),
-           ( ( proof_of_work_threshold,
-               tokens_per_roll,
+             hard_gas_limit_per_block,
+             proof_of_work_threshold ),
+           ( ( tokens_per_roll,
                michelson_maximum_type_size,
                seed_nonce_revelation_tip,
                origination_size,
                block_security_deposit,
                endorsement_security_deposit,
-               baking_reward_per_endorsement ),
-             ( endorsement_reward,
+               baking_reward_per_endorsement,
+               endorsement_reward,
                cost_per_byte,
-               hard_storage_limit_per_operation,
-               _test_chain_duration,
-               quorum_min,
+               hard_storage_limit_per_operation ),
+             ( quorum_min,
                quorum_max,
                min_proposal_quorum,
                initial_endorsers,
@@ -210,7 +203,7 @@ let parametric_encoding =
         minimal_block_delay;
       })
     (merge_objs
-       (obj9
+       (obj10
           (req "preserved_cycles" uint8)
           (req "blocks_per_cycle" int32)
           (req "blocks_per_commitment" int32)
@@ -223,22 +216,21 @@ let parametric_encoding =
              Gas_limit_repr.Arith.z_integral_encoding)
           (req
              "hard_gas_limit_per_block"
-             Gas_limit_repr.Arith.z_integral_encoding))
+             Gas_limit_repr.Arith.z_integral_encoding)
+          (req "proof_of_work_threshold" int64))
        (merge_objs
-          (obj8
-             (req "proof_of_work_threshold" int64)
+          (obj10
              (req "tokens_per_roll" Tez_repr.encoding)
              (req "michelson_maximum_type_size" uint16)
              (req "seed_nonce_revelation_tip" Tez_repr.encoding)
              (req "origination_size" int31)
              (req "block_security_deposit" Tez_repr.encoding)
              (req "endorsement_security_deposit" Tez_repr.encoding)
-             (req "baking_reward_per_endorsement" (list Tez_repr.encoding)))
-          (obj10
+             (req "baking_reward_per_endorsement" (list Tez_repr.encoding))
              (req "endorsement_reward" (list Tez_repr.encoding))
              (req "cost_per_byte" Tez_repr.encoding)
-             (req "hard_storage_limit_per_operation" z)
-             (req "test_chain_duration" int64)
+             (req "hard_storage_limit_per_operation" z))
+          (obj6
              (req "quorum_min" int32)
              (req "quorum_max" int32)
              (req "min_proposal_quorum" int32)

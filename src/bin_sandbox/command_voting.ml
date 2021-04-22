@@ -90,8 +90,8 @@ let register state ~client ~dst =
       "--fee";
       "0.05" ]
 
-let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
-    =
+let bake_until_voting_period ?keep_alive_delegate state ~protocol ~baker
+    ~attempts period =
   let is_expected_period (voting_period : (string * Ezjsonm.value) list)
       period_name =
     match Stdlib.List.assoc_opt "voting_period" voting_period with
@@ -105,7 +105,7 @@ let bake_until_voting_period ?keep_alive_delegate state ~baker ~attempts period
         false
   in
   let client = baker.Tezos_client.Keyed.client in
-  let period_name = Tezos_protocol.Voting_period.to_string period in
+  let period_name = Tezos_protocol.voting_period_to_string protocol period in
   Helpers.wait_for state ~attempts ~seconds:0.5 (fun nth ->
       Tezos_client.rpc
         state
@@ -345,6 +345,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   in
   bake_until_voting_period
     state
+    ~protocol
     ~baker:special_baker
     ~attempts
     `Proposal
@@ -464,6 +465,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   >>= fun _ ->
   bake_until_voting_period
     state
+    ~protocol
     ~baker:baker_0
     ~attempts:protocol.blocks_per_voting_period
     `Exploration
@@ -517,6 +519,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   >>= fun () ->
   bake_until_voting_period
     state
+    ~protocol
     ~baker:baker_0
     ~attempts:(1 + protocol.blocks_per_voting_period)
     ~keep_alive_delegate:special_baker.key_name
@@ -553,6 +556,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
   >>= fun () ->
   bake_until_voting_period
     state
+    ~protocol
     ~baker:baker_0
     ~attempts:(1 + protocol.blocks_per_voting_period)
     ~keep_alive_delegate:special_baker.key_name
