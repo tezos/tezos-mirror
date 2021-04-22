@@ -42,14 +42,6 @@ end
 module Hashtbl = Stdlib.Hashtbl
 
 module BlockToHash (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
-  let raw_hash_of_block (block : Tezos_shell_services.Block_services.block) :
-      Block_hash.t option =
-    match block with
-    | `Hash (h, 0) ->
-        Some h
-    | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) ->
-        None
-
   let table = Hashtbl.create 17
 
   let add chain block hash = Hashtbl.add table (chain, block) hash
@@ -57,7 +49,7 @@ module BlockToHash (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
   let hash_of_block (rpc_context : #RPC_context.simple)
       (chain : Tezos_shell_services.Shell_services.chain)
       (block : Tezos_shell_services.Block_services.block) =
-    match raw_hash_of_block block with
+    match Light.hash_of_block block with
     | Some h ->
         (* Block is defined by its hash *)
         return_some h
@@ -77,7 +69,7 @@ module BlockToHash (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
                This avoids one RPC call, but it is
                important because it is the first one: often there is
                a single call. Skipping it reduces the node's load.
-               
+
                In the heavyduty.py scenario (see the proxy's original MR:
                !1943), it reduces the number of calls to RPC .../hash
                from 1200 to 700.
@@ -94,12 +86,32 @@ module BlockToHash (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
             return_some hash )
 end
 
+type mode = Light of Light.sources | Proxy
+
 let build_directory (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : RPC_context.json)
+    (rpc_context : RPC_context.json) (mode : mode)
     (proxy_env : Registration.proxy_environment) : unit RPC_directory.t =
   let (module Proxy_environment) = proxy_env in
   let module B2H = BlockToHash (Proxy_environment) in
   let envs_cache = Hashtbl.create 17 in
+  let make chain block (module P_RPC : Proxy_proto.PROTO_RPC) =
+    match mode with
+    | Light sources ->
+        let (module C) =
+          Light_core.get_core (module Proxy_environment) printer sources
+        in
+        let (chain_string, block_string) =
+          Tezos_shell_services.Block_services.
+            (chain_to_string chain, to_string block)
+        in
+        Light_logger.Logger.(emit core_created (chain_string, block_string))
+        >>= fun () ->
+        let module M = Proxy_getter.Make (C) (P_RPC) in
+        Lwt.return (module M : Proxy_getter.M)
+    | Proxy ->
+        let module M = Proxy_getter.MakeProxy (P_RPC) in
+        Lwt.return (module M : Proxy_getter.M)
+  in
   let get_env_rpc_context chain block =
     B2H.hash_of_block rpc_context chain block
     >>=? fun block_hash_opt ->
@@ -117,6 +129,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     | None ->
         Proxy_environment.init_env_rpc_context
           printer
+          (make chain block_key)
           rpc_context
           chain
           block_key

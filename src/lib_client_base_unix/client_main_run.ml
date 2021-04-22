@@ -129,6 +129,34 @@ let setup_remote_signer (module C : M) client_config
     | None ->
         () )
 
+(** Warn the user if there are duplicate URIs in the sources (may or may
+    not be a misconfiguration). *)
+let warn_if_duplicates_light_sources (printer : unix_logger) uris =
+  let module UriMap = Map.Make (Uri) in
+  let uri_duplicates =
+    List.fold_left
+      (fun map uri ->
+        UriMap.update
+          uri
+          (fun nb -> Option.fold ~none:1 ~some:succ nb |> Option.some)
+          map)
+      UriMap.empty
+      uris
+    |> UriMap.filter (fun _uri nb -> nb > 1)
+  in
+  if not (UriMap.is_empty uri_duplicates) then
+    printer#warning
+      "The following URIs are duplicated in the light mode --sources argument \
+       (this will increase their weight in the consensus check). If this is \
+       not intentional, please fix your configuration: [%a]"
+      Format.(
+        pp_print_list
+          ~pp_sep:(fun ppf () -> pp_print_string ppf "; ")
+          (fun ppf (uri, nb) ->
+            fprintf ppf "%a (%i occurrences)" Uri.pp uri nb))
+      (UriMap.bindings uri_duplicates)
+  else Lwt.return_unit
+
 let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
   (* Make sure that base_dir is not a mockup. *)
   Tezos_mockup.Persistence.M.classify_base_dir base_dir
@@ -140,11 +168,12 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
          | _ ->
              return_unit)
   >>=? fun () ->
-  let (chain, block, confirmations, password_filename, protocol) =
+  let (chain, block, confirmations, password_filename, protocol, sources) =
     match parsed_args with
     | None ->
         ( Client_config.default_chain,
           Client_config.default_block,
+          None,
           None,
           None,
           None )
@@ -153,7 +182,8 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
           p.Client_config.block,
           p.Client_config.confirmations,
           p.Client_config.password_filename,
-          p.Client_config.protocol )
+          p.Client_config.protocol,
+          p.Client_config.sources )
   in
   match mode with
   | `Mode_client ->
@@ -165,20 +195,64 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~password_filename
            ~base_dir
            ~rpc_config
-  | `Mode_proxy ->
+  | (`Mode_light | `Mode_proxy) as mode ->
       let printer = new unix_logger ~base_dir in
       let rpc_context =
         new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
           rpc_config
           Media_type.all_media_types
       in
+      let get_mode () =
+        match (mode, sources) with
+        | (`Mode_proxy, _) ->
+            return Tezos_proxy.Proxy_services.Proxy
+        | (`Mode_light, None) ->
+            failwith
+              "--sources MUST be specified when --mode light is specified"
+        | (`Mode_light, Some sources_config) ->
+            ( if List.mem rpc_config.endpoint sources_config.uris then
+              return_unit
+            else
+              failwith
+                "Value of --endpoint is %a. Therefore, this URI MUST be in \
+                 field 'uris' of --sources (whose value is: %a). If you did \
+                 not specify --endpoint, it is being defaulted; you may \
+                 hereby specify --endpoint %a to fix this error."
+                Uri.pp
+                rpc_config.endpoint
+                (Format.pp_print_list Uri.pp)
+                sources_config.uris
+                (* By the check done in Light.mk_sources_config, sources_config.uris
+                   cannot be empty, but we don't rely on this here. Hence the use
+                   of pp_print_option. *)
+                (Format.pp_print_option Uri.pp)
+                (List.hd sources_config.uris) )
+            >>=? fun () ->
+            warn_if_duplicates_light_sources printer sources_config.uris
+            >>= fun () ->
+            let rpc_builder endpoint =
+              ( new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+                  {rpc_config with endpoint}
+                  Media_type.all_media_types
+                :> RPC_context.simple )
+            in
+            let sources =
+              Tezos_proxy.Light.sources_config_to_sources
+                rpc_builder
+                sources_config
+            in
+            return (Tezos_proxy.Proxy_services.Light sources)
+      in
       Tezos_proxy.Registration.get_registered_proxy
         printer
         rpc_context
+        mode
         protocol
         chain
         block
       >>=? fun proxy_env ->
+      get_mode ()
+      >>=? fun mode ->
       return
       @@ new unix_proxy
            ~chain
@@ -187,6 +261,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~password_filename
            ~base_dir
            ~rpc_config
+           ~mode
            ~proxy_env
 
 let setup_mockup_rpc_client_config
@@ -224,20 +299,18 @@ let setup_mockup_rpc_client_config
 
 let setup_client_config (cctxt : Tezos_client_base.Client_context.full)
     (parsed_args : Client_config.cli_args option) base_dir rpc_config =
-  let client_or_proxy_fun =
+  let setup_non_mockup_rpc_client_config =
     setup_default_proxy_client_config parsed_args base_dir rpc_config
   in
   match parsed_args with
   | None ->
-      client_or_proxy_fun `Mode_client
+      setup_non_mockup_rpc_client_config `Mode_client
   | Some args -> (
     match args.Client_config.client_mode with
-    | `Mode_client ->
-        client_or_proxy_fun `Mode_client
+    | (`Mode_client | `Mode_light | `Mode_proxy) as m ->
+        setup_non_mockup_rpc_client_config m
     | `Mode_mockup ->
-        setup_mockup_rpc_client_config cctxt args base_dir
-    | `Mode_proxy ->
-        client_or_proxy_fun `Mode_proxy )
+        setup_mockup_rpc_client_config cctxt args base_dir )
 
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =

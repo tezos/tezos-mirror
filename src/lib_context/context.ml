@@ -227,13 +227,9 @@ let checkout index key =
   sync index
   >>= fun () ->
   Store.Commit.of_hash index.repo (Hash.of_context_hash key)
-  >>= function
-  | None ->
-      Lwt.return_none
-  | Some commit ->
-      let tree = Store.Commit.tree commit in
-      let ctxt = {index; tree; parents = [commit]} in
-      Lwt.return_some ctxt
+  >|= Option.map (fun commit ->
+          let tree = Store.Commit.tree commit in
+          {index; tree; parents = [commit]})
 
 let checkout_exn index key =
   checkout index key
@@ -325,15 +321,115 @@ let add_tree ctxt key tree =
 let fold ?depth ctxt key ~init ~f =
   Tree.fold ?depth ctxt.tree (data_key key) ~init ~f
 
+(** The light mode relies on the implementation of this
+    function, because it uses Irmin.Type.of_string to rebuild values
+    of type Irmin.Hash.t. This is a temporary workaround until we
+    do that in a type safe manner when there are less moving pieces. *)
+let merkle_hash_to_string = Irmin.Type.to_string Store.Hash.t
+
+let rec tree_to_raw_context tree =
+  match Store.Tree.destruct tree with
+  | `Contents (v, _) ->
+      Store.Tree.Contents.force_exn v >|= fun v -> Block_services.Key v
+  | `Node _ ->
+      Store.Tree.list tree [] >|= List.map fst
+      >>= fun keys ->
+      let f acc key =
+        (* get_tree is safe, because we iterate over keys *)
+        Store.Tree.get_tree tree [key]
+        >>= tree_to_raw_context
+        >|= fun sub_raw_context -> TzString.Map.add key sub_raw_context acc
+      in
+      Lwt_list.fold_left_s f TzString.Map.empty keys
+      >|= fun res -> Block_services.Dir res
+
+let merkle_hash tree =
+  let merkle_hash_kind =
+    match Store.Tree.destruct tree with
+    | `Contents _ ->
+        Block_services.Contents
+    | `Node _ ->
+        Block_services.Node
+  in
+  let hash_str = Store.Tree.hash tree |> merkle_hash_to_string in
+  Block_services.Hash (merkle_hash_kind, hash_str)
+
+let merkle_tree t leaf_kind key =
+  Store.Tree.find_tree t.tree (data_key [])
+  >>= fun subtree_opt ->
+  match subtree_opt with
+  | None ->
+      Lwt.return TzString.Map.empty
+  | Some subtree ->
+      let key_to_string k = String.concat ";" k in
+      let rec key_to_merkle_tree t target =
+        match (Store.Tree.destruct t, target) with
+        | (_, []) ->
+            (* We cannot use this case as the base case, because a merkle_node
+               is a map from string to something. In this case, we have
+               no key to put in the map's domain. *)
+            raise
+              (Invalid_argument
+                 ( Printf.sprintf "Reached end of key (top-level key was: %s)"
+                 @@ key_to_string key ))
+        | (_, [hd]) ->
+            let finally key =
+              (* get_tree is safe because we iterate on keys *)
+              Store.Tree.get_tree t [key]
+              >>= fun tree ->
+              if key = hd then
+                (* on the target path: the final leaf *)
+                match leaf_kind with
+                | Block_services.Hole ->
+                    Lwt.return @@ merkle_hash tree
+                | Block_services.Raw_context ->
+                    tree_to_raw_context tree
+                    >|= fun raw_context -> Block_services.Data raw_context
+              else
+                (* a sibling of the target path: return a hash *)
+                Lwt.return @@ merkle_hash tree
+            in
+            Store.Tree.list t []
+            >>= Lwt_list.fold_left_s
+                  (fun acc (key, _) ->
+                    finally key >|= fun v -> TzString.Map.add key v acc)
+                  TzString.Map.empty
+        | (`Node _, target_hd :: target_tl) ->
+            let continue key =
+              (* get_tree is safe because we iterate on keys *)
+              Store.Tree.get_tree t [key]
+              >>= fun tree ->
+              if key = target_hd then
+                (* on the target path: recurse *)
+                key_to_merkle_tree tree target_tl
+                >|= fun sub -> Block_services.Continue sub
+              else
+                (* a sibling of the target path: return a hash *)
+                Lwt.return @@ merkle_hash tree
+            in
+            Store.Tree.list t []
+            >>= Lwt_list.fold_left_s
+                  (fun acc (key, _) ->
+                    continue key >|= fun atom -> TzString.Map.add key atom acc)
+                  TzString.Map.empty
+        | (`Contents _, _) ->
+            raise
+              (Invalid_argument
+                 (Printf.sprintf
+                    "(`Contents _, l) when l <> [_] (in other words: found a \
+                     leaf node whereas key %s (top-level key: %s) wasn't \
+                     fully consumed)"
+                    (key_to_string target)
+                    (key_to_string key)))
+      in
+      key_to_merkle_tree subtree key
+
 (*-- Predefined Fields -------------------------------------------------------*)
 
 let get_protocol v =
   raw_find v current_protocol_key
-  >>= function
-  | None ->
-      assert false
-  | Some data ->
-      Lwt.return (Protocol_hash.of_bytes_exn data)
+  >|= function
+  | None -> assert false | Some data -> Protocol_hash.of_bytes_exn data
 
 let add_protocol v key =
   let key = Protocol_hash.to_bytes key in
@@ -475,8 +571,7 @@ let commit_test_chain_genesis ctxt (forked_header : Block_header.t) =
     }
   in
   let branch = get_branch chain_id in
-  Store.Branch.set ctxt.index.repo branch commit
-  >>= fun () -> Lwt.return genesis_header
+  Store.Branch.set ctxt.index.repo branch commit >|= fun () -> genesis_header
 
 let clear_test_chain index chain_id =
   (* TODO remove commits... ??? *)
@@ -661,7 +756,7 @@ module Dumpable_context = struct
     | None ->
         Lwt.return_none
     | Some t ->
-        Store.Tree.add_tree tree key (t :> tree) >>= Lwt.return_some
+        Store.Tree.add_tree tree key (t :> tree) >|= Option.some
 
   let add_bytes (Batch (_, t, _)) bytes =
     (* Save the contents in the store *)

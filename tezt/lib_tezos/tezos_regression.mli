@@ -28,5 +28,6 @@
 (** Hooks that replaces Tezos-specific values with constants.
 
     They replace public key hashes, public keys, contract hashes, and timestamps.
-    They also remove command arguments: --base-dir, -d, --endpoint, and -E. *)
+    They also remove command arguments: --base-dir, -d, --endpoint, -E, and
+    --sources. *)
 val hooks : Process.hooks

@@ -105,6 +105,7 @@ in the :ref:`introduction <howtoget>`.
    user/sandbox
    user/mockup
    user/proxy
+   user/light
    user/history_modes
    user/snapshots
    user/node-configuration

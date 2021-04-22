@@ -30,6 +30,7 @@ type cli_args = {
   chain : Chain_services.chain;
   block : Shell_services.block;
   confirmations : int option;
+  sources : Tezos_proxy.Light.sources_config option;
   password_filename : string option;
   protocol : Protocol_hash.t option;
   print_timings : bool;
@@ -37,13 +38,15 @@ type cli_args = {
   client_mode : client_mode;
 }
 
-and client_mode = [`Mode_client | `Mode_mockup | `Mode_proxy]
+and client_mode = [`Mode_client | `Mode_light | `Mode_mockup | `Mode_proxy]
 
-let all_modes = [`Mode_client; `Mode_mockup; `Mode_proxy]
+let all_modes = [`Mode_client; `Mode_light; `Mode_mockup; `Mode_proxy]
 
 let client_mode_to_string = function
   | `Mode_client ->
       "client"
+  | `Mode_light ->
+      "light"
   | `Mode_mockup ->
       "mockup"
   | `Mode_proxy ->
@@ -289,6 +292,7 @@ let default_cli_args =
     chain = default_chain;
     block = default_block;
     confirmations = Some 0;
+    sources = None;
     password_filename = None;
     protocol = None;
     print_timings = false;
@@ -319,6 +323,30 @@ let endpoint_parameter () =
           fail
             (Invalid_endpoint_arg
                ("endpoint uri should not have query string or fragment: " ^ x)))
+
+let sources_parameter () =
+  parameter (fun _ path ->
+      Lwt_utils_unix.Json.read_file path
+      >>= function
+      | Error errs ->
+          failwith
+            "Can't parse the file specified by --sources as JSON: %s@,%a"
+            path
+            pp_print_error
+            errs
+      | Ok json -> (
+        try
+          match Tezos_proxy.Light.destruct_sources_config json with
+          | Ok sources_cfg ->
+              return sources_cfg
+          | Error msg ->
+              failwith "%s" msg
+        with exn ->
+          failwith
+            "Can't parse the file specified by --sources: %s@,%a"
+            path
+            (fun ppf exn -> Json_encoding.print_error ppf exn)
+            exn ))
 
 let chain_parameter () =
   parameter (fun _ chain ->
@@ -473,6 +501,15 @@ let endpoint_arg () =
     ~doc:
       "HTTP(S) endpoint of the node RPC interface; e.g. 'http://localhost:8732'"
     (endpoint_parameter ())
+
+let sources_arg () =
+  arg
+    ~long:"sources"
+    ~short:'s'
+    ~placeholder:"path"
+    ~doc:
+      {|path to JSON file containing sources for --mode light. Example file content: {"min_agreement": 1.0, "uris": ["http://localhost:8732", "https://localhost:8733"]}|}
+    (sources_parameter ())
 
 let remote_signer_arg () =
   arg
@@ -678,7 +715,7 @@ let commands config_file cfg (client_mode : client_mode)
       (fixed ["config"; "show"])
       (fun () (cctxt : #Client_context.full) ->
         match client_mode with
-        | `Mode_client | `Mode_proxy ->
+        | `Mode_client | `Mode_light | `Mode_proxy ->
             config_show_client cctxt config_file cfg
         | `Mode_mockup ->
             config_show_mockup cctxt protocol_hash_opt base_dir);
@@ -737,7 +774,7 @@ let commands config_file cfg (client_mode : client_mode)
       (fun (config_file, bootstrap_accounts_file, protocol_constants_file)
            cctxt ->
         match client_mode with
-        | `Mode_client | `Mode_proxy ->
+        | `Mode_client | `Mode_light | `Mode_proxy ->
             config_init_client config_file cfg
         | `Mode_mockup ->
             config_init_mockup
@@ -748,7 +785,7 @@ let commands config_file cfg (client_mode : client_mode)
               base_dir) ]
 
 let global_options () =
-  args15
+  args16
     (base_dir_arg ())
     (config_file_arg ())
     (timings_switch ())
@@ -761,6 +798,7 @@ let global_options () =
     (port_arg ())
     (tls_switch ())
     (endpoint_arg ())
+    (sources_arg ())
     (remote_signer_arg ())
     (password_filename_arg ())
     (client_mode_arg ())
@@ -796,13 +834,13 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
   classify_base_dir base_dir
   >>=? fun base_dir_class ->
   match client_mode with
-  | `Mode_client | `Mode_proxy -> (
+  | `Mode_client | `Mode_light | `Mode_proxy -> (
     match base_dir_class with
     | Base_dir_is_mockup ->
         failwith
-          "Base directory %s is in mockup mode while operation is in client \
-           mode"
+          "Base directory %s is in mockup mode while operation is in %s mode"
           base_dir
+        @@ client_mode_to_string client_mode
     (* You might be creating a mockup directory here *)
     | Base_dir_is_empty ->
         return_unit
@@ -893,6 +931,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
                node_port,
                tls,
                endpoint,
+               sources,
                remote_signer,
                password_filename,
                client_mode ),
@@ -907,7 +946,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
       >>=? fun () -> return base_dir
   | Some dir -> (
     match client_mode with
-    | `Mode_client | `Mode_proxy ->
+    | `Mode_client | `Mode_light | `Mode_proxy ->
         if not (Sys.file_exists dir) then
           failwith
             "Specified --base-dir does not exist. Please create the directory \
@@ -919,6 +958,14 @@ let parse_config_args (ctx : #Client_context.full) argv =
         return dir ) )
   >>=? fun base_dir ->
   check_base_dir_for_mode ctx client_mode base_dir
+  >>=? fun () ->
+  when_
+    (Option.is_some sources && client_mode <> `Mode_light)
+    (fun () ->
+      failwith
+        "--sources is specific to --mode light, please do not specify it with \
+         --mode %s."
+      @@ client_mode_to_string client_mode)
   >>=? fun () ->
   ( match config_file with
   | None ->
@@ -1025,6 +1072,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
       chain;
       block;
       confirmations;
+      sources;
       print_timings = timings;
       log_requests;
       password_filename;
@@ -1055,6 +1103,7 @@ type t =
   * int option
   * bool
   * Uri.t option
+  * Tezos_proxy.Light.sources_config option
   * Uri.t option
   * string option
   * client_mode

@@ -57,4 +57,12 @@ module Make_tree (DB : DB) : sig
   val to_raw : DB.tree -> raw Lwt.t
 
   val of_raw : raw -> DB.tree
+
+  type kinded_hash := [`Contents of Context_hash.t | `Node of Context_hash.t]
+
+  type repo = DB.repo
+
+  val make_repo : DB.repo Lwt.t
+
+  val shallow : DB.repo -> kinded_hash -> DB.tree
 end

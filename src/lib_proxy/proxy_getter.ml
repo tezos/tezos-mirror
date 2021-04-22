@@ -84,6 +84,8 @@ module type M = sig
   val proxy_mem : Proxy.proxy_getter_input -> Local.key -> bool tzresult Lwt.t
 end
 
+type proxy_m = (module M)
+
 module StringMap = TzString.Map
 
 module Tree : Proxy.TREE with type t = Local.tree with type key = Local.key =

@@ -45,6 +45,7 @@ let () =
   Synchronisation_heuristic.register ~protocols:[Alpha] ;
   Normalize.register ~protocols:[Alpha] ;
   Double_bake.register ~protocols:[Alpha] ;
+  Light.register ~protocols:[Alpha] ;
   Mockup.register ~protocols:[Protocol.current_mainnet; Alpha] ;
   Mockup.register_constant_migration ~migrate_from:Florence ~migrate_to:Alpha ;
   Proxy.register ~protocols:[Protocol.current_mainnet; Alpha] ;

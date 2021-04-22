@@ -127,7 +127,7 @@ let parse_block s =
         Ok (`Hash (Block_hash.of_b58check_exn h, -int_of_string n))
     | _ ->
         raise Exit
-  with _ -> Error "Cannot parse block identifier."
+  with _ -> Error ("Cannot parse block identifier: " ^ s)
 
 let alias_to_string = function
   | `Checkpoint ->
@@ -241,6 +241,87 @@ let raw_context_encoding =
             (fun () -> Cut) ])
 
 type error += Invalid_depth_arg of int
+
+type merkle_hash_kind = Contents | Node
+
+type merkle_node =
+  | Hash of (merkle_hash_kind * string)
+  | Data of raw_context
+  | Continue of merkle_tree
+
+and merkle_tree = merkle_node TzString.Map.t
+
+type merkle_leaf_kind = Hole | Raw_context
+
+let rec pp_merkle_node ppf = function
+  | Hash (k, h) ->
+      let k_str = match k with Contents -> "Contents" | Node -> "Node" in
+      Format.fprintf ppf "Hash(%s, %s)" k_str h
+  | Data raw_context ->
+      Format.fprintf ppf "Data(%a)" pp_raw_context raw_context
+  | Continue tree ->
+      Format.fprintf ppf "Continue(%a)" pp_merkle_tree tree
+
+and pp_merkle_tree ppf mtree =
+  let pairs = TzString.Map.bindings mtree in
+  Format.fprintf
+    ppf
+    "{@[<v 1>@,%a@]@,}"
+    (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (s, t) ->
+         Format.fprintf ppf "\"%s\": %a" s pp_merkle_node t))
+    pairs
+
+let stringmap_encoding value_encoding =
+  let open Data_encoding in
+  conv
+    TzString.Map.bindings
+    (fun l ->
+      List.fold_left
+        (fun acc (k, v) -> TzString.Map.add k v acc)
+        TzString.Map.empty
+        l)
+    (list (tup2 string value_encoding))
+
+let merkle_tree_encoding : merkle_tree Data_encoding.t =
+  let open Data_encoding in
+  let hash_tag = 0 and hash_encoding = tup2 bool string in
+  let data_tag = 1 and data_encoding = raw_context_encoding in
+  let continue_tag = 2 in
+  mu "merkle_tree" (fun encoding ->
+      let continue_encoding = encoding in
+      stringmap_encoding
+        (matching
+           (function
+             | Hash (kind, content) ->
+                 matched
+                   hash_tag
+                   hash_encoding
+                   ( (match kind with Contents -> true | Node -> false),
+                     content )
+             | Data raw_context ->
+                 matched data_tag data_encoding raw_context
+             | Continue dir ->
+                 matched continue_tag encoding dir)
+           [ case
+               (Tag hash_tag)
+               ~title:"Hash"
+               hash_encoding
+               (function Hash (k, h) -> Some (k = Contents, h) | _ -> None)
+               (fun (k, h) ->
+                 let kind = if k then Contents else Node in
+                 Hash (kind, h));
+             case
+               (Tag data_tag)
+               data_encoding
+               ~title:"Data"
+               (function Data raw_context -> Some raw_context | _ -> None)
+               (fun raw_context -> Data raw_context);
+             case
+               (Tag continue_tag)
+               continue_encoding
+               ~title:"Continue"
+               (function Continue dir -> Some dir | _ -> None)
+               (fun dir -> Continue dir) ]))
 
 let () =
   register_error_kind
@@ -773,7 +854,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     end
 
     module Context = struct
-      let path = RPC_path.(path / "context" / "raw" / "bytes")
+      let path = RPC_path.(path / "context")
+
+      let raw_bytes_path = RPC_path.(path / "raw" / "bytes")
+
+      let merkle_tree_path = RPC_path.(path / "merkle_tree")
 
       let context_path_arg : string RPC_arg.t =
         let name = "context_path" in
@@ -796,7 +881,27 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~description:"Returns the raw context."
           ~query:raw_context_query
           ~output:raw_context_encoding
-          RPC_path.(path /:* context_path_arg)
+          RPC_path.(raw_bytes_path /:* context_path_arg)
+
+      let merkle_tree_query : < holey : bool option > RPC_query.t =
+        let open RPC_query in
+        query (fun holey ->
+            object
+              method holey = holey
+            end)
+        |+ opt_field
+             ~descr:"Send only hashes, omit data of key"
+             "holey"
+             RPC_arg.bool
+             (fun t -> t#holey)
+        |> seal
+
+      let merkle_tree =
+        RPC_service.get_service
+          ~description:"Returns the merkle tree of a piece of context."
+          ~query:merkle_tree_query
+          ~output:Data_encoding.(option merkle_tree_encoding)
+          RPC_path.(merkle_tree_path /:* context_path_arg)
     end
 
     let info =
@@ -1070,6 +1175,18 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           path
           (object
              method depth = depth
+          end)
+          ()
+
+    let merkle_tree ctxt =
+      let f = make_call1 S.merkle_tree ctxt in
+      fun ?(chain = `Main) ?(block = `Head 0) ?holey path ->
+        f
+          chain
+          block
+          path
+          (object
+             method holey = holey
           end)
           ()
   end

@@ -23,7 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mode = Client of Node.t option | Mockup | Proxy of Node.t
+type mode =
+  | Client of Node.t option
+  | Mockup
+  | Light of float * Node.t list
+  | Proxy of Node.t
 
 type mockup_sync_mode = Asynchronous | Synchronous
 
@@ -39,6 +43,8 @@ type t = {
 }
 
 let base_dir t = t.base_dir
+
+let get_mode t = t.mode
 
 let set_mode mode t = t.mode <- mode
 
@@ -65,14 +71,28 @@ let create ?path ?admin_path ?name ?color ?base_dir ?node () =
 
 let base_dir_arg client = ["--base-dir"; client.base_dir]
 
+(* To avoid repeating unduly the sources file name, we create a function here
+   to get said file name as string.
+   Do not call it from a client in Mockup or Client (nominal) mode. *)
+let sources_file client =
+  match client.mode with
+  | Mockup | Client _ | Proxy _ ->
+      assert false
+  | Light _ ->
+      client.base_dir // "sources.json"
+
 (* [?node] can be used to override the default node stored in the client.
-   Mockup nodes do not use [--endpoint] at all: RPCs are mocked up. *)
+   Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.
+   Light mode needs a sources file which contains a list of endpoints.
+*)
 let endpoint_arg ?node client =
   match (client.mode, node) with
-  | (Mockup, _) | (Client None, None) ->
+  | (Mockup, _) | (Client None, None) | (Light (_, []), _) ->
       []
   | (Client _, Some node)
   | (Client (Some node), None)
+  | (Light (_, node :: _), None)
+  | (Light _, Some node)
   | (Proxy _, Some node)
   | (Proxy node, None) ->
       ["--endpoint"; "http://localhost:" ^ string_of_int (Node.rpc_port node)]
@@ -83,6 +103,8 @@ let mode_arg client =
       []
   | Mockup ->
       ["--mode"; "mockup"]
+  | Light _ ->
+      ["--mode"; "light"; "--sources"; sources_file client]
   | Proxy _ ->
       ["--mode"; "proxy"]
 
@@ -270,6 +292,14 @@ let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
     ?parameter_file
     client
   |> Process.check
+
+let spawn_endorse_for ?node ?(key = Constant.bootstrap2.alias) client =
+  spawn_command
+    client
+    (endpoint_arg ?node client @ mode_arg client @ ["endorse"; "for"; key])
+
+let endorse_for ?node ?key client =
+  spawn_endorse_for ?node ?key client |> Process.check
 
 let spawn_bake_for ?node ?protocol ?(key = Constant.bootstrap1.alias)
     ?(minimal_timestamp = true) ?mempool ?force ?context_path client =
@@ -588,3 +618,65 @@ let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ?constants
   let* () = create_mockup ?sync_mode ?constants ~protocol client in
   (* We want, however, to return a mockup client; hence the following: *)
   set_mode Mockup client ; return client
+
+let init_light ?path ?admin_path ?name ?color ?base_dir ?nodes
+    ?(min_agreement = 0.66) () =
+  let* nodes =
+    match nodes with
+    | None ->
+        let* node1 =
+          Node.init ~name:"node1" [Connections 1; Synchronisation_threshold 0]
+        and* node2 = Node.init ~name:"node2" [Connections 1] in
+        return [node1; node2]
+    | Some [] | Some [_] ->
+        Test.fail
+          "When initializing a light client and specifying the nodes, there \
+           should be 2 or more nodes but found %d nodes"
+          (Option.value nodes ~default:[] |> List.length)
+    | Some nodes ->
+        return nodes
+  in
+  let client =
+    create_with_mode
+      ?path
+      ?admin_path
+      ?name
+      ?color
+      ?base_dir
+      (Light (min_agreement, nodes))
+  in
+  (* Create a services.json file in the base directory with correctly
+    JSONified data *)
+  let* () =
+    Lwt_io.with_file ~mode:Lwt_io.Output (sources_file client) (fun oc ->
+        let obj =
+          `O
+            [ ("min_agreement", `Float min_agreement);
+              ( "uris",
+                `A
+                  (List.map
+                     (fun node ->
+                       `String
+                         (Printf.sprintf
+                            "http://localhost:%d"
+                            (Node.rpc_port node)))
+                     nodes) ) ]
+        in
+        Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
+  in
+  let json = JSON.parse_file (sources_file client) in
+  Log.info "%s" @@ JSON.encode json ;
+  Log.info "Importing keys" ;
+  let* () =
+    Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
+  in
+  Log.info "Syncing peers" ;
+  let* () =
+    assert (nodes <> []) ;
+    (* endpoint_arg is the first element of the list by default so we sync it
+       with all other nodes. *)
+    Lwt_list.iter_s
+      (fun peer -> Admin.connect_address ~peer client)
+      (List.tl nodes)
+  in
+  return (client, nodes)
