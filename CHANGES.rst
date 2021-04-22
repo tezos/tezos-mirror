@@ -110,6 +110,8 @@ Client
 -  Added commands to display the hash of Michelson script from files and
    from addresses.
 
+-  Added support for a new generic version of the multisig contract.
+
 Baker / Endorser / Accuser
 --------------------------
 
