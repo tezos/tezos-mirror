@@ -23,7 +23,7 @@ depends: [
   "alcotest" { with-test & >= "1.1.0" }
   "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
-conflicts: [
+depopts: [
   "hacl_x25519"
 ]
 build: [
