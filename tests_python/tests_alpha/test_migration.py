@@ -8,7 +8,7 @@ from tools import constants, utils
 from tools.constants import PROTO_GENESIS
 from . import protocol
 
-MIGRATION_LEVEL = 3
+MIGRATION_LEVEL = 8
 BAKER = 'bootstrap1'
 BAKER_PKH = constants.IDENTITIES[BAKER]['identity']
 PREV_DEPOSIT = protocol.PREV_PARAMETERS["block_security_deposit"]
@@ -41,7 +41,7 @@ DEPOSIT_RECEIPTS = [
         "kind": "freezer",
         "category": "deposits",
         "delegate": BAKER_PKH,
-        "cycle": 0,
+        "cycle": 1,
         "change": DEPOSIT,
         "origin": "block",
     },
@@ -113,7 +113,8 @@ class TestMigration:
 
     def test_migration(self, client, sandbox):
         # 3: last block of PROTO_A, runs migration code (MIGRATION_LEVEL)
-        utils.bake(client, BAKER)
+        for _i in range(MIGRATION_LEVEL - 2):
+            utils.bake(client, BAKER)
         metadata = client.get_metadata()
         assert metadata['next_protocol'] == protocol.HASH
         assert metadata['balance_updates'] == PREV_DEPOSIT_RECEIPTS
