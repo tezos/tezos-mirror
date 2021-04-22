@@ -249,8 +249,10 @@ let check_existence kind known specified =
     (Log.warn "Unknown %s: %s" kind)
     (String_set.diff (String_set.of_list specified) !known)
 
-(* Field [time] contains the cumulated time taken by all successful runs of this test. *)
+(* Field [id] is used to be able to iterate on tests in order of registration.
+   Field [time] contains the cumulated time taken by all successful runs of this test. *)
 type test = {
+  id : int;
   file : string;
   title : string;
   tags : string list;
@@ -264,13 +266,23 @@ let registered : test String_map.t ref = ref String_map.empty
 
 (* Using [iter_registered] instead of [String_map.iter] allows to more easily
    change the representation of [registered] in the future if needed. *)
-let iter_registered f = String_map.iter (fun _ -> f) !registered
+let iter_registered f =
+  let list = ref [] in
+  String_map.iter (fun _ test -> list := test :: !list) !registered ;
+  let by_id {id = a; _} {id = b; _} = Int.compare a b in
+  list := List.sort by_id !list ;
+  List.iter (fun test -> f test) !list
 
 let fold_registered acc f =
   String_map.fold (fun _ test acc -> f acc test) !registered acc
 
 (* Map [register] as if it was a list, to obtain a list. *)
-let map_registered_list f = fold_registered [] @@ fun acc test -> f test :: acc
+let map_registered_list f =
+  let list = ref [] in
+  (* By using [iter_registered] we ensure the resulting list is
+     in order of registration. *)
+  (iter_registered @@ fun test -> list := f test :: !list) ;
+  List.rev !list
 
 let list_tests format =
   match format with
@@ -382,7 +394,7 @@ let record_results filename =
   (* Remove the closure ([body]). *)
   let marshaled_tests =
     map_registered_list
-    @@ fun {file; title; tags; body = _; time; run_count} ->
+    @@ fun {id = _; file; title; tags; body = _; time; run_count} ->
     {file; title; tags; time = time /. float (max 1 run_count)}
   in
   (* Write to file using Marshal.
@@ -451,6 +463,8 @@ let suggest_jobs (tests : marshaled_test list) =
      because it means to run all tests. *)
   display_job ~negate:true (fst jobs.(job_count - 1), !all_other_tests)
 
+let next_id = ref 0
+
 let register ~__FILE__ ~title ~tags body =
   let file = Filename.basename __FILE__ in
   ( match String_map.find_opt title !registered with
@@ -471,13 +485,13 @@ let register ~__FILE__ ~title ~tags body =
   register_file file ;
   register_title title ;
   List.iter register_tag tags ;
+  let id = !next_id in
+  incr next_id ;
   if test_should_be_run ~file ~title ~tags then
-    let test = {file; title; tags; body; time = 0.; run_count = 0} in
+    let test = {id; file; title; tags; body; time = 0.; run_count = 0} in
     registered := String_map.add title test !registered
 
 let run () =
-  (* Now that all tests are registered, put them in registration order. *)
-  list := List.rev !list ;
   (* Check command-line options. *)
   check_existence "--file" known_files Cli.options.files_to_run ;
   check_existence "--test" known_titles Cli.options.tests_to_run ;
