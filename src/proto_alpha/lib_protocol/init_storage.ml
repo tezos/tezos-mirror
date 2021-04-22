@@ -101,6 +101,8 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           start_position = Int32.succ voting_period.start_position;
         }
       >>=? fun ctxt ->
+      Lazy_storage_diff.cleanup_edo_florence_dangling_lazy_storage ctxt
+      >>= fun ctxt ->
       (* Add balance updates receipts to be attached on the first block of this
          protocol - see [[prepare]] function below. Any balance updates attached
          in the migration should use the [[Receipt_repr.Migration]] constructor.
