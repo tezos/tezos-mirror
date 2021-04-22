@@ -210,7 +210,7 @@ release) directly as OPAM packages.
    to add some lines in them).
 
 The binaries need a specific version of the OCaml compiler (currently
-4.09.1). To get an environment with it do:
+4.10.2). To get an environment with it do:
 
 .. literalinclude:: install-opam.sh
   :language: shell
@@ -223,7 +223,7 @@ The binaries need a specific version of the OCaml compiler (currently
    variables. OPAM will suggest to add it in your rc file. If, at any
    point, you get an error like ``tezos-something: command not
    found``, first thing to try is to (re)run ``eval $(opam
-   env --switch 4.09.1)`` to see if it fixes the problem.
+   env --switch 4.10.2)`` to see if it fixes the problem.
 
 In order to get the system dependencies of the binaries, do:
 
