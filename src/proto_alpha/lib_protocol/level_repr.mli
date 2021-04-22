@@ -23,6 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type t = private {
+  level : Raw_level_repr.t;
+      (** The level of the block relative to genesis. This
+                              is also the Shell's notion of level. *)
+  level_position : int32;
+      (** The level of the block relative to the block that starts the
+     alpha family of protocols.  *)
+  cycle : Cycle_repr.t;
+      (** The current cycle's number. Note that cycles are a protocol-specific
+     notion. As a result, the cycle number starts at 0 with the first block of
+     the first version of protocol alpha. *)
+  cycle_position : int32;
+      (** The current level of the block relative to the first block of the current
+     cycle. *)
+  expected_commitment : bool;
+}
+
+type level = t
+
+include Compare.S with type t := level
+
+val encoding : level Data_encoding.t
+
+val pp : Format.formatter -> level -> unit
+
+val pp_full : Format.formatter -> level -> unit
+
+val diff : level -> level -> int32
+
 (** A cycle era is a chunk of cycles having the same number of levels
    per cycle and the same number of blocks per commitment. *)
 type cycle_era = {
@@ -52,32 +81,8 @@ val cycle_eras_encoding : cycle_eras Data_encoding.t
 *)
 val create_cycle_eras : cycle_era list -> cycle_eras tzresult
 
-type t = private {
-  level : Raw_level_repr.t;
-      (** The level of the block relative to genesis. This
-                              is also the Shell's notion of level. *)
-  level_position : int32;
-      (** The level of the block relative to the block that starts the
-     alpha family of protocols.  *)
-  cycle : Cycle_repr.t;
-      (** The current cycle's number. Note that cycles are a protocol-specific
-     notion. As a result, the cycle number starts at 0 with the first block of
-     the first version of protocol alpha. *)
-  cycle_position : int32;
-      (** The current level of the block relative to the first block of the current
-     cycle. *)
-  expected_commitment : bool;
-}
-
-type level = t
-
-include Compare.S with type t := level
-
-val encoding : level Data_encoding.t
-
-val pp : Format.formatter -> level -> unit
-
-val pp_full : Format.formatter -> level -> unit
+(** Returns the current era *)
+val current_era : cycle_eras -> cycle_era
 
 (** Returns the first level of the oldest era *)
 val root_level : cycle_eras -> level
@@ -86,11 +91,6 @@ val root_level : cycle_eras -> level
    offset. A positive offset corresponds to a higher level. *)
 val from_raw :
   cycle_eras:cycle_eras -> ?offset:int32 -> Raw_level_repr.t -> level
-
-val diff : level -> level -> int32
-
-(** Returns the current era *)
-val current_era : cycle_eras -> cycle_era
 
 (** Returns the first level of the given cycle. *)
 val first_level_in_cycle : cycle_eras:cycle_eras -> Cycle_repr.t -> level

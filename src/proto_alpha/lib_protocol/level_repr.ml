@@ -93,6 +93,9 @@ let encoding =
              hash."
           bool))
 
+let diff {level = l1; _} {level = l2; _} =
+  Int32.sub (Raw_level_repr.to_int32 l1) (Raw_level_repr.to_int32 l2)
+
 type cycle_era = {
   first_level : Raw_level_repr.t;
   first_cycle : Cycle_repr.t;
@@ -259,9 +262,6 @@ let from_raw ~cycle_eras ?offset l =
         Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o))
   in
   level_from_raw ~cycle_eras l
-
-let diff {level = l1; _} {level = l2; _} =
-  Int32.sub (Raw_level_repr.to_int32 l1) (Raw_level_repr.to_int32 l2)
 
 let first_level_in_cycle ~cycle_eras cycle =
   let first_level_in_alpha_family =
