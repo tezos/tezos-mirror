@@ -30,6 +30,8 @@
    Subject:      Test the synchronisation heuristic with a reference implementation
 *)
 
+open Lib_test.Qcheck_helpers
+
 (* Interface implemented by the synchronisation heuristic. *)
 
 module type S = sig
@@ -49,7 +51,7 @@ end
 (* This is a reference implementation for the synchronisation
    heuristic. It should behave exactly as the one provided in the
    [Synchronisation_heuristic] module but it is less efficient. With
-   Crowbar, we check that both implementations have the same
+   QCheck, we check that both implementations have the same
    behavior. *)
 module Reference : S = struct
   type status = Chain_validator_worker_state.Event.synchronisation_status =
@@ -128,7 +130,7 @@ let forge_peer_id () =
   identity.peer_id
 
 let peer_id =
-  let open Crowbar in
+  let open QCheck in
   let p1 = forge_peer_id () in
   let p2 = forge_peer_id () in
   let p3 = forge_peer_id () in
@@ -138,59 +140,52 @@ let peer_id =
   let p7 = forge_peer_id () in
   let p8 = forge_peer_id () in
   let p9 = forge_peer_id () in
-  with_printer (fun fmt pid ->
-      let id =
-        if pid == p1 then "P1"
-        else if pid == p2 then "P2"
-        else if pid == p3 then "P3"
-        else if pid == p4 then "P4"
-        else if pid == p5 then "P5"
-        else if pid == p6 then "P6"
-        else if pid == p7 then "P7"
-        else if pid == p8 then "P8"
-        else if pid == p9 then "P9"
-        else "fresh"
-      in
-      Format.fprintf fmt "peer: %s" id)
-  @@ choose
-       [ const p1;
-         const p2;
-         const p3;
-         const p4;
-         const p5;
-         const p6;
-         const p7;
-         const p8;
-         const p9;
-         map [const ()] (fun () -> forge_peer_id ()) ]
+  let pp_peer_id pid =
+    let id =
+      if pid == p1 then "P1"
+      else if pid == p2 then "P2"
+      else if pid == p3 then "P3"
+      else if pid == p4 then "P4"
+      else if pid == p5 then "P5"
+      else if pid == p6 then "P6"
+      else if pid == p7 then "P7"
+      else if pid == p8 then "P8"
+      else if pid == p9 then "P9"
+      else "fresh"
+    in
+    Format.asprintf "peer: %s" id
+  in
+  (map (fun () -> forge_peer_id ()) unit |> set_print pp_peer_id)
+  :: List.map
+       (fun p -> make ~print:pp_peer_id (Gen.return p))
+       [p1; p2; p3; p4; p5; p6; p7; p8; p9]
+  |> choose
 
 let now = Time.System.to_protocol @@ Systime_os.now ()
 
 let forge_timestamp ~delay = Time.Protocol.add now (Int64.of_int delay)
 
 let timestamp =
-  let open Crowbar in
-  with_printer (fun fmt n ->
-      let delay = Time.Protocol.diff n now in
-      Format.fprintf fmt "delay: %Ld" delay)
-  @@ map
-       [choose [const 5; range 20]]
-       (fun pre_delay ->
-         let delay = (pre_delay * 20) - 300 in
-         (* ~ [ -300; 100] with a step of 20 *)
-         forge_timestamp ~delay)
+  let open QCheck in
+  let timestamp_pp n =
+    let delay = Time.Protocol.diff n now in
+    Format.asprintf "delay: %Ld" delay
+  in
+  map
+    (fun pre_delay ->
+      let delay = (pre_delay * 20) - 300 in
+      (* ~ [ -300; 100] with a step of 20 *)
+      forge_timestamp ~delay)
+    (make (Gen.oneof [Gen.return 5; Gen.int_range 0 20]))
+  |> set_print timestamp_pp
 
 let value =
-  let open Crowbar in
-  map [timestamp; peer_id] (fun timestamp peer_id -> (timestamp, peer_id))
+  let open QCheck in
+  pair timestamp peer_id
 
 let values =
-  let open Crowbar in
-  (* This is similar to [list value] but it generates longer lists (in
-     quick-check mode) *)
-  fix (fun values ->
-      choose
-        [map [value; values] (fun v vs -> v :: vs); map [value] (fun v -> [v])])
+  let open QCheck in
+  list value
 
 let pp fmt =
   let open Reference in
@@ -202,42 +197,62 @@ let pp fmt =
   | Synchronised {is_chain_stuck = false} ->
       Format.fprintf fmt "Synchronised (not stuck)"
 
-let () =
+let make_tests check_update lcreate rcreate threshold latency =
+  let threshold_1 =
+    QCheck.Test.make
+      ~name:
+        (Format.asprintf
+           "Shell.synchronisation_heuristic.equivalence-with-reference-implementation \
+            (threshold %d) (latency %d)"
+           1
+           latency)
+      QCheck.(pair value value)
+      (fun (v1, v2) ->
+        let state_left = lcreate ~threshold:1 ~latency in
+        let state_right = rcreate ~threshold:1 ~latency in
+        check_update state_left state_right v1
+        && check_update state_left state_right v2)
+  in
+  let threshold_n =
+    List.map
+      (fun threshold ->
+        QCheck.Test.make
+          ~name:
+            (Format.asprintf
+               "Shell.synchronisation_heuristic.equivalence-with-reference-implementation \
+                (threshold %d) (latency %d)"
+               threshold
+               latency)
+          values
+          (fun values ->
+            let state_left = lcreate ~threshold ~latency in
+            let state_right = rcreate ~threshold ~latency in
+            List.for_all
+              (fun value -> check_update state_left state_right value)
+              values))
+      (2 -- threshold)
+  in
+  threshold_1 :: threshold_n
+
+let tests =
   (* The module Synchronisation_heuristic should have the same
      semantics as the reference implementation given in the Reference
-     module. We use crowbar to generate a bunch of updates and check
+     module. We use QCheck to generate a bunch of updates and check
      that both implementations send the same result. *)
   let module L = Synchronisation_heuristic in
   let module R = Reference in
   let check_update state_left state_right value =
     L.update state_left value ;
     R.update state_right value ;
-    Crowbar.check_eq ~pp (L.get_status state_left) (R.get_status state_right)
+    qcheck_eq'
+      ~pp
+      ~expected:(R.get_status state_right)
+      ~actual:(L.get_status state_left)
+      ()
   in
-  Crowbar.add_test
-    ~name:
-      (Format.asprintf
-         "Shell.synchronisation_heuristic.equivalence-with-reference-implementation \
-          (threshold %d) (latency %d)"
-         1
-         latency)
-    [value; value]
-    (fun v1 v2 ->
-      let state_left = L.create ~threshold:1 ~latency in
-      let state_right = R.create ~threshold:1 ~latency in
-      check_update state_left state_right v1 ;
-      check_update state_left state_right v2) ;
-  for threshold = 2 to 7 do
-    Crowbar.add_test
-      ~name:
-        (Format.asprintf
-           "Shell.synchronisation_heuristic.equivalence-with-reference-implementation \
-            (threshold %d) (latency %d)"
-           threshold
-           latency)
-      [values]
-      (fun values ->
-        let state_left = L.create ~threshold ~latency in
-        let state_right = R.create ~threshold ~latency in
-        List.iter (check_update state_left state_right) values)
-  done
+  make_tests check_update L.create R.create 8 latency
+
+let () =
+  Alcotest.run
+    "synchronisation heuristic fuzzy"
+    [("synchronisation heuristic fuzzy", qcheck_wrap tests)]
