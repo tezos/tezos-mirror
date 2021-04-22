@@ -89,7 +89,7 @@
          --tezos-baker %{bin:tezos-baker-009-PsFLoren}
          --tezos-endorser %{bin:tezos-endorser-009-PsFLoren}
          --tezos-accuser %{bin:tezos-accuser-009-PsFLoren}
-         --hard-fork 10:ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+         --hard-fork 8:ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
          --hard-fork-baker %{bin:tezos-baker-alpha}
          --hard-fork-endorser %{bin:tezos-endorser-alpha}
          --hard-fork-accuser %{bin:tezos-accuser-alpha}
