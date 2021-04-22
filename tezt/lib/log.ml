@@ -42,20 +42,29 @@ let channel =
         keep_going = _;
         files_to_run = _;
         tests_to_run = _;
+        tests_not_to_run = _;
         tags_to_run = _;
         tags_not_to_run = _;
         list;
         global_timeout = _;
         test_timeout = _;
         reset_regressions = _;
-        loop = _;
+        loop_mode = _;
         time = _;
-        starting_port = _ } =
+        starting_port = _;
+        record = _;
+        job_count = _;
+        suggest_jobs } =
     Cli.options
   in
-  match list with None -> stdout | Some (`Ascii_art | `Tsv) -> stderr
+  if
+    (match list with None -> false | Some (`Ascii_art | `Tsv) -> true)
+    || match suggest_jobs with None -> false | Some _ -> true
+  then stderr
+  else stdout
 
-(* In theory we could simply escape spaces, backslashes, double quotes and single quotes.
+(* In theory we could simply escape spaces, backslashes, double quotes, single quotes
+   and other symbols with a meaning for the shell.
    But 'some long argument' is arguably more readable than some\ long\ argument.
    We use this quoting method if the string contains no single quote. *)
 let quote_shell s =
@@ -83,16 +92,7 @@ let quote_shell s =
   String.iter categorize s ;
   if not !needs_quotes then s
   else if not !contains_single_quote then "'" ^ s ^ "'"
-  else
-    let buffer = Buffer.create (String.length s * 2) in
-    let add_char = function
-      | (' ' | '\\' | '"' | '\'') as c ->
-          Buffer.add_char buffer '\\' ;
-          Buffer.add_char buffer c
-      | c ->
-          Buffer.add_char buffer c
-    in
-    String.iter add_char s ; Buffer.contents buffer
+  else Filename.quote s
 
 let quote_shell_command command arguments =
   String.concat " " (List.map quote_shell (command :: arguments))
@@ -273,7 +273,8 @@ let test_result ~iteration test_result test_name =
         ("ABORTED", Color.(FG.red ++ bold))
   in
   let message =
-    if Cli.options.loop then Printf.sprintf "(loop %d) %s" iteration test_name
+    if Cli.options.loop_mode <> Count 1 then
+      Printf.sprintf "(loop %d) %s" iteration test_name
     else test_name
   in
   log_string ~level:Report ~prefix ~prefix_color message

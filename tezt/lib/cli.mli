@@ -58,6 +58,9 @@ type log_level = Quiet | Error | Warn | Report | Info | Debug
 (** What to do with temporary files after the test is finished. *)
 type temporary_file_mode = Delete | Delete_if_successful | Keep
 
+(** How many times to loop. *)
+type loop_mode = Infinite | Count of int
+
 (** Command-line options. *)
 type options = {
   color : bool;
@@ -69,15 +72,19 @@ type options = {
   keep_going : bool;
   files_to_run : string list;
   tests_to_run : string list;
+  tests_not_to_run : string list;
   tags_to_run : string list;
   tags_not_to_run : string list;
   list : [`Ascii_art | `Tsv] option;
   global_timeout : float option;
   test_timeout : float option;
   reset_regressions : bool;
-  loop : bool;
+  loop_mode : loop_mode;
   time : bool;
   starting_port : int;
+  record : string option;
+  job_count : int;
+  suggest_jobs : string option;
 }
 
 (** Values for command-line options. *)

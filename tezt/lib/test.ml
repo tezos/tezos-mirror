@@ -210,6 +210,7 @@ let test_should_be_run ~file ~title ~tags =
          true
      | titles ->
          List.mem title titles )
+  && (not (List.mem title Cli.options.tests_not_to_run))
   &&
   match Cli.options.files_to_run with
   | [] ->
@@ -244,43 +245,58 @@ let register_tag tag = known_tags := String_set.add tag !known_tags
 
 (* Check that all [specified] values are in [!known]. *)
 let check_existence kind known specified =
-  match
-    String_set.elements (String_set.diff (String_set.of_list specified) !known)
-  with
-  | [] ->
-      true
-  | unknown ->
-      List.iter (Printf.eprintf "Unknown %s: %s\n" kind) unknown ;
-      false
+  String_set.iter
+    (Log.warn "Unknown %s: %s" kind)
+    (String_set.diff (String_set.of_list specified) !known)
 
-(* Field [time] contains the cumulated time taken by all successful runs of this test. *)
+(* Field [id] is used to be able to iterate on tests in order of registration.
+   Field [time] contains the cumulated time taken by all successful runs of this test. *)
 type test = {
+  id : int;
   file : string;
   title : string;
   tags : string list;
   body : unit -> unit Lwt.t;
   mutable time : float;
+  mutable run_count : int;
 }
 
-(* List of tests added using [add] and that match command-line filters. *)
-let list : test list ref = ref []
+(* Tests added using [register] and that match command-line filters. *)
+let registered : test String_map.t ref = ref String_map.empty
+
+(* Using [iter_registered] instead of [String_map.iter] allows to more easily
+   change the representation of [registered] in the future if needed. *)
+let iter_registered f =
+  let list = ref [] in
+  String_map.iter (fun _ test -> list := test :: !list) !registered ;
+  let by_id {id = a; _} {id = b; _} = Int.compare a b in
+  list := List.sort by_id !list ;
+  List.iter (fun test -> f test) !list
+
+let fold_registered acc f =
+  String_map.fold (fun _ test acc -> f acc test) !registered acc
+
+(* Map [register] as if it was a list, to obtain a list. *)
+let map_registered_list f =
+  let list = ref [] in
+  (* By using [iter_registered] we ensure the resulting list is
+     in order of registration. *)
+  (iter_registered @@ fun test -> list := f test :: !list) ;
+  List.rev !list
 
 let list_tests format =
   match format with
   | `Tsv ->
-      List.iter
-        (fun {file; title; tags; _} ->
-          Printf.printf "%s\t%s\t%s\n%!" file title (String.concat " " tags))
-        !list
+      iter_registered
+      @@ fun {file; title; tags; _} ->
+      Printf.printf "%s\t%s\t%s\n%!" file title (String.concat " " tags)
   | `Ascii_art ->
       let file_header = "FILE" in
       let title_header = "TITLE" in
       let tags_header = "TAGS" in
       let list =
-        List.map
-          (fun {file; title; tags; _} ->
-            (file, title, String.concat ", " tags))
-          !list
+        map_registered_list
+        @@ fun {file; title; tags; _} -> (file, title, String.concat ", " tags)
       in
       (* Compute the size of each column. *)
       let (file_size, title_size, tags_size) =
@@ -335,18 +351,14 @@ let list_tests format =
       ()
 
 let display_time_summary () =
-  let sum_time = List.fold_left (fun acc {time; _} -> acc +. time) 0. in
-  let total_time = sum_time !list in
+  let total_time = fold_registered 0. @@ fun acc {time; _} -> acc +. time in
   let tests_by_file =
-    List.fold_left
-      (fun acc test ->
-        String_map.add
-          test.file
-          ( test
-          :: (String_map.find_opt test.file acc |> Option.value ~default:[]) )
-          acc)
-      String_map.empty
-      !list
+    fold_registered String_map.empty
+    @@ fun acc test ->
+    String_map.add
+      test.file
+      (test :: (String_map.find_opt test.file acc |> Option.value ~default:[]))
+      acc
   in
   let show_time seconds =
     let seconds = int_of_float seconds in
@@ -362,41 +374,133 @@ let display_time_summary () =
       title
   in
   let print_time_for_file file tests =
-    print_time "" file (sum_time tests) ;
+    print_time
+      ""
+      file
+      (List.fold_left (fun acc {time; _} -> acc +. time) 0. tests) ;
     List.iter (fun {title; time; _} -> print_time "- " title time) tests
   in
   String_map.iter print_time_for_file tests_by_file ;
   ()
 
+type marshaled_test = {
+  file : string;
+  title : string;
+  tags : string list;
+  time : float;
+}
+
+let record_results filename =
+  (* Remove the closure ([body]). *)
+  let marshaled_tests =
+    map_registered_list
+    @@ fun {id = _; file; title; tags; body = _; time; run_count} ->
+    {file; title; tags; time = time /. float (max 1 run_count)}
+  in
+  (* Write to file using Marshal.
+     This is not very robust but enough for the purposes of this file. *)
+  try
+    with_open_out filename
+    @@ fun file ->
+    Marshal.to_channel file (marshaled_tests : marshaled_test list) []
+  with Sys_error error -> Log.warn "Failed to write record: %s\n%!" error
+
+let read_recorded_results filename : marshaled_test list =
+  with_open_in filename Marshal.from_channel
+
+let suggest_jobs (tests : marshaled_test list) =
+  let job_count = max 1 Cli.options.job_count in
+  (* [jobs] is an array of pairs where the first value is the total time of the job
+     and the second value is the list of tests that are currently allocated to this job. *)
+  let jobs = Array.make job_count (0., []) in
+  let allocate test =
+    let smallest_job =
+      let best_index = ref 0 in
+      let best_time = ref max_float in
+      for i = 0 to job_count - 1 do
+        let (job_time, _) = jobs.(i) in
+        if job_time < !best_time then (
+          best_index := i ;
+          best_time := job_time )
+      done ;
+      !best_index
+    in
+    let (job_time, job_tests) = jobs.(smallest_job) in
+    jobs.(smallest_job) <- (job_time +. test.time, test :: job_tests)
+  in
+  (* Finding the optimal partition is NP-complete.
+     We use a heuristic to find an approximation: allocate longest tests first,
+     then fill the gaps with smaller tests. *)
+  let longest_first {time = a; _} {time = b; _} = Float.compare b a in
+  List.iter allocate (List.sort longest_first tests) ;
+  (* Jobs are allocated, now display them. *)
+  let display_job ~negate (total_job_time, job_tests) =
+    print_endline
+      ( String.concat
+          " "
+          (List.map
+             (fun test ->
+               Printf.sprintf
+                 "%s %s"
+                 (if negate then "--not-test" else "--test")
+                 (Log.quote_shell test.title))
+             job_tests)
+      ^ " # "
+      ^ string_of_float total_job_time
+      ^ "s" )
+  in
+  let all_other_tests = ref [] in
+  for i = 0 to job_count - 2 do
+    display_job ~negate:false jobs.(i) ;
+    List.iter
+      (fun test -> all_other_tests := test :: !all_other_tests)
+      (snd jobs.(i))
+  done ;
+  (* The last job uses --not-test so that if a test is added and the job list is not
+     updated, the new test is automatically added to the last job.
+     Note: if [job_count] is 1, this actually outputs no --not-test at all
+     since [all_other_tests] is empty, which is consistent
+     because it means to run all tests. *)
+  display_job ~negate:true (fst jobs.(job_count - 1), !all_other_tests)
+
+let next_id = ref 0
+
 let register ~__FILE__ ~title ~tags body =
   let file = Filename.basename __FILE__ in
+  ( match String_map.find_opt title !registered with
+  | None ->
+      ()
+  | Some {file = other_file; tags = other_tags; _} ->
+      Printf.eprintf "Error: there are several tests with title: %S\n" title ;
+      Printf.eprintf
+        "- first seen in: %s with tags: %s\n"
+        other_file
+        (String.concat ", " other_tags) ;
+      Printf.eprintf
+        "- also seen in: %s with tags: %s\n%!"
+        file
+        (String.concat ", " tags) ;
+      exit 1 ) ;
   check_tags tags ;
   register_file file ;
   register_title title ;
   List.iter register_tag tags ;
+  let id = !next_id in
+  incr next_id ;
   if test_should_be_run ~file ~title ~tags then
-    list := {file; title; tags; body; time = 0.} :: !list
+    let test = {id; file; title; tags; body; time = 0.; run_count = 0} in
+    registered := String_map.add title test !registered
 
 let run () =
-  (* Now that all tests are registered, put them in registration order. *)
-  list := List.rev !list ;
   (* Check command-line options. *)
-  let all_files_exist =
-    check_existence "--file" known_files Cli.options.files_to_run
-  in
-  let all_titles_exist =
-    check_existence "--test" known_titles Cli.options.tests_to_run
-  in
-  let all_tags_exist =
-    check_existence
-      "tag"
-      known_tags
-      (Cli.options.tags_to_run @ Cli.options.tags_not_to_run)
-  in
-  if (not all_files_exist) || (not all_titles_exist) || not all_tags_exist then
-    exit 1 ;
+  check_existence "--file" known_files Cli.options.files_to_run ;
+  check_existence "--test" known_titles Cli.options.tests_to_run ;
+  check_existence
+    "tag"
+    known_tags
+    (Cli.options.tags_to_run @ Cli.options.tags_not_to_run) ;
   (* Print a warning if no test was selected. *)
-  if !list = [] then (
+  if String_map.is_empty !registered then (
     Printf.eprintf
       "No test found for filters: %s\n%!"
       (String.concat
@@ -413,20 +517,36 @@ let run () =
       prerr_endline
         "You can use --list to get the list of tests and their tags." ) ;
   (* Actually run the tests (or list them). *)
-  match Cli.options.list with
-  | Some format ->
+  match (Cli.options.list, Cli.options.suggest_jobs) with
+  | (Some format, None) ->
       list_tests format
-  | None ->
+  | (None, Some record_file) -> (
+    match read_recorded_results record_file with
+    | exception Sys_error error ->
+        Printf.eprintf "Failed to read record: %s\n%!" error ;
+        exit 1
+    | record ->
+        suggest_jobs record )
+  | (Some _, Some _) ->
+      prerr_endline
+        "Cannot use both --list and --suggest-jobs at the same time."
+  | (None, None) ->
       let rec run iteration =
-        let run_and_measure_time test =
-          let start = Unix.gettimeofday () in
-          really_run ~iteration test.title test.body ;
-          let time = Unix.gettimeofday () -. start in
-          test.time <- test.time +. time
-        in
-        List.iter run_and_measure_time !list ;
-        if Cli.options.loop then run (iteration + 1)
+        match Cli.options.loop_mode with
+        | Count n when n < iteration ->
+            ()
+        | _ ->
+            let run_and_measure_time (test : test) =
+              let start = Unix.gettimeofday () in
+              really_run ~iteration test.title test.body ;
+              let time = Unix.gettimeofday () -. start in
+              test.run_count <- test.run_count + 1 ;
+              test.time <- test.time +. time
+            in
+            iter_registered run_and_measure_time ;
+            run (iteration + 1)
       in
       run 1 ;
+      Option.iter record_results Cli.options.record ;
       if !a_test_failed then exit 1 ;
       if Cli.options.time then display_time_summary ()

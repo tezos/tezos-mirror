@@ -104,8 +104,7 @@ let test_cache_at_most_once ?query_string path =
 
 let test_cache_at_most_once ~protocols =
   let paths =
-    [ (["context"; "constants"], []);
-      (["helpers"; "baking_rights"], []);
+    [ (["helpers"; "baking_rights"], []);
       (["helpers"; "baking_rights"], [("all", "true")]);
       (["helpers"; "current_level"], []);
       (["minimal_valid_time"], []);

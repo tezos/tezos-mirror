@@ -28,6 +28,8 @@ type log_level = Quiet | Error | Warn | Report | Info | Debug
 
 type temporary_file_mode = Delete | Delete_if_successful | Keep
 
+type loop_mode = Infinite | Count of int
+
 type options = {
   color : bool;
   log_level : log_level;
@@ -38,15 +40,19 @@ type options = {
   keep_going : bool;
   files_to_run : string list;
   tests_to_run : string list;
+  tests_not_to_run : string list;
   tags_to_run : string list;
   tags_not_to_run : string list;
   list : [`Ascii_art | `Tsv] option;
   global_timeout : float option;
   test_timeout : float option;
   reset_regressions : bool;
-  loop : bool;
+  loop_mode : loop_mode;
   time : bool;
   starting_port : int;
+  record : string option;
+  job_count : int;
+  suggest_jobs : string option;
 }
 
 let options =
@@ -61,15 +67,19 @@ let options =
   let keep_going = ref false in
   let files_to_run = ref [] in
   let tests_to_run = ref [] in
+  let tests_not_to_run = ref [] in
   let tags_to_run = ref [] in
   let tags_not_to_run = ref [] in
   let list = ref None in
   let global_timeout = ref None in
   let test_timeout = ref None in
   let reset_regressions = ref false in
-  let loop = ref false in
+  let loop_mode = ref (Count 1) in
   let time = ref false in
   let starting_port = ref 16384 in
+  let record = ref None in
+  let job_count = ref 3 in
+  let suggest_jobs = ref None in
   let set_log_level = function
     | "quiet" ->
         log_level := Quiet
@@ -85,6 +95,14 @@ let options =
         log_level := Debug
     | level ->
         raise (Arg.Bad (Printf.sprintf "invalid log level: %S" level))
+  in
+  let set_job_count value =
+    if value < 1 then raise (Arg.Bad "--job-count must be positive") ;
+    job_count := value
+  in
+  let set_loop_count value =
+    if value < 0 then raise (Arg.Bad "--loop-count must be positive or null") ;
+    loop_mode := Count value
   in
   let spec =
     Arg.align
@@ -159,6 +177,11 @@ let options =
         ( "-t",
           Arg.String (fun title -> tests_to_run := title :: !tests_to_run),
           "<TITLE> Same as --test." );
+        ( "--not-test",
+          Arg.String
+            (fun title -> tests_not_to_run := title :: !tests_not_to_run),
+          "<TITLE> Only run tests which are not exactly entitled TITLE (see \
+           SELECTING TESTS)." );
         ( "--global-timeout",
           Arg.Float (fun delay -> global_timeout := Some delay),
           "<SECONDS> Fail if the set of tests takes more than SECONDS to run."
@@ -172,19 +195,42 @@ let options =
           " Remove regression test outputs if they exist, and regenerate them."
         );
         ( "--loop",
-          Arg.Set loop,
+          Arg.Unit (fun () -> loop_mode := Infinite),
           " Restart from the beginning once all tests are done. All tests are \
            repeated until one of them fails or if you interrupt with Ctrl+C. \
            This is useful to reproduce non-deterministic failures. When used \
            in conjunction with --keep-going, tests are repeated even if they \
            fail, until you interrupt them with Ctrl+C." );
+        ( "--loop-count",
+          Arg.Int set_loop_count,
+          "<COUNT> Same as --loop, but stop after all tests have been run \
+           COUNT times. A value of 0 means tests are not run. The default \
+           behavior corresponds to --loop-count 1. If you specify both --loop \
+           and --loop-count, only the last one is taken into account." );
         ( "--time",
           Arg.Set time,
           " Print a summary of the time taken by each test. Ignored if a test \
            failed." );
         ( "--starting-port",
           Arg.Set_int starting_port,
-          " If tests need to open ports, they may start from this number." ) ]
+          " If tests need to open ports, they may start from this number." );
+        ( "--record",
+          Arg.String (fun file -> record := Some file),
+          "<FILE> Record test results to FILE. This file can then be used \
+           with --suggest-jobs. If you use --loop or --loop-count, times are \
+           averaged for each test." );
+        ( "--job-count",
+          Arg.Int set_job_count,
+          "<COUNT> Set the number of target jobs for --suggest-jobs (default \
+           is 3)." );
+        ("-j", Arg.Int set_job_count, "<COUNT> Same as --job-count.");
+        ( "--suggest-jobs",
+          Arg.String (fun file -> suggest_jobs := Some file),
+          "<FILE> Read test results from a file generated with --record and \
+           suggest a partition of the tests that would result in --job-count \
+           sets of roughly the same total duration. Output each job as a list \
+           of flags that can be passed to Tezt, followed by a shell comment \
+           that denotes the expected duration of the job." ) ]
   in
   let usage =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
@@ -201,7 +247,8 @@ let options =
        negate a tag, prefix it with a slash: /\n\n\
       \  The title of a test is given by the ~title argument of Test.run. It \
        is what is printed after [SUCCESS] (or [FAILURE] or [ABORTED]) in the \
-       reports. Use --test to select a test by its title on the command-line.\n\n\
+       reports. Use --test (respectively --not-test) to select (respectively \
+       unselect) a test by its title on the command-line.\n\n\
       \  The file in which a test is implemented is specified by the \
        ~__FILE__ argument of Test.run. In other words, it is the name of the \
        file in which the test is defined, without directories. Use --file to \
@@ -231,13 +278,17 @@ let options =
     keep_going = !keep_going;
     files_to_run = !files_to_run;
     tests_to_run = !tests_to_run;
+    tests_not_to_run = !tests_not_to_run;
     tags_to_run = !tags_to_run;
     tags_not_to_run = !tags_not_to_run;
     list = !list;
     global_timeout = !global_timeout;
     test_timeout = !test_timeout;
     reset_regressions = !reset_regressions;
-    loop = !loop;
+    loop_mode = !loop_mode;
     time = !time;
     starting_port = !starting_port;
+    record = !record;
+    job_count = !job_count;
+    suggest_jobs = !suggest_jobs;
   }
