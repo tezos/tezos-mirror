@@ -116,6 +116,22 @@ module MakeV3 (Param : sig
 end)
 () =
 struct
+  (* The protocol V3 only supports 64-bits architectures. We ensure this the
+     hard way with a dynamic check. *)
+  let () =
+    match Sys.word_size with
+    | 32 ->
+        Printf.eprintf
+          "FAILURE: Environment V3 does not support 32-bit architectures\n%!" ;
+        Stdlib.exit 1
+    | 64 ->
+        ()
+    | n ->
+        Printf.eprintf
+          "FAILURE: Unknown, unsupported architecture (%d bits)\n%!"
+          n ;
+        Stdlib.exit 1
+
   include Stdlib
 
   (* The modules provided in the [_struct.V3.M] pack are meant specifically to
