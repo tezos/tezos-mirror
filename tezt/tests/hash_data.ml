@@ -33,7 +33,7 @@
                recommended to clear the output directory [tezt/_regressions/hash_data]
                first to remove unused files in case some paths change.
    Subject: Tests of the client's `hash data ... of type` command.
-   
+
             Regression capture the output of tezos-client calls and compare it
             with the output from the previous run. The test passes only if the
             outputs match exactly. It is important that return values
@@ -43,7 +43,7 @@
 (* These hooks must be attached to every process that should be captured for
    regression testing. Not plugged for negative tests, since tezos-client
    shows its manpage, which will change overtime. *)
-let hooks = Regression.scrubbing_hooks
+let hooks = Tezos_regression.hooks
 
 (** Test.
     Call `tezos-client hash data ... of type ...` with data on which

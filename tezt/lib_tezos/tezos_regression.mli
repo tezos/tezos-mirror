@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,47 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Run Tezt regression tests and capture their output.
+(** Tezos-specific extension for the [Regression] module. *)
 
-    NOTE: consider using dune cram when it becomes available:
-    https://dune.readthedocs.io/en/stable/tests.html#cram-tests
-*)
+(** Hooks that replaces Tezos-specific values with constants.
 
-(** Register a regression test.
-
-    This function is a wrapper around [Test.register]. It adds the "regression" tag
-    to the [tags] list provided by the argument.
-
-    The [output_file] is a filename, where the output of the test is stored and
-    read to be compared on subsequent runs. The output file with ".out"
-    filename extension added is placed in the [regression_output_path],
-    which is by default "tezt/_regressions". *)
-val register :
-  __FILE__:string ->
-  title:string ->
-  tags:string list ->
-  output_file:string ->
-  ?regression_output_path:string ->
-  (unit -> unit Lwt.t) ->
-  unit
-
-(** Capture some output of a regression test.
-
-    Call this to record a string into the [output_file] given to [register].
-    A newline character [\n] will be added after it.
-
-    This function only records its argument when called while a regression test is running,
-    i.e. from the body of [Regression.register]. If you call it outside of
-    [Regression.register], it has no effect. So you can define a function that captures
-    and use it with or without regression testing.
-
-    A typical use is to define custom process hooks that substitute non-deterministic
-    parts of the output with deterministic ones. See also {!hooks}. *)
-val capture : string -> unit
-
-(** Hooks that enable regression testing when attached to a process ran from a
-    {!register}ed regression test function.
-
-    The hooks will {!capture} the spawned command, its arguments and the output of
-    its execution into the registered [output_file]. *)
+    They replace public key hashes, public keys, contract hashes, and timestamps.
+    They also remove command arguments: --base-dir, -d, --endpoint, and -E. *)
 val hooks : Process.hooks
