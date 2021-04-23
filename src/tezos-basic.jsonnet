@@ -10,6 +10,7 @@ local row = grafana.row;
 local node = import './node.jsonnet';
 local p2p = import './p2p.jsonnet';
 local node_hardware = import './node_hardware.jsonnet';
+local delegate_hardware = import './delegate_hardware.jsonnet';
 local workers = import './workers.jsonnet';
 
 local boardtitle = 'Tezos branch: ' + std.extVar('branch');
@@ -106,7 +107,17 @@ dashboard.new(
       showTitle=true,
     ) + { gridPos: { h: 0, w: 8, x: 0, y: 86 } },
     node.gcOperations { gridPos: { h: 8, w: 12, x: 0, y: 86 } },
-    node.gcMajorHeap { gridPos: { h: 8, w: 12, x: 12, y: 86 } }
+    node.gcMajorHeap { gridPos: { h: 8, w: 12, x: 12, y: 86 } },
+
+    //#######
+    row.new(
+      title='Delegates Hardware stats',
+      repeat='',
+      showTitle=true,
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: 94 } },
+    delegate_hardware.cpu { gridPos: { h: 8, w: 8, x: 0, y: 94 } },
+    delegate_hardware.memory { gridPos: { h: 8, w: 8, x: 8, y: 94 } },
+    delegate_hardware.ios { gridPos: { h: 8, w: 8, x: 16, y: 94 } },
 
   ]
 )
