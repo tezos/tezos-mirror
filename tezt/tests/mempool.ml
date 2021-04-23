@@ -834,9 +834,206 @@ let refetch_failed_operation =
   check_operation_is_in_applied_mempool mempool_inject_on_node_2 oph ;
   unit
 
+let get_op_hash_to_ban client =
+  let* pending_ops = RPC.get_mempool_pending_operations client in
+  let open JSON in
+  let ops_list = pending_ops |-> "applied" |> as_list in
+  match ops_list with
+  | [] -> Test.fail "No operation has been found"
+  | op :: _ ->
+      let oph = op |-> "hash" |> as_string in
+      return oph
+
+let check_op_removed client op =
+  let* pending_ops = RPC.get_mempool_pending_operations client in
+  let open JSON in
+  let ops_list = pending_ops |-> "applied" |> as_list in
+  let res = List.exists (fun e -> e |-> "hash" |> as_string = op) ops_list in
+  if res then Test.fail "%s found after removal" op ;
+  unit
+
+let check_op_not_in_baked_block client op =
+  let* ops = RPC.get_operations client in
+  let open JSON in
+  let ops_list = ops |=> 3 |> as_list in
+  let res = List.exists (fun e -> e |-> "hash" |> as_string = op) ops_list in
+  if res then Test.fail "%s found in Baked block" op ;
+  unit
+
+(* Matches events where the id is of the form:
+   "node.prevalidator.banned_operation_injection". And the operation hash is the banned operation
+   For example:
+
+     "event": {
+       "error": [
+         {
+           "kind": "permanent",
+           "id": "node.prevalidator.banned_operation_injection",
+           "operation": "oo1yEKfvPjzvssYHjjSm2mdh7JcqSEnapxycGYbXuGP6u5y9bfK"
+         }
+       ],
+       "failed_request": {
+         "request": "inject",
+         "operation": {
+           "branch": "BLASX74G86Myb8SuScRaWBxv6pQN68sYNrEhQNdghHzumBMTXZ3",
+           "data": "6c0002298c03ed7d454a101eb7022bc95f7e5f41ac78930301f70b00c0843d0000e7670f32038107a59a2b9cfefae36ea21f5aa63c00c5e2d8c670fe006afdd6e5359534226298217bd0da92d74598b6928a120b7a2ea476fbaa062088591421fd1f3e57ab40964bc75c862b83fd566f222da7e16807"
+         }
+       },
+       "status": {
+         "pushed": "2021-04-28T10:11:30.692-00:00",
+         "treated": 2.0603e-05,
+         "completed": 1.0407e-05
+       }
+     },
+     "level": "notice"
+ *)
+let wait_for_banned_transfer node oph =
+  let filter json =
+    match JSON.(json |=> 1 |-> "event" |-> "error" |> as_list) with
+    | [] -> None
+    | e :: _ -> (
+        match
+          ( JSON.(e |-> "id" |> as_string_opt),
+            JSON.(e |-> "operation" |> as_string_opt) )
+        with
+        | (Some id, Some op) ->
+            let res =
+              Format.sprintf "node.prevalidator.banned_operation_injection"
+            in
+            if id = res && op = oph then Some id else None
+        | (Some _, None) | (None, Some _) | (None, None) -> None)
+  in
+  let* _ = Node.wait_for node "node_prevalidator.v0" filter in
+  return ()
+
+(* This tests aims to ban an operation and test the ban.
+   The scenario is the following:
+
+   1. Node 1 activates a protocol,
+
+   2. Node 2 catches up with Node 1,
+
+   3. Injection of two operation (transfer)
+
+   4. Get the hash of tthe first operation and ban it on Node 2
+
+   5. Try to re-add the banned operation in Node 2
+
+   6. Add Node 3 connected to Node 2
+
+   7. Bake on Node 2 with an empty mempool to force synchronisation of mempool with Node 3 and check that the banned op is not in Node 3 mempool
+
+   8. Bake on Node 2 with its mempool and check that the banned operation has not been added and is still banned
+
+   The test is successful if the ban is exexuted correctly *)
+let mempool =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"mempool ban operation"
+    ~tags:["mempool"; "node"]
+  @@ fun protocol ->
+  (* Step 1 and 2 *)
+  (* Note: we start node_1 and node_2 and connect them. We wait until they are synced to the same level *)
+  let* node_1 = Node.init [Synchronisation_threshold 0; Connections 2]
+  and* node_2 = Node.init [Synchronisation_threshold 0; Connections 2] in
+  let* client_1 = Client.init ~endpoint:Client.(Node node_1) ()
+  and* client_2 = Client.init ~endpoint:Client.(Node node_2) () in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
+  let* () = Client.activate_protocol ~protocol client_1 in
+  Log.info "Activated protocol." ;
+  let common_ancestor = 0 in
+  let* _ = Node.wait_for_level node_1 (common_ancestor + 1)
+  and* _ = Node.wait_for_level node_2 (common_ancestor + 1) in
+  Log.info "Both nodes are at level %d." (common_ancestor + 1) ;
+  (* Step 3 *)
+  (* inject 2 operation (transfer) *)
+  let transfer_1 = wait_for_injection node_1 in
+  let _ =
+    Client.transfer
+      ~wait:"0"
+      ~amount:(Tez.of_int 1)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~counter:1
+      client_1
+  in
+  let* () = transfer_1 in
+  Log.info "First transfer done." ;
+  let transfer_2 = wait_for_injection node_1 in
+  let _ =
+    Client.transfer
+      ~wait:"0"
+      ~amount:(Tez.of_int 2)
+      ~giver:Constant.bootstrap3.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~counter:1
+      client_1
+  in
+  let* () = transfer_2 in
+  Log.info "Second transfer done." ;
+  (* Step 4 *)
+  (* choose an op hash to ban from the mempool of client_2 operations *)
+  let* oph_to_ban = get_op_hash_to_ban client_2 in
+  Log.info "Op Hash to ban : %s" oph_to_ban ;
+  (* ban operation *)
+  let* _ = RPC.mempool_ban_operation ~data:(`String oph_to_ban) client_2 in
+  Log.info "Ban %s" oph_to_ban ;
+  (* Check that the operation is removed from the mempool *)
+  let* () = check_op_removed client_2 oph_to_ban in
+  Log.info "%s op has been correctly removed" oph_to_ban ;
+  (* Step 5 *)
+  (* Try to re-add the banned operation in the node 2 *)
+  let banned_transfer = wait_for_banned_transfer node_2 oph_to_ban in
+  let _ =
+    Client.transfer
+      ~wait:"0"
+      ~amount:(Tez.of_int 1)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~counter:1
+      client_2
+  in
+  let* () = banned_transfer in
+  let* () = check_op_removed client_2 oph_to_ban in
+  Log.info "%s op is still banned" oph_to_ban ;
+  (* Step 6 *)
+  (* Add a new node connected to node_2 *)
+  let* node_3 = Node.init [Synchronisation_threshold 0; Connections 2] in
+  let* client_3 = Client.init ~endpoint:Client.(Node node_3) () in
+  let* () = Client.Admin.connect_address client_3 ~peer:node_2 in
+  let* _ = Node.wait_for_level node_3 (common_ancestor + 1) in
+  (* Step 7 *)
+  (* Bake with an empty mempool to force synchronisation *)
+  let mempool_str =
+    {|{"applied":[],"refused":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}"|}
+  in
+  Log.info "Dummy mempool content : %s" mempool_str ;
+  let mempool = Temp.file "mempool.json" in
+  let* _ =
+    Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
+        Lwt_io.write oc mempool_str)
+  in
+  let dummy_baking = wait_for_flush node_2 in
+  let* () = Client.bake_for ~mempool client_2 in
+  let* () = dummy_baking in
+  let* _ = check_op_removed client_3 oph_to_ban in
+  Log.info "Check that banned op is not in node_3" ;
+  (* Step 8 *)
+  (* Bake on client 2 and check that the banned operation has not been added and is still banned *)
+  let baking = wait_for_flush node_2 in
+  let* () = Client.bake_for client_2 in
+  let* _ = baking in
+  Log.info "Client2 baked" ;
+  let* _ = check_op_not_in_baked_block client_2 oph_to_ban in
+  Log.info "%s op is not in baked block" oph_to_ban ;
+  let* () = check_op_removed client_2 oph_to_ban in
+  Log.info "%s op is still banned in client_2" oph_to_ban ;
+  unit
+
 let register ~protocols =
   flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
   endorsement_flushed_branch_refused ~protocols ;
   forge_pre_filtered_operation ~protocols ;
-  refetch_failed_operation ~protocols
+  refetch_failed_operation ~protocols ;
+  mempool ~protocols
