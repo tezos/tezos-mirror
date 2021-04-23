@@ -9,7 +9,7 @@ local row = grafana.row;
 
 local node = import './node.jsonnet';
 local p2p = import './p2p.jsonnet';
-local hardware = import './hardware.jsonnet';
+local node_hardware = import './node_hardware.jsonnet';
 local workers = import './workers.jsonnet';
 
 local boardtitle = 'Tezos branch: ' + std.extVar('branch');
@@ -57,20 +57,20 @@ dashboard.new(
 
     //#######
     row.new(
-      title='Hardware stats',
+      title='Node Hardware stats',
       repeat='',
       showTitle=true,
     ) + { gridPos: { h: 0, w: 8, x: 0, y: 22 } },
-    hardware.cpu { gridPos: { h: 8, w: 12, x: 0, y: 22 } },
-    hardware.memory { gridPos: { h: 8, w: 12, x: 12, y: 22 } },
+    node_hardware.cpu { gridPos: { h: 8, w: 12, x: 0, y: 22 } },
+    node_hardware.memory { gridPos: { h: 8, w: 12, x: 12, y: 22 } },
 
 
-    hardware.diskFreeSpace { gridPos: { h: 8, w: 2, x: 0, y: 30 } },
-    hardware.storage { gridPos: { h: 8, w: 11, x: 2, y: 30 } },
-    hardware.ios { gridPos: { h: 8, w: 11, x: 13, y: 30 } },
+    node_hardware.diskFreeSpace { gridPos: { h: 8, w: 2, x: 0, y: 30 } },
+    node_hardware.storage { gridPos: { h: 8, w: 11, x: 2, y: 30 } },
+    node_hardware.ios { gridPos: { h: 8, w: 11, x: 13, y: 30 } },
 
-    hardware.networkIOS { gridPos: { h: 8, w: 12, x: 0, y: 38 } },
-    hardware.fileDescriptors { gridPos: { h: 8, w: 12, x: 12, y: 38 } },
+    node_hardware.networkIOS { gridPos: { h: 8, w: 12, x: 0, y: 38 } },
+    node_hardware.fileDescriptors { gridPos: { h: 8, w: 12, x: 12, y: 38 } },
 
     //#######
     row.new(
