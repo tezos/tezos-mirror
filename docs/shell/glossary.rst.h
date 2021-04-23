@@ -42,6 +42,10 @@ _`Economic protocol`
 _`Fitness`
     See score_.
 
+_`Level`
+    The position of a block in the chain, that is, the number of blocks
+    since the genesis block, where the genesis block is at level 0.
+
 _`Mempool`
     A pool (set) of operations_ maintained by a node_ and not yet included in a block_.
 

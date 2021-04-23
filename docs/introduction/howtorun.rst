@@ -12,6 +12,7 @@ The second way allows to participate more actively in the protocol, by baking bl
 
 To learn more about the protocol refer to :doc:`this page <../active/proof_of_stake>`.
 
+.. _delegating_coins:
 
 Delegating your coins
 ---------------------
