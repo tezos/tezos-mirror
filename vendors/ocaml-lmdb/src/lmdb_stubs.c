@@ -340,7 +340,7 @@ CAMLprim value stub_mdb_get(value txn, value dbi, value key) {
     int ret;
 
     k.mv_size = caml_string_length(key);
-    k.mv_data = String_val(key);
+    k.mv_data = Bytes_val(key);
 
     ret = mdb_get(Txn_val(txn), Nativeint_val(dbi), &k, &v);
     if (ret) {
@@ -359,7 +359,7 @@ CAMLprim value stub_mdb_put(value txn, value dbi,
                             value key, value data, value flags) {
     MDB_val k, v;
     k.mv_size = caml_string_length(key);
-    k.mv_data = String_val(key);
+    k.mv_data = Bytes_val(key);
     v.mv_size = Caml_ba_array_val(data)->dim[0];
     v.mv_data = Caml_ba_data_val(data);
     return Val_int(mdb_put(Txn_val(txn), Nativeint_val(dbi), &k, &v, Int_val(flags)));
@@ -369,16 +369,16 @@ CAMLprim value stub_mdb_put_string(value txn, value dbi,
                                    value key, value data, value flags) {
     MDB_val k, v;
     k.mv_size = caml_string_length(key);
-    k.mv_data = String_val(key);
+    k.mv_data = Bytes_val(key);
     v.mv_size = caml_string_length(data);
-    v.mv_data = String_val(data);
+    v.mv_data = Bytes_val(data);
     return Val_int(mdb_put(Txn_val(txn), Nativeint_val(dbi), &k, &v, Int_val(flags)));
 }
 
 CAMLprim value stub_mdb_del(value txn, value dbi, value key, value data) {
     MDB_val k, v, *vp = NULL;
     k.mv_size = caml_string_length(key);
-    k.mv_data = String_val(key);
+    k.mv_data = Bytes_val(key);
 
     if (Is_block(data)) {
         v.mv_size = Caml_ba_array_val(Field(data, 0))->dim[0];
@@ -392,11 +392,11 @@ CAMLprim value stub_mdb_del(value txn, value dbi, value key, value data) {
 CAMLprim value stub_mdb_del_string(value txn, value dbi, value key, value data) {
     MDB_val k, v, *vp = NULL;
     k.mv_size = caml_string_length(key);
-    k.mv_data = String_val(key);
+    k.mv_data = Bytes_val(key);
 
     if (Is_block(data)) {
         v.mv_size = caml_string_length(Field(data, 0));
-        v.mv_data = String_val(Field(data, 0));
+        v.mv_data = Bytes_val(Field(data, 0));
         vp = &v;
     }
 
@@ -453,7 +453,7 @@ CAMLprim value stub_mdb_cursor_get(value cursor, value key, value data, value op
 
     if (Is_block(key)) {
         k.mv_size = caml_string_length(Field(key, 0));
-        k.mv_data = String_val(Field(key, 0));
+        k.mv_data = Bytes_val(Field(key, 0));
     }
 
     if (Is_block(data)) {
@@ -486,12 +486,12 @@ CAMLprim value stub_mdb_cursor_get_string(value cursor, value key, value data, v
 
     if (Is_block(key)) {
         k.mv_size = caml_string_length(Field(key, 0));
-        k.mv_data = String_val(Field(key, 0));
+        k.mv_data = Bytes_val(Field(key, 0));
     }
 
     if (Is_block(data)) {
         v.mv_size = caml_string_length(Field(data, 0));
-        v.mv_data = String_val(Field(data, 0));
+        v.mv_data = Bytes_val(Field(data, 0));
     }
 
     ret = mdb_cursor_get(Cursor_val(cursor), &k, &v, Int_val(op));
@@ -513,7 +513,7 @@ CAMLprim value stub_mdb_cursor_get_string(value cursor, value key, value data, v
 CAMLprim value stub_mdb_cursor_put(value cursor, value key, value data, value flags) {
     MDB_val k, v;
     k.mv_size = caml_string_length(key);
-    k.mv_data = String_val(key);
+    k.mv_data = Bytes_val(key);
     v.mv_size = Caml_ba_array_val(data)->dim[0];
     v.mv_data = Caml_ba_data_val(data);
     return Val_int(mdb_cursor_put(Cursor_val(cursor), &k, &v, Int_val(flags)));
@@ -522,9 +522,9 @@ CAMLprim value stub_mdb_cursor_put(value cursor, value key, value data, value fl
 CAMLprim value stub_mdb_cursor_put_string(value cursor, value key, value data, value flags) {
     MDB_val k, v;
     k.mv_size = caml_string_length(key);
-    k.mv_data = String_val(key);
+    k.mv_data = Bytes_val(key);
     v.mv_size = caml_string_length(data);
-    v.mv_data = String_val(data);
+    v.mv_data = Bytes_val(data);
     return Val_int(mdb_cursor_put(Cursor_val(cursor), &k, &v, Int_val(flags)));
 }
 
