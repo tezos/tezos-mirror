@@ -153,3 +153,14 @@ let iter_e f = function None -> Ok () | Some v -> f v
 let iter_es f = function None -> Lwt.return_ok () | Some v -> f v
 
 let of_result = function Ok v -> Some v | Error _ -> None
+
+let catch ?(catch_only = fun _ -> true) f =
+  match f () with
+  | v -> Some v
+  | exception ((Stack_overflow | Out_of_memory) as e) -> raise e
+  | exception e -> if catch_only e then None else raise e
+
+let catch_s ?(catch_only = fun _ -> true) f =
+  Lwt.try_bind f Lwt.return_some (function
+      | (Stack_overflow | Out_of_memory) as e -> raise e
+      | e -> if catch_only e then Lwt.return_none else raise e)
