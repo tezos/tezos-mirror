@@ -5,7 +5,7 @@
  (foreign_stubs
   (language c)
   (names mdb midl lmdb_stubs)
-  (flags -lpthread
+  (flags -lpthread -Wstringop-overflow=0
   	 (:include c_flags.sexp))))
 
 (rule
