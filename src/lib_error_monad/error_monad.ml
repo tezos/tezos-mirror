@@ -60,6 +60,8 @@ let error_of_exn e = TzTrace.make @@ Exn e
 
 let error_exn s = Error (TzTrace.make @@ Exn s)
 
+let tzresult_of_exn_result r = Result.map_error error_of_exn r
+
 let trace_exn exn f = trace (Exn exn) f
 
 let generic_trace fmt =
@@ -156,3 +158,9 @@ let cancel_with_exceptions canceler =
   Lwt_canceler.cancel canceler >>= function
   | Ok () | Error [] -> Lwt.return_unit
   | Error (h :: _) -> raise h
+
+let catch ?catch_only f =
+  TzLwtreslib.Result.catch ?catch_only f |> Result.map_error error_of_exn
+
+let catch_s ?catch_only f =
+  TzLwtreslib.Result.catch_s ?catch_only f >|= Result.map_error error_of_exn

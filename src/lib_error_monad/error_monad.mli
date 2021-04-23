@@ -65,12 +65,22 @@ val error_exn : exn -> 'a tzresult
 
 {[
 try
-  Ok (make_some_call parameter)
+   Ok (make_some_call parameter)
 with
   | (Not_found | Failure _) as e ->
-    Error (error_of_exn e)
+        Error (error_of_exn e)
 ]} *)
 val error_of_exn : exn -> error trace
+
+(** [tzresult_of_exn_result r] wraps the payload construction of the [Error]
+    constructor of a result into a [tzresult]. This is intended for use when
+    interacting with code that uses exceptions wrapped in a [result]. E.g.,
+
+{[
+let p : int Lwt.t = … in
+Lwt_result.catch p >|= tzresult_of_exn_result
+]} *)
+val tzresult_of_exn_result : ('a, exn) result -> 'a tzresult
 
 val record_trace_exn : exn -> 'a tzresult -> 'a tzresult
 
@@ -110,6 +120,38 @@ val protect :
   ?canceler:Lwt_canceler.t ->
   (unit -> 'a tzresult Lwt.t) ->
   'a tzresult Lwt.t
+
+(** [catch f] executes [f] within a try-with block and wraps exceptions within
+    a [tzresult]. [catch f] is equivalent to
+    [try Ok (f ()) with e -> Error (error_of_exn e)].
+
+    If [catch_only] is set, then only exceptions [e] such that [catch_only e] is
+    [true] are caught.
+
+    Whether [catch_only] is set or not, this function never catches
+    non-deterministic runtime exceptions of OCaml such as {!Stack_overflow} and
+    {!Out_of_memory}.
+    *)
+val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a tzresult
+
+(** [catch_s] is like [catch] but when [f] returns a promise. It is equivalent
+    to
+
+{[
+Lwt.try_bind f
+  (fun v -> Lwt.return (Ok v))
+  (fun e -> Lwt.return (Error (error_of_exn e)))
+]}
+
+    If [catch_only] is set, then only exceptions [e] such that [catch_only e] is
+    [true] are caught.
+
+    Whether [catch_only] is set or not, this function never catches
+    non-deterministic runtime exceptions of OCaml such as {!Stack_overflow} and
+    {!Out_of_memory}.
+    *)
+val catch_s :
+  ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a tzresult Lwt.t
 
 type error += Timeout
 
