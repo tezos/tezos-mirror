@@ -1,5 +1,5 @@
 local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
-local singlestat = grafana.singlestat;
+local stat = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 
@@ -16,6 +16,12 @@ local prometheus = grafana.prometheus;
       datasource='Prometheus',
       linewidth=1,
       format='kbytes',
+      legend_alignAsTable=true,
+      legend_current=true,
+      legend_avg=true,
+      legend_max=true,
+      legend_show=true,
+      legend_values=true,
       aliasColors={
         [reads]: 'light-green',
         [writes]: 'light-yellow',
@@ -57,6 +63,12 @@ local prometheus = grafana.prometheus;
       datasource='Prometheus',
       linewidth=1,
       format='mbytes',
+      legend_alignAsTable=true,
+      legend_current=true,
+      legend_avg=true,
+      legend_max=true,
+      legend_show=true,
+      legend_values=true,
       aliasColors={
         [ram]: 'light-green',
         [swap]: 'light-orange',
@@ -111,6 +123,19 @@ local prometheus = grafana.prometheus;
       )
     ),
 
+  diskFreeSpace:
+    stat.new(
+      title='Disk free space',
+      graphMode='area',
+      unit='decbytes',
+      reducerFunction='lastNotNull'
+    ).addTarget(
+      prometheus.target(
+	'node_filesystem_free_bytes{mountpoint=\"/\"}',
+	legendFormat= 'Available bytes on disk.',
+      )
+    ),
+
   fileDescriptors:
     local total = 'All fds';
     local sockets = 'Sockets';
@@ -156,5 +181,32 @@ local prometheus = grafana.prometheus;
         'netdata_apps_pipes_open_pipes_average{dimension="tezos"}',
         legendFormat=pipes,
       )
+    ),
+
+  networkIOS:
+    graphPanel.new(
+      title='Network traffic',
+      format='Bps',
+      legend_alignAsTable=true,
+      legend_current=true,
+      legend_avg=true,
+      legend_max=true,
+      legend_show=true,
+      legend_values=true,
+    ).addTarget(
+      prometheus.target(
+	"irate(node_network_receive_bytes_total[5m]) > 0",
+	legendFormat="Bytes received",
+      )
+    ).addTarget(
+      prometheus.target(
+	"irate(node_network_transmit_bytes_total[5m]) > 0",
+	legendFormat="Bytes transmitted",
+      )
+    ).addSeriesOverride(
+      {
+	alias:'/.*received/',
+	transform:'negative-Y',
+      }
     ),
 }

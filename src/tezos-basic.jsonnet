@@ -46,12 +46,13 @@ dashboard.new(
 
 
     node.headHistory                                                + {gridPos: {h: 10, w: 10, x: 4, y: 0}},
-    node.invalidBlocksHistory                                       + {gridPos: {h: 8, w: 10, x: 4, y: 10}},
+
+    node.blocksPerSecond                                            + {gridPos: {h: 8, w: 10, x: 4, y: 10 }},
 
     node.logs                                                                                               + {gridPos: {h: 18, w: 10, x: 14, y: 0}},
 
 
-    node.headOperations { gridPos: { h: 8, w: 24, x: 0, y: 14 } },
+    node.headOperations { gridPos: { h: 8, w: 14, x: 0, y: 14 } }, node.invalidBlocksHistory {gridPos: {h: 8, w: 10, x: 14, y: 14}},
 
     //#######
     row.new(
@@ -59,48 +60,52 @@ dashboard.new(
       repeat='',
       showTitle=true,
     ) + { gridPos: { h: 0, w: 8, x: 0, y: 22 } },
-    hardware.cpu { gridPos: { h: 8, w: 8, x: 0, y: 22 } },
-    hardware.ios { gridPos: { h: 8, w: 8, x: 8, y: 22 } },
-    hardware.memory { gridPos: { h: 8, w: 8, x: 16, y: 22 } },
+    hardware.cpu { gridPos: { h: 8, w: 12, x: 0, y: 22 } },
+    hardware.memory { gridPos: { h: 8, w: 12, x: 12, y: 22 } },
 
-    hardware.storage { gridPos: { h: 8, w: 12, x: 0, y: 30 } },
-    hardware.fileDescriptors { gridPos: { h: 8, w: 12, x: 12, y: 30 } },
+
+    hardware.diskFreeSpace { gridPos: { h: 8, w: 2, x: 0, y: 30 } },
+    hardware.storage { gridPos: { h: 8, w: 11, x: 2, y: 30 } },
+    hardware.ios { gridPos: { h: 8, w: 11, x: 13, y: 30 } },
+
+    hardware.networkIOS { gridPos: { h: 8, w: 12, x: 0, y: 38 } },
+    hardware.fileDescriptors { gridPos: { h: 8, w: 12, x: 12, y: 38 } },
 
     //#######
     row.new(
       title='P2P stats',
       repeat='',
       showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: 38 } },
-    p2p.mempoolPending { gridPos: { h: 8, w: 12, x: 0, y: 38 } },
-    p2p.totalConnections { gridPos: { h: 8, w: 12, x: 12, y: 38 } },
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: 46 } },
+    p2p.mempoolPending { gridPos: { h: 8, w: 12, x: 0, y: 46 } },
+    p2p.totalConnections { gridPos: { h: 8, w: 12, x: 12, y: 46 } },
 
-    p2p.peers { gridPos: { h: 8, w: 12, x: 0, y: 46 } },
-    p2p.points { gridPos: { h: 8, w: 12, x: 12, y: 46 } },
+    p2p.peers { gridPos: { h: 8, w: 12, x: 0, y: 54 } },
+    p2p.points { gridPos: { h: 8, w: 12, x: 12, y: 54 } },
 
     //#######
     row.new(
       title='Workers stats',
       repeat='',
       showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: 54 } },
-    workers.requests { gridPos: { h: 8, w: 12, x: 12, y: 54 } },
-    workers.distributedDB { gridPos: { h: 8, w: 12, x: 0, y: 54 } },
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: 62 } },
+    workers.requests { gridPos: { h: 8, w: 12, x: 12, y: 62 } },
+    workers.distributedDB { gridPos: { h: 8, w: 12, x: 0, y: 62 } },
 
-    workers.prevalidators { gridPos: { h: 8, w: 12, x: 12, y: 62 } },
-    workers.peerValidators { gridPos: { h: 8, w: 12, x: 0, y: 62 } },
+    workers.prevalidators { gridPos: { h: 8, w: 12, x: 12, y: 70 } },
+    workers.peerValidators { gridPos: { h: 8, w: 12, x: 0, y: 70 } },
 
-    workers.peerValidatorsFetchedBlockPipelines { gridPos: { h: 8, w: 12, x: 12, y: 70 } },
-    workers.peerValidatorsFetchedHeaderPipelines { gridPos: { h: 8, w: 12, x: 0, y: 70 } },
+    workers.peerValidatorsFetchedBlockPipelines { gridPos: { h: 8, w: 12, x: 12, y: 78 } },
+    workers.peerValidatorsFetchedHeaderPipelines { gridPos: { h: 8, w: 12, x: 0, y: 78 } },
 
     //#######
     row.new(
       title='Miscellaneous',
       repeat='',
       showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: 78 } },
-    node.gcOperations { gridPos: { h: 8, w: 12, x: 0, y: 78 } },
-    node.gcMajorHeap { gridPos: { h: 8, w: 12, x: 12, y: 78 } },
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: 86 } },
+    node.gcOperations { gridPos: { h: 8, w: 12, x: 0, y: 86 } },
+    node.gcMajorHeap { gridPos: { h: 8, w: 12, x: 12, y: 86 } }
 
   ]
 )
