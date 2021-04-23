@@ -32,6 +32,8 @@ let json_pp id description encoding ppf data =
   in
   Data_encoding.Json.construct pp_encoding (id, description, data)
 
+(* This is a global variable because it is shared amongst all the error monads (the
+   shell's and the protocols'). See below for use. *)
 let set_error_encoding_cache_dirty = ref (fun () -> ())
 
 module Make (Prefix : Sig.PREFIX) : sig
@@ -140,10 +142,10 @@ end = struct
   let error_encoding_cache = ref None
 
   let () =
-    let cont = !set_error_encoding_cache_dirty in
+    let set_older_caches_dirty = !set_error_encoding_cache_dirty in
     set_error_encoding_cache_dirty :=
       fun () ->
-        cont () ;
+        set_older_caches_dirty () ;
         error_encoding_cache := None
 
   let string_of_category = function
