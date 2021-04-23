@@ -16,7 +16,7 @@ opam init --bare -y
 export OPAMYES=true
 export OPAMSOLVERTIMEOUT=1200
 # [install ocaml compiler]
-opam switch create for_tezos 4.09.1
+opam switch create for_tezos 4.10.2
 eval $(opam env)
 # [get system dependencies]
 opam install depext
