@@ -2,7 +2,7 @@
 
 sanity:
   extends: .runtime_build_test_dependencies_template
-  stage: sanity
+  stage: build
   except:
     - master
     - tags@tezos/tezos
