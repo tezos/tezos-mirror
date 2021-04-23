@@ -58,10 +58,3 @@ val dawn_of_a_new_cycle : Raw_context.t -> Cycle_repr.t option
 (** Returns [true] if the rolls should be snapshot at the current
    level. *)
 val may_snapshot_rolls : Raw_context.t -> bool
-
-(**/**)
-
-(* exported for unit testing only *)
-
-val first_level_in_cycle_with_era :
-  Level_repr.cycle_era list -> Cycle_repr.t -> Level_repr.t

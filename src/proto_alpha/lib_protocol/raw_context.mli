@@ -94,9 +94,8 @@ val constants : t -> Constants_repr.parametric
 val patch_constants :
   t -> (Constants_repr.parametric -> Constants_repr.parametric) -> t Lwt.t
 
-(** Retrieve the cycle eras. NOTE: the last cycle era is the current
-   era, so it contains the same values as in Constants. *)
-val cycle_eras : t -> Level_repr.cycle_era list
+(** Retrieve the cycle eras. *)
+val cycle_eras : t -> Level_repr.cycle_eras
 
 (** Increment the current block fee stash that will be credited to baker's
     frozen_fees account at finalize_application *)

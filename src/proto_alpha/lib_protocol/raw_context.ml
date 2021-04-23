@@ -57,7 +57,7 @@ module Int_set = Set.Make (Compare.Int)
 type back = {
   context : Context.t;
   constants : Constants_repr.parametric;
-  cycle_eras : Level_repr.cycle_era list;
+  cycle_eras : Level_repr.cycle_eras;
   level : Level_repr.t;
   predecessor_timestamp : Time.t;
   timestamp : Time.t;
@@ -576,47 +576,16 @@ let get_cycle_eras ctxt =
       storage_error (Missing_key (cycle_eras_key, Get))
   | Some bytes -> (
     match
-      Data_encoding.Binary.of_bytes
-        (Data_encoding.list Level_repr.cycle_era_encoding)
-        bytes
+      Data_encoding.Binary.of_bytes Level_repr.cycle_eras_encoding bytes
     with
     | None ->
         storage_error (Corrupted_data cycle_eras_key)
     | Some cycle_eras ->
         ok cycle_eras )
 
-type error += Failed_to_set_cycle_eras
-
-let () =
-  register_error_kind
-    `Temporary
-    ~id:"context.failed_to_set_cycle_eras"
-    ~title:"Failed to set cycle eras"
-    ~description:"The cycles eras are not valid: non-increase first levels."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "The cycles eras are not valid: non-increase first levels.")
-    Data_encoding.empty
-    (function Failed_to_set_cycle_eras -> Some () | _ -> None)
-    (fun () -> Failed_to_set_cycle_eras)
-
-let check_increasing_first_levels cycle_eras =
-  let first_levels =
-    List.map (fun era -> era.Level_repr.first_level) cycle_eras
-  in
-  let sorted = List.sort Raw_level_repr.compare first_levels in
-  let module CompareList = Compare.List (Raw_level_repr) in
-  if CompareList.(first_levels = sorted) then return_unit
-  else fail Failed_to_set_cycle_eras
-
 let set_cycle_eras ctxt cycle_eras =
-  check_increasing_first_levels cycle_eras
-  >>=? fun () ->
   let bytes =
-    Data_encoding.Binary.to_bytes_exn
-      (Data_encoding.list Level_repr.cycle_era_encoding)
-      cycle_eras
+    Data_encoding.Binary.to_bytes_exn Level_repr.cycle_eras_encoding cycle_eras
   in
   Context.add ctxt cycle_eras_key bytes >|= ok
 
@@ -719,18 +688,15 @@ let check_inited ctxt =
       if Compare.String.(s = version_value) then ok_unit
       else storage_error (Incompatible_protocol_version s)
 
-let check_cycle_eras (cycle_eras : Level_repr.cycle_era list)
+let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
     (constants : Constants_repr.parametric) =
-  match List.rev cycle_eras with
-  | last_era :: _ ->
-      assert (
-        Compare.Int32.(last_era.blocks_per_cycle = constants.blocks_per_cycle)
-      ) ;
-      assert (
-        Compare.Int32.(
-          last_era.blocks_per_commitment = constants.blocks_per_commitment) )
-  | [] ->
-      assert false
+  let current_era = Level_repr.current_era cycle_eras in
+  assert (
+    Compare.Int32.(current_era.blocks_per_cycle = constants.blocks_per_cycle)
+  ) ;
+  assert (
+    Compare.Int32.(
+      current_era.blocks_per_commitment = constants.blocks_per_commitment) )
 
 let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
   Raw_level_repr.of_int32 level
@@ -744,7 +710,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
   get_cycle_eras ctxt
   >|=? fun cycle_eras ->
   check_cycle_eras cycle_eras constants ;
-  let level = Level_repr.level_from_raw ~cycle_eras level in
+  let level = Level_repr.from_raw ~cycle_eras level in
   {
     remaining_operation_gas = Gas_limit_repr.Arith.zero;
     back =
@@ -837,11 +803,14 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
         Level_repr.
           {
             first_level;
+            first_cycle = Cycle_repr.root;
             blocks_per_cycle = param.constants.blocks_per_cycle;
             blocks_per_commitment = param.constants.blocks_per_commitment;
           }
       in
-      set_cycle_eras ctxt [cycle_era]
+      Level_repr.create_cycle_eras [cycle_era]
+      >>?= fun cycle_eras ->
+      set_cycle_eras ctxt cycle_eras
       >>=? fun ctxt -> add_constants ctxt param.constants >|= ok
   | Florence_009 ->
       get_first_level ctxt
@@ -917,20 +886,29 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
         Level_repr.
           {
             first_level;
+            first_cycle = Cycle_repr.root;
             blocks_per_cycle = c.blocks_per_cycle;
             blocks_per_commitment = c.blocks_per_commitment;
           }
+      in
+      let current_cycle =
+        let level_position =
+          Int32.sub level (Raw_level_repr.to_int32 first_level)
+        in
+        Cycle_repr.of_int32_exn (Int32.div level_position c.blocks_per_cycle)
       in
       let second_cycle_era =
         Level_repr.
           {
             first_level =
               Raw_level_repr.of_int32_exn (Int32.succ (Int32.succ level));
+            first_cycle = Cycle_repr.succ current_cycle;
             blocks_per_cycle = constants.blocks_per_cycle;
             blocks_per_commitment = constants.blocks_per_commitment;
           }
       in
-      set_cycle_eras ctxt [first_cycle_era; second_cycle_era] )
+      Level_repr.create_cycle_eras [second_cycle_era; first_cycle_era]
+      >>?= fun cycle_eras -> set_cycle_eras ctxt cycle_eras )
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp ~fitness
   >|=? fun ctxt -> (previous_proto, ctxt)

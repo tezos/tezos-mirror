@@ -32,10 +32,65 @@
 
 open Protocol
 
+let test_create_cycle_eras () =
+  let empty_cycle_eras =
+    Level_repr.create_cycle_eras [] |> Environment.wrap_tzresult
+  in
+  Assert.proto_error ~loc:__LOC__ empty_cycle_eras (function
+      | Level_repr.Invalid_cycle_eras ->
+          true
+      | _ ->
+          false)
+  >>=? fun () ->
+  let increasing_first_levels =
+    [ Level_repr.
+        {
+          first_level = Raw_level_repr.of_int32_exn 1l;
+          first_cycle = Cycle_repr.succ Cycle_repr.root;
+          blocks_per_cycle = 8l;
+          blocks_per_commitment = 2l;
+        };
+      {
+        first_level = Raw_level_repr.of_int32_exn 9l;
+        first_cycle = Cycle_repr.root;
+        blocks_per_cycle = 8l;
+        blocks_per_commitment = 2l;
+      } ]
+    |> Level_repr.create_cycle_eras |> Environment.wrap_tzresult
+  in
+  Assert.proto_error ~loc:__LOC__ increasing_first_levels (function
+      | Level_repr.Invalid_cycle_eras ->
+          true
+      | _ ->
+          false)
+  >>=? fun () ->
+  let increasing_first_cycles =
+    [ Level_repr.
+        {
+          first_level = Raw_level_repr.of_int32_exn 9l;
+          first_cycle = Cycle_repr.root;
+          blocks_per_cycle = 8l;
+          blocks_per_commitment = 2l;
+        };
+      {
+        first_level = Raw_level_repr.of_int32_exn 1l;
+        first_cycle = Cycle_repr.succ Cycle_repr.root;
+        blocks_per_cycle = 8l;
+        blocks_per_commitment = 2l;
+      } ]
+    |> Level_repr.create_cycle_eras |> Environment.wrap_tzresult
+  in
+  Assert.proto_error ~loc:__LOC__ increasing_first_cycles (function
+      | Level_repr.Invalid_cycle_eras ->
+          true
+      | _ ->
+          false)
+
 let test_case_1 =
   ( [ Level_repr.
         {
           first_level = Raw_level_repr.of_int32_exn 1l;
+          first_cycle = Cycle_repr.root;
           blocks_per_cycle = 8l;
           blocks_per_commitment = 2l;
         } ],
@@ -50,17 +105,20 @@ let test_case_1 =
       (65, (65, 64, 8, 0, false)) ] )
 
 let test_case_2 =
-  ( [ Level_repr.
+  ( List.rev
+      [ Level_repr.
+          {
+            first_level = Raw_level_repr.of_int32_exn 1l;
+            first_cycle = Cycle_repr.root;
+            blocks_per_cycle = 8l;
+            blocks_per_commitment = 2l;
+          };
         {
-          first_level = Raw_level_repr.of_int32_exn 1l;
-          blocks_per_cycle = 8l;
-          blocks_per_commitment = 2l;
-        };
-      {
-        first_level = Raw_level_repr.of_int32_exn 17l;
-        blocks_per_cycle = 16l;
-        blocks_per_commitment = 4l;
-      } ],
+          first_level = Raw_level_repr.of_int32_exn 17l;
+          first_cycle = Cycle_repr.of_int32_exn 2l;
+          blocks_per_cycle = 16l;
+          blocks_per_commitment = 4l;
+        } ],
     [ (1, (1, 0, 0, 0, false));
       (2, (2, 1, 0, 1, true));
       (3, (3, 2, 0, 2, false));
@@ -74,22 +132,26 @@ let test_case_2 =
       (65, (65, 64, 5, 0, false)) ] )
 
 let test_case_3 =
-  ( [ Level_repr.
+  ( List.rev
+      [ Level_repr.
+          {
+            first_level = Raw_level_repr.of_int32_exn 1l;
+            first_cycle = Cycle_repr.root;
+            blocks_per_cycle = 8l;
+            blocks_per_commitment = 2l;
+          };
         {
-          first_level = Raw_level_repr.of_int32_exn 1l;
-          blocks_per_cycle = 8l;
-          blocks_per_commitment = 2l;
+          first_level = Raw_level_repr.of_int32_exn 17l;
+          first_cycle = Cycle_repr.of_int32_exn 2l;
+          blocks_per_cycle = 16l;
+          blocks_per_commitment = 4l;
         };
-      {
-        first_level = Raw_level_repr.of_int32_exn 17l;
-        blocks_per_cycle = 16l;
-        blocks_per_commitment = 4l;
-      };
-      {
-        first_level = Raw_level_repr.of_int32_exn 49l;
-        blocks_per_cycle = 6l;
-        blocks_per_commitment = 3l;
-      } ],
+        {
+          first_level = Raw_level_repr.of_int32_exn 49l;
+          first_cycle = Cycle_repr.of_int32_exn 4l;
+          blocks_per_cycle = 6l;
+          blocks_per_commitment = 3l;
+        } ],
     [ (1, (1, 0, 0, 0, false));
       (2, (2, 1, 0, 1, true));
       (3, (3, 2, 0, 2, false));
@@ -107,11 +169,8 @@ let test_case_3 =
       (67, (67, 66, 7, 0, false)) ] )
 
 let test_level_from_raw () =
-  let cnt = ref 0 in
   List.iter_es
     (fun (cycle_eras, test_cases) ->
-      incr cnt ;
-      Format.printf "\ntest %d\n" !cnt ;
       List.iter_es
         (fun ( input_level,
                ( level,
@@ -122,10 +181,12 @@ let test_level_from_raw () =
           let raw_level =
             Raw_level_repr.of_int32_exn (Int32.of_int input_level)
           in
+          Level_repr.create_cycle_eras cycle_eras
+          |> Environment.wrap_tzresult
+          >>?= fun cycle_eras ->
           let level_from_raw =
-            Protocol.Level_repr.level_from_raw ~cycle_eras raw_level
+            Protocol.Level_repr.from_raw ~cycle_eras raw_level
           in
-          Format.printf "level %d\n" input_level ;
           Assert.equal_int
             ~loc:__LOC__
             (Int32.to_int (Raw_level_repr.to_int32 level_from_raw.level))
@@ -167,10 +228,11 @@ let test_first_level_in_cycle () =
       (7l, 67) ]
   in
   let f (input_cycle, level) =
+    Level_repr.create_cycle_eras cycle_eras
+    |> Environment.wrap_tzresult
+    >>?= fun cycle_eras ->
     let input_cycle = Cycle_repr.of_int32_exn input_cycle in
-    let level_res =
-      Level_storage.first_level_in_cycle_with_era cycle_eras input_cycle
-    in
+    let level_res = Level_repr.first_level_in_cycle ~cycle_eras input_cycle in
     Assert.equal_int
       ~loc:__LOC__
       (Int32.to_int (Raw_level_repr.to_int32 level_res.level))
@@ -179,7 +241,8 @@ let test_first_level_in_cycle () =
   List.iter_es f test_cases
 
 let tests =
-  [ Test_services.tztest "level_from_raw" `Quick test_level_from_raw;
+  [ Test_services.tztest "create_cycle_eras" `Quick test_create_cycle_eras;
+    Test_services.tztest "level_from_raw" `Quick test_level_from_raw;
     Test_services.tztest
       "first_level_in_cycle"
       `Quick
