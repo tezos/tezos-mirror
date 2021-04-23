@@ -32,48 +32,24 @@ module Int_set = Set.Make (Compare.Int)
 
    The context maintains two levels of gas, one corresponds to the gas
    available for the current operation while the other is the gas
-   available for the current block.
-
-   When gas is consumed, we must morally decrement these two levels to
-   check if one of them hits zero. However, since these decrements are
-   the same on both levels, it is not strictly necessary to update the
-   two levels: we can simply maintain the minimum of both levels in a
-   [gas_counter]. The meaning of [gas_counter] is denoted by
-   [gas_counter_status]: *)
-
-type gas_counter_status =
-  (* When the operation gas is unaccounted: *)
-  | Unlimited_operation_gas
-  (* When the operation gas level is the minimum: *)
-  | Count_operation_gas of {block_gas_delta : Gas_limit_repr.Arith.fp}
-  (* When the block gas level is the minimum. *)
-  | Count_block_gas of {operation_gas_delta : Gas_limit_repr.Arith.fp}
-
-(*
-   In each case, we keep enough information in [gas_counter_status] to
-   reconstruct the level that is not represented by [gas_counter]. In
-   the gas [Unlimited_operation_gas], the block gas level is stored
-   in [gas_counter].
-
-   [Raw_context] interface provides two accessors for the operation
-   gas level and the block gas level. These accessors compute these values
-   on-the-fly based on the current value of [gas_counter] and
-   [gas_counter_status].
+   available for the current block. Both levels are maintained
+   independently: [consume_gas] only decreases the operation level,
+   and block level should be updated with [consume_gas_limit_in_block].
 
    A layered context
    =================
 
-   Updating the context [gas_counter] is a critical routine called
-   very frequently by the operations performed by the protocol.
+   Updating the context [remaining_operation_gas] is a critical routine
+   called very frequently by the operations performed by the protocol.
    On the contrary, other fields are less frequently updated.
 
    In a previous version of the context datatype definition, all
-   the fields were represented at the toplevel. To update the
-   [gas_counter], we had to copy ~25 fields (that is 200 bytes).
+   the fields were represented at the toplevel. To update the remaining
+   gas, we had to copy ~25 fields (that is 200 bytes).
 
    With the following layered representation, we only have to
-   copy 2 fields (16 bytes) during [gas_counter] update. This
-   has a significant impact on the Michelson runtime efficiency.
+   copy 2 fields (16 bytes) during [remaining_operation_gas] update.
+   This has a significant impact on the Michelson runtime efficiency.
 
    Here are the fields on the [back] of the context:
 
@@ -98,16 +74,17 @@ type back = {
   temporary_lazy_storage_ids : Lazy_storage_kind.Temp_ids.t;
   internal_nonce : int;
   internal_nonces_used : Int_set.t;
-  gas_counter_status : gas_counter_status;
+  remaining_block_gas : Gas_limit_repr.Arith.fp;
+  unlimited_operation_gas : bool;
 }
 
 (*
 
    The context is simply a record with two fields which
-   limits the cost of updating the [gas_counter].
+   limits the cost of updating the [remaining_operation_gas].
 
 *)
-type t = {gas_counter : Gas_limit_repr.Arith.fp; back : back}
+type t = {remaining_operation_gas : Gas_limit_repr.Arith.fp; back : back}
 
 type root = t
 
@@ -153,7 +130,9 @@ let[@inline] internal_nonce ctxt = ctxt.back.internal_nonce
 
 let[@inline] internal_nonces_used ctxt = ctxt.back.internal_nonces_used
 
-let[@inline] gas_counter_status ctxt = ctxt.back.gas_counter_status
+let[@inline] remaining_block_gas ctxt = ctxt.back.remaining_block_gas
+
+let[@inline] unlimited_operation_gas ctxt = ctxt.back.unlimited_operation_gas
 
 let[@inline] rewards ctxt = ctxt.back.rewards
 
@@ -162,14 +141,18 @@ let[@inline] allocated_contracts ctxt = ctxt.back.allocated_contracts
 let[@inline] temporary_lazy_storage_ids ctxt =
   ctxt.back.temporary_lazy_storage_ids
 
-let[@inline] gas_counter ctxt = ctxt.gas_counter
+let[@inline] remaining_operation_gas ctxt = ctxt.remaining_operation_gas
 
-let[@inline] update_gas_counter ctxt gas_counter = {ctxt with gas_counter}
+let[@inline] update_remaining_operation_gas ctxt remaining_operation_gas =
+  {ctxt with remaining_operation_gas}
 
 let[@inline] update_back ctxt back = {ctxt with back}
 
-let[@inline] update_gas_counter_status ctxt gas_counter_status =
-  update_back ctxt {ctxt.back with gas_counter_status}
+let[@inline] update_remaining_block_gas ctxt remaining_block_gas =
+  update_back ctxt {ctxt.back with remaining_block_gas}
+
+let[@inline] update_unlimited_operation_gas ctxt unlimited_operation_gas =
+  update_back ctxt {ctxt.back with unlimited_operation_gas}
 
 let[@inline] update_context ctxt context =
   update_back ctxt {ctxt.back with context}
@@ -379,23 +362,12 @@ let () =
 
 let gas_level ctxt =
   let open Gas_limit_repr in
-  match gas_counter_status ctxt with
-  | Unlimited_operation_gas ->
-      Unaccounted
-  | Count_block_gas {operation_gas_delta} ->
-      Limited {remaining = Arith.(add (gas_counter ctxt) operation_gas_delta)}
-  | Count_operation_gas _ ->
-      Limited {remaining = gas_counter ctxt}
+  if unlimited_operation_gas ctxt then Unaccounted
+  else Limited {remaining = remaining_operation_gas ctxt}
 
-let block_gas_level ctxt =
-  let open Gas_limit_repr in
-  match gas_counter_status ctxt with
-  | Unlimited_operation_gas | Count_block_gas _ ->
-      gas_counter ctxt
-  | Count_operation_gas {block_gas_delta} ->
-      Arith.(add (gas_counter ctxt) block_gas_delta)
+let block_gas_level = remaining_block_gas
 
-let check_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
+let check_gas_limit_is_valid ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   if
     Gas_limit_repr.Arith.(
       remaining > (constants ctxt).hard_gas_limit_per_operation
@@ -403,45 +375,33 @@ let check_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   then error Gas_limit_too_high
   else ok_unit
 
+let consume_gas_limit_in_block ctxt (limit : 'a Gas_limit_repr.Arith.t) =
+  check_gas_limit_is_valid ctxt limit
+  >>? fun () ->
+  let block_gas = block_gas_level ctxt in
+  let limit = Gas_limit_repr.Arith.fp limit in
+  if Gas_limit_repr.Arith.(limit > block_gas) then error Block_quota_exceeded
+  else
+    Ok
+      (update_remaining_block_gas
+         ctxt
+         (Gas_limit_repr.Arith.sub (block_gas_level ctxt) limit))
+
 let set_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   let open Gas_limit_repr in
-  let remaining = Arith.fp remaining in
-  let block_gas = block_gas_level ctxt in
-  let (gas_counter_status, gas_counter) =
-    if Arith.(remaining < block_gas) then
-      let block_gas_delta = Arith.sub block_gas remaining in
-      (Count_operation_gas {block_gas_delta}, remaining)
-    else
-      let operation_gas_delta = Arith.sub remaining block_gas in
-      (Count_block_gas {operation_gas_delta}, block_gas)
-  in
-  let ctxt = update_gas_counter_status ctxt gas_counter_status in
-  {ctxt with gas_counter}
+  let remaining_operation_gas = Arith.fp remaining in
+  let ctxt = update_unlimited_operation_gas ctxt false in
+  {ctxt with remaining_operation_gas}
 
-let set_gas_unlimited ctxt =
-  let block_gas = block_gas_level ctxt in
-  let ctxt = {ctxt with gas_counter = block_gas} in
-  update_gas_counter_status ctxt Unlimited_operation_gas
-
-let is_gas_unlimited ctxt =
-  match ctxt.back.gas_counter_status with
-  | Unlimited_operation_gas ->
-      true
-  | _ ->
-      false
-
-let is_counting_block_gas ctxt =
-  match gas_counter_status ctxt with Count_block_gas _ -> true | _ -> false
+let set_gas_unlimited ctxt = update_unlimited_operation_gas ctxt true
 
 let consume_gas ctxt cost =
-  if is_gas_unlimited ctxt then ok ctxt
-  else
-    match Gas_limit_repr.raw_consume (gas_counter ctxt) cost with
-    | Some gas_counter ->
-        Ok (update_gas_counter ctxt gas_counter)
-    | None ->
-        if is_counting_block_gas ctxt then error Block_quota_exceeded
-        else error Operation_quota_exceeded
+  match Gas_limit_repr.raw_consume (remaining_operation_gas ctxt) cost with
+  | Some gas_counter ->
+      Ok (update_remaining_operation_gas ctxt gas_counter)
+  | None ->
+      if unlimited_operation_gas ctxt then ok ctxt
+      else error Operation_quota_exceeded
 
 let check_enough_gas ctxt cost = consume_gas ctxt cost >>? fun _ -> ok_unit
 
@@ -786,8 +746,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
   check_cycle_eras cycle_eras constants ;
   let level = Level_repr.level_from_raw ~cycle_eras level in
   {
-    gas_counter =
-      Gas_limit_repr.Arith.fp constants.Constants_repr.hard_gas_limit_per_block;
+    remaining_operation_gas = Gas_limit_repr.Arith.zero;
     back =
       {
         context = ctxt;
@@ -808,7 +767,10 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
         temporary_lazy_storage_ids = Lazy_storage_kind.Temp_ids.init;
         internal_nonce = 0;
         internal_nonces_used = Int_set.empty;
-        gas_counter_status = Unlimited_operation_gas;
+        remaining_block_gas =
+          Gas_limit_repr.Arith.fp
+            constants.Constants_repr.hard_gas_limit_per_block;
+        unlimited_operation_gas = true;
       };
   }
 

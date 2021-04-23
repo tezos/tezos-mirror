@@ -332,7 +332,12 @@ let transaction ?counter ?fee ?gas_limit ?storage_limit
 
 let delegation ?fee ctxt source dst =
   let top = Delegation dst in
-  manager_operation ?fee ~source ctxt top
+  manager_operation
+    ?fee
+    ~gas_limit:(Gas.Arith.integral_of_int_exn 1000)
+    ~source
+    ctxt
+    top
   >>=? fun sop ->
   Context.Contract.manager ctxt source
   >|=? fun account -> sign account.sk ctxt sop

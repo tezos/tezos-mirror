@@ -213,20 +213,37 @@ module Gas : sig
 
   val ( +@ ) : cost -> cost -> cost
 
-  val check_limit : context -> 'a Arith.t -> unit tzresult
+  (** Checks that the given gas limit does not exceed the hard gas limit
+      per operation *)
+  val check_limit_is_valid : context -> 'a Arith.t -> unit tzresult
 
+  (** Consumes gas equal to the given operation gas limit in the current
+      block gas level of the context. May fail if not enough gas remains
+      in the block *)
+  val consume_limit_in_block : context -> 'a Arith.t -> context tzresult
+
+  (** Sets a limit to the consumable operation gas *)
   val set_limit : context -> 'a Arith.t -> context
 
+  (** Allows unlimited gas consumption *)
   val set_unlimited : context -> context
 
+  (** Consumes operation gas. May fail if not enough gas remains for the
+      operation *)
   val consume : context -> cost -> context tzresult
 
+  (** Checks that enough operation gas remains for the given cost *)
   val check_enough : context -> cost -> unit tzresult
 
+  (** Returns operation gas level *)
   val level : context -> t
 
+  (** Returns the operation gas level difference between two contexts.
+      Returns [Arith.zero] if any of the contexts are set to unlimited
+      gas *)
   val consumed : since:context -> until:context -> Arith.fp
 
+  (** Returns block gas level *)
   val block_level : context -> Arith.fp
 
   val cost_of_repr : Gas_limit_repr.cost -> cost

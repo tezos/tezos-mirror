@@ -61,7 +61,13 @@ let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
   >>=? fun bal_src ->
   Context.Contract.balance (I b) dst
   >>=? fun bal_dst ->
-  Op.transaction (I b) ~fee src dst amount
+  Op.transaction
+    ~gas_limit:(Alpha_context.Gas.Arith.integral_of_int_exn 3000)
+    (I b)
+    ~fee
+    src
+    dst
+    amount
   >>=? fun op ->
   Incremental.add_operation ?expect_failure b op
   >>=? fun b ->

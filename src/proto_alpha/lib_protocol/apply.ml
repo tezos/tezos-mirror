@@ -811,8 +811,8 @@ let precheck_manager_contents (type kind) ctxt
         {source; fee; counter; operation; gas_limit; storage_limit}) =
     op
   in
-  Gas.check_limit ctxt gas_limit
-  >>?= fun () ->
+  Gas.consume_limit_in_block ctxt gas_limit
+  >>?= fun ctxt ->
   let ctxt = Gas.set_limit ctxt gas_limit in
   Fees.check_storage_limit ctxt storage_limit
   >>?= fun () ->
