@@ -1,5 +1,4 @@
 opam-version: "2.0"
-version: "dev"
 maintainer: "contact@tezos.com"
 authors: [ "Tezos devteam" ]
 homepage: "https://www.tezos.com/"
