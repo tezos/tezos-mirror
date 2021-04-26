@@ -14,6 +14,9 @@ documentation:build:
     paths:
       - docs
     expire_in: 1 week
+  environment:
+    name: "Documentation"
+    url: "https://$CI_PROJECT_NAMESPACE.gitlab.io/-/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/docs/_build/index.html"
 
 documentation:linkcheck:
   extends: .runtime_build_test_dependencies_template
