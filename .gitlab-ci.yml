@@ -25,7 +25,6 @@ variables:
   ARTIFACT_DOWNLOAD_ATTEMPTS: "2"
 
 stages:
-  - sanity
   - build
   - sanity_ci
   - test
