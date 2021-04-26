@@ -41,7 +41,7 @@ script:prepare_migration_test:
 integration:sandboxes:voting:
   extends: .integration_template
   script:
-    - ROOT_PATH=$PWD/flextesa-voting-demo-noops dune build @src/bin_sandbox/runtest_sandbox_voting_demo_noops
+    - TMP=$PWD make -f sandbox.Makefile voting_demo_noops
   artifacts:
     paths:
       - flextesa-voting-demo-noops
@@ -52,7 +52,7 @@ integration:sandboxes:voting:
 integration:sandboxes:acc-baking:
   extends: .integration_template
   script:
-    - ROOT_PATH=$PWD/flextesa-acc-sdb dune build @src/bin_sandbox/runtest_sandbox_accusations_simple_double_baking
+    - TMP=$PWD make -f sandbox.Makefile accusations_simple_double_baking
   artifacts:
     paths:
       - flextesa-acc-sdb
@@ -62,7 +62,7 @@ integration:sandboxes:acc-baking:
 integration:sandboxes:acc-endorsement:
   extends: .integration_template
   script:
-    - ROOT_PATH=$PWD/flextesa-acc-sde dune build @src/bin_sandbox/runtest_sandbox_accusations_simple_double_endorsing
+    - TMP=$PWD make -f sandbox.Makefile accusations_simple_double_endorsing
   artifacts:
     paths:
       - flextesa-acc-sde
@@ -72,22 +72,24 @@ integration:sandboxes:acc-endorsement:
 integration:sandboxes:u-a-u:
   extends: .integration_template
   script:
-    - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_next
-    - ROOT_PATH=$PWD/flextesa-hard-fork dune build @src/bin_sandbox/runtest_sandbox_user_activated_upgrade_alpha
+    - TMP=$PWD make -f sandbox.Makefile user_activated_upgrade_next
+    - TMP=$PWD make -f sandbox.Makefile user_activated_upgrade_alpha
   artifacts:
     paths:
       - flextesa-hard-fork
+      - flextesa-hard-fork-alpha
     expire_in: 1 day
     when: on_failure
 
 integration:sandboxes:daemons-upgrade:
   extends: .integration_template
   script:
-    - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_next
-    - ROOT_PATH=$PWD/flextesa-daemons-upgrade dune build @src/bin_sandbox/runtest_sandbox_daemons_upgrade_alpha
+    - TMP=$PWD make -f sandbox.Makefile daemons_upgrade_next
+    - TMP=$PWD make -f sandbox.Makefile daemons_upgrade_alpha
   artifacts:
     paths:
       - flextesa-daemons-upgrade
+      - flextesa-daemons-upgrade-alpha
     expire_in: 1 day
     when: on_failure
 

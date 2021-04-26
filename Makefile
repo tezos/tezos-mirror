@@ -130,7 +130,7 @@ test-python: all
 
 .PHONY: test-flextesa
 test-flextesa:
-	@dune build @runtest_flextesa
+	@make -f sandbox.Makefile
 
 .PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
 test-tezt:
