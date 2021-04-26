@@ -1226,6 +1226,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let s = S.Mempool.pending_operations (mempool_path chain_path) in
       RPC_context.make_call1 s ctxt chain () ()
 
+    let ban_operation ctxt ?(chain = `Main) op_hash =
+      let s = S.Mempool.ban_operation (mempool_path chain_path) in
+      RPC_context.make_call1 s ctxt chain () op_hash
+
     let monitor_operations ctxt ?(chain = `Main) ?(applied = true)
         ?(branch_delayed = true) ?(branch_refused = false) ?(refused = false) ()
         =

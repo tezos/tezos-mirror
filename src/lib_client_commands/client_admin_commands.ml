@@ -31,6 +31,13 @@ let block_param ~name ~desc t =
     (Clic.parameter (fun _ str -> Lwt.return (Block_hash.of_b58check str)))
     t
 
+let operation_param ~name ~desc t =
+  Clic.param
+    ~name
+    ~desc
+    (Clic.parameter (fun _ str -> Lwt.return (Operation_hash.of_b58check str)))
+    t
+
 let commands () =
   let open Clic in
   let group =
@@ -97,5 +104,22 @@ let commands () =
           history_mode
           save_point
           caboose
+        >>= fun () -> return ());
+    command
+      ~group
+      ~desc:
+        "Remove an operation from the mempool if present, reverting its effect \
+         if it was applied. Add it to the set of banned operations to prevent \
+         it from being fetched/processed/injected in the future. Note: If the \
+         baker has already received the operation, then it's necessary to \
+         restart it to flush the operation from it."
+      no_options
+      (prefixes ["ban"; "operation"]
+      @@ operation_param ~name:"operation" ~desc:"hash of operation to ban"
+      @@ stop)
+      (fun () op_hash (cctxt : #Client_context.full) ->
+        Shell_services.Mempool.ban_operation cctxt ~chain:cctxt#chain op_hash
+        >>=? fun () ->
+        cctxt#message "Operation %a is now banned." Operation_hash.pp op_hash
         >>= fun () -> return ());
   ]
