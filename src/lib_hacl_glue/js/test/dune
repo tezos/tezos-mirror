@@ -18,14 +18,10 @@
 )
 
 (rule
- (alias runtest_yarn)
+ (alias runtest_js)
+ (package tezos-hacl-glue-js)
  (deps
    ../.yarnrc
    test.bc.js
    test.sh)
  (action (system "./test.sh")))
-
-(rule
- (alias runtest)
- (deps (alias runtest_yarn))
- (action (progn)))

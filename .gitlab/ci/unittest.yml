@@ -97,6 +97,11 @@ unit:non-proto:
     - scripts/test_wrapper.sh vendors/ocaml-uecc ocaml-uecc
 ##END_UNITTEST##
 
+unit:js_components:
+  extends: .test_template
+  script:
+    - dune build @runtest_js
+
 unit:protocol_compiles:
   extends: .test_template
   script:
