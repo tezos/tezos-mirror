@@ -879,7 +879,8 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
               ( if mainnet_constants then Period_repr.of_seconds_exn 4L
               else c.delay_per_missing_endorsement );
             liquidity_baking_subsidy = Tez_repr.of_mutez_exn 2_500_000L;
-            liquidity_baking_sunset_level = 525600l;
+            (* Approximately 6 month after the first activation of Liquidity Baking on mainnet *)
+            liquidity_baking_sunset_level = 2_032_928l;
             liquidity_baking_escape_ema_threshold = 1_000_000l;
           }
       in
