@@ -66,3 +66,5 @@ fi
 if [ -n "$dev" ]; then
     opam install --yes merlin odoc utop ocp-indent ocaml-lsp-server --criteria="-changed,-removed"
 fi
+
+"$script_dir"/install_sapling_parameters.sh

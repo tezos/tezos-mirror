@@ -15,6 +15,7 @@
                    -open Data_encoding))
  (libraries data-encoding
             tezos-crypto
+            bls12-381-unix
             tezos-base
             tezos-stdlib
             tezos-stdlib-unix

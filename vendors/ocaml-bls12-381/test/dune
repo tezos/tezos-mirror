@@ -1,4 +1,0 @@
-(tests
- (names test_fr test_fq12 test_g1 test_g2 test_pairing)
- (modules test_fr test_fq12 test_g1 test_g2 test_pairing test_ec_make test_ff_make)
- (libraries bls12-381 alcotest))
