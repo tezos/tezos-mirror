@@ -97,6 +97,11 @@ Client
    considered final with quasi-certainty if there are at least 5 blocks
    built on top of it. See Emmy\* TZIP for more detailed explanations.
 
+- Added ``--mode light`` which makes the client execute some RPCs
+  locally (to lower the load of nodes and to avoid having to trust
+  the nodes). This mode is akin to light clients and SPV clients:
+  it uses Merkle proofs to make the light mode super safe.
+
 Baker / Endorser / Accuser
 --------------------------
 
