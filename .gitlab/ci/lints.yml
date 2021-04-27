@@ -1,21 +1,29 @@
 check_opam_deps:
   extends: .build_template
+  stage: test
+  needs: []
   script:
     - ./scripts/opam-check.sh
   timeout: 10m # if it takes more than 10 minutes, then it'll just timeout after 1h
 
 check_opam_lint:
   extends: .build_template
+  stage: test
+  needs: []
   script:
     - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
 
 check_linting:
   extends: .build_template
+  stage: test
+  needs: []
   script:
     - make check-linting
 
 check_precommit_hook:
   extends: .build_template
+  stage: test
+  needs: []
   script:
     - ./scripts/pre_commit/pre_commit.py --test-itself
     - cd tests_python
@@ -25,11 +33,15 @@ check_precommit_hook:
 
 check_python_linting:
   extends: .build_template
+  stage: test
+  needs: []
   script:
     - make check-python-linting
 
 check_python_types:
   extends: .build_template
+  stage: test
+  needs: []
   script:
     - make -C tests_python typecheck
 
@@ -37,6 +49,8 @@ check_scripts_b58_prefix:
   # Can be changed to a python image, but using the build docker image to keep
   # in sync with the python version used for the tests
   extends: .build_template
+  stage: test
+  needs: []
   before_script:
     - cd scripts/b58_prefix
     - poetry install

@@ -1,5 +1,6 @@
 coq:lint:
   extends: .test_template
+  needs: []
   script:
     # we only need merlin to be able to read the cmt files, the @check target
     # provides this

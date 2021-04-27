@@ -3,12 +3,10 @@
 # (sequentially).
 
 test_coverage:
-  extends: .runtime_build_test_dependencies_template
+  extends:
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development_manual
   stage: test_coverage
-  except:
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
-  when: manual
   variables:
     # We exclude from coverage old protocols and code that can't be
     # instrumented because of current limitations of bisect_ppx.

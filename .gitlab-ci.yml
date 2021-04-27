@@ -35,11 +35,99 @@ stages:
   - test_coverage
   - publish_coverage
 
-# we specify this template here that is used in all other
-# targets in the include files. Include files cannot refer
-# to variables defined here.
-.runtime_build_test_dependencies_template:
+# Basic, specialised, minimal, orthogonal templates
+
+# Image templates
+.image_template__runtime_build_test_dependencies_template:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+
+.image_template__runtime_build_dependencies_template:
+  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+
+.image_template__latest:
+  image: docker:latest
+
+# Rules template
+
+# Rules for all the jobs that need to be run on development branches (typically
+# those that have an MR, but also some experiments, etc.)
+.rules_template__development:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - when: on_success
+
+# Rules for all the jobs that can be manually run on development branches
+.rules_template__development_manual:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - when: manual
+
+# Rules for all the jobs that are run only for the master branch and the like
+# (tags, releases, etc.)
+.rules_template__master_and_releases:
+  rules:
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: on_success
+    - when: never
+
+# Rules for all the jobs that are run only for the master branch
+.rules_template__master:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: on_success
+    - when: never
+
+# Rules for specific topics: doc, opam, etc.
+.rules_template__development_documentation:
+  rules:
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /doc/'
+      when: always
+    - changes:
+        - /docs
+      when: always
+    - when: manual
+.rules_template__development_opam:
+  rules:
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: always
+    - if: '$CI_COMMIT_BRANCH =~ /opam/'
+      when: always
+    - changes:
+        - /**/*.opam
+        - /**/dune
+        - /**/dune.inc
+        - /**/*.dune.inc
+        - /scripts/version.sh
+        - /.gitlab-ci.yml
+      when: always
+    - when: never
+
+
+# Actual jobs are defined in these included files
 
 include:
   - .gitlab/ci/build.yml

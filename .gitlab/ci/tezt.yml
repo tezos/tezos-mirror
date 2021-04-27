@@ -34,14 +34,14 @@ tezt:3:
     TEZT_JOB: 3
 
 tezt:manual:migration:
-  extends: .test_template
-  when: manual
+  extends:
+    - .test_template
+    - .rules_template__development_manual
   before_script:
     - export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
     - curl -s https://api.github.com/repos/Phlogi/tezos-snapshots/releases/latest | jq -r ".assets[] | select(.name) | .browser_download_url" | grep roll | xargs wget -q
     - block_hash=$(echo mainnet.roll.* | sed -r 's/mainnet\.roll\.[0-9_-]+\.(.*)\.[0-9]+\.chain\.xz/\1/g')
     - cat mainnet.roll.* | xz -d -v -T0 > mainnet.rolling
-
     - scripts/prepare_migration_test.sh auto mainnet.rolling "$block_hash"
   script:
     - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi

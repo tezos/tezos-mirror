@@ -1,16 +1,12 @@
 ---
 
 documentation:build:
-  extends: .runtime_build_test_dependencies_template
+  extends:
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
   interruptible: true
   stage: build
-  # NOTE: we want to build the doc on development branches to check that MRs
-  # haven't broken doc building, we don't build it otherwise, but note that on
-  # master the documentation is built as part of the publish:documentation job.
-  except:
-    - master
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
+  needs: []
   script:
     - make -C docs html
   artifacts:
@@ -19,25 +15,15 @@ documentation:build:
     expire_in: 1 week
 
 documentation:linkcheck:
-  extends: .runtime_build_test_dependencies_template
+  extends:
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development_documentation
   stage: doc
-  before_script:
-    - . ./scripts/version.sh
+  needs: ["documentation:build"]
   dependencies:
     - documentation:build
-  rules:
-    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH =~ /doc/'
-      when: on_success
-    - changes:
-        - /docs
-      when: on_success
-    - when: never
+  before_script:
+    - . ./scripts/version.sh
   script:
     - make -C docs redirectcheck
     - make -C docs linkcheck

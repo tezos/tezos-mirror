@@ -1,10 +1,8 @@
 .build_template:
-  extends: .runtime_build_test_dependencies_template
+  extends:
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
   stage: build
-  except:
-    - master
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
   before_script:
     - . ./scripts/version.sh
     # Load the environment poetry previously created in the docker image.
@@ -14,6 +12,7 @@
 
 build:
   extends: .build_template
+  needs: []
   script:
     # The following protocols are not needed for tests.
     # By removing them, we cause them not to be compiled and linked and the CI runs faster.
@@ -61,8 +60,10 @@ build:
     when: on_success
 
 build_arm64:
-  extends: .build_template
-  when: manual
+  extends:
+    - .build_template
+    - .rules_template__development_manual
+  needs: []
   script:
     - . ./scripts/version.sh
     - dune build @all
