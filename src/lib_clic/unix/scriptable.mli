@@ -33,7 +33,7 @@ type output_format
 
 (** Command line argument for {!Clic.command} (and the [Clic.args*]
     functions). Not that this is the only way to obtain a value of type
-    [output_format]. On the command line, it appears as [--for-script] with
+    {!output_format}. On the command line, it appears as [--for-script] with
     values [TSV] or [CSV]. *)
 val clic_arg : unit -> (output_format option, _) Clic.arg
 

@@ -386,13 +386,13 @@ let commands () =
          would have produced.\n\
          Also displays the result of hashing this packed data with `BLAKE2B`, \
          `SHA256` or `SHA512` instruction."
-      (args1 custom_gas_flag)
+      (args2 custom_gas_flag (Tezos_clic_unix.Scriptable.clic_arg ()))
       ( prefixes ["hash"; "data"]
       @@ param ~name:"data" ~desc:"the data to hash" data_parameter
       @@ prefixes ["of"; "type"]
       @@ param ~name:"type" ~desc:"type of the data" data_parameter
       @@ stop )
-      (fun custom_gas data typ cctxt ->
+      (fun (custom_gas, scriptable) data typ cctxt ->
         resolve_max_gas cctxt cctxt#block custom_gas
         >>=? fun original_gas ->
         Alpha_services.Helpers.Scripts.pack_data
@@ -404,28 +404,43 @@ let commands () =
         >>= function
         | Ok (bytes, remaining_gas) ->
             let hash = Script_expr_hash.hash_bytes [bytes] in
-            cctxt#message
-              "Raw packed data: 0x%a@,\
-               Script-expression-ID-Hash: %a@,\
-               Raw Script-expression-ID-Hash: 0x%a@,\
-               Ledger Blake2b hash: %s@,\
-               Raw Sha256 hash: 0x%a@,\
-               Raw Sha512 hash: 0x%a@,\
-               Gas remaining: %a"
-              Hex.pp
-              (Hex.of_bytes bytes)
-              Script_expr_hash.pp
-              hash
-              Hex.pp
-              (Hex.of_bytes (Script_expr_hash.to_bytes hash))
-              (Base58.raw_encode Blake2B.(hash_bytes [bytes] |> to_string))
-              Hex.pp
-              (Hex.of_bytes (Environment.Raw_hashes.sha256 bytes))
-              Hex.pp
-              (Hex.of_bytes (Environment.Raw_hashes.sha512 bytes))
-              Alpha_context.Gas.pp
-              remaining_gas
-            >>= fun () -> return_unit
+            let name_value_rows =
+              Format.
+                [ ( "Raw packed data",
+                    asprintf "0x%a" Hex.pp (Hex.of_bytes bytes) );
+                  ( "Script-expression-ID-Hash",
+                    asprintf "%a" Script_expr_hash.pp hash );
+                  ( "Raw Script-expression-ID-Hash",
+                    asprintf
+                      "0x%a"
+                      Hex.pp
+                      (Hex.of_bytes (Script_expr_hash.to_bytes hash)) );
+                  ( "Ledger Blake2b hash",
+                    Base58.raw_encode Blake2B.(hash_bytes [bytes] |> to_string)
+                  );
+                  ( "Raw Sha256 hash",
+                    asprintf
+                      "0x%a"
+                      Hex.pp
+                      (Hex.of_bytes (Environment.Raw_hashes.sha256 bytes)) );
+                  ( "Raw Sha512 hash",
+                    asprintf
+                      "0x%a"
+                      Hex.pp
+                      (Hex.of_bytes (Environment.Raw_hashes.sha512 bytes)) );
+                  ( "Gas remaining",
+                    asprintf "%a" Alpha_context.Gas.pp remaining_gas ) ]
+            in
+            Tezos_clic_unix.Scriptable.output
+              scriptable
+              ~for_human:(fun () ->
+                List.iter_s
+                  (fun (name, value) -> cctxt#message "%s: %s" name value)
+                  name_value_rows
+                >|= ok)
+              ~for_script:(fun () ->
+                name_value_rows
+                |> List.map (fun (name, value) -> [name; value]))
         | Error errs ->
             cctxt#warning
               "%a"

@@ -114,6 +114,9 @@ Client
 
 -  Added a new flag, ``--simulation``, which simulates operations instead of preapplying them.
 
+- ``hash data`` command now supports the optional ``--for-script [TSV|CSV]``
+   argument to ease parsing the response.
+
 Baker / Endorser / Accuser
 --------------------------
 

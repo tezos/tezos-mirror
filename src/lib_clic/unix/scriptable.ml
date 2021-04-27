@@ -11,7 +11,8 @@ let csv = rows "," `OCaml
 let clic_arg () =
   let open Clic in
   arg
-    ~doc:"Make the output script-friendly"
+    ~doc:
+      "Make the output script-friendly. Possible values are 'TSV' and 'CSV'."
     ~long:"for-script"
     ~placeholder:"FORMAT"
     (parameter (fun _ spec ->
