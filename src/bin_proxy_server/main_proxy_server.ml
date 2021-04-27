@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Cmdliner
+module Proxy_server_config = Tezos_proxy_server_config.Proxy_server_config
 
 let name = "tezos-proxy-server"
 

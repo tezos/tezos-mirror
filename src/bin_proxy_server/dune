@@ -11,6 +11,7 @@
             cmdliner
             lwt-exit
             tezos-proxy
+            tezos-proxy-server-config
             tezos-rpc-http-client-unix
             tezos-rpc-http-server
             tezos-shell-services
