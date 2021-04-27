@@ -1,19 +1,18 @@
 ---
 
-include:
-  - .gitlab/ci/sanity.yml
-  - .gitlab/ci/build.yml
-  - .gitlab/ci/sanity_ci.yml
-  - .gitlab/ci/unittest.yml
-  - .gitlab/ci/integration.yml
-  - .gitlab/ci/liquidity-baking-scripts-integrity.yml
-  - .gitlab/ci/coq.yml
-  - .gitlab/ci/tezt.yml
-  - .gitlab/ci/doc.yml
-  - .gitlab/ci/opam.yml
-  - .gitlab/ci/publish.yml
-  - .gitlab/ci/coverage.yml
-  - .gitlab/ci/test-doc-scripts.yml
+# General setup
+
+# Basic configuration to guard against double-pipelines
+workflow:
+  rules:
+    # The following guard is the standard way to run pipelines for branches. It
+    # runs a CI pipeline each time the branch is pushed to (including
+    # force-push, push of fixup commits, rebase, etc.).
+    # Future additions might include rules for MR events and for regular
+    # schedules.
+    # See https://docs.gitlab.com/ee/ci/yaml/README.html#workflow for additional
+    # details.
+    - if: '$CI_PIPELINE_SOURCE == "push"'
 
 variables:
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
@@ -42,3 +41,18 @@ stages:
 # to variables defined here.
 .runtime_build_test_dependencies_template:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+
+include:
+  - .gitlab/ci/sanity.yml
+  - .gitlab/ci/build.yml
+  - .gitlab/ci/sanity_ci.yml
+  - .gitlab/ci/unittest.yml
+  - .gitlab/ci/integration.yml
+  - .gitlab/ci/liquidity-baking-scripts-integrity.yml
+  - .gitlab/ci/coq.yml
+  - .gitlab/ci/tezt.yml
+  - .gitlab/ci/doc.yml
+  - .gitlab/ci/opam.yml
+  - .gitlab/ci/publish.yml
+  - .gitlab/ci/coverage.yml
+  - .gitlab/ci/test-doc-scripts.yml
