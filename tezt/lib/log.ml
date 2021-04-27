@@ -153,8 +153,8 @@ let log_file = Option.map open_out Cli.options.log_file
 module Log_buffer = struct
   let capacity = Cli.options.log_buffer_size
 
-  (* Each item is a tuple [(timestamp, color, prefix, prefix_color, message)]. *)
-  let buffer = Array.make capacity (0., None, None, None, "")
+  (* Each item is a tuple [(timestamp, color, prefix, prefix_color, progress, message)]. *)
+  let buffer = Array.make capacity (0., None, None, None, None, "")
 
   (* Index where to add the next item. *)
   let next = ref 0
@@ -193,8 +193,8 @@ let output_timestamp output timestamp =
        time.tm_sec
        (int_of_float ((timestamp -. float (truncate timestamp)) *. 1000.)))
 
-let log_line_to ~use_colors (timestamp, color, prefix, prefix_color, message)
-    channel =
+let log_line_to ~use_colors
+    (timestamp, color, prefix, prefix_color, progress, message) channel =
   let output = output_string channel in
   output "[" ;
   output_timestamp output timestamp ;
@@ -213,18 +213,25 @@ let log_line_to ~use_colors (timestamp, color, prefix, prefix_color, message)
             output Color.reset ; Option.iter output color ) ;
       output "] ")
     prefix ;
+  Option.iter output progress ;
   output message ;
   if use_colors && color <> None then output Color.reset ;
   output "\n"
 
-let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color message =
+let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color
+    ?progress_msg message =
   match String.split_on_char '\n' message with
   | [] | [""] ->
       ()
   | lines ->
       let log_line message =
         let line =
-          (Unix.gettimeofday (), color, prefix, prefix_color, message)
+          ( Unix.gettimeofday (),
+            color,
+            prefix,
+            prefix_color,
+            progress_msg,
+            message )
         in
         Option.iter (log_line_to ~use_colors:false line) log_file ;
         match (Cli.options.log_level, level) with
@@ -262,7 +269,7 @@ let error x = log ~level:Error ~color:Color.FG.red ~prefix:"error" x
 
 type test_result = Successful | Failed | Aborted
 
-let test_result ~iteration test_result test_name =
+let test_result ~progress_state ~iteration test_result test_name =
   let (prefix, prefix_color) =
     match test_result with
     | Successful ->
@@ -277,7 +284,8 @@ let test_result ~iteration test_result test_name =
       Printf.sprintf "(loop %d) %s" iteration test_name
     else test_name
   in
-  log_string ~level:Report ~prefix ~prefix_color message
+  let progress_msg = Format.asprintf "%a " Progress.pp progress_state in
+  log_string ~level:Report ~prefix ~prefix_color ~progress_msg message
 
 let command ?color ?prefix command arguments =
   let message = quote_shell_command command arguments in

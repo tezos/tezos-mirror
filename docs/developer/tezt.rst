@@ -113,6 +113,8 @@ Tezt is composed of some generic, non-Tezos-related modules:
 - a ``Regression`` module for regression testing by comparing command outputs
   with previous runs.
 
+- a ``Progress`` module to track and display progress of a test suite.
+
 All those modules are part of the ``tezt`` library which can be found in directory
 ``tezt/lib`` of the Tezos repository.
 

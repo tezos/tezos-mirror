@@ -75,7 +75,7 @@ let global_starting_time = Unix.gettimeofday ()
 
 let a_test_failed = ref false
 
-let really_run ~iteration title f =
+let really_run ~progress_state ~iteration title f =
   Log.info "Starting test: %s" title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
   Lwt_main.run
@@ -184,8 +184,13 @@ let really_run ~iteration title f =
     in
     Lwt.catch wait_for_async handle_exception
   in
+  (* Update progress indicators *)
+  let has_failed =
+    match !test_result with Successful -> false | Failed | Aborted -> true
+  in
+  Progress.update ~has_failed progress_state ;
   (* Display test result. *)
-  Log.test_result ~iteration !test_result title ;
+  Log.test_result ~progress_state ~iteration !test_result title ;
   match !test_result with
   | Successful ->
       unit
@@ -536,9 +541,12 @@ let run () =
         | Count n when n < iteration ->
             ()
         | _ ->
+            let progress_state =
+              Progress.create ~total:(String_map.cardinal !registered)
+            in
             let run_and_measure_time (test : test) =
               let start = Unix.gettimeofday () in
-              really_run ~iteration test.title test.body ;
+              really_run ~progress_state ~iteration test.title test.body ;
               let time = Unix.gettimeofday () -. start in
               test.run_count <- test.run_count + 1 ;
               test.time <- test.time +. time
