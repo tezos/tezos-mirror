@@ -175,7 +175,7 @@ let commands () =
                  "invalid output format, expecting one of \"michelson\", \
                   \"json\", \"binary\" or \"ocaml\"."))
   in
-  let file_or_literal_param =
+  let file_or_literal_param () =
     param
       ~name:"source"
       ~desc:"literal or a path to a file"
@@ -435,6 +435,23 @@ let commands () =
                  ?parsed:None)
               errs
             >>= fun () -> cctxt#error "ill-formed data");
+    command
+      ~group
+      ~desc:"Ask the node to hash a Michelson script with `BLAKE2B`."
+      no_options
+      (prefixes ["hash"; "script"] @@ file_or_literal_param () @@ stop)
+      (fun () expr_string (cctxt : Protocol_client_context.full) ->
+        let program = Michelson_v1_parser.parse_toplevel expr_string in
+        Lwt.return @@ Micheline_parser.no_parsing_error program
+        >>=? fun program ->
+        let code = program.expanded in
+        let bytes =
+          Data_encoding.Binary.to_bytes_exn
+            Alpha_context.Script.expr_encoding
+            code
+        in
+        let hash = Script_expr_hash.hash_bytes [bytes] in
+        cctxt#answer "%a" Script_expr_hash.pp hash >|= ok);
     command
       ~group
       ~desc:
@@ -742,8 +759,9 @@ let commands () =
          Micheline, JSON, binary or OCaml"
       (args1 zero_loc_switch)
       ( prefixes ["convert"; "script"]
-      @@ file_or_literal_param @@ prefix "from" @@ convert_input_format_param
-      @@ prefix "to" @@ convert_output_format_param @@ stop )
+      @@ file_or_literal_param () @@ prefix "from"
+      @@ convert_input_format_param @@ prefix "to"
+      @@ convert_output_format_param @@ stop )
       (fun zero_loc
            expr_string
            from_format
@@ -822,8 +840,9 @@ let commands () =
          Micheline, JSON, binary or OCaml"
       (args2 zero_loc_switch data_type_arg)
       ( prefixes ["convert"; "data"]
-      @@ file_or_literal_param @@ prefix "from" @@ convert_input_format_param
-      @@ prefix "to" @@ convert_output_format_param @@ stop )
+      @@ file_or_literal_param () @@ prefix "from"
+      @@ convert_input_format_param @@ prefix "to"
+      @@ convert_output_format_param @@ stop )
       (fun (zero_loc, data_ty)
            data_string
            from_format

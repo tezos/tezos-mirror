@@ -102,6 +102,9 @@ Client
   the nodes). This mode is akin to light clients and SPV clients:
   it uses Merkle proofs to make the light mode super safe.
 
+-  Added commands to display the hash of Michelson script from files and
+   from addresses.
+
 Baker / Endorser / Accuser
 --------------------------
 

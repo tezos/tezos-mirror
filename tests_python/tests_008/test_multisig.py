@@ -19,6 +19,11 @@ class TestMultisig:
         )
         utils.bake(client)
 
+    def test_deployed_hash(self, client: Client):
+        msig_hash = client.get_script_hash('msig')
+        hashes = client.run(['show', 'supported', 'multisig', 'hashes'])
+        assert msig_hash in hashes
+
     def test_transfer(self, client: Client, session: dict):
         key = session['keys'][0]
         session['sig0'] = client.msig_sign_transfer(

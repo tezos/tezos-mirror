@@ -895,10 +895,6 @@ let commands () : #Protocol_client_context.full Clic.command list =
         (fun () _cctxt ->
           Format.printf "Hashes of supported multisig contracts:@." ;
           List.iter
-            (fun h ->
-              Format.printf
-                "  0x%a@."
-                Hex.pp
-                (Script_expr_hash.to_bytes h |> Hex.of_bytes))
+            (fun h -> Format.printf "%a@." Script_expr_hash.pp h)
             Client_proto_multisig.known_multisig_hashes ;
           return_unit) ]

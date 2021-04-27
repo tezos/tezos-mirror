@@ -1375,6 +1375,38 @@ class TestSelfAddressTransfer:
         utils.bake(client, 'bootstrap5')
 
 
+@pytest.mark.slow
+@pytest.mark.contract
+@pytest.mark.regression
+class TestScriptHashRegression:
+    @pytest.mark.parametrize("contract", all_contracts())
+    def test_contract_hash(self, client_regtest: Client, contract):
+        client = client_regtest
+        assert contract.endswith(
+            '.tz'
+        ), "test contract should have .tz extension"
+        client.hash_script(os.path.join(CONTRACT_PATH, contract))
+
+
+@pytest.mark.contract
+class TestScriptHashOrigination:
+    def test_contract_hash_with_origination(
+        self, client: Client, session: dict
+    ):
+        script = 'parameter unit; storage unit; code {CAR; NIL operation; PAIR}'
+        originate(
+            client,
+            session,
+            contract=script,
+            init_storage='Unit',
+            amount=1000,
+            contract_name='dummy_contract',
+        )
+        hash1 = client.hash_script(script)
+        hash2 = client.get_script_hash('dummy_contract')
+        assert hash1 == hash2
+
+
 @pytest.mark.contract
 @pytest.mark.regression
 class TestNormalize:
