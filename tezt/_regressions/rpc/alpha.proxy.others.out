@@ -20,7 +20,7 @@ protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGen
   "quorum_max": 7000, "min_proposal_quorum": 500, "initial_endorsers": 1,
   "delay_per_missing_endorsement": "1", "minimal_block_delay": "1",
   "liquidity_baking_subsidy": "2500000",
-  "liquidity_baking_sunset_duration": 4096,
+  "liquidity_baking_sunset_level": 4096,
   "liquidity_baking_escape_ema_threshold": 1000000 }
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
