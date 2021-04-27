@@ -26,7 +26,6 @@ variables:
 
 stages:
   - build
-  - sanity_ci
   - test
   - doc
   - test-doc-scripts
@@ -43,9 +42,8 @@ stages:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
 
 include:
-  - .gitlab/ci/sanity.yml
   - .gitlab/ci/build.yml
-  - .gitlab/ci/sanity_ci.yml
+  - .gitlab/ci/lints.yml
   - .gitlab/ci/unittest.yml
   - .gitlab/ci/integration.yml
   - .gitlab/ci/liquidity-baking-scripts-integrity.yml
