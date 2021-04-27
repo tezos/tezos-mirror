@@ -103,7 +103,7 @@ let balance_update_encoding =
                    failwith "Qty.of_mutez" )
              int64))
 
-type update_origin = Block_application | Protocol_migration
+type update_origin = Block_application | Protocol_migration | Subsidy
 
 let update_origin_encoding =
   let open Data_encoding in
@@ -121,7 +121,13 @@ let update_origin_encoding =
            ~title:"Protocol_migration"
            (constant "migration")
            (function Protocol_migration -> Some () | _ -> None)
-           (fun () -> Protocol_migration) ]
+           (fun () -> Protocol_migration);
+         case
+           (Tag 2)
+           ~title:"Subsidy"
+           (constant "subsidy")
+           (function Subsidy -> Some () | _ -> None)
+           (fun () -> Subsidy) ]
 
 type balance_updates = (balance * balance_update * update_origin) list
 

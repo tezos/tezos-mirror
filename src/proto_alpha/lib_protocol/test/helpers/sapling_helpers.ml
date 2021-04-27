@@ -160,7 +160,7 @@ module Alpha_context_helpers = struct
       ~timestamp:b.header.shell.timestamp
       ~fitness:b.header.shell.fitness
     >>= wrap
-    >|=? fun (ctxt, _) -> ctxt
+    >|=? fun (ctxt, _, _) -> ctxt
 
   (* takes a state obtained from Sapling.empty_state or Sapling.state_from_id and
    passed through Sapling.verify_update *)
@@ -233,7 +233,7 @@ module Alpha_context_helpers = struct
           ~timestamp:(Time.Protocol.of_seconds Int64.zero)
           ~fitness:(Fitness_repr.from_int64 Int64.zero)
         >>= wrap
-        >|=? fun (ctx, _) -> Some (ctx, id)
+        >|=? fun (ctx, _, _) -> Some (ctx, id)
 
   let transfer_inputs_outputs w cs is =
     (* Tezos_sapling.Storage.size cs *)

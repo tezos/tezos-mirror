@@ -878,6 +878,9 @@ let prepare_first_block ~level ~timestamp ~fitness ctxt =
             delay_per_missing_endorsement =
               ( if mainnet_constants then Period_repr.of_seconds_exn 4L
               else c.delay_per_missing_endorsement );
+            liquidity_baking_subsidy = Tez_repr.of_mutez_exn 2_500_000L;
+            liquidity_baking_sunset_level = 525600l;
+            liquidity_baking_escape_ema_threshold = 1_000_000l;
           }
       in
       add_constants ctxt constants

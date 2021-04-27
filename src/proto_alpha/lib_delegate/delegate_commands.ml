@@ -86,12 +86,29 @@ let keep_alive_arg =
     ~long:"keep-alive"
     ()
 
+let per_block_vote_file_arg =
+  Clic.arg
+    ~doc:
+      "Read per block votes as json file. The content of the file should be \
+       either \"{'liquidity_baking_escape_vote':'false'}\" or \
+       \"{'liquidity_baking_escape_vote':'true'}\"."
+    ~short:'V'
+    ~long:"votefile"
+    ~placeholder:"filename"
+    (Clic.parameter (fun _ s -> return s))
+
+let liquidity_baking_escape_vote_switch =
+  Clic.switch
+    ~doc:"Vote to end the liquidity baking subsidy."
+    ~long:"liquidity-baking-escape-vote"
+    ()
+
 let delegate_commands () =
   let open Clic in
   [ command
       ~group
       ~desc:"Forge and inject block using the delegate rights."
-      (args8
+      (args9
          max_priority_arg
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
@@ -99,7 +116,8 @@ let delegate_commands () =
          force_switch
          minimal_timestamp_switch
          mempool_arg
-         context_path_arg)
+         context_path_arg
+         liquidity_baking_escape_vote_switch)
       ( prefixes ["bake"; "for"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"baker"
@@ -112,7 +130,8 @@ let delegate_commands () =
              force,
              minimal_timestamp,
              mempool,
-             context_path )
+             context_path,
+             liquidity_baking_escape_vote )
            delegate
            cctxt ->
         bake_block
@@ -125,6 +144,7 @@ let delegate_commands () =
           ~minimal_timestamp
           ?mempool
           ?context_path
+          ~liquidity_baking_escape_vote
           ~chain:cctxt#chain
           ~head:cctxt#block
           delegate);
@@ -247,13 +267,14 @@ let baker_commands () =
   [ command
       ~group
       ~desc:"Launch the baker daemon."
-      (args6
+      (args7
          pidfile_arg
          max_priority_arg
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
-         keep_alive_arg)
+         keep_alive_arg
+         per_block_vote_file_arg)
       ( prefixes ["run"; "with"; "local"; "node"]
       @@ param
            ~name:"context_path"
@@ -265,7 +286,8 @@ let baker_commands () =
              minimal_fees,
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
-             keep_alive )
+             keep_alive,
+             per_block_vote_file )
            node_path
            delegates
            cctxt ->
@@ -282,6 +304,7 @@ let baker_commands () =
           ~minimal_nanotez_per_gas_unit
           ~minimal_nanotez_per_byte
           ?max_priority
+          ?per_block_vote_file
           ~context_path:(Filename.concat node_path "context")
           ~keep_alive
           (List.map snd delegates)) ]

@@ -166,6 +166,8 @@ let pp_balance_updates ppf = function
                   balance
               | Protocol_migration ->
                   Format.asprintf "migration %s" balance
+              | Subsidy ->
+                  Format.asprintf "subsidy %s" balance
             in
             (balance, update))
           balance_updates

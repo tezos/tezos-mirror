@@ -67,6 +67,8 @@ let origination_burn c =
   >|? fun to_be_paid ->
   (Raw_context.update_allocated_contracts_count c, to_be_paid)
 
+let start_counting_storage_fees c = Raw_context.init_storage_space_to_pay c
+
 let record_paid_storage_space c contract =
   Contract_storage.used_storage_space c contract
   >>=? fun size ->
@@ -80,6 +82,13 @@ let record_paid_storage_space c contract =
   Lwt.return
     ( Tez_repr.(cost_per_byte *? Z.to_int64 to_be_paid)
     >|? fun to_burn -> (c, size, to_be_paid, to_burn) )
+
+let record_paid_storage_space_subsidy c contract =
+  let c = start_counting_storage_fees c in
+  record_paid_storage_space c contract
+  >>=? fun (c, size, to_be_paid, _) ->
+  let (c, _, _) = Raw_context.clear_storage_space_to_pay c in
+  return (c, size, to_be_paid)
 
 let burn_storage_fees c ~storage_limit ~payer =
   let origination_size = Constants_storage.origination_size c in
@@ -117,5 +126,3 @@ let check_storage_limit c ~storage_limit =
     || Compare.Z.(storage_limit < Z.zero)
   then error Storage_limit_too_high
   else ok_unit
-
-let start_counting_storage_fees c = Raw_context.init_storage_space_to_pay c

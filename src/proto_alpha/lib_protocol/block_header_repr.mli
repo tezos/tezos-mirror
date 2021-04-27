@@ -27,6 +27,8 @@ type contents = {
   priority : int;
   seed_nonce_hash : Nonce_hash.t option;
   proof_of_work_nonce : bytes;
+  liquidity_baking_escape_vote : bool;
+      (* set by baker to vote in favor of permanently disabling liquidity baking *)
 }
 
 type protocol_data = {contents : contents; signature : Signature.t}

@@ -538,6 +538,9 @@ module Constants : sig
     min_proposal_quorum : int32;
     initial_endorsers : int;
     delay_per_missing_endorsement : Period.t;
+    liquidity_baking_subsidy : Tez.t;
+    liquidity_baking_sunset_level : int32;
+    liquidity_baking_escape_ema_threshold : int32;
   }
 
   val parametric_encoding : parametric Data_encoding.t
@@ -587,6 +590,12 @@ module Constants : sig
   val quorum_max : context -> int32
 
   val min_proposal_quorum : context -> int32
+
+  val liquidity_baking_subsidy : context -> Tez.t
+
+  val liquidity_baking_sunset_level : context -> int32
+
+  val liquidity_baking_escape_ema_threshold : context -> int32
 
   (** All constants: fixed and parametric *)
   type t = {fixed : fixed; parametric : parametric}
@@ -773,7 +782,7 @@ module Sapling : sig
   (**
     Returns a [state] with fields filled accordingly.
     [id] should only be used by [extract_lazy_storage_updates].
-  *)
+   *)
   val empty_state : ?id:Id.t -> memo_size:Memo_size.t -> unit -> state
 
   type transaction = Sapling.UTXO.transaction
@@ -784,7 +793,7 @@ module Sapling : sig
 
   (**
     Tries to fetch a state from the storage.
-  *)
+   *)
   val state_from_id : context -> Id.t -> (state * context) tzresult Lwt.t
 
   val rpc_arg : Id.t RPC_arg.t
@@ -989,7 +998,7 @@ module Receipt : sig
 
   type balance_update = Debited of Tez.t | Credited of Tez.t
 
-  type update_origin = Block_application | Protocol_migration
+  type update_origin = Block_application | Protocol_migration | Subsidy
 
   type balance_updates = (balance * balance_update * update_origin) list
 
@@ -1182,6 +1191,7 @@ module Block_header : sig
     priority : int;
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
+    liquidity_baking_escape_vote : bool;
   }
 
   type protocol_data = {contents : contents; signature : Signature.t}
@@ -1373,6 +1383,9 @@ module Fees : sig
   val record_paid_storage_space :
     context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
 
+  val record_paid_storage_space_subsidy :
+    context -> Contract.t -> (context * Z.t * Z.t) tzresult Lwt.t
+
   val start_counting_storage_fees : context -> context
 
   val burn_storage_fees :
@@ -1563,6 +1576,15 @@ end
 
 val max_operations_ttl : int
 
+module Migration : sig
+  type origination_result = {
+    balance_updates : Receipt.balance_updates;
+    originated_contracts : Contract.t list;
+    storage_size : Z.t;
+    paid_storage_size_diff : Z.t;
+  }
+end
+
 val prepare_first_block :
   Context.t ->
   typecheck:(context ->
@@ -1579,7 +1601,9 @@ val prepare :
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
-  (context * Receipt.balance_updates) tzresult Lwt.t
+  (context * Receipt.balance_updates * Migration.origination_result list)
+  tzresult
+  Lwt.t
 
 val finalize : ?commit_message:string -> context -> Updater.validation_result
 
@@ -1644,4 +1668,16 @@ module Parameters : sig
   }
 
   val encoding : t Data_encoding.t
+end
+
+module Liquidity_baking : sig
+  val get_cpmm_address : context -> Contract.t tzresult Lwt.t
+
+  type escape_ema = Int32.t
+
+  val on_subsidy_allowed :
+    context ->
+    escape_vote:bool ->
+    (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
+    (context * 'a list * escape_ema) tzresult Lwt.t
 end

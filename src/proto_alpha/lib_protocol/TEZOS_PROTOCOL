@@ -38,6 +38,7 @@
         "Sapling_repr",
         "Lazy_storage_kind",
         "Receipt_repr",
+        "Migration_repr",
 
         "Raw_context_intf",
         "Raw_context",
@@ -60,8 +61,12 @@
         "Voting_period_storage",
         "Vote_storage",
         "Commitment_storage",
+	"Fees_storage",
+	"Liquidity_baking_repr",
+	"Liquidity_baking_cpmm",
+	"Liquidity_baking_lqt",
+	"Liquidity_baking_migration",
         "Init_storage",
-        "Fees_storage",
         "Sapling_validator",
 
         "Alpha_context",

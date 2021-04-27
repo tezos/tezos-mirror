@@ -38,6 +38,7 @@ val bake_block :
   ?mempool:string ->
   ?context_path:string ->
   ?src_sk:Client_keys.sk_uri ->
+  liquidity_baking_escape_vote:bool ->
   chain:Chain_services.chain ->
   head:Block_services.block ->
   public_key_hash ->

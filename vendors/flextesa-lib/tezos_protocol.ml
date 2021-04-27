@@ -157,14 +157,20 @@ let protocol_parameters_json t : Ezjsonm.t =
     let alpha_specific_parameters =
       match subkind with
       | `Alpha ->
-          [ ( "minimal_block_delay"
-            , string (Int.to_string t.minimal_block_delay) ) ]
+         [ ( "minimal_block_delay"
+           , string (Int.to_string t.minimal_block_delay) );
+           ( "liquidity_baking_subsidy"
+           , string "2500000" );
+           ( "liquidity_baking_sunset_level"
+           , int 525600 );
+           ( "liquidity_baking_escape_ema_threshold"
+           , int 1000000 ); ]
       | _ -> [] in
     let legacy_parameters =
       match subkind with
       | `Babylon | `Carthage | `Delphi | `Edo | `Florence ->
          [ ("test_chain_duration", string (Int.to_string 1_966_080)) ]
-      | `Alpha -> []
+      | `Florence | `Alpha -> []
     in
     let op_gas_limit, block_gas_limit =
       match subkind with

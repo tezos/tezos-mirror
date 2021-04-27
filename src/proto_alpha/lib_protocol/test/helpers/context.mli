@@ -63,6 +63,10 @@ val get_baking_reward :
 val get_endorsing_reward :
   t -> priority:int -> endorsing_power:int -> Tez.t tzresult Lwt.t
 
+val get_liquidity_baking_subsidy : t -> Tez.t tzresult Lwt.t
+
+val get_liquidity_baking_cpmm_address : t -> Contract.t tzresult Lwt.t
+
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
 
@@ -108,6 +112,8 @@ module Contract : sig
   val delegate : t -> Contract.t -> public_key_hash tzresult Lwt.t
 
   val delegate_opt : t -> Contract.t -> public_key_hash option tzresult Lwt.t
+
+  val storage : t -> Contract.t -> Script.expr tzresult Lwt.t
 end
 
 module Delegate : sig
@@ -137,5 +143,6 @@ val init :
   ?time_between_blocks:Period.t list ->
   ?minimal_block_delay:Period.t ->
   ?delay_per_missing_endorsement:Period.t ->
+  ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t

@@ -1,0 +1,47 @@
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[big_map_mem_string.tz-(Pair { Elt "bar" 4 ; Elt "foo" 11 } None)-"foo"-(Pair 4 (Some True))]
+
+storage
+  (Pair 4 (Some True))
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string nat)
+  Set map(4)["bar"] to 4
+  Set map(4)["foo"] to 11
+trace
+  - location: 11 (remaining gas: 1039963.846 units remaining)
+    [ (Pair "foo" { Elt "bar" 4 ; Elt "foo" 11 } None)  	 ]
+  - location: 12 (remaining gas: 1039963.766 units remaining)
+    [ "foo"  	@parameter
+      (Pair { Elt "bar" 4 ; Elt "foo" 11 } None)  	@storage ]
+  - location: 15 (remaining gas: 1039963.611 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: 16 (remaining gas: 1039963.531 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 }  	
+      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: -1 (remaining gas: 1039963.486 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 }  	
+      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: 13 (remaining gas: 1039963.486 units remaining)
+    [ "foo"  	@parameter
+      { Elt "bar" 4 ; Elt "foo" 11 }  	
+      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: 17 (remaining gas: 1039952.621 units remaining)
+    [ True  	
+      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: 18 (remaining gas: 1039952.546 units remaining)
+    [ (Some True)  	
+      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
+  - location: 19 (remaining gas: 1039952.476 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 }  	
+      (Some True)  	 ]
+  - location: 20 (remaining gas: 1039952.401 units remaining)
+    [ (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some True))  	 ]
+  - location: 21 (remaining gas: 1039952.326 units remaining)
+    [ {}  	
+      (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some True))  	 ]
+  - location: 23 (remaining gas: 1039952.251 units remaining)
+    [ (Pair {} { Elt "bar" 4 ; Elt "foo" 11 } (Some True))  	 ]
+  - location: -1 (remaining gas: 1039952.206 units remaining)
+    [ (Pair {} { Elt "bar" 4 ; Elt "foo" 11 } (Some True))  	 ]
+

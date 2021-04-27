@@ -127,4 +127,16 @@ let min_proposal_quorum c =
   let constants = Raw_context.constants c in
   constants.min_proposal_quorum
 
+let liquidity_baking_subsidy c =
+  let constants = Raw_context.constants c in
+  constants.liquidity_baking_subsidy
+
+let liquidity_baking_sunset_level c =
+  let constants = Raw_context.constants c in
+  constants.liquidity_baking_sunset_level
+
+let liquidity_baking_escape_ema_threshold c =
+  let constants = Raw_context.constants c in
+  constants.liquidity_baking_escape_ema_threshold
+
 let parametric c = Raw_context.constants c

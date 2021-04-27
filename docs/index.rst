@@ -161,6 +161,7 @@ in the :ref:`introduction <howtoget>`.
    alpha/glossary
    alpha/cli-commands
    alpha/rpc
+   alpha/liquidity_baking
 
 .. toctree::
    :maxdepth: 2

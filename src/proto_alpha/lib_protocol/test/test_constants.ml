@@ -28,7 +28,9 @@
     Component:  Protocol (baking)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^constants$"
     Subject:    the consistency of parametric constants
-*)
+ *)
+
+open Test_tez
 
 let test_constants_consistency () =
   let open Tezos_protocol_alpha_parameters.Default_parameters in
@@ -65,9 +67,34 @@ let test_max_operations_ttl () =
     Alpha_context.Period.one_hour
     result
 
+(* Test that the amount of the liquidity baking subsidy is 1/16th of total rewards
+   of a fully-endorsed block with priority zero. *)
+let liquidity_baking_subsidy_param () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Context.get_constants (B blk)
+  >>=? fun csts ->
+  let hd l = Option.value_fe ~error:(fun () -> assert false) (List.hd l) in
+  hd csts.parametric.baking_reward_per_endorsement
+  >>?= fun baking_reward_per_endorsement ->
+  hd csts.parametric.endorsement_reward
+  >>?= fun endorsement_reward ->
+  let endorsers_per_block = csts.parametric.endorsers_per_block in
+  let actual_subsidy = csts.parametric.liquidity_baking_subsidy in
+  Tez.(baking_reward_per_endorsement +? endorsement_reward)
+  >>?= fun total_reward ->
+  Tez.(mul_exn total_reward endorsers_per_block /? 16L)
+  >>?= fun expected_subsidy ->
+  Assert.equal_tez ~loc:__LOC__ actual_subsidy expected_subsidy
+
 let tests =
   [ Test_services.tztest
       "constants consistency"
       `Quick
       test_constants_consistency;
-    Test_services.tztest "max_operations_ttl" `Quick test_max_operations_ttl ]
+    Test_services.tztest "max_operations_ttl" `Quick test_max_operations_ttl;
+    Test_services.tztest
+      "test liquidity_baking_subsidy parameter is 1/16th of total baking \
+       rewards"
+      `Quick
+      liquidity_baking_subsidy_param ]

@@ -33,7 +33,8 @@ open Alpha_context
 val generate_seed_nonce : unit -> Nonce.t
 
 (** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
-    ~seed_nonce ~src_sk ops] tries to inject a block in the node. If
+    ~seed_nonce ~src_sk ops liquidity_baking_escape_vote]
+    tries to inject a block in the node. If
     [?force] is set, the fitness check will be bypassed. [priority]
     will be used to compute the baking slot (level is
     precomputed). [src_sk] is used to sign the block header. *)
@@ -48,6 +49,7 @@ val inject_block :
   delegate_sk:Client_keys.sk_uri ->
   level:Raw_level.t ->
   Operation.raw list list ->
+  liquidity_baking_escape_vote:bool ->
   Block_hash.t tzresult Lwt.t
 
 type error += Failed_to_preapply of Tezos_base.Operation.t * error list
@@ -85,6 +87,7 @@ val forge_block :
   ?mempool:string ->
   ?context_path:string ->
   ?seed_nonce_hash:Nonce_hash.t ->
+  liquidity_baking_escape_vote:bool ->
   chain:Chain_services.chain ->
   priority:[`Set of int | `Auto of public_key_hash * int option] ->
   delegate_pkh:Signature.Public_key_hash.t ->
@@ -99,6 +102,7 @@ val create :
   ?minimal_nanotez_per_gas_unit:Q.t ->
   ?minimal_nanotez_per_byte:Q.t ->
   ?max_priority:int ->
+  ?per_block_vote_file:string ->
   chain:Chain_services.chain ->
   context_path:string ->
   public_key_hash list ->

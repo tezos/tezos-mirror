@@ -110,6 +110,26 @@ module Parse = Helpers_services.Parse
 module Voting = Voting_services
 module Sapling = Sapling_services
 
+module Liquidity_baking = struct
+  module S = struct
+    let get_cpmm_address =
+      RPC_service.get_service
+        ~description:"Liquidity baking CPMM address"
+        ~query:RPC_query.empty
+        ~output:Alpha_context.Contract.encoding
+        RPC_path.(
+          custom_root / "context" / "liquidity_baking" / "cpmm_address")
+  end
+
+  let register () =
+    let open Services_registration in
+    register0 S.get_cpmm_address (fun ctxt () () ->
+        Alpha_context.Liquidity_baking.get_cpmm_address ctxt)
+
+  let get_cpmm_address ctxt block =
+    RPC_context.make_call0 S.get_cpmm_address ctxt block () ()
+end
+
 let register () =
   Contract.register () ;
   Constants.register () ;
@@ -117,4 +137,5 @@ let register () =
   Helpers.register () ;
   Nonce.register () ;
   Voting.register () ;
-  Sapling.register ()
+  Sapling.register () ;
+  Liquidity_baking.register ()

@@ -78,7 +78,15 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
         ~start_position:(Level_storage.current ctxt).level_position
       >>=? fun ctxt ->
       Storage.Block_priority.init ctxt 0
-      >>=? fun ctxt -> Vote_storage.update_listings ctxt
+      >>=? fun ctxt ->
+      Vote_storage.update_listings ctxt
+      >>=? fun ctxt ->
+      Liquidity_baking_migration.init_from_genesis
+        ctxt
+        ~typecheck
+        ~fa12_admin:(List.hd param.bootstrap_accounts).public_key_hash
+      >>=? fun (ctxt, operation_results) ->
+      Storage.Pending_migration.Operation_results.init ctxt operation_results
   | Florence_009 ->
       (* Only the starting position of the voting period is shifted by
        one level into the future, so that voting periods are again
@@ -105,19 +113,13 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           >>= fun (ctxt, balance_updates) ->
           Storage.Pending_migration_balance_updates.init ctxt balance_updates
       *)
-      return ctxt
+      Liquidity_baking_migration.init_from_florence ctxt ~typecheck
+      >>=? fun (ctxt, operation_results) ->
+      Storage.Pending_migration.save
+        ~balance_updates:[]
+        ~operation_results
+        ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt
-  >>=? fun ctxt ->
-  Storage.Pending_migration_balance_updates.find ctxt
-  >>=? function
-  | Some balance_updates ->
-      Storage.Pending_migration_balance_updates.remove ctxt
-      >>= fun ctxt ->
-      (* When applying balance updates in a migration, we must attach receipts.
-         The balance updates returned from here will be applied in the first
-         block of the new protocol. *)
-      return (ctxt, balance_updates)
-  | None ->
-      return (ctxt, [])
+  >>=? fun ctxt -> Storage.Pending_migration.remove ctxt

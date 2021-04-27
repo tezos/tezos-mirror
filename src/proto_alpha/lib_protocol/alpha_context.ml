@@ -246,6 +246,8 @@ module Global = struct
   let set_block_priority = Storage.Block_priority.update
 end
 
+module Migration = Migration_repr
+
 let prepare_first_block = Init_storage.prepare_first_block
 
 let prepare = Init_storage.prepare
@@ -305,3 +307,4 @@ let get_rewards = Raw_context.get_rewards
 let description = Raw_context.description
 
 module Parameters = Parameters_repr
+module Liquidity_baking = Liquidity_baking_repr

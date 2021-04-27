@@ -62,6 +62,7 @@ module Forge : sig
     ?proof_of_work_nonce:Bytes.t ->
     ?priority:int ->
     ?seed_nonce_hash:Nonce_hash.t ->
+    ?liquidity_baking_escape_vote:bool ->
     unit ->
     Block_header.contents
 
@@ -73,6 +74,7 @@ module Forge : sig
     ?policy:baker_policy ->
     ?timestamp:Timestamp.time ->
     ?operations:Operation.packed list ->
+    ?liquidity_baking_escape_vote:bool ->
     t ->
     header tzresult Lwt.t
 
@@ -101,6 +103,7 @@ val genesis :
   ?time_between_blocks:Period.t list ->
   ?minimal_block_delay:Period.t ->
   ?delay_per_missing_endorsement:Period.t ->
+  ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   (Account.t * Tez.tez) list ->
   block tzresult Lwt.t
 
@@ -127,11 +130,26 @@ val bake :
   ?timestamp:Timestamp.time ->
   ?operation:Operation.packed ->
   ?operations:Operation.packed list ->
+  ?liquidity_baking_escape_vote:bool ->
   t ->
   t tzresult Lwt.t
 
 (** Bakes [n] blocks. *)
-val bake_n : ?policy:baker_policy -> int -> t -> block tzresult Lwt.t
+val bake_n :
+  ?policy:baker_policy ->
+  ?liquidity_baking_escape_vote:bool ->
+  int ->
+  t ->
+  block tzresult Lwt.t
+
+(** Version of bake_n that returns a list of all balance updates included
+    in the metadata of baked blocks. **)
+val bake_n_with_all_balance_updates :
+  ?policy:baker_policy ->
+  ?liquidity_baking_escape_vote:bool ->
+  int ->
+  t ->
+  (block * Alpha_context.Receipt.balance_updates) tzresult Lwt.t
 
 val current_cycle : t -> Cycle.t tzresult Lwt.t
 

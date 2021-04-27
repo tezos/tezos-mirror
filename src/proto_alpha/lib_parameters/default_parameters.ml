@@ -57,6 +57,12 @@ let constants_mainnet =
       min_proposal_quorum = 5_00l;
       initial_endorsers = 192;
       delay_per_missing_endorsement = Period.of_seconds_exn 4L;
+      (* liquidity_baking_subsidy is 1/16th of total rewards for a block of priority 0 with all endorsements *)
+      liquidity_baking_subsidy = Tez.of_mutez_exn 2_500_000L;
+      (* level after protocol activation when liquidity baking shuts off *)
+      liquidity_baking_sunset_level = 525600l;
+      (* 1/2 window size of 2000 blocks with precision of 1000 for integer computation *)
+      liquidity_baking_escape_ema_threshold = 1_000_000l;
     }
 
 let constants_sandbox =
@@ -73,6 +79,7 @@ let constants_sandbox =
       proof_of_work_threshold = Int64.of_int (-1);
       initial_endorsers = 1;
       delay_per_missing_endorsement = Period.of_seconds_exn 1L;
+      liquidity_baking_sunset_level = 4096l;
     }
 
 let constants_test =
@@ -88,6 +95,7 @@ let constants_test =
       proof_of_work_threshold = Int64.of_int (-1);
       initial_endorsers = 1;
       delay_per_missing_endorsement = Period.of_seconds_exn 1L;
+      liquidity_baking_sunset_level = 4096l;
     }
 
 let bootstrap_accounts_strings =

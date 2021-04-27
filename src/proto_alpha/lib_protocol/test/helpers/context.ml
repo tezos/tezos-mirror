@@ -173,6 +173,14 @@ let get_endorsing_reward ctxt ~priority ~endorsing_power =
     (Environment.wrap_tzresult
        Tez.(reward_per_endorsement *? Int64.of_int endorsing_power))
 
+let get_liquidity_baking_subsidy ctxt =
+  get_constants ctxt
+  >>=? fun {Constants.parametric = {liquidity_baking_subsidy; _}; _} ->
+  return liquidity_baking_subsidy
+
+let get_liquidity_baking_cpmm_address ctxt =
+  Alpha_services.Liquidity_baking.get_cpmm_address rpc_ctxt ctxt
+
 (* Voting *)
 
 module Vote = struct
@@ -274,6 +282,9 @@ module Contract = struct
 
   let delegate_opt ctxt contract =
     Alpha_services.Contract.delegate_opt rpc_ctxt ctxt contract
+
+  let storage ctxt contract =
+    Alpha_services.Contract.storage rpc_ctxt ctxt contract
 end
 
 module Delegate = struct
@@ -294,7 +305,8 @@ end
 
 let init ?endorsers_per_block ?with_commitments ?(initial_balances = [])
     ?initial_endorsers ?min_proposal_quorum ?time_between_blocks
-    ?minimal_block_delay ?delay_per_missing_endorsement n =
+    ?minimal_block_delay ?delay_per_missing_endorsement ?bootstrap_contracts n
+    =
   let accounts = Account.generate_accounts ~initial_balances n in
   let contracts =
     List.map
@@ -309,5 +321,6 @@ let init ?endorsers_per_block ?with_commitments ?(initial_balances = [])
     ?time_between_blocks
     ?minimal_block_delay
     ?delay_per_missing_endorsement
+    ?bootstrap_contracts
     accounts
   >|=? fun blk -> (blk, contracts)

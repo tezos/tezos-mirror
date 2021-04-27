@@ -54,6 +54,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_repr.ml
    lazy_storage_kind.mli lazy_storage_kind.ml
    receipt_repr.mli receipt_repr.ml
+   migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -74,8 +75,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
-   init_storage.mli init_storage.ml
    fees_storage.mli fees_storage.ml
+   liquidity_baking_repr.mli liquidity_baking_repr.ml
+   liquidity_baking_cpmm.ml
+   liquidity_baking_lqt.ml
+   liquidity_baking_migration.mli liquidity_baking_migration.ml
+   init_storage.mli init_storage.ml
    sapling_validator.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml
@@ -141,6 +146,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_repr.ml
    lazy_storage_kind.mli lazy_storage_kind.ml
    receipt_repr.mli receipt_repr.ml
+   migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -161,8 +167,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
-   init_storage.mli init_storage.ml
    fees_storage.mli fees_storage.ml
+   liquidity_baking_repr.mli liquidity_baking_repr.ml
+   liquidity_baking_cpmm.ml
+   liquidity_baking_lqt.ml
+   liquidity_baking_migration.mli liquidity_baking_migration.ml
+   init_storage.mli init_storage.ml
    sapling_validator.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml
@@ -228,6 +238,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_repr.ml
    lazy_storage_kind.mli lazy_storage_kind.ml
    receipt_repr.mli receipt_repr.ml
+   migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -248,8 +259,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
-   init_storage.mli init_storage.ml
    fees_storage.mli fees_storage.ml
+   liquidity_baking_repr.mli liquidity_baking_repr.ml
+   liquidity_baking_cpmm.ml
+   liquidity_baking_lqt.ml
+   liquidity_baking_migration.mli liquidity_baking_migration.ml
+   init_storage.mli init_storage.ml
    sapling_validator.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml
@@ -335,6 +350,7 @@ include Tezos_raw_protocol_alpha.Main
    Sapling_repr
    Lazy_storage_kind
    Receipt_repr
+   Migration_repr
    Raw_context_intf
    Raw_context
    Storage_costs
@@ -355,8 +371,12 @@ include Tezos_raw_protocol_alpha.Main
    Voting_period_storage
    Vote_storage
    Commitment_storage
-   Init_storage
    Fees_storage
+   Liquidity_baking_repr
+   Liquidity_baking_cpmm
+   Liquidity_baking_lqt
+   Liquidity_baking_migration
+   Init_storage
    Sapling_validator
    Alpha_context
    Script_typed_ir
@@ -458,6 +478,7 @@ include Tezos_raw_protocol_alpha.Main
    sapling_repr.ml
    lazy_storage_kind.mli lazy_storage_kind.ml
    receipt_repr.mli receipt_repr.ml
+   migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -478,8 +499,12 @@ include Tezos_raw_protocol_alpha.Main
    voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    commitment_storage.mli commitment_storage.ml
-   init_storage.mli init_storage.ml
    fees_storage.mli fees_storage.ml
+   liquidity_baking_repr.mli liquidity_baking_repr.ml
+   liquidity_baking_cpmm.ml
+   liquidity_baking_lqt.ml
+   liquidity_baking_migration.mli liquidity_baking_migration.ml
+   init_storage.mli init_storage.ml
    sapling_validator.ml
    alpha_context.mli alpha_context.ml
    script_typed_ir.ml

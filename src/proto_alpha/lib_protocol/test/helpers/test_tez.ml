@@ -60,6 +60,8 @@ module Tez = struct
     | Some x ->
         x
 
+  let to_mutez = Tez.to_mutez
+
   let max_tez =
     match Tez.of_mutez Int64.max_int with None -> assert false | Some p -> p
 end
