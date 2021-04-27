@@ -1,24 +1,18 @@
-check_opam_deps:
+misc_checks:
   extends: .build_template
   stage: test
   needs: []
   script:
+    # checks that all deps of opam packages are already installed
     - ./scripts/opam-check.sh
-  timeout: 10m # if it takes more than 10 minutes, then it'll just timeout after 1h
-
-check_opam_lint:
-  extends: .build_template
-  stage: test
-  needs: []
-  script:
+    # misc linting
     - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
-
-check_linting:
-  extends: .build_template
-  stage: test
-  needs: []
-  script:
     - make check-linting
+    - make check-python-linting
+    # python checks
+    - make -C tests_python typecheck
+    # check the static-build patch applies cleanly
+    - git apply packaging/build/static_libs.patch
 
 check_precommit_hook:
   extends: .build_template
@@ -31,25 +25,10 @@ check_precommit_hook:
     - poetry run pycodestyle ../scripts/pre_commit/pre_commit.py
     - poetry run mypy ../scripts/pre_commit/pre_commit.py
 
-check_python_linting:
-  extends: .build_template
-  stage: test
-  needs: []
-  script:
-    - make check-python-linting
-
-check_python_types:
-  extends: .build_template
-  stage: test
-  needs: []
-  script:
-    - make -C tests_python typecheck
-
 check_scripts_b58_prefix:
   # Can be changed to a python image, but using the build docker image to keep
   # in sync with the python version used for the tests
-  extends: .build_template
-  stage: test
+  extends: .test_template
   needs: []
   before_script:
     - cd scripts/b58_prefix
