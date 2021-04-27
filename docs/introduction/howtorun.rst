@@ -231,6 +231,8 @@ operations during 5 cycles to remain active.
 If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
 
+.. _baker_run:
+
 Baker
 ~~~~~
 
