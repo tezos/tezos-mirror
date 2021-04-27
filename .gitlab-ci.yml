@@ -99,7 +99,7 @@ stages:
     - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "master"'
-      when: on_success
+      when: never
     - if: '$CI_COMMIT_BRANCH =~ /doc/'
       when: always
     - changes:
