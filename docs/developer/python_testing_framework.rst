@@ -191,7 +191,7 @@ Tests can be classified with tags. Tags are added with the annotation
     @pytest.mark.TAG
 
 The configuration file ``pytest.ini`` defines the list of allowed tags.
-It includes ``vote``, ``multinode``, ``baker``, ``endorser``, ``contract``, ``slow``, ``multibranch``.
+It includes ``vote``, ``multinode``, ``baker``, ``endorser``, ``contract``, ``slow``.
 
 Examples
 """"""""
@@ -383,131 +383,6 @@ suffixed by ``003-PsddFKi3`` (``tezos-baker-003-PsddFKi3``).
 To reduce coupling between tests and the actual branch to be tested, tests
 refer to protocol Alpha using ``constants.ALPHA`` and
 ``constants.ALPHA_DAEMON`` rather than by hard-coded identifiers.
-
-Tests based on fixed revisions (multibranch)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-It is useful to test interactions between different server versions. There
-are currently two ways of doing this.
-
-1. The ``Sandbox`` launcher can use binaries built from different revisions.
-Methods ``add_node``, ``add_baker`` and ``add_endorser`` have an optional
-parameter ``branch`` that points to a subdirectory where binaries are to be
-looked for.
-
-2. The ``SandboxMultibranch`` launcher is instantiated by map from ids to
-branches. Then every time we launch a node or a daemon the actual binary will
-be selected according to the map.
-
-Tests using specific revisions are in ``tests/multibranch`` and aren't run by
-default. They are not regression tests and are usually launched separately
-from the rest of the tests. To run these tests, you need to set up the
-``TEZOS_BINARIES`` environment variable to a directory that contains the
-binaries for all revisions needed by test (see below). The tests will be
-skipped if this variable isn't set, and fail if the binaries aren't
-available.
-
-Building binaries for several revisions
-"""""""""""""""""""""""""""""""""""""""
-
-Before running the tests, the user has to build the binaries and copy them to
-the right location. This can be done by the ``scripts/build_branches.py``
-script.
-
-For instance, suppose we want to build binaries for two different revisions
-of zeronet:
-
-::
-
-    A = b8de4297db6a681eb13343d2773c6840969a5537
-    B = 816625bed0983f7201e4c369440a910f006beb1a
-
-    TEZOS_HOME=~/tezos  # TEZOS repo, read-only access from the script
-    TEZOS_BINARIES=~/tezos-binaries  # where the binaries will be stored
-    TEZOS_BUILD=~/tmp/tezos_tmp  # where the binaries will be built
-
-The following command will generate binaries for each of the specified
-branches in ``TEZOS_BINARIES``.
-
-::
-
-    scripts/build_branches.py --clone $TEZOS_HOME --build-dir $TEZOS_BUILD \
-                            --bin-dir $TEZOS_BINARIES \
-                            b8de4297db6a681eb13343d2773c6840969a5537 \
-                            816625bed0983f7201e4c369440a910f006beb1a
-
-    > ls $TEZOS_BINARIES *
-    816625bed0983f7201e4c369440a910f006beb1a:
-    tezos-accuser-003-PsddFKi3  tezos-baker-004-Pt24m4xi    tezos-node
-    tezos-accuser-004-Pt24m4xi  tezos-client                tezos-protocol-compiler
-    tezos-admin-client          tezos-endorser-003-PsddFKi3 tezos-signer
-    tezos-baker-003-PsddFKi3    tezos-endorser-004-Pt24m4xi
-
-    b8de4297db6a681eb13343d2773c6840969a5537:
-    tezos-accuser-003-PsddFKi3  tezos-baker-004-Pt24m4xi    tezos-node
-    tezos-accuser-004-Pt24m4xi  tezos-client                tezos-protocol-compiler
-    tezos-admin-client          tezos-endorser-003-PsddFKi3 tezos-signer
-    tezos-baker-003-PsddFKi3    tezos-endorser-004-Pt24m4xi
-
-
-Note: One can specify a branch instead of a revision but this is error-prone.
-For instance, protocols may have different hashes on different revisions
-on the same branch, and these hashes are typically hard-coded in the tests to
-activate the protocols.
-
-Example 1: ``test_baker_endorser_mb.py``
-""""""""""""""""""""""""""""""""""""""""
-
-The test ``test_baker_endorser_mb.py`` uses two different revisions.
-
-the ``sandbox_multibranch`` fixtures (which uses the ``SandboxMultibranch``
-launcher) parameterized by a map that alternates between the two revisions.
-
-The executables will be selected from revisions A and B as specified by:
-
-::
-
-    A = "d272059bf474018d0c39f5a6e60634a95f0c44aa" # MAINNET
-    B = "6718e80254d4cb8d7ad86bce8cf3cb692550c6e7"  # MAINNET SNAPSHOT
-    MAP = {i:A if i % 2 == 0 else B  for i in range(20)}
-    @pytest.mark.parametrize('sandbox_multibranch', [MAP], indirect=True)
-
-Run the test with
-
-::
-
-    # mkdir tmp
-    poetry run pytest tests/multibranch/test_baker_endorser_mb.py --log-dir=tmp
-
-Example 2: A full voting scenario ``test_voting_full.py``
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-This tests uses binaries from revision
-``b8de4297db6a681eb13343d2773c6840969a5537`` and implements a full voting
-scenario (voting, launching a test chain and a test chain baker, upgrading to
-a new protocol, performing operations on the new protocol). It uses two
-protocols implemented by this specific revision,
-
-::
-
-    ALPHA = 'PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP'
-    NEW_PROTO = 'Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd'
-
-as well the corresponding bakers ``tezos-baker-003-PsddFKi3`` ``tezos-baker-004-Pt24m4xi``.
-
-::
-
-    scripts/build_branches.py --clone $TEZOS_HOME --build-dir $TEZOS_BUILD \
-        --bin-dir $TEZOS_BINARIES \ b8de4297db6a681eb13343d2773c6840969a5537
-
-It can be run with
-
-::
-
-    poetry run pytest tests/multibranch/test_baker_endorser_mb.py`
-
-Note: this test uses only one revision but it can't run
-on branch ``master`` as we need an extra protocol with bakers.
 
 .. _pytest_regression_testing:
 

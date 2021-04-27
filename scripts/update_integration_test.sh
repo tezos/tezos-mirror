@@ -33,12 +33,6 @@ EOF
                  done | grep ^tests_.*\.py | uniq | LC_COLLATE=C sort)
 
     for test in $slow_tests; do
-     case "$test" in
-       */multibranch/*)
-         # skip multibranch tests for now
-         ;;
-       *)
-
         testname=${test##*/test_}
         testname=${testname%%.py}
 
@@ -50,7 +44,6 @@ integration:${PROTO_DIR_BASE}_${testname}:
   stage: test
 
 EOF
-     esac
     done
 
 done

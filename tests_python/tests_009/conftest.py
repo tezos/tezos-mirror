@@ -14,7 +14,7 @@ from pytest_regtest import (
     deregister_converter_pre,
     _std_conversion,
 )
-from launchers.sandbox import Sandbox, SandboxMultiBranch
+from launchers.sandbox import Sandbox
 from tools import constants, paths, utils
 from tools.client_regression import ClientRegression
 from client.client import Client
@@ -184,47 +184,6 @@ def clients(sandbox: Sandbox, request) -> Iterator[List[Client]]:
         proto = protocol.HASH
         assert utils.check_protocol(client, proto)
     yield clients
-
-
-@pytest.fixture(scope="class")
-def sandbox_multibranch(log_dir, request) -> Iterator[SandboxMultiBranch]:
-    """Multi-branch sandbox fixture. Parameterized by map of branches.
-
-    This fixture is identical to `sandbox` except that each node_id is
-    mapped to a pair (git revision, protocol version). For instance,
-    suppose a mapping:
-
-      MAP = { 0: ('zeronet', 'alpha'), 1:('mainnet', '003-PsddFKi3'),
-              2: ('alphanet', '003-PsddFKi3' }
-
-    If we annotate the class test as follows.
-    @pytest.mark.parametrize('sandbox_multibranch', [MAP], indirect=True)
-
-    The executables (node, baker, endorser)
-    - for node_id 0 will be looked up in `TEZOS_BINARY/zeronet`,
-    - for node_id 1 will be looked up in `TEZOS_BINARY/mainnet` and so on...
-
-    baker and endorser will use the specified protocol version, according
-    to the tezos executables naming conventions.
-    """
-    if paths.TEZOS_BINARIES is None:
-        pytest.skip()
-    branch_map = request.param
-    assert branch_map is not None
-    num_peers = max(branch_map) + 1
-
-    assert paths.TEZOS_BINARIES is not None  # helps `mypy`
-    with SandboxMultiBranch(
-        paths.TEZOS_BINARIES,
-        constants.IDENTITIES,
-        num_peers=num_peers,
-        log_dir=log_dir,
-        branch_map=branch_map,
-    ) as sandbox:
-        yield sandbox
-        # this assertion checks that daemons (baker, endorser, node...) didn't
-        # fail unexpected.
-        assert sandbox.are_daemons_alive(), DEAD_DAEMONS_WARN
 
 
 def pytest_collection_modifyitems(config, items):
