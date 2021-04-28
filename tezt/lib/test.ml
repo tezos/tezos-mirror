@@ -73,23 +73,35 @@ let fail x =
 
 let global_starting_time = Unix.gettimeofday ()
 
-let a_test_failed = ref false
+(* Field [id] is used to be able to iterate on tests in order of registration.
+   Field [time] contains the cumulated time taken by all successful runs of this test.
+   Field [result] contains the result of the last time the test was run.
+   If the test was not run, it contains [None]. *)
+type test = {
+  id : int;
+  file : string;
+  title : string;
+  tags : string list;
+  body : unit -> unit Lwt.t;
+  mutable time : float;
+  mutable run_count : int;
+  mutable result : Log.test_result option;
+}
 
-let really_run ~progress_state ~iteration title f =
-  Log.info "Starting test: %s" title ;
+let really_run ~progress_state ~iteration test =
+  Log.info "Starting test: %s" test.title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
   Lwt_main.run
   @@
   let (fail_promise, new_fail_awakener) = Lwt.task () in
   fail_awakener := Some new_fail_awakener ;
   let already_logged_exn = ref false in
-  let test_result = ref Log.Failed in
   (* Run the test until it succeeds, fails, or we receive SIGINT. *)
   let main_temporary_directory = Temp.start () in
   let* () =
     let run_test () =
-      let* () = f () in
-      test_result := Successful ;
+      let* () = test.body () in
+      test.result <- Some Successful ;
       unit
     in
     let handle_exception = function
@@ -99,14 +111,16 @@ let really_run ~progress_state ~iteration title f =
           already_logged_exn := true ;
           unit
       | exn ->
-          Log.error "%s" (Printexc.to_string exn) ;
+          let message = Printexc.to_string exn in
+          test.result <- Some (Failed message) ;
+          Log.error "%s" message ;
           already_logged_exn := true ;
           unit
     in
     let handle_sigint () =
       let* () = sigint () in
       Log.debug "Received SIGINT." ;
-      test_result := Aborted ;
+      test.result <- Some Aborted ;
       unit
     in
     let global_timeout =
@@ -153,7 +167,7 @@ let really_run ~progress_state ~iteration title f =
       | Delete ->
           Temp.clean_up () ; false
       | Delete_if_successful ->
-          if !test_result = Successful then (Temp.clean_up () ; false)
+          if test.result = Some Successful then (Temp.clean_up () ; false)
           else (Temp.stop () ; true)
       | Keep ->
           Temp.stop () ; true
@@ -175,34 +189,42 @@ let really_run ~progress_state ~iteration title f =
            It is still possible that the error is actually unrelated,
            but we already printed an error for the user to debug so it's ok. *)
         unit
-      else (
+      else
         (* This could happen if an async promise fails *after* the test
            was successful. In that case, the test is not that successful after all. *)
-        Log.error "%s" (Printexc.to_string exn) ;
-        test_result := Log.Failed ;
-        unit )
+        let message = Printexc.to_string exn in
+        Log.error "%s" message ;
+        test.result <- Some (Log.Failed message) ;
+        unit
     in
     Lwt.catch wait_for_async handle_exception
   in
-  (* Update progress indicators *)
+  (* Update progress indicators. *)
+  let test_result =
+    match test.result with
+    | None ->
+        (* Should not happen: after the test ends we always set [result] to [Some].
+           But if it does happen we assume that it failed and that we failed to
+           maintain this invariant. *)
+        Log.Failed "unknown error"
+    | Some result ->
+        result
+  in
   let has_failed =
-    match !test_result with Successful -> false | Failed | Aborted -> true
+    match test_result with Successful -> false | Failed _ | Aborted -> true
   in
   Progress.update ~has_failed progress_state ;
   (* Display test result. *)
-  Log.test_result ~progress_state ~iteration !test_result title ;
-  match !test_result with
+  Log.test_result ~progress_state ~iteration test_result test.title ;
+  match test_result with
   | Successful ->
-      unit
-  | Failed ->
+      return true
+  | Failed _ ->
       Log.report
         "Try again with: %s --verbose --test %s"
         Sys.argv.(0)
-        (Log.quote_shell title) ;
-      if Cli.options.keep_going then (
-        a_test_failed := true ;
-        unit )
-      else exit 1
+        (Log.quote_shell test.title) ;
+      return false
   | Aborted ->
       exit 2
 
@@ -253,18 +275,6 @@ let check_existence kind known specified =
   String_set.iter
     (Log.warn "Unknown %s: %s" kind)
     (String_set.diff (String_set.of_list specified) !known)
-
-(* Field [id] is used to be able to iterate on tests in order of registration.
-   Field [time] contains the cumulated time taken by all successful runs of this test. *)
-type test = {
-  id : int;
-  file : string;
-  title : string;
-  tags : string list;
-  body : unit -> unit Lwt.t;
-  mutable time : float;
-  mutable run_count : int;
-}
 
 (* Tests added using [register] and that match command-line filters. *)
 let registered : test String_map.t ref = ref String_map.empty
@@ -399,7 +409,7 @@ let record_results filename =
   (* Remove the closure ([body]). *)
   let marshaled_tests =
     map_registered_list
-    @@ fun {id = _; file; title; tags; body = _; time; run_count} ->
+    @@ fun {id = _; file; title; tags; body = _; time; run_count; result = _} ->
     {file; title; tags; time = time /. float (max 1 run_count)}
   in
   (* Write to file using Marshal.
@@ -468,6 +478,77 @@ let suggest_jobs (tests : marshaled_test list) =
      because it means to run all tests. *)
   display_job ~negate:true (fst jobs.(job_count - 1), !all_other_tests)
 
+let output_junit filename =
+  with_open_out filename
+  @@ fun ch ->
+  let echo x =
+    Printf.ksprintf (fun s -> output_string ch s ; output_char ch '\n') x
+  in
+  let (count, fail_count, skipped_count, total_time) =
+    fold_registered (0, 0, 0, 0.)
+    @@ fun (count, fail_count, skipped_count, total_time) test ->
+    ( count + 1,
+      (fail_count + match test.result with Some (Failed _) -> 1 | _ -> 0),
+      ( skipped_count
+      + match test.result with None | Some Aborted -> 1 | _ -> 0 ),
+      total_time +. test.time )
+  in
+  echo {|<?xml version="1.0" encoding="UTF-8" ?>|} ;
+  echo
+    {|<testsuites id="tezt" name="Tezt" tests="%d" failures="%d" skipped="%d" time="%f">|}
+    count
+    fail_count
+    skipped_count
+    total_time ;
+  echo
+    {|  <testsuite id="tezt" name="Tezt" tests="%d" failures="%d" skipped="%d" time="%f">|}
+    count
+    fail_count
+    skipped_count
+    total_time ;
+  ( iter_registered
+  @@ fun test ->
+  match test.result with
+  | None | Some Aborted ->
+      (* Skipped test, do not output. *)
+      ()
+  | Some (Successful | Failed _) ->
+      let replace_entities s =
+        let buffer = Buffer.create (String.length s * 2) in
+        for i = 0 to String.length s - 1 do
+          match s.[i] with
+          | '"' ->
+              Buffer.add_string buffer "&quot;"
+          | '&' ->
+              Buffer.add_string buffer "&amp;"
+          | '\'' ->
+              Buffer.add_string buffer "&apos;"
+          | '<' ->
+              Buffer.add_string buffer "&lt;"
+          | '>' ->
+              Buffer.add_string buffer "&gt;"
+          | c ->
+              Buffer.add_char buffer c
+        done ;
+        Buffer.contents buffer
+      in
+      let title = replace_entities test.title in
+      echo
+        {|    <testcase id="%s" name="%s: %s" time="%f">|}
+        title
+        (replace_entities test.file)
+        title
+        test.time ;
+      ( match test.result with
+      | None | Some Successful | Some Aborted ->
+          ()
+      | Some (Failed message) ->
+          echo
+            {|      <failure message="test failed" type="ERROR">%s</failure>|}
+            (replace_entities message) ) ;
+      echo "    </testcase>" ) ;
+  echo "  </testsuite>" ; echo "</testsuites>" ; ()
+
 let next_id = ref 0
 
 let register ~__FILE__ ~title ~tags body =
@@ -493,7 +574,9 @@ let register ~__FILE__ ~title ~tags body =
   let id = !next_id in
   incr next_id ;
   if test_should_be_run ~file ~title ~tags then
-    let test = {id; file; title; tags; body; time = 0.; run_count = 0} in
+    let test =
+      {id; file; title; tags; body; time = 0.; run_count = 0; result = None}
+    in
     registered := String_map.add title test !registered
 
 let run () =
@@ -536,6 +619,8 @@ let run () =
       prerr_endline
         "Cannot use both --list and --suggest-jobs at the same time."
   | (None, None) ->
+      let exception Stop in
+      let a_test_failed = ref false in
       let rec run iteration =
         match Cli.options.loop_mode with
         | Count n when n < iteration ->
@@ -546,15 +631,19 @@ let run () =
             in
             let run_and_measure_time (test : test) =
               let start = Unix.gettimeofday () in
-              really_run ~progress_state ~iteration test.title test.body ;
+              let success = really_run ~progress_state ~iteration test in
               let time = Unix.gettimeofday () -. start in
               test.run_count <- test.run_count + 1 ;
-              test.time <- test.time +. time
+              test.time <- test.time +. time ;
+              if not success then (
+                a_test_failed := true ;
+                if not Cli.options.keep_going then raise Stop )
             in
             iter_registered run_and_measure_time ;
             run (iteration + 1)
       in
-      run 1 ;
+      (try run 1 with Stop -> ()) ;
+      Option.iter output_junit Cli.options.junit ;
       Option.iter record_results Cli.options.record ;
-      if !a_test_failed then exit 1 ;
-      if Cli.options.time then display_time_summary ()
+      if Cli.options.time then display_time_summary () ;
+      if !a_test_failed then exit 1

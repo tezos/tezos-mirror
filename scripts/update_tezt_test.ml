@@ -64,7 +64,7 @@ let () =
           output_string output {|
   extends: .tezt_template
   script:
-    - 'dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --time |};
+    - 'dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --time |};
           let double_single_quotes s =
             String.split_on_char '\'' s |> String.concat "''"
           in

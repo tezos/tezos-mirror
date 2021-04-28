@@ -54,7 +54,8 @@ let channel =
         starting_port = _;
         record = _;
         job_count = _;
-        suggest_jobs } =
+        suggest_jobs;
+        junit = _ } =
     Cli.options
   in
   if
@@ -267,14 +268,14 @@ let warn x = log ~level:Warn ~color:Color.FG.red ~prefix:"warn" x
 
 let error x = log ~level:Error ~color:Color.FG.red ~prefix:"error" x
 
-type test_result = Successful | Failed | Aborted
+type test_result = Successful | Failed of string | Aborted
 
 let test_result ~progress_state ~iteration test_result test_name =
   let (prefix, prefix_color) =
     match test_result with
     | Successful ->
         ("SUCCESS", Color.(FG.green ++ bold))
-    | Failed ->
+    | Failed _ ->
         ("FAILURE", Color.(FG.red ++ bold))
     | Aborted ->
         ("ABORTED", Color.(FG.red ++ bold))
