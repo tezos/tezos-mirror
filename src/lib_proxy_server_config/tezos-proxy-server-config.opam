@@ -8,6 +8,9 @@ license: "MIT"
 depends: [
   "dune" { >= "2.0" }
   "tezos-base"
+  "tezos-test-helpers" { with-test }
+  "qcheck-alcotest" { with-test }
+  "tezos-test-services" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
