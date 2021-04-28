@@ -374,6 +374,11 @@ and ``sapling-output.params``. Here is where you should expect to find those fil
 
 * if you used ``fetch-params.sh``, parameters should be in ``~/.zcash-params``.
 
+.. note::
+
+   Some operating systems may not be covered by the list of directories above.
+   If Zcash is located elsewhere on your system (typically, on MacOS X), you may try creating a symbolic link such as: ``ln -s ~/Library/Application\ Support/ZcashParams ~/.zcash-params``.
+
 Get the sources
 ~~~~~~~~~~~~~~~
 

@@ -54,7 +54,9 @@ the following built-in networks:
 
 - ``sandbox``
 
-- ``edo2net`` (available from version 8.3)
+- ``edo2net`` (available from version 9.0, see :ref:`version 8 release notes<v8_known_issues>` to run Edo2net with version 8.3)
+
+- ``florencenet`` (available since version 9.0)
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
@@ -66,6 +68,7 @@ it runs on Edo2net::
 
 This command will fail with an error if the configured network is not Edo2net.
 The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.
+Also mind opening the :doc:`RPC interface <../developer/rpc>` as appropriate.
 
 Custom Networks
 ---------------
