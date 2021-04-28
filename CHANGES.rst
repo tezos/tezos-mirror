@@ -88,6 +88,11 @@ Node
 -  Fixed a bug that caused the lack of connection in private network
    with ``--connections`` set to 1.
 
+- Updated the behaviour of the ``TEZOS_STORAGE`` environment variable
+  which aims to display the logs of the Irmin's context backend. It
+  now allows to display ``Info`` logs using the ``v`` value. ``Debug``
+  logs are now available through ``vv``.
+
 Client
 ------
 
