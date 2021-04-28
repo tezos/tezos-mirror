@@ -15,36 +15,36 @@ trace
   - location: 10 (remaining gas: 1039987.826 units remaining)
     [ { Elt "foo" 1 }  	@storage
       10  	@parameter ]
-  - location: 11 (remaining gas: 1039986.985 units remaining)
+  - location: 11 (remaining gas: 1039987.826 units remaining)
     [ (Pair "foo" 1)  	
       10  	@parameter ]
-  - location: 13 (remaining gas: 1039986.935 units remaining)
+  - location: 13 (remaining gas: 1039987.776 units remaining)
     [ 1  	@elt
       10  	@parameter ]
-  - location: 14 (remaining gas: 1039986.890 units remaining)
+  - location: 14 (remaining gas: 1039987.731 units remaining)
     [ 10  	@parameter ]
-  - location: 16 (remaining gas: 1039986.840 units remaining)
+  - location: 16 (remaining gas: 1039987.681 units remaining)
     [ 10  	@parameter
       10  	@parameter ]
-  - location: 14 (remaining gas: 1039986.840 units remaining)
+  - location: 14 (remaining gas: 1039987.681 units remaining)
     [ 1  	@elt
       10  	@parameter
       10  	@parameter ]
-  - location: 17 (remaining gas: 1039986.760 units remaining)
+  - location: 17 (remaining gas: 1039987.601 units remaining)
     [ 11  	
       10  	@parameter ]
-  - location: 11 (remaining gas: 1039986.760 units remaining)
+  - location: 11 (remaining gas: 1039987.601 units remaining)
     [ { Elt "foo" 11 }  	
       10  	@parameter ]
-  - location: 18 (remaining gas: 1039986.715 units remaining)
+  - location: 18 (remaining gas: 1039987.556 units remaining)
     [ 10  	@parameter ]
-  - location: 20 (remaining gas: 1039986.670 units remaining)
+  - location: 20 (remaining gas: 1039987.511 units remaining)
     [  ]
-  - location: 18 (remaining gas: 1039986.670 units remaining)
+  - location: 18 (remaining gas: 1039987.511 units remaining)
     [ { Elt "foo" 11 }  	 ]
-  - location: 21 (remaining gas: 1039986.625 units remaining)
+  - location: 21 (remaining gas: 1039987.466 units remaining)
     [ {}  	
       { Elt "foo" 11 }  	 ]
-  - location: 23 (remaining gas: 1039986.580 units remaining)
+  - location: 23 (remaining gas: 1039987.421 units remaining)
     [ (Pair {} { Elt "foo" 11 })  	 ]
 
