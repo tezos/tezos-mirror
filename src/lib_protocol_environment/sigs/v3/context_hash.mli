@@ -25,3 +25,19 @@
 
 (** Committed context hashes / IDs. *)
 include S.HASH
+
+module Version : sig
+  type t
+
+  include Compare.S with type t := t
+
+  val pp : Format.formatter -> t -> unit
+
+  val encoding : t Data_encoding.t
+
+  val zero : t
+
+  val one : t
+end
+
+type version = Version.t

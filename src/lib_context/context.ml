@@ -234,6 +234,14 @@ let unshallow context =
               >|= fun _ -> ())
         children)
 
+let get_hash_version _c = Context_hash.Version.zero
+
+let set_hash_version c v =
+  if Context_hash.Version.( = ) Context_hash.Version.zero v
+  then Lwt.return c
+  else (* XXX *)
+    assert false
+
 let raw_commit ~time ?(message = "") context =
   let info =
     Info.v ~author:"Tezos" ~date:(Time.Protocol.to_seconds time) message

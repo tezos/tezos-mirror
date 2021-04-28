@@ -197,6 +197,11 @@ module C = struct
 
   let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
 
+  let set_hash_version (t : t) v =
+    Local.set_hash_version t.local v >|= fun local -> {t with local}
+
+  let get_hash_version (t : t) = Local.get_hash_version t.local
+
   module Tree = struct
     let pp ppf t = Local.Tree.pp ppf t.tree
 

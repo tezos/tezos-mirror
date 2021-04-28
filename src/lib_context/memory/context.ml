@@ -72,6 +72,10 @@ let add_protocol t key =
   let key = Protocol_hash.to_bytes key in
   Tree.add t current_protocol_key key
 
+let set_hash_version _ _ = assert false (* XXX *)
+
+let get_hash_version _ = assert false (* XXX *)
+
 let empty = Store.Tree.empty
 
 let concrete_encoding : Store.Tree.concrete Data_encoding.t =

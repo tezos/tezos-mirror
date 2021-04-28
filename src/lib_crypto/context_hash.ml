@@ -37,3 +37,24 @@ include
     end)
 
 let () = Base58.check_encoded_prefix b58check_encoding "Co" 52
+
+module Version = struct
+  include Compare.Int
+
+  let pp = Format.pp_print_int
+
+  let encoding =
+    let open Data_encoding in
+    def
+      "context_hash_version"
+      ~description:"A version number for the context hash computation"
+      uint16
+
+  let zero = 0
+
+  let one = 1
+
+  let () = Data_encoding.Registration.register ~pp encoding
+end
+
+type version = Version.t

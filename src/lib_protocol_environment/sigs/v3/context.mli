@@ -175,3 +175,7 @@ val register_resolver :
   'a Base58.encoding -> (t -> string -> 'a list Lwt.t) -> unit
 
 val complete : t -> string -> string list Lwt.t
+
+val get_hash_version : t -> Context_hash.Version.t
+
+val set_hash_version : t -> Context_hash.Version.t -> t Lwt.t

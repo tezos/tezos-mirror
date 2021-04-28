@@ -159,6 +159,15 @@ module type TREE = sig
   val clear : ?depth:int -> tree -> unit
 end
 
+module type HASH_VERSION = sig
+  (** The type for context views. *)
+  type t
+
+  val get_hash_version : t -> Context_hash.Version.t
+
+  val set_hash_version : t -> Context_hash.Version.t -> t Lwt.t
+end
+
 module type S = sig
   include VIEW with type key = string list and type value = bytes
 
