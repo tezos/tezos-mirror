@@ -82,20 +82,24 @@ build_release:docker_arm64:
     # TODO: patch approach is very fragile, we should think about something
     # more reliable
     - git apply packaging/build/static_libs.patch
-    - dune build @install --profile release
-    - dune install --prefix install_root
+    # dune build @install make ocamlopt stack overflow when compiling
+    # protocol functor with static linking (because of
+    # liquidity_baking_cpmm.ml).
+    # Let's skip protocol functors, they are not needed for the release
+    - dune build $(for i in src/{,proto_*/}bin_* ; do echo @$i/install ; done) --profile release
+    - mkdir tezos-binaries && install -t tezos-binaries _build/install/default/bin/*
     # Strip debug symbols in binaries
-    - find . -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
+    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
   artifacts:
     paths:
-      - install_root/bin/*
+      - tezos-binaries/*
 
 build_release:static-x86_64-linux-binaries:
   extends: .build_static_binaries_template
   script:
     - sudo apk --no-cache --virtual add upx
     # Compress resulting binaries
-    - find . -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
+    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
 
 build_release:static-arm64-linux-binaries:
   extends: .build_static_binaries_template
