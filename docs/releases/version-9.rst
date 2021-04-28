@@ -32,7 +32,7 @@ Known Issues
 ------------
 
 Regular but infrequent (a few times a day) spikes of RAM usage have
-been noticed. If you run a node on hardware with less than 8Go of RAM
+been noticed. If you run a node on hardware with less than 8 GB of RAM
 you should activate some swap to handle those spikes. Of course, swap
 may have a price in terms of performance. To not risk any slowdown at
 all, especially when baking on Mainnet, the safest option is to have

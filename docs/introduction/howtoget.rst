@@ -160,7 +160,6 @@ executed by using ``./edo2net.sh client``, passing the needed arguments. Similar
 can be executed using ``./edo2net.sh admin-client``.
 
 
-.. _build_from_sources:
 .. _building_with_opam:
 
 Building from sources via OPAM
@@ -284,6 +283,7 @@ Identified situations where it will be more tricky are:
   The solution will be defined when delivering the first release with Rust
   dependencies.
 
+.. _build_from_sources:
 .. _compiling_with_make:
 
 Setting up the development environment from scratch
