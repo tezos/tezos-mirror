@@ -190,10 +190,10 @@ The tool returns the following on standard output:
 
 This commands measures `100000` times the latency of the timer, that is
 the minimum time between two timing measurements. This yields an empirical distribution
-on timings. The tools takes the 50th percentile (ie the median) of the empirical distribution
+on timings. The tool takes the 50th percentile (ie the median) of the empirical distribution
 and returns the result: 25ns latency. This is reasonable.
 Since there's only one benchmark (with many samples), the standard deviation is by definition
-zero. One could also run many benchmarks with less samples per benchmark:
+zero. One could also run many benchmarks with fewer samples per benchmark:
 
 .. code-block:: shell
 
@@ -231,7 +231,7 @@ Step 3: benchmarking
 
 If the results obtained in the previous section are reasonable,
 we can proceed to the generation of raw timing data. We want
-to invoke the ``Blake2b_example`` benchmark and save the resulting data to `./blake2b.workload`.
+to invoke the ``Blake2b_example`` benchmark and save the resulting data to ``./blake2b.workload``.
 We want `500` distinct random inputs, and for each stack we will perform
 the timing measurement `3000` times. The ``--determinizer`` option specifies
 how the empirical timing distribution corresponding to the per-stack `3000` samples
@@ -313,16 +313,16 @@ At the time of writing, the tool offloads the regression problem to the scikit-l
 
 The command performed the following tasks:
 
-- load the workload data from `blake2b.workload`;
+- load the workload data from ``blake2b.workload``;
 - construct a linear regression problem using the chosen model: here,
   the ``Blake2b_example`` benchmark only provides the ``blake2b`` model;
 - solve this problem using the specified ``lasso`` algorithm, with the
   constraint that the inferred coefficients must be positive;
-- dump the result of inference to a csv file named `blake2b.csv`;
-- save a structured solution (useful for code generation) to `blake2b.sol`;
+- dump the result of inference to a csv file named ``blake2b.csv``;
+- save a structured solution (useful for code generation) to ``blake2b.sol``;
 - plot the result of inference.
 
-Let's first have a look at the contents of the CSV solution `blake2b.csv`.
+Let's first have a look at the contents of the CSV solution ``blake2b.csv``.
 
 .. csv-table:: Inference results
    :header: "blake2b_const", "blake2b_ns_p_byte"
@@ -364,7 +364,7 @@ but the principle is similar.
 By default, the tool produces integer code by casting floating point constant to integers.
 The tool produces the following code on ``stdout``:
 
-:: code-block:: ocaml
+.. code-block:: ocaml
 
    let model_blake2b_codegen size =
        (int_of_float 144.753899773) + (int_of_float 1.17988921492) * size
@@ -389,7 +389,7 @@ Calling the tool:
 
 We get:
 
-:: code-block:: ocaml
+.. code-block:: ocaml
 
    let model_blake2b_codegen size =
        let v0 = size in

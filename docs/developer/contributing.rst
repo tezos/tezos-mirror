@@ -14,7 +14,7 @@ Reporting issues
 ~~~~~~~~~~~~~~~~
 
 The simplest way to contribute to Tezos is to report issues that you may
-find with the software on `gitlab <https://gitlab.com/tezos/tezos/-/issues>`__.
+find with the software on `GitLab <https://gitlab.com/tezos/tezos/-/issues>`__.
 If you are unsure about an issue
 consult the :ref:`technical support sources <support>`
 first and always make sure
@@ -25,11 +25,14 @@ Stretch*), the network you are connected to (e.g. *Carthagenet*), the
 binary or component (e.g. *tezos-node crashes* or *rpc X returns Y
 while Z was expected*).
 
-
 Going further
 ~~~~~~~~~~~~~
 
-To directly contribute to the codebase, expertise in a few areas is necessary.
++You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository.
+This kind of small contribution can be done without creating a merge request, by directly pushing commits to the ``typo-train`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
+Of course, all these commits will be reviewed before being integrated.
+
+To directly contribute to the *codebase*, expertise in a few areas is necessary.
 
 First, make sure that you are proficient enough in OCaml. The community
 website https://ocaml.org gives a few useful pointers for that. In
@@ -52,7 +55,7 @@ While you familiarize yourself with the basics as suggested above, you
 can have a look at the :ref:`software architecture
 <software_architecture>` of Tezos. It will
 give you the main components and their interactions, and links to the
-documentations for the various parts.
+documentation for the various parts.
 
 Now, that you're ready to delve into the code, it is time to know how
 contributions to the code are submitted, reviewed, and finally accepted into the master branch.
@@ -236,7 +239,7 @@ Therefore, when creating your MR, observe the following rules:
 
   - Isolate complicated parts of your patch in their own commits.
   - Put simple, non-controversial commits first. For instance: commits
-    which fix typos, improve documentation, or are simple enough that
+    that fix typos, improve documentation, or are simple enough that
     we may want to merge them even without the rest of the merge
     request.
     Even better put them in a separate MR which can be merged easily.
@@ -446,7 +449,7 @@ pitfalls a code reviewer should avoid.
   what else would have to change? How could we make this more maintainable?
 
 - Discuss in person for more detailed points: Online comments are useful for
-  focused technical questions. In many occasions it is more productive to
+  focused technical questions. On many occasions it is more productive to
   discuss it in person rather than in the comments. Similarly, if discussion
   about a point goes back and forth, It will be often more productive to pick
   it up in person and finish out the discussion.
@@ -482,7 +485,7 @@ pitfalls a code reviewer should avoid.
 
 - Consider the person you are reviewing: Each developer is a person. If you
   know the person, consider their personality and experience while reviewing their
-  code. Sometime it is possible with somebody to be more direct and terse, while
+  code. Sometimes it is possible with somebody to be more direct and terse, while
   other people require a more thorough explanation.
 
 - Avoid confrontational and authoritative language: The way we communicate has
@@ -492,9 +495,9 @@ pitfalls a code reviewer should avoid.
   a problem in the code : "This operation is wrong. Please fix it." and
   "Doing this operation might result in an error, can you please
   review it?". The first one implies you made an error (confrontational), and
-  you should fix it (authority). The second suggest to review the code because
+  you should fix it (authority). The second suggests to review the code because
   there might be a mistake. Despite the message being the same, the recipient might
-  have a different reactions to it and impact on the quality of this work. This
+  have a different reaction to it and impact on the quality of this work. This
   general remark is valid for any comment.
 
 .. _merge_bot:

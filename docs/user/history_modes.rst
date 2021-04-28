@@ -1,7 +1,7 @@
 .. _history-modes:
 
 History modes
--------------
+=============
 
 History modes allow a node to require less disk storage. Indeed,
 depending on the chosen history mode, some parts of the complete chain

@@ -66,11 +66,12 @@ FIXME comments
 During the :ref:`code review process <code_review>`, follow-up issues may be created, for instance to improve or generalize some piece of code.
 When the place of the future fix is known in advance (e.g. a given function), you should mark it with a FIXME comment of the form::
 
-    (* FIXME (<issue>): <one-line explanation>
+    (* FIXME: <reference to issue>
+       <one-line explanation>
        <Add long explanation if the issue description is not the right place.>
     *)
 
-Note that the reference to an existing issue is mandatory, and might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`.
+Note that the reference to an existing issue on the first line is mandatory, to facilitate searches of FIXMEs corresponding to given issues, and might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`.
 
 Documenting interfaces and implementations
 ------------------------------------------

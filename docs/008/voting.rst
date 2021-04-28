@@ -71,7 +71,7 @@ the current participation with the following coefficients::
   newQ = oldQ * 8/10 + participation * 2/10
 
 More details can be found in the file
-``src/proto_008_PtEdo2Zk/lib_protocol/amendment.ml``.
+:src:`src/proto_008_PtEdo2Zk/lib_protocol/amendment.ml`.
 
 Operations
 ----------
@@ -96,11 +96,11 @@ maximum number of proposals for that delegate.
 However duplicates from the same delegate are not tallied at the end
 of the proposal period.
 
-For example, a delegate submits a proposals operation for protocol A
+For example, a delegate submits a ``proposals`` operation for protocols A
 and B early in the proposal period, later a new protocol C is revealed
-and the delegate submits another proposals operation for protocol B
+and the delegate submits another ``proposals`` operation for protocols B
 and C.
-The list of submissions that will be tallied is [A,B,C] and the
+The list of submissions that will be tallied is [A,B,C].
 
 A ballot operation can only be submitted during one of the voting
 periods, and only once per period.
@@ -120,7 +120,7 @@ The pass vote allows a delegate to not influence a vote but still
 allowing it to reach quorum.
 
 More details can be found, as for all operations, in
-``src/proto_008_PtEdo2Zk/lib_protocol/operation_repr.ml``.
+:src:`src/proto_008_PtEdo2Zk/lib_protocol/operation_repr.ml`.
 The binary format is described by ``tezos-client describe unsigned
 operation``.
 

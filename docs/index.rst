@@ -102,14 +102,14 @@ in the :ref:`introduction <howtoget>`.
    :caption: User documentation:
 
    user/key-management
+   user/node-configuration
+   user/snapshots
+   user/history_modes
+   user/multinetwork
    user/sandbox
    user/mockup
    user/proxy
    user/light
-   user/history_modes
-   user/snapshots
-   user/node-configuration
-   user/multinetwork
    user/various
 
 .. toctree::

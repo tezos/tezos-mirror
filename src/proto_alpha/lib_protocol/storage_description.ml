@@ -31,7 +31,10 @@ type 'key t = 'key desc_with_path
     [rev_path] which is the reverse path up to the position, and [dir] the
     position's [description]. [rev_path] is only useful in case of an error to
     print a descriptive message. [List.rev rev_path] is a storage's path that
-    contains no conflict and allow the registration of a [dir]'s storage. *)
+    contains no conflict and allows the registration of a [dir]'s storage.
+    NB: [rev_path] indicates the position in the tree, so once the node is
+    added, it won't change; whereas [dir] is mutable because when more subtrees
+    are added this may require updating it. *)
 and 'key desc_with_path = {
   rev_path : string list;
   mutable dir : 'key description;
