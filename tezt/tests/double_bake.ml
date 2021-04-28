@@ -53,10 +53,7 @@ let is_operation_in_applied_mempool mempool oph =
  *)
 let wait_for_denunciation accuser =
   let filter json = JSON.(json |-> "hash" |> as_string_opt) in
-  Accuser.wait_for
-    accuser
-    "double_baking_denounced.v0"
-    filter
+  Accuser.wait_for accuser "double_baking_denounced.v0" filter
 
 (* Matches events which contain an injection request.
    For example:

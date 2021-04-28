@@ -327,4 +327,9 @@ module Make (X : PARAMETERS) = struct
 
   let on_stdout daemon handler =
     daemon.stdout_handlers <- handler :: daemon.stdout_handlers
+
+  let log_events daemon =
+    on_event daemon
+    @@ fun event ->
+    Log.info "Received event: %s = %s" event.name (JSON.encode event.value)
 end

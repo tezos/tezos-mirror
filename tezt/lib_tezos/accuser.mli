@@ -28,6 +28,9 @@
 (** Tezos accuser states. *)
 type t
 
+(** Raw events. *)
+type event = {name : string; value : JSON.t}
+
 (** Create an accuser.
 
     This function just creates the [t] value, it does not call [run].
@@ -115,6 +118,21 @@ val wait_for_ready : t -> unit Lwt.t
     and bind it later with [let* x = x_event]. *)
 val wait_for :
   ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
+(** Add a callback to be called whenever the accuser emits an event.
+
+    Contrary to [wait_for] functions, this callback is never removed.
+
+    Listening to events with [on_event] will not prevent [wait_for] promises
+    to be fulfilled. You can also have multiple [on_event] handlers, although
+    the order in which they trigger is unspecified. *)
+val on_event : t -> (event -> unit) -> unit
+
+(** Register an event handler that logs all events.
+
+    Use this when you need to debug or reverse engineer incoming events.
+    Usually you do not want to keep that in the final versions of your tests. *)
+val log_events : t -> unit
 
 (** {2 High-Level Functions} *)
 

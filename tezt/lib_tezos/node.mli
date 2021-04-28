@@ -258,6 +258,12 @@ type event = {name : string; value : JSON.t}
     the order in which they trigger is unspecified. *)
 val on_event : t -> (event -> unit) -> unit
 
+(** Register an event handler that logs all events.
+
+    Use this when you need to debug or reverse engineer incoming events.
+    Usually you do not want to keep that in the final versions of your tests. *)
+val log_events : t -> unit
+
 (** {2 High-Level Functions} *)
 
 (** Initialize a node.
