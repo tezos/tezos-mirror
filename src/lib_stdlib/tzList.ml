@@ -106,45 +106,8 @@ let split_n n l =
 
 let take_n_unsorted n l = fst (split_n n l)
 
-module Bounded (E : Set.OrderedType) : sig
-  type t
-
-  val create : int -> t
-
-  val insert : E.t -> t -> unit
-
-  val get : t -> E.t list
-end = struct
-  (* TODO one day replace the list by an heap array *)
-
-  type t = {bound : int; mutable size : int; mutable data : E.t list}
-
-  let create bound =
-    if bound <= 0 then invalid_arg "Utils.Bounded(_).create" ;
-    {bound; size = 0; data = []}
-
-  let rec push x = function
-    | [] ->
-        [x]
-    | y :: xs as ys ->
-        if E.compare x y <= 0 then x :: ys else y :: push x xs
-
-  let insert x t =
-    if t.size < t.bound then (
-      t.size <- t.size + 1 ;
-      t.data <- push x t.data )
-    else
-      match t.data with
-      | [] ->
-          assert false
-      | hd :: tl ->
-          if E.compare hd x < 0 then t.data <- push x tl
-
-  let get {data; _} = data
-end
-
 let take_n_sorted (type a) compare n l =
-  let module B = Bounded (struct
+  let module B = Bounded_heap.Make (struct
     type t = a
 
     let compare = compare

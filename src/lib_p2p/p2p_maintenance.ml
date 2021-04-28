@@ -114,7 +114,7 @@ let establish t contactable =
    [expected] connections candidates from the known points, not in [seen]
    points. *)
 let connectable t start_time expected seen_points =
-  let module Bounded_point_info = List.Bounded (struct
+  let module Bounded_point_info = Bounded_heap.Make (struct
     type t = Time.System.t option * P2p_point.Id.t
 
     let compare (t1, _) (t2, _) =
