@@ -144,8 +144,23 @@ let rec choose_gaussian_nat (a, b) =
   if z > a && z < b then z else choose_gaussian_nat (a, b)
 
 let list_shuffle l =
-  List.map (fun c -> (Random.bits (), c)) l
-  |> List.sort compare |> List.map snd
+  let knuth_shuffle a =
+    let len = Array.length a in
+    let swap i j =
+      let tmp = a.(i) in
+      a.(i) <- a.(j) ;
+      a.(j) <- tmp
+    in
+    let rec loop n =
+      if n > 1 then (
+        let m = Random.int n in
+        let n' = n - 1 in
+        swap m n' ; loop n' )
+    in
+    loop len
+  in
+  let a = Array.of_list l in
+  knuth_shuffle a ; Array.to_list a
 
 (******************************************************************)
 
