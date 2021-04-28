@@ -12,6 +12,10 @@ Data-encoding:
 - offer modern version of functions (notably to support string as well as bytes),
 - remove some unused functions
 
+Addition of some time-lock related function
+https://gitlab.com/nomadic-labs/tezos/-/merge_requests/254
+
+
 ## V2
 
 Everywhere: update version dependencies for data-encoding, resto and lwt-canceler
