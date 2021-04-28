@@ -1,6 +1,7 @@
 (executables
  (names test_bits
         test_tzList
+        test_bounded_heap
         test_tzString
         test_fallbackArray
         test_lwt_pipe
@@ -12,12 +13,16 @@
             lwt_log
             bigstring
             lwt.unix
+            lib-test
+            qcheck-core
+            qcheck-alcotest
             crowbar)
  (flags (:standard -open Tezos_stdlib)))
 
 (rule
  (alias buildtest)
  (deps test_tzList.exe
+       test_bounded_heap.exe
        test_tzString.exe
        test_lwt_pipe.exe)
  (action (progn)))
@@ -29,6 +34,10 @@
 (rule
  (alias runtest_tzList)
  (action (run %{exe:test_tzList.exe})))
+
+(rule
+ (alias runtest_bounded_heap)
+ (action (run %{exe:test_bounded_heap.exe})))
 
 (rule
  (alias runtest_tzString)
@@ -55,6 +64,7 @@
  (package tezos-stdlib)
  (deps (alias runtest_bits)
        (alias runtest_tzList)
+       (alias runtest_bounded_heap)
        (alias runtest_tzString)
        (alias runtest_lwt_pipe)
        (alias runtest_circular_buffer)

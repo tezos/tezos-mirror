@@ -66,7 +66,7 @@ type ('msg, 'peer, 'conn) t = {
   acl : P2p_acl.t;
 }
 
-module Gc_point_set = List.Bounded (struct
+module Gc_point_set = Bounded_heap.Make (struct
   type t = Time.System.t * P2p_point.Id.t
 
   let compare (x, _) (y, _) = -Time.System.compare x y
@@ -180,7 +180,7 @@ let register_list_of_new_points ?trusted ~medium ~source t point_list =
    case of a flood attack, the newly added infos will probably belong
    to peer_ids with the same (low) score and removing the most recent ones
    ensure that older (and probably legit) peer_id infos are kept. *)
-module Gc_peer_set = List.Bounded (struct
+module Gc_peer_set = Bounded_heap.Make (struct
   type t = float * Time.System.t * P2p_peer.Id.t
 
   let compare (s, t, _) (s', t', _) =

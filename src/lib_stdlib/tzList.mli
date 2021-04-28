@@ -45,17 +45,6 @@ val take_n : ?compare:('a -> 'a -> int) -> int -> 'a list -> 'a list
     exactly [n] elements, [j] is [l] and [k] is [[]]. *)
 val split_n : int -> 'a list -> 'a list * 'a list
 
-(** Bounded sequence: keep only the [n] greatest elements. *)
-module Bounded (E : Set.OrderedType) : sig
-  type t
-
-  val create : int -> t
-
-  val insert : E.t -> t -> unit
-
-  val get : t -> E.t list
-end
-
 (** [select n l] is ([n]th element of [l], [l] without that element) *)
 val select : int -> 'a list -> 'a * 'a list
 

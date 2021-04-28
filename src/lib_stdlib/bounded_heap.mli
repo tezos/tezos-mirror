@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,60 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    _______
+(** Bounded sequence: keep only the [n] greatest elements. *)
 
-    Invocation: dune build @src/lib_stdlib/test/runtest_tzList
- *)
+module Make (E : Set.OrderedType) : sig
+  type t
 
-let rec permut = function
-  | [] ->
-      [[]]
-  | x :: xs ->
-      let insert xs =
-        let rec loop acc left right =
-          match right with
-          | [] ->
-              List.rev (x :: left) :: acc
-          | y :: ys ->
-              loop (List.rev_append left (x :: right) :: acc) (y :: left) ys
-        in
-        loop [] [] xs
-      in
-      List.concat (List.map insert (permut xs))
+  (** [create size] create a bounded sequence of at most [size] elements.
 
-let test_take_n _ =
-  ListLabels.iter
-    (permut [1; 2; 3; 4; 5; 6; 7; 8; 9])
-    ~f:(fun xs -> Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 1 xs) [9]) ;
-  ListLabels.iter
-    (permut [1; 2; 3; 4; 5; 6; 7; 8; 9])
-    ~f:(fun xs ->
-      Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 3 xs) [7; 8; 9]) ;
-  let inv_compare x y = compare y x in
-  ListLabels.iter
-    (permut [1; 2; 3; 4; 5; 6; 7; 8; 9])
-    ~f:(fun xs ->
-      Assert.equal
-        ~msg:__LOC__
-        (TzList.take_n ~compare:inv_compare 3 xs)
-        [3; 2; 1]) ;
-  (* less elements than the bound. *)
-  ListLabels.iter
-    (permut [1; 2; 3; 4; 5; 6; 7; 8; 9])
-    ~f:(fun xs ->
-      Assert.equal
-        ~msg:__LOC__
-        (TzList.take_n ~compare 12 xs)
-        [1; 2; 3; 4; 5; 6; 7; 8; 9]) ;
-  (* with duplicates. *)
-  ListLabels.iter
-    (permut [1; 2; 3; 3; 4; 5; 5; 5; 6])
-    ~f:(fun xs ->
-      Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 3 xs) [5; 5; 6]) ;
-  ListLabels.iter
-    (permut [1; 2; 3; 3; 4; 5; 5; 5; 6])
-    ~f:(fun xs ->
-      Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 5 xs) [4; 5; 5; 5; 6])
+      Raise [Invalid_argument] if [size < 0] or [size > Sys.max_array_length].
+   *)
+  val create : int -> t
 
-let () = Alcotest.run "stdlib" [("tzList", [("take_n", `Quick, test_take_n)])]
+  (** [insert e b] adds element [e] to bounded sequence [b] if:
+      - [b] is not full (i.e, we have not inserted [size] elements until now); or
+      - there is an element [e'] from [b] such that [E.compare e' e < 0]. 
+
+      Worst-case complexity: O(log n) where n is the size of the heap.
+   *)
+  val insert : E.t -> t -> unit
+
+  (** [get b] returns the contents of [b] as a sorted list in increasing order
+     according to [E.compare].
+
+     Worst-case complexity: O(n log n) where n is the size of the heap.
+   *)
+  val get : t -> E.t list
+
+  (** [peek b] returns [Some e] if [b] is not empty where [e] is the smallest
+     element in [b] according to [E.compare], [None] otherwise.
+
+     Worst-case complexity: O(1).
+   *)
+  val peek : t -> E.t option
+end
