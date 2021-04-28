@@ -14,7 +14,6 @@
             bigstring
             lwt.unix
             lib-test
-            qcheck-core
             qcheck-alcotest
             crowbar)
  (flags (:standard -open Tezos_stdlib)))
