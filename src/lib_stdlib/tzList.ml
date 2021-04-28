@@ -143,11 +143,26 @@ let rec product a b =
   | hd :: tl ->
       List.map (fun x -> (hd, x)) b @ product tl b
 
+(* Use Fisher-Yates shuffle as described by Knuth
+   https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle *)
 let shuffle l =
-  l
-  |> List.map (fun d -> (Random.bits (), d))
-  |> List.sort (fun (x, _) (y, _) -> compare x y)
-  |> List.map snd
+  let knuth_shuffle a =
+    let len = Array.length a in
+    let swap i j =
+      let tmp = a.(i) in
+      a.(i) <- a.(j) ;
+      a.(j) <- tmp
+    in
+    let rec loop n =
+      if n > 1 then (
+        let m = Random.int n in
+        let n' = n - 1 in
+        swap m n' ; loop n' )
+    in
+    loop len
+  in
+  let a = Array.of_list l in
+  knuth_shuffle a ; Array.to_list a
 
 let index_of ?(compare = Stdlib.compare) item list =
   let rec find index = function
