@@ -211,8 +211,8 @@ let options =
            and --loop-count, only the last one is taken into account." );
         ( "--time",
           Arg.Set time,
-          " Print a summary of the time taken by each test. Ignored if a test \
-           failed." );
+          " Print a summary of the total time taken by each test. Ignored if \
+           a test failed." );
         ( "--starting-port",
           Arg.Set_int starting_port,
           " If tests need to open ports, they may start from this number." );
@@ -235,7 +235,9 @@ let options =
            that denotes the expected duration of the job." );
         ( "--junit",
           Arg.String (fun path -> junit := Some path),
-          "<FILE> Store test results in FILE using JUnit XML format." ) ]
+          "<FILE> Store test results in FILE using JUnit XML format. Time \
+           information for each test is the sum of all runs of this test for \
+           the current session." ) ]
   in
   let usage =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
