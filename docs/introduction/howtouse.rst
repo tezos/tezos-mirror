@@ -647,6 +647,12 @@ The behavior of the client can be configured using the following environment var
 - `TEZOS_CLIENT_DIR`: This variable may be used to supply the client data directory (by default, ``~/.tezos-client``).
   Its value is overridden by option ``-d``.
 - `TEZOS_SIGNER_*`: These variables are used for connecting the client to a remote :ref:`signer <signer>`.
+  Its value is overwritten by option ``-d``.
+- `TEZOS_CLIENT_RPC_TIMEOUT_SECONDS`: This variable controls how long (in seconds, as an integer)
+  the client will wait for a response from the node, for each of the two RPC calls made during startup.
+  If this variable is not set, or otherwise cannot be parsed as a positive integer, a default value of ``10`` seconds is used for each call.
+  The two RPC calls this variable affects are queries that the client makes to the node in order to determine:
+  (1) the protocol version of the node it connects to, and (2) the commands supported in that version.
 
 Other binaries
 --------------
