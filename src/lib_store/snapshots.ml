@@ -578,7 +578,7 @@ let pp_metadata ppf {version; chain_name; history_mode; block_hash; level; _} =
     Block_hash.pp
     block_hash
     level
-    History_mode.pp
+    History_mode.pp_short
     history_mode
     version
 
