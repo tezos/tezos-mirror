@@ -196,11 +196,7 @@ module S = struct
         fun ctxt contract_id q () ->
           single_sapling_get_id ctxt contract_id
           >>=? fun (sapling_id, ctxt) ->
-          match sapling_id with
-          | None ->
-              return_none
-          | Some sapling_id ->
-              f ctxt sapling_id q >|=? Option.some )
+          Option.map_es (fun sapling_id -> f ctxt sapling_id q) sapling_id )
 
     let get_diff = make_service Sapling_services.S.Args.get_diff
 

@@ -1160,13 +1160,17 @@ let register () =
   register0 S.current_level (fun ctxt q () ->
       Level.from_raw ctxt ~offset:q.offset (Level.current ctxt).level |> return) ;
   opt_register0 S.levels_in_current_cycle (fun ctxt q () ->
-      let levels = Level.levels_in_current_cycle ctxt ~offset:q.offset () in
-      match levels with
+      let rev_levels =
+        Level.levels_in_current_cycle ctxt ~offset:q.offset ()
+      in
+      match rev_levels with
       | [] ->
           return_none
-      | _ ->
-          let first = List.hd (List.rev levels) in
-          let last = List.hd levels in
+      | [level] ->
+          return (Some (level.level, level.level))
+      | last :: (_ :: _ as rest) ->
+          (* The [rev_levels] list is reversed, the last level is the head *)
+          let first = List.hd (List.rev rest) in
           return (Some (first.level, last.level)))
 
 let current_level ctxt ?(offset = 0l) block =

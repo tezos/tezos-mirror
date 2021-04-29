@@ -1025,7 +1025,7 @@ module Interpreter_tests = struct
         script.storage
       |> wrap
       >>=? fun (id, _ctx_2) ->
-      let single_id = match id with Some id -> id | None -> assert false in
+      let single_id = WithExceptions.Option.get ~loc:__LOC__ id in
       let id =
         Lazy_storage_kind.Sapling_state.Id.parse_z
         @@ Alpha_context.Sapling.Id.unparse_to_z single_id

@@ -2635,25 +2635,21 @@ type 'before dup_n_proof_argument =
       -> 'before dup_n_proof_argument
 
 let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
+  let annot_is_entrypoint entrypoint = function
+    | None ->
+        false
+    | Some (Field_annot l) ->
+        Compare.String.(l = entrypoint)
+  in
   let rec find_entrypoint :
       type t. t ty -> string -> ((Script.node -> Script.node) * ex_ty) option =
    fun t entrypoint ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) -> (
-        if
-          match al with
-          | None ->
-              false
-          | Some (Field_annot l) ->
-              Compare.String.(l = entrypoint)
-        then Some ((fun e -> Prim (0, D_Left, [e], [])), Ex_ty tl)
-        else if
-          match ar with
-          | None ->
-              false
-          | Some (Field_annot r) ->
-              Compare.String.(r = entrypoint)
-        then Some ((fun e -> Prim (0, D_Right, [e], [])), Ex_ty tr)
+        if annot_is_entrypoint entrypoint al then
+          Some ((fun e -> Prim (0, D_Left, [e], [])), Ex_ty tl)
+        else if annot_is_entrypoint entrypoint ar then
+          Some ((fun e -> Prim (0, D_Right, [e], [])), Ex_ty tr)
         else
           match find_entrypoint tl entrypoint with
           | Some (f, t) ->
@@ -7465,5 +7461,5 @@ let get_single_sapling_state ctxt ty x =
   match id with
   | Fold_lazy_storage.Ok (Some id) ->
       ok (Some id, ctxt)
-  | _ ->
+  | Fold_lazy_storage.Ok None | Fold_lazy_storage.Error ->
       ok (None, ctxt)
