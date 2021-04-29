@@ -10,15 +10,6 @@ test-script-gen-genesis:
     - dune build gen_genesis.exe
   interruptible: true
 
-test-static-libs-patch:
-  extends:
-    - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development
-  stage: test
-  needs: []
-  script:
-    - git apply packaging/build/static_libs.patch
-
 .test_template:
   extends:
     - .image_template__runtime_build_test_dependencies_template
