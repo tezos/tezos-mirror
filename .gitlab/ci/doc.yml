@@ -19,9 +19,9 @@ documentation:linkcheck:
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development_documentation
   stage: doc
-  needs: ["documentation:build"]
-  dependencies:
-    - documentation:build
+  needs:
+    - job: documentation:build
+      artifacts: true
   before_script:
     - . ./scripts/version.sh
   script:

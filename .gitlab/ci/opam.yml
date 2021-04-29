@@ -4,6 +4,8 @@
     - .rules_template__development_opam
   stage: packaging
   needs: []
+  # We set the dependencies to [] to force the job to run without any artifacts
+  # produced by previous stages.
   dependencies: []
   script:
     - ./scripts/opam-pin.sh
