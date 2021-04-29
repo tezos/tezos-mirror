@@ -14,7 +14,7 @@ We have also spawned a test network for Edo, named Edonet, that
 replaces Ebetanet, which was a test network for a beta version of
 Edo. The release candidate contains the necessary configuration to
 join Edonet: just configure your node with
-``tezos-node config init --network edonet``.
+``tezos-node config init --network edonet`` (but see `Known Issues`_ below).
 
 Version 8.1 fixes a performance regression related to operations
 involving ``tz3`` addresses and several compilation problems in
@@ -44,6 +44,44 @@ To update from sources::
   make
 
 If you are using Docker instead, use the ``v8.3`` Docker images of Tezos.
+
+.. _v8_known_issues:
+
+Known Issues
+------------
+
+The Tezos node of version 8.3 does not recognize as a builtin network ``edo2net``, the current test network for the Edo protocol (which has replaced ``edonet``). To join it, you must configure a custom network as follows:
+
+- create a data directory for the node and copy in it the following ``config.json`` file (alternatively, you may only modify the ``network`` field in your own configuration file)::
+
+    {
+      "p2p": {},
+      "network": {
+        "genesis": {
+          "timestamp": "2021-02-11T14:00:00Z",
+          "block": "BLockGenesisGenesisGenesisGenesisGenesisdae8bZxCCxh",
+          "protocol": "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex"
+        },
+        "genesis_parameters": {
+          "values": {
+            "genesis_pubkey": "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu"
+          }
+        },
+        "chain_name": "TEZOS_EDO2NET_2021-02-11T14:00:00Z",
+        "sandboxed_chain_name": "SANDBOXED_TEZOS",
+        "default_bootstrap_peers": [
+          "edonet.tezos.co.il",
+          "188.40.128.216:29732",
+          "51.79.165.131",
+          "edo2net.kaml.fr",
+          "edonet2.smartpy.io",
+          "edonetb.boot.tezostaquito.io"
+        ]
+      }
+    }
+
+- optionally, import a snapshot file
+- run the node, passing it the data directory via option ``--data-dir`` if needed.
 
 Changelog
 ---------
