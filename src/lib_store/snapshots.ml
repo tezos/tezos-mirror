@@ -2024,9 +2024,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     | Archive | Full _ -> return_unit
     | Rolling _ when rolling -> return_unit
     | Rolling _ as stored ->
-        fail
-          (Incompatible_history_mode
-             {stored; requested = Full (Some {offset = 0})})
+        fail (Incompatible_history_mode {stored; requested = Full None})
 
   let export_floating_block_stream snapshot_exporter floating_block_stream =
     let f fd =
@@ -2051,7 +2049,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       >>=? fun (export_block, pred_block, lowest_block_level_needed) ->
       (* The number of additional cycles to export is fixed as the
          snasphot content must not rely on the local configuration. *)
-      let export_mode = History_mode.Rolling (Some {offset = 0}) in
+      let export_mode = History_mode.Rolling None in
       Event.(
         emit export_info (export_mode, Store.Block.descriptor export_block))
       >>= fun () ->
@@ -2123,7 +2121,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       >>=? fun (export_block, pred_block, _lowest_block_level_needed) ->
       (* The number of additional cycles to export is fixed as the
          snasphot content must not rely on the local configuration. *)
-      let export_mode = History_mode.Full (Some {offset = 0}) in
+      let export_mode = History_mode.Full None in
       Event.(
         emit export_info (export_mode, Store.Block.descriptor export_block))
       >>= fun () ->
