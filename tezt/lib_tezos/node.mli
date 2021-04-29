@@ -144,6 +144,20 @@ val rpc_port : t -> int
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
 
+(** Wait until a node terminates and check its status. 
+ 
+    If the node is not running,
+    or if the process returns an exit code which is not [exit_code],
+    or if [msg] does not match the stderr output, fail the test.
+
+    If [exit_code] is not specified, any non-zero code is accepted.
+    If no [msg] is given, the stderr is ignored.*)
+val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
+
+(** Wait until a node terminates and return its status. If the node is not
+   running, make the test fail. *)
+val wait : t -> Unix.process_status Lwt.t
+
 (** Send SIGTERM to a node and wait for it to terminate. *)
 val terminate : t -> unit Lwt.t
 

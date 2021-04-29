@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -55,29 +55,32 @@ let rec list_find_map f = function
         | Some _ as x ->
             x
 
-type rex = Re.re
+type rex = string * Re.re
 
-let rex r = Re.compile (Re.Perl.re r)
+let rex r = r, Re.compile (Re.Perl.re r)
 
-let ( =~ ) s r = Re.execp r s
+let show_rex = fst
 
-let ( =~! ) s r = not (Re.execp r s)
+let ( =~ ) s (_, r) = Re.execp r s
 
-let ( =~* ) s r =
+let ( =~! ) s (_, r) = not (Re.execp r s)
+
+let ( =~* ) s (_, r) =
   match Re.exec_opt r s with
   | None ->
       None
   | Some group ->
       Some (Re.Group.get group 1)
 
-let ( =~** ) s r =
+let ( =~** ) s (_, r) =
   match Re.exec_opt r s with
   | None ->
       None
   | Some group ->
       Some (Re.Group.get group 1, Re.Group.get group 2)
 
-let replace_string = Re.replace_string
+let replace_string ?pos ?len ?all (_, r) ~by s =
+  Re.replace_string ?pos ?len ?all r ~by s
 
 let async_promises = ref []
 
