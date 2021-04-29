@@ -36,8 +36,9 @@ let get_balance (rpc : #rpc_context) ~chain ~block contract =
 let get_storage (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.storage_opt rpc (chain, block) contract
 
-let get_big_map_value (rpc : #rpc_context) ~chain ~block id key =
-  Alpha_services.Contract.big_map_get rpc (chain, block) id key
+let get_big_map_value (rpc : #rpc_context) ~chain ~block id key ~unparsing_mode
+    =
+  Plugin.RPC.big_map_get_normalized rpc (chain, block) id key ~unparsing_mode
 
 let get_contract_big_map_value (rpc : #rpc_context) ~chain ~block contract key
     =
