@@ -165,6 +165,19 @@ val get_levels_in_current_cycle :
   Client.t ->
   JSON.t Lwt.t
 
+module Big_maps : sig
+  (** Call RPC /chain/[chain]/blocks/[block]/context/big_maps/[id]/[key_hash] *)
+  val get :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    id:string ->
+    key_hash:string ->
+    Client.t ->
+    JSON.t Lwt.t
+end
+
 module Contracts : sig
   (** Common protocol RPSs for contracts (i.e. under [/contracts]). *)
 
