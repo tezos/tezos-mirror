@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -71,6 +71,9 @@ type rex
 
 (** Compile a regular expression using Perl syntax. *)
 val rex : string -> rex
+
+(** Convert a regular expression to a string using Perl syntax. *)
+val show_rex : rex -> string
 
 (** Test whether a string matches a regular expression.
 
