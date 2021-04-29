@@ -1431,8 +1431,10 @@ module Tar_exporter : EXPORTER = struct
     >>= fun tar ->
     (* As the metadata are available after exporting the whole
        snapshot, we reserve a metadata slot as header, by writing a
-       dummy header. It will be overwrite when finalizing the
-       snapshot. *)
+       dummy header which will be overwritten once the archive is
+       finalized. Having the metadata at the beginning of the archive
+       allows to extract it without the need to interpret the complete
+       archive. *)
     let dummy_metadata =
       {
         version = current_version;
@@ -1587,6 +1589,7 @@ module Tar_exporter : EXPORTER = struct
     Onthefly.add_file_and_finalize t.tar ~file:src ~filename:dst
 
   let write_metadata t ~f =
+    (* Overwrite the dummy metadata. *)
     let raw_fd = Onthefly.get_raw_output_fd t.tar in
     Lwt_unix.LargeFile.lseek raw_fd (Int64.of_int Onthefly.header_size) SEEK_SET
     >>= fun _ -> f raw_fd
