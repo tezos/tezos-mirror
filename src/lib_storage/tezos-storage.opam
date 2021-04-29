@@ -10,8 +10,8 @@ depends: [
   "dune" { >= "2.0" }
   "tezos-base"
   "tezos-lmdb"
-  "irmin" { >= "2.5.3" }
-  "irmin-pack" { >= "2.5.3" }
+  "irmin" { = "2.5.4" }
+  "irmin-pack" { = "2.5.4" }
   "digestif" {>= "0.7.3"}
   "tezos-shell-services"
   "tezos-stdlib-unix"
