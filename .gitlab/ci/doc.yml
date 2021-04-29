@@ -4,6 +4,9 @@ documentation:build:
   extends: .runtime_build_test_dependencies_template
   interruptible: true
   stage: build
+  # NOTE: we want to build the doc on development branches to check that MRs
+  # haven't broken doc building, we don't build it otherwise, but note that on
+  # master the documentation is built as part of the publish:documentation job.
   except:
     - master
     - tags@tezos/tezos
@@ -28,7 +31,7 @@ documentation:linkcheck:
     - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "master"'
-      when: on_success
+      when: never
     - if: '$CI_COMMIT_BRANCH =~ /doc/'
       when: on_success
     - changes:

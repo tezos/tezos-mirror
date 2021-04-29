@@ -203,7 +203,7 @@ merge-manifest:
     - docker manifest push "${public_docker_image_name%?}:${TAG_NAME}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
   interruptible: false
 
-publish:doc:
+publish:documentation:
   extends: .runtime_build_test_dependencies_template
   stage: doc
   only:
