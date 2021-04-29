@@ -410,23 +410,7 @@ let assert_block_is_well_baked block =
 
 let random_permutation list =
   assert (list <> []) ;
-  let knuth_shuffle a =
-    let len = Array.length a in
-    let swap i j =
-      let tmp = a.(i) in
-      a.(i) <- a.(j) ;
-      a.(j) <- tmp
-    in
-    let rec loop n =
-      if n > 1 then (
-        let m = Random.int n in
-        let n' = n - 1 in
-        swap m n' ; loop n' )
-    in
-    loop len
-  in
-  let a = Array.of_list list in
-  knuth_shuffle a ; Array.to_list a
+  Tezos_stdlib.TzList.shuffle list
 
 let single_baker_increasing_fees state ~account : mempool Lwt.t =
   let* branch = get_current_head_hash state in
