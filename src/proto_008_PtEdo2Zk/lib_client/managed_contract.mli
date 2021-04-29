@@ -109,3 +109,16 @@ val transfer :
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
   Lwt.t
+
+val build_lambda_for_set_delegate : delegate:public_key_hash option -> string
+
+val build_lambda_for_transfer_to_implicit :
+  destination:public_key_hash -> amount:Tez.t -> string
+
+val build_lambda_for_transfer_to_originated :
+  destination:Contract.t ->
+  entrypoint:string ->
+  amount:Tez.t ->
+  parameter_type:Script.expr ->
+  parameter:Script.expr ->
+  string

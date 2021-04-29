@@ -110,6 +110,7 @@ in the :ref:`introduction <howtoget>`.
    user/mockup
    user/proxy
    user/light
+   user/multisig
    user/various
 
 .. toctree::
