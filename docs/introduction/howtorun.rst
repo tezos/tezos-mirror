@@ -218,6 +218,8 @@ baking rights at priority 2 like in the example above.
 There is no priority for endorsements, every missed endorsement is
 lost.
 
+.. _inactive_delegates:
+
 Inactive delegates
 ~~~~~~~~~~~~~~~~~~
 
@@ -230,6 +232,9 @@ Normally even a baker with one single roll should perform enough
 operations during 5 cycles to remain active.
 If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
+
+To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and endorsing slots assigned to it, using a block explorer in the :ref:`Tezos community <tezos_community>`.
+Alternatively, you may use the `baking rights RPC <https://tezos.gitlab.io/alpha/rpc.html#get-block-id-helpers-baking-rights>`_) and the `endorsing rights RPC <https://tezos.gitlab.io/alpha/rpc.html#get-block-id-helpers-endorsing-rights>`_,  able to return a list of baking/endorsing slots for a given delegate.
 
 .. _baker_run:
 
@@ -247,12 +252,11 @@ baking for user *bob*::
 
    tezos-baker-alpha run with local node ~/.tezos-node bob
 
-**Remember that having two bakers or endorsers running connected to the
-same account could lead to double baking/endorsing and the loss of all
-your bonds.**
-If you are worried about the availability of your node when it is its turn to
-bake/endorse, **there are other ways** than duplicating your credentials.
-**Never** use the same account on two daemons.
+.. warning::
+
+    **Remember that having two bakers or endorsers running connected to the same account could lead to double baking/endorsing and the loss of all your bonds.**
+    If you are worried about the availability of your node when it is its turn to bake/endorse, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
+    **Never** use the same account on two daemons.
 
 Endorser
 ~~~~~~~~

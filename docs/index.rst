@@ -27,6 +27,8 @@ Latest Release
 
 The current version of Tezos is :ref:`version-9`.
 
+.. _tezos_community:
+
 The Community
 -------------
 
