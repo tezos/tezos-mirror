@@ -41,6 +41,7 @@ let get_contract_manager (cctxt : #full) contract =
     cctxt
     ~chain:cctxt#chain
     ~block:cctxt#block
+    ~unparsing_mode:Optimized
     contract
   >>=? function
   | None ->

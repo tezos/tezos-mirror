@@ -826,7 +826,7 @@ let multisig_get_information (cctxt : #Protocol_client_context.full) ~chain
     ~block contract =
   let open Client_proto_context in
   let open Tezos_micheline.Micheline in
-  get_storage cctxt ~chain ~block contract
+  get_storage cctxt ~chain ~block ~unparsing_mode:Readable contract
   >>=? fun storage_opt ->
   match storage_opt with
   | None ->

@@ -1314,6 +1314,17 @@ module RPC = struct
         ( RPC_path.(open_root / "context" / "contracts")
           : RPC_context.t RPC_path.context )
 
+      let get_storage_normalized =
+        let open Data_encoding in
+        RPC_service.post_service
+          ~description:
+            "Access the data of the contract and normalize it using the \
+             requested unparsing mode."
+          ~input:(obj1 (req "unparsing_mode" unparsing_mode_encoding))
+          ~query:RPC_query.empty
+          ~output:(option Script.expr_encoding)
+          RPC_path.(path /: Contract.rpc_arg / "storage" / "normalized")
+
       let get_script_normalized =
         let open Data_encoding in
         RPC_service.post_service
@@ -1327,6 +1338,28 @@ module RPC = struct
     end
 
     let register () =
+      (* Patched RPC: get_storage *)
+      Registration.register1
+        S.get_storage_normalized
+        (fun ctxt contract () unparsing_mode ->
+          Contract.get_script ctxt contract
+          >>=? fun (ctxt, script) ->
+          match script with
+          | None ->
+              return_none
+          | Some script ->
+              let ctxt = Gas.set_unlimited ctxt in
+              let open Script_ir_translator in
+              parse_script
+                ctxt
+                ~legacy:true
+                ~allow_forged_in_storage:true
+                script
+              >>=? fun (Ex_script script, ctxt) ->
+              unparse_script ctxt unparsing_mode script
+              >>=? fun (script, ctxt) ->
+              Script.force_decode_in_context ctxt script.storage
+              >>?= fun (storage, _ctxt) -> return_some storage) ;
       (* Patched RPC: get_script *)
       Registration.register1
         S.get_script_normalized
@@ -1347,6 +1380,15 @@ module RPC = struct
               >>=? fun (Ex_script script, ctxt) ->
               unparse_script ctxt unparsing_mode script
               >>=? fun (script, _ctxt) -> return_some script)
+
+    let get_storage_normalized ctxt block ~contract ~unparsing_mode =
+      RPC_context.make_call1
+        S.get_storage_normalized
+        ctxt
+        block
+        contract
+        ()
+        unparsing_mode
 
     let get_script_normalized ctxt block ~contract ~unparsing_mode =
       RPC_context.make_call1

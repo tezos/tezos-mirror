@@ -36,6 +36,7 @@ val get_storage :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
+  unparsing_mode:Script_ir_translator.unparsing_mode ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
 

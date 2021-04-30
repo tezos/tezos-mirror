@@ -33,8 +33,12 @@ open Client_keys
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
-let get_storage (rpc : #rpc_context) ~chain ~block contract =
-  Alpha_services.Contract.storage_opt rpc (chain, block) contract
+let get_storage (rpc : #rpc_context) ~chain ~block ~unparsing_mode contract =
+  Plugin.RPC.Contract.get_storage_normalized
+    rpc
+    (chain, block)
+    ~unparsing_mode
+    ~contract
 
 let get_big_map_value (rpc : #rpc_context) ~chain ~block id key =
   Alpha_services.Contract.big_map_get rpc (chain, block) id key
