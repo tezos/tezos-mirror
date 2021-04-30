@@ -40,8 +40,14 @@ let get_storage (rpc : #rpc_context) ~chain ~block ~unparsing_mode contract =
     ~unparsing_mode
     ~contract
 
-let get_big_map_value (rpc : #rpc_context) ~chain ~block id key =
-  Alpha_services.Contract.big_map_get rpc (chain, block) id key
+let get_big_map_value (rpc : #rpc_context) ~chain ~block ~unparsing_mode id key
+    =
+  Plugin.RPC.Big_map.big_map_get_normalized
+    rpc
+    (chain, block)
+    ~unparsing_mode
+    id
+    key
 
 let get_contract_big_map_value (rpc : #rpc_context) ~chain ~block contract key
     =

@@ -303,6 +303,18 @@ module RPC = struct
 
     let register1 s f =
       register1_fullctxt s (fun {context; _} x -> f context x)
+
+    let register2_fullctxt s f =
+      patched_services :=
+        RPC_directory.register
+          !patched_services
+          s
+          (fun ((ctxt, arg1), arg2) q i ->
+            Services_registration.rpc_init ctxt
+            >>=? fun ctxt -> f ctxt arg1 arg2 q i)
+
+    let register2 s f =
+      register2_fullctxt s (fun {context; _} a1 a2 q i -> f context a1 a2 q i)
   end
 
   let unparsing_mode_encoding =
@@ -1400,6 +1412,70 @@ module RPC = struct
         unparsing_mode
   end
 
+  module Big_map = struct
+    module S = struct
+      let path =
+        ( RPC_path.(open_root / "context" / "big_maps")
+          : RPC_context.t RPC_path.context )
+
+      let big_map_get_normalized =
+        let open Data_encoding in
+        RPC_service.post_service
+          ~description:
+            "Access the value associated with a key in a big map, normalize \
+             the output using the requested unparsing mode."
+          ~query:RPC_query.empty
+          ~input:(obj1 (req "unparsing_mode" unparsing_mode_encoding))
+          ~output:Script.expr_encoding
+          RPC_path.(
+            path /: Big_map.Id.rpc_arg /: Script_expr_hash.rpc_arg
+            / "normalized")
+    end
+
+    let register () =
+      Registration.register2
+        S.big_map_get_normalized
+        (fun ctxt id key () unparsing_mode ->
+          let open Script_ir_translator in
+          let ctxt = Gas.set_unlimited ctxt in
+          Big_map.exists ctxt id
+          >>=? fun (ctxt, types) ->
+          match types with
+          | None ->
+              raise Not_found
+          | Some (_, value_type) -> (
+              parse_big_map_value_ty
+                ctxt
+                ~legacy:true
+                (Micheline.root value_type)
+              >>?= fun (Ex_ty value_type, ctxt) ->
+              Big_map.get_opt ctxt id key
+              >>=? fun (_ctxt, value) ->
+              match value with
+              | None ->
+                  raise Not_found
+              | Some value ->
+                  parse_data
+                    ctxt
+                    ~legacy:true
+                    ~allow_forged:true
+                    value_type
+                    (Micheline.root value)
+                  >>=? fun (value, ctxt) ->
+                  unparse_data ctxt unparsing_mode value_type value
+                  >|=? fun (value, _ctxt) -> Micheline.strip_locations value ))
+
+    let big_map_get_normalized ctxt block id key ~unparsing_mode =
+      RPC_context.make_call2
+        S.big_map_get_normalized
+        ctxt
+        block
+        id
+        key
+        ()
+        unparsing_mode
+  end
+
   module Forge = struct
     module S = struct
       open Data_encoding
@@ -1731,6 +1807,7 @@ module RPC = struct
     Forge.register () ;
     Parse.register () ;
     Contract.register () ;
+    Big_map.register () ;
     Registration.register0 S.current_level (fun ctxt q () ->
         Level.from_raw ctxt ~offset:q.offset (Level.current ctxt).level
         |> return) ;

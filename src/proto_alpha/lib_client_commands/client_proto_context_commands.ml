@@ -342,7 +342,7 @@ let commands network () =
     command
       ~group
       ~desc:"Get a value in a big map."
-      no_options
+      (args1 (unparsing_mode_arg ~default:"Readable"))
       ( prefixes ["get"; "element"]
       @@ Clic.param
            ~name:"key"
@@ -355,11 +355,12 @@ let commands network () =
            ~desc:"identifier of the big_map"
            int_parameter
       @@ stop )
-      (fun () key id (cctxt : Protocol_client_context.full) ->
+      (fun unparsing_mode key id (cctxt : Protocol_client_context.full) ->
         get_big_map_value
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
+          ~unparsing_mode
           (Big_map.Id.parse_z (Z.of_int id))
           key
         >>=? fun value ->

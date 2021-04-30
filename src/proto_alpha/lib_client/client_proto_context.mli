@@ -52,6 +52,7 @@ val get_big_map_value :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
+  unparsing_mode:Script_ir_translator.unparsing_mode ->
   Big_map.Id.t ->
   Script_expr_hash.t ->
   Script.expr tzresult Lwt.t
