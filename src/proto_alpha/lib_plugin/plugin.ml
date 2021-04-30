@@ -344,6 +344,26 @@ module RPC = struct
              (dft "entrypoint" string "default"))
           (obj1 (opt "unparsing_mode" unparsing_mode_encoding))
 
+      let run_code_output_encoding =
+        conv
+          (fun (storage, operations, lazy_storage_diff) ->
+            (storage, operations, lazy_storage_diff, lazy_storage_diff))
+          (fun ( storage,
+                 operations,
+                 legacy_lazy_storage_diff,
+                 lazy_storage_diff ) ->
+            let lazy_storage_diff =
+              Option.either lazy_storage_diff legacy_lazy_storage_diff
+            in
+            (storage, operations, lazy_storage_diff))
+          (obj4
+             (req "storage" Script.expr_encoding)
+             (req "operations" (list Operation.internal_operation_encoding))
+             (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
+             (opt "lazy_storage_diff" Lazy_storage.encoding))
+
+      let trace_code_input_encoding = run_code_input_encoding
+
       let trace_encoding =
         def "scripted.trace" @@ list
         @@ obj3
@@ -354,64 +374,60 @@ module RPC = struct
                 (list
                    (obj2 (req "item" Script.expr_encoding) (opt "annot" string))))
 
+      let trace_code_output_encoding =
+        conv
+          (fun (storage, operations, trace, lazy_storage_diff) ->
+            (storage, operations, trace, lazy_storage_diff, lazy_storage_diff))
+          (fun ( storage,
+                 operations,
+                 trace,
+                 legacy_lazy_storage_diff,
+                 lazy_storage_diff ) ->
+            let lazy_storage_diff =
+              Option.either lazy_storage_diff legacy_lazy_storage_diff
+            in
+            (storage, operations, trace, lazy_storage_diff))
+          (obj5
+             (req "storage" Script.expr_encoding)
+             (req "operations" (list Operation.internal_operation_encoding))
+             (req "trace" trace_encoding)
+             (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
+             (opt "lazy_storage_diff" Lazy_storage.encoding))
+
       let run_code =
         RPC_service.post_service
           ~description:"Run a piece of code in the current context"
           ~query:RPC_query.empty
           ~input:run_code_input_encoding
-          ~output:
-            (conv
-               (fun (storage, operations, lazy_storage_diff) ->
-                 (storage, operations, lazy_storage_diff, lazy_storage_diff))
-               (fun ( storage,
-                      operations,
-                      legacy_lazy_storage_diff,
-                      lazy_storage_diff ) ->
-                 let lazy_storage_diff =
-                   Option.either lazy_storage_diff legacy_lazy_storage_diff
-                 in
-                 (storage, operations, lazy_storage_diff))
-               (obj4
-                  (req "storage" Script.expr_encoding)
-                  (req
-                     "operations"
-                     (list Operation.internal_operation_encoding))
-                  (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
-                  (opt "lazy_storage_diff" Lazy_storage.encoding)))
+          ~output:run_code_output_encoding
           RPC_path.(path / "run_code")
+
+      let run_code_normalized =
+        RPC_service.post_service
+          ~description:
+            "Deprecated alias of the .../helpers/scripts/run_code RPC"
+          ~query:RPC_query.empty
+          ~input:run_code_input_encoding
+          ~output:run_code_output_encoding
+          RPC_path.(path / "run_code" / "normalized")
 
       let trace_code =
         RPC_service.post_service
           ~description:
             "Run a piece of code in the current context, keeping a trace"
           ~query:RPC_query.empty
-          ~input:run_code_input_encoding
-          ~output:
-            (conv
-               (fun (storage, operations, trace, lazy_storage_diff) ->
-                 ( storage,
-                   operations,
-                   trace,
-                   lazy_storage_diff,
-                   lazy_storage_diff ))
-               (fun ( storage,
-                      operations,
-                      trace,
-                      legacy_lazy_storage_diff,
-                      lazy_storage_diff ) ->
-                 let lazy_storage_diff =
-                   Option.either lazy_storage_diff legacy_lazy_storage_diff
-                 in
-                 (storage, operations, trace, lazy_storage_diff))
-               (obj5
-                  (req "storage" Script.expr_encoding)
-                  (req
-                     "operations"
-                     (list Operation.internal_operation_encoding))
-                  (req "trace" trace_encoding)
-                  (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
-                  (opt "lazy_storage_diff" Lazy_storage.encoding)))
+          ~input:trace_code_input_encoding
+          ~output:trace_code_output_encoding
           RPC_path.(path / "trace_code")
+
+      let trace_code_normalized =
+        RPC_service.post_service
+          ~description:
+            "Deprecated alias of the .../helpers/scripts/trace_code RPC"
+          ~query:RPC_query.empty
+          ~input:trace_code_input_encoding
+          ~output:trace_code_output_encoding
+          RPC_path.(path / "trace_code" / "normalized")
 
       let typecheck_code =
         RPC_service.post_service
