@@ -576,10 +576,48 @@ let test_dump {idx; block3b; _} =
         (fun () -> Lwt_unix.close context_fd))
   >>=! Lwt.return
 
+let test_is_empty {idx; block2; _} =
+  checkout idx block2
+  >>= function
+  | None ->
+      Assert.fail_msg "checkout block2"
+  | Some ctxt -> (
+      (* By [create_block2] above, [ctxt] maps "a/b", "a/c", and "version" *)
+      let etree = Context.Tree.empty ctxt in
+      Assert.equal_bool true (Tree.is_empty etree) ;
+      Context.find_tree ctxt ["a"]
+      >>= function
+      | None ->
+          Assert.fail_msg "dir 'a/' not found"
+      | Some dir_a ->
+          Tree.remove dir_a ["b"]
+          >>= fun dir_a ->
+          Tree.remove dir_a ["c"]
+          >>= fun dir_a ->
+          Tree.list dir_a []
+          >>= fun ls ->
+          let assert_equal_ls = Assert.make_equal_list ( = ) fst in
+          assert_equal_ls
+            ~msg:"length of directory /a/ is unexpectedly not 0"
+            []
+            ls ;
+          Assert.equal_context_hash
+            ~msg:
+              "A fresh empty tree has the same hash as a tree containing data \
+               after removing all its data"
+            (Tree.hash etree)
+            (Tree.hash dir_a) ;
+          Assert.equal_bool
+            ~msg:"directory /a/ is unexpectedly not empty"
+            true
+            (Context.Tree.is_empty dir_a) ;
+          Lwt.return_unit )
+
 (******************************************************************************)
 
 let tests : (string * (t -> unit Lwt.t)) list =
-  [ ("simple", test_simple);
+  [ ("is_empty", test_is_empty);
+    ("simple", test_simple);
     ("list", test_list);
     ("continuation", test_continuation);
     ("fork", test_fork);
