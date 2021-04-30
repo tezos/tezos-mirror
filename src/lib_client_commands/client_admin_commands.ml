@@ -122,4 +122,27 @@ let commands () =
         >>=? fun () ->
         cctxt#message "Operation %a is now banned." Operation_hash.pp op_hash
         >>= fun () -> return ());
+    command
+      ~group
+      ~desc:
+        "Remove an operation from the set of banned operations (nothing \
+         happens if it was not banned)."
+      no_options
+      (prefixes ["unban"; "operation"]
+      @@ operation_param ~name:"operation" ~desc:"hash of operation to unban"
+      @@ stop)
+      (fun () op_hash (cctxt : #Client_context.full) ->
+        Shell_services.Mempool.unban_operation cctxt ~chain:cctxt#chain op_hash
+        >>=? fun () ->
+        cctxt#message "Operation %a is now unbanned." Operation_hash.pp op_hash
+        >>= fun () -> return ());
+    command
+      ~group
+      ~desc:"Clear the set of banned operations."
+      no_options
+      (fixed ["unban"; "all"; "operations"])
+      (fun () (cctxt : #Client_context.full) ->
+        Shell_services.Mempool.unban_all_operations cctxt ~chain:cctxt#chain ()
+        >>=? fun () ->
+        cctxt#message "All operations are now unbanned." >>= fun () -> return ());
   ]

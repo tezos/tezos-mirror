@@ -856,6 +856,24 @@ module Make
            (Proto_services.S.Mempool.ban_operation RPC_path.open_root)
            (fun _pv () oph ->
              Worker.Queue.push_request_and_wait w (Request.Ban oph)) ;
+       (* Unban an operation (from its given hash): remove it from the
+          set pv.banned_operations (nothing happens if it was not banned). *)
+       dir :=
+         RPC_directory.register
+           !dir
+           (Proto_services.S.Mempool.unban_operation RPC_path.open_root)
+           (fun pv () oph ->
+             pv.shell.banned_operations <-
+               Operation_hash.Set.remove oph pv.shell.banned_operations ;
+             return_unit) ;
+       (* Unban all operations: clear the set pv.banned_operations. *)
+       dir :=
+         RPC_directory.register
+           !dir
+           (Proto_services.S.Mempool.unban_all_operations RPC_path.open_root)
+           (fun pv () () ->
+             pv.shell.banned_operations <- Operation_hash.Set.empty ;
+             return_unit) ;
        dir :=
          RPC_directory.register
            !dir

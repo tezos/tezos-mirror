@@ -950,6 +950,24 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~output:unit
           RPC_path.(path / "ban_operation")
 
+      let unban_operation path =
+        RPC_service.post_service
+          ~description:
+            "Remove an operation from the set of banned operations (nothing \
+             happens if it was not banned)."
+          ~query:RPC_query.empty
+          ~input:Operation_hash.encoding
+          ~output:unit
+          RPC_path.(path / "unban_operation")
+
+      let unban_all_operations path =
+        RPC_service.post_service
+          ~description:"Clear the set of banned operations."
+          ~query:RPC_query.empty
+          ~input:Data_encoding.empty
+          ~output:unit
+          RPC_path.(path / "unban_all_operations")
+
       let mempool_query =
         let open RPC_query in
         query (fun applied refused branch_refused branch_delayed ->
@@ -1229,6 +1247,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     let ban_operation ctxt ?(chain = `Main) op_hash =
       let s = S.Mempool.ban_operation (mempool_path chain_path) in
       RPC_context.make_call1 s ctxt chain () op_hash
+
+    let unban_operation ctxt ?(chain = `Main) op_hash =
+      let s = S.Mempool.unban_operation (mempool_path chain_path) in
+      RPC_context.make_call1 s ctxt chain () op_hash
+
+    let unban_all_operations ctxt ?(chain = `Main) () =
+      let s = S.Mempool.unban_all_operations (mempool_path chain_path) in
+      RPC_context.make_call1 s ctxt chain () ()
 
     let monitor_operations ctxt ?(chain = `Main) ?(applied = true)
         ?(branch_delayed = true) ?(branch_refused = false) ?(refused = false) ()

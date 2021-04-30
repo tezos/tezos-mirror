@@ -386,6 +386,18 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       Operation_hash.t ->
       unit Tezos_error_monad.Error_monad.tzresult Lwt.t
 
+    val unban_operation :
+      #simple ->
+      ?chain:chain ->
+      Operation_hash.t ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
+    val unban_all_operations :
+      #simple ->
+      ?chain:chain ->
+      unit ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
     val monitor_operations :
       #streamed ->
       ?chain:chain ->
@@ -604,6 +616,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       val ban_operation :
         ('a, 'b) RPC_path.t ->
         ([`POST], 'a, 'b, unit, Operation_hash.t, unit) RPC_service.t
+
+      val unban_operation :
+        ('a, 'b) RPC_path.t ->
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) RPC_service.t
+
+      val unban_all_operations :
+        ('a, 'b) RPC_path.t -> ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
 
       val monitor_operations :
         ('a, 'b) RPC_path.t ->
