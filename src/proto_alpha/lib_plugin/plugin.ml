@@ -295,39 +295,48 @@ module RPC = struct
 
     let opt_register0 s f =
       opt_register0_fullctxt s (fun {context; _} -> f context)
+
+    let register1_fullctxt s f =
+      patched_services :=
+        RPC_directory.register !patched_services s (fun (ctxt, arg) q i ->
+            Services_registration.rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
+
+    let register1 s f =
+      register1_fullctxt s (fun {context; _} x -> f context x)
   end
+
+  let unparsing_mode_encoding =
+    let open Script_ir_translator in
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [ case
+          (Tag 0)
+          ~title:"Readable"
+          (constant "Readable")
+          (function
+            | Readable -> Some () | Optimized | Optimized_legacy -> None)
+          (fun () -> Readable);
+        case
+          (Tag 1)
+          ~title:"Optimized"
+          (constant "Optimized")
+          (function
+            | Optimized -> Some () | Readable | Optimized_legacy -> None)
+          (fun () -> Optimized);
+        case
+          (Tag 2)
+          ~title:"Optimized_legacy"
+          (constant "Optimized_legacy")
+          (function
+            | Optimized_legacy -> Some () | Readable | Optimized -> None)
+          (fun () -> Optimized_legacy) ]
 
   module Scripts = struct
     module S = struct
       open Data_encoding
 
       let path = RPC_path.(path / "scripts")
-
-      let unparsing_mode_encoding =
-        let open Script_ir_translator in
-        union
-          ~tag_size:`Uint8
-          [ case
-              (Tag 0)
-              ~title:"Readable"
-              (constant "Readable")
-              (function
-                | Readable -> Some () | Optimized | Optimized_legacy -> None)
-              (fun () -> Readable);
-            case
-              (Tag 1)
-              ~title:"Optimized"
-              (constant "Optimized")
-              (function
-                | Optimized -> Some () | Readable | Optimized_legacy -> None)
-              (fun () -> Optimized);
-            case
-              (Tag 2)
-              ~title:"Optimized_legacy"
-              (constant "Optimized_legacy")
-              (function
-                | Optimized_legacy -> Some () | Readable | Optimized -> None)
-              (fun () -> Optimized_legacy) ]
 
       let run_code_input_encoding =
         merge_objs
@@ -1299,6 +1308,56 @@ module RPC = struct
       RPC_context.make_call0 S.list_entrypoints ctxt block () script
   end
 
+  module Contract = struct
+    module S = struct
+      let path =
+        ( RPC_path.(open_root / "context" / "contracts")
+          : RPC_context.t RPC_path.context )
+
+      let get_script_normalized =
+        let open Data_encoding in
+        RPC_service.post_service
+          ~description:
+            "Access the script of the contract and normalize it using the \
+             requested unparsing mode."
+          ~input:(obj1 (req "unparsing_mode" unparsing_mode_encoding))
+          ~query:RPC_query.empty
+          ~output:(option Script.encoding)
+          RPC_path.(path /: Contract.rpc_arg / "script" / "normalized")
+    end
+
+    let register () =
+      (* Patched RPC: get_script *)
+      Registration.register1
+        S.get_script_normalized
+        (fun ctxt contract () unparsing_mode ->
+          Contract.get_script ctxt contract
+          >>=? fun (ctxt, script) ->
+          match script with
+          | None ->
+              return_none
+          | Some script ->
+              let ctxt = Gas.set_unlimited ctxt in
+              let open Script_ir_translator in
+              parse_script
+                ctxt
+                ~legacy:true
+                ~allow_forged_in_storage:true
+                script
+              >>=? fun (Ex_script script, ctxt) ->
+              unparse_script ctxt unparsing_mode script
+              >>=? fun (script, _ctxt) -> return_some script)
+
+    let get_script_normalized ctxt block ~contract ~unparsing_mode =
+      RPC_context.make_call1
+        S.get_script_normalized
+        ctxt
+        block
+        contract
+        ()
+        unparsing_mode
+  end
+
   module Forge = struct
     module S = struct
       open Data_encoding
@@ -1629,6 +1688,7 @@ module RPC = struct
     Scripts.register () ;
     Forge.register () ;
     Parse.register () ;
+    Contract.register () ;
     Registration.register0 S.current_level (fun ctxt q () ->
         Level.from_raw ctxt ~offset:q.offset (Level.current ctxt).level
         |> return) ;

@@ -59,6 +59,7 @@ val get_script :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
+  unparsing_mode:Script_ir_translator.unparsing_mode ->
   Contract.t ->
   Script.t option tzresult Lwt.t
 

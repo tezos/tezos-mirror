@@ -363,12 +363,17 @@ let commands network () =
     command
       ~group
       ~desc:"Get the code of a contract."
-      no_options
+      (args1 (unparsing_mode_arg ~default:"Readable"))
       ( prefixes ["get"; "contract"; "code"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
-        get_script cctxt ~chain:cctxt#chain ~block:cctxt#block contract
+      (fun unparsing_mode (_, contract) (cctxt : Protocol_client_context.full) ->
+        get_script
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~unparsing_mode
+          contract
         >>=? function
         | None ->
             cctxt#error "This is not a smart contract."
