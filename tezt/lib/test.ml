@@ -516,36 +516,48 @@ let read_record_and_update_tests filename =
   in
   List.iter update_test (read_recorded_results filename)
 
-let suggest_jobs () =
-  let test_time test =
-    Summed_durations.total_nanoseconds test.past_records_successful_runs
-  in
-  let job_count = max 1 Cli.options.job_count in
-  (* [jobs] is an array of pairs where the first value is the total time of the job
-     and the second value is the list of tests that are currently allocated to this job. *)
-  let jobs = Array.make job_count (0L, []) in
-  let allocate test =
-    let smallest_job =
+(* Get a partition of weighted [items] where the total weights of each subset are
+   approximately close to each other. *)
+let knapsack (type a) bag_count (items : (int64 * a) list) :
+    (int64 * a list) array =
+  let bag_count = max 1 bag_count in
+  (* [bags] is an array of pairs where the first value is the total
+     weight of the bag and the second value is the list of items that
+     are currently allocated to this bag. *)
+  let bags = Array.make bag_count (0L, []) in
+  (* Finding the optimal partition is NP-complete.
+     We use a heuristic to find an approximation: allocate heavier items first,
+     then fill the gaps with smaller items. *)
+  let allocate (item_weight, item) =
+    let smallest_bag =
       let best_index = ref 0 in
-      let best_time = ref Int64.max_int in
-      for i = 0 to job_count - 1 do
-        let (job_time, _) = jobs.(i) in
-        if job_time < !best_time then (
+      let best_weight = ref Int64.max_int in
+      for i = 0 to bag_count - 1 do
+        let (bag_weight, _) = bags.(i) in
+        if bag_weight < !best_weight then (
           best_index := i ;
-          best_time := job_time )
+          best_weight := bag_weight )
       done ;
       !best_index
     in
-    let (job_time, job_tests) = jobs.(smallest_job) in
-    jobs.(smallest_job) <-
-      (Int64.add job_time (test_time test), test :: job_tests)
+    let (bag_weight, bag_items) = bags.(smallest_bag) in
+    bags.(smallest_bag) <- (Int64.add bag_weight item_weight, item :: bag_items)
   in
-  (* Finding the optimal partition is NP-complete.
-     We use a heuristic to find an approximation: allocate longest tests first,
-     then fill the gaps with smaller tests. *)
-  let longest_first a b = Int64.compare (test_time b) (test_time a) in
+  let longest_first (a, _) (b, _) = Int64.compare b a in
+  List.iter allocate (List.sort longest_first items) ;
+  bags
+
+let split_tests_into_balanced_jobs job_count =
+  let test_time test =
+    Summed_durations.total_nanoseconds test.past_records_successful_runs
+  in
   let tests = String_map.bindings !registered |> List.map snd in
-  List.iter allocate (List.sort longest_first tests) ;
+  let weighted_tests = List.map (fun test -> (test_time test, test)) tests in
+  knapsack job_count weighted_tests
+
+let suggest_jobs () =
+  let jobs = split_tests_into_balanced_jobs Cli.options.job_count in
+  let job_count = Array.length jobs in
   (* Jobs are allocated, now display them. *)
   let display_job ~negate (total_job_time, job_tests) =
     print_endline
