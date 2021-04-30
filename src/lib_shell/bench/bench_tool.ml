@@ -143,10 +143,6 @@ let rec choose_gaussian_nat (a, b) =
   let z = (z *. sigma) +. mu |> round in
   if z > a && z < b then z else choose_gaussian_nat (a, b)
 
-let list_shuffle l =
-  List.map (fun c -> (Random.bits (), c)) l
-  |> List.sort compare |> List.map snd
-
 (******************************************************************)
 
 type gen_state = {
@@ -239,7 +235,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
     gen_state.possible_transfers <-
       List.product l l |> List.filter (fun (a, b) -> a <> b) ;
     regenerate_transfers := false ) ;
-  gen_state.remaining_transfers <- list_shuffle gen_state.possible_transfers ;
+  gen_state.remaining_transfers <- TzList.shuffle gen_state.possible_transfers ;
   let nb_operations =
     min nb_operations_per_block (List.length gen_state.remaining_transfers)
   in
@@ -307,7 +303,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
                  inc ))
   >>=? fun inc ->
   (* (\* Shuffle the operations a bit (why not) *\)
-   * let operations = endorsements @ operations |> list_shuffle in *)
+   * let operations = endorsements @ operations |> TzList.shuffle in *)
   Incremental.finalize_block inc
 
 let init () =

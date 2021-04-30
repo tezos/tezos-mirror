@@ -410,12 +410,7 @@ let assert_block_is_well_baked block =
 
 let random_permutation list =
   assert (list <> []) ;
-  let array = Array.of_list list in
-  let with_randomness =
-    Array.map (fun elt -> (Random.int (Array.length array), elt)) array
-  in
-  Array.sort (fun (i, _) (j, _) -> Int.compare i j) with_randomness ;
-  Array.to_list (Array.map snd with_randomness)
+  Tezos_stdlib.TzList.shuffle list
 
 let single_baker_increasing_fees state ~account : mempool Lwt.t =
   let* branch = get_current_head_hash state in
