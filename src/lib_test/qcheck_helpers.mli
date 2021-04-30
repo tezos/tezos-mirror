@@ -59,12 +59,28 @@ val qcheck_eq' :
   unit ->
   bool
 
-(** [int64_range a b] generates an [int64] between [a] inclusive and [b] inclusive.
+(** [int64_range_gen a b] generates an [int64] between [a] inclusive
+    and [b] inclusive.
 
-    Poorman's implementation until https://github.com/c-cube/qcheck/issues/105 is done.
+    Poorman's implementation until
+    https://github.com/c-cube/qcheck/issues/105 is done.
 
     This probably spectacularly crashes if [(b - a) > Int64.max_int]. *)
+val int64_range_gen : int64 -> int64 -> int64 QCheck.Gen.t
+
 val int64_range : int64 -> int64 -> int64 QCheck.arbitrary
+
+(** [int_strictly_positive_gen x] generates an [int] between [1] inclusive
+    and [x] inclusive.
+
+    This will fail if [x] is not strictly positive. *)
+val int_strictly_positive_gen : int -> int QCheck.Gen.t
+
+(** [int64_strictly_positive_gen x] generates an [int64] between [1] inclusive
+    and [x] inclusive.
+
+    This will fail if [x] is not strictly positive. *)
+val int64_strictly_positive_gen : int64 -> int64 QCheck.Gen.t
 
 (** [of_option_gen gen] converts a generator [gen] of optional values into a
     generator of values by rerunning the generator if the generated value

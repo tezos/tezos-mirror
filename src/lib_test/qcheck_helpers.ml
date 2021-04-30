@@ -50,15 +50,18 @@ let qcheck_eq ?pp ?cmp ?eq expected actual =
 let qcheck_eq' ?pp ?cmp ?eq ~expected ~actual () =
   qcheck_eq ?pp ?cmp ?eq expected actual
 
-let int64_range a b =
-  let int64_range_gen st =
-    let range = Int64.sub b a in
-    let raw_val = Random.State.int64 st range in
-    let res = Int64.add a raw_val in
-    assert (a <= res && res <= b) ;
-    res
-  in
-  QCheck.int64 |> QCheck.set_gen int64_range_gen
+let int64_range_gen a b st =
+  let range = Int64.sub b a in
+  let raw_val = Random.State.int64 st range in
+  let res = Int64.add a raw_val in
+  assert (a <= res && res <= b) ;
+  res
+
+let int64_range a b = QCheck.int64 |> QCheck.set_gen (int64_range_gen a b)
+
+let int_strictly_positive_gen = QCheck.Gen.int_range 1
+
+let int64_strictly_positive_gen = int64_range_gen 1L
 
 let endpoint_arb =
   let open QCheck in

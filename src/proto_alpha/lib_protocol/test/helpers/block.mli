@@ -106,6 +106,7 @@ val genesis :
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
+  ?liquidity_baking_subsidy:Tez.t ->
   (Account.t * Tez.tez) list ->
   block tzresult Lwt.t
 
@@ -209,6 +210,7 @@ val prepare_initial_context_params :
   ?min_proposal_quorum:int32 ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
+  ?liquidity_baking_subsidy:Tez.t ->
   (Account.t * Tez.t) list ->
   ( Constants.parametric * Block_header.shell_header * Block_hash.t,
     tztrace )

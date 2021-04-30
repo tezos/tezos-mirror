@@ -408,7 +408,8 @@ let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
 
 let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
     ?time_between_blocks ?minimal_block_delay ?delay_per_missing_endorsement
-    ?min_proposal_quorum ?level ?cost_per_byte initial_accounts =
+    ?min_proposal_quorum ?level ?cost_per_byte ?liquidity_baking_subsidy
+    initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let endorsers_per_block =
@@ -434,6 +435,11 @@ let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
   let cost_per_byte =
     Option.value ~default:constants.cost_per_byte cost_per_byte
   in
+  let liquidity_baking_subsidy =
+    Option.value
+      ~default:constants.liquidity_baking_subsidy
+      liquidity_baking_subsidy
+  in
   let constants =
     {
       constants with
@@ -444,6 +450,7 @@ let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
       minimal_block_delay;
       delay_per_missing_endorsement;
       cost_per_byte;
+      liquidity_baking_subsidy;
     }
   in
   (* Check there is at least one roll *)
@@ -481,7 +488,7 @@ let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
 let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     ?min_proposal_quorum ?time_between_blocks ?minimal_block_delay
     ?delay_per_missing_endorsement ?bootstrap_contracts ?level ?cost_per_byte
-    (initial_accounts : (Account.t * Tez.t) list) =
+    ?liquidity_baking_subsidy (initial_accounts : (Account.t * Tez.t) list) =
   prepare_initial_context_params
     ?endorsers_per_block
     ?initial_endorsers
@@ -491,6 +498,7 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     ?delay_per_missing_endorsement
     ?level
     ?cost_per_byte
+    ?liquidity_baking_subsidy
     initial_accounts
   >>=? fun (constants, shell, hash) ->
   initial_context
