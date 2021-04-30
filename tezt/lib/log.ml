@@ -54,6 +54,7 @@ let channel =
         starting_port = _;
         record = _;
         from_records = _;
+        job = _;
         job_count = _;
         suggest_jobs;
         junit = _ } =

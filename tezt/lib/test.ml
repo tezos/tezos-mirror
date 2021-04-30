@@ -555,6 +555,26 @@ let split_tests_into_balanced_jobs job_count =
   let weighted_tests = List.map (fun test -> (test_time test, test)) tests in
   knapsack job_count weighted_tests
 
+(* Apply --job: take the list of registered tests, split it into jobs,
+   and unregister all tests that are not selected by --job. *)
+let select_job () =
+  match Cli.options.job with
+  | None ->
+      (* No --job: do not unregister any test. *)
+      ()
+  | Some (job_index, job_count) ->
+      let jobs = split_tests_into_balanced_jobs job_count in
+      (* [Cli] ensures that [1 <= job_index <= job_count],
+         and [split_tests_into_balanced_jobs] ensures that its result
+         has length [job_count] if [job_count >= 1]. *)
+      let (_, job_tests) = jobs.(job_index - 1) in
+      (* Reset the list of tests to run to re-fill it with the requested job. *)
+      registered := String_map.empty ;
+      List.iter
+        (fun (test : test) ->
+          registered := String_map.add test.title test !registered)
+        job_tests
+
 let suggest_jobs () =
   let jobs = split_tests_into_balanced_jobs Cli.options.job_count in
   let job_count = Array.length jobs in
@@ -728,6 +748,8 @@ let run () =
         "You can use --list to get the list of tests and their tags." ) ;
   (* Read records. *)
   List.iter read_record_and_update_tests Cli.options.from_records ;
+  (* Apply --job if needed. *)
+  select_job () ;
   (* Actually run the tests (or list them). *)
   match (Cli.options.list, Cli.options.suggest_jobs) with
   | (Some format, false) ->

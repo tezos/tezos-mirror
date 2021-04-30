@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Base
+
 type log_level = Quiet | Error | Warn | Report | Info | Debug
 
 type temporary_file_mode = Delete | Delete_if_successful | Keep
@@ -52,6 +54,7 @@ type options = {
   starting_port : int;
   record : string option;
   from_records : string list;
+  job : (int * int) option;
   job_count : int;
   suggest_jobs : bool;
   junit : string option;
@@ -81,6 +84,7 @@ let options =
   let starting_port = ref 16384 in
   let record = ref None in
   let from_records = ref [] in
+  let job = ref None in
   let job_count = ref 3 in
   let suggest_jobs = ref false in
   let junit = ref None in
@@ -107,6 +111,29 @@ let options =
   let set_loop_count value =
     if value < 0 then raise (Arg.Bad "--loop-count must be positive or null") ;
     loop_mode := Count value
+  in
+  let set_job value =
+    match value =~** rex "^([0-9]+)/([0-9]+)$" with
+    | None ->
+        raise
+          (Arg.Bad
+             "--job must be of the form: X/Y where X and Y are positive \
+              integers")
+    | Some (index, count) ->
+        let int s =
+          match int_of_string_opt s with
+          | None ->
+              raise (Arg.Bad ("value too large: " ^ s))
+          | Some i ->
+              i
+        in
+        let index = int index in
+        let count = int count in
+        if index < 1 then raise (Arg.Bad "--job index must be at least 1")
+        else if count < 1 then raise (Arg.Bad "--job count must be at least 1")
+        else if index > count then
+          raise (Arg.Bad "--job index cannot be greater than job count")
+        else job := Some (index, count)
   in
   let spec =
     Arg.align
@@ -231,6 +258,22 @@ let options =
            found in record files. When using --record, the new record which \
            is output does NOT include the input records. When using --junit, \
            reports do NOT include input records." );
+        ( "--job",
+          Arg.String set_job,
+          "<INDEX>/<COUNT> COUNT must be at least 1 and INDEX must be between \
+           1 and COUNT. Use --from-record to feed duration data from past \
+           runs. Split the set of selected tests (see SELECTING TESTS) into \
+           COUNT subsets of roughly the same total duration. Execute only one \
+           of these subsets, specified by INDEX. Tests for which no time data \
+           is available are given a default duration of 1 second. You can use \
+           --list to see what tests are in a subset without actually running \
+           the tests. A typical use is to run tests in parallel on different \
+           machines. For instance, have one machine run with --job 1/3, one \
+           with --job 2/3 and one with --job 3/3. Be sure to provide exactly \
+           the same records with --from-record, in the same order, and to \
+           select exactly the same set of tests (same tags, same --file and \
+           same --test) for all machines, otherwise some tests may not be run \
+           at all." );
         ( "--job-count",
           Arg.Int set_job_count,
           "<COUNT> Set the number of target jobs for --suggest-jobs (default \
@@ -242,7 +285,11 @@ let options =
            suggest a partition of the tests that would result in --job-count \
            sets of roughly the same total duration. Output each job as a list \
            of flags that can be passed to Tezt, followed by a shell comment \
-           that denotes the expected duration of the job." );
+           that denotes the expected duration of the job. A similar result \
+           can be obtained with --list --job, except that the last job \
+           suggested by --suggest-jobs uses --not-test to express \"all tests \
+           that are not already in other jobs\", meaning that the last job \
+           acts as a catch-all for unknown tests." );
         ( "--junit",
           Arg.String (fun path -> junit := Some path),
           "<FILE> Store test results in FILE using JUnit XML format. Time \
@@ -307,6 +354,7 @@ let options =
     starting_port = !starting_port;
     record = !record;
     from_records = List.rev !from_records;
+    job = !job;
     job_count = !job_count;
     suggest_jobs = !suggest_jobs;
     junit = !junit;
