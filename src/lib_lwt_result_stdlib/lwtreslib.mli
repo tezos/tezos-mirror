@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {1 Lwtreslib: the Lwt- and result-aware Stdlib complement.
+(** {1 Lwtreslib: the Lwt- and result-aware Stdlib complement}
 
     Lwtreslib (or Lwt-result-stdlib) is a library to complement the OCaml's
     Stdlib in software projects that make heavy use of Lwt and the result type.
