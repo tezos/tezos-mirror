@@ -34,8 +34,8 @@
 
     All traversal functions that are suffixed with [_e] are within the result
     monad. Note that these functions have a "fail-early" behaviour: the
-    traversal is interrupted as when any of the intermediate application fails
-    (i.e., returns an [Error _]).
+    traversal is interrupted as soon as any of the intermediate application
+    fails (i.e., returns an [Error _]).
 
     All traversal functions that are suffixed with [_s] are within the Lwt
     monad. These functions traverse the elements sequentially: the promise for a
