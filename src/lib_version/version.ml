@@ -42,6 +42,6 @@ let to_string {major; minor; additional_info} =
   string_of_int major ^ "." ^ string_of_int minor
   ^ string_of_additional_info additional_info
 
-let current = {major = 9; minor = 0; additional_info = Dev}
+let current = {major = 9; minor = 1; additional_info = Dev}
 
 let current_string = to_string current
