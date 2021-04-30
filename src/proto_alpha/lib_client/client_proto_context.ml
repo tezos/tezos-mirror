@@ -50,6 +50,21 @@ let get_contract_big_map_value (rpc : #rpc_context) ~chain ~block contract key
 let get_script (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.script_opt rpc (chain, block) contract
 
+let get_script_hash (rpc : #rpc_context) ~chain ~block contract =
+  Alpha_services.Contract.script_opt rpc (chain, block) contract
+  >>=? fun script_opt ->
+  Lwt.return @@ Environment.wrap_tzresult
+  @@ Option.map_e
+       (fun {Script.code; storage = _} ->
+         Script_repr.force_decode code
+         >>? fun (code, _) ->
+         let bytes =
+           Data_encoding.Binary.to_bytes_exn Script.expr_encoding code
+         in
+         let hash = Script_expr_hash.hash_bytes [bytes] in
+         ok hash)
+       script_opt
+
 let parse_expression arg =
   Lwt.return
     (Micheline_parser.no_parsing_error

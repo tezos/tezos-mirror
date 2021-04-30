@@ -389,20 +389,14 @@ let commands network () =
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
-        get_script cctxt ~chain:cctxt#chain ~block:cctxt#block contract
-        >>=? function
-        | None ->
+        get_script_hash cctxt ~chain:cctxt#chain ~block:cctxt#block contract
+        >>= function
+        | Error errs ->
+            cctxt#error "%a" pp_print_error errs
+        | Ok None ->
             cctxt#error "This is not a smart contract."
-        | Some {code; storage = _} -> (
-          match Script_repr.force_decode code with
-          | Error errs ->
-              cctxt#error "%a" Environment.Error_monad.pp_trace errs
-          | Ok (code, _) ->
-              let bytes =
-                Data_encoding.Binary.to_bytes_exn Script.expr_encoding code
-              in
-              let hash = Script_expr_hash.hash_bytes [bytes] in
-              cctxt#answer "%a" Script_expr_hash.pp hash >|= ok ));
+        | Ok (Some hash) ->
+            cctxt#answer "%a" Script_expr_hash.pp hash >|= ok);
     command
       ~group
       ~desc:"Get the type of an entrypoint of a contract."

@@ -62,6 +62,13 @@ val get_script :
   Contract.t ->
   Script.t option tzresult Lwt.t
 
+val get_script_hash :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract.t ->
+  Script_expr_hash.t option tzresult Lwt.t
+
 val get_balance :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
