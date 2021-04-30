@@ -939,7 +939,9 @@ module Chain = struct
           seed
         >>= Lwt.return_some
 
-  (* Hypothesis: \forall x. x \in current_head \union alternate_heads | new_head is not a predecessor of x *)
+  (* Hypothesis:
+     \forall x. x \in current_head \union alternate_heads | new_head
+     is not a predecessor of x *)
   let locked_update_and_trim_alternate_heads chain_store chain_state
       ~new_checkpoint ~new_head =
     Stored_data.get chain_state.current_head_data >>= fun prev_head_descr ->
@@ -949,8 +951,16 @@ module Chain = struct
     is_ancestor chain_store ~head:new_head_descr ~ancestor:prev_head_descr
     >>= function
     | true ->
-        (* If the new head is a successor of prev_head, do nothing. *)
-        Lwt.return prev_alternate_heads
+        (* If the new head is a successor of prev_head, do nothing
+           particular, just trim alternate heads which are anchored
+           below the checkpoint. *)
+        Lwt_list.filter_s
+          (fun alternate_head ->
+            is_ancestor
+              chain_store
+              ~head:alternate_head
+              ~ancestor:new_checkpoint)
+          prev_alternate_heads
     | false ->
         (* If the new head is not a successor of prev_head. *)
         (* 2 cases:
@@ -966,7 +976,7 @@ module Chain = struct
             | true ->
                 (* If the new head is a successor of a former
                    alternate_head, remove it from the alternate heads,
-                   it will be added updated as the current head *)
+                   it will be updated as the current head *)
                 Lwt.return_false
             | false ->
                 (* Only retain alternate_heads that are successor of the
