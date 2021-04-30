@@ -1,3 +1,25 @@
+Version 9.1
+===========
+
+Node
+----
+
+-  Fixed a performance issue that caused the node to freeze for several minutes
+   and memory usage to rise to unexpected levels.
+
+-  Reintroduced the following RPCs in the Florence RPC plugin. These
+   RPCs were already present in the Edo protocol plugin and were removed
+   by mistake when moving the functionality they offer to the Florence
+   protocol:
+
+   - ``../<block_id>/context/contracts/<contract_id>/storage/normalized``
+   - ``../<block_id>/context/contracts/<contract_id>/script/normalized``
+   - ``../<block_id>/context/big_maps/<big_map_id>/<script_expr>/normalized``
+   - ``../<block_id>/helpers/scripts/run_code/normalized``
+     (deprecated alias of ``../<block_id>/helpers/scripts/run_code``)
+   - ``../<block_id>/helpers/scripts/trace_code/normalized``
+     (deprecated alias of ``../<block_id>/helpers/scripts/trace_code``)
+
 Version 9.0
 ===========
 
