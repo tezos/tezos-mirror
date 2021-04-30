@@ -53,6 +53,7 @@ let channel =
         time = _;
         starting_port = _;
         record = _;
+        from_records = _;
         job_count = _;
         suggest_jobs;
         junit = _ } =
@@ -60,7 +61,7 @@ let channel =
   in
   if
     (match list with None -> false | Some (`Ascii_art | `Tsv) -> true)
-    || match suggest_jobs with None -> false | Some _ -> true
+    || suggest_jobs
   then stderr
   else stdout
 

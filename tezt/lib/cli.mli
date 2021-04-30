@@ -83,8 +83,9 @@ type options = {
   time : bool;
   starting_port : int;
   record : string option;
+  from_records : string list;
   job_count : int;
-  suggest_jobs : string option;
+  suggest_jobs : bool;
   junit : string option;
 }
 
