@@ -5527,25 +5527,33 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                908,
-                                                                               I_SWAP,
-                                                                               [],
-                                                                               []
-                                                                               );
+                                                                               I_PUSH,
+                                                                               [ 
                                                                                Prim
                                                                                ( 
                                                                                909,
-                                                                               I_DUP,
+                                                                               T_nat,
                                                                                [],
+                                                                               []
+                                                                               );
+                                                                               Int
+                                                                               ( 
+                                                                               910,
+                                                                               Z
+                                                                               .of_int
+                                                                               999
+                                                                               )
+                                                                               ],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               910,
-                                                                               I_DUG,
+                                                                               911,
+                                                                               I_DIG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               911,
+                                                                               912,
                                                                                Z
                                                                                .of_int
                                                                                2
@@ -5555,35 +5563,64 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               912,
+                                                                               913,
+                                                                               I_DUP,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               914,
+                                                                               I_DUG,
+                                                                               [ 
+                                                                               Int
+                                                                               ( 
+                                                                               915,
+                                                                               Z
+                                                                               .of_int
+                                                                               3
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               916,
+                                                                               I_MUL,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               917,
                                                                                I_EDIV,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               913,
+                                                                               918,
                                                                                I_IF_NONE,
                                                                                [ 
                                                                                Seq
                                                                                ( 
-                                                                               914,
+                                                                               919,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               915,
+                                                                               920,
                                                                                I_PUSH,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               916,
+                                                                               921,
                                                                                T_string,
                                                                                [],
                                                                                []
                                                                                );
                                                                                String
                                                                                ( 
-                                                                               917,
+                                                                               922,
                                                                                "DIV \
                                                                                by \
                                                                                0"
@@ -5593,7 +5630,7 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               918,
+                                                                               923,
                                                                                I_FAILWITH,
                                                                                [],
                                                                                []
@@ -5602,7 +5639,7 @@ let script =
                                                                                );
                                                                                Seq
                                                                                ( 
-                                                                               919,
+                                                                               924,
                                                                                []
                                                                                )
                                                                                ],
@@ -5610,48 +5647,19 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               920,
+                                                                               925,
                                                                                I_CAR,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               921,
-                                                                               I_DUP,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               922,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               923,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               924,
-                                                                               I_SUB,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               925,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
                                                                                926,
+                                                                               I_DIG,
+                                                                               [ 
+                                                                               Int
+                                                                               ( 
+                                                                               927,
                                                                                Z
                                                                                .of_int
                                                                                7
@@ -5661,19 +5669,19 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               927,
+                                                                               928,
                                                                                I_DUP,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               928,
+                                                                               929,
                                                                                I_DUG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               929,
+                                                                               930,
                                                                                Z
                                                                                .of_int
                                                                                8
@@ -5683,19 +5691,19 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               930,
+                                                                               931,
                                                                                I_CDR,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               931,
+                                                                               932,
                                                                                I_DIG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               932,
+                                                                               933,
                                                                                Z
                                                                                .of_int
                                                                                4
@@ -5705,19 +5713,19 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               933,
+                                                                               934,
                                                                                I_DUP,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               934,
+                                                                               935,
                                                                                I_DUG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               935,
+                                                                               936,
                                                                                Z
                                                                                .of_int
                                                                                5
@@ -5727,12 +5735,12 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               936,
+                                                                               937,
                                                                                I_DIG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               937,
+                                                                               938,
                                                                                Z
                                                                                .of_int
                                                                                9
@@ -5742,19 +5750,19 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               938,
+                                                                               939,
                                                                                I_DUP,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               939,
+                                                                               940,
                                                                                I_DUG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               940,
+                                                                               941,
                                                                                Z
                                                                                .of_int
                                                                                10
@@ -5764,36 +5772,29 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               941,
+                                                                               942,
                                                                                I_CAR,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               942,
+                                                                               943,
                                                                                I_ADD,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               943,
+                                                                               944,
                                                                                I_PAIR,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               944,
-                                                                               I_DUP,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
                                                                                945,
-                                                                               I_CDR,
+                                                                               I_DUP,
                                                                                [],
                                                                                []
                                                                                );
@@ -5807,48 +5808,40 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                947,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               948,
-                                                                               Z
-                                                                               .of_int
-                                                                               3
-                                                                               )
-                                                                               ],
+                                                                               I_CDR,
+                                                                               [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
+                                                                               948,
+                                                                               I_DIG,
+                                                                               [ 
+                                                                               Int
+                                                                               ( 
                                                                                949,
-                                                                               I_DUP,
-                                                                               [],
+                                                                               Z
+                                                                               .of_int
+                                                                               2
+                                                                               )
+                                                                               ],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
                                                                                950,
-                                                                               I_DUG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               951,
-                                                                               Z
-                                                                               .of_int
-                                                                               4
-                                                                               )
-                                                                               ],
+                                                                               I_DUP,
+                                                                               [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               952,
-                                                                               I_DIG,
+                                                                               951,
+                                                                               I_DUG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               953,
+                                                                               952,
                                                                                Z
                                                                                .of_int
                                                                                3
@@ -5858,45 +5851,51 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
+                                                                               953,
+                                                                               I_DIG,
+                                                                               [ 
+                                                                               Int
+                                                                               ( 
                                                                                954,
-                                                                               I_DUP,
-                                                                               [],
+                                                                               Z
+                                                                               .of_int
+                                                                               10
+                                                                               )
+                                                                               ],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
                                                                                955,
-                                                                               I_DUG,
-                                                                               [ 
-                                                                               Int
+                                                                               I_CDR,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
                                                                                ( 
                                                                                956,
-                                                                               Z
-                                                                               .of_int
-                                                                               4
-                                                                               )
-                                                                               ],
+                                                                               I_CAR,
+                                                                               [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
                                                                                957,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
+                                                                               I_SUB,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
                                                                                ( 
                                                                                958,
-                                                                               Z
-                                                                               .of_int
-                                                                               11
-                                                                               )
-                                                                               ],
+                                                                               I_PAIR,
+                                                                               [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
                                                                                959,
-                                                                               I_CDR,
+                                                                               I_SWAP,
                                                                                [],
                                                                                []
                                                                                );
@@ -5910,35 +5909,36 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                961,
-                                                                               I_SUB,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               962,
-                                                                               I_SUB,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               963,
                                                                                I_PAIR,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
+                                                                               962,
+                                                                               I_DIG,
+                                                                               [ 
+                                                                               Int
+                                                                               ( 
+                                                                               963,
+                                                                               Z
+                                                                               .of_int
+                                                                               4
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
                                                                                964,
-                                                                               I_SWAP,
+                                                                               I_SELF,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
                                                                                965,
-                                                                               I_CAR,
+                                                                               I_ADDRESS,
                                                                                [],
                                                                                []
                                                                                );
@@ -5952,80 +5952,79 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                967,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               968,
-                                                                               Z
-                                                                               .of_int
-                                                                               4
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               969,
-                                                                               I_SELF,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               970,
-                                                                               I_ADDRESS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               971,
-                                                                               I_PAIR,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               972,
                                                                                I_SENDER,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               973,
+                                                                               968,
                                                                                I_PAIR,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               974,
+                                                                               969,
                                                                                I_SWAP,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               975,
+                                                                               970,
                                                                                I_DUP,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               976,
+                                                                               971,
                                                                                I_DUG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               977,
+                                                                               972,
                                                                                Z
                                                                                .of_int
                                                                                2
                                                                                )
                                                                                ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               973,
+                                                                               I_SWAP,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               974,
+                                                                               I_DUP,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               975,
+                                                                               I_CDR,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               976,
+                                                                               I_SWAP,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               977,
+                                                                               I_CAR,
+                                                                               [],
                                                                                []
                                                                                );
                                                                                Prim
@@ -6066,15 +6065,16 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                983,
-                                                                               I_SWAP,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
+                                                                               I_DIG,
+                                                                               [ 
+                                                                               Int
                                                                                ( 
                                                                                984,
-                                                                               I_DUP,
-                                                                               [],
+                                                                               Z
+                                                                               .of_int
+                                                                               3
+                                                                               )
+                                                                               ],
                                                                                []
                                                                                );
                                                                                Prim
@@ -6087,92 +6087,56 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                986,
-                                                                               I_SWAP,
+                                                                               I_CDR,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
                                                                                987,
-                                                                               I_CAR,
+                                                                               I_CDR,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
                                                                                988,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               989,
-                                                                               Z
-                                                                               .of_int
-                                                                               3
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               990,
-                                                                               I_CDR,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               991,
-                                                                               I_CDR,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               992,
-                                                                               I_CDR,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               993,
                                                                                I_CAR,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               994,
+                                                                               989,
                                                                                I_CONTRACT,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               995,
+                                                                               990,
                                                                                T_pair,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               996,
+                                                                               991,
                                                                                T_address,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               997,
+                                                                               992,
                                                                                T_pair,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               998,
+                                                                               993,
                                                                                T_address,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               999,
+                                                                               994,
                                                                                T_nat,
                                                                                [],
                                                                                []
@@ -6190,13 +6154,51 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1000,
+                                                                               995,
                                                                                I_IF_NONE,
                                                                                [ 
                                                                                Seq
                                                                                ( 
-                                                                               1001,
+                                                                               996,
                                                                                [ 
+                                                                               Prim
+                                                                               ( 
+                                                                               997,
+                                                                               I_PUSH,
+                                                                               [ 
+                                                                               Prim
+                                                                               ( 
+                                                                               998,
+                                                                               T_nat,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Int
+                                                                               ( 
+                                                                               999,
+                                                                               Z
+                                                                               .zero
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1000,
+                                                                               I_FAILWITH,
+                                                                               [],
+                                                                               []
+                                                                               )
+                                                                               ]
+                                                                               );
+                                                                               Seq
+                                                                               ( 
+                                                                               1001,
+                                                                               []
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
                                                                                Prim
                                                                                ( 
                                                                                1002,
@@ -6205,7 +6207,7 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                1003,
-                                                                               T_nat,
+                                                                               T_mutez,
                                                                                [],
                                                                                []
                                                                                );
@@ -6221,16 +6223,14 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                1005,
-                                                                               I_FAILWITH,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                               ]
-                                                                               );
-                                                                               Seq
+                                                                               I_DIG,
+                                                                               [ 
+                                                                               Int
                                                                                ( 
                                                                                1006,
-                                                                               []
+                                                                               Z
+                                                                               .of_int
+                                                                               3
                                                                                )
                                                                                ],
                                                                                []
@@ -6238,22 +6238,23 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                1007,
-                                                                               I_PUSH,
+                                                                               I_DIG,
                                                                                [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1008,
-                                                                               T_mutez,
-                                                                               [],
-                                                                               []
-                                                                               );
                                                                                Int
                                                                                ( 
-                                                                               1009,
+                                                                               1008,
                                                                                Z
-                                                                               .zero
+                                                                               .of_int
+                                                                               3
                                                                                )
                                                                                ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1009,
+                                                                               I_PAIR,
+                                                                               [],
                                                                                []
                                                                                );
                                                                                Prim
@@ -6274,58 +6275,58 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                1012,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
+                                                                               I_PAIR,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
                                                                                ( 
                                                                                1013,
-                                                                               Z
-                                                                               .of_int
-                                                                               3
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1014,
-                                                                               I_PAIR,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1015,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1016,
-                                                                               Z
-                                                                               .of_int
-                                                                               3
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1017,
-                                                                               I_PAIR,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1018,
                                                                                I_TRANSFER_TOKENS,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1019,
+                                                                               1014,
                                                                                I_DIG,
+                                                                               [ 
+                                                                               Int
+                                                                               ( 
+                                                                               1015,
+                                                                               Z
+                                                                               .of_int
+                                                                               4
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1016,
+                                                                               I_DIG,
+                                                                               [ 
+                                                                               Int
+                                                                               ( 
+                                                                               1017,
+                                                                               Z
+                                                                               .of_int
+                                                                               3
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1018,
+                                                                               I_DUP,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1019,
+                                                                               I_DUG,
                                                                                [ 
                                                                                Int
                                                                                ( 
@@ -6347,7 +6348,7 @@ let script =
                                                                                1022,
                                                                                Z
                                                                                .of_int
-                                                                               3
+                                                                               6
                                                                                )
                                                                                ],
                                                                                []
@@ -6362,7 +6363,7 @@ let script =
                                                                                1024,
                                                                                Z
                                                                                .of_int
-                                                                               5
+                                                                               8
                                                                                )
                                                                                ],
                                                                                []
@@ -6370,11 +6371,18 @@ let script =
                                                                                Prim
                                                                                ( 
                                                                                1025,
+                                                                               I_PAIR,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1026,
                                                                                I_DIG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               1026,
+                                                                               1027,
                                                                                Z
                                                                                .of_int
                                                                                7
@@ -6384,69 +6392,41 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1027,
+                                                                               1028,
                                                                                I_PAIR,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
-                                                                               ( 
-                                                                               1028,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
                                                                                ( 
                                                                                1029,
-                                                                               Z
-                                                                               .of_int
-                                                                               6
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1030,
-                                                                               I_PAIR,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1031,
                                                                                I_TRANSFER_TOKENS,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1032,
-                                                                               I_PUSH,
+                                                                               1030,
+                                                                               I_DIG,
                                                                                [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1033,
-                                                                               T_mutez,
-                                                                               [],
-                                                                               []
-                                                                               );
                                                                                Int
                                                                                ( 
-                                                                               1034,
+                                                                               1031,
                                                                                Z
-                                                                               .zero
+                                                                               .of_int
+                                                                               3
                                                                                )
                                                                                ],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1035,
+                                                                               1032,
                                                                                I_DIG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               1036,
+                                                                               1033,
                                                                                Z
                                                                                .of_int
                                                                                4
@@ -6456,79 +6436,26 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1037,
-                                                                               I_DUP,
+                                                                               1034,
+                                                                               I_SUB,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1038,
-                                                                               I_DUG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1039,
-                                                                               Z
-                                                                               .of_int
-                                                                               5
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1040,
-                                                                               I_COMPARE,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1041,
-                                                                               I_GT,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1042,
-                                                                               I_IF,
-                                                                               [ 
-                                                                               Seq
-                                                                               ( 
-                                                                               1043,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1044,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1045,
-                                                                               Z
-                                                                               .of_int
-                                                                               3
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1046,
+                                                                               1035,
                                                                                I_PUSH,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1047,
+                                                                               1036,
                                                                                T_address,
                                                                                [],
                                                                                []
                                                                                );
                                                                                String
                                                                                ( 
-                                                                               1048,
+                                                                               1037,
                                                                                "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
                                                                                )
                                                                                ],
@@ -6536,12 +6463,12 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1049,
+                                                                               1038,
                                                                                I_CONTRACT,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1050,
+                                                                               1039,
                                                                                T_unit,
                                                                                [],
                                                                                []
@@ -6551,28 +6478,28 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1051,
+                                                                               1040,
                                                                                I_IF_NONE,
                                                                                [ 
                                                                                Seq
                                                                                ( 
-                                                                               1052,
+                                                                               1041,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1053,
+                                                                               1042,
                                                                                I_PUSH,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1054,
+                                                                               1043,
                                                                                T_nat,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Int
                                                                                ( 
-                                                                               1055,
+                                                                               1044,
                                                                                Z
                                                                                .of_int
                                                                                9
@@ -6582,7 +6509,7 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1056,
+                                                                               1045,
                                                                                I_FAILWITH,
                                                                                [],
                                                                                []
@@ -6591,7 +6518,7 @@ let script =
                                                                                );
                                                                                Seq
                                                                                ( 
-                                                                               1057,
+                                                                               1046,
                                                                                []
                                                                                )
                                                                                ],
@@ -6599,26 +6526,26 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1058,
+                                                                               1047,
                                                                                I_SWAP,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1059,
+                                                                               1048,
                                                                                I_PUSH,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1060,
+                                                                               1049,
                                                                                T_unit,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1061,
+                                                                               1050,
                                                                                D_Unit,
                                                                                [],
                                                                                []
@@ -6628,226 +6555,112 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1062,
+                                                                               1051,
                                                                                I_TRANSFER_TOKENS,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1063,
+                                                                               1052,
                                                                                I_DIG,
                                                                                [ 
                                                                                Int
                                                                                ( 
-                                                                               1064,
+                                                                               1053,
                                                                                Z
                                                                                .of_int
                                                                                3
                                                                                )
                                                                                ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1054,
+                                                                               I_NIL,
+                                                                               [ 
+                                                                               Prim
+                                                                               ( 
+                                                                               1055,
+                                                                               T_operation,
+                                                                               [],
+                                                                               []
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1056,
+                                                                               I_DIG,
+                                                                               [ 
+                                                                               Int
+                                                                               ( 
+                                                                               1057,
+                                                                               Z
+                                                                               .of_int
+                                                                               2
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1058,
+                                                                               I_CONS,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1059,
+                                                                               I_DIG,
+                                                                               [ 
+                                                                               Int
+                                                                               ( 
+                                                                               1060,
+                                                                               Z
+                                                                               .of_int
+                                                                               2
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1061,
+                                                                               I_CONS,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1062,
+                                                                               I_DIG,
+                                                                               [ 
+                                                                               Int
+                                                                               ( 
+                                                                               1063,
+                                                                               Z
+                                                                               .of_int
+                                                                               2
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1064,
+                                                                               I_CONS,
+                                                                               [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
                                                                                1065,
-                                                                               I_NIL,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1066,
-                                                                               T_operation,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1067,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1068,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1069,
-                                                                               I_CONS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1070,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1071,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1072,
-                                                                               I_CONS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1073,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1074,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1075,
-                                                                               I_CONS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1076,
                                                                                I_PAIR,
                                                                                [],
-                                                                               []
-                                                                               )
-                                                                               ]
-                                                                               );
-                                                                               Seq
-                                                                               ( 
-                                                                               1077,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1078,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1079,
-                                                                               Z
-                                                                               .of_int
-                                                                               3
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1080,
-                                                                               I_DROP,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1081,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1082,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1083,
-                                                                               I_NIL,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1084,
-                                                                               T_operation,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1085,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1086,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1087,
-                                                                               I_CONS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1088,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1089,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1090,
-                                                                               I_CONS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1091,
-                                                                               I_PAIR,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                               ]
-                                                                               )
-                                                                               ],
                                                                                []
                                                                                )
                                                                               ]
@@ -6859,96 +6672,96 @@ let script =
                                                 [] ) ] ) ],
                                     [] ) ] );
                           Seq
-                            ( 1092,
+                            ( 1066,
                               [ Prim
-                                  ( 1093,
+                                  ( 1067,
                                     I_IF_LEFT,
                                     [ Seq
-                                        ( 1094,
-                                          [ Prim (1095, I_DUP, [], []);
-                                            Prim (1096, I_CDR, [], []);
-                                            Prim (1097, I_SWAP, [], []);
-                                            Prim (1098, I_CAR, [], []);
-                                            Prim (1099, I_SWAP, [], []);
-                                            Prim (1100, I_DUP, [], []);
-                                            Prim (1101, I_CDR, [], []);
-                                            Prim (1102, I_SWAP, [], []);
-                                            Prim (1103, I_CAR, [], []);
-                                            Prim (1104, I_SWAP, [], []);
-                                            Prim (1105, I_DUP, [], []);
-                                            Prim (1106, I_CDR, [], []);
-                                            Prim (1107, I_SWAP, [], []);
-                                            Prim (1108, I_CAR, [], []);
-                                            Prim (1109, I_SWAP, [], []);
-                                            Prim (1110, I_NOW, [], []);
-                                            Prim (1111, I_COMPARE, [], []);
-                                            Prim (1112, I_GE, [], []);
+                                        ( 1068,
+                                          [ Prim (1069, I_DUP, [], []);
+                                            Prim (1070, I_CDR, [], []);
+                                            Prim (1071, I_SWAP, [], []);
+                                            Prim (1072, I_CAR, [], []);
+                                            Prim (1073, I_SWAP, [], []);
+                                            Prim (1074, I_DUP, [], []);
+                                            Prim (1075, I_CDR, [], []);
+                                            Prim (1076, I_SWAP, [], []);
+                                            Prim (1077, I_CAR, [], []);
+                                            Prim (1078, I_SWAP, [], []);
+                                            Prim (1079, I_DUP, [], []);
+                                            Prim (1080, I_CDR, [], []);
+                                            Prim (1081, I_SWAP, [], []);
+                                            Prim (1082, I_CAR, [], []);
+                                            Prim (1083, I_SWAP, [], []);
+                                            Prim (1084, I_NOW, [], []);
+                                            Prim (1085, I_COMPARE, [], []);
+                                            Prim (1086, I_GE, [], []);
                                             Prim
-                                              ( 1113,
+                                              ( 1087,
                                                 I_IF,
                                                 [ Seq
-                                                    ( 1114,
+                                                    ( 1088,
                                                       [ Prim
-                                                          ( 1115,
+                                                          ( 1089,
                                                             I_DROP,
                                                             [ Int
-                                                                ( 1116,
+                                                                ( 1090,
                                                                   Z.of_int 4 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1117,
+                                                          ( 1091,
                                                             I_PUSH,
                                                             [ Prim
-                                                                ( 1118,
+                                                                ( 1092,
                                                                   T_nat,
                                                                   [],
                                                                   [] );
                                                               Int
-                                                                ( 1119,
+                                                                ( 1093,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1120,
+                                                          ( 1094,
                                                             I_FAILWITH,
                                                             [],
                                                             [] ) ] );
                                                   Seq
-                                                    ( 1121,
+                                                    ( 1095,
                                                       [ Prim
-                                                          ( 1122,
+                                                          ( 1096,
                                                             I_PUSH,
                                                             [ Prim
-                                                                ( 1123,
+                                                                ( 1097,
                                                                   T_mutez,
                                                                   [],
                                                                   [] );
-                                                              Int (1124, Z.zero)
+                                                              Int (1098, Z.zero)
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1125,
+                                                          ( 1099,
                                                             I_AMOUNT,
                                                             [],
                                                             [] );
                                                         Prim
-                                                          ( 1126,
+                                                          ( 1100,
                                                             I_COMPARE,
                                                             [],
                                                             [] );
                                                         Prim
-                                                          (1127, I_GT, [], []);
+                                                          (1101, I_GT, [], []);
                                                         Prim
-                                                          ( 1128,
+                                                          ( 1102,
                                                             I_IF,
                                                             [ Seq
-                                                                ( 1129,
+                                                                ( 1103,
                                                                   [ Prim
-                                                                      ( 1130,
+                                                                      ( 1104,
                                                                         I_DROP,
                                                                         [ Int
-                                                                            ( 1131,
+                                                                            ( 1105,
                                                                               Z
                                                                               .of_int
                                                                                4
@@ -6956,16 +6769,16 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1132,
+                                                                      ( 1106,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1133,
+                                                                            ( 1107,
                                                                               T_nat,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Int
-                                                                            ( 1134,
+                                                                            ( 1108,
                                                                               Z
                                                                               .of_int
                                                                                10
@@ -6973,24 +6786,24 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1135,
+                                                                      ( 1109,
                                                                         I_FAILWITH,
                                                                         [],
                                                                         [] ) ]
                                                                 );
                                                               Seq
-                                                                ( 1136,
+                                                                ( 1110,
                                                                   [ Prim
-                                                                      ( 1137,
+                                                                      ( 1111,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1138,
+                                                                            ( 1112,
                                                                               T_nat,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Int
-                                                                            ( 1139,
+                                                                            ( 1113,
                                                                               Z
                                                                               .of_int
                                                                                999
@@ -6998,10 +6811,10 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1140,
+                                                                      ( 1114,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1141,
+                                                                            ( 1115,
                                                                               Z
                                                                               .of_int
                                                                                2
@@ -7009,15 +6822,15 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1142,
+                                                                      ( 1116,
                                                                         I_DUP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1143,
+                                                                      ( 1117,
                                                                         I_DUG,
                                                                         [ Int
-                                                                            ( 1144,
+                                                                            ( 1118,
                                                                               Z
                                                                               .of_int
                                                                                3
@@ -7025,21 +6838,21 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1145,
+                                                                      ( 1119,
                                                                         I_MUL,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1146,
+                                                                      ( 1120,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1147,
+                                                                            ( 1121,
                                                                               T_nat,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Int
-                                                                            ( 1148,
+                                                                            ( 1122,
                                                                               Z
                                                                               .of_int
                                                                                1000
@@ -7047,10 +6860,10 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1149,
+                                                                      ( 1123,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1150,
+                                                                            ( 1124,
                                                                               Z
                                                                               .of_int
                                                                                5
@@ -7058,15 +6871,15 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1151,
+                                                                      ( 1125,
                                                                         I_DUP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1152,
+                                                                      ( 1126,
                                                                         I_DUG,
                                                                         [ Int
-                                                                            ( 1153,
+                                                                            ( 1127,
                                                                               Z
                                                                               .of_int
                                                                                6
@@ -7074,41 +6887,41 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1154,
+                                                                      ( 1128,
                                                                         I_CAR,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1155,
+                                                                      ( 1129,
                                                                         I_MUL,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1156,
+                                                                      ( 1130,
                                                                         I_ADD,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1157,
+                                                                      ( 1131,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1158,
+                                                                            ( 1132,
                                                                               T_mutez,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Int
-                                                                            ( 1159,
+                                                                            ( 1133,
                                                                               Z
                                                                               .one
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1160,
+                                                                      ( 1134,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1161,
+                                                                            ( 1135,
                                                                               Z
                                                                               .of_int
                                                                                5
@@ -7116,15 +6929,15 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1162,
+                                                                      ( 1136,
                                                                         I_DUP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1163,
+                                                                      ( 1137,
                                                                         I_DUG,
                                                                         [ Int
-                                                                            ( 1164,
+                                                                            ( 1138,
                                                                               Z
                                                                               .of_int
                                                                                6
@@ -7132,41 +6945,41 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1165,
+                                                                      ( 1139,
                                                                         I_CDR,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1166,
+                                                                      ( 1140,
                                                                         I_CAR,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1167,
+                                                                      ( 1141,
                                                                         I_EDIV,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1168,
+                                                                      ( 1142,
                                                                         I_IF_NONE,
                                                                         [ Seq
-                                                                            ( 1169,
+                                                                            ( 1143,
                                                                               [ 
                                                                               Prim
                                                                                ( 
-                                                                               1170,
+                                                                               1144,
                                                                                I_PUSH,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1171,
+                                                                               1145,
                                                                                T_string,
                                                                                [],
                                                                                []
                                                                                );
                                                                                String
                                                                                ( 
-                                                                               1172,
+                                                                               1146,
                                                                                "DIV \
                                                                                by \
                                                                                0"
@@ -7176,7 +6989,7 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1173,
+                                                                               1147,
                                                                                I_FAILWITH,
                                                                                [],
                                                                                []
@@ -7184,27 +6997,27 @@ let script =
                                                                               ]
                                                                             );
                                                                           Seq
-                                                                            ( 1174,
+                                                                            ( 1148,
                                                                               []
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1175,
+                                                                      ( 1149,
                                                                         I_CAR,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1176,
+                                                                      ( 1150,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1177,
+                                                                            ( 1151,
                                                                               T_nat,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Int
-                                                                            ( 1178,
+                                                                            ( 1152,
                                                                               Z
                                                                               .of_int
                                                                                999
@@ -7212,10 +7025,10 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1179,
+                                                                      ( 1153,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1180,
+                                                                            ( 1154,
                                                                               Z
                                                                               .of_int
                                                                                4
@@ -7223,15 +7036,15 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1181,
+                                                                      ( 1155,
                                                                         I_DUP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1182,
+                                                                      ( 1156,
                                                                         I_DUG,
                                                                         [ Int
-                                                                            ( 1183,
+                                                                            ( 1157,
                                                                               Z
                                                                               .of_int
                                                                                5
@@ -7239,9 +7052,154 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1184,
+                                                                      ( 1158,
                                                                         I_MUL,
                                                                         [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1159,
+                                                                        I_MUL,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1160,
+                                                                        I_EDIV,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1161,
+                                                                        I_IF_NONE,
+                                                                        [ Seq
+                                                                            ( 1162,
+                                                                              [ 
+                                                                              Prim
+                                                                               ( 
+                                                                               1163,
+                                                                               I_PUSH,
+                                                                               [ 
+                                                                               Prim
+                                                                               ( 
+                                                                               1164,
+                                                                               T_string,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               String
+                                                                               ( 
+                                                                               1165,
+                                                                               "DIV \
+                                                                               by \
+                                                                               0"
+                                                                               )
+                                                                               ],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1166,
+                                                                               I_FAILWITH,
+                                                                               [],
+                                                                               []
+                                                                               )
+                                                                              ]
+                                                                            );
+                                                                          Seq
+                                                                            ( 1167,
+                                                                              []
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1168,
+                                                                        I_CAR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1169,
+                                                                        I_PUSH,
+                                                                        [ Prim
+                                                                            ( 1170,
+                                                                              T_mutez,
+                                                                              [],
+                                                                              []
+                                                                            );
+                                                                          Int
+                                                                            ( 1171,
+                                                                              Z
+                                                                              .one
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1172,
+                                                                        I_SWAP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1173,
+                                                                        I_MUL,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1174,
+                                                                        I_PUSH,
+                                                                        [ Prim
+                                                                            ( 1175,
+                                                                              T_nat,
+                                                                              [],
+                                                                              []
+                                                                            );
+                                                                          Int
+                                                                            ( 1176,
+                                                                              Z
+                                                                              .of_int
+                                                                               1000
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1177,
+                                                                        I_PUSH,
+                                                                        [ Prim
+                                                                            ( 1178,
+                                                                              T_nat,
+                                                                              [],
+                                                                              []
+                                                                            );
+                                                                          Int
+                                                                            ( 1179,
+                                                                              Z
+                                                                              .of_int
+                                                                               999
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1180,
+                                                                        I_DIG,
+                                                                        [ Int
+                                                                            ( 1181,
+                                                                              Z
+                                                                              .of_int
+                                                                               2
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1182,
+                                                                        I_DUP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1183,
+                                                                        I_DUG,
+                                                                        [ Int
+                                                                            ( 1184,
+                                                                              Z
+                                                                              .of_int
+                                                                               3
+                                                                            )
+                                                                        ],
                                                                         [] );
                                                                     Prim
                                                                       ( 1185,
@@ -7303,62 +7261,9 @@ let script =
                                                                         [] );
                                                                     Prim
                                                                       ( 1195,
-                                                                        I_PUSH,
-                                                                        [ Prim
-                                                                            ( 1196,
-                                                                              T_mutez,
-                                                                              [],
-                                                                              []
-                                                                            );
-                                                                          Int
-                                                                            ( 1197,
-                                                                              Z
-                                                                              .one
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1198,
-                                                                        I_SWAP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1199,
-                                                                        I_MUL,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1200,
-                                                                        I_PUSH,
-                                                                        [ Prim
-                                                                            ( 1201,
-                                                                              T_nat,
-                                                                              [],
-                                                                              []
-                                                                            );
-                                                                          Int
-                                                                            ( 1202,
-                                                                              Z
-                                                                              .of_int
-                                                                               1000
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1203,
-                                                                        I_SWAP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1204,
-                                                                        I_DUP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1205,
-                                                                        I_DUG,
+                                                                        I_DIG,
                                                                         [ Int
-                                                                            ( 1206,
+                                                                            ( 1196,
                                                                               Z
                                                                               .of_int
                                                                                2
@@ -7366,41 +7271,74 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1207,
-                                                                        I_EDIV,
+                                                                      ( 1197,
+                                                                        I_SWAP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1208,
-                                                                        I_IF_NONE,
+                                                                      ( 1198,
+                                                                        I_DUP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1199,
+                                                                        I_DUG,
+                                                                        [ Int
+                                                                            ( 1200,
+                                                                              Z
+                                                                              .of_int
+                                                                               2
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1201,
+                                                                        I_COMPARE,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1202,
+                                                                        I_LT,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1203,
+                                                                        I_IF,
                                                                         [ Seq
-                                                                            ( 1209,
+                                                                            ( 1204,
                                                                               [ 
                                                                               Prim
                                                                                ( 
-                                                                               1210,
+                                                                               1205,
+                                                                               I_DROP,
+                                                                               [],
+                                                                               []
+                                                                               );
+                                                                               Prim
+                                                                               ( 
+                                                                               1206,
                                                                                I_PUSH,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1211,
-                                                                               T_string,
+                                                                               1207,
+                                                                               T_nat,
                                                                                [],
                                                                                []
                                                                                );
-                                                                               String
+                                                                               Int
                                                                                ( 
-                                                                               1212,
-                                                                               "DIV \
-                                                                               by \
-                                                                               0"
+                                                                               1208,
+                                                                               Z
+                                                                               .of_int
+                                                                               8
                                                                                )
                                                                                ],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1213,
+                                                                               1209,
                                                                                I_FAILWITH,
                                                                                [],
                                                                                []
@@ -7408,52 +7346,73 @@ let script =
                                                                               ]
                                                                             );
                                                                           Seq
-                                                                            ( 1214,
+                                                                            ( 1210,
                                                                               []
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1215,
-                                                                        I_CAR,
-                                                                        [],
+                                                                      ( 1211,
+                                                                        I_DIG,
+                                                                        [ Int
+                                                                            ( 1212,
+                                                                              Z
+                                                                              .of_int
+                                                                               2
+                                                                            )
+                                                                        ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1216,
+                                                                      ( 1213,
                                                                         I_DUP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1217,
-                                                                        I_DIG,
+                                                                      ( 1214,
+                                                                        I_DUG,
                                                                         [ Int
-                                                                            ( 1218,
+                                                                            ( 1215,
                                                                               Z
                                                                               .of_int
-                                                                               2
+                                                                               3
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
+                                                                      ( 1216,
+                                                                        I_SELF,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1217,
+                                                                        I_ADDRESS,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1218,
+                                                                        I_PAIR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
                                                                       ( 1219,
-                                                                        I_SUB,
+                                                                        I_SENDER,
                                                                         [],
                                                                         [] );
                                                                     Prim
                                                                       ( 1220,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1221,
-                                                                              Z
-                                                                              .of_int
-                                                                               2
-                                                                            )
-                                                                        ],
+                                                                        I_PAIR,
+                                                                        [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1222,
-                                                                        I_SWAP,
-                                                                        [],
+                                                                      ( 1221,
+                                                                        I_DIG,
+                                                                        [ Int
+                                                                            ( 1222,
+                                                                              Z
+                                                                              .of_int
+                                                                               5
+                                                                            )
+                                                                        ],
                                                                         [] );
                                                                     Prim
                                                                       ( 1223,
@@ -7467,69 +7426,59 @@ let script =
                                                                             ( 1225,
                                                                               Z
                                                                               .of_int
-                                                                               2
+                                                                               6
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
                                                                       ( 1226,
-                                                                        I_COMPARE,
+                                                                        I_SWAP,
                                                                         [],
                                                                         [] );
                                                                     Prim
                                                                       ( 1227,
-                                                                        I_LT,
+                                                                        I_DUP,
                                                                         [],
                                                                         [] );
                                                                     Prim
                                                                       ( 1228,
-                                                                        I_IF,
-                                                                        [ Seq
-                                                                            ( 1229,
-                                                                              [ 
-                                                                              Prim
-                                                                               ( 
-                                                                               1230,
-                                                                               I_DROP,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1231,
-                                                                               I_PUSH,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1232,
-                                                                               T_nat,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Int
-                                                                               ( 
-                                                                               1233,
-                                                                               Z
-                                                                               .of_int
-                                                                               8
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1234,
-                                                                               I_FAILWITH,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                              ]
-                                                                            );
-                                                                          Seq
-                                                                            ( 1235,
-                                                                              []
-                                                                            )
-                                                                        ],
+                                                                        I_CDR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1229,
+                                                                        I_SWAP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1230,
+                                                                        I_CAR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1231,
+                                                                        I_SWAP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1232,
+                                                                        I_DUP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1233,
+                                                                        I_CDR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1234,
+                                                                        I_SWAP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1235,
+                                                                        I_CAR,
+                                                                        [],
                                                                         [] );
                                                                     Prim
                                                                       ( 1236,
@@ -7538,188 +7487,59 @@ let script =
                                                                             ( 1237,
                                                                               Z
                                                                               .of_int
-                                                                               2
+                                                                               3
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
                                                                       ( 1238,
-                                                                        I_DUP,
+                                                                        I_CDR,
                                                                         [],
                                                                         [] );
                                                                     Prim
                                                                       ( 1239,
-                                                                        I_DUG,
-                                                                        [ Int
-                                                                            ( 1240,
-                                                                              Z
-                                                                              .of_int
-                                                                               3
-                                                                            )
-                                                                        ],
+                                                                        I_CDR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1240,
+                                                                        I_CDR,
+                                                                        [],
                                                                         [] );
                                                                     Prim
                                                                       ( 1241,
-                                                                        I_SELF,
+                                                                        I_CAR,
                                                                         [],
                                                                         [] );
                                                                     Prim
                                                                       ( 1242,
-                                                                        I_ADDRESS,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1243,
-                                                                        I_PAIR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1244,
-                                                                        I_SENDER,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1245,
-                                                                        I_PAIR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1246,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1247,
-                                                                              Z
-                                                                              .of_int
-                                                                               5
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1248,
-                                                                        I_DUP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1249,
-                                                                        I_DUG,
-                                                                        [ Int
-                                                                            ( 1250,
-                                                                              Z
-                                                                              .of_int
-                                                                               6
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1251,
-                                                                        I_SWAP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1252,
-                                                                        I_DUP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1253,
-                                                                        I_CDR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1254,
-                                                                        I_SWAP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1255,
-                                                                        I_CAR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1256,
-                                                                        I_SWAP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1257,
-                                                                        I_DUP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1258,
-                                                                        I_CDR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1259,
-                                                                        I_SWAP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1260,
-                                                                        I_CAR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1261,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1262,
-                                                                              Z
-                                                                              .of_int
-                                                                               3
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1263,
-                                                                        I_CDR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1264,
-                                                                        I_CDR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1265,
-                                                                        I_CDR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1266,
-                                                                        I_CAR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1267,
                                                                         I_CONTRACT,
                                                                         [ Prim
-                                                                            ( 1268,
+                                                                            ( 1243,
                                                                               T_pair,
                                                                               [ 
                                                                               Prim
                                                                                ( 
-                                                                               1269,
+                                                                               1244,
                                                                                T_address,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1270,
+                                                                               1245,
                                                                                T_pair,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1271,
+                                                                               1246,
                                                                                T_address,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1272,
+                                                                               1247,
                                                                                T_nat,
                                                                                [],
                                                                                []
@@ -7734,26 +7554,26 @@ let script =
                                                                         [ "%transfer"
                                                                         ] );
                                                                     Prim
-                                                                      ( 1273,
+                                                                      ( 1248,
                                                                         I_IF_NONE,
                                                                         [ Seq
-                                                                            ( 1274,
+                                                                            ( 1249,
                                                                               [ 
                                                                               Prim
                                                                                ( 
-                                                                               1275,
+                                                                               1250,
                                                                                I_PUSH,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1276,
+                                                                               1251,
                                                                                T_nat,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Int
                                                                                ( 
-                                                                               1277,
+                                                                               1252,
                                                                                Z
                                                                                .zero
                                                                                )
@@ -7762,7 +7582,7 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1278,
+                                                                               1253,
                                                                                I_FAILWITH,
                                                                                [],
                                                                                []
@@ -7770,32 +7590,32 @@ let script =
                                                                               ]
                                                                             );
                                                                           Seq
-                                                                            ( 1279,
+                                                                            ( 1254,
                                                                               []
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1280,
+                                                                      ( 1255,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1281,
+                                                                            ( 1256,
                                                                               T_mutez,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Int
-                                                                            ( 1282,
+                                                                            ( 1257,
                                                                               Z
                                                                               .zero
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1283,
+                                                                      ( 1258,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1284,
+                                                                            ( 1259,
                                                                               Z
                                                                               .of_int
                                                                                3
@@ -7803,10 +7623,10 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1285,
+                                                                      ( 1260,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1286,
+                                                                            ( 1261,
                                                                               Z
                                                                               .of_int
                                                                                3
@@ -7814,15 +7634,15 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1287,
+                                                                      ( 1262,
                                                                         I_PAIR,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1288,
+                                                                      ( 1263,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1289,
+                                                                            ( 1264,
                                                                               Z
                                                                               .of_int
                                                                                3
@@ -7830,30 +7650,30 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1290,
+                                                                      ( 1265,
                                                                         I_PAIR,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1291,
+                                                                      ( 1266,
                                                                         I_TRANSFER_TOKENS,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1292,
+                                                                      ( 1267,
                                                                         I_SWAP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1293,
+                                                                      ( 1268,
                                                                         I_DUP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1294,
+                                                                      ( 1269,
                                                                         I_DUG,
                                                                         [ Int
-                                                                            ( 1295,
+                                                                            ( 1270,
                                                                               Z
                                                                               .of_int
                                                                                2
@@ -7861,10 +7681,10 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1296,
+                                                                      ( 1271,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1297,
+                                                                            ( 1272,
                                                                               Z
                                                                               .of_int
                                                                                5
@@ -7872,10 +7692,10 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1298,
+                                                                      ( 1273,
                                                                         I_CONTRACT,
                                                                         [ Prim
-                                                                            ( 1299,
+                                                                            ( 1274,
                                                                               T_unit,
                                                                               [],
                                                                               []
@@ -7883,26 +7703,26 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1300,
+                                                                      ( 1275,
                                                                         I_IF_NONE,
                                                                         [ Seq
-                                                                            ( 1301,
+                                                                            ( 1276,
                                                                               [ 
                                                                               Prim
                                                                                ( 
-                                                                               1302,
+                                                                               1277,
                                                                                I_PUSH,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1303,
+                                                                               1278,
                                                                                T_nat,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Int
                                                                                ( 
-                                                                               1304,
+                                                                               1279,
                                                                                Z
                                                                                .of_int
                                                                                9
@@ -7912,7 +7732,7 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1305,
+                                                                               1280,
                                                                                I_FAILWITH,
                                                                                [],
                                                                                []
@@ -7920,27 +7740,27 @@ let script =
                                                                               ]
                                                                             );
                                                                           Seq
-                                                                            ( 1306,
+                                                                            ( 1281,
                                                                               []
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1307,
+                                                                      ( 1282,
                                                                         I_SWAP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1308,
+                                                                      ( 1283,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1309,
+                                                                            ( 1284,
                                                                               T_unit,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Prim
-                                                                            ( 1310,
+                                                                            ( 1285,
                                                                               D_Unit,
                                                                               [],
                                                                               []
@@ -7948,15 +7768,15 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1311,
+                                                                      ( 1286,
                                                                         I_TRANSFER_TOKENS,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1312,
+                                                                      ( 1287,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1313,
+                                                                            ( 1288,
                                                                               Z
                                                                               .of_int
                                                                                5
@@ -7964,15 +7784,15 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1314,
+                                                                      ( 1289,
                                                                         I_DUP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1315,
+                                                                      ( 1290,
                                                                         I_DUG,
                                                                         [ Int
-                                                                            ( 1316,
+                                                                            ( 1291,
                                                                               Z
                                                                               .of_int
                                                                                6
@@ -7980,20 +7800,150 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1317,
+                                                                      ( 1292,
                                                                         I_CDR,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1318,
+                                                                      ( 1293,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1319,
+                                                                            ( 1294,
                                                                               Z
                                                                               .of_int
                                                                                5
                                                                             )
                                                                         ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1295,
+                                                                        I_DIG,
+                                                                        [ Int
+                                                                            ( 1296,
+                                                                              Z
+                                                                              .of_int
+                                                                               6
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1297,
+                                                                        I_DUP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1298,
+                                                                        I_DUG,
+                                                                        [ Int
+                                                                            ( 1299,
+                                                                              Z
+                                                                              .of_int
+                                                                               7
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1300,
+                                                                        I_CAR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1301,
+                                                                        I_ADD,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1302,
+                                                                        I_PAIR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1303,
+                                                                        I_DUP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1304,
+                                                                        I_CDR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1305,
+                                                                        I_CDR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1306,
+                                                                        I_DIG,
+                                                                        [ Int
+                                                                            ( 1307,
+                                                                              Z
+                                                                              .of_int
+                                                                               4
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1308,
+                                                                        I_DUP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1309,
+                                                                        I_DUG,
+                                                                        [ Int
+                                                                            ( 1310,
+                                                                              Z
+                                                                              .of_int
+                                                                               5
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1311,
+                                                                        I_DIG,
+                                                                        [ Int
+                                                                            ( 1312,
+                                                                              Z
+                                                                              .of_int
+                                                                               7
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1313,
+                                                                        I_CDR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1314,
+                                                                        I_CAR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1315,
+                                                                        I_SUB,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1316,
+                                                                        I_PAIR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1317,
+                                                                        I_SWAP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1318,
+                                                                        I_CAR,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1319,
+                                                                        I_PAIR,
+                                                                        [],
                                                                         [] );
                                                                     Prim
                                                                       ( 1320,
@@ -8002,166 +7952,15 @@ let script =
                                                                             ( 1321,
                                                                               Z
                                                                               .of_int
-                                                                               6
+                                                                               3
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
                                                                       ( 1322,
-                                                                        I_DUP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1323,
-                                                                        I_DUG,
-                                                                        [ Int
-                                                                            ( 1324,
-                                                                              Z
-                                                                              .of_int
-                                                                               7
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1325,
-                                                                        I_CAR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1326,
-                                                                        I_ADD,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1327,
-                                                                        I_PAIR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1328,
-                                                                        I_DUP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1329,
-                                                                        I_CDR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1330,
-                                                                        I_CDR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1331,
                                                                         I_DIG,
                                                                         [ Int
-                                                                            ( 1332,
-                                                                              Z
-                                                                              .of_int
-                                                                               5
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1333,
-                                                                        I_DUP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1334,
-                                                                        I_DUG,
-                                                                        [ Int
-                                                                            ( 1335,
-                                                                              Z
-                                                                              .of_int
-                                                                               6
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1336,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1337,
-                                                                              Z
-                                                                              .of_int
-                                                                               5
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1338,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1339,
-                                                                              Z
-                                                                              .of_int
-                                                                               7
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1340,
-                                                                        I_CDR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1341,
-                                                                        I_CAR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1342,
-                                                                        I_SUB,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1343,
-                                                                        I_SUB,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1344,
-                                                                        I_PAIR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1345,
-                                                                        I_SWAP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1346,
-                                                                        I_CAR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1347,
-                                                                        I_PAIR,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1348,
-                                                                        I_PUSH,
-                                                                        [ Prim
-                                                                            ( 1349,
-                                                                              T_mutez,
-                                                                              [],
-                                                                              []
-                                                                            );
-                                                                          Int
-                                                                            ( 1350,
-                                                                              Z
-                                                                              .zero
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1351,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1352,
+                                                                            ( 1323,
                                                                               Z
                                                                               .of_int
                                                                                4
@@ -8169,111 +7968,57 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1353,
-                                                                        I_DUP,
+                                                                      ( 1324,
+                                                                        I_SUB,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1354,
-                                                                        I_DUG,
-                                                                        [ Int
-                                                                            ( 1355,
-                                                                              Z
-                                                                              .of_int
-                                                                               5
+                                                                      ( 1325,
+                                                                        I_PUSH,
+                                                                        [ Prim
+                                                                            ( 1326,
+                                                                              T_address,
+                                                                              [],
+                                                                              []
+                                                                            );
+                                                                          String
+                                                                            ( 1327,
+                                                                              "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1356,
-                                                                        I_COMPARE,
-                                                                        [],
+                                                                      ( 1328,
+                                                                        I_CONTRACT,
+                                                                        [ Prim
+                                                                            ( 1329,
+                                                                              T_unit,
+                                                                              [],
+                                                                              []
+                                                                            )
+                                                                        ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1357,
-                                                                        I_GT,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1358,
-                                                                        I_IF,
+                                                                      ( 1330,
+                                                                        I_IF_NONE,
                                                                         [ Seq
-                                                                            ( 1359,
+                                                                            ( 1331,
                                                                               [ 
                                                                               Prim
                                                                                ( 
-                                                                               1360,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1361,
-                                                                               Z
-                                                                               .of_int
-                                                                               3
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1362,
+                                                                               1332,
                                                                                I_PUSH,
                                                                                [ 
                                                                                Prim
                                                                                ( 
-                                                                               1363,
-                                                                               T_address,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               String
-                                                                               ( 
-                                                                               1364,
-                                                                               "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1365,
-                                                                               I_CONTRACT,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1366,
-                                                                               T_unit,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1367,
-                                                                               I_IF_NONE,
-                                                                               [ 
-                                                                               Seq
-                                                                               ( 
-                                                                               1368,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1369,
-                                                                               I_PUSH,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1370,
+                                                                               1333,
                                                                                T_nat,
                                                                                [],
                                                                                []
                                                                                );
                                                                                Int
                                                                                ( 
-                                                                               1371,
+                                                                               1334,
                                                                                Z
                                                                                .of_int
                                                                                9
@@ -8283,351 +8028,217 @@ let script =
                                                                                );
                                                                                Prim
                                                                                ( 
-                                                                               1372,
+                                                                               1335,
                                                                                I_FAILWITH,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                               ]
-                                                                               );
-                                                                               Seq
-                                                                               ( 
-                                                                               1373,
-                                                                               []
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1374,
-                                                                               I_SWAP,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1375,
-                                                                               I_PUSH,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1376,
-                                                                               T_unit,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1377,
-                                                                               D_Unit,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1378,
-                                                                               I_TRANSFER_TOKENS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1379,
-                                                                               I_SWAP,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1380,
-                                                                               I_NIL,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1381,
-                                                                               T_operation,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1382,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1383,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1384,
-                                                                               I_CONS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1385,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1386,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1387,
-                                                                               I_CONS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1388,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1389,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1390,
-                                                                               I_CONS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1391,
-                                                                               I_PAIR,
                                                                                [],
                                                                                []
                                                                                )
                                                                               ]
                                                                             );
                                                                           Seq
-                                                                            ( 1392,
-                                                                              [ 
-                                                                              Prim
-                                                                               ( 
-                                                                               1393,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1394,
-                                                                               Z
-                                                                               .of_int
-                                                                               3
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1395,
-                                                                               I_DROP,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1396,
-                                                                               I_NIL,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1397,
-                                                                               T_operation,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1398,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1399,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1400,
-                                                                               I_CONS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1401,
-                                                                               I_DIG,
-                                                                               [ 
-                                                                               Int
-                                                                               ( 
-                                                                               1402,
-                                                                               Z
-                                                                               .of_int
-                                                                               2
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1403,
-                                                                               I_CONS,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1404,
-                                                                               I_PAIR,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                              ]
+                                                                            ( 1336,
+                                                                              []
                                                                             )
                                                                         ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1337,
+                                                                        I_SWAP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1338,
+                                                                        I_PUSH,
+                                                                        [ Prim
+                                                                            ( 1339,
+                                                                              T_unit,
+                                                                              [],
+                                                                              []
+                                                                            );
+                                                                          Prim
+                                                                            ( 1340,
+                                                                              D_Unit,
+                                                                              [],
+                                                                              []
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1341,
+                                                                        I_TRANSFER_TOKENS,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1342,
+                                                                        I_SWAP,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1343,
+                                                                        I_NIL,
+                                                                        [ Prim
+                                                                            ( 1344,
+                                                                              T_operation,
+                                                                              [],
+                                                                              []
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1345,
+                                                                        I_DIG,
+                                                                        [ Int
+                                                                            ( 1346,
+                                                                              Z
+                                                                              .of_int
+                                                                               2
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1347,
+                                                                        I_CONS,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1348,
+                                                                        I_DIG,
+                                                                        [ Int
+                                                                            ( 1349,
+                                                                              Z
+                                                                              .of_int
+                                                                               2
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1350,
+                                                                        I_CONS,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1351,
+                                                                        I_DIG,
+                                                                        [ Int
+                                                                            ( 1352,
+                                                                              Z
+                                                                              .of_int
+                                                                               2
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1353,
+                                                                        I_CONS,
+                                                                        [],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1354,
+                                                                        I_PAIR,
+                                                                        [],
                                                                         [] ) ]
                                                                 ) ],
                                                             [] ) ] ) ],
                                                 [] ) ] );
                                       Seq
-                                        ( 1405,
-                                          [ Prim (1406, I_DUP, [], []);
-                                            Prim (1407, I_CDR, [], []);
-                                            Prim (1408, I_SWAP, [], []);
-                                            Prim (1409, I_CAR, [], []);
-                                            Prim (1410, I_SWAP, [], []);
-                                            Prim (1411, I_DUP, [], []);
-                                            Prim (1412, I_CDR, [], []);
-                                            Prim (1413, I_SWAP, [], []);
-                                            Prim (1414, I_CAR, [], []);
-                                            Prim (1415, I_SWAP, [], []);
-                                            Prim (1416, I_NOW, [], []);
-                                            Prim (1417, I_COMPARE, [], []);
-                                            Prim (1418, I_GE, [], []);
+                                        ( 1355,
+                                          [ Prim (1356, I_DUP, [], []);
+                                            Prim (1357, I_CDR, [], []);
+                                            Prim (1358, I_SWAP, [], []);
+                                            Prim (1359, I_CAR, [], []);
+                                            Prim (1360, I_SWAP, [], []);
+                                            Prim (1361, I_DUP, [], []);
+                                            Prim (1362, I_CDR, [], []);
+                                            Prim (1363, I_SWAP, [], []);
+                                            Prim (1364, I_CAR, [], []);
+                                            Prim (1365, I_SWAP, [], []);
+                                            Prim (1366, I_NOW, [], []);
+                                            Prim (1367, I_COMPARE, [], []);
+                                            Prim (1368, I_GE, [], []);
                                             Prim
-                                              ( 1419,
+                                              ( 1369,
                                                 I_IF,
                                                 [ Seq
-                                                    ( 1420,
+                                                    ( 1370,
                                                       [ Prim
-                                                          ( 1421,
+                                                          ( 1371,
                                                             I_DROP,
                                                             [ Int
-                                                                ( 1422,
+                                                                ( 1372,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1423,
+                                                          ( 1373,
                                                             I_PUSH,
                                                             [ Prim
-                                                                ( 1424,
+                                                                ( 1374,
                                                                   T_nat,
                                                                   [],
                                                                   [] );
                                                               Int
-                                                                ( 1425,
+                                                                ( 1375,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1426,
+                                                          ( 1376,
                                                             I_FAILWITH,
                                                             [],
                                                             [] ) ] );
                                                   Seq
-                                                    ( 1427,
+                                                    ( 1377,
                                                       [ Prim
-                                                          ( 1428,
+                                                          ( 1378,
                                                             I_PUSH,
                                                             [ Prim
-                                                                ( 1429,
+                                                                ( 1379,
                                                                   T_mutez,
                                                                   [],
                                                                   [] );
-                                                              Int (1430, Z.one)
+                                                              Int (1380, Z.one)
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1431,
+                                                          ( 1381,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1432,
+                                                                ( 1382,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1433, I_DUP, [], []);
+                                                          (1383, I_DUP, [], []);
                                                         Prim
-                                                          ( 1434,
+                                                          ( 1384,
                                                             I_DUG,
                                                             [ Int
-                                                                ( 1435,
+                                                                ( 1385,
                                                                   Z.of_int 4 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1436, I_CDR, [], []);
+                                                          (1386, I_CDR, [], []);
                                                         Prim
-                                                          (1437, I_CAR, [], []);
+                                                          (1387, I_CAR, [], []);
                                                         Prim
-                                                          (1438, I_EDIV, [], []);
+                                                          (1388, I_EDIV, [], []);
                                                         Prim
-                                                          ( 1439,
+                                                          ( 1389,
                                                             I_IF_NONE,
                                                             [ Seq
-                                                                ( 1440,
+                                                                ( 1390,
                                                                   [ Prim
-                                                                      ( 1441,
+                                                                      ( 1391,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1442,
+                                                                            ( 1392,
                                                                               T_string,
                                                                               [],
                                                                               []
                                                                             );
                                                                           String
-                                                                            ( 1443,
+                                                                            ( 1393,
                                                                               "DIV \
                                                                                by \
                                                                                0"
@@ -8635,51 +8246,51 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1444,
+                                                                      ( 1394,
                                                                         I_FAILWITH,
                                                                         [],
                                                                         [] ) ]
                                                                 );
-                                                              Seq (1445, []) ],
+                                                              Seq (1395, []) ],
                                                             [] );
                                                         Prim
-                                                          (1446, I_CAR, [], []);
+                                                          (1396, I_CAR, [], []);
                                                         Prim
-                                                          ( 1447,
+                                                          ( 1397,
                                                             I_AMOUNT,
                                                             [],
                                                             [] );
                                                         Prim
-                                                          ( 1448,
+                                                          ( 1398,
                                                             I_PUSH,
                                                             [ Prim
-                                                                ( 1449,
+                                                                ( 1399,
                                                                   T_mutez,
                                                                   [],
                                                                   [] );
-                                                              Int (1450, Z.one)
+                                                              Int (1400, Z.one)
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1451, I_SWAP, [], []);
+                                                          (1401, I_SWAP, [], []);
                                                         Prim
-                                                          (1452, I_EDIV, [], []);
+                                                          (1402, I_EDIV, [], []);
                                                         Prim
-                                                          ( 1453,
+                                                          ( 1403,
                                                             I_IF_NONE,
                                                             [ Seq
-                                                                ( 1454,
+                                                                ( 1404,
                                                                   [ Prim
-                                                                      ( 1455,
+                                                                      ( 1405,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1456,
+                                                                            ( 1406,
                                                                               T_string,
                                                                               [],
                                                                               []
                                                                             );
                                                                           String
-                                                                            ( 1457,
+                                                                            ( 1407,
                                                                               "DIV \
                                                                                by \
                                                                                0"
@@ -8687,58 +8298,79 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1458,
+                                                                      ( 1408,
                                                                         I_FAILWITH,
                                                                         [],
                                                                         [] ) ]
                                                                 );
-                                                              Seq (1459, []) ],
+                                                              Seq (1409, []) ],
                                                             [] );
                                                         Prim
-                                                          (1460, I_CAR, [], []);
+                                                          (1410, I_CAR, [], []);
                                                         Prim
-                                                          ( 1461,
+                                                          ( 1411,
                                                             I_PUSH,
                                                             [ Prim
-                                                                ( 1462,
+                                                                ( 1412,
                                                                   T_nat,
                                                                   [],
                                                                   [] );
                                                               Int
-                                                                ( 1463,
+                                                                ( 1413,
                                                                   Z.of_int 1000
                                                                 ) ],
                                                             [] );
                                                         Prim
-                                                          (1464, I_SWAP, [], []);
+                                                          ( 1414,
+                                                            I_PUSH,
+                                                            [ Prim
+                                                                ( 1415,
+                                                                  T_nat,
+                                                                  [],
+                                                                  [] );
+                                                              Int
+                                                                ( 1416,
+                                                                  Z.of_int 999
+                                                                ) ],
+                                                            [] );
                                                         Prim
-                                                          (1465, I_DUP, [], []);
-                                                        Prim
-                                                          ( 1466,
-                                                            I_DUG,
+                                                          ( 1417,
+                                                            I_DIG,
                                                             [ Int
-                                                                ( 1467,
+                                                                ( 1418,
                                                                   Z.of_int 2 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1468, I_EDIV, [], []);
+                                                          (1419, I_DUP, [], []);
                                                         Prim
-                                                          ( 1469,
+                                                          ( 1420,
+                                                            I_DUG,
+                                                            [ Int
+                                                                ( 1421,
+                                                                  Z.of_int 3 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1422, I_MUL, [], []);
+                                                        Prim
+                                                          (1423, I_EDIV, [], []);
+                                                        Prim
+                                                          ( 1424,
                                                             I_IF_NONE,
                                                             [ Seq
-                                                                ( 1470,
+                                                                ( 1425,
                                                                   [ Prim
-                                                                      ( 1471,
+                                                                      ( 1426,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1472,
+                                                                            ( 1427,
                                                                               T_string,
                                                                               [],
                                                                               []
                                                                             );
                                                                           String
-                                                                            ( 1473,
+                                                                            ( 1428,
                                                                               "DIV \
                                                                                by \
                                                                                0"
@@ -8746,208 +8378,224 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1474,
+                                                                      ( 1429,
                                                                         I_FAILWITH,
                                                                         [],
                                                                         [] ) ]
                                                                 );
-                                                              Seq (1475, []) ],
+                                                              Seq (1430, []) ],
                                                             [] );
                                                         Prim
-                                                          (1476, I_CAR, [], []);
+                                                          (1431, I_CAR, [], []);
                                                         Prim
-                                                          (1477, I_DUP, [], []);
+                                                          (1432, I_DUP, [], []);
+                                                        Prim
+                                                          ( 1433,
+                                                            I_DIG,
+                                                            [ Int
+                                                                ( 1434,
+                                                                  Z.of_int 2 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1435, I_SUB, [], []);
+                                                        Prim
+                                                          (1436, I_ABS, [], []);
+                                                        Prim
+                                                          ( 1437,
+                                                            I_PUSH,
+                                                            [ Prim
+                                                                ( 1438,
+                                                                  T_nat,
+                                                                  [],
+                                                                  [] );
+                                                              Int
+                                                                ( 1439,
+                                                                  Z.of_int 999
+                                                                ) ],
+                                                            [] );
+                                                        Prim
+                                                          ( 1440,
+                                                            I_DIG,
+                                                            [ Int
+                                                                ( 1441,
+                                                                  Z.of_int 2 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1442, I_DUP, [], []);
+                                                        Prim
+                                                          ( 1443,
+                                                            I_DUG,
+                                                            [ Int
+                                                                ( 1444,
+                                                                  Z.of_int 3 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1445, I_MUL, [], []);
+                                                        Prim
+                                                          ( 1446,
+                                                            I_PUSH,
+                                                            [ Prim
+                                                                ( 1447,
+                                                                  T_nat,
+                                                                  [],
+                                                                  [] );
+                                                              Int
+                                                                ( 1448,
+                                                                  Z.of_int 1000
+                                                                ) ],
+                                                            [] );
+                                                        Prim
+                                                          ( 1449,
+                                                            I_DIG,
+                                                            [ Int
+                                                                ( 1450,
+                                                                  Z.of_int 4 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1451, I_MUL, [], []);
+                                                        Prim
+                                                          (1452, I_ADD, [], []);
+                                                        Prim
+                                                          ( 1453,
+                                                            I_DIG,
+                                                            [ Int
+                                                                ( 1454,
+                                                                  Z.of_int 5 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1455, I_DUP, [], []);
+                                                        Prim
+                                                          ( 1456,
+                                                            I_DUG,
+                                                            [ Int
+                                                                ( 1457,
+                                                                  Z.of_int 6 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1458, I_CAR, [], []);
+                                                        Prim
+                                                          ( 1459,
+                                                            I_PUSH,
+                                                            [ Prim
+                                                                ( 1460,
+                                                                  T_nat,
+                                                                  [],
+                                                                  [] );
+                                                              Int
+                                                                ( 1461,
+                                                                  Z.of_int 999
+                                                                ) ],
+                                                            [] );
+                                                        Prim
+                                                          ( 1462,
+                                                            I_DIG,
+                                                            [ Int
+                                                                ( 1463,
+                                                                  Z.of_int 4 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1464, I_DUP, [], []);
+                                                        Prim
+                                                          ( 1465,
+                                                            I_DUG,
+                                                            [ Int
+                                                                ( 1466,
+                                                                  Z.of_int 5 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1467, I_MUL, [], []);
+                                                        Prim
+                                                          (1468, I_MUL, [], []);
+                                                        Prim
+                                                          (1469, I_EDIV, [], []);
+                                                        Prim
+                                                          ( 1470,
+                                                            I_IF_NONE,
+                                                            [ Seq
+                                                                ( 1471,
+                                                                  [ Prim
+                                                                      ( 1472,
+                                                                        I_PUSH,
+                                                                        [ Prim
+                                                                            ( 1473,
+                                                                              T_string,
+                                                                              [],
+                                                                              []
+                                                                            );
+                                                                          String
+                                                                            ( 1474,
+                                                                              "DIV \
+                                                                               by \
+                                                                               0"
+                                                                            )
+                                                                        ],
+                                                                        [] );
+                                                                    Prim
+                                                                      ( 1475,
+                                                                        I_FAILWITH,
+                                                                        [],
+                                                                        [] ) ]
+                                                                );
+                                                              Seq (1476, []) ],
+                                                            [] );
+                                                        Prim
+                                                          (1477, I_CAR, [], []);
                                                         Prim
                                                           ( 1478,
                                                             I_DIG,
                                                             [ Int
                                                                 ( 1479,
-                                                                  Z.of_int 2 )
-                                                            ],
-                                                            [] );
-                                                        Prim
-                                                          (1480, I_SUB, [], []);
-                                                        Prim
-                                                          (1481, I_ABS, [], []);
-                                                        Prim
-                                                          ( 1482,
-                                                            I_PUSH,
-                                                            [ Prim
-                                                                ( 1483,
-                                                                  T_nat,
-                                                                  [],
-                                                                  [] );
-                                                              Int
-                                                                ( 1484,
-                                                                  Z.of_int 999
-                                                                ) ],
-                                                            [] );
-                                                        Prim
-                                                          (1485, I_SWAP, [], []);
-                                                        Prim
-                                                          (1486, I_DUP, [], []);
-                                                        Prim
-                                                          ( 1487,
-                                                            I_DUG,
-                                                            [ Int
-                                                                ( 1488,
-                                                                  Z.of_int 2 )
-                                                            ],
-                                                            [] );
-                                                        Prim
-                                                          (1489, I_MUL, [], []);
-                                                        Prim
-                                                          ( 1490,
-                                                            I_PUSH,
-                                                            [ Prim
-                                                                ( 1491,
-                                                                  T_nat,
-                                                                  [],
-                                                                  [] );
-                                                              Int
-                                                                ( 1492,
-                                                                  Z.of_int 1000
-                                                                ) ],
-                                                            [] );
-                                                        Prim
-                                                          ( 1493,
-                                                            I_DIG,
-                                                            [ Int
-                                                                ( 1494,
-                                                                  Z.of_int 4 )
-                                                            ],
-                                                            [] );
-                                                        Prim
-                                                          (1495, I_MUL, [], []);
-                                                        Prim
-                                                          (1496, I_ADD, [], []);
-                                                        Prim
-                                                          ( 1497,
-                                                            I_DIG,
-                                                            [ Int
-                                                                ( 1498,
-                                                                  Z.of_int 5 )
-                                                            ],
-                                                            [] );
-                                                        Prim
-                                                          (1499, I_DUP, [], []);
-                                                        Prim
-                                                          ( 1500,
-                                                            I_DUG,
-                                                            [ Int
-                                                                ( 1501,
-                                                                  Z.of_int 6 )
-                                                            ],
-                                                            [] );
-                                                        Prim
-                                                          (1502, I_CAR, [], []);
-                                                        Prim
-                                                          ( 1503,
-                                                            I_PUSH,
-                                                            [ Prim
-                                                                ( 1504,
-                                                                  T_nat,
-                                                                  [],
-                                                                  [] );
-                                                              Int
-                                                                ( 1505,
-                                                                  Z.of_int 999
-                                                                ) ],
-                                                            [] );
-                                                        Prim
-                                                          ( 1506,
-                                                            I_DIG,
-                                                            [ Int
-                                                                ( 1507,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1508, I_MUL, [], []);
+                                                          (1480, I_SWAP, [], []);
                                                         Prim
-                                                          (1509, I_MUL, [], []);
+                                                          (1481, I_DUP, [], []);
                                                         Prim
-                                                          (1510, I_EDIV, [], []);
-                                                        Prim
-                                                          ( 1511,
-                                                            I_IF_NONE,
-                                                            [ Seq
-                                                                ( 1512,
-                                                                  [ Prim
-                                                                      ( 1513,
-                                                                        I_PUSH,
-                                                                        [ Prim
-                                                                            ( 1514,
-                                                                              T_string,
-                                                                              [],
-                                                                              []
-                                                                            );
-                                                                          String
-                                                                            ( 1515,
-                                                                              "DIV \
-                                                                               by \
-                                                                               0"
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1516,
-                                                                        I_FAILWITH,
-                                                                        [],
-                                                                        [] ) ]
-                                                                );
-                                                              Seq (1517, []) ],
-                                                            [] );
-                                                        Prim
-                                                          (1518, I_CAR, [], []);
-                                                        Prim
-                                                          ( 1519,
-                                                            I_DIG,
-                                                            [ Int
-                                                                ( 1520,
-                                                                  Z.of_int 2 )
-                                                            ],
-                                                            [] );
-                                                        Prim
-                                                          (1521, I_SWAP, [], []);
-                                                        Prim
-                                                          (1522, I_DUP, [], []);
-                                                        Prim
-                                                          ( 1523,
+                                                          ( 1482,
                                                             I_DUG,
                                                             [ Int
-                                                                ( 1524,
+                                                                ( 1483,
                                                                   Z.of_int 2 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1525,
+                                                          ( 1484,
                                                             I_COMPARE,
                                                             [],
                                                             [] );
                                                         Prim
-                                                          (1526, I_LT, [], []);
+                                                          (1485, I_LT, [], []);
                                                         Prim
-                                                          ( 1527,
+                                                          ( 1486,
                                                             I_IF,
                                                             [ Seq
-                                                                ( 1528,
+                                                                ( 1487,
                                                                   [ Prim
-                                                                      ( 1529,
+                                                                      ( 1488,
                                                                         I_DROP,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1530,
+                                                                      ( 1489,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1531,
+                                                                            ( 1490,
                                                                               T_nat,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Int
-                                                                            ( 1532,
+                                                                            ( 1491,
                                                                               Z
                                                                               .of_int
                                                                                18
@@ -8955,58 +8603,58 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1533,
+                                                                      ( 1492,
                                                                         I_FAILWITH,
                                                                         [],
                                                                         [] ) ]
                                                                 );
-                                                              Seq (1534, []) ],
+                                                              Seq (1493, []) ],
                                                             [] );
                                                         Prim
-                                                          (1535, I_DUP, [], []);
+                                                          (1494, I_DUP, [], []);
                                                         Prim
-                                                          ( 1536,
+                                                          ( 1495,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1537,
-                                                                  Z.of_int 4 )
-                                                            ],
-                                                            [] );
-                                                        Prim
-                                                          (1538, I_DUP, [], []);
-                                                        Prim
-                                                          ( 1539,
-                                                            I_DUG,
-                                                            [ Int
-                                                                ( 1540,
+                                                                ( 1496,
                                                                   Z.of_int 5 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1541, I_CAR, [], []);
+                                                          (1497, I_DUP, [], []);
                                                         Prim
-                                                          (1542, I_SUB, [], []);
+                                                          ( 1498,
+                                                            I_DUG,
+                                                            [ Int
+                                                                ( 1499,
+                                                                  Z.of_int 6 )
+                                                            ],
+                                                            [] );
                                                         Prim
-                                                          ( 1543,
+                                                          (1500, I_CAR, [], []);
+                                                        Prim
+                                                          (1501, I_SUB, [], []);
+                                                        Prim
+                                                          ( 1502,
                                                             I_ISNAT,
                                                             [],
                                                             [] );
                                                         Prim
-                                                          ( 1544,
+                                                          ( 1503,
                                                             I_IF_NONE,
                                                             [ Seq
-                                                                ( 1545,
+                                                                ( 1504,
                                                                   [ Prim
-                                                                      ( 1546,
+                                                                      ( 1505,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1547,
+                                                                            ( 1506,
                                                                               T_nat,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Int
-                                                                            ( 1548,
+                                                                            ( 1507,
                                                                               Z
                                                                               .of_int
                                                                                19
@@ -9014,208 +8662,191 @@ let script =
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1549,
+                                                                      ( 1508,
                                                                         I_FAILWITH,
                                                                         [],
                                                                         [] ) ]
                                                                 );
-                                                              Seq (1550, []) ],
+                                                              Seq (1509, []) ],
                                                             [] );
                                                         Prim
-                                                          ( 1551,
+                                                          ( 1510,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1552,
-                                                                  Z.of_int 4 )
-                                                            ],
-                                                            [] );
-                                                        Prim
-                                                          (1553, I_DUP, [], []);
-                                                        Prim
-                                                          ( 1554,
-                                                            I_DUG,
-                                                            [ Int
-                                                                ( 1555,
+                                                                ( 1511,
                                                                   Z.of_int 5 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1556, I_CDR, [], []);
+                                                          (1512, I_DUP, [], []);
                                                         Prim
-                                                          (1557, I_CDR, [], []);
+                                                          ( 1513,
+                                                            I_DUG,
+                                                            [ Int
+                                                                ( 1514,
+                                                                  Z.of_int 6 )
+                                                            ],
+                                                            [] );
                                                         Prim
-                                                          ( 1558,
+                                                          (1515, I_CDR, [], []);
+                                                        Prim
+                                                          (1516, I_CDR, [], []);
+                                                        Prim
+                                                          ( 1517,
                                                             I_PUSH,
                                                             [ Prim
-                                                                ( 1559,
+                                                                ( 1518,
                                                                   T_mutez,
                                                                   [],
                                                                   [] );
-                                                              Int (1560, Z.one)
+                                                              Int (1519, Z.one)
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1561,
+                                                          ( 1520,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1562,
-                                                                  Z.of_int 4 )
-                                                            ],
-                                                            [] );
-                                                        Prim
-                                                          (1563, I_DUP, [], []);
-                                                        Prim
-                                                          ( 1564,
-                                                            I_DUG,
-                                                            [ Int
-                                                                ( 1565,
+                                                                ( 1521,
                                                                   Z.of_int 5 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1566, I_MUL, [], []);
+                                                          (1522, I_MUL, [], []);
                                                         Prim
-                                                          ( 1567,
-                                                            I_AMOUNT,
-                                                            [],
-                                                            [] );
-                                                        Prim
-                                                          ( 1568,
+                                                          ( 1523,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1569,
+                                                                ( 1524,
+                                                                  Z.of_int 6 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1525, I_DUP, [], []);
+                                                        Prim
+                                                          ( 1526,
+                                                            I_DUG,
+                                                            [ Int
+                                                                ( 1527,
                                                                   Z.of_int 7 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1570, I_DUP, [], []);
+                                                          (1528, I_CDR, [], []);
                                                         Prim
-                                                          ( 1571,
-                                                            I_DUG,
-                                                            [ Int
-                                                                ( 1572,
-                                                                  Z.of_int 8 )
-                                                            ],
-                                                            [] );
+                                                          (1529, I_CAR, [], []);
                                                         Prim
-                                                          (1573, I_CDR, [], []);
+                                                          (1530, I_ADD, [], []);
                                                         Prim
-                                                          (1574, I_CAR, [], []);
+                                                          (1531, I_PAIR, [], []);
                                                         Prim
-                                                          (1575, I_ADD, [], []);
-                                                        Prim
-                                                          (1576, I_SUB, [], []);
-                                                        Prim
-                                                          (1577, I_PAIR, [], []);
-                                                        Prim
-                                                          ( 1578,
+                                                          ( 1532,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1579,
+                                                                ( 1533,
                                                                   Z.of_int 5 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1580, I_CAR, [], []);
+                                                          (1534, I_CAR, [], []);
                                                         Prim
-                                                          (1581, I_PAIR, [], []);
+                                                          (1535, I_PAIR, [], []);
                                                         Prim
-                                                          (1582, I_CDR, [], []);
+                                                          (1536, I_CDR, [], []);
                                                         Prim
-                                                          (1583, I_SWAP, [], []);
+                                                          (1537, I_SWAP, [], []);
                                                         Prim
-                                                          (1584, I_PAIR, [], []);
+                                                          (1538, I_PAIR, [], []);
                                                         Prim
-                                                          (1585, I_SWAP, [], []);
+                                                          (1539, I_SWAP, [], []);
                                                         Prim
-                                                          ( 1586,
+                                                          ( 1540,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1587,
+                                                                ( 1541,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1588, I_PAIR, [], []);
+                                                          (1542, I_PAIR, [], []);
                                                         Prim
-                                                          (1589, I_SELF, [], []);
+                                                          (1543, I_SELF, [], []);
                                                         Prim
-                                                          ( 1590,
+                                                          ( 1544,
                                                             I_ADDRESS,
                                                             [],
                                                             [] );
                                                         Prim
-                                                          (1591, I_PAIR, [], []);
+                                                          (1545, I_PAIR, [], []);
                                                         Prim
-                                                          (1592, I_SWAP, [], []);
+                                                          (1546, I_SWAP, [], []);
                                                         Prim
-                                                          (1593, I_DUP, [], []);
+                                                          (1547, I_DUP, [], []);
                                                         Prim
-                                                          ( 1594,
+                                                          ( 1548,
                                                             I_DUG,
                                                             [ Int
-                                                                ( 1595,
+                                                                ( 1549,
                                                                   Z.of_int 2 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1596, I_SWAP, [], []);
+                                                          (1550, I_SWAP, [], []);
                                                         Prim
-                                                          (1597, I_DUP, [], []);
+                                                          (1551, I_DUP, [], []);
                                                         Prim
-                                                          (1598, I_CDR, [], []);
+                                                          (1552, I_CDR, [], []);
                                                         Prim
-                                                          (1599, I_SWAP, [], []);
+                                                          (1553, I_SWAP, [], []);
                                                         Prim
-                                                          (1600, I_CAR, [], []);
+                                                          (1554, I_CAR, [], []);
                                                         Prim
-                                                          (1601, I_SWAP, [], []);
+                                                          (1555, I_SWAP, [], []);
                                                         Prim
-                                                          (1602, I_DUP, [], []);
+                                                          (1556, I_DUP, [], []);
                                                         Prim
-                                                          (1603, I_CDR, [], []);
+                                                          (1557, I_CDR, [], []);
                                                         Prim
-                                                          (1604, I_SWAP, [], []);
+                                                          (1558, I_SWAP, [], []);
                                                         Prim
-                                                          (1605, I_CAR, [], []);
+                                                          (1559, I_CAR, [], []);
                                                         Prim
-                                                          ( 1606,
+                                                          ( 1560,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1607,
+                                                                ( 1561,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1608, I_CDR, [], []);
+                                                          (1562, I_CDR, [], []);
                                                         Prim
-                                                          (1609, I_CDR, [], []);
+                                                          (1563, I_CDR, [], []);
                                                         Prim
-                                                          (1610, I_CDR, [], []);
+                                                          (1564, I_CDR, [], []);
                                                         Prim
-                                                          (1611, I_CAR, [], []);
+                                                          (1565, I_CAR, [], []);
                                                         Prim
-                                                          ( 1612,
+                                                          ( 1566,
                                                             I_CONTRACT,
                                                             [ Prim
-                                                                ( 1613,
+                                                                ( 1567,
                                                                   T_pair,
                                                                   [ Prim
-                                                                      ( 1614,
+                                                                      ( 1568,
                                                                         T_address,
                                                                         [],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1615,
+                                                                      ( 1569,
                                                                         T_pair,
                                                                         [ Prim
-                                                                            ( 1616,
+                                                                            ( 1570,
                                                                               T_address,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Prim
-                                                                            ( 1617,
+                                                                            ( 1571,
                                                                               T_nat,
                                                                               [],
                                                                               []
@@ -9225,364 +8856,212 @@ let script =
                                                                   [] ) ],
                                                             ["%transfer"] );
                                                         Prim
-                                                          ( 1618,
+                                                          ( 1572,
                                                             I_IF_NONE,
                                                             [ Seq
-                                                                ( 1619,
+                                                                ( 1573,
                                                                   [ Prim
-                                                                      ( 1620,
+                                                                      ( 1574,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1621,
+                                                                            ( 1575,
                                                                               T_nat,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Int
-                                                                            ( 1622,
+                                                                            ( 1576,
                                                                               Z
                                                                               .zero
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1623,
+                                                                      ( 1577,
                                                                         I_FAILWITH,
                                                                         [],
                                                                         [] ) ]
                                                                 );
-                                                              Seq (1624, []) ],
+                                                              Seq (1578, []) ],
                                                             [] );
                                                         Prim
-                                                          ( 1625,
+                                                          ( 1579,
                                                             I_PUSH,
                                                             [ Prim
-                                                                ( 1626,
+                                                                ( 1580,
                                                                   T_mutez,
                                                                   [],
                                                                   [] );
-                                                              Int (1627, Z.zero)
+                                                              Int (1581, Z.zero)
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1628,
+                                                          ( 1582,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1629,
+                                                                ( 1583,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1630,
+                                                          ( 1584,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1631,
+                                                                ( 1585,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1632, I_PAIR, [], []);
+                                                          (1586, I_PAIR, [], []);
                                                         Prim
-                                                          ( 1633,
+                                                          ( 1587,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1634,
+                                                                ( 1588,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1635, I_PAIR, [], []);
+                                                          (1589, I_PAIR, [], []);
                                                         Prim
-                                                          ( 1636,
+                                                          ( 1590,
                                                             I_TRANSFER_TOKENS,
                                                             [],
                                                             [] );
                                                         Prim
-                                                          ( 1637,
+                                                          ( 1591,
                                                             I_PUSH,
                                                             [ Prim
-                                                                ( 1638,
-                                                                  T_nat,
+                                                                ( 1592,
+                                                                  T_mutez,
                                                                   [],
                                                                   [] );
-                                                              Int (1639, Z.zero)
+                                                              Int (1593, Z.one)
                                                             ],
                                                             [] );
                                                         Prim
-                                                          ( 1640,
+                                                          ( 1594,
                                                             I_DIG,
                                                             [ Int
-                                                                ( 1641,
+                                                                ( 1595,
                                                                   Z.of_int 3 )
                                                             ],
                                                             [] );
                                                         Prim
-                                                          (1642, I_DUP, [], []);
+                                                          (1596, I_MUL, [], []);
                                                         Prim
-                                                          ( 1643,
-                                                            I_DUG,
-                                                            [ Int
-                                                                ( 1644,
-                                                                  Z.of_int 4 )
-                                                            ],
+                                                          ( 1597,
+                                                            I_PUSH,
+                                                            [ Prim
+                                                                ( 1598,
+                                                                  T_address,
+                                                                  [],
+                                                                  [] );
+                                                              String
+                                                                ( 1599,
+                                                                  "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+                                                                ) ],
                                                             [] );
                                                         Prim
-                                                          ( 1645,
-                                                            I_COMPARE,
-                                                            [],
+                                                          ( 1600,
+                                                            I_CONTRACT,
+                                                            [ Prim
+                                                                ( 1601,
+                                                                  T_unit,
+                                                                  [],
+                                                                  [] ) ],
                                                             [] );
                                                         Prim
-                                                          (1646, I_GT, [], []);
-                                                        Prim
-                                                          ( 1647,
-                                                            I_IF,
+                                                          ( 1602,
+                                                            I_IF_NONE,
                                                             [ Seq
-                                                                ( 1648,
+                                                                ( 1603,
                                                                   [ Prim
-                                                                      ( 1649,
+                                                                      ( 1604,
                                                                         I_PUSH,
                                                                         [ Prim
-                                                                            ( 1650,
-                                                                              T_mutez,
+                                                                            ( 1605,
+                                                                              T_nat,
                                                                               [],
                                                                               []
                                                                             );
                                                                           Int
-                                                                            ( 1651,
-                                                                              Z
-                                                                              .one
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1652,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1653,
+                                                                            ( 1606,
                                                                               Z
                                                                               .of_int
-                                                                               3
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1654,
-                                                                        I_MUL,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1655,
-                                                                        I_PUSH,
-                                                                        [ Prim
-                                                                            ( 1656,
-                                                                              T_address,
-                                                                              [],
-                                                                              []
-                                                                            );
-                                                                          String
-                                                                            ( 1657,
-                                                                              "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1658,
-                                                                        I_CONTRACT,
-                                                                        [ Prim
-                                                                            ( 1659,
-                                                                              T_unit,
-                                                                              [],
-                                                                              []
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1660,
-                                                                        I_IF_NONE,
-                                                                        [ Seq
-                                                                            ( 1661,
-                                                                              [ 
-                                                                              Prim
-                                                                               ( 
-                                                                               1662,
-                                                                               I_PUSH,
-                                                                               [ 
-                                                                               Prim
-                                                                               ( 
-                                                                               1663,
-                                                                               T_nat,
-                                                                               [],
-                                                                               []
-                                                                               );
-                                                                               Int
-                                                                               ( 
-                                                                               1664,
-                                                                               Z
-                                                                               .of_int
                                                                                9
-                                                                               )
-                                                                               ],
-                                                                               []
-                                                                               );
-                                                                               Prim
-                                                                               ( 
-                                                                               1665,
-                                                                               I_FAILWITH,
-                                                                               [],
-                                                                               []
-                                                                               )
-                                                                              ]
-                                                                            );
-                                                                          Seq
-                                                                            ( 1666,
-                                                                              []
                                                                             )
                                                                         ],
                                                                         [] );
                                                                     Prim
-                                                                      ( 1667,
-                                                                        I_SWAP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1668,
-                                                                        I_PUSH,
-                                                                        [ Prim
-                                                                            ( 1669,
-                                                                              T_unit,
-                                                                              [],
-                                                                              []
-                                                                            );
-                                                                          Prim
-                                                                            ( 1670,
-                                                                              D_Unit,
-                                                                              [],
-                                                                              []
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1671,
-                                                                        I_TRANSFER_TOKENS,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1672,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1673,
-                                                                              Z
-                                                                              .of_int
-                                                                               2
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1674,
-                                                                        I_NIL,
-                                                                        [ Prim
-                                                                            ( 1675,
-                                                                              T_operation,
-                                                                              [],
-                                                                              []
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1676,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1677,
-                                                                              Z
-                                                                              .of_int
-                                                                               2
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1678,
-                                                                        I_CONS,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1679,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1680,
-                                                                              Z
-                                                                              .of_int
-                                                                               2
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1681,
-                                                                        I_CONS,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1682,
-                                                                        I_PAIR,
+                                                                      ( 1607,
+                                                                        I_FAILWITH,
                                                                         [],
                                                                         [] ) ]
                                                                 );
-                                                              Seq
-                                                                ( 1683,
-                                                                  [ Prim
-                                                                      ( 1684,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1685,
-                                                                              Z
-                                                                              .of_int
-                                                                               2
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1686,
-                                                                        I_DROP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1687,
-                                                                        I_SWAP,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1688,
-                                                                        I_NIL,
-                                                                        [ Prim
-                                                                            ( 1689,
-                                                                              T_operation,
-                                                                              [],
-                                                                              []
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1690,
-                                                                        I_DIG,
-                                                                        [ Int
-                                                                            ( 1691,
-                                                                              Z
-                                                                              .of_int
-                                                                               2
-                                                                            )
-                                                                        ],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1692,
-                                                                        I_CONS,
-                                                                        [],
-                                                                        [] );
-                                                                    Prim
-                                                                      ( 1693,
-                                                                        I_PAIR,
-                                                                        [],
-                                                                        [] ) ]
-                                                                ) ],
-                                                            [] ) ] ) ],
+                                                              Seq (1608, []) ],
+                                                            [] );
+                                                        Prim
+                                                          (1609, I_SWAP, [], []);
+                                                        Prim
+                                                          ( 1610,
+                                                            I_PUSH,
+                                                            [ Prim
+                                                                ( 1611,
+                                                                  T_unit,
+                                                                  [],
+                                                                  [] );
+                                                              Prim
+                                                                ( 1612,
+                                                                  D_Unit,
+                                                                  [],
+                                                                  [] ) ],
+                                                            [] );
+                                                        Prim
+                                                          ( 1613,
+                                                            I_TRANSFER_TOKENS,
+                                                            [],
+                                                            [] );
+                                                        Prim
+                                                          ( 1614,
+                                                            I_DIG,
+                                                            [ Int
+                                                                ( 1615,
+                                                                  Z.of_int 2 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          ( 1616,
+                                                            I_NIL,
+                                                            [ Prim
+                                                                ( 1617,
+                                                                  T_operation,
+                                                                  [],
+                                                                  [] ) ],
+                                                            [] );
+                                                        Prim
+                                                          ( 1618,
+                                                            I_DIG,
+                                                            [ Int
+                                                                ( 1619,
+                                                                  Z.of_int 2 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1620, I_CONS, [], []);
+                                                        Prim
+                                                          ( 1621,
+                                                            I_DIG,
+                                                            [ Int
+                                                                ( 1622,
+                                                                  Z.of_int 2 )
+                                                            ],
+                                                            [] );
+                                                        Prim
+                                                          (1623, I_CONS, [], []);
+                                                        Prim
+                                                          (1624, I_PAIR, [], [])
+                                                      ] ) ],
                                                 [] ) ] ) ],
                                     [] ) ] ) ],
                         [] ) ] ) ],
