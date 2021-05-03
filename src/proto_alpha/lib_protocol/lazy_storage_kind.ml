@@ -30,6 +30,9 @@ module type Temp_id = sig
 
   val init : t
 
+  (* Remove me after Granada *)
+  val threshold_for_edo_florence_dangling_lazy_storage_cleanup : t
+
   val next : t -> t
 end
 
@@ -131,6 +134,10 @@ module MakeId (Title : Title) : TitleWithId = struct
       let equal = Z.equal
 
       let init = Z.of_int ~-1
+
+      (* Remove me after Granada *)
+      let threshold_for_edo_florence_dangling_lazy_storage_cleanup =
+        Z.of_int ~-99
 
       let next z = Z.sub z Z.one
     end
@@ -257,17 +264,29 @@ module Temp_ids = struct
       sapling_state = Sapling_state.Id.Temp.init;
     }
 
+  (* Remove me after Granada *)
+  let threshold_for_edo_florence_dangling_lazy_storage_cleanup =
+    {
+      big_map =
+        Big_map.Id.Temp
+        .threshold_for_edo_florence_dangling_lazy_storage_cleanup;
+      sapling_state =
+        Sapling_state.Id.Temp
+        .threshold_for_edo_florence_dangling_lazy_storage_cleanup;
+    }
+
   let fresh : type i a u. (i, a, u) kind -> t -> t * i =
    fun kind temp_ids ->
     match kind with
     | Big_map ->
         let big_map = Big_map.Id.Temp.next temp_ids.big_map in
-        ({temp_ids with big_map}, (big_map :> Big_map.Id.t))
+        ({temp_ids with big_map}, (temp_ids.big_map :> Big_map.Id.t))
     | Sapling_state ->
         let sapling_state =
           Sapling_state.Id.Temp.next temp_ids.sapling_state
         in
-        ({temp_ids with sapling_state}, (sapling_state :> Sapling_state.Id.t))
+        ( {temp_ids with sapling_state},
+          (temp_ids.sapling_state :> Sapling_state.Id.t) )
    [@@coq_axiom_with_reason "gadt"]
 
   let fold_s :

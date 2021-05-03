@@ -325,6 +325,106 @@ let test_migration_transfer ?migration_spec () =
     ~info:"transfer"
     ()
 
+(** Check the dangling temp big maps cleanup performed at stitching from
+    Florence to Granada leaves existing non-temp big maps unchanged.
+    (and also check that dangling temp big maps are actually cleaned up)
+    This test can be removed once that stitching code is removed.
+*)
+let test_granada_migration_temp_big_maps =
+  let big_map_get_opt ~id ~key_hash client =
+    Lwt.catch
+      (fun () ->
+        let* v = RPC.Big_maps.get ~id:(string_of_int id) ~key_hash client in
+        Lwt.return_some v)
+      (fun _exn -> Lwt.return_none)
+  in
+  let find_big_maps_with_key_1 client =
+    (* There is no RPC to list all big maps, let's approximate the list of all
+       big maps by iterating over -5 .. 5 and collecting only big maps that
+       have key 1 *)
+    let key1 =
+      "expru2dKqDfZG8hu4wNGkiyunvq2hdSKuVYtcKta7BWP6Q18oNxKjS"
+      (* result of [tezos-client hash data 1 of type int] *)
+    in
+    let key2 =
+      "expruDuAZnFKqmLoisJqUGqrNzXTvw7PJM2rYk97JErM5FHCerQqgn"
+      (* result of [tezos-client hash data 2 of type int] *)
+    in
+    let min_id = -5 in
+    let max_id = 5 in
+    let rec aux acc id =
+      if id < min_id then return acc
+      else
+        let* val1_opt = big_map_get_opt ~id ~key_hash:key1 client in
+        match val1_opt with
+        | None ->
+            aux acc (pred id)
+        | Some val1 ->
+            let* val2_opt = big_map_get_opt ~id ~key_hash:key2 client in
+            aux ((id, val1, val2_opt) :: acc) (pred id)
+    in
+    aux [] max_id
+  in
+  let pre_migration client =
+    let* _contract_address =
+      Client.originate_contract
+        ~alias:"temp_big_maps"
+        ~amount:Tez.zero
+        ~src:"bootstrap1"
+        ~prg:"file:./tezt/tests/contracts/proto_alpha/temp_big_maps.tz"
+        ~init:"{ Elt 1 3; Elt 2 4 }"
+        ~burn_cap:(Tez.of_int 2)
+        client
+    in
+    let* () = Client.bake_for ~key:"bootstrap1" client in
+    let param =
+      "Pair (Left True) 1"
+      (* create a fresh big map containing { 1 -> 2 } and pass it as parameter *)
+    in
+    let* () =
+      Client.transfer
+        ~amount:Tez.zero
+        ~giver:"bootstrap1"
+        ~receiver:"temp_big_maps"
+        ~param
+        client
+    in
+    let* () = Client.bake_for ~key:"bootstrap1" client in
+    let* big_maps = find_big_maps_with_key_1 client in
+    if List.length big_maps <= 0 then
+      Test.fail
+        "No big maps found after initializing the contract, did we use the \
+         correct RPC?" ;
+    let (non_temp_big_maps, temp_big_maps) =
+      List.partition (fun (id, _, _) -> id >= 0) big_maps
+    in
+    if List.length temp_big_maps <= 0 then
+      Test.fail "Dangling temporary big map expected in Edo and Florence" ;
+    Lwt.return non_temp_big_maps
+  in
+  let post_migration client pre_big_maps =
+    let* post_big_maps = find_big_maps_with_key_1 client in
+    (* Liquidity baking big maps introduced at Granada stitching won't be
+       returned by [find_big_maps_with_key_1] *)
+    if pre_big_maps <> post_big_maps then
+      Test.fail
+        "Big maps have changed, either dangling temporary ones were not \
+         cleaned or non-temporary ones have changed" ;
+    Lwt.return_unit
+  in
+  fun () ->
+    Test.register
+      ~__FILE__
+      ~title:"(Florence -> Alpha) dangling temp big maps cleanup"
+      ~tags:["mockup"; "migration"]
+      (fun () ->
+        perform_migration
+          ~protocol:Protocol.Florence
+          ~next_protocol:Protocol.Alpha
+          ~next_constants:Protocol.default_constants
+          ~pre_migration
+          ~post_migration)
+
 (* Check constants equality between that obtained by directly initializing
    a mockup context at alpha and that obtained by migrating from
    alpha~1 to alpha *)
@@ -421,4 +521,6 @@ let register ~protocols =
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to
 
-let register_protocol_independent () = test_migration_transfer ()
+let register_protocol_independent () =
+  test_migration_transfer () ;
+  test_granada_migration_temp_big_maps ()

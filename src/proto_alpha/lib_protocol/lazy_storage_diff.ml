@@ -391,3 +391,15 @@ let cleanup_temporaries ctxt =
         Lazy_storage_kind.all
       >|= fun ctxt -> (ctxt, Lazy_storage_kind.Temp_ids.init))
   [@@coq_axiom_with_reason "gadt"]
+
+(* Remove me after Granada *)
+let cleanup_edo_florence_dangling_lazy_storage ctxt =
+  let (ctxt, ()) =
+    Raw_context.fold_map_temporary_lazy_storage_ids
+      ctxt
+      (fun _prev_temp_ids_should_be_zero ->
+        ( Lazy_storage_kind.Temp_ids
+          .threshold_for_edo_florence_dangling_lazy_storage_cleanup,
+          () ))
+  in
+  cleanup_temporaries ctxt

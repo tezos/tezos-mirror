@@ -109,6 +109,15 @@ let get_levels_in_current_cycle ?node ?hooks ?(chain = "main")
   in
   Client.rpc ?node ?hooks GET path client
 
+module Big_maps = struct
+  let get ?node ?hooks ?(chain = "main") ?(block = "head") ~id ~key_hash client
+      =
+    let path =
+      ["chains"; chain; "blocks"; block; "context"; "big_maps"; id; key_hash]
+    in
+    Client.rpc ?node ?hooks GET path client
+end
+
 module Contracts = struct
   let spawn_get_all ?node ?hooks ?(chain = "main") ?(block = "head") client =
     let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in

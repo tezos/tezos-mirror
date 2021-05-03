@@ -63,5 +63,6 @@ let () =
       ("time", Test_time_repr.tests);
       ("constants", Test_constants.tests);
       ("level module", Test_level_module.tests);
-      ("liquidity baking", Test_liquidity_baking.tests) ]
+      ("liquidity baking", Test_liquidity_baking.tests);
+      ("temp big maps", Test_temp_big_maps.tests) ]
   |> Lwt_main.run

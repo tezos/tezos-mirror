@@ -367,7 +367,7 @@ let gen_and_show_keys ~alias client =
   show_address ~show_secret:true ~alias client
 
 let spawn_transfer ?node ?(wait = "none") ?burn_cap ?fee ?gas_limit
-    ?storage_limit ~amount ~giver ~receiver client =
+    ?storage_limit ?param ~amount ~giver ~receiver client =
   spawn_command
     ?node
     client
@@ -388,10 +388,11 @@ let spawn_transfer ?node ?(wait = "none") ?burn_cap ?fee ?gas_limit
     @ Option.fold
         ~none:[]
         ~some:(fun s -> ["--storage-limit"; string_of_int s])
-        storage_limit )
+        storage_limit
+    @ Option.fold ~none:[] ~some:(fun p -> ["--arg"; p]) param )
 
-let transfer ?node ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ~amount
-    ~giver ~receiver client =
+let transfer ?node ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?param
+    ~amount ~giver ~receiver client =
   spawn_transfer
     ?node
     ?wait
@@ -399,6 +400,7 @@ let transfer ?node ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ~amount
     ?fee
     ?gas_limit
     ?storage_limit
+    ?param
     ~amount
     ~giver
     ~receiver

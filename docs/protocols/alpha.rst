@@ -83,6 +83,10 @@ Minor changes
 
 - Fix handling of potential integer overflow in `Time_repr` addition `Protocol/time_repr: check for potential overflow on addition <https://gitlab.com/tezos/tezos/-/merge_requests/2660>`_
 
+- Fix dangling temporary big maps preventing originating contracts with fresh big maps or passing fresh big maps to another contract,
+  solves issue `#1154 <https://gitlab.com/tezos/tezos/-/issues/1154>`__
+  `<https://gitlab.com/tezos/tezos/-/merge_requests/2839>`__
+
 - Increased the max operation time to live (`max_op_ttl`) from 60 to
   120
 
