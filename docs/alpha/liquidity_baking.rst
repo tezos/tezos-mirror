@@ -10,7 +10,7 @@ Contracts
 
 During protocol stitching a constant product market making (CPMM) Michelson contract is deployed on the chain with address ``KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5`` as well as an associated liquidity token contract with address ``KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo``.
 
-The CPMM maintains a balance of ``a`` tez and ``b`` `tzBTC <https://tzbtc.io/>`_, where tzBTC is the `FA1.2 token <https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md>`_  found at address KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn. The smart contract accepts deposits of ``da`` tez and returns ``db`` tzBTC (or vice versa) where the invariant ``(a + da * (1 - f - n)) * (b - db) = a b`` is preserved, and ``f`` and ``n`` are a fee and burn, set at 0.1% each. Calculations are done with precision of 1000, rounding down on division.
+The CPMM maintains a balance of ``a`` tez and ``b`` `tzBTC <https://tzbtc.io/>`_, where tzBTC is the `FA1.2 token <https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md>`_  found at address ``KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn``. The smart contract accepts deposits of ``da`` tez and returns ``db`` tzBTC (or vice versa) where the invariant ``(a + da * (1 - f - n)) * (b - db) = a b`` is preserved, and ``f`` and ``n`` are a fee and burn, set at 0.1% each. Calculations are done with precision of 1000, rounding down on division.
 
 To implement this contract, we use a fork of the open source code base used by `version two <https://gitlab.com/dexter2tz/dexter2tz>`_ of the "Dexter" project. The implementation of this contract has been `formally verified <https://gitlab.com/dexter2tz/dexter2tz/-/blob/master/dexter_spec.v>`_ against its functional specification. The contract code is modified in the following way:
 
@@ -18,7 +18,7 @@ To implement this contract, we use a fork of the open source code base used by `
 2. An additional 0.1% of every trade is burned by being transferred to the null implicit account. Rationale: this mechanism offsets inflation from the subsidy. The inflation is exactly balanced at a daily trade volume of 7.2 million tez.
 3. The ability to set a delegate has been removed. Rationale: the subsidy means there is no need for a baker for that contract and having one would create an imbalance.
 4. The ability to set a manager has been removed. Rationale: the only privilege of the Dexter manager is to set Dexter's delegate so this role is now unnecessary.
- 
+
 Subsidy
 ~~~~~~~
 
