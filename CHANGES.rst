@@ -88,11 +88,6 @@ Node
 -  Fixed a bug that caused the lack of connection in private network
    with ``--connections`` set to 1.
 
-- Updated the behaviour of the ``TEZOS_STORAGE`` environment variable
-  which aims to display the logs of the Irmin's context backend. It
-  now allows to display ``Info`` logs using the ``v`` value. ``Debug``
-  logs are now available through ``vv``.
-
 -  Fixed a potential interleaving of distinct events written to a file
    descriptor sink simultaneously.
 
@@ -104,6 +99,14 @@ Node
   `config.json` configuration file. If the number of additional cycles
   is not explicitly specified, the default value is used. The default
   number of additional cycles to keep is set to 5.
+
+-  You can now control the verbosity of the logs of the context
+   storage backend using the ``TEZOS_CONTEXT`` environment
+   variable. Set it to ``v`` to display log messages with level "info"
+   or to ``vv`` to also display log messages with level "debug".
+
+-  The ``TEZOS_STORAGE`` variable now has no effect. Use
+   ``TEZOS_CONTEXT`` instead (see previous item).
 
 Client
 ------
