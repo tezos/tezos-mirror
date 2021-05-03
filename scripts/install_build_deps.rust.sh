@@ -30,8 +30,8 @@ fi
 
 if ! [[ "$(rustc --version | cut -d' ' -f2)" == *"$rust_version"* ]]; then
     echo "\
-Wrong Rust version. This is probably because you have used `rustup
-override` in the past. Run the following command from your
+Wrong Rust version. This is probably because you have used \`rustup
+override\` in the past. Run the following command from your
 favorite shell, and retry to install the dependencies:
 $ rustup override unset"
     exit 1
