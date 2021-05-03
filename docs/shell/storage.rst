@@ -162,3 +162,9 @@ It is possible to export a concrete context associated to a specific
 block's ledger state. This feature dumps a canonical representation of
 this ledger state that may be incorporated in a snapshot to expose a
 minimal storage state.
+
+Note that it is possible to enable logging for the context backend
+using the ``TEZOS_CONTEXT`` environment variable. There are two
+possible values for this variable: ``v`` for ``Info`` logging and
+``vv`` for ``Debug`` logging (warning, the ``Debug`` mode is very
+talkative).
