@@ -430,7 +430,9 @@ let commands () =
       no_options
       (prefixes ["hash"; "script"] @@ file_or_literal_param () @@ stop)
       (fun () expr_string (cctxt : Protocol_client_context.full) ->
-        let program = Michelson_v1_parser.parse_toplevel expr_string in
+        let program =
+          Michelson_v1_parser.parse_toplevel ~check:false expr_string
+        in
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
         let code = program.expanded in
@@ -748,7 +750,9 @@ let commands () =
            (cctxt : Protocol_client_context.full) ->
         (match from_format with
         | `Michelson ->
-            let program = Michelson_v1_parser.parse_toplevel expr_string in
+            let program =
+              Michelson_v1_parser.parse_toplevel ~check:false expr_string
+            in
             Lwt.return @@ Micheline_parser.no_parsing_error program
             >>=? fun program ->
             (typecheck_program
