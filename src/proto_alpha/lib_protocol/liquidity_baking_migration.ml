@@ -123,9 +123,7 @@ let originate_test_fa12 ~typecheck ctxt admin =
   let script =
     Script_repr.
       {
-        code =
-          Script_repr.lazy_expr
-            (Micheline.strip_locations Liquidity_baking_lqt.script);
+        code = Script_repr.lazy_expr Liquidity_baking_lqt.script;
         storage =
           test_fa12_init_storage (Signature.Public_key_hash.to_b58check admin);
       }
@@ -194,9 +192,7 @@ let init_common ~typecheck ?test_fa12_admin ctxt =
       let cpmm_script =
         Script_repr.
           {
-            code =
-              Script_repr.lazy_expr
-                (Micheline.strip_locations Liquidity_baking_cpmm.script);
+            code = Script_repr.lazy_expr Liquidity_baking_cpmm.script;
             storage =
               cpmm_init_storage
                 ~token_address:(Contract_repr.to_b58check token_address)
@@ -208,9 +204,7 @@ let init_common ~typecheck ?test_fa12_admin ctxt =
       let lqt_script =
         Script_repr.
           {
-            code =
-              Script_repr.lazy_expr
-                (Micheline.strip_locations Liquidity_baking_lqt.script);
+            code = Script_repr.lazy_expr Liquidity_baking_lqt.script;
             storage = lqt_init_storage (Contract_repr.to_b58check cpmm_address);
           }
       in
