@@ -2635,34 +2635,33 @@ type 'before dup_n_proof_argument =
       -> 'before dup_n_proof_argument
 
 let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
+  let annot_is_entrypoint entrypoint = function
+    | None ->
+        false
+    | Some (Field_annot l) ->
+        Compare.String.(l = entrypoint)
+  in
   let rec find_entrypoint :
-      type t. t ty -> string -> (Script.node -> Script.node) * ex_ty =
+      type t. t ty -> string -> ((Script.node -> Script.node) * ex_ty) option =
    fun t entrypoint ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) -> (
-        if
-          match al with
-          | None ->
-              false
-          | Some (Field_annot l) ->
-              Compare.String.(l = entrypoint)
-        then ((fun e -> Prim (0, D_Left, [e], [])), Ex_ty tl)
-        else if
-          match ar with
-          | None ->
-              false
-          | Some (Field_annot r) ->
-              Compare.String.(r = entrypoint)
-        then ((fun e -> Prim (0, D_Right, [e], [])), Ex_ty tr)
+        if annot_is_entrypoint entrypoint al then
+          Some ((fun e -> Prim (0, D_Left, [e], [])), Ex_ty tl)
+        else if annot_is_entrypoint entrypoint ar then
+          Some ((fun e -> Prim (0, D_Right, [e], [])), Ex_ty tr)
         else
-          try
-            let (f, t) = find_entrypoint tl entrypoint in
-            ((fun e -> Prim (0, D_Left, [f e], [])), t)
-          with Not_found ->
-            let (f, t) = find_entrypoint tr entrypoint in
-            ((fun e -> Prim (0, D_Right, [f e], [])), t) )
+          match find_entrypoint tl entrypoint with
+          | Some (f, t) ->
+              Some ((fun e -> Prim (0, D_Left, [f e], [])), t)
+          | None -> (
+            match find_entrypoint tr entrypoint with
+            | Some (f, t) ->
+                Some ((fun e -> Prim (0, D_Right, [f e], [])), t)
+            | None ->
+                None ) )
     | _ ->
-        raise Not_found
+        None
   in
   let entrypoint =
     if Compare.String.(entrypoint = "") then "default" else entrypoint
@@ -2675,8 +2674,10 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
       ->
         ok ((fun e -> e), Ex_ty full)
     | _ -> (
-      try ok (find_entrypoint full entrypoint)
-      with Not_found -> (
+      match find_entrypoint full entrypoint with
+      | Some result ->
+          ok result
+      | None -> (
         match entrypoint with
         | "default" ->
             ok ((fun e -> e), Ex_ty full)
@@ -7308,71 +7309,100 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
   let has_lazy_storage = has_lazy_storage ty in
   aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
 
+(** We namespace an error type for [fold_lazy_storage]. The error case is only
+    available when the ['error] parameter is equal to unit. *)
+module Fold_lazy_storage = struct
+  type ('acc, 'error) result =
+    | Ok : 'acc -> ('acc, 'error) result
+    | Error : ('acc, unit) result
+end
+
+(** Prematurely abort if [f] generates an error. Use this function without the
+    [unit] type for [error] if you are in a case where errors are impossible.
+*)
 let rec fold_lazy_storage :
-    type a.
-    f:'acc Lazy_storage.IdSet.fold_f ->
+    type a error.
+    f:('acc, error) Fold_lazy_storage.result Lazy_storage.IdSet.fold_f ->
     init:'acc ->
     context ->
     a ty ->
     a ->
     has_lazy_storage:a has_lazy_storage ->
-    ('acc * context) tzresult =
+    (('acc, error) Fold_lazy_storage.result * context) tzresult =
  fun ~f ~init ctxt ty x ~has_lazy_storage ->
   Gas.consume ctxt Typecheck_costs.parse_instr_cycle
   >>? fun ctxt ->
   match (has_lazy_storage, ty, x) with
   | (_, Big_map_t (_, _, _), {id = Some id}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle
-      >>? fun ctxt -> ok (f.f Big_map id init, ctxt)
+      >>? fun ctxt -> ok (f.f Big_map id (Fold_lazy_storage.Ok init), ctxt)
   | (_, Sapling_state_t _, {id = Some id}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle
-      >>? fun ctxt -> ok (f.f Sapling_state id init, ctxt)
+      >>? fun ctxt ->
+      ok (f.f Sapling_state id (Fold_lazy_storage.Ok init), ctxt)
   | (False_f, _, _) ->
-      ok (init, ctxt)
+      ok (Fold_lazy_storage.Ok init, ctxt)
   | (_, Big_map_t (_, _, _), {id = None}) ->
-      ok (init, ctxt)
+      ok (Fold_lazy_storage.Ok init, ctxt)
   | (_, Sapling_state_t _, {id = None}) ->
-      ok (init, ctxt)
-  | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) ->
+      ok (Fold_lazy_storage.Ok init, ctxt)
+  | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) -> (
       fold_lazy_storage ~f ~init ctxt tyl xl ~has_lazy_storage:hl
       >>? fun (init, ctxt) ->
-      fold_lazy_storage ~f ~init ctxt tyr xr ~has_lazy_storage:hr
+      match init with
+      | Fold_lazy_storage.Ok init ->
+          fold_lazy_storage ~f ~init ctxt tyr xr ~has_lazy_storage:hr
+      | Fold_lazy_storage.Error ->
+          ok (init, ctxt) )
   | (Union_f (has_lazy_storage, _), Union_t ((ty, _), (_, _), _), L x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
   | (Union_f (_, has_lazy_storage), Union_t ((_, _), (ty, _), _), R x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
   | (_, Option_t (_, _), None) ->
-      ok (init, ctxt)
+      ok (Fold_lazy_storage.Ok init, ctxt)
   | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
   | (List_f has_lazy_storage, List_t (ty, _), l) ->
       List.fold_left
-        (fun acc x ->
+        (fun (acc :
+               (('acc, error) Fold_lazy_storage.result * context) tzresult)
+             x ->
           acc
           >>? fun (init, ctxt) ->
-          fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage)
-        (ok (init, ctxt))
+          match init with
+          | Fold_lazy_storage.Ok init ->
+              fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
+          | Fold_lazy_storage.Error ->
+              ok (init, ctxt))
+        (ok (Fold_lazy_storage.Ok init, ctxt))
         l.elements
   | (Map_f has_lazy_storage, Map_t (_, ty, _), m) ->
       map_fold
-        (fun _ v acc ->
+        (fun _
+             v
+             (acc :
+               (('acc, error) Fold_lazy_storage.result * context) tzresult) ->
           acc
           >>? fun (init, ctxt) ->
-          fold_lazy_storage ~f ~init ctxt ty v ~has_lazy_storage)
+          match init with
+          | Fold_lazy_storage.Ok init ->
+              fold_lazy_storage ~f ~init ctxt ty v ~has_lazy_storage
+          | Fold_lazy_storage.Error ->
+              ok (init, ctxt))
         m
-        (ok (init, ctxt))
+        (ok (Fold_lazy_storage.Ok init, ctxt))
   | _ ->
       (* TODO: fix injectivity of types *) assert false
 
 let collect_lazy_storage ctxt ty x =
   let has_lazy_storage = has_lazy_storage ty in
-  fold_lazy_storage
-    ~f:{f = (fun kind id acc -> Lazy_storage.IdSet.add kind id acc)}
-    ~init:no_lazy_storage_id
-    ctxt
-    ty
-    x
-    ~has_lazy_storage
+  let f kind id (acc : (_, never) Fold_lazy_storage.result) =
+    let acc = match acc with Fold_lazy_storage.Ok acc -> acc in
+    Fold_lazy_storage.Ok (Lazy_storage.IdSet.add kind id acc)
+  in
+  fold_lazy_storage ~f:{f} ~init:no_lazy_storage_id ctxt ty x ~has_lazy_storage
+  >>? fun (ids, ctxt) ->
+  match ids with Fold_lazy_storage.Ok ids -> ok (ids, ctxt)
 
 let extract_lazy_storage_diff ctxt mode ~temporary ~to_duplicate ~to_update ty
     v =
@@ -7413,13 +7443,23 @@ let unparse_code = unparse_code ~stack_depth:0
 let get_single_sapling_state ctxt ty x =
   let has_lazy_storage = has_lazy_storage ty in
   let f (type i a u) (kind : (i, a, u) Lazy_storage.Kind.t) (id : i)
-      single_id_opt : Sapling.Id.t option =
+      single_id_opt : (Sapling.Id.t option, unit) Fold_lazy_storage.result =
     match kind with
     | Lazy_storage.Kind.Sapling_state -> (
-      match single_id_opt with None -> Some id | Some _ -> raise Not_found
-      (* more than one *) )
+      match single_id_opt with
+      | Fold_lazy_storage.Ok None ->
+          Fold_lazy_storage.Ok (Some id)
+      | Fold_lazy_storage.Ok (Some _) ->
+          Fold_lazy_storage.Error (* more than one *)
+      | Fold_lazy_storage.Error ->
+          single_id_opt )
     | _ ->
         single_id_opt
   in
   fold_lazy_storage ~f:{f} ~init:None ctxt ty x ~has_lazy_storage
-  >>? function (None, _) -> raise Not_found | (Some id, ctxt) -> ok (id, ctxt)
+  >>? fun (id, ctxt) ->
+  match id with
+  | Fold_lazy_storage.Ok (Some id) ->
+      ok (Some id, ctxt)
+  | Fold_lazy_storage.Ok None | Fold_lazy_storage.Error ->
+      ok (None, ctxt)

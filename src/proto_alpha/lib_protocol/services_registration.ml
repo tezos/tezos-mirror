@@ -71,6 +71,30 @@ let register2_fullctxt s f =
 let register2 s f =
   register2_fullctxt s (fun {context; _} a1 a2 q i -> f context a1 a2 q i)
 
+let opt_register0_fullctxt s f =
+  rpc_services :=
+    RPC_directory.opt_register !rpc_services s (fun ctxt q i ->
+        rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
+
+let opt_register0 s f =
+  opt_register0_fullctxt s (fun {context; _} -> f context)
+
+let opt_register1_fullctxt s f =
+  rpc_services :=
+    RPC_directory.opt_register !rpc_services s (fun (ctxt, arg) q i ->
+        rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
+
+let opt_register1 s f =
+  opt_register1_fullctxt s (fun {context; _} x -> f context x)
+
+let opt_register2_fullctxt s f =
+  rpc_services :=
+    RPC_directory.opt_register !rpc_services s (fun ((ctxt, arg1), arg2) q i ->
+        rpc_init ctxt >>=? fun ctxt -> f ctxt arg1 arg2 q i)
+
+let opt_register2 s f =
+  opt_register2_fullctxt s (fun {context; _} a1 a2 q i -> f context a1 a2 q i)
+
 let get_rpc_services () =
   let p =
     RPC_directory.map

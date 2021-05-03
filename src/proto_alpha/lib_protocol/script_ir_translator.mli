@@ -360,6 +360,9 @@ val extract_lazy_storage_diff :
   'a ->
   ('a * Lazy_storage.diffs option * context) tzresult Lwt.t
 
-(* raise Not_found if none or more than one found *)
+(* return [None] if none or more than one found *)
 val get_single_sapling_state :
-  context -> 'a Script_typed_ir.ty -> 'a -> (Sapling.Id.t * context) tzresult
+  context ->
+  'a Script_typed_ir.ty ->
+  'a ->
+  (Sapling.Id.t option * context) tzresult

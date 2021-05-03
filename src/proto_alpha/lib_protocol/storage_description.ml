@@ -312,9 +312,8 @@ let build_directory : type key. key t -> key RPC_directory.t =
       RPC_service.get_service ~query:depth_query ~output:encoding path
     in
     rpc_dir :=
-      RPC_directory.register !rpc_dir service (fun k q () ->
-          get k (q.depth + 1)
-          >|=? function None -> raise Not_found | Some x -> x)
+      RPC_directory.opt_register !rpc_dir service (fun k q () ->
+          get k (q.depth + 1))
   in
   let rec build_handler :
       type ikey. ikey t -> (key, ikey) RPC_path.t -> ikey opt_handler =
