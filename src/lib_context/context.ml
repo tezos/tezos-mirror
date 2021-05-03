@@ -122,7 +122,7 @@ let () =
     Logs.set_reporter (reporter ())
   in
   let index_log_size n = index_log_size := Some (int_of_string n) in
-  match Unix.getenv "TEZOS_STORAGE" with
+  match Unix.getenv "TEZOS_CONTEXT" with
   | exception Not_found -> ()
   | v ->
       let args = String.split ',' v in
