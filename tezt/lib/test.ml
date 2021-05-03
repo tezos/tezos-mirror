@@ -70,6 +70,11 @@ module Summed_durations : sig
   val total_seconds : t -> float
 
   val total_nanoseconds : t -> int64
+
+  val encode : t -> JSON.u
+
+  (* May raise [JSON.Error]. *)
+  val decode : JSON.t -> t
 end = struct
   (* Information about how much time a test takes to run.
      Field [total_time_ns] contains the sum of the duration of runs in nanoseconds,
@@ -93,6 +98,17 @@ end = struct
     Int64.to_float total_time /. 1_000_000.
 
   let total_nanoseconds {total_time; count = _} = total_time
+
+  let encode {total_time; count} =
+    `O
+      [ ("total_time", `String (Int64.to_string total_time));
+        ("count", `String (string_of_int count)) ]
+
+  let decode (json : JSON.t) =
+    {
+      total_time = JSON.(json |-> "total_time" |> as_int64);
+      count = JSON.(json |-> "count" |> as_int);
+    }
 end
 
 (* Field [id] is used to be able to iterate on tests in order of registration.
@@ -460,24 +476,44 @@ module Record = struct
     failed_runs : Summed_durations.t;
   }
 
+  let encode_test {file; title; tags; successful_runs; failed_runs} : JSON.u =
+    `O
+      [ ("file", `String file);
+        ("title", `String title);
+        ("tags", `A (List.map (fun tag -> `String tag) tags));
+        ("successful_runs", Summed_durations.encode successful_runs);
+        ("failed_runs", Summed_durations.encode failed_runs) ]
+
+  let decode_test (json : JSON.t) : test =
+    {
+      file = JSON.(json |-> "file" |> as_string);
+      title = JSON.(json |-> "title" |> as_string);
+      tags = JSON.(json |-> "tags" |> as_list |> List.map as_string);
+      successful_runs =
+        Summed_durations.decode JSON.(json |-> "successful_runs");
+      failed_runs = Summed_durations.decode JSON.(json |-> "failed_runs");
+    }
+
   type t = test list
+
+  let encode (record : t) : JSON.u = `A (List.map encode_test record)
+
+  let decode (json : JSON.t) : t =
+    JSON.(json |> as_list |> List.map decode_test)
 
   let output_file (record : t) filename =
     (* Write to file using Marshal.
        This is not very robust but enough for the purposes of this file. *)
     try
       with_open_out filename
-      @@ fun file -> Marshal.to_channel file (record : t) []
-    with Sys_error error -> Log.warn "Failed to write record: %s\n%!" error
+      @@ fun file -> output_string file (JSON.encode_u (encode record))
+    with Sys_error error -> Log.warn "Failed to write record: %s" error
 
   let input_file filename : t =
-    try with_open_in filename Marshal.from_channel with
-    | Sys_error error ->
-        Printf.eprintf "Failed to read record: %s\n%!" error ;
-        exit 1
-    | End_of_file ->
-        Printf.eprintf "Failed to read record: %s: end of file\n%!" filename ;
-        exit 1
+    try decode (JSON.parse_file filename)
+    with JSON.Error error ->
+      Log.error "%s" (JSON.show_error error) ;
+      exit 1
 
   (* Get the record for the current run. *)
   let current () =

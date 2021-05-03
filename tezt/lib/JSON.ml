@@ -219,6 +219,19 @@ let as_int = check as_int_opt "expected an integer"
 
 let is_int = test as_int_opt
 
+let as_int64_opt json =
+  match json.node with
+  | `Float f ->
+      if Float.is_integer f then Some (Int64.of_float f) else None
+  | `String s ->
+      Int64.of_string_opt s
+  | _ ->
+      None
+
+let as_int64 = check as_int64_opt "expected a 64-bit integer"
+
+let is_int64 = test as_int64_opt
+
 let as_float_opt json =
   match json.node with
   | `Float f ->
