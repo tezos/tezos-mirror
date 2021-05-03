@@ -17,9 +17,9 @@ tezos_node=./tezos-node
 tezos_client=./tezos-client
 
 # Protocol configuration.
-protocol_hash=PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
-protocol_parameters=src/proto_008_PtEdo2Zk/parameters/sandbox-parameters.json
-protocol_name=edo
+protocol_hash=PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
+protocol_parameters=src/proto_009_PsFLoren/parameters/sandbox-parameters.json
+protocol_name=florence
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
