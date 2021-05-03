@@ -82,14 +82,9 @@
 *)
 
 module type S = sig
-  (** {3 Boilerplate} *)
-
-  (** Include the legacy list. Functions that raise exceptions are shadowed
-      below. *)
-  include
-    module type of Stdlib.List with type 'a t = 'a Stdlib.List.t
-
   (** {3 Trivial values} *)
+
+  type 'a t = 'a Stdlib.List.t = [] | ( :: ) of 'a * 'a list
 
   (** in-monad, preallocated nil *)
 
@@ -128,6 +123,9 @@ module type S = sig
       [nth xs 0 = tl xs] *)
   val nth : 'a list -> int -> 'a option
 
+  (** [nth_opt] is an alias for [nth] provided for backwards compatibility. *)
+  val nth_opt : 'a list -> int -> 'a option
+
   (** [last x xs] is the last element of the list [xs] or [x] if [xs] is empty.
 
       The primary intended use for [last] is after destructing a list:
@@ -144,6 +142,9 @@ module type S = sig
       [predicate x] is [true] or [None] if the list [xs] has no such element. *)
   val find : ('a -> bool) -> 'a list -> 'a option
 
+  (** [find_opt] is an alias for [find] provided for backwards compatibility. *)
+  val find_opt : ('a -> bool) -> 'a list -> 'a option
+
   (** [mem ~equal a l] is [true] iff there is an element [e] of [l] such that
       [equal a e]. *)
   val mem : equal:('a -> 'a -> bool) -> 'a -> 'a list -> bool
@@ -153,12 +154,14 @@ module type S = sig
       pair. *)
   val assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
 
+  (** [assoc_opt] is an alias for [assoc] provided for backwards compatibility. *)
   val assoc_opt : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
 
   (** [assq k kvs] is the same as [assoc ~equal:Stdlib.( == ) k kvs]: it uses
       the physical equality. *)
   val assq : 'a -> ('a * 'b) list -> 'b option
 
+  (** [assq_opt] is an alias for [assq] provided for backwards compatibility. *)
   val assq_opt : 'a -> ('a * 'b) list -> 'b option
 
   (** [mem_assoc ~equal k l] is equivalent to
@@ -185,6 +188,20 @@ module type S = sig
     int ->
     (int -> 'a) ->
     ('a list, 'trace) result
+
+  (** {4 Basic traversal} *)
+
+  val length : 'a list -> int
+
+  val rev : 'a list -> 'a list
+
+  val concat : 'a list list -> 'a list
+
+  val append : 'a list -> 'a list -> 'a list
+
+  val rev_append : 'a list -> 'a list -> 'a list
+
+  val flatten : 'a list list -> 'a list
 
   (** {4 Double-list traversals}
 
@@ -222,6 +239,8 @@ module type S = sig
     'a list ->
     'b list ->
     (('a * 'b) list, 'trace) result
+
+  val split : ('a * 'b) list -> 'a list * 'b list
 
   val iter2 :
     when_different_lengths:'trace ->
@@ -329,6 +348,8 @@ module type S = sig
     'a list ->
     ('a option, 'trace) result Lwt.t
 
+  val filter : ('a -> bool) -> 'a list -> 'a list
+
   (** [rev_filter f l] is [rev (filter f l)] but more efficient. *)
   val rev_filter : ('a -> bool) -> 'a list -> 'a list
 
@@ -371,6 +392,10 @@ module type S = sig
 
   val filter_p : ('a -> bool Lwt.t) -> 'a list -> 'a list Lwt.t
 
+  val rev_partition : ('a -> bool) -> 'a list -> 'a list * 'a list
+
+  val partition : ('a -> bool) -> 'a list -> 'a list * 'a list
+
   val rev_partition_result : ('a, 'b) result list -> 'a list * 'b list
 
   val partition_result : ('a, 'b) result list -> 'a list * 'b list
@@ -408,6 +433,7 @@ module type S = sig
   val partition_p : ('a -> bool Lwt.t) -> 'a list -> ('a list * 'a list) Lwt.t
 
   (** {4 Traversal variants} *)
+  val iter : ('a -> unit) -> 'a list -> unit
 
   val iter_e :
     ('a -> (unit, 'trace) result) -> 'a list -> (unit, 'trace) result
@@ -426,6 +452,8 @@ module type S = sig
 
   val iter_p : ('a -> unit Lwt.t) -> 'a list -> unit Lwt.t
 
+  val iteri : (int -> 'a -> unit) -> 'a list -> unit
+
   val iteri_e :
     (int -> 'a -> (unit, 'trace) result) -> 'a list -> (unit, 'trace) result
 
@@ -442,6 +470,8 @@ module type S = sig
     (unit, 'trace list) result Lwt.t
 
   val iteri_p : (int -> 'a -> unit Lwt.t) -> 'a list -> unit Lwt.t
+
+  val map : ('a -> 'b) -> 'a list -> 'b list
 
   val map_e :
     ('a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
@@ -460,6 +490,8 @@ module type S = sig
 
   val map_p : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
 
+  val mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
+
   val mapi_e :
     (int -> 'a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
 
@@ -476,6 +508,8 @@ module type S = sig
     ('b list, 'trace list) result Lwt.t
 
   val mapi_p : (int -> 'a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
+
+  val rev_map : ('a -> 'b) -> 'a list -> 'b list
 
   val rev_mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
 
@@ -523,6 +557,8 @@ module type S = sig
 
   val rev_filter_map_s : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
 
+  val filter_map : ('a -> 'b option) -> 'a list -> 'b list
+
   val filter_map_s : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
 
   val rev_filter_map_es :
@@ -542,6 +578,8 @@ module type S = sig
 
   val filter_map_p : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
 
+  val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
+
   val fold_left_e :
     ('a -> 'b -> ('a, 'trace) result) -> 'a -> 'b list -> ('a, 'trace) result
 
@@ -552,6 +590,9 @@ module type S = sig
     'a ->
     'b list ->
     ('a, 'trace) result Lwt.t
+
+  (** This function is not tail-recursive *)
+  val fold_right : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
 
   (** This function is not tail-recursive *)
   val fold_right_e :
@@ -688,6 +729,8 @@ module type S = sig
 
   (** {4 Scanning variants} *)
 
+  val for_all : ('a -> bool) -> 'a list -> bool
+
   val for_all_e :
     ('a -> (bool, 'trace) result) -> 'a list -> (bool, 'trace) result
 
@@ -704,6 +747,8 @@ module type S = sig
     (bool, 'trace list) result Lwt.t
 
   val for_all_p : ('a -> bool Lwt.t) -> 'a list -> bool Lwt.t
+
+  val exists : ('a -> bool) -> 'a list -> bool
 
   val exists_e :
     ('a -> (bool, 'trace) result) -> 'a list -> (bool, 'trace) result
@@ -805,4 +850,20 @@ module type S = sig
   val compare : ('a -> 'a -> int) -> 'a list -> 'a list -> int
 
   val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
+
+  (** {3 Sorting} *)
+
+  val sort : ('a -> 'a -> int) -> 'a list -> 'a list
+
+  val stable_sort : ('a -> 'a -> int) -> 'a list -> 'a list
+
+  val fast_sort : ('a -> 'a -> int) -> 'a list -> 'a list
+
+  val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
+
+  (** {3 conversion} *)
+
+  val to_seq : 'a t -> 'a Stdlib.Seq.t
+
+  val of_seq : 'a Stdlib.Seq.t -> 'a list
 end

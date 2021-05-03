@@ -1041,6 +1041,19 @@ let exists2_es ~when_different_lengths f xs ys =
   | (x :: xs, y :: ys) -> (
       lwt_apply2 f x y >>=? function false -> aux xs ys | true -> true_es )
 
+let rev_partition f xs =
+  let rec aux trues falses = function
+    | [] ->
+        (trues, falses)
+    | x :: xs ->
+        if f x then (aux [@ocaml.tailcall]) (x :: trues) falses xs
+        else (aux [@ocaml.tailcall]) trues (x :: falses) xs
+  in
+  aux [] [] xs
+
+let partition f xs =
+  rev_partition f xs |> fun (trues, falses) -> (rev trues, rev falses)
+
 let rev_partition_result xs =
   let rec aux oks errors = function
     | [] ->
