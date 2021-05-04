@@ -923,7 +923,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * 'a comparable_ty
       * ('a ticket option, 's, 'r, 'f) kinstr
       -> ('a ticket * 'a ticket, 's, 'r, 'f) kinstr
-  (* Internal control instructions
+  (*
+
+     Internal control instructions
      =============================
 
      The following instructions are not available in the source language.
