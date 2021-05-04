@@ -49,7 +49,7 @@ The values of the ``BLOCKS_PER_*`` constants has doubled in order to
 match the reduced block times, as follows: ``BLOCKS_PER_CYCLE =
 8192``, ``BLOCKS_PER_COMMITMENT = 64``, ``BLOCKS_PER_ROLL_SNAPSHOT =
 512``, and ``BLOCKS_PER_VOTING_PERIOD = 40960``. This partially solves issue: `tezos#1027 <https://gitlab.com/tezos/tezos/-/issues/1027>`__
- `tezos!2531 <https://gitlab.com/tezos/tezos/-/merge_requests/2531>`__
+via MR `tezos!2531 <https://gitlab.com/tezos/tezos/-/merge_requests/2531>`__ .
 
 Liquidity Baking
 ----------------
@@ -72,16 +72,16 @@ RPC changes
 - Remove deprecated RPCs and deprecated fields in RPC answers related
   to voting periods. (MR `tezos!2763
   <https://gitlab.com/tezos/tezos/-/merge_requests/2763>`__, addresses
-  issue `tezos#1204 <https://gitlab.com/tezos/tezos/-/issues/1204>__.)
+  issue `tezos#1204 <https://gitlab.com/tezos/tezos/-/issues/1204>`__.)
 
 - The RPC ``../<block_id>/required_endorsements`` has been removed.
 
 - Replace `deposit` by `deposits` in `frozen_balance` RPC.
 
 - All the protocol-specific RPCs under the ``helpers`` path have been
-moved from the protocol to the `recently introduced <tezos!2446>`_ RPC
-plugin. This change should not be visible for end-users but improves
-the maintainability of these RPCs.
+  moved from the protocol to the `recently introduced <tezos!2446>`_ RPC
+  plugin. This change should not be visible for end-users but improves
+  the maintainability of these RPCs.
 
 Minor changes
 -------------
