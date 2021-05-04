@@ -9,13 +9,6 @@
  (libraries data-encoding
             tezos-lwt-result-stdlib
             lwt
-            ; Check src/bin_node/dune for a short explanation of this
-            ; use of select for optional linking.  Also, this needs to
-            ; remain above `hacl-star' in order to avoid linking
-            ; errors.
-            (select haclcompat from
-              (hacl_x25519 -> haclcompat.empty)
-              (-> haclcompat.empty))
             hacl-star
             bls12-381
             secp256k1-internal
@@ -25,10 +18,6 @@
             uecc
             ringo
             zarith))
-
-(rule
-  (target haclcompat-empty)
-  (action (write-file %{target} "")))
 
 (rule
  (alias runtest_lint)
