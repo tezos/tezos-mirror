@@ -48,6 +48,8 @@ let rec append ta tb () =
   >>= function
   | Nil -> tb () | Cons (item, ta) -> Lwt.return (Cons (item, append ta tb))
 
+let first s = s () >|= function Nil -> None | Cons (x, _) -> Some x
+
 let rec fold_left f acc seq =
   seq ()
   >>= function

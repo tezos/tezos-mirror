@@ -73,6 +73,8 @@ module type S = sig
 
   val interrupted_s : 'e Lwt.t -> ('a, 'e) t
 
+  val first : ('a, 'e) t -> ('a, 'e) result option Lwt.t
+
   val fold_left : ('a -> 'b -> 'a) -> 'a -> ('b, 'e) t -> ('a, 'e) result Lwt.t
 
   (** See {!Seq_e.fold_left_e} for a warning about traversal and interruption

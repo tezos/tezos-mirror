@@ -69,6 +69,16 @@ let rec append ta tb () =
   >>=? function
   | Nil -> tb () | Cons (item, ta) -> Monad.return (Cons (item, append ta tb))
 
+let first s =
+  s ()
+  >>= function
+  | Ok Nil ->
+      Lwt.return_none
+  | Ok (Cons (x, _)) ->
+      Lwt.return_some (Ok x)
+  | Error _ as error ->
+      Lwt.return_some error
+
 let rec fold_left f acc seq =
   seq ()
   >>=? function

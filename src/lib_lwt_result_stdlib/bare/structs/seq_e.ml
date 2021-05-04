@@ -50,6 +50,15 @@ let rec append ta tb () =
   >>? function
   | Nil -> tb () | Cons (item, ta) -> Ok (Cons (item, append ta tb))
 
+let first s =
+  match s () with
+  | Ok Nil ->
+      None
+  | Ok (Cons (x, _)) ->
+      Some (Ok x)
+  | Error _ as error ->
+      Some error
+
 let rec fold_left f acc seq =
   seq ()
   >>? function

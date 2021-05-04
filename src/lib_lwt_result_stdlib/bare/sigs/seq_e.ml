@@ -75,6 +75,16 @@ module type S = sig
 
   val append : ('a, 'e) t -> ('a, 'e) t -> ('a, 'e) t
 
+  (** [first s] is [None] if [s] is empty, it is [Some (Error e)] if [s] is
+      immediately interrupted by [e], it is [Some (Ok x)] where [x] is the
+      first element of [s] otherwise.
+
+      Note that [first] forces the first element of the sequence, which can have
+      side-effects or be computationally expensive. Consider, e.g., the case
+      where [s = filter (fun …) s']: [first s] can force multiple of the values
+      from [s']. *)
+  val first : ('a, 'e) t -> ('a, 'e) result option
+
   (** [fold_left f init seq] is
 
       - if [seq] is a whole sequence, then [Ok x] where [x] is the result of

@@ -31,6 +31,8 @@ let cons item t () = Cons (item, t)
 let rec append ta tb () =
   match ta () with Nil -> tb () | Cons (item, ta) -> Cons (item, append ta tb)
 
+let first s = match s () with Nil -> None | Cons (x, _) -> Some x
+
 let rec fold_left_e f acc seq =
   match seq () with
   | Nil ->

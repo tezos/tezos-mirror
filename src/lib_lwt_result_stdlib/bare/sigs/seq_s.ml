@@ -48,6 +48,16 @@ module type S = sig
 
   val append : 'a t -> 'a t -> 'a t
 
+  (** [first s] resolves to [None] if [s] is empty (and its suspended node
+      resolves), it resolves to [Some x] where [x] is the first element of [s],
+      it does not resolve if the promised node of [s] doesn't.
+
+      Note that [first] forces the first element of the sequence, which can have
+      side-effects or be computationally expensive. Consider, e.g., the case
+      where [s = filter (fun …) s']: [first s] can force multiple of the values
+      from [s']. *)
+  val first : 'a t -> 'a option Lwt.t
+
   (** Similar to {!fold_left} but applies to Lwt-suspended sequences. Because
       the nodes are suspended in promises, traversing may yield and,
       consequently, the function [fold_left] returns a promise. *)

@@ -95,6 +95,15 @@ module type S = sig
 
   (** {3 Lwtreslib-specific extensions} *)
 
+  (** [first s] is [None] if [s] is empty, it is [Some x] where [x] is the
+      first element of [s] otherwise.
+
+      Note that [first] forces the first element of the sequence, which can have
+      side-effects or be computationally expensive. Consider, e.g., the case
+      where [s = filter (fun …) s']: [first s] can force multiple of the values
+      from [s']. *)
+  val first : 'a t -> 'a option
+
   (** Similar to {!fold_left} but wraps the traversal in {!result}. The
       traversal is interrupted if one of the step returns an [Error _]. *)
   val fold_left_e :
