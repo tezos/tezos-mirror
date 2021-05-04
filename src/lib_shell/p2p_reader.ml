@@ -89,28 +89,24 @@ let find_pending_operations {peer_active_chains; _} h i =
          Distributed_db_requester.Raw_operations.pending
            chain_db.operations_db
            (h, i))
-  |> fun s -> match s () with Cons (item, _) -> Some item | Nil -> None
+  |> Seq.first
 
 let find_pending_operation {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains
   |> Seq.filter (fun chain_db ->
          Distributed_db_requester.Raw_operation.pending chain_db.operation_db h)
-  |> fun s -> match s () with Cons (item, _) -> Some item | Nil -> None
+  |> Seq.first
 
 let read_operation state h =
   (* Remember that seqs are lazy. The table is only traversed until a match is
      found, the rest is not explored. *)
-  let id_db_seq = Seq_s.of_seq (Chain_id.Table.to_seq state.active_chains) in
-  let id_bh_seq =
-    Seq_s.filter_map_s
-      (fun (chain_id, chain_db) ->
-        Distributed_db_requester.Raw_operation.read_opt chain_db.operation_db h
-        >|= Option.map (fun bh -> (chain_id, bh)))
-      id_db_seq
-  in
-  id_bh_seq ()
-  >>= function
-  | Seq_s.Nil -> Lwt.return_none | Seq_s.Cons (item, _) -> Lwt.return_some item
+  Seq_s.of_seq (Chain_id.Table.to_seq state.active_chains)
+  |> Seq_s.filter_map_s (fun (chain_id, chain_db) ->
+         Distributed_db_requester.Raw_operation.read_opt
+           chain_db.operation_db
+           h
+         >|= Option.map (fun bh -> (chain_id, bh)))
+  |> Seq_s.first
 
 let read_block {disk; _} h =
   Store.all_chain_stores disk
@@ -156,7 +152,7 @@ let find_pending_block_header {peer_active_chains; _} h =
          Distributed_db_requester.Raw_block_header.pending
            chain_db.block_header_db
            h)
-  |> fun s -> match s () with Cons (item, _) -> Some item | Nil -> None
+  |> Seq.first
 
 let deactivate gid chain_db =
   chain_db.callback.disconnection gid ;
