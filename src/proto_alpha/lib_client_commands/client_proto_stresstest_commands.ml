@@ -41,6 +41,8 @@ type parameters = {
   fee_mutez : Tez.t;  (** fees for each transfer, in mutez *)
   gas_limit : Gas.Arith.integral;  (** gas limit per operation *)
   storage_limit : Z.t;  (** storage limit per operation *)
+  account_creation_storage : Z.t;
+      (** upper bound on bytes consumed when creating a tz1 account *)
   total_transfers : int option;
       (** total number of transfers to perform; unbounded if None *)
 }
@@ -57,6 +59,7 @@ type transfer = {
   fee : Tez.t;
   amount : Tez.t;
   counter : Z.t option;
+  fresh_dst : bool;
 }
 
 type state = {
@@ -74,8 +77,15 @@ let default_parameters =
     tps = 5.0;
     strategy = Fixed_amount {mutez = Tez.one};
     fee_mutez = Tez.of_mutez_exn 2_000L;
-    gas_limit = Gas.Arith.integral_of_int_exn 1_000;
+    gas_limit = Gas.Arith.integral_of_int_exn 1_600;
+    (* [gas_limit] corresponds to a slight overapproximation of the
+       gas needed to inject an operation. It was obtained by simulating
+       the operation using the client. *)
     storage_limit = Z.zero;
+    account_creation_storage = Z.of_int 300;
+    (* [account_creation_storage] corresponds to a slight overapproximation
+       of the storage consumed when allocating a new implicit account.
+       It was obtained by simulating the operation using the client. *)
     total_transfers = None;
   }
 
@@ -170,7 +180,8 @@ let rec sample_transfer (cctxt : Protocol_client_context.full)
           Tez.of_mutez_exn amount
     in
     let fee = parameters.fee_mutez in
-    return {src; dst = dest.pkh; fee; amount; counter = None}
+    return
+      {src; dst = dest.pkh; fee; amount; counter = None; fresh_dst = fresh}
 
 let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
     contents =
@@ -191,10 +202,15 @@ let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
   Shell_services.Injection.operation cctxt ~chain bytes
 
 (* counter _must_ be set before calling this function *)
-let manager_op_of_transfer parameters {src; dst; fee; amount; counter} =
+let manager_op_of_transfer parameters
+    {src; dst; fee; amount; counter; fresh_dst} =
   let source = src.pkh in
   let gas_limit = parameters.gas_limit in
-  let storage_limit = parameters.storage_limit in
+  let storage_limit =
+    if fresh_dst then
+      Z.add parameters.account_creation_storage parameters.storage_limit
+    else parameters.storage_limit
+  in
   let operation =
     let parameters =
       let open Tezos_micheline in
