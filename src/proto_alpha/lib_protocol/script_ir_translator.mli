@@ -53,7 +53,6 @@ type ('arg, 'storage) code = {
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
 type ('a, 's, 'b, 'u) cinstr = {
-  csize : int;
   apply :
     'r 'f. ('a, 's) Script_typed_ir.kinfo ->
     ('b, 'u, 'r, 'f) Script_typed_ir.kinstr ->
