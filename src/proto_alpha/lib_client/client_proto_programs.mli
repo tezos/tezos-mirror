@@ -73,6 +73,9 @@ val trace :
   tzresult
   Lwt.t
 
+val print_view_result :
+  #Client_context.printer -> Script_repr.expr tzresult -> unit tzresult Lwt.t
+
 val print_run_result :
   #Client_context.printer ->
   show_source:bool ->
