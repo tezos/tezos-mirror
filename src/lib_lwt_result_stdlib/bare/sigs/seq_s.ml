@@ -31,21 +31,31 @@
     The functions [of_seq] and [of_seq_s] allow conversion from vanilla
     sequences. *)
 module type S = sig
-  (** This is similar to [S.t] but the suspended node is a promise *)
+  (** This is similar to [S.t] but the suspended node is a promise. *)
   type +'a node = Nil | Cons of 'a * 'a t
 
   and 'a t = unit -> 'a node Lwt.t
 
+  (** [empty] is a sequence with no elements. *)
   val empty : 'a t
 
+  (** [return x] is a sequence with the single element [x]. *)
   val return : 'a -> 'a t
 
+  (** [return_s p] is a sequence with the value the promise [p] resolves to as
+      its single element. *)
   val return_s : 'a Lwt.t -> 'a t
 
+  (** [cons x s] is the sequence containing [x] followed by [s]. It is a whole
+      sequence if [s] is. *)
   val cons : 'a -> 'a t -> 'a t
 
+  (** [cons_s p s] is the sequence containing the value the promise [p] resolves
+      to, followed by [s]. *)
   val cons_s : 'a Lwt.t -> 'a t -> 'a t
 
+  (** [append s1 s2] is a sequence [s] containing the elements of [s1] followed
+      by the elements of [s2]. *)
   val append : 'a t -> 'a t -> 'a t
 
   (** [first s] resolves to [None] if [s] is empty (and its suspended node

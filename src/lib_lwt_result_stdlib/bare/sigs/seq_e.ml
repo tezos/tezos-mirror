@@ -61,18 +61,37 @@ module type S = sig
   (** A whole sequence of zero elements. *)
   val empty : ('a, 'e) t
 
+  (** [return x] is a whole sequence containing the single element [x]. *)
   val return : 'a -> ('a, 'e) t
 
+  (** [return_e (Ok x)] is a whole sequence containing the single element [x].
+      [return_e (Error e)] is a sequence immediately interrupted by the error
+      [e]. *)
   val return_e : ('a, 'e) result -> ('a, 'e) t
 
+  (** [interrupted e] is a sequence immediately interrupted by the error [e]. *)
   val interrupted : 'e -> ('a, 'e) t
 
+  (** [nil] is the node forming the empty sequence. *)
   val nil : ('a, 'e) node
 
+  (** [cons x s] is the sequence containing [x] followed by [s]. It is a whole
+      sequence if [s] is. *)
   val cons : 'a -> ('a, 'e) t -> ('a, 'e) t
 
+  (** [cons_e (Ok x) s] is the sequence containing [x] followed by [s]. It is a
+      whole sequence if [s] is.
+
+      [cons_e (Error e) s] is a sequence immediately interrupted by [e]. *)
   val cons_e : ('a, 'e) result -> ('a, 'e) t -> ('a, 'e) t
 
+  (** [append s1 s2] is a sequence [s].
+      If [s1] is a whole sequence then [s] is composed of all the elements of
+      [s1] followed by [s2].
+      If [s1] is an interrupted sequence then [s] is indistinguishable from
+      [s1].
+
+      [s] is a whole sequence if both [s1] and [s2] are. *)
   val append : ('a, 'e) t -> ('a, 'e) t -> ('a, 'e) t
 
   (** [first s] is [None] if [s] is empty, it is [Some (Error e)] if [s] is
