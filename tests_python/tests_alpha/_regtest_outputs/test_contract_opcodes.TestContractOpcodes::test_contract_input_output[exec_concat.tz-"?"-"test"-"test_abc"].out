@@ -17,32 +17,32 @@ trace
   - location: 22 (remaining gas: 1039986.283 units remaining)
     [ "test"  	@parameter
       { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	 ]
-  - location: 12 (remaining gas: 1039986.138 units remaining)
+  - location: 12 (remaining gas: 1039986.238 units remaining)
     [ "_abc"  	
       "test"  	@arg ]
-  - location: 15 (remaining gas: 1039986.093 units remaining)
+  - location: 15 (remaining gas: 1039986.193 units remaining)
     [ {}  	
       "_abc"  	
       "test"  	@arg ]
-  - location: 17 (remaining gas: 1039986.053 units remaining)
+  - location: 17 (remaining gas: 1039986.153 units remaining)
     [ "_abc"  	
       {}  	
       "test"  	@arg ]
-  - location: 18 (remaining gas: 1039986.003 units remaining)
+  - location: 18 (remaining gas: 1039986.103 units remaining)
     [ { "_abc" }  	
       "test"  	@arg ]
-  - location: 19 (remaining gas: 1039985.963 units remaining)
+  - location: 19 (remaining gas: 1039986.063 units remaining)
     [ "test"  	@arg
       { "_abc" }  	 ]
-  - location: 20 (remaining gas: 1039985.913 units remaining)
+  - location: 20 (remaining gas: 1039986.013 units remaining)
     [ { "test" ; "_abc" }  	 ]
-  - location: 21 (remaining gas: 1039985.793 units remaining)
+  - location: 21 (remaining gas: 1039985.893 units remaining)
     [ "test_abc"  	 ]
-  - location: 23 (remaining gas: 1039985.793 units remaining)
+  - location: 23 (remaining gas: 1039985.893 units remaining)
     [ "test_abc"  	 ]
-  - location: 24 (remaining gas: 1039985.748 units remaining)
+  - location: 24 (remaining gas: 1039985.848 units remaining)
     [ {}  	
       "test_abc"  	 ]
-  - location: 26 (remaining gas: 1039985.703 units remaining)
+  - location: 26 (remaining gas: 1039985.803 units remaining)
     [ (Pair {} "test_abc")  	 ]
 

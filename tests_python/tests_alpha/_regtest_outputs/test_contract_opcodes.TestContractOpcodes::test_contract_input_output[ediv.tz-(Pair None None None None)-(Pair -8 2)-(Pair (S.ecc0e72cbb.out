@@ -113,6 +113,13 @@ trace
       (Some (Pair 4 0))  	 ]
   - location: 52 (remaining gas: 1039964.162 units remaining)
     [ (Pair (Some (Pair 4 0)) (Some (Pair 4 0)))  	 ]
+  - location: 49 (remaining gas: 1039964.117 units remaining)
+    [ (Some (Pair -4 0))  	
+      (Pair (Some (Pair 4 0)) (Some (Pair 4 0)))  	 ]
+  - location: 49 (remaining gas: 1039964.072 units remaining)
+    [ (Some (Pair -4 0))  	
+      (Some (Pair -4 0))  	
+      (Pair (Some (Pair 4 0)) (Some (Pair 4 0)))  	 ]
   - location: 49 (remaining gas: 1039964.072 units remaining)
     [ (Some (Pair -4 0))  	
       (Some (Pair -4 0))  	

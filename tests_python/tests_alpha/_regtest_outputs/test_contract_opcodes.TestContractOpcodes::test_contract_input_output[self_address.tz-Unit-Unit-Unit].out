@@ -16,29 +16,29 @@ trace
   - location: 14 (remaining gas: 1039983.255 units remaining)
     [ Unit  	
       { DROP ; SELF_ADDRESS }  	 ]
-  - location: 12 (remaining gas: 1039983.110 units remaining)
+  - location: 12 (remaining gas: 1039983.210 units remaining)
     [  ]
-  - location: 13 (remaining gas: 1039983.065 units remaining)
+  - location: 13 (remaining gas: 1039983.165 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self ]
-  - location: 15 (remaining gas: 1039983.065 units remaining)
+  - location: 15 (remaining gas: 1039983.165 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
-  - location: 16 (remaining gas: 1039983.020 units remaining)
+  - location: 16 (remaining gas: 1039983.120 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self
       "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
-  - location: 17 (remaining gas: 1039982.975 units remaining)
+  - location: 17 (remaining gas: 1039983.075 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self.address
       "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
-  - location: 20 (remaining gas: 1039982.757 units remaining)
+  - location: 20 (remaining gas: 1039982.857 units remaining)
     [ 0  	 ]
-  - location: 21 (remaining gas: 1039982.707 units remaining)
+  - location: 21 (remaining gas: 1039982.807 units remaining)
     [ True  	 ]
-  - location: 22 (remaining gas: 1039982.682 units remaining)
+  - location: 22 (remaining gas: 1039982.782 units remaining)
     [  ]
-  - location: 28 (remaining gas: 1039982.637 units remaining)
+  - location: 28 (remaining gas: 1039982.737 units remaining)
     [ Unit  	 ]
-  - location: 29 (remaining gas: 1039982.592 units remaining)
+  - location: 29 (remaining gas: 1039982.692 units remaining)
     [ {}  	
       Unit  	 ]
-  - location: 31 (remaining gas: 1039982.547 units remaining)
+  - location: 31 (remaining gas: 1039982.647 units remaining)
     [ (Pair {} Unit)  	 ]
 

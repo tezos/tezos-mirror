@@ -33,6 +33,31 @@ trace
     [  ]
   - location: 23 (remaining gas: 1039982.885 units remaining)
     [ 6  	 ]
+  - location: 20 (remaining gas: 1039982.840 units remaining)
+    [ 5  	
+      6  	 ]
+  - location: 20 (remaining gas: 1039982.795 units remaining)
+    [ 4  	
+      5  	
+      6  	 ]
+  - location: 20 (remaining gas: 1039982.750 units remaining)
+    [ 3  	
+      4  	
+      5  	
+      6  	 ]
+  - location: 20 (remaining gas: 1039982.705 units remaining)
+    [ 2  	
+      3  	
+      4  	
+      5  	
+      6  	 ]
+  - location: 20 (remaining gas: 1039982.660 units remaining)
+    [ 1  	
+      2  	
+      3  	
+      4  	
+      5  	
+      6  	 ]
   - location: 20 (remaining gas: 1039982.660 units remaining)
     [ 1  	
       2  	

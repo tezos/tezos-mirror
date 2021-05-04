@@ -113,6 +113,13 @@ trace
       None  	 ]
   - location: 52 (remaining gas: 1039964.162 units remaining)
     [ (Pair None None)  	 ]
+  - location: 49 (remaining gas: 1039964.117 units remaining)
+    [ None  	
+      (Pair None None)  	 ]
+  - location: 49 (remaining gas: 1039964.072 units remaining)
+    [ None  	
+      None  	
+      (Pair None None)  	 ]
   - location: 49 (remaining gas: 1039964.072 units remaining)
     [ None  	
       None  	

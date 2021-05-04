@@ -27,21 +27,21 @@ trace
   - location: 17 (remaining gas: 1039987.665 units remaining)
     [ 38  	@parameter
       { PUSH nat 14 ; PAIR ; { UNPAIR ; ADD } }  	 ]
-  - location: 12 (remaining gas: 1039987.520 units remaining)
+  - location: 12 (remaining gas: 1039987.620 units remaining)
     [ 14  	
       38  	 ]
-  - location: 12 (remaining gas: 1039987.475 units remaining)
+  - location: 12 (remaining gas: 1039987.575 units remaining)
     [ (Pair 14 38)  	@arg ]
-  - location: 13 (remaining gas: 1039987.425 units remaining)
+  - location: 13 (remaining gas: 1039987.525 units remaining)
     [ 14  	
       38  	 ]
-  - location: 14 (remaining gas: 1039987.345 units remaining)
+  - location: 14 (remaining gas: 1039987.445 units remaining)
     [ 52  	 ]
-  - location: 20 (remaining gas: 1039987.345 units remaining)
+  - location: 20 (remaining gas: 1039987.445 units remaining)
     [ 52  	 ]
-  - location: 21 (remaining gas: 1039987.300 units remaining)
+  - location: 21 (remaining gas: 1039987.400 units remaining)
     [ {}  	
       52  	 ]
-  - location: 23 (remaining gas: 1039987.255 units remaining)
+  - location: 23 (remaining gas: 1039987.355 units remaining)
     [ (Pair {} 52)  	 ]
 
