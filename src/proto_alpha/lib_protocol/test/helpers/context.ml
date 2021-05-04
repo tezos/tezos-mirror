@@ -285,6 +285,23 @@ module Contract = struct
 
   let storage ctxt contract =
     Alpha_services.Contract.storage rpc_ctxt ctxt contract
+
+  let script ctxt contract =
+    Alpha_services.Contract.script rpc_ctxt ctxt contract
+    >>=? fun {code; storage = _} ->
+    match Data_encoding.force_decode code with
+    | Some v ->
+        return v
+    | None ->
+        invalid_arg "Cannot force lazy script"
+
+  let script_hash ctxt contract =
+    script ctxt contract
+    >>=? fun script ->
+    let bytes =
+      Data_encoding.Binary.to_bytes_exn Script.expr_encoding script
+    in
+    return @@ Script_expr_hash.hash_bytes [bytes]
 end
 
 module Delegate = struct

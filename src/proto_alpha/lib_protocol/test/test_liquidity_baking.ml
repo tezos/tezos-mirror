@@ -34,6 +34,46 @@
 open Protocol
 open Test_tez
 
+(* The script hash of https://gitlab.com/dexter2tz/dexter2tz/-/blob/liquidity_baking/dexter.liquidity_baking.mligo.tz *)
+let expected_cpmm_hash =
+  Script_expr_hash.of_b58check_exn
+    "exprvS9AKw8Ejk5vfc1tod589gK1yoGcQEJYsMkKaeojDr5jQNSHpX"
+
+(* The script hash of https://gitlab.com/dexter2tz/dexter2tz/-/blob/liquidity_baking/lqt_fa12.mligo.tz *)
+let expected_lqt_hash =
+  Script_expr_hash.of_b58check_exn
+    "exprufAK15C2FCbxGLCEVXFe26p3eQdYuwZRk1morJUwy9NBUmEZVB"
+
+(* Test that the scripts of the Liquidity Baking contracts (CPMM and LQT) have the expected hashes. *)
+let liquidity_baking_origination () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk)
+  >>=? fun cpmm_address ->
+  Context.Contract.script_hash (B blk) cpmm_address
+  >>=? fun cpmm_hash ->
+  Lwt.return @@ Environment.wrap_tzresult
+  @@ Alpha_context.Contract.of_b58check "KT1SLWhfqPtQq7f4zLomh8BNgDeprF9B6d2M"
+  >>=? fun lqt_address ->
+  Context.Contract.script_hash (B blk) lqt_address
+  >>=? fun lqt_hash ->
+  Assert.equal
+    ~loc:__LOC__
+    Script_expr_hash.equal
+    "Unexpected CPMM script."
+    Script_expr_hash.pp
+    cpmm_hash
+    expected_cpmm_hash
+  >>=? fun () ->
+  Assert.equal
+    ~loc:__LOC__
+    Script_expr_hash.equal
+    "Unexpected LQT script."
+    Script_expr_hash.pp
+    lqt_hash
+    expected_lqt_hash
+  >>=? fun () -> return_unit
+
 (* Test that after [n] blocks, the liquidity baking CPMM contract is credited [n] times the subsidy amount. *)
 let liquidity_baking_subsidies n () =
   Context.init 1
@@ -237,6 +277,10 @@ let liquidity_baking_balance_update () =
 
 let tests =
   [ Test_services.tztest
+      "test liquidity baking script hashes"
+      `Quick
+      liquidity_baking_origination;
+    Test_services.tztest
       "test liquidity baking subsidy is correct"
       `Quick
       (liquidity_baking_subsidies 64);
