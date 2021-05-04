@@ -1445,6 +1445,12 @@ and log :
       (imap_map [@ocaml.tailcall]) with_log g gas body k ks accu stack
   | IMap_iter (_, body, k) ->
       (imap_iter [@ocaml.tailcall]) with_log g gas body k ks accu stack
+  | ILoop (_, body, k) ->
+      let ks = with_log (KLoop_in (body, KCons (k, ks))) in
+      (next [@ocaml.tailcall]) g gas ks accu stack
+  | ILoop_left (_, bl, br) ->
+      let ks = with_log (KLoop_in_left (bl, KCons (br, ks))) in
+      (next [@ocaml.tailcall]) g gas ks accu stack
   | _ ->
       (step [@ocaml.tailcall]) g gas k (with_log ks) accu stack
  [@@inline]
