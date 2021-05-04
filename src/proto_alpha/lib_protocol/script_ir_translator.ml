@@ -4166,13 +4166,11 @@ and parse_instr :
                let hinfo =
                  {iloc = loc; kstack_ty = Item_t (ret, rest, ret_annot)}
                in
+               let ibody = kibody.instr.apply binfo (IHalt hinfo) in
                let list_map =
                  {
                    csize = 1;
-                   apply =
-                     (fun kinfo k ->
-                       let ibody = kibody.instr.apply binfo (IHalt hinfo) in
-                       IList_map (kinfo, ibody, k));
+                   apply = (fun kinfo k -> IList_map (kinfo, ibody, k));
                  }
                in
                typed_no_lwt
