@@ -948,8 +948,6 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
         >>=? fun (v, _ctxt) ->
         let v = Micheline.strip_locations v in
         get_log logger >>=? fun log -> fail (Reject (kloc, v, log))
-    | INop (_, k) ->
-        (step [@ocaml.tailcall]) g gas k ks accu stack
     (* comparison *)
     | ICompare (_, ty, k) ->
         let a = accu in

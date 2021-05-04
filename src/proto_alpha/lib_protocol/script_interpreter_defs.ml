@@ -338,8 +338,6 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       Interp_costs.push
   | IFailwith _ ->
       Gas.free
-  | INop _ ->
-      Interp_costs.nop
   | IEq _ ->
       Interp_costs.eq
   | INeq _ ->

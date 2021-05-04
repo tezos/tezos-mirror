@@ -638,7 +638,6 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * logger option
       * ('b, 't, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
-  | INop : ('a, 's) kinfo * ('a, 's, 'r, 'f) kinstr -> ('a, 's, 'r, 'f) kinstr
   (*
      Comparison
      ----------
@@ -1448,8 +1447,6 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | IFailwith (kinfo, _, _, _, _) ->
       kinfo
-  | INop (kinfo, _) ->
-      kinfo
   | ICompare (kinfo, _, _) ->
       kinfo
   | IEq (kinfo, _) ->
@@ -1784,8 +1781,6 @@ let kinstr_rewritek :
       ILambda (kinfo, l, f.apply k)
   | IFailwith (kinfo, i, ty, logger, k) ->
       IFailwith (kinfo, i, ty, logger, f.apply k)
-  | INop (kinfo, k) ->
-      INop (kinfo, f.apply k)
   | ICompare (kinfo, ty, k) ->
       ICompare (kinfo, ty, f.apply k)
   | IEq (kinfo, k) ->

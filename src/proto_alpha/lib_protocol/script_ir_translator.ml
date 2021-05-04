@@ -5505,14 +5505,14 @@ and parse_instr :
       >>?= fun (Ex_ty cast_t, ctxt) ->
       merge_types ~legacy ctxt loc cast_t t
       >>?= fun (Eq, _, ctxt) ->
-      let instr = {csize = 0; apply = (fun kinfo k -> INop (kinfo, k))} in
+      let instr = {csize = 0; apply = (fun _ k -> k)} in
       ( typed ctxt loc instr (Item_t (cast_t, stack, annot))
         : ((a, s) judgement * context) tzresult Lwt.t )
   | (Prim (loc, I_RENAME, [], annot), Item_t (t, (Item_t _ as stack), _)) ->
       parse_var_annot loc annot
       >>?= fun annot ->
       (* can erase annot *)
-      let instr = {csize = 0; apply = (fun kinfo k -> INop (kinfo, k))} in
+      let instr = {csize = 0; apply = (fun _ k -> k)} in
       typed ctxt loc instr (Item_t (t, stack, annot))
   (* packing *)
   | (Prim (loc, I_PACK, [], annot), Item_t (t, rest, unpacked_annot)) ->
