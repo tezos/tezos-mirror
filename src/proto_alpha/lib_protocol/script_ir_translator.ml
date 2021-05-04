@@ -4201,6 +4201,17 @@ and parse_instr :
         body
         (Item_t (elt, rest, elt_annot))
       >>=? fun (judgement, ctxt) ->
+      let mk_list_iter ibody =
+        {
+          csize = 0;
+          apply =
+            (fun kinfo k ->
+              let hinfo = {iloc = loc; kstack_ty = rest} in
+              let binfo = kinfo_of_descr ibody in
+              let ibody = ibody.instr.apply binfo (IHalt hinfo) in
+              IList_iter (kinfo, ibody, k));
+        }
+      in
       match judgement with
       | Typed ({aft; _} as ibody) ->
           let invalid_iter_body () =
@@ -4214,33 +4225,10 @@ and parse_instr :
                invalid_iter_body
                ( merge_stacks ~legacy loc ctxt 1 aft rest
                >>? fun (Eq, rest, ctxt) ->
-               let list_iter =
-                 {
-                   csize = 0;
-                   apply =
-                     (fun kinfo k ->
-                       let hinfo = {iloc = loc; kstack_ty = rest} in
-                       let binfo = kinfo_of_descr ibody in
-                       let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-                       IList_iter (kinfo, ibody, k));
-                 }
-               in
-               ( typed_no_lwt ctxt loc list_iter rest
+               ( typed_no_lwt ctxt loc (mk_list_iter ibody) rest
                  : ((a, s) judgement * context) tzresult ) )
       | Failed {descr} ->
-          let list_iter =
-            {
-              csize = 0;
-              apply =
-                (fun kinfo k ->
-                  let ibody = descr rest in
-                  let hinfo = {iloc = loc; kstack_ty = rest} in
-                  let binfo = kinfo_of_descr ibody in
-                  let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-                  IList_iter (kinfo, ibody, k));
-            }
-          in
-          typed ctxt loc list_iter rest )
+          typed ctxt loc (mk_list_iter (descr rest)) rest )
   (* sets *)
   | (Prim (loc, I_EMPTY_SET, [t], annot), rest) ->
       parse_comparable_ty ctxt t
@@ -4267,6 +4255,17 @@ and parse_instr :
         body
         (Item_t (elt, rest, elt_annot))
       >>=? fun (judgement, ctxt) ->
+      let mk_iset_iter ibody =
+        {
+          csize = 0;
+          apply =
+            (fun kinfo k ->
+              let hinfo = {iloc = loc; kstack_ty = rest} in
+              let binfo = kinfo_of_descr ibody in
+              let ibody = ibody.instr.apply binfo (IHalt hinfo) in
+              ISet_iter (kinfo, ibody, k));
+        }
+      in
       match judgement with
       | Typed ({aft; _} as ibody) ->
           let invalid_iter_body () =
@@ -4280,33 +4279,10 @@ and parse_instr :
                invalid_iter_body
                ( merge_stacks ~legacy loc ctxt 1 aft rest
                >>? fun (Eq, rest, ctxt) ->
-               let instr =
-                 {
-                   csize = 0;
-                   apply =
-                     (fun kinfo k ->
-                       let hinfo = {iloc = loc; kstack_ty = rest} in
-                       let binfo = kinfo_of_descr ibody in
-                       let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-                       ISet_iter (kinfo, ibody, k));
-                 }
-               in
-               ( typed_no_lwt ctxt loc instr rest
+               ( typed_no_lwt ctxt loc (mk_iset_iter ibody) rest
                  : ((a, s) judgement * context) tzresult ) )
       | Failed {descr} ->
-          let instr =
-            {
-              csize = 0;
-              apply =
-                (fun kinfo k ->
-                  let ibody = descr rest in
-                  let hinfo = {iloc = loc; kstack_ty = rest} in
-                  let binfo = kinfo_of_descr ibody in
-                  let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-                  ISet_iter (kinfo, ibody, k));
-            }
-          in
-          typed ctxt loc instr rest )
+          typed ctxt loc (mk_iset_iter (descr rest)) rest )
   | ( Prim (loc, I_MEM, [], annot),
       Item_t (v, Item_t (Set_t (elt, _), rest, _), _) ) ->
       let elt = ty_of_comparable_ty elt in
