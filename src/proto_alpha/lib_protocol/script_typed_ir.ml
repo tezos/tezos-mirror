@@ -1019,7 +1019,7 @@ and (_, _, _, _) continuation =
       ('a, 's, ('a, 'b) union, 's) kinstr * ('b, 's, 'r, 'f) continuation
       -> (('a, 'b) union, 's, 'r, 'f) continuation
   (* This continuation is executed at each iteration of a traversal.
-     (Used in List, Map and Big_map.) *)
+     (Used in List, Map and Set.) *)
   | KIter :
       ('a, 'b * 's, 'b, 's) kinstr * 'a list * ('b, 's, 'r, 'f) continuation
       -> ('b, 's, 'r, 'f) continuation
