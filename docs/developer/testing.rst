@@ -485,8 +485,9 @@ Python integration and regression tests
   will include your new test in :src:`.gitlab-ci.yml`.
 
 Tezt integration and regression tests
-  New Tezt tests will be included automatically in the CI. To
-  rebalance the Tezt batches, run ``./scripts/run-tezt-tests-ci.sh``.
+  New Tezt tests will be included automatically in the CI.
+  To rebalance the Tezt batches, run (from the root of the Tezos repository):
+  ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
 
 The OCaml package tests (Alcotest, Crowbar & QCheck)
   Run ``./scripts/update_unit_test.sh`` in Tezos home. This will
