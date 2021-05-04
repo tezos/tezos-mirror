@@ -455,6 +455,69 @@ and imap_iter : type a b c d e f g h. (a, b, c, d, e, f, g, h) imap_iter_type =
   (next [@ocaml.tailcall]) g gas ks accu stack
  [@@inline]
 
+and imul_teznat : type a b c d e f. (a, b, c, d, e, f) imul_teznat_type =
+ fun logger g gas kinfo k ks accu stack ->
+  let x = accu in
+  let (y, stack) = stack in
+  match Script_int.to_int64 y with
+  | None ->
+      get_log logger >>=? fun log -> fail (Overflow (kinfo.iloc, log))
+  | Some y ->
+      Tez.(x *? y)
+      >>?= fun res -> (step [@ocaml.tailcall]) g gas k ks res stack
+
+and imul_nattez : type a b c d e f. (a, b, c, d, e, f) imul_nattez_type =
+ fun logger g gas kinfo k ks accu stack ->
+  let y = accu in
+  let (x, stack) = stack in
+  match Script_int.to_int64 y with
+  | None ->
+      get_log logger >>=? fun log -> fail (Overflow (kinfo.iloc, log))
+  | Some y ->
+      Tez.(x *? y)
+      >>?= fun res -> (step [@ocaml.tailcall]) g gas k ks res stack
+
+and ilsl_nat : type a b c d e f. (a, b, c, d, e, f) ilsl_nat_type =
+ fun logger g gas kinfo k ks accu stack ->
+  let x = accu and (y, stack) = stack in
+  match Script_int.shift_left_n x y with
+  | None ->
+      get_log logger >>=? fun log -> fail (Overflow (kinfo.iloc, log))
+  | Some x ->
+      (step [@ocaml.tailcall]) g gas k ks x stack
+
+and ilsr_nat : type a b c d e f. (a, b, c, d, e, f) ilsr_nat_type =
+ fun logger g gas kinfo k ks accu stack ->
+  let x = accu and (y, stack) = stack in
+  match Script_int.shift_right_n x y with
+  | None ->
+      get_log logger >>=? fun log -> fail (Overflow (kinfo.iloc, log))
+  | Some r ->
+      (step [@ocaml.tailcall]) g gas k ks r stack
+
+and ifailwith : type a b. (a, b) ifailwith_type =
+ fun logger (ctxt, _) gas kloc tv accu ->
+  let v = accu in
+  let ctxt = update_context gas ctxt in
+  trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
+  >>=? fun (v, _ctxt) ->
+  let v = Micheline.strip_locations v in
+  get_log logger >>=? fun log -> fail (Reject (kloc, v, log))
+
+and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
+ fun logger g gas k ks accu stack ->
+  let arg = accu and (code, stack) = stack in
+  let (Lam (code, _)) = code in
+  let code =
+    match logger with
+    | None ->
+        code.kinstr
+    | Some logger ->
+        log_kinstr logger code.kinstr
+  in
+  let ks = KReturn (stack, KCons (k, ks)) in
+  (step [@ocaml.tailcall]) g gas code ks arg (EmptyCell, EmptyCell)
+
 and step : type a s b t r f. (a, s, b, t, r, f) step_type =
  fun ((ctxt, sc) as g) gas i ks accu stack ->
   match consume gas i accu stack with
@@ -718,24 +781,10 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
         let (y, stack) = stack in
         Tez.(x -? y)
         >>?= fun res -> (step [@ocaml.tailcall]) g gas k ks res stack
-    | IMul_teznat (kinfo, logger, k) -> (
-        let x = accu in
-        let (y, stack) = stack in
-        match Script_int.to_int64 y with
-        | None ->
-            get_log logger >>=? fun log -> fail (Overflow (kinfo.iloc, log))
-        | Some y ->
-            Tez.(x *? y)
-            >>?= fun res -> (step [@ocaml.tailcall]) g gas k ks res stack )
-    | IMul_nattez (kinfo, logger, k) -> (
-        let y = accu in
-        let (x, stack) = stack in
-        match Script_int.to_int64 y with
-        | None ->
-            get_log logger >>=? fun log -> fail (Overflow (kinfo.iloc, log))
-        | Some y ->
-            Tez.(x *? y)
-            >>?= fun res -> (step [@ocaml.tailcall]) g gas k ks res stack )
+    | IMul_teznat (kinfo, k) ->
+        imul_teznat None g gas kinfo k ks accu stack
+    | IMul_nattez (kinfo, k) ->
+        imul_nattez None g gas kinfo k ks accu stack
     (* boolean operations *)
     | IOr (_, k) ->
         let x = accu in
@@ -867,20 +916,10 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
         let x = accu and (y, stack) = stack in
         let res = Script_int.ediv_n x y in
         (step [@ocaml.tailcall]) g gas k ks res stack
-    | ILsl_nat (kinfo, logger, k) -> (
-        let x = accu and (y, stack) = stack in
-        match Script_int.shift_left_n x y with
-        | None ->
-            get_log logger >>=? fun log -> fail (Overflow (kinfo.iloc, log))
-        | Some x ->
-            (step [@ocaml.tailcall]) g gas k ks x stack )
-    | ILsr_nat (kinfo, logger, k) -> (
-        let x = accu and (y, stack) = stack in
-        match Script_int.shift_right_n x y with
-        | None ->
-            get_log logger >>=? fun log -> fail (Overflow (kinfo.iloc, log))
-        | Some r ->
-            (step [@ocaml.tailcall]) g gas k ks r stack )
+    | ILsl_nat (kinfo, k) ->
+        ilsl_nat None g gas kinfo k ks accu stack
+    | ILsr_nat (kinfo, k) ->
+        ilsr_nat None g gas kinfo k ks accu stack
     | IOr_nat (_, k) ->
         let x = accu and (y, stack) = stack in
         let res = Script_int.logor x y in
@@ -921,18 +960,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
         let ks = KUndip (ign, KCons (k, ks)) in
         let (accu, stack) = stack in
         (step [@ocaml.tailcall]) g gas b ks accu stack
-    | IExec (_, logger, k) ->
-        let arg = accu and (code, stack) = stack in
-        let (Lam (code, _)) = code in
-        let code =
-          match logger with
-          | None ->
-              code.kinstr
-          | Some logger ->
-              log_kinstr logger code.kinstr
-        in
-        let ks = KReturn (stack, KCons (k, ks)) in
-        (step [@ocaml.tailcall]) g gas code ks arg (EmptyCell, EmptyCell)
+    | IExec (_, k) ->
+        iexec None g gas k ks accu stack
     | IApply (_, capture_ty, k) ->
         let capture = accu in
         let (lam, stack) = stack in
@@ -941,13 +970,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
         (step [@ocaml.tailcall]) (ctxt, sc) gas k ks lam' stack
     | ILambda (_, lam, k) ->
         (step [@ocaml.tailcall]) g gas k ks lam (accu, stack)
-    | IFailwith (_, kloc, tv, logger, _) ->
-        let v = accu in
-        let ctxt = update_context gas ctxt in
-        trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
-        >>=? fun (v, _ctxt) ->
-        let v = Micheline.strip_locations v in
-        get_log logger >>=? fun log -> fail (Reject (kloc, v, log))
+    | IFailwith (_, kloc, tv, _) ->
+        ifailwith None g gas kloc tv accu
     (* comparison *)
     | ICompare (_, ty, k) ->
         let a = accu in
@@ -1449,6 +1473,18 @@ and log :
   | ILoop_left (_, bl, br) ->
       let ks = with_log (KLoop_in_left (bl, KCons (br, ks))) in
       (next [@ocaml.tailcall]) g gas ks accu stack
+  | IMul_teznat (kinfo, k) ->
+      imul_teznat (Some logger) g gas kinfo k ks accu stack
+  | IMul_nattez (kinfo, k) ->
+      imul_nattez (Some logger) g gas kinfo k ks accu stack
+  | ILsl_nat (kinfo, k) ->
+      ilsl_nat (Some logger) g gas kinfo k ks accu stack
+  | ILsr_nat (kinfo, k) ->
+      ilsr_nat (Some logger) g gas kinfo k ks accu stack
+  | IFailwith (_, kloc, tv, _) ->
+      ifailwith (Some logger) g gas kloc tv accu
+  | IExec (_, k) ->
+      iexec (Some logger) g gas k ks accu stack
   | _ ->
       (step [@ocaml.tailcall]) g gas k (with_log ks) accu stack
  [@@inline]

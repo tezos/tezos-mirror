@@ -609,29 +609,7 @@ let get_log (logger : logger option) =
    execution of [i] with [logger]. In some cases, it embeds [logger]
    to [i] to let the instruction [i] asks [logger] for a backtrace
    when the evaluation of [i] fails. *)
-let log_kinstr logger i =
-  let set_logger_for_trace_dependent_kinstr :
-      type a s r f. (a, s, r, f) kinstr -> (a, s, r, f) kinstr = function
-    | IFailwith (kinfo, kloc, tv, _, k) ->
-        IFailwith (kinfo, kloc, tv, Some logger, k)
-    | IExec (kinfo, _, k) ->
-        IExec (kinfo, Some logger, k)
-    | IMul_teznat (kinfo, _, k) ->
-        IMul_teznat (kinfo, Some logger, k)
-    | IMul_nattez (kinfo, _, k) ->
-        IMul_nattez (kinfo, Some logger, k)
-    | ILsr_nat (kinfo, _, k) ->
-        ILsr_nat (kinfo, Some logger, k)
-    | ILsl_nat (kinfo, _, k) ->
-        ILsl_nat (kinfo, Some logger, k)
-    | i ->
-        i
-  in
-  ILog
-    ( kinfo_of_kinstr i,
-      LogEntry,
-      logger,
-      set_logger_for_trace_dependent_kinstr i )
+let log_kinstr logger i = ILog (kinfo_of_kinstr i, LogEntry, logger, i)
 
 (* [log_next_kinstr logger i] instruments the next instruction of [i]
    with the [logger].*)
@@ -1057,3 +1035,66 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) imap_iter_type =
   ('e, 'f) map ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
+
+type ('a, 'b, 'c, 'd, 'e, 'f) imul_teznat_type =
+  logger option ->
+  outdated_context * step_constants ->
+  local_gas_counter ->
+  (Tez.t, 'a) kinfo ->
+  (Tez.t, 'b, 'c, 'd) kinstr ->
+  ('c, 'd, 'e, 'f) continuation ->
+  Tez.t ->
+  Script_int.n Script_int.num * 'b ->
+  ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
+
+type ('a, 'b, 'c, 'd, 'e, 'f) imul_nattez_type =
+  logger option ->
+  outdated_context * step_constants ->
+  local_gas_counter ->
+  (Script_int.n Script_int.num, 'a) kinfo ->
+  (Tez.t, 'b, 'c, 'd) kinstr ->
+  ('c, 'd, 'e, 'f) continuation ->
+  Script_int.n Script_int.num ->
+  Tez.t * 'b ->
+  ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
+
+type ('a, 'b, 'c, 'd, 'e, 'f) ilsl_nat_type =
+  logger option ->
+  outdated_context * step_constants ->
+  local_gas_counter ->
+  (Script_int.n Script_int.num, 'a) kinfo ->
+  (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
+  ('c, 'd, 'e, 'f) continuation ->
+  Script_int.n Script_int.num ->
+  Script_int.n Script_int.num * 'b ->
+  ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
+
+type ('a, 'b, 'c, 'd, 'e, 'f) ilsr_nat_type =
+  logger option ->
+  outdated_context * step_constants ->
+  local_gas_counter ->
+  (Script_int.n Script_int.num, 'a) kinfo ->
+  (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
+  ('c, 'd, 'e, 'f) continuation ->
+  Script_int.n Script_int.num ->
+  Script_int.n Script_int.num * 'b ->
+  ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
+
+type ('a, 'b) ifailwith_type =
+  logger option ->
+  outdated_context * step_constants ->
+  local_gas_counter ->
+  int ->
+  'a ty ->
+  'a ->
+  ('b, error trace) result Lwt.t
+
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iexec_type =
+  logger option ->
+  outdated_context * step_constants ->
+  local_gas_counter ->
+  ('a, 'b, 'c, 'd) kinstr ->
+  ('c, 'd, 'e, 'f) continuation ->
+  'g ->
+  ('g, 'a) lambda * 'b ->
+  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t

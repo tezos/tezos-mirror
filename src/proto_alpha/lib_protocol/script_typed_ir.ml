@@ -475,10 +475,10 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       (Tez.t, Tez.t * 's) kinfo * (Tez.t, 's, 'r, 'f) kinstr
       -> (Tez.t, Tez.t * 's, 'r, 'f) kinstr
   | IMul_teznat :
-      (Tez.t, n num * 's) kinfo * logger option * (Tez.t, 's, 'r, 'f) kinstr
+      (Tez.t, n num * 's) kinfo * (Tez.t, 's, 'r, 'f) kinstr
       -> (Tez.t, n num * 's, 'r, 'f) kinstr
   | IMul_nattez :
-      (n num, Tez.t * 's) kinfo * logger option * (Tez.t, 's, 'r, 'f) kinstr
+      (n num, Tez.t * 's) kinfo * (Tez.t, 's, 'r, 'f) kinstr
       -> (n num, Tez.t * 's, 'r, 'f) kinstr
   | IEdiv_teznat :
       (Tez.t, n num * 's) kinfo
@@ -567,10 +567,10 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ((n num, n num) pair option, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
   | ILsl_nat :
-      (n num, n num * 's) kinfo * logger option * (n num, 's, 'r, 'f) kinstr
+      (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
   | ILsr_nat :
-      (n num, n num * 's) kinfo * logger option * (n num, 's, 'r, 'f) kinstr
+      (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
       -> (n num, n num * 's, 'r, 'f) kinstr
   | IOr_nat :
       (n num, n num * 's) kinfo * (n num, 's, 'r, 'f) kinstr
@@ -617,9 +617,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('a, 'c * 't, 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
   | IExec :
-      ('a, ('a, 'b) lambda * 's) kinfo
-      * logger option
-      * ('b, 's, 'r, 'f) kinstr
+      ('a, ('a, 'b) lambda * 's) kinfo * ('b, 's, 'r, 'f) kinstr
       -> ('a, ('a, 'b) lambda * 's, 'r, 'f) kinstr
   | IApply :
       ('a, ('a * 'b, 'c) lambda * 's) kinfo
@@ -632,11 +630,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (('b, 'c) lambda, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IFailwith :
-      ('a, 's) kinfo
-      * Script.location
-      * 'a ty
-      * logger option
-      * ('b, 't, 'r, 'f) kinstr
+      ('a, 's) kinfo * Script.location * 'a ty * ('b, 't, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   (*
      Comparison
@@ -1363,9 +1357,9 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | ISub_tez (kinfo, _) ->
       kinfo
-  | IMul_teznat (kinfo, _, _) ->
+  | IMul_teznat (kinfo, _) ->
       kinfo
-  | IMul_nattez (kinfo, _, _) ->
+  | IMul_nattez (kinfo, _) ->
       kinfo
   | IEdiv_teznat (kinfo, _) ->
       kinfo
@@ -1415,9 +1409,9 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | IEdiv_natnat (kinfo, _) ->
       kinfo
-  | ILsl_nat (kinfo, _, _) ->
+  | ILsl_nat (kinfo, _) ->
       kinfo
-  | ILsr_nat (kinfo, _, _) ->
+  | ILsr_nat (kinfo, _) ->
       kinfo
   | IOr_nat (kinfo, _) ->
       kinfo
@@ -1439,13 +1433,13 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
       kinfo
   | IDip (kinfo, _, _) ->
       kinfo
-  | IExec (kinfo, _, _) ->
+  | IExec (kinfo, _) ->
       kinfo
   | IApply (kinfo, _, _) ->
       kinfo
   | ILambda (kinfo, _, _) ->
       kinfo
-  | IFailwith (kinfo, _, _, _, _) ->
+  | IFailwith (kinfo, _, _, _) ->
       kinfo
   | ICompare (kinfo, _, _) ->
       kinfo
@@ -1695,10 +1689,10 @@ let kinstr_rewritek :
       IAdd_tez (kinfo, f.apply k)
   | ISub_tez (kinfo, k) ->
       ISub_tez (kinfo, f.apply k)
-  | IMul_teznat (kinfo, logger, k) ->
-      IMul_teznat (kinfo, logger, f.apply k)
-  | IMul_nattez (kinfo, logger, k) ->
-      IMul_nattez (kinfo, logger, f.apply k)
+  | IMul_teznat (kinfo, k) ->
+      IMul_teznat (kinfo, f.apply k)
+  | IMul_nattez (kinfo, k) ->
+      IMul_nattez (kinfo, f.apply k)
   | IEdiv_teznat (kinfo, k) ->
       IEdiv_teznat (kinfo, f.apply k)
   | IEdiv_tez (kinfo, k) ->
@@ -1747,10 +1741,10 @@ let kinstr_rewritek :
       IEdiv_natint (kinfo, f.apply k)
   | IEdiv_natnat (kinfo, k) ->
       IEdiv_natnat (kinfo, f.apply k)
-  | ILsl_nat (kinfo, logger, k) ->
-      ILsl_nat (kinfo, logger, f.apply k)
-  | ILsr_nat (kinfo, logger, k) ->
-      ILsr_nat (kinfo, logger, f.apply k)
+  | ILsl_nat (kinfo, k) ->
+      ILsl_nat (kinfo, f.apply k)
+  | ILsr_nat (kinfo, k) ->
+      ILsr_nat (kinfo, f.apply k)
   | IOr_nat (kinfo, k) ->
       IOr_nat (kinfo, f.apply k)
   | IAnd_nat (kinfo, k) ->
@@ -1773,14 +1767,14 @@ let kinstr_rewritek :
       ILoop_left (kinfo, f.apply kl, f.apply kr)
   | IDip (kinfo, body, k) ->
       IDip (kinfo, f.apply body, f.apply k)
-  | IExec (kinfo, logger, k) ->
-      IExec (kinfo, logger, f.apply k)
+  | IExec (kinfo, k) ->
+      IExec (kinfo, f.apply k)
   | IApply (kinfo, ty, k) ->
       IApply (kinfo, ty, f.apply k)
   | ILambda (kinfo, l, k) ->
       ILambda (kinfo, l, f.apply k)
-  | IFailwith (kinfo, i, ty, logger, k) ->
-      IFailwith (kinfo, i, ty, logger, f.apply k)
+  | IFailwith (kinfo, i, ty, k) ->
+      IFailwith (kinfo, i, ty, f.apply k)
   | ICompare (kinfo, ty, k) ->
       ICompare (kinfo, ty, f.apply k)
   | IEq (kinfo, k) ->
