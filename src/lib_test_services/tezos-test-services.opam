@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "dune" { >= "2.0" }
   "tezos-base"
-  "alcotest-lwt"
+  "alcotest-lwt" { >= "1.4.0" }
   "tezos-stdlib-unix" { with-test }
 ]
 build: [

@@ -319,13 +319,13 @@ end = struct
       | (pes, None) ->
           List.iter (fun (p, e) -> Pattern.assert_event p e) pes
       | (_, Some (`Left pats)) ->
-          Alcotest.fail
+          Alcotest.fail ?here:None ?pos:None
           @@ Format.asprintf
                "Missing events in sink: %a"
                (Format.pp_print_list Pattern.pp)
                pats
       | (_, Some (`Right events)) ->
-          Alcotest.fail
+          Alcotest.fail ?here:None ?pos:None
           @@ Format.asprintf
                "Excess events in sink: %a"
                (Format.pp_print_list pp_event)
