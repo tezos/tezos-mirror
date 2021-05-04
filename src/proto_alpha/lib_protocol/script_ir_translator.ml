@@ -4162,18 +4162,15 @@ and parse_instr :
                invalid_map_body
                ( merge_stacks ~legacy loc ctxt 1 rest starting_rest
                >>? fun (Eq, rest, ctxt) ->
+               let binfo = kinfo_of_descr kibody in
+               let hinfo =
+                 {iloc = loc; kstack_ty = Item_t (ret, rest, ret_annot)}
+               in
                let list_map =
                  {
                    csize = 1;
                    apply =
                      (fun kinfo k ->
-                       let binfo = kinfo_of_descr kibody in
-                       let hinfo =
-                         {
-                           iloc = loc;
-                           kstack_ty = Item_t (ret, rest, ret_annot);
-                         }
-                       in
                        let ibody = kibody.instr.apply binfo (IHalt hinfo) in
                        IList_map (kinfo, ibody, k));
                  }
