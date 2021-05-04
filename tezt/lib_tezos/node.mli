@@ -144,8 +144,8 @@ val rpc_port : t -> int
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
 
-(** Wait until a node terminates and check its status. 
- 
+(** Wait until a node terminates and check its status.
+
     If the node is not running,
     or if the process returns an exit code which is not [exit_code],
     or if [msg] does not match the stderr output, fail the test.

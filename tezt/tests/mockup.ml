@@ -377,7 +377,7 @@ let test_granada_migration_temp_big_maps =
         client
     in
     let* () = Client.bake_for ~key:"bootstrap1" client in
-    let param =
+    let arg =
       "Pair (Left True) 1"
       (* create a fresh big map containing { 1 -> 2 } and pass it as parameter *)
     in
@@ -386,7 +386,7 @@ let test_granada_migration_temp_big_maps =
         ~amount:Tez.zero
         ~giver:"bootstrap1"
         ~receiver:"temp_big_maps"
-        ~param
+        ~arg
         client
     in
     let* () = Client.bake_for ~key:"bootstrap1" client in

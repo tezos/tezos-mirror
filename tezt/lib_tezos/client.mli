@@ -273,7 +273,7 @@ val transfer :
   ?fee:Tez.t ->
   ?gas_limit:int ->
   ?storage_limit:int ->
-  ?param:string ->
+  ?arg:string ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->
@@ -288,7 +288,7 @@ val spawn_transfer :
   ?fee:Tez.t ->
   ?gas_limit:int ->
   ?storage_limit:int ->
-  ?param:string ->
+  ?arg:string ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->
