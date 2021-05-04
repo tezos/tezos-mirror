@@ -1240,10 +1240,6 @@ module Pending_migration = struct
         let encoding = Migration_repr.origination_result_list_encoding
       end)
 
-  let save ?(balance_updates = []) ?(operation_results = []) ctxt =
-    Balance_updates.init ctxt balance_updates
-    >>=? fun ctxt -> Operation_results.init ctxt operation_results
-
   let remove ctxt =
     let balance_updates ctxt =
       Balance_updates.find ctxt

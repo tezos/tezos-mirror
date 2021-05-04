@@ -53,7 +53,7 @@ let liquidity_baking_origination () =
   Context.Contract.script_hash (B blk) cpmm_address
   >>=? fun cpmm_hash ->
   Lwt.return @@ Environment.wrap_tzresult
-  @@ Alpha_context.Contract.of_b58check "KT1SLWhfqPtQq7f4zLomh8BNgDeprF9B6d2M"
+  @@ Alpha_context.Contract.of_b58check "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
   >>=? fun lqt_address ->
   Context.Contract.script_hash (B blk) lqt_address
   >>=? fun lqt_hash ->
@@ -72,6 +72,21 @@ let liquidity_baking_origination () =
     Script_expr_hash.pp
     lqt_hash
     expected_lqt_hash
+  >>=? fun () -> return_unit
+
+(* Test that the CPMM address in storage is correct *)
+let liquidity_baking_cpmm_address () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk)
+  >>=? fun liquidity_baking ->
+  Assert.equal
+    ~loc:__LOC__
+    String.equal
+    "CPMM address in storage is incorrect"
+    Format.pp_print_string
+    (Alpha_context.Contract.to_b58check liquidity_baking)
+    "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
   >>=? fun () -> return_unit
 
 (* Test that after [n] blocks, the liquidity baking CPMM contract is credited [n] times the subsidy amount. *)
@@ -280,6 +295,10 @@ let tests =
       "test liquidity baking script hashes"
       `Quick
       liquidity_baking_origination;
+    Test_services.tztest
+      "test liquidity baking cpmm is originated at the expected address"
+      `Quick
+      liquidity_baking_cpmm_address;
     Test_services.tztest
       "test liquidity baking subsidy is correct"
       `Quick
