@@ -216,8 +216,8 @@ let liquidity_baking_storage n () =
          "Pair 1\n\
          \        %d\n\
          \        100\n\
-         \        \"KT1QuofAgnsWffHzLA7D78rxytJruGHDe7XG\"\n\
-         \        \"KT1SLWhfqPtQq7f4zLomh8BNgDeprF9B6d2M\""
+         \        \"KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN\"\n\
+         \        \"KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo\""
          (100 + (n * Int64.to_int (Tez.to_mutez subsidy))))
   in
   Block.bake_n n blk

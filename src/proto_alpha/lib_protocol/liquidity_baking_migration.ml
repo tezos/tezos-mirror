@@ -177,18 +177,18 @@ let init_common ~typecheck ?test_fa12_admin ctxt =
     ctxt
     (Constants_storage.liquidity_baking_sunset_level ctxt)
   >>=? fun ctxt ->
+  Contract_storage.fresh_contract_from_current_nonce ctxt
+  >>?= fun (ctxt, cpmm_address) ->
+  Contract_storage.fresh_contract_from_current_nonce ctxt
+  >>?= fun (ctxt, lqt_address) ->
+  Storage.Liquidity_baking.Cpmm_address.init ctxt cpmm_address
+  >>=? fun ctxt ->
   check_tzBTC
     ~typecheck
     current_level
     ?test_fa12_admin
     ctxt
     (fun ctxt token_address token_result ->
-      Contract_storage.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, cpmm_address) ->
-      Contract_storage.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, lqt_address) ->
-      Storage.Liquidity_baking.Cpmm_address.init ctxt cpmm_address
-      >>=? fun ctxt ->
       let cpmm_script =
         Script_repr.
           {
@@ -218,7 +218,7 @@ let init_common ~typecheck ?test_fa12_admin ctxt =
       >>=? fun (ctxt, cpmm_result) ->
       originate ctxt lqt_address ~balance:Tez_repr.zero lqt_script
       >|=? fun (ctxt, lqt_result) ->
-      (ctxt, token_result @ [cpmm_result; lqt_result]))
+      (ctxt, [cpmm_result; lqt_result] @ token_result))
 
 let init_from_florence ctxt ~typecheck =
   (* origination nonce is unset when stitching from 009 *)
