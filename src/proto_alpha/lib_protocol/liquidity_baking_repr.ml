@@ -25,8 +25,6 @@
 
 let get_cpmm_address = Storage.Liquidity_baking.Cpmm_address.get
 
-let get_sunset_level = Storage.Liquidity_baking.Sunset_level.get
-
 let get_escape_ema = Storage.Liquidity_baking.Escape_ema.get
 
 type escape_ema = Int32.t
@@ -43,8 +41,7 @@ let on_cpmm_exists ctxt f =
       f ctxt cpmm_contract
 
 let on_below_sunset ctxt f =
-  get_sunset_level ctxt
-  >>=? fun sunset_level ->
+  let sunset_level = Constants_storage.liquidity_baking_sunset_level ctxt in
   let level = Raw_level_repr.to_int32 (Level_storage.current ctxt).level in
   if Compare.Int32.(level >= sunset_level) then return (ctxt, [])
   else on_cpmm_exists ctxt f

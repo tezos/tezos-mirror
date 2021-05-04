@@ -177,10 +177,6 @@ let init ctxt ~typecheck =
   let current_level =
     Raw_level_repr.to_int32 (Level_storage.current ctxt).level
   in
-  Storage.Liquidity_baking.Sunset_level.init
-    ctxt
-    (Constants_storage.liquidity_baking_sunset_level ctxt)
-  >>=? fun ctxt ->
   Contract_storage.fresh_contract_from_current_nonce ctxt
   >>?= fun (ctxt, cpmm_address) ->
   Contract_storage.fresh_contract_from_current_nonce ctxt

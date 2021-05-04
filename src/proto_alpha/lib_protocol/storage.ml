@@ -1278,13 +1278,6 @@ module Liquidity_baking = struct
       end)
       (Int32)
 
-  module Sunset_level =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["liquidity_baking_sunset_level"]
-      end)
-      (Int32)
-
   module Cpmm_address =
     Make_single_data_storage (Registered) (Raw_context)
       (struct

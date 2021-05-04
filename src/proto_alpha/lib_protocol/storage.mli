@@ -510,11 +510,6 @@ module Liquidity_baking : sig
   module Escape_ema :
     Single_data_storage with type t := Raw_context.t and type value = Int32.t
 
-  (** Level at which liquidity baking automatically shuts off.
-      Set in stitching to six months from activation. **)
-  module Sunset_level :
-    Single_data_storage with type t := Raw_context.t and type value = Int32.t
-
   (** Constant product market maker contract that receives liquidity baking subsidy. **)
   module Cpmm_address :
     Single_data_storage
