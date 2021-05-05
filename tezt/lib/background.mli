@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,84 +23,45 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ( // ) = Filename.concat
+(** Promises to run in the background during tests. *)
 
-let sf = Printf.sprintf
+(** Register a promise that will run in the background.
 
-let (let*) = Lwt.bind
+    After a test runs, [Test.run] waits for all registered promises to finish.
 
-let (and*) = Lwt.both
+    If a registered promise raises an exception which is not [Lwt.Canceled],
+    the current test fails immediately, but [Test.run] still waits for
+    other background promises to finish.
 
-let return = Lwt.return
+    Make sure that the promise you register eventually resolves.
+    If it doesn't, [stop] (and thus [Test.run], which calls [stop])
+    will hang forever.
 
-let unit = Lwt.return_unit
+    Calls to [register] when no test is running result in an error. *)
+val register : unit Lwt.t -> unit
 
-let none = Lwt.return_none
+(** Allow calls to [register] until [stop] is called.
 
-let some = Lwt.return_some
+    If a promise that is later [register]ed is rejected by an exception
+    which is not [Lwt.Canceled], [start] calls its argument.
+    This may occur several times, including during [stop].
 
-let range a b =
-  let rec range ?(acc = []) a b =
-    if b < a then acc else range ~acc:(b :: acc) a (b - 1)
-  in
-  range a b
+    @raise [Invalid_arg] if calls to [register] are already allowed,
+    i.e. if [start] has already been called without a corresponding [stop].
 
-let rec list_find_map f = function
-  | [] ->
-      None
-  | head :: tail ->
-      match f head with
-        | None ->
-            list_find_map f tail
-        | Some _ as x ->
-            x
+    Don't call this directly, it is called by {!Test.run}. *)
+val start : (exn -> unit) -> unit
 
-type rex = string * Re.re
+(** Let all [register]ed promises resolve, then stop allowing calls to [register].
 
-let rex r = r, Re.compile (Re.Perl.re r)
+    The promise returned by [stop] is never rejected except if you cancel it.
+    If you do cancel it, you may have to call [stop] again though as it is not
+    guaranteed that all background promises have also been canceled.
+    In other words, canceling the promise returned by [stop] is probably
+    a bad idea.
 
-let show_rex = fst
+    Calling [stop] when calls to [register] are not allowed has no effect,
+    i.e. you can call [stop] even with no corresponding [start].
 
-let ( =~ ) s (_, r) = Re.execp r s
-
-let ( =~! ) s (_, r) = not (Re.execp r s)
-
-let ( =~* ) s (_, r) =
-  match Re.exec_opt r s with
-  | None ->
-      None
-  | Some group ->
-      Some (Re.Group.get group 1)
-
-let ( =~** ) s (_, r) =
-  match Re.exec_opt r s with
-  | None ->
-      None
-  | Some group ->
-      Some (Re.Group.get group 1, Re.Group.get group 2)
-
-let replace_string ?pos ?len ?all (_, r) ~by s =
-  Re.replace_string ?pos ?len ?all r ~by s
-
-let rec repeat n f =
-  if n <= 0 then unit
-  else
-    let* () = f () in
-    repeat (n - 1) f
-
-let with_open_out file write_f =
-  let chan = open_out file in
-  try (write_f chan; close_out chan;)
-  with x -> close_out chan; raise x
-
-let with_open_in file read_f =
-  let chan = open_in file in
-  try (let value = read_f chan in close_in chan; value)
-  with x -> close_in chan; raise x
-
-let read_file filename =
-  let* ic = Lwt_io.open_file ~mode:Lwt_io.Input filename in
-  Lwt_io.read ic
-
-module String_map = Map.Make (String)
-module String_set = Set.Make (String)
+    Don't call this directly, it is called by {!Test.run}. *)
+val stop : unit -> unit Lwt.t

@@ -299,7 +299,7 @@ module Make (X : PARAMETERS) = struct
       unit
     in
     running_status.event_loop_promise <- Some event_loop_promise ;
-    async event_loop_promise ;
+    Background.register event_loop_promise ;
     unit
 
   let wait_for ?where daemon name filter =

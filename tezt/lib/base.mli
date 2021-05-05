@@ -101,21 +101,6 @@ val replace_string :
   string ->      (* string to replace in *)
   string
 
-(** {2 Asynchronous Promises} *)
-
-(** Register a promise so that [wait_for_async] handles it.
-
-    It is important to use [async] instead of [Lwt.async] so that we wait for those
-    promises to resolve (if only by being canceled) before moving on to other tests.
-
-    Warning: if an [async] promise raises an exception other than [Test.Failed],
-    it currently does not stop the test. You should probably not use [async], it
-    is mostly for internal use. *)
-val async : unit Lwt.t -> unit
-
-(** Return a promise which resolves once all {!async}s have resolved. *)
-val wait_for_async : unit -> unit Lwt.t
-
 (** {2 Promises} *)
 
 (** Repeat something a given amount of times. *)

@@ -51,8 +51,12 @@ val fail : ('a, unit, string, 'b) format4 -> 'a
     Try to reuse them if possible.
 
     The last argument is a function [f] which implements the test.
-
-    After [f] is done, whatever the result, {!Tezt_process.clean_up} is run.
+    If [f] needs to spawn external processes, it should use
+    the [Process] module to do so, so that those processes are automatically
+    killed at the end of the test. Similarly, if this function needs to
+    create temporary files, it should declare them with [Temp], and if it
+    needs to have promises that run in the background, it should use
+    [Background.register] (and not [Lwt.async] in particular).
 
     If [f] raises an exception, act as if [fail] was called (without the
     error location unfortunately).

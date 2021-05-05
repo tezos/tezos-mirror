@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,84 +23,60 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ( // ) = Filename.concat
+open Base
 
-let sf = Printf.sprintf
+type state =
+  | Not_started
+  | Started of {
+      exception_handler : exn -> unit;
+      mutable pending : unit Lwt.t list;
+    }
 
-let (let*) = Lwt.bind
+let state = ref Not_started
 
-let (and*) = Lwt.both
+let register p =
+  match !state with
+  | Not_started ->
+      invalid_arg "Background.register: not started"
+  | Started started_state ->
+      let p =
+        Lwt.catch
+          (fun () -> p)
+          (function
+            | Lwt.Canceled ->
+                unit
+            | exn ->
+                started_state.exception_handler exn ;
+                unit)
+      in
+      started_state.pending <- p :: started_state.pending
 
-let return = Lwt.return
+let start exception_handler =
+  match !state with
+  | Not_started ->
+      state := Started {exception_handler; pending = []}
+  | Started _ ->
+      invalid_arg "Background.start: already started"
 
-let unit = Lwt.return_unit
-
-let none = Lwt.return_none
-
-let some = Lwt.return_some
-
-let range a b =
-  let rec range ?(acc = []) a b =
-    if b < a then acc else range ~acc:(b :: acc) a (b - 1)
-  in
-  range a b
-
-let rec list_find_map f = function
-  | [] ->
-      None
-  | head :: tail ->
-      match f head with
-        | None ->
-            list_find_map f tail
-        | Some _ as x ->
-            x
-
-type rex = string * Re.re
-
-let rex r = r, Re.compile (Re.Perl.re r)
-
-let show_rex = fst
-
-let ( =~ ) s (_, r) = Re.execp r s
-
-let ( =~! ) s (_, r) = not (Re.execp r s)
-
-let ( =~* ) s (_, r) =
-  match Re.exec_opt r s with
-  | None ->
-      None
-  | Some group ->
-      Some (Re.Group.get group 1)
-
-let ( =~** ) s (_, r) =
-  match Re.exec_opt r s with
-  | None ->
-      None
-  | Some group ->
-      Some (Re.Group.get group 1, Re.Group.get group 2)
-
-let replace_string ?pos ?len ?all (_, r) ~by s =
-  Re.replace_string ?pos ?len ?all r ~by s
-
-let rec repeat n f =
-  if n <= 0 then unit
-  else
-    let* () = f () in
-    repeat (n - 1) f
-
-let with_open_out file write_f =
-  let chan = open_out file in
-  try (write_f chan; close_out chan;)
-  with x -> close_out chan; raise x
-
-let with_open_in file read_f =
-  let chan = open_in file in
-  try (let value = read_f chan in close_in chan; value)
-  with x -> close_in chan; raise x
-
-let read_file filename =
-  let* ic = Lwt_io.open_file ~mode:Lwt_io.Input filename in
-  Lwt_io.read ic
-
-module String_map = Map.Make (String)
-module String_set = Set.Make (String)
+let stop () =
+  match !state with
+  | Not_started ->
+      unit
+  | Started started_state ->
+      let rec loop () =
+        match started_state.pending with
+        | [] ->
+            unit
+        | list ->
+            started_state.pending <- [] ;
+            (* Note that when registered promises are rejected, their wrapper
+               cause them to resolve with unit instead. So this [join]
+               cannot be rejected. (The user may still cancel it though, by
+               canceling the promise returned by [stop].) *)
+            let* () = Lwt.join list in
+            (* Maybe some new promises were registered. *)
+            loop ()
+      in
+      let* () = loop () in
+      state := Not_started ;
+      unit
