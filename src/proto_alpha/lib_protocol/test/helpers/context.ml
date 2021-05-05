@@ -219,6 +219,8 @@ end
 module Contract = struct
   let pp = Alpha_context.Contract.pp
 
+  let equal a b = Alpha_context.Contract.compare a b = 0
+
   let pkh c =
     Alpha_context.Contract.is_implicit c
     |> function

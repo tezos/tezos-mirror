@@ -625,6 +625,30 @@ let bake_n_with_all_balance_updates ?policy ?liquidity_baking_escape_vote n b =
     (1 -- n)
   >|=? fun (b, balance_updates_rev) -> (b, List.rev balance_updates_rev)
 
+let bake_n_with_origination_results ?policy n b =
+  List.fold_left_es
+    (fun (b, origination_results_rev) _ ->
+      bake_with_metadata ?policy b
+      >>=? fun (b, metadata) ->
+      let origination_results_rev =
+        List.fold_left
+          (fun origination_results_rev ->
+            let open Apply_results in
+            function
+            | Successful_manager_result (Reveal_result _)
+            | Successful_manager_result (Delegation_result _)
+            | Successful_manager_result (Transaction_result _) ->
+                origination_results_rev
+            | Successful_manager_result (Origination_result x) ->
+                Origination_result x :: origination_results_rev)
+          origination_results_rev
+          metadata.implicit_operations_results
+      in
+      return (b, origination_results_rev))
+    (b, [])
+    (1 -- n)
+  >|=? fun (b, origination_results_rev) -> (b, List.rev origination_results_rev)
+
 let bake_n_with_liquidity_baking_escape_ema ?policy
     ?liquidity_baking_escape_vote n b =
   List.fold_left_es

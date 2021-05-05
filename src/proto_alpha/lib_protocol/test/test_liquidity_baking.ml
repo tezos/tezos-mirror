@@ -319,6 +319,88 @@ let liquidity_baking_balance_update () =
     ((Int32.to_int sunset - 1) * Int64.to_int (Tez.to_mutez subsidy))
   >>=? fun () -> return_unit
 
+let get_cpmm_result results =
+  match results with
+  | cpmm_result :: _results ->
+      cpmm_result
+  | _ ->
+      assert false
+
+let get_lqt_result results =
+  match results with
+  | _cpmm_result :: lqt_result :: _results ->
+      lqt_result
+  | _ ->
+      assert false
+
+let get_address_in_result result =
+  match result with
+  | Apply_results.Origination_result {originated_contracts; _} -> (
+    match originated_contracts with [c] -> c | _ -> assert false )
+
+let get_balance_update_in_result result =
+  match result with
+  | Apply_results.Origination_result {balance_updates; _} -> (
+    match balance_updates with
+    | [(Contract _, Credited balance, Protocol_migration)] ->
+        balance
+    | _ ->
+        assert false )
+
+let liquidity_baking_origination_result_cpmm_address () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk)
+  >>=? fun cpmm_address_in_storage ->
+  Block.bake_n_with_origination_results 1 blk
+  >>=? fun (_blk, origination_results) ->
+  let result = get_cpmm_result origination_results in
+  let address = get_address_in_result result in
+  Assert.equal
+    ~loc:__LOC__
+    Context.Contract.equal
+    "CPMM address in storage is not the same as in origination result"
+    Context.Contract.pp
+    address
+    cpmm_address_in_storage
+  >>=? fun () -> return_unit
+
+let liquidity_baking_origination_result_cpmm_balance () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Block.bake_n_with_origination_results 1 blk
+  >>=? fun (_blk, origination_results) ->
+  let result = get_cpmm_result origination_results in
+  let balance_update = get_balance_update_in_result result in
+  Assert.equal_tez ~loc:__LOC__ balance_update Tez.(of_mutez_exn 100L)
+  >>=? fun () -> return_unit
+
+let liquidity_baking_origination_result_lqt_address () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Block.bake_n_with_origination_results 1 blk
+  >>=? fun (_blk, origination_results) ->
+  let result = get_lqt_result origination_results in
+  let address = get_address_in_result result in
+  Assert.equal
+    ~loc:__LOC__
+    String.equal
+    "LQT address in origination result is incorrect"
+    Format.pp_print_string
+    (Alpha_context.Contract.to_b58check address)
+    "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
+  >>=? fun () -> return_unit
+
+let liquidity_baking_origination_result_lqt_balance () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Block.bake_n_with_origination_results 1 blk
+  >>=? fun (_blk, origination_results) ->
+  let result = get_lqt_result origination_results in
+  let balance_update = get_balance_update_in_result result in
+  Assert.equal_tez ~loc:__LOC__ balance_update Tez.zero
+  >>=? fun () -> return_unit
+
 let tests =
   [ Test_services.tztest
       "test liquidity baking script hashes"
@@ -424,4 +506,21 @@ let tests =
     Test_services.tztest
       "test liquidity baking balance updates"
       `Quick
-      liquidity_baking_balance_update ]
+      liquidity_baking_balance_update;
+    Test_services.tztest
+      "test liquidity baking CPMM address in storage matches address in the \
+       origination result"
+      `Quick
+      liquidity_baking_origination_result_cpmm_address;
+    Test_services.tztest
+      "test liquidity baking CPMM balance in origination result is 100 mutez"
+      `Quick
+      liquidity_baking_origination_result_cpmm_balance;
+    Test_services.tztest
+      "test liquidity baking LQT contract is originated at expected address"
+      `Quick
+      liquidity_baking_origination_result_lqt_address;
+    Test_services.tztest
+      "test liquidity baking LQT balance in origination result is 0 mutez"
+      `Quick
+      liquidity_baking_origination_result_lqt_balance ]

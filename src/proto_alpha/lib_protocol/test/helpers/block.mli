@@ -163,6 +163,19 @@ val bake_n_with_all_balance_updates :
   t ->
   (block * Alpha_context.Receipt.balance_updates) tzresult Lwt.t
 
+(** Version of bake_n that returns a list of all origination results
+    in the metadata of baked blocks. **)
+val bake_n_with_origination_results :
+  ?policy:baker_policy ->
+  int ->
+  t ->
+  ( block
+  * Alpha_context.Kind.origination
+    Apply_results.successful_manager_operation_result
+    list )
+  tzresult
+  Lwt.t
+
 (** Version of bake_n that returns the liquidity baking escape EMA after [n] blocks. **)
 val bake_n_with_liquidity_baking_escape_ema :
   ?policy:baker_policy ->

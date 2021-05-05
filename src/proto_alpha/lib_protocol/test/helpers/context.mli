@@ -94,6 +94,8 @@ end
 module Contract : sig
   val pp : Format.formatter -> Contract.t -> unit
 
+  val equal : Contract.t -> Contract.t -> bool
+
   val pkh : Contract.t -> public_key_hash tzresult Lwt.t
 
   type balance_kind = Main | Deposit | Fees | Rewards
