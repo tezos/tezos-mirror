@@ -4098,7 +4098,7 @@ and parse_instr :
         {loc; instr; bef; aft = ibt.aft}
       in
       merge_branches ~legacy ctxt loc btr bfr {branch}
-      >>?= fun (judgement, ctxt) -> return ctxt 1 judgement
+      >>?= fun (judgement, ctxt) -> return ctxt 0 judgement
   | (Prim (loc, I_SIZE, [], annot), Item_t (List_t _, rest, _)) ->
       parse_var_type_annot loc annot
       >>?= fun (annot, tname) ->
