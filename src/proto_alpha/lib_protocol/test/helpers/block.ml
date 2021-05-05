@@ -417,7 +417,7 @@ let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
 
 let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
     ?time_between_blocks ?minimal_block_delay ?delay_per_missing_endorsement
-    ?min_proposal_quorum initial_accounts =
+    ?min_proposal_quorum ?level initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let endorsers_per_block =
@@ -473,7 +473,7 @@ let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
   in
   let shell =
     Forge.make_shell
-      ~level:0l
+      ~level:(Option.value ~default:0l level)
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
       ~fitness:(Fitness.from_int64 0L)
@@ -487,7 +487,7 @@ let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
    where the test is run *)
 let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     ?min_proposal_quorum ?time_between_blocks ?minimal_block_delay
-    ?delay_per_missing_endorsement ?bootstrap_contracts
+    ?delay_per_missing_endorsement ?bootstrap_contracts ?level
     (initial_accounts : (Account.t * Tez.t) list) =
   prepare_initial_context_params
     ?endorsers_per_block
@@ -496,6 +496,7 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     ?time_between_blocks
     ?minimal_block_delay
     ?delay_per_missing_endorsement
+    ?level
     initial_accounts
   >>=? fun (constants, shell, hash) ->
   initial_context

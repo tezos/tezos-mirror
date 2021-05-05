@@ -150,5 +150,6 @@ val init :
   ?minimal_block_delay:Period.t ->
   ?delay_per_missing_endorsement:Period.t ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
+  ?level:int32 ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t

@@ -401,6 +401,25 @@ let liquidity_baking_origination_result_lqt_balance () =
   Assert.equal_tez ~loc:__LOC__ balance_update Tez.zero
   >>=? fun () -> return_unit
 
+(* Test that with no contract at the tzBTC address and the level low enough to indicate we're not on mainnet, three contracts are originated in stitching. *)
+let liquidity_baking_origination_test_migration () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  Block.bake_n_with_origination_results 1 blk
+  >>=? fun (_blk, origination_results) ->
+  let num_results = List.length origination_results in
+  Assert.equal_int ~loc:__LOC__ num_results 3
+
+(* Test that with no contract at the tzBTC address and the level high enough to indicate we could be on mainnet, no contracts are originated in stitching. *)
+let liquidity_baking_origination_no_tzBTC_mainnet_migration () =
+  Context.init 1 ~level:1_437_862l
+  >>=? fun (blk, _contracts) ->
+  (* By baking a bit we also check that the subsidy application with no CPMM present does nothing rather than stopping the chain.*)
+  Block.bake_n_with_origination_results 64 blk
+  >>=? fun (_blk, origination_results) ->
+  let num_results = List.length origination_results in
+  Assert.equal_int ~loc:__LOC__ num_results 0
+
 let tests =
   [ Test_services.tztest
       "test liquidity baking script hashes"
@@ -523,4 +542,14 @@ let tests =
     Test_services.tztest
       "test liquidity baking LQT balance in origination result is 0 mutez"
       `Quick
-      liquidity_baking_origination_result_lqt_balance ]
+      liquidity_baking_origination_result_lqt_balance;
+    Test_services.tztest
+      "test liquidity baking originates three contracts when tzBTC does not \
+       exist and level indicates we are not on mainnet"
+      `Quick
+      liquidity_baking_origination_test_migration;
+    Test_services.tztest
+      "test liquidity baking originates three contracts when tzBTC does not \
+       exist and level indicates we might be on mainnet"
+      `Quick
+      liquidity_baking_origination_no_tzBTC_mainnet_migration ]

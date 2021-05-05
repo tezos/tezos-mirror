@@ -104,6 +104,7 @@ val genesis :
   ?minimal_block_delay:Period.t ->
   ?delay_per_missing_endorsement:Period.t ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
+  ?level:int32 ->
   (Account.t * Tez.tez) list ->
   block tzresult Lwt.t
 
@@ -205,6 +206,7 @@ val prepare_initial_context_params :
   ?minimal_block_delay:Period.t ->
   ?delay_per_missing_endorsement:Period.t ->
   ?min_proposal_quorum:int32 ->
+  ?level:int32 ->
   (Account.t * Tez.t) list ->
   ( Constants.parametric * Block_header.shell_header * Block_hash.t,
     tztrace )
