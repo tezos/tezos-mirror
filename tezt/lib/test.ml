@@ -54,22 +54,7 @@ let () =
   Printexc.register_printer
   @@ function Failed message -> Some message | _ -> None
 
-(* [Failed] can be raised from [async] promises, but we still want to
-   stop the test immediately if those promises raise it.
-   So we have a promise which can be fulfilled with exception [Failed]. *)
-let fail_awakener = ref None
-
-let fail x =
-  Printf.ksprintf
-    (fun message ->
-      ( match !fail_awakener with
-      | None ->
-          ()
-      | Some awakener ->
-          fail_awakener := None ;
-          Lwt.wakeup_later_exn awakener (Failed message) ) ;
-      raise (Failed message))
-    x
+let fail x = Printf.ksprintf (fun message -> raise (Failed message)) x
 
 let global_starting_time = Unix.gettimeofday ()
 
@@ -93,34 +78,63 @@ let really_run ~progress_state ~iteration test =
   List.iter (fun reset -> reset ()) !reset_functions ;
   Lwt_main.run
   @@
-  let (fail_promise, new_fail_awakener) = Lwt.task () in
-  fail_awakener := Some new_fail_awakener ;
-  let already_logged_exn = ref false in
+  let (fail_promise, fail_awakener) = Lwt.task () in
+  (* Ensure that errors raised from background promises are logged
+     and cause the test to fail immediately. *)
+  let already_woke_up_fail_promise = ref false in
+  let handle_background_exception exn =
+    let message = Printexc.to_string exn in
+    Log.error "%s" message ;
+    ( match test.result with
+    | Some _ ->
+        ()
+    | None ->
+        test.result <- Some (Log.Failed message) ) ;
+    if not !already_woke_up_fail_promise then (
+      already_woke_up_fail_promise := true ;
+      Lwt.wakeup_later fail_awakener () )
+  in
+  Background.start handle_background_exception ;
+  (* It may happen that the promise of the function resolves successfully
+     at the same time as a background promise is rejected or that we
+     receive SIGINT. To handle those race conditions, setting the value
+     of [test.result] is done through [set_test_result], which makes sure that:
+     - if the test was aborted, [test.result] is [Aborted];
+     - otherwise, if anything went wrong, [test.result] is [Failed];
+     - the error message in [Failed] is the first error that was encountered. *)
+  let set_test_result new_result =
+    match test.result with
+    | None ->
+        test.result <- Some new_result
+    | Some old_result -> (
+      match (old_result, new_result) with
+      | (Successful, _) | (Failed _, Aborted) ->
+          test.result <- Some new_result
+      | (Failed _, (Successful | Failed _)) | (Aborted, _) ->
+          () )
+  in
   (* Run the test until it succeeds, fails, or we receive SIGINT. *)
   let main_temporary_directory = Temp.start () in
   let* () =
     let run_test () =
       let* () = test.body () in
-      test.result <- Some Successful ;
-      unit
+      set_test_result Successful ; unit
     in
     let handle_exception = function
       | Lwt.Canceled ->
           (* Aborted with SIGINT, or [fail_promise] resolved (possibly because of
              an [async] promise). So we already logged what happened. *)
-          already_logged_exn := true ;
           unit
       | exn ->
           let message = Printexc.to_string exn in
-          test.result <- Some (Failed message) ;
+          set_test_result (Failed message) ;
           Log.error "%s" message ;
-          already_logged_exn := true ;
           unit
     in
     let handle_sigint () =
       let* () = sigint () in
       Log.debug "Received SIGINT." ;
-      test.result <- Some Aborted ;
+      set_test_result Aborted ;
       unit
     in
     let global_timeout =
@@ -179,26 +193,7 @@ let really_run ~progress_state ~iteration test =
     Log.report "Temporary files can be found in: %s" main_temporary_directory ;
   (* Resolve all pending promises so that they won't do anything
      (like raise [Canceled]) during the next test. *)
-  let* () =
-    let handle_exception exn =
-      if !already_logged_exn then
-        (* In all likelihood the error we already logged is this one,
-           as if an async promise raises [Failed] it causes the test
-           to print the error and stop but the async promise is still
-           rejected with [Failed].
-           It is still possible that the error is actually unrelated,
-           but we already printed an error for the user to debug so it's ok. *)
-        unit
-      else
-        (* This could happen if an async promise fails *after* the test
-           was successful. In that case, the test is not that successful after all. *)
-        let message = Printexc.to_string exn in
-        Log.error "%s" message ;
-        test.result <- Some (Log.Failed message) ;
-        unit
-    in
-    Lwt.catch wait_for_async handle_exception
-  in
+  let* () = Background.stop () in
   (* Update progress indicators. *)
   let test_result =
     match test.result with

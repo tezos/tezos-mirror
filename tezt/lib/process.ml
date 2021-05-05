@@ -277,7 +277,7 @@ let spawn_with_stdin ?(log_status_on_exit = true) ?(log_output = true) ?name
     }
   in
   live_processes := ID_map.add process.id process !live_processes ;
-  async (handle_process ~log_output process) ;
+  Background.register (handle_process ~log_output process) ;
   (process, (process.lwt_process)#stdin)
 
 let spawn ?log_status_on_exit ?log_output ?name ?color ?env ?hooks command
@@ -293,7 +293,7 @@ let spawn ?log_status_on_exit ?log_output ?name ?color ?env ?hooks command
       command
       arguments
   in
-  async (Lwt_io.close stdin) ;
+  Background.register (Lwt_io.close stdin) ;
   process
 
 let terminate process =

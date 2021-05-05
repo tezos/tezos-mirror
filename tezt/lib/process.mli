@@ -53,6 +53,9 @@ type hooks = {
 
     Parameter [hooks] allow to attach some hooks to the process.
 
+    Note that this function can only be called if [Background.register] is
+    allowed (which is the case inside functions given to [Test.register]).
+
     Example: [spawn "git" [ "log"; "-p" ]] *)
 val spawn :
   ?log_status_on_exit:bool ->
