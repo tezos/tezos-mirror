@@ -1,5 +1,22 @@
 tezt/_regressions/rpc/alpha.client.delegates.out
 
+./tezos-client rpc get /chains/main/blocks/head/context/contracts
+[ "[CONTRACT_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
+./tezos-client rpc get /chains/main/blocks/head/context/delegates
+[ "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "balance": "4000000000000", "frozen_balance": "0",
   "frozen_balance_by_cycle": [], "staking_balance": "4000000000000",

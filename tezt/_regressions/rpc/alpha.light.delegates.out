@@ -1,5 +1,24 @@
 tezt/_regressions/rpc/alpha.light.delegates.out
 
+./tezos-client --mode light rpc get /chains/main/blocks/head/context/contracts
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+[ "[CONTRACT_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
+./tezos-client --mode light rpc get /chains/main/blocks/head/context/delegates
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+[ "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "balance": "4000000000000", "frozen_balance": "0",

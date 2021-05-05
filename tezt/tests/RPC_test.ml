@@ -117,7 +117,8 @@ let test_contracts client =
     let* _ = RPC.Contracts.get_manager_key ~hooks ~contract_id client in
     unit
   in
-  let* contracts = RPC.Contracts.get_all ~hooks client in
+  let* _contracts = RPC.Contracts.get_all ~hooks client in
+  let* contracts = RPC.Contracts.get_all_delegates ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* () = test_implicit_contract bootstrap in
@@ -276,7 +277,8 @@ let test_contracts client =
 
 (* Test the delegates RPC for protocol Alpha. *)
 let test_delegates_alpha client =
-  let* contracts = RPC.Contracts.get_all client in
+  let* _contracts = RPC.Contracts.get_all ~hooks client in
+  let* contracts = RPC.Contracts.get_all_delegates ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* _ = RPC.Delegates.get ~hooks ~pkh:bootstrap client in
@@ -340,7 +342,8 @@ let test_delegates_alpha client =
 
 (* Test the delegates RPC for the current Mainnet protocol. *)
 let test_delegates_current_mainnet client =
-  let* contracts = RPC.Contracts.get_all client in
+  let* _contracts = RPC.Contracts.get_all ~hooks client in
+  let* contracts = RPC.Contracts.get_all_delegates ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* _ = RPC.Delegates.get ~hooks ~pkh:bootstrap client in
