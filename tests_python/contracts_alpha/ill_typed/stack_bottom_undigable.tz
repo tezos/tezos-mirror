@@ -2,5 +2,5 @@ parameter unit;
 storage unit;
 code {
        DROP;
-       DIG;
+       DIG 0;
      }
