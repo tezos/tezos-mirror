@@ -24,10 +24,7 @@
  (libraries tezos-legacy-store
             tezos-validation
             tezos-protocol-updater
-            ; also embed some protocols
-            tezos-embedded-protocol-000-Ps9mPmXa
-            tezos-embedded-protocol-005-PsBabyM1
-            tezos-embedded-protocol-006-PsCARTHA
+            ; embed some protocols for testing purposes
             tezos-embedded-protocol-alpha
             tezos-embedded-protocol-genesis)
  (modules legacy_store_builder)

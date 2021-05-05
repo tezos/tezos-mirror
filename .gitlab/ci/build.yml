@@ -61,6 +61,20 @@ check_scripts_b58_prefix:
 build:
   extends: .build_template
   script:
+    # The following protocols are not needed for tests.
+    # By removing them, we cause them not to be compiled and linked and the CI runs faster.
+    # At least the following other jobs still compile with all protocols:
+    # - Docker images (for master and releases)
+    # - static binaries (only for releases)
+    # Note: src/proto_000_Ps9mPmXa is needed by Flextesa
+    - rm -r src/proto_001_PtCJ7pwo
+    - rm -r src/proto_002_PsYLVpVv
+    - rm -r src/proto_003_PsddFKi3
+    - rm -r src/proto_004_Pt24m4xi
+    - rm -r src/proto_005_PsBABY5H
+    - rm -r src/proto_005_PsBabyM1
+    - rm -r src/proto_006_PsCARTHA
+    - rm -r src/proto_007_PsDELPH1
     - . ./scripts/version.sh
     - dune build @runtest_dune_template
     - make all build-test
