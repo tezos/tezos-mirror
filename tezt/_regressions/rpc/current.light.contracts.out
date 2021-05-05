@@ -8,6 +8,14 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
+./tezos-client --mode light rpc get /chains/main/blocks/head/context/delegates
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+[ "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "balance": "4000000000000",

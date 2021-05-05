@@ -23,21 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val init_from_florence :
+val init :
   Raw_context.t ->
   typecheck:(Raw_context.t ->
             Script_repr.t ->
             ((Script_repr.t * Lazy_storage_diff.diffs option) * Raw_context.t)
             tzresult
             Lwt.t) ->
-  (Raw_context.t * Migration_repr.origination_result list) tzresult Lwt.t
-
-val init_from_genesis :
-  Raw_context.t ->
-  typecheck:(Raw_context.t ->
-            Script_repr.t ->
-            ((Script_repr.t * Lazy_storage_diff.diffs option) * Raw_context.t)
-            tzresult
-            Lwt.t) ->
-  fa12_admin:Signature.Public_key_hash.t ->
   (Raw_context.t * Migration_repr.origination_result list) tzresult Lwt.t

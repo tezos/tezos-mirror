@@ -190,6 +190,15 @@ module Contracts : sig
     Client.t ->
     string list Lwt.t
 
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
+  val get_all_delegates :
+    ?node:Node.t ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    string list Lwt.t
+
   (** Same as [get_all], but do not wait for the process to exit. *)
   val spawn_get_all :
     ?node:Node.t ->

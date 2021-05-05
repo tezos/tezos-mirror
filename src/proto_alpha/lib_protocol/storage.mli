@@ -494,12 +494,6 @@ module Pending_migration : sig
       with type value = Migration_repr.origination_result list
        and type t := Raw_context.t
 
-  val save :
-    ?balance_updates:Receipt_repr.balance_updates ->
-    ?operation_results:Migration_repr.origination_result list ->
-    Raw_context.t ->
-    Raw_context.t tzresult Lwt.t
-
   val remove :
     Raw_context.t ->
     ( Raw_context.t

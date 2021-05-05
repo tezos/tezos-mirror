@@ -81,10 +81,8 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
       >>=? fun ctxt ->
       Vote_storage.update_listings ctxt
       >>=? fun ctxt ->
-      Liquidity_baking_migration.init_from_genesis
-        ctxt
-        ~typecheck
-        ~fa12_admin:(List.hd param.bootstrap_accounts).public_key_hash
+      (* Must be called after other originations since it unsets the origination nonce.*)
+      Liquidity_baking_migration.init ctxt ~typecheck
       >>=? fun (ctxt, operation_results) ->
       Storage.Pending_migration.Operation_results.init ctxt operation_results
   | Florence_009 ->
@@ -115,12 +113,10 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
           >>= fun (ctxt, balance_updates) ->
           Storage.Pending_migration_balance_updates.init ctxt balance_updates
       *)
-      Liquidity_baking_migration.init_from_florence ctxt ~typecheck
+      (* Must be called after other originations since it unsets the origination nonce.*)
+      Liquidity_baking_migration.init ctxt ~typecheck
       >>=? fun (ctxt, operation_results) ->
-      Storage.Pending_migration.save
-        ~balance_updates:[]
-        ~operation_results
-        ctxt
+      Storage.Pending_migration.Operation_results.init ctxt operation_results
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp ~fitness =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt

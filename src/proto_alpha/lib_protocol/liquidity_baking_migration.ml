@@ -24,21 +24,22 @@
 (*****************************************************************************)
 
 (** This module is used to originate contracts for liquidity baking during
-    protocol stitching. Two functions are exposed: one for stitching from 009
-    to 010 on mainnet and one for stitching from Genesis to Alpha for testing.
-
-    Both originate a CPMM (constant product market making) contract and a
+    protocol stitching: a CPMM (constant product market making) contract and a
     liquidity token FA1.2 contract, with the storage of each containing the
-    other's address. The CPMM's storage contains a token address, which
-    corresponds to tzBTC in the mainnet version and a reference FA1.2 contract
-    in the test version.
+    other's address.
+
+    The CPMM's storage contains a token address, which corresponds to tzBTC when
+    originated on mainnet and a reference FA1.2 contract when originated for
+    testing.
+
+    The test FA1.2 contract uses the same script as the liquidity token. Its
+    manager is initialized to the first bootstrap account. Before originating it,
+    we make sure we are not on mainnet by both checking for the existence of the
+    tzBTC contract and that the level is sufficiently low.
 
     The Michelson and Ligo code, as well as Coq proofs, for the CPMM and
     liquidity token contracts are available here:
     https://gitlab.com/dexter2tz/dexter2tz/-/tree/liquidity_baking
-
-    The test FA1.2 contract uses the same script as the liquidity token. Its
-    manager is initialized to the first bootstrap account.
 
     All contracts were generated from Ligo at revision
     4d10d07ca05abe0f8a5fb97d15267bf5d339d9f4 and converted to OCaml using
@@ -144,7 +145,7 @@ let first_bootstrap_account =
     (Signature.Public_key.of_b58check_exn
        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav")
 
-let check_tzBTC ~typecheck current_level ?test_fa12_admin ctxt f =
+let check_tzBTC ~typecheck current_level ctxt f =
   Contract_repr.of_b58check mainnet_tzBTC_address
   >>?= fun tzBTC ->
   Contract_storage.exists ctxt tzBTC
@@ -157,17 +158,20 @@ let check_tzBTC ~typecheck current_level ?test_fa12_admin ctxt f =
 
      First, we check current level is below mainnet level roughly around 010 injection so we do not accidentally originate the test token contract on mainnet. *)
       if Compare.Int32.(current_level < 1_437_862l) then
-        originate_test_fa12
-          typecheck
-          ctxt
-          (Option.value test_fa12_admin ~default:first_bootstrap_account)
+        originate_test_fa12 typecheck ctxt first_bootstrap_account
+        (* Token contract admin *)
         >>=? fun (ctxt, token_address, token_result) ->
         f ctxt token_address token_result
       else
         (* If we accidentally entered the tzBTC address incorrectly, but current level indicates this could be mainnet, we do not originate any contracts *)
         return (ctxt, [])
 
-let init_common ~typecheck ?test_fa12_admin ctxt =
+let init ctxt ~typecheck =
+  (* We use a custom origination nonce because it is unset when stitching from 009 *)
+  let nonce =
+    Operation_hash.hash_bytes [Bytes.of_string "Drip, drip, drip."]
+  in
+  let ctxt = Raw_context.init_origination_nonce ctxt nonce in
   Storage.Liquidity_baking.Escape_ema.init ctxt 0l
   >>=? fun ctxt ->
   let current_level =
@@ -177,18 +181,17 @@ let init_common ~typecheck ?test_fa12_admin ctxt =
     ctxt
     (Constants_storage.liquidity_baking_sunset_level ctxt)
   >>=? fun ctxt ->
+  Contract_storage.fresh_contract_from_current_nonce ctxt
+  >>?= fun (ctxt, cpmm_address) ->
+  Contract_storage.fresh_contract_from_current_nonce ctxt
+  >>?= fun (ctxt, lqt_address) ->
+  Storage.Liquidity_baking.Cpmm_address.init ctxt cpmm_address
+  >>=? fun ctxt ->
   check_tzBTC
     ~typecheck
     current_level
-    ?test_fa12_admin
     ctxt
     (fun ctxt token_address token_result ->
-      Contract_storage.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, cpmm_address) ->
-      Contract_storage.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, lqt_address) ->
-      Storage.Liquidity_baking.Cpmm_address.init ctxt cpmm_address
-      >>=? fun ctxt ->
       let cpmm_script =
         Script_repr.
           {
@@ -218,18 +221,6 @@ let init_common ~typecheck ?test_fa12_admin ctxt =
       >>=? fun (ctxt, cpmm_result) ->
       originate ctxt lqt_address ~balance:Tez_repr.zero lqt_script
       >|=? fun (ctxt, lqt_result) ->
-      (ctxt, token_result @ [cpmm_result; lqt_result]))
-
-let init_from_florence ctxt ~typecheck =
-  (* origination nonce is unset when stitching from 009 *)
-  let nonce =
-    Operation_hash.hash_bytes [Bytes.of_string "Drip, drip, drip."]
-  in
-  let ctxt = Raw_context.init_origination_nonce ctxt nonce in
-  init_common ~typecheck ctxt
-  >>=? fun (ctxt, operation_results) ->
-  return (Raw_context.unset_origination_nonce ctxt, operation_results)
-
-let init_from_genesis ctxt ~typecheck ~fa12_admin =
-  (* when stitching from Genesis origination nonce is set by bootstrap storage *)
-  init_common ~typecheck ~test_fa12_admin:fa12_admin ctxt
+      (* Unsets the origination nonce, which is okay because this is called after other originations in stitching. *)
+      let ctxt = Raw_context.unset_origination_nonce ctxt in
+      (ctxt, [cpmm_result; lqt_result] @ token_result))
