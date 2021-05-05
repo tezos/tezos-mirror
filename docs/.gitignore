@@ -7,3 +7,4 @@ tezos-baker-*.html
 tezos-accuser-*.html
 tezos-endorser-*.html
 tezos-client-*.html
+/CHANGES.rst
