@@ -612,7 +612,18 @@ let get_log (logger : logger option) =
 let log_kinstr logger i = ILog (kinfo_of_kinstr i, LogEntry, logger, i)
 
 (* [log_next_kinstr logger i] instruments the next instruction of [i]
-   with the [logger].*)
+   with the [logger].
+
+   Notice that the instrumentation breaks the sharing of continuations
+   that is normally enforced between branches of conditionals. This
+   has a performance cost. Anyway, the instrumentation allocates many
+   new [ILog] instructions and [KLog] continuations which makes
+   the execution of instrumented code significantly slower than
+   non-instrumented code. "Zero-cost logging" means that the normal
+   non-instrumented execution is not impacted by the ability to
+   instrument it, not that the logging itself has no cost.
+
+*)
 let log_next_kinstr logger i =
   let apply k =
     ILog
