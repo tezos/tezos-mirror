@@ -625,6 +625,15 @@ let bake_n_with_all_balance_updates ?policy ?liquidity_baking_escape_vote n b =
     (1 -- n)
   >|=? fun (b, balance_updates_rev) -> (b, List.rev balance_updates_rev)
 
+let bake_n_with_liquidity_baking_escape_ema ?policy
+    ?liquidity_baking_escape_vote n b =
+  List.fold_left_es
+    (fun (b, _escape_ema) _ ->
+      bake_with_metadata ?policy ?liquidity_baking_escape_vote b
+      >|=? fun (b, metadata) -> (b, metadata.liquidity_baking_escape_ema))
+    (b, 0l)
+    (1 -- n)
+
 let bake_until_cycle_end ?policy b =
   get_constants b
   >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->

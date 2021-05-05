@@ -218,6 +218,35 @@ let liquidity_baking_escape_hatch_50 n () =
     expected_balance
   >>=? fun () -> return_unit
 
+(* Test that the escape EMA in block metadata is correct. *)
+let liquidity_baking_escape_ema n_vote_false n_vote_true escape_level
+    bake_after_escape expected_escape_ema () =
+  Context.init 1
+  >>=? fun (blk, _contracts) ->
+  let rec bake_escaping blk i =
+    if i < escape_level then
+      Block.bake_n n_vote_false blk
+      >>=? fun blk ->
+      Block.bake_n ~liquidity_baking_escape_vote:true n_vote_true blk
+      >>=? fun blk -> bake_escaping blk (i + n_vote_false + n_vote_true)
+    else return blk
+  in
+  bake_escaping blk 0
+  >>=? fun blk ->
+  (* We only need to return the escape EMA at the end. *)
+  Block.bake_n_with_liquidity_baking_escape_ema bake_after_escape blk
+  >>=? fun (_blk, escape_ema) ->
+  Assert.leq_int ~loc:__LOC__ (Int32.to_int escape_ema) expected_escape_ema
+  >>=? fun () -> return_unit
+
+(* With no bakers setting the escape vote, EMA should be zero. *)
+let liquidity_baking_escape_ema_zero () =
+  liquidity_baking_escape_ema 0 0 0 100 0 ()
+
+(* The EMA should be not much over the threshold after the escape hatch has been activated. We add 50_000 to the constant to give room for the last update. *)
+let liquidity_baking_escape_ema_threshold () =
+  liquidity_baking_escape_ema 0 1 1387 1 1_050_000 ()
+
 let liquidity_baking_storage n () =
   Context.init 1
   >>=? fun (blk, _contracts) ->
@@ -378,6 +407,16 @@ let tests =
        50% and baking 100 blocks longer"
       `Quick
       (liquidity_baking_escape_hatch_50 100);
+    Test_services.tztest
+      "test liquidity baking escape ema in block metadata is zero with no \
+       bakers flagging."
+      `Quick
+      liquidity_baking_escape_ema_zero;
+    Test_services.tztest
+      "test liquidity baking escape ema is equal to the threshold after the \
+       escape hatch has been activated"
+      `Quick
+      liquidity_baking_escape_ema_threshold;
     Test_services.tztest
       "test liquidity baking storage is updated"
       `Quick

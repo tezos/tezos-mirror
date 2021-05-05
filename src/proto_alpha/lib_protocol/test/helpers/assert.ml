@@ -74,6 +74,18 @@ let equal_int32 ~loc (a : int32) (b : int32) =
 let not_equal_int ~loc (a : int) (b : int) =
   not_equal ~loc ( = ) "Integers are equal" Format.pp_print_int a b
 
+let leq_int ~loc (a : int) (b : int) =
+  if a > b then
+    failwith
+      "@[@[[%s]@] - @[Integers aren't less than or equal : %a is greater \
+       than  %a@]@]"
+      loc
+      Format.pp_print_int
+      a
+      Format.pp_print_int
+      b
+  else return_unit
+
 (* int64 *)
 let equal_int64 ~loc (a : int64) (b : int64) =
   equal

@@ -163,6 +163,14 @@ val bake_n_with_all_balance_updates :
   t ->
   (block * Alpha_context.Receipt.balance_updates) tzresult Lwt.t
 
+(** Version of bake_n that returns the liquidity baking escape EMA after [n] blocks. **)
+val bake_n_with_liquidity_baking_escape_ema :
+  ?policy:baker_policy ->
+  ?liquidity_baking_escape_vote:bool ->
+  int ->
+  t ->
+  (block * Alpha_context.Liquidity_baking.escape_ema) tzresult Lwt.t
+
 val current_cycle : t -> Cycle.t tzresult Lwt.t
 
 (** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
