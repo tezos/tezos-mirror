@@ -169,7 +169,6 @@ let error_encoding_tests =
       ( "Runtime_contract_error",
         Runtime_contract_error (contract_zero, script_expr_int) );
       ("Bad_contract_parameter", Bad_contract_parameter contract_zero);
-      ("Cannot_serialize_log", Helpers_services.Cannot_serialize_log);
       ("Cannot_serialize_failure", Cannot_serialize_failure);
       ("Cannot_serialize_storage", Cannot_serialize_storage) ]
 

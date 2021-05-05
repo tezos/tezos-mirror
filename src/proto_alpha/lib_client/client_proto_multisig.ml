@@ -30,8 +30,7 @@ open Michelson_v1_helpers
 
 type error += Contract_has_no_script of Contract.t
 
-type error +=
-  | Not_a_supported_multisig_contract of (Script_expr_hash.t * Script.expr)
+type error += Not_a_supported_multisig_contract of Script_expr_hash.t
 
 type error += Contract_has_no_storage of Contract.t
 
@@ -85,23 +84,17 @@ let () =
     ~description:
       "A multisig command has referenced a smart contract whose script is not \
        one of the known multisig contract scripts."
-    ~pp:(fun ppf (hash, script) ->
+    ~pp:(fun ppf hash ->
       Format.fprintf
         ppf
-        "Not a supported multisig contract %a.@\n\
+        "Not a supported multisig contract.@\n\
          The hash of this script is 0x%a, it was not found among in the list \
          of known multisig script hashes."
-        Michelson_v1_printer.print_expr
-        script
         Hex.pp
         (Script_expr_hash.to_bytes hash |> Hex.of_bytes))
-    Data_encoding.(
-      obj2
-        (req "hash" Script_expr_hash.encoding)
-        (req "script" Script.expr_encoding))
-    (function
-      | Not_a_supported_multisig_contract (h, c) -> Some (h, c) | _ -> None)
-    (fun (h, c) -> Not_a_supported_multisig_contract (h, c)) ;
+    Data_encoding.(obj1 (req "hash" Script_expr_hash.encoding))
+    (function Not_a_supported_multisig_contract h -> Some h | _ -> None)
+    (fun h -> Not_a_supported_multisig_contract h) ;
   register_error_kind
     `Permanent
     ~id:"contractHasNoStorage"
@@ -562,24 +555,15 @@ let known_multisig_contracts : multisig_contract_description list =
 let known_multisig_hashes =
   List.map (fun descr -> descr.hash) known_multisig_contracts
 
-let check_multisig_script script : multisig_contract_description tzresult Lwt.t
-    =
-  let bytes = Data_encoding.force_bytes script in
-  let hash = Script_expr_hash.hash_bytes [bytes] in
+let check_multisig_script_hash hash :
+    multisig_contract_description tzresult Lwt.t =
   match
     List.find_opt
       (fun d -> Script_expr_hash.(d.hash = hash))
       known_multisig_contracts
   with
   | None ->
-      fail
-        (Not_a_supported_multisig_contract
-           ( hash,
-             match Data_encoding.force_decode script with
-             | Some s ->
-                 s
-             | None ->
-                 assert false ))
+      fail (Not_a_supported_multisig_contract hash)
   | Some d ->
       return d
 
@@ -587,14 +571,12 @@ let check_multisig_script script : multisig_contract_description tzresult Lwt.t
    is [multisig_script] *)
 let check_multisig_contract (cctxt : #Protocol_client_context.full) ~chain
     ~block contract =
-  Client_proto_context.get_script cctxt ~chain ~block contract
-  >>=? fun script_opt ->
-  ( match script_opt with
-  | Some script ->
-      return script.code
+  Client_proto_context.get_script_hash cctxt ~chain ~block contract
+  >>=? function
   | None ->
-      fail (Contract_has_no_script contract) )
-  >>=? check_multisig_script
+      fail (Contract_has_no_script contract)
+  | Some hash ->
+      check_multisig_script_hash hash
 
 (* Some Michelson building functions, specific to the needs of the multisig
    interface.*)
@@ -844,7 +826,7 @@ let multisig_get_information (cctxt : #Protocol_client_context.full) ~chain
     ~block contract =
   let open Client_proto_context in
   let open Tezos_micheline.Micheline in
-  get_storage cctxt ~chain ~block contract
+  get_storage cctxt ~chain ~block ~unparsing_mode:Readable contract
   >>=? fun storage_opt ->
   match storage_opt with
   | None ->
@@ -987,7 +969,7 @@ let check_parameter_type (cctxt : #Protocol_client_context.full) ?gas ?legacy
     ~destination ~entrypoint ~parameter_type ~parameter () =
   trace
     (Ill_typed_argument (destination, entrypoint, parameter_type, parameter))
-  @@ Alpha_services.Helpers.Scripts.typecheck_data
+  @@ Plugin.RPC.Scripts.typecheck_data
        cctxt
        (cctxt#chain, cctxt#block)
        ~data:parameter
@@ -1022,7 +1004,7 @@ let check_action (cctxt : #Protocol_client_context.full) ~action ~balance ?gas
         Tezos_micheline.Micheline.strip_locations (lambda_action_t ~loc:0)
       in
       trace (Ill_typed_lambda (code, action_t))
-      @@ Alpha_services.Helpers.Scripts.typecheck_data
+      @@ Plugin.RPC.Scripts.typecheck_data
            cctxt
            (cctxt#chain, cctxt#block)
            ~data:code

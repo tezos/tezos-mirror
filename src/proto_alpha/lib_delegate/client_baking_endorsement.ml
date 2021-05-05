@@ -52,12 +52,7 @@ let inject_endorsement (cctxt : #Protocol_client_context.full) ?async ~chain
   | [{slots = []; _}] | [] | _ :: _ :: _ ->
       assert false
   | [{slots = slot :: _; _}] ->
-      Alpha_services.Forge.endorsement
-        cctxt
-        (chain, block)
-        ~branch:hash
-        ~level
-        ()
+      Plugin.RPC.Forge.endorsement cctxt (chain, block) ~branch:hash ~level ()
       >>=? fun bytes ->
       let wallet = (cctxt :> Client_context.wallet) in
       (* Double-check the right to inject an endorsement *)

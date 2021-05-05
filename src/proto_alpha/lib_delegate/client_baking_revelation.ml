@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-
 include Internal_event.Legacy_logging.Make_semantic (struct
   let name = Protocol.name ^ ".baking.nonce_revelation"
 end)
@@ -45,7 +43,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
   | _ ->
       List.iter_es
         (fun (level, nonce) ->
-          Alpha_services.Forge.seed_nonce_revelation
+          Plugin.RPC.Forge.seed_nonce_revelation
             cctxt
             (chain, block)
             ~branch:hash

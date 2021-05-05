@@ -539,7 +539,7 @@ let decode_priority cctxt chain block ~priority ~endorsing_power =
         endorsing_power
       >>=? fun minimal_timestamp -> return (priority, minimal_timestamp)
   | `Auto (src_pkh, max_priority) -> (
-      Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
+      Plugin.RPC.current_level cctxt ~offset:1l (chain, block)
       >>=? fun {level; _} ->
       Alpha_services.Delegate.Baking_rights.get
         cctxt
@@ -1286,7 +1286,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
     ~liquidity_baking_escape_vote =
   let chain = `Hash bi.Client_baking_blocks.chain_id in
   let block = `Hash (bi.hash, 0) in
-  Alpha_services.Helpers.current_level cctxt ~offset:1l (chain, block)
+  Plugin.RPC.current_level cctxt ~offset:1l (chain, block)
   >>=? fun next_level ->
   let seed_nonce_hash =
     if next_level.expected_commitment then Some seed_nonce_hash else None

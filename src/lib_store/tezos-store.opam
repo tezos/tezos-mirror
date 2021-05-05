@@ -25,6 +25,7 @@ depends: [
   "tezos-embedded-protocol-006-PsCARTHA" { with-test }
   "tezos-embedded-protocol-genesis" { with-test }
   "tezos-embedded-protocol-alpha" { with-test }
+  "tezos-protocol-plugin-alpha" { with-test }
   "tezos-protocol-alpha-parameters" { with-test }
 ]
 build: [

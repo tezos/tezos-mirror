@@ -48,7 +48,7 @@ let print_errors (cctxt : #Client_context.printer) errs =
 
 let script_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     (program : Script.expr) ~entrypoint =
-  Alpha_services.Helpers.Scripts.entrypoint_type
+  Plugin.RPC.Scripts.entrypoint_type
     cctxt
     (chain, block)
     ~script:program
@@ -136,17 +136,11 @@ let list_contract_entrypoints cctxt ~chain ~block ~contract =
   else return entrypoints
 
 let list_unreachables cctxt ~chain ~block (program : Script.expr) =
-  Alpha_services.Helpers.Scripts.list_entrypoints
-    cctxt
-    (chain, block)
-    ~script:program
+  Plugin.RPC.Scripts.list_entrypoints cctxt (chain, block) ~script:program
   >>=? fun (unreachables, _) -> return unreachables
 
 let list_entrypoints cctxt ~chain ~block (program : Script.expr) =
-  Alpha_services.Helpers.Scripts.list_entrypoints
-    cctxt
-    (chain, block)
-    ~script:program
+  Plugin.RPC.Scripts.list_entrypoints cctxt (chain, block) ~script:program
   >>=? fun (_, entrypoints) ->
   if not @@ List.mem_assoc "default" entrypoints then
     script_entrypoint_type cctxt ~chain ~block program ~entrypoint:"default"

@@ -191,7 +191,7 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   >>=? fun hash ->
   Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
   >>=? fun {level; _} ->
-  Alpha_services.Helpers.levels_in_current_cycle cctxt ~offset (chain, block)
+  Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block)
   >>= function
   | Error (RPC_context.Not_found _ :: _) ->
       return_nil

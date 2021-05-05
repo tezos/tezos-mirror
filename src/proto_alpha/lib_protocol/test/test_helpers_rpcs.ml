@@ -58,16 +58,16 @@ let test_baking_rights () =
   >>=? fun rights ->
   assert (List.for_all (fun {delegate; _} -> delegate = d) rights) ;
   (* filtering by cycle *)
-  Alpha_services.Helpers.current_level Block.rpc_ctxt b
+  Plugin.RPC.current_level Block.rpc_ctxt b
   >>=? fun {cycle; _} ->
   get Block.rpc_ctxt b ~all:true ~cycles:[cycle]
   >>=? fun rights ->
-  Alpha_services.Helpers.levels_in_current_cycle Block.rpc_ctxt b
+  Plugin.RPC.levels_in_current_cycle Block.rpc_ctxt b
   >>=? fun (first, last) ->
   assert (
     List.for_all (fun {level; _} -> level >= first && level <= last) rights ) ;
   (* filtering by level *)
-  Alpha_services.Helpers.current_level Block.rpc_ctxt b
+  Plugin.RPC.current_level Block.rpc_ctxt b
   >>=? fun {level; _} ->
   get Block.rpc_ctxt b ~all:true ~levels:[level]
   >>=? fun rights ->

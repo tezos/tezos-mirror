@@ -33,11 +33,21 @@ open Client_keys
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
-let get_storage (rpc : #rpc_context) ~chain ~block contract =
-  Alpha_services.Contract.storage_opt rpc (chain, block) contract
+let get_storage (rpc : #rpc_context) ~chain ~block ~unparsing_mode contract =
+  Plugin.RPC.Contract.get_storage_normalized
+    rpc
+    (chain, block)
+    ~unparsing_mode
+    ~contract
 
-let get_big_map_value (rpc : #rpc_context) ~chain ~block id key =
-  Alpha_services.Contract.big_map_get rpc (chain, block) id key
+let get_big_map_value (rpc : #rpc_context) ~chain ~block ~unparsing_mode id key
+    =
+  Plugin.RPC.Big_map.big_map_get_normalized
+    rpc
+    (chain, block)
+    ~unparsing_mode
+    id
+    key
 
 let get_contract_big_map_value (rpc : #rpc_context) ~chain ~block contract key
     =
@@ -47,8 +57,27 @@ let get_contract_big_map_value (rpc : #rpc_context) ~chain ~block contract key
     contract
     key
 
-let get_script (rpc : #rpc_context) ~chain ~block contract =
+let get_script (rpc : #rpc_context) ~chain ~block ~unparsing_mode contract =
+  Plugin.RPC.Contract.get_script_normalized
+    rpc
+    (chain, block)
+    ~unparsing_mode
+    ~contract
+
+let get_script_hash (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.script_opt rpc (chain, block) contract
+  >>=? fun script_opt ->
+  Lwt.return @@ Environment.wrap_tzresult
+  @@ Option.map_e
+       (fun {Script.code; storage = _} ->
+         Script_repr.force_decode code
+         >>? fun (code, _) ->
+         let bytes =
+           Data_encoding.Binary.to_bytes_exn Script.expr_encoding code
+         in
+         let hash = Script_expr_hash.hash_bytes [bytes] in
+         ok hash)
+       script_opt
 
 let parse_expression arg =
   Lwt.return

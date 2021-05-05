@@ -395,7 +395,7 @@ let commands () =
       (fun custom_gas data typ cctxt ->
         resolve_max_gas cctxt cctxt#block custom_gas
         >>=? fun original_gas ->
-        Alpha_services.Helpers.Scripts.pack_data
+        Plugin.RPC.Scripts.pack_data
           cctxt
           (cctxt#chain, cctxt#block)
           ~gas:original_gas
@@ -487,7 +487,7 @@ let commands () =
       (fun unparsing_mode program cctxt ->
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
-        Alpha_services.Helpers.Scripts.normalize_script
+        Plugin.RPC.Scripts.normalize_script
           cctxt
           (cctxt#chain, cctxt#block)
           ~script:program.expanded
@@ -522,7 +522,7 @@ let commands () =
       @@ param ~name:"type" ~desc:"type of the data expression" data_parameter
       @@ stop )
       (fun (unparsing_mode, legacy) data typ cctxt ->
-        Alpha_services.Helpers.Scripts.normalize_data
+        Plugin.RPC.Scripts.normalize_data
           cctxt
           (cctxt#chain, cctxt#block)
           ~legacy
@@ -553,7 +553,7 @@ let commands () =
            data_parameter
       @@ stop )
       (fun () typ cctxt ->
-        Plugin.RPC.normalize_type
+        Plugin.RPC.Scripts.normalize_type
           cctxt
           (cctxt#chain, cctxt#block)
           ~ty:typ.expanded
