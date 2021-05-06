@@ -412,9 +412,12 @@ command instead:
      dependencies are compiled and installed (this takes a while but it's
      only done once).
 
-   * Be sure to ``eval $(opam env)`` when you ``cd``
+   * Be sure to ``eval $(scripts/env.sh)`` when you ``cd``
      into the repository in order to be sure to load this local
      environment.
+
+   * As the opam hook would overwrite the effects of ``eval $(scripts/env.sh)``
+     the script will disable the opam hook temporarily.
 
    * OPAM is meant to handle correctly the OCaml libraries but it is
      not always able to handle all external C libraries we depend
