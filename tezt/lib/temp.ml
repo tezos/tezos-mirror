@@ -84,13 +84,34 @@ let dir ?(perms = 0o755) base_name =
   filename
 
 let rec remove_recursively filename =
-  if Sys.is_directory filename then (
-    let contents =
-      Sys.readdir filename |> Array.map (Filename.concat filename)
-    in
-    Array.iter remove_recursively contents ;
-    Unix.rmdir filename )
-  else Sys.remove filename
+  match (Unix.stat filename).st_kind with
+  | exception Unix.Unix_error (error, _, _) ->
+      Log.warn
+        "Failed to read file type for %s: %s"
+        filename
+        (Unix.error_message error)
+  | S_REG | S_LNK | S_FIFO | S_SOCK -> (
+    (* It is particularly important to not recursively delete symbolic links
+       to directories but to remove the links instead. *)
+    try Sys.remove filename
+    with Sys_error error -> Log.warn "Failed to remove %s: %s" filename error )
+  | S_DIR -> (
+    match Sys.readdir filename with
+    | exception Sys_error error ->
+        Log.warn "Failed to read %s: %s" filename error
+    | contents -> (
+        let contents = Array.map (Filename.concat filename) contents in
+        Array.iter remove_recursively contents ;
+        try Unix.rmdir filename
+        with Unix.Unix_error (error, _, _) ->
+          Log.warn
+            "Failed to remove directory %s: %s"
+            filename
+            (Unix.error_message error) ) )
+  | S_CHR ->
+      Log.warn "Will not remove character device: %s" filename
+  | S_BLK ->
+      Log.warn "Will not remove block device: %s" filename
 
 let start () =
   if !allowed then invalid_arg "Temp.start: a test is already running" ;
