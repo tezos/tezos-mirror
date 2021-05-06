@@ -523,7 +523,7 @@ class TestContracts:
             ),
             (
                 "stack_bottom_undug2able.tz",
-                r'wrong stack type for instruction DUG 2',
+                r'wrong stack type for instruction DUG',
             ),
             (
                 "stack_bottom_undugable.tz",
@@ -531,7 +531,7 @@ class TestContracts:
             ),
             (
                 "stack_bottom_undig2able.tz",
-                r'wrong stack type for instruction DIG 2',
+                r'wrong stack type for instruction DIG',
             ),
             (
                 "stack_bottom_undigable.tz",
@@ -539,15 +539,15 @@ class TestContracts:
             ),
             (
                 "stack_bottom_undip2able.tz",
-                r'wrong stack type for instruction DIP 2',
+                r'wrong stack type for instruction DUP',
             ),
             (
                 "stack_bottom_undipable.tz",
-                r'wrong stack type for instruction DIP',
+                r'wrong stack type for instruction DUP',
             ),
             (
                 "stack_bottom_undup2able.tz",
-                r'wrong stack type for instruction DUP 2',
+                r'wrong stack type for instruction DUP',
             ),
             (
                 "stack_bottom_undropable.tz",
