@@ -745,5 +745,3 @@ val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
 
   @since 4.03
 *)
-
-val eprintf : ('a, formatter, unit) format -> 'a
