@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -455,6 +455,8 @@ module Peers = struct
 end
 
 module ACL = struct
+  type ip_list = {ips : Ipaddr.V6.t list; not_reliable_since : Ptime.t option}
+
   module S = struct
     let clear =
       RPC_service.get_service
@@ -474,7 +476,46 @@ module ACL = struct
           "Clear all greylists tables. This will unban all addresses and \
            peers automatically greylisted by the system."
         RPC_path.(root / "network" / "greylist")
+
+    let get_greylisted_peers =
+      RPC_service.get_service
+        ~query:RPC_query.empty
+        ~output:Data_encoding.(list P2p_peer.Id.encoding)
+        ~description:"List of the last greylisted peers."
+        RPC_path.(root / "network" / "greylist" / "peers")
+
+    let get_greylisted_ips =
+      RPC_service.get_service
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(
+            conv
+              (fun {ips; not_reliable_since} -> (ips, not_reliable_since))
+              (fun (ips, not_reliable_since) -> {ips; not_reliable_since})
+              (obj2
+                 (req "ips" (list P2p_addr.encoding))
+                 (req
+                    "not_reliable_since"
+                    (Data_encoding.option Time.System.encoding))))
+        ~description:
+          "Returns an object that contains a list of IP and the field \
+           \"not_reliable_since\".\n\
+          \           If the field \"not_reliable_since\" is None then the \
+           list contains the currently greylisted IP addresses.\n\
+          \           If the field \"not_reliable_since\" Contains a date, \
+           this means that the greylist has been overflowed and it is no more \
+           possible to obtain the exact list of greylisted IPs. Since the \
+           greylist of IP addresses has been design to work whatever his \
+           size, there is no security issue related to this overflow.\n\
+          \          Reinitialize the ACL structure by calling \"delete \
+           /network/greylist\" to get back this list reliable."
+        RPC_path.(root / "network" / "greylist" / "ips")
   end
 
   let clear ctxt = make_call S.clear_delete ctxt () ()
+
+  let get_greylisted_peers ctxt =
+    make_call S.get_greylisted_peers ctxt () () ()
+
+  let get_greylisted_ips ctxt = make_call S.get_greylisted_ips ctxt () () ()
 end

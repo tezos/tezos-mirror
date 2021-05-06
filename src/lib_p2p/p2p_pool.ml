@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -324,6 +324,11 @@ module Points = struct
     set_trusted pool (point, None)
 
   let untrust pool point = unset_trusted pool point
+
+  let get_greylisted_list pool = P2p_acl.IPGreylist.list pool.acl
+
+  let greylisted_list_not_reliable_since pool =
+    P2p_acl.IPGreylist.list_not_reliable_since pool.acl
 end
 
 module Peers = struct
@@ -387,6 +392,8 @@ module Peers = struct
   let untrust pool peer = unset_trusted pool peer
 
   let banned pool peer = P2p_acl.banned_peer pool.acl peer
+
+  let get_greylisted_list pool = P2p_acl.PeerGreylist.list pool.acl
 end
 
 module Connection = struct

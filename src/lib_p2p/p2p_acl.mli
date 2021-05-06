@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -102,7 +103,16 @@ module IPGreylist : sig
       removed from the greylist. *)
   val life_expectancy_histogram : t -> int array
 
-  val encoding : P2p_addr.t list Data_encoding.t
+  (** [list t] if [list_not_reliable_since t] returns [None], returns the list
+      of currently greylisted IPs. Else it return the list of all ips greylisted
+      since `list_not_reliable_since` *)
+  val list : t -> P2p_addr.t list
+
+  (* The list returned by [list t] can be overflowed. When it
+     has been overflowed, it is no more reliable. The date of the first
+     overflow is memorized to indicate that it is no more reliable. This is
+     reset by calling [P2p_acl.clear t]. *)
+  val list_not_reliable_since : t -> Time.System.t option
 end
 
 module IPBlacklist : sig
@@ -127,6 +137,9 @@ module PeerGreylist : sig
 
   (** [mem t peer] returns true iff [peer] is greylisted.*)
   val mem : t -> P2p_peer.Id.t -> bool
+
+  (** [list t]: return the list peers added to the greylist *)
+  val list : t -> P2p_peer.Id.t list
 end
 
 (** / *)
