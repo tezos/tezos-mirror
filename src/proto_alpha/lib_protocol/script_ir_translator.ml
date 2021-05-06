@@ -3444,6 +3444,7 @@ and parse_instr :
         unparse_stack ctxt aft >|? fun (aft, _) -> log loc stack_ty aft ; ()
   in
   (*
+
      In the following functions, [number_of_generated_growing_types] is the
      depth of the stack to inspect for sizes overflow. We only need to check
      the produced types that can be larger than the arguments. That's why Swap
@@ -3451,10 +3452,6 @@ and parse_instr :
      Constant sized types are not checked: it is assumed they are lower than
      the bound (otherwise every program would be rejected).
 
-     In a [(b, a) instr], it is the number of types in [a] that may exceed the
-     limit, knowing that types in [b] don't.
-     If the instr is parameterized by [(b', a') descr] then you may assume that
-     types in [a'] don't exceed the limit.
   *)
   let return_no_lwt :
       type a s.

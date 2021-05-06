@@ -585,20 +585,19 @@ let consume_control local_gas_counter ks =
 
 *)
 
-let log_entry (logger : logger) ctxt gas k accu stack =
+let log_entry logger ctxt gas k accu stack =
   let kinfo = kinfo_of_kinstr k in
   let ctxt = update_context gas ctxt in
   logger.log_entry k ctxt kinfo.iloc kinfo.kstack_ty (accu, stack)
 
-let log_exit (logger : logger) ctxt gas kinfo_prev k accu stack =
-  let ctxt = update_context gas ctxt in
+let log_exit logger ctxt gas kinfo_prev k accu stack =
   let kinfo = kinfo_of_kinstr k in
+  let ctxt = update_context gas ctxt in
   logger.log_exit k ctxt kinfo_prev.iloc kinfo.kstack_ty (accu, stack)
 
-let log_control (logger : logger) ks = logger.log_control ks
+let log_control logger ks = logger.log_control ks
 
-let get_log (logger : logger option) =
-  match logger with
+let get_log = function
   | None ->
       Lwt.return (Ok None)
   | Some logger ->
@@ -606,9 +605,7 @@ let get_log (logger : logger option) =
   [@@ocaml.inline always]
 
 (* [log_kinstr logger i] emits an instruction to instrument the
-   execution of [i] with [logger]. In some cases, it embeds [logger]
-   to [i] to let the instruction [i] asks [logger] for a backtrace
-   when the evaluation of [i] fails. *)
+   execution of [i] with [logger]. *)
 let log_kinstr logger i = ILog (kinfo_of_kinstr i, LogEntry, logger, i)
 
 (* [log_next_kinstr logger i] instruments the next instruction of [i]
