@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Support.Lib.Monad
+open Lib_test.Qcheck_helpers
 
 let rec log_pause n =
   if n <= 0 then Lwt.return_unit
@@ -35,46 +36,43 @@ let rec log_pause n =
 
 module Fn = struct
   let lambda s l =
-    let open Crowbar in
-    with_printer (fun fmt _ -> Format.pp_print_string fmt s) @@ const l
+    let open QCheck in
+    make ~print:(fun _ -> s) (Gen.return l)
 
   let pred =
-    Crowbar.choose
+    QCheck.oneof
       [ lambda "(fun x _ -> x > 0)" (fun x _ -> x > 0);
         lambda "(fun _ y -> y < 0)" (fun _ y -> y < 0);
         lambda "(fun _ _ -> false)" (fun _ _ -> false);
         lambda "(fun _ _ -> true)" (fun _ _ -> true);
         lambda "(fun x y -> x < y)" (fun x y -> x < y) ]
 
+  let basic_int =
+    QCheck.(oneof [int; Gen.return 0 |> make; Gen.return 1 |> make])
+
   let arith =
-    Crowbar.choose
-      [ lambda "(fun x _ -> x)" (fun x _ -> x);
-        lambda "(fun _ y -> y)" (fun _ y -> y);
-        lambda "(fun x _ -> 2 * x)" (fun x _ -> 2 * x);
-        lambda "(fun _ _ -> 0)" (fun _ _ -> 0);
-        lambda "(fun x y -> x + y)" (fun x y -> x + y);
-        lambda "(fun _ y -> 2 * y)" (fun _ y -> 2 * y);
-        lambda "(fun _ y -> y + 1)" (fun _ y -> y + 1);
-        lambda "(fun x y -> min x y)" (fun x y -> min x y);
-        lambda "(fun x y -> max x y)" (fun x y -> max x y);
-        lambda "(fun x y -> (5 * x) + (112 * y))" (fun x y ->
-            (5 * x) + (112 * y));
-        Crowbar.(map [int] (fun n _ _ -> n)) ]
+    let open QCheck in
+    let module O = Observable in
+    fun2 O.int O.int int
 
   (* combinators *)
-  let e cond ok error x y = if cond x y then Ok (ok x y) else Error (error x y)
+  let e (cond, QCheck.Fun (_, ok), QCheck.Fun (_, error)) x y =
+    if cond x y then Ok (ok x y) else Error (error x y)
 
-  let arith_e = Crowbar.map [pred; arith; arith] e
+  let arith_e = QCheck.(map e (triple pred arith arith))
 
-  let s pauses fn x y = log_pause (pauses x y) >|= fun () -> fn x y
+  let s (QCheck.Fun (_, pauses), QCheck.Fun (_, fn)) x y =
+    log_pause (pauses x y) >|= fun () -> fn x y
 
-  let arith_s = Crowbar.map [arith; arith] s
+  let arith_s = QCheck.(map s (pair arith arith))
 
-  let es cond pauses ok error x y =
+  let es
+      (cond, QCheck.Fun (_, pauses), QCheck.Fun (_, ok), QCheck.Fun (_, error))
+      x y =
     log_pause (pauses x y)
     >|= fun () -> if cond x y then Ok (ok x y) else Error (error x y)
 
-  let arith_es = Crowbar.map [pred; arith; arith; arith] es
+  let arith_es = QCheck.(map es (quad pred arith arith arith))
 end
 
 (* Wrappers for generated functions *)
@@ -394,27 +392,52 @@ end
 
 (* Data generators (we use lists of integers) *)
 
-let one = Crowbar.int
+let one = QCheck.int
 
-let many = Crowbar.(list int)
+let many = QCheck.(list int)
 
 let manymany =
-  let open Crowbar in
-  choose
-    [ map [list int] (fun input -> (input, input));
-      map [list int; list int] (fun l r -> (l, r)) ]
+  let open QCheck in
+  oneof
+    [ map
+        ~rev:(fun (input, _) -> input)
+        (fun input -> (input, input))
+        (list int);
+      pair (list int) (list int) ]
 
 (* equality and lwt/error variants *)
 
-let eq ?pp a b = Crowbar.check_eq ?pp a b
+let eq ?pp a b = qcheck_eq ?pp a b
 
-let eq_e ?pp a b = Crowbar.check_eq ?pp a b
+(** [eq_e] is a duplicate of {!eq} for consistency
 
-let eq_s ?pp a b =
-  Lwt_main.run (a >>= fun a -> b >|= fun b -> Crowbar.check_eq ?pp a b)
+   example (simplified):
+   {[
+   eq (M.iter (IterOf.fn acc fn)) (M.fold_left fn init)
+   eq_e (M.iter_e (IterEOf.fn_e acc fn)) (M.fold_left_e (fn_e fn) init)
+   ]}
+*)
+let eq_e ?pp (a : ('a, 'trace) result) (b : ('a, 'trace) result) = eq ?pp a b
 
-let eq_es ?pp a b =
-  Lwt_main.run (a >>= fun a -> b >|= fun b -> Crowbar.check_eq ?pp a b)
+let eq_s ?pp a b = Lwt_main.run (a >>= fun a -> b >|= fun b -> eq ?pp a b)
+
+(** [eq_es] is a duplicate of {!eq_s} for consistency
+
+   example:
+   {[
+   eq_s
+     (let acc = ref init in
+     M.iter_s (IterSOf.fn_s acc fn) input >|= fun () -> !acc)
+     (M.fold_left_s (FoldSOf.fn_s fn) init input)
+
+   eq_es
+     (let acc = ref init in
+     M.iter_es (IterESOf.fn acc fn) (M.of_list input) >|=? fun () -> !acc)
+     (Lwt.return_ok @@ with_stdlib_iter (fn, init, input))
+   ]}
+*)
+let eq_es ?pp (a : ('a, 'b) result Lwt.t) (b : ('a, 'b) result Lwt.t) =
+  eq_s ?pp a b
 
 let eq_es_ep ?pp es ep =
   Lwt_main.run
@@ -432,17 +455,17 @@ let eq_es_ep ?pp es ep =
             false
             trace_ep
         in
-        if trace_ep_has_error_es then ()
+        if trace_ep_has_error_es then true
         else
-          Crowbar.failf
+          QCheck.Test.fail_reportf
             "%d not in %a"
             error_es
-            (Support.Test_trace.pp Crowbar.pp_int)
+            (Support.Test_trace.pp Format.pp_print_int)
             trace_ep
     | (Ok _, Error _) ->
-        Crowbar.fail "Ok _ is not Error _"
+        QCheck.Test.fail_report "Ok _ is not Error _"
     | (Error _, Ok _) ->
-        Crowbar.fail "Error _ is not Ok _" )
+        QCheck.Test.fail_report "Error _ is not Ok _" )
 
 let eq_ep ?pp a b =
   Lwt_main.run
@@ -454,11 +477,11 @@ let eq_ep ?pp a b =
     | (Ok ok_es, Ok ok_ep) ->
         eq ?pp ok_es ok_ep
     | (Error _, Error _) ->
-        () (* Not as precise as we could be, but precise enough *)
+        true (* Not as precise as we could be, but precise enough *)
     | (Ok _, Error _) ->
-        Crowbar.fail "Ok _ is not Error _"
+        QCheck.Test.fail_report "Ok _ is not Error _"
     | (Error _, Ok _) ->
-        Crowbar.fail "Error _ is not Ok _" )
+        QCheck.Test.fail_report "Error _ is not Ok _" )
 
 module PP = struct
   let int = Format.pp_print_int

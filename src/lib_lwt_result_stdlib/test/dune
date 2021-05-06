@@ -12,7 +12,8 @@
             tezos-lwt-result-stdlib.examples.traces
             lwt.unix
             alcotest-lwt
-            crowbar)
+            qcheck-alcotest
+            lib-test)
  (flags (:standard -open Tezos_lwt_result_stdlib)))
 
 (alias
