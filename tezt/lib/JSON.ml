@@ -116,11 +116,19 @@ let fail origin x = Printf.ksprintf (fail_string origin) x
 
 let parse_file file =
   let node =
-    try Base.with_open_in file (fun chan -> Ezjsonm.from_channel chan)
-    with Ezjsonm.Parse_error (_, message) ->
-      raise
-        (Error
-           {raw = None; origin = file; message = "invalid JSON: " ^ message})
+    try Base.with_open_in file Ezjsonm.from_channel with
+    | Ezjsonm.Parse_error (_, message) ->
+        raise
+          (Error
+             {raw = None; origin = file; message = "invalid JSON: " ^ message})
+    | Sys_error message ->
+        raise
+          (Error
+             {
+               raw = None;
+               origin = file;
+               message = "failed to read file: " ^ message;
+             })
   in
   annotate ~origin:file node
 
