@@ -716,8 +716,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
         let total_length =
           List.fold_left
             (fun acc s -> S.add acc (S.safe_int (String.length s)))
-            (S.zero |> S.may_saturate)
-            accu.elements
+            S.zero
+            ss.elements
         in
         consume' ctxt gas (Interp_costs.concat_string total_length)
         >>?= fun gas ->
@@ -749,8 +749,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
         let total_length =
           List.fold_left
             (fun acc s -> S.add acc (S.safe_int (Bytes.length s)))
-            (S.zero |> S.may_saturate)
-            accu.elements
+            S.zero
+            ss.elements
         in
         consume' ctxt gas (Interp_costs.concat_string total_length)
         >>?= fun gas ->
