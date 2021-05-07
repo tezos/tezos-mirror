@@ -23,6 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* [raw] contains a pair [name, raw_value].
+   It is present for values that cannot be found easily elsewhere.
+   For instance, [parse_file] sets [raw] to [None] because the raw value
+   can be found easily in the file. But for JSON values that are obtained
+   through other means, it is useful to print the value in the logs,
+   so we store it in the error.
+
+   [name] is the name of the root value; it is the [~origin] argument of [parse].
+
+   [raw_value] is the string representation of the JSON value.
+
+   [origin] is the string representation of the value of type [origin],
+   which is [name] plus some location information.
+
+   [message] is the error message. *)
+type error = {
+  raw : (string * string) option;
+  origin : string;
+  message : string;
+}
+
+let show_error {raw; origin; message} =
+  match raw with
+  | None ->
+      Printf.sprintf "%s: %s" origin message
+  | Some (raw_origin, raw_value) ->
+      Printf.sprintf "%s = %s\n%s: %s" raw_origin raw_value origin message
+
+exception Error of error
+
+let () =
+  Printexc.register_printer
+  @@ function Error error -> Some (show_error error) | _ -> None
+
 type u = Ezjsonm.value
 
 (* Each [JSON.t] comes with its origin so that we can print nice error messages.
@@ -65,8 +99,7 @@ let fail_string origin message =
           | _ :: _ ->
               name ^ ", at " ^ String.concat "" fields
         in
-        Log.log ~level:Error "%s = %s" name (encode_u json) ;
-        Test.fail "%s: %s" origin message
+        raise (Error {raw = Some (name, encode_u json); origin; message})
     | Field {origin; name} ->
         gather_origin message (("." ^ name) :: fields) origin
     | Item {origin; index} ->
@@ -85,7 +118,9 @@ let parse_file file =
   let node =
     try Base.with_open_in file (fun chan -> Ezjsonm.from_channel chan)
     with Ezjsonm.Parse_error (_, message) ->
-      Test.fail "%s: invalid JSON: %s" file message
+      raise
+        (Error
+           {raw = None; origin = file; message = "invalid JSON: " ^ message})
   in
   annotate ~origin:file node
 
@@ -93,8 +128,13 @@ let parse ~origin raw =
   let node =
     try Ezjsonm.value_from_string raw
     with Ezjsonm.Parse_error (_, message) ->
-      Log.log ~level:Error "%s = %S" origin raw ;
-      Test.fail "%s: invalid JSON: %s" origin message
+      raise
+        (Error
+           {
+             raw = Some (origin, raw);
+             origin;
+             message = "invalid JSON: " ^ message;
+           })
   in
   annotate ~origin node
 
