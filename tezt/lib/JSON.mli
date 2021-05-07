@@ -25,6 +25,15 @@
 
 (** JSON decoding. *)
 
+(** Errors that can happen when parsing or reading JSON. *)
+type error
+
+(** Convert a JSON parse error to a string. *)
+val show_error : error -> string
+
+(** Exception that can happen when parsing or reading JSON. *)
+exception Error of error
+
 (** JSON unannotated ASTs. *)
 type u = Ezjsonm.value
 
@@ -53,21 +62,21 @@ val encode_u : u -> string
 
 (** Parse a JSON file.
 
-    Call [Test.fail] if the input is invalid JSON. *)
+    @raise [Error] if the input is invalid JSON. *)
 val parse_file : string -> t
 
 (** Parse a JSON string.
 
-    Call [Test.fail] if the input is invalid JSON. *)
+    @raise [Error] if the input is invalid JSON. *)
 val parse : origin:string -> string -> t
 
-(** Same as [parse], but return [None] instead of calling [Test.fail]. *)
+(** Same as [parse], but return [None] instead of raising [Error]. *)
 val parse_opt : origin:string -> string -> t option
 
 (** The general pattern for the accessors below is that only [as_x] functions can fail.
     Getters [get] and [geti] return [`Null] instead of failing.
     This allows to chain them and only test for errors at the end with [as_x],
-    either by calling [Test.fail] or by returning [None] (with the [as_x_opt] variant).
+    either by raising [Error] or by returning [None] (with the [as_x_opt] variant).
 
     Internally, the actual error which is printed is the correct one.
     For instance, with [json |-> "x" |> as_int], if [json] is not an object,
@@ -98,10 +107,10 @@ val is_null : t -> bool
 
 (** Get the value from a [`Bool] node.
 
-    Call [Test.fail] if the input is not a [`Bool]. *)
+    @raise [Error] if the input is not a [`Bool]. *)
 val as_bool : t -> bool
 
-(** Same as [as_bool], but return [None] instead of calling [Test.fail]. *)
+(** Same as [as_bool], but return [None] instead of raising [Error]. *)
 val as_bool_opt : t -> bool option
 
 (** Test whether [as_bool] would succeed. *)
@@ -109,13 +118,13 @@ val is_bool : t -> bool
 
 (** Get the integer value from a [`Float] or [`String] node.
 
-    Call [Test.fail] if:
+    @raise [Error] if:
     - the input is not a [`Float] nor a [`String];
     - the input is a [`Float] but is not an integer;
     - the input is a [`String] but does not denote a valid decimal integer. *)
 val as_int : t -> int
 
-(** Same as [as_int], but return [None] instead of calling [Test.fail]. *)
+(** Same as [as_int], but return [None] instead of raising [Error]. *)
 val as_int_opt : t -> int option
 
 (** Test whether [as_int] would succeed. *)
@@ -123,12 +132,12 @@ val is_int : t -> bool
 
 (** Get the float value from a [`Float] or [`String] node.
 
-    Call [Test.fail] if:
+    @raise [Error] if:
     - the input is not a [`Float] nor a [`String];
     - the input is a [`String] but does not denote a valid decimal float. *)
 val as_float : t -> float
 
-(** Same as [as_float], but return [None] instead of calling [Test.fail]. *)
+(** Same as [as_float], but return [None] instead of raising [Error]. *)
 val as_float_opt : t -> float option
 
 (** Test whether [as_float] would succeed. *)
@@ -136,10 +145,10 @@ val is_float : t -> bool
 
 (** Get the value from a [`String] node.
 
-    Call [Test.fail] if the input is not a [`String]. *)
+    @raise [Error] if the input is not a [`String]. *)
 val as_string : t -> string
 
-(** Same as [as_string], but return [None] instead of calling [Test.fail]. *)
+(** Same as [as_string], but return [None] instead of raising [Error]. *)
 val as_string_opt : t -> string option
 
 (** Test whether [as_string] would succeed. *)
@@ -147,11 +156,11 @@ val is_string : t -> bool
 
 (** Get the list of items from an [`Array] node.
 
-    Call [Test.fail] if the input is not an [`Array] nor [`Null].
+    @raise [Error] if the input is not an [`Array] nor [`Null].
     Return the empty list if the input is [`Null]. *)
 val as_list : t -> t list
 
-(** Same as [as_list], but return [None] instead of calling [Test.fail]. *)
+(** Same as [as_list], but return [None] instead of raising [Error]. *)
 val as_list_opt : t -> t list option
 
 (** Test whether [as_list] would succeed. *)
@@ -159,11 +168,11 @@ val is_list : t -> bool
 
 (** Get the list of fields from an [`Object] node.
 
-    Call [Test.fail] if the input is not an [`Object] nor [`Null].
+    @raise [Error] if the input is not an [`Object] nor [`Null].
     Return the empty list if the input is [`Null]. *)
 val as_object : t -> (string * t) list
 
-(** Same as [as_object], but return [None] instead of calling [Test.fail]. *)
+(** Same as [as_object], but return [None] instead of raising [Error]. *)
 val as_object_opt : t -> (string * t) list option
 
 (** Test whether [as_object] would succeed. *)
