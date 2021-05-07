@@ -104,7 +104,52 @@ let test_stack_overflow () =
     in
     aux n (IHalt kinfo)
   in
-  run_step ctxt (descr (enorme_et_seq 100_000)) EmptyCell EmptyCell
+  run_step ctxt (descr (enorme_et_seq 1_000_000)) EmptyCell EmptyCell
+  >>= function
+  | Ok _ ->
+      return_unit
+  | Error trace ->
+      let trace_string =
+        Format.asprintf "%a" Environment.Error_monad.pp_trace trace
+      in
+      Alcotest.failf "Unexpected error (%s) at %s" trace_string __LOC__
+
+let test_stack_overflow_in_lwt () =
+  let open Script_typed_ir in
+  test_context ()
+  >>=? fun ctxt ->
+  let stack = Bot_t in
+  let item ty s = Item_t (ty, s, None) in
+  let unit_t = Unit_t None in
+  let unit_k = Unit_key None in
+  let bool_t = Bool_t None in
+  let big_map_t = Big_map_t (unit_k, unit_t, None) in
+  let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
+  let kinfo s = {iloc = -1; kstack_ty = s} in
+  let stack1 = item big_map_t Bot_t in
+  let stack2 = item big_map_t (item big_map_t Bot_t) in
+  let stack3 = item unit_t stack2 in
+  let stack4 = item bool_t stack1 in
+  let push_empty_big_map k =
+    IEmpty_big_map (kinfo stack, Unit_key None, Unit_t None, k)
+  in
+  let large_mem_seq n =
+    let rec aux n acc =
+      if n = 0 then acc
+      else
+        aux
+          (n - 1)
+          (IDup
+             ( kinfo stack1,
+               IConst
+                 ( kinfo stack2,
+                   (),
+                   IBig_map_mem (kinfo stack3, IDrop (kinfo stack4, acc)) ) ))
+    in
+    aux n (IDrop (kinfo stack1, IHalt (kinfo stack)))
+  in
+  let script = push_empty_big_map (large_mem_seq 1_000_000) in
+  run_step ctxt (descr script) EmptyCell EmptyCell
   >>= function
   | Ok _ ->
       return_unit
@@ -163,5 +208,9 @@ let tests =
     Test_services.tztest
       "check robustness overflow error"
       `Slow
-      test_stack_overflow ]
+      test_stack_overflow;
+    Test_services.tztest
+      "check robustness overflow error in lwt"
+      `Slow
+      test_stack_overflow_in_lwt ]
   @ error_encoding_tests
