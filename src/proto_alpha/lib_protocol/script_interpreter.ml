@@ -1573,7 +1573,7 @@ let step_descr ~log_now logger (ctxt, sc) descr accu stack =
 
 let interp logger g (Lam (code, _)) arg =
   step_descr ~log_now:true logger g code arg (EmptyCell, EmptyCell)
-  >|=? fun (ret, _, ctxt) -> (ret, ctxt)
+  >|=? fun (ret, (EmptyCell, EmptyCell), ctxt) -> (ret, ctxt)
 
 let kstep logger ctxt step_constants kinstr accu stack =
   let gas = (Gas.gas_counter ctxt :> int) in
