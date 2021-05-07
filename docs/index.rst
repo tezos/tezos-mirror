@@ -204,6 +204,7 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: Releases:
 
+   releases/releases
    releases/april-2019
    releases/may-2019
    releases/september-2019

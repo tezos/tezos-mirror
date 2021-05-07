@@ -10,12 +10,12 @@ Tezos consists of :ref:`several binaries <tezos_binaries>` (i.e., executable fil
 There are several options for getting the binaries, depending on how you plan to use Tezos:
 
 - :ref:`getting static binaries <getting_static_binaries>`.
-  This is the easiest way to get native binaries for the latest stable version,
+  This is the easiest way to get native binaries for the latest stable release,
   requiring no dependencies, under Linux.
 - :ref:`installing binaries <installing_binaries>`.
-  This is the easiest way to install native binaries for the latest stable version, together with their dependencies, using a package manager.
+  This is the easiest way to install native binaries for the latest stable release, together with their dependencies, using a package manager.
 - :ref:`using docker images <using_docker_images>`.
-  This is the easiest way to run the latest stable versions of the binaries in
+  This is the easiest way to run the latest stable release of the binaries in
   Docker containers, on any OS supported by Docker.
 - :ref:`building the binaries via the OPAM source package manager <building_with_opam>`.
   Take this way to install the latest stable release in your native OS
@@ -30,7 +30,9 @@ There are several options for getting the binaries, depending on how you plan to
 
 These different options are described in the following sections.
 
-When choosing between these options, you may take into account the
+Note that some of the packaged distributions are not only available for the latest stable release. For instance, static binaries are also available for release candidates, and Docker images are also available for the current developement version (see :doc:`../releases/releases` for more information).
+
+When choosing between the installation options, you may take into account the
 convenience of the installation step (and of upgrading steps), but also
 efficiency and security considerations. For instance, static binaries have a
 different memory footprint compared to dynamically-linked binaries. Also,
