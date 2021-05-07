@@ -885,26 +885,10 @@ type ('a, 's, 'b, 't, 'r, 'f) step_type =
   's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ( 'a,
-       'b,
-       'c,
-       'd,
-       'e,
-       'f,
-       'g,
-       'h,
-       'i,
-       'j,
-       'k,
-       'l,
-       'm,
-       'n,
-       'o )
-     kmap_exit_type =
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'm, 'n, 'o) kmap_exit_type =
   (('c, 'd, 'e, 'f) continuation -> ('a, 'b, 'g, 'h) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('i, 'j, 'k, 'l) continuation ->
   ('m * 'n, 'c * 'd, 'o, 'c * 'd) kinstr ->
   ('m * 'n) list ->
   ('m, 'o) map ->
@@ -914,11 +898,10 @@ type ( 'a,
   'a * 'b ->
   ('g * 'h * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k) kmap_enter_type =
+type ('a, 'b, 'c, 'd, 'e, 'j, 'k) kmap_enter_type =
   (('a, 'b * 'c, 'd, 'e) continuation -> ('a, 'b * 'c, 'd, 'e) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('f, 'g, 'h, 'i) continuation ->
   ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr ->
   ('j * 'k) list ->
   ('j, 'a) map ->
@@ -927,11 +910,10 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k) kmap_enter_type =
   'c ->
   ('d * 'e * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) klist_exit_type =
+type ('a, 'b, 'c, 'd, 'i, 'j) klist_exit_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e, 'f, 'g, 'h) continuation ->
   ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
   'i list ->
   'j list ->
@@ -941,11 +923,10 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) klist_exit_type =
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) klist_enter_type =
+type ('a, 'b, 'c, 'd, 'e, 'j) klist_enter_type =
   (('b, 'a * 'c, 'd, 'e) continuation -> ('b, 'a * 'c, 'd, 'e) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('f, 'g, 'h, 'i) continuation ->
   ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
   'j list ->
   'b list ->
@@ -959,29 +940,26 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) kloop_in_left_type =
   outdated_context * step_constants ->
   local_gas_counter ->
   ('c, 'd, 'e, 'f) continuation ->
-  ('c, 'd, 'e, 'f) continuation ->
   ('a, 'g, 'c, 'd) kinstr ->
   ('b, 'g, 'e, 'f) continuation ->
   ('a, 'b) union ->
   'g ->
   ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'r, 'f, 'd, 'e, 'u, 'h, 's) kloop_in_type =
+type ('a, 'b, 'c, 'r, 'f, 's) kloop_in_type =
   outdated_context * step_constants ->
   local_gas_counter ->
   ('b, 'c, 'r, 'f) continuation ->
-  ('d, 'e, 'u, 'h) continuation ->
   ('a, 's, 'b, 'c) kinstr ->
   ('a, 's, 'r, 'f) continuation ->
   bool ->
   'a * 's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 's, 'r, 'f, 'c, 'd, 'e, 'g) kiter_type =
+type ('a, 'b, 's, 'r, 'f) kiter_type =
   (('a, 's, 'r, 'f) continuation -> ('a, 's, 'r, 'f) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('c, 'd, 'e, 'g) continuation ->
   ('b, 'a * 's, 'a, 's) kinstr ->
   'b list ->
   ('a, 's, 'r, 'f) continuation ->
