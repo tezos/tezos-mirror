@@ -113,9 +113,10 @@ p2p: $(DOCGENDIR)/p2p_doc.exe shell/p2p_usage.rst.inc
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 html: Makefile api/errors.rst rpc p2p
+	cp ../CHANGES.rst .
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst 008/rpc.rst 009/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst
+	@-rm -Rf api/errors.rst 008/rpc.rst 009/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
 	@-rm -Rf api/tezos-*.html api/tezos-*.txt 008/tezos-*.html 009/tezos-*.html
