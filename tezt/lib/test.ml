@@ -58,8 +58,44 @@ let fail x = Printf.ksprintf (fun message -> raise (Failed message)) x
 
 let global_starting_time = Unix.gettimeofday ()
 
+module Summed_durations : sig
+  type t
+
+  val zero : t
+
+  val single_seconds : float -> t
+
+  val ( + ) : t -> t -> t
+
+  val total_seconds : t -> float
+
+  val total_nanoseconds : t -> int64
+end = struct
+  (* Information about how much time a test takes to run.
+     Field [total_time_ns] contains the sum of the duration of runs in nanoseconds,
+     and [count] contains the number of runs.
+     By storing integers we ensure commutativity and associativity (which would not
+     be the case with floats). *)
+  type t = {total_time : int64; count : int}
+
+  let zero = {total_time = 0L; count = 0}
+
+  let single_seconds time =
+    {total_time = Int64.of_float (time *. 1_000_000.); count = 1}
+
+  let ( + ) a b =
+    {
+      total_time = Int64.add a.total_time b.total_time;
+      count = a.count + b.count;
+    }
+
+  let total_seconds {total_time; count = _} =
+    Int64.to_float total_time /. 1_000_000.
+
+  let total_nanoseconds {total_time; count = _} = total_time
+end
+
 (* Field [id] is used to be able to iterate on tests in order of registration.
-   Field [time] contains the cumulated time taken by all successful runs of this test.
    Field [result] contains the result of the last time the test was run.
    If the test was not run, it contains [None]. *)
 type test = {
@@ -68,8 +104,10 @@ type test = {
   title : string;
   tags : string list;
   body : unit -> unit Lwt.t;
-  mutable time : float;
-  mutable run_count : int;
+  mutable session_successful_runs : Summed_durations.t;
+  mutable session_failed_runs : Summed_durations.t;
+  mutable past_records_successful_runs : Summed_durations.t;
+  mutable past_records_failed_runs : Summed_durations.t;
   mutable result : Log.test_result option;
 }
 
@@ -360,8 +398,28 @@ let list_tests format =
       if list <> [] then print_string line ;
       ()
 
+(* Total time, in seconds.
+   Since this involves floats it should not be used for --job splitting. *)
+let total_test_display_time ~past_records ~session test =
+  let past_records =
+    if past_records then
+      Summed_durations.total_seconds test.past_records_successful_runs
+      +. Summed_durations.total_seconds test.past_records_failed_runs
+    else 0.
+  in
+  let session =
+    if session then
+      Summed_durations.total_seconds test.session_successful_runs
+      +. Summed_durations.total_seconds test.session_failed_runs
+    else 0.
+  in
+  past_records +. session
+
 let display_time_summary () =
-  let total_time = fold_registered 0. @@ fun acc {time; _} -> acc +. time in
+  let test_time = total_test_display_time ~past_records:true ~session:true in
+  let total_time =
+    fold_registered 0. @@ fun acc test -> acc +. test_time test
+  in
   let tests_by_file =
     fold_registered String_map.empty
     @@ fun acc test ->
@@ -387,8 +445,8 @@ let display_time_summary () =
     print_time
       ""
       file
-      (List.fold_left (fun acc {time; _} -> acc +. time) 0. tests) ;
-    List.iter (fun {title; time; _} -> print_time "- " title time) tests
+      (List.fold_left (fun acc test -> acc +. test_time test) 0. tests) ;
+    List.iter (fun test -> print_time "- " test.title (test_time test)) tests
   in
   String_map.iter print_time_for_file tests_by_file ;
   ()
@@ -397,15 +455,31 @@ type marshaled_test = {
   file : string;
   title : string;
   tags : string list;
-  time : float;
+  successful_runs : Summed_durations.t;
+  failed_runs : Summed_durations.t;
 }
 
 let record_results filename =
   (* Remove the closure ([body]). *)
   let marshaled_tests =
     map_registered_list
-    @@ fun {id = _; file; title; tags; body = _; time; run_count; result = _} ->
-    {file; title; tags; time = time /. float (max 1 run_count)}
+    @@ fun { id = _;
+             file;
+             title;
+             tags;
+             body = _;
+             session_successful_runs;
+             session_failed_runs;
+             past_records_successful_runs = _;
+             past_records_failed_runs = _;
+             result = _ } ->
+    {
+      file;
+      title;
+      tags;
+      successful_runs = session_successful_runs;
+      failed_runs = session_failed_runs;
+    }
   in
   (* Write to file using Marshal.
      This is not very robust but enough for the purposes of this file. *)
@@ -416,33 +490,99 @@ let record_results filename =
   with Sys_error error -> Log.warn "Failed to write record: %s\n%!" error
 
 let read_recorded_results filename : marshaled_test list =
-  with_open_in filename Marshal.from_channel
+  try with_open_in filename Marshal.from_channel with
+  | Sys_error error ->
+      Printf.eprintf "Failed to read record: %s\n%!" error ;
+      exit 1
+  | End_of_file ->
+      Printf.eprintf "Failed to read record: %s: end of file\n%!" filename ;
+      exit 1
 
-let suggest_jobs (tests : marshaled_test list) =
-  let job_count = max 1 Cli.options.job_count in
-  (* [jobs] is an array of pairs where the first value is the total time of the job
-     and the second value is the list of tests that are currently allocated to this job. *)
-  let jobs = Array.make job_count (0., []) in
-  let allocate test =
-    let smallest_job =
+(* Read a record and update the time information of registered tests
+   that appear in this record. *)
+let read_record_and_update_tests filename =
+  let update_test (recorded_test : marshaled_test) =
+    match String_map.find_opt recorded_test.title !registered with
+    | None ->
+        (* Test no longer exists or was not selected, ignoring. *)
+        ()
+    | Some test ->
+        test.past_records_successful_runs <-
+          Summed_durations.(
+            test.past_records_successful_runs + recorded_test.successful_runs) ;
+        test.past_records_failed_runs <-
+          Summed_durations.(
+            test.past_records_failed_runs + recorded_test.failed_runs)
+  in
+  List.iter update_test (read_recorded_results filename)
+
+(* Get a partition of weighted [items] where the total weights of each subset are
+   approximately close to each other. *)
+let knapsack (type a) bag_count (items : (int64 * a) list) :
+    (int64 * a list) array =
+  let bag_count = max 1 bag_count in
+  (* [bags] is an array of pairs where the first value is the total
+     weight of the bag and the second value is the list of items that
+     are currently allocated to this bag. *)
+  let bags = Array.make bag_count (0L, []) in
+  (* Finding the optimal partition is NP-complete.
+     We use a heuristic to find an approximation: allocate heavier items first,
+     then fill the gaps with smaller items. *)
+  let allocate (item_weight, item) =
+    let smallest_bag =
       let best_index = ref 0 in
-      let best_time = ref max_float in
-      for i = 0 to job_count - 1 do
-        let (job_time, _) = jobs.(i) in
-        if job_time < !best_time then (
+      let best_weight = ref Int64.max_int in
+      for i = 0 to bag_count - 1 do
+        let (bag_weight, _) = bags.(i) in
+        if bag_weight < !best_weight then (
           best_index := i ;
-          best_time := job_time )
+          best_weight := bag_weight )
       done ;
       !best_index
     in
-    let (job_time, job_tests) = jobs.(smallest_job) in
-    jobs.(smallest_job) <- (job_time +. test.time, test :: job_tests)
+    let (bag_weight, bag_items) = bags.(smallest_bag) in
+    bags.(smallest_bag) <- (Int64.add bag_weight item_weight, item :: bag_items)
   in
-  (* Finding the optimal partition is NP-complete.
-     We use a heuristic to find an approximation: allocate longest tests first,
-     then fill the gaps with smaller tests. *)
-  let longest_first {time = a; _} {time = b; _} = Float.compare b a in
-  List.iter allocate (List.sort longest_first tests) ;
+  let longest_first (a, _) (b, _) = Int64.compare b a in
+  List.iter allocate (List.sort longest_first items) ;
+  bags
+
+let split_tests_into_balanced_jobs job_count =
+  let test_time test =
+    (* Give a default duration of 1 second as specified by --help.
+       This allows to split jobs even with no time data (otherwise all jobs
+       would be grouped together). *)
+    max
+      1_000_000L
+      (Summed_durations.total_nanoseconds test.past_records_successful_runs)
+  in
+  let tests = String_map.bindings !registered |> List.map snd in
+  let weighted_tests = List.map (fun test -> (test_time test, test)) tests in
+  knapsack job_count weighted_tests
+
+(* Apply --job: take the list of registered tests, split it into jobs,
+   and unregister all tests that are not selected by --job. *)
+let select_job () =
+  match Cli.options.job with
+  | None ->
+      (* No --job: do not unregister any test. *)
+      ()
+  | Some (job_index, job_count) ->
+      let jobs = split_tests_into_balanced_jobs job_count in
+      (* [Cli] ensures that [1 <= job_index <= job_count],
+         and [split_tests_into_balanced_jobs] ensures that its result
+         has length [job_count] if [job_count >= 1]. *)
+      let (_, job_tests) = jobs.(job_index - 1) in
+      (* Reset the list of tests to run to re-fill it with the requested job. *)
+      registered := String_map.empty ;
+      List.iter
+        (fun (test : test) ->
+          registered := String_map.add test.title test !registered)
+        job_tests
+
+let suggest_jobs () =
+  let jobs = split_tests_into_balanced_jobs Cli.options.job_count in
+  let job_count = Array.length jobs in
   (* Jobs are allocated, now display them. *)
   let display_job ~negate (total_job_time, job_tests) =
     print_endline
@@ -453,10 +593,10 @@ let suggest_jobs (tests : marshaled_test list) =
                Printf.sprintf
                  "%s %s"
                  (if negate then "--not-test" else "--test")
-                 (Log.quote_shell test.title))
+                 (Log.quote_shell (test : test).title))
              job_tests)
       ^ " # "
-      ^ string_of_float total_job_time
+      ^ Int64.to_string (Int64.div total_job_time 1_000_000L)
       ^ "s" )
   in
   let all_other_tests = ref [] in
@@ -474,6 +614,7 @@ let suggest_jobs (tests : marshaled_test list) =
   display_job ~negate:true (fst jobs.(job_count - 1), !all_other_tests)
 
 let output_junit filename =
+  let test_time = total_test_display_time ~past_records:false ~session:true in
   with_open_out filename
   @@ fun ch ->
   let echo x =
@@ -486,7 +627,7 @@ let output_junit filename =
       (fail_count + match test.result with Some (Failed _) -> 1 | _ -> 0),
       ( skipped_count
       + match test.result with None | Some Aborted -> 1 | _ -> 0 ),
-      total_time +. test.time )
+      total_time +. test_time test )
   in
   echo {|<?xml version="1.0" encoding="UTF-8" ?>|} ;
   echo
@@ -533,7 +674,7 @@ let output_junit filename =
         title
         (replace_entities test.file)
         title
-        test.time ;
+        (test_time test) ;
       ( match test.result with
       | None | Some Successful | Some Aborted ->
           ()
@@ -570,7 +711,18 @@ let register ~__FILE__ ~title ~tags body =
   incr next_id ;
   if test_should_be_run ~file ~title ~tags then
     let test =
-      {id; file; title; tags; body; time = 0.; run_count = 0; result = None}
+      {
+        id;
+        file;
+        title;
+        tags;
+        body;
+        session_successful_runs = Summed_durations.zero;
+        session_failed_runs = Summed_durations.zero;
+        past_records_successful_runs = Summed_durations.zero;
+        past_records_failed_runs = Summed_durations.zero;
+        result = None;
+      }
     in
     registered := String_map.add title test !registered
 
@@ -599,21 +751,20 @@ let run () =
     if Cli.options.list = None then
       prerr_endline
         "You can use --list to get the list of tests and their tags." ) ;
+  (* Read records. *)
+  List.iter read_record_and_update_tests Cli.options.from_records ;
+  (* Apply --job if needed. *)
+  select_job () ;
   (* Actually run the tests (or list them). *)
   match (Cli.options.list, Cli.options.suggest_jobs) with
-  | (Some format, None) ->
+  | (Some format, false) ->
       list_tests format
-  | (None, Some record_file) -> (
-    match read_recorded_results record_file with
-    | exception Sys_error error ->
-        Printf.eprintf "Failed to read record: %s\n%!" error ;
-        exit 1
-    | record ->
-        suggest_jobs record )
-  | (Some _, Some _) ->
+  | (None, true) ->
+      suggest_jobs ()
+  | (Some _, true) ->
       prerr_endline
         "Cannot use both --list and --suggest-jobs at the same time."
-  | (None, None) ->
+  | (None, false) ->
       let exception Stop in
       let a_test_failed = ref false in
       let rec run iteration =
@@ -628,9 +779,14 @@ let run () =
               let start = Unix.gettimeofday () in
               let success = really_run ~progress_state ~iteration test in
               let time = Unix.gettimeofday () -. start in
-              test.run_count <- test.run_count + 1 ;
-              test.time <- test.time +. time ;
-              if not success then (
+              if success then
+                test.session_successful_runs <-
+                  Summed_durations.(
+                    test.session_successful_runs + single_seconds time)
+              else (
+                test.session_failed_runs <-
+                  Summed_durations.(
+                    test.session_failed_runs + single_seconds time) ;
                 a_test_failed := true ;
                 if not Cli.options.keep_going then raise Stop )
             in
