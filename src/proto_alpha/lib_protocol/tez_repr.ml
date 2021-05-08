@@ -123,19 +123,11 @@ let ( +? ) t1 t2 =
   if t < t1 then error (Addition_overflow (t1, t2)) else ok t
 
 let ( *? ) t m =
-  let open Compare.Int64 in
-  let open Int64 in
-  let rec step cur pow acc =
-    if cur = 0L then ok acc
-    else
-      pow +? pow
-      >>? fun npow ->
-      if logand cur 1L = 1L then
-        acc +? pow >>? fun nacc -> step (shift_right_logical cur 1) npow nacc
-      else step (shift_right_logical cur 1) npow acc
-  in
-  if m < 0L then error (Negative_multiplicator (t, m))
-  else record_trace (Multiplication_overflow (t, m)) @@ step m t 0L
+  if Compare.Int64.(m < 0L) then error (Negative_multiplicator (t, m))
+  else if Compare.Int64.(m = 0L) then ok 0L
+  else if Compare.Int64.(t > Int64.(div max_int m)) then
+    error (Multiplication_overflow (t, m))
+  else ok (Int64.mul t m)
 
 let ( /? ) t d =
   if d <= 0L then error (Invalid_divisor (t, d)) else ok (Int64.div t d)

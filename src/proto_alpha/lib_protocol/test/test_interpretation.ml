@@ -100,6 +100,24 @@ let test_bad_contract_parameter () =
   | Error errs ->
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
 
+let test_multiplication_close_to_overflow_passes () =
+  test_context ()
+  >>=? fun ctx ->
+  (* Get sure that multiplication deals with numbers between 2^62 and
+     2^63 without overflowing *)
+  run_script
+    ctx
+    "{parameter unit;storage unit;code {DROP; PUSH mutez 2944023901536524477; \
+     PUSH nat 2; MUL; DROP; UNIT; NIL operation; PAIR}}"
+    ~storage:"Unit"
+    ~parameter:"Unit"
+    ()
+  >>= function
+  | Ok _ ->
+      return_unit
+  | Error errs ->
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
+
 let read_file filename =
   let ch = open_in filename in
   let s = really_input_string ch (in_channel_length ch) in
@@ -229,5 +247,11 @@ let tests =
     Test_services.tztest
       "check robustness overflow error in lwt"
       `Slow
-      test_stack_overflow_in_lwt ]
+      test_stack_overflow_in_lwt;
+    Test_services.tztest
+      "test multiplication no illegitimate overflow"
+      `Quick
+      test_multiplication_close_to_overflow_passes;
+    Test_services.tztest "test stack overflow error" `Slow test_stack_overflow
+  ]
   @ error_encoding_tests
