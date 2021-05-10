@@ -23,33 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* [raw] contains a pair [name, raw_value].
-   It is present for values that cannot be found easily elsewhere.
-   For instance, [parse_file] sets [raw] to [None] because the raw value
-   can be found easily in the file. But for JSON values that are obtained
-   through other means, it is useful to print the value in the logs,
-   so we store it in the error.
+(* String representations of JSON values, annotated with their origin.
+   Used to store raw JSON in errors, for display purposes.
+   Field [raw_origin] is the [~origin] argument of [parse],
+   and field [raw_string] is the string representation. *)
+type raw = {raw_origin : string; raw_string : string}
 
-   [name] is the name of the root value; it is the [~origin] argument of [parse].
+(* [raw] is only present for values that cannot be found easily elsewhere.
 
-   [raw_value] is the string representation of the JSON value.
-
-   [origin] is the string representation of the value of type [origin],
-   which is [name] plus some location information.
+   [origin] is the string representation of the value of type [origin].
+   It is more precise than [raw.raw_origin].
 
    [message] is the error message. *)
-type error = {
-  raw : (string * string) option;
-  origin : string;
-  message : string;
-}
+type error = {raw : raw option; origin : string; message : string}
 
 let show_error {raw; origin; message} =
   match raw with
   | None ->
       Printf.sprintf "%s: %s" origin message
-  | Some (raw_origin, raw_value) ->
-      Printf.sprintf "%s = %s\n%s: %s" raw_origin raw_value origin message
+  | Some {raw_origin; raw_string} ->
+      Printf.sprintf "%s = %s\n%s: %s" raw_origin raw_string origin message
 
 exception Error of error
 
@@ -99,7 +92,13 @@ let fail_string origin message =
           | _ :: _ ->
               name ^ ", at " ^ String.concat "" fields
         in
-        raise (Error {raw = Some (name, encode_u json); origin; message})
+        raise
+          (Error
+             {
+               raw = Some {raw_origin = name; raw_string = encode_u json};
+               origin;
+               message;
+             })
     | Field {origin; name} ->
         gather_origin message (("." ^ name) :: fields) origin
     | Item {origin; index} ->
@@ -116,11 +115,21 @@ let fail origin x = Printf.ksprintf (fail_string origin) x
 
 let parse_file file =
   let node =
-    try Base.with_open_in file (fun chan -> Ezjsonm.from_channel chan)
-    with Ezjsonm.Parse_error (_, message) ->
-      raise
-        (Error
-           {raw = None; origin = file; message = "invalid JSON: " ^ message})
+    try Base.with_open_in file Ezjsonm.from_channel with
+    | Ezjsonm.Parse_error (_, message) ->
+        (* In the error, [raw] is [None] because the raw value
+           can be found easily in the file. *)
+        raise
+          (Error
+             {raw = None; origin = file; message = "invalid JSON: " ^ message})
+    | Sys_error message ->
+        raise
+          (Error
+             {
+               raw = None;
+               origin = file;
+               message = "failed to read file: " ^ message;
+             })
   in
   annotate ~origin:file node
 
@@ -131,7 +140,7 @@ let parse ~origin raw =
       raise
         (Error
            {
-             raw = Some (origin, raw);
+             raw = Some {raw_origin = origin; raw_string = raw};
              origin;
              message = "invalid JSON: " ^ message;
            })
@@ -210,6 +219,19 @@ let as_int_opt json =
 let as_int = check as_int_opt "expected an integer"
 
 let is_int = test as_int_opt
+
+let as_int64_opt json =
+  match json.node with
+  | `Float f ->
+      if Float.is_integer f then Some (Int64.of_float f) else None
+  | `String s ->
+      Int64.of_string_opt s
+  | _ ->
+      None
+
+let as_int64 = check as_int64_opt "expected a 64-bit integer"
+
+let is_int64 = test as_int64_opt
 
 let as_float_opt json =
   match json.node with

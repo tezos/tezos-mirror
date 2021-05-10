@@ -70,6 +70,11 @@ module Summed_durations : sig
   val total_seconds : t -> float
 
   val total_nanoseconds : t -> int64
+
+  val encode : t -> JSON.u
+
+  (* May raise [JSON.Error]. *)
+  val decode : JSON.t -> t
 end = struct
   (* Information about how much time a test takes to run.
      Field [total_time_ns] contains the sum of the duration of runs in nanoseconds,
@@ -93,6 +98,17 @@ end = struct
     Int64.to_float total_time /. 1_000_000.
 
   let total_nanoseconds {total_time; count = _} = total_time
+
+  let encode {total_time; count} =
+    `O
+      [ ("total_time", `String (Int64.to_string total_time));
+        ("count", `String (string_of_int count)) ]
+
+  let decode (json : JSON.t) =
+    {
+      total_time = JSON.(json |-> "total_time" |> as_int64);
+      count = JSON.(json |-> "count" |> as_int);
+    }
 end
 
 (* Field [id] is used to be able to iterate on tests in order of registration.
@@ -451,17 +467,56 @@ let display_time_summary () =
   String_map.iter print_time_for_file tests_by_file ;
   ()
 
-type marshaled_test = {
-  file : string;
-  title : string;
-  tags : string list;
-  successful_runs : Summed_durations.t;
-  failed_runs : Summed_durations.t;
-}
+module Record = struct
+  type test = {
+    file : string;
+    title : string;
+    tags : string list;
+    successful_runs : Summed_durations.t;
+    failed_runs : Summed_durations.t;
+  }
 
-let record_results filename =
-  (* Remove the closure ([body]). *)
-  let marshaled_tests =
+  let encode_test {file; title; tags; successful_runs; failed_runs} : JSON.u =
+    `O
+      [ ("file", `String file);
+        ("title", `String title);
+        ("tags", `A (List.map (fun tag -> `String tag) tags));
+        ("successful_runs", Summed_durations.encode successful_runs);
+        ("failed_runs", Summed_durations.encode failed_runs) ]
+
+  let decode_test (json : JSON.t) : test =
+    {
+      file = JSON.(json |-> "file" |> as_string);
+      title = JSON.(json |-> "title" |> as_string);
+      tags = JSON.(json |-> "tags" |> as_list |> List.map as_string);
+      successful_runs =
+        Summed_durations.decode JSON.(json |-> "successful_runs");
+      failed_runs = Summed_durations.decode JSON.(json |-> "failed_runs");
+    }
+
+  type t = test list
+
+  let encode (record : t) : JSON.u = `A (List.map encode_test record)
+
+  let decode (json : JSON.t) : t =
+    JSON.(json |> as_list |> List.map decode_test)
+
+  let output_file (record : t) filename =
+    (* Write to file using Marshal.
+       This is not very robust but enough for the purposes of this file. *)
+    try
+      with_open_out filename
+      @@ fun file -> output_string file (JSON.encode_u (encode record))
+    with Sys_error error -> Log.warn "Failed to write record: %s" error
+
+  let input_file filename : t =
+    try decode (JSON.parse_file filename)
+    with JSON.Error error ->
+      Log.error "%s" (JSON.show_error error) ;
+      exit 1
+
+  (* Get the record for the current run. *)
+  let current () =
     map_registered_list
     @@ fun { id = _;
              file;
@@ -480,41 +535,25 @@ let record_results filename =
       successful_runs = session_successful_runs;
       failed_runs = session_failed_runs;
     }
-  in
-  (* Write to file using Marshal.
-     This is not very robust but enough for the purposes of this file. *)
-  try
-    with_open_out filename
-    @@ fun file ->
-    Marshal.to_channel file (marshaled_tests : marshaled_test list) []
-  with Sys_error error -> Log.warn "Failed to write record: %s\n%!" error
 
-let read_recorded_results filename : marshaled_test list =
-  try with_open_in filename Marshal.from_channel with
-  | Sys_error error ->
-      Printf.eprintf "Failed to read record: %s\n%!" error ;
-      exit 1
-  | End_of_file ->
-      Printf.eprintf "Failed to read record: %s: end of file\n%!" filename ;
-      exit 1
-
-(* Read a record and update the time information of registered tests
-   that appear in this record. *)
-let read_record_and_update_tests filename =
-  let update_test (recorded_test : marshaled_test) =
-    match String_map.find_opt recorded_test.title !registered with
-    | None ->
-        (* Test no longer exists or was not selected, ignoring. *)
-        ()
-    | Some test ->
-        test.past_records_successful_runs <-
-          Summed_durations.(
-            test.past_records_successful_runs + recorded_test.successful_runs) ;
-        test.past_records_failed_runs <-
-          Summed_durations.(
-            test.past_records_failed_runs + recorded_test.failed_runs)
-  in
-  List.iter update_test (read_recorded_results filename)
+  (* Read a record and update the time information of registered tests
+     that appear in this record. *)
+  let use (record : t) =
+    let update_test (recorded_test : test) =
+      match String_map.find_opt recorded_test.title !registered with
+      | None ->
+          (* Test no longer exists or was not selected, ignoring. *)
+          ()
+      | Some test ->
+          test.past_records_successful_runs <-
+            Summed_durations.(
+              test.past_records_successful_runs + recorded_test.successful_runs) ;
+          test.past_records_failed_runs <-
+            Summed_durations.(
+              test.past_records_failed_runs + recorded_test.failed_runs)
+    in
+    List.iter update_test record
+end
 
 (* Get a partition of weighted [items] where the total weights of each subset are
    approximately close to each other. *)
@@ -752,7 +791,9 @@ let run () =
       prerr_endline
         "You can use --list to get the list of tests and their tags." ) ;
   (* Read records. *)
-  List.iter read_record_and_update_tests Cli.options.from_records ;
+  List.iter
+    Record.(fun filename -> use (input_file filename))
+    Cli.options.from_records ;
   (* Apply --job if needed. *)
   select_job () ;
   (* Actually run the tests (or list them). *)
@@ -795,6 +836,6 @@ let run () =
       in
       (try run 1 with Stop -> ()) ;
       Option.iter output_junit Cli.options.junit ;
-      Option.iter record_results Cli.options.record ;
+      Option.iter Record.(output_file (current ())) Cli.options.record ;
       if Cli.options.time then display_time_summary () ;
       if !a_test_failed then exit 1
