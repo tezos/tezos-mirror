@@ -1,5 +1,5 @@
 (executables
- (names main saturation_fuzzing test_gas_properties)
+ (names main saturation_fuzzing test_gas_properties test_tez_repr)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
@@ -53,9 +53,14 @@
  (action (run %{exe:saturation_fuzzing.exe})))
 
 (rule
+ (alias runtest_test_tez_repr)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{exe:test_tez_repr.exe})))
+
+(rule
  (alias runtest)
  (package tezos-protocol-alpha-tests)
- (deps (alias runtest_proto_alpha) (alias runtest_saturation_fuzzing))
+ (deps (alias runtest_proto_alpha) (alias runtest_saturation_fuzzing) (alias runtest_test_tez_repr))
  (action (progn)))
 
 (rule
