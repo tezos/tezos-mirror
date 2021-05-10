@@ -49,16 +49,23 @@ end
 
 module Block = struct
   type t =
-    { hash : Block_hash.t; reception_time : Time.System.t; nonce : unit option }
+    { hash : Block_hash.t;
+      timestamp : Time.Protocol.t;
+      reception_time : Time.System.t;
+      nonce : unit option
+    }
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun { hash; reception_time; nonce } -> (hash, reception_time, nonce))
-      (fun (hash, reception_time, nonce) -> { hash; reception_time; nonce })
-      (obj3
+      (fun { hash; reception_time; timestamp; nonce } ->
+        (hash, reception_time, timestamp, nonce))
+      (fun (hash, reception_time, timestamp, nonce) ->
+        { hash; reception_time; timestamp; nonce })
+      (obj4
          (req "hash" Block_hash.encoding)
          (req "reception_time" Time.System.encoding)
+         (req "timestamp" Time.Protocol.encoding)
          (opt "nonce" unit))
 end
 
@@ -206,7 +213,7 @@ let extract_anomalies path level infos =
     | [] -> return_unit
     | _ :: _ -> dump_anomalies path level anomalies
 
-let dump_included_in_block path block_level block_hash reception_time
+let dump_included_in_block path block_level block_hash timestamp reception_time
     endorsers_pkhs =
   let open Lwt.Infix in
   (let endorsements_level = Int32.pred block_level in
@@ -275,7 +282,7 @@ let dump_included_in_block path block_level block_hash reception_time
       let () = files_in_use := (filename, mutex) :: !files_in_use in
       load filename encoding empty >>=? fun infos ->
       let blocks =
-        Block.{ hash = block_hash; reception_time; nonce = None }
+        Block.{ hash = block_hash; reception_time; timestamp; nonce = None }
         :: infos.blocks
       in
       let out =
@@ -358,7 +365,11 @@ let dump_received path ?unaccurate level items =
 
 type chunk =
   | Block of
-      Int32.t * Block_hash.t * Time.System.t * Signature.Public_key_hash.t list
+      Int32.t
+      * Block_hash.t
+      * Time.Protocol.t
+      * Time.System.t
+      * Signature.Public_key_hash.t list
   | Mempool of
       bool option
       * Int32.t
@@ -369,8 +380,14 @@ let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
 let launch prefix =
   Lwt_stream.iter_p
     (function
-      | Block (block_level, block, reception_time, pkhs) ->
-          dump_included_in_block prefix block_level block reception_time pkhs
+      | Block (block_level, block, timestamp, reception_time, pkhs) ->
+          dump_included_in_block
+            prefix
+            block_level
+            block
+            timestamp
+            reception_time
+            pkhs
       | Mempool (unaccurate, level, items) ->
           dump_received prefix ?unaccurate level items)
     chunk_stream
@@ -380,5 +397,6 @@ let stop () = chunk_feeder None
 let add_received ?unaccurate level items =
   chunk_feeder (Some (Mempool (unaccurate, level, items)))
 
-let add_block block_level block_hash reception_time pkhs =
-  chunk_feeder (Some (Block (block_level, block_hash, reception_time, pkhs)))
+let add_block block_level block_hash timestamp reception_time pkhs =
+  chunk_feeder
+    (Some (Block (block_level, block_hash, timestamp, reception_time, pkhs)))

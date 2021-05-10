@@ -202,6 +202,7 @@ let blocks_loop cctxt =
         0
       >>=? fun ops ->
       let block_level = header.Block_header.shell.Block_header.level in
+      let timestamp = header.Block_header.shell.Block_header.timestamp in
       (*_assert
           (check_level_in_endorsements (Int32.pred block_level) ops)
           __LOC__
@@ -223,7 +224,9 @@ let blocks_loop cctxt =
             | _ -> None)
           ops
       in
-      let () = Archiver.add_block block_level hash reception_time pks in
+      let () =
+        Archiver.add_block block_level hash timestamp reception_time pks
+      in
       return_unit)
     block_stream
     (ok ())
