@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Block_services = Protocol_client_context.Alpha_block_services
-open Tezos_protocol_008_PtEdo2Zk
+open Tezos_protocol_009_PsFLoren
 
 let endorsers_pk_at cctxt chain block =
   Protocol.Delegate_services.Endorsing_rights.get cctxt (chain, block)
@@ -90,8 +90,20 @@ let extract_endorsement infos
   match operation_content with
   | { Protocol.Main.protocol_data =
         Protocol.Alpha_context.Operation_data
-          ( { contents = Single (Endorsement { level }); signature = _ } as
-          protocol_data );
+          { contents =
+              Single
+                (Endorsement_with_slot
+                  { endorsement =
+                      { shell = _;
+                        protocol_data =
+                          { contents = Single (Endorsement { level });
+                            signature = _
+                          } as protocol_data
+                      };
+                    slot = _
+                  });
+            signature = _
+          };
       shell = { branch } as shell
     } ->
       let () =
@@ -220,8 +232,9 @@ let blocks_loop cctxt =
                 (Protocol.Apply_results.Operation_metadata
                   { contents =
                       Single_result
-                        (Protocol.Apply_results.Endorsement_result
-                          { delegate; _ })
+                        (Protocol.Apply_results.Endorsement_with_slot_result
+                          (Tezos_raw_protocol_009_PsFLoren.Apply_results
+                           .Endorsement_result { delegate; _ }))
                   }) ->
                 Some delegate
             | _ -> None)

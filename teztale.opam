@@ -9,7 +9,7 @@ depends: [
   "tezos-tooling" { with-test }
   "dune" { >= "1.11" }
   "tezos-client-base-unix"
-  "tezos-client-007-PsDELPH1"
+  "tezos-client-009-PsFLoren"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
