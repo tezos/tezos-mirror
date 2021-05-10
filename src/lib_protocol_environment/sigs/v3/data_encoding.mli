@@ -316,16 +316,17 @@ type 'a matching_function = 'a -> match_result
 
 and match_result
 
-val matched :
-  ?tag_size:[`Uint8 | `Uint16] -> int -> 'a encoding -> 'a -> match_result
+(* [tag_size] is not declared in the upstream library, instead, the expanded
+   polymorphic-variant type-expression is used as is. We include it in the
+   protocol environment to help coq-of-ocaml process the files. *)
+type tag_size = [`Uint8 | `Uint16]
+
+val matched : ?tag_size:tag_size -> int -> 'a encoding -> 'a -> match_result
 
 val matching :
-  ?tag_size:[`Uint8 | `Uint16] ->
-  't matching_function ->
-  't case list ->
-  't encoding
+  ?tag_size:tag_size -> 't matching_function -> 't case list -> 't encoding
 
-val union : ?tag_size:[`Uint8 | `Uint16] -> 't case list -> 't encoding
+val union : ?tag_size:tag_size -> 't case list -> 't encoding
 
 val def :
   string -> ?title:string -> ?description:string -> 't encoding -> 't encoding
