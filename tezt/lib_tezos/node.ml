@@ -345,12 +345,27 @@ let add_peer_with_id node peer =
   add_argument node (Peer peer) ;
   Lwt.return_unit
 
-let run ?(on_terminate = fun _ -> ()) node arguments =
+let run ?(on_terminate = fun _ -> ()) ?event_level node arguments =
   ( match node.status with
   | Not_running ->
       ()
   | Running _ ->
       Test.fail "node %s is already running" node.name ) ;
+  let event_level =
+    match event_level with
+    | Some level -> (
+      match String.lowercase_ascii level with
+      | "debug" | "info" | "notice" ->
+          event_level
+      | _ ->
+          Log.warn
+            "Node.run: Invalid argument event_level:%s. Possible values are: \
+             debug, info, and notice. Keeping default level (notice)."
+            level ;
+          None )
+    | None ->
+        None
+  in
   let arguments = node.persistent_state.arguments @ arguments in
   let arguments =
     "run" :: "--data-dir" :: node.persistent_state.data_dir
@@ -371,13 +386,14 @@ let run ?(on_terminate = fun _ -> ()) node arguments =
     unit
   in
   run
+    ?event_level
     node
     {ready = false; level = Unknown; identity = Unknown}
     arguments
     ~on_terminate
 
-let init ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port arguments
-    =
+let init ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port
+    ?event_level arguments =
   let node =
     create
       ?path
@@ -391,7 +407,7 @@ let init ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port arguments
   in
   let* () = identity_generate node in
   let* () = config_init node [] in
-  let* () = run node [] in
+  let* () = run ?event_level node [] in
   let* () = wait_for_ready node in
   return node
 

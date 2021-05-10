@@ -183,9 +183,16 @@ val spawn_config_init : t -> argument list -> Process.t
 (** Spawn [tezos-node run].
 
     The resulting promise is fulfilled as soon as the node has been spawned.
-    It continues running in the background. *)
+    It continues running in the background.
+
+    [event_level] specifies the verbosity of the file descriptor sink.
+    This must be at least ["notice"], which is the level of event
+    ["node_is_ready.v0"], needed for {!wait_for_ready}.
+    Possible values are therefore: ["debug"], ["info"], and ["notice"].
+    Other values are ignored (verbosity then stays at default ["notice"]). *)
 val run :
   ?on_terminate:(Unix.process_status -> unit) ->
+  ?event_level:string ->
   t ->
   argument list ->
   unit Lwt.t
@@ -283,6 +290,7 @@ val init :
   ?event_pipe:string ->
   ?net_port:int ->
   ?rpc_port:int ->
+  ?event_level:string ->
   argument list ->
   t Lwt.t
 
