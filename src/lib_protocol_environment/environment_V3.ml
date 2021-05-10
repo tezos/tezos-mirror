@@ -80,6 +80,9 @@ module type V3 = sig
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult =
             ('a, Error_monad.tztrace) result
+       and type Timelock.chest = Timelock.chest
+       and type Timelock.chest_key = Timelock.chest_key
+       and type Timelock.opening_result = Timelock.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
 
   type error += Ecoproto_error of Error_monad.error
@@ -189,6 +192,7 @@ struct
   module P256 = P256
   module Signature = Signature
   module Pvss_secp256k1 = Pvss_secp256k1
+  module Timelock = Timelock
 
   module S = struct
     module type T = Tezos_base.S.T

@@ -54,6 +54,7 @@
    v3/context_hash.mli
    v3/pvss_secp256k1.mli
    v3/sapling.mli
+   v3/timelock.mli
 
    ;; Tezos specifics
    v3/micheline.mli
