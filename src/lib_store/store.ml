@@ -2561,6 +2561,7 @@ module Unsafe = struct
     let genesis_block =
       Block_repr.create_genesis_block ~genesis genesis_context_hash
     in
+    let real_genesis_hash = Block_header.hash (Block.header genesis_block) in
     let new_head_descr =
       ( Block_repr.hash new_head_with_metadata,
         Block_repr.level new_head_with_metadata )
@@ -2651,7 +2652,10 @@ module Unsafe = struct
                 (* If we are importing a rolling snapshot then allow the
                    absence of block. *)
                 return_unit
-            | _ -> fail (Missing_activation_block (bh, protocol, history_mode)))
+            | _ ->
+                fail_unless
+                  (Block_hash.equal real_genesis_hash bh)
+                  (Missing_activation_block (bh, protocol, history_mode)))
         | (Some _block, None) -> return_unit
         | (Some block, Some commit_info) ->
             Context.check_protocol_commit_consistency
@@ -2815,9 +2819,13 @@ module Unsafe = struct
                         proto_levels)
                 else return proto_levels
             | _ ->
-                fail
+                fail_unless
+                  Compare.Int32.(transition_level = Block.level genesis_block)
                   (Missing_activation_block_legacy
-                     (transition_level, protocol_hash, history_mode)))
+                     (transition_level, protocol_hash, history_mode))
+                >>=? fun () ->
+                (* genesis commit info was already added *)
+                return proto_levels)
         | (Some block, None) ->
             return
               Protocol_levels.(
