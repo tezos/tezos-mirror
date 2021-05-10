@@ -26,45 +26,31 @@
 module Block_services = Protocol_client_context.Alpha_block_services
 open Tezos_protocol_009_PsFLoren
 
-let endorsers_pk_at cctxt chain block =
-  Protocol.Delegate_services.Endorsing_rights.get cctxt (chain, block)
+let dump_my_current_endorsements cctxt ?unaccurate ~full block level errors ops
+    =
+  Protocol.Delegate_services.Endorsing_rights.get
+    cctxt
+    (cctxt#chain, `Hash (block, 0))
   >>=? fun rights ->
-  List.map_ep
-    (fun Protocol.Delegate_services.Endorsing_rights.{ delegate; _ } ->
-      Protocol.Contract_services.manager_key cctxt (chain, block) delegate
-      >>=? fun x ->
-      Lwt.return (Option.value_e ~error:[Error_monad.Exn Not_found] x))
-    rights
-
-let dump_my_current_endorsements cctxt ?unaccurate ~full chain_id block level
-    errors ops =
-  endorsers_pk_at cctxt cctxt#chain (`Hash (block, 0)) >>=? fun pks ->
   let (items, missing) =
     List.fold_left
-      (fun (acc, pks) (delay, op) ->
-        match
-          List.partition
-            (fun delegate_pk ->
-              match
-                Protocol.Alpha_context.Operation.check_signature
-                  delegate_pk
-                  chain_id
-                  op
-              with
-              | Ok () -> true
-              | Error _ -> false)
-            pks
-        with
-        | (([] | _ :: _ :: _), _) -> assert false
-        | ([pk], pks') ->
-            ((Signature.Public_key.hash pk, errors, Some delay) :: acc, pks'))
-      ([], pks)
+      Protocol.Delegate_services.Endorsing_rights.(
+        fun (acc, rights) (delay, slot) ->
+          match
+            List.partition (fun right -> List.mem slot right.slots) rights
+          with
+          | (([] | _ :: _ :: _), _) -> assert false
+          | ([right], rights') ->
+              ((right.delegate, errors, Some delay) :: acc, rights'))
+      ([], rights)
       ops
   in
   let endorsements =
     if full then
       List.fold_left
-        (fun acc pk -> (Signature.Public_key.hash pk, [], None) :: acc)
+        (fun acc right ->
+          (right.Protocol.Delegate_services.Endorsing_rights.delegate, [], None)
+          :: acc)
         items
         missing
     else items
@@ -98,13 +84,13 @@ let extract_endorsement infos
                         protocol_data =
                           { contents = Single (Endorsement { level });
                             signature = _
-                          } as protocol_data
+                          }
                       };
-                    slot = _
+                    slot
                   });
             signature = _
           };
-      shell = { branch } as shell
+      shell = { branch }
     } ->
       let () =
         assert (
@@ -114,11 +100,10 @@ let extract_endorsement infos
               Block_hash.equal branch b'
               && Protocol.Alpha_context.Raw_level.equal level l' )
       in
-      ( Some (branch, level),
-        Some { Protocol.Alpha_context.Operation.shell; protocol_data } )
+      (Some (branch, level), Some slot)
   | _ -> (infos, None)
 
-let rec valid_endorsements_loop cctxt unaccurate chain_id =
+let rec valid_endorsements_loop cctxt unaccurate =
   Block_services.Mempool.monitor_operations
     cctxt
     ~chain:cctxt#chain
@@ -137,7 +122,7 @@ let rec valid_endorsements_loop cctxt unaccurate chain_id =
     op_stream
     (None, [])
   >>= fun out ->
-  let next = valid_endorsements_loop cctxt false chain_id in
+  let next = valid_endorsements_loop cctxt false in
   match out with
   | (None, _) -> next
   | (Some (block, level), timed_ops) ->
@@ -146,7 +131,6 @@ let rec valid_endorsements_loop cctxt unaccurate chain_id =
         cctxt
         ~unaccurate
         ~full:true
-        chain_id
         block
         level
         []
@@ -167,7 +151,7 @@ let errors_of_operation cctxt op =
           | Some (_, err) -> err
           | None -> [] ) )
 
-let rec invalid_endorsements_loop cctxt chain_id =
+let rec invalid_endorsements_loop cctxt =
   Block_services.Mempool.monitor_operations
     cctxt
     ~chain:cctxt#chain
@@ -191,14 +175,13 @@ let rec invalid_endorsements_loop cctxt chain_id =
     op_stream
     (ok [])
   >>=? fun out ->
-  let next = invalid_endorsements_loop cctxt chain_id in
+  let next = invalid_endorsements_loop cctxt in
   List.iter_ep
     (fun (block, level, errors, endorsement) ->
       let level = Protocol.Alpha_context.Raw_level.to_int32 level in
       dump_my_current_endorsements
         cctxt
         ~full:false
-        chain_id
         block
         level
         errors
@@ -253,11 +236,9 @@ let print_failures f =
 let main cctxt prefix =
   let dumper = Archiver.launch prefix in
   let main =
-    Shell_services.Chain.chain_id cctxt ~chain:cctxt#chain ()
-    >>=? fun chain_id ->
     Lwt.join
-      [ print_failures (valid_endorsements_loop cctxt true chain_id);
-        print_failures (invalid_endorsements_loop cctxt chain_id);
+      [ print_failures (valid_endorsements_loop cctxt true);
+        print_failures (invalid_endorsements_loop cctxt);
         print_failures (blocks_loop cctxt) ]
     >>= fun () ->
     let () = Archiver.stop () in
