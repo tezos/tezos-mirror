@@ -296,12 +296,16 @@ let commands network () =
     command
       ~group
       ~desc:"Get the storage of a contract."
-      no_options
+      (args1 (unparsing_mode_arg ~default:"Readable"))
       ( prefixes ["get"; "contract"; "storage"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
-        get_storage cctxt ~chain:cctxt#chain ~block:cctxt#block contract
+      (fun unparsing_mode (_, contract) (cctxt : Protocol_client_context.full) ->
+        Plugin.RPC.get_storage_normalized
+          cctxt
+          (cctxt#chain, cctxt#block)
+          ~contract
+          ~unparsing_mode
         >>=? function
         | None ->
             cctxt#error "This is not a smart contract."
@@ -337,7 +341,7 @@ let commands network () =
     command
       ~group
       ~desc:"Get a value in a big map."
-      no_options
+      (args1 (unparsing_mode_arg ~default:"Readable"))
       ( prefixes ["get"; "element"]
       @@ Clic.param
            ~name:"key"
@@ -350,25 +354,30 @@ let commands network () =
            ~desc:"identifier of the big_map"
            int_parameter
       @@ stop )
-      (fun () key id (cctxt : Protocol_client_context.full) ->
+      (fun unparsing_mode key id (cctxt : Protocol_client_context.full) ->
         get_big_map_value
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
           (Big_map.Id.parse_z (Z.of_int id))
           key
+          ~unparsing_mode
         >>=? fun value ->
         cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped value
         >>= fun () -> return_unit);
     command
       ~group
       ~desc:"Get the code of a contract."
-      no_options
+      (args1 (unparsing_mode_arg ~default:"Readable"))
       ( prefixes ["get"; "contract"; "code"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop )
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
-        get_script cctxt ~chain:cctxt#chain ~block:cctxt#block contract
+      (fun unparsing_mode (_, contract) (cctxt : Protocol_client_context.full) ->
+        Plugin.RPC.get_script_normalized
+          cctxt
+          (cctxt#chain, cctxt#block)
+          ~contract
+          ~unparsing_mode
         >>=? function
         | None ->
             cctxt#error "This is not a smart contract."
