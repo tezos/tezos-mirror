@@ -24,244 +24,241 @@
 (*****************************************************************************)
 
 open Store_types
+include Internal_event.Simple
 
-module Event = struct
-  include Internal_event.Simple
+let section = ["node"; "store"]
 
-  let section = ["node"; "store"]
+(* Info *)
+let set_head =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"set_head"
+    ~msg:"{block} set as new head"
+    ~pp1:pp_block_descriptor
+    ("block", block_descriptor_encoding)
 
-  (* Info *)
-  let set_head =
-    declare_1
-      ~section
-      ~level:Info
-      ~name:"set_head"
-      ~msg:"{block} set as new head"
-      ~pp1:pp_block_descriptor
-      ("block", block_descriptor_encoding)
+let set_checkpoint =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"set_checkpoint"
+    ~msg:"checkpoint updated to {new_checkpoint}"
+    ~pp1:pp_block_descriptor
+    ("new_checkpoint", block_descriptor_encoding)
 
-  let set_checkpoint =
-    declare_1
-      ~section
-      ~level:Info
-      ~name:"set_checkpoint"
-      ~msg:"checkpoint updated to {new_checkpoint}"
-      ~pp1:pp_block_descriptor
-      ("new_checkpoint", block_descriptor_encoding)
+let set_target =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"set_target"
+    ~msg:"the target was updated to {new_target}"
+    ~pp1:pp_block_descriptor
+    ("new_target", block_descriptor_encoding)
 
-  let set_target =
-    declare_1
-      ~section
-      ~level:Info
-      ~name:"set_target"
-      ~msg:"the target was updated to {new_target}"
-      ~pp1:pp_block_descriptor
-      ("new_target", block_descriptor_encoding)
+let set_savepoint =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"set_savepoint"
+    ~msg:"the savepoint was updated to {new_savepoint}"
+    ~pp1:pp_block_descriptor
+    ("new_savepoint", block_descriptor_encoding)
 
-  let set_savepoint =
-    declare_1
-      ~section
-      ~level:Info
-      ~name:"set_savepoint"
-      ~msg:"the savepoint was updated to {new_savepoint}"
-      ~pp1:pp_block_descriptor
-      ("new_savepoint", block_descriptor_encoding)
+let set_caboose =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"set_caboose"
+    ~msg:"the caboose was updated to {new_caboose}"
+    ~pp1:pp_block_descriptor
+    ("new_caboose", block_descriptor_encoding)
 
-  let set_caboose =
-    declare_1
-      ~section
-      ~level:Info
-      ~name:"set_caboose"
-      ~msg:"the caboose was updated to {new_caboose}"
-      ~pp1:pp_block_descriptor
-      ("new_caboose", block_descriptor_encoding)
+let store_block =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"store_block"
+    ~msg:"block {block} was stored"
+    ~pp1:pp_block_descriptor
+    ("block", block_descriptor_encoding)
 
-  let store_block =
-    declare_1
-      ~section
-      ~level:Info
-      ~name:"store_block"
-      ~msg:"block {block} was stored"
-      ~pp1:pp_block_descriptor
-      ("block", block_descriptor_encoding)
+(* Notice*)
+let fork_testchain =
+  declare_4
+    ~section
+    ~level:Notice
+    ~name:"fork_testchain"
+    ~msg:
+      "the test chain {chain_id} for protocol {protocol_hash} with genesis \
+       block hash {genesis_hash} was initialized from {fork_block} and is now \
+       registered in the store"
+    ~pp1:Chain_id.pp
+    ("chain_id", Chain_id.encoding)
+    ~pp2:Protocol_hash.pp
+    ("protocol_hash", Protocol_hash.encoding)
+    ~pp3:Block_hash.pp
+    ("genesis_hash", Block_hash.encoding)
+    ~pp4:pp_block_descriptor
+    ("fork_block", block_descriptor_encoding)
 
-  (* Notice*)
-  let fork_testchain =
-    declare_4
-      ~section
-      ~level:Notice
-      ~name:"fork_testchain"
-      ~msg:
-        "the test chain {chain_id} for protocol {protocol_hash} with genesis \
-         block hash {genesis_hash} was initialized from {fork_block} and is \
-         now registered in the store"
-      ~pp1:Chain_id.pp
-      ("chain_id", Chain_id.encoding)
-      ~pp2:Protocol_hash.pp
-      ("protocol_hash", Protocol_hash.encoding)
-      ~pp3:Block_hash.pp
-      ("genesis_hash", Block_hash.encoding)
-      ~pp4:pp_block_descriptor
-      ("fork_block", block_descriptor_encoding)
+let pp_int32 fmt i = Format.fprintf fmt "%ld" i
 
-  let pp_int32 fmt i = Format.fprintf fmt "%ld" i
+let start_merging_stores =
+  declare_1
+    ~section
+    ~level:Notice
+    ~name:"start_merging_stores"
+    ~msg:"merging store up to block level {lafl}"
+    ~pp1:pp_int32
+    ("lafl", Data_encoding.int32)
 
-  let start_merging_stores =
-    declare_1
-      ~section
-      ~level:Notice
-      ~name:"start_merging_stores"
-      ~msg:"merging store up to block level {lafl}"
-      ~pp1:pp_int32
-      ("lafl", Data_encoding.int32)
+let end_merging_stores =
+  declare_1
+    ~section
+    ~level:Notice
+    ~name:"end_merging_stores"
+    ~msg:"store was successfully merged in {time}"
+    ~pp1:Time.System.Span.pp_hum
+    ("time", Time.System.Span.encoding)
 
-  let end_merging_stores =
-    declare_1
-      ~section
-      ~level:Notice
-      ~name:"end_merging_stores"
-      ~msg:"store was successfully merged in {time}"
-      ~pp1:Time.System.Span.pp_hum
-      ("time", Time.System.Span.encoding)
+let try_waiting_for_merge_termination =
+  declare_0
+    ~section
+    ~level:Notice
+    ~name:"try_waiting_for_merge_termination"
+    ~msg:"try waiting for the store's merge completion"
+    ()
 
-  let try_waiting_for_merge_termination =
-    declare_0
-      ~section
-      ~level:Notice
-      ~name:"try_waiting_for_merge_termination"
-      ~msg:"try waiting for the store's merge completion"
-      ()
+let switch_history_mode =
+  declare_2
+    ~section
+    ~level:Notice
+    ~name:"switch_history_mode"
+    ~msg:"history mode successfully switched from {old} to {new}"
+    ~pp1:History_mode.pp
+    ("old", History_mode.encoding)
+    ~pp2:History_mode.pp
+    ("new", History_mode.encoding)
 
-  let switch_history_mode =
-    declare_2
-      ~section
-      ~level:Notice
-      ~name:"switch_history_mode"
-      ~msg:"history mode successfully switched from {old} to {new}"
-      ~pp1:History_mode.pp
-      ("old", History_mode.encoding)
-      ~pp2:History_mode.pp
-      ("new", History_mode.encoding)
+let store_is_consistent =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"store_is_consistent"
+    ~msg:"the store is consistent"
+    ()
 
-  let store_is_consistent =
-    declare_0
-      ~section
-      ~level:Info
-      ~name:"store_is_consistent"
-      ~msg:"the store is consistent"
-      ()
+let inconsistent_store =
+  declare_1
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"inconsistent_store"
+    ~msg:"the store is in an inconsistent state: {errs}"
+    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_error)
+    ("errs", Error_monad.trace_encoding)
 
-  let inconsistent_store =
-    declare_1
-      ~section
-      ~level:Internal_event.Notice
-      ~name:"inconsistent_store"
-      ~msg:"the store is in an inconsistent state: {errs}"
-      ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_error)
-      ("errs", Error_monad.trace_encoding)
+let fix_store =
+  declare_0
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"fix_store"
+    ~msg:"attempting to restore the store's consistency..."
+    ()
 
-  let fix_store =
-    declare_0
-      ~section
-      ~level:Internal_event.Notice
-      ~name:"fix_store"
-      ~msg:"attempting to restore the store's consistency..."
-      ()
+let fix_floating_stores =
+  declare_0
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"fix_floating_stores"
+    ~msg:"the consistency of the floating stores was restored"
+    ()
 
-  let fix_floating_stores =
-    declare_0
-      ~section
-      ~level:Internal_event.Notice
-      ~name:"fix_floating_stores"
-      ~msg:"the consistency of the floating stores was restored"
-      ()
+let fix_head =
+  declare_1
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"fix_head"
+    ~msg:"updating head with the fittest block present in the store: {new}"
+    ~pp1:pp_block_descriptor
+    ("new", block_descriptor_encoding)
 
-  let fix_head =
-    declare_1
-      ~section
-      ~level:Internal_event.Notice
-      ~name:"fix_head"
-      ~msg:"updating head with the fittest block present in the store: {new}"
-      ~pp1:pp_block_descriptor
-      ("new", block_descriptor_encoding)
+let fix_cementing_highwatermark =
+  let option_pp ~default pp fmt = function
+    | None -> Format.fprintf fmt "%s" default
+    | Some x -> Format.fprintf fmt "%a" pp x
+  in
+  declare_1
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"fix_cementing_highwatermark"
+    ~msg:"updating cementing highwatermark with: {new}"
+    ~pp1:(option_pp ~default:"None" (fun fmt -> Format.fprintf fmt "%ld"))
+    ("new", Data_encoding.(option int32))
 
-  let fix_cementing_highwatermark =
-    let option_pp ~default pp fmt = function
-      | None -> Format.fprintf fmt "%s" default
-      | Some x -> Format.fprintf fmt "%a" pp x
-    in
-    declare_1
-      ~section
-      ~level:Internal_event.Notice
-      ~name:"fix_cementing_highwatermark"
-      ~msg:"updating cementing highwatermark with: {new}"
-      ~pp1:(option_pp ~default:"None" (fun fmt -> Format.fprintf fmt "%ld"))
-      ("new", Data_encoding.(option int32))
+let fix_checkpoint =
+  declare_1
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"fix_checkpoint"
+    ~msg:"updating checkpoint with: {new}"
+    ~pp1:pp_block_descriptor
+    ("new", block_descriptor_encoding)
 
-  let fix_checkpoint =
-    declare_1
-      ~section
-      ~level:Internal_event.Notice
-      ~name:"fix_checkpoint"
-      ~msg:"updating checkpoint with: {new}"
-      ~pp1:pp_block_descriptor
-      ("new", block_descriptor_encoding)
+let fix_savepoint =
+  declare_1
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"fix_savepoint"
+    ~msg:
+      "updating savepoint with the lowest block with metadata found in the \
+       store: {new}"
+    ~pp1:pp_block_descriptor
+    ("new", block_descriptor_encoding)
 
-  let fix_savepoint =
-    declare_1
-      ~section
-      ~level:Internal_event.Notice
-      ~name:"fix_savepoint"
-      ~msg:
-        "updating savepoint with the lowest block with metadata found in the \
-         store: {new}"
-      ~pp1:pp_block_descriptor
-      ("new", block_descriptor_encoding)
+let fix_caboose =
+  declare_1
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"fix_caboose"
+    ~msg:"updating caboose with the lowest block found in the store: {new}"
+    ~pp1:pp_block_descriptor
+    ("new", block_descriptor_encoding)
 
-  let fix_caboose =
-    declare_1
-      ~section
-      ~level:Internal_event.Notice
-      ~name:"fix_caboose"
-      ~msg:"updating caboose with the lowest block found in the store: {new}"
-      ~pp1:pp_block_descriptor
-      ("new", block_descriptor_encoding)
+let store_was_fixed =
+  declare_0
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"store_was_fixed"
+    ~msg:"the store was successfully fixed!"
+    ()
 
-  let store_was_fixed =
-    declare_0
-      ~section
-      ~level:Internal_event.Notice
-      ~name:"store_was_fixed"
-      ~msg:"the store was successfully fixed!"
-      ()
+let recover_merge =
+  declare_0
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"recovering_merge"
+    ~msg:"recovering from an interrupted store merge"
+    ()
 
-  let recover_merge =
-    declare_0
-      ~section
-      ~level:Internal_event.Notice
-      ~name:"recovering_merge"
-      ~msg:"recovering from an interrupted store merge"
-      ()
+(* Error *)
+let merge_error =
+  declare_3
+    ~section
+    ~level:Internal_event.Error
+    ~name:"merge_error"
+    ~msg:"merge from {start} to {end} failed: {message}"
+    ~pp1:pp_int32
+    ("start", Data_encoding.int32)
+    ~pp2:pp_int32
+    ("end", Data_encoding.int32)
+    ~pp3:Format.pp_print_string
+    ("message", Data_encoding.string)
 
-  (* Error *)
-  let merge_error =
-    declare_3
-      ~section
-      ~level:Internal_event.Error
-      ~name:"merge_error"
-      ~msg:"merge from {start} to {end} failed: {message}"
-      ~pp1:pp_int32
-      ("start", Data_encoding.int32)
-      ~pp2:pp_int32
-      ("end", Data_encoding.int32)
-      ~pp3:Format.pp_print_string
-      ("message", Data_encoding.string)
-
-  let notify_merge_error =
-    declare_0
-      ~section
-      ~level:Internal_event.Error
-      ~name:"notify_merge_error"
-      ~msg:"store merge has failed, restart the node to restore the consistency"
-      ()
-end
+let notify_merge_error =
+  declare_0
+    ~section
+    ~level:Internal_event.Error
+    ~name:"notify_merge_error"
+    ~msg:"store merge has failed, restart the node to restore the consistency"
+    ()

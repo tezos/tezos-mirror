@@ -1049,7 +1049,8 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
       let new_head_lafl =
         Block_repr.last_allowed_fork_level new_head_metadata
       in
-      Store_events.Event.(emit start_merging_stores) new_head_lafl >>= fun () ->
+
+      Store_events.(emit start_merging_stores) new_head_lafl >>= fun () ->
       check_store_consistency block_store ~cementing_highwatermark
       >>=? fun () ->
       compute_lowest_bound_to_preserve_in_floating
@@ -1074,7 +1075,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                   ~on_error:(fun err ->
                     (* Failures should be handled using [get_merge_status] *)
                     let msg = Format.asprintf "%a" pp_print_error err in
-                    Store_events.Event.(emit merge_error)
+                    Store_events.(emit merge_error)
                       (cementing_highwatermark, new_head_lafl, msg)
                     >>= fun () -> on_error (Merge_error :: err))
                   (fun () ->
@@ -1112,8 +1113,8 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
             >>=? fun () ->
             let merge_end = Systime_os.now () in
             let merging_time = Ptime.diff merge_end merge_start in
-            Store_events.Event.(emit end_merging_stores) merging_time
-            >>= fun () -> return_unit
+            Store_events.(emit end_merging_stores) merging_time >>= fun () ->
+            return_unit
           in
           block_store.merging_thread <- Some (new_head_lafl, merging_thread) ;
           (* Temporary stores in place and the merging thread was
@@ -1139,7 +1140,7 @@ let may_recover_merge block_store =
           Stored_data.get block_store.status_data >>= function
           | Idle -> return_unit
           | Merging ->
-              Store_events.Event.(emit recover_merge ()) >>= fun () ->
+              Store_events.(emit recover_merge ()) >>= fun () ->
               Lwt_list.iter_s
                 Floating_block_store.close
                 (block_store.rw_floating_block_store
@@ -1254,8 +1255,7 @@ let close block_store =
   (match get_merge_status block_store with
   | Not_running | Merge_failed _ -> Lwt.return_unit
   | Running ->
-      Store_events.Event.(emit try_waiting_for_merge_termination) ()
-      >>= fun () ->
+      Store_events.(emit try_waiting_for_merge_termination) () >>= fun () ->
       Lwt_unix.with_timeout 5. (fun () ->
           await_merging block_store >>= fun () -> Lwt.return_unit))
   >>= fun () ->

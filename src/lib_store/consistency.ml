@@ -25,7 +25,6 @@
 
 open Store_types
 open Store_errors
-open Store_events
 
 (* A non-empty store is considered consistent if the following
    invariants hold:
@@ -192,7 +191,7 @@ let fix_floating_stores chain_dir =
     (fun kind -> Floating_block_store.fix_integrity chain_dir kind)
     existing_floating_stores
   >>=? fun () ->
-  Event.(emit fix_floating_stores ()) >>= fun () -> return_unit
+  Store_events.(emit fix_floating_stores ()) >>= fun () -> return_unit
 
 (* [fix_head ~chain_dir block_store genesis_block] iter through the
    floating blocks and set, as head, the fittest block found. *)
@@ -256,7 +255,8 @@ let fix_head block_store genesis_block =
    | None -> fail (Corrupted_store "infered head must have metadata")
    | Some _ -> return_unit)
   >>=? fun () ->
-  Event.(emit fix_head (Block_repr.descriptor head)) >>= fun () -> return head
+  Store_events.(emit fix_head (Block_repr.descriptor head)) >>= fun () ->
+  return head
 
 (* [fix_savepoint_and_caboose ~chain_dir block_store head]
    Fix the savepoint by setting it to the lowest block with metadata.
@@ -447,7 +447,8 @@ let fix_savepoint_and_caboose chain_dir block_store head =
        let savepoint = (Block_repr.hash b, Block_repr.level b) in
        Stored_data.write_file (Naming.savepoint_file chain_dir) savepoint
        >>=? fun () ->
-       Event.(emit fix_savepoint savepoint) >>= fun () -> return savepoint
+       Store_events.(emit fix_savepoint savepoint) >>= fun () ->
+       return savepoint
    | None ->
        (* Assumption: the head is valid. Thus, at least the head
           (with metadata) must be a valid candidate for the
@@ -466,7 +467,7 @@ let fix_savepoint_and_caboose chain_dir block_store head =
        let caboose = (Block_repr.hash b, Block_repr.level b) in
        Stored_data.write_file (Naming.caboose_file chain_dir) caboose
        >>=? fun () ->
-       Event.(emit fix_caboose caboose) >>= fun () -> return caboose
+       Store_events.(emit fix_caboose caboose) >>= fun () -> return caboose
    | None -> fail (Corrupted_store "Failed to find a valid caboose"))
   >>=? fun caboose -> return (savepoint, caboose)
 
@@ -516,7 +517,7 @@ let fix_checkpoint chain_dir block_store head =
     >>=? fun () -> return checkpoint
   in
   set_checkpoint head >>=? fun checkpoint ->
-  Event.(emit fix_checkpoint checkpoint) >>= fun () -> return checkpoint
+  Store_events.(emit fix_checkpoint checkpoint) >>= fun () -> return checkpoint
 
 (* [fix_protocol_levels context_index block_store genesis_header]
    fixes protocol levels table by searching for all the protocol
@@ -820,8 +821,8 @@ let fix_cementing_highwatermark block_store =
   let cementing_highwatermark =
     Cemented_block_store.get_highest_cemented_level cemented_block_store
   in
-  Event.(emit fix_cementing_highwatermark cementing_highwatermark) >>= fun () ->
-  Lwt.return cementing_highwatermark
+  Store_events.(emit fix_cementing_highwatermark cementing_highwatermark)
+  >>= fun () -> Lwt.return cementing_highwatermark
 
 (* [fix_consistency store_dir context_index]
    aims to fix a store in an inconsistent state. The fixing steps are:
@@ -839,7 +840,7 @@ let fix_cementing_highwatermark block_store =
     - context is valid and available
     - block store is valid and available *)
 let fix_consistency chain_dir context_index genesis =
-  Event.(emit fix_store ()) >>= fun () ->
+  Store_events.(emit fix_store ()) >>= fun () ->
   (* We suppose that the genesis block is accessible *)
   trace
     (Corrupted_store "The genesis block is not available in the store.")
