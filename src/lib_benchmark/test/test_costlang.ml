@@ -78,7 +78,12 @@ let test_eval1 () =
     Subst
       (struct
         let subst x =
-          match List.assoc x [(fv_v1, 88.); (fv_v2, 4.); (fv_const, -10.)] with
+          match
+            List.assoc
+              ~equal:Free_variable.equal
+              x
+              [(fv_v1, 88.); (fv_v2, 4.); (fv_const, -10.)]
+          with
           | Some v ->
               v
           | None ->
@@ -96,7 +101,12 @@ let test_eval2 () =
     Subst
       (struct
         let subst x =
-          match List.assoc x [(fv_v1, 2.); (fv_v2, 4.); (fv_const, -10.)] with
+          match
+            List.assoc
+              ~equal:Free_variable.equal
+              x
+              [(fv_v1, 2.); (fv_v2, 4.); (fv_const, -10.)]
+          with
           | Some v ->
               v
           | None ->

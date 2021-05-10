@@ -27,9 +27,7 @@ open Protocol
 open Alpha_context
 
 module ContractEntity = struct
-  type t = Contract.t
-
-  let encoding = Contract.encoding
+  include Contract (* t, Compare, encoding *)
 
   let of_source s =
     Contract.of_b58check s |> Environment.wrap_tzresult

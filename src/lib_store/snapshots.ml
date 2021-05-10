@@ -1912,7 +1912,8 @@ struct
                     let src_protocol_file =
                       Naming.protocol_file protocol_store_dir ph
                     in
-                    ( if List.mem ph proto_to_export then
+                    ( if List.mem ~equal:Protocol_hash.equal ph proto_to_export
+                    then
                       Exporter.copy_protocol
                         snapshot_exporter
                         ~src:(Naming.file_path src_protocol_file)

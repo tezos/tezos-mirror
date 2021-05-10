@@ -49,7 +49,7 @@ let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz1" 36
 open Hacl.Ed25519
 
 module Public_key = struct
-  type t = Hacl.public key
+  type t = Hacl.public Hacl.Ed25519.key
 
   let name = "Ed25519.Public_key"
 
@@ -84,7 +84,7 @@ module Public_key = struct
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare = compare
+    let compare = Hacl.Ed25519.compare
   end)
 
   include Helpers.MakeRaw (struct

@@ -41,6 +41,8 @@ type parsed = {
         expression. *)
 }
 
+val compare_parsed : parsed -> parsed -> int
+
 val parse_toplevel :
   ?check:bool -> string -> parsed Micheline_parser.parsing_result
 

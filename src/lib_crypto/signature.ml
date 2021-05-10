@@ -305,8 +305,14 @@ module Public_key = struct
           Secp256k1.Public_key.compare x y
       | (P256 x, P256 y) ->
           P256.Public_key.compare x y
-      | _ ->
-          Stdlib.compare a b
+      | (Ed25519 _, (Secp256k1 _ | P256 _)) ->
+          -1
+      | (Secp256k1 _, P256 _) ->
+          -1
+      | (P256 _, (Secp256k1 _ | Ed25519 _)) ->
+          1
+      | (Secp256k1 _, Ed25519 _) ->
+          1
   end)
 
   type Base58.data += Data of t (* unused *)

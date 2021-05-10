@@ -38,6 +38,8 @@ module type Entity = sig
   val to_source : t -> string tzresult Lwt.t
 
   val name : string
+
+  include Compare.S with type t := t
 end
 
 module type Alias = sig
@@ -129,12 +131,12 @@ module Alias (Entity : Entity) = struct
     | Error _ -> return_nil | Ok list -> return (List.map fst list)
 
   let find_opt (wallet : #wallet) name =
-    load wallet >|=? fun list -> List.assoc name list
+    load wallet >|=? fun list -> List.assoc ~equal:String.equal name list
 
   let find (wallet : #wallet) name =
     load wallet
     >>=? fun list ->
-    match List.assoc name list with
+    match List.assoc ~equal:String.equal name list with
     | Some v ->
         return v
     | None ->
@@ -142,16 +144,19 @@ module Alias (Entity : Entity) = struct
 
   let rev_find (wallet : #wallet) v =
     load wallet
-    >|=? fun list -> Option.map fst @@ List.find (fun (_, v') -> v = v') list
+    >|=? fun list ->
+    Option.map fst @@ List.find (fun (_, v') -> Entity.(v = v')) list
 
   let rev_find_all (wallet : #wallet) v =
     load wallet
     >>=? fun list ->
     return
-      (List.filter_map (fun (n, v') -> if v = v' then Some n else None) list)
+      (List.filter_map
+         (fun (n, v') -> if Entity.(v = v') then Some n else None)
+         list)
 
   let mem (wallet : #wallet) name =
-    load wallet >|=? fun list -> List.mem_assoc name list
+    load wallet >|=? fun list -> List.mem_assoc ~equal:String.equal name list
 
   let add ~force (wallet : #wallet) name value =
     let keep = ref false in
@@ -161,15 +166,15 @@ module Alias (Entity : Entity) = struct
     else
       List.iter_es
         (fun (n, v) ->
-          if n = name && v = value then (
+          if Compare.String.(n = name) && Entity.(v = value) then (
             keep := true ;
             return_unit )
-          else if n = name && v <> value then
+          else if Compare.String.(n = name) && Entity.(v <> value) then
             failwith
               "another %s is already aliased as %s, use --force to update"
               Entity.name
               n
-          else if n <> name && v = value then
+          else if Compare.String.(n <> name) && Entity.(v = value) then
             failwith
               "this %s is already aliased as %s, use --force to insert \
                duplicate"
@@ -178,7 +183,7 @@ module Alias (Entity : Entity) = struct
           else return_unit)
         list )
     >>=? fun () ->
-    let list = List.filter (fun (n, _) -> n <> name) list in
+    let list = List.filter (fun (n, _) -> not (String.equal n name)) list in
     let list = (name, value) :: list in
     if !keep then return_unit
     else wallet#write Entity.name list wallet_encoding
@@ -186,14 +191,16 @@ module Alias (Entity : Entity) = struct
   let del (wallet : #wallet) name =
     load wallet
     >>=? fun list ->
-    let list = List.filter (fun (n, _) -> n <> name) list in
+    let list = List.filter (fun (n, _) -> not (String.equal n name)) list in
     wallet#write Entity.name list wallet_encoding
 
   let update (wallet : #wallet) name value =
     load wallet
     >>=? fun list ->
     let list =
-      List.map (fun (n, v) -> (n, if n = name then value else v)) list
+      List.map
+        (fun (n, v) -> (n, if String.equal n name then value else v))
+        list
     in
     wallet#write Entity.name list wallet_encoding
 
@@ -216,7 +223,7 @@ module Alias (Entity : Entity) = struct
     else
       List.iter_es
         (fun (n, v) ->
-          if n = s then
+          if String.equal n s then
             Entity.to_source v
             >>=? fun value ->
             failwith

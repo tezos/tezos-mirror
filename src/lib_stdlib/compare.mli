@@ -135,3 +135,15 @@ module Option (P : COMPARABLE) : S with type t = P.t option
 
 module Result (Ok : COMPARABLE) (Error : COMPARABLE) :
   S with type t = (Ok.t, Error.t) result
+
+(** {2 Building blocks} *)
+
+(** [or_else c f] is [c] if [c <> 0] or [f ()] otherwise.
+
+    The intended use is
+{[
+let compare (foo_a, bar_a) (foo_b, bar_b) =
+  or_else (Foo.compare foo_a foo_b) (fun () -> Bar.compare bar_a bar_b)
+]}
+*)
+val or_else : int -> (unit -> int) -> int

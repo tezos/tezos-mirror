@@ -211,7 +211,7 @@ let may_update_protocol_table legacy_chain_store chain_store ~prev_block ~block
     >>= fun protocol_table ->
     let (proto_hash, transition_level) : Legacy_store.Chain.Protocol_info.value
         =
-      List.assoc proto_level protocol_table
+      List.assoc ~equal:Int.equal proto_level protocol_table
       |> WithExceptions.Option.get ~loc:__LOC__
     in
     assert (Int32.equal transition_level block_level) ;

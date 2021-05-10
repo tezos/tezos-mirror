@@ -600,13 +600,14 @@ module Consensus = struct
     let trial =
       if random = 0 then "a" else Char.chr (random mod 256) |> String.make 1
     in
-    if List.mem trial siblings || trial = key then String.concat "" siblings
+    if List.mem ~equal:String.equal trial siblings || trial = key then
+      String.concat "" siblings
     else trial
 
   let mk_rogue_key siblings key random =
-    assert (not (List.mem key siblings)) ;
+    assert (not (List.mem ~equal:String.equal key siblings)) ;
     let res = mk_rogue_key siblings key random in
-    assert (not (List.mem res siblings)) ;
+    assert (not (List.mem ~equal:String.equal res siblings)) ;
     assert (res <> key) ;
     res
 

@@ -255,6 +255,7 @@ module Term = struct
   let network_parser =
     let parse_network_name s =
       List.assoc_opt
+        ~equal:String.equal
         (String.lowercase_ascii s)
         Node_config_file.builtin_blockchain_networks
       |> Option.map (fun net -> Result.ok (BuiltIn net))

@@ -426,7 +426,8 @@ let make_tests speed genesis_parameters =
         (product
            nb_initial_blocks_list
            ( map export_blocks_levels nb_initial_blocks_list
-           |> flatten |> List.sort_uniq compare ))
+           |> flatten
+           |> List.sort_uniq Stdlib.compare ))
         (product exporter_history_modes [false; true]))
     |> List.map (fun ((a, b), (c, d)) -> (a, b, c, d))
   in

@@ -73,11 +73,16 @@ let announced ~chain_name ~distributed_db_versions ~p2p_versions =
     p2p_version = greatest p2p_versions;
   }
 
-let may_select_version accepted_versions remote_version motive =
+let may_select_version ~compare accepted_versions remote_version motive =
   let open Error_monad in
   let best_local_version = greatest accepted_versions in
-  if best_local_version <= remote_version then ok best_local_version
-  else if List.mem remote_version accepted_versions then ok remote_version
+  if compare best_local_version remote_version <= 0 then ok best_local_version
+  else if
+    List.mem
+      ~equal:(fun a b -> compare a b = 0)
+      remote_version
+      accepted_versions
+  then ok remote_version
   else P2p_rejection.rejecting motive
 
 let select ~chain_name ~distributed_db_versions ~p2p_versions remote =
@@ -88,11 +93,16 @@ let select ~chain_name ~distributed_db_versions ~p2p_versions remote =
   else
     let open Error_monad in
     may_select_version
+      ~compare:Distributed_db_version.compare
       distributed_db_versions
       remote.distributed_db_version
       Deprecated_distributed_db_version
     >>? fun distributed_db_version ->
-    may_select_version p2p_versions remote.p2p_version Deprecated_p2p_version
+    may_select_version
+      ~compare:P2p_version.compare
+      p2p_versions
+      remote.p2p_version
+      Deprecated_p2p_version
     >>? fun p2p_version -> ok {chain_name; distributed_db_version; p2p_version}
 
 let () = Data_encoding.Registration.register ~pp encoding

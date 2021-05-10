@@ -103,7 +103,8 @@ let get_next_baker_excluding excludes block =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
-           not (List.mem delegate excludes))
+           not
+             (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
          bakers
   in
   (pkh, priority, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)

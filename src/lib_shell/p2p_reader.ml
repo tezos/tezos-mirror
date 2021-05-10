@@ -85,34 +85,28 @@ let may_handle_global state chain_id f =
 
 let find_pending_operations {peer_active_chains; _} h i =
   Chain_id.Table.to_seq_values peer_active_chains
-  |> Seq.find (fun chain_db ->
+  |> Seq.filter (fun chain_db ->
          Distributed_db_requester.Raw_operations.pending
            chain_db.operations_db
            (h, i))
+  |> Seq.first
 
 let find_pending_operation {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains
-  |> Seq.find (fun chain_db ->
+  |> Seq.filter (fun chain_db ->
          Distributed_db_requester.Raw_operation.pending chain_db.operation_db h)
+  |> Seq.first
 
 let read_operation state h =
-  (* NOTE: to optimise this into an early-return map-and-search we need either a
-     special [Seq.find_map : ('a -> 'b option) -> 'a Seq.t -> 'b option]
-     or we need a [Seq.map_s] that is lazy. *)
-  Chain_id.Table.fold_s
-    (fun chain_id chain_db acc ->
-      match acc with
-      | Some _ ->
-          Lwt.return acc
-      | None -> (
-          Distributed_db_requester.Raw_operation.read_opt
-            chain_db.operation_db
-            h
-          >>= function
-          | None -> Lwt.return_none | Some bh -> Lwt.return_some (chain_id, bh)
-          ))
-    state.active_chains
-    None
+  (* Remember that seqs are lazy. The table is only traversed until a match is
+     found, the rest is not explored. *)
+  Seq_s.of_seq (Chain_id.Table.to_seq state.active_chains)
+  |> Seq_s.filter_map_s (fun (chain_id, chain_db) ->
+         Distributed_db_requester.Raw_operation.read_opt
+           chain_db.operation_db
+           h
+         >|= Option.map (fun bh -> (chain_id, bh)))
+  |> Seq_s.first
 
 let read_block {disk; _} h =
   Store.all_chain_stores disk
@@ -154,10 +148,11 @@ let read_predecessor_header {disk; _} h offset =
 
 let find_pending_block_header {peer_active_chains; _} h =
   Chain_id.Table.to_seq_values peer_active_chains
-  |> Seq.find (fun chain_db ->
+  |> Seq.filter (fun chain_db ->
          Distributed_db_requester.Raw_block_header.pending
            chain_db.block_header_db
            h)
+  |> Seq.first
 
 let deactivate gid chain_db =
   chain_db.callback.disconnection gid ;

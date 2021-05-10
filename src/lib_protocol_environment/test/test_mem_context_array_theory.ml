@@ -51,6 +51,9 @@ open Lib_test.Qcheck_helpers
 
 type key = Context.key
 
+let equal_key : key -> key -> bool =
+ fun (a : string list) (b : string list) -> Stdlib.( = ) a b
+
 type value = Context.value
 
 (** Using [QCheck.small_list] for performance reasons: using [QCheck.list] here
@@ -110,7 +113,7 @@ let test_domain_spec (ctxt, k) =
     qcheck_eq
       ~pp:Format.pp_print_bool
       (Lwt_main.run @@ Context.mem ctxt k)
-      (List.mem k domain)
+      (List.mem ~equal:equal_key k domain)
 
 (* Tests that (get (set m k v) k) equals v.
    This is the first axiom of array theory *)
@@ -147,7 +150,8 @@ let test_set_domain (ctxt, (k, v)) =
   let ctxt' = Lwt_main.run @@ Context.add ctxt k v in
   let domain' = Lwt_main.run @@ Test_mem_context.domain ctxt' in
   List.for_all
-    (fun in_domain' -> in_domain' = k || List.mem in_domain' domain)
+    (fun in_domain' ->
+      equal_key in_domain' k || List.mem ~equal:equal_key in_domain' domain)
     domain'
 
 let () =

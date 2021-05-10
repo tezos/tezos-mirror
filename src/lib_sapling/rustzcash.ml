@@ -84,6 +84,8 @@ module T : Rustzcash_sig.T = struct
 
   type diversifier_index = Bytes.t
 
+  let compare_diversifier_index = Bytes.compare
+
   (* 96 bytes *)
   type expanded_spending_key = {ask : ask; nsk : nsk; ovk : ovk}
 

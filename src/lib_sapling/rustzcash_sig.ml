@@ -70,6 +70,8 @@ module type T = sig
 
   type diversifier_index (* 11 *)
 
+  val compare_diversifier_index : diversifier_index -> diversifier_index -> int
+
   (*96 bytes*)
   type expanded_spending_key = {ask : ask; nsk : nsk; ovk : ovk}
 

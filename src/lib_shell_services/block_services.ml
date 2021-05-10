@@ -78,7 +78,8 @@ let parse_block s =
         ([s], ' ')
     | 1 ->
         let delim =
-          WithExceptions.Option.get ~loc:__LOC__ @@ List.assoc 1 counts
+          WithExceptions.Option.get ~loc:__LOC__
+          @@ List.assoc ~equal:Int.equal 1 counts
         in
         (String.split delim s, delim)
     | _ ->

@@ -104,4 +104,4 @@ let () =
     "blake2b_codegen"
     (Model.For_codegen
        ( WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc "blake2b" Blake2b_bench.models ))
+       @@ List.assoc ~equal:String.equal "blake2b" Blake2b_bench.models ))

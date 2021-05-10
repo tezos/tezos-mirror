@@ -26,6 +26,10 @@
 
 type t = int
 
+let equal = Int.equal
+
+let compare = Int.compare
+
 let pp = Format.pp_print_int
 
 let encoding =

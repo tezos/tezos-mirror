@@ -142,9 +142,13 @@ let report_errors ~details ~show_source ?parsed ppf errs =
     in
     let parsed_locations parsed loc =
       let ( >?? ) = Option.bind in
-      List.assoc loc parsed.Michelson_v1_parser.unexpansion_table
+      List.assoc
+        ~equal:Int.equal
+        loc
+        parsed.Michelson_v1_parser.unexpansion_table
       >?? fun oloc ->
-      List.assoc oloc parsed.expansion_table >?? fun (ploc, _) -> Some ploc
+      List.assoc ~equal:Int.equal oloc parsed.expansion_table
+      >?? fun (ploc, _) -> Some ploc
     in
     let print_source ppf (parsed, _hilights) (* TODO *) =
       let lines =

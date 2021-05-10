@@ -25,6 +25,8 @@
 
 type shell_header = {branch : Block_hash.t}
 
+let equal_shell_header {branch = b1} {branch = b2} = Block_hash.equal b1 b2
+
 let shell_header_encoding =
   let open Data_encoding in
   def "operation.shell_header" ~description:"An operation's shell header."

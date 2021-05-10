@@ -241,3 +241,5 @@ end)
 module String = Make (String)
 module Bytes = Make (Bytes)
 module Z = Make (Z)
+
+let or_else c f = if c <> 0 then c else f ()

@@ -43,6 +43,10 @@ end
 (** An abstract version number for the high-level [Distributed_db] messages. *)
 type t = private int
 
+val equal : t -> t -> bool
+
+val compare : t -> t -> int
+
 val pp : Format.formatter -> t -> unit
 
 val encoding : t Data_encoding.t

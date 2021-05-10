@@ -1,7 +1,13 @@
 (library
  (name traced_sigs)
  (public_name tezos-lwt-result-stdlib.traced.sigs)
- (libraries lwt tezos-lwt-result-stdlib.bare.sigs tezos-lwt-result-stdlib.traced.functor-outputs))
+ (libraries
+   lwt
+   tezos-lwt-result-stdlib.bare.sigs
+   tezos-lwt-result-stdlib.bare.structs
+   tezos-lwt-result-stdlib.traced.functor-outputs
+ )
+)
 
 (rule
  (alias runtest_lint)

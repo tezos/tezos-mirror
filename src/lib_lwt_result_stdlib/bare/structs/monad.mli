@@ -24,3 +24,9 @@
 (*****************************************************************************)
 
 include Bare_sigs.Monad.S
+
+(**/**)
+
+val lwt_apply2 : ('a -> 'b -> 'c Lwt.t) -> 'a -> 'b -> 'c Lwt.t
+
+val lwt_apply3 : ('a -> 'b -> 'c -> 'd Lwt.t) -> 'a -> 'b -> 'c -> 'd Lwt.t

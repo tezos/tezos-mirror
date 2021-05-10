@@ -98,7 +98,7 @@ let record (cctxt : #Protocol_client_context.full) location ~delegate level =
   load_highwatermarks cctxt filename
   >>=? fun highwatermarks ->
   let level =
-    match List.assoc_opt delegate highwatermarks with
+    match List.assoc_opt ~equal:String.equal delegate highwatermarks with
     | None ->
         level
     | Some lower_prev_level when level >= lower_prev_level ->

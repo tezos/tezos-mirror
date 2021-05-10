@@ -269,7 +269,8 @@ let validator_empirical workload_data (problem : Inference.problem)
     (int * (col:int -> unit Plot.t), string) result =
   let {Inference.mapping; _} = solution in
   let valuation name =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.assoc name mapping
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.assoc ~equal:Free_variable.equal name mapping
   in
   let predicted =
     match problem with

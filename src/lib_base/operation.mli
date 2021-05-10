@@ -25,6 +25,8 @@
 
 type shell_header = {branch : Block_hash.t}
 
+val equal_shell_header : shell_header -> shell_header -> bool
+
 val shell_header_encoding : shell_header Data_encoding.t
 
 type t = {shell : shell_header; proto : Bytes.t}

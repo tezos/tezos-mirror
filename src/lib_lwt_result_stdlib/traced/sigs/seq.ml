@@ -48,20 +48,4 @@ module type S = sig
     ('a -> (unit, 'error trace) result Lwt.t) ->
     'a t ->
     (unit, 'error trace) result Lwt.t
-
-  (** Similar to {!map} but wraps the transformation in [result Lwt]. All the
-      transformations are done concurrently. The promise [map_ep f s] resolves
-      once all the promises of the traversal resolve. At this point it is
-      rejected if any of the promises are, and otherwise it is resolved with
-      [Error _] if any of the promises are, and otherwise it is fulfilled (if
-      all the promises are).
-
-      Note that, unlike {!map}, [map_ep] is not lazy: it applies the
-      transformation eagerly to all the elements of the sequence and does not
-      terminate on infinite sequences. Moreover [map_ep] is not tail-recursive.
-  *)
-  val map_ep :
-    ('a -> ('b, 'error trace) result Lwt.t) ->
-    'a t ->
-    ('b t, 'error trace) result Lwt.t
 end

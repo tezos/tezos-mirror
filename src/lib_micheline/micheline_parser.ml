@@ -29,6 +29,11 @@ open Micheline
 
 type 'a parsing_result = 'a * error list
 
+let compare compare (aa, ael) (ba, bel) =
+  Compare.or_else (compare aa ba) (fun () ->
+      (* FIXME: we need error comparison *)
+      Stdlib.compare ael bel)
+
 type point = {point : int; byte : int; line : int; column : int}
 
 let point_zero = {point = 0; byte = 0; line = 0; column = 0}

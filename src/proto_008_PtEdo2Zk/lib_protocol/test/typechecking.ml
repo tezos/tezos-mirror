@@ -114,6 +114,7 @@ let test_typecheck_stack_overflow () =
       Alcotest.fail "expected an error"
   | Error lst
     when List.mem
+           ~equal:( = )
            (Environment.Ecoproto_error
               Script_tc_errors.Typechecking_too_many_recursive_calls)
            lst ->
@@ -134,7 +135,10 @@ let test_unparse_stack_overflow () =
   | Ok _ ->
       Alcotest.fail "expected an error"
   | Error lst
-    when List.mem Script_tc_errors.Unparsing_too_many_recursive_calls lst ->
+    when List.mem
+           ~equal:( = )
+           Script_tc_errors.Unparsing_too_many_recursive_calls
+           lst ->
       return ()
   | Error _ ->
       Alcotest.failf "Unexpected error: %s" __LOC__

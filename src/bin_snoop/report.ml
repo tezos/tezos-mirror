@@ -40,12 +40,14 @@ type context =
   | If_cond
   | If_branch
 
+let equal_context : context -> context -> bool = Stdlib.( = )
+
 type printed = Format.formatter -> context -> unit
 
 let pp c fmtr printed = Format.fprintf fmtr (printed c)
 
 let unprotect_in_context ctxts f fmtr c =
-  if List.mem c ctxts then Format.fprintf fmtr "%a" f ()
+  if List.mem ~equal:equal_context c ctxts then Format.fprintf fmtr "%a" f ()
   else Format.fprintf fmtr "(%a)" f ()
 
 let to_string (x : printed) = Format.asprintf "%a" x Lam_body

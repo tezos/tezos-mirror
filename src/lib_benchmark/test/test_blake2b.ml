@@ -70,7 +70,7 @@ let solution =
   match measurement with
   | Measure.Measurement ((module Bench), {workload_data; _}) ->
       let model =
-        List.assoc "blake2b" Bench.models
+        List.assoc ~equal:String.equal "blake2b" Bench.models
         |> WithExceptions.Option.get ~loc:__LOC__
       in
       let problem =
@@ -93,7 +93,7 @@ let () =
   match measurement with
   | Measure.Measurement ((module Bench), _) -> (
       let model =
-        List.assoc "blake2b" Bench.models
+        List.assoc ~equal:String.equal "blake2b" Bench.models
         |> WithExceptions.Option.get ~loc:__LOC__
       in
       let solution = Free_variable.Map.of_seq (List.to_seq solution.mapping) in

@@ -196,7 +196,7 @@ let get_next_baker_excluding ctxt excludes block =
         _ } =
     List.find
       (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
-        not (List.mem delegate excludes))
+        not (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
       bakers
     |> WithExceptions.Option.get ~loc:__LOC__
   in

@@ -29,6 +29,8 @@ open Alpha_context
 module ContractEntity = struct
   type t = Contract.t
 
+  include (Contract : Compare.S with type t := t)
+
   let encoding = Contract.encoding
 
   let of_source s =

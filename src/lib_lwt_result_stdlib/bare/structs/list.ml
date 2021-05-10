@@ -156,9 +156,33 @@ let exists2 ~when_different_lengths f xs ys =
   in
   aux xs ys
 
-let assoc = assoc_opt
+let rec mem ~equal x = function
+  | [] ->
+      false
+  | y :: ys ->
+      equal x y || mem ~equal x ys
+
+let rec assoc ~equal k = function
+  | [] ->
+      None
+  | (kk, v) :: kvs ->
+      if equal k kk then Some v else assoc ~equal k kvs
+
+let assoc_opt = assoc
 
 let assq = assq_opt
+
+let rec mem_assoc ~equal k = function
+  | [] ->
+      false
+  | (kk, _) :: kvs ->
+      equal k kk || mem_assoc ~equal k kvs
+
+let rec remove_assoc ~equal k = function
+  | [] ->
+      []
+  | ((kk, _) as kv) :: kvs ->
+      if equal k kk then kvs else kv :: remove_assoc ~equal k kvs
 
 let init ~when_negative_length l f =
   if l < 0 then Error when_negative_length
@@ -403,8 +427,6 @@ let iteri_e f l =
         f i x >>? fun () -> (aux [@ocaml.tailcall]) (i + 1) xs
   in
   aux 0 l
-
-let lwt_apply2 f x y = try f x y with exc -> Lwt.fail exc
 
 let iteri_s f l =
   let rec aux i = function
@@ -755,8 +777,6 @@ let fold_left2_e ~when_different_lengths f init xs ys =
   in
   aux init xs ys
 
-let lwt_apply3 f a x y = try f a x y with exc -> Lwt.fail exc
-
 let fold_left2_s ~when_different_lengths f init xs ys =
   let rec aux acc xs ys =
     match (xs, ys) with
@@ -1021,6 +1041,19 @@ let exists2_es ~when_different_lengths f xs ys =
   | (x :: xs, y :: ys) -> (
       lwt_apply2 f x y >>=? function false -> aux xs ys | true -> true_es )
 
+let rev_partition f xs =
+  let rec aux trues falses = function
+    | [] ->
+        (trues, falses)
+    | x :: xs ->
+        if f x then (aux [@ocaml.tailcall]) (x :: trues) falses xs
+        else (aux [@ocaml.tailcall]) trues (x :: falses) xs
+  in
+  aux [] [] xs
+
+let partition f xs =
+  rev_partition f xs |> fun (trues, falses) -> (rev trues, rev falses)
+
 let rev_partition_result xs =
   let rec aux oks errors = function
     | [] ->
@@ -1136,3 +1169,24 @@ let combine_drop xs ys =
         rev rev_combined
   in
   aux [] xs ys
+
+let rec compare ecomp xs ys =
+  match (xs, ys) with
+  | ([], []) ->
+      0
+  | ([], _ :: _) ->
+      -1
+  | (_ :: _, []) ->
+      1
+  | (x :: xs, y :: ys) ->
+      let ec = ecomp x y in
+      if ec = 0 then compare ecomp xs ys else ec
+
+let rec equal eeq xs ys =
+  match (xs, ys) with
+  | ([], []) ->
+      true
+  | ([], _ :: _) | (_ :: _, []) ->
+      false
+  | (x :: xs, y :: ys) ->
+      eeq x y && equal eeq xs ys

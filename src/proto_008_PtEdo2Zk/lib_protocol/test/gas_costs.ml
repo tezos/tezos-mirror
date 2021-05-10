@@ -232,7 +232,9 @@ let check_cost_reprs_are_all_positive list () =
   List.iter_es
     (fun (cost_name, cost) ->
       if Z.gt cost Z.zero then return_unit
-      else if Z.equal cost Z.zero && List.mem cost_name free then return_unit
+      else if
+        Z.equal cost Z.zero && List.mem ~equal:String.equal cost_name free
+      then return_unit
       else
         fail
           (Exn

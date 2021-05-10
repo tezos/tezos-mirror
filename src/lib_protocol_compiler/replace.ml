@@ -137,7 +137,7 @@ let read_proto destination final_protocol_file =
     | Ok (None, proto) ->
         (Protocol.hash proto, proto, false)
     | Ok (Some hash, proto) ->
-        (hash, proto, List.mem hash final_protocol)
+        (hash, proto, List.mem ~equal:Protocol_hash.equal hash final_protocol)
     | Error err ->
         Format.kasprintf
           Stdlib.failwith

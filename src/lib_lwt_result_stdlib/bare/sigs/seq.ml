@@ -34,8 +34,8 @@
 
     All traversal functions that are suffixed with [_e] are within the result
     monad. Note that these functions have a "fail-early" behaviour: the
-    traversal is interrupted as when any of the intermediate application fails
-    (i.e., returns an [Error _]).
+    traversal is interrupted as soon as any of the intermediate application
+    fails (i.e., returns an [Error _]).
 
     All traversal functions that are suffixed with [_s] are within the Lwt
     monad. These functions traverse the elements sequentially: the promise for a
@@ -69,29 +69,40 @@
 
     Because of the type of {!Stdlib.Seq.t}, some interactions with Lwt are not
     possible. Specifically, note that the type includes the variant
-    [Cons of (unit -> ('a * 'a t))] which is not within Lwt. *)
+    [unit -> 'a node] which is not within Lwt nor within the result monad.
+    As a result, some of the traversals ([map_s], [map_e], etc.) cannot be
+    applied lazily.
+
+    Check-out the [S] variants ({!Seq_s.S}, {!Seq_e.S}, and
+    {!Seq_es.S}) that integrate the base sequence type better with the monads'
+    type. It is recommended that you use the variant as appropriate to your
+    traversal. Note the presence of [of_seq] in each of those variants to
+    convert from the standard [S.t]. *)
 
 module type S = sig
-  (** including the OCaml's {!Stdlib.Seq} module to share the {!Seq.t} type
-      (including concrete definition) and to bring the existing functions. *)
+  (** {3 Common interface with Stdlib} *)
+
   include
     module type of Stdlib.Seq
       with type 'a t = 'a Stdlib.Seq.t
        and type 'a node = 'a Stdlib.Seq.node
 
-  (** in-monad, preallocated empty/nil *)
+  (** {3 Some values that made it to Stdlib's Seq since} *)
 
-  val empty_e : ('a t, 'trace) result
+  val cons : 'a -> 'a t -> 'a t
 
-  val empty_s : 'a t Lwt.t
+  val append : 'a t -> 'a t -> 'a t
 
-  val empty_es : ('a t, 'trace) result Lwt.t
+  (** {3 Lwtreslib-specific extensions} *)
 
-  val nil_e : ('a node, 'trace) result
+  (** [first s] is [None] if [s] is empty, it is [Some x] where [x] is the
+      first element of [s] otherwise.
 
-  val nil_s : 'a node Lwt.t
-
-  val nil_es : ('a node, 'trace) result Lwt.t
+      Note that [first] forces the first element of the sequence, which can have
+      side-effects or be computationally expensive. Consider, e.g., the case
+      where [s = filter (fun …) s']: [first s] can force multiple of the values
+      from [s']. *)
+  val first : 'a t -> 'a option
 
   (** Similar to {!fold_left} but wraps the traversal in {!result}. The
       traversal is interrupted if one of the step returns an [Error _]. *)
@@ -149,130 +160,5 @@ module type S = sig
       them is. *)
   val iter_p : ('a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 
-  (** Similar to {!map} but wraps the transformation in {!result}. The
-      traversal is interrupted if any of the application returns an [Error _].
-
-      Note that, unlike {!map}, [map_e] is not lazy: it applies the
-      transformation immediately to all the elements of the sequence (unless it
-      is interrupted by an [Error _]) and does not terminate on infinite
-      sequences (again, unless interrupted). Moreover [map_e] is not
-      tail-recursive. *)
-  val map_e : ('a -> ('b, 'trace) result) -> 'a t -> ('b t, 'trace) result
-
-  (** Similar to {!map} but wraps the transformation in {!Lwt}. Each
-      transformation is done sequentially, only starting once the previous
-      one has resolved. The traversal is interrupted if any of the promise is
-      rejected.
-
-      Note that, unlike {!map}, [map_s] is not lazy: it applies the
-      transformation eagerly to all the elements of the sequence (unless
-      interrupted by a rejection) and does not terminate on infinite sequences
-      (again, unless interrupted). Moreover [map_s] is not tail-recursive. *)
-  val map_s : ('a -> 'b Lwt.t) -> 'a t -> 'b t Lwt.t
-
-  (** Similar to {!map} but wraps the transformation in [result Lwt.t]. Each
-      transformation is done sequentially, only starting once the previous
-      one has resolved. The traversal is interrupted if any of the promise is
-      rejected or fulfilled with an [Error _].
-
-      Note that, unlike {!map}, [map_es] is not lazy: it applies the
-      transformation eagerly to all the elements of the sequence (unless
-      interrupted by rejection or an [Error _]) and does not terminate on
-      infinite sequences (again, unless interrupted). Moreover [map_es] is not
-      tail-recursive. *)
-  val map_es :
-    ('a -> ('b, 'trace) result Lwt.t) -> 'a t -> ('b t, 'trace) result Lwt.t
-
-  (** Similar to {!map} but wraps the transformation in [result Lwt]. All the
-      transformations are done concurrently. The promise [map_p f s] resolves
-      once all the promises of the traversal resolve. At this point it is
-      rejected if any of the promises are, and otherwise it is resolved with
-      [Error _] if any of the promises are, and otherwise it is fulfilled (if
-      all the promises are).
-
-      Note that, unlike {!map}, [map_ep] is not lazy: it applies the
-      transformation eagerly to all the elements of the sequence and does not
-      terminate on infinite sequences. Moreover [map_p] is not tail-recursive.
-  *)
-  val map_ep :
-    ('a -> ('b, 'trace) result Lwt.t) ->
-    'a t ->
-    ('b t, 'trace list) result Lwt.t
-
-  (** Similar to {!map} but wraps the transformation in {!Lwt}. All the
-      transformations are done concurrently. The promise [map_p f s] resolves
-      once all the promises of the traversal resolve. At this point it is
-      fulfilled if all the promises are, and it is rejected if any of them are.
-
-      Note that, unlike {!map}, [map_p] is not lazy: it applies the
-      transformation eagerly to all the elements of the sequence and does not
-      terminate on infinite sequences. Moreover [map_p] is not tail-recursive.
-  *)
-  val map_p : ('a -> 'b Lwt.t) -> 'a t -> 'b t Lwt.t
-
-  (** Similar to {!filter} but wraps the transformation in [result]. Note
-      that, unlike {!filter}, [filter_e] is not lazy: it applies the
-      transformation immediately and does not terminate on infinite sequences.
-      Moreover [filter_e] is not tail-recursive. *)
-  val filter_e : ('a -> (bool, 'trace) result) -> 'a t -> ('a t, 'trace) result
-
-  (** Similar to {!filter} but wraps the transformation in {!Lwt.t}. Each
-      test of the predicate is done sequentially, only starting once the
-      previous one has resolved. Note that, unlike {!filter}, [filter_s] is not
-      lazy: it applies the transformation immediately and does not terminate on
-      infinite sequences. Moreover [filter_s] is not tail-recursive. *)
-  val filter_s : ('a -> bool Lwt.t) -> 'a t -> 'a t Lwt.t
-
-  (** Similar to {!filter} but wraps the transformation in [result Lwt.t].
-      Each test of the predicate is done sequentially, only starting once the
-      previous one has resolved. Note that, unlike {!filter}, [filter_es] is not
-      lazy: it applies the transformation immediately and does not terminate on
-      infinite sequences. Moreover [filter_es] is not tail-recursive. *)
-  val filter_es :
-    ('a -> (bool, 'trace) result Lwt.t) -> 'a t -> ('a t, 'trace) result Lwt.t
-
-  (** Similar to {!filter_map} but within [result]. Not lazy and not
-      tail-recursive. *)
-  val filter_map_e :
-    ('a -> ('b option, 'trace) result) -> 'a t -> ('b t, 'trace) result
-
-  (** Similar to {!filter_map} but within [Lwt.t]. Not lazy and not
-      tail-recursive. *)
-  val filter_map_s : ('a -> 'b option Lwt.t) -> 'a t -> 'b t Lwt.t
-
-  (** Similar to {!filter_map} but within [result Lwt.t]. Not lazy and not
-      tail-recursive. *)
-  val filter_map_es :
-    ('a -> ('b option, 'trace) result Lwt.t) ->
-    'a t ->
-    ('b t, 'trace) result Lwt.t
-
-  (** [find f t] is [Some x] where [x] is the first item in [t] such that
-      [f x]. It is [None] if there are no such element. It does not terminate if
-      the sequence is infinite and the predicate is always false. *)
-  val find : ('a -> bool) -> 'a t -> 'a option
-
-  (** [find_e f t] is similar to {!find} but wraps the search within
-      [result]. Specifically, [find_e f t] is either
-    - [Ok (Some x)] if forall [y] before [x] [f y = Ok false] and
-      [f x = Ok true],
-    - [Error e] if there exists [x] such that forall [y] before [x]
-      [f y = Ok false] and [f x = Error e],
-    - [Ok None] otherwise and [t] is finite,
-    - an expression that never returns otherwise. *)
-  val find_e :
-    ('a -> (bool, 'trace) result) -> 'a t -> ('a option, 'trace) result
-
-  (** [find_s f t] is similar to {!find} but wrapped within
-      [Lwt.t]. The search is identical to [find_e] but each
-      predicate is applied when the previous one has resolved. *)
-  val find_s : ('a -> bool Lwt.t) -> 'a t -> 'a option Lwt.t
-
-  (** [find_es f t] is similar to {!find} but wrapped within
-      [result Lwt.t]. The search is identical to [find_e] but each
-      predicate is applied when the previous one has resolved. *)
-  val find_es :
-    ('a -> (bool, 'trace) result Lwt.t) ->
-    'a t ->
-    ('a option, 'trace) result Lwt.t
+  val unfold : ('b -> ('a * 'b) option) -> 'b -> 'a t
 end
