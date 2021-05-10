@@ -319,7 +319,7 @@ end
 let init ?rng_state ?endorsers_per_block ?with_commitments
     ?(initial_balances = []) ?initial_endorsers ?min_proposal_quorum
     ?time_between_blocks ?minimal_block_delay ?delay_per_missing_endorsement
-    ?bootstrap_contracts ?level n =
+    ?bootstrap_contracts ?level ?cost_per_byte n =
   let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
   let contracts =
     List.map
@@ -336,5 +336,6 @@ let init ?rng_state ?endorsers_per_block ?with_commitments
     ?delay_per_missing_endorsement
     ?bootstrap_contracts
     ?level
+    ?cost_per_byte
     accounts
   >|=? fun blk -> (blk, contracts)
