@@ -33,18 +33,18 @@ trace
     [ (Pair {} {})  	 ]
   - location: 23 (remaining gas: 1039977.236 units remaining)
     [ {}  	 ]
-  - location: 21 (remaining gas: 1039977.236 units remaining)
+  - location: 21 (remaining gas: 1039977.234 units remaining)
     [ {}  	@parameter
       {}  	 ]
-  - location: 24 (remaining gas: 1039977.206 units remaining)
+  - location: 24 (remaining gas: 1039977.204 units remaining)
     [ {}  	 ]
-  - location: 35 (remaining gas: 1039977.161 units remaining)
+  - location: 35 (remaining gas: 1039977.159 units remaining)
     [ (Right {})  	 ]
-  - location: 17 (remaining gas: 1039977.161 units remaining)
+  - location: 17 (remaining gas: 1039977.158 units remaining)
     [ {}  	 ]
-  - location: 41 (remaining gas: 1039977.116 units remaining)
+  - location: 41 (remaining gas: 1039977.113 units remaining)
     [ {}  	
       {}  	 ]
-  - location: 43 (remaining gas: 1039977.071 units remaining)
+  - location: 43 (remaining gas: 1039977.068 units remaining)
     [ (Pair {} {})  	 ]
 

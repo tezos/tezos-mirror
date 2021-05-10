@@ -19,28 +19,28 @@ trace
     [ (Pair 100 "hello" 7)  	 ]
   - location: 13 (remaining gas: 1039985.856 units remaining)
     [ 100  	@parameter ]
-  - location: 11 (remaining gas: 1039985.856 units remaining)
+  - location: 11 (remaining gas: 1039985.854 units remaining)
     [ (Pair "hello" 7)  	@storage
       100  	@parameter ]
-  - location: 15 (remaining gas: 1039985.806 units remaining)
+  - location: 15 (remaining gas: 1039985.804 units remaining)
     [ (Pair "hello" 7)  	@storage
       (Pair "hello" 7)  	@storage
       100  	@parameter ]
-  - location: 16 (remaining gas: 1039985.756 units remaining)
+  - location: 16 (remaining gas: 1039985.754 units remaining)
     [ 7  	
       (Pair "hello" 7)  	@storage
       100  	@parameter ]
-  - location: 17 (remaining gas: 1039985.711 units remaining)
+  - location: 17 (remaining gas: 1039985.709 units remaining)
     [ (Pair "hello" 7)  	@storage
       100  	@parameter ]
-  - location: 18 (remaining gas: 1039985.661 units remaining)
+  - location: 18 (remaining gas: 1039985.659 units remaining)
     [ "hello"  	@storage.s
       100  	@parameter ]
-  - location: 19 (remaining gas: 1039985.616 units remaining)
+  - location: 19 (remaining gas: 1039985.614 units remaining)
     [ (Pair "hello" 100)  	@storage ]
-  - location: 20 (remaining gas: 1039985.571 units remaining)
+  - location: 20 (remaining gas: 1039985.569 units remaining)
     [ {}  	
       (Pair "hello" 100)  	@storage ]
-  - location: 22 (remaining gas: 1039985.526 units remaining)
+  - location: 22 (remaining gas: 1039985.524 units remaining)
     [ (Pair {} "hello" 100)  	 ]
 

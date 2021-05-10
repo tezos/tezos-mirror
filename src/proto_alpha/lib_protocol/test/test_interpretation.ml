@@ -56,8 +56,25 @@ let run_script ctx ?(step_constants = default_step_constants) contract
     ~internal:false
   >>=?? fun res -> return res
 
+let logger =
+  Script_typed_ir.
+    {
+      log_interp = (fun _ _ _ _ _ -> ());
+      log_entry = (fun _ _ _ _ _ -> ());
+      log_exit = (fun _ _ _ _ _ -> ());
+      log_control = (fun _ -> ());
+      get_log = (fun () -> Lwt.return (Ok None));
+    }
+
 let run_step ctxt code accu stack =
-  Script_interpreter.step None ctxt default_step_constants code accu stack
+  let open Script_interpreter in
+  step None ctxt default_step_constants code accu stack
+  >>=? fun ((accu, stack, ctxt') as r) ->
+  step (Some logger) ctxt default_step_constants code accu stack
+  >>=? fun (_, _, ctxt'') ->
+  if Gas.(gas_counter ctxt' <> gas_counter ctxt'') then
+    Alcotest.failf "Logging should not have an impact on gas consumption." ;
+  return r
 
 (** Runs a script with an ill-typed parameter and verifies that a
     Bad_contract_parameter error is returned. *)

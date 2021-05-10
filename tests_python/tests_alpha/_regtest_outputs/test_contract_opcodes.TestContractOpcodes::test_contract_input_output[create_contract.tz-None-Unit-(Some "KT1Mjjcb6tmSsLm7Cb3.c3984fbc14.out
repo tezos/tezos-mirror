@@ -36,14 +36,14 @@ emitted operations
     - location: 28 (remaining gas: 1039983.555 units remaining)
       [ {}  	
         (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 25 (remaining gas: 1039983.555 units remaining)
+    - location: 25 (remaining gas: 1039983.553 units remaining)
       [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b  	
         {}  	
         (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 30 (remaining gas: 1039983.505 units remaining)
+    - location: 30 (remaining gas: 1039983.503 units remaining)
       [ { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b }  	
         (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm")  	 ]
-    - location: 31 (remaining gas: 1039983.460 units remaining)
+    - location: 31 (remaining gas: 1039983.458 units remaining)
       [ (Pair { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b }
               (Some "KT1Mjjcb6tmSsLm7Cb3DSQszePjfchPM4Uxm"))  	 ]
 

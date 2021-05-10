@@ -29,33 +29,33 @@ trace
   - location: 18 (remaining gas: 1039980.367 units remaining)
     [ { "Hi" }  	
       (Pair "Hi" { "Hi" } None)  	 ]
-  - location: 14 (remaining gas: 1039980.367 units remaining)
+  - location: 14 (remaining gas: 1039980.365 units remaining)
     [ "Hi"  	@parameter
       { "Hi" }  	
       (Pair "Hi" { "Hi" } None)  	 ]
-  - location: 19 (remaining gas: 1039980.287 units remaining)
+  - location: 19 (remaining gas: 1039980.285 units remaining)
     [ True  	
       (Pair "Hi" { "Hi" } None)  	 ]
-  - location: 20 (remaining gas: 1039980.242 units remaining)
+  - location: 20 (remaining gas: 1039980.240 units remaining)
     [ (Some True)  	
       (Pair "Hi" { "Hi" } None)  	 ]
-  - location: 21 (remaining gas: 1039980.197 units remaining)
+  - location: 21 (remaining gas: 1039980.195 units remaining)
     [ (Pair "Hi" { "Hi" } None)  	 ]
-  - location: 24 (remaining gas: 1039980.147 units remaining)
+  - location: 24 (remaining gas: 1039980.145 units remaining)
     [ (Pair { "Hi" } None)  	@storage ]
-  - location: 25 (remaining gas: 1039980.097 units remaining)
+  - location: 25 (remaining gas: 1039980.095 units remaining)
     [ { "Hi" }  	 ]
-  - location: 21 (remaining gas: 1039980.097 units remaining)
+  - location: 21 (remaining gas: 1039980.093 units remaining)
     [ (Some True)  	
       { "Hi" }  	 ]
-  - location: 26 (remaining gas: 1039980.057 units remaining)
+  - location: 26 (remaining gas: 1039980.053 units remaining)
     [ { "Hi" }  	
       (Some True)  	 ]
-  - location: 27 (remaining gas: 1039980.012 units remaining)
+  - location: 27 (remaining gas: 1039980.008 units remaining)
     [ (Pair { "Hi" } (Some True))  	 ]
-  - location: 28 (remaining gas: 1039979.967 units remaining)
+  - location: 28 (remaining gas: 1039979.963 units remaining)
     [ {}  	
       (Pair { "Hi" } (Some True))  	 ]
-  - location: 30 (remaining gas: 1039979.922 units remaining)
+  - location: 30 (remaining gas: 1039979.918 units remaining)
     [ (Pair {} { "Hi" } (Some True))  	 ]
 

@@ -23,14 +23,14 @@ trace
       9  	 ]
   - location: 16 (remaining gas: 1039989.325 units remaining)
     [ 24  	 ]
-  - location: 14 (remaining gas: 1039989.325 units remaining)
+  - location: 14 (remaining gas: 1039989.323 units remaining)
     [ 15  	
       24  	 ]
-  - location: 17 (remaining gas: 1039989.280 units remaining)
+  - location: 17 (remaining gas: 1039989.278 units remaining)
     [ (Pair 15 24)  	 ]
-  - location: 18 (remaining gas: 1039989.235 units remaining)
+  - location: 18 (remaining gas: 1039989.233 units remaining)
     [ {}  	
       (Pair 15 24)  	 ]
-  - location: 20 (remaining gas: 1039989.190 units remaining)
+  - location: 20 (remaining gas: 1039989.188 units remaining)
     [ (Pair {} 15 24)  	 ]
 

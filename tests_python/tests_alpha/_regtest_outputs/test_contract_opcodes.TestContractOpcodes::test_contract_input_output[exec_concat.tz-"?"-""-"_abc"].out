@@ -38,11 +38,11 @@ trace
     [ { "" ; "_abc" }  	 ]
   - location: 21 (remaining gas: 1039985.933 units remaining)
     [ "_abc"  	 ]
-  - location: 23 (remaining gas: 1039985.933 units remaining)
+  - location: 23 (remaining gas: 1039985.931 units remaining)
     [ "_abc"  	 ]
-  - location: 24 (remaining gas: 1039985.888 units remaining)
+  - location: 24 (remaining gas: 1039985.886 units remaining)
     [ {}  	
       "_abc"  	 ]
-  - location: 26 (remaining gas: 1039985.843 units remaining)
+  - location: 26 (remaining gas: 1039985.841 units remaining)
     [ (Pair {} "_abc")  	 ]
 

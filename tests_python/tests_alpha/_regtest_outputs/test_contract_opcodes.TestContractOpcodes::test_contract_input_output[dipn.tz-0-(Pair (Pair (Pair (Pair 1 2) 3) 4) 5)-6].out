@@ -33,61 +33,61 @@ trace
     [  ]
   - location: 23 (remaining gas: 1039982.885 units remaining)
     [ 6  	 ]
-  - location: 20 (remaining gas: 1039982.840 units remaining)
+  - location: 20 (remaining gas: 1039982.839 units remaining)
     [ 5  	
       6  	 ]
-  - location: 20 (remaining gas: 1039982.795 units remaining)
+  - location: 20 (remaining gas: 1039982.794 units remaining)
     [ 4  	
       5  	
       6  	 ]
-  - location: 20 (remaining gas: 1039982.750 units remaining)
+  - location: 20 (remaining gas: 1039982.749 units remaining)
     [ 3  	
       4  	
       5  	
       6  	 ]
-  - location: 20 (remaining gas: 1039982.705 units remaining)
+  - location: 20 (remaining gas: 1039982.704 units remaining)
     [ 2  	
       3  	
       4  	
       5  	
       6  	 ]
-  - location: 20 (remaining gas: 1039982.660 units remaining)
+  - location: 20 (remaining gas: 1039982.659 units remaining)
     [ 1  	
       2  	
       3  	
       4  	
       5  	
       6  	 ]
-  - location: 20 (remaining gas: 1039982.660 units remaining)
+  - location: 20 (remaining gas: 1039982.659 units remaining)
     [ 1  	
       2  	
       3  	
       4  	
       5  	
       6  	 ]
-  - location: 26 (remaining gas: 1039982.615 units remaining)
+  - location: 26 (remaining gas: 1039982.614 units remaining)
     [ 2  	
       3  	
       4  	
       5  	
       6  	 ]
-  - location: 27 (remaining gas: 1039982.570 units remaining)
+  - location: 27 (remaining gas: 1039982.569 units remaining)
     [ 3  	
       4  	
       5  	
       6  	 ]
-  - location: 28 (remaining gas: 1039982.525 units remaining)
+  - location: 28 (remaining gas: 1039982.524 units remaining)
     [ 4  	
       5  	
       6  	 ]
-  - location: 29 (remaining gas: 1039982.480 units remaining)
+  - location: 29 (remaining gas: 1039982.479 units remaining)
     [ 5  	
       6  	 ]
-  - location: 30 (remaining gas: 1039982.435 units remaining)
+  - location: 30 (remaining gas: 1039982.434 units remaining)
     [ 6  	 ]
-  - location: 31 (remaining gas: 1039982.390 units remaining)
+  - location: 31 (remaining gas: 1039982.389 units remaining)
     [ {}  	
       6  	 ]
-  - location: 33 (remaining gas: 1039982.345 units remaining)
+  - location: 33 (remaining gas: 1039982.344 units remaining)
     [ (Pair {} 6)  	 ]
 

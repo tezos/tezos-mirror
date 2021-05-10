@@ -18,18 +18,18 @@ trace
       "test1"  	@parameter.elt ]
   - location: 15 (remaining gas: 1039991.503 units remaining)
     [ "Hello test1"  	 ]
-  - location: 10 (remaining gas: 1039991.503 units remaining)
+  - location: 10 (remaining gas: 1039991.502 units remaining)
     [ "test2"  	@parameter.elt ]
-  - location: 12 (remaining gas: 1039991.458 units remaining)
+  - location: 12 (remaining gas: 1039991.457 units remaining)
     [ "Hello "  	@hello
       "test2"  	@parameter.elt ]
-  - location: 15 (remaining gas: 1039991.378 units remaining)
+  - location: 15 (remaining gas: 1039991.377 units remaining)
     [ "Hello test2"  	 ]
-  - location: 10 (remaining gas: 1039991.378 units remaining)
+  - location: 10 (remaining gas: 1039991.376 units remaining)
     [ { "Hello test1" ; "Hello test2" }  	 ]
-  - location: 16 (remaining gas: 1039991.333 units remaining)
+  - location: 16 (remaining gas: 1039991.331 units remaining)
     [ {}  	
       { "Hello test1" ; "Hello test2" }  	 ]
-  - location: 18 (remaining gas: 1039991.288 units remaining)
+  - location: 18 (remaining gas: 1039991.286 units remaining)
     [ (Pair {} { "Hello test1" ; "Hello test2" })  	 ]
 

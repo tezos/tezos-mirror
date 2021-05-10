@@ -21,14 +21,14 @@ trace
     [ (Pair "1970-01-01T00:01:40Z" -100)  	@parameter ]
   - location: 14 (remaining gas: 1039989.955 units remaining)
     [ -100  	 ]
-  - location: 12 (remaining gas: 1039989.955 units remaining)
+  - location: 12 (remaining gas: 1039989.953 units remaining)
     [ "1970-01-01T00:01:40Z"  	
       -100  	 ]
-  - location: 15 (remaining gas: 1039989.875 units remaining)
+  - location: 15 (remaining gas: 1039989.873 units remaining)
     [ "1970-01-01T00:03:20Z"  	 ]
-  - location: 16 (remaining gas: 1039989.830 units remaining)
+  - location: 16 (remaining gas: 1039989.828 units remaining)
     [ {}  	
       "1970-01-01T00:03:20Z"  	 ]
-  - location: 18 (remaining gas: 1039989.785 units remaining)
+  - location: 18 (remaining gas: 1039989.783 units remaining)
     [ (Pair {} "1970-01-01T00:03:20Z")  	 ]
 

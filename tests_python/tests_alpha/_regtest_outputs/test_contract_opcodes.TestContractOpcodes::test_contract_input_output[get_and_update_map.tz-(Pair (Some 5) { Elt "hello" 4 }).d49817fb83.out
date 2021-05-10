@@ -17,18 +17,18 @@ trace
   - location: 16 (remaining gas: 1039988.802 units remaining)
     [ (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 14 (remaining gas: 1039988.802 units remaining)
+  - location: 14 (remaining gas: 1039988.800 units remaining)
     [ "hello"  	@parameter
       (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 17 (remaining gas: 1039988.642 units remaining)
+  - location: 17 (remaining gas: 1039988.640 units remaining)
     [ (Some 4)  	
       { Elt "hello" 5 }  	 ]
-  - location: 18 (remaining gas: 1039988.597 units remaining)
+  - location: 18 (remaining gas: 1039988.595 units remaining)
     [ (Pair (Some 4) { Elt "hello" 5 })  	 ]
-  - location: 19 (remaining gas: 1039988.552 units remaining)
+  - location: 19 (remaining gas: 1039988.550 units remaining)
     [ {}  	
       (Pair (Some 4) { Elt "hello" 5 })  	 ]
-  - location: 21 (remaining gas: 1039988.507 units remaining)
+  - location: 21 (remaining gas: 1039988.505 units remaining)
     [ (Pair {} (Some 4) { Elt "hello" 5 })  	 ]
 

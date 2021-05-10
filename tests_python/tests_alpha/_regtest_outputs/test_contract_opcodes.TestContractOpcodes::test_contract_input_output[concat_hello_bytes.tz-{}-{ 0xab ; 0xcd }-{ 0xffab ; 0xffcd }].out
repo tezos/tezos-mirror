@@ -18,18 +18,18 @@ trace
       0xab  	@parameter.elt ]
   - location: 15 (remaining gas: 1039991.705 units remaining)
     [ 0xffab  	 ]
-  - location: 10 (remaining gas: 1039991.705 units remaining)
+  - location: 10 (remaining gas: 1039991.704 units remaining)
     [ 0xcd  	@parameter.elt ]
-  - location: 12 (remaining gas: 1039991.660 units remaining)
+  - location: 12 (remaining gas: 1039991.659 units remaining)
     [ 0xff  	
       0xcd  	@parameter.elt ]
-  - location: 15 (remaining gas: 1039991.580 units remaining)
+  - location: 15 (remaining gas: 1039991.579 units remaining)
     [ 0xffcd  	 ]
-  - location: 10 (remaining gas: 1039991.580 units remaining)
+  - location: 10 (remaining gas: 1039991.578 units remaining)
     [ { 0xffab ; 0xffcd }  	 ]
-  - location: 16 (remaining gas: 1039991.535 units remaining)
+  - location: 16 (remaining gas: 1039991.533 units remaining)
     [ {}  	
       { 0xffab ; 0xffcd }  	 ]
-  - location: 18 (remaining gas: 1039991.490 units remaining)
+  - location: 18 (remaining gas: 1039991.488 units remaining)
     [ (Pair {} { 0xffab ; 0xffcd })  	 ]
 

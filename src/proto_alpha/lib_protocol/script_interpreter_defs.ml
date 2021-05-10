@@ -251,7 +251,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       Interp_costs.join_tickets ty ticket_a ticket_b
   | IHalt _ ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      Gas.atomic_step_cost (Saturation_repr.safe_int 1)
   | IDrop _ ->
       Interp_costs.drop
   | IDup _ ->
@@ -443,43 +443,45 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
 
 let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
  fun ks ->
+  (* FIXME: This will be fixed when the new cost model is defined. *)
+  let a_little = Gas.atomic_step_cost (Saturation_repr.safe_int 1) in
   match ks with
   | KLog _ ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KNil ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
   | KCons (_, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
   | KReturn _ ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
   | KUndip (_, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
   | KLoop_in (_, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
   | KLoop_in_left (_, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
   | KIter (_, _, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
   | KList_enter_body (_, _, _, _, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
   | KList_exit_body (_, _, _, _, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
   | KMap_enter_body (_, _, _, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
   | KMap_exit_body (_, _, _, _, _) ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.free
+      a_little
 
 (*
 

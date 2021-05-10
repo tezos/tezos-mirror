@@ -21,43 +21,43 @@ trace
     [ (Pair {} {})  	@parameter ]
   - location: 17 (remaining gas: 1039956.935 units remaining)
     [ {}  	 ]
-  - location: 15 (remaining gas: 1039956.935 units remaining)
+  - location: 15 (remaining gas: 1039956.933 units remaining)
     [ {}  	
       {}  	 ]
-  - location: 18 (remaining gas: 1039956.735 units remaining)
-    [ {}  	
-      {}  	
-      {}  	 ]
-  - location: 20 (remaining gas: 1039956.695 units remaining)
+  - location: 18 (remaining gas: 1039956.733 units remaining)
     [ {}  	
       {}  	
       {}  	 ]
-  - location: 21 (remaining gas: 1039956.695 units remaining)
+  - location: 20 (remaining gas: 1039956.693 units remaining)
+    [ {}  	
+      {}  	
+      {}  	 ]
+  - location: 21 (remaining gas: 1039956.693 units remaining)
     [ {}  	
       {}  	 ]
-  - location: 34 (remaining gas: 1039956.650 units remaining)
+  - location: 34 (remaining gas: 1039956.648 units remaining)
     [ True  	
       {}  	
       {}  	 ]
-  - location: 37 (remaining gas: 1039956.610 units remaining)
+  - location: 37 (remaining gas: 1039956.608 units remaining)
     [ {}  	
       True  	
       {}  	 ]
-  - location: 38 (remaining gas: 1039956.565 units remaining)
+  - location: 38 (remaining gas: 1039956.563 units remaining)
     [ (Pair {} True)  	
       {}  	 ]
-  - location: 39 (remaining gas: 1039956.525 units remaining)
+  - location: 39 (remaining gas: 1039956.523 units remaining)
     [ {}  	
       (Pair {} True)  	 ]
-  - location: 40 (remaining gas: 1039956.525 units remaining)
+  - location: 40 (remaining gas: 1039956.523 units remaining)
     [ (Pair {} True)  	 ]
-  - location: 64 (remaining gas: 1039956.475 units remaining)
+  - location: 64 (remaining gas: 1039956.473 units remaining)
     [ True  	 ]
-  - location: 65 (remaining gas: 1039956.430 units remaining)
+  - location: 65 (remaining gas: 1039956.428 units remaining)
     [ (Some True)  	 ]
-  - location: 66 (remaining gas: 1039956.385 units remaining)
+  - location: 66 (remaining gas: 1039956.383 units remaining)
     [ {}  	
       (Some True)  	 ]
-  - location: 68 (remaining gas: 1039956.340 units remaining)
+  - location: 68 (remaining gas: 1039956.338 units remaining)
     [ (Pair {} (Some True))  	 ]
 

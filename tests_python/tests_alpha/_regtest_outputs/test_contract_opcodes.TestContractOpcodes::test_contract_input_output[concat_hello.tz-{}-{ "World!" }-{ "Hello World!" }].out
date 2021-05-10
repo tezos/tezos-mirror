@@ -18,11 +18,11 @@ trace
       "World!"  	@parameter.elt ]
   - location: 15 (remaining gas: 1039991.797 units remaining)
     [ "Hello World!"  	 ]
-  - location: 10 (remaining gas: 1039991.797 units remaining)
+  - location: 10 (remaining gas: 1039991.796 units remaining)
     [ { "Hello World!" }  	 ]
-  - location: 16 (remaining gas: 1039991.752 units remaining)
+  - location: 16 (remaining gas: 1039991.751 units remaining)
     [ {}  	
       { "Hello World!" }  	 ]
-  - location: 18 (remaining gas: 1039991.707 units remaining)
+  - location: 18 (remaining gas: 1039991.706 units remaining)
     [ (Pair {} { "Hello World!" })  	 ]
 
