@@ -1,0 +1,10 @@
+(executable
+ (name main)
+ (package teztale)
+ (public_name teztale)
+ (libraries tezos-client-008-PtEdo2Zk tezos-client-base-unix)
+ (flags
+  (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
+    Tezos_shell_services -open Tezos_client_008_PtEdo2Zk -open
+    Tezos_client_base_unix -open Tezos_rpc_http_client_unix -open
+    Tezos_rpc_http)))
