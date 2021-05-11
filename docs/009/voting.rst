@@ -1,3 +1,5 @@
+.. _voting_009:
+
 The Voting Process
 ==================
 

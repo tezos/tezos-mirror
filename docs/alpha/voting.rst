@@ -1,3 +1,5 @@
+.. _voting_alpha:
+
 The Voting Process
 ==================
 

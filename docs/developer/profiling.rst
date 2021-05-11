@@ -91,8 +91,8 @@ Performance profiling
 
    - `flamegraph <https://github.com/brendangregg/FlameGraph>`_: command-line
      tool for generating flamegraphs
-     (`example <https://gitlab.com/tezos/tezos/uploads/f8f8cece73da52b54fd9c79364e656e1/flame.svg>`_ for tezos-node)
+     (`example <https://gitlab.com/tezos/tezos/uploads/f8f8cece73da52b54fd9c79364e656e1/flame.svg>`__ for tezos-node)
    - `gprof2dot <https://github.com/jrfonseca/gprof2dot>`_: command-line
      tool for generating callgraphs
-     (`example <https://gitlab.com/tezos/tezos/uploads/8640f489ad8002271fe41bbd0c34dfdc/callgraph.svg>`_ for tezos-node)
+     (`example <https://gitlab.com/tezos/tezos/uploads/8640f489ad8002271fe41bbd0c34dfdc/callgraph.svg>`__ for tezos-node)
    - `hotspot <https://github.com/KDAB/hotspot>`_: a GUI for the `perf` tool

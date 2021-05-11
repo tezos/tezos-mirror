@@ -98,7 +98,7 @@ However, when adding a new page or modifying an existing one, you should check t
 For that, you should build the documentation (by running ``make`` in the ``docs`` directory), address any new error message, and check the generated pages (`docs/_build/index.html`) in a browser.
 
 Links
-~~~~
+~~~~~
 
 +When introducing cross-references between documentation pages as well as references to external resources, please consider using the most appropriate kind of link:
 

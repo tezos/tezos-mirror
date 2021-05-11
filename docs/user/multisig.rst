@@ -17,7 +17,7 @@ multisig contract has built-in support in the ``tezos-client`` and has
 been formally verified using the `Mi-Cho-Coq <https://gitlab.com/nomadic-labs/mi-cho-coq/>`_ framework.
 
 Interacting with a multisig contract using ``tezos-client``
--------------------------------------------------------
+-----------------------------------------------------------
 
 The recommended way to create and use a multisig contract is via
 the ``tezos-client`` built-in commands for the multisig contract. The command

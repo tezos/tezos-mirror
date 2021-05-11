@@ -1,3 +1,6 @@
+.. _voting:
+.. _voting_008:
+
 The Voting Process
 ==================
 

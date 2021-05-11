@@ -160,7 +160,7 @@ means that your node will take some time to resync the chain.
 
 If removing this directory, please note that if it took you a long time to
 compute your node identity, keep the ``identity.json`` file and instead only
-remove its child ``store``, ``context`` and ``protocol``(if any) sub-directories.
+remove its child ``store``, ``context`` and ``protocol`` (if any) sub-directories.
 
 If you are also running a baker, make sure that it is configured to access the
 data directory of the node (see :ref:`how to run a baker <baker_run>`).
