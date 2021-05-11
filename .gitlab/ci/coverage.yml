@@ -5,7 +5,7 @@
 test_coverage:
   extends:
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development_manual
+    - .rules_template__development_coverage
   stage: test_coverage
   variables:
     # We exclude from coverage old protocols and code that can't be

@@ -223,7 +223,7 @@ publish:documentation:
 
 pages:
   extends:
-    - .rules_template__development_manual
+    - .rules_template__development_coverage
   needs: ["test_coverage"]
   stage: publish_coverage
   # The cache rule ensures public (i.e. the static website) isn't erased
