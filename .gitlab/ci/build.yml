@@ -62,7 +62,7 @@ build:
 build_arm64:
   extends:
     - .build_template
-    - .rules_template__development_manual
+    - .rules_template__extended_test_pipeline
   needs: []
   script:
     - . ./scripts/version.sh

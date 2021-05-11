@@ -5,7 +5,7 @@
 .install_bin_ubuntu_template:
   extends:
     - .base-test-doc-scripts-template
-    - .rules_template__development_manual
+    - .rules_template__development_documentation
   script:
     - bash ./docs/introduction/install-bin-ubuntu.sh
 
@@ -20,7 +20,7 @@ install_bin_focal:
 .install_bin_fedora_template:
   extends:
     - .base-test-doc-scripts-template
-    - .rules_template__development_manual
+    - .rules_template__development_documentation
   script:
     - bash ./docs/introduction/install-bin-fedora.sh
 
@@ -35,7 +35,7 @@ install_bin_fedora_33:
 .install_opam_ubuntu_template:
   extends:
     - .base-test-doc-scripts-template
-    - .rules_template__development_manual
+    - .rules_template__development_documentation
   script:
     - bash < ./docs/introduction/install-opam.sh
 
@@ -50,7 +50,7 @@ install_opam_focal:
 .compile_sources_template:
   extends:
     - .base-test-doc-scripts-template
-    - .rules_template__development_manual
+    - .rules_template__development_documentation
   script:
     - bash < ./docs/introduction/compile-sources.sh
 

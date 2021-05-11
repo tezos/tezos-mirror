@@ -36,7 +36,7 @@ tezt:3:
 tezt:manual:migration:
   extends:
     - .test_template
-    - .rules_template__development_manual
+    - .rules_template__extended_test_pipeline
   before_script:
     - export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
     - curl -s https://api.github.com/repos/Phlogi/tezos-snapshots/releases/latest | jq -r ".assets[] | select(.name) | .browser_download_url" | grep roll | xargs wget -q
