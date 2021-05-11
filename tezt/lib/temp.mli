@@ -38,12 +38,16 @@
     [perms] is the permissions for parent directories if they are created.
     Default is [0o755], i.e. [rwxr-xr-x].
 
+    If [runner] is specified, the temporary file is registered to be located
+    in this remote runner, which means that it will be removed using SSH
+    by the [clean up] function.
+
     [file base] always returns the same result for a given [base]
     and for the same process. *)
-val file : ?perms:Unix.file_perm -> string -> string
+val file : ?runner:Runner.t -> ?perms:Unix.file_perm -> string -> string
 
 (** Get a temporary file name and create it as a directory. *)
-val dir : ?perms:Unix.file_perm -> string -> string
+val dir : ?runner:Runner.t -> ?perms:Unix.file_perm -> string -> string
 
 (** Allow calls to [file] and [dir] until the next [clean_up] or [stop].
 
