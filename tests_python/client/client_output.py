@@ -527,3 +527,10 @@ class CheckSignMessageResult:
         if match is None:
             raise InvalidClientOutput(client_output)
         self.check = True
+
+
+class ViewResult:
+    """Result of a 'run tzip4 view...' command."""
+
+    def __init__(self, client_output: str):
+        self.result = client_output
