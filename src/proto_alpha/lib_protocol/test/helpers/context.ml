@@ -219,6 +219,8 @@ end
 module Contract = struct
   let pp = Alpha_context.Contract.pp
 
+  let equal a b = Alpha_context.Contract.compare a b = 0
+
   let pkh c =
     Alpha_context.Contract.is_implicit c
     |> function
@@ -322,8 +324,8 @@ end
 
 let init ?endorsers_per_block ?with_commitments ?(initial_balances = [])
     ?initial_endorsers ?min_proposal_quorum ?time_between_blocks
-    ?minimal_block_delay ?delay_per_missing_endorsement ?bootstrap_contracts n
-    =
+    ?minimal_block_delay ?delay_per_missing_endorsement ?bootstrap_contracts
+    ?level n =
   let accounts = Account.generate_accounts ~initial_balances n in
   let contracts =
     List.map
@@ -339,5 +341,6 @@ let init ?endorsers_per_block ?with_commitments ?(initial_balances = [])
     ?minimal_block_delay
     ?delay_per_missing_endorsement
     ?bootstrap_contracts
+    ?level
     accounts
   >|=? fun blk -> (blk, contracts)

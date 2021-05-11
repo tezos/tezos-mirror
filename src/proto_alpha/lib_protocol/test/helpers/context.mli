@@ -94,6 +94,8 @@ end
 module Contract : sig
   val pp : Format.formatter -> Contract.t -> unit
 
+  val equal : Contract.t -> Contract.t -> bool
+
   val pkh : Contract.t -> public_key_hash tzresult Lwt.t
 
   type balance_kind = Main | Deposit | Fees | Rewards
@@ -148,5 +150,6 @@ val init :
   ?minimal_block_delay:Period.t ->
   ?delay_per_missing_endorsement:Period.t ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
+  ?level:int32 ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t

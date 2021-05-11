@@ -104,6 +104,7 @@ val genesis :
   ?minimal_block_delay:Period.t ->
   ?delay_per_missing_endorsement:Period.t ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
+  ?level:int32 ->
   (Account.t * Tez.tez) list ->
   block tzresult Lwt.t
 
@@ -163,6 +164,27 @@ val bake_n_with_all_balance_updates :
   t ->
   (block * Alpha_context.Receipt.balance_updates) tzresult Lwt.t
 
+(** Version of bake_n that returns a list of all origination results
+    in the metadata of baked blocks. **)
+val bake_n_with_origination_results :
+  ?policy:baker_policy ->
+  int ->
+  t ->
+  ( block
+  * Alpha_context.Kind.origination
+    Apply_results.successful_manager_operation_result
+    list )
+  tzresult
+  Lwt.t
+
+(** Version of bake_n that returns the liquidity baking escape EMA after [n] blocks. **)
+val bake_n_with_liquidity_baking_escape_ema :
+  ?policy:baker_policy ->
+  ?liquidity_baking_escape_vote:bool ->
+  int ->
+  t ->
+  (block * Alpha_context.Liquidity_baking.escape_ema) tzresult Lwt.t
+
 val current_cycle : t -> Cycle.t tzresult Lwt.t
 
 (** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
@@ -184,6 +206,7 @@ val prepare_initial_context_params :
   ?minimal_block_delay:Period.t ->
   ?delay_per_missing_endorsement:Period.t ->
   ?min_proposal_quorum:int32 ->
+  ?level:int32 ->
   (Account.t * Tez.t) list ->
   ( Constants.parametric * Block_header.shell_header * Block_hash.t,
     tztrace )

@@ -417,7 +417,7 @@ let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
 
 let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
     ?time_between_blocks ?minimal_block_delay ?delay_per_missing_endorsement
-    ?min_proposal_quorum initial_accounts =
+    ?min_proposal_quorum ?level initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let endorsers_per_block =
@@ -473,7 +473,7 @@ let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
   in
   let shell =
     Forge.make_shell
-      ~level:0l
+      ~level:(Option.value ~default:0l level)
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
       ~fitness:(Fitness.from_int64 0L)
@@ -487,7 +487,7 @@ let prepare_initial_context_params ?endorsers_per_block ?initial_endorsers
    where the test is run *)
 let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     ?min_proposal_quorum ?time_between_blocks ?minimal_block_delay
-    ?delay_per_missing_endorsement ?bootstrap_contracts
+    ?delay_per_missing_endorsement ?bootstrap_contracts ?level
     (initial_accounts : (Account.t * Tez.t) list) =
   prepare_initial_context_params
     ?endorsers_per_block
@@ -496,6 +496,7 @@ let genesis ?with_commitments ?endorsers_per_block ?initial_endorsers
     ?time_between_blocks
     ?minimal_block_delay
     ?delay_per_missing_endorsement
+    ?level
     initial_accounts
   >>=? fun (constants, shell, hash) ->
   initial_context
@@ -624,6 +625,39 @@ let bake_n_with_all_balance_updates ?policy ?liquidity_baking_escape_vote n b =
     (b, [])
     (1 -- n)
   >|=? fun (b, balance_updates_rev) -> (b, List.rev balance_updates_rev)
+
+let bake_n_with_origination_results ?policy n b =
+  List.fold_left_es
+    (fun (b, origination_results_rev) _ ->
+      bake_with_metadata ?policy b
+      >>=? fun (b, metadata) ->
+      let origination_results_rev =
+        List.fold_left
+          (fun origination_results_rev ->
+            let open Apply_results in
+            function
+            | Successful_manager_result (Reveal_result _)
+            | Successful_manager_result (Delegation_result _)
+            | Successful_manager_result (Transaction_result _) ->
+                origination_results_rev
+            | Successful_manager_result (Origination_result x) ->
+                Origination_result x :: origination_results_rev)
+          origination_results_rev
+          metadata.implicit_operations_results
+      in
+      return (b, origination_results_rev))
+    (b, [])
+    (1 -- n)
+  >|=? fun (b, origination_results_rev) -> (b, List.rev origination_results_rev)
+
+let bake_n_with_liquidity_baking_escape_ema ?policy
+    ?liquidity_baking_escape_vote n b =
+  List.fold_left_es
+    (fun (b, _escape_ema) _ ->
+      bake_with_metadata ?policy ?liquidity_baking_escape_vote b
+      >|=? fun (b, metadata) -> (b, metadata.liquidity_baking_escape_ema))
+    (b, 0l)
+    (1 -- n)
 
 let bake_until_cycle_end ?policy b =
   get_constants b
