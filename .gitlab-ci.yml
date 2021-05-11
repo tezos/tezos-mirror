@@ -36,6 +36,7 @@ variables:
 
 stages:
   - build
+  - sanity_ci
   - test
   - doc
   - test-doc-scripts

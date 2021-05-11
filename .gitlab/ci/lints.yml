@@ -37,4 +37,16 @@ check_scripts_b58_prefix:
     - poetry run pylint b58_prefix.py --disable=missing-docstring --disable=invalid-name
     - poetry run pytest test_b58_prefix.py -v
 
-
+# fast self-checks that depends on build
+sanity_ci:
+  extends:
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
+  stage: sanity_ci
+  needs: ["build"]
+  before_script:
+    - . ./scripts/version.sh
+    - . $HOME/.venv/bin/activate
+  script:
+    - src/tooling/lint.sh --check-gitlab-ci-yml
+  interruptible: true
