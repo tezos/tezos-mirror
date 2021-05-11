@@ -39,7 +39,6 @@ stages:
   - sanity_ci
   - test
   - doc
-  - test-doc-scripts
   - packaging
   - build_release
   - publish_release
