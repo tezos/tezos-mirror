@@ -49,13 +49,17 @@ type event = {name : string; value : JSON.t}
 
     The [Node.t] parameter is the accuser's node target. The accuser
     will be configured to be synchronised with the given node, and
-    will communicate with it. *)
+    will communicate with it.
+
+    If [runner] is specified, the accuser will be spawned on this
+    runner using SSH. *)
 val create :
   protocol:Protocol.t ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?base_dir:string ->
+  ?runner:Runner.t ->
   Node.t ->
   t
 
@@ -160,13 +164,17 @@ val log_events : t -> unit
 
     The [Node.t] parameter is the accuser's node target. The accuser
     will be configured to be synchronised with the given node, and
-    will communicate with it. *)
+    will communicate with it.
+
+    If [runner] is specified, the accuser will be spawned on this
+    runner using SSH. *)
 val init :
   protocol:Protocol.t ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?base_dir:string ->
+  ?runner:Runner.t ->
   Node.t ->
   t Lwt.t
 
