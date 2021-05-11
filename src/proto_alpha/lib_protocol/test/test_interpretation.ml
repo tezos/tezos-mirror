@@ -69,7 +69,7 @@ let logger =
 let run_step ctxt code accu stack =
   let open Script_interpreter in
   step None ctxt default_step_constants code accu stack
-  >>=? fun ((accu, stack, ctxt') as r) ->
+  >>=? fun ((_, _, ctxt') as r) ->
   step (Some logger) ctxt default_step_constants code accu stack
   >>=? fun (_, _, ctxt'') ->
   if Gas.(gas_counter ctxt' <> gas_counter ctxt'') then
