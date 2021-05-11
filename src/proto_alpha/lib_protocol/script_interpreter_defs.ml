@@ -526,11 +526,13 @@ type outdated_context = OutDatedContext of context [@@unboxed]
 
 let update_context local_gas_counter = function
   | OutDatedContext ctxt ->
-      Gas.update_gas_counter ctxt (Saturation_repr.safe_int local_gas_counter)
+      Gas.update_remaining_operation_gas
+        ctxt
+        (Saturation_repr.safe_int local_gas_counter)
   [@@ocaml.inline always]
 
 let update_local_gas_counter ctxt =
-  (Gas.gas_counter ctxt :> int)
+  (Gas.remaining_operation_gas ctxt :> int)
   [@@ocaml.inline always]
 
 let outdated ctxt = OutDatedContext ctxt [@@ocaml.inline always]

@@ -1518,7 +1518,7 @@ and klog :
 *)
 
 let step_descr ~log_now logger (ctxt, sc) descr accu stack =
-  let gas = (Gas.gas_counter ctxt :> int) in
+  let gas = (Gas.remaining_operation_gas ctxt :> int) in
   ( match logger with
   | None ->
       step (outdated ctxt, sc) gas descr.kinstr KNil accu stack
@@ -1539,7 +1539,7 @@ let interp logger g (Lam (code, _)) arg =
   >|=? fun (ret, (EmptyCell, EmptyCell), ctxt) -> (ret, ctxt)
 
 let kstep logger ctxt step_constants kinstr accu stack =
-  let gas = (Gas.gas_counter ctxt :> int) in
+  let gas = (Gas.remaining_operation_gas ctxt :> int) in
   let kinstr =
     match logger with
     | None ->

@@ -72,7 +72,7 @@ let run_step ctxt code accu stack =
   >>=? fun ((_, _, ctxt') as r) ->
   step (Some logger) ctxt default_step_constants code accu stack
   >>=? fun (_, _, ctxt'') ->
-  if Gas.(gas_counter ctxt' <> gas_counter ctxt'') then
+  if Gas.(remaining_operation_gas ctxt' <> remaining_operation_gas ctxt'') then
     Alcotest.failf "Logging should not have an impact on gas consumption." ;
   return r
 
