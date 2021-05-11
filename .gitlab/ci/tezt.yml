@@ -13,21 +13,25 @@
       - tezt.log
     expire_in: 1 day
     when: on_failure
+  variables:
+    TEZT_JOBS_TOTAL: 3
+  script:
+    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/test-results.json --job $TEZT_JOB/$TEZT_JOBS_TOTAL
 
 tezt:1:
   extends: .tezt_template
-  script:
-    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/test-results.json --job 1/3
+  variables:
+    TEZT_JOB: 1
 
 tezt:2:
   extends: .tezt_template
-  script:
-    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/test-results.json --job 2/3
+  variables:
+    TEZT_JOB: 2
 
 tezt:3:
   extends: .tezt_template
-  script:
-    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/test-results.json --job 3/3
+  variables:
+    TEZT_JOB: 3
 
 tezt:manual:migration:
   extends: .test_template
