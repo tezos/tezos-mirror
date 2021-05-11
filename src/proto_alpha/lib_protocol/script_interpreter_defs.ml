@@ -447,7 +447,6 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
   let a_little = Gas.atomic_step_cost (Saturation_repr.safe_int 1) in
   match ks with
   | KLog _ ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
   | KNil ->
       (* FIXME: This will be fixed when the new cost model is defined. *)
