@@ -112,6 +112,24 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
       >>= fun () -> return_unit
   | Error errs -> print_errors cctxt errs ~show_source ~parsed
 
+let run_view (cctxt : #Protocol_client_context.rpc_context)
+    ~(chain : Chain_services.chain) ~block ~(contract : Contract.t) ~entrypoint
+    ~(input : Michelson_v1_parser.parsed)
+    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
+    () =
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  Plugin.RPC.run_view
+    cctxt
+    (chain, block)
+    ?gas
+    ~contract
+    ~entrypoint
+    ~input:input.expanded
+    ~chain_id
+    ~source
+    ~payer
+    ~unparsing_mode
+
 let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance
     ~(program : Michelson_v1_parser.parsed)

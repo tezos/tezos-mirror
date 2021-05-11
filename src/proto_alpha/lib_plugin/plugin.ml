@@ -244,6 +244,9 @@ module View_helpers = struct
   type Environment.Error_monad.error += View_callback_origination_failed
 
   type Environment.Error_monad.error +=
+    | Illformed_view_type of string * Script.expr
+
+  type Environment.Error_monad.error +=
     | View_never_returns of string * Contract.t
 
   type Environment.Error_monad.error +=
@@ -270,6 +273,25 @@ module View_helpers = struct
       Data_encoding.(unit)
       (function View_callback_origination_failed -> Some () | _ -> None)
       (fun () -> View_callback_origination_failed) ;
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"illformedViewType"
+      ~title:"An entrypoint type is incompatible with TZIP-4 view type."
+      ~description:"An entrypoint type is incompatible with TZIP-4 view type."
+      ~pp:(fun ppf (entrypoint, typ) ->
+        Format.fprintf
+          ppf
+          "The view %s has type %a, it is not compatible with a TZIP-4 view \
+           type."
+          entrypoint
+          Micheline_printer.print_expr
+          (Micheline_printer.printable
+             (fun x -> x)
+             (Michelson_v1_primitives.strings_of_prims typ)))
+      Data_encoding.(
+        obj2 (req "entrypoint" string) (req "type" Script.expr_encoding))
+      (function Illformed_view_type (etp, exp) -> Some (etp, exp) | _ -> None)
+      (fun (etp, exp) -> Illformed_view_type (etp, exp)) ;
     Environment.Error_monad.register_error_kind
       `Permanent
       ~id:"viewNeverReturns"
@@ -352,6 +374,16 @@ module View_helpers = struct
                  Data_encoding.Binary.to_bytes_exn Contract.encoding callback );
            ],
            [] ))
+
+  let extract_view_output_type entrypoint ty =
+    match Micheline.root ty with
+    | Micheline.Prim
+        ( _,
+          Script.T_pair,
+          [_; Micheline.Prim (_, Script.T_contract, [ty], _)],
+          _ ) ->
+        ok (Micheline.strip_locations ty)
+    | _ -> Environment.Error_monad.error (Illformed_view_type (entrypoint, ty))
 
   (* 'view' entrypoints returns their value by calling a callback contract, thus
      the expected result is a unique internal transaction to this callback. *)
@@ -530,10 +562,9 @@ module RPC = struct
 
       let run_view_encoding =
         let open Data_encoding in
-        obj9
+        obj8
           (req "contract" Contract.encoding)
           (req "entrypoint" string)
-          (req "type" Script.expr_encoding)
           (req "input" Script.expr_encoding)
           (req "chain_id" Chain_id.encoding)
           (opt "source" Contract.encoding)
@@ -955,6 +986,22 @@ module RPC = struct
           ~script:(script, None)
         >>=? fun ctxt -> return (ctxt, dummy_contract)
       in
+      let script_entrypoint_type ctxt expr entrypoint =
+        let ctxt = Gas.set_unlimited ctxt in
+        let legacy = false in
+        let open Script_ir_translator in
+        Lwt.return
+          ( ( parse_toplevel ~legacy expr >>? fun (arg_type, _, _, root_name) ->
+              parse_parameter_ty ctxt ~legacy arg_type
+              >>? fun (Ex_ty arg_type, _) ->
+              Script_ir_translator.find_entrypoint
+                ~root_name
+                arg_type
+                entrypoint )
+          >>? fun (_f, Ex_ty ty) ->
+            unparse_ty ctxt ty >|? fun (ty_node, _) ->
+            Micheline.strip_locations ty_node )
+      in
       Registration.register0
         S.run_code
         (fun
@@ -1071,7 +1118,6 @@ module RPC = struct
           ()
           ( contract,
             entrypoint,
-            ty,
             input,
             chain_id,
             source,
@@ -1080,10 +1126,16 @@ module RPC = struct
             unparsing_mode )
         ->
           Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
-          (match script_opt with
-          | None -> Error_monad.error View_helpers.Viewed_contract_has_no_script
-          | Some script -> ok script)
+          Option.fold
+            ~some:ok
+            ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
+            script_opt
           >>?= fun script ->
+          Script_repr.(force_decode script.code) >>?= fun decoded_script ->
+          script_entrypoint_type ctxt decoded_script entrypoint
+          >>=? fun view_ty ->
+          View_helpers.extract_view_output_type entrypoint view_ty
+          >>?= fun ty ->
           Error_monad.trace View_helpers.View_callback_origination_failed
           @@ originate_dummy_contract
                ctxt
@@ -1313,21 +1365,7 @@ module RPC = struct
       Registration.register0
         S.entrypoint_type
         (fun ctxt () (expr, entrypoint) ->
-          let ctxt = Gas.set_unlimited ctxt in
-          let legacy = false in
-          let open Script_ir_translator in
-          Lwt.return
-            ( ( parse_toplevel ~legacy expr
-              >>? fun (arg_type, _, _, root_name) ->
-                parse_parameter_ty ctxt ~legacy arg_type
-                >>? fun (Ex_ty arg_type, _) ->
-                Script_ir_translator.find_entrypoint
-                  ~root_name
-                  arg_type
-                  entrypoint )
-            >>? fun (_f, Ex_ty ty) ->
-              unparse_ty ctxt ty >|? fun (ty_node, _) ->
-              Micheline.strip_locations ty_node )) ;
+          script_entrypoint_type ctxt expr entrypoint) ;
       Registration.register0 S.list_entrypoints (fun ctxt () expr ->
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = false in
@@ -1383,8 +1421,8 @@ module RPC = struct
             entrypoint ),
           unparsing_mode )
 
-    let run_view ctxt block ?gas ~contract ~entrypoint ~ty ~input ~chain_id
-        ?source ?payer ~unparsing_mode =
+    let run_view ctxt block ?gas ~contract ~entrypoint ~input ~chain_id ?source
+        ?payer ~unparsing_mode =
       RPC_context.make_call0
         S.run_view
         ctxt
@@ -1392,7 +1430,6 @@ module RPC = struct
         ()
         ( contract,
           entrypoint,
-          ty,
           input,
           chain_id,
           source,

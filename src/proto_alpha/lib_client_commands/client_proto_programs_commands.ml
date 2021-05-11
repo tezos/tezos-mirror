@@ -924,8 +924,6 @@ let commands () =
          (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["run"; "tzip4"; "view"]
       @@ param ~name:"entrypoint" ~desc:"the name of the view" string_parameter
-      @@ prefixes ["of"; "type"]
-      @@ param ~name:"ty" ~desc:"the return type of the view" data_parameter
       @@ prefixes ["on"; "contract"]
       @@ ContractAlias.destination_param
            ~name:"contract"
@@ -935,24 +933,22 @@ let commands () =
       @@ stop)
       (fun (source, payer, gas, unparsing_mode)
            entrypoint
-           typ
            (_, contract)
            input
            cctxt ->
         let source = Option.map snd source in
         let payer = Option.map snd payer in
-        Chain_services.chain_id cctxt ~chain:cctxt#chain () >>=? fun chain_id ->
-        Plugin.RPC.Scripts.run_view
+        Client_proto_programs.run_view
           cctxt
-          (cctxt#chain, cctxt#block)
+          ~chain:cctxt#chain
+          ~block:cctxt#block
           ?gas
           ~contract
           ~entrypoint
-          ~ty:typ.expanded
-          ~input:input.expanded
-          ~chain_id
+          ~input
           ?source
           ?payer
           ~unparsing_mode
+          ()
         >>= fun res -> print_view_result cctxt res);
   ]
