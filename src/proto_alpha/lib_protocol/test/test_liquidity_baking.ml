@@ -37,7 +37,7 @@ open Test_tez
 (* The script hash of https://gitlab.com/dexter2tz/dexter2tz/-/blob/liquidity_baking/dexter.liquidity_baking.mligo.tz *)
 let expected_cpmm_hash =
   Script_expr_hash.of_b58check_exn
-    "exprvS9AKw8Ejk5vfc1tod589gK1yoGcQEJYsMkKaeojDr5jQNSHpX"
+    "exprvEBYbxZruLZ9aUDEC9cUxn5KUj361xsaZXGfCxogFoKQ1er9Np"
 
 (* The script hash of https://gitlab.com/dexter2tz/dexter2tz/-/blob/liquidity_baking/lqt_fa12.mligo.tz *)
 let expected_lqt_hash =
