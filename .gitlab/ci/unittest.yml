@@ -72,6 +72,7 @@ unit:non-proto:
     - scripts/test_wrapper.sh src/bin_client client
     - scripts/test_wrapper.sh src/bin_snoop/latex snoop_latex
     - scripts/test_wrapper.sh src/lib_base base
+    - scripts/test_wrapper.sh src/lib_base/unix base_unix
     - scripts/test_wrapper.sh src/lib_benchmark/lib_micheline_rewriting benchmark_lib_micheline_rewriting
     - scripts/test_wrapper.sh src/lib_benchmark benchmark
     - scripts/test_wrapper.sh src/lib_clic clic
