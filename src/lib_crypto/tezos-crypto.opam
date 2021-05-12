@@ -15,7 +15,8 @@ depends: [
   "tezos-clic"
   "lwt"
   "bls12-381"
-  "hacl-star" { >= "0.3" }
+  "tezos-hacl-glue"
+  "tezos-hacl-glue-unix" {with-test}
   "zarith"
   "secp256k1-internal"
   "uecc"
@@ -23,9 +24,6 @@ depends: [
   "bls12-381-unix" { with-test }
   "alcotest" { with-test & >= "1.1.0" }
   "alcotest-lwt" { with-test & >= "1.1.0" }
-]
-conflicts: [
-  "hacl_x25519"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

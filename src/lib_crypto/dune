@@ -9,7 +9,9 @@
  (libraries data-encoding
             tezos-lwt-result-stdlib
             lwt
-            hacl-star
+            ; NOTE: tezos-*-glue are virtual packages
+            ; either the unix or js implementation must be installed
+            tezos-hacl-glue
             bls12-381
             secp256k1-internal
             tezos-error-monad
