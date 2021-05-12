@@ -181,6 +181,8 @@ struct
   module Data_encoding = struct
     include Data_encoding
 
+    type tag_size = [`Uint8 | `Uint16]
+
     let def name ?title ?description encoding =
       def (Param.name ^ "." ^ name) ?title ?description encoding
   end
