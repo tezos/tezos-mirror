@@ -61,7 +61,7 @@ module P256_Props =
     (struct
       let name = "P256"
     end)
-    (P256_hacl)
+    (P256)
 
 module Secp256k1_Props =
   Signature_Properties
