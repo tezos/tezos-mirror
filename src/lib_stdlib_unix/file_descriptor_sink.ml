@@ -174,10 +174,17 @@ end) : Internal_event.SINK with type t = t = struct
       in
       lwt_bad_citizen_hack := event_json :: !lwt_bad_citizen_hack ;
       output_one output format event_json
-      >>=? fun () ->
-      lwt_bad_citizen_hack :=
-        List.filter (( = ) event_json) !lwt_bad_citizen_hack ;
-      return_unit )
+      >>= function
+      | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
+          (* The file descriptor was closed before the event arrived,
+             ignore it. *)
+          return_unit
+      | Error _ as err ->
+          Lwt.return err
+      | Ok () ->
+          lwt_bad_citizen_hack :=
+            List.filter (( = ) event_json) !lwt_bad_citizen_hack ;
+          return_unit )
     else return_unit
 
   let close {lwt_bad_citizen_hack; output; format; _} =
