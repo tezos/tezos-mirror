@@ -315,9 +315,7 @@ module Public_key = struct
     | Some (Secp256k1.Public_key.Data public_key) ->
         Some (Secp256k1 public_key)
     | Some (P256.Public_key.Data public_key) ->
-        if Option.is_some (Tezos_crypto.P256_hacl.Public_key.of_b58check_opt s)
-        then Some (P256 public_key)
-        else None
+        Some (P256 public_key)
     | _ ->
         None
 
@@ -395,14 +393,7 @@ module Public_key = struct
              case
                ~title:"P256"
                (Tag 2)
-               (conv
-                  (Binary.to_bytes_exn P256.Public_key.encoding)
-                  (fun bytes ->
-                    let _ =
-                      Binary.of_bytes_exn P256_hacl.Public_key.encoding bytes
-                    in
-                    Binary.of_bytes_exn P256.Public_key.encoding bytes)
-                  (Fixed.bytes 33))
+               P256.Public_key.encoding
                (function P256 x -> Some x | _ -> None)
                (function x -> P256 x) ]
 
