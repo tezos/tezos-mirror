@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(** This is the Michelson interpreter.
 
-type execution_trace =
-  (Script.location * Gas.t * (Script.expr * string option) list) list
+    This module offers a way to execute either a Michelson script or a
+    Michelson instruction.
+
+    Implementation details are documented in the .ml file.
+
+*)
+
+open Alpha_context
+open Script_typed_ir
 
 type error +=
   | Reject of Script.location * Script.expr * execution_trace option
@@ -58,41 +66,14 @@ type step_constants = {
   chain_id : Chain_id.t;
 }
 
-(** [STEP_LOGGER] is the module type of logging
-    modules as passed to the Michelson interpreter.
-    Note that logging must be performed by side-effects
-    on an underlying log structure. *)
-module type STEP_LOGGER = sig
-  (** [log_interp] is called at each call of the internal
-      function [interp]. [interp] is called when starting
-      the interpretation of a script and subsequently
-      at each [Exec] instruction. *)
-  val log_interp :
-    context -> ('bef, 'aft) Script_typed_ir.descr -> 'bef -> unit
-
-  (** [log_entry] is called {i before} executing
-      each instruction but {i after} gas for
-      this instruction has been successfully consumed. *)
-  val log_entry : context -> ('bef, 'aft) Script_typed_ir.descr -> 'bef -> unit
-
-  (** [log_exit] is called {i after} executing each
-      instruction. *)
-  val log_exit : context -> ('bef, 'aft) Script_typed_ir.descr -> 'aft -> unit
-
-  (** [get_log] allows to obtain an execution trace, if
-      any was produced. *)
-  val get_log : unit -> execution_trace option tzresult Lwt.t
-end
-
-type logger = (module STEP_LOGGER)
-
 val step :
-  logger ->
+  logger option ->
   context ->
   step_constants ->
-  ('bef, 'aft) Script_typed_ir.descr ->
-  'bef ->
-  ('aft * context) tzresult Lwt.t
+  ('a, 's, 'r, 'f) Script_typed_ir.kdescr ->
+  'a ->
+  's ->
+  ('r * 'f * context) tzresult Lwt.t
 
 val execute :
   ?logger:logger ->
@@ -104,3 +85,53 @@ val execute :
   parameter:Script.expr ->
   internal:bool ->
   execution_result tzresult Lwt.t
+
+(** [kstep logger ctxt step_constants kinstr accu stack] interprets the
+    script represented by [kinstr] under the context [ctxt]. This will
+    turn a stack whose topmost element is [accu] and remaining elements
+    [stack] into a new accumulator and a new stack. This function also
+    returns an updated context. If [logger] is given, [kstep] calls back
+    its functions at specific points of the execution. The execution is
+    parameterized by some [step_constants]. *)
+val kstep :
+  logger option ->
+  context ->
+  step_constants ->
+  ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
+  'a ->
+  's ->
+  ('r * 'f * context) tzresult Lwt.t
+
+(** Internal interpretation loop
+    ============================
+
+    The following types and the following functions are exposed
+    in the interface to allow the inference of a gas model in
+    snoop.
+
+    Strictly speaking, they should not be considered as part of
+    the interface since they expose implementation details that
+    may change in the future.
+
+*)
+
+module Internals : sig
+  (** Internally, the interpretation loop uses a local gas counter. *)
+  type local_gas_counter = int
+
+  (** During the evaluation, the gas level in the context is outdated.
+      See comments in the implementation file for more details. *)
+  type outdated_context = OutDatedContext of context [@@unboxed]
+
+  (** [next logger (ctxt, step_constants) local_gas_counter ks accu
+      stack] is an internal function which interprets the continuation
+      [ks] to execute the interpreter on the current A-stack. *)
+  val next :
+    logger option ->
+    outdated_context * step_constants ->
+    local_gas_counter ->
+    ('a, 's, 'r, 'f) continuation ->
+    'a ->
+    's ->
+    ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+end

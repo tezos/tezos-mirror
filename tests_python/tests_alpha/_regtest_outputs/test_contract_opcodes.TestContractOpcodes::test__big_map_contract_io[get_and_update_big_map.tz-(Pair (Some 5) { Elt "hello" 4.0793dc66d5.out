@@ -9,35 +9,28 @@ big_map diff
   Set map(4)["hello"] to 4
   Set map(4)["hi"] to 5
 trace
-  - location: 11 (remaining gas: 1039975.301 units remaining)
+  - location: 13 (remaining gas: 1039975.301 units remaining)
     [ (Pair "hi" (Some 5) { Elt "hello" 4 })  	 ]
-  - location: 13 (remaining gas: 1039975.191 units remaining)
+  - location: 13 (remaining gas: 1039975.251 units remaining)
     [ "hi"  	@parameter
       (Pair (Some 5) { Elt "hello" 4 })  	@storage ]
-  - location: 16 (remaining gas: 1039975.036 units remaining)
+  - location: 14 (remaining gas: 1039975.206 units remaining)
+    [ (Pair (Some 5) { Elt "hello" 4 })  	@storage ]
+  - location: 16 (remaining gas: 1039975.156 units remaining)
     [ (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: 15 (remaining gas: 1039974.991 units remaining)
-    [ (Some 5)  	
-      { Elt "hello" 4 }  	 ]
-  - location: 14 (remaining gas: 1039974.991 units remaining)
+  - location: 14 (remaining gas: 1039975.154 units remaining)
     [ "hi"  	@parameter
       (Some 5)  	
       { Elt "hello" 4 }  	 ]
-  - location: -1 (remaining gas: 1039974.946 units remaining)
-    [ "hi"  	@parameter
-      (Some 5)  	
-      { Elt "hello" 4 }  	 ]
-  - location: 17 (remaining gas: 1039965.996 units remaining)
+  - location: 17 (remaining gas: 1039966.234 units remaining)
     [ None  	
       { Elt "hello" 4 ; Elt "hi" 5 }  	 ]
-  - location: 18 (remaining gas: 1039965.921 units remaining)
+  - location: 18 (remaining gas: 1039966.189 units remaining)
     [ (Pair None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: 19 (remaining gas: 1039965.846 units remaining)
+  - location: 19 (remaining gas: 1039966.144 units remaining)
     [ {}  	
       (Pair None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: 21 (remaining gas: 1039965.771 units remaining)
-    [ (Pair {} None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
-  - location: -1 (remaining gas: 1039965.726 units remaining)
+  - location: 21 (remaining gas: 1039966.099 units remaining)
     [ (Pair {} None { Elt "hello" 4 ; Elt "hi" 5 })  	 ]
 

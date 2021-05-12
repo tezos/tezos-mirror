@@ -9,39 +9,36 @@ big_map diff
   Set map(4)["bar"] to 4
   Set map(4)["foo"] to 11
 trace
-  - location: 11 (remaining gas: 1039963.846 units remaining)
+  - location: 12 (remaining gas: 1039963.846 units remaining)
     [ (Pair "baz" { Elt "bar" 4 ; Elt "foo" 11 } None)  	 ]
-  - location: 12 (remaining gas: 1039963.766 units remaining)
+  - location: 12 (remaining gas: 1039963.796 units remaining)
     [ "baz"  	@parameter
       (Pair { Elt "bar" 4 ; Elt "foo" 11 } None)  	@storage ]
-  - location: 15 (remaining gas: 1039963.611 units remaining)
+  - location: 13 (remaining gas: 1039963.751 units remaining)
+    [ (Pair { Elt "bar" 4 ; Elt "foo" 11 } None)  	@storage ]
+  - location: 15 (remaining gas: 1039963.701 units remaining)
     [ { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
-  - location: 16 (remaining gas: 1039963.531 units remaining)
+  - location: 16 (remaining gas: 1039963.651 units remaining)
     [ { Elt "bar" 4 ; Elt "foo" 11 }  	
       { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
-  - location: -1 (remaining gas: 1039963.486 units remaining)
-    [ { Elt "bar" 4 ; Elt "foo" 11 }  	
-      { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
-  - location: 13 (remaining gas: 1039963.486 units remaining)
+  - location: 13 (remaining gas: 1039963.649 units remaining)
     [ "baz"  	@parameter
       { Elt "bar" 4 ; Elt "foo" 11 }  	
       { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
-  - location: 17 (remaining gas: 1039952.621 units remaining)
+  - location: 17 (remaining gas: 1039952.814 units remaining)
     [ False  	
       { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
-  - location: 18 (remaining gas: 1039952.546 units remaining)
+  - location: 18 (remaining gas: 1039952.769 units remaining)
     [ (Some False)  	
       { Elt "bar" 4 ; Elt "foo" 11 }  	 ]
-  - location: 19 (remaining gas: 1039952.476 units remaining)
+  - location: 19 (remaining gas: 1039952.729 units remaining)
     [ { Elt "bar" 4 ; Elt "foo" 11 }  	
       (Some False)  	 ]
-  - location: 20 (remaining gas: 1039952.401 units remaining)
+  - location: 20 (remaining gas: 1039952.684 units remaining)
     [ (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some False))  	 ]
-  - location: 21 (remaining gas: 1039952.326 units remaining)
+  - location: 21 (remaining gas: 1039952.639 units remaining)
     [ {}  	
       (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some False))  	 ]
-  - location: 23 (remaining gas: 1039952.251 units remaining)
-    [ (Pair {} { Elt "bar" 4 ; Elt "foo" 11 } (Some False))  	 ]
-  - location: -1 (remaining gas: 1039952.206 units remaining)
+  - location: 23 (remaining gas: 1039952.594 units remaining)
     [ (Pair {} { Elt "bar" 4 ; Elt "foo" 11 } (Some False))  	 ]
 

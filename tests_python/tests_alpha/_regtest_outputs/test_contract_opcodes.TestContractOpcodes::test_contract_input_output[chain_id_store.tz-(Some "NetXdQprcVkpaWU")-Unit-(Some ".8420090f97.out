@@ -7,19 +7,17 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039991.950 units remaining)
+  - location: 8 (remaining gas: 1039991.950 units remaining)
     [ (Pair Unit (Some "NetXdQprcVkpaWU"))  	 ]
-  - location: 8 (remaining gas: 1039991.875 units remaining)
+  - location: 8 (remaining gas: 1039991.905 units remaining)
     [  ]
-  - location: 9 (remaining gas: 1039991.800 units remaining)
+  - location: 9 (remaining gas: 1039991.860 units remaining)
     [ "NetXdQprcVkpaWU"  	 ]
-  - location: 10 (remaining gas: 1039991.725 units remaining)
+  - location: 10 (remaining gas: 1039991.815 units remaining)
     [ (Some "NetXdQprcVkpaWU")  	 ]
-  - location: 11 (remaining gas: 1039991.650 units remaining)
+  - location: 11 (remaining gas: 1039991.770 units remaining)
     [ {}  	
       (Some "NetXdQprcVkpaWU")  	 ]
-  - location: 13 (remaining gas: 1039991.575 units remaining)
-    [ (Pair {} (Some "NetXdQprcVkpaWU"))  	 ]
-  - location: -1 (remaining gas: 1039991.530 units remaining)
+  - location: 13 (remaining gas: 1039991.725 units remaining)
     [ (Pair {} (Some "NetXdQprcVkpaWU"))  	 ]
 

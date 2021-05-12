@@ -68,6 +68,30 @@ let saturate_if_undef = function None -> saturated | Some x -> x
 
 let safe_int x = of_int_opt x |> saturate_if_undef
 
+let numbits x =
+  let x = ref x and n = ref 0 in
+  (let y = !x lsr 32 in
+   if y <> 0 then (
+     n := !n + 32 ;
+     x := y )) ;
+  (let y = !x lsr 16 in
+   if y <> 0 then (
+     n := !n + 16 ;
+     x := y )) ;
+  (let y = !x lsr 8 in
+   if y <> 0 then (
+     n := !n + 8 ;
+     x := y )) ;
+  (let y = !x lsr 4 in
+   if y <> 0 then (
+     n := !n + 4 ;
+     x := y )) ;
+  (let y = !x lsr 2 in
+   if y <> 0 then (
+     n := !n + 2 ;
+     x := y )) ;
+  if !x lsr 1 <> 0 then !n + 2 else !n + !x
+
 let zero = 0
 
 let small_enough z =
@@ -115,7 +139,7 @@ let scale_fast x y =
 
 let add x y =
   let z = x + y in
-  if z >= 0 then z else saturated
+  if Compare.Int.(z >= 0) then z else saturated
 
 let sub x y = Compare.Int.max (x - y) 0
 

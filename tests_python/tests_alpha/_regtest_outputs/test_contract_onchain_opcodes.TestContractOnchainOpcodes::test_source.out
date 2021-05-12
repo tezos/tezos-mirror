@@ -44,7 +44,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as source.
 Injected block [BLOCK_HASH]
 Node is bootstrapped.
-Estimated gas: 2543.074 units (will add 100 for safety)
+Estimated gas: 2542.911 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -57,7 +57,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000513
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2644
+    Gas limit: 2643
     Storage limit: 0 bytes
     Balance updates:
       [CONTRACT_HASH] ................ -ꜩ0.000513
@@ -69,14 +69,14 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c
       Storage size: 65 bytes
-      Consumed gas: 2543.074
+      Consumed gas: 2542.911
 
 Injected block [BLOCK_HASH]
 "[CONTRACT_HASH]"
 [CONTRACT_HASH]
 
 Node is bootstrapped.
-Estimated gas: 5960.632 units (will add 100 for safety)
+Estimated gas: 5960.144 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -102,7 +102,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 55 bytes
-      Consumed gas: 3417.558
+      Consumed gas: 3417.233
     Internal operations:
       Transaction:
         Amount: ꜩ0
@@ -111,7 +111,7 @@ This sequence of operations was run:
         This transaction was successfully applied
         Updated storage: 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c
         Storage size: 65 bytes
-        Consumed gas: 2543.074
+        Consumed gas: 2542.911
 
 Injected block [BLOCK_HASH]
 "[CONTRACT_HASH]"

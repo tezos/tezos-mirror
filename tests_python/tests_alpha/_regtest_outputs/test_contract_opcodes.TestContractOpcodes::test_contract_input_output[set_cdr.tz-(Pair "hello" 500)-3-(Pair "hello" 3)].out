@@ -7,44 +7,40 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 1039986.051 units remaining)
+  - location: 9 (remaining gas: 1039986.051 units remaining)
     [ (Pair 3 "hello" 500)  	 ]
-  - location: 9 (remaining gas: 1039985.971 units remaining)
+  - location: 9 (remaining gas: 1039986.001 units remaining)
     [ (Pair 3 "hello" 500)  	
       (Pair 3 "hello" 500)  	 ]
-  - location: 10 (remaining gas: 1039985.891 units remaining)
+  - location: 10 (remaining gas: 1039985.951 units remaining)
     [ (Pair "hello" 500)  	@storage
       (Pair 3 "hello" 500)  	 ]
-  - location: 13 (remaining gas: 1039985.736 units remaining)
+  - location: 11 (remaining gas: 1039985.906 units remaining)
+    [ (Pair 3 "hello" 500)  	 ]
+  - location: 13 (remaining gas: 1039985.856 units remaining)
     [ 3  	@parameter ]
-  - location: 12 (remaining gas: 1039985.691 units remaining)
-    [ 3  	@parameter ]
-  - location: 11 (remaining gas: 1039985.691 units remaining)
+  - location: 11 (remaining gas: 1039985.854 units remaining)
     [ (Pair "hello" 500)  	@storage
       3  	@parameter ]
-  - location: 15 (remaining gas: 1039985.581 units remaining)
+  - location: 15 (remaining gas: 1039985.804 units remaining)
     [ (Pair "hello" 500)  	@storage
       (Pair "hello" 500)  	@storage
       3  	@parameter ]
-  - location: 16 (remaining gas: 1039985.501 units remaining)
+  - location: 16 (remaining gas: 1039985.754 units remaining)
     [ 500  	
       (Pair "hello" 500)  	@storage
       3  	@parameter ]
-  - location: 17 (remaining gas: 1039985.426 units remaining)
+  - location: 17 (remaining gas: 1039985.709 units remaining)
     [ (Pair "hello" 500)  	@storage
       3  	@parameter ]
-  - location: 18 (remaining gas: 1039985.346 units remaining)
+  - location: 18 (remaining gas: 1039985.659 units remaining)
     [ "hello"  	@storage.s
       3  	@parameter ]
-  - location: 19 (remaining gas: 1039985.271 units remaining)
+  - location: 19 (remaining gas: 1039985.614 units remaining)
     [ (Pair "hello" 3)  	@storage ]
-  - location: -1 (remaining gas: 1039985.226 units remaining)
-    [ (Pair "hello" 3)  	@storage ]
-  - location: 20 (remaining gas: 1039985.151 units remaining)
+  - location: 20 (remaining gas: 1039985.569 units remaining)
     [ {}  	
       (Pair "hello" 3)  	@storage ]
-  - location: 22 (remaining gas: 1039985.076 units remaining)
-    [ (Pair {} "hello" 3)  	 ]
-  - location: -1 (remaining gas: 1039985.031 units remaining)
+  - location: 22 (remaining gas: 1039985.524 units remaining)
     [ (Pair {} "hello" 3)  	 ]
 

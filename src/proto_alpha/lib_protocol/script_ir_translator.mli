@@ -33,7 +33,8 @@ type ex_comparable_ty =
 
 type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 
-type ex_stack_ty = Ex_stack_ty : 'a Script_typed_ir.stack_ty -> ex_stack_ty
+type ex_stack_ty =
+  | Ex_stack_ty : ('a, 's) Script_typed_ir.stack_ty -> ex_stack_ty
 
 type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
 
@@ -51,9 +52,23 @@ type ('arg, 'storage) code = {
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
+type ('a, 's, 'b, 'u) cinstr = {
+  apply :
+    'r 'f. ('a, 's) Script_typed_ir.kinfo ->
+    ('b, 'u, 'r, 'f) Script_typed_ir.kinstr ->
+    ('a, 's, 'r, 'f) Script_typed_ir.kinstr;
+}
+
+type ('a, 's, 'b, 'u) descr = {
+  loc : Script.location;
+  bef : ('a, 's) Script_typed_ir.stack_ty;
+  aft : ('b, 'u) Script_typed_ir.stack_ty;
+  instr : ('a, 's, 'b, 'u) cinstr;
+}
+
 type tc_context =
   | Lambda : tc_context
-  | Dip : 'a Script_typed_ir.stack_ty * tc_context -> tc_context
+  | Dip : ('a, 's) Script_typed_ir.stack_ty * tc_context -> tc_context
   | Toplevel : {
       storage_type : 'sto Script_typed_ir.ty;
       param_type : 'param Script_typed_ir.ty;
@@ -62,14 +77,13 @@ type tc_context =
     }
       -> tc_context
 
-type 'bef judgement =
-  | Typed : ('bef, 'aft) Script_typed_ir.descr -> 'bef judgement
+type ('a, 's) judgement =
+  | Typed : ('a, 's, 'b, 'u) descr -> ('a, 's) judgement
   | Failed : {
       descr :
-        'aft. 'aft Script_typed_ir.stack_ty ->
-        ('bef, 'aft) Script_typed_ir.descr;
+        'b 'u. ('b, 'u) Script_typed_ir.stack_ty -> ('a, 's, 'b, 'u) descr;
     }
-      -> 'bef judgement
+      -> ('a, 's) judgement
 
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
@@ -150,7 +164,7 @@ val big_map_get_and_update :
   'key ->
   'value option ->
   ('key, 'value) Script_typed_ir.big_map ->
-  ('value option * ('key, 'value) Script_typed_ir.big_map * context) tzresult
+  (('value option * ('key, 'value) Script_typed_ir.big_map) * context) tzresult
   Lwt.t
 
 val ty_eq :
@@ -199,8 +213,8 @@ val parse_instr :
   context ->
   legacy:bool ->
   Script.node ->
-  'bef Script_typed_ir.stack_ty ->
-  ('bef judgement * context) tzresult Lwt.t
+  ('a, 's) Script_typed_ir.stack_ty ->
+  (('a, 's) judgement * context) tzresult Lwt.t
 
 (**
   [parse_ty] specialized for the right-hand side part of a big map type, i.e.

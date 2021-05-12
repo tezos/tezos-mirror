@@ -579,17 +579,20 @@ module RPC = struct
     module Traced_interpreter (Unparsing_mode : UNPARSING_MODE) = struct
       type log_element =
         | Log :
-            context * Script.location * 'a * 'a Script_typed_ir.stack_ty
+            context
+            * Script.location
+            * ('a * 's)
+            * ('a, 's) Script_typed_ir.stack_ty
             -> log_element
 
       let unparse_stack ctxt (stack, stack_ty) =
         (* We drop the gas limit as this function is only used for debugging/errors. *)
         let ctxt = Gas.set_unlimited ctxt in
         let rec unparse_stack :
-            type a.
-            a Script_typed_ir.stack_ty * a ->
+            type a s.
+            (a, s) Script_typed_ir.stack_ty * (a * s) ->
             (Script.expr * string option) list tzresult Lwt.t = function
-          | (Empty_t, ()) ->
+          | (Bot_t, (EmptyCell, EmptyCell)) ->
               return_nil
           | (Item_t (ty, rest_ty, annot), (v, rest)) ->
               Script_ir_translator.unparse_data
@@ -614,17 +617,16 @@ module RPC = struct
         in
         unparse_stack (stack_ty, stack)
 
-      module Trace_logger () : Script_interpreter.STEP_LOGGER = struct
-        let log : log_element list ref = ref []
-
-        let log_interp ctxt (descr : (_, _) Script_typed_ir.descr) stack =
-          log := Log (ctxt, descr.loc, stack, descr.bef) :: !log
-
-        let log_entry _ctxt _descr _stack = ()
-
-        let log_exit ctxt (descr : (_, _) Script_typed_ir.descr) stack =
-          log := Log (ctxt, descr.loc, stack, descr.aft) :: !log
-
+      let trace_logger () : Script_typed_ir.logger =
+        let log : log_element list ref = ref [] in
+        let log_interp _ ctxt loc sty stack =
+          log := Log (ctxt, loc, stack, sty) :: !log
+        in
+        let log_entry _ _ctxt _loc _sty _stack = () in
+        let log_exit _ ctxt loc sty stack =
+          log := Log (ctxt, loc, stack, sty) :: !log
+        in
+        let log_control _ = () in
         let get_log () =
           map_s
             (fun (Log (ctxt, loc, stack, stack_ty)) ->
@@ -632,12 +634,12 @@ module RPC = struct
               >>=? fun stack -> return (loc, Gas.level ctxt, stack))
             !log
           >>=? fun res -> return (Some (List.rev res))
-      end
+        in
+        {log_exit; log_entry; log_interp; get_log; log_control}
 
       let execute ctxt step_constants ~script ~entrypoint ~parameter =
-        let module Logger = Trace_logger () in
         let open Script_interpreter in
-        let logger = (module Logger : STEP_LOGGER) in
+        let logger = trace_logger () in
         execute
           ~logger
           ctxt
@@ -648,7 +650,7 @@ module RPC = struct
           ~parameter
           ~internal:true
         >>=? fun {ctxt; storage; lazy_storage_diff; operations} ->
-        Logger.get_log ()
+        logger.get_log ()
         >|=? fun trace ->
         let trace = Option.value ~default:[] trace in
         ({ctxt; storage; lazy_storage_diff; operations}, trace)

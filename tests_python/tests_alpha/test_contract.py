@@ -499,6 +499,68 @@ class TestContracts:
     @pytest.mark.parametrize(
         "contract,error_pattern",
         [
+            # Even though the interpreter uses a nonempty stack internally,
+            # the typechecker should not be able to observe it.
+            (
+                "stack_bottom_unfailwithable.tz",
+                r'wrong stack type for instruction FAILWITH',
+            ),
+            (
+                "stack_bottom_unrightable.tz",
+                r'wrong stack type for instruction RIGHT',
+            ),
+            (
+                "stack_bottom_unleftable.tz",
+                r'wrong stack type for instruction LEFT',
+            ),
+            (
+                "stack_bottom_ungetable.tz",
+                r'wrong stack type for instruction GET',
+            ),
+            (
+                "stack_bottom_unpairable.tz",
+                r'wrong stack type for instruction UNPAIR',
+            ),
+            (
+                "stack_bottom_undug2able.tz",
+                r'wrong stack type for instruction DUG',
+            ),
+            (
+                "stack_bottom_undugable.tz",
+                r'wrong stack type for instruction DUG',
+            ),
+            (
+                "stack_bottom_undig2able.tz",
+                r'wrong stack type for instruction DIG',
+            ),
+            (
+                "stack_bottom_undigable.tz",
+                r'wrong stack type for instruction DIG',
+            ),
+            (
+                "stack_bottom_undip2able.tz",
+                r'wrong stack type for instruction DUP',
+            ),
+            (
+                "stack_bottom_undipable.tz",
+                r'wrong stack type for instruction DUP',
+            ),
+            (
+                "stack_bottom_undup2able.tz",
+                r'wrong stack type for instruction DUP',
+            ),
+            (
+                "stack_bottom_undropable.tz",
+                r'wrong stack type for instruction DROP',
+            ),
+            (
+                "stack_bottom_unpopable.tz",
+                r'wrong stack type for instruction DUP',
+            ),
+            (
+                "stack_bottom_unpopable_in_lambda.tz",
+                r'wrong stack type for instruction DUP',
+            ),
             # operations cannot be PACKed
             (
                 "pack_operation.tz",
