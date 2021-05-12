@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Hacl_star
+open Tezos_hacl_glue
 
 type rsa_secret = {p : Z.t; q : Z.t}
 
@@ -50,11 +50,7 @@ let unlocked_value_to_symmetric_key unlocked_value =
   Crypto_box.Secretbox.unsafe_of_bytes hash
 
 (* A random Z arith element of size [size] bytes *)
-let random_z size =
-  let bytes = Bytes.create size in
-  let check_randomness = Hacl.RandomBuffer.randombytes bytes in
-  if not check_randomness then failwith "Hacl cannot generate entropy"
-  else bytes |> Bytes.to_string |> Z.of_bits
+let random_z size = Hacl.Rand.gen size |> Bytes.to_string |> Z.of_bits
 
 let random_prime_z size = random_z size |> Z.nextprime
 
@@ -80,8 +76,9 @@ let hash_to_prime public ~time value key =
       "\xff\x00\xff\x00\xff\x00\xff\x00"
       (List.map Z.to_bits [public; time; value; key])
   in
-  let hash_result = Bytes.create 32 in
-  Hacl.Blake2b_256.hash personalization (Bytes.of_string s) hash_result ;
+  let (Hacl.Blake2b.Hash hash_result) =
+    Hacl.Blake2b.direct ~key:personalization (Bytes.of_string s) 32
+  in
   Z.(nextprime (of_bits (Bytes.to_string hash_result)))
 
 let prove_without_secret public ~time locked_value unlocked_value =
