@@ -168,7 +168,11 @@ let get_constructor_name = function
   | EOVERFLOW -> "EOVERFLOW"
   | EUNKNOWNERR _ -> "EUNKNOWNERR"
 
-(* Should not be applied to eunknownerr *)
+(* This function is used to create an encoding for
+   the majority of unix error cases, which could be
+   encoded as constants.
+   It should not be applied to eunknownerr which needs
+   to also encode the error code *)
 let unix_error_constant_encoding error =
   let error_name = get_constructor_name @@ error in
   obj1 @@ req "unix-error" (constant error_name)
