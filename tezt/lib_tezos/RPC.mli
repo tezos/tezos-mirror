@@ -61,6 +61,14 @@ val get_checkpoint :
   Client.t ->
   JSON.t Lwt.t
 
+(** Call RPC /injection/operation *)
+val inject_operation :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
+
 (** Call RPC /injection/block *)
 val inject_block :
   ?node:Node.t ->
@@ -76,6 +84,14 @@ val get_protocol_data :
   ?chain:string ->
   ?block:string ->
   ?offset:int ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Call RPC /chain/[chain]/blocks/head/hash *)
+val get_branch :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
   Client.t ->
   JSON.t Lwt.t
 
@@ -98,6 +114,16 @@ val get_mempool_pending_operations :
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/preapply/block *)
 val preapply_block :
+  ?node:Node.t ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Call RPC /chain/[chain]/blocks/[block]/helpers/forge/operations *)
+val post_forge_operations :
   ?node:Node.t ->
   ?hooks:Process.hooks ->
   ?chain:string ->

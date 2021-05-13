@@ -271,6 +271,14 @@ let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
     client
   |> Process.check
 
+let spawn_endorse_for ?node ?(key = Constant.bootstrap2.alias) client =
+  spawn_command
+    client
+    (endpoint_arg ?node client @ mode_arg client @ ["endorse"; "for"; key])
+
+let endorse_for ?node ?key client =
+  spawn_endorse_for ?node ?key client |> Process.check
+
 let spawn_bake_for ?node ?protocol ?(key = Constant.bootstrap1.alias)
     ?(minimal_timestamp = true) ?mempool ?force ?context_path client =
   spawn_command

@@ -52,6 +52,10 @@ let get_protocol_data ?node ?hooks ?(chain = "main") ?(block = "head")
   let query_string = [("offset", string_of_int offset)] in
   Client.rpc ?node ?hooks GET path ~query_string client
 
+let get_branch ?node ?hooks ?(chain = "main") client =
+  let path = ["chains"; chain; "blocks"; "head"; "hash"] in
+  Client.rpc ?node ?hooks GET path client
+
 let get_operations ?node ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "operations"] in
   Client.rpc ?node ?hooks GET path client
@@ -69,6 +73,10 @@ let preapply_block ?node ?hooks ?(chain = "main") ?(block = "head") ~data
 
 let inject_block ?node ?hooks ~data client =
   let path = ["injection"; "block"] in
+  Client.rpc ?node ?hooks ~data POST path client
+
+let inject_operation ?node ?hooks ~data client =
+  let path = ["injection"; "operation"] in
   Client.rpc ?node ?hooks ~data POST path client
 
 let get_constants ?node ?hooks ?(chain = "main") ?(block = "head") client =
@@ -108,6 +116,13 @@ let get_levels_in_current_cycle ?node ?hooks ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
   in
   Client.rpc ?node ?hooks GET path client
+
+let post_forge_operations ?node ?hooks ?(chain = "main") ?(block = "head")
+    ~data client =
+  let path =
+    ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
+  in
+  Client.rpc ?node ?hooks ~data POST path client
 
 module Contracts = struct
   let spawn_get_all ?node ?hooks ?(chain = "main") ?(block = "head") client =

@@ -249,6 +249,14 @@ val spawn_show_address : ?show_secret:bool -> alias:string -> t -> Process.t
     [tezos-client show address] to get the generated key. *)
 val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
 
+(** Run [tezos-client endorse for].
+
+    Default [key] is {!Constant.bootstrap2.alias}. *)
+val endorse_for : ?node:Node.t -> ?key:string -> t -> unit Lwt.t
+
+(** Same as [endorse_for], but do not wait for the process to exit. *)
+val spawn_endorse_for : ?node:Node.t -> ?key:string -> t -> Process.t
+
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
   ?node:Node.t ->
