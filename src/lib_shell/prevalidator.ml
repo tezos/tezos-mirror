@@ -868,7 +868,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         ~from_block:pv.predecessor
         ~to_block:predecessor
         ~live_blocks:new_live_blocks
-        (Preapply_result.operations (validation_result pv))
+        (Operation_hash.Map.union
+           (fun _key v _ -> Some v)
+           (Preapply_result.operations (validation_result pv))
+           pv.pending)
       >>= fun pending ->
       let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
       let timestamp = Time.System.to_protocol timestamp_system in
