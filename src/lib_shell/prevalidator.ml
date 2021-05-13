@@ -434,14 +434,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                 let limit = limit - 1 in
                 let refused hash raw errors =
                   notify_operation pv `Refused raw ;
-                  let new_mempool =
-                    Mempool.
-                      {
-                        acc_mempool with
-                        pending =
-                          Operation_hash.Set.add hash acc_mempool.pending;
-                      }
-                  in
                   Option.iter
                     (fun e ->
                       pv.refusals <- Operation_hash.Map.remove e pv.refusals)
@@ -449,7 +441,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                   pv.refusals <-
                     Operation_hash.Map.add hash (raw, errors) pv.refusals ;
                   Distributed_db.Operation.clear_or_cancel pv.chain_db hash ;
-                  Lwt.return_ok (acc_validation_state, new_mempool, limit)
+                  pv.in_mempool <- Operation_hash.Set.add hash pv.in_mempool ;
+                  Lwt.return_ok (acc_validation_state, acc_mempool, limit)
                 in
                 match Prevalidation.parse op with
                 | Error errors ->
