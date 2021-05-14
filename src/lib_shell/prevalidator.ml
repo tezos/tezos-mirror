@@ -796,16 +796,40 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   module Handlers = struct
     type self = worker
 
+    let may_propagate_unknown_branch_operation pv op =
+      Prevalidation.parse op
+      >>?= (fun op ->
+             let is_alternative_endorsement () =
+               Lwt.return pv.validation_state
+               >>=? fun validation_state ->
+               Prevalidation.apply_operation validation_state op
+               >>= function
+               | Applied _ | Branch_delayed _ ->
+                   return_true
+               | _ ->
+                   return_false
+             in
+             if is_endorsement op then is_alternative_endorsement ()
+             else return_false)
+      >>= function Ok b -> Lwt.return b | Error _ -> Lwt.return_false
+
     let on_operation_arrived w (pv : state) oph op =
       pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
-      if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks) then (
-        Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+      if already_handled pv oph then return_unit
+      else if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks)
+      then (
         let error = [Exn (Failure "Unknown branch operation")] in
         handle_branch_refused pv op oph error ;
-        return_unit )
-      else if
-        not (already_handled pv oph) (* prevent double inclusion on flush *)
-      then
+        may_propagate_unknown_branch_operation pv op
+        >>= function
+        | true ->
+            let pending = Operation_hash.Set.singleton oph in
+            advertise w pv {Mempool.empty with pending} ;
+            return_unit
+        | false ->
+            Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+            return_unit )
+      else
         pre_filter w pv oph op
         >>= function
         | true ->
@@ -814,7 +838,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             return_unit
         | false ->
             return_unit
-      else return_unit
 
     let on_inject _w pv op =
       let oph = Operation.hash op in
