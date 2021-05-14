@@ -146,6 +146,16 @@ Docker Images
 Miscellaneous
 -------------
 
+Version 9.2
+===========
+
+Node
+----
+
+-  Updated the mempool to keep more than 50 non-included operations
+   when receiving a new block. In particular, this should result in
+   fewer endorsements being missed.
+
 Version 9.1
 ===========
 
