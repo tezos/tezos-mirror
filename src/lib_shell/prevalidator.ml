@@ -347,13 +347,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       {shell = op.raw.shell; protocol_data = op.protocol_data}
     = [0]
 
-  let is_endorsement_raw op =
-    match Prevalidation.parse op with
-    | Ok op ->
-        is_endorsement op
-    | Error _ ->
-        false
-
   let filter_config w pv =
     try
       match Protocol_hash.Map.find Proto.hash pv.filter_config with
@@ -564,18 +557,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           pv.mempool <-
             {
               Mempool.known_valid = List.rev_map fst pv.applied;
-              pending =
-                Operation_hash.Map.fold
-                  (fun k (op, _) s ->
-                    if is_endorsement_raw op then Operation_hash.Set.add k s
-                    else s)
-                  pv.branch_delays
-                @@ Operation_hash.Map.fold
-                     (fun k (op, _) s ->
-                       if is_endorsement_raw op then Operation_hash.Set.add k s
-                       else s)
-                     pv.branch_refusals
-                @@ remaining_pendings;
+              pending = remaining_pendings;
             } ;
           let chain_store = Distributed_db.chain_store pv.chain_db in
           Store.Chain.set_mempool
