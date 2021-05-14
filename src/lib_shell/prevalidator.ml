@@ -337,7 +337,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
               "Uncaught exception: %s\n%!"
               (Printexc.to_string exc))
           (fun () ->
-            Lwt_unix.sleep 0.01
+            Lwt_unix.sleep 0.1
             >>= fun () ->
             Worker.Queue.push_request_now w Advertise ;
             Lwt.return_unit)
