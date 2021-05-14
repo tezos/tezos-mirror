@@ -25,6 +25,8 @@
 
 open Binary_error_types
 
+let reraise e = raise e
+
 let raise e = raise (Read_error e)
 
 type state = {
@@ -232,13 +234,25 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let right = read_rec right state in
       (left, right)
   | Tups {kind = `Variable; left; right} -> read_variable_pair left right state
-  | Conv {inj; encoding; _} -> inj (read_rec encoding state)
-  | Union {tag_size; tagged_cases; _} ->
+  | Conv {inj; encoding; _} -> (
+      let v = read_rec encoding state in
+      try inj v with
+      | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+      | exc ->
+          let s = Printexc.to_string exc in
+          raise (Exception_raised_in_user_lambda s) )
+  | Union {tag_size; tagged_cases; _} -> (
       let ctag = Atom.tag tag_size state in
       if ctag >= Array.length tagged_cases then raise (Unexpected_tag ctag);
       let (Case {inj; encoding; _} as case) = tagged_cases.(ctag) in
       if is_undefined_case case then raise (Unexpected_tag ctag)
-      else inj (read_rec encoding state)
+      else
+        let e = read_rec encoding state in
+        try inj e with
+        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | exc ->
+            let s = Printexc.to_string exc in
+            raise (Exception_raised_in_user_lambda s) )
   | Dynamic_size {kind; encoding = e} ->
       let sz = Atom.int kind state in
       let remaining = check_remaining_bytes state sz in
@@ -273,8 +287,24 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       v
   | Describe {encoding = e; _} -> read_rec e state
   | Splitted {encoding = e; _} -> read_rec e state
-  | Mu {fix; _} -> read_rec (fix e) state
-  | Delayed f -> read_rec (f ()) state
+  | Mu {fix; _} ->
+      let e =
+        try fix e with
+        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | exc ->
+            let s = Printexc.to_string exc in
+            raise (Exception_raised_in_user_lambda s)
+      in
+      read_rec e state
+  | Delayed f ->
+      let e =
+        try f () with
+        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | exc ->
+            let s = Printexc.to_string exc in
+            raise (Exception_raised_in_user_lambda s)
+      in
+      read_rec e state
 
 and read_variable_pair :
     type left right.

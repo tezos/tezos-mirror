@@ -25,6 +25,8 @@
 
 open Binary_error_types
 
+let reraise exc = Stdlib.raise exc
+
 let raise error = Stdlib.raise (Write_error error)
 
 (** Imperative state of the binary writer. *)
@@ -266,9 +268,23 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       let (v1, v2) = value in
       write_rec left state v1;
       write_rec right state v2
-  | Conv {encoding = e; proj; _} -> write_rec e state (proj value)
+  | Conv {encoding = e; proj; _} ->
+      let value =
+        try proj value with
+        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | exc ->
+            let s = Printexc.to_string exc in
+            raise (Exception_raised_in_user_lambda s)
+      in
+      write_rec e state value
   | Union {tag_size; match_case; _} ->
-      let (Matched (tag, e, value)) = match_case value in
+      let (Matched (tag, e, value)) =
+        try match_case value with
+        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | exc ->
+            let s = Printexc.to_string exc in
+            raise (Exception_raised_in_user_lambda s)
+      in
       Atom.tag tag_size state tag;
       write_rec e state value
   | Dynamic_size {kind; encoding = e} ->
@@ -285,8 +301,24 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | Check_size {limit; encoding = e} -> write_with_limit limit e state value
   | Describe {encoding = e; _} -> write_rec e state value
   | Splitted {encoding = e; _} -> write_rec e state value
-  | Mu {fix; _} -> write_rec (fix e) state value
-  | Delayed f -> write_rec (f ()) state value
+  | Mu {fix; _} ->
+      let e =
+        try fix e with
+        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | exc ->
+            let s = Printexc.to_string exc in
+            raise (Exception_raised_in_user_lambda s)
+      in
+      write_rec e state value
+  | Delayed f ->
+      let e =
+        try f () with
+        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | exc ->
+            let s = Printexc.to_string exc in
+            raise (Exception_raised_in_user_lambda s)
+      in
+      write_rec e state value
 
 and write_with_limit : type a. int -> a Encoding.t -> writer_state -> a -> unit
     =

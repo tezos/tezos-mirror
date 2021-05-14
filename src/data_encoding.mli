@@ -971,6 +971,7 @@ module Binary : sig
     | Size_limit_exceeded
     | List_too_long
     | Array_too_long
+    | Exception_raised_in_user_lambda of string
 
   exception Read_error of read_error
 
@@ -989,6 +990,7 @@ module Binary : sig
     | Invalid_natural
     | List_too_long
     | Array_too_long
+    | Exception_raised_in_user_lambda of string
 
   val pp_write_error : Format.formatter -> write_error -> unit
 

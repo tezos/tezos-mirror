@@ -25,6 +25,8 @@
 
 open Binary_error_types
 
+let reraise exc = Stdlib.raise exc
+
 let raise e = raise (Read_error e)
 
 (** Persistent state of the binary reader. *)
@@ -313,6 +315,13 @@ let rec read_rec :
   | Tups {kind = `Variable; left; right} ->
       read_variable_pair left right state k
   | Conv {inj; encoding; _} ->
+      let inj v =
+        try inj v with
+        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | exc ->
+            let s = Printexc.to_string exc in
+            raise (Exception_raised_in_user_lambda s)
+      in
       read_rec whole encoding state @@ fun (v, state) -> k (inj v, state)
   | Union {tag_size; cases; _} -> (
       Atom.tag tag_size resume state @@ fun (ctag, state) ->
@@ -324,6 +333,13 @@ let rec read_rec :
       with
       | None -> Error (Unexpected_tag ctag)
       | Some (Case {encoding; inj; _}) ->
+          let inj v =
+            try inj v with
+            | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+            | exc ->
+                let s = Printexc.to_string exc in
+                raise (Exception_raised_in_user_lambda s)
+          in
           read_rec whole encoding state @@ fun (v, state) -> k (inj v, state) )
   | Dynamic_size {kind; encoding = e} ->
       Atom.int kind resume state @@ fun (sz, state) ->
@@ -361,8 +377,24 @@ let rec read_rec :
       k (v, {state with allowed_bytes})
   | Describe {encoding = e; _} -> read_rec whole e state k
   | Splitted {encoding = e; _} -> read_rec whole e state k
-  | Mu {fix; _} -> read_rec whole (fix e) state k
-  | Delayed f -> read_rec whole (f ()) state k
+  | Mu {fix; _} ->
+      let e =
+        try fix e with
+        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | exc ->
+            let s = Printexc.to_string exc in
+            raise (Exception_raised_in_user_lambda s)
+      in
+      read_rec whole e state k
+  | Delayed f ->
+      let e =
+        try f () with
+        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | exc ->
+            let s = Printexc.to_string exc in
+            raise (Exception_raised_in_user_lambda s)
+      in
+      read_rec whole e state k
 
 and remaining_bytes {remaining_bytes; _} =
   match remaining_bytes with

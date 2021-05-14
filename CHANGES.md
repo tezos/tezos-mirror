@@ -17,3 +17,6 @@ v0.3:
 - Improved documentation
 - Increase test coverage
 - Fix JSON encoding of Result
+
+v0.4:  
+- catch exceptions in user-provided functions
