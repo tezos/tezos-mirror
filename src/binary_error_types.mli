@@ -26,6 +26,8 @@
 (** This is for use *within* the data encoding library only. Instead, you should
     use the corresponding module intended for use: {!Data_encoding.Binary}. *)
 
+exception Invariant_gurad of string
+
 type read_error =
   | Not_enough_data
   | Extra_bytes
@@ -39,6 +41,7 @@ type read_error =
   | List_too_long
   | Array_too_long
   | Exception_raised_in_user_lambda of string
+  | User_invariant_guard of string
 
 exception Read_error of read_error
 

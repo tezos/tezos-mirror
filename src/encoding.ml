@@ -451,7 +451,7 @@ let conv_guard proj inj_guard ?schema encoding =
   let inj x =
     match inj_guard x with
     | Ok y -> y
-    | Error s -> raise (Failure ("Decoding invariant broken: " ^ s))
+    | Error s -> raise (Binary_error_types.Invariant_gurad s)
   in
   conv proj inj ?schema encoding
 

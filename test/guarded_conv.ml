@@ -105,6 +105,11 @@ let non_empty_list_is_not_an_empty_list () =
   (* decode with non-empty-list *)
   let d = Data_encoding.Binary.of_string non_empty_int8s s in
   assert (Result.is_error d);
+  let d = Result.get_error d in
+  assert (
+    match d with
+    | Data_encoding.Binary.User_invariant_guard _ -> true
+    | _ -> false );
   ()
 
 (* A second series of tests that defines an encoding for sorted lists. *)
@@ -184,6 +189,11 @@ let sorted_list_is_not_a_list_that_is_not_sorted xs =
   (* decode with non-empty-list *)
   let d = Data_encoding.Binary.of_string sorted_int8s s in
   assert (Result.is_error d);
+  let d = Result.get_error d in
+  assert (
+    match d with
+    | Data_encoding.Binary.User_invariant_guard _ -> true
+    | _ -> false );
   ()
 
 let sorted_list_is_not_a_list_that_is_not_sorted () =

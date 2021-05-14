@@ -107,6 +107,12 @@ let read_error_encoding : read_error Encoding.t =
           | (Exception_raised_in_user_lambda s : read_error) -> Some s
           | _ -> None)
         (fun s -> Exception_raised_in_user_lambda s);
+      case
+        (Tag 12)
+        ~title:"User invariant guard"
+        string
+        (function User_invariant_guard s -> Some s | _ -> None)
+        (fun s -> User_invariant_guard s);
     ]
 
 let pp_read_error ppf = function
@@ -125,6 +131,11 @@ let pp_read_error ppf = function
   | Array_too_long -> Format.fprintf ppf "Array length limit exceeded"
   | Exception_raised_in_user_lambda s ->
       Format.fprintf ppf "Exception raised in user function: %s" s
+  | User_invariant_guard s ->
+      Format.fprintf
+        ppf
+        "User-specified invariant not respected in encoded data: %s"
+        s
 
 let write_error_encoding =
   let open Encoding in

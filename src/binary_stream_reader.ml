@@ -318,6 +318,7 @@ let rec read_rec :
       let inj v =
         try inj v with
         | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | Invariant_gurad s -> raise (User_invariant_guard s)
         | exc ->
             let s = Printexc.to_string exc in
             raise (Exception_raised_in_user_lambda s)
@@ -336,6 +337,7 @@ let rec read_rec :
           let inj v =
             try inj v with
             | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+            | Invariant_gurad s -> raise (User_invariant_guard s)
             | exc ->
                 let s = Printexc.to_string exc in
                 raise (Exception_raised_in_user_lambda s)
@@ -381,6 +383,7 @@ let rec read_rec :
       let e =
         try fix e with
         | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | Invariant_gurad s -> raise (User_invariant_guard s)
         | exc ->
             let s = Printexc.to_string exc in
             raise (Exception_raised_in_user_lambda s)
@@ -390,6 +393,7 @@ let rec read_rec :
       let e =
         try f () with
         | (Out_of_memory | Stack_overflow) as exc -> reraise exc
+        | Invariant_gurad s -> raise (User_invariant_guard s)
         | exc ->
             let s = Printexc.to_string exc in
             raise (Exception_raised_in_user_lambda s)
