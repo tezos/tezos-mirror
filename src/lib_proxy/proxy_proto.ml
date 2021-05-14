@@ -46,10 +46,10 @@ module type PROTO_RPC = sig
 
     To speed things up, this function returns "v1" on any of these keys,
     to do a single request instead of two. This list is arbitrary. It was
-    built by initial input from @klakplok and by experimenting.
+    built by initial input from \@klakplok and by experimenting.
 
     This function guarantees that if it returns Some(prefix, suffix) then
-    prefix @@ suffix = key.
+    prefix \@\@ suffix = key.
   *)
   val split_key :
     Proxy_context.M.key -> (Proxy_context.M.key * Proxy_context.M.key) option

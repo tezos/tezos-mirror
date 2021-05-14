@@ -89,8 +89,8 @@
   - [Get_current_head chain_id]:
     message is ignored if the chain [chain_id] is inactive for the remote peer.
     Otherwise, replies with [Current_head (chain_id, head, mempool)] where
-    [head] is the current head for the requested chain. [mempool is the current
-    [mempool], or an empty mempool if the remote peer's mempool is disabled.
+    [head] is the current head for the requested chain. [mempool] is the current
+    mempool, or an empty mempool if the remote peer's mempool is disabled.
 
   - [Current_head (chain_id, header, mempool)]:
     message is ignored if the chain [chain_id] is inactive for the remote peer.

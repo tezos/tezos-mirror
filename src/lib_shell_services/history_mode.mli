@@ -77,7 +77,7 @@ val pp_short : Format.formatter -> t -> unit
 val tag : t Tag.def
 
 (** The module for handling legacy history modes. It is only used for
-   legacy support, see {lib_store/Legacy} and {lib_store/Snapshots}.
+   legacy support, see {!Tezos_store.Legacy} and {!Tezos_store.Snapshots}.
 *)
 module Legacy : sig
   type t = Archive | Full | Rolling

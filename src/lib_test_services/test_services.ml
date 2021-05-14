@@ -106,7 +106,7 @@ module Mock_sink : sig
      an event [e], and fails with the assertion message [str] if not. If
      [filter] is set, only the events whose section is [filter] are
      searched. If [strict] is set, then [e] must be the only event recorded
-     (subject to [filter).  *)
+     (subject to [filter]).  *)
   val assert_has_event :
     string -> ?filter:filter -> ?strict:bool -> pattern -> unit
 
@@ -114,7 +114,7 @@ module Mock_sink : sig
      recorded the list of events [es], and fails with the assertion message
      [str] if not. If [filter] is set, only the events whose section is
      [filter] are searched. If [strict] is set, then [es] must be the only
-     events recorded (subject to [filter).  *)
+     events recorded (subject to [filter]).  *)
   val assert_has_events :
     string -> ?filter:filter -> ?strict:bool -> pattern list -> unit
 

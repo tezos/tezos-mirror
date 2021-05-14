@@ -31,7 +31,7 @@ open Protocol
 (**
    Michelson code is a hard to type-check and generate incrementally due to
    the presence of ambiguous constructs, such as literals
-   like '{ 1 ; 2 ; 3 }'. Is it a list of ints? of nats? of tez? Or a set?
+   like [{ 1 ; 2 ; 3 }]. Is it a list of ints? of nats? of tez? Or a set?
 
    Thus, we will work with Mikhailsky, a better behaved version of Michelson
    allowing local reconstruction of types.

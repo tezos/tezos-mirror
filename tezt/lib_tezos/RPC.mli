@@ -25,7 +25,7 @@
 
 (** In all RPCs, default [chain] is "main" and default [block] is "head". *)
 
-(** {2 Shell RPCs *)
+(** {2 Shell RPCs} *)
 
 (** Call RPC /network/connections if [peer_id] is [None].
     Call RPC /network/connections/[peer_id] otherwise. *)
@@ -136,7 +136,7 @@ val post_forge_operations :
   Client.t ->
   JSON.t Lwt.t
 
-(** {2 Protocol RPCs *)
+(** {2 Protocol RPCs} *)
 
 (** Call RPC /chain/[chain]/blocks/[block]/context/constants *)
 val get_constants :
