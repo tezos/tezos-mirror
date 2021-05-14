@@ -447,6 +447,14 @@ let string_enum = function
 
 let conv proj inj ?schema encoding = make @@ Conv {proj; inj; encoding; schema}
 
+let conv_guard proj inj_guard ?schema encoding =
+  let inj x =
+    match inj_guard x with
+    | Ok y -> y
+    | Error s -> raise (Failure ("Decoding invariant broken: " ^ s))
+  in
+  conv proj inj ?schema encoding
+
 let def id ?title ?description encoding =
   make @@ Describe {id; title; description; encoding}
 

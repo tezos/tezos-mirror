@@ -234,6 +234,19 @@ module Encoding : sig
     'b encoding ->
     'a encoding
 
+  (** [conv_guard] is similar to [conv] but the function that takes in the value
+      from the outside (untrusted) world has a chance to fail.
+
+      Specificially, if the function returns [Error msg] then the decoding is
+      interrupted with an error carrying the message [msg]. If the function
+      returns [Ok _] then the decoding proceeds normally. *)
+  val conv_guard :
+    ('a -> 'b) ->
+    ('b -> ('a, string) result) ->
+    ?schema:Json_schema.schema ->
+    'b encoding ->
+    'a encoding
+
   (** Association list.
       An object in JSON, a list of pairs in binary. *)
   val assoc : 'a encoding -> (string * 'a) list encoding

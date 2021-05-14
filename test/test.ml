@@ -37,4 +37,5 @@ let () =
       ("registration", Registrationed.tests);
       ("mu", Mu.tests);
       ("slice", Slice_test.tests);
+      ("conv_guard", Guarded_conv.tests);
     ]

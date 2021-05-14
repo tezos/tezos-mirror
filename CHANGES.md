@@ -20,3 +20,4 @@ v0.3:
 
 v0.4:  
 - catch exceptions in user-provided functions
+- provide `conv_guard` to help enforce invariants
