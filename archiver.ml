@@ -268,11 +268,11 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
    | Error err ->
        Lwt_io.printl
          (Format.asprintf
-            "Failed to dump endorsements in block %a at level %li : %a"
+            "@[Failed to dump endorsements in block %a at level %li :@ @[%a@]@]"
             Block_hash.pp
             block_hash
             block_level
-            (Format.pp_print_list Error_monad.pp)
+            Error_monad.pp_print_error
             err))
   <&>
   let filename = filename_of_level path block_level in
@@ -299,11 +299,11 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
   | Error err ->
       Lwt_io.printl
         (Format.asprintf
-           "Failed to dump block %a at level %li : %a"
+           "@[Failed to dump block %a at level %li :@ @[%a@]@]"
            Block_hash.pp
            block_hash
            block_level
-           (Format.pp_print_list Error_monad.pp)
+           Error_monad.pp_print_error
            err)
 
 let dump_received path ?unaccurate level items =
@@ -355,9 +355,9 @@ let dump_received path ?unaccurate level items =
   | Error err ->
       Lwt_io.printl
         (Format.asprintf
-           "Failed to dump endorsements at level %li : %a"
+           "@[Failed to dump endorsements at level %li :@ @[%a@]@]"
            level
-           (Format.pp_print_list Error_monad.pp)
+           Error_monad.pp_print_error
            err)
 
 type chunk =
