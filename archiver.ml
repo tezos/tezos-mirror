@@ -159,6 +159,7 @@ let get_file_mutex filename =
   match List.assoc_opt filename !files_in_use with
   | None ->
       let x = Lwt_mutex.create () in
+      let () = files_in_use := (filename, x) :: !files_in_use in
       x
   | Some x -> x
 
@@ -171,7 +172,6 @@ let dump_anomalies path level anomalies =
   in
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
-      let () = files_in_use := (filename, mutex) :: !files_in_use in
       load filename (Data_encoding.list Anomaly.encoding) [] >>=? fun known ->
       let out =
         write
@@ -220,7 +220,6 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
    let filename = filename_of_level path endorsements_level in
    let mutex = get_file_mutex filename in
    Lwt_mutex.with_lock mutex (fun () ->
-       let () = files_in_use := (filename, mutex) :: !files_in_use in
        load filename encoding empty >>=? fun infos ->
        let (updated_known, unknown) =
          List.fold_left
@@ -279,7 +278,6 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
   let filename = filename_of_level path block_level in
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
-      let () = files_in_use := (filename, mutex) :: !files_in_use in
       load filename encoding empty >>=? fun infos ->
       let blocks =
         Block.{ hash = block_hash; reception_time; timestamp; nonce = None }
@@ -312,7 +310,6 @@ let dump_received path ?unaccurate level items =
   let filename = filename_of_level path level in
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
-      let () = files_in_use := (filename, mutex) :: !files_in_use in
       load filename encoding empty >>=? fun infos ->
       let (updated_known, unknown) =
         List.fold_left
