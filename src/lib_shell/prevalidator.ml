@@ -424,11 +424,14 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           Worker.log_event w (Processing_n_operations n)
           >>= fun () ->
           Operation_hash.Map.fold_es
-            (fun _ op (acc_validation_state, acc_mempool, limit) ->
+            (fun oph op (acc_validation_state, acc_mempool, limit) ->
               if limit <= 0 then
                 (* Using Error as an early-return mechanism *)
                 Lwt.return_error (acc_validation_state, acc_mempool)
-              else
+              else (
+                (* Do not forget to remove the treated operation
+                         from the pendings *)
+                pv.pending <- Operation_hash.Map.remove oph pv.pending ;
                 let limit = limit - 1 in
                 let refused hash raw errors =
                   notify_operation pv `Refused raw ;
@@ -533,7 +536,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                         refused op.hash op.raw errors
                     | Duplicate | Outdated ->
                         Lwt.return_ok (acc_validation_state, acc_mempool, limit)
-                    ))
+                    ) ))
             pv.pending
             (state, Mempool.empty, pv.limits.operations_batch_size)
           >>= (function
@@ -545,7 +548,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                     Lwt.return (state, advertised_mempool))
           >>= fun (state, advertised_mempool) ->
           pv.validation_state <- Ok state ;
-          pv.pending <- Operation_hash.Map.empty ;
           advertise
             w
             pv
