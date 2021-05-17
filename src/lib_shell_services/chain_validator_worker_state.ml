@@ -146,13 +146,16 @@ module Event = struct
         case
           (Tag 0)
           ~title:"Processed_block"
-          (obj6
-             (req "request" Request.encoding)
-             (req "status" Worker_types.request_status_encoding)
-             (req "outcome" update_encoding)
-             (req "fitness" Fitness.encoding)
-             (req "level" int32)
-             (req "timestamp" Time.Protocol.encoding))
+          (obj1
+             (req
+                "processed_block"
+                (obj6
+                   (req "request" Request.encoding)
+                   (req "status" Worker_types.request_status_encoding)
+                   (req "outcome" update_encoding)
+                   (req "fitness" Fitness.encoding)
+                   (req "level" int32)
+                   (req "timestamp" Time.Protocol.encoding))))
           (function
             | Processed_block
                 {request; request_status; update; fitness; level; timestamp} ->
@@ -164,13 +167,13 @@ module Event = struct
         case
           (Tag 1)
           ~title:"Could_not_switch_testchain"
-          RPC_error.encoding
+          (obj1 (req "could_not_switch_testchain" RPC_error.encoding))
           (function Could_not_switch_testchain err -> Some err | _ -> None)
           (fun err -> Could_not_switch_testchain err);
         case
           (Tag 2)
           ~title:"Bootstrapped"
-          unit
+          (obj1 (req "bootstrapped" unit))
           (function Bootstrapped -> Some () | _ -> None)
           (fun () -> Bootstrapped);
         case
@@ -182,7 +185,10 @@ module Event = struct
         case
           (Tag 4)
           ~title:"Bootstrap_active_peers"
-          (obj2 (req "active" int31) (req "needed" int31))
+          (obj1
+             (req
+                "bootstrap_active_peers"
+                (obj2 (req "active" int31) (req "needed" int31))))
           (function
             | Bootstrap_active_peers {active; needed} -> Some (active, needed)
             | _ -> None)
@@ -190,10 +196,13 @@ module Event = struct
         case
           (Tag 5)
           ~title:"Bootstrap_active_peers_heads_time"
-          (obj3
-             (req "min_head_time" Time.Protocol.encoding)
-             (req "max_head_time" Time.Protocol.encoding)
-             (req "most_recent_validation" Time.Protocol.encoding))
+          (obj1
+             (req
+                "bootstrap_active_peers_head_time"
+                (obj3
+                   (req "min_head_time" Time.Protocol.encoding)
+                   (req "max_head_time" Time.Protocol.encoding)
+                   (req "most_recent_validation" Time.Protocol.encoding))))
           (function
             | Bootstrap_active_peers_heads_time
                 {min_head_time; max_head_time; most_recent_validation} ->
@@ -205,28 +214,33 @@ module Event = struct
         case
           (Tag 6)
           ~title:"notify_branch"
-          (obj1 (req "peer_id" P2p_peer.Id.encoding))
+          (obj1
+             (req "notify_branch" (obj1 (req "peer_id" P2p_peer.Id.encoding))))
           (function Notify_branch peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> Notify_branch peer_id);
         case
           (Tag 7)
           ~title:"notify_head"
-          (obj1 (req "peer_id" P2p_peer.Id.encoding))
+          (obj1 (req "notify_head" (obj1 (req "peer_id" P2p_peer.Id.encoding))))
           (function Notify_head peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> Notify_head peer_id);
         case
           (Tag 8)
           ~title:"disconnection"
-          (obj1 (req "peer_id" P2p_peer.Id.encoding))
+          (obj1
+             (req "disconnection" (obj1 (req "peer_id" P2p_peer.Id.encoding))))
           (function Disconnection peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> Disconnection peer_id);
         case
           (Tag 9)
           ~title:"request_failure"
-          (obj3
-             (req "failed_validation" Request.encoding)
-             (req "status" Worker_types.request_status_encoding)
-             (dft "errors" RPC_error.encoding []))
+          (obj1
+             (req
+                "request_failure"
+                (obj3
+                   (req "failed_validation" Request.encoding)
+                   (req "status" Worker_types.request_status_encoding)
+                   (dft "errors" RPC_error.encoding []))))
           (function
             | Request_failure (r, s, err) -> Some (r, s, err) | _ -> None)
           (fun (r, s, err) -> Request_failure (r, s, err));

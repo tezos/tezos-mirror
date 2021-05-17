@@ -47,6 +47,8 @@ Node
    -  POST ``/chains/<chain_id>/mempool/unban_all_operations``: Unban
       all operations, i.e. clear the set of banned operations.
 
+- Change chain validator event encoding. RPC GET  ``/workers/chain_validators/<chain_id>`` is modified.
+
 Client
 ------
 
