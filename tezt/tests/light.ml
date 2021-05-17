@@ -57,14 +57,10 @@ let init_light ~protocol =
   assert (is_light_mode mode_received) ;
   Client.set_mode (Client.Client (Some node0)) client ;
   let* () =
-    let bakers =
-      match protocol with
-      | Protocol.Alpha | Florence ->
-          [Constant.bootstrap1.identity; Constant.bootstrap1.identity]
-      | Edo ->
-          [Constant.bootstrap1.alias; Constant.bootstrap1.alias]
-    in
-    Lwt_list.iter_s (fun key -> Client.bake_for ~node:node0 ~key client) bakers
+    Client.bake_for ~node:node0 ~key:Constant.bootstrap1.alias client
+  in
+  let* () =
+    Client.bake_for ~node:node0 ~key:Constant.bootstrap2.alias client
   in
   let* level_json = get_current_level ~node:node0 client in
   let level = JSON.(level_json |-> "level" |> as_int) in
@@ -101,13 +97,7 @@ let test_bake =
     ~tags:["light"; "client"; "bake"]
   @@ fun protocol ->
   let* (_, client) = init_light ~protocol in
-  let giver =
-    match protocol with
-    | Protocol.Edo ->
-        Constant.bootstrap1.alias
-    | Florence | Alpha ->
-        Constant.bootstrap1.identity
-  in
+  let giver = Constant.bootstrap1.alias in
   let* () = do_transfer ~giver client in
   Client.bake_for ~key:giver client
 
