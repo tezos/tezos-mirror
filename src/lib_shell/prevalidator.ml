@@ -483,18 +483,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                             (acc_validation_state, acc_mempool, limit)
                     | Branch_delayed errors ->
                         notify_operation pv `Branch_delayed op.raw ;
-                        let new_mempool =
-                          if is_endorsement op then
-                            Mempool.
-                              {
-                                acc_mempool with
-                                pending =
-                                  Operation_hash.Set.add
-                                    op.hash
-                                    acc_mempool.pending;
-                              }
-                          else acc_mempool
-                        in
                         Option.iter
                           (fun e ->
                             pv.branch_delays <-
@@ -511,22 +499,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                             op.hash
                             (op.raw, errors)
                             pv.branch_delays ;
-                        Lwt.return_ok (acc_validation_state, new_mempool, limit)
+                        Lwt.return_ok (acc_validation_state, acc_mempool, limit)
                     | Branch_refused errors ->
-                        let new_mempool =
-                          if is_endorsement op then
-                            Mempool.
-                              {
-                                acc_mempool with
-                                pending =
-                                  Operation_hash.Set.add
-                                    op.hash
-                                    acc_mempool.pending;
-                              }
-                          else acc_mempool
-                        in
                         handle_branch_refused pv op.raw op.hash errors ;
-                        Lwt.return_ok (acc_validation_state, new_mempool, limit)
+                        Lwt.return_ok (acc_validation_state, acc_mempool, limit)
                     | Refused errors ->
                         refused errors
                     | Duplicate | Outdated ->
