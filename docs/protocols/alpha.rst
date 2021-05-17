@@ -92,6 +92,11 @@ Minor changes
   solves issue `#1154 <https://gitlab.com/tezos/tezos/-/issues/1154>`__
   `<https://gitlab.com/tezos/tezos/-/merge_requests/2839>`__
 
+- Fix overconservative detection of overflows in Michelson mutez multiplication,
+  and reported error trace when multiplication is overflowing,
+  solves issues `#958 <https://gitlab.com/tezos/tezos/-/issues/958>`__ `#972 <https://gitlab.com/tezos/tezos/-/issues/972>`__
+  `<https://gitlab.com/tezos/tezos/-/merge_requests/2947>`__
+
 - Increased the max operation time to live (`max_op_ttl`) from 60 to
   120
 
