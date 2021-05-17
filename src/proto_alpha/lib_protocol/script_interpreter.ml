@@ -1556,6 +1556,9 @@ let kstep logger ctxt step_constants kinstr accu stack =
   >>=? fun (accu, stack, ctxt, gas) ->
   return (accu, stack, update_context gas ctxt)
 
+let internal_step ctxt step_constants gas kinstr accu stack =
+  step (ctxt, step_constants) gas kinstr KNil accu stack
+
 let step logger ctxt step_constants descr stack =
   step_descr ~log_now:false logger (ctxt, step_constants) descr stack
 
@@ -1670,4 +1673,7 @@ module Internals = struct
       match logger with None -> ks | Some logger -> KLog (ks, logger)
     in
     next g gas ks accu stack
+
+  let step (ctxt, step_constants) gas ks accu stack =
+    internal_step ctxt step_constants gas ks accu stack
 end

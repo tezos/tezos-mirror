@@ -254,6 +254,11 @@ val parse_ty :
 val unparse_ty :
   context -> 'a Script_typed_ir.ty -> (Script.node * context) tzresult
 
+val ty_of_comparable_ty :
+  'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.ty
+
+val type_size : 't Script_typed_ir.ty -> int
+
 val parse_toplevel :
   legacy:bool ->
   Script.expr ->
