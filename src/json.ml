@@ -42,7 +42,9 @@ type pair_builder = {
 exception Parse_error of string
 
 let wrap_error f str =
-  try f str with exn -> raise (Json_encoding.Cannot_destruct ([], exn))
+  try f str with
+  | (Out_of_memory | Stack_overflow) as e -> raise e
+  | exn -> raise (Json_encoding.Cannot_destruct ([], exn))
 
 let int64_encoding =
   let open Json_encoding in

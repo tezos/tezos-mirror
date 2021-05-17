@@ -841,13 +841,15 @@ let mu name ?title ?description fix =
     match classify @@ fixed_precursor with
     | `Fixed _ | `Dynamic -> fixed_precursor
     | `Variable -> raise Exit
-  with Exit | _ (* TODO variability error *) ->
-    let precursor =
-      make @@ Mu {kind = `Variable; name; title; description; fix}
-    in
-    let fixed_precursor = fix precursor in
-    ignore (classify fixed_precursor);
-    fixed_precursor
+  with
+  | (Out_of_memory | Stack_overflow) as e -> raise e
+  | Exit | _ (* TODO variability error *) ->
+      let precursor =
+        make @@ Mu {kind = `Variable; name; title; description; fix}
+      in
+      let fixed_precursor = fix precursor in
+      ignore (classify fixed_precursor);
+      fixed_precursor
 
 let result ok_enc error_enc =
   union
