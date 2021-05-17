@@ -402,7 +402,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Operation_hash.Map.add oph (op, errors) pv.branch_refusals
 
   let handle_unprocessed w pv =
-    ( match pv.validation_state with
+    match pv.validation_state with
     | Error err ->
         Operation_hash.Map.iter
           (fun h op ->
@@ -549,6 +549,12 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                 | Ok (state, advertised_mempool, _) ->
                     Lwt.return (state, advertised_mempool))
           >>= fun (state, advertised_mempool) ->
+          let remaining_pendings =
+            Operation_hash.Map.fold
+              (fun k _ acc -> Operation_hash.Set.add k acc)
+              pv.pending
+              Operation_hash.Set.empty
+          in
           pv.validation_state <- Ok state ;
           advertise
             w
@@ -557,28 +563,27 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
               advertised_mempool with
               known_valid = List.rev advertised_mempool.known_valid;
             } ;
-          Lwt.return_unit ) )
-    >>= fun () ->
-    pv.mempool <-
-      {
-        Mempool.known_valid = List.rev_map fst pv.applied;
-        pending =
-          Operation_hash.Map.fold
-            (fun k (op, _) s ->
-              if is_endorsement_raw op then Operation_hash.Set.add k s else s)
-            pv.branch_delays
-          @@ Operation_hash.Map.fold
-               (fun k (op, _) s ->
-                 if is_endorsement_raw op then Operation_hash.Set.add k s
-                 else s)
-               pv.branch_refusals
-          @@ Operation_hash.Set.empty;
-      } ;
-    State.Current_mempool.set
-      (Distributed_db.chain_state pv.chain_db)
-      ~head:(State.Block.hash pv.predecessor)
-      pv.mempool
-    >>= fun () -> Lwt_main.yield ()
+          pv.mempool <-
+            {
+              Mempool.known_valid = List.rev_map fst pv.applied;
+              pending =
+                Operation_hash.Map.fold
+                  (fun k (op, _) s ->
+                    if is_endorsement_raw op then Operation_hash.Set.add k s
+                    else s)
+                  pv.branch_delays
+                @@ Operation_hash.Map.fold
+                     (fun k (op, _) s ->
+                       if is_endorsement_raw op then Operation_hash.Set.add k s
+                       else s)
+                     pv.branch_refusals
+                @@ remaining_pendings;
+            } ;
+          State.Current_mempool.set
+            (Distributed_db.chain_state pv.chain_db)
+            ~head:(State.Block.hash pv.predecessor)
+            pv.mempool
+          >>= fun () -> Lwt_main.yield () )
 
   let fetch_operation w pv ?peer oph =
     Worker.log_event w (Fetching_operation oph)
