@@ -13,6 +13,17 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-alpha"
   "tezos-alpha-test-helpers"
+  "tezos-protocol-alpha-parameters"
+  "tezos-micheline-rewriting"
+  "tezos-benchmark-type-inference-alpha"
+  "hashcons"
+  "benchmark-utils"
+  "tezos-alpha-test-helpers"
+  "staTz"
+  "tezos-micheline" { with-test }
+  "tezos-error-monad" { with-test }
+  "alcotest-lwt" { with-test }
+
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

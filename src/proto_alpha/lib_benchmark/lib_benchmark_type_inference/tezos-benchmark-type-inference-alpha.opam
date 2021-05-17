@@ -7,6 +7,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
+  "tezos-client-alpha" { with-test }
   "dune" { >= "1.11" }
   "tezos-stdlib"
   "tezos-error-monad"
@@ -14,6 +15,7 @@ depends: [
   "tezos-protocol-alpha"
   "tezos-micheline"
   "tezos-micheline-rewriting"
+  "hashcons"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
