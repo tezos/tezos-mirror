@@ -49,7 +49,9 @@ let slice_all bytes =
         let _ = Binary_reader.of_string_exn encoding bytes in
         let slice = Binary_slicer.slice_string_exn encoding bytes in
         (enc_id, slice) :: sliced
-      with _ -> sliced)
+      with
+      | (Out_of_memory | Stack_overflow) as e -> raise e
+      | _ -> sliced)
     !table
     []
 
