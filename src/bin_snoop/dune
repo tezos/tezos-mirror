@@ -9,6 +9,7 @@
             tezos-benchmark
             tezos-benchmark-examples
 	    tezos-shell-benchmarks
+	    tezos-benchmarks-proto-alpha
             str
             ocamlgraph
             pyml
