@@ -7,36 +7,36 @@ emitted operations
 big_map diff
   New map(4) of type (big_map string nat)
 trace
-  - location: 12 (remaining gas: 1039986.686 units remaining)
+  - location: 12 (remaining gas: 1039993.136 units remaining)
     [ (Pair "bar" {} None)  	 ]
-  - location: 12 (remaining gas: 1039986.636 units remaining)
+  - location: 12 (remaining gas: 1039993.126 units remaining)
     [ "bar"  	@parameter
       (Pair {} None)  	@storage ]
-  - location: 13 (remaining gas: 1039986.591 units remaining)
+  - location: 13 (remaining gas: 1039993.111 units remaining)
     [ (Pair {} None)  	@storage ]
-  - location: 15 (remaining gas: 1039986.541 units remaining)
+  - location: 15 (remaining gas: 1039993.101 units remaining)
     [ {}  	 ]
-  - location: 16 (remaining gas: 1039986.491 units remaining)
+  - location: 16 (remaining gas: 1039993.091 units remaining)
     [ {}  	
       {}  	 ]
-  - location: 13 (remaining gas: 1039986.489 units remaining)
+  - location: 13 (remaining gas: 1039993.061 units remaining)
     [ "bar"  	@parameter
       {}  	
       {}  	 ]
-  - location: 17 (remaining gas: 1039975.657 units remaining)
+  - location: 17 (remaining gas: 1039991.708 units remaining)
     [ False  	
       {}  	 ]
-  - location: 18 (remaining gas: 1039975.612 units remaining)
+  - location: 18 (remaining gas: 1039991.693 units remaining)
     [ (Some False)  	
       {}  	 ]
-  - location: 19 (remaining gas: 1039975.572 units remaining)
+  - location: 19 (remaining gas: 1039991.683 units remaining)
     [ {}  	
       (Some False)  	 ]
-  - location: 20 (remaining gas: 1039975.527 units remaining)
+  - location: 20 (remaining gas: 1039991.668 units remaining)
     [ (Pair {} (Some False))  	 ]
-  - location: 21 (remaining gas: 1039975.482 units remaining)
+  - location: 21 (remaining gas: 1039991.653 units remaining)
     [ {}  	
       (Pair {} (Some False))  	 ]
-  - location: 23 (remaining gas: 1039975.437 units remaining)
+  - location: 23 (remaining gas: 1039991.638 units remaining)
     [ (Pair {} {} (Some False))  	 ]
 

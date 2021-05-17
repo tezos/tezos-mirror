@@ -8,28 +8,28 @@ big_map diff
   New map(4) of type (big_map string nat)
   Unset map(4)["hello"]
 trace
-  - location: 13 (remaining gas: 1039975.511 units remaining)
+  - location: 13 (remaining gas: 1039992.603 units remaining)
     [ (Pair "hello" None { Elt "hello" 4 })  	 ]
-  - location: 13 (remaining gas: 1039975.461 units remaining)
+  - location: 13 (remaining gas: 1039992.593 units remaining)
     [ "hello"  	@parameter
       (Pair None { Elt "hello" 4 })  	@storage ]
-  - location: 14 (remaining gas: 1039975.416 units remaining)
+  - location: 14 (remaining gas: 1039992.578 units remaining)
     [ (Pair None { Elt "hello" 4 })  	@storage ]
-  - location: 16 (remaining gas: 1039975.366 units remaining)
+  - location: 16 (remaining gas: 1039992.568 units remaining)
     [ None  	
       { Elt "hello" 4 }  	 ]
-  - location: 14 (remaining gas: 1039975.364 units remaining)
+  - location: 14 (remaining gas: 1039992.538 units remaining)
     [ "hello"  	@parameter
       None  	
       { Elt "hello" 4 }  	 ]
-  - location: 17 (remaining gas: 1039962.441 units remaining)
+  - location: 17 (remaining gas: 1039990.958 units remaining)
     [ (Some 4)  	
       {}  	 ]
-  - location: 18 (remaining gas: 1039962.396 units remaining)
+  - location: 18 (remaining gas: 1039990.943 units remaining)
     [ (Pair (Some 4) {})  	 ]
-  - location: 19 (remaining gas: 1039962.351 units remaining)
+  - location: 19 (remaining gas: 1039990.928 units remaining)
     [ {}  	
       (Pair (Some 4) {})  	 ]
-  - location: 21 (remaining gas: 1039962.306 units remaining)
+  - location: 21 (remaining gas: 1039990.913 units remaining)
     [ (Pair {} (Some 4) {})  	 ]
 
