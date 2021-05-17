@@ -390,6 +390,26 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
     pv.branch_delays <- Operation_hash.Map.add oph (op, errors) pv.branch_delays
 
+  (* Classify pending operations into either: [Refused |
+     Branch_delayed | Branch_refused | Applied].  To ensure fairness
+     with other worker requests, classification of operations is done
+     by batch of [operation_batch_size] operations.
+
+     This function ensures the following invariants:
+
+     - If an operation is classified, it is not part of the [pending]
+     map
+
+     - A classified operation is part of the [in_mempool] set
+
+     - A classified operation is part only of one of the following
+     maps: [branch_refusals, branch_delays, refused, applied]
+
+     Moreover, this function ensures that only each newly classified
+     operations are advertised to the remote peers. However, if a peer
+     request our mempool, we advertise all our classified operations and
+     all our pending operations. *)
+
   let handle_unprocessed w pv =
     match pv.validation_state with
     | Error err ->
@@ -497,6 +517,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                 Operation_hash.Set.empty
             in
             pv.validation_state <- Ok state ;
+            (* We advertise only newly classified operations. *)
             advertise
               w
               pv
@@ -709,6 +730,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   module Handlers = struct
     type self = worker
 
+    (* For every consensus operation which arrived before the block
+       they are branched on, we try to propagate them if the protocol
+       manages to apply the operation on the current validation state
+       or if the operation can be applied later on ([branch_delayed]
+       classification). *)
     let may_propagate_unknown_branch_operation pv op =
       ( Prevalidation.parse op >>?= fun op ->
         let is_alternative_endorsement () =
