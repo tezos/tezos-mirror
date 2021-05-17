@@ -35,8 +35,6 @@ module Cost_of : sig
 
     val swap : Gas.cost
 
-    val push : Gas.cost
-
     val cons_some : Gas.cost
 
     val cons_none : Gas.cost
@@ -107,8 +105,11 @@ module Cost_of : sig
     val add_seconds_timestamp :
       'a Script_int.num -> Script_timestamp.t -> Gas.cost
 
-    val sub_seconds_timestamp :
-      'a Script_int.num -> Script_timestamp.t -> Gas.cost
+    val add_timestamp_seconds :
+      Script_timestamp.t -> 'a Script_int.num -> Gas.cost
+
+    val sub_timestamp_seconds :
+      Script_timestamp.t -> 'a Script_int.num -> Gas.cost
 
     val diff_timestamps : Script_timestamp.t -> Script_timestamp.t -> Gas.cost
 
@@ -128,7 +129,9 @@ module Cost_of : sig
 
     val sub_tez : Gas.cost
 
-    val mul_teznat : 'a Script_int.num -> Gas.cost
+    val mul_teznat : Gas.cost
+
+    val mul_nattez : Gas.cost
 
     val bool_or : Gas.cost
 
@@ -140,25 +143,79 @@ module Cost_of : sig
 
     val is_nat : Gas.cost
 
-    val abs_int : 'a Script_int.num -> Gas.cost
+    val abs_int : Alpha_context.Script_int.z Script_int.num -> Gas.cost
 
     val int_nat : Gas.cost
 
-    val neg_int : 'a Script_int.num -> Gas.cost
+    val neg_int : Alpha_context.Script_int.z Script_int.num -> Gas.cost
 
-    val neg_nat : 'a Script_int.num -> Gas.cost
+    val neg_nat : Alpha_context.Script_int.n Script_int.num -> Gas.cost
 
-    val add_bigint : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+    val add_intint :
+      Alpha_context.Script_int.z Script_int.num ->
+      Alpha_context.Script_int.z Script_int.num ->
+      Gas.cost
 
-    val sub_bigint : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+    val add_intnat :
+      Alpha_context.Script_int.z Script_int.num ->
+      Alpha_context.Script_int.n Script_int.num ->
+      Gas.cost
 
-    val mul_bigint : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+    val add_natint :
+      Alpha_context.Script_int.n Script_int.num ->
+      Alpha_context.Script_int.z Script_int.num ->
+      Gas.cost
+
+    val add_natnat :
+      Alpha_context.Script_int.n Script_int.num ->
+      Alpha_context.Script_int.n Script_int.num ->
+      Gas.cost
+
+    val sub_int : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+
+    val mul_intint :
+      Alpha_context.Script_int.z Script_int.num ->
+      Alpha_context.Script_int.z Script_int.num ->
+      Gas.cost
+
+    val mul_intnat :
+      Alpha_context.Script_int.z Script_int.num ->
+      Alpha_context.Script_int.n Script_int.num ->
+      Gas.cost
+
+    val mul_natint :
+      Alpha_context.Script_int.n Script_int.num ->
+      Alpha_context.Script_int.z Script_int.num ->
+      Gas.cost
+
+    val mul_natnat :
+      Alpha_context.Script_int.n Script_int.num ->
+      Alpha_context.Script_int.n Script_int.num ->
+      Gas.cost
 
     val ediv_teznat : 'a -> 'b Script_int.num -> Gas.cost
 
     val ediv_tez : Gas.cost
 
-    val ediv_bigint : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+    val ediv_intint :
+      Alpha_context.Script_int.z Script_int.num ->
+      Alpha_context.Script_int.z Script_int.num ->
+      Gas.cost
+
+    val ediv_intnat :
+      Alpha_context.Script_int.z Script_int.num ->
+      Alpha_context.Script_int.n Script_int.num ->
+      Gas.cost
+
+    val ediv_natint :
+      Alpha_context.Script_int.n Script_int.num ->
+      Alpha_context.Script_int.z Script_int.num ->
+      Gas.cost
+
+    val ediv_natnat :
+      Alpha_context.Script_int.n Script_int.num ->
+      Alpha_context.Script_int.n Script_int.num ->
+      Gas.cost
 
     val eq : Gas.cost
 
@@ -170,13 +227,16 @@ module Cost_of : sig
 
     val and_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
+    val and_int_nat :
+      Alpha_context.Script_int.z Script_int.num ->
+      Alpha_context.Script_int.n Script_int.num ->
+      Gas.cost
+
     val xor_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
     val not_int : 'a Script_int.num -> Gas.cost
 
     val not_nat : 'a Script_int.num -> Gas.cost
-
-    val seq : Gas.cost
 
     val if_ : Gas.cost
 
@@ -222,7 +282,9 @@ module Cost_of : sig
 
     val mul_bls12_381_fr : Gas.cost
 
-    val mul_bls12_381_fr_z : Gas.cost
+    val mul_bls12_381_fr_z : 'a Script_int.num -> Gas.cost
+
+    val mul_bls12_381_z_fr : 'a Script_int.num -> Gas.cost
 
     val int_bls12_381_fr : Gas.cost
 
@@ -233,8 +295,6 @@ module Cost_of : sig
     val neg_bls12_381_fr : Gas.cost
 
     val neq : Gas.cost
-
-    val nop : Gas.cost
 
     val pairing_check_bls12_381 : 'a Script_typed_ir.boxed_list -> Gas.cost
 
@@ -257,6 +317,20 @@ module Cost_of : sig
 
     val concat_bytes :
       Saturation_repr.may_saturate Saturation_repr.t -> Gas.cost
+
+    val halt : Gas.cost
+
+    val const : Gas.cost
+
+    val empty_big_map : Gas.cost
+
+    val lt : Gas.cost
+
+    val le : Gas.cost
+
+    val gt : Gas.cost
+
+    val ge : Gas.cost
 
     val exec : Gas.cost
 
@@ -296,6 +370,8 @@ module Cost_of : sig
 
     val chain_id : Gas.cost
 
+    val unpack : bytes -> Gas.cost
+
     val unpack_failed : bytes -> Gas.cost
 
     val sapling_empty_state : Gas.cost
@@ -314,6 +390,30 @@ module Cost_of : sig
       'a Script_typed_ir.ticket ->
       'a Script_typed_ir.ticket ->
       Gas.cost
+
+    module Control : sig
+      val nil : Gas.cost
+
+      val cons : Gas.cost
+
+      val return : Gas.cost
+
+      val undip : Gas.cost
+
+      val loop_in : Gas.cost
+
+      val loop_in_left : Gas.cost
+
+      val iter : Gas.cost
+
+      val list_enter_body : 'a list -> int -> Gas.cost
+
+      val list_exit_body : Gas.cost
+
+      val map_enter_body : Gas.cost
+
+      val map_exit_body : 'k -> ('k, 'v) Script_typed_ir.map -> Gas.cost
+    end
   end
 
   module Typechecking : sig

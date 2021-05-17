@@ -458,6 +458,8 @@ module Script : sig
 
   val lazy_expr_encoding : lazy_expr Data_encoding.t
 
+  val deserialization_cost_estimated_from_bytes : int -> Gas.cost
+
   val deserialized_cost : expr -> Gas.cost
 
   val serialized_cost : bytes -> Gas.cost

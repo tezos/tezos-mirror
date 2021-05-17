@@ -47,6 +47,8 @@ type t = {code : lazy_expr; storage : lazy_expr}
 
 val encoding : t Data_encoding.encoding
 
+val deserialization_cost_estimated_from_bytes : int -> Gas_limit_repr.cost
+
 val deserialized_cost : expr -> Gas_limit_repr.cost
 
 val serialized_cost : bytes -> Gas_limit_repr.cost
