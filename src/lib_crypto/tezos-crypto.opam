@@ -19,7 +19,6 @@ depends: [
   "tezos-hacl-glue-unix" {with-test}
   "zarith"
   "secp256k1-internal"
-  "uecc"
   "ringo" { = "0.5" }
   "bls12-381-unix" { with-test }
   "alcotest" { with-test & >= "1.1.0" }

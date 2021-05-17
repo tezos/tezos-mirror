@@ -94,7 +94,6 @@ unit:non-proto:
     - scripts/test_wrapper.sh src/tooling src_tooling
     - scripts/test_wrapper.sh vendors/ocaml-ledger-wallet ocaml-ledger-wallet
     - scripts/test_wrapper.sh vendors/ocaml-lmdb ocaml-lmdb
-    - scripts/test_wrapper.sh vendors/ocaml-uecc ocaml-uecc
 ##END_UNITTEST##
 
 unit:js_components:
@@ -106,4 +105,3 @@ unit:protocol_compiles:
   extends: .test_template
   script:
     - dune build @runtest_compile_protocol
-

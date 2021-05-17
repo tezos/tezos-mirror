@@ -987,9 +987,4 @@ opam:tezos-workers:
   variables:
     package: tezos-workers
 
-opam:uecc:
-  extends: .opam_template
-  variables:
-    package: uecc
-
 ##END_OPAM##
