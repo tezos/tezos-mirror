@@ -100,6 +100,11 @@ Node
   restrict access to selected RPC endpoints for different listening
   addresses.
 
+- Updated the behaviour of the history mode field in the node's
+  `config.json` configuration file. If the number of additional cycles
+  is not explicitly specified, the default value is used. The default
+  number of additional cycles to keep is set to 5.
+
 Client
 ------
 
