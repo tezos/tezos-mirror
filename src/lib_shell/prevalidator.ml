@@ -70,7 +70,6 @@ module type T = sig
     mutable mempool : Mempool.t;
     mutable in_mempool : Operation_hash.Set.t;
     mutable applied : (Operation_hash.t * Operation.t) list;
-    mutable applied_count : int;
     mutable validation_state : Prevalidation.t tzresult;
     mutable operation_stream :
       ( [`Applied | `Refused | `Branch_refused | `Branch_delayed]
@@ -152,7 +151,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     mutable mempool : Mempool.t;
     mutable in_mempool : Operation_hash.Set.t;
     mutable applied : (Operation_hash.t * Operation.t) list;
-    mutable applied_count : int;
     mutable validation_state : Prevalidation.t tzresult;
     mutable operation_stream :
       ( [`Applied | `Refused | `Branch_refused | `Branch_delayed]
@@ -457,11 +455,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                           op.protocol_data
                           receipt
                         >>= fun accept ->
-                        if
-                          (accept && pv.applied_count <= 2000)
-                          (* this test is a quick fix while we wait for the new mempool *)
-                          || is_endorsement op
-                        then (
+                        if accept then (
                           notify_operation pv `Applied op.raw ;
                           let new_mempool =
                             Mempool.
@@ -876,7 +870,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Ringo.Ring.clear pv.branch_refused ;
       pv.branch_refusals <- Operation_hash.Map.empty ;
       pv.applied <- [] ;
-      pv.applied_count <- 0 ;
       pv.validation_state <- validation_state ;
       pv.operation_stream <- Lwt_watcher.create_input () ;
       return_unit
@@ -964,7 +957,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           pending = Operation_hash.Map.empty;
           in_mempool = Operation_hash.Set.empty;
           applied = [];
-          applied_count = 0;
           branch_refused = Ringo.Ring.create limits.max_refused_operations;
           branch_refusals = Operation_hash.Map.empty;
           branch_delayed = Ringo.Ring.create limits.max_refused_operations;
