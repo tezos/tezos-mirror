@@ -417,7 +417,7 @@ Addressing these points beforehand makes the reviewing process easier and less
 painful for everybody. The reviewer is your ally, not your enemy.
 
 - Commented code: Did I remove any commented out lines?
-  Did I leave a ``TODO`` or an old comment?
+  Did I leave a :ref:`TODO/FIXME comment <todo_fixme>` without an issue number?
 
 - Docstrings: Did I export a new function? Each exported
   function should be documented in the corresponding ``mli`` (or directly in the ``ml`` file if there is no ``mli``).
@@ -471,7 +471,7 @@ pitfalls a code reviewer should avoid.
   to improve their work incrementally.
 
 - When you consider that a fix is important but should not prevent the current MR to be merged (e.g., because it adds a sufficient amount of useful new features), you may suggest creating a follow-up issue.
-  If the place in the code that needs to be fixed later is clear, you may also suggest marking it with a :ref:`FIXME comment <fixme_comments>`.
+  If the place in the code that needs to be fixed later is clear, you may also suggest marking it with a :ref:`TODO/FIXME comment <todo_fixme>`.
 
 - Take the developer's opinion into consideration: Imposing a particular design
   choice out of personal preferences and without a real explanation will
@@ -520,11 +520,7 @@ comments any time.
 If you think some of the remarks/warnings do not apply to your MR feel free to
 add a comment to justify it.
 
-In particular, the Merge-Request Bot may complain about TODOs but they aren't
-strictly
-forbidden, if they alert the reader that some code is a short-term solution
-but could be improved in the future.
-However, consider using a :ref:`FIXME comment <fixme_comments>` instead, whenever possible, to ensure that the intended evolution is tracked by an issue.
+In particular, the Merge-Request Bot may complain about :ref:`TODO/FIXME comments <todo_fixme>` without an issue number ensuring that the intended evolution is tracked.
 
 The code for the bot is at
 `smondet/merbocop <https://gitlab.com/smondet/merbocop>`__. It is of course
