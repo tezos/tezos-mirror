@@ -451,7 +451,7 @@ let conv_guard proj inj_guard ?schema encoding =
   let inj x =
     match inj_guard x with
     | Ok y -> y
-    | Error s -> raise (Binary_error_types.Invariant_gurad s)
+    | Error s -> raise (Binary_error_types.Invariant_guard s)
   in
   conv proj inj ?schema encoding
 

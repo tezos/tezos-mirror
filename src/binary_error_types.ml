@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-exception Invariant_gurad of string
+exception Invariant_guard of string
 
 type read_error =
   | Not_enough_data

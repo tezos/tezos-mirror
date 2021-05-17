@@ -238,7 +238,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let v = read_rec encoding state in
       try inj v with
       | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-      | Invariant_gurad s -> raise (User_invariant_guard s)
+      | Invariant_guard s -> raise (User_invariant_guard s)
       | exc ->
           let s = Printexc.to_string exc in
           raise (Exception_raised_in_user_lambda s) )
@@ -251,7 +251,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
         let e = read_rec encoding state in
         try inj e with
         | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-        | Invariant_gurad s -> raise (User_invariant_guard s)
+        | Invariant_guard s -> raise (User_invariant_guard s)
         | exc ->
             let s = Printexc.to_string exc in
             raise (Exception_raised_in_user_lambda s) )
@@ -293,7 +293,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let e =
         try fix e with
         | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-        | Invariant_gurad s -> raise (User_invariant_guard s)
+        | Invariant_guard s -> raise (User_invariant_guard s)
         | exc ->
             let s = Printexc.to_string exc in
             raise (Exception_raised_in_user_lambda s)
@@ -303,7 +303,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let e =
         try f () with
         | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-        | Invariant_gurad s -> raise (User_invariant_guard s)
+        | Invariant_guard s -> raise (User_invariant_guard s)
         | exc ->
             let s = Printexc.to_string exc in
             raise (Exception_raised_in_user_lambda s)

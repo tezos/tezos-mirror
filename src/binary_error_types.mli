@@ -26,7 +26,7 @@
 (** This is for use *within* the data encoding library only. Instead, you should
     use the corresponding module intended for use: {!Data_encoding.Binary}. *)
 
-exception Invariant_gurad of string
+exception Invariant_guard of string
 
 type read_error =
   | Not_enough_data
