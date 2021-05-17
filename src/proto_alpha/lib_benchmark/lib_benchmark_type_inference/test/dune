@@ -1,0 +1,30 @@
+(executables
+ (names test_uf test_inference)
+ (libraries tezos-micheline
+            tezos-micheline-rewriting
+            tezos-benchmark-type-inference-alpha
+            tezos-protocol-alpha
+            tezos-error-monad
+            tezos-client-alpha)
+ (flags (:standard -open Tezos_micheline)))
+
+(alias
+  (name buildtest)
+  (deps test_uf.exe test_inference.exe))
+
+(alias
+  (name runtest_inference)
+  (action (run %{exe:test_inference.exe})))
+
+(alias
+  (name runtest_union_find)
+  (action (run %{exe:test_uf.exe})))
+
+(alias
+  (name runtest)
+  (deps (alias runtest_inference) (alias runtest_union_find)))
+
+(alias
+ (name runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
