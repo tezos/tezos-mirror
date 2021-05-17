@@ -433,21 +433,21 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                          from the pendings *)
                 pv.pending <- Operation_hash.Map.remove oph pv.pending ;
                 let limit = limit - 1 in
-                let refused hash raw errors =
-                  notify_operation pv `Refused raw ;
+                let refused errors =
+                  notify_operation pv `Refused op ;
                   Option.iter
                     (fun e ->
                       pv.refusals <- Operation_hash.Map.remove e pv.refusals)
-                    (Ringo.Ring.add_and_return_erased pv.refused hash) ;
+                    (Ringo.Ring.add_and_return_erased pv.refused oph) ;
                   pv.refusals <-
-                    Operation_hash.Map.add hash (raw, errors) pv.refusals ;
-                  Distributed_db.Operation.clear_or_cancel pv.chain_db hash ;
-                  pv.in_mempool <- Operation_hash.Set.add hash pv.in_mempool ;
+                    Operation_hash.Map.add oph (op, errors) pv.refusals ;
+                  Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+                  pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
                   Lwt.return_ok (acc_validation_state, acc_mempool, limit)
                 in
                 match Prevalidation.parse op with
                 | Error errors ->
-                    refused (Operation.hash op) op errors
+                    refused errors
                 | Ok op -> (
                     Prevalidation.apply_operation state op
                     >>= function
@@ -533,7 +533,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                         handle_branch_refused pv op.raw op.hash errors ;
                         Lwt.return_ok (acc_validation_state, new_mempool, limit)
                     | Refused errors ->
-                        refused op.hash op.raw errors
+                        refused errors
                     | Duplicate | Outdated ->
                         Lwt.return_ok (acc_validation_state, acc_mempool, limit)
                     ) ))
