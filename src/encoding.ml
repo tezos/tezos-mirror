@@ -455,6 +455,15 @@ let conv_guard proj inj_guard ?schema encoding =
   in
   conv proj inj ?schema encoding
 
+let with_decoding_guard guard encoding =
+  conv
+    (fun x -> x)
+    (fun y ->
+      match guard y with
+      | Ok () -> y
+      | Error s -> raise (Binary_error_types.Invariant_guard s))
+    encoding
+
 let def id ?title ?description encoding =
   make @@ Describe {id; title; description; encoding}
 

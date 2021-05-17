@@ -480,6 +480,9 @@ val conv_guard :
   'b encoding ->
   'a encoding
 
+val with_decoding_guard :
+  ('a -> (unit, string) result) -> 'a encoding -> 'a encoding
+
 val mu :
   string ->
   ?title:string ->

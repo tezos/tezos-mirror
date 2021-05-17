@@ -247,6 +247,11 @@ module Encoding : sig
     'b encoding ->
     'a encoding
 
+  (** [with_decoding_guard g e] is similar to [e] but decoding fails if [g]
+      returns [Error _] on the decoded value. *)
+  val with_decoding_guard :
+    ('a -> (unit, string) result) -> 'a encoding -> 'a encoding
+
   (** Association list.
       An object in JSON, a list of pairs in binary. *)
   val assoc : 'a encoding -> (string * 'a) list encoding
