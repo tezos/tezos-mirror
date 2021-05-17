@@ -158,14 +158,14 @@ let sorted_list_roundtrips () =
   sorted_list_roundtrips [1; 5; 10; 23; 76; 95];
   ()
 
-(* Checking that we can decode encoded lists when they are not empty *)
+(* Checking that we can decode encoded lists when they are sorted *)
 let sorted_list_is_a_list_that_is_sorted xs =
   let data = List.sort compare xs in
   (* encode with list *)
   let s = Data_encoding.Binary.to_string int8s data in
   assert (Result.is_ok s);
   let s = Result.get_ok s in
-  (* decode with non-empty-list *)
+  (* decode with sorted-list *)
   let d = Data_encoding.Binary.of_string sorted_int8s s in
   assert (Result.is_ok d);
   let d = Result.get_ok d in
@@ -179,14 +179,14 @@ let sorted_list_is_a_list_that_is_sorted () =
   sorted_list_is_a_list_that_is_sorted [0; 0; 0; 0; 0; 0; 0; 0; 0; 0];
   ()
 
-(* Checking that we cannot decode encoded lists when they are empty *)
+(* Checking that we cannot decode encoded lists when they are not sorted *)
 let sorted_list_is_not_a_list_that_is_not_sorted xs =
   let data = xs in
   (* encode with list *)
   let s = Data_encoding.Binary.to_string int8s data in
   assert (Result.is_ok s);
   let s = Result.get_ok s in
-  (* decode with non-empty-list *)
+  (* decode with sorted-list *)
   let d = Data_encoding.Binary.of_string sorted_int8s s in
   assert (Result.is_error d);
   let d = Result.get_error d in
