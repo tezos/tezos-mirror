@@ -72,7 +72,7 @@ let build_transaction_operation ~amount ~parameters ?(entrypoint = "default")
   Injection.prepare_manager_operation ?fee ?gas_limit ?storage_limit operation
 
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?branch ~source ~src_pk ~src_sk ~destination
+    ?verbose_signing ?simulation ?branch ~source ~src_pk ~src_sk ~destination
     ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
     ?counter ~fee_parameter () =
   parse_arg_transfer arg
@@ -95,6 +95,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?confirmations
     ?dry_run
     ?verbose_signing
+    ?simulation
     ?branch
     ~source
     ?fee
@@ -151,7 +152,8 @@ let build_delegate_operation ?fee ?gas_limit ?(storage_limit = Z.zero)
   Injection.prepare_manager_operation ?fee ?gas_limit ~storage_limit operation
 
 let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
-    ?verbose_signing ~source ~src_pk ~src_sk ?fee ~fee_parameter delegate_opt =
+    ?verbose_signing ?simulation ~source ~src_pk ~src_sk ?fee ~fee_parameter
+    delegate_opt =
   let operation =
     Injection.Single_manager
       (build_delegate_operation ?fee ~storage_limit:Z.zero delegate_opt)
@@ -163,6 +165,7 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ?confirmations
     ?dry_run
     ?verbose_signing
+    ?simulation
     ?branch
     ~source
     ?fee
@@ -216,7 +219,7 @@ let message_added_contract (cctxt : #full) name =
   cctxt#message "Contract memorized as %s." name
 
 let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
-    ?fee contract ~src_pk ~manager_sk ~fee_parameter opt_delegate =
+    ?simulation ?fee contract ~src_pk ~manager_sk ~fee_parameter opt_delegate =
   delegate_contract
     cctxt
     ~chain
@@ -224,6 +227,7 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     ?confirmations
     ?dry_run
     ?verbose_signing
+    ?simulation
     ~source:contract
     ~src_pk
     ~src_sk:manager_sk

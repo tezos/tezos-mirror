@@ -737,8 +737,8 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       return contents
 
 let inject_operation (type kind) cctxt ~chain ~block ?confirmations
-    ?(dry_run = false) ?branch ?src_sk ?verbose_signing ~fee_parameter
-    ?compute_fee (contents : kind contents_list) =
+    ?(dry_run = false) ?(simulation = false) ?branch ?src_sk ?verbose_signing
+    ~fee_parameter ?compute_fee (contents : kind contents_list) =
   Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
   >>=? fun () ->
   may_patch_limits
@@ -750,15 +750,17 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ?compute_fee
     contents
   >>=? fun contents ->
-  preapply
-    cctxt
-    ~chain
-    ~block
-    ~fee_parameter
-    ?verbose_signing
-    ?branch
-    ?src_sk
-    contents
+  ( if simulation then simulate cctxt ~chain ~block ?branch contents
+  else
+    preapply
+      cctxt
+      ~chain
+      ~block
+      ~fee_parameter
+      ?verbose_signing
+      ?branch
+      ?src_sk
+      contents )
   >>=? fun (_oph, op, result) ->
   ( match detect_script_failure result with
   | Ok () ->
@@ -773,7 +775,7 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
   let bytes =
     Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
   in
-  if dry_run then
+  if dry_run || simulation then
     let oph = Operation_hash.hash_bytes [bytes] in
     cctxt#message
       "@[<v 0>Operation: 0x%a@,Operation hash is '%a'@]"
@@ -875,7 +877,7 @@ let prepare_manager_operation ?fee ?gas_limit ?storage_limit operation =
   Manager_info {fee; gas_limit; storage_limit; operation}
 
 let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
-    ?dry_run ?verbose_signing ~source ~src_pk ~src_sk ?fee
+    ?dry_run ?verbose_signing ?simulation ~source ~src_pk ~src_sk ?fee
     ?(gas_limit = Gas.Arith.integral Z.minus_one)
     ?(storage_limit = Z.of_int (-1)) ?counter ~fee_parameter (type kind)
     (operations : kind annotated_manager_operation_list) :
@@ -968,6 +970,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
         ~block
         ?confirmations
         ?dry_run
+        ?simulation
         ~fee_parameter
         ~compute_fee
         ?verbose_signing
@@ -992,6 +995,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
         ?confirmations
         ?dry_run
         ?verbose_signing
+        ?simulation
         ~compute_fee
         ~fee_parameter
         ?branch

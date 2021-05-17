@@ -158,8 +158,8 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
        contract)
 
 let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?branch ~fee_parameter ?fee ~source ~src_pk ~src_sk
-    contract (* the KT1 to delegate *)
+    ?verbose_signing ?simulation ?branch ~fee_parameter ?fee ~source ~src_pk
+    ~src_sk contract (* the KT1 to delegate *)
     (delegate : Signature.public_key_hash option) =
   build_delegate_operation cctxt ~chain ~block ?fee contract delegate
   >>=? fun operation ->
@@ -171,6 +171,7 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?confirmations
     ?dry_run
     ?verbose_signing
+    ?simulation
     ?branch
     ~source
     ?fee
@@ -287,9 +288,9 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
        contract)
 
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?branch ~source ~src_pk ~src_sk ~contract ~destination
-    ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
-    ?counter ~fee_parameter () :
+    ?verbose_signing ?simulation ?branch ~source ~src_pk ~src_sk ~contract
+    ~destination ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit
+    ?storage_limit ?counter ~fee_parameter () :
     (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
     Lwt.t =
   build_transaction_operation
@@ -314,6 +315,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?confirmations
     ?dry_run
     ?verbose_signing
+    ?simulation
     ?branch
     ~source
     ?fee

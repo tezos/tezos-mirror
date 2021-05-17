@@ -278,15 +278,24 @@ class Client:
         params = ['get', 'contract', 'script', 'hash', 'for', contract]
         return self.run(params)
 
-    def gen_key(self, alias: str, args: List[str] = None) -> str:
+    def gen_key(
+        self, alias: str, args: List[str] = None, stdin: str = ""
+    ) -> str:
         cmd = ['gen', 'keys', alias]
         if args is None:
             args = []
         cmd += args
-        return self.run(cmd)
+        stdout, _, _ = self.run_generic(cmd, stdin=stdin)
+        return stdout
 
-    def import_secret_key(self, name: str, secret: str) -> str:
-        return self.run(['import', 'secret', 'key', name, secret])
+    def import_secret_key(
+        self, name: str, secret: str, password: str = None
+    ) -> str:
+        prms = ['import', 'secret', 'key', name, secret]
+        stdout, _, _ = self.run_generic(
+            prms, stdin=f"{password}" if password else ""
+        )
+        return stdout
 
     def add_address(self, name: str, address: str, force: bool = False):
         cmd = ['add', 'address', name, address]
@@ -501,7 +510,6 @@ class Client:
         cmd = ['transfer', str(amount), 'from', giver, 'to', receiver]
         if chain is not None:
             cmd = ['--chain', chain] + cmd
-
         if args is None:
             args = []
         cmd += args

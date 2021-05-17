@@ -747,17 +747,19 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
            annotated_contents)
 
 let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
-    ?(dry_run = false) ?branch ?src_sk ?verbose_signing ~fee_parameter
-    (contents : kind contents_list) =
-  preapply
-    cctxt
-    ~chain
-    ~block
-    ~fee_parameter
-    ?verbose_signing
-    ?branch
-    ?src_sk
-    contents
+    ?(dry_run = false) ?(simulation = false) ?branch ?src_sk ?verbose_signing
+    ~fee_parameter (contents : kind contents_list) =
+  ( if simulation then simulate cctxt ~chain ~block ?branch contents
+  else
+    preapply
+      cctxt
+      ~chain
+      ~block
+      ~fee_parameter
+      ?verbose_signing
+      ?branch
+      ?src_sk
+      contents )
   >>=? fun (_oph, op, result) ->
   ( match detect_script_failure result with
   | Ok () ->
@@ -772,7 +774,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
   let bytes =
     Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
   in
-  if dry_run then
+  if dry_run || simulation then
     let oph = Operation_hash.hash_bytes [bytes] in
     cctxt#message
       "@[<v 0>Operation: 0x%a@,Operation hash is '%a'@]"
@@ -873,8 +875,8 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
 
 let inject_operation (type kind) cctxt ~chain ~block ?confirmations
-    ?(dry_run = false) ?branch ?src_sk ?verbose_signing ~fee_parameter
-    (contents : kind contents_list) =
+    ?(dry_run = false) ?(simulation = false) ?branch ?src_sk ?verbose_signing
+    ~fee_parameter (contents : kind contents_list) =
   Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
   >>=? fun () ->
   inject_operation_internal
@@ -883,6 +885,7 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ~block
     ?confirmations
     ~dry_run
+    ~simulation
     ?branch
     ?src_sk
     ?verbose_signing
@@ -909,8 +912,8 @@ let reveal_error (cctxt : #Protocol_client_context.full) =
   cctxt#error "%s" reveal_error_message
 
 let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
-    ?dry_run ?verbose_signing ~source ~src_pk ~src_sk ~fee ~gas_limit
-    ~storage_limit ?counter ~fee_parameter (type kind)
+    ?dry_run ?verbose_signing ?simulation ~source ~src_pk ~src_sk ~fee
+    ~gas_limit ~storage_limit ?counter ~fee_parameter (type kind)
     (operations : kind Annotated_manager_operation.annotated_list) :
     ( Operation_hash.t
     * kind Kind.manager contents_list
@@ -993,6 +996,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
         ~block
         ?confirmations
         ?dry_run
+        ?simulation
         ~fee_parameter
         ?verbose_signing
         ?branch
@@ -1019,6 +1023,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations
         ?confirmations
         ?dry_run
         ?verbose_signing
+        ?simulation
         ~fee_parameter
         ?branch
         ~src_sk

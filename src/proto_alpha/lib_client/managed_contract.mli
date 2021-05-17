@@ -54,6 +54,7 @@ val set_delegate :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
+  ?simulation:bool ->
   ?branch:int ->
   fee_parameter:Injection.fee_parameter ->
   ?fee:Tez.t ->
@@ -92,6 +93,7 @@ val transfer :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
+  ?simulation:bool ->
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
