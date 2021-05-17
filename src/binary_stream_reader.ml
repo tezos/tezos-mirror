@@ -25,7 +25,13 @@
 
 open Binary_error_types
 
-let reraise exc = Stdlib.raise exc
+let wrap_user_function f a =
+  try f a with
+  | (Out_of_memory | Stack_overflow) as exc -> raise exc
+  | Invariant_guard s -> raise (Read_error (User_invariant_guard s))
+  | exc ->
+      let s = Printexc.to_string exc in
+      raise (Read_error (Exception_raised_in_user_lambda s))
 
 let raise e = raise (Read_error e)
 
@@ -315,14 +321,7 @@ let rec read_rec :
   | Tups {kind = `Variable; left; right} ->
       read_variable_pair left right state k
   | Conv {inj; encoding; _} ->
-      let inj v =
-        try inj v with
-        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-        | Invariant_guard s -> raise (User_invariant_guard s)
-        | exc ->
-            let s = Printexc.to_string exc in
-            raise (Exception_raised_in_user_lambda s)
-      in
+      let inj v = wrap_user_function inj v in
       read_rec whole encoding state @@ fun (v, state) -> k (inj v, state)
   | Union {tag_size; cases; _} -> (
       Atom.tag tag_size resume state @@ fun (ctag, state) ->
@@ -334,14 +333,7 @@ let rec read_rec :
       with
       | None -> Error (Unexpected_tag ctag)
       | Some (Case {encoding; inj; _}) ->
-          let inj v =
-            try inj v with
-            | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-            | Invariant_guard s -> raise (User_invariant_guard s)
-            | exc ->
-                let s = Printexc.to_string exc in
-                raise (Exception_raised_in_user_lambda s)
-          in
+          let inj v = wrap_user_function inj v in
           read_rec whole encoding state @@ fun (v, state) -> k (inj v, state) )
   | Dynamic_size {kind; encoding = e} ->
       Atom.int kind resume state @@ fun (sz, state) ->
@@ -380,24 +372,10 @@ let rec read_rec :
   | Describe {encoding = e; _} -> read_rec whole e state k
   | Splitted {encoding = e; _} -> read_rec whole e state k
   | Mu {fix; _} ->
-      let e =
-        try fix e with
-        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-        | Invariant_guard s -> raise (User_invariant_guard s)
-        | exc ->
-            let s = Printexc.to_string exc in
-            raise (Exception_raised_in_user_lambda s)
-      in
+      let e = wrap_user_function fix e in
       read_rec whole e state k
   | Delayed f ->
-      let e =
-        try f () with
-        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-        | Invariant_guard s -> raise (User_invariant_guard s)
-        | exc ->
-            let s = Printexc.to_string exc in
-            raise (Exception_raised_in_user_lambda s)
-      in
+      let e = wrap_user_function f () in
       read_rec whole e state k
 
 and remaining_bytes {remaining_bytes; _} =

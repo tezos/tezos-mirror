@@ -25,7 +25,13 @@
 
 open Binary_error_types
 
-let reraise e = raise e
+let wrap_user_function f a =
+  try f a with
+  | (Out_of_memory | Stack_overflow) as exc -> raise exc
+  | Invariant_guard s -> raise (Read_error (User_invariant_guard s))
+  | exc ->
+      let s = Printexc.to_string exc in
+      raise (Read_error (Exception_raised_in_user_lambda s))
 
 let raise e = raise (Read_error e)
 
@@ -234,27 +240,17 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let right = read_rec right state in
       (left, right)
   | Tups {kind = `Variable; left; right} -> read_variable_pair left right state
-  | Conv {inj; encoding; _} -> (
+  | Conv {inj; encoding; _} ->
       let v = read_rec encoding state in
-      try inj v with
-      | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-      | Invariant_guard s -> raise (User_invariant_guard s)
-      | exc ->
-          let s = Printexc.to_string exc in
-          raise (Exception_raised_in_user_lambda s) )
-  | Union {tag_size; tagged_cases; _} -> (
+      wrap_user_function inj v
+  | Union {tag_size; tagged_cases; _} ->
       let ctag = Atom.tag tag_size state in
       if ctag >= Array.length tagged_cases then raise (Unexpected_tag ctag);
       let (Case {inj; encoding; _} as case) = tagged_cases.(ctag) in
       if is_undefined_case case then raise (Unexpected_tag ctag)
       else
         let e = read_rec encoding state in
-        try inj e with
-        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-        | Invariant_guard s -> raise (User_invariant_guard s)
-        | exc ->
-            let s = Printexc.to_string exc in
-            raise (Exception_raised_in_user_lambda s) )
+        wrap_user_function inj e
   | Dynamic_size {kind; encoding = e} ->
       let sz = Atom.int kind state in
       let remaining = check_remaining_bytes state sz in
@@ -290,24 +286,10 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Describe {encoding = e; _} -> read_rec e state
   | Splitted {encoding = e; _} -> read_rec e state
   | Mu {fix; _} ->
-      let e =
-        try fix e with
-        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-        | Invariant_guard s -> raise (User_invariant_guard s)
-        | exc ->
-            let s = Printexc.to_string exc in
-            raise (Exception_raised_in_user_lambda s)
-      in
+      let e = wrap_user_function fix e in
       read_rec e state
   | Delayed f ->
-      let e =
-        try f () with
-        | (Out_of_memory | Stack_overflow) as exc -> reraise exc
-        | Invariant_guard s -> raise (User_invariant_guard s)
-        | exc ->
-            let s = Printexc.to_string exc in
-            raise (Exception_raised_in_user_lambda s)
-      in
+      let e = wrap_user_function f () in
       read_rec e state
 
 and read_variable_pair :
