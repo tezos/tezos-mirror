@@ -104,9 +104,9 @@ let read_error_encoding : read_error Encoding.t =
         ~title:"Exception raised in user function"
         string
         (function
-          | (Exception_raised_in_user_lambda s : read_error) -> Some s
+          | (Exception_raised_in_user_function s : read_error) -> Some s
           | _ -> None)
-        (fun s -> Exception_raised_in_user_lambda s);
+        (fun s -> Exception_raised_in_user_function s);
       case
         (Tag 12)
         ~title:"User invariant guard"
@@ -129,7 +129,7 @@ let pp_read_error ppf = function
   | Size_limit_exceeded -> Format.fprintf ppf "Size limit exceeded"
   | List_too_long -> Format.fprintf ppf "List length limit exceeded"
   | Array_too_long -> Format.fprintf ppf "Array length limit exceeded"
-  | Exception_raised_in_user_lambda s ->
+  | Exception_raised_in_user_function s ->
       Format.fprintf ppf "Exception raised in user function: %s" s
   | User_invariant_guard s ->
       Format.fprintf
@@ -205,9 +205,9 @@ let write_error_encoding =
         ~title:"Exception raised in user function"
         string
         (function
-          | (Exception_raised_in_user_lambda s : write_error) -> Some s
+          | (Exception_raised_in_user_function s : write_error) -> Some s
           | _ -> None)
-        (fun s -> Exception_raised_in_user_lambda s);
+        (fun s -> Exception_raised_in_user_function s);
     ]
 
 let pp_write_error ppf = function
@@ -232,5 +232,5 @@ let pp_write_error ppf = function
   | Invalid_natural -> Format.fprintf ppf "Negative natural"
   | List_too_long -> Format.fprintf ppf "List length limit exceeded"
   | Array_too_long -> Format.fprintf ppf "Array length limit exceeded"
-  | Exception_raised_in_user_lambda s ->
+  | Exception_raised_in_user_function s ->
       Format.fprintf ppf "Exception raised in user function: %s" s

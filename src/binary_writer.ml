@@ -30,7 +30,7 @@ let wrap_user_function f a =
   | (Out_of_memory | Stack_overflow) as exc -> raise exc
   | exc ->
       let s = Printexc.to_string exc in
-      raise (Write_error (Exception_raised_in_user_lambda s))
+      raise (Write_error (Exception_raised_in_user_function s))
 
 let raise error = Stdlib.raise (Write_error error)
 

@@ -40,7 +40,7 @@ type read_error =
   | Size_limit_exceeded
   | List_too_long
   | Array_too_long
-  | Exception_raised_in_user_lambda of string
+  | Exception_raised_in_user_function of string
   | User_invariant_guard of string
 
 exception Read_error of read_error
@@ -55,6 +55,6 @@ type write_error =
   | Invalid_natural
   | List_too_long
   | Array_too_long
-  | Exception_raised_in_user_lambda of string
+  | Exception_raised_in_user_function of string
 
 exception Write_error of write_error

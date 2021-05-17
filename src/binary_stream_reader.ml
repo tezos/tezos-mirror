@@ -31,7 +31,7 @@ let wrap_user_function f a =
   | Invariant_guard s -> raise (Read_error (User_invariant_guard s))
   | exc ->
       let s = Printexc.to_string exc in
-      raise (Read_error (Exception_raised_in_user_lambda s))
+      raise (Read_error (Exception_raised_in_user_function s))
 
 let raise e = raise (Read_error e)
 
