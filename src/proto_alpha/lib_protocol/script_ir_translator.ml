@@ -3762,31 +3762,20 @@ and parse_instr :
       >>?= fun annot ->
       let rec make_proof_argument :
           type a s.
-          int ->
-          (a, s) stack_ty ->
-          ((a * s) comb_proof_argument * var_annot option) tzresult =
+          int -> (a, s) stack_ty -> (a * s) comb_proof_argument tzresult =
        fun n stack_ty ->
         match (n, stack_ty) with
-        | (1, Item_t (a_ty, tl_ty, a_annot_opt)) ->
-            ok
-              ( Comb_proof_argument (Comb_one, Item_t (a_ty, tl_ty, annot)),
-                a_annot_opt )
-        | (n, Item_t (a_ty, tl_ty, prop_annot_opt)) ->
+        | (1, Item_t (a_ty, tl_ty, _a_annot_opt)) ->
+            ok (Comb_proof_argument (Comb_one, Item_t (a_ty, tl_ty, annot)))
+        | (n, Item_t (a_ty, tl_ty, _prop_annot_opt)) ->
             make_proof_argument (n - 1) tl_ty
-            >|? fun ( Comb_proof_argument
-                        (comb_witness, Item_t (b_ty, tl_ty', annot)),
-                      b_annot_opt ) ->
-            let prop_annot_opt' = var_to_field_annot prop_annot_opt in
-            let b_prop_annot_opt = var_to_field_annot b_annot_opt in
+            >|? fun (Comb_proof_argument
+                      (comb_witness, Item_t (b_ty, tl_ty', annot))) ->
             let pair_t =
-              Pair_t
-                ( (a_ty, prop_annot_opt', None),
-                  (b_ty, b_prop_annot_opt, None),
-                  None )
+              Pair_t ((a_ty, None, None), (b_ty, None, None), None)
             in
-            ( Comb_proof_argument
-                (Comb_succ comb_witness, Item_t (pair_t, tl_ty', annot)),
-              None )
+            Comb_proof_argument
+              (Comb_succ comb_witness, Item_t (pair_t, tl_ty', annot))
         | _ ->
             serialize_stack_for_error ctxt stack_ty
             >>? fun (whole_stack, _ctxt) ->
@@ -3799,7 +3788,7 @@ and parse_instr :
       error_unless (Compare.Int.( > ) n 1) (Pair_bad_argument loc)
       >>?= fun () ->
       make_proof_argument n stack_ty
-      >>?= fun (Comb_proof_argument (witness, after_ty), _none) ->
+      >>?= fun (Comb_proof_argument (witness, after_ty)) ->
       let comb = {apply = (fun kinfo k -> IComb (kinfo, n, witness, k))} in
       typed ctxt 1 loc comb after_ty
   | (Prim (loc, I_UNPAIR, [n], annot), stack_ty) ->
