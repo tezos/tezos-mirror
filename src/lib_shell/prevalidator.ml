@@ -380,6 +380,16 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     pv.branch_refusals <-
       Operation_hash.Map.add oph (op, errors) pv.branch_refusals
 
+  let handle_branch_delayed pv op oph errors =
+    notify_operation pv `Branch_delayed op ;
+    Option.iter
+      (fun e ->
+        pv.branch_delays <- Operation_hash.Map.remove e pv.branch_delays ;
+        pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
+      (Ringo.Ring.add_and_return_erased pv.branch_delayed oph) ;
+    pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
+    pv.branch_delays <- Operation_hash.Map.add oph (op, errors) pv.branch_delays
+
   let handle_unprocessed w pv =
     match pv.validation_state with
     | Error err ->
@@ -459,23 +469,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                              Lwt.return_ok
                                (acc_validation_state, acc_mempool, limit)
                        | Branch_delayed errors ->
-                           notify_operation pv `Branch_delayed op.raw ;
-                           Option.iter
-                             (fun e ->
-                               pv.branch_delays <-
-                                 Operation_hash.Map.remove e pv.branch_delays ;
-                               pv.in_mempool <-
-                                 Operation_hash.Set.remove e pv.in_mempool)
-                             (Ringo.Ring.add_and_return_erased
-                                pv.branch_delayed
-                                op.hash) ;
-                           pv.in_mempool <-
-                             Operation_hash.Set.add op.hash pv.in_mempool ;
-                           pv.branch_delays <-
-                             Operation_hash.Map.add
-                               op.hash
-                               (op.raw, errors)
-                               pv.branch_delays ;
+                           handle_branch_delayed pv op.raw op.hash errors ;
                            Lwt.return_ok
                              (acc_validation_state, acc_mempool, limit)
                        | Branch_refused errors ->
