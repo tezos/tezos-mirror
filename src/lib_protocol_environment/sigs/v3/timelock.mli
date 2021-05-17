@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,7 +38,7 @@ val chest_key_encoding : chest_key Data_encoding.t
     The opening can fail in two way which we distinguish to blame the right person.
     One can provide a false unlocked_value or unlocked_proof, in which case
     we return [Bogus_opening] and the provider of the chest key is at fault.
-    Otherwise, one can lock the wrong key or put garbage in the ciphertext in which case 
+    Otherwise, one can lock the wrong key or put garbage in the ciphertext in which case
     we return [Bogus_cipher] and the provider of the chest is at fault.
     Otherwise we return [Correct payload] where payload was what had
     originally been put in the chest. *)
