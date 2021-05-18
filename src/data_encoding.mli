@@ -1135,6 +1135,45 @@ module Binary : sig
   val to_string_exn : ?buffer_size:int -> 'a Encoding.t -> 'a -> string
 
   val describe : 'a Encoding.t -> Binary_schema.t
+
+  module Slicer : sig
+    (** A [slice] is a part of a binary representation of some data. The
+      concatenation of multiple slice represents the whole data. *)
+    type slice = {name: string; value: string; pretty_printed: string}
+
+    type slicer_state
+
+    (** [None] if [offset] and [length] do not describe a valid substring. *)
+    val make_slicer_state :
+      string -> offset:int -> length:int -> slicer_state option
+
+    (** [slice e b offset length] slices the data represented by the [length]
+      bytes in [b] starting at index [offset].
+
+      If [e] does not correctly describe the given bytes (i.e., if [read]
+      would fail on equivalent parameters) then it returns [Error]. *)
+    val slice :
+      _ Encoding.t ->
+      slicer_state ->
+      (slice list, Binary_error_types.read_error) result
+
+    val slice_opt : _ Encoding.t -> slicer_state -> slice list option
+
+    val slice_exn : _ Encoding.t -> slicer_state -> slice list
+
+    (** [slice_string] slices the whole content of the buffer. *)
+    val slice_string : _ Encoding.t -> string -> (slice list, read_error) result
+
+    val slice_string_opt : _ Encoding.t -> string -> slice list option
+
+    val slice_string_exn : _ Encoding.t -> string -> slice list
+
+    val slice_bytes : _ Encoding.t -> bytes -> (slice list, read_error) result
+
+    val slice_bytes_opt : _ Encoding.t -> bytes -> slice list option
+
+    val slice_bytes_exn : _ Encoding.t -> bytes -> slice list
+  end
 end
 
 type json = Json.t
@@ -1170,6 +1209,21 @@ module Registration : sig
       later be found using {!find} and providing the matching [id]. It will
       also appear in the results of {!list}. *)
   val register : ?pp:(Format.formatter -> 'a -> unit) -> 'a Encoding.t -> unit
+
+  (** [slice r b] attempts to slice a binary representation [b] of some data
+      assuming it is correctly described by the registered encoding [r].
+      If [r] does not correctly describe [b], then it returns [None].
+
+      See {!Binary.slice_string} for details about slicing. *)
+  val slice :
+    t -> string -> (Binary.Slicer.slice list, Binary.read_error) result
+
+  (** [slice_all b] attempts to slice a binary representation [b] of some data
+      for all of the registered encodings. It returns a list of the slicing for
+      each of the registered encodings that correctly describe [b].
+
+      See {!Binary.slice_string} for details about slicing. *)
+  val slice_all : string -> (string * Binary.Slicer.slice list) list
 
   (** [find id] is [Some r] if [register id e] has been called, in which
       case [r] matches [e]. Otherwise, it is [None]. *)

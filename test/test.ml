@@ -36,4 +36,5 @@ let () =
       ("versioned", Versioned.tests);
       ("registration", Registrationed.tests);
       ("mu", Mu.tests);
+      ("slice", Slice_test.tests);
     ]

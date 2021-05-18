@@ -143,6 +143,7 @@ module Binary = struct
   include Binary_writer
   include Binary_reader
   include Binary_stream_reader
+  module Slicer = Binary_slicer
 
   let describe = Binary_description.describe
 end

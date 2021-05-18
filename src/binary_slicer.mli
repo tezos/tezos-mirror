@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,33 +26,32 @@
 (** This is for use *within* the data encoding library only. Instead, you should
     use the corresponding module intended for use: {!Data_encoding.Encoding}. *)
 
-type id = string
+type slice = {name: string; value: string; pretty_printed: string}
 
-type t
+type slicer_state
 
-val binary_schema : t -> Binary_schema.t
-
-val json_schema : t -> Json.schema
-
-val description : t -> string option
-
-val json_pretty_printer : t -> Format.formatter -> Json.t -> unit
-
-val binary_pretty_printer : t -> Format.formatter -> Bytes.t -> unit
+val make_slicer_state :
+  string -> offset:int -> length:int -> slicer_state option
 
 val slice :
-  t ->
-  string ->
-  (Binary_slicer.slice list, Binary_error_types.read_error) result
+  _ Encoding.t ->
+  slicer_state ->
+  (slice list, Binary_error_types.read_error) result
 
-val slice_all : string -> (string * Binary_slicer.slice list) list
+val slice_opt : _ Encoding.t -> slicer_state -> slice list option
 
-val register : ?pp:(Format.formatter -> 'a -> unit) -> 'a Encoding.t -> unit
+val slice_exn : _ Encoding.t -> slicer_state -> slice list
 
-val find : id -> t option
+val slice_string :
+  _ Encoding.t -> string -> (slice list, Binary_error_types.read_error) result
 
-val list : unit -> (id * t) list
+val slice_string_opt : _ Encoding.t -> string -> slice list option
 
-val bytes_of_json : t -> Json.t -> Bytes.t option
+val slice_string_exn : _ Encoding.t -> string -> slice list
 
-val json_of_bytes : t -> Bytes.t -> Json.t option
+val slice_bytes :
+  _ Encoding.t -> bytes -> (slice list, Binary_error_types.read_error) result
+
+val slice_bytes_opt : _ Encoding.t -> bytes -> slice list option
+
+val slice_bytes_exn : _ Encoding.t -> bytes -> slice list
