@@ -134,13 +134,13 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: 009 Florence doc:
 
-   009/michelson
-   009/proof_of_stake
-   009/sapling
-   009/voting
-   009/glossary
-   009/cli-commands
-   009/rpc
+   active/michelson
+   active/proof_of_stake
+   active/sapling
+   active/voting
+   active/glossary
+   active/cli-commands
+   active/rpc
 
 .. toctree::
    :maxdepth: 2
