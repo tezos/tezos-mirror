@@ -22,7 +22,7 @@ Client manual
 =============
 
 .. raw:: html
-         :file: tezos-client-009.html
+         :file: tezos-client.html
 
 
 .. _baker_manual:
@@ -32,7 +32,7 @@ Baker manual
 ============
 
 .. raw:: html
-         :file: tezos-baker-009.html
+         :file: tezos-baker.html
 
 
 .. _endorser_manual:
@@ -42,7 +42,7 @@ Endorser manual
 ===============
 
 .. raw:: html
-         :file: tezos-endorser-009.html
+         :file: tezos-endorser.html
 
 
 .. _accuser_manual:
@@ -52,4 +52,4 @@ Accuser manual
 ==============
 
 .. raw:: html
-         :file: tezos-accuser-009.html
+         :file: tezos-accuser.html
