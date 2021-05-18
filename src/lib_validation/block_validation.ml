@@ -55,6 +55,25 @@ type result = {
   ops_metadata_hashes : Operation_metadata_hash.t list list option;
 }
 
+let check_proto_environment_version_increasing block_hash before after =
+  match (before, after) with
+  | (Protocol.V0, Protocol.V0)
+  | (V0, V1)
+  | (V0, V2)
+  | (V0, V3)
+  | (V1, V1)
+  | (V1, V2)
+  | (V1, V3)
+  | (V2, V2)
+  | (V2, V3)
+  | (V3, V3) ->
+      ok ()
+  | _ ->
+      error
+        (invalid_block
+           block_hash
+           (Invalid_protocol_environment_transition (before, after)))
+
 let update_testchain_status ctxt predecessor_header timestamp =
   Context.get_test_chain ctxt >>= function
   | Not_running -> Lwt.return ctxt
@@ -349,6 +368,11 @@ module Make (Proto : Registered_protocol.T) = struct
           fail
             (Unavailable_protocol {block = block_hash; protocol = new_protocol})
       | Some (module NewProto) ->
+          check_proto_environment_version_increasing
+            block_hash
+            Proto.environment_version
+            NewProto.environment_version
+          >>?= fun () ->
           NewProto.init validation_result.context block_header.shell
           >|=? fun validation_result ->
           (validation_result, NewProto.environment_version))

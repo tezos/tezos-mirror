@@ -40,6 +40,14 @@ Docker Images
 
 Miscellaneous
 -------------
+Version 10.0~rc2
+================
+
+Node
+----
+
+- Check that protocol migrations can only increase the protocol
+  environment version.
 
 Version 10.0~rc1
 ================

@@ -51,6 +51,8 @@ type block_error =
     }
   | Cannot_parse_block_header
   | Economic_protocol_error of error list
+  | Invalid_protocol_environment_transition of
+      Protocol.env_version * Protocol.env_version
 
 type validation_process_error =
   | Missing_handshake
