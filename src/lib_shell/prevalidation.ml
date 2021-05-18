@@ -432,6 +432,11 @@ let preapply chain_store ~user_activated_upgrades
              {block = pred_block_hash; protocol})
     | Some (module NewProto) ->
         let context = Shell_context.wrap_disk_context context in
+        Block_validation.check_proto_environment_version_increasing
+          Block_hash.zero
+          Proto.environment_version
+          NewProto.environment_version
+        >>?= fun () ->
         NewProto.init context shell_header >>=? fun {context; message; _} ->
         let context = Shell_context.unwrap_disk_context context in
         return (context, message))

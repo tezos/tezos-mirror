@@ -40,6 +40,9 @@ Node
    -  POST ``/chains/<chain_id>/mempool/unban_all_operations``: Unban
       all operations, i.e. clear the set of banned operations.
 
+- Check that protocol migrations can only increase the protocol
+  environment version.
+
 Client
 ------
 
