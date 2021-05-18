@@ -31,14 +31,11 @@ let protocols =
       "Alpha",
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
-    ( "009",
+    (* TODO nomadic-labs/tezos#462: adapt rest of this list *)
+    ( "",
       "009 Florence",
       Some "/include/rpc_introduction.rst.inc",
-      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" );
-    ( "",
-      "008 Edo",
-      Some "/include/rpc_introduction.rst.inc",
-      "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA" ) ]
+      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" ) ]
 
 let pp_name ppf = function
   | [] | [""] ->

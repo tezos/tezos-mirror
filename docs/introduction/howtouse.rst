@@ -1,3 +1,5 @@
+.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+
 .. _howtouse:
 
 Getting started with Tezos
@@ -26,8 +28,8 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
 
 The daemons other than the node are suffixed with the name of the protocol they are
-bound to. For instance, ``tezos-baker-008-PtEdo2Zk`` is the baker
-for the Edo protocol, and ``tezos-baker-alpha`` is the baker
+bound to. For instance, ``tezos-baker-009-PsFLoren`` is the baker
+for the Florence protocol, and ``tezos-baker-alpha`` is the baker
 of the development protocol.
 The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node Protocol`_ section below.
 
@@ -256,11 +258,11 @@ command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
-If you run Tezos using docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``edo2net.sh``
-to run the Edo2net test network for instance), you should prefix the file
+If you run Tezos using docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``florencenet.sh``
+to run the Florencenet test network for instance), you should prefix the file
 with ``container:`` in order to copy it into the docker image::
 
-    ./edo2net.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
+    ./florencenet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
 
 Let's check the balance of the new account with::
 

@@ -3,6 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
 
 Welcome to the Tezos Developer Documentation!
 =============================================
@@ -128,18 +129,6 @@ in the :ref:`introduction <howtoget>`.
    shell/micheline
    shell/cli-commands
    shell/rpc
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 008 Edo doc:
-
-   008/michelson
-   008/proof_of_stake
-   008/sapling
-   008/voting
-   008/glossary
-   008/cli-commands
-   008/rpc
 
 .. toctree::
    :maxdepth: 2
