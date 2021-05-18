@@ -312,17 +312,17 @@ end = struct
       match List.combine_with_leftovers pats events with
       | (pes, None) -> List.iter (fun (p, e) -> Pattern.assert_event p e) pes
       | (_, Some (`Left pats)) ->
-          Alcotest.fail ?here:None ?pos:None
-          @@ Format.asprintf
+          Alcotest.fail
+            (Format.asprintf
                "Missing events in sink: %a"
                (Format.pp_print_list Pattern.pp)
-               pats
+               pats)
       | (_, Some (`Right events)) ->
-          Alcotest.fail ?here:None ?pos:None
-          @@ Format.asprintf
+          Alcotest.fail
+            (Format.asprintf
                "Excess events in sink: %a"
                (Format.pp_print_list pp_event)
-               events
+               events)
     else
       List.iter
         (fun pattern ->
