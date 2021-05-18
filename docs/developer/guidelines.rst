@@ -71,7 +71,7 @@ When the place of the future evolution is known in advance (e.g. a given functio
        <Add long explanation if the issue description is not the right place.>
     *)
 
-If the evolution is needed to fix some code that does *not* fully implement its specification, while serving as a useful intermediate step (e.g., it temporarily handles just some particular cases), rather than to merely improve the code, you should use a ``FIXME`` tag instead of the ``TODO``, adhering to the same syntax for the rest.
+If the evolution is needed to fix some code that does *not* fully implement its specification, (e.g., a known bug detected but not yet fixed, or a temporary implementation handling only some particular cases), rather than to merely improve the code, you should use a ``FIXME`` tag instead of the ``TODO``, adhering to the same syntax for the rest.
 
 Thus, the difference between ``TODO`` and ``FIXME`` tags is a semantic one,  reflecting the full/partial implementation of the specification.
 Consequently, when the specification evolves to become more demanding, some ``TODO`` tags corresponding to *potential* evolutions may have to be recasted as ``FIXME`` tags, corresponding to *required* evolutions.
