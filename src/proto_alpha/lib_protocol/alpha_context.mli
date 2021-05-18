@@ -464,25 +464,7 @@ module Script : sig
 
   val serialized_cost : bytes -> Gas.cost
 
-  val traversal_cost : node -> Gas.cost
-
-  val int_node_cost : Z.t -> Gas.cost
-
-  val int_node_cost_of_numbits : int -> Gas.cost
-
-  val string_node_cost : string -> Gas.cost
-
-  val string_node_cost_of_length : int -> Gas.cost
-
   val bytes_node_cost : bytes -> Gas.cost
-
-  val bytes_node_cost_of_length : int -> Gas.cost
-
-  val prim_node_cost_nonrec : expr list -> annot -> Gas.cost
-
-  val seq_node_cost_nonrec : expr list -> Gas.cost
-
-  val seq_node_cost_nonrec_of_length : int -> Gas.cost
 
   val minimal_deserialize_cost : lazy_expr -> Gas.cost
 
@@ -493,8 +475,6 @@ module Script : sig
     context -> lazy_expr -> (bytes * context) tzresult
 
   val unit_parameter : lazy_expr
-
-  val micheline_nodes : node -> int
 
   val strip_locations_cost : node -> Gas.cost
 end
