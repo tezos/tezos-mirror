@@ -174,7 +174,7 @@ Sapling
 
 Integration of the Sapling protocol into the Michelson language.
 More information can be found in the :ref:`Sapling documentation page
-<sapling_dev_008>`.
+<sapling_dev>`.
 
 Bls12-381
 ~~~~~~~~~
@@ -186,7 +186,7 @@ Tickets
 
 Tickets are a generic and composable mechanism for authenticating data
 from smart contracts, managing permissions, and representing assets.
-More information can be found in the :ref:`Ticket documentation <MichelsonTickets_008>`.
+More information can be found in the :ref:`Ticket documentation <MichelsonTickets>`.
 
 Comb pairs
 ~~~~~~~~~~

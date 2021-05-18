@@ -5,8 +5,10 @@
 
 # This script checks only local protocol references, that is, refs in
 # protocol NNN to labels defined in the protocol pages.
-# All these refs and the corresponding labels must be versioned, i.e.
-# suffixed by _NNN.
+# All these refs must be versioned, i.e. suffixed by _NNN.
+# With option -l, also checks that all defined labels are versioned.
+# You should use this option for all protocols except the active one
+# (which may contain unversioned labels).
 
 # The script warns about refs to section headings (having the form
 # :ref:`Section Name`), because these ones cannot be versioned (besides being

@@ -1,3 +1,4 @@
+.. _cli_commands:
 .. _cli_commands_009:
 
 **********************
@@ -17,6 +18,7 @@ The rest of this page documents the protocol-dependent tools.
 The protocol-independent tools are documented :ref:`here <cli_commands_shell>`.
 
 
+.. _client_manual:
 .. _client_manual_009:
 
 Client manual
@@ -26,6 +28,7 @@ Client manual
          :file: tezos-client-009.html
 
 
+.. _baker_manual:
 .. _baker_manual_009:
 
 Baker manual
@@ -35,6 +38,7 @@ Baker manual
          :file: tezos-baker-009.html
 
 
+.. _endorser_manual:
 .. _endorser_manual_009:
 
 Endorser manual
@@ -44,6 +48,7 @@ Endorser manual
          :file: tezos-endorser-009.html
 
 
+.. _accuser_manual:
 .. _accuser_manual_009:
 
 Accuser manual

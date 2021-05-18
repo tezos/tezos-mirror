@@ -1,3 +1,4 @@
+# TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
 # You can set these variables from the command line.
 SPHINXOPTS    = -aE -n
 SPHINXBUILD   = poetry run sphinx-build
@@ -11,11 +12,9 @@ DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
 ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 FLORENCE_LONG = PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
-EDO_LONG      = PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA
 
 ALPHA_SHORT    = alpha
 FLORENCE_SHORT = 009-PsFLoren
-EDO_SHORT      = 008-PtEdo2Zk
 
 SCRIPTSDIR		= scripts
 CHECKXREFS		= $(SCRIPTSDIR)/check_proto_xrefs.py
@@ -36,11 +35,6 @@ manuals: main
 	@../tezos-baker-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-baker-009.html
 	@../tezos-endorser-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-endorser-009.html
 	@../tezos-accuser-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-accuser-009.html
-    # 008 (Edo) protocol
-	@../tezos-client -protocol $(EDO_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-client-008.html
-	@../tezos-baker-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-baker-008.html
-	@../tezos-endorser-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-endorser-008.html
-	@../tezos-accuser-$(EDO_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 008/tezos-accuser-008.html
     # generic
 	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
@@ -68,8 +62,8 @@ redirectcheck:
 	@cd $$(pwd)/.. ; ./src/tooling/lint.sh --check-redirects
 
 xrefscheck:
-	$(CHECKXREFS) 008
-	$(CHECKXREFS) -l 009
+	$(CHECKXREFS) 009
+	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
 	introduction/test_howtoget.sh install-bin-bionic
@@ -97,8 +91,7 @@ $(DOCGENDIR)/rpc_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
-	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 008/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe 009 > 009/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 009/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe shell > shell/rpc.rst
 
@@ -118,5 +111,5 @@ html: Makefile api/errors.rst rpc p2p
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst 008/rpc.rst 009/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt 008/tezos-*.html 009/tezos-*.html
+	@-rm -Rf api/errors.rst 009/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt 009/tezos-*.html

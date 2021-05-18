@@ -5,7 +5,7 @@
             tezos-stdlib-unix
             tezos-shell
             tezos-protocol-updater
-            tezos-embedded-protocol-008-PtEdo2Zk
+            ; TODO nomadic-labs/tezos#462: adapt next line(s)
             tezos-embedded-protocol-009-PsFLoren
             tezos-embedded-protocol-alpha
             re)
