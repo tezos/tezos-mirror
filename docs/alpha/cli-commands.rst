@@ -1,5 +1,3 @@
-.. _cli_commands_alpha:
-
 **********************
 Command Line Interface
 **********************
@@ -14,7 +12,7 @@ using the following shell commands.
    tezos-admin-client man -verbosity 3
 
 The rest of this page documents the protocol-dependent tools.
-The protocol-independent tools are documented :ref:`here <cli_commands_shell>`.
+The protocol-independent tools are documented :doc:`here <../shell/cli-commands>`.
 
 
 .. _client_manual_alpha:

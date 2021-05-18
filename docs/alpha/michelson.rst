@@ -1,5 +1,3 @@
-.. _michelson_alpha:
-
 Michelson: the language of Smart Contracts in Tezos
 ===================================================
 
@@ -1719,9 +1717,9 @@ Domain specific data types
 
 -  ``bls12_381_fr`` : An element of the scalar field F\ :sub:`r`\ , used for scalar multiplication on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ .
 
--  ``sapling_transaction ms``: A :ref:`Sapling<sapling_dev_alpha>` transaction
+-  ``sapling_transaction ms``: A :doc:`Sapling <sapling>` transaction
 
--  ``sapling_state ms``: A :ref:`Sapling<sapling_dev_alpha>` state
+-  ``sapling_state ms``: A :doc:`Sapling <sapling>` state
 
 -  ``ticket (t)``: A ticket used to authenticate information of type ``(t)`` on-chain.
 
@@ -2205,7 +2203,7 @@ BLS12-381 primitives
 Sapling operations
 ~~~~~~~~~~~~~~~~~~
 
-Please see the :ref:`Sapling integration<sapling_dev_alpha>` page for a more
+Please see the :doc:`Sapling integration<sapling>` page for a more
 comprehensive description of the Sapling protocol.
 
 -  ``SAPLING_VERIFY_UPDATE``: verify and apply a transaction on a Sapling state.

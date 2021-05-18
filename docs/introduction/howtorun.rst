@@ -9,7 +9,7 @@ In this section, we discuss how to take part in the protocol that runs
 the network.
 There are two main ways to participate in the consensus, delegating
 your coins and running a delegate.
-To learn more about the protocol refer to :ref:`this section <proof-of-stake>`.
+To learn more about the protocol refer to :doc:`this page <../active/proof_of_stake>`.
 
 
 Delegating your coins
@@ -284,7 +284,7 @@ chains and looks for:
 
 * bakers who signed two blocks at the same level
 * endorsers who injected more than one endorsement operation for the
-  same baking slot (more details :ref:`here<proof-of-stake>`)
+  same baking slot (more details :doc:`here <../active/proof_of_stake>`)
 
 Upon finding such irregularity, it will emit respectively a
 double-baking or double-endorsing denunciation operation, which will

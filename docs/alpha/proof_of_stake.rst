@@ -1,5 +1,3 @@
-.. _proof-of-stake_alpha:
-
 Proof-of-stake in Tezos
 =======================
 

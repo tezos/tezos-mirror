@@ -100,7 +100,7 @@ its own new operations when instructed by the ``tezos-client`` and even
 send new blocks when guided by the ``tezos-baker-*``.
 The node has also a view of the multiple chains that may exist
 concurrently and selects the best one based on its fitness (see
-:ref:`proof-of-stake`).
+:doc:`../active/proof_of_stake`).
 
 
 Node Identity
@@ -544,7 +544,7 @@ usage. Otherwise, you can force a low fee operation using the
 More test contracts can be found in directory
 :src:`tests_python/contracts_alpha/`.
 Advanced documentation of the smart contract language is available
-:ref:`here<michelson>`.
+:doc:`here<../active/michelson>`.
 
 
 Validation

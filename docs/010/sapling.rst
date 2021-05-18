@@ -180,7 +180,7 @@ Michelson: verify update
 We introduce two new Michelson types `sapling_state` and
 `sapling_transaction`, and two instructions called
 `SAPLING_VERIFY_UPDATE` and `SAPLING_EMPTY_STATE`
-(see the :ref:`Michelson reference<michelson_010>`
+(see the :doc:`Michelson reference<michelson>`
 for more details).
 `SAPLING_EMPTY_STATE` pushes an empty `sapling_state` on the stack.
 `SAPLING_VERIFY_UPDATE` takes a transaction and a state and returns an

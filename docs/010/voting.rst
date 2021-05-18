@@ -1,5 +1,3 @@
-.. _voting_010:
-
 The Voting Process
 ==================
 
@@ -190,7 +188,7 @@ Other resources
 For more details on the client commands refer to the manual at
 :ref:`client_manual_010`.
 
-For vote related RPCs check the :ref:`rpc_index_010` under the prefix
+For vote related RPCs check the :doc:`rpc` under the prefix
 ``votes/``.
 
 For Ledger support refer to Obsidian Systems' `documentation
