@@ -267,10 +267,62 @@ Example:
      module Mycache = Mycache
    end
 
+Exceptions and errors
+---------------------
+
+The following pieces of advice should be applied in general, although exceptions apply (pun intended).
+
+- Only use exceptions locally and don't let them escape: raise them and catch them within the same function or the same module.
+
+  - If a function that is exported can fail, return a ``result`` or a ``tzresult``.
+
+  - If you cannot (or for another reason do not) handle an exception and it may escape you **must** document it.
+
+- Never catch ``Stack_overflow`` nor ``Out_of_memory`` which are exceptions from
+  the OCaml runtime rather than the code itself. In other words, when one of
+  these exception is raised in one process, the same exception may or may not be
+  raised in another process executing the same code on other machines. When you
+  catch this exception, you make a branching in the code that is decided not
+  based on properties of the code, but properties of the process executing the
+  code. Consequently, the same branching may differ on two distinct runs of the
+  same code. This is, in essence, non-determinism.
+
+  - If you are in one of the small cases where non-determinism is ok and you
+    have a compelling reason to catch either ``Stack_overflow`` or
+    ``Out_of_memory``, you **must** include a comment explaining why.
+
+  - Note that catch-all patterns (such as wildcard (`| _ ->`) and variable
+    (`| exn ->`) include ``Stack_overflow`` and ``Out_of_memory``.
+
+- Do not let low-level, implementation-dependent exceptions and errors bubble up
+  to high-level code. For example, you should catch ``Unix_error`` near the
+  syscall sites (ideally, within the same module) and handle it there. If you
+  cannot handle it (e.g., if the error is non-recoverable) you should translate
+  it into an error that is more relevant to the high-level code.
+
+  - E.g., If a file-writing call to a library function raises
+    ``Unix_error(ENOSPC, _, _)``, the caller of that library function should
+
+    - catch the exception,
+
+    - attempt to recover (if possible; e.g., by removing other old files before attempting it again),
+
+    - and if the recovery does not work (e.g., does not release sufficient
+      space) or is impossible (e.g., there are no references to old files in
+      scope) then it should fail in a more meaningful way than by forwarding the
+      exception (e.g., indicating what operation it was trying to carry).
+
+  - In the rare case that the underlying exception/error is satisfactory to the
+    higher level code, then you may propagate it as is.
+
+The ``Lwtreslib`` and the ``Error_monad`` libraries provide functions that can
+help you follow these guidelines. Notably, ``traces`` allow callers to
+contextualise the errors produced by its callees.
+
 Coding conventions
 ------------------
 
-Other than the formatting rules above, there are currently no coding
+Other than the guidelines above, there are currently no coding
 conventions enforced in the codebase. However, Tezos developers should be aware
 of general `OCaml programming guidelines <http://caml.inria.fr/resources/doc/
 guides/guidelines.en.html>`_, which recommend formatting, naming conventions,
