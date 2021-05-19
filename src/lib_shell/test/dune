@@ -1,7 +1,8 @@
 (executables
  (names test_shell
         test_locator
-        test_synchronisation_heuristic_fuzzy)
+        test_synchronisation_heuristic_fuzzy
+        test_prevalidation)
  (libraries tezos-base
             tezos-store
             tezos-context
@@ -43,6 +44,10 @@
  (action (run %{exe:test_shell.exe})))
 
 (rule
+ (alias runtest_prevalidation)
+ (action (run %{exe:test_prevalidation.exe})))
+
+(rule
  (alias runtest_locator)
  (action (run %{exe:test_locator.exe} --no-bench)))
 
@@ -59,5 +64,6 @@
  (package tezos-shell)
  (deps (alias runtest_shell)
        (alias runtest_locator)
-       (alias runtest_synchronisation))
+       (alias runtest_synchronisation)
+       (alias runtest_prevalidation))
  (action (progn)))

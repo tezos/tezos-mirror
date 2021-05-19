@@ -42,9 +42,8 @@ module type T = sig
 
   val parse : Operation.t -> operation tzresult
 
-  (** Creates a new prevalidation context w.r.t. the protocol associate to the
-      predecessor block . When ?protocol_data is passed to this function, it will
-      be used to create the new block *)
+  val parse_unsafe : bytes -> Proto.operation_data tzresult
+
   val create :
     Store.chain_store ->
     ?protocol_data:Bytes.t ->
@@ -77,6 +76,15 @@ module type T = sig
   val pp_result : Format.formatter -> result -> unit
 end
 
+(** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
+let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
+    'a tzresult =
+  try
+    match Data_encoding.Binary.of_bytes_opt encoding bytes with
+    | None -> error Parse_error
+    | Some protocol_data -> ok protocol_data
+  with _ -> error Parse_error
+
 module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
   T with module Proto = Proto = struct
   module Proto = Proto
@@ -101,21 +109,16 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     | Refused of error list
     | Outdated
 
+  let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
+    safe_binary_of_bytes Proto.operation_data_encoding proto
+
   let parse (raw : Operation.t) =
     let hash = Operation.hash raw in
     let size = Data_encoding.Binary.length Operation.encoding raw in
     if size > Proto.max_operation_data_length then
       error (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
-      try
-        match
-          Data_encoding.Binary.of_bytes_opt
-            Proto.operation_data_encoding
-            raw.Operation.proto
-        with
-        | None -> error Parse_error
-        | Some protocol_data -> ok {hash; raw; protocol_data}
-      with _ -> error Parse_error
+      parse_unsafe raw.proto >|? fun protocol_data -> {hash; raw; protocol_data}
 
   let compare op1 op2 =
     Proto.compare_operations
@@ -400,3 +403,7 @@ let preapply chain_store ~user_activated_upgrades
   >>=? fun context ->
   let context = Context.hash ?message ~time:timestamp context in
   return ({shell_header with context}, validation_result_list)
+
+module Internal_for_tests = struct
+  let safe_binary_of_bytes = safe_binary_of_bytes
+end

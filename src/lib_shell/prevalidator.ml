@@ -24,6 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1491
+   This module should not use [Prevalidation.parse_unsafe] *)
+
 open Prevalidator_worker_state
 
 type limits = {
@@ -354,20 +357,12 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (Types)
       (Logger)
 
-  let decode_operation_data proto_bytes =
-    try
-      Some
-        (Data_encoding.Binary.of_bytes_exn
-           Proto.operation_data_encoding
-           proto_bytes)
-    with _ -> None
-
   (** Centralised operation stream for the RPCs *)
   let notify_operation {operation_stream; _} result {Operation.shell; proto} =
-    match decode_operation_data proto with
-    | Some protocol_data ->
+    match Prevalidation.parse_unsafe proto with
+    | Ok protocol_data ->
         Lwt_watcher.notify operation_stream (result, shell, protocol_data)
-    | None -> ()
+    | Error _ -> ()
 
   open Types
 
@@ -470,11 +465,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Lwt.return Filter.Mempool.default_config
 
   let pre_filter w pv oph op =
-    match decode_operation_data op.Operation.proto with
-    | None ->
+    match Prevalidation.parse_unsafe op.Operation.proto with
+    | Error _ ->
         Worker.log_event w (Unparsable_operation oph) >>= fun () ->
         Lwt.return false
-    | Some protocol_data ->
+    | Ok protocol_data ->
         let op = {Filter.Proto.shell = op.shell; protocol_data} in
         filter_config w pv >>= fun config ->
         Lwt.return
@@ -736,10 +731,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
            (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
            (fun pv () () ->
              let map_op op =
-               match decode_operation_data op.Operation.proto with
-               | Some protocol_data ->
+               match Prevalidation.parse_unsafe op.Operation.proto with
+               | Ok protocol_data ->
                    Some {Proto.shell = op.shell; protocol_data}
-               | None -> None
+               | Error _ -> None
              in
              let map_op_error oph (op, error) acc =
                match map_op op with
@@ -805,9 +800,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
              in
              (* Convert ops *)
              let map_op op =
-               match decode_operation_data op.Operation.proto with
-               | None -> None
-               | Some protocol_data ->
+               match Prevalidation.parse_unsafe op.Operation.proto with
+               | Error _ -> None
+               | Ok protocol_data ->
                    Some Proto.{shell = op.shell; protocol_data}
              in
              let fold_op _k (op, _error) acc =
@@ -862,9 +857,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                        with
                        | None -> Lwt.return_none
                        | Some proto_bytes -> (
-                           match decode_operation_data proto_bytes with
-                           | None -> Lwt.return_none
-                           | Some protocol_data ->
+                           match Prevalidation.parse_unsafe proto_bytes with
+                           | Error _ -> Lwt.return_none
+                           | Ok protocol_data ->
                                Lwt.return_some [{Proto.shell; protocol_data}]))
                    | Some _ -> next ()
                    | None -> Lwt.return_none)

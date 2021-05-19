@@ -44,6 +44,11 @@ module type T = sig
 
   val parse : Operation.t -> operation tzresult
 
+  (** [parse_unsafe bytes] parses [bytes] as operation data. Any error happening during parsing becomes {!Parse_error}.
+
+      [unsafe] because there are no length checks, unlike {!parse}. *)
+  val parse_unsafe : bytes -> Proto.operation_data tzresult
+
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
       predecessor block . When ?protocol_data is passed to this function, it will
       be used to create the new block *)
@@ -92,3 +97,15 @@ val preapply :
   protocol_data:Bytes.t ->
   Operation.t list list ->
   (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
+
+module Internal_for_tests : sig
+  (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding]. Any error happening during parsing becomes {!Parse_error}.
+
+      If one day the functor signature is simplified, tests could use [parse_unsafe] directly rather than relying on this function to
+      replace [Proto.operation_data_encoding].
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/1487
+      Move this function to [data_encoding] or [tezos_base] and consider not catching some exceptions
+      *)
+  val safe_binary_of_bytes : 'a Data_encoding.t -> bytes -> 'a tzresult
+end
