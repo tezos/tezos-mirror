@@ -55,11 +55,13 @@ val serialized_cost : bytes -> Gas_limit_repr.cost
 
 val bytes_node_cost : bytes -> Gas_limit_repr.cost
 
-val force_decode : lazy_expr -> (expr * Gas_limit_repr.cost) tzresult
+val force_decode_cost : lazy_expr -> Gas_limit_repr.cost
 
-val force_bytes : lazy_expr -> (bytes * Gas_limit_repr.cost) tzresult
+val force_decode : lazy_expr -> expr tzresult
 
-val minimal_deserialize_cost : lazy_expr -> Gas_limit_repr.cost
+val force_bytes_cost : lazy_expr -> Gas_limit_repr.cost
+
+val force_bytes : lazy_expr -> bytes tzresult
 
 val unit_parameter : lazy_expr
 

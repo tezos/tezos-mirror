@@ -825,25 +825,15 @@ let precheck_manager_contents (type kind) ctxt
       Contract.reveal_manager_key ctxt source pk
   | Transaction {parameters; _} ->
       Lwt.return
-      (* Fail quickly if not enough gas for minimal deserialization cost *)
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ ( Gas.check_enough ctxt (Script.minimal_deserialize_cost parameters)
-         >>? fun () ->
-         (* Fail if not enough gas for complete deserialization cost *)
-         Script.force_decode_in_context ctxt parameters
+      @@ (* Fail if not enough gas for complete deserialization cost *)
+         ( Script.force_decode_in_context ctxt parameters
          >|? fun (_arg, ctxt) -> ctxt )
   | Origination {script; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* Fail quickly if not enough gas for minimal deserialization cost *)
-         ( Gas.(
-             check_enough
-               ctxt
-               ( Script.minimal_deserialize_cost script.code
-               +@ Script.minimal_deserialize_cost script.storage ))
-         >>? fun () ->
-         (* Fail if not enough gas for complete deserialization cost *)
-         Script.force_decode_in_context ctxt script.code
+      @@ (* Fail if not enough gas for complete deserialization cost *)
+         ( Script.force_decode_in_context ctxt script.code
          >>? fun (_code, ctxt) ->
          Script.force_decode_in_context ctxt script.storage
          >|? fun (_storage, ctxt) -> ctxt )

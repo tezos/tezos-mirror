@@ -656,10 +656,10 @@ let get_storage ctxt contract =
   | (ctxt, None) ->
       return (ctxt, None)
   | (ctxt, Some storage) ->
-      Lwt.return (Script_repr.force_decode storage)
-      >>=? fun (storage, cost) ->
-      Lwt.return (Raw_context.consume_gas ctxt cost)
-      >>=? fun ctxt -> return (ctxt, Some storage)
+      Raw_context.consume_gas ctxt (Script_repr.force_decode_cost storage)
+      >>?= fun ctxt ->
+      Script_repr.force_decode storage
+      >>?= fun storage -> return (ctxt, Some storage)
 
 let get_counter c manager =
   let contract = Contract_repr.implicit_contract manager in

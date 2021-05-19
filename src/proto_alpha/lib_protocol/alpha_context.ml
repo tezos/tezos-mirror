@@ -90,14 +90,12 @@ module Script = struct
   include Script_repr
 
   let force_decode_in_context ctxt lexpr =
-    Script_repr.force_decode lexpr
-    >>? fun (v, cost) ->
-    Raw_context.consume_gas ctxt cost >|? fun ctxt -> (v, ctxt)
+    Raw_context.consume_gas ctxt (Script_repr.force_decode_cost lexpr)
+    >>? fun ctxt -> Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
 
   let force_bytes_in_context ctxt lexpr =
-    Script_repr.force_bytes lexpr
-    >>? fun (b, cost) ->
-    Raw_context.consume_gas ctxt cost >|? fun ctxt -> (b, ctxt)
+    Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
+    >>? fun ctxt -> Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
 end
 
 module Fees = Fees_storage

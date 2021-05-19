@@ -187,9 +187,9 @@ let deserialization_cost size =
        Micheline_decoding.micheline_size_dependent_cost
 
 (* Estimate the cost of deserializing a term encoded in [bytes_len] bytes. *)
-let[@warning "-32"] deserialization_cost_estimated_from_bytes bytes_len =
+let deserialization_cost_estimated_from_bytes bytes_len =
   Gas_limit_repr.atomic_step_cost
-  @@ S.mul Micheline_decoding.bytes_dependent_cost bytes_len
+  @@ S.mul Micheline_decoding.bytes_dependent_cost (S.safe_int bytes_len)
 
 (* Estimate the cost of serializing a term from its encoded form,
    having [bytes_len] bytes. *)
@@ -215,47 +215,36 @@ let serialized_cost bytes =
   Gas_limit_repr.atomic_step_cost
   @@ serialization_cost_estimated_from_bytes (Bytes.length bytes)
 
+let force_decode_cost lexpr =
+  Data_encoding.apply_lazy
+    ~fun_value:(fun _ -> Gas_limit_repr.free)
+    ~fun_bytes:(fun b ->
+      deserialization_cost_estimated_from_bytes (Bytes.length b))
+    ~fun_combine:(fun _ _ -> Gas_limit_repr.free)
+    lexpr
+
 let force_decode lexpr =
-  let account_deserialization_cost =
-    Data_encoding.apply_lazy
-      ~fun_value:(fun _ -> false)
-      ~fun_bytes:(fun _ -> true)
-      ~fun_combine:(fun _ _ -> false)
-      lexpr
-  in
   match Data_encoding.force_decode lexpr with
   | Some v ->
-      if account_deserialization_cost then ok (v, deserialized_cost v)
-      else ok (v, Gas_limit_repr.free)
+      ok v
   | None ->
       error Lazy_script_decode
 
-let force_bytes expr =
-  let account_serialization_cost =
-    Data_encoding.apply_lazy
-      ~fun_value:(fun v -> Some v)
-      ~fun_bytes:(fun _ -> None)
-      ~fun_combine:(fun _ _ -> None)
-      expr
-  in
-  match Data_encoding.force_bytes expr with
-  | bytes -> (
-    match account_serialization_cost with
-    | Some v ->
-        (* Estimating the cost directly from the bytes would be cheaper, but
+let force_bytes_cost expr =
+  (* Estimating the cost directly from the bytes would be cheaper, but
            using [serialized_cost] is more accurate. *)
-        ok (bytes, serialization_cost (expr_size v))
-    | None ->
-        ok (bytes, Gas_limit_repr.free) )
+  Data_encoding.apply_lazy
+    ~fun_value:(fun v -> serialization_cost (expr_size v))
+    ~fun_bytes:(fun _ -> Gas_limit_repr.free)
+    ~fun_combine:(fun _ _ -> Gas_limit_repr.free)
+    expr
+
+let force_bytes expr =
+  match Data_encoding.force_bytes expr with
+  | bytes ->
+      ok bytes
   | exception _ ->
       error Lazy_script_decode
-
-let minimal_deserialize_cost lexpr =
-  Data_encoding.apply_lazy
-    ~fun_value:(fun _ -> Gas_limit_repr.free)
-    ~fun_bytes:(fun b -> serialized_cost b)
-    ~fun_combine:(fun c_free _ -> c_free)
-    lexpr
 
 let unit =
   Micheline.strip_locations (Prim (0, Michelson_v1_primitives.D_Unit, [], []))

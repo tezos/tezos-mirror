@@ -71,7 +71,7 @@ let get_script_hash (rpc : #rpc_context) ~chain ~block contract =
   @@ Option.map_e
        (fun {Script.code; storage = _} ->
          Script_repr.force_decode code
-         >>? fun (code, _) ->
+         >>? fun code ->
          let bytes =
            Data_encoding.Binary.to_bytes_exn Script.expr_encoding code
          in
