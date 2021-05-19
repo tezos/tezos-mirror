@@ -964,37 +964,37 @@ module Cost_of = struct
        and copied manually from the parameter fit for the MERGE_TYPES benchmark
        (the model is parametric on the size of the type, which we don't have
        access to in O(1)). *)
-    let cost_MERGE_TYPES = S.safe_int 130
+    let cost_MERGE_TYPES = S.safe_int 40
 
     (* model TYPECHECKING_CODE
        This is the cost of one iteration of parse_instr, extracted by hand from the
        parameter fit for the TYPECHECKING_CODE benchmark. *)
-    let cost_TYPECHECKING_CODE = S.safe_int 375
+    let cost_TYPECHECKING_CODE = S.safe_int 220
 
     (* model UNPARSING_CODE
        This is the cost of one iteration of unparse_instr, extracted by hand from the
        parameter fit for the UNPARSING_CODE benchmark. *)
-    let cost_UNPARSING_CODE = S.safe_int 200
+    let cost_UNPARSING_CODE = S.safe_int 115
 
     (* model TYPECHECKING_DATA
        This is the cost of one iteration of parse_data, extracted by hand from the
        parameter fit for the TYPECHECKING_DATA benchmark. *)
-    let cost_TYPECHECKING_DATA = S.safe_int 240
+    let cost_TYPECHECKING_DATA = S.safe_int 100
 
     (* model UNPARSING_DATA
        This is the cost of one iteration of unparse_data, extracted by hand from the
        parameter fit for the UNPARSING_DATA benchmark. *)
-    let cost_UNPARSING_DATA = S.safe_int 140
+    let cost_UNPARSING_DATA = S.safe_int 45
 
     (* model PARSE_TYPE
        This is the cost of one iteration of parse_ty, extracted by hand from the
        parameter fit for the PARSE_TYPE benchmark. *)
-    let cost_PARSE_TYPE = S.safe_int 170
+    let cost_PARSE_TYPE = S.safe_int 60
 
     (* model UNPARSE_TYPE
        This is the cost of one iteration of unparse_ty, extracted by hand from the
        parameter fit for the UNPARSE_TYPE benchmark. *)
-    let cost_UNPARSE_TYPE = S.safe_int 185
+    let cost_UNPARSE_TYPE = S.safe_int 20
 
     (* TODO: benchmark *)
     let cost_COMPARABLE_TY_OF_TY = S.safe_int 120
