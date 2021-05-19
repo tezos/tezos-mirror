@@ -87,6 +87,7 @@ type error +=
     }
   | Inconsistent_imported_block of Block_hash.t * Block_hash.t
   | Inconsistent_snapshot_file of string
+  | Invalid_chain_store_export of Chain_id.t * string
 
 let () =
   let open Data_encoding in
@@ -513,7 +514,29 @@ let () =
         filename)
     Data_encoding.(obj1 (req "filename" string))
     (function Inconsistent_snapshot_file s -> Some s | _ -> None)
-    (fun s -> Inconsistent_snapshot_file s)
+    (fun s -> Inconsistent_snapshot_file s) ;
+  register_error_kind
+    `Permanent
+    ~id:"Snapshot.invalid_chain_store_export"
+    ~title:"Invalid chain store export"
+    ~description:"Error while exporting snapshot"
+    ~pp:(fun ppf (chain_id, store_dir) ->
+      Format.fprintf
+        ppf
+        "Failed to export snapshot. Cannot find chain %a from store located \
+         at directory %s."
+        Chain_id.pp_short
+        chain_id
+        store_dir)
+    Data_encoding.(
+      obj2 (req "chain_id" Chain_id.encoding) (req "store_dir" string))
+    (function
+      | Invalid_chain_store_export (chain_id, store_dir) ->
+          Some (chain_id, store_dir)
+      | _ ->
+          None)
+    (fun (chain_id, store_dir) ->
+      Invalid_chain_store_export (chain_id, store_dir))
 
 type metadata = {
   version : int;
@@ -2223,8 +2246,21 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         protocol_levels,
         (reading_thread, floating_block_stream) )
 
+  let ensure_valid_export_chain_dir store_path chain_id =
+    let store_dir = Naming.store_dir ~dir_path:store_path in
+    let chain_dir = Naming.chain_dir store_dir chain_id in
+    Lwt_unix.file_exists (Naming.dir_path chain_dir)
+    >>= function
+    | true ->
+        return_unit
+    | false ->
+        fail (Invalid_chain_store_export (chain_id, Naming.dir_path store_dir))
+
   let export ?snapshot_path ?(rolling = false) ~block ~store_dir ~context_dir
       ~chain_name genesis =
+    let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+    ensure_valid_export_chain_dir store_dir chain_id
+    >>=? fun () ->
     init
       ~chain_name
       ~export_mode:
