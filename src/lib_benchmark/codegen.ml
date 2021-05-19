@@ -26,8 +26,6 @@
 (* ------------------------------------------------------------------------- *)
 (* OCaml codegen *)
 
-open Migrate_parsetree.Ast_408
-
 module Codegen_helpers = struct
   open Ast_helper
 
@@ -49,8 +47,8 @@ module Codegen_helpers = struct
   let string_of_fv fv = Format.asprintf "%a" Free_variable.pp fv
 end
 
-module Codegen : Costlang.S with type 'a repr = Parsetree.expr = struct
-  type 'a repr = Parsetree.expr
+module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
+  type 'a repr = Parsetree.expression
 
   type size = int
 
@@ -106,29 +104,24 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expr = struct
 end
 
 let make_module bindings =
-  let open Migrate_parsetree.Ast_408.Ast_helper in
+  let open Ast_helper in
   let structure_items =
     List.map
       (fun (name, expr) ->
         let name = Printf.sprintf "cost_%s" name in
         Str.value
-          Migrate_parsetree.Ast_408.Asttypes.Nonrecursive
+          Asttypes.Nonrecursive
           [Vb.mk (Codegen_helpers.pvar name) expr])
       bindings
   in
   Str.module_
-    (Mb.mk (Codegen_helpers.loc "Generated") @@ Mod.structure structure_items)
-
-module Convert_to_current =
-  Migrate_parsetree.Convert
-    (Migrate_parsetree.OCaml_408)
-    (Migrate_parsetree.OCaml_current)
+    (Mb.mk (Codegen_helpers.loc (Some "Generated")) @@ Mod.structure structure_items)
 
 let pp_expr fmtr expr =
-  Pprintast.expression fmtr (Convert_to_current.copy_expression expr)
+  Pprintast.expression fmtr expr
 
 let pp_structure_item fmtr generated =
-  Pprintast.structure fmtr (Convert_to_current.copy_structure [generated])
+  Pprintast.structure fmtr [generated]
 
 (* ------------------------------------------------------------------------- *)
 
