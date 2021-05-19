@@ -143,8 +143,6 @@ module Gas = struct
 
   let gas_exhausted_error = Raw_context.gas_exhausted_error
 
-  let check_enough = Raw_context.check_enough_gas
-
   let level = Raw_context.gas_level
 
   let consumed = Raw_context.gas_consumed

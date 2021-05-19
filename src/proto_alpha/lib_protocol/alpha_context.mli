@@ -243,9 +243,6 @@ module Gas : sig
   (** Triggers an error in case of gas exhaustion. *)
   val gas_exhausted_error : context -> 'a tzresult
 
-  (** Checks that enough operation gas remains for the given cost *)
-  val check_enough : context -> cost -> unit tzresult
-
   (** Returns operation gas level *)
   val level : context -> t
 
