@@ -103,6 +103,8 @@ module Micheline_size = struct
     let string_bytes = S.safe_int (Bytes.length n) in
     {nodes = S.safe_int 1; string_bytes; z_bytes = S.zero}
 
+  let incr_nodes s = {s with nodes = S.(add (safe_int 1) s.nodes)}
+
   (* We model annotations as Seqs of Strings *)
   let of_annots acc annots =
     List.fold_left (fun acc s -> add acc (of_string s)) acc annots
@@ -123,9 +125,11 @@ module Micheline_size = struct
     | Bytes (_, s) :: nodes ->
         (of_nodes [@ocaml.tailcall]) (add acc (of_bytes s)) nodes more_nodes
     | Prim (_, _, args, annots) :: nodes ->
+        let acc = incr_nodes acc in
         let acc = of_annots acc annots in
         (of_nodes [@ocaml.tailcall]) acc args (nodes :: more_nodes)
     | Seq (_, args) :: nodes ->
+        let acc = incr_nodes acc in
         (of_nodes [@ocaml.tailcall]) acc args (nodes :: more_nodes)
 
   let of_node node = of_nodes zero [node] []
