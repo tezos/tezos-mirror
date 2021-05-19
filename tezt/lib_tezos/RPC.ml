@@ -120,6 +120,30 @@ module Big_maps = struct
       ["chains"; chain; "blocks"; block; "context"; "big_maps"; id; key_hash]
     in
     Client.rpc ?node ?hooks GET path client
+
+  let spawn_get_all ?node ?hooks ?(chain = "main") ?(block = "head")
+      ~big_map_id ?offset ?length client =
+    let path =
+      ["chains"; chain; "blocks"; block; "context"; "big_maps"; big_map_id]
+    in
+    let query_string =
+      [ Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
+        Option.map (fun length -> ("length", Int.to_string length)) length ]
+      |> List.filter_map Fun.id
+    in
+    Client.spawn_rpc ?node ?hooks ~query_string GET path client
+
+  let get_all ?node ?hooks ?(chain = "main") ?(block = "head") ~big_map_id
+      ?offset ?length client =
+    let path =
+      ["chains"; chain; "blocks"; block; "context"; "big_maps"; big_map_id]
+    in
+    let query_string =
+      [ Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
+        Option.map (fun length -> ("length", Int.to_string length)) length ]
+      |> List.filter_map Fun.id
+    in
+    Client.rpc ?node ?hooks ~query_string GET path client
 end
 
 module Contracts = struct

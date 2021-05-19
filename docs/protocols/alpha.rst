@@ -83,6 +83,11 @@ RPC changes
   plugin. This change should not be visible for end-users but improves
   the maintainability of these RPCs.
 
+- Added a new RPC for Alpha to retrieve several Big Map values at once:
+  `/chains/<chain_id>/blocks/<block_id>/context/big_maps/<big_map_id>?offset=<int>&length=<int>`.
+  This API is meant for dapp developers to improve performance when retrieving
+  many values in a big map.
+
 Minor changes
 -------------
 

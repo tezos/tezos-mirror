@@ -461,6 +461,8 @@ module Big_map = struct
 
     let add = I.add
 
+    let list_values = I.list_values
+
     let consume_deserialize_gas ctxt value =
       Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
 

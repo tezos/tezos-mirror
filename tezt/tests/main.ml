@@ -67,5 +67,7 @@ let () =
      Those modules define different tests for different protocols in their [register]. *)
   Encoding.register () ;
   RPC_test.register () ;
+  (* This file tests an RPC added in protocol G *)
+  Big_map_all.register () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
