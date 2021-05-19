@@ -80,34 +80,39 @@ module Micheline_size = struct
 
   let zero = {nodes = S.zero; string_bytes = S.zero; z_bytes = S.zero}
 
-  let add s1 s2 =
-    {
-      nodes = S.add s1.nodes s2.nodes;
-      string_bytes = S.add s1.string_bytes s2.string_bytes;
-      z_bytes = S.add s1.z_bytes s2.z_bytes;
-    }
-
-  let of_int n =
+  let add_int acc n =
     let numbits = Z.numbits n in
     let z_bytes =
       S.safe_int ((numbits + 7) / 8)
       (* Compute the number of bytes in a Z.t *)
     in
-    {nodes = S.one; string_bytes = S.zero; z_bytes}
+    {
+      nodes = S.succ acc.nodes;
+      string_bytes = acc.string_bytes;
+      z_bytes = S.add acc.z_bytes z_bytes;
+    }
 
-  let of_string n =
+  let add_string acc n =
     let string_bytes = S.safe_int (String.length n) in
-    {nodes = S.one; string_bytes; z_bytes = S.zero}
+    {
+      nodes = S.succ acc.nodes;
+      string_bytes = S.add acc.string_bytes string_bytes;
+      z_bytes = acc.z_bytes;
+    }
 
-  let of_bytes n =
+  let add_bytes acc n =
     let string_bytes = S.safe_int (Bytes.length n) in
-    {nodes = S.one; string_bytes; z_bytes = S.zero}
+    {
+      nodes = S.succ acc.nodes;
+      string_bytes = S.add acc.string_bytes string_bytes;
+      z_bytes = acc.z_bytes;
+    }
 
-  let incr_nodes s = {s with nodes = S.(succ s.nodes)}
+  let add_node s = {s with nodes = S.succ s.nodes}
 
   (* We model annotations as Seqs of Strings *)
   let of_annots acc annots =
-    List.fold_left (fun acc s -> add acc (of_string s)) acc annots
+    List.fold_left (fun acc s -> add_string acc s) acc annots
 
   let rec of_nodes acc nodes more_nodes =
     let open Micheline in
@@ -119,17 +124,20 @@ module Micheline_size = struct
       | nodes :: more_nodes ->
           (of_nodes [@ocaml.tailcall]) acc nodes more_nodes )
     | Int (_, n) :: nodes ->
-        (of_nodes [@ocaml.tailcall]) (add acc (of_int n)) nodes more_nodes
+        let acc = add_int acc n in
+        (of_nodes [@ocaml.tailcall]) acc nodes more_nodes
     | String (_, s) :: nodes ->
-        (of_nodes [@ocaml.tailcall]) (add acc (of_string s)) nodes more_nodes
+        let acc = add_string acc s in
+        (of_nodes [@ocaml.tailcall]) acc nodes more_nodes
     | Bytes (_, s) :: nodes ->
-        (of_nodes [@ocaml.tailcall]) (add acc (of_bytes s)) nodes more_nodes
+        let acc = add_bytes acc s in
+        (of_nodes [@ocaml.tailcall]) acc nodes more_nodes
     | Prim (_, _, args, annots) :: nodes ->
-        let acc = incr_nodes acc in
+        let acc = add_node acc in
         let acc = of_annots acc annots in
         (of_nodes [@ocaml.tailcall]) acc args (nodes :: more_nodes)
     | Seq (_, args) :: nodes ->
-        let acc = incr_nodes acc in
+        let acc = add_node acc in
         (of_nodes [@ocaml.tailcall]) acc args (nodes :: more_nodes)
 
   let of_node node = of_nodes zero [node] []
