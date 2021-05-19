@@ -81,7 +81,7 @@ configuration file would not parse. They are just provided here to help
 writing your own configuration file if needed.
 
 .. literalinclude:: node-config.json
-   :language: c
+   :language: javascript
 
 The rest of this page provides more details about the use of some selected
 configuration options/parameters.
