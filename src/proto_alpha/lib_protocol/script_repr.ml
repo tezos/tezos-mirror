@@ -93,17 +93,17 @@ module Micheline_size = struct
       S.safe_int ((numbits + 7) / 8)
       (* Compute the number of bytes in a Z.t *)
     in
-    {nodes = S.safe_int 1; string_bytes = S.zero; z_bytes}
+    {nodes = S.one; string_bytes = S.zero; z_bytes}
 
   let of_string n =
     let string_bytes = S.safe_int (String.length n) in
-    {nodes = S.safe_int 1; string_bytes; z_bytes = S.zero}
+    {nodes = S.one; string_bytes; z_bytes = S.zero}
 
   let of_bytes n =
     let string_bytes = S.safe_int (Bytes.length n) in
-    {nodes = S.safe_int 1; string_bytes; z_bytes = S.zero}
+    {nodes = S.one; string_bytes; z_bytes = S.zero}
 
-  let incr_nodes s = {s with nodes = S.(add (safe_int 1) s.nodes)}
+  let incr_nodes s = {s with nodes = S.(succ s.nodes)}
 
   (* We model annotations as Seqs of Strings *)
   let of_annots acc annots =

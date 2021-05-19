@@ -58,7 +58,7 @@ module Cost_of = struct
    fun wit v ->
     match (wit, v) with
     | (Unit_key _, _) ->
-        S.safe_int 1
+        S.one
     | (Never_key _, _) ->
         .
     | (Int_key _, _) ->
@@ -88,13 +88,13 @@ module Cost_of = struct
     | (Pair_key ((l, _), (r, _), _), (lval, rval)) ->
         S.add (size_of_comparable l lval) (size_of_comparable r rval)
     | (Union_key ((t, _), _, _), L x) ->
-        S.add (S.safe_int 1) (size_of_comparable t x)
+        S.succ (size_of_comparable t x)
     | (Union_key (_, (t, _), _), R x) ->
-        S.add (S.safe_int 1) (size_of_comparable t x)
+        S.succ (size_of_comparable t x)
     | (Option_key _, None) ->
-        S.safe_int 1
+        S.one
     | (Option_key (t, _), Some x) ->
-        S.add (S.safe_int 1) (size_of_comparable t x)
+        S.succ (size_of_comparable t x)
 
   let manager_operation = step_cost @@ S.safe_int 1_000
 
@@ -1595,8 +1595,7 @@ module Cost_of = struct
       let d = Z.numbits (Z.of_int blen) in
       (len *@ alloc_mbytes_cost 1)
       +@ len
-         *@ ( S.safe_int d
-            *@ (alloc_cost (S.safe_int 3) +@ step_cost (S.safe_int 1)) )
+         *@ (S.safe_int d *@ (alloc_cost (S.safe_int 3) +@ step_cost S.one))
   end
 
   module Typechecking = struct
