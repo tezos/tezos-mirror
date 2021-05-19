@@ -144,9 +144,9 @@ let check_authorization cctxt pkh data require_auth signature =
       then return_unit
       else failwith "invalid authentication signature"
 
-let sign (cctxt : #Client_context.wallet)
-    Signer_messages.Sign.Request.{pkh; data; signature} ?magic_bytes
-    ~check_high_watermark ~require_auth =
+let sign ?magic_bytes ~check_high_watermark ~require_auth
+    (cctxt : #Client_context.wallet)
+    Signer_messages.Sign.Request.{pkh; data; signature} =
   Events.(emit request_for_signing)
     (Bytes.length data, pkh, TzEndian.get_uint8 data 0)
   >>= fun () ->

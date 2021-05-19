@@ -308,7 +308,6 @@ module type S_legacy = sig
     unit tzresult Lwt.t
 
   val restore_context_fd :
-    index ->
     fd:Lwt_unix.file_descr ->
     ?expected_block:string ->
     handle_block:
@@ -321,6 +320,7 @@ module type S_legacy = sig
       Block_hash.t ->
       pruned_block ->
       unit tzresult Lwt.t) ->
+    index ->
     (block_header
     * block_data
     * Block_metadata_hash.t option

@@ -1493,8 +1493,8 @@ module Chain = struct
     in
     {Block_repr.hash = genesis_hash; contents; metadata}
 
-  let create_chain_state chain_dir ?target ~genesis_block ~genesis_protocol
-      ~genesis_commit_info =
+  let create_chain_state ?target ~genesis_block ~genesis_protocol
+      ~genesis_commit_info chain_dir =
     let genesis_proto_level = Block_repr.proto_level genesis_block in
     let ((_, genesis_level) as genesis_descr) =
       Block_repr.descriptor genesis_block
@@ -2025,8 +2025,8 @@ module Protocol = struct
     Lwt_watcher.create_stream protocol_watcher
 end
 
-let create_store store_dir ~context_index ~chain_id ~genesis ~genesis_context
-    ?(history_mode = History_mode.default) ~allow_testchains =
+let create_store ~context_index ~chain_id ~genesis ~genesis_context
+    ?(history_mode = History_mode.default) ~allow_testchains store_dir =
   let store_dir_path = Naming.dir_path store_dir in
   Lwt_utils_unix.create_dir store_dir_path >>= fun () ->
   Protocol_store.init store_dir >>= fun protocol_store ->

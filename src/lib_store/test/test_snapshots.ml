@@ -90,8 +90,8 @@ let check_import_invariants ~test_descr ~rolling
         (snd caboose) ;
       return_unit)
 
-let export_import ~test_descr (store_dir, context_dir) chain_store
-    ~previously_baked_blocks ?exported_block_hash ~rolling =
+let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
+    ~rolling (store_dir, context_dir) chain_store =
   check_invariants chain_store >>=? fun () ->
   let open Filename.Infix in
   let snapshot_path = store_dir // "snapshot.full" in
@@ -234,8 +234,8 @@ let check_baking_continuity ~test_descr ~exported_chain_store
     checkpoint' ;
   return_unit
 
-let test store_path store ~test_descr ?exported_block_level
-    ~nb_blocks_to_bake_before_export ~rolling =
+let test store_path ~test_descr ?exported_block_level
+    ~nb_blocks_to_bake_before_export ~rolling store =
   let chain_store = Store.main_chain_store store in
   Store.Chain.genesis_block chain_store >>= fun genesis_block ->
   Alpha_utils.bake_n chain_store nb_blocks_to_bake_before_export genesis_block

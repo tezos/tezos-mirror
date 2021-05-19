@@ -1406,8 +1406,8 @@ let resolve_addr ~default_addr ?(no_peer_id_expected = true) ?default_port
       Lwt_utils_unix.getaddrinfo ~passive ~node ~service >>= fun l ->
       return (List.map (fun point -> (point, peer_id)) l)
 
-let resolve_addrs ?default_port ?passive addrs ?no_peer_id_expected
-    ~default_addr =
+let resolve_addrs ?default_port ?passive ?no_peer_id_expected ~default_addr
+    addrs =
   List.fold_left_es
     (fun a addr ->
       resolve_addr

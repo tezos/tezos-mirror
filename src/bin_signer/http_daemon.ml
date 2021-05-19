@@ -31,11 +31,11 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
   let dir =
     RPC_directory.register1 dir Signer_services.sign (fun pkh signature data ->
         Handler.sign
-          cctxt
-          {pkh; data; signature}
           ?magic_bytes
           ~check_high_watermark
-          ~require_auth)
+          ~require_auth
+          cctxt
+          {pkh; data; signature})
   in
   let dir =
     RPC_directory.register1 dir Signer_services.public_key (fun pkh () () ->
@@ -67,8 +67,8 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
           failwith "Port already in use."
       | exn -> Lwt.return (error_exn exn))
 
-let run_https (cctxt : #Client_context.wallet) ~host ~port ~cert ~key
-    ?magic_bytes ~check_high_watermark ~require_auth =
+let run_https ~host ~port ~cert ~key ?magic_bytes ~check_high_watermark
+    ~require_auth (cctxt : #Client_context.wallet) =
   Lwt_utils_unix.getaddrinfo
     ~passive:true
     ~node:host
@@ -89,8 +89,8 @@ let run_https (cctxt : #Client_context.wallet) ~host ~port ~cert ~key
         ~require_auth
         mode
 
-let run_http (cctxt : #Client_context.wallet) ~host ~port ?magic_bytes
-    ~check_high_watermark ~require_auth =
+let run_http ~host ~port ?magic_bytes ~check_high_watermark ~require_auth
+    (cctxt : #Client_context.wallet) =
   Lwt_utils_unix.getaddrinfo
     ~passive:true
     ~node:host

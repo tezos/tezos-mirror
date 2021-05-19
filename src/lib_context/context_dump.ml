@@ -818,8 +818,8 @@ module Make_legacy (I : Dump_interface_legacy) = struct
 
   (* Restoring legacy *)
 
-  let restore_context_fd index ~fd ?expected_block ~handle_block
-      ~handle_protocol_data ~block_validation =
+  let restore_context_fd ~fd ?expected_block ~handle_block ~handle_protocol_data
+      ~block_validation index =
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
     (* Editing the repository *)

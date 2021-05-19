@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 val run_https :
-  #Client_context.io_wallet ->
   host:string ->
   port:int ->
   cert:string ->
@@ -32,13 +31,14 @@ val run_https :
   ?magic_bytes:int list ->
   check_high_watermark:bool ->
   require_auth:bool ->
+  #Client_context.io_wallet ->
   'a tzresult Lwt.t
 
 val run_http :
-  #Client_context.io_wallet ->
   host:string ->
   port:int ->
   ?magic_bytes:int list ->
   check_high_watermark:bool ->
   require_auth:bool ->
+  #Client_context.io_wallet ->
   'a tzresult Lwt.t

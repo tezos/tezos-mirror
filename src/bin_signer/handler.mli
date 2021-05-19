@@ -36,11 +36,11 @@ val public_key :
 (** [sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth]
     signs [req] and returns a signature. *)
 val sign :
-  #Client_context.wallet ->
-  Signer_messages.Sign.Request.t ->
   ?magic_bytes:int list ->
   check_high_watermark:bool ->
   require_auth:bool ->
+  #Client_context.wallet ->
+  Signer_messages.Sign.Request.t ->
   Signature.t tzresult Lwt.t
 
 (** [deterministic_nonce cctxt req ~require_auth] generates
