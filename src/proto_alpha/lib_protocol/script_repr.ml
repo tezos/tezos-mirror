@@ -104,29 +104,31 @@ module Micheline_size = struct
     {nodes = S.safe_int 1; string_bytes; z_bytes = S.zero}
 
   (* We model annotations as Seqs of Strings *)
-  let of_annots annots =
-    List.fold_left (fun acc s -> add acc (of_string s)) zero annots
+  let of_annots acc annots =
+    List.fold_left (fun acc s -> add acc (of_string s)) acc annots
 
-  (* Nb: not tail rec *)
-  let rec node_size node =
-    let of_node acc node =
-      let size = node_size node in
-      add acc size
-    in
+  let rec of_nodes acc nodes more_nodes =
     let open Micheline in
-    match node with
-    | Int (_, n) ->
-        of_int n
-    | String (_, s) ->
-        of_string s
-    | Bytes (_, s) ->
-        of_bytes s
-    | Prim (_, _, args, annot) ->
-        List.fold_left of_node (of_annots annot) args
-    | Seq (_, args) ->
-        List.fold_left of_node zero args
+    match nodes with
+    | [] -> (
+      match more_nodes with
+      | [] ->
+          acc
+      | nodes :: more_nodes ->
+          (of_nodes [@ocaml.tailcall]) acc nodes more_nodes )
+    | Int (_, n) :: nodes ->
+        (of_nodes [@ocaml.tailcall]) (add acc (of_int n)) nodes more_nodes
+    | String (_, s) :: nodes ->
+        (of_nodes [@ocaml.tailcall]) (add acc (of_string s)) nodes more_nodes
+    | Bytes (_, s) :: nodes ->
+        (of_nodes [@ocaml.tailcall]) (add acc (of_bytes s)) nodes more_nodes
+    | Prim (_, _, args, annots) :: nodes ->
+        let acc = of_annots acc annots in
+        (of_nodes [@ocaml.tailcall]) acc args (nodes :: more_nodes)
+    | Seq (_, args) :: nodes ->
+        (of_nodes [@ocaml.tailcall]) acc args (nodes :: more_nodes)
 
-  let of_node = node_size
+  let of_node node = of_nodes zero [node] []
 
   let dot_product s1 s2 =
     S.add
