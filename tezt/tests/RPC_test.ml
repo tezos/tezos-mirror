@@ -487,6 +487,56 @@ let test_others client =
   let* _ = RPC.get_levels_in_current_cycle ~hooks client in
   unit
 
+let start_with_acl address acl =
+  let node = Node.create ~rpc_host:address [] in
+  let* () = Node.config_init node [] in
+  Node.Config_file.update node (JSON.update "rpc" (JSON.put ("acl", acl))) ;
+  let* () = Node.identity_generate node in
+  let* () = Node.run node [] in
+  Client.init ~node ()
+
+(* Test access to RPC regulated with an ACL. *)
+let test_whitelist address () =
+  let whitelist =
+    JSON.annotate ~origin:"whitelist"
+    @@ `A
+         [ `O
+             [ ("address", `String address);
+               ( "whitelist",
+                 `A [`String "GET /describe/**"; `String "GET /chains/**"] ) ]
+         ]
+  in
+  let* client = start_with_acl address whitelist in
+  let* success_resp = Client.rpc GET ["chains"; "main"; "blocks"] client in
+  let block_hash = JSON.geti 0 success_resp |> JSON.geti 0 |> JSON.as_string in
+  let* () =
+    if block_hash = "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" then
+      unit
+    else
+      Test.fail "Received an unexpected block hash from node: '%s'." block_hash
+  in
+  let* () =
+    Client.spawn_rpc GET ["network"; "connections"] client
+    |> Process.check_error ~exit_code:1
+  in
+  unit
+
+let test_blacklist address () =
+  let blacklist =
+    JSON.annotate ~origin:"blacklist"
+    @@ `A
+         [ `O
+             [ ("address", `String address);
+               ("blacklist", `A [`String "GET /chains/**"]) ] ]
+  in
+  let* client = start_with_acl address blacklist in
+  let* () =
+    Client.spawn_rpc GET ["chains"; "main"; "blocks"] client
+    |> Process.check_error ~exit_code:1
+  in
+  let* _success_resp = Client.rpc GET ["network"; "connections"] client in
+  unit
+
 let register () =
   let register_alpha client_mode_tag =
     check_rpc
@@ -527,4 +577,21 @@ let register () =
     (fun mode ->
       register_alpha mode ;
       register_current_mainnet mode)
-    modes
+    modes ;
+  let addresses = ["localhost"; "127.0.0.1"] in
+  let mk_title list_type address =
+    Format.sprintf "Test RPC %s @@ %s" list_type address
+  in
+  List.iter
+    (fun addr ->
+      Test.register
+        ~__FILE__
+        ~title:(mk_title "whitelist" addr)
+        ~tags:["rpc"; "acl"]
+        (test_whitelist addr) ;
+      Test.register
+        ~__FILE__
+        ~title:(mk_title "blacklist" addr)
+        ~tags:["rpc"; "acl"]
+        (test_blacklist addr))
+    addresses

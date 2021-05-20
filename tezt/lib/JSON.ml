@@ -285,3 +285,23 @@ let as_object_opt json =
 let as_object = check as_object_opt "expected an object"
 
 let is_object = test as_object_opt
+
+let rec assoc_put_or_replace ~key ~value = function
+  | [] ->
+      [(key, value)]
+  | (k, _) :: assoc when k = key ->
+      (key, value) :: assoc
+  | (k, v) :: assoc ->
+      (k, v) :: assoc_put_or_replace ~key ~value assoc
+
+let put (key, value) json =
+  let new_fields =
+    as_object json
+    |> assoc_put_or_replace ~key ~value
+    |> List.map (fun (k, v) -> (k, v.node))
+  in
+  {json with node = `O new_fields}
+
+let update key f json =
+  let v = json |-> key in
+  put (key, f v) json
