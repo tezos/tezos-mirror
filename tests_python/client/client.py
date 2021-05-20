@@ -468,7 +468,7 @@ class Client:
     def sign_message(self, data: str, identity: str, block=None) -> str:
         cmd = ['sign', 'message', data, 'for', identity]
         if block is not None:
-            cmd += ["--block", block]
+            cmd += ["--branch", block]
         return client_output.SignMessageResult(self.run(cmd)).signature
 
     def check_message(self, data: str, identity: str, signature: str) -> bool:
