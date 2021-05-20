@@ -15,8 +15,8 @@ to Florence.
 The main novelties in the Alpha protocol are:
 
 - an upgrade of the consensus algorithm Emmy+ to Emmy*, which brings smaller block times and faster finality
-
 - a 2.5 tez per block subsidy to a CPMM contract to generate liquidity between tez and tzBTC
+- gas improvements leading to a 3x to 6x decrease in gas consumption of typical contracts
 
 .. contents:: Here is the complete list of changes:
 
@@ -39,17 +39,22 @@ The values of the security deposits are updated from ``512`` tez to ``640`` tez 
 
 The constant ``hard_gas_limit_per_block`` is updated from ``10,400,000`` to ``5,200,000`` gas units.
 
-The Michelson `NOW` instruction keeps the same intuitive meaning,
+The Michelson ``NOW`` instruction keeps the same intuitive meaning,
 namely it pushes the minimal injection time on the stack for the
 current block. However, this minimal injection time is not 1 minute
 after the previous block's timestamp as before, instead it is 30
 seconds after.
 
-The values of the ``BLOCKS_PER_*`` constants has doubled in order to
-match the reduced block times, as follows: ``BLOCKS_PER_CYCLE =
-8192``, ``BLOCKS_PER_COMMITMENT = 64``, ``BLOCKS_PER_ROLL_SNAPSHOT =
-512``, and ``BLOCKS_PER_VOTING_PERIOD = 40960``. This partially solves issue: `tezos#1027 <https://gitlab.com/tezos/tezos/-/issues/1027>`__
-via MR `tezos!2531 <https://gitlab.com/tezos/tezos/-/merge_requests/2531>`__ .
+The values of the ``blocks_per_*`` constants has doubled in order to
+match the reduced block times, as follows: ``blocks_per_cycle =
+8192``, ``blocks_per_commitment = 64``, ``blocks_per_roll_snapshot =
+512``, and ``blocks_per_voting_period = 40960``.
+
+The constant ``time_between_blocks`` is left unchanged at ``[60; 40]`` but the new constant ``minimal_block_delay = 30`` is added.
+
+- `TZIP <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`__
+- MRs: :gl:`!2386` :gl:`!2531` :gl:`!2881`
+- Issue: :gl:`#1027`
 
 Liquidity Baking
 ----------------
@@ -58,61 +63,72 @@ Liquidity Baking
 
 The liquidity baking subsidy shuts off automatically at a fixed level if not renewed in a future upgrade. The sunset level is included in constants.
 
-At any time bakers can vote to shut off the liquidity baking subsidy by setting a boolean flag in protocol_data. An exponential moving average (ema) of this escape flag is calculated with a window size of 1000 blocks and the subsidy permanently shuts off if the ema is ever over a threshold included in constants (half the window size with precision of 1000 added for integer computation).
+At any time bakers can vote to shut off the liquidity baking subsidy by setting a boolean flag in protocol_data. An exponential moving average (ema) of this escape flag is calculated with a window size of 2000 blocks and the subsidy permanently shuts off if the ema is ever over a threshold included in constants (half the window size with precision of 1000 added for integer computation).
 
-- `TZIP <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft-liquidity_baking.md>`_
-- MR:
-  :gl:`tezos!2765`
+- `TZIP <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft-liquidity_baking.md>`__
+- MRs: :gl:`!2765` :gl:`!2897` :gl:`!2920` :gl:`!2929` :gl:`!2946`
+- Issue: :gl:`#1238`
 
 More detailed docs for liquidity baking can be found :ref:`here<liquidity_baking_alpha>`.
+
+Gas improvements
+----------------
+
+- The gas cost of serialization and deserialization of Micheline is divided by 10 thanks to an optimization of the data-encoding library. This reduces the cost of storage operations.
+- The gas cost of "small" instructions (e.g., stack manipulation and arithmetic instructions) is divided by 3 to 5 thanks to a significant rewriting of the Michelson interpreter. This reduces the cost of contract execution.
+- The gas cost of most instructions have been re-evaluated. (MR :gl:`!2966`)
+- Typically, trading XTZ against a token in Dexter was costing ~50K units of gas, now this operation costs ~10K units of gas. We observed a decrease by a factor of 3 to 6 of the gas consumed by such contracts.
 
 RPC changes
 -----------
 
 - Remove deprecated RPCs and deprecated fields in RPC answers related
-  to voting periods. (MR `tezos!2763
-  <https://gitlab.com/tezos/tezos/-/merge_requests/2763>`__, addresses
-  issue `tezos#1204 <https://gitlab.com/tezos/tezos/-/issues/1204>`__.)
+  to voting periods. (MR :gl:`!2763`; Issue :gl:`#1204`)
 
-- The RPC ``../<block_id>/required_endorsements`` has been removed.
+- The RPC ``../<block_id>/required_endorsements`` has been removed. (MR :gl:`!2386`)
 
-- Replace `deposit` by `deposits` in `frozen_balance` RPC.
+- Replace `deposit` by `deposits` in `frozen_balance` RPC. (MR :gl:`!2751`)
 
 - All the protocol-specific RPCs under the ``helpers`` path have been
-  moved from the protocol to the `recently introduced <tezos!2446>`_ RPC
+  moved from the protocol to the `recently introduced <tezos!2446>`__ RPC
   plugin. This change should not be visible for end-users but improves
-  the maintainability of these RPCs.
+  the maintainability of these RPCs. (MR :gl:`!2811`)
 
 - Added a new RPC for Alpha to retrieve several Big Map values at once:
-  `/chains/<chain_id>/blocks/<block_id>/context/big_maps/<big_map_id>?offset=<int>&length=<int>`.
+  ``/chains/<chain_id>/blocks/<block_id>/context/big_maps/<big_map_id>?offset=<int>&length=<int>``.
   This API is meant for dapp developers to improve performance when retrieving
-  many values in a big map.
+  many values in a big map. (MR :gl:`!2855`)
+
+Metadata changes
+----------------
+
+In block metadata, two new fields are added:
+- ``liquidity_baking_escape_ema`` representing the new value of the exponential moving average for the liquidity baking escape vote.
+- ``implicit_operations_results`` representing results of operations not explicitly appearing in the block, namely migration operations at protocol activation and the liquidity baking subsidy operation at each block.
+
+In turn, two deprecated fields are removed: ``level`` (use ``level_info`` instead) and ``voting_period_kind`` (use ``voting_period_info`` instead). (MR :gl:`!2763`)
+
+In the balance updates of a block metadata, the new origin ``subsidy`` has been introduced, besides the existing ones: ``block application`` and ``protocol migration``. (MR :gl:`!2897`)
 
 Minor changes
 -------------
 
-- Fix handling of potential integer overflow in `Time_repr` addition `Protocol/time_repr: check for potential overflow on addition <https://gitlab.com/tezos/tezos/-/merge_requests/2660>`_
+- Realign voting periods with cycles. (MR :gl:`!2838`; Issue :gl:`#1151`)
+
+- Fix dangling temporary big maps preventing originating contracts with fresh big maps or passing fresh big maps to another contract.
+  (MR :gl:`!2839`; Issue :gl:`#1154`)
 
 - Typing of `PAIR k` in Michelson no longer promotes `@` annotations
-  on the stack to `%` annotations in the result type.
-  `tezos!2815 <https://gitlab.com/tezos/tezos/-/merge_requests/2815>`__
-  
-- Fix dangling temporary big maps preventing originating contracts with fresh big maps or passing fresh big maps to another contract,
-  solves issue `#1154 <https://gitlab.com/tezos/tezos/-/issues/1154>`__
-  `<https://gitlab.com/tezos/tezos/-/merge_requests/2839>`__
+  on the stack to `%` annotations in the result type. (MR :gl:`!2815`)
 
 - Fix overconservative detection of overflows in Michelson mutez multiplication,
-  and reported error trace when multiplication is overflowing,
-  solves issues `#958 <https://gitlab.com/tezos/tezos/-/issues/958>`__ `#972 <https://gitlab.com/tezos/tezos/-/issues/972>`__
-  `<https://gitlab.com/tezos/tezos/-/merge_requests/2947>`__
+  and reported error trace when multiplication is overflowing. (MR :gl:`!2947`; Issues :gl:`#958` :gl:`#972`)
 
-- Increased the max operation time to live (`max_op_ttl`) from 60 to
-  120
-
-- Realign voting periods with cycles, solves issue `tezos#1151
-  <https://gitlab.com/tezos/tezos/-/issues/1151>`__
-  `<https://gitlab.com/tezos/tezos/-/merge_requests/2838>`__
+- Fix handling of potential integer overflow in `Time_repr` addition. (MR :gl:`!2660`)
 
 - If gas remains for an operation after it gets executed, the remaining
-  gas also gets consumed in the block;
-  `tezos!2880 <https://gitlab.com/tezos/tezos/-/merge_requests/2880>`__
+  gas also gets consumed from the block allowance. (MR :gl:`!2880`)
+
+- Increased the max operation time to live (`max_op_ttl`) from 60 to 120. (MR :gl:`!2828`)
+
+- Other internal refactorings or documentation. (MRs :gl:`!2559` :gl:`!2563` :gl:`!2593` :gl:`!2741` :gl:`!2808` :gl:`!2862` :gl:`!2897` :gl:`!2932`)
