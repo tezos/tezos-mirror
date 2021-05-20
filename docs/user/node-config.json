@@ -15,7 +15,14 @@
 
       /* Certificate and key files (necessary when TLS is used). */
       "crt": "tezos-node.crt",
-      "key": "tezos-node.key"
+      "key": "tezos-node.key",
+      /* An access control list for RPC. */
+      "acl": [
+        {
+          "address": "localhost:8732",
+          "blacklist": ["GET /chains/**", "GET /network/points/*/unban"]
+        }
+      ]
     },
 
   "p2p": /* Configuration of network parameters */

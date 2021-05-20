@@ -93,6 +93,46 @@ RPC parameters
 
 RPC parameters allow to customize the :doc:`JSON/RPC interface <../developer/rpc>`, by defining for instance hosts to listen for RPC requests, or a certificate/key file necessary when TLS is used.
 
+Access to RPC endpoints can be restricted using an Access Control List. The
+default policy for now is to allow access to all paths, but this is not very
+safe and will likely change in the future. Such a list can be put in the
+configuration file. In the ``rpc`` object a key ``acl`` can be included,
+containing a list of policies for different listening addresses:
+
+.. code-block:: json
+
+   {
+      "rpc": {
+        "acl": [
+          {
+            "address": "localhost:8732",
+            "blacklist": ["GET /chains/**", "GET /network/points/*/unban"]
+          }
+        ]
+      }
+   }
+
+The ``address`` field specifies a binding address this rule applies to. Port can be omitted,
+in which case the rule applies to any port on that address. Note that this does not automatically
+enable RPC on that address, to do that the address must be included in ``listen-addrs`` or passed
+by command-line argument ``--rpc-addr`` when starting the node.
+
+Additionally either the ``whitelist`` **or** the ``blacklist`` field must be specified
+(but not both), containing a list of paths which should be black-listed or
+white-listed. Each element in the list is an API-endpoint (that can be passed to e.g. the ``tezos-client rpc``
+command). It may be preceded by a capitalized HTTP method name. In the absence of
+the method, the rule applies to all methods. The path can include an ``*``
+character, which stands for any whole path segment (i.e. it's not allowed to mix ``*``
+with other characters in a path segment).
+A ``**`` stands for any possible path suffix.
+
+.. warning::
+   The policy is always searched from the beginning of the list to the end and
+   the first matching address is returned. Therefore if one wants to put one
+   rule on a specific port on a given host and another rule for all other ports
+   on the same host, then more specific rules should always be written *first*
+   Otherwise they'll be shadowed by the more general rule.
+
 .. _configure_p2p:
 
 P2P parameters
