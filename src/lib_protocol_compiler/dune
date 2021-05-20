@@ -105,6 +105,8 @@
 (install
  (section libexec)
  (files (replace.exe as replace)
-        dune_protocol
-        dune_protocol.template
+        dune_protocol.v0
+        dune_protocol.v1
+        dune_protocol.template.v0
+        dune_protocol.template.v1
         final_protocol_versions))

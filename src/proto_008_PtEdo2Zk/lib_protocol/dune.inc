@@ -6,6 +6,18 @@
 ; but the original template in `tezos-protocol-compiler`
 ;
 
+; generated from src/lib_protocol_compiler/dune_protocol.template.v0
+;
+; This template is intended for protocols written when the Tezos
+; project was using OCaml 4.10 or earlier.
+;
+; Protocols that have already been activated on-chain cannot be
+; changed. Additionally, protocols written when the tezos project was
+; using OCaml 4.10 or earlier may trigger warnings when compiled with a more
+; recent version of the OCaml compiler. Consequently, this template
+; sets some specific warning-related options so that protocols written
+; on OCaml 4.10 or earlier can be compiled with the more recent compiler version
+; currently used in the tezos project.
 
 (rule
  (targets environment.ml)
@@ -285,7 +297,7 @@ include Tezos_raw_protocol_008_PtEdo2Zk.Main
  (libraries tezos_protocol_environment_008_PtEdo2Zk)
  (library_flags (:standard -linkall))
  (flags (:standard -nopervasives -nostdlib
-                   -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+                   -w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67-68
                    -warn-error +a
                    -open Tezos_protocol_environment_008_PtEdo2Zk__Environment
                    -open Pervasives
@@ -380,8 +392,8 @@ include Tezos_raw_protocol_008_PtEdo2Zk.Main
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos_raw_protocol_008_PtEdo2Zk)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
-        -warn-error "+a"
+ (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
+        -warn-error "-A"
         -nopervasives)
  (modules Protocol))
 
@@ -392,8 +404,8 @@ include Tezos_raw_protocol_008_PtEdo2Zk.Main
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos-protocol-008-PtEdo2Zk.raw)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
-        -warn-error "+a"
+ (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
+        -warn-error "-A"
         -nopervasives)
  (modules Functor))
 
@@ -404,7 +416,7 @@ include Tezos_raw_protocol_008_PtEdo2Zk.Main
  (libraries tezos-protocol-008-PtEdo2Zk
             tezos-protocol-updater
             tezos-protocol-environment)
- (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+ (flags (:standard -w +a-4-6-7-9-16-29-32-40..42-44-45-48-60-67
                    -warn-error +a))
  (modules Registerer))
 

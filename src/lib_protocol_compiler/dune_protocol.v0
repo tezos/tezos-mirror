@@ -8,7 +8,7 @@
  (action
   (run
     %{libexec:tezos-protocol-compiler:replace}
-    %{libexec:tezos-protocol-compiler:dune_protocol.template}
+    %{libexec:tezos-protocol-compiler:dune_protocol.template.v0}
     "dune.inc.gen"
     %{libexec:tezos-protocol-compiler:final_protocol_versions})))
 

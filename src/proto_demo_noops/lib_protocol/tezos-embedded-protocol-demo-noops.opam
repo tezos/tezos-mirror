@@ -14,7 +14,7 @@ depends: [
 build: [
   [
     "%{tezos-protocol-compiler:lib}%/replace"
-    "%{tezos-protocol-compiler:lib}%/dune_protocol.template"
+    "%{tezos-protocol-compiler:lib}%/dune_protocol.template.v1"
     "dune"
     "%{tezos-protocol-compiler:lib}%/final_protocol_versions"
     "demo_noops"
