@@ -186,7 +186,7 @@ module Event = struct
       ~msg:
         "The given history mode {given_history_mode} does not correspond to \
          the stored history mode {stored_history_mode}. If you wish to force \
-         the switch, use the flag '--force_history_mode_switch'."
+         the switch, use the flag '--force-history-mode-switch'."
       ~level:Error
       ~pp1:History_mode.pp
       ("given_history_mode", History_mode.encoding)
