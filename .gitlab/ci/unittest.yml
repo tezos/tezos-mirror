@@ -86,6 +86,7 @@ unit:non-proto:
     - scripts/test_wrapper.sh src/lib_protocol_environment protocol_environment
     - scripts/test_wrapper.sh src/lib_proxy proxy
     - scripts/test_wrapper.sh src/lib_requester requester
+    - scripts/test_wrapper.sh src/lib_rpc_http rpc_http
     - scripts/test_wrapper.sh src/lib_sapling sapling
     - scripts/test_wrapper.sh src/lib_shell shell
     - scripts/test_wrapper.sh src/lib_signer_backends signer_backends
