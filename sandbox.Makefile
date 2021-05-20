@@ -19,16 +19,22 @@ all: accusations_simple_double_baking \
 	daemons_upgrade_alpha \
 	node_synchronization
 
-# The following rules define how to build Tezos binaries if they are missing.
+# The following rules define how to build Tezos binaries if they are
+# missing.
 #
-# We only run "dune build" if it is strictly necessary.
-# The CI stores the binaries as artefacts, but not _build.
-# Those rules allow us to use these artefacts.
-# Systematically running dune would cause a full rebuild since _build is not an artefact.
+# We only run "dune build" if it is strictly necessary.  The CI stores
+# the binaries as artefacts, but not _build.  Those rules allow us to
+# use these artefacts.  Systematically running dune would cause a full
+# rebuild since _build is not an artefact.
 #
-# The drawback of writing the rules this way is that if we need several binaries,
-# we call dune several times, which takes a bit longer than calling it only once
-# (dune scans the whole repository first).
+# The drawback of writing the rules this way is that if we need
+# several binaries, we call dune several times, which takes a bit
+# longer than calling it only once (dune scans the whole repository
+# first).
+#
+# The real drawback of writing the rules this way is that during
+# development, if you change something in the sources, as the binaries
+# exist, nothing is recompiled!
 
 tezos-node:
 	dune build src/bin_node/main.exe

@@ -47,7 +47,6 @@ integration:sandboxes:voting:
       - flextesa-voting-demo-noops
     expire_in: 1 day
     when: on_failure
-  allow_failure: true # This test uses too much resources for GitLab's workers
 
 integration:sandboxes:acc-baking:
   extends: .integration_template

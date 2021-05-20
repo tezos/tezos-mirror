@@ -80,15 +80,7 @@ let register state ~client ~dst =
   Tezos_client.successful_client_cmd
     state
     ~client
-    [ "--wait";
-      "none";
-      "register";
-      "key";
-      dst;
-      "as";
-      "delegate";
-      "--fee";
-      "0.05" ]
+    ["--wait"; "none"; "register"; "key"; dst; "as"; "delegate"]
 
 let bake_until_voting_period ?keep_alive_delegate state ~protocol ~baker
     ~attempts period =
@@ -302,13 +294,27 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
     ~client:(client 0)
     [ "--wait";
       "none";
+      "reveal";
+      "key";
+      "for";
+      special_baker.Tezos_client.Keyed.key_name;
+      "--fee";
+      "0.1" ]
+  >>= fun _ ->
+  Tezos_client.Keyed.bake state baker_0 "Bake to reveal special_baker key"
+  >>= fun _ ->
+  Tezos_client.successful_client_cmd
+    state
+    ~client:(client 0)
+    [ "--wait";
+      "none";
       "register";
       "key";
       special_baker.Tezos_client.Keyed.key_name;
       "as";
       "delegate";
       "--fee";
-      "0.5" ]
+      "0.4" ]
   >>= fun _ ->
   let activation_bakes =
     let open Tezos_protocol in
