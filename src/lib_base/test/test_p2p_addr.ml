@@ -225,10 +225,49 @@ let encode_decode =
       let actual = Data_encoding.Binary.of_bytes_exn encoding b in
       qcheck_eq' ~pp ~expected:t ~actual ())
 
+(** Test that reading a point in streaming fails fast in case of invalid size, i.e.
+    without even reading the data.
+
+    The max size of a binary encoded {!P2p_point.Id.t} is the same logic as in {!P2p_point.Id.encoding}
+    (51) minus the 4 bytes used in the header to store the size, at the beginning (hence 47). This
+    corresponds to an IPv6 with port and the optional enclosing brackets. *)
+let p2p_point_encoding_eager_fail =
+  let open QCheck in
+  let max_binary_size_point = 47 in
+  let max_possible_size_on_4_bytes = Int32.(to_int max_int) in
+  Test.make
+    ~name:"Base.P2p_point.Id.encoding eagerly fails on too big input"
+    (max_binary_size_point + 1 -- max_possible_size_on_4_bytes)
+    (fun excessive_size ->
+      (* The size header is stored on 4 bytes (the 4 bytes we remove from the
+         total size of [max_binary_size_point] compared to the max size coded
+         in the encoding). *)
+      let size_header = Bytes.create 4 in
+      Bytes.set_int32_be size_header 0 (Int32.of_int excessive_size) ;
+      let continue =
+        match Data_encoding.Binary.read_stream P2p_point.Id.encoding with
+        | Await continue ->
+            continue
+        | _ ->
+            Test.fail_report
+              "Opening an empty reading stream should await for further \
+               input, but status is already Success or Error"
+      in
+      match continue size_header with
+      | Error Data_encoding.Binary.Size_limit_exceeded ->
+          true
+      | _ ->
+          Test.fail_report
+            "Binary stream reading of a point should fail fast when the size \
+             is too big")
+
 let p2p_addr = [ip_to_string_from_string]
 
 let p2p_point =
-  [ipv6_to_string_from_string; ipv4_to_string_from_string; encode_decode]
+  [ ipv6_to_string_from_string;
+    ipv4_to_string_from_string;
+    encode_decode;
+    p2p_point_encoding_eager_fail ]
 
 let tests =
   [ Alcotest.test_case
