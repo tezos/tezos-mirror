@@ -12,7 +12,7 @@ renamings.
 <name> should be in lower case
 <version_number> should be three digits"
 
-script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 cd "$script_dir"/..
 
 current=$1
@@ -21,6 +21,8 @@ version=$(echo $current | cut -d'_' -f2)
 
 if ! ( [[ "$label" =~ ^[a-z]+$ ]] && [[ "$version" =~ ^[0-9][0-9][0-9]$ ]] ); then
     echo "Wrong protocol version."
+    echo "Name should be a lowercase alphabetic word."
+    echo "Number should be a 3-digit number."
     echo
     echo "$usage"
     exit 1
@@ -38,6 +40,7 @@ fi
 
 # create a temporary directory until the hash is known
 # this is equivalent to `cp src/proto_alpha/ src/proto_${version}` but only for versioned files
+echo "Copying src/proto_alpha to src/proto_${version}"
 mkdir /tmp/tezos_proto_snapshot
 git archive HEAD src/proto_alpha/ | tar -x -C /tmp/tezos_proto_snapshot
 # remove the README because it is specific to Alpha
@@ -45,13 +48,21 @@ rm /tmp/tezos_proto_snapshot/src/proto_alpha/README.md
 mv /tmp/tezos_proto_snapshot/src/proto_alpha src/proto_${version}
 rm -rf /tmp/tezos_proto_snapshot
 
+echo "Copying docs/alpha to docs/${version}"
 mkdir /tmp/tezos_proto_doc_snapshot
 git archive HEAD docs/alpha/ | tar -x -C /tmp/tezos_proto_doc_snapshot
 mv /tmp/tezos_proto_doc_snapshot/docs/alpha docs/${version}
 rm -rf /tmp/tezos_proto_doc_snapshot
 
+echo "Copying tests_python/{contracts,tests}_alpha to tests_python/{contracts,tests}_${version}"
+mkdir /tmp/tezos_proto_tests_python_snapshot
+git archive HEAD tests_python/{contracts,tests}_alpha | tar -x -C /tmp/tezos_proto_tests_python_snapshot
+mv /tmp/tezos_proto_tests_python_snapshot/tests_python/contracts_alpha tests_python/contracts_${version}
+mv /tmp/tezos_proto_tests_python_snapshot/tests_python/tests_alpha tests_python/tests_${version}
+rm -rf /tmp/tezos_proto_tests_python_snapshot
 
 # set current version
+echo "Setting current version in raw_context and proxy"
 sed -i.old.old -e 's/let version_value = "alpha_current"/let version_value = "'${current}'"/' \
     src/proto_${version}/lib_protocol/raw_context.ml src/proto_${version}/lib_client/proxy.ml
 
@@ -65,15 +76,73 @@ fi
 
 mv src/proto_${version} src/proto_${version}_${short_hash}
 
-# fix versionned links (in labels, references, and paths) in docs
+# fix versioned links (in labels, references, and paths) in docs
+echo "Fixing versioned links in docs"
 cd docs/${version}
 sed -i.old -e s/_alpha:/_${version}:/g \
+       -e s,src/proto_alpha,src/proto_${version}_${short_hash},g \
        -e s/_alpha\>/_${version}\>/g \
        -e s/_alpha\`/_${version}\`/g \
        -e s/-alpha.html/-${version}.html/g \
-       -e s,src/proto_alpha,src/proto_${version}_${short_hash},g \
     $(find . -name \*.rst)
 cd ../..
+
+# generate docs/protocols/042_jeanmichel.rst from docs/protocols/alpha.rst
+echo "Copying+fixing docs/protocols/alpha.rst to docs/protocols/${version}_${label}.rst"
+sed -e s/_alpha:/_${version}_${label}:/g \
+    -e s,src/proto_alpha,src/proto_${version}_${short_hash},g \
+    -e s/_alpha\>/_${version}\>/g \
+    -e s/_alpha\`/_${version}\`/g \
+    -e s/-alpha.html/-${version}.html/g \
+    docs/protocols/alpha.rst > "docs/protocols/${version}_${label}.rst"
+
+# add entries in the doc index
+# copy from alpha rather from previous protocol because there may be newly added items
+echo "Add entries in the doc index"
+capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${label:0:1}")${label:1}
+alpha_line='Alpha Development Protocol'
+doc_index="docs/index.rst"
+(
+    set -e
+    grep -B9999 -F "$alpha_line" "$doc_index" \
+      | head -n-1
+    grep -A9999 -F "$alpha_line" "$doc_index" \
+      | grep -B9999 -F 'toctree' -m1 \
+      | head -n-1 \
+      | sed -e "s/Alpha Development/${version} ${capitalized_label}/g" \
+            -e "s,alpha/,${version}/,g"
+    grep -B9999 -F "$alpha_line" "$doc_index" \
+      | tac \
+      | grep -B9999 -F 'toctree' -m1 \
+      | tac
+    grep -A9999 -F "$alpha_line" "$doc_index" \
+      | tail -n+2 \
+      | awk '{
+                if ($0 ~ PATTERN) {
+                    x=$0
+                    sub(PATTERN,REPLACEMENT)
+                    print
+                    print x
+                } else {
+                    print
+                }
+             }' PATTERN='protocols/alpha' REPLACEMENT="protocols/${version}_${label}"
+) > "${doc_index}.tmp"
+mv "${doc_index}.tmp" "$doc_index"
+
+
+# fix paths and comments in python tests and regtest outputs
+echo "Fixing python tests"
+cd tests_python/tests_${version}
+sed -i.old -e "s,tezos\.gitlab\.io/alpha/,tezos.gitlab.io/${version}_${label}/,g" \
+           -e "s/proto_alpha/proto_${version}_${short_hash}/g" \
+           -e "s/_alpha\b/_${version}/g" \
+           -e "s/\balpha\b/${version}/g" \
+    $(find . -name \*.py)
+echo "Fixing python regtests ouputs"
+cd _regtest_outputs
+sed -i.old -e "s/_alpha\b/_${version}/g" *.out
+cd ../../..
 
 # move daemons to a tmp directory to avoid editing lib_protocol
 cd src/proto_${version}_${short_hash}
