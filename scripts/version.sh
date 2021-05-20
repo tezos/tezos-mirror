@@ -13,7 +13,7 @@ recommended_rust_version=1.44.0
 full_opam_repository_tag=a147c4ecea9e6eaa71a0f3bc152d502695c569c4
 
 ## opam_repository is an additional, tezos-specific opam repository.
-opam_repository_tag=a81bef303928fb2d171e2b703bf970b1e751e293
+opam_repository_tag=0de0cd8a503fbf917116c0e461a13fb2f4f351a6
 opam_repository_url=https://gitlab.com/tezos/opam-repository.git
 opam_repository=$opam_repository_url\#$opam_repository_tag
 
