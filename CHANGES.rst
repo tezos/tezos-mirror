@@ -152,6 +152,9 @@ Version 9.2
 Node
 ----
 
+-  Added Granada, a protocol proposal for Mainnet featuring, among others,
+   the Emmy* consensus algorithm, Liquidity Baking, and reduced gas consumption.
+
 -  Updated the mempool to keep more than 50 non-included operations
    when receiving a new block. In particular, this should result in
    fewer endorsements being missed.
