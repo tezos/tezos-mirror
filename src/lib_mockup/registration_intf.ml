@@ -52,7 +52,7 @@ module type MOCKUP = sig
   val default_protocol_constants :
     Tezos_client_base.Client_context.full -> protocol_constants tzresult Lwt.t
 
-  (** The content equivalent to the default value of [--bootstrap-acounts] *)
+  (** The content equivalent to the default value of [--bootstrap-accounts] *)
   val default_bootstrap_accounts :
     Tezos_client_base.Client_context.full -> string tzresult Lwt.t
 
