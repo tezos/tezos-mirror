@@ -94,6 +94,8 @@ let numbits x =
 
 let zero = 0
 
+let one = 1
+
 let small_enough z =
   (* The following literal triggers an error if compiled under 32-bit
      architectures, please do not modify it. This is a static way to
@@ -140,6 +142,8 @@ let scale_fast x y =
 let add x y =
   let z = x + y in
   if Compare.Int.(z >= 0) then z else saturated
+
+let succ x = add one x
 
 let sub x y = Compare.Int.max (x - y) 0
 

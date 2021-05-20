@@ -225,16 +225,10 @@ module Contract = struct
     let remove = I.remove
 
     let consume_deserialize_gas ctxt value =
-      Raw_context.check_enough_gas
-        ctxt
-        (Script_repr.minimal_deserialize_cost value)
-      >>? fun () ->
-      Script_repr.force_decode value
-      >>? fun (_value, value_cost) -> Raw_context.consume_gas ctxt value_cost
+      Raw_context.consume_gas ctxt (Script_repr.force_decode_cost value)
 
     let consume_serialize_gas ctxt value =
-      Script_repr.force_bytes value
-      >>? fun (_value, value_cost) -> Raw_context.consume_gas ctxt value_cost
+      Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost value)
 
     let get ctxt contract =
       I.get ctxt contract

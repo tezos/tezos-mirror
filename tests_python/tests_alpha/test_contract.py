@@ -160,7 +160,7 @@ class TestManager:
         utils.bake(client, 'bootstrap5')
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.000548
+        fee = 0.000468
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance + amount_mutez == new_balance
         assert (
@@ -182,7 +182,7 @@ class TestManager:
         utils.bake(client, 'bootstrap5')
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.000794
+        fee = 0.000691
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance - amount_mutez == new_balance
         assert (
@@ -206,7 +206,7 @@ class TestManager:
         new_balance = client.get_mutez_balance('manager')
         new_balance_dest = client.get_mutez_balance('manager2')
         new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.001124
+        fee = 0.000858
         fee_mutez = utils.mutez_of_tez(fee)
         assert balance_bootstrap - fee_mutez == new_balance_bootstrap
         assert balance - amount_mutez == new_balance
@@ -337,7 +337,7 @@ class TestManager:
         new_balance = client.get_mutez_balance('manager')
         new_balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
         new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
-        fee_mutez = 794 + 698
+        fee_mutez = 691 + 595
         assert balance - amount_mutez_2 - amount_mutez_3 == new_balance
         assert (
             balance_bootstrap2 + amount_mutez_2 - fee_mutez
@@ -750,7 +750,7 @@ class TestGasBound:
         name = 'first_explosion.tz'
         contract = session[name]
         client.typecheck(contract)
-        args = ['-G', f'{1870}', '--burn-cap', '10']
+        args = ['-G', f'{1461}', '--burn-cap', '10']
 
         expected_error = "Gas limit exceeded during typechecking or execution"
         with utils.assert_run_failure(expected_error):
@@ -781,7 +781,7 @@ class TestGasBound:
         storage = '{}'
         inp = (
             '{1;2;3;4;5;6;7;8;9;0;1;2;3;4;5;6;7;1;1;1;1;1;1;1;1;1;1;1'
-            + ';1;1;1;1;1;1;1;1;1;1;1;1;1;1}'
+            + ';1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1}'
         )
 
         expected_error = (

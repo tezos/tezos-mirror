@@ -72,6 +72,9 @@ val to_int : 'a t -> int
 (** 0 *)
 val zero : _ t
 
+(** 1 *)
+val one : _ t
+
 (** 2^62 - 1 *)
 val saturated : may_saturate t
 
@@ -128,6 +131,9 @@ val scale_fast : mul_safe t -> _ t -> may_saturate t
    its result stay below [saturated]. Otherwise, [add] returns
    [saturated]. *)
 val add : _ t -> _ t -> may_saturate t
+
+(** [succ x] is like [add one x] *)
+val succ : _ t -> may_saturate t
 
 (** [sub x y] behaves like subtraction between native integers as long
    as its result stay positive. Otherwise, [sub] returns [zero].

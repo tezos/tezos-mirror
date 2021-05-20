@@ -104,10 +104,10 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       Interp_costs.add_seconds_timestamp n t
   | IAdd_timestamp_to_seconds _ ->
       let t = accu and (n, _) = stack in
-      Interp_costs.add_seconds_timestamp n t
+      Interp_costs.add_timestamp_seconds t n
   | ISub_timestamp_seconds _ ->
       let t = accu and (n, _) = stack in
-      Interp_costs.sub_seconds_timestamp n t
+      Interp_costs.sub_timestamp_seconds t n
   | IDiff_timestamps _ ->
       let t1 = accu and (t2, _) = stack in
       Interp_costs.diff_timestamps t1 t2
@@ -131,11 +131,9 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let (_, (s, _)) = stack in
       Interp_costs.slice_bytes s
   | IMul_teznat _ ->
-      let (n, _) = stack in
-      Interp_costs.mul_teznat n
+      Interp_costs.mul_teznat
   | IMul_nattez _ ->
-      let n = accu in
-      Interp_costs.mul_teznat n
+      Interp_costs.mul_nattez
   | IAbs_int _ ->
       let x = accu in
       Interp_costs.abs_int x
@@ -147,46 +145,46 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       Interp_costs.neg_nat x
   | IAdd_intint _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.add_bigint x y
+      Interp_costs.add_intint x y
   | IAdd_intnat _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.add_bigint x y
+      Interp_costs.add_intnat x y
   | IAdd_natint _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.add_bigint x y
+      Interp_costs.add_natint x y
   | IAdd_natnat _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.add_bigint x y
+      Interp_costs.add_natnat x y
   | ISub_int _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.sub_bigint x y
+      Interp_costs.sub_int x y
   | IMul_intint _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.mul_bigint x y
+      Interp_costs.mul_intint x y
   | IMul_intnat _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.mul_bigint x y
+      Interp_costs.mul_intnat x y
   | IMul_natint _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.mul_bigint x y
+      Interp_costs.mul_natint x y
   | IMul_natnat _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.mul_bigint x y
+      Interp_costs.mul_natnat x y
   | IEdiv_teznat _ ->
       let x = accu and (y, _) = stack in
       Interp_costs.ediv_teznat x y
   | IEdiv_intint _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.ediv_bigint x y
+      Interp_costs.ediv_intint x y
   | IEdiv_intnat _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.ediv_bigint x y
+      Interp_costs.ediv_intnat x y
   | IEdiv_natint _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.ediv_bigint x y
+      Interp_costs.ediv_natint x y
   | IEdiv_natnat _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.ediv_bigint x y
+      Interp_costs.ediv_natnat x y
   | ILsl_nat _ ->
       let x = accu in
       Interp_costs.lsl_nat x
@@ -201,13 +199,13 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       Interp_costs.and_nat x y
   | IAnd_int_nat _ ->
       let x = accu and (y, _) = stack in
-      Interp_costs.and_nat x y
+      Interp_costs.and_int_nat x y
   | IXor_nat _ ->
       let x = accu and (y, _) = stack in
       Interp_costs.xor_nat x y
   | INot_int _ ->
       let x = accu in
-      Interp_costs.not_nat x
+      Interp_costs.not_int x
   | INot_nat _ ->
       let x = accu in
       Interp_costs.not_nat x
@@ -250,8 +248,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let (ticket_a, ticket_b) = accu in
       Interp_costs.join_tickets ty ticket_a ticket_b
   | IHalt _ ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      Gas.atomic_step_cost (Saturation_repr.safe_int 1)
+      Interp_costs.halt
   | IDrop _ ->
       Interp_costs.drop
   | IDup _ ->
@@ -259,7 +256,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | ISwap _ ->
       Interp_costs.swap
   | IConst _ ->
-      Interp_costs.push
+      Interp_costs.const
   | ICons_some _ ->
       Interp_costs.cons_some
   | ICons_none _ ->
@@ -297,7 +294,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IMap_size _ ->
       Interp_costs.map_size
   | IEmpty_big_map _ ->
-      Interp_costs.empty_map
+      Interp_costs.empty_big_map
   | IString_size _ ->
       Interp_costs.string_size
   | IBytes_size _ ->
@@ -335,7 +332,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IApply _ ->
       Interp_costs.apply
   | ILambda _ ->
-      Interp_costs.push
+      Interp_costs.lambda
   | IFailwith _ ->
       Gas.free
   | IEq _ ->
@@ -343,17 +340,18 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | INeq _ ->
       Interp_costs.neq
   | ILt _ ->
-      Interp_costs.neq
+      Interp_costs.lt
   | ILe _ ->
-      Interp_costs.neq
+      Interp_costs.le
   | IGt _ ->
-      Interp_costs.neq
+      Interp_costs.gt
   | IGe _ ->
-      Interp_costs.neq
+      Interp_costs.ge
   | IPack _ ->
       Gas.free
   | IUnpack _ ->
-      Gas.free
+      let b = accu in
+      Interp_costs.unpack b
   | IAddress _ ->
       Interp_costs.address
   | IContract _ ->
@@ -375,11 +373,11 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | ISource _ ->
       Interp_costs.source
   | ISender _ ->
-      Interp_costs.source
+      Interp_costs.sender
   | ISelf _ ->
       Interp_costs.self
   | ISelf_address _ ->
-      Interp_costs.self
+      Interp_costs.self_address
   | IAmount _ ->
       Interp_costs.amount
   | IDig (_, n, _, _) ->
@@ -419,9 +417,11 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | INeg_bls12_381_fr _ ->
       Interp_costs.neg_bls12_381_fr
   | IMul_bls12_381_fr_z _ ->
-      Interp_costs.mul_bls12_381_fr_z
+      let z = accu in
+      Interp_costs.mul_bls12_381_fr_z z
   | IMul_bls12_381_z_fr _ ->
-      Interp_costs.mul_bls12_381_fr_z
+      let (z, _) = stack in
+      Interp_costs.mul_bls12_381_z_fr z
   | IDup_n (_, n, _, _) ->
       Interp_costs.dupn n
   | IComb (_, n, _, _) ->
@@ -437,50 +437,36 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IRead_ticket _ ->
       Interp_costs.read_ticket
   | ILog _ ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
       Gas.free
  [@@ocaml.inline always]
 
 let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
  fun ks ->
-  (* FIXME: This will be fixed when the new cost model is defined. *)
-  let a_little = Gas.atomic_step_cost (Saturation_repr.safe_int 1) in
   match ks with
   | KLog _ ->
       Gas.free
   | KNil ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
+      Interp_costs.Control.nil
   | KCons (_, _) ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
+      Interp_costs.Control.cons
   | KReturn _ ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
+      Interp_costs.Control.return
   | KUndip (_, _) ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
+      Interp_costs.Control.undip
   | KLoop_in (_, _) ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
+      Interp_costs.Control.loop_in
   | KLoop_in_left (_, _) ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
+      Interp_costs.Control.loop_in_left
   | KIter (_, _, _) ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
-  | KList_enter_body (_, _, _, _, _) ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
+      Interp_costs.Control.iter
+  | KList_enter_body (_, xs, _, len, _) ->
+      Interp_costs.Control.list_enter_body xs len
   | KList_exit_body (_, _, _, _, _) ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
+      Interp_costs.Control.list_exit_body
   | KMap_enter_body (_, _, _, _) ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
-  | KMap_exit_body (_, _, _, _, _) ->
-      (* FIXME: This will be fixed when the new cost model is defined. *)
-      a_little
+      Interp_costs.Control.map_enter_body
+  | KMap_exit_body (_, _, map, key, _) ->
+      Interp_costs.Control.map_exit_body key map
 
 (*
 
@@ -822,8 +808,10 @@ let create_contract (ctxt, sc) gas storage_type param_type code root_name
 
 (* [unpack ctxt ty bytes] deserialize [bytes] into a value of type [ty]. *)
 let unpack ctxt ~ty ~bytes =
-  Gas.check_enough ctxt (Script.serialized_cost bytes)
-  >>?= fun () ->
+  Gas.consume
+    ctxt
+    (Script.deserialization_cost_estimated_from_bytes (Bytes.length bytes))
+  >>?= fun ctxt ->
   if
     Compare.Int.(Bytes.length bytes >= 1)
     && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
@@ -835,8 +823,6 @@ let unpack ctxt ~ty ~bytes =
           ( Gas.consume ctxt (Interp_costs.unpack_failed bytes)
           >|? fun ctxt -> (None, ctxt) )
     | Some expr -> (
-        Gas.consume ctxt (Script.deserialized_cost expr)
-        >>?= fun ctxt ->
         parse_data
           ctxt
           ~legacy:false

@@ -1096,13 +1096,10 @@ module RPC = struct
                   | None ->
                       assert false
                 in
-                (* Fail quickly if not enough gas for minimal deserialization cost *)
                 Lwt.return
                 @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-                @@ ( Gas.check_enough ctxt (Script.minimal_deserialize_cost arg)
-                   >>? fun () ->
-                   (* Fail if not enough gas for complete deserialization cost *)
-                   Script.force_decode_in_context ctxt arg
+                @@ (* Fail if not enough gas for complete deserialization cost *)
+                   ( Script.force_decode_in_context ctxt arg
                    >|? fun (_arg, ctxt) -> ctxt )
             | Origination {script; _} ->
                 (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
@@ -1120,15 +1117,8 @@ module RPC = struct
                 in
                 Lwt.return
                 @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-                @@ ( Gas.(
-                       check_enough
-                         (* Fail quickly if not enough gas for minimal deserialization cost *)
-                         ctxt
-                         ( Script.minimal_deserialize_cost script.code
-                         +@ Script.minimal_deserialize_cost script.storage ))
-                   >>? fun () ->
-                   (* Fail if not enough gas for complete deserialization cost *)
-                   Script.force_decode_in_context ctxt script.code
+                @@ (* Fail if not enough gas for complete deserialization cost *)
+                   ( Script.force_decode_in_context ctxt script.code
                    >>? fun (_code, ctxt) ->
                    Script.force_decode_in_context ctxt script.storage
                    >|? fun (_storage, ctxt) -> ctxt )

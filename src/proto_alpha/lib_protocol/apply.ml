@@ -550,6 +550,11 @@ let apply_manager_operation_content :
             : kind successful_manager_operation_result ),
           [] )
   | Transaction {amount; parameters; destination; entrypoint} -> (
+      Script.force_decode_in_context ctxt parameters
+      (* [note]: for toplevel ops, cost is nil since the lazy value has
+                 already been forced at precheck. Otherwise fail early if not
+                 enough gas for complete deserialization cost *)
+      >>?= fun (parameter, ctxt) ->
       Contract.spend ctxt source amount
       >>=? fun ctxt ->
       ( match Contract.is_implicit destination with
@@ -585,16 +590,7 @@ let apply_manager_operation_content :
               | entrypoint ->
                   error (Script_tc_errors.No_such_entrypoint entrypoint) )
             >>? (fun () ->
-                  Script.force_decode_in_context ctxt parameters
-                  >>? fun (arg, ctxt) ->
-                  (* see [note] *)
-                  (* [note]: for toplevel ops, cost is nil since the
-               lazy value has already been forced at precheck, so
-               we compute and consume the full cost again *)
-                  let cost_arg = Script.deserialized_cost arg in
-                  Gas.consume ctxt cost_arg
-                  >>? fun ctxt ->
-                  match Micheline.root arg with
+                  match Micheline.root parameter with
                   | Prim (_, D_Unit, [], _) ->
                       (* Allow [Unit] parameter to non-scripted contracts. *)
                       ok ctxt
@@ -625,12 +621,6 @@ let apply_manager_operation_content :
             in
             (ctxt, result, []) )
       | Some script ->
-          Script.force_decode_in_context ctxt parameters
-          >>?= fun (parameter, ctxt) ->
-          (* see [note] *)
-          let cost_parameter = Script.deserialized_cost parameter in
-          Gas.consume ctxt cost_parameter
-          >>?= fun ctxt ->
           let step_constants =
             let open Script_interpreter in
             {source; payer; self = destination; amount; chain_id}
@@ -677,15 +667,11 @@ let apply_manager_operation_content :
           (ctxt, result, operations) )
   | Origination {delegate; script; preorigination; credit} ->
       Script.force_decode_in_context ctxt script.storage
-      >>?= fun (unparsed_storage, ctxt) ->
       (* see [note] *)
-      Gas.consume ctxt (Script.deserialized_cost unparsed_storage)
-      >>?= fun ctxt ->
+      >>?= fun (_unparsed_storage, ctxt) ->
       Script.force_decode_in_context ctxt script.code
-      >>?= fun (unparsed_code, ctxt) ->
       (* see [note] *)
-      Gas.consume ctxt (Script.deserialized_cost unparsed_code)
-      >>?= fun ctxt ->
+      >>?= fun (_unparsed_code, ctxt) ->
       Script_ir_translator.parse_script
         ctxt
         ~legacy:false
@@ -825,25 +811,15 @@ let precheck_manager_contents (type kind) ctxt
       Contract.reveal_manager_key ctxt source pk
   | Transaction {parameters; _} ->
       Lwt.return
-      (* Fail quickly if not enough gas for minimal deserialization cost *)
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ ( Gas.check_enough ctxt (Script.minimal_deserialize_cost parameters)
-         >>? fun () ->
-         (* Fail if not enough gas for complete deserialization cost *)
-         Script.force_decode_in_context ctxt parameters
+      @@ (* Fail early if not enough gas for complete deserialization cost *)
+         ( Script.force_decode_in_context ctxt parameters
          >|? fun (_arg, ctxt) -> ctxt )
   | Origination {script; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* Fail quickly if not enough gas for minimal deserialization cost *)
-         ( Gas.(
-             check_enough
-               ctxt
-               ( Script.minimal_deserialize_cost script.code
-               +@ Script.minimal_deserialize_cost script.storage ))
-         >>? fun () ->
-         (* Fail if not enough gas for complete deserialization cost *)
-         Script.force_decode_in_context ctxt script.code
+      @@ (* Fail early if not enough gas for complete deserialization cost *)
+         ( Script.force_decode_in_context ctxt script.code
          >>? fun (_code, ctxt) ->
          Script.force_decode_in_context ctxt script.storage
          >|? fun (_storage, ctxt) -> ctxt )

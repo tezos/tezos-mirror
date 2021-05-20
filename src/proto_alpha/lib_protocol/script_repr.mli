@@ -47,42 +47,26 @@ type t = {code : lazy_expr; storage : lazy_expr}
 
 val encoding : t Data_encoding.encoding
 
+val deserialization_cost_estimated_from_bytes : int -> Gas_limit_repr.cost
+
 val deserialized_cost : expr -> Gas_limit_repr.cost
 
 val serialized_cost : bytes -> Gas_limit_repr.cost
 
-val traversal_cost : node -> Gas_limit_repr.cost
-
-val int_node_cost : Z.t -> Gas_limit_repr.cost
-
-val int_node_cost_of_numbits : int -> Gas_limit_repr.cost
-
-val string_node_cost : string -> Gas_limit_repr.cost
-
-val string_node_cost_of_length : int -> Gas_limit_repr.cost
-
 val bytes_node_cost : bytes -> Gas_limit_repr.cost
 
-val bytes_node_cost_of_length : int -> Gas_limit_repr.cost
+val force_decode_cost : lazy_expr -> Gas_limit_repr.cost
 
-val prim_node_cost_nonrec : expr list -> annot -> Gas_limit_repr.cost
+val force_decode : lazy_expr -> expr tzresult
 
-val seq_node_cost_nonrec : expr list -> Gas_limit_repr.cost
+val force_bytes_cost : lazy_expr -> Gas_limit_repr.cost
 
-val seq_node_cost_nonrec_of_length : int -> Gas_limit_repr.cost
-
-val force_decode : lazy_expr -> (expr * Gas_limit_repr.cost) tzresult
-
-val force_bytes : lazy_expr -> (bytes * Gas_limit_repr.cost) tzresult
-
-val minimal_deserialize_cost : lazy_expr -> Gas_limit_repr.cost
+val force_bytes : lazy_expr -> bytes tzresult
 
 val unit_parameter : lazy_expr
 
 val is_unit_parameter : lazy_expr -> bool
 
 val strip_annotations : node -> node
-
-val micheline_nodes : node -> int
 
 val strip_locations_cost : node -> Gas_limit_repr.cost
