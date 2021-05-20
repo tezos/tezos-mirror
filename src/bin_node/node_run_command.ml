@@ -338,7 +338,7 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let launch_rpc_server (config : Node_config_file.t) node (addr, port) =
+let launch_rpc_server ?acl (config : Node_config_file.t) node (addr, port) =
   let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
   let dir = Node.build_rpc_directory node in
@@ -366,6 +366,7 @@ let launch_rpc_server (config : Node_config_file.t) node (addr, port) =
         ~host
         mode
         dir
+        ?acl
         ~media_types:Media_type.all_media_types
         ~cors:
           {
@@ -387,9 +388,13 @@ let init_rpc (config : Node_config_file.t) node =
       | [] ->
           failwith "Cannot resolve listening address: %S" addr
       | addrs ->
+          let acl =
+            Option.value ~default:RPC_server.Acl.default
+            @@ RPC_server.Acl.find_policy config.rpc.acl addr
+          in
           List.fold_right_es
             (fun x a ->
-              launch_rpc_server config node x >>=? fun o -> return (o :: a))
+              launch_rpc_server ~acl config node x >>=? fun o -> return (o :: a))
             addrs
             acc)
     config.rpc.listen_addrs

@@ -437,9 +437,14 @@ let display_answer (cctxt : #Client_context.full) = function
         "Requested data concerns a pruned block and target resource is no \
          longer available\n\
          %!"
+  | `Unauthorized None ->
+      cctxt#error
+        "@[<v 2>[HTTP 403] Access denied to: %a@]@."
+        Uri.pp
+        cctxt#base
   | `Error (Some json) ->
       cctxt#error
-        "@[<v 2>Command failed :@[ %a@]@]@."
+        "@[<v 2>Command failed: @[%a@]@]@."
         (Format.pp_print_list Error_monad.pp)
         (Data_encoding.Json.destruct
            (Data_encoding.list Error_monad.error_encoding)

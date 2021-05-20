@@ -20,7 +20,7 @@ EXPECTED_CABOOSE = 0
 EXPECTED_ROLLING_CABOOSE = EXPECTED_SAVEPOINT - MAX_OP_TTL
 
 EXPECTED_SERVICE_ERROR = 'Did not find service'
-EXPECTED_COMMAND_ERROR = 'Command failed : Unable to find block'
+EXPECTED_COMMAND_ERROR = 'Command failed: Unable to find block'
 
 
 def check_expected_values(head):

@@ -15,7 +15,7 @@ SNAPSHOT_1 = f'snapshot_block_{BATCH_1}.full'
 SNAPSHOT_2 = f'snapshot_block_{BATCH_2}.full'
 
 EXPECTED_BLOCK_ERROR = 'Unable to find block'
-EXPECTED_COMMAND_ERROR = 'Command failed : Unable to find block'
+EXPECTED_COMMAND_ERROR = 'Command failed: Unable to find block'
 
 
 def clear_cache(sandbox, node_id):

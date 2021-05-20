@@ -597,7 +597,7 @@ def node_consistency_after_import(
 # - blocks from the savepoint (included) have metadata.
 def full_node_blocks_availability(node_id, sandbox, savepoint, head):
     # Error that must be raised when a block is not available
-    expected_command_error = 'Command failed : Unable to find block'
+    expected_command_error = 'Command failed: Unable to find block'
     # Genesis is available with metadata
     assert get_block_at_level(sandbox.client(node_id), 0)
     # [1;…;savepoint[ headers are available but metadata are not
