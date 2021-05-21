@@ -473,7 +473,7 @@ val conv :
   'b encoding ->
   'a encoding
 
-val conv_guard :
+val conv_with_guard :
   ('a -> 'b) ->
   ('b -> ('a, string) result) ->
   ?schema:Json_schema.schema ->

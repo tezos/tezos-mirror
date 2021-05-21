@@ -26,7 +26,7 @@
 let int8s = Data_encoding.(list int8)
 
 (* A first series of tests that defines an encoding for non-empty lists, the
-   decoding of which is guarded by conv_guard to prevent the creation of empty
+   decoding of which is guarded by conv_with_guard to prevent the creation of empty
    non-empty lists. *)
 
 module NonEmptyList : sig
@@ -46,7 +46,7 @@ end = struct
 
   let encoding e =
     let open Data_encoding in
-    conv_guard
+    conv_with_guard
       (fun xs -> xs)
       (function
         | [] -> Error "NonEmptyList cannot be empty" | _ :: _ as xs -> Ok xs)
@@ -127,7 +127,7 @@ end = struct
 
   let encoding e =
     let open Data_encoding in
-    conv_guard
+    conv_with_guard
       (fun xs -> xs)
       (fun xs ->
         let ys = of_list xs in

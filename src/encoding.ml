@@ -447,7 +447,7 @@ let string_enum = function
 
 let conv proj inj ?schema encoding = make @@ Conv {proj; inj; encoding; schema}
 
-let conv_guard proj inj_guard ?schema encoding =
+let conv_with_guard proj inj_guard ?schema encoding =
   let inj x =
     match inj_guard x with
     | Ok y -> y
