@@ -26,6 +26,42 @@
 
 module Events = P2p_events.P2p_io_scheduler
 
+type error +=
+  | Invalid_read_request of {
+      expected : string;
+      pos : int32;
+      len : int32;
+      buflen : int32;
+    }
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"p2p_io_scheduler.invalid_read_request"
+    ~title:"Read request is erroneously specified"
+    ~description:
+      "When about to read incoming data, read parameters are erroneous"
+    ~pp:(fun fmt (expected, pos, len, buflen) ->
+      Format.fprintf
+        fmt
+        "%s should hold, but pos=%ld len=%ld buflen=%ld"
+        expected
+        pos
+        len
+        buflen)
+    Data_encoding.(
+      obj4
+        (req "expected" string)
+        (req "pos" int32)
+        (req "len" int32)
+        (req "buflen" int32))
+    (function
+      | Invalid_read_request {expected; pos; len; buflen} ->
+          Some (expected, pos, len, buflen)
+      | _ -> None)
+    (fun (expected, pos, len, buflen) ->
+      Invalid_read_request {expected; pos; len; buflen})
+
 let alpha = 0.2
 
 module type IO = sig
@@ -604,16 +640,51 @@ let write ?canceler {write_queue; _} msg =
 (* pushing bytes in the pipe or return false if it is bounded and full *)
 let write_now {write_queue; _} msg = Lwt_pipe.push_now write_queue msg
 
+(** Container to write bytes to when reading [len] bytes from a connection.
+    Bytes read are written to [buf] starting at offset [pos].
+    Values of this type guarantee that [0 <= len], [0 <= pos], and
+    [pos + len <= (Bytes.length buf)].
+
+    This is ensured by the smart constructor [mk_buffer] and
+    the type's implementation not being exposed. *)
+type buffer = {len : int; pos : int; buf : Bytes.t}
+
+(** [mk_buffer ?pos ?len buf] creates an instance of {!buffer},
+    making sure its invariant holds; or fails with [Invalid_read_request]. *)
+let mk_buffer ?pos ?len buf : (buffer, tztrace) result =
+  let buflen = Bytes.length buf in
+  let pos = Option.value ~default:0 pos in
+  let len = Option.value ~default:(buflen - pos) len in
+  let check cond ~expected =
+    if cond then ok ()
+    else
+      error
+        Int32.(
+          Invalid_read_request
+            {
+              expected;
+              pos = of_int pos;
+              len = of_int pos;
+              buflen = of_int buflen;
+            })
+  in
+  check (0 <= len) ~expected:"0 <= len" >>? fun () ->
+  check (0 <= pos) ~expected:"0 <= pos" >>? fun () ->
+  check (pos + len <= buflen) ~expected:"pos + len <= buflen" >>? fun () ->
+  Ok {len; pos; buf}
+
+let mk_buffer_safe buf : buffer = {len = Bytes.length buf; pos = 0; buf}
+
+(** [shift amount buffer] returns a variant of buffer whose next read
+    will write to [buffer.buf] [amount] cells to the right. *)
+let shift amount {pos; len; buf} =
+  mk_buffer ~pos:(pos + amount) ~len:(len - amount) buf
+
 (* Copy [len] bytes from [data] starting at [pos] into [buf].
 
    If not all [data] is read, the remainder is put back in
    [conn.partial_read] *)
-let read_from conn ?pos ?len buf data =
-  let maxlen = Bytes.length buf in
-  let pos = Option.value ~default:0 pos in
-  assert (0 <= pos && pos < maxlen) ;
-  let len = Option.value ~default:(maxlen - pos) len in
-  assert (len <= maxlen - pos) ;
+let read_from conn {pos = offset; len; buf} data =
   match data with
   | Ok data ->
       let read_len = min len (Circular_buffer.length data) in
@@ -624,7 +695,7 @@ let read_from conn ?pos ?len buf data =
            conn.read_buffer
            ~len:read_len
            ~into:buf
-           ~offset:pos) ;
+           ~offset) ;
       Ok read_len
   | Error _ -> error P2p_errors.Connection_closed
 
@@ -635,47 +706,43 @@ let read_from conn ?pos ?len buf data =
 
    TODO: [read_now] could do a better job by popping data until buf is
    full or pipe is drained ?  *)
-let read_now conn ?pos ?len buf =
+let read_now conn buffer =
   match conn.partial_read with
   | Some msg ->
       conn.partial_read <- None ;
-      Some (read_from conn ?pos ?len buf (Ok msg))
+      Some (read_from conn buffer (Ok msg))
   | None -> (
-      try
-        Option.map
-          (read_from conn ?pos ?len buf)
-          (Lwt_pipe.pop_now conn.read_queue)
+      try Option.map (read_from conn buffer) (Lwt_pipe.pop_now conn.read_queue)
       with Lwt_pipe.Closed -> Some (error P2p_errors.Connection_closed))
 
 (* Read available data or wait for it.
 
    Todo : could do [read_now] and wait for data if result is None *)
-let read ?canceler conn ?pos ?len buf =
+let read ?canceler conn buffer =
   match conn.partial_read with
   | Some msg ->
       conn.partial_read <- None ;
-      Lwt.return (read_from conn ?pos ?len buf (Ok msg))
+      Lwt.return (read_from conn buffer (Ok msg))
   | None ->
       Lwt.catch
         (fun () ->
           protect ?canceler (fun () -> Lwt_pipe.pop conn.read_queue)
-          >|= fun msg -> read_from conn ?pos ?len buf msg)
+          >|= read_from conn buffer)
         (fun _ -> fail P2p_errors.Connection_closed)
 
 (* fill [buf] with data *)
-let read_full ?canceler conn ?pos ?len buf =
-  let maxlen = Bytes.length buf in
-  let pos = Option.value ~default:0 pos in
-  let len = Option.value ~default:(maxlen - pos) len in
-  assert (0 <= pos && pos < maxlen) ;
-  assert (len <= maxlen - pos) ;
-  let rec loop pos len =
+let read_full ?canceler conn buffer =
+  let rec loop ({len; _} as buffer) =
     if len = 0 then return_unit
     else
-      read ?canceler conn ~pos ~len buf >>=? fun read_len ->
-      loop (pos + read_len) (len - read_len)
+      read ?canceler conn buffer >>=? fun read_len ->
+      (* This is safe - even if the initial ~len is not a multiple of the
+         connection's pending bytes - because the low-level read function
+         [read_from] reads *at most* the requested number of bytes:
+         it doesn't try to read more than available. *)
+      shift read_len buffer >>?= loop
   in
-  loop pos len
+  loop buffer
 
 let convert ~ws ~rs =
   {
@@ -759,3 +826,7 @@ let shutdown ?timeout st =
   Events.(emit shutdown_scheduler) ()
 
 let id conn = P2p_fd.id conn.fd
+
+module Internal = struct
+  let destruct_buffer {pos; len; buf} = (pos, len, buf)
+end
