@@ -23,29 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Defines the internal Michelson representation for timestamps and basic
+    operations that can be performed on it. *)
+
 open Script_int_repr
 
+(** Representation of timestamps specific to the Michelson interpreter.
+    A number of seconds since the epoch. *)
 type t
 
+(** Convert a number of seconds since the epoch to a timestamp.*)
 val of_int64 : int64 -> t
 
+(** Compare timestamps. Returns [1] if the first timestamp is later than the
+    second one; [0] if they're equal and [-1] othwerwise. *)
 val compare : t -> t -> int
 
-(* Convert a timestamp to a notation if possible *)
+(** Convert a timestamp to RFC3339 notation if possible **)
 val to_notation : t -> string option
 
-(* Convert a timestamp to a string representation of the seconds *)
+(** Convert a timestamp to a string representation of the seconds *)
 val to_num_str : t -> string
 
-(* Convert to a notation if possible, or num if not *)
+(** Convert to RFC3339 notation if possible, or num if not *)
 val to_string : t -> string
 
 val of_string : string -> t option
 
+(** Returns difference between timestamps as integral number of seconds
+    in Michelson representation of numbers. *)
 val diff : t -> t -> z num
 
+(** Add a number of seconds to the timestamp. *)
 val add_delta : t -> z num -> t
 
+(** Subtract a number of seconds from the timestamp. *)
 val sub_delta : t -> z num -> t
 
 val to_zint : t -> Z.t

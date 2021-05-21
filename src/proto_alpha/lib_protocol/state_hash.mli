@@ -24,4 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A specialized Blake2B implementation for hashing internal states of random
+    number generators. *)
+
 include S.HASH

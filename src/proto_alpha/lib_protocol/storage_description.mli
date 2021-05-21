@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module is responsible for building the description of the current state
+    of the storage, which is then used to build specification of the RPC
+    endpoints for accessing the storage. It produces [resto] [RPC_directory.t]
+    values, which can be used directly to construct the RPC endpoint tree. *)
+
 (** Typed description of the key-value context. *)
 type 'key t
 

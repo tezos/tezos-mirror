@@ -23,6 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Internal representation of the gas limit available to the node baking a new
+    block. It should be proportional to the time and energy required to perform a
+    computation.
+
+    This protects the bakers from performing exceedingly costly computations
+    while baking and also allows them to select cheaper-to-compute operations to
+    include in their blocks, as their reward for baking a block is not directly
+    related to the resources consumed by the machine performing the operation.
+
+    It can be [Unaccounted] (unlimited) or [Limited] to some fixed-point value
+    (see [Fixed_point_repr] for the details). The value is represented with 3
+    decimal places of precision.
+
+    All computations on gas are performed in saturation arithmetic (see
+    [Saturation_repr]) bounded between [0] and [2 ^ 62 - 1]*)
+
 module Arith :
   Fixed_point_repr.Full
     with type 'a t = Saturation_repr.may_saturate Saturation_repr.t
@@ -33,30 +49,59 @@ val encoding : t Data_encoding.encoding
 
 val pp : Format.formatter -> t -> unit
 
+(** Represents a gas cost of an operation. The gas model is constructed such
+    that the cost of each operation is roughly proportional to the time required
+    to perform the operation. If the gas cost of an operation exceeds the
+    available limit, such an operation is rejected. This is especially meant to
+    protect bakers against DoS attacks. *)
 type cost = Saturation_repr.may_saturate Saturation_repr.t
 
 val cost_encoding : cost Data_encoding.encoding
 
 val pp_cost : Format.formatter -> cost -> unit
 
+(** Subtracts the cost from the current limit. Returns [None] if the limit
+    would fall below [0]. *)
 val raw_consume : Arith.fp -> cost -> Arith.fp option
 
+(** The cost of free operation is [0]. *)
 val free : cost
 
 val atomic_step_cost : _ Saturation_repr.t -> cost
 
 val step_cost : _ Saturation_repr.t -> cost
 
+(** Cost of allocating qwords of storage.
+
+    [alloc_cost n] estimates the cost of allocating [n] qwords of storage. *)
 val alloc_cost : _ Saturation_repr.t -> cost
 
+(** Cost of allocating bytes in the storage.
+
+    [alloc_bytes_cost b] estimates the cost of allocating [b] bytes of
+    storage. *)
 val alloc_bytes_cost : int -> cost
 
+(** Cost of allocating bytes in the storage.
+
+    [alloc_mbytes_cost b] estimates the cost of allocating [b] bytes of
+    storage. *)
 val alloc_mbytes_cost : int -> cost
 
+(** Cost of reading the storage.
+
+    [read_bytes_const n] estimates the cost of reading [n] bytes of storage. *)
 val read_bytes_cost : int -> cost
 
+(** Cost of writing to storage.
+
+    [write_bytes_const n] estimates the cost of writing [n] bytes to the
+    storage. *)
 val write_bytes_cost : int -> cost
 
+(** Multiply a cost by a factor. Both arguments are saturated arithmetic values,
+    so no negative numbers are involved. *)
 val ( *@ ) : _ Saturation_repr.t -> cost -> cost
 
+(** Add two costs together. *)
 val ( +@ ) : cost -> cost -> cost

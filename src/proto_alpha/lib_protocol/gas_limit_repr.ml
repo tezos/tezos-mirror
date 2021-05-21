@@ -31,6 +31,7 @@ type integral_tag
 
 module S = Saturation_repr
 
+(* 1 gas unit *)
 let scaling_factor = S.mul_safe_of_int_exn 1000
 
 module Arith = struct
@@ -156,20 +157,25 @@ let cost_encoding = S.z_encoding
 
 let pp_cost fmt z = S.pp fmt z
 
+(* 2 units of gas *)
 let allocation_weight =
   S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 2)) |> S.mul_safe_exn
 
 let step_weight = scaling_factor
 
+(* 100 units of gas *)
 let read_base_weight =
   S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 100)) |> S.mul_safe_exn
 
+(* 160 units of gas *)
 let write_base_weight =
   S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 160)) |> S.mul_safe_exn
 
+(* 10 units of gas *)
 let byte_read_weight =
   S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 10)) |> S.mul_safe_exn
 
+(* 15 units of gas *)
 let byte_written_weight =
   S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 15)) |> S.mul_safe_exn
 

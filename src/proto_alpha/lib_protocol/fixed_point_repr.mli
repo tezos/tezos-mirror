@@ -23,10 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines a standard signature for modules providing fixed-point
+    arithmetic. *)
+
 type fp_tag (* Tag for fixed point computations *)
 
 type integral_tag (* Tag for integral computations *)
 
+(** A signature for modules implementing a fixed-point arithmetic.
+
+    Fixed-point types come in two flavours:
+    - integral (marked with [integral_tag]), behaving like integers;
+    - fp (marked with [fp_tag]), allowing for fractions.
+
+    Such numbers represent standard arithmetic, rounding (converting fp
+    flavour to integral one) and comparisons (which can work across flavours). *)
 module type Safe = sig
   type 'a t
 
