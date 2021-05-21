@@ -1,5 +1,6 @@
 test-script-gen-genesis:
   extends:
+    - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
   stage: test
@@ -8,10 +9,10 @@ test-script-gen-genesis:
     - cd scripts/gen-genesis
   script:
     - dune build gen_genesis.exe
-  interruptible: true
 
 .test_template:
   extends:
+    - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
   stage: test
@@ -23,7 +24,6 @@ test-script-gen-genesis:
   cache:
     key: "$CI_COMMIT_REF_SLUG"
     policy: pull
-  interruptible: true
 
 .unit_test_template:
   extends: .test_template

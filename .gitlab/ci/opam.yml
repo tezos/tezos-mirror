@@ -1,5 +1,6 @@
 .opam_template:
   extends:
+    - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development_opam
   stage: packaging
@@ -12,7 +13,6 @@
     - opam depext --yes ${package}
     - opam install --yes ${package}
     - opam reinstall --yes --with-test ${package}
-  interruptible: true
 
 ##BEGIN_OPAM##
 # this section is updated using the script scripts/update_opam_test.sh

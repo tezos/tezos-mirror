@@ -40,6 +40,7 @@ check_scripts_b58_prefix:
 # fast self-checks that depends on build
 sanity_ci:
   extends:
+    - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
   stage: sanity_ci
@@ -49,4 +50,3 @@ sanity_ci:
     - . $HOME/.venv/bin/activate
   script:
     - src/tooling/lint.sh --check-gitlab-ci-yml
-  interruptible: true

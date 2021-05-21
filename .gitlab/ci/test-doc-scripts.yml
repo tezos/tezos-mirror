@@ -4,6 +4,7 @@
 
 .install_bin_ubuntu_template:
   extends:
+    - .default_settings_template
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
@@ -19,6 +20,7 @@ install_bin_focal:
 
 .install_bin_fedora_template:
   extends:
+    - .default_settings_template
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
@@ -34,6 +36,7 @@ install_bin_fedora_33:
 
 .install_opam_ubuntu_template:
   extends:
+    - .default_settings_template
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
@@ -49,6 +52,7 @@ install_opam_focal:
 
 .compile_sources_template:
   extends:
+    - .default_settings_template
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:

@@ -47,6 +47,10 @@ stages:
 
 # Basic, specialised, minimal, orthogonal templates
 
+# Some settings we want by default on all jobs
+.default_settings_template:
+  interruptible: true
+
 # Image templates
 .image_template__runtime_build_test_dependencies_template:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}

@@ -1,5 +1,6 @@
 .build_docker_release_template:
   extends:
+    - .default_settings_template
     - .image_template__latest
     - .rules_template__master_and_releases
   services:
@@ -59,6 +60,7 @@ build_release:docker_arm64:
 
 .build_static_binaries_template:
   extends:
+    - .default_settings_template
     - .image_template__runtime_build_dependencies_template
     - .rules_template__master_and_releases
   stage: build_release
@@ -184,6 +186,7 @@ merge-manifest:
 
 publish:documentation:
   extends:
+    - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__master
   stage: doc
@@ -223,6 +226,7 @@ publish:documentation:
 
 pages:
   extends:
+    - .default_settings_template
     - .rules_template__development_coverage
   needs: ["test_coverage"]
   stage: publish_coverage
