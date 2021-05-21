@@ -27,6 +27,12 @@
     use the corresponding module intended for use: {!Data_encoding.Encoding}. *)
 
 module Kind : sig
+  (** [`Fixed n] indicates that the binary representation of the value always
+      takes exactly [n] bytes.
+      [`Dynamic] indicates that the binary representation starts with a length
+      field followed by the the value in the number of specified bytes.
+      [`Variable] indicates that the binary representation of the value is
+      neither statically known nor encoded. *)
   type t = [`Fixed of int | `Dynamic | `Variable]
 
   type length = [`Fixed of int | `Variable]
@@ -58,21 +64,26 @@ type 'a desc =
   | Int31 : int desc
   | Int32 : Int32.t desc
   | Int64 : Int64.t desc
-  | N : Z.t desc
-  | Z : Z.t desc
+  | N : Z.t desc  (** An arbitrary-precision natural number *)
+  | Z : Z.t desc  (** An arbitrary-precision integer *)
   | RangedInt : {minimum: int; maximum: int} -> int desc
+      (** Note: the encoding size is determined by range *)
   | RangedFloat : {minimum: float; maximum: float} -> float desc
   | Float : float desc
-  | Bytes : Kind.length -> Bytes.t desc
-  | String : Kind.length -> string desc
+  | Bytes : Kind.length -> Bytes.t desc  (** A mutable string *)
+  | String : Kind.length -> string desc  (** An immutable string *)
   | Padded : 'a t * int -> 'a desc
+      (** The [int] indicates how many null bytes should be added on the right
+          of the value. *)
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
   | Array : int option * 'a t -> 'a array desc
   | List : int option * 'a t -> 'a list desc
-  | Obj : 'a field -> 'a desc
+  | Obj : 'a field -> 'a desc  (** An object with one field *)
   | Objs : {kind: Kind.t; left: 'a t; right: 'b t} -> ('a * 'b) desc
-  | Tup : 'a t -> 'a desc
+      (** Two objects merged *)
+  | Tup : 'a t -> 'a desc  (** A tuple with one field *)
   | Tups : {kind: Kind.t; left: 'a t; right: 'b t} -> ('a * 'b) desc
+      (** Two tuples merged *)
   | Union : {
       kind: Kind.t;
       tag_size: Binary_size.tag_size;
@@ -110,13 +121,19 @@ type 'a desc =
       is_tup: bool;
     }
       -> 'a desc
+      (** Used when the binary and JSON encodings are structurally different. *)
   | Dynamic_size : {
       kind: Binary_size.unsigned_integer;
       encoding: 'a t;
     }
       -> 'a desc
+      (** [kind] indicates how many bytes in the size field.
+          [encoding] is a (generally variable) encoding *)
   | Check_size : {limit: int; encoding: 'a t} -> 'a desc
+      (** Indicates the maximum number of bytes to encode decode.
+          More than that will fault. *)
   | Delayed : (unit -> 'a t) -> 'a desc
+      (** Compute the encoding impurely using some state. *)
 
 and _ field =
   | Req : {
@@ -125,7 +142,7 @@ and _ field =
       title: string option;
       description: string option;
     }
-      -> 'a field
+      -> 'a field  (** A required field *)
   | Opt : {
       name: string;
       kind: Kind.enum;
@@ -133,7 +150,7 @@ and _ field =
       title: string option;
       description: string option;
     }
-      -> 'a option field
+      -> 'a option field  (** An optional field *)
   | Dft : {
       name: string;
       encoding: 'a t;
@@ -141,7 +158,7 @@ and _ field =
       title: string option;
       description: string option;
     }
-      -> 'a field
+      -> 'a field  (** An optional field with a default value *)
 
 and 'a case =
   | Case : {
@@ -152,7 +169,7 @@ and 'a case =
       inj: 'a -> 't;
       tag: case_tag_internal;
     }
-      -> 't case
+      -> 't case  (** How to construct and pattern match on the target type. *)
 
 and 'a t = {
   encoding: 'a desc;
