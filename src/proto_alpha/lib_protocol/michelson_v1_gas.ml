@@ -662,22 +662,8 @@ module Cost_of = struct
       let v0 = S.safe_int size in
       S.safe_int 60 + (S.safe_int 4 * v0) + (v0 lsr 2)
 
-    (* model N_ISet_mem *)
-    (* Approximating 0.048153 x term *)
-    let cost_N_ISet_mem size1 size2 =
-      let open S_syntax in
-      let v0 = size1 * log2 (S.safe_int size2) in
-      S.safe_int 80 + (v0 lsr 5) + (v0 lsr 6)
-
     (* model N_ISet_size *)
     let cost_N_ISet_size = S.safe_int 15
-
-    (* model N_ISet_update *)
-    (* Approximating 0.121078 x term *)
-    let cost_N_ISet_update size1 size2 =
-      let open S_syntax in
-      let v0 = size1 * log2 (S.safe_int size2) in
-      S.safe_int 75 + (v0 lsr 3)
 
     (* model N_ISha256 *)
     (* Approximating 4.763264 x term *)
@@ -1056,14 +1042,6 @@ module Cost_of = struct
     let set_iter (type a) ((module Box) : a Script_typed_ir.set) =
       atomic_step_cost (cost_N_ISet_iter Box.size)
 
-    let set_mem (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
-      let elt_size = size_of_comparable Box.elt_ty elt in
-      atomic_step_cost (cost_N_ISet_mem elt_size Box.size)
-
-    let set_update (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
-      let elt_size = size_of_comparable Box.elt_ty elt in
-      atomic_step_cost (cost_N_ISet_update elt_size Box.size)
-
     let set_size = atomic_step_cost cost_N_ISet_size
 
     let empty_map = atomic_step_cost cost_N_IEmpty_map
@@ -1073,28 +1051,6 @@ module Cost_of = struct
 
     let map_iter (type k v) ((module Box) : (k, v) Script_typed_ir.map) =
       atomic_step_cost (cost_N_IMap_iter (snd Box.boxed))
-
-    let map_mem (type k v) (elt : k)
-        ((module Box) : (k, v) Script_typed_ir.map) =
-      let elt_size = size_of_comparable Box.key_ty elt in
-      atomic_step_cost (cost_N_IMap_mem elt_size (S.safe_int (snd Box.boxed)))
-
-    let map_get (type k v) (elt : k)
-        ((module Box) : (k, v) Script_typed_ir.map) =
-      let elt_size = size_of_comparable Box.key_ty elt in
-      atomic_step_cost (cost_N_IMap_get elt_size (S.safe_int (snd Box.boxed)))
-
-    let map_update (type k v) (elt : k)
-        ((module Box) : (k, v) Script_typed_ir.map) =
-      let elt_size = size_of_comparable Box.key_ty elt in
-      atomic_step_cost
-        (cost_N_IMap_update elt_size (S.safe_int (snd Box.boxed)))
-
-    let map_get_and_update (type k v) (elt : k)
-        ((module Box) : (k, v) Script_typed_ir.map) =
-      let elt_size = size_of_comparable Box.key_ty elt in
-      atomic_step_cost
-        (cost_N_IMap_get_and_update elt_size (S.safe_int (snd Box.boxed)))
 
     let map_size = atomic_step_cost cost_N_IMap_size
 
@@ -1445,6 +1401,8 @@ module Cost_of = struct
     (* Semi-hand-crafted models *)
     let compare_unit = atomic_step_cost (S.safe_int 10)
 
+    let compare_pair_tag = atomic_step_cost (S.safe_int 10)
+
     let compare_union_tag = atomic_step_cost (S.safe_int 10)
 
     let compare_option_tag = atomic_step_cost (S.safe_int 10)
@@ -1522,6 +1480,8 @@ module Cost_of = struct
           compare_chain_id
       | Pair_key ((tl, _), (tr, _), _) ->
           (* Reasonable over-approximation of the cost of lexicographic comparison. *)
+          compare_pair_tag
+          +@
           let (xl, xr) = x in
           let (yl, yr) = y in
           compare tl xl yl +@ compare tr xr yr
@@ -1549,6 +1509,52 @@ module Cost_of = struct
               free
           | (Some x, Some y) ->
               compare t x y )
+
+    let set_mem (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
+      let open S_syntax in
+      let per_elt_cost = compare Box.elt_ty elt elt in
+      let size = S.safe_int Box.size in
+      let intercept = atomic_step_cost (S.safe_int 80) in
+      Gas.(intercept +@ (log2 size *@ per_elt_cost))
+
+    let set_update (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
+      let open S_syntax in
+      let per_elt_cost = compare Box.elt_ty elt elt in
+      let size = S.safe_int Box.size in
+      let intercept = atomic_step_cost (S.safe_int 80) in
+      (* The 2 factor reflects the update vs mem overhead as benchmarked
+         on non-structured data *)
+      Gas.(intercept +@ (S.safe_int 2 * log2 size *@ per_elt_cost))
+
+    let map_mem (type k v) (elt : k)
+        ((module Box) : (k, v) Script_typed_ir.map) =
+      let open S_syntax in
+      let per_elt_cost = compare Box.key_ty elt elt in
+      let size = S.safe_int (snd Box.boxed) in
+      let intercept = atomic_step_cost (S.safe_int 80) in
+      Gas.(intercept +@ (log2 size *@ per_elt_cost))
+
+    let map_get = map_mem
+
+    let map_update (type k v) (elt : k)
+        ((module Box) : (k, v) Script_typed_ir.map) =
+      let open S_syntax in
+      let per_elt_cost = compare Box.key_ty elt elt in
+      let size = S.safe_int (snd Box.boxed) in
+      let intercept = atomic_step_cost (S.safe_int 80) in
+      (* The 2 factor reflects the update vs mem overhead as benchmarked
+         on non-structured data *)
+      Gas.(intercept +@ (S.safe_int 2 * log2 size *@ per_elt_cost))
+
+    let map_get_and_update (type k v) (elt : k)
+        ((module Box) : (k, v) Script_typed_ir.map) =
+      let open S_syntax in
+      let per_elt_cost = compare Box.key_ty elt elt in
+      let size = S.safe_int (snd Box.boxed) in
+      let intercept = atomic_step_cost (S.safe_int 80) in
+      (* The 3 factor reflects the update vs mem overhead as benchmarked
+         on non-structured data *)
+      Gas.(intercept +@ (S.safe_int 3 * log2 size *@ per_elt_cost))
 
     (* --------------------------------------------------------------------- *)
     (* Hand-crafted models *)
