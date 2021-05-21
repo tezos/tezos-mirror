@@ -167,6 +167,37 @@ let blockchain_network_florencenet =
         "florencenobanet.boot.tez.ie";
         "florencenobanet.smartpy.io:9733" ]
 
+let blockchain_network_granadanet =
+  make_blockchain_network
+    ~alias:"granadanet"
+    {
+      time = Time.Protocol.of_notation_exn "2021-05-21T15:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesisd4299hBGVoU";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [ ( "genesis_pubkey",
+                `String
+                  "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n" ) ];
+      }
+    ~chain_name:"TEZOS_GRANADANET_2021-05-21T15:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~user_activated_upgrades:
+      [(4095l, "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV")]
+    ~default_bootstrap_peers:
+      [ "granadanet.smartpy.io";
+        "granadanet.tezos.co.il";
+        "granadanet.kaml.fr";
+        "granadanet.tznode.net" ]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -260,8 +291,9 @@ let builtin_blockchain_networks_with_tags =
   [ (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (12, blockchain_network_edo2net);
-    (13, blockchain_network_florencenet)
-    (* 14 was Florencenet with Baking Accounts. *) ]
+    (13, blockchain_network_florencenet);
+    (* 14 was Florencenet with Baking Accounts. *)
+    (15, blockchain_network_granadanet) ]
   |> List.map (fun (tag, network) ->
          match network.alias with
          | None ->

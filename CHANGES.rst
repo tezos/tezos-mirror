@@ -155,6 +155,9 @@ Node
 -  Added Granada, a protocol proposal for Mainnet featuring, among others,
    the Emmy* consensus algorithm, Liquidity Baking, and reduced gas consumption.
 
+-  Added the configuration for Granadanet, a test network for Granada,
+   as a built-in network alias (``--network granadanet``).
+
 -  Updated the mempool to keep more than 50 non-included operations
    when receiving a new block. In particular, this should result in
    fewer endorsements being missed.
