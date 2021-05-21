@@ -33,7 +33,7 @@
         [ "boot.tzbeta.net", "116.202.172.21", "[::]:10732",
           "192.168.1.3:9733" ],
 
-      /* List of address/ports to listen to. Tezos can connect to both IPv6 and IPv4 hosts. If
+      /* Address/port to listen to. Tezos can connect to both IPv6 and IPv4 hosts. If
          the port is not specified, default port 9732 will be assumed. */,
       "listen-addr": "95.216.45.62:9733",
 
