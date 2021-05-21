@@ -254,5 +254,5 @@ if [ -n "$commit" ]; then
 fi
 
 if $check_clean; then
-    git diff --name-only HEAD --exit-code
+    git diff HEAD --exit-code
 fi
