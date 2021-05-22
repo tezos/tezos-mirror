@@ -1339,69 +1339,84 @@ module Cost_of = struct
 
     let compare_chain_id = atomic_step_cost (S.safe_int 30)
 
-    let[@coq_axiom_with_reason "gadt"] rec compare :
-        type a. a Script_typed_ir.comparable_ty -> a -> a -> cost =
+    (* Defunctionalized CPS *)
+    type cont =
+      | Compare : 'a Script_typed_ir.comparable_ty * 'a * 'a * cont -> cont
+      | Return : cont
+
+    let compare : type a. a Script_typed_ir.comparable_ty -> a -> a -> cost =
      fun ty x y ->
-      match ty with
-      | Unit_key _ ->
-          compare_unit
-      | Never_key _ -> (
-        match x with _ -> . )
-      | Bool_key _ ->
-          compare_bool
-      | String_key _ ->
-          compare_string x y
-      | Signature_key _ ->
-          compare_signature
-      | Bytes_key _ ->
-          compare_bytes x y
-      | Mutez_key _ ->
-          compare_mutez
-      | Int_key _ ->
-          compare_int x y
-      | Nat_key _ ->
-          compare_nat x y
-      | Key_hash_key _ ->
-          compare_key_hash
-      | Key_key _ ->
-          compare_key
-      | Timestamp_key _ ->
-          compare_timestamp x y
-      | Address_key _ ->
-          compare_address
-      | Chain_id_key _ ->
-          compare_chain_id
-      | Pair_key ((tl, _), (tr, _), _) ->
-          (* Reasonable over-approximation of the cost of lexicographic comparison. *)
-          compare_pair_tag
-          +@
-          let (xl, xr) = x in
-          let (yl, yr) = y in
-          compare tl xl yl +@ compare tr xr yr
-      | Union_key ((tl, _), (tr, _), _) -> (
-          compare_union_tag
-          +@
+      let[@coq_axiom_with_reason "gadt"] rec compare :
+          type a.
+          a Script_typed_ir.comparable_ty -> a -> a -> cost -> cont -> cost =
+       fun ty x y acc k ->
+        match ty with
+        | Unit_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_unit) k
+        | Never_key _ -> (
+          match x with _ -> . )
+        | Bool_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_bool) k
+        | String_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_string x y) k
+        | Signature_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_signature) k
+        | Bytes_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_bytes x y) k
+        | Mutez_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_mutez) k
+        | Int_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_int x y) k
+        | Nat_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_nat x y) k
+        | Key_hash_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_key_hash) k
+        | Key_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_key) k
+        | Timestamp_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_timestamp x y) k
+        | Address_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_address) k
+        | Chain_id_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
+        | Pair_key ((tl, _), (tr, _), _) ->
+            (* Reasonable over-approximation of the cost of lexicographic comparison. *)
+            let (xl, xr) = x in
+            let (yl, yr) = y in
+            (compare [@tailcall])
+              tl
+              xl
+              yl
+              Gas.(acc +@ compare_pair_tag)
+              (Compare (tr, xr, yr, k))
+        | Union_key ((tl, _), (tr, _), _) -> (
           match (x, y) with
           | (L x, L y) ->
-              compare tl x y
+              (compare [@tailcall]) tl x y Gas.(acc +@ compare_union_tag) k
           | (L _, R _) ->
-              free
+              (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
           | (R _, L _) ->
-              free
+              (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
           | (R x, R y) ->
-              compare tr x y )
-      | Option_key (t, _) -> (
-          compare_option_tag
-          +@
+              (compare [@tailcall]) tr x y Gas.(acc +@ compare_union_tag) k )
+        | Option_key (t, _) -> (
           match (x, y) with
           | (None, None) ->
-              free
+              (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
           | (None, Some _) ->
-              free
+              (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
           | (Some _, None) ->
-              free
+              (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
           | (Some x, Some y) ->
-              compare t x y )
+              (compare [@tailcall]) t x y Gas.(acc +@ compare_option_tag) k )
+      and apply cost k =
+        match k with
+        | Compare (ty, x, y, k) ->
+            (compare [@tailcall]) ty x y cost k
+        | Return ->
+            cost
+      in
+      compare ty x y Gas.free Return
 
     let set_mem (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
       let open S_syntax in
