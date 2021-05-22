@@ -322,63 +322,93 @@ let compare_address (x, ex) (y, ey) =
   let lres = Contract.compare x y in
   if Compare.Int.(lres = 0) then Compare.String.compare ex ey else lres
 
-let rec compare_comparable : type a. a comparable_ty -> a -> a -> int =
- fun kind ->
-  match kind with
-  | Unit_key _ ->
-      fun () () -> 0
-  | Never_key _ -> (
-      function _ -> . )
-  | Signature_key _ ->
-      wrap_compare Signature.compare
-  | String_key _ ->
-      wrap_compare Compare.String.compare
-  | Bool_key _ ->
-      wrap_compare Compare.Bool.compare
-  | Mutez_key _ ->
-      wrap_compare Tez.compare
-  | Key_hash_key _ ->
-      wrap_compare Signature.Public_key_hash.compare
-  | Key_key _ ->
-      wrap_compare Signature.Public_key.compare
-  | Int_key _ ->
-      wrap_compare Script_int.compare
-  | Nat_key _ ->
-      wrap_compare Script_int.compare
-  | Timestamp_key _ ->
-      wrap_compare Script_timestamp.compare
-  | Address_key _ ->
-      wrap_compare compare_address
-  | Bytes_key _ ->
-      wrap_compare Compare.Bytes.compare
-  | Chain_id_key _ ->
-      wrap_compare Chain_id.compare
-  | Pair_key ((tl, _), (tr, _), _) ->
-      fun (lx, rx) (ly, ry) ->
-        let lres = compare_comparable tl lx ly in
-        if Compare.Int.(lres = 0) then compare_comparable tr rx ry else lres
-  | Union_key ((tl, _), (tr, _), _) -> (
-      fun x y ->
-        match (x, y) with
-        | (L x, L y) ->
-            compare_comparable tl x y
-        | (L _, R _) ->
-            -1
-        | (R _, L _) ->
-            1
-        | (R x, R y) ->
-            compare_comparable tr x y )
-  | Option_key (t, _) -> (
-      fun x y ->
-        match (x, y) with
-        | (None, None) ->
-            0
-        | (None, Some _) ->
-            -1
-        | (Some _, None) ->
-            1
-        | (Some x, Some y) ->
-            compare_comparable t x y )
+type compare_comparable_cont =
+  | Compare_comparable :
+      'a comparable_ty * 'a * 'a * compare_comparable_cont
+      -> compare_comparable_cont
+  | Compare_comparable_return : compare_comparable_cont
+
+let compare_comparable : type a. a comparable_ty -> a -> a -> int =
+  let rec compare_comparable :
+      type a. a comparable_ty -> compare_comparable_cont -> a -> a -> int =
+   fun kind k ->
+    match kind with
+    | Unit_key _ ->
+        fun () () -> (apply [@tailcall]) 0 k
+    | Never_key _ -> (
+        function _ -> . )
+    | Signature_key _ ->
+        fun x y -> (apply [@tailcall]) (wrap_compare Signature.compare x y) k
+    | String_key _ ->
+        fun x y ->
+          (apply [@tailcall]) (wrap_compare Compare.String.compare x y) k
+    | Bool_key _ ->
+        fun x y ->
+          (apply [@tailcall]) (wrap_compare Compare.Bool.compare x y) k
+    | Mutez_key _ ->
+        fun x y -> (apply [@tailcall]) (wrap_compare Tez.compare x y) k
+    | Key_hash_key _ ->
+        fun x y ->
+          (apply [@tailcall])
+            (wrap_compare Signature.Public_key_hash.compare x y)
+            k
+    | Key_key _ ->
+        fun x y ->
+          (apply [@tailcall]) (wrap_compare Signature.Public_key.compare x y) k
+    | Int_key _ ->
+        fun x y -> (apply [@tailcall]) (wrap_compare Script_int.compare x y) k
+    | Nat_key _ ->
+        fun x y -> (apply [@tailcall]) (wrap_compare Script_int.compare x y) k
+    | Timestamp_key _ ->
+        fun x y ->
+          (apply [@tailcall]) (wrap_compare Script_timestamp.compare x y) k
+    | Address_key _ ->
+        fun x y -> (apply [@tailcall]) (wrap_compare compare_address x y) k
+    | Bytes_key _ ->
+        fun x y ->
+          (apply [@tailcall]) (wrap_compare Compare.Bytes.compare x y) k
+    | Chain_id_key _ ->
+        fun x y -> (apply [@tailcall]) (wrap_compare Chain_id.compare x y) k
+    | Pair_key ((tl, _), (tr, _), _) ->
+        fun (lx, rx) (ly, ry) ->
+          (compare_comparable [@tailcall])
+            tl
+            (Compare_comparable (tr, rx, ry, k))
+            lx
+            ly
+    | Union_key ((tl, _), (tr, _), _) -> (
+        fun x y ->
+          match (x, y) with
+          | (L x, L y) ->
+              (compare_comparable [@tailcall]) tl k x y
+          | (L _, R _) ->
+              -1
+          | (R _, L _) ->
+              1
+          | (R x, R y) ->
+              (compare_comparable [@tailcall]) tr k x y )
+    | Option_key (t, _) -> (
+        fun x y ->
+          match (x, y) with
+          | (None, None) ->
+              apply 0 k
+          | (None, Some _) ->
+              -1
+          | (Some _, None) ->
+              1
+          | (Some x, Some y) ->
+              (compare_comparable [@tailcall]) t k x y )
+  and apply ret k =
+    match (ret, k) with
+    | (0, Compare_comparable (ty, x, y, k)) ->
+        (compare_comparable [@tailcall]) ty k x y
+    | (0, Compare_comparable_return) ->
+        0
+    | (ret, _) ->
+        (* ret <> 0, we perform an early exit *)
+        if Compare.Int.(ret > 0) then 1 else -1
+  in
+  fun t x y -> compare_comparable t Compare_comparable_return x y
 
 let empty_set : type a. a comparable_ty -> a set =
  fun ty ->
