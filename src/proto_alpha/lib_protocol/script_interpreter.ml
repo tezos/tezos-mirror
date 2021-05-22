@@ -253,7 +253,7 @@ let () =
 let rec kmap_exit :
     type a b c d e f g h m n o.
     (a, b, c, d, e, f, g, h, m, n, o) kmap_exit_type =
- fun mk g gas body xs ys yk ks accu stack ->
+ fun mk g gas (body, xs, ys, yk) ks accu stack ->
   let ys = map_update yk (Some accu) ys in
   let ks = mk (KMap_enter_body (body, xs, ys, ks)) in
   let (accu, stack) = stack in
@@ -273,14 +273,14 @@ and kmap_enter : type a b c d i j k. (a, b, c, d, i, j, k) kmap_enter_type =
  [@@inline]
 
 and klist_exit : type a b c d i j. (a, b, c, d, i, j) klist_exit_type =
- fun mk g gas body xs ys len ks accu stack ->
+ fun mk g gas (body, xs, ys, len) ks accu stack ->
   let ks = mk (KList_enter_body (body, xs, accu :: ys, len, ks)) in
   let (accu, stack) = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
  [@@inline]
 
 and klist_enter : type a b c d e j. (a, b, c, d, e, j) klist_enter_type =
- fun mk g gas body xs ys len ks' accu stack ->
+ fun mk g gas (body, xs, ys, len) ks' accu stack ->
   match xs with
   | [] ->
       let ys = {elements = List.rev ys; length = len} in
@@ -348,13 +348,16 @@ and next :
     | KIter (body, xs, ks) ->
         (kiter [@ocaml.tailcall]) id g gas body xs ks accu stack
     | KList_enter_body (body, xs, ys, len, ks) ->
-        (klist_enter [@ocaml.tailcall]) id g gas body xs ys len ks accu stack
+        let extra = (body, xs, ys, len) in
+        (klist_enter [@ocaml.tailcall]) id g gas extra ks accu stack
     | KList_exit_body (body, xs, ys, len, ks) ->
-        (klist_exit [@ocaml.tailcall]) id g gas body xs ys len ks accu stack
+        let extr = (body, xs, ys, len) in
+        (klist_exit [@ocaml.tailcall]) id g gas extr ks accu stack
     | KMap_enter_body (body, xs, ys, ks) ->
         (kmap_enter [@ocaml.tailcall]) id g gas body xs ys ks accu stack
     | KMap_exit_body (body, xs, ys, yk, ks) ->
-        (kmap_exit [@ocaml.tailcall]) id g gas body xs ys yk ks accu stack )
+        let extra = (body, xs, ys, yk) in
+        (kmap_exit [@ocaml.tailcall]) id g gas extra ks accu stack )
 
 (*
 
@@ -1495,16 +1498,18 @@ and klog :
       (kiter [@ocaml.tailcall]) mk g gas body xs ks' accu stack
   | KList_enter_body (body, xs, ys, len, ks') ->
       let ks' = mk ks' in
-      (klist_enter [@ocaml.tailcall]) mk g gas body xs ys len ks' accu stack
+      let extra = (body, xs, ys, len) in
+      (klist_enter [@ocaml.tailcall]) mk g gas extra ks' accu stack
   | KList_exit_body (body, xs, ys, len, ks') ->
       let ks' = mk ks' in
-      (klist_exit [@ocaml.tailcall]) mk g gas body xs ys len ks' accu stack
+      let extra = (body, xs, ys, len) in
+      (klist_exit [@ocaml.tailcall]) mk g gas extra ks' accu stack
   | KMap_enter_body (body, xs, ys, ks') ->
       let ks' = mk ks' in
       (kmap_enter [@ocaml.tailcall]) mk g gas body xs ys ks' accu stack
   | KMap_exit_body (body, xs, ys, yk, ks') ->
       let ks' = mk ks' in
-      (kmap_exit [@ocaml.tailcall]) mk g gas body xs ys yk ks' accu stack
+      (kmap_exit [@ocaml.tailcall]) mk g gas (body, xs, ys, yk) ks' accu stack
   | KLog (_, _) ->
       (* This case should never happen. *)
       (next [@ocaml.tailcall]) g gas ks accu stack

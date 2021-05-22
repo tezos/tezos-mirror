@@ -878,10 +878,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'm, 'n, 'o) kmap_exit_type =
   (('c, 'd, 'e, 'f) continuation -> ('a, 'b, 'g, 'h) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('m * 'n, 'c * 'd, 'o, 'c * 'd) kinstr ->
-  ('m * 'n) list ->
-  ('m, 'o) map ->
-  'm ->
+  ('m * 'n, 'c * 'd, 'o, 'c * 'd) kinstr * ('m * 'n) list * ('m, 'o) map * 'm ->
   (('m, 'o) map, 'c * 'd, 'e, 'f) continuation ->
   'o ->
   'a * 'b ->
@@ -903,10 +900,7 @@ type ('a, 'b, 'c, 'd, 'i, 'j) klist_exit_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
-  'i list ->
-  'j list ->
-  local_gas_counter ->
+  ('i, 'a * 'b, 'j, 'a * 'b) kinstr * 'i list * 'j list * local_gas_counter ->
   ('j boxed_list, 'a * 'b, 'c, 'd) continuation ->
   'j ->
   'a * 'b ->
@@ -916,10 +910,7 @@ type ('a, 'b, 'c, 'd, 'e, 'j) klist_enter_type =
   (('b, 'a * 'c, 'd, 'e) continuation -> ('b, 'a * 'c, 'd, 'e) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
-  'j list ->
-  'b list ->
-  local_gas_counter ->
+  ('j, 'a * 'c, 'b, 'a * 'c) kinstr * 'j list * 'b list * local_gas_counter ->
   ('b boxed_list, 'a * 'c, 'd, 'e) continuation ->
   'a ->
   'c ->
