@@ -351,8 +351,8 @@ and next :
         let extra = (body, xs, ys, len) in
         (klist_enter [@ocaml.tailcall]) id g gas extra ks accu stack
     | KList_exit_body (body, xs, ys, len, ks) ->
-        let extr = (body, xs, ys, len) in
-        (klist_exit [@ocaml.tailcall]) id g gas extr ks accu stack
+        let extra = (body, xs, ys, len) in
+        (klist_exit [@ocaml.tailcall]) id g gas extra ks accu stack
     | KMap_enter_body (body, xs, ys, ks) ->
         (kmap_enter [@ocaml.tailcall]) id g gas body xs ys ks accu stack
     | KMap_exit_body (body, xs, ys, yk, ks) ->
