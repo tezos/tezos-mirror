@@ -85,6 +85,9 @@ module Atom = struct
 
   let int31 =
     read_atom Binary_size.int31 @@ fun buffer ofs ->
+    (* FIXME: check that we are not outside of the int31 range (otherwise the
+       semantic is different on 64- and 32-bit machines). Raise [Invalid_int] if
+       we are.*)
     Int32.to_int (TzEndian.get_int32_string buffer ofs)
 
   let int = function

@@ -54,12 +54,6 @@ let read_error_encoding : read_error Encoding.t =
         (function Unexpected_tag i -> Some i | _ -> None)
         (fun i -> Unexpected_tag i);
       case
-        (Tag 4)
-        ~title:"Invalid size"
-        int31
-        (function Invalid_size i -> Some i | _ -> None)
-        (fun i -> Invalid_size i);
-      case
         (Tag 5)
         ~title:"Invalid int"
         (obj3 (req "min" int31) (req "v" int31) (req "max" int31))
@@ -120,7 +114,6 @@ let pp_read_error ppf = function
   | Extra_bytes -> Format.fprintf ppf "Extra bytes"
   | No_case_matched -> Format.fprintf ppf "No case matched"
   | Unexpected_tag tag -> Format.fprintf ppf "Unexpected tag %d" tag
-  | Invalid_size sz -> Format.fprintf ppf "Invalid size %d" sz
   | Invalid_int {min; v; max} ->
       Format.fprintf ppf "Invalid int (%d <= %d <= %d) " min v max
   | Invalid_float {min; v; max} ->

@@ -979,19 +979,39 @@ module Binary : sig
   (** All the errors that might be returned while reading a binary value *)
   type read_error =
     | Not_enough_data
-    | Extra_bytes
-    | No_case_matched
-    | Unexpected_tag of int
-    | Invalid_size of int
+        (** Decoding requires more bytes than are available in the
+            source of the data. E.g., there are fewer bytes available in the
+            reading buffer than is required by the length field of a
+            dynamically-sized string. *)
+    | Extra_bytes  (** Decoding requires fewer bytes than were provided. *)
+    | No_case_matched  (** Unknown case in a {!string_enum}. *)
+    | Unexpected_tag of int  (** Unknown case in a {!union} or {!matching}. *)
     | Invalid_int of {min: int; v: int; max: int}
+        (** An integer is out of range. E.g., an integer is beyond a
+            user-provided range. *)
     | Invalid_float of {min: float; v: float; max: float}
+        (** A float is out of range. *)
     | Trailing_zero
+        (** An arbitrary-precision number (N or Z) leads to a null byte. *)
     | Size_limit_exceeded
+        (** A value is encoded with more bytes than is allowed by the encoding.
+            E.g., the constraints of a {!check_size} are being broken. *)
     | List_too_long
+        (** A list contains more elements than is specified in its {!max_length}
+            parameter. *)
     | Array_too_long
+        (** An array contains more elements than is specified in its
+            {!max_length} parameter. *)
     | Exception_raised_in_user_function of string
+        (** A function provided by the user raised an exception. E.g., a
+            function in a {!conv} encoding or a {!delayed} encoding raised. *)
     | User_invariant_guard of string
+        (** A user-provided guard returned an [Error _]. E.g., in a
+            {!conv_with_guard}.*)
 
+  (** [Read_error e] is an exception wrapping the {!read_error} [e]. It is used
+      only by function suffixed by [_exn] where the suffix-less function would
+      have returned [Error e]. *)
   exception Read_error of read_error
 
   val pp_read_error : Format.formatter -> read_error -> unit
@@ -1055,8 +1075,19 @@ module Binary : sig
       [len] bytes. This function also returns the offset of the first
       unread bytes in the [buf].
 
-      The function will fail (returning [Error _]) if it needs to read more than
-      [len] bytes to decode the value.
+      The function will fail (returning [Error _]) if
+      - the bytes in [buf] designated by [ofs] and [len] are not compatible with
+        the encoding [enc] (e.g., an integer is out the range specified in the
+        encoding, or a union's tag is not recognised),
+      - it needs to read more than [len] bytes to decode the value,
+      - a user-provided function (such as that of a [conv] or [delayed]) raises
+        an exception,
+      - etc.
+      In which case the returned error contains minimal diagnosis information
+      about the dicrepancy between the bytes and the encoding.
+
+      Other reading functions ({!of_string}, {!of_bytes}) may fail for the same
+      reasons.
 
       The returned value contains no pointer back to [buf] (as a whole or as
       sub-strings), even in the case where the encoding is or includes
@@ -1064,8 +1095,12 @@ module Binary : sig
   val read :
     'a Encoding.t -> string -> int -> int -> (int * 'a, read_error) result
 
+  (** [read_opt] is like [read] but in case of failure, the error is ignored and
+      [None] is returned instead. *)
   val read_opt : 'a Encoding.t -> string -> int -> int -> (int * 'a) option
 
+  (** [read_exn] is like [read] but in case of failure, the error is wrapped in
+      [Read_error] which is raised. *)
   val read_exn : 'a Encoding.t -> string -> int -> int -> int * 'a
 
   (** Return type for the function [read_stream]. *)

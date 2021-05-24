@@ -33,7 +33,6 @@ type read_error =
   | Extra_bytes
   | No_case_matched
   | Unexpected_tag of int
-  | Invalid_size of int
   | Invalid_int of {min: int; v: int; max: int}
   | Invalid_float of {min: float; v: float; max: float}
   | Trailing_zero
