@@ -602,7 +602,81 @@ let endorsement_flushed_branch_refused =
   Log.info "Endorsement found in branch_refused of node_3 mempool" ;
   unit
 
+let check_empty_operation__ddb ddb =
+  let open JSON in
+  let op_db_length = as_int (ddb |-> "operation_db" |-> "table_length") in
+  if op_db_length > 0 then
+    Test.fail
+      "Operation Ddb should be empty, contains : %d elements"
+      op_db_length
+
+(* This test checks that pre-filtered operations are cleaned from the ddb
+
+   Scenario:
+
+   1. 3 Nodes are chained connected and activate a protocol
+
+   2. Get the counter and the current branch
+
+   3. Forge operation, inject it and check injection on node_1
+      This operation is pre-filtered on node_2
+
+   4. Bake 1 block
+
+   5. Get client_2 ddb and check that it contains no operation
+*)
+let forge_pre_filtered_operation =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Forge pre-filtered operation and check mempool"
+    ~tags:["forge"; "mempool"; "pre_filtered"]
+  @@ fun protocol ->
+  (* Step 1 *)
+  (* Two Nodes are started and we activate the protocol and wait the nodes to be synced *)
+  let* node_1 = Node.init [Bootstrap_threshold 0; Private_mode]
+  and* node_2 = Node.init [Bootstrap_threshold 0; Private_mode] in
+  let* client_1 = Client.init ~endpoint:(Node node_1) ()
+  and* client_2 = Client.init ~endpoint:(Node node_2) () in
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2
+  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
+  let* () = Client.activate_protocol ~protocol client_1 in
+  Log.info "Activated protocol." ;
+  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  Log.info "All nodes are at level %d." 1 ;
+  (* Step 2 *)
+  (* Get the counter and the current branch *)
+  let* base_counter =
+    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+  in
+  let counter = JSON.as_int base_counter in
+  let* branch = RPC.get_branch client_1 in
+  (* Step 3 *)
+  (* Forge operation, inject it and check injection *)
+  let* _op =
+    forge_and_inject_operation
+      ~branch:(JSON.as_string branch)
+      ~fee:1
+      ~gas_limit:1040000
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap2.identity
+      ~counter:(counter + 1)
+      ~signer:Constant.bootstrap1
+      ~client:client_1
+  in
+  Log.info "Op forged and injected" ;
+  (* Step 4 *)
+  (* Bake 1 block *)
+  let* () = Client.bake_for client_2 in
+  (* Step 5 *)
+  (* Get client_2 ddb and check that it contains no operation *)
+  let* ddb2 = RPC.get_ddb client_2 in
+  check_empty_operation__ddb ddb2 ;
+  Log.info "Operation Ddb of client_2 does not contain any operation" ;
+  unit
+
 let register ~protocols =
   flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
-  endorsement_flushed_branch_refused ~protocols
+  endorsement_flushed_branch_refused ~protocols ;
+  forge_pre_filtered_operation ~protocols
