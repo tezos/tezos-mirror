@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,68 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(* Input parameter parsing *)
 
-type t = {
-  pkh : Signature.Public_key_hash.t;
-  pk : Signature.Public_key.t;
-  sk : Signature.Secret_key.t;
-}
+let _ =
+  if Array.length Sys.argv < 2 then (
+    Format.eprintf "Executable expects random seed on input\n%!" ;
+    exit 1 )
+  else Random.init (int_of_string Sys.argv.(1))
 
-type account = t
+(* ------------------------------------------------------------------------- *)
+(* MCMC instantiation *)
 
-val known_accounts : t Signature.Public_key_hash.Table.t
+let sampling_parameters =
+  let open Michelson_samplers_parameters in
+  let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32} in
+  {
+    int_size = size;
+    string_size = size;
+    bytes_size = size;
+    stack_size = size;
+    type_depth = size;
+    list_size = size;
+    set_size = size;
+    map_size = size;
+  }
 
-val activator_account : account
+let state = Random.State.make [|42; 987897; 54120|]
 
-val dummy_account : account
+module Full = Michelson_samplers_base.Make_full (struct
+  let parameters = sampling_parameters
 
-val new_account : ?seed:Bytes.t -> unit -> account
+  let algo = `Default
 
-val add_account : t -> unit
+  let size = 16
+end)
 
-val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
+module Gen = Generators.Data (struct
+  module Samplers = Full
 
-val find_alternate : Signature.Public_key_hash.t -> t
+  let rng_state = state
 
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    4.000.000.000 tz (if the list is too short); and add them to the
-    global account state *)
+  let target_size = 500
 
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  int ->
-  (t * Tez.t) list
+  let verbosity = `Trace
+end)
 
-val commitment_secret : Blinded_public_key_hash.activation_code
+let start = Unix.gettimeofday ()
 
-val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+let generator = Gen.generator ~burn_in:(200 * 7)
+
+let stop = Unix.gettimeofday ()
+
+let () = Format.printf "Burn in time: %f seconds@." (stop -. start)
+
+let _ =
+  for _i = 0 to 1000 do
+    let (michelson, typ) = StaTz.Stats.sample_gen generator in
+    let printable =
+      Micheline_printer.printable
+        Tezos_protocol_alpha.Protocol.Michelson_v1_primitives.string_of_prim
+        michelson
+    in
+    Format.eprintf "result:@." ;
+    Format.eprintf "type: %a@." Type.Base.pp typ ;
+    Format.eprintf "%a@." Micheline_printer.print_expr printable
+  done

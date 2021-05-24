@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,51 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(* The state of rewriting is a typed term *)
+type t = {typing : Inference.state lazy_t; term : Mikhailsky.node}
 
-type t = {
-  pkh : Signature.Public_key_hash.t;
-  pk : Signature.Public_key.t;
-  sk : Signature.Secret_key.t;
+let compare (term1 : t) (term2 : t) =
+  let tag1 = Mikhailsky.tag term1.term in
+  let tag2 = Mikhailsky.tag term2.term in
+  if tag1 < tag2 then -1 else if tag1 > tag2 then 1 else 0
+
+type node_statistics = {
+  mutable size : int;
+  mutable bytes : int;
+  mutable holes : int;
+  mutable depth : int;
 }
 
-type account = t
+let pp_statistics fmtr stats =
+  Format.fprintf
+    fmtr
+    "{ size = %d ; bytes = %d ; holes = %d }"
+    stats.size
+    stats.bytes
+    stats.holes
 
-val known_accounts : t Signature.Public_key_hash.Table.t
+let rec statistics stats depth (n : Mikhailsky.node) =
+  stats.size <- stats.size + 1 ;
+  stats.depth <- max depth stats.depth ;
+  match n with
+  | Micheline.Int (_, z) ->
+      stats.bytes <- stats.bytes + (Z.numbits z / 8)
+  | Micheline.String (_, s) ->
+      stats.bytes <- stats.bytes + String.length s
+  | Micheline.Bytes (_, b) ->
+      stats.bytes <- stats.bytes + Bytes.length b
+  | Micheline.Prim (_, Mikhailsky_prim.I_Hole, _, _)
+  | Micheline.Prim (_, Mikhailsky_prim.D_Hole, _, _) ->
+      stats.holes <- stats.holes + 1
+  | Micheline.Prim (_, _, subterms, _) | Micheline.Seq (_, subterms) ->
+      List.iter (statistics stats (depth + 1)) subterms
 
-val activator_account : account
+let statistics {term; _} =
+  let stats = {size = 0; bytes = 0; holes = 0; depth = 0} in
+  statistics stats 0 term ; stats
 
-val dummy_account : account
-
-val new_account : ?seed:Bytes.t -> unit -> account
-
-val add_account : t -> unit
-
-val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
-
-val find_alternate : Signature.Public_key_hash.t -> t
-
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    4.000.000.000 tz (if the list is too short); and add them to the
-    global account state *)
-
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  int ->
-  (t * Tez.t) list
-
-val commitment_secret : Blinded_public_key_hash.activation_code
-
-val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+let pp fmtr (state : t) =
+  Format.fprintf fmtr "current term:@." ;
+  Format.fprintf fmtr "%a@." Mikhailsky.pp state.term ;
+  Format.fprintf fmtr "stats:@." ;
+  Format.fprintf fmtr "%a:@." pp_statistics (statistics state)

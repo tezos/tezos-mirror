@@ -141,6 +141,7 @@ end
 (** [init n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)
 val init :
+  ?rng_state:Random.State.t ->
   ?endorsers_per_block:int ->
   ?with_commitments:bool ->
   ?initial_balances:int64 list ->

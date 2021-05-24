@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,43 +24,70 @@
 (*****************************************************************************)
 
 open Protocol
-open Alpha_context
+open Error_monad
 
-type t = {
-  pkh : Signature.Public_key_hash.t;
-  pk : Signature.Public_key.t;
-  sk : Signature.Secret_key.t;
-}
+type context = Alpha_context.context * Script_interpreter.step_constants
 
-type account = t
+let context_init_memory ~rng_state =
+  Context.init
+    ~rng_state
+    ~initial_balances:
+      [ 4_000_000_000_000L;
+        4_000_000_000_000L;
+        4_000_000_000_000L;
+        4_000_000_000_000L;
+        4_000_000_000_000L ]
+    5
+  >>=? fun (block, accounts) ->
+  match accounts with
+  | [bs1; bs2; bs3; bs4; bs5] ->
+      return (`Mem_block (block, (bs1, bs2, bs3, bs4, bs5)))
+  | _ ->
+      assert false
 
-val known_accounts : t Signature.Public_key_hash.Table.t
+let context_init ~rng_state = context_init_memory ~rng_state
 
-val activator_account : account
-
-val dummy_account : account
-
-val new_account : ?seed:Bytes.t -> unit -> account
-
-val add_account : t -> unit
-
-val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
-
-val find_alternate : Signature.Public_key_hash.t -> t
-
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    4.000.000.000 tz (if the list is too short); and add them to the
-    global account state *)
-
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  int ->
-  (t * Tez.t) list
-
-val commitment_secret : Blinded_public_key_hash.activation_code
-
-val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+let make ~rng_state =
+  context_init_memory ~rng_state
+  >>=? fun context ->
+  let open Script_interpreter in
+  ( match context with
+  | `Mem_block (block, (bs1, bs2, bs3, _, _)) ->
+      let source = bs1 in
+      let payer = bs2 in
+      let self = bs3 in
+      let step_constants =
+        {
+          source;
+          payer;
+          self;
+          amount = Alpha_context.Tez.one;
+          chain_id = Chain_id.zero;
+        }
+      in
+      return (block, step_constants)
+  | `Disk_block (block, source) ->
+      let step_constants =
+        {
+          source;
+          payer = source;
+          self = source;
+          amount = Alpha_context.Tez.one;
+          chain_id = Chain_id.zero;
+        }
+      in
+      return (block, step_constants) )
+  >>=? fun (block, step_constants) ->
+  Incremental.begin_construction
+    ~priority:0
+    ~timestamp:(Time.Protocol.add block.header.shell.timestamp 30L)
+    block
+  >>=? fun vs ->
+  let ctxt = Incremental.alpha_ctxt vs in
+  let ctxt =
+    (* Required for eg Create_contract *)
+    Protocol.Alpha_context.Contract.init_origination_nonce
+      ctxt
+      Operation_hash.zero
+  in
+  return (ctxt, step_constants)

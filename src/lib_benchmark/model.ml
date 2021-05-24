@@ -491,3 +491,74 @@ let trilinear ~coeff1 ~coeff2 ~coeff3 =
     end
   end in
   (module M : Model_impl with type arg_type = int * (int * (int * unit)))
+
+(** A multi-affine model in two parts. The breakpoint [break] indicates the
+    point at which the slope changes coefficient. *)
+let breakdown ~coeff1 ~coeff2 ~break =
+  let module M = struct
+    type arg_type = int * unit
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model =
+        lam ~name:"size"
+        @@ fun size ->
+        (free ~name:coeff1 * max (int 0) (min (int break) size))
+        + (free ~name:coeff2 * max (int 0) (size - int break))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
+
+(** A multi-affine model in three parts, with breakpoints [break1] and [break2].
+    Expects [break1] <= [break2]
+ *)
+let breakdown2 ~coeff1 ~coeff2 ~coeff3 ~break1 ~break2 =
+  assert (break1 <= break2) ;
+  let module M = struct
+    type arg_type = int * unit
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model =
+        lam ~name:"size"
+        @@ fun size ->
+        (free ~name:coeff1 * max (int 0) (min (int break1) size))
+        + (free ~name:coeff2 * max (int 0) (min (int break2) size - int break1))
+        + (free ~name:coeff3 * max (int 0) (size - int break2))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
+
+(** [breakdown2] with a non-zero value at 0 *)
+let breakdown2_const ~coeff1 ~coeff2 ~coeff3 ~const ~break1 ~break2 =
+  assert (break1 <= break2) ;
+  let module M = struct
+    type arg_type = int * unit
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model =
+        lam ~name:"size"
+        @@ fun size ->
+        (free ~name:coeff1 * max (int 0) (min (int break1) size))
+        + (free ~name:coeff2 * max (int 0) (min (int break2) size - int break1))
+        + (free ~name:coeff3 * max (int 0) (size - int break2))
+        + free ~name:const
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)

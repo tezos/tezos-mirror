@@ -58,6 +58,8 @@ unit:009_PsFLoren:
 unit:alpha:
   extends: .unit_test_template
   script:
+    - scripts/test_wrapper.sh src/proto_alpha/lib_benchmark/lib_benchmark_type_inference alpha_lib_benchmark_lib_benchmark_type_inference
+    - scripts/test_wrapper.sh src/proto_alpha/lib_benchmark alpha_lib_benchmark
     - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
     - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
 

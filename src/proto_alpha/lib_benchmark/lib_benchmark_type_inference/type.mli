@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,89 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(** Michelson types, hash-consed. *)
 
-type t = {
-  pkh : Signature.Public_key_hash.t;
-  pk : Signature.Public_key.t;
-  sk : Signature.Secret_key.t;
-}
+(** Base types *)
+module Base : sig
+  type comparable_tag = Comparable | Maybe_not_comparable
 
-type account = t
+  type t = t_node Hashcons.hash_consed
 
-val known_accounts : t Signature.Public_key_hash.Table.t
+  and t_node = private
+    | Unit_t
+    | Var_t of int
+    | Int_t
+    | Nat_t
+    | Bool_t
+    | String_t
+    | Bytes_t
+    | Key_hash_t
+    | Timestamp_t
+    | Mutez_t
+    | Key_t
+    | Option_t of t
+    | Pair_t of t * t
+    | Union_t of t * t
+    | List_t of t
+    | Set_t of t
+    | Map_t of t * t
+    | Lambda_t of t * t
 
-val activator_account : account
+  val pp : Format.formatter -> t -> unit
 
-val dummy_account : account
+  val vars : t -> int list
+end
 
-val new_account : ?seed:Bytes.t -> unit -> account
+(** Stack types *)
+module Stack : sig
+  type t = t_node Hashcons.hash_consed
 
-val add_account : t -> unit
+  and t_node = private Empty_t | Stack_var_t of int | Item_t of Base.t * t
 
-val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
+  val pp : Format.formatter -> t -> unit
 
-val find_alternate : Signature.Public_key_hash.t -> t
+  val vars : t -> int option
+end
 
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    4.000.000.000 tz (if the list is too short); and add them to the
-    global account state *)
+(** Smart constructors *)
+val unit : Base.t
 
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  int ->
-  (t * Tez.t) list
+val var : int -> Base.t
 
-val commitment_secret : Blinded_public_key_hash.activation_code
+val int : Base.t
 
-val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+val nat : Base.t
+
+val bool : Base.t
+
+val string : Base.t
+
+val bytes : Base.t
+
+val key_hash : Base.t
+
+val timestamp : Base.t
+
+val mutez : Base.t
+
+val key : Base.t
+
+val option : Base.t -> Base.t
+
+val pair : Base.t -> Base.t -> Base.t
+
+val union : Base.t -> Base.t -> Base.t
+
+val list : Base.t -> Base.t
+
+val set : Base.t -> Base.t
+
+val map : Base.t -> Base.t -> Base.t
+
+val lambda : Base.t -> Base.t -> Base.t
+
+val empty : Stack.t
+
+val stack_var : int -> Stack.t
+
+val item : Base.t -> Stack.t -> Stack.t

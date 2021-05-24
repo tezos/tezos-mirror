@@ -29,3 +29,9 @@ computing the gas costs in the Tezos protocol.
    :caption: Rewriting Micheline terms
 
    tezos_micheline_rewriting
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Writing your very own benchmarks and models for the Michelson interpreter
+
+   snoop_interpreter

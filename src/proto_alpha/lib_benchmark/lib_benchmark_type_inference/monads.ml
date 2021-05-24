@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,63 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(* Widely used module types. *)
 
-type t = {
-  pkh : Signature.Public_key_hash.t;
-  pk : Signature.Public_key.t;
-  sk : Signature.Secret_key.t;
-}
+module type S = sig
+  type 'a t
 
-type account = t
+  val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
 
-val known_accounts : t Signature.Public_key_hash.Table.t
+  val return : 'a -> 'a t
 
-val activator_account : account
+  val run : 'a t -> 'a
+end
 
-val dummy_account : account
+(* Signature of a state monad. *)
+module type State_sig = sig
+  type state
 
-val new_account : ?seed:Bytes.t -> unit -> account
+  type key
 
-val add_account : t -> unit
+  type value
 
-val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
+  include S with type 'a t = state -> 'a * state
 
-val find_alternate : Signature.Public_key_hash.t -> t
+  val empty : unit -> state
 
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    4.000.000.000 tz (if the list is too short); and add them to the
-    global account state *)
+  val set : key -> value -> unit t
 
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  int ->
-  (t * Tez.t) list
+  val get : key -> value option t
 
-val commitment_secret : Blinded_public_key_hash.activation_code
+  val iter_list : ('a -> unit t) -> 'a list -> unit t
+end
 
-val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+module Make_state_monad (X : Stores.S) :
+  State_sig
+    with type state = X.state
+     and type key = X.key
+     and type value = X.value
+     and type 'a t = X.state -> 'a * X.state = struct
+  include X
+
+  type 'a t = state -> 'a * state
+
+  let ( >>= ) m f s =
+    let (x, s) = m s in
+    f x s
+
+  let return x s = (x, s)
+
+  let run m = fst (m (empty ()))
+
+  let set k v s = ((), set k v s)
+
+  let get k s = (get k s, s)
+
+  let rec iter_list (f : 'a -> unit t) (l : 'a list) =
+    match l with
+    | [] ->
+        return ()
+    | elt :: tl ->
+        f elt >>= fun () -> iter_list f tl
+end

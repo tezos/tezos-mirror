@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,63 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(* Various implementations of Monads.Store_sig *)
 
-type t = {
-  pkh : Signature.Public_key_hash.t;
-  pk : Signature.Public_key.t;
-  sk : Signature.Secret_key.t;
-}
+(* Signature of a persistent store. *)
+module type S = sig
+  type state
 
-type account = t
+  type key
 
-val known_accounts : t Signature.Public_key_hash.Table.t
+  type value
 
-val activator_account : account
+  val empty : unit -> state
 
-val dummy_account : account
+  val set : key -> value -> state -> state
 
-val new_account : ?seed:Bytes.t -> unit -> account
+  val get : key -> state -> value option
 
-val add_account : t -> unit
+  val map : (value -> value) -> state -> state
 
-val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
+  val to_string : state -> string
+end
 
-val find_alternate : Signature.Public_key_hash.t -> t
+module type Map_store_param_sig = sig
+  type key
 
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    4.000.000.000 tz (if the list is too short); and add them to the
-    global account state *)
+  type value
 
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  int ->
-  (t * Tez.t) list
+  val key_to_string : key -> string
 
-val commitment_secret : Blinded_public_key_hash.activation_code
+  val value_to_string : value -> string
+end
 
-val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+(* An implemention of [S] using maps. *)
+module Map (M : Map.S) (V : Map_store_param_sig with type key = M.key) :
+  S with type state = V.value M.t and type key = M.key and type value = V.value =
+struct
+  type state = V.value M.t
+
+  type key = M.key
+
+  type value = V.value
+
+  let empty () = M.empty
+
+  let set = M.add
+
+  let get = M.find_opt
+
+  let map = M.map
+
+  let to_string s =
+    M.fold
+      (fun key node acc ->
+        Printf.sprintf
+          "%s\n%s  |->  %s"
+          acc
+          (V.key_to_string key)
+          (V.value_to_string node))
+      s
+      ""
+end

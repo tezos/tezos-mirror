@@ -182,6 +182,11 @@ opam:tezos-benchmark:
   variables:
     package: tezos-benchmark
 
+opam:tezos-benchmark-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmark-alpha
+
 opam:tezos-benchmark-examples:
   extends: .opam_template
   variables:
@@ -191,6 +196,16 @@ opam:tezos-benchmark-tests:
   extends: .opam_template
   variables:
     package: tezos-benchmark-tests
+
+opam:tezos-benchmark-type-inference-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmark-type-inference-alpha
+
+opam:tezos-benchmarks-proto-alpha:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmarks-proto-alpha
 
 opam:tezos-clic:
   extends: .opam_template

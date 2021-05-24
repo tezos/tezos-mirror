@@ -134,4 +134,12 @@ module Internals : sig
     'a ->
     's ->
     ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+
+  val step :
+    outdated_context * step_constants ->
+    local_gas_counter ->
+    ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
+    'a ->
+    's ->
+    ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 end

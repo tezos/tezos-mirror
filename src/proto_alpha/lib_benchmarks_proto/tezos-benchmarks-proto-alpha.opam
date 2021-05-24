@@ -6,21 +6,22 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
+  "tezos-tooling" { with-test }
   "dune" { >= "1.11" }
   "tezos-base"
   "tezos-benchmark"
-  "tezos-benchmark-examples"
+  "tezos-benchmark-alpha"
+  "tezos-protocol-environment"
+  "tezos-protocol-alpha"
+  "tezos-protocol-alpha-parameters"
   "tezos-shell-benchmarks"
-  "tezos-benchmarks-proto-alpha"
-  "tezos-stdlib-unix"
-  "tezos-clic"
-  "pyml"
-  "pyml-plot"
-  "ocamlgraph"
-  "latex"
+  "tezos-micheline"
+  "tezos-alpha-test-helpers"
+  "tezos-sapling"
+
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `tezos-snoop` binary"
+synopsis: "Tezos/Protocol: protocol benchmarks"

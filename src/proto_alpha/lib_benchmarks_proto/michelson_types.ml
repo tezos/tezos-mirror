@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,43 +24,93 @@
 (*****************************************************************************)
 
 open Protocol
-open Alpha_context
+open Script_typed_ir
 
-type t = {
-  pkh : Signature.Public_key_hash.t;
-  pk : Signature.Public_key.t;
-  sk : Signature.Secret_key.t;
-}
+[@@@ocaml.warning "-32"]
 
-type account = t
+let ( @$ ) x y = Item_t (x, y, None)
 
-val known_accounts : t Signature.Public_key_hash.Table.t
+let bot = Bot_t
 
-val activator_account : account
+let unit = Unit_t None
 
-val dummy_account : account
+let unit_cmp = Unit_key None
 
-val new_account : ?seed:Bytes.t -> unit -> account
+let int_cmp = Int_key None
 
-val add_account : t -> unit
+let string_cmp = String_key None
 
-val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
+(* the type of integers *)
+let int = Int_t None
 
-val find_alternate : Signature.Public_key_hash.t -> t
+(* the type of naturals *)
+let nat = Nat_t None
 
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    4.000.000.000 tz (if the list is too short); and add them to the
-    global account state *)
+(* the type of strings *)
+let string = String_t None
 
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  int ->
-  (t * Tez.t) list
+(* the type of bytes *)
+let bytes = Bytes_t None
 
-val commitment_secret : Blinded_public_key_hash.activation_code
+(* the type of booleans *)
+let bool = Bool_t None
 
-val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+(* the type of mutez *)
+let mutez = Mutez_t None
+
+(* the type of public key *)
+let public_key = Key_t None
+
+(* the type of key hashes *)
+let key_hash = Key_hash_t None
+
+(* the type of signatures *)
+let signature = Signature_t None
+
+(* the type of addresses *)
+let address = Address_t None
+
+(* the type of chain ids *)
+let chain_id = Chain_id_t None
+
+(* the type of timestamps *)
+let timestamp = Timestamp_t None
+
+(* list type constructor *)
+let list x = List_t (x, None)
+
+(* option type constructor *)
+let option x = Option_t (x, None)
+
+(* map type constructor*)
+let map k v = Map_t (k, v, None)
+
+(* map type constructor*)
+let big_map k v = Big_map_t (k, v, None)
+
+(* set type constructor*)
+let set k = Set_t (k, None)
+
+(* pair type constructor*)
+let pair k1 k2 = Pair_t ((k1, None, None), (k2, None, None), None)
+
+(* union type constructor*)
+let union k1 k2 = Union_t ((k1, None), (k2, None), None)
+
+let lambda x y = Lambda_t (x, y, None)
+
+let contract arg_ty = Contract_t (arg_ty, None)
+
+let operation = Operation_t None
+
+let sapling_state memo_size = Sapling_state_t (memo_size, None)
+
+let sapling_transaction memo_size = Sapling_transaction_t (memo_size, None)
+
+let bls12_381_g1 = Bls12_381_g1_t None
+
+let bls12_381_g2 = Bls12_381_g2_t None
+
+let bls12_381_fr = Bls12_381_fr_t None
+
+let ticket ty = Ticket_t (ty, None)

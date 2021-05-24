@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,71 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(* ------------------------------------------------------------------------- *)
 
 type t = {
-  pkh : Signature.Public_key_hash.t;
-  pk : Signature.Public_key.t;
-  sk : Signature.Secret_key.t;
+  int_size : Base_samplers.range;
+  string_size : Base_samplers.range;
+  bytes_size : Base_samplers.range;
+  stack_size : Base_samplers.range;
+  type_depth : Base_samplers.range;
+  list_size : Base_samplers.range;
+  set_size : Base_samplers.range;
+  map_size : Base_samplers.range;
 }
 
-type account = t
+let encoding =
+  let open Data_encoding in
+  let range = Base_samplers.range_encoding in
+  conv
+    (fun { int_size;
+           string_size;
+           bytes_size;
+           stack_size;
+           type_depth;
+           list_size;
+           set_size;
+           map_size } ->
+      ( int_size,
+        string_size,
+        bytes_size,
+        stack_size,
+        type_depth,
+        list_size,
+        set_size,
+        map_size ))
+    (fun ( int_size,
+           string_size,
+           bytes_size,
+           stack_size,
+           type_depth,
+           list_size,
+           set_size,
+           map_size ) ->
+      {
+        int_size;
+        string_size;
+        bytes_size;
+        stack_size;
+        type_depth;
+        list_size;
+        set_size;
+        map_size;
+      })
+    (obj8
+       (req "int_size" range)
+       (req "string_size" range)
+       (req "bytes_size" range)
+       (req "stack_size" range)
+       (req "michelson_type_depth" range)
+       (req "list_size" range)
+       (req "set_size" range)
+       (req "map_size" range))
 
-val known_accounts : t Signature.Public_key_hash.Table.t
+module type S = sig
+  val parameters : t
 
-val activator_account : account
+  val size : int
 
-val dummy_account : account
-
-val new_account : ?seed:Bytes.t -> unit -> account
-
-val add_account : t -> unit
-
-val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
-
-val find_alternate : Signature.Public_key_hash.t -> t
-
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    4.000.000.000 tz (if the list is too short); and add them to the
-    global account state *)
-
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  int ->
-  (t * Tez.t) list
-
-val commitment_secret : Blinded_public_key_hash.activation_code
-
-val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+  val algo : [`Algo of Signature.algo | `Default]
+end

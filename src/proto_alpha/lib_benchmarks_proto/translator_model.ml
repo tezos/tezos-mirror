@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+let gas_full t_kind code_or_data =
+  let name =
+    Format.asprintf
+      "%a_%a"
+      Translator_workload.pp_kind
+      t_kind
+      Translator_workload.pp_code_or_data
+      code_or_data
+  in
+  let intercept = Free_variable.of_string (Format.asprintf "%s_const" name) in
+  let coeff = Free_variable.of_string (Format.asprintf "%s_coeff" name) in
+  Model.affine ~intercept ~coeff
 
-type t = {
-  pkh : Signature.Public_key_hash.t;
-  pk : Signature.Public_key.t;
-  sk : Signature.Secret_key.t;
-}
+let size_full t_kind code_or_data =
+  let name =
+    Format.asprintf
+      "%a_%a"
+      Translator_workload.pp_kind
+      t_kind
+      Translator_workload.pp_code_or_data
+      code_or_data
+  in
+  let coeff1 = Free_variable.of_string (Format.asprintf "%s_traversal" name) in
+  let coeff2 = Free_variable.of_string (Format.asprintf "%s_int_bytes" name) in
+  let coeff3 =
+    Free_variable.of_string (Format.asprintf "%s_string_bytes" name)
+  in
+  Model.trilinear ~coeff1 ~coeff2 ~coeff3
 
-type account = t
+let gas_based_model t_kind code_or_data =
+  Model.make
+    ~conv:(function
+      | Translator_workload.Typechecker_workload {consumed; _} -> (consumed, ()))
+    ~model:(gas_full t_kind code_or_data)
 
-val known_accounts : t Signature.Public_key_hash.Table.t
-
-val activator_account : account
-
-val dummy_account : account
-
-val new_account : ?seed:Bytes.t -> unit -> account
-
-val add_account : t -> unit
-
-val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
-
-val find_alternate : Signature.Public_key_hash.t -> t
-
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    4.000.000.000 tz (if the list is too short); and add them to the
-    global account state *)
-
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  int ->
-  (t * Tez.t) list
-
-val commitment_secret : Blinded_public_key_hash.activation_code
-
-val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+let size_based_model t_kind code_or_data =
+  Model.make
+    ~conv:(function
+      | Translator_workload.Typechecker_workload {micheline_size; _} -> (
+        match micheline_size with
+        | {traversal; int_bytes; string_bytes} ->
+            (traversal, (int_bytes, (string_bytes, ()))) ))
+    ~model:(size_full t_kind code_or_data)

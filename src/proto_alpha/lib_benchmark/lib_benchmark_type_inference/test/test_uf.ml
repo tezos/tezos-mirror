@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,62 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+open Tezos_benchmark_type_inference_alpha
 
-type t = {
-  pkh : Signature.Public_key_hash.t;
-  pk : Signature.Public_key.t;
-  sk : Signature.Secret_key.t;
-}
+let _ =
+  print_newline () ;
+  Printf.printf "Testing union-find algorithm\n"
 
-type account = t
+module UF = Uf.UF
 
-val known_accounts : t Signature.Public_key_hash.Table.t
+let test =
+  let open UF.M in
+  UF.add 0
+  >>= fun () ->
+  UF.add 1
+  >>= fun () ->
+  UF.add 2
+  >>= fun () ->
+  UF.add 3
+  >>= fun () ->
+  UF.add 4
+  >>= fun () ->
+  UF.find 0
+  >>= fun v0_repr ->
+  UF.find 1
+  >>= fun v1_repr ->
+  assert (v0_repr <> v1_repr) ;
+  UF.union 0 1
+  >>= fun _ ->
+  UF.find 0
+  >>= fun v0_repr ->
+  UF.find 1
+  >>= fun v1_repr ->
+  UF.find 2
+  >>= fun v2_repr ->
+  assert (v0_repr = v1_repr) ;
+  assert (v0_repr <> v2_repr) ;
+  UF.union 2 3
+  >>= fun _ ->
+  UF.union 0 3
+  >>= fun _ ->
+  UF.find 1
+  >>= fun v1_repr ->
+  UF.find 2
+  >>= fun v2_repr ->
+  UF.find 3
+  >>= fun v3_repr ->
+  UF.find 4
+  >>= fun v4_repr ->
+  assert (v1_repr = v2_repr) ;
+  UF.union 4 4
+  >>= fun _ ->
+  assert (v3_repr <> v4_repr) ;
+  UF.show
+  >>= fun s ->
+  Printf.printf "UF state:%s\n" s ;
+  return ()
 
-val activator_account : account
+let () = UF.M.run test
 
-val dummy_account : account
-
-val new_account : ?seed:Bytes.t -> unit -> account
-
-val add_account : t -> unit
-
-val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
-
-val find_alternate : Signature.Public_key_hash.t -> t
-
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    4.000.000.000 tz (if the list is too short); and add them to the
-    global account state *)
-
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  int ->
-  (t * Tez.t) list
-
-val commitment_secret : Blinded_public_key_hash.activation_code
-
-val new_commitment :
-  ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+let _ = Printf.printf "Success.\n"
