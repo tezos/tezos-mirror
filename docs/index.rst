@@ -174,6 +174,7 @@ in the :ref:`introduction <howtoget>`.
    :caption: Developer Tutorials:
 
    developer/rpc
+   developer/encodings
    developer/data_encoding
    developer/error_monad
    developer/michelson_anti_patterns
