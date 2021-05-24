@@ -485,9 +485,12 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                                Operation_hash.Set.add op.hash pv.in_mempool ;
                              Lwt.return_ok
                                (new_acc_validation_state, new_mempool, limit))
-                           else
+                           else (
+                             Distributed_db.Operation.clear_or_cancel
+                               pv.chain_db
+                               oph ;
                              Lwt.return_ok
-                               (acc_validation_state, acc_mempool, limit)
+                               (acc_validation_state, acc_mempool, limit))
                        | Branch_delayed errors ->
                            handle_branch_delayed pv op.raw op.hash errors ;
                            Lwt.return_ok
@@ -770,7 +773,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             (* TODO: should this have an influence on the peer's score ? *)
             pv.pending <- Operation_hash.Map.add oph op pv.pending ;
             return_unit
-        | false -> return_unit
+        | false ->
+            Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+            return_unit
 
     let on_inject _w pv op =
       let oph = Operation.hash op in
