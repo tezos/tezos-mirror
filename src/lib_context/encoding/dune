@@ -3,6 +3,6 @@
  (public_name tezos-context.encoding)
  (libraries tezos-base
             irmin
-            irmin.mem)
+            irmin-pack)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib)))

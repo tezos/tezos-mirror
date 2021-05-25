@@ -4,6 +4,7 @@
  (libraries tezos-base
             tezos-context.encoding
             tezos-context.sigs
-            irmin)
+            irmin
+            irmin-pack)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib)))
