@@ -1127,6 +1127,8 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       else
         let operation = unslotted (* shadow the slot box *) in
         let block = operation.shell.branch in
+        Baking.check_endorsement_rights ctxt chain_id operation ~slot
+        >>=? fun (delegate, slots, used) ->
         error_unless
           (Block_hash.equal block pred_block)
           (Wrong_endorsement_predecessor (pred_block, block))
@@ -1136,8 +1138,6 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           Raw_level.(succ level = current_level)
           Invalid_endorsement_level
         >>?= fun () ->
-        Baking.check_endorsement_rights ctxt chain_id operation ~slot
-        >>=? fun (delegate, slots, used) ->
         if used then fail (Duplicate_endorsement delegate)
         else
           let ctxt = record_endorsement ctxt delegate in
