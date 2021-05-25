@@ -58,3 +58,6 @@ val fold_left : ('a -> char -> 'a) -> 'a -> string -> 'a
 
 (** Test whether a string is a valid hexadecimal value *)
 val is_hex : string -> bool
+
+(** Pretty print bytes as hexadecimal string. *)
+val pp_bytes_hex : Format.formatter -> bytes -> unit

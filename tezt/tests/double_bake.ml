@@ -41,34 +41,19 @@ let is_operation_in_applied_mempool mempool oph =
   List.exists (fun e -> e |-> "hash" |> as_string = oph) applied_list
 
 (* Matches events where the message is of the form:
-   "Double baking evidence injected <operation_hash>".
+   "double baking evidence injected <operation_hash>".
    For example:
 
     "event": {
-      "legacy_logging_event-alpha-baking-denunciation.v0": {
-        "message": "Double baking evidence injected onkfjSun49iRrGtuN9FwtiCqDAEgzPKzg1BSa7BSHnaAkButUxx",
-        "section": [
-          "alpha",
-          "baking",
-          "denunciation"
-        ],
-        "level": "notice",
-        "tags": "{(tag:Operation_hash onkfjSun49iRrGtuN9FwtiCqDAEgzPKzg1BSa7BSHnaAkButUxx)\n (tag:signed_operation\n  aede0aa...000000)\n (tag:event double_baking_denounced)}"
+      "double_baking_denounced.v0": {
+        "hash": "onkfjSun49iRrGtuN9FwtiCqDAEgzPKzg1BSa7BSHnaAkButUxx",
+        "bytes": "..."
       }
     }
  *)
 let wait_for_denunciation accuser =
-  let filter json =
-    match JSON.(json |-> "message" |> as_string_opt) with
-    | Some s ->
-        s =~* rex "Double baking evidence injected (\\S*)$"
-    | None ->
-        None
-  in
-  Accuser.wait_for
-    accuser
-    "legacy_logging_event-alpha-baking-denunciation.v0"
-    filter
+  let filter json = JSON.(json |-> "hash" |> as_string_opt) in
+  Accuser.wait_for accuser "double_baking_denounced.v0" filter
 
 (* Matches events which contain an injection request.
    For example:

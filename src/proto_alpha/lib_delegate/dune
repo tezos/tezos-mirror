@@ -10,6 +10,7 @@
             tezos-client-base
             tezos-client-alpha
             tezos-client-commands
+            tezos-stdlib
             tezos-stdlib-unix
             tezos-context
             tezos-rpc-http
@@ -27,6 +28,7 @@
                    -open Tezos_client_base
                    -open Tezos_client_alpha
                    -open Tezos_client_commands
+                   -open Tezos_stdlib
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_context
                    -open Tezos_context
