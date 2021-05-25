@@ -34,12 +34,20 @@
 open Protocol
 open Test_tez
 
-(* The script hash of https://gitlab.com/dexter2tz/dexter2tz/-/blob/liquidity_baking/dexter.liquidity_baking.mligo.tz *)
+(* The script hash of
+
+   https://gitlab.com/dexter2tz/dexter2tz/-/blob/d98643881fe14996803997f1283e84ebd2067e35/dexter.liquidity_baking.mligo.tz
+
+*)
 let expected_cpmm_hash =
   Script_expr_hash.of_b58check_exn
     "exprvEBYbxZruLZ9aUDEC9cUxn5KUj361xsaZXGfCxogFoKQ1er9Np"
 
-(* The script hash of https://gitlab.com/dexter2tz/dexter2tz/-/blob/liquidity_baking/lqt_fa12.mligo.tz *)
+(* The script hash of
+
+   https://gitlab.com/dexter2tz/dexter2tz/-/blob/d98643881fe14996803997f1283e84ebd2067e35/lqt_fa12.mligo.tz
+
+*)
 let expected_lqt_hash =
   Script_expr_hash.of_b58check_exn
     "exprufAK15C2FCbxGLCEVXFe26p3eQdYuwZRk1morJUwy9NBUmEZVB"
