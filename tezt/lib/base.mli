@@ -41,6 +41,13 @@ val ( let* ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 (** Same as [Lwt.both]. *)
 val ( and* ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 
+(** Same as [Lwt.both], but immediately propagate exceptions.
+
+    More precisely, if one of the two promises is rejected
+    or canceled, cancel the other promise and reject the resulting
+    promise immediately with the original exception. *)
+val ( and*! ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+
 (** Same as [Lwt.return]. *)
 val return : 'a -> 'a Lwt.t
 

@@ -297,8 +297,8 @@ module Make (X : PARAMETERS) = struct
                 stdout_loop ())
       in
       let* () = event_loop ()
-      and* () = stdout_loop ()
-      and* () =
+      and*! () = stdout_loop ()
+      and*! () =
         let* process_status = Process.wait process in
         (* Setting [daemon.status] to [Not_running] stops the event loop cleanly. *)
         daemon.status <- Not_running ;
