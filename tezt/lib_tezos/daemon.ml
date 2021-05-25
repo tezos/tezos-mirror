@@ -161,10 +161,9 @@ module Make (X : PARAMETERS) = struct
     }
 
   let handle_raw_event daemon line =
-    let open JSON in
-    let json = parse ~origin:("event from " ^ daemon.name) line in
-    let event = json |-> "fd-sink-item.v0" |-> "event" in
-    match as_object_opt event with
+    let json = JSON.parse ~origin:("event from " ^ daemon.name) line in
+    let event = JSON.(json |-> "fd-sink-item.v0" |-> "event") in
+    match JSON.as_object_opt event with
     | None | Some ([] | _ :: _ :: _) ->
         (* Some events are not one-field objects. Ignore them for now. *)
         ()
