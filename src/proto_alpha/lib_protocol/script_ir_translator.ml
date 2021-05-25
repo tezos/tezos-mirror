@@ -336,33 +336,26 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
     | Signature_key _ ->
         fun x y -> (apply [@tailcall]) (Signature.compare x y) k
     | String_key _ ->
-        fun x y ->
-          (apply [@tailcall]) (Compare.String.compare x y) k
+        fun x y -> (apply [@tailcall]) (Compare.String.compare x y) k
     | Bool_key _ ->
-        fun x y ->
-          (apply [@tailcall]) (Compare.Bool.compare x y) k
+        fun x y -> (apply [@tailcall]) (Compare.Bool.compare x y) k
     | Mutez_key _ ->
         fun x y -> (apply [@tailcall]) (Tez.compare x y) k
     | Key_hash_key _ ->
         fun x y ->
-          (apply [@tailcall])
-            (Signature.Public_key_hash.compare x y)
-            k
+          (apply [@tailcall]) (Signature.Public_key_hash.compare x y) k
     | Key_key _ ->
-        fun x y ->
-          (apply [@tailcall]) (Signature.Public_key.compare x y) k
+        fun x y -> (apply [@tailcall]) (Signature.Public_key.compare x y) k
     | Int_key _ ->
         fun x y -> (apply [@tailcall]) (Script_int.compare x y) k
     | Nat_key _ ->
         fun x y -> (apply [@tailcall]) (Script_int.compare x y) k
     | Timestamp_key _ ->
-        fun x y ->
-          (apply [@tailcall]) (Script_timestamp.compare x y) k
+        fun x y -> (apply [@tailcall]) (Script_timestamp.compare x y) k
     | Address_key _ ->
         fun x y -> (apply [@tailcall]) (compare_address x y) k
     | Bytes_key _ ->
-        fun x y ->
-          (apply [@tailcall]) (Compare.Bytes.compare x y) k
+        fun x y -> (apply [@tailcall]) (Compare.Bytes.compare x y) k
     | Chain_id_key _ ->
         fun x y -> (apply [@tailcall]) (Chain_id.compare x y) k
     | Pair_key ((tl, _), (tr, _), _) ->
@@ -404,7 +397,7 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
         (* ret <> 0, we perform an early exit *)
         if Compare.Int.(ret > 0) then 1 else -1
   in
-  fun t x y -> compare_comparable t Compare_comparable_return x y
+  fun t -> compare_comparable t Compare_comparable_return
 
 let empty_set : type a. a comparable_ty -> a set =
  fun ty ->
@@ -2153,14 +2146,7 @@ and parse_ty :
     from another contract with `PUSH t id` or `UNPACK`.
   *)
   | Prim (loc, T_big_map, args, annot) when allow_lazy_storage ->
-      parse_big_map_ty
-        ctxt
-        ~stack_depth:(stack_depth + 1)
-        ~legacy
-        loc
-        args
-        annot
-      >>? fun (big_map_ty, ctxt) -> ok (big_map_ty, ctxt)
+      (parse_big_map_ty [@tailcall]) ctxt ~stack_depth ~legacy loc args annot
   | Prim (loc, T_sapling_state, [memo_size], annot) when allow_lazy_storage ->
       parse_type_annot loc annot
       >>? fun ty_name ->
@@ -2248,7 +2234,7 @@ and parse_big_map_ty ctxt ~stack_depth ~legacy big_map_loc args map_annot =
       error @@ Invalid_arity (big_map_loc, T_big_map, 2, List.length args)
 
 and parse_big_map_value_ty ctxt ~stack_depth ~legacy value_ty =
-  parse_ty
+  (parse_ty [@tailcall])
     ctxt
     ~stack_depth
     ~legacy
@@ -2259,8 +2245,12 @@ and parse_big_map_value_ty ctxt ~stack_depth ~legacy value_ty =
     value_ty
 
 and parse_storage_ty :
-    context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult =
- fun ctxt ~legacy node ->
+    context ->
+    stack_depth:int ->
+    legacy:bool ->
+    Script.node ->
+    (ex_ty * context) tzresult =
+ fun ctxt ~stack_depth ~legacy node ->
   match node with
   | Prim
       ( loc,
@@ -2270,18 +2260,28 @@ and parse_storage_ty :
     when legacy -> (
     match storage_annot with
     | [] ->
-        parse_normal_storage_ty ctxt ~stack_depth:0 ~legacy node
+        parse_normal_storage_ty ctxt ~stack_depth ~legacy node
     | [single]
       when Compare.Int.(String.length single > 0)
            && Compare.Char.(single.[0] = '%') ->
-        parse_normal_storage_ty ctxt ~stack_depth:0 ~legacy node
+        parse_normal_storage_ty ctxt ~stack_depth ~legacy node
     | _ ->
         (* legacy semantics of big maps used the wrong annotation parser *)
         Gas.consume ctxt Typecheck_costs.parse_type_cycle
         >>? fun ctxt ->
-        parse_big_map_ty ctxt ~stack_depth:0 ~legacy big_map_loc args map_annot
+        parse_big_map_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          big_map_loc
+          args
+          map_annot
         >>? fun (Ex_ty big_map_ty, ctxt) ->
-        parse_normal_storage_ty ctxt ~stack_depth:0 ~legacy remaining_storage
+        parse_normal_storage_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          remaining_storage
         >>? fun (Ex_ty remaining_storage, ctxt) ->
         parse_composed_type_annot loc storage_annot
         >>? fun (ty_name, map_field, storage_field) ->
@@ -3210,7 +3210,14 @@ let rec parse_data :
         ( parse_address ctxt expr
         >>?= fun ((c, entrypoint), ctxt) ->
         let loc = location expr in
-        parse_contract ~legacy ctxt loc ty c ~entrypoint
+        parse_contract
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          ctxt
+          loc
+          ty
+          c
+          ~entrypoint
         >|=? fun (ctxt, _) -> ((ty, (c, entrypoint)), ctxt) )
   (* Pairs *)
   | (Pair_t ((tl, _, _), (tr, _, _), _), expr) ->
@@ -5579,7 +5586,11 @@ and parse_instr :
       >>?= fun () ->
       record_trace
         (Ill_formed_type (Some "storage", canonical_code, location storage_type))
-        (parse_storage_ty ctxt ~legacy storage_type)
+        (parse_storage_ty
+           ctxt
+           ~stack_depth:(stack_depth + 1)
+           ~legacy
+           storage_type)
       >>?= fun (Ex_ty storage_type, ctxt) ->
       let arg_annot =
         default_annot
@@ -6309,6 +6320,7 @@ and parse_instr :
 
 and parse_contract :
     type arg.
+    stack_depth:int ->
     legacy:bool ->
     context ->
     Script.location ->
@@ -6316,7 +6328,7 @@ and parse_contract :
     Contract.t ->
     entrypoint:string ->
     (context * arg typed_contract) tzresult Lwt.t =
- fun ~legacy ctxt loc arg contract ~entrypoint ->
+ fun ~stack_depth ~legacy ctxt loc arg contract ~entrypoint ->
   Gas.consume ctxt Typecheck_costs.contract_exists
   >>?= fun ctxt ->
   Contract.exists ctxt contract
@@ -6346,7 +6358,11 @@ and parse_contract :
           >>? fun (code, ctxt) ->
           parse_toplevel ~legacy:true code
           >>? fun (arg_type, _, _, root_name) ->
-          parse_parameter_ty ctxt ~stack_depth:0 ~legacy:true arg_type
+          parse_parameter_ty
+            ctxt
+            ~stack_depth:(stack_depth + 1)
+            ~legacy:true
+            arg_type
           >>? fun (Ex_ty targ, ctxt) ->
           find_entrypoint_for_type
             ~legacy
@@ -6572,7 +6588,7 @@ let parse_code :
   >>?= fun () ->
   record_trace
     (Ill_formed_type (Some "storage", code, location storage_type))
-    (parse_storage_ty ctxt ~legacy storage_type)
+    (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
   let arg_annot =
     default_annot
@@ -6677,7 +6693,7 @@ let typecheck_code :
   >>?= fun () ->
   record_trace
     (Ill_formed_type (Some "storage", code, location storage_type))
-    (parse_storage_ty ctxt ~legacy storage_type)
+    (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
   let arg_annot =
     default_annot
@@ -6995,7 +7011,7 @@ and unparse_code ctxt ~stack_depth mode code =
   in
   match code with
   | Prim (loc, I_PUSH, [ty; data], annot) ->
-      parse_packable_ty ctxt ~stack_depth ~legacy ty
+      parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty
       >>?= fun (Ex_ty t, ctxt) ->
       let allow_forged =
         false
@@ -7610,6 +7626,9 @@ let parse_instr :
 let unparse_data = unparse_data ~stack_depth:0
 
 let unparse_code = unparse_code ~stack_depth:0
+
+let parse_contract ~legacy context loc arg_ty contract ~entrypoint =
+  parse_contract ~stack_depth:0 ~legacy context loc arg_ty contract ~entrypoint
 
 let parse_big_map_value_ty = parse_big_map_value_ty ~stack_depth:0
 
