@@ -204,11 +204,56 @@ module TestFilterMap = struct
   let tests = [filter_map; filter_map_e; filter_map_s; filter_map_es]
 end
 
+(* First-4: testing equivalence of map* *)
+module TestMap = struct
+  open QCheck
+  open Monad
+
+  let map =
+    Test.make
+      ~name:"{Option,List([01])}.map"
+      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (fun (Fun (_, fn), const, input) ->
+        eq
+          (Option.map (MapOf.fn const fn) input)
+          (List.map (MapOf.fn const fn) (Option.to_list input) |> List.hd))
+
+  let map_e =
+    Test.make
+      ~name:"{Option,List([01])}.map_e"
+      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (fun (Fun (_, fn), const, input) ->
+        eq
+          (Option.map_e (MapEOf.fn const fn) input)
+          (List.map_e (MapEOf.fn const fn) (Option.to_list input) >|? List.hd))
+
+  let map_s =
+    Test.make
+      ~name:"{Option,List([01])}.map_s"
+      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (fun (Fun (_, fn), const, input) ->
+        eq
+          (Option.map_s (MapSOf.fn const fn) input)
+          (List.map_s (MapSOf.fn const fn) (Option.to_list input) >|= List.hd))
+
+  let map_es =
+    Test.make
+      ~name:"{Option,List([01])}.map_es"
+      (triple Test_fuzzing_helpers.Fn.arith one maybe)
+      (fun (Fun (_, fn), const, input) ->
+        eq
+          (Option.map_es (MapESOf.fn const fn) input)
+          ( List.map_es (MapESOf.fn const fn) (Option.to_list input)
+          >|=? List.hd ))
+
+  let tests = [map; map_e; map_s; map_es]
+end
+
 let () =
   let tests =
     [ ("iter*", Lib_test.Qcheck_helpers.qcheck_wrap TestIter.tests);
       ("filter*", Lib_test.Qcheck_helpers.qcheck_wrap TestFilter.tests);
-      ("filter_map*", Lib_test.Qcheck_helpers.qcheck_wrap TestFilterMap.tests)
-    ]
+      ("filter_map*", Lib_test.Qcheck_helpers.qcheck_wrap TestFilterMap.tests);
+      ("map*", Lib_test.Qcheck_helpers.qcheck_wrap TestIter.tests) ]
   in
   Alcotest.run "Option" tests
