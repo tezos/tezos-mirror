@@ -141,7 +141,7 @@ let freeze_rolls_for_cycle ctxt cycle =
         Storage.Roll.Owner.delete_snapshot ctxt (cycle, index) >>= fun ctxt ->
         Storage.Roll.Last_for_snapshot.remove_existing (ctxt, cycle) index)
     ctxt
-    Misc.(0 --> (max_index - 1))
+    (0 --> (max_index - 1))
 
 (* Roll selection *)
 module Random = struct
