@@ -92,6 +92,49 @@ let fold_s ~none ~some = function None -> Lwt.return none | Some v -> some v
 
 let fold_f ~none ~some = function None -> none () | Some v -> some v
 
+let filter p o = match o with Some x when p x -> o | Some _ | None -> None
+
+let filter_s p o =
+  match o with
+  | None ->
+      none_s
+  | Some x -> (
+      p x >>= function true -> Lwt.return o | false -> none_s )
+
+let filter_e p o =
+  match o with
+  | None ->
+      none_e
+  | Some x -> (
+      p x >>? function true -> Ok o | false -> none_e )
+
+let filter_es p o =
+  match o with
+  | None ->
+      none_es
+  | Some x -> (
+      p x >>=? function true -> Monad.return o | false -> none_es )
+
+let filter_map f o = bind o f
+
+let filter_map_s f o = match o with None -> none_s | Some x -> f x
+
+let filter_map_e f o = match o with None -> none_e | Some x -> f x
+
+let filter_map_es f o = match o with None -> none_es | Some x -> f x
+
+let filter_ok = function
+  | Some (Ok x) ->
+      Some x
+  | Some (Error _) | None ->
+      None
+
+let filter_error = function
+  | Some (Error x) ->
+      Some x
+  | Some (Ok _) | None ->
+      None
+
 let iter_s f = function None -> Lwt.return_unit | Some v -> f v
 
 let iter_e f = function None -> Ok () | Some v -> f v

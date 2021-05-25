@@ -117,6 +117,53 @@ module type S = sig
 
   val fold_f : none:(unit -> 'a) -> some:('b -> 'a) -> 'b option -> 'a
 
+  (** [filter p o] is [Some x] iff [o] is [Some x] and [p o] is [true].
+
+      In other words, [filter] is like [List.filter] if [option] is the type of
+      lists of either zero or one elements. In fact, the following equality
+      holds for all [p] and for all [o]:
+      [Option.filter p o = List.hd (List.filter p (Option.to_list o))]
+
+      The other [filter] variants below are also equivalent to their [List]
+      counterpart and a similar equality holds. *)
+  val filter : ('a -> bool) -> 'a option -> 'a option
+
+  (** [filter_map] is the [Option] counterpart to [List]'s [filter_map].
+      Incidentally, [filter_map f o] is also [bind o f]. *)
+  val filter_map : ('a -> 'b option) -> 'a option -> 'b option
+
+  (** [filter_s] is [filter] where the predicate returns a promise. *)
+  val filter_s : ('a -> bool Lwt.t) -> 'a option -> 'a option Lwt.t
+
+  (** [filter_map_s] is [filter_map] where the function returns a promise. *)
+  val filter_map_s : ('a -> 'b option Lwt.t) -> 'a option -> 'b option Lwt.t
+
+  (** [filter_e] is [filter] where the predicate returns a [result]. *)
+  val filter_e :
+    ('a -> (bool, 'e) result) -> 'a option -> ('a option, 'e) result
+
+  (** [filter_map_e] is [filter_map] where the function returns a [result]. *)
+  val filter_map_e :
+    ('a -> ('b option, 'e) result) -> 'a option -> ('b option, 'e) result
+
+  (** [filter_es] is [filter] where the predicate returns a promise of a [result]. *)
+  val filter_es :
+    ('a -> (bool, 'e) result Lwt.t) ->
+    'a option ->
+    ('a option, 'e) result Lwt.t
+
+  (** [filter_map_es] is [filter_map] where the function returns a promise of a [result]. *)
+  val filter_map_es :
+    ('a -> ('b option, 'e) result Lwt.t) ->
+    'a option ->
+    ('b option, 'e) result Lwt.t
+
+  (** [filter_ok o] is [Some x] iff [o] is [Some (Ok x)]. *)
+  val filter_ok : ('a, 'e) result option -> 'a option
+
+  (** [filter_error o] is [Some x] iff [o] is [Some (Error x)]. *)
+  val filter_error : ('a, 'e) result option -> 'e option
+
   val iter : ('a -> unit) -> 'a option -> unit
 
   val iter_s : ('a -> unit Lwt.t) -> 'a option -> unit Lwt.t

@@ -27,6 +27,8 @@ open Support.Lib
 open Test_fuzzing_helpers
 
 (* First series of tests: testing equivalence with size-1 lists *)
+
+(* First-1: testing equivalence of iter* *)
 module TestIter = struct
   open QCheck
   open Monad
@@ -83,8 +85,130 @@ module TestIter = struct
   let tests = [iter; iter_e; iter_s; iter_es]
 end
 
+(* First-2: testing equivalence of filter* *)
+module TestFilter = struct
+  open QCheck
+  open Monad
+
+  let filter =
+    Test.make
+      ~name:"{Option,List([01])}.filter"
+      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (fun (fn, const, input) ->
+        eq
+          (Option.filter (CondOf.fn fn const) input)
+          (List.filter (CondOf.fn fn const) (Option.to_list input) |> List.hd))
+
+  let filter_e =
+    Test.make
+      ~name:"{Option,List([01])}.filter_e"
+      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (fun (fn, const, input) ->
+        eq_e
+          (Option.filter_e (CondEOf.fn fn const) input)
+          ( List.filter_e (CondEOf.fn fn const) (Option.to_list input)
+          >|? List.hd ))
+
+  let filter_s =
+    Test.make
+      ~name:"{Option,List([01])}.filter_s"
+      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (fun (fn, const, input) ->
+        eq_s
+          (Option.filter_s (CondSOf.fn fn const) input)
+          ( List.filter_s (CondSOf.fn fn const) (Option.to_list input)
+          >|= List.hd ))
+
+  let filter_es =
+    Test.make
+      ~name:"{Option,List([01])}.filter_es"
+      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (fun (fn, const, input) ->
+        eq_es
+          (Option.filter_es (CondESOf.fn fn const) input)
+          ( List.filter_es (CondESOf.fn fn const) (Option.to_list input)
+          >|=? List.hd ))
+
+  let tests = [filter; filter_e; filter_s; filter_es]
+end
+
+(* First-3: testing equivalence of filter_map* *)
+module TestFilterMap = struct
+  open QCheck
+  open Monad
+
+  let filter_map =
+    Test.make
+      ~name:"{Option,List([01])}.filter_map"
+      (quad
+         Test_fuzzing_helpers.Fn.pred
+         Test_fuzzing_helpers.Fn.arith
+         one
+         maybe)
+      (fun (pred, Fun (_, arith), const, input) ->
+        eq
+          (Option.filter_map (FilterMapOf.fns pred arith const) input)
+          ( List.filter_map
+              (FilterMapOf.fns pred arith const)
+              (Option.to_list input)
+          |> List.hd ))
+
+  let filter_map_e =
+    Test.make
+      ~name:"{Option,List([01])}.filter_map_e"
+      (quad
+         Test_fuzzing_helpers.Fn.pred
+         Test_fuzzing_helpers.Fn.arith
+         one
+         maybe)
+      (fun (pred, Fun (_, arith), const, input) ->
+        eq_e
+          (Option.filter_map_e (FilterMapEOf.fns pred arith const) input)
+          ( List.filter_map_e
+              (FilterMapEOf.fns pred arith const)
+              (Option.to_list input)
+          >|? List.hd ))
+
+  let filter_map_s =
+    Test.make
+      ~name:"{Option,List([01])}.filter_map_s"
+      (quad
+         Test_fuzzing_helpers.Fn.pred
+         Test_fuzzing_helpers.Fn.arith
+         one
+         maybe)
+      (fun (pred, Fun (_, arith), const, input) ->
+        eq_s
+          (Option.filter_map_s (FilterMapSOf.fns pred arith const) input)
+          ( List.filter_map_s
+              (FilterMapSOf.fns pred arith const)
+              (Option.to_list input)
+          >|= List.hd ))
+
+  let filter_map_es =
+    Test.make
+      ~name:"{Option,List([01])}.filter_map_es"
+      (quad
+         Test_fuzzing_helpers.Fn.pred
+         Test_fuzzing_helpers.Fn.arith
+         one
+         maybe)
+      (fun (pred, Fun (_, arith), const, input) ->
+        eq_es
+          (Option.filter_map_es (FilterMapESOf.fns pred arith const) input)
+          ( List.filter_map_es
+              (FilterMapESOf.fns pred arith const)
+              (Option.to_list input)
+          >|=? List.hd ))
+
+  let tests = [filter_map; filter_map_e; filter_map_s; filter_map_es]
+end
+
 let () =
   let tests =
-    [("iter*", Lib_test.Qcheck_helpers.qcheck_wrap TestIter.tests)]
+    [ ("iter*", Lib_test.Qcheck_helpers.qcheck_wrap TestIter.tests);
+      ("filter*", Lib_test.Qcheck_helpers.qcheck_wrap TestFilter.tests);
+      ("filter_map*", Lib_test.Qcheck_helpers.qcheck_wrap TestFilterMap.tests)
+    ]
   in
   Alcotest.run "Option" tests
