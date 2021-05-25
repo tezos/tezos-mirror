@@ -2,7 +2,7 @@
  (name tezos_context_memory)
  (public_name tezos-context.memory)
  (libraries tezos-base
-            irmin.mem
+            irmin-pack.mem
             tezos-context.sigs
             tezos-context.encoding
             tezos-context.helpers)

@@ -136,36 +136,19 @@ let () =
               | _ -> ()))
         args
 
-module Conf = struct
-  let entries = 32
-
-  let stable_hash = 256
-end
-
 module Store =
-  Irmin_pack.Make_ext
-    (struct
-      let io_version = `V1
-    end)
-    (Conf)
-    (Metadata)
+  Irmin_pack.Make_ext (Irmin_pack.Version.V1) (Conf) (Node) (Commit) (Metadata)
     (Contents)
     (Path)
     (Branch)
     (Hash)
-    (Node)
-    (Commit)
-
 module P = Store.Private
 
 module Checks = struct
-  module Maker (V : Irmin_pack.VERSION) =
-    Irmin_pack.Make_ext (V) (Conf) (Irmin.Metadata.None) (Contents)
-      (Irmin.Path.String_list)
-      (Irmin.Branch.String)
+  module Maker (V : Irmin_pack.Version.S) =
+    Irmin_pack.Make_ext (V) (Conf) (Node) (Commit) (Metadata) (Contents) (Path)
+      (Branch)
       (Hash)
-      (Node)
-      (Commit)
 
   module Pack : Irmin_pack.Checks.S = Irmin_pack.Checks.Make (Maker)
 
@@ -253,7 +236,7 @@ let unshallow context =
 
 let raw_commit ~time ?(message = "") context =
   let info =
-    Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message
+    Info.v ~author:"Tezos" ~date:(Time.Protocol.to_seconds time) message
   in
   let parents = List.map Store.Commit.hash context.parents in
   unshallow context >>= fun () ->
@@ -263,7 +246,7 @@ let raw_commit ~time ?(message = "") context =
 
 let hash ~time ?(message = "") context =
   let info =
-    Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message
+    Info.v ~author:"Tezos" ~date:(Time.Protocol.to_seconds time) message
   in
   let parents = List.map (fun c -> Store.Commit.hash c) context.parents in
   let node = Store.Tree.hash context.tree in
@@ -570,7 +553,7 @@ module Dumpable_context = struct
 
   type hash = [`Blob of Store.hash | `Node of Store.hash]
 
-  type commit_info = Irmin.Info.t
+  type commit_info = Info.t
 
   type batch =
     | Batch of
@@ -583,11 +566,11 @@ module Dumpable_context = struct
     let open Data_encoding in
     conv
       (fun irmin_info ->
-        let author = Irmin.Info.author irmin_info in
-        let message = Irmin.Info.message irmin_info in
-        let date = Irmin.Info.date irmin_info in
+        let author = Info.author irmin_info in
+        let message = Info.message irmin_info in
+        let date = Info.date irmin_info in
         (author, message, date))
-      (fun (author, message, date) -> Irmin.Info.v ~author ~date message)
+      (fun (author, message, date) -> Info.v ~author ~date message)
       (obj3 (req "author" string) (req "message" string) (req "date" int64))
 
   let hash_encoding : hash Data_encoding.t =
@@ -914,7 +897,7 @@ module Dumpable_context_legacy = struct
 
   type hash = [`Blob of Store.hash | `Node of Store.hash]
 
-  type commit_info = Irmin.Info.t
+  type commit_info = Info.t
 
   type batch =
     | Batch of
@@ -927,11 +910,11 @@ module Dumpable_context_legacy = struct
     let open Data_encoding in
     conv
       (fun irmin_info ->
-        let author = Irmin.Info.author irmin_info in
-        let message = Irmin.Info.message irmin_info in
-        let date = Irmin.Info.date irmin_info in
+        let author = Info.author irmin_info in
+        let message = Info.message irmin_info in
+        let date = Info.date irmin_info in
         (author, message, date))
-      (fun (author, message, date) -> Irmin.Info.v ~author ~date message)
+      (fun (author, message, date) -> Info.v ~author ~date message)
       (obj3 (req "author" string) (req "message" string) (req "date" int64))
 
   let hash_encoding : hash Data_encoding.t =
@@ -1095,9 +1078,9 @@ let data_node_hash context =
 let retrieve_commit_info index block_header =
   checkout_exn index block_header.Block_header.shell.context >>= fun context ->
   let irmin_info = Dumpable_context.context_info context in
-  let author = Irmin.Info.author irmin_info in
-  let message = Irmin.Info.message irmin_info in
-  let timestamp = Time.Protocol.of_seconds (Irmin.Info.date irmin_info) in
+  let author = Info.author irmin_info in
+  let message = Info.message irmin_info in
+  let timestamp = Time.Protocol.of_seconds (Info.date irmin_info) in
   get_protocol context >>= fun protocol_hash ->
   get_test_chain context >>= fun test_chain_status ->
   find_predecessor_block_metadata_hash context
@@ -1156,7 +1139,7 @@ let check_protocol_commit_consistency index ~expected_context_hash
   | None -> Lwt.return tree)
   >>= fun tree ->
   let info =
-    Irmin.Info.v ~date:(Time.Protocol.to_seconds timestamp) ~author message
+    Info.v ~author ~date:(Time.Protocol.to_seconds timestamp) message
   in
   let data_tree = Store.Tree.shallow index.repo (`Node data_merkle_root) in
   Store.Tree.add_tree tree current_data_key data_tree >>= fun node ->
@@ -1238,9 +1221,9 @@ let legacy_get_protocol_data_from_header index block_header =
   checkout_exn index block_header.Block_header.shell.context >>= fun context ->
   let level = block_header.shell.level in
   let irmin_info = Dumpable_context.context_info context in
-  let date = Irmin.Info.date irmin_info in
-  let author = Irmin.Info.author irmin_info in
-  let message = Irmin.Info.message irmin_info in
+  let date = Info.date irmin_info in
+  let author = Info.author irmin_info in
+  let message = Info.message irmin_info in
   let info = {timestamp = Time.Protocol.of_seconds date; author; message} in
   let parents = Dumpable_context.context_parents context in
   get_protocol context >>= fun protocol_hash ->
@@ -1363,7 +1346,7 @@ let validate_context_hash_consistency_and_commit ~data_hash
   | None -> Lwt.return tree)
   >>= fun tree ->
   let info =
-    Irmin.Info.v ~date:(Time.Protocol.to_seconds timestamp) ~author message
+    Info.v ~author ~date:(Time.Protocol.to_seconds timestamp) message
   in
   let data_tree = Store.Tree.shallow index.repo (`Node data_hash) in
   Store.Tree.add_tree tree current_data_key data_tree >>= fun node ->

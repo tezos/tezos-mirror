@@ -62,7 +62,7 @@ module Make_tree (DB : DB) : sig
 
   type repo = DB.repo
 
-  val make_repo : DB.repo Lwt.t
+  val make_repo : unit -> DB.repo Lwt.t
 
   val shallow : DB.repo -> kinded_hash -> DB.tree
 end
