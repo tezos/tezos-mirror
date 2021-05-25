@@ -131,4 +131,4 @@ Minor changes
 
 - Increased the max operation time to live (`max_op_ttl`) from 60 to 120. (MR :gl:`!2828`)
 
-- Other internal refactorings or documentation. (MRs :gl:`!2559` :gl:`!2563` :gl:`!2593` :gl:`!2741` :gl:`!2808` :gl:`!2862` :gl:`!2897` :gl:`!2932` :gl:`!2995`)
+- Other internal refactorings or documentation. (MRs :gl:`!2559` :gl:`!2563` :gl:`!2593` :gl:`!2741` :gl:`!2808` :gl:`!2862` :gl:`!2897` :gl:`!2932` :gl:`!2995` :gl:`!3088`)
