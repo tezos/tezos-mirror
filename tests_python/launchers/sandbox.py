@@ -381,6 +381,7 @@ class Sandbox:
         proto: str,
         params: List[str] = None,
         branch: str = "",
+        run_params: List[str] = None,
     ) -> None:
         """
         Add a baker associated to a node.
@@ -420,6 +421,7 @@ class Sandbox:
             account,
             params=params,
             log_file=log_file,
+            run_params=run_params,
         )
         time.sleep(0.1)
         assert baker.poll() is None, 'seems baker failed at startup'
