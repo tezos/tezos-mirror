@@ -48,6 +48,7 @@ let () =
   Light.register ~protocols:[Alpha] ;
   Mockup.register ~protocols:[Protocol.current_mainnet; Alpha] ;
   Mockup.register_constant_migration ~migrate_from:Florence ~migrate_to:Alpha ;
+  Node_event_level.register ~protocols:[Alpha] ;
   Proxy.register ~protocols:[Protocol.current_mainnet; Alpha] ;
   P2p.register ~protocols:[Alpha] ;
   Protocol_limits.register ~protocols:[Alpha] ;
