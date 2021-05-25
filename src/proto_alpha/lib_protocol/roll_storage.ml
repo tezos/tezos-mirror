@@ -483,7 +483,7 @@ let update_tokens_per_roll ctxt new_tokens_per_roll =
   (if decrease then Tez_repr.(old_tokens_per_roll -? new_tokens_per_roll)
   else Tez_repr.(new_tokens_per_roll -? old_tokens_per_roll))
   >>?= fun abs_diff ->
-  Storage.Delegates.fold ctxt (Ok ctxt) (fun pkh ctxt_opt ->
+  Storage.Delegates.fold ctxt ~init:(Ok ctxt) ~f:(fun pkh ctxt_opt ->
       ctxt_opt >>?= fun ctxt ->
       count_rolls ctxt pkh >>=? fun rolls ->
       Tez_repr.(abs_diff *? Int64.of_int rolls) >>?= fun amount ->

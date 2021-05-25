@@ -159,7 +159,7 @@ let check_tzBTC ~typecheck current_level ctxt f =
 
          First, we check current level is below mainnet level roughly around 010 injection so we do not accidentally originate the test token contract on mainnet. *)
       if Compare.Int32.(current_level < 1_437_862l) then
-        originate_test_fa12 typecheck ctxt first_bootstrap_account
+        originate_test_fa12 ~typecheck ctxt first_bootstrap_account
         (* Token contract admin *)
         >>=? fun (ctxt, token_address, token_result) ->
         f ctxt token_address token_result

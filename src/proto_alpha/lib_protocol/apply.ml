@@ -777,7 +777,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   in
   Gas.consume_limit_in_block ctxt gas_limit >>?= fun ctxt ->
   let ctxt = Gas.set_limit ctxt gas_limit in
-  Fees.check_storage_limit ctxt storage_limit >>?= fun () ->
+  Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
   Contract.must_be_allocated ctxt (Contract.implicit_contract source)
   >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
@@ -1553,8 +1553,8 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
   let included_endorsements = included_endorsements ctxt in
   check_minimal_valid_time
     ctxt
-    protocol_data.Block_header.priority
-    included_endorsements
+    ~priority:protocol_data.Block_header.priority
+    ~endorsing_power:included_endorsements
   >>?= fun () ->
   let deposit = Constants.block_security_deposit ctxt in
   add_deposit ctxt delegate deposit >>?= fun ctxt ->

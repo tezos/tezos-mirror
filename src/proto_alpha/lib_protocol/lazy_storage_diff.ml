@@ -259,7 +259,7 @@ let apply_init :
         return (ctxt, Z.add copy_size OPS.bytes_size_for_empty)
   | Alloc alloc ->
       OPS.Total_bytes.init ctxt id Z.zero >>=? fun ctxt ->
-      OPS.alloc ctxt id alloc >>=? fun ctxt ->
+      OPS.alloc ctxt ~id alloc >>=? fun ctxt ->
       return (ctxt, OPS.bytes_size_for_empty)
 
 (**
@@ -333,7 +333,7 @@ let apply ctxt diffs =
   fold_left_s
     (fun (ctxt, total_size) (Item (k, id, diff)) ->
       let ops = get_ops k in
-      apply_diff ctxt ops id diff >|=? fun (ctxt, added_size) ->
+      apply_diff ctxt ops ~id diff >|=? fun (ctxt, added_size) ->
       let (module OPS) = ops in
       ( ctxt,
         if OPS.Id.is_temp id then total_size else Z.add total_size added_size ))

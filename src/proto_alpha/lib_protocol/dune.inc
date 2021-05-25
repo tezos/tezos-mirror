@@ -318,7 +318,7 @@ include Tezos_raw_protocol_alpha.Main
  (libraries tezos_protocol_environment_alpha)
  (library_flags (:standard -linkall))
  (flags (:standard -nopervasives -nostdlib
-                   -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+                   -w +a-4-7-9-29-32-40..42-44-45-48-60-67
                    -warn-error +a
                    -open Tezos_protocol_environment_alpha__Environment
                    -open Pervasives
@@ -421,7 +421,7 @@ include Tezos_raw_protocol_alpha.Main
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos_raw_protocol_alpha)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
+ (flags -w "+a-4-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)
  (modules Protocol))
@@ -433,7 +433,7 @@ include Tezos_raw_protocol_alpha.Main
       tezos-protocol-environment
       tezos-protocol-environment-sigs
       tezos-protocol-alpha.raw)
- (flags -w "+a-4-6-7-9-29-40..42-44-45-48-60-67"
+ (flags -w "+a-4-7-9-29-40..42-44-45-48-60-67"
         -warn-error "+a"
         -nopervasives)
  (modules Functor))
@@ -445,7 +445,7 @@ include Tezos_raw_protocol_alpha.Main
  (libraries tezos-protocol-alpha
             tezos-protocol-updater
             tezos-protocol-environment)
- (flags (:standard -w +a-4-6-7-9-29-32-40..42-44-45-48-60-67
+ (flags (:standard -w +a-4-7-9-29-32-40..42-44-45-48-60-67
                    -warn-error +a))
  (modules Registerer))
 

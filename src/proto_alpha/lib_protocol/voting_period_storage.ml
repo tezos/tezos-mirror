@@ -125,7 +125,7 @@ let get_current_info ctxt =
     Voting_period_repr.remaining_blocks
       level
       voting_period
-      blocks_per_voting_period
+      ~blocks_per_voting_period
   in
   Voting_period_repr.{voting_period; position; remaining}
 
@@ -137,7 +137,7 @@ let get_current_remaining ctxt =
   Voting_period_repr.remaining_blocks
     (Level_storage.current ctxt)
     voting_period
-    blocks_per_voting_period
+    ~blocks_per_voting_period
 
 let is_last_block ctxt =
   get_current_remaining ctxt >|=? fun remaining ->
@@ -183,6 +183,6 @@ let get_rpc_succ_info ctxt =
     Voting_period_repr.remaining_blocks
       level
       voting_period
-      blocks_per_voting_period
+      ~blocks_per_voting_period
   in
   Voting_period_repr.{voting_period; position; remaining}

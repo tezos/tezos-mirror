@@ -111,7 +111,7 @@ end = struct
   let assert_pos pos height =
     assert (Compare.Int64.(pos >= 0L && pos <= pow2 height))
 
-  let default_root = H.uncommitted max_height
+  let default_root = H.uncommitted ~height:max_height
 
   let init = Storage.Sapling.commitments_init
 
@@ -120,7 +120,7 @@ end = struct
     assert_height height ;
     Storage.Sapling.Commitments.find (ctx, id) node >|=? function
     | (ctx, None) ->
-        let hash = H.uncommitted height in
+        let hash = H.uncommitted ~height in
         (ctx, hash)
     | (ctx, Some hash) -> (ctx, hash)
 

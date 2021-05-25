@@ -394,7 +394,7 @@ module Baking_rights = struct
         | Some pred_timestamp ->
             Baking.minimal_time
               (Constants.parametric ctxt)
-              priority
+              ~priority
               pred_timestamp
             >|? fun t -> Some t)
         >>?= fun timestamp ->
@@ -426,7 +426,7 @@ module Baking_rights = struct
                 | Some pred_timestamp ->
                     Baking.minimal_time
                       (Constants.parametric ctxt)
-                      priority
+                      ~priority
                       pred_timestamp
                     >|? fun t -> Some t)
                 >>?= fun timestamp ->
@@ -484,8 +484,8 @@ module Baking_rights = struct
               (fun level ->
                 baking_priorities_of_delegates
                   ctxt
-                  q.all
-                  max_priority
+                  ~all:q.all
+                  ~max_prio:max_priority
                   delegates
                   level)
               levels
