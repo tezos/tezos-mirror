@@ -314,10 +314,6 @@ let list_cons :
   let open Script_typed_ir in
   {length = 1 + l.length; elements = elt :: l.elements}
 
-let wrap_compare compare a b =
-  let res = compare a b in
-  if Compare.Int.(res = 0) then 0 else if Compare.Int.(res > 0) then 1 else -1
-
 let compare_address (x, ex) (y, ey) =
   let lres = Contract.compare x y in
   if Compare.Int.(lres = 0) then Compare.String.compare ex ey else lres
@@ -338,37 +334,37 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
     | Never_key _ -> (
         function _ -> . )
     | Signature_key _ ->
-        fun x y -> (apply [@tailcall]) (wrap_compare Signature.compare x y) k
+        fun x y -> (apply [@tailcall]) (Signature.compare x y) k
     | String_key _ ->
         fun x y ->
-          (apply [@tailcall]) (wrap_compare Compare.String.compare x y) k
+          (apply [@tailcall]) (Compare.String.compare x y) k
     | Bool_key _ ->
         fun x y ->
-          (apply [@tailcall]) (wrap_compare Compare.Bool.compare x y) k
+          (apply [@tailcall]) (Compare.Bool.compare x y) k
     | Mutez_key _ ->
-        fun x y -> (apply [@tailcall]) (wrap_compare Tez.compare x y) k
+        fun x y -> (apply [@tailcall]) (Tez.compare x y) k
     | Key_hash_key _ ->
         fun x y ->
           (apply [@tailcall])
-            (wrap_compare Signature.Public_key_hash.compare x y)
+            (Signature.Public_key_hash.compare x y)
             k
     | Key_key _ ->
         fun x y ->
-          (apply [@tailcall]) (wrap_compare Signature.Public_key.compare x y) k
+          (apply [@tailcall]) (Signature.Public_key.compare x y) k
     | Int_key _ ->
-        fun x y -> (apply [@tailcall]) (wrap_compare Script_int.compare x y) k
+        fun x y -> (apply [@tailcall]) (Script_int.compare x y) k
     | Nat_key _ ->
-        fun x y -> (apply [@tailcall]) (wrap_compare Script_int.compare x y) k
+        fun x y -> (apply [@tailcall]) (Script_int.compare x y) k
     | Timestamp_key _ ->
         fun x y ->
-          (apply [@tailcall]) (wrap_compare Script_timestamp.compare x y) k
+          (apply [@tailcall]) (Script_timestamp.compare x y) k
     | Address_key _ ->
-        fun x y -> (apply [@tailcall]) (wrap_compare compare_address x y) k
+        fun x y -> (apply [@tailcall]) (compare_address x y) k
     | Bytes_key _ ->
         fun x y ->
-          (apply [@tailcall]) (wrap_compare Compare.Bytes.compare x y) k
+          (apply [@tailcall]) (Compare.Bytes.compare x y) k
     | Chain_id_key _ ->
-        fun x y -> (apply [@tailcall]) (wrap_compare Chain_id.compare x y) k
+        fun x y -> (apply [@tailcall]) (Chain_id.compare x y) k
     | Pair_key ((tl, _), (tr, _), _) ->
         fun (lx, rx) (ly, ry) ->
           (compare_comparable [@tailcall])
