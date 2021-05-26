@@ -3561,7 +3561,7 @@ and parse_instr :
           type_size_of_stack_head aft ~up_to:number_of_generated_growing_types
         in
         if Compare.Int.(type_size > maximum_type_size) then
-          error (Type_too_large (loc, type_size, maximum_type_size))
+          error (Type_too_large (loc, maximum_type_size))
         else ok (judgement, ctxt)
     | Failed _ ->
         ok (judgement, ctxt)

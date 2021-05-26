@@ -619,13 +619,9 @@ let () =
     ~id:"michelson_v1.type_too_large"
     ~title:"Stack item type too large"
     ~description:"An instruction generated a type larger than the limit."
-    (obj3
-       (req "loc" Script.location_encoding)
-       (req "type_size" uint16)
-       (req "maximum_type_size" uint16))
-    (function
-      | Type_too_large (loc, ts, maxts) -> Some (loc, ts, maxts) | _ -> None)
-    (fun (loc, ts, maxts) -> Type_too_large (loc, ts, maxts)) ;
+    (obj2 (req "loc" Script.location_encoding) (req "maximum_type_size" uint16))
+    (function Type_too_large (loc, maxts) -> Some (loc, maxts) | _ -> None)
+    (fun (loc, maxts) -> Type_too_large (loc, maxts)) ;
   (* Bad PAIR argument *)
   register_error_kind
     `Permanent
