@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 #
 # This script checks that the serialized versions of the Liquidity Baking
 # LIGO scripts
