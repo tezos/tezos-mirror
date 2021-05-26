@@ -6,6 +6,7 @@ include:
   - .gitlab/ci/sanity_ci.yml
   - .gitlab/ci/unittest.yml
   - .gitlab/ci/integration.yml
+  - .gitlab/ci/liquidity-baking-scripts-integrity.yml
   - .gitlab/ci/coq.yml
   - .gitlab/ci/tezt.yml
   - .gitlab/ci/doc.yml

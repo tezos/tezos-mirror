@@ -1,0 +1,5 @@
+test-liquidity-baking-scripts:
+  extends: .test_template
+  stage: test
+  script:
+    - scripts/check-liquidity-baking-scripts.sh
