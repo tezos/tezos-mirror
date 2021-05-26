@@ -80,7 +80,7 @@ The schema output by this command is as follows (slightly abbreviated and reform
        contain invalid byte sequences. */
     string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
 
-The schema starts with the main non-terminal (here, a Micheline expression, denoted by ``$alpha.script.expr``), whose defintion appears lower in the file.
+The schema starts with the main non-terminal (here, a Micheline expression, denoted by ``$alpha.script.expr``), whose definition appears lower in the schema.
 The schema also defines all the non-terminals which are used, directly or indirectly, in this definition.
 Note that we omitted in the listing above the definition of non-terminal ``$micheline.alpha.michelson_v1.expression``, because it is identical to that of the main non-terminal ``$alpha.script.expr``.
 
@@ -90,9 +90,9 @@ Some attached comments further clarify the meaning of most alternatives or field
 Binary schemas
 ~~~~~~~~~~~~~~
 
-The descriptions of binary schemas and the are more complex to some extent, mainly for two reasons:
+The descriptions of binary schemas are more complex to some extent, mainly for two reasons:
 
-- binary schemas is lower level than the JSON schemas.
+- binary schemas is more low level than the JSON schemas.
   Thus, the encoding of elementary types has to be precisely defined: strings must include a field containing their length; discriminated unions must include a field containing a tag, whose possible values must be enumerated; the precise binary layout of various integer types must be made explicit, and so on.
 - the binary encodings are optimized for certain common cases, in order to save space.
   For instance, Micheline primitive applications with one or two arguments uses specialized encodings that are more compact (see the :ref:`binary encoding principles <micheline_bin>` for Micheline).
@@ -180,7 +180,7 @@ The binary schema produced by this command is as follows (abbreviated and reform
   | 140         | GET_AND_UPDATE        |
   +-------------+-----------------------+
 
-The binary scheme starts with the binary layout of the main non-terminal (here, ``alpha.script.expr``), and also defines the other non-terminals that are used, directly or indirectly in this definition.
+The binary schema starts with the binary layout of the main non-terminal (here, ``alpha.script.expr``), and also defines the other non-terminals that are used, directly or indirectly in this definition.
 Each definition forms a section (whose heading is underlined by all-"*" lines).
 Sections corresponding to disjunctions are further structured in subsections (whose headings are underlined by all-"=" lines), one for each possible value of the discriminating tag.
 
@@ -241,7 +241,7 @@ which can be detailed by describing their schemas, e.g.::
   (positive if zero). Size and sign bits ignored, data is then the binary
   representation of the absolute value of the number in little endian order.
 
-To illustrate the Zarith representation, let us encode the number ``1,000,000`` (one million)::
+To illustrate the Zarith representation, let us encode the Micheline representation of the number ``1,000,000`` (one million)::
 
   $ tezos-codec encode alpha.script.expr from '{"int":"1000000"}'
   0080897a
@@ -255,7 +255,7 @@ Reading each byte from left to right, the first indicates whether more bytes are
 
   0x80897a = 0b10000000, 0b10001001, 0b01111010
 
-The first bit in each byte indicates that this value is represented by three bytes.
+The first bit in each byte indicates whether it is the last byte (0) in the sequence or if there is more to read (1).
 The second bit in the first byte indicates that this is a positive number.
 The remaining bits are then ``0b000000``, ``0b0001001``, ``0b1111010``.
 Reversing the byte order (because little-endian) we get: ``0b11110100001001000000`` = ``0xf4240`` = ``1000000``.
@@ -390,11 +390,11 @@ The ``tezos-client`` can be used to convert Micheline expressions between the fo
 
 Note that the client has to be run in conjunction to a running node for the following commands to work (unless option ``--protocol`` is specified)::
 
-  $ tezos-client convert data '(Pair 1 2)' from Michelson to binary
+  $ tezos-client convert data '(Pair 1 2)' from michelson to binary
   0x070700010002
   $ tezos-client convert data 0x070700010002 from binary to michelson
   (Pair 1 2)
   $ tezos-client convert data 0x070700010002 from binary to json
   { "prim": "Pair", "args": [ { "int": "1" }, { "int": "2" } ] }
-  $ tezos-client convert data 0x070700010002 from binary to Ocaml
+  $ tezos-client convert data 0x070700010002 from binary to ocaml
   Prim (0, D_Pair, [Int (1, Z.one); Int (2, Z.of_int 2)], [])
