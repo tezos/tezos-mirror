@@ -470,6 +470,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   let handle_unprocessed w pv =
     match pv.validation_state with
     | Error err ->
+        (* At the time this comment was written (26/05/21), this is dead
+           code since [Proto.begin_construction] cannot fail. *)
         Operation_hash.Map.iter
           (fun oph op -> handle_branch_delayed pv op oph err)
           pv.pending ;
