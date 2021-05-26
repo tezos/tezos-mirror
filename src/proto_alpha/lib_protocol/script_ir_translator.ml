@@ -1857,7 +1857,7 @@ let rec parse_packable_ty :
     Script.node ->
     (ex_ty * context) tzresult =
  fun ctxt ~stack_depth ~legacy ->
-  parse_ty
+  (parse_ty [@tailcall])
     ctxt
     ~stack_depth
     ~legacy
@@ -1873,7 +1873,7 @@ and parse_parameter_ty :
     Script.node ->
     (ex_ty * context) tzresult =
  fun ctxt ~stack_depth ~legacy ->
-  parse_ty
+  (parse_ty [@tailcall])
     ctxt
     ~stack_depth
     ~legacy
@@ -1889,7 +1889,7 @@ and parse_normal_storage_ty :
     Script.node ->
     (ex_ty * context) tzresult =
  fun ctxt ~stack_depth ~legacy ->
-  parse_ty
+  (parse_ty [@tailcall])
     ctxt
     ~stack_depth
     ~legacy
@@ -1905,7 +1905,7 @@ and parse_any_ty :
     Script.node ->
     (ex_ty * context) tzresult =
  fun ctxt ~stack_depth ~legacy ->
-  parse_ty
+  (parse_ty [@tailcall])
     ctxt
     ~stack_depth
     ~legacy
@@ -2260,11 +2260,11 @@ let parse_storage_ty :
     when legacy -> (
     match storage_annot with
     | [] ->
-        parse_normal_storage_ty ctxt ~stack_depth ~legacy node
+        (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
     | [single]
       when Compare.Int.(String.length single > 0)
            && Compare.Char.(single.[0] = '%') ->
-        parse_normal_storage_ty ctxt ~stack_depth ~legacy node
+        (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
     | _ ->
         (* legacy semantics of big maps used the wrong annotation parser *)
         Gas.consume ctxt Typecheck_costs.parse_type_cycle
@@ -2293,7 +2293,7 @@ let parse_storage_ty :
                    ty_name )),
             ctxt ) )
   | _ ->
-      parse_normal_storage_ty ctxt ~stack_depth:0 ~legacy node
+      (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
 
 let check_packable ~legacy loc root =
   let rec check : type t. t ty -> unit tzresult = function
@@ -6892,7 +6892,12 @@ let rec unparse_data :
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, List.rev items), ctxt)
   | (Ticket_t (t, _), {ticketer; contents; amount}) ->
       let t = ty_of_comparable_ty @@ opened_ticket_type t in
-      unparse_data ctxt ~stack_depth mode t (ticketer, (contents, amount))
+      (unparse_data [@tailcall])
+        ctxt
+        ~stack_depth
+        mode
+        t
+        (ticketer, (contents, amount))
   | (Set_t (t, _), set) ->
       fold_left_s
         (fun (l, ctxt) item ->
