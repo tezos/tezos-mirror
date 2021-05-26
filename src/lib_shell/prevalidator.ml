@@ -41,6 +41,11 @@ module Logger =
       let worker_name = "node_prevalidator"
     end)
 
+type 'a bounded_map = {
+  ring : Operation_hash.t Ringo.Ring.t;
+  mutable map : (Operation.t * error list) Operation_hash.Map.t;
+}
+
 module type T = sig
   module Proto : Registered_protocol.T
 
@@ -59,12 +64,9 @@ module type T = sig
     mutable timestamp : Time.System.t;
     mutable live_blocks : Block_hash.Set.t;
     mutable live_operations : Operation_hash.Set.t;
-    refused : Operation_hash.t Ringo.Ring.t;
-    mutable refusals : (Operation.t * error list) Operation_hash.Map.t;
-    branch_refused : Operation_hash.t Ringo.Ring.t;
-    mutable branch_refusals : (Operation.t * error list) Operation_hash.Map.t;
-    branch_delayed : Operation_hash.t Ringo.Ring.t;
-    mutable branch_delays : (Operation.t * error list) Operation_hash.Map.t;
+    refused : [`Refused] bounded_map;
+    branch_refused : [`Branch_refused] bounded_map;
+    branch_delayed : [`Branch_delayed] bounded_map;
     mutable fetching : Operation_hash.Set.t;
     mutable pending : Operation.t Operation_hash.Map.t;
     mutable mempool : Mempool.t;
@@ -140,12 +142,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     (* just a cache *)
     mutable live_operations : Operation_hash.Set.t;
     (* just a cache *)
-    refused : Operation_hash.t Ringo.Ring.t;
-    mutable refusals : (Operation.t * error list) Operation_hash.Map.t;
-    branch_refused : Operation_hash.t Ringo.Ring.t;
-    mutable branch_refusals : (Operation.t * error list) Operation_hash.Map.t;
-    branch_delayed : Operation_hash.t Ringo.Ring.t;
-    mutable branch_delays : (Operation.t * error list) Operation_hash.Map.t;
+    refused : [`Refused] bounded_map;
+    branch_refused : [`Branch_refused] bounded_map;
+    branch_delayed : [`Branch_delayed] bounded_map;
     mutable fetching : Operation_hash.Set.t;
     mutable pending : Operation.t Operation_hash.Map.t;
     mutable mempool : Mempool.t;
@@ -216,8 +215,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         applied = List.rev_map (fun (h, _) -> h) state.applied;
         delayed =
           Operation_hash.Set.union
-            (domain state.branch_delays)
-            (domain state.branch_refusals);
+            (domain state.branch_delayed.map)
+            (domain state.branch_refused.map);
       }
   end
 
@@ -300,7 +299,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     Lwt.return new_mempool
 
   let already_handled pv oph =
-    Operation_hash.Map.mem oph pv.refusals
+    Operation_hash.Map.mem oph pv.refused.map
     || Operation_hash.Map.mem oph pv.pending
     || Operation_hash.Set.mem oph pv.fetching
     || Operation_hash.Set.mem oph pv.live_operations
@@ -309,8 +308,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   let validation_result (state : types_state) =
     {
       Preapply_result.applied = List.rev state.applied;
-      branch_delayed = state.branch_delays;
-      branch_refused = state.branch_refusals;
+      branch_delayed = state.branch_delayed.map;
+      branch_refused = state.branch_refused.map;
       refused = Operation_hash.Map.empty;
     }
 
@@ -373,22 +372,25 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     notify_operation pv `Branch_refused op ;
     Option.iter
       (fun e ->
-        pv.branch_refusals <- Operation_hash.Map.remove e pv.branch_refusals ;
+        pv.branch_refused.map <-
+          Operation_hash.Map.remove e pv.branch_refused.map ;
         pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
-      (Ringo.Ring.add_and_return_erased pv.branch_refused oph) ;
+      (Ringo.Ring.add_and_return_erased pv.branch_refused.ring oph) ;
     pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
-    pv.branch_refusals <-
-      Operation_hash.Map.add oph (op, errors) pv.branch_refusals
+    pv.branch_refused.map <-
+      Operation_hash.Map.add oph (op, errors) pv.branch_refused.map
 
   let handle_branch_delayed pv op oph errors =
     notify_operation pv `Branch_delayed op ;
     Option.iter
       (fun e ->
-        pv.branch_delays <- Operation_hash.Map.remove e pv.branch_delays ;
+        pv.branch_delayed.map <-
+          Operation_hash.Map.remove e pv.branch_delayed.map ;
         pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
-      (Ringo.Ring.add_and_return_erased pv.branch_delayed oph) ;
+      (Ringo.Ring.add_and_return_erased pv.branch_delayed.ring oph) ;
     pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
-    pv.branch_delays <- Operation_hash.Map.add oph (op, errors) pv.branch_delays
+    pv.branch_delayed.map <-
+      Operation_hash.Map.add oph (op, errors) pv.branch_delayed.map
 
   (* Classify pending operations into either: [Refused |
      Branch_delayed | Branch_refused | Applied].  To ensure fairness
@@ -417,12 +419,13 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           (fun h op ->
             Option.iter
               (fun e ->
-                pv.branch_delays <- Operation_hash.Map.remove e pv.branch_delays ;
+                pv.branch_delayed.map <-
+                  Operation_hash.Map.remove e pv.branch_delayed.map ;
                 pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
-              (Ringo.Ring.add_and_return_erased pv.branch_delayed h) ;
+              (Ringo.Ring.add_and_return_erased pv.branch_delayed.ring h) ;
             pv.in_mempool <- Operation_hash.Set.add h pv.in_mempool ;
-            pv.branch_delays <-
-              Operation_hash.Map.add h (op, err) pv.branch_delays)
+            pv.branch_delayed.map <-
+              Operation_hash.Map.add h (op, err) pv.branch_delayed.map)
           pv.pending ;
         pv.pending <- Operation_hash.Map.empty ;
         Lwt.return_unit
@@ -445,10 +448,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                      notify_operation pv `Refused op ;
                      Option.iter
                        (fun e ->
-                         pv.refusals <- Operation_hash.Map.remove e pv.refusals)
-                       (Ringo.Ring.add_and_return_erased pv.refused oph) ;
-                     pv.refusals <-
-                       Operation_hash.Map.add oph (op, errors) pv.refusals ;
+                         pv.refused.map <-
+                           Operation_hash.Map.remove e pv.refused.map)
+                       (Ringo.Ring.add_and_return_erased pv.refused.ring oph) ;
+                     pv.refused.map <-
+                       Operation_hash.Map.add oph (op, errors) pv.refused.map ;
                      Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
                      pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
                      Lwt.return_ok (acc_validation_state, acc_mempool, limit)
@@ -615,9 +619,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
              let filter f map =
                Operation_hash.Map.fold f map Operation_hash.Map.empty
              in
-             let refused = filter map_op_error pv.refusals in
-             let branch_refused = filter map_op_error pv.branch_refusals in
-             let branch_delayed = filter map_op_error pv.branch_delays in
+             let refused = filter map_op_error pv.refused.map in
+             let branch_refused = filter map_op_error pv.branch_refused.map in
+             let branch_delayed = filter map_op_error pv.branch_delayed.map in
              let unprocessed =
                Operation_hash.Map.fold
                  (fun oph op acc ->
@@ -649,9 +653,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
            (fun
              {
                applied;
-               refusals = refused;
-               branch_refusals = branch_refused;
-               branch_delays = branch_delayed;
+               refused;
+               branch_refused;
+               branch_delayed;
                operation_stream;
                _;
              }
@@ -678,17 +682,18 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                else []
              in
              let refused =
-               if params#refused then Operation_hash.Map.fold fold_op refused []
+               if params#refused then
+                 Operation_hash.Map.fold fold_op refused.map []
                else []
              in
              let branch_refused =
                if params#branch_refused then
-                 Operation_hash.Map.fold fold_op branch_refused []
+                 Operation_hash.Map.fold fold_op branch_refused.map []
                else []
              in
              let branch_delayed =
                if params#branch_delayed then
-                 Operation_hash.Map.fold fold_op branch_delayed []
+                 Operation_hash.Map.fold fold_op branch_delayed.map []
                else []
              in
              let current_mempool =
@@ -849,10 +854,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       pv.mempool <- {known_valid = []; pending = Operation_hash.Set.empty} ;
       pv.pending <- pending ;
       pv.in_mempool <- Operation_hash.Set.empty ;
-      Ringo.Ring.clear pv.branch_delayed ;
-      pv.branch_delays <- Operation_hash.Map.empty ;
-      Ringo.Ring.clear pv.branch_refused ;
-      pv.branch_refusals <- Operation_hash.Map.empty ;
+      Ringo.Ring.clear pv.branch_delayed.ring ;
+      pv.branch_delayed.map <- Operation_hash.Map.empty ;
+      Ringo.Ring.clear pv.branch_refused.ring ;
+      pv.branch_refused.map <- Operation_hash.Map.empty ;
       pv.applied <- [] ;
       pv.validation_state <- validation_state ;
       pv.operation_stream <- Lwt_watcher.create_input () ;
@@ -922,6 +927,12 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           Operation_hash.Set.empty
           mempool.known_valid
       in
+      let make_bounded_operation_collections () =
+        {
+          ring = Ringo.Ring.create limits.max_refused_operations;
+          map = Operation_hash.Map.empty;
+        }
+      in
       let pv =
         {
           limits;
@@ -931,16 +942,13 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           live_blocks;
           live_operations;
           mempool = {known_valid = []; pending = Operation_hash.Set.empty};
-          refused = Ringo.Ring.create limits.max_refused_operations;
-          refusals = Operation_hash.Map.empty;
+          refused = make_bounded_operation_collections ();
           fetching;
           pending = Operation_hash.Map.empty;
           in_mempool = Operation_hash.Set.empty;
           applied = [];
-          branch_refused = Ringo.Ring.create limits.max_refused_operations;
-          branch_refusals = Operation_hash.Map.empty;
-          branch_delayed = Ringo.Ring.create limits.max_refused_operations;
-          branch_delays = Operation_hash.Map.empty;
+          branch_refused = make_bounded_operation_collections ();
+          branch_delayed = make_bounded_operation_collections ();
           validation_state;
           operation_stream = Lwt_watcher.create_input ();
           advertisement = `None;
