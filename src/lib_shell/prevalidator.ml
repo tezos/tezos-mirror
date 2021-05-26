@@ -408,6 +408,45 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     pv.applied <- (op.hash, op.raw) :: pv.applied ;
     pv.in_mempool <- Operation_hash.Set.add op.hash pv.in_mempool
 
+  let classify_operation w pv validation_state mempool op oph =
+    match Prevalidation.parse op with
+    | Error errors ->
+        handle_refused pv op oph errors ;
+        Lwt.return (validation_state, mempool)
+    | Ok op -> (
+        Prevalidation.apply_operation validation_state op >>= function
+        | Applied (new_validation_state, receipt) ->
+            post_filter
+              w
+              pv
+              ~validation_state_before:
+                (Prevalidation.validation_state validation_state)
+              ~validation_state_after:
+                (Prevalidation.validation_state new_validation_state)
+              op.protocol_data
+              receipt
+            >>= fun accept ->
+            if accept then (
+              handle_applied pv op ;
+              let new_mempool =
+                Mempool.
+                  {mempool with known_valid = op.hash :: mempool.known_valid}
+              in
+              Lwt.return (new_validation_state, new_mempool))
+            else (
+              Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+              Lwt.return (validation_state, mempool))
+        | Branch_delayed errors ->
+            handle_branch_delayed pv op.raw op.hash errors ;
+            Lwt.return (validation_state, mempool)
+        | Branch_refused errors ->
+            handle_branch_refused pv op.raw op.hash errors ;
+            Lwt.return (validation_state, mempool)
+        | Refused errors ->
+            handle_refused pv op.raw op.hash errors ;
+            Lwt.return (validation_state, mempool)
+        | Duplicate | Outdated -> Lwt.return (validation_state, mempool))
+
   (* Classify pending operations into either: [Refused |
      Branch_delayed | Branch_refused | Applied].  To ensure fairness
      with other worker requests, classification of operations is done
@@ -450,59 +489,15 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                    (* Do not forget to remove the treated operation
                             from the pendings *)
                    pv.pending <- Operation_hash.Map.remove oph pv.pending ;
-                   let limit = limit - 1 in
-                   match Prevalidation.parse op with
-                   | Error errors ->
-                       handle_refused pv op oph errors ;
-                       Lwt.return_ok (acc_validation_state, acc_mempool, limit)
-                   | Ok op -> (
-                       Prevalidation.apply_operation state op >>= function
-                       | Applied (new_acc_validation_state, receipt) ->
-                           post_filter
-                             w
-                             pv
-                             ~validation_state_before:
-                               (Prevalidation.validation_state
-                                  acc_validation_state)
-                             ~validation_state_after:
-                               (Prevalidation.validation_state
-                                  new_acc_validation_state)
-                             op.protocol_data
-                             receipt
-                           >>= fun accept ->
-                           if accept then (
-                             handle_applied pv op ;
-                             let new_mempool =
-                               Mempool.
-                                 {
-                                   acc_mempool with
-                                   known_valid =
-                                     op.hash :: acc_mempool.known_valid;
-                                 }
-                             in
-                             Lwt.return_ok
-                               (new_acc_validation_state, new_mempool, limit))
-                           else (
-                             Distributed_db.Operation.clear_or_cancel
-                               pv.chain_db
-                               oph ;
-                             Lwt.return_ok
-                               (acc_validation_state, acc_mempool, limit))
-                       | Branch_delayed errors ->
-                           handle_branch_delayed pv op.raw op.hash errors ;
-                           Lwt.return_ok
-                             (acc_validation_state, acc_mempool, limit)
-                       | Branch_refused errors ->
-                           handle_branch_refused pv op.raw op.hash errors ;
-                           Lwt.return_ok
-                             (acc_validation_state, acc_mempool, limit)
-                       | Refused errors ->
-                           handle_refused pv op.raw op.hash errors ;
-                           Lwt.return_ok
-                             (acc_validation_state, acc_mempool, limit)
-                       | Duplicate | Outdated ->
-                           Lwt.return_ok
-                             (acc_validation_state, acc_mempool, limit))))
+                   classify_operation
+                     w
+                     pv
+                     acc_validation_state
+                     acc_mempool
+                     op
+                     oph
+                   >|= fun (new_validation_state, new_mempool) ->
+                   ok (new_validation_state, new_mempool, limit - 1)))
                pv.pending
                (state, Mempool.empty, pv.limits.operations_batch_size)
              >>= function
