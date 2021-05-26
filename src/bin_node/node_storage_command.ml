@@ -51,11 +51,9 @@ module Term = struct
     | Integrity_check_inodes
 
   let read_config_file config_file =
-    match config_file with
-    | Some config_file when Sys.file_exists config_file ->
-        Node_config_file.read config_file
-    | _ ->
-        return Node_config_file.default_config
+    Option.filter Sys.file_exists config_file
+    |> Option.map Node_config_file.read
+    |> Option.value ~default:(return Node_config_file.default_config)
 
   let ensure_context_dir context_dir =
     Lwt.catch

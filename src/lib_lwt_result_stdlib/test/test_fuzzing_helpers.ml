@@ -404,6 +404,8 @@ let one = QCheck.int
 
 let many = QCheck.(list int)
 
+let maybe = QCheck.(option int)
+
 let manymany =
   let open QCheck in
   oneof
