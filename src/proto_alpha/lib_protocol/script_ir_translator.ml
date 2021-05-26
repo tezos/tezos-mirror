@@ -126,121 +126,133 @@ let add_dip ty annot prev =
 
 (* ---- Type size accounting ------------------------------------------------*)
 
-let rec comparable_type_size : type t. t comparable_ty -> int =
- fun ty ->
-  (* No wildcard to force the update when comparable_ty changes. *)
-  match ty with
-  | Unit_key _ ->
-      1
-  | Never_key _ ->
-      1
-  | Int_key _ ->
-      1
-  | Nat_key _ ->
-      1
-  | Signature_key _ ->
-      1
-  | String_key _ ->
-      1
-  | Bytes_key _ ->
-      1
-  | Mutez_key _ ->
-      1
-  | Bool_key _ ->
-      1
-  | Key_hash_key _ ->
-      1
-  | Key_key _ ->
-      1
-  | Timestamp_key _ ->
-      1
-  | Chain_id_key _ ->
-      1
-  | Address_key _ ->
-      1
-  | Pair_key ((t1, _), (t2, _), _) ->
-      1 + comparable_type_size t1 + comparable_type_size t2
-  | Union_key ((t1, _), (t2, _), _) ->
-      1 + comparable_type_size t1 + comparable_type_size t2
-  | Option_key (t, _) ->
-      1 + comparable_type_size t
+(**
+  [deduce_comparable_type_size ~remaining ty] returns [remaining] minus the size of type [ty].
+  It is guaranteed to not grow the stack by more than [remaining] non-tail calls.
+*)
+let rec deduce_comparable_type_size :
+    type t. remaining:int -> t comparable_ty -> int =
+ fun ~remaining ty ->
+  if Compare.Int.(remaining < 0) then remaining
+  else
+    match ty with
+    | Unit_key _
+    | Never_key _
+    | Int_key _
+    | Nat_key _
+    | Signature_key _
+    | String_key _
+    | Bytes_key _
+    | Mutez_key _
+    | Bool_key _
+    | Key_hash_key _
+    | Key_key _
+    | Timestamp_key _
+    | Chain_id_key _
+    | Address_key _ ->
+        remaining - 1
+    | Pair_key ((t1, _), (t2, _), _) ->
+        let remaining = remaining - 1 in
+        let remaining = deduce_comparable_type_size ~remaining t1 in
+        deduce_comparable_type_size ~remaining t2
+    | Union_key ((t1, _), (t2, _), _) ->
+        let remaining = remaining - 1 in
+        let remaining = deduce_comparable_type_size ~remaining t1 in
+        deduce_comparable_type_size ~remaining t2
+    | Option_key (t, _) ->
+        let remaining = remaining - 1 in
+        deduce_comparable_type_size ~remaining t
 
-let rec type_size : type t. t ty -> int =
- fun ty ->
+(**
+  [deduce_type_size ~remaining ty] returns [remaining] minus the size of type [ty].
+  It is guaranteed to not grow the stack by more than [remaining] non-tail calls.
+*)
+let rec deduce_type_size : type t. remaining:int -> t ty -> int =
+ fun ~remaining ty ->
   match ty with
-  | Unit_t _ ->
-      1
-  | Int_t _ ->
-      1
-  | Nat_t _ ->
-      1
-  | Signature_t _ ->
-      1
-  | Bytes_t _ ->
-      1
-  | String_t _ ->
-      1
-  | Mutez_t _ ->
-      1
-  | Key_hash_t _ ->
-      1
-  | Key_t _ ->
-      1
-  | Timestamp_t _ ->
-      1
-  | Address_t _ ->
-      1
-  | Bool_t _ ->
-      1
-  | Operation_t _ ->
-      1
-  | Chain_id_t _ ->
-      1
-  | Never_t _ ->
-      1
-  | Bls12_381_g1_t _ ->
-      1
-  | Bls12_381_g2_t _ ->
-      1
-  | Bls12_381_fr_t _ ->
-      1
-  | Sapling_transaction_t _ ->
-      1
+  | Unit_t _
+  | Int_t _
+  | Nat_t _
+  | Signature_t _
+  | Bytes_t _
+  | String_t _
+  | Mutez_t _
+  | Key_hash_t _
+  | Key_t _
+  | Timestamp_t _
+  | Address_t _
+  | Bool_t _
+  | Operation_t _
+  | Chain_id_t _
+  | Never_t _
+  | Bls12_381_g1_t _
+  | Bls12_381_g2_t _
+  | Bls12_381_fr_t _
+  | Sapling_transaction_t _
   | Sapling_state_t _ ->
-      1
+      remaining - 1
   | Pair_t ((l, _, _), (r, _, _), _) ->
-      1 + type_size l + type_size r
+      let remaining = remaining - 1 in
+      let remaining = deduce_type_size ~remaining l in
+      deduce_type_size ~remaining r
   | Union_t ((l, _), (r, _), _) ->
-      1 + type_size l + type_size r
+      let remaining = remaining - 1 in
+      let remaining = deduce_type_size ~remaining l in
+      deduce_type_size ~remaining r
   | Lambda_t (arg, ret, _) ->
-      1 + type_size arg + type_size ret
+      let remaining = remaining - 1 in
+      let remaining = deduce_type_size ~remaining arg in
+      deduce_type_size ~remaining ret
   | Option_t (t, _) ->
-      1 + type_size t
+      let remaining = remaining - 1 in
+      deduce_type_size ~remaining t
   | List_t (t, _) ->
-      1 + type_size t
+      let remaining = remaining - 1 in
+      deduce_type_size ~remaining t
   | Ticket_t (t, _) ->
-      1 + comparable_type_size t
+      let remaining = remaining - 1 in
+      deduce_comparable_type_size ~remaining t
   | Set_t (k, _) ->
-      1 + comparable_type_size k
+      let remaining = remaining - 1 in
+      deduce_comparable_type_size ~remaining k
   | Map_t (k, v, _) ->
-      1 + comparable_type_size k + type_size v
+      let remaining = remaining - 1 in
+      let remaining = deduce_comparable_type_size ~remaining k in
+      deduce_type_size ~remaining v
   | Big_map_t (k, v, _) ->
-      1 + comparable_type_size k + type_size v
+      let remaining = remaining - 1 in
+      let remaining = deduce_comparable_type_size ~remaining k in
+      deduce_type_size ~remaining v
   | Contract_t (arg, _) ->
-      1 + type_size arg
+      let remaining = remaining - 1 in
+      deduce_type_size ~remaining arg
 
-let rec type_size_of_stack_head : type a s. (a, s) stack_ty -> up_to:int -> int
-    =
- fun stack ~up_to ->
-  match stack with
-  | Bot_t ->
-      0
-  | Item_t (head, tail, _annot) ->
-      if Compare.Int.(up_to > 0) then
-        Compare.Int.max
-          (type_size head)
-          (type_size_of_stack_head tail ~up_to:(up_to - 1))
-      else 0
+let check_type_size ~loc ~maximum_type_size ty =
+  if Compare.Int.(deduce_type_size ~remaining:maximum_type_size ty >= 0) then
+    ok_unit
+  else error (Type_too_large (loc, maximum_type_size))
+
+let rec check_type_size_of_stack_head :
+    type a s.
+    loc:Script.location ->
+    maximum_type_size:int ->
+    (a, s) stack_ty ->
+    up_to:int ->
+    unit tzresult =
+ fun ~loc ~maximum_type_size stack ~up_to ->
+  if Compare.Int.(up_to <= 0) then ok_unit
+  else
+    match stack with
+    | Bot_t ->
+        ok_unit
+    | Item_t (head, tail, _annot) ->
+        check_type_size ~loc ~maximum_type_size head
+        >>? fun () ->
+        (check_type_size_of_stack_head [@tailcall])
+          ~loc
+          ~maximum_type_size
+          tail
+          ~up_to:(up_to - 1)
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -3557,12 +3569,12 @@ and parse_instr :
     match judgement with
     | Typed {loc; aft; _} ->
         let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
-        let type_size =
-          type_size_of_stack_head aft ~up_to:number_of_generated_growing_types
-        in
-        if Compare.Int.(type_size > maximum_type_size) then
-          error (Type_too_large (loc, maximum_type_size))
-        else ok (judgement, ctxt)
+        check_type_size_of_stack_head
+          ~loc
+          ~maximum_type_size
+          aft
+          ~up_to:number_of_generated_growing_types
+        >|? fun () -> (judgement, ctxt)
     | Failed _ ->
         ok (judgement, ctxt)
   in

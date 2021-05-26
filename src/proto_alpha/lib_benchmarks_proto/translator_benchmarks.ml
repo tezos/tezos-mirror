@@ -831,7 +831,14 @@ module Merge_types : Benchmark.S = struct
       match ty with
       | Ex_ty ty ->
           let dummy_loc = 0 in
-          let nodes = Script_ir_translator.type_size ty in
+          let nodes =
+            let max_type_size = 9999 in
+            let remaining =
+              Script_ir_translator.deduce_type_size ~remaining:max_type_size ty
+            in
+            assert (remaining >= 0) ;
+            max_type_size - remaining
+          in
           Lwt.return (Script_ir_translator.ty_eq ctxt dummy_loc ty ty)
           >|= Environment.wrap_tzresult
           >>=? fun (_, ctxt') ->
