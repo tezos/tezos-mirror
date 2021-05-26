@@ -22,10 +22,12 @@ echo "* Configuration"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
 TOP_DIR="$SCRIPT_DIR"/..
 cd "$TOP_DIR" || exit
-"$TOP_DIR"/tezos-client --mode mockup --base-dir /tmp/mockup create mockup \
+
+MOCKUP_DIR=$(mktemp -d)
+"$TOP_DIR"/tezos-client --mode mockup --base-dir "$MOCKUP_DIR" create mockup \
                       1> /tmp/create-mockup.log 2>&1
 
-TEZOS_CLIENT="$TOP_DIR/tezos-client --base-dir /tmp/mockup \
+TEZOS_CLIENT="$TOP_DIR/tezos-client --base-dir $MOCKUP_DIR \
                     --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
                     --mode mockup"
 
