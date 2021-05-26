@@ -58,20 +58,29 @@ Constants and struct fields:
 
 - Purpose and definition of this data. If the unit is a measurement of time, include it, e.g., TIMEOUT_MS for timeout in milliseconds.
 
-.. _fixme_comments:
+.. _todo_fixme:
 
-FIXME comments
-~~~~~~~~~~~~~~
+TODO/FIXME comments
+~~~~~~~~~~~~~~~~~~~
 
-During the :ref:`code review process <code_review>`, follow-up issues may be created, for instance to improve or generalize some piece of code.
-When the place of the future fix is known in advance (e.g. a given function), you should mark it with a FIXME comment of the form::
+During the :ref:`code review process <code_review>`, follow-up issues may be created to improve some piece of code that already implement its specification (e.g., optimize, refactor, or bring a potentially useful generalization).
+When the place of the future evolution is known in advance (e.g. a given function), you should mark it with a ``TODO`` comment of the form::
 
-    (* FIXME: <reference to issue>
+    (* TODO: <reference to issue>
        <one-line explanation>
        <Add long explanation if the issue description is not the right place.>
     *)
 
-Note that the reference to an existing issue on the first line is mandatory, to facilitate searches of FIXMEs corresponding to given issues, and might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`.
+If the evolution is needed to fix some code that does *not* fully implement its specification, (e.g., a known bug detected but not yet fixed, or a temporary implementation handling only some particular cases), rather than to merely improve the code, you should use a ``FIXME`` tag instead of the ``TODO``, adhering to the same syntax for the rest.
+
+Thus, the difference between ``TODO`` and ``FIXME`` tags is a semantic one,  reflecting the full/partial implementation of the specification.
+Consequently, when the specification evolves to become more demanding, some ``TODO`` tags corresponding to *potential* evolutions may have to be recasted as ``FIXME`` tags, corresponding to *required* evolutions.
+
+Note that the reference to an existing issue on the first line is mandatory, to facilitate searches of evolutions corresponding to given issues, and might be checked automatically by the :ref:`Merge-Request Bot <merge_bot>`.
+The reference to an issue may be one of:
+
+- a URL such as ``https://gitlab.com/tezos/tezos/-/issues/1377``
+- a GitLab notation such as ``#123`` (implicitly under ``tezos/tezos``), ``michelson-reference#123`` (implicitly under ``tezos/michelson-reference``), or ``smondet/merbocop#123`` (fully qualified).
 
 Documenting interfaces and implementations
 ------------------------------------------
