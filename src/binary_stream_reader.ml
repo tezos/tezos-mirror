@@ -25,15 +25,11 @@
 
 open Binary_error_types
 
-let wrap_user_function f a =
-  try f a with
-  | (Out_of_memory | Stack_overflow) as exc -> raise exc
-  | Invariant_guard s -> raise (Read_error (User_invariant_guard s))
-  | exc ->
-      let s = Printexc.to_string exc in
-      raise (Read_error (Exception_raised_in_user_function s))
+exception Local_read_error of read_error
 
-let raise e = raise (Read_error e)
+(* do not leak this exception outside of this module *)
+
+let raise_read_error e = raise (Local_read_error e)
 
 (** Persistent state of the binary reader. *)
 type state = {
@@ -59,13 +55,13 @@ type 'ret status =
 
 let check_remaining_bytes state size =
   match state.remaining_bytes with
-  | Some len when len < size -> raise Not_enough_data
+  | Some len when len < size -> raise_read_error Not_enough_data
   | Some len -> Some (len - size)
   | None -> None
 
 let check_allowed_bytes state size =
   match state.allowed_bytes with
-  | Some len when len < size -> raise Size_limit_exceeded
+  | Some len when len < size -> raise_read_error Size_limit_exceeded
   | Some len -> Some (len - size)
   | None -> None
 
@@ -73,7 +69,7 @@ let check_allowed_bytes state size =
     pass it to [conv] to be decoded, and finally call the continuation [k]
     with the decoded value and the updated state.
 
-    The function [conv] is also allowed to raise [Read_error err].
+    The function [conv] is also allowed to raise [Local_read_error err].
     In that case the exception is caught and [Error err] is returned.
 
     If there is not enough [remaining_bytes] to be read in [state], the
@@ -99,7 +95,7 @@ let read_atom resume size conv state k =
         total_read = state.total_read + size;
       } )
   with
-  | exception Read_error error -> Error error
+  | exception Local_read_error error -> Error error
   | exception Binary_stream.Need_more_data -> Await resume
   | v -> k v
 
@@ -127,7 +123,8 @@ module Atom = struct
   let uint30 r =
     read_atom r Binary_size.uint30 @@ fun buffer ofs ->
     let v = Int32.to_int (TzEndian.get_int32 buffer ofs) in
-    if v < 0 then raise (Invalid_int {min = 0; v; max = (1 lsl 30) - 1});
+    if v < 0 then
+      raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1});
     v
 
   let int31 r =
@@ -181,7 +178,7 @@ module Atom = struct
     if byte land 0x80 = 0x80 then read_z res value bit_in_value state k
     else (
       if bit_in_value > 0 then Buffer.add_char res (Char.unsafe_chr value);
-      if byte = 0x00 then raise Trailing_zero;
+      if byte = 0x00 then raise_read_error Trailing_zero;
       k (Z.of_bits (Buffer.contents res), state) )
 
   let n resume state k =
@@ -225,7 +222,7 @@ end
 let rec skip n state k =
   let resume buffer =
     let stream = Binary_stream.push buffer state.stream in
-    try skip n {state with stream} k with Read_error err -> Error err
+    try skip n {state with stream} k with Local_read_error err -> Error err
   in
   Atom.fixed_length_string n resume state @@ fun ((_, state) : string * _) ->
   k state
@@ -242,7 +239,7 @@ let rec read_rec :
   let resume buffer =
     let stream = Binary_stream.push buffer state.stream in
     try read_rec whole e {state with stream} k
-    with Read_error err -> Error err
+    with Local_read_error err -> Error err
   in
   let open Encoding in
   assert (Encoding.classify e <> `Variable || state.remaining_bytes <> None);
@@ -321,7 +318,6 @@ let rec read_rec :
   | Tups {kind = `Variable; left; right} ->
       read_variable_pair left right state k
   | Conv {inj; encoding; _} ->
-      let inj v = wrap_user_function inj v in
       read_rec whole encoding state @@ fun (v, state) -> k (inj v, state)
   | Union {tag_size; cases; _} -> (
       Atom.tag tag_size resume state @@ fun (ctag, state) ->
@@ -333,7 +329,6 @@ let rec read_rec :
       with
       | None -> Error (Unexpected_tag ctag)
       | Some (Case {encoding; inj; _}) ->
-          let inj v = wrap_user_function inj v in
           read_rec whole encoding state @@ fun (v, state) -> k (inj v, state) )
   | Dynamic_size {kind; encoding = e} ->
       Atom.int kind resume state @@ fun (sz, state) ->
@@ -352,7 +347,7 @@ let rec read_rec :
       in
       ( match state.remaining_bytes with
       | Some remaining when whole && limit < remaining ->
-          raise Size_limit_exceeded
+          raise_read_error Size_limit_exceeded
       | _ -> () );
       let state = {state with allowed_bytes = Some limit} in
       read_rec whole e state @@ fun (v, state) ->
@@ -372,10 +367,10 @@ let rec read_rec :
   | Describe {encoding = e; _} -> read_rec whole e state k
   | Splitted {encoding = e; _} -> read_rec whole e state k
   | Mu {fix; _} ->
-      let e = wrap_user_function fix e in
+      let e = fix e in
       read_rec whole e state k
   | Delayed f ->
-      let e = wrap_user_function f () in
+      let e = f () in
       read_rec whole e state k
 
 and remaining_bytes {remaining_bytes; _} =
@@ -424,7 +419,7 @@ and read_list :
   let rec loop state acc max_length =
     let size = remaining_bytes state in
     if size = 0 then k (List.rev acc, state)
-    else if max_length = 0 then raise error
+    else if max_length = 0 then raise_read_error error
     else
       read_rec false e state @@ fun (v, state) ->
       loop state (v :: acc) (max_length - 1)
@@ -432,7 +427,13 @@ and read_list :
   loop state [] max_length
 
 let read_rec e state k =
-  try read_rec false e state k with Read_error err -> Error err
+  try read_rec false e state k with
+  | (Out_of_memory | Stack_overflow) as exc -> raise exc
+  | Invariant_guard s -> Error (User_invariant_guard s)
+  | Local_read_error re -> Error re
+  | exc ->
+      let s = Printexc.to_string exc in
+      Error (Exception_raised_in_user_function s)
 
 (** ******************** *)
 
