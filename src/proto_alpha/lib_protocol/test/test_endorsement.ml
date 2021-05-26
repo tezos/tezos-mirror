@@ -528,15 +528,9 @@ let test_non_normalized_slot_wrapper () =
 let test_wrong_endorsement_predecessor () =
   Context.init 5
   >>=? fun (b, _) ->
-  Context.get_endorser (B b)
-  >>=? fun (genesis_endorser, slots) ->
   Block.bake b
   >>=? fun b' ->
-  Op.endorsement_with_slot
-    ~delegate:(genesis_endorser, slots)
-    ~signing_context:(B b)
-    (B b')
-    ()
+  Op.endorsement_with_slot ~signing_context:(B b) (B b') ()
   >>=? fun operation ->
   let operation = Operation.pack operation in
   Block.bake ~operation b'
@@ -555,11 +549,18 @@ let test_invalid_endorsement_level () =
   Context.get_level (B b)
   >>?= fun genesis_level ->
   Block.bake b
-  >>=? fun b ->
-  Op.endorsement_with_slot ~level:genesis_level (B b) ()
+  >>=? fun b' ->
+  Context.get_endorser (B b)
+  >>=? fun (genesis_endorser, slots) ->
+  Op.endorsement_with_slot
+    ~delegate:(genesis_endorser, slots)
+    ~signing_context:(B b')
+    ~level:genesis_level
+    (B b')
+    ()
   >>=? fun operation ->
   let operation = Operation.pack operation in
-  Block.bake ~operation b
+  Block.bake ~operation b'
   >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Apply.Invalid_endorsement_level ->
