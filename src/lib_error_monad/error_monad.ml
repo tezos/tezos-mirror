@@ -59,6 +59,8 @@ let generic_error fmt = Format.kasprintf (fun s -> error (Exn (Failure s))) fmt
 
 let failwith fmt = Format.kasprintf (fun s -> fail (Exn (Failure s))) fmt
 
+let error_of_exn e = TzTrace.make @@ Exn e
+
 let error_exn s = Error (TzTrace.make @@ Exn s)
 
 let trace_exn exn f = trace (Exn exn) f
