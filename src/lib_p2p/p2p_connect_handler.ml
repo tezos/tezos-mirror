@@ -200,15 +200,13 @@ let may_register_my_id_point pool = function
    *)
 let check_expected_peer_id (point_info : 'a P2p_point_state.Info.t option)
     (conn_info : 'b P2p_connection.Info.t) =
-  Option.fold
-  (* if no point info, nothing is expected from the point, it cannot
+  Option.iter_es
+    (* if no point info, nothing is expected from the point, it cannot
      even be set to trusted.  *)
-    ~none:return_unit
-    ~some:(fun point_info ->
+      (fun point_info ->
       let point = P2p_point_state.Info.point point_info in
-      Option.fold
-        ~none:return_unit
-        ~some:(fun expected_peer_id ->
+      Option.iter_es
+        (fun expected_peer_id ->
           if P2p_peer.Id.(expected_peer_id <> conn_info.peer_id) then
             Events.(emit authenticate_status_peer_id_incorrect)
               ("peer_id", point, expected_peer_id, conn_info.peer_id)

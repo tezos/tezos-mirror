@@ -76,11 +76,9 @@ let p2p_point_id_t = QCheck.pair ip port
 
 let pp_addr_port_id fmt {P2p_point.Id.addr; port; peer_id} =
   let open Format in
-  let port_s = Option.fold ~none:"" ~some:(asprintf ":%d") port in
-  let peer_id_s =
-    Option.fold ~none:"" ~some:(asprintf "#%a" P2p_peer_id.pp) peer_id
-  in
-  fprintf fmt "%s%s%s" addr port_s peer_id_s
+  fprintf fmt "%s" addr ;
+  Option.iter (fprintf fmt ":%d") port ;
+  Option.iter (fprintf fmt "#%a" P2p_peer_id.pp) peer_id
 
 let addr_port_id_v4 =
   QCheck.map

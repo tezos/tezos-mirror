@@ -149,14 +149,10 @@ let locked_is_acceptable_block chain_state (hash, level) =
     (* FIXME? should we read its predecessor at checkpoint level to
        see if it's the same? *)
     Stored_data.get chain_state.target_data
-    >>= fun target ->
-    Option.fold
-      ~none:Lwt.return_true
-      ~some:(fun (target_hash, target_level) ->
-        if Compare.Int32.(level = target_level) then
-          Lwt.return (Block_hash.equal hash target_hash)
-        else Lwt.return_true)
-      target
+    >|= Option.fold ~none:true ~some:(fun (target_hash, target_level) ->
+            if Compare.Int32.(level = target_level) then
+              Block_hash.equal hash target_hash
+            else true)
 
 let create_lockfile chain_dir =
   protect (fun () ->

@@ -643,8 +643,9 @@ let use_ledger_or_fail ~ledger_uri ?filter ?msg f =
       return o
   | None ->
       failwith
-        "%sFound no ledger corresponding to %a%t."
-        (Option.fold ~none:"" ~some:(Printf.sprintf "%s: ") msg)
+        "%aFound no ledger corresponding to %a%t."
+        (Format.pp_print_option (fun fmt s -> Format.fprintf fmt "%s: " s))
+        msg
         Ledger_uri.pp
         ledger_uri
         (fun ppf ->

@@ -354,10 +354,7 @@ let pp_document ppf descriptions version =
   List.iter
     (fun (name, intro, prefix, rpc_dir) ->
       (* If provided, insert the introductory include *)
-      Option.fold
-        ~none:()
-        ~some:(Format.fprintf ppf ".. include:: %s@\n@\n")
-        intro ;
+      Option.iter (Format.fprintf ppf ".. include:: %s@\n@\n") intro ;
       Rst.pp_h3 ppf name ;
       Format.fprintf ppf "%a@\n@\n" (Index.pp prefix) rpc_dir)
     descriptions ;
