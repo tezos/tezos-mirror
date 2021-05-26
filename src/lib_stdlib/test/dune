@@ -13,7 +13,7 @@
             lwt_log
             bigstring
             lwt.unix
-            lib-test
+            tezos-test-helpers
             qcheck-alcotest
             crowbar)
  (flags (:standard -open Tezos_stdlib)))

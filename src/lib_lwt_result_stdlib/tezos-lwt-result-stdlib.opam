@@ -10,7 +10,7 @@ depends: [
   "ocaml" { >= "4.07" }
   "lwt"
   "alcotest-lwt" { with-test & >= "1.1.0" }
-  "lib-test" { with-test }
+  "tezos-test-helpers" { with-test }
   "qcheck-alcotest" { with-test }
 ]
 build: [

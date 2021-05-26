@@ -12,7 +12,7 @@ depends: [
   "resto-cohttp-server" { >= "0.6" & < "0.7" }
   "resto-acl" { >= "0.6" & < "0.7" }
   "alcotest-lwt" { with-test }
-  "lib-test" { with-test }
+  "tezos-test-helpers" { with-test }
   "qcheck-alcotest" { with-test }
   "tezos-test-services" { with-test }
 ]

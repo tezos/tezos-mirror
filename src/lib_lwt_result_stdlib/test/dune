@@ -16,7 +16,7 @@
             lwt.unix
             alcotest-lwt
             qcheck-alcotest
-            lib-test)
+            tezos-test-helpers)
  (flags (:standard -open Tezos_lwt_result_stdlib))
  (package tezos-lwt-result-stdlib)
 )

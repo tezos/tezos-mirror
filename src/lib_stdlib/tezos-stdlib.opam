@@ -16,7 +16,7 @@ depends: [
   "alcotest" { with-test & >= "1.1.0" }
   "alcotest-lwt" { with-test & >= "1.1.0" }
   "crowbar" { with-test }
-  "lib-test" { with-test }
+  "tezos-test-helpers" { with-test }
   "qcheck-alcotest" { with-test }
 ]
 build: [

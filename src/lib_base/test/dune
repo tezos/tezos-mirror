@@ -8,7 +8,7 @@
    tezos-base.unix
    data-encoding
    qcheck-alcotest
-   lib-test
+   tezos-test-helpers
  )
  (flags (:standard
           -open Tezos_base

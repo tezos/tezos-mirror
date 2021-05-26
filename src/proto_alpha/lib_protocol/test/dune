@@ -4,7 +4,7 @@
             tezos-micheline
             tezos-protocol-environment
             alcotest-lwt
-            lib-test
+            tezos-test-helpers
             qcheck-alcotest
             tezos-alpha-test-helpers
             tezos-stdlib-unix

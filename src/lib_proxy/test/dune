@@ -8,7 +8,7 @@
   tezos-proxy
   tezos-test-services
   crowbar
-  lib-test
+  tezos-test-helpers
   qcheck-alcotest
   alcotest-lwt)
  (flags
