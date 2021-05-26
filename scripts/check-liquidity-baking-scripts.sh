@@ -35,6 +35,10 @@ cd /tmp || exit
 echo "* Step 1: Setup the LIGO compiler"
 # --------------------------------------
 
+# This is the exact version of the compiler used to compile the scripts:
+#
+#   https://gitlab.com/ligolang/ligo/-/releases/0.9.0-liquidity-baking
+#
 rm -fr ligo
 wget --quiet https://gitlab.com/ligolang/ligo/-/jobs/1291756399/artifacts/raw/ligo -O ligo
 chmod a+rx ligo
