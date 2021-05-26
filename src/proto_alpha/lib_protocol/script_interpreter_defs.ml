@@ -888,9 +888,7 @@ type ('a, 'b, 'c, 'd, 'e, 'j, 'k) kmap_enter_type =
   (('a, 'b * 'c, 'd, 'e) continuation -> ('a, 'b * 'c, 'd, 'e) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr ->
-  ('j * 'k) list ->
-  ('j, 'a) map ->
+  ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr * ('j * 'k) list * ('j, 'a) map ->
   (('j, 'a) map, 'b * 'c, 'd, 'e) continuation ->
   'b ->
   'c ->
@@ -940,8 +938,7 @@ type ('a, 'b, 's, 'r, 'f) kiter_type =
   (('a, 's, 'r, 'f) continuation -> ('a, 's, 'r, 'f) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('b, 'a * 's, 'a, 's) kinstr ->
-  'b list ->
+  ('b, 'a * 's, 'a, 's) kinstr * 'b list ->
   ('a, 's, 'r, 'f) continuation ->
   'a ->
   's ->
@@ -951,8 +948,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) ilist_map_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e, 'a * 'b, 'f, 'a * 'b) kinstr ->
-  ('f boxed_list, 'a * 'b, 'g, 'h) kinstr ->
+  ('e, 'a * 'b, 'f, 'a * 'b) kinstr * ('f boxed_list, 'a * 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
   'e boxed_list ->
   'a * 'b ->
@@ -962,8 +958,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) ilist_iter_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e, 'a * 'b, 'a, 'b) kinstr ->
-  ('a, 'b, 'f, 'g) kinstr ->
+  ('e, 'a * 'b, 'a, 'b) kinstr * ('a, 'b, 'f, 'g) kinstr ->
   ('f, 'g, 'c, 'd) continuation ->
   'e boxed_list ->
   'a * 'b ->
@@ -973,8 +968,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e, 'a * 'b, 'a, 'b) kinstr ->
-  ('a, 'b, 'f, 'g) kinstr ->
+  ('e, 'a * 'b, 'a, 'b) kinstr * ('a, 'b, 'f, 'g) kinstr ->
   ('f, 'g, 'c, 'd) continuation ->
   'e set ->
   'a * 'b ->
@@ -984,8 +978,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) imap_map_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr ->
-  (('e, 'g) map, 'a * 'b, 'h, 'i) kinstr ->
+  ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr
+  * (('e, 'g) map, 'a * 'b, 'h, 'i) kinstr ->
   ('h, 'i, 'c, 'd) continuation ->
   ('e, 'f) map ->
   'a * 'b ->
@@ -995,8 +989,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) imap_iter_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e * 'f, 'a * 'b, 'a, 'b) kinstr ->
-  ('a, 'b, 'g, 'h) kinstr ->
+  ('e * 'f, 'a * 'b, 'a, 'b) kinstr * ('a, 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
   ('e, 'f) map ->
   'a * 'b ->
@@ -1006,8 +999,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) imul_teznat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Tez.t, 'a) kinfo ->
-  (Tez.t, 'b, 'c, 'd) kinstr ->
+  (Tez.t, 'a) kinfo * (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Tez.t ->
   Script_int.n Script_int.num * 'b ->
@@ -1017,8 +1009,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) imul_nattez_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo ->
-  (Tez.t, 'b, 'c, 'd) kinstr ->
+  (Script_int.n Script_int.num, 'a) kinfo * (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Tez.t * 'b ->
@@ -1028,8 +1019,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsl_nat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo ->
-  (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
+  (Script_int.n Script_int.num, 'a) kinfo
+  * (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Script_int.n Script_int.num * 'b ->
@@ -1039,8 +1030,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsr_nat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo ->
-  (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
+  (Script_int.n Script_int.num, 'a) kinfo
+  * (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Script_int.n Script_int.num * 'b ->
