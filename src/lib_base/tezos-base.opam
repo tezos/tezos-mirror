@@ -9,6 +9,7 @@ depends: [
   "dune" { >= "2.0" }
   "tezos-stdlib"
   "tezos-crypto"
+  "bls12-381-unix"
   "tezos-hacl-glue-unix"
   "data-encoding" { >= "0.3" & < "0.4" }
   "tezos-error-monad"
