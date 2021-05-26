@@ -403,6 +403,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
     pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool
 
+  let handle_applied pv (op : Prevalidation.operation) =
+    notify_operation pv `Applied op.raw ;
+    pv.applied <- (op.hash, op.raw) :: pv.applied ;
+    pv.in_mempool <- Operation_hash.Set.add op.hash pv.in_mempool
+
   (* Classify pending operations into either: [Refused |
      Branch_delayed | Branch_refused | Applied].  To ensure fairness
      with other worker requests, classification of operations is done
@@ -466,7 +471,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                              receipt
                            >>= fun accept ->
                            if accept then (
-                             notify_operation pv `Applied op.raw ;
+                             handle_applied pv op ;
                              let new_mempool =
                                Mempool.
                                  {
@@ -475,9 +480,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                                      op.hash :: acc_mempool.known_valid;
                                  }
                              in
-                             pv.applied <- (op.hash, op.raw) :: pv.applied ;
-                             pv.in_mempool <-
-                               Operation_hash.Set.add op.hash pv.in_mempool ;
                              Lwt.return_ok
                                (new_acc_validation_state, new_mempool, limit))
                            else (
