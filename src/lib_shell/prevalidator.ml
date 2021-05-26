@@ -516,18 +516,20 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             in
             pv.validation_state <- Ok state ;
             (* We advertise only newly classified operations. *)
-            advertise
-              w
-              pv
+            let mempool_to_advertise =
               {
                 advertised_mempool with
                 known_valid = List.rev advertised_mempool.known_valid;
-              } ;
-            pv.mempool <-
+              }
+            in
+            advertise w pv mempool_to_advertise ;
+            let our_mempool =
               {
                 Mempool.known_valid = List.rev_map fst pv.applied;
                 pending = remaining_pendings;
-              } ;
+              }
+            in
+            pv.mempool <- our_mempool ;
             let chain_store = Distributed_db.chain_store pv.chain_db in
             Store.Chain.set_mempool
               chain_store
