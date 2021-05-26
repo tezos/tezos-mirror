@@ -416,16 +416,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     match pv.validation_state with
     | Error err ->
         Operation_hash.Map.iter
-          (fun h op ->
-            Option.iter
-              (fun e ->
-                pv.branch_delayed.map <-
-                  Operation_hash.Map.remove e pv.branch_delayed.map ;
-                pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
-              (Ringo.Ring.add_and_return_erased pv.branch_delayed.ring h) ;
-            pv.in_mempool <- Operation_hash.Set.add h pv.in_mempool ;
-            pv.branch_delayed.map <-
-              Operation_hash.Map.add h (op, err) pv.branch_delayed.map)
+          (fun oph op -> handle_branch_delayed pv op oph err)
           pv.pending ;
         pv.pending <- Operation_hash.Map.empty ;
         Lwt.return_unit
