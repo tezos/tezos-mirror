@@ -34,12 +34,13 @@ let commands () =
   in
   let block_arg =
     default_arg
-      ~long:"block"
+      ~long:"branch"
       ~short:'b'
       ~placeholder:"hash|tag"
       ~doc:
-        "block on which to apply contextual commands (possible tags are \
-         'head' and 'genesis'). Defaults to 'genesis'."
+        "Block hash used to create the no-op operation to sign (possible tags \
+         are 'head' and 'genesis'). Defaults to 'genesis'. Note that the the \
+         genesis block hash is network-dependent."
       ~default:(Block_services.to_string `Genesis)
       (Client_config.block_parameter ())
   in
