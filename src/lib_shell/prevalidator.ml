@@ -397,7 +397,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   let handle_refused pv op oph errors =
     notify_operation pv `Refused op ;
     Option.iter
-      (fun e -> pv.refused.map <- Operation_hash.Map.remove e pv.refused.map)
+      (fun e ->
+        pv.refused.map <- Operation_hash.Map.remove e pv.refused.map ;
+        (* The line below is not necessary but just to be sure *)
+        Distributed_db.Operation.clear_or_cancel pv.chain_db e ;
+        pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
       (Ringo.Ring.add_and_return_erased pv.refused.ring oph) ;
     pv.refused.map <- Operation_hash.Map.add oph (op, errors) pv.refused.map ;
     Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
