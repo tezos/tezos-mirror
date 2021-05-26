@@ -1711,144 +1711,150 @@ let parse_memo_size (n : (location, _) Micheline.node) :
       error @@ Invalid_kind (location n, [Int_kind], kind n)
 
 let rec parse_comparable_ty :
-    context -> Script.node -> (ex_comparable_ty * context) tzresult =
- fun ctxt ty ->
+    stack_depth:int ->
+    context ->
+    Script.node ->
+    (ex_comparable_ty * context) tzresult =
+ fun ~stack_depth ctxt ty ->
   Gas.consume ctxt Typecheck_costs.parse_type_cycle
   >>? fun ctxt ->
-  match ty with
-  | Prim (loc, T_unit, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Unit_key tname), ctxt)
-  | Prim (loc, T_never, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Never_key tname), ctxt)
-  | Prim (loc, T_int, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Int_key tname), ctxt)
-  | Prim (loc, T_nat, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Nat_key tname), ctxt)
-  | Prim (loc, T_signature, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Signature_key tname), ctxt)
-  | Prim (loc, T_string, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (String_key tname), ctxt)
-  | Prim (loc, T_bytes, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Bytes_key tname), ctxt)
-  | Prim (loc, T_mutez, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Mutez_key tname), ctxt)
-  | Prim (loc, T_bool, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Bool_key tname), ctxt)
-  | Prim (loc, T_key_hash, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Key_hash_key tname), ctxt)
-  | Prim (loc, T_key, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Key_key tname), ctxt)
-  | Prim (loc, T_timestamp, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Timestamp_key tname), ctxt)
-  | Prim (loc, T_chain_id, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Chain_id_key tname), ctxt)
-  | Prim (loc, T_address, [], annot) ->
-      parse_type_annot loc annot
-      >|? fun tname -> (Ex_comparable_ty (Address_key tname), ctxt)
-  | Prim
-      ( loc,
-        ( ( T_unit
-          | T_never
-          | T_int
-          | T_nat
-          | T_string
-          | T_bytes
-          | T_mutez
-          | T_bool
-          | T_key_hash
-          | T_timestamp
-          | T_address
-          | T_chain_id
-          | T_signature
-          | T_key ) as prim ),
-        l,
-        _ ) ->
-      error (Invalid_arity (loc, prim, 0, List.length l))
-  | Prim (loc, T_pair, left :: right, annot) ->
-      parse_type_annot loc annot
-      >>? fun pname ->
-      extract_field_annot left
-      >>? fun (left, left_annot) ->
-      ( match right with
-      | [right] ->
-          extract_field_annot right
-      | right ->
-          (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
-          ok (Prim (loc, T_pair, right, []), None) )
-      >>? fun (right, right_annot) ->
-      parse_comparable_ty ctxt right
-      >>? fun (Ex_comparable_ty right, ctxt) ->
-      parse_comparable_ty ctxt left
-      >|? fun (Ex_comparable_ty left, ctxt) ->
-      ( Ex_comparable_ty
-          (Pair_key ((left, left_annot), (right, right_annot), pname)),
-        ctxt )
-  | Prim (loc, T_or, [left; right], annot) ->
-      parse_type_annot loc annot
-      >>? fun pname ->
-      extract_field_annot left
-      >>? fun (left, left_annot) ->
-      extract_field_annot right
-      >>? fun (right, right_annot) ->
-      parse_comparable_ty ctxt right
-      >>? fun (Ex_comparable_ty right, ctxt) ->
-      parse_comparable_ty ctxt left
-      >|? fun (Ex_comparable_ty left, ctxt) ->
-      ( Ex_comparable_ty
-          (Union_key ((left, left_annot), (right, right_annot), pname)),
-        ctxt )
-  | Prim (loc, ((T_pair | T_or) as prim), l, _) ->
-      error (Invalid_arity (loc, prim, 2, List.length l))
-  | Prim (loc, T_option, [t], annot) ->
-      parse_type_annot loc annot
-      >>? fun tname ->
-      parse_comparable_ty ctxt t
-      >|? fun (Ex_comparable_ty t, ctxt) ->
-      (Ex_comparable_ty (Option_key (t, tname)), ctxt)
-  | Prim (loc, T_option, l, _) ->
-      error (Invalid_arity (loc, T_option, 1, List.length l))
-  | Prim
-      ( loc,
-        (T_set | T_map | T_list | T_lambda | T_contract | T_operation),
-        _,
-        _ ) ->
-      error (Comparable_type_expected (loc, Micheline.strip_locations ty))
-  | expr ->
-      error
-      @@ unexpected
-           expr
-           []
-           Type_namespace
-           [ T_unit;
-             T_never;
-             T_int;
-             T_nat;
-             T_string;
-             T_bytes;
-             T_mutez;
-             T_bool;
-             T_key_hash;
-             T_timestamp;
-             T_address;
-             T_pair;
-             T_or;
-             T_option;
-             T_chain_id;
-             T_signature;
-             T_key ]
+  if Compare.Int.(stack_depth > 10000) then
+    error Typechecking_too_many_recursive_calls
+  else
+    match ty with
+    | Prim (loc, T_unit, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Unit_key tname), ctxt)
+    | Prim (loc, T_never, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Never_key tname), ctxt)
+    | Prim (loc, T_int, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Int_key tname), ctxt)
+    | Prim (loc, T_nat, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Nat_key tname), ctxt)
+    | Prim (loc, T_signature, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Signature_key tname), ctxt)
+    | Prim (loc, T_string, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (String_key tname), ctxt)
+    | Prim (loc, T_bytes, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Bytes_key tname), ctxt)
+    | Prim (loc, T_mutez, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Mutez_key tname), ctxt)
+    | Prim (loc, T_bool, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Bool_key tname), ctxt)
+    | Prim (loc, T_key_hash, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Key_hash_key tname), ctxt)
+    | Prim (loc, T_key, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Key_key tname), ctxt)
+    | Prim (loc, T_timestamp, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Timestamp_key tname), ctxt)
+    | Prim (loc, T_chain_id, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Chain_id_key tname), ctxt)
+    | Prim (loc, T_address, [], annot) ->
+        parse_type_annot loc annot
+        >|? fun tname -> (Ex_comparable_ty (Address_key tname), ctxt)
+    | Prim
+        ( loc,
+          ( ( T_unit
+            | T_never
+            | T_int
+            | T_nat
+            | T_string
+            | T_bytes
+            | T_mutez
+            | T_bool
+            | T_key_hash
+            | T_timestamp
+            | T_address
+            | T_chain_id
+            | T_signature
+            | T_key ) as prim ),
+          l,
+          _ ) ->
+        error (Invalid_arity (loc, prim, 0, List.length l))
+    | Prim (loc, T_pair, left :: right, annot) ->
+        parse_type_annot loc annot
+        >>? fun pname ->
+        extract_field_annot left
+        >>? fun (left, left_annot) ->
+        ( match right with
+        | [right] ->
+            extract_field_annot right
+        | right ->
+            (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
+            ok (Prim (loc, T_pair, right, []), None) )
+        >>? fun (right, right_annot) ->
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt right
+        >>? fun (Ex_comparable_ty right, ctxt) ->
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
+        >|? fun (Ex_comparable_ty left, ctxt) ->
+        ( Ex_comparable_ty
+            (Pair_key ((left, left_annot), (right, right_annot), pname)),
+          ctxt )
+    | Prim (loc, T_or, [left; right], annot) ->
+        parse_type_annot loc annot
+        >>? fun pname ->
+        extract_field_annot left
+        >>? fun (left, left_annot) ->
+        extract_field_annot right
+        >>? fun (right, right_annot) ->
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt right
+        >>? fun (Ex_comparable_ty right, ctxt) ->
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
+        >|? fun (Ex_comparable_ty left, ctxt) ->
+        ( Ex_comparable_ty
+            (Union_key ((left, left_annot), (right, right_annot), pname)),
+          ctxt )
+    | Prim (loc, ((T_pair | T_or) as prim), l, _) ->
+        error (Invalid_arity (loc, prim, 2, List.length l))
+    | Prim (loc, T_option, [t], annot) ->
+        parse_type_annot loc annot
+        >>? fun tname ->
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt t
+        >|? fun (Ex_comparable_ty t, ctxt) ->
+        (Ex_comparable_ty (Option_key (t, tname)), ctxt)
+    | Prim (loc, T_option, l, _) ->
+        error (Invalid_arity (loc, T_option, 1, List.length l))
+    | Prim
+        ( loc,
+          (T_set | T_map | T_list | T_lambda | T_contract | T_operation),
+          _,
+          _ ) ->
+        error (Comparable_type_expected (loc, Micheline.strip_locations ty))
+    | expr ->
+        error
+        @@ unexpected
+             expr
+             []
+             Type_namespace
+             [ T_unit;
+               T_never;
+               T_int;
+               T_nat;
+               T_string;
+               T_bytes;
+               T_mutez;
+               T_bool;
+               T_key_hash;
+               T_timestamp;
+               T_address;
+               T_pair;
+               T_or;
+               T_option;
+               T_chain_id;
+               T_signature;
+               T_key ]
 
 let rec parse_packable_ty :
     context ->
@@ -1932,293 +1938,297 @@ and parse_ty :
      ~allow_contract
      ~allow_ticket
      node ->
-  ( if Compare.Int.(stack_depth > 10000) then
-    error Typechecking_too_many_recursive_calls
-  else ok_unit )
-  >>? fun () ->
   Gas.consume ctxt Typecheck_costs.parse_type_cycle
   >>? fun ctxt ->
-  match node with
-  | Prim (loc, T_unit, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Unit_t ty_name), ctxt)
-  | Prim (loc, T_int, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Int_t ty_name), ctxt)
-  | Prim (loc, T_nat, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Nat_t ty_name), ctxt)
-  | Prim (loc, T_string, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (String_t ty_name), ctxt)
-  | Prim (loc, T_bytes, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Bytes_t ty_name), ctxt)
-  | Prim (loc, T_mutez, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Mutez_t ty_name), ctxt)
-  | Prim (loc, T_bool, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Bool_t ty_name), ctxt)
-  | Prim (loc, T_key, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Key_t ty_name), ctxt)
-  | Prim (loc, T_key_hash, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Key_hash_t ty_name), ctxt)
-  | Prim (loc, T_timestamp, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Timestamp_t ty_name), ctxt)
-  | Prim (loc, T_address, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Address_t ty_name), ctxt)
-  | Prim (loc, T_signature, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Signature_t ty_name), ctxt)
-  | Prim (loc, T_operation, [], annot) ->
-      if allow_operation then
+  if Compare.Int.(stack_depth > 10000) then
+    error Typechecking_too_many_recursive_calls
+  else
+    match node with
+    | Prim (loc, T_unit, [], annot) ->
         parse_type_annot loc annot
-        >>? fun ty_name -> ok (Ex_ty (Operation_t ty_name), ctxt)
-      else error (Unexpected_operation loc)
-  | Prim (loc, T_chain_id, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Chain_id_t ty_name), ctxt)
-  | Prim (loc, T_never, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Never_t ty_name), ctxt)
-  | Prim (loc, T_bls12_381_g1, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Bls12_381_g1_t ty_name), ctxt)
-  | Prim (loc, T_bls12_381_g2, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Bls12_381_g2_t ty_name), ctxt)
-  | Prim (loc, T_bls12_381_fr, [], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Bls12_381_fr_t ty_name), ctxt)
-  | Prim (loc, T_contract, [utl], annot) ->
-      if allow_contract then
-        parse_parameter_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utl
+        >>? fun ty_name -> ok (Ex_ty (Unit_t ty_name), ctxt)
+    | Prim (loc, T_int, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Int_t ty_name), ctxt)
+    | Prim (loc, T_nat, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Nat_t ty_name), ctxt)
+    | Prim (loc, T_string, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (String_t ty_name), ctxt)
+    | Prim (loc, T_bytes, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Bytes_t ty_name), ctxt)
+    | Prim (loc, T_mutez, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Mutez_t ty_name), ctxt)
+    | Prim (loc, T_bool, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Bool_t ty_name), ctxt)
+    | Prim (loc, T_key, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Key_t ty_name), ctxt)
+    | Prim (loc, T_key_hash, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Key_hash_t ty_name), ctxt)
+    | Prim (loc, T_timestamp, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Timestamp_t ty_name), ctxt)
+    | Prim (loc, T_address, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Address_t ty_name), ctxt)
+    | Prim (loc, T_signature, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Signature_t ty_name), ctxt)
+    | Prim (loc, T_operation, [], annot) ->
+        if allow_operation then
+          parse_type_annot loc annot
+          >>? fun ty_name -> ok (Ex_ty (Operation_t ty_name), ctxt)
+        else error (Unexpected_operation loc)
+    | Prim (loc, T_chain_id, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Chain_id_t ty_name), ctxt)
+    | Prim (loc, T_never, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Never_t ty_name), ctxt)
+    | Prim (loc, T_bls12_381_g1, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Bls12_381_g1_t ty_name), ctxt)
+    | Prim (loc, T_bls12_381_g2, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Bls12_381_g2_t ty_name), ctxt)
+    | Prim (loc, T_bls12_381_fr, [], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Bls12_381_fr_t ty_name), ctxt)
+    | Prim (loc, T_contract, [utl], annot) ->
+        if allow_contract then
+          parse_parameter_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utl
+          >>? fun (Ex_ty tl, ctxt) ->
+          parse_type_annot loc annot
+          >>? fun ty_name -> ok (Ex_ty (Contract_t (tl, ty_name)), ctxt)
+        else error (Unexpected_contract loc)
+    | Prim (loc, T_pair, utl :: utr, annot) ->
+        extract_field_annot utl
+        >>? fun (utl, left_field) ->
+        parse_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          ~allow_lazy_storage
+          ~allow_operation
+          ~allow_contract
+          ~allow_ticket
+          utl
         >>? fun (Ex_ty tl, ctxt) ->
+        ( match utr with
+        | [utr] ->
+            extract_field_annot utr
+        | utr ->
+            (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
+            ok (Prim (loc, T_pair, utr, []), None) )
+        >>? fun (utr, right_field) ->
+        parse_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          ~allow_lazy_storage
+          ~allow_operation
+          ~allow_contract
+          ~allow_ticket
+          utr
+        >>? fun (Ex_ty tr, ctxt) ->
         parse_type_annot loc annot
-        >>? fun ty_name -> ok (Ex_ty (Contract_t (tl, ty_name)), ctxt)
-      else error (Unexpected_contract loc)
-  | Prim (loc, T_pair, utl :: utr, annot) ->
-      extract_field_annot utl
-      >>? fun (utl, left_field) ->
-      parse_ty
-        ctxt
-        ~stack_depth:(stack_depth + 1)
-        ~legacy
-        ~allow_lazy_storage
-        ~allow_operation
-        ~allow_contract
-        ~allow_ticket
-        utl
-      >>? fun (Ex_ty tl, ctxt) ->
-      ( match utr with
-      | [utr] ->
-          extract_field_annot utr
-      | utr ->
-          (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
-          ok (Prim (loc, T_pair, utr, []), None) )
-      >>? fun (utr, right_field) ->
-      parse_ty
-        ctxt
-        ~stack_depth:(stack_depth + 1)
-        ~legacy
-        ~allow_lazy_storage
-        ~allow_operation
-        ~allow_contract
-        ~allow_ticket
-        utr
-      >>? fun (Ex_ty tr, ctxt) ->
-      parse_type_annot loc annot
-      >>? fun ty_name ->
-      ok
-        ( Ex_ty
-            (Pair_t ((tl, left_field, None), (tr, right_field, None), ty_name)),
-          ctxt )
-  | Prim (loc, T_or, [utl; utr], annot) ->
-      extract_field_annot utl
-      >>? fun (utl, left_constr) ->
-      extract_field_annot utr
-      >>? fun (utr, right_constr) ->
-      parse_ty
-        ctxt
-        ~stack_depth:(stack_depth + 1)
-        ~legacy
-        ~allow_lazy_storage
-        ~allow_operation
-        ~allow_contract
-        ~allow_ticket
-        utl
-      >>? fun (Ex_ty tl, ctxt) ->
-      parse_ty
-        ctxt
-        ~stack_depth:(stack_depth + 1)
-        ~legacy
-        ~allow_lazy_storage
-        ~allow_operation
-        ~allow_contract
-        ~allow_ticket
-        utr
-      >>? fun (Ex_ty tr, ctxt) ->
-      parse_type_annot loc annot
-      >>? fun ty_name ->
-      ok
-        (Ex_ty (Union_t ((tl, left_constr), (tr, right_constr), ty_name)), ctxt)
-  | Prim (loc, T_lambda, [uta; utr], annot) ->
-      parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy uta
-      >>? fun (Ex_ty ta, ctxt) ->
-      parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utr
-      >>? fun (Ex_ty tr, ctxt) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Lambda_t (ta, tr, ty_name)), ctxt)
-  | Prim (loc, T_option, [ut], annot) ->
-      ( if legacy then
-        (* legacy semantics with (broken) field annotations *)
-        extract_field_annot ut
-        >>? fun (ut, _some_constr) ->
-        parse_composed_type_annot loc annot
-        >>? fun (ty_name, _none_constr, _) -> ok (ut, ty_name)
-      else parse_type_annot loc annot >>? fun ty_name -> ok (ut, ty_name) )
-      >>? fun (ut, ty_name) ->
-      parse_ty
-        ctxt
-        ~stack_depth:(stack_depth + 1)
-        ~legacy
-        ~allow_lazy_storage
-        ~allow_operation
-        ~allow_contract
-        ~allow_ticket
-        ut
-      >>? fun (Ex_ty t, ctxt) -> ok (Ex_ty (Option_t (t, ty_name)), ctxt)
-  | Prim (loc, T_list, [ut], annot) ->
-      parse_ty
-        ctxt
-        ~stack_depth:(stack_depth + 1)
-        ~legacy
-        ~allow_lazy_storage
-        ~allow_operation
-        ~allow_contract
-        ~allow_ticket
-        ut
-      >>? fun (Ex_ty t, ctxt) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (List_t (t, ty_name)), ctxt)
-  | Prim (loc, T_ticket, [ut], annot) ->
-      if allow_ticket then
-        parse_comparable_ty ctxt ut
+        >>? fun ty_name ->
+        ok
+          ( Ex_ty
+              (Pair_t ((tl, left_field, None), (tr, right_field, None), ty_name)),
+            ctxt )
+    | Prim (loc, T_or, [utl; utr], annot) ->
+        extract_field_annot utl
+        >>? fun (utl, left_constr) ->
+        extract_field_annot utr
+        >>? fun (utr, right_constr) ->
+        parse_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          ~allow_lazy_storage
+          ~allow_operation
+          ~allow_contract
+          ~allow_ticket
+          utl
+        >>? fun (Ex_ty tl, ctxt) ->
+        parse_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          ~allow_lazy_storage
+          ~allow_operation
+          ~allow_contract
+          ~allow_ticket
+          utr
+        >>? fun (Ex_ty tr, ctxt) ->
+        parse_type_annot loc annot
+        >>? fun ty_name ->
+        ok
+          ( Ex_ty (Union_t ((tl, left_constr), (tr, right_constr), ty_name)),
+            ctxt )
+    | Prim (loc, T_lambda, [uta; utr], annot) ->
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy uta
+        >>? fun (Ex_ty ta, ctxt) ->
+        parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utr
+        >>? fun (Ex_ty tr, ctxt) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Lambda_t (ta, tr, ty_name)), ctxt)
+    | Prim (loc, T_option, [ut], annot) ->
+        ( if legacy then
+          (* legacy semantics with (broken) field annotations *)
+          extract_field_annot ut
+          >>? fun (ut, _some_constr) ->
+          parse_composed_type_annot loc annot
+          >>? fun (ty_name, _none_constr, _) -> ok (ut, ty_name)
+        else parse_type_annot loc annot >>? fun ty_name -> ok (ut, ty_name) )
+        >>? fun (ut, ty_name) ->
+        parse_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          ~allow_lazy_storage
+          ~allow_operation
+          ~allow_contract
+          ~allow_ticket
+          ut
+        >>? fun (Ex_ty t, ctxt) -> ok (Ex_ty (Option_t (t, ty_name)), ctxt)
+    | Prim (loc, T_list, [ut], annot) ->
+        parse_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          ~allow_lazy_storage
+          ~allow_operation
+          ~allow_contract
+          ~allow_ticket
+          ut
+        >>? fun (Ex_ty t, ctxt) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (List_t (t, ty_name)), ctxt)
+    | Prim (loc, T_ticket, [ut], annot) ->
+        if allow_ticket then
+          parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
+          >>? fun (Ex_comparable_ty t, ctxt) ->
+          parse_type_annot loc annot
+          >>? fun ty_name -> ok (Ex_ty (Ticket_t (t, ty_name)), ctxt)
+        else error (Unexpected_ticket loc)
+    | Prim (loc, T_set, [ut], annot) ->
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
         >>? fun (Ex_comparable_ty t, ctxt) ->
         parse_type_annot loc annot
-        >>? fun ty_name -> ok (Ex_ty (Ticket_t (t, ty_name)), ctxt)
-      else error (Unexpected_ticket loc)
-  | Prim (loc, T_set, [ut], annot) ->
-      parse_comparable_ty ctxt ut
-      >>? fun (Ex_comparable_ty t, ctxt) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Set_t (t, ty_name)), ctxt)
-  | Prim (loc, T_map, [uta; utr], annot) ->
-      parse_comparable_ty ctxt uta
-      >>? fun (Ex_comparable_ty ta, ctxt) ->
-      parse_ty
-        ctxt
-        ~stack_depth:(stack_depth + 1)
-        ~legacy
-        ~allow_lazy_storage
-        ~allow_operation
-        ~allow_contract
-        ~allow_ticket
-        utr
-      >>? fun (Ex_ty tr, ctxt) ->
-      parse_type_annot loc annot
-      >>? fun ty_name -> ok (Ex_ty (Map_t (ta, tr, ty_name)), ctxt)
-  | Prim (loc, T_sapling_transaction, [memo_size], annot) ->
-      parse_type_annot loc annot
-      >>? fun ty_name ->
-      parse_memo_size memo_size
-      >|? fun memo_size ->
-      (Ex_ty (Sapling_transaction_t (memo_size, ty_name)), ctxt)
-  (*
+        >>? fun ty_name -> ok (Ex_ty (Set_t (t, ty_name)), ctxt)
+    | Prim (loc, T_map, [uta; utr], annot) ->
+        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt uta
+        >>? fun (Ex_comparable_ty ta, ctxt) ->
+        parse_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          ~allow_lazy_storage
+          ~allow_operation
+          ~allow_contract
+          ~allow_ticket
+          utr
+        >>? fun (Ex_ty tr, ctxt) ->
+        parse_type_annot loc annot
+        >>? fun ty_name -> ok (Ex_ty (Map_t (ta, tr, ty_name)), ctxt)
+    | Prim (loc, T_sapling_transaction, [memo_size], annot) ->
+        parse_type_annot loc annot
+        >>? fun ty_name ->
+        parse_memo_size memo_size
+        >|? fun memo_size ->
+        (Ex_ty (Sapling_transaction_t (memo_size, ty_name)), ctxt)
+    (*
     /!\ When adding new lazy storage kinds, be careful to use
     [when allow_lazy_storage] /!\
     Lazy storage should not be packable to avoid stealing a lazy storage
     from another contract with `PUSH t id` or `UNPACK`.
   *)
-  | Prim (loc, T_big_map, args, annot) when allow_lazy_storage ->
-      (parse_big_map_ty [@tailcall]) ctxt ~stack_depth ~legacy loc args annot
-  | Prim (loc, T_sapling_state, [memo_size], annot) when allow_lazy_storage ->
-      parse_type_annot loc annot
-      >>? fun ty_name ->
-      parse_memo_size memo_size
-      >|? fun memo_size -> (Ex_ty (Sapling_state_t (memo_size, ty_name)), ctxt)
-  | Prim (loc, (T_big_map | T_sapling_state), _, _) ->
-      error (Unexpected_lazy_storage loc)
-  | Prim
-      ( loc,
-        ( ( T_unit
-          | T_signature
-          | T_int
-          | T_nat
-          | T_string
-          | T_bytes
-          | T_mutez
-          | T_bool
-          | T_key
-          | T_key_hash
-          | T_timestamp
-          | T_address
-          | T_chain_id
-          | T_operation
-          | T_never ) as prim ),
-        l,
-        _ ) ->
-      error (Invalid_arity (loc, prim, 0, List.length l))
-  | Prim
-      (loc, ((T_set | T_list | T_option | T_contract | T_ticket) as prim), l, _)
-    ->
-      error (Invalid_arity (loc, prim, 1, List.length l))
-  | Prim (loc, ((T_pair | T_or | T_map | T_lambda) as prim), l, _) ->
-      error (Invalid_arity (loc, prim, 2, List.length l))
-  | expr ->
-      error
-      @@ unexpected
-           expr
-           []
-           Type_namespace
-           [ T_pair;
-             T_or;
-             T_set;
-             T_map;
-             T_list;
-             T_option;
-             T_lambda;
-             T_unit;
-             T_signature;
-             T_contract;
-             T_int;
-             T_nat;
-             T_operation;
-             T_string;
-             T_bytes;
-             T_mutez;
-             T_bool;
-             T_key;
-             T_key_hash;
-             T_timestamp;
-             T_chain_id;
-             T_never;
-             T_bls12_381_g1;
-             T_bls12_381_g2;
-             T_bls12_381_fr;
-             T_ticket ]
+    | Prim (loc, T_big_map, args, annot) when allow_lazy_storage ->
+        (parse_big_map_ty [@tailcall]) ctxt ~stack_depth ~legacy loc args annot
+    | Prim (loc, T_sapling_state, [memo_size], annot) when allow_lazy_storage
+      ->
+        parse_type_annot loc annot
+        >>? fun ty_name ->
+        parse_memo_size memo_size
+        >|? fun memo_size ->
+        (Ex_ty (Sapling_state_t (memo_size, ty_name)), ctxt)
+    | Prim (loc, (T_big_map | T_sapling_state), _, _) ->
+        error (Unexpected_lazy_storage loc)
+    | Prim
+        ( loc,
+          ( ( T_unit
+            | T_signature
+            | T_int
+            | T_nat
+            | T_string
+            | T_bytes
+            | T_mutez
+            | T_bool
+            | T_key
+            | T_key_hash
+            | T_timestamp
+            | T_address
+            | T_chain_id
+            | T_operation
+            | T_never ) as prim ),
+          l,
+          _ ) ->
+        error (Invalid_arity (loc, prim, 0, List.length l))
+    | Prim
+        ( loc,
+          ((T_set | T_list | T_option | T_contract | T_ticket) as prim),
+          l,
+          _ ) ->
+        error (Invalid_arity (loc, prim, 1, List.length l))
+    | Prim (loc, ((T_pair | T_or | T_map | T_lambda) as prim), l, _) ->
+        error (Invalid_arity (loc, prim, 2, List.length l))
+    | expr ->
+        error
+        @@ unexpected
+             expr
+             []
+             Type_namespace
+             [ T_pair;
+               T_or;
+               T_set;
+               T_map;
+               T_list;
+               T_option;
+               T_lambda;
+               T_unit;
+               T_signature;
+               T_contract;
+               T_int;
+               T_nat;
+               T_operation;
+               T_string;
+               T_bytes;
+               T_mutez;
+               T_bool;
+               T_key;
+               T_key_hash;
+               T_timestamp;
+               T_chain_id;
+               T_never;
+               T_bls12_381_g1;
+               T_bls12_381_g2;
+               T_bls12_381_fr;
+               T_ticket ]
 
 and parse_big_map_ty ctxt ~stack_depth ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.parse_type_cycle
   >>? fun ctxt ->
   match args with
   | [key_ty; value_ty] ->
-      parse_comparable_ty ctxt key_ty
+      parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt key_ty
       >>? fun (Ex_comparable_ty key_ty, ctxt) ->
       parse_big_map_value_ty
         ctxt
@@ -3352,7 +3362,10 @@ let rec parse_data :
                 traced_fail (Invalid_big_map (loc, id))
             | (ctxt, Some (btk, btv)) ->
                 Lwt.return
-                  ( parse_comparable_ty ctxt (Micheline.root btk)
+                  ( parse_comparable_ty
+                      ~stack_depth:(stack_depth + 1)
+                      ctxt
+                      (Micheline.root btk)
                   >>? fun (Ex_comparable_ty btk, ctxt) ->
                   parse_big_map_value_ty
                     ctxt
@@ -4259,7 +4272,7 @@ and parse_instr :
           typed ctxt 0 loc (mk_list_iter (descr rest)) rest )
   (* sets *)
   | (Prim (loc, I_EMPTY_SET, [t], annot), rest) ->
-      parse_comparable_ty ctxt t
+      parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt t
       >>?= fun (Ex_comparable_ty t, ctxt) ->
       parse_var_type_annot loc annot
       >>?= fun (annot, tname) ->
@@ -4337,7 +4350,7 @@ and parse_instr :
       typed ctxt 0 loc instr (Item_t (Nat_t None, rest, annot))
   (* maps *)
   | (Prim (loc, I_EMPTY_MAP, [tk; tv], annot), stack) ->
-      parse_comparable_ty ctxt tk
+      parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt tk
       >>?= fun (Ex_comparable_ty tk, ctxt) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tv
       >>?= fun (Ex_ty tv, ctxt) ->
@@ -4517,7 +4530,7 @@ and parse_instr :
       typed ctxt 0 loc instr (Item_t (Nat_t None, rest, annot))
   (* big_map *)
   | (Prim (loc, I_EMPTY_BIG_MAP, [tk; tv], annot), stack) ->
-      parse_comparable_ty ctxt tk
+      parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt tk
       >>?= fun (Ex_comparable_ty tk, ctxt) ->
       parse_big_map_value_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tv
       >>?= fun (Ex_ty tv, ctxt) ->
@@ -7634,6 +7647,8 @@ let unparse_code = unparse_code ~stack_depth:0
 
 let parse_contract ~legacy context loc arg_ty contract ~entrypoint =
   parse_contract ~stack_depth:0 ~legacy context loc arg_ty contract ~entrypoint
+
+let parse_comparable_ty = parse_comparable_ty ~stack_depth:0
 
 let parse_big_map_value_ty = parse_big_map_value_ty ~stack_depth:0
 
