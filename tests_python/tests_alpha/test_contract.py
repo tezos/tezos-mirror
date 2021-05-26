@@ -762,7 +762,7 @@ class TestGasBound:
 
         # We could not be bothered with finding how to escape parentheses
         # so we put dots
-        expected_error = "type size .1023. exceeded maximum type size .1000."
+        expected_error = "type exceeded maximum type size .1000."
         with utils.assert_run_failure(expected_error):
             client.typecheck(contract)
 
