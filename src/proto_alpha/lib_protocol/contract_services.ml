@@ -427,8 +427,16 @@ let[@coq_axiom_with_reason "gadt"] register () =
     (fun ctxt contract () (key, key_type) ->
       Contract.get_script ctxt contract
       >>=? fun (ctxt, script) ->
-      Script_ir_translator.parse_comparable_ty ctxt (Micheline.root key_type)
+      let key_type_node = Micheline.root key_type in
+      Script_ir_translator.parse_comparable_ty ctxt key_type_node
       >>?= fun (Ex_comparable_ty key_type, ctxt) ->
+      let loc = Micheline.location key_type_node in
+      Script_ir_translator.check_comparable_type_size
+        ~legacy:false
+        ctxt
+        ~loc
+        key_type
+      >>?= fun () ->
       Script_ir_translator.parse_comparable_data
         ctxt
         key_type

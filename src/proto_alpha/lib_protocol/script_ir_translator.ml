@@ -254,6 +254,22 @@ let rec check_type_size_of_stack_head :
           tail
           ~up_to:(up_to - 1)
 
+let check_comparable_type_size ~legacy ctxt ~loc ty =
+  if legacy then ok_unit
+  else
+    let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
+    if
+      Compare.Int.(
+        deduce_comparable_type_size ~remaining:maximum_type_size ty >= 0)
+    then ok_unit
+    else error (Type_too_large (loc, maximum_type_size))
+
+let check_type_size ~legacy ctxt ~loc ty =
+  if legacy then ok_unit
+  else
+    let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
+    check_type_size ~loc ~maximum_type_size ty
+
 (* ---- Error helpers -------------------------------------------------------*)
 
 let location = function
@@ -3786,6 +3802,8 @@ and parse_instr :
       >>?= fun annot ->
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
+      check_type_size ~legacy ctxt ~loc t
+      >>?= fun () ->
       parse_data
         ?type_logger
         ~stack_depth:(stack_depth + 1)
@@ -3796,7 +3814,12 @@ and parse_instr :
         d
       >>=? fun (v, ctxt) ->
       let const = {apply = (fun kinfo k -> IConst (kinfo, v, k))} in
-      typed ctxt 1 loc const (Item_t (t, stack, annot))
+      typed
+        ctxt
+        0
+        (* type size already checked *) loc
+        const
+        (Item_t (t, stack, annot))
   | (Prim (loc, I_UNIT, [], annot), stack) ->
       parse_var_type_annot loc annot
       >>?= fun (annot, ty_name) ->
@@ -4817,8 +4840,12 @@ and parse_instr :
   | (Prim (loc, I_LAMBDA, [arg; ret; code], annot), stack) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy arg
       >>?= fun (Ex_ty arg, ctxt) ->
+      check_type_size ~legacy ctxt ~loc arg
+      >>?= fun () ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ret
       >>?= fun (Ex_ty ret, ctxt) ->
+      check_type_size ~legacy ctxt ~loc ret
+      >>?= fun () ->
       check_kind [Seq_kind] code
       >>?= fun () ->
       parse_var_annot loc annot
@@ -5607,6 +5634,8 @@ and parse_instr :
            ~legacy
            arg_type)
       >>?= fun (Ex_ty arg_type, ctxt) ->
+      check_type_size ~legacy ctxt ~loc arg_type
+      >>?= fun () ->
       (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
       >>?= fun () ->
       record_trace
@@ -5617,6 +5646,8 @@ and parse_instr :
            ~legacy
            storage_type)
       >>?= fun (Ex_ty storage_type, ctxt) ->
+      check_type_size ~legacy ctxt ~loc storage_type
+      >>?= fun () ->
       let arg_annot =
         default_annot
           (type_to_var_annot (name_of_ty arg_type))
@@ -6571,6 +6602,7 @@ let parse_contract_for_script :
                   | Error _ ->
                       error (Invalid_contract (loc, contract))
                   | Ok (Ex_ty targ, ctxt) -> (
+                    (* we don't check targ size here because it's a legacy contract code *)
                     match
                       find_entrypoint_for_type
                         ~legacy:false
@@ -6605,16 +6637,22 @@ let parse_code :
   >>?= fun (code, ctxt) ->
   parse_toplevel ~legacy code
   >>?= fun (arg_type, storage_type, code_field, root_name) ->
+  let arg_type_loc = location arg_type in
   record_trace
-    (Ill_formed_type (Some "parameter", code, location arg_type))
+    (Ill_formed_type (Some "parameter", code, arg_type_loc))
     (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_ty arg_type, ctxt) ->
+  check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type
+  >>?= fun () ->
   (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
   >>?= fun () ->
+  let storage_type_loc = location storage_type in
   record_trace
-    (Ill_formed_type (Some "storage", code, location storage_type))
+    (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
+  check_type_size ~legacy ctxt ~loc:storage_type_loc storage_type
+  >>?= fun () ->
   let arg_annot =
     default_annot
       (type_to_var_annot (name_of_ty arg_type))
@@ -6710,16 +6748,22 @@ let typecheck_code :
   parse_toplevel ~legacy code
   >>?= fun (arg_type, storage_type, code_field, root_name) ->
   let type_map = ref [] in
+  let arg_type_loc = location arg_type in
   record_trace
-    (Ill_formed_type (Some "parameter", code, location arg_type))
+    (Ill_formed_type (Some "parameter", code, arg_type_loc))
     (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_ty arg_type, ctxt) ->
+  check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type
+  >>?= fun () ->
   (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
   >>?= fun () ->
+  let storage_type_loc = location storage_type in
   record_trace
-    (Ill_formed_type (Some "storage", code, location storage_type))
+    (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
+  check_type_size ~legacy ctxt ~loc:storage_type_loc storage_type
+  >>?= fun () ->
   let arg_annot =
     default_annot
       (type_to_var_annot (name_of_ty arg_type))
