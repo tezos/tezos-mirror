@@ -95,15 +95,12 @@ let destruct_config json =
       CannotDeserialize
 
 let union_right_bias (t1 : t) (t2 : t) =
-  let ( <|> ) opt1 opt2 =
-    match (opt1, opt2) with (_, Some x) -> Some x | (x, _) -> x
-  in
   {
-    endpoint = t1.endpoint <|> t2.endpoint;
-    rpc_addr = t1.rpc_addr <|> t2.rpc_addr;
-    rpc_tls = t1.rpc_tls <|> t2.rpc_tls;
+    endpoint = Option.either t2.endpoint t1.endpoint;
+    rpc_addr = Option.either t2.rpc_addr t1.rpc_addr;
+    rpc_tls = Option.either t2.rpc_tls t1.rpc_tls;
     sym_block_caching_time =
-      t1.sym_block_caching_time <|> t2.sym_block_caching_time;
+      Option.either t2.sym_block_caching_time t1.sym_block_caching_time;
   }
 
 type runtime = {
@@ -143,19 +140,20 @@ let address_and_port_for_runtime rpc_addr =
 
 (** Given the value of the [--rpc-tls] argument (or the [rpc_tls] CONFIG field),
     return the paths to the certificate and the key for use by TLS *)
-let tls_for_runtime rpc_tls =
+let tls_for_runtime =
   let open Result in
-  let rex r = Re.compile (Re.Perl.re r) in
-  let regexp = "(.*),(.*)" in
-  match Re.exec_opt (rex regexp) rpc_tls with
-  | None ->
-      error
-      @@ Format.asprintf
-           {|Value of "--rpc-tls" argument or "rpc_tls" field cannot be parsed: %s doesn't match regexp %s|}
-           rpc_tls
-           regexp
-  | Some group ->
-      ok (Re.Group.get group 1, Re.Group.get group 2)
+  let regexp_str = "(.*),(.*)" in
+  let regexp = Re.compile (Re.Perl.re regexp_str) in
+  fun rpc_tls ->
+    match Re.exec_opt regexp rpc_tls with
+    | None ->
+        error
+        @@ Format.asprintf
+             {|Value of "--rpc-tls" argument or "rpc_tls" field cannot be parsed: %s doesn't match regexp %s|}
+             rpc_tls
+             regexp_str
+    | Some group ->
+        ok (Re.Group.get group 1, Re.Group.get group 2)
 
 (** Helper to lift a validation function [f : 'a -> ('b * _) result] over
     an optional value. *)

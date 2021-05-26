@@ -41,7 +41,7 @@ type t = private {
   sym_block_caching_time : int option;
       (** The time during which data for a symbolic block identifier
           (like [head], [head~1]) is kept. Smaller values increase [endpoint]'s
-          load but yield more up-to-data to clients. Higher values
+          load but yield more up-to-date to clients. Higher values
           decrease [endpoint]'s load but make clients observe slightly deprecated
           values. If omitted, defaulted to [time_between_blocks].
 
