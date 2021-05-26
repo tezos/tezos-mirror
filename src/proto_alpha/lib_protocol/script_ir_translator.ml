@@ -1850,7 +1850,7 @@ let rec parse_comparable_ty :
              T_signature;
              T_key ]
 
-and parse_packable_ty :
+let rec parse_packable_ty :
     context ->
     stack_depth:int ->
     legacy:bool ->
@@ -2244,7 +2244,7 @@ and parse_big_map_value_ty ctxt ~stack_depth ~legacy value_ty =
     ~allow_ticket:true
     value_ty
 
-and parse_storage_ty :
+let parse_storage_ty :
     context ->
     stack_depth:int ->
     legacy:bool ->
@@ -6376,96 +6376,6 @@ and parse_contract :
           let contract : arg typed_contract = (arg, (contract, entrypoint)) in
           (ctxt, contract) )
 
-(* Same as the one above, but does not fail when the contact is missing or
-   if the expected type doesn't match the actual one. In that case None is
-   returned and some overapproximation of the typechecking gas is consumed.
-   This can still fail on gas exhaustion. *)
-and parse_contract_for_script :
-    type arg.
-    context ->
-    Script.location ->
-    arg ty ->
-    Contract.t ->
-    entrypoint:string ->
-    (context * arg typed_contract option) tzresult Lwt.t =
- fun ctxt loc arg contract ~entrypoint ->
-  Gas.consume ctxt Typecheck_costs.contract_exists
-  >>?= fun ctxt ->
-  match (Contract.is_implicit contract, entrypoint) with
-  | (Some _, "default") ->
-      (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-      Lwt.return
-        ( match ty_eq ctxt loc arg (Unit_t None) with
-        | Ok (Eq, ctxt) ->
-            let contract : arg typed_contract =
-              (arg, (contract, entrypoint))
-            in
-            ok (ctxt, Some contract)
-        | Error _ ->
-            Gas.consume ctxt Typecheck_costs.parse_instr_cycle
-            >>? fun ctxt -> ok (ctxt, None) )
-  | (Some _, _) ->
-      Lwt.return
-        ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle
-        >|? fun ctxt ->
-        (* An implicit account on any other entrypoint is not a valid contract. *)
-        (ctxt, None) )
-  | (None, _) -> (
-      (* Originated account *)
-      Contract.exists ctxt contract
-      >>=? function
-      | false ->
-          return (ctxt, None)
-      | true -> (
-          trace (Invalid_contract (loc, contract))
-          @@ Contract.get_script_code ctxt contract
-          >>=? fun (ctxt, code) ->
-          match code with
-          | None ->
-              (* Since protocol 005, we have the invariant that all originated accounts have code *)
-              assert false
-          | Some code ->
-              Lwt.return
-                ( Script.force_decode_in_context ctxt code
-                >>? fun (code, ctxt) ->
-                (* can only fail because of gas *)
-                match parse_toplevel ~legacy:true code with
-                | Error _ ->
-                    error (Invalid_contract (loc, contract))
-                | Ok (arg_type, _, _, root_name) -> (
-                  match
-                    parse_parameter_ty
-                      ctxt
-                      ~stack_depth:0
-                      ~legacy:true
-                      arg_type
-                  with
-                  | Error _ ->
-                      error (Invalid_contract (loc, contract))
-                  | Ok (Ex_ty targ, ctxt) -> (
-                    match
-                      find_entrypoint_for_type
-                        ~legacy:false
-                        ~full:targ
-                        ~expected:arg
-                        ~root_name
-                        entrypoint
-                        ctxt
-                        loc
-                      >|? fun (ctxt, entrypoint, arg) ->
-                      let contract : arg typed_contract =
-                        (arg, (contract, entrypoint))
-                      in
-                      (ctxt, Some contract)
-                    with
-                    | Ok res ->
-                        ok res
-                    | Error _ ->
-                        (* overapproximation by checking if targ = targ,
-                                                       can only fail because of gas *)
-                        merge_types ~legacy:false ctxt loc targ targ
-                        >|? fun (Eq, _, ctxt) -> (ctxt, None) ) ) ) ) )
-
 and parse_toplevel :
     legacy:bool ->
     Script.expr ->
@@ -6568,6 +6478,96 @@ and parse_toplevel :
             >>? fun () ->
             Script_ir_annot.error_unexpected_annot sloc sannot
             >>? fun () -> ok (p, s, c, root_name) )
+
+(* Same as [parse_contract], but does not fail when the contact is missing or
+   if the expected type doesn't match the actual one. In that case None is
+   returned and some overapproximation of the typechecking gas is consumed.
+   This can still fail on gas exhaustion. *)
+let parse_contract_for_script :
+    type arg.
+    context ->
+    Script.location ->
+    arg ty ->
+    Contract.t ->
+    entrypoint:string ->
+    (context * arg typed_contract option) tzresult Lwt.t =
+ fun ctxt loc arg contract ~entrypoint ->
+  Gas.consume ctxt Typecheck_costs.contract_exists
+  >>?= fun ctxt ->
+  match (Contract.is_implicit contract, entrypoint) with
+  | (Some _, "default") ->
+      (* An implicit account on the "default" entrypoint always exists and has type unit. *)
+      Lwt.return
+        ( match ty_eq ctxt loc arg (Unit_t None) with
+        | Ok (Eq, ctxt) ->
+            let contract : arg typed_contract =
+              (arg, (contract, entrypoint))
+            in
+            ok (ctxt, Some contract)
+        | Error _ ->
+            Gas.consume ctxt Typecheck_costs.parse_instr_cycle
+            >>? fun ctxt -> ok (ctxt, None) )
+  | (Some _, _) ->
+      Lwt.return
+        ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle
+        >|? fun ctxt ->
+        (* An implicit account on any other entrypoint is not a valid contract. *)
+        (ctxt, None) )
+  | (None, _) -> (
+      (* Originated account *)
+      Contract.exists ctxt contract
+      >>=? function
+      | false ->
+          return (ctxt, None)
+      | true -> (
+          trace (Invalid_contract (loc, contract))
+          @@ Contract.get_script_code ctxt contract
+          >>=? fun (ctxt, code) ->
+          match code with
+          | None ->
+              (* Since protocol 005, we have the invariant that all originated accounts have code *)
+              assert false
+          | Some code ->
+              Lwt.return
+                ( Script.force_decode_in_context ctxt code
+                >>? fun (code, ctxt) ->
+                (* can only fail because of gas *)
+                match parse_toplevel ~legacy:true code with
+                | Error _ ->
+                    error (Invalid_contract (loc, contract))
+                | Ok (arg_type, _, _, root_name) -> (
+                  match
+                    parse_parameter_ty
+                      ctxt
+                      ~stack_depth:0
+                      ~legacy:true
+                      arg_type
+                  with
+                  | Error _ ->
+                      error (Invalid_contract (loc, contract))
+                  | Ok (Ex_ty targ, ctxt) -> (
+                    match
+                      find_entrypoint_for_type
+                        ~legacy:false
+                        ~full:targ
+                        ~expected:arg
+                        ~root_name
+                        entrypoint
+                        ctxt
+                        loc
+                      >|? fun (ctxt, entrypoint, arg) ->
+                      let contract : arg typed_contract =
+                        (arg, (contract, entrypoint))
+                      in
+                      (ctxt, Some contract)
+                    with
+                    | Ok res ->
+                        ok res
+                    | Error _ ->
+                        (* overapproximation by checking if targ = targ,
+                                                       can only fail because of gas *)
+                        merge_types ~legacy:false ctxt loc targ targ
+                        >|? fun (Eq, _, ctxt) -> (ctxt, None) ) ) ) ) )
 
 let parse_code :
     ?type_logger:type_logger ->
