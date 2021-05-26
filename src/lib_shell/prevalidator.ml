@@ -392,6 +392,15 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     pv.branch_delayed.map <-
       Operation_hash.Map.add oph (op, errors) pv.branch_delayed.map
 
+  let handle_refused pv op oph errors =
+    notify_operation pv `Refused op ;
+    Option.iter
+      (fun e -> pv.refused.map <- Operation_hash.Map.remove e pv.refused.map)
+      (Ringo.Ring.add_and_return_erased pv.refused.ring oph) ;
+    pv.refused.map <- Operation_hash.Map.add oph (op, errors) pv.refused.map ;
+    Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+    pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool
+
   (* Classify pending operations into either: [Refused |
      Branch_delayed | Branch_refused | Applied].  To ensure fairness
      with other worker requests, classification of operations is done
@@ -435,21 +444,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                             from the pendings *)
                    pv.pending <- Operation_hash.Map.remove oph pv.pending ;
                    let limit = limit - 1 in
-                   let refused errors =
-                     notify_operation pv `Refused op ;
-                     Option.iter
-                       (fun e ->
-                         pv.refused.map <-
-                           Operation_hash.Map.remove e pv.refused.map)
-                       (Ringo.Ring.add_and_return_erased pv.refused.ring oph) ;
-                     pv.refused.map <-
-                       Operation_hash.Map.add oph (op, errors) pv.refused.map ;
-                     Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
-                     pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
-                     Lwt.return_ok (acc_validation_state, acc_mempool, limit)
-                   in
                    match Prevalidation.parse op with
-                   | Error errors -> refused errors
+                   | Error errors ->
+                       handle_refused pv op oph errors ;
+                       Lwt.return_ok (acc_validation_state, acc_mempool, limit)
                    | Ok op -> (
                        Prevalidation.apply_operation state op >>= function
                        | Applied (new_acc_validation_state, receipt) ->
@@ -494,7 +492,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                            handle_branch_refused pv op.raw op.hash errors ;
                            Lwt.return_ok
                              (acc_validation_state, acc_mempool, limit)
-                       | Refused errors -> refused errors
+                       | Refused errors ->
+                           handle_refused pv op.raw op.hash errors ;
+                           Lwt.return_ok
+                             (acc_validation_state, acc_mempool, limit)
                        | Duplicate | Outdated ->
                            Lwt.return_ok
                              (acc_validation_state, acc_mempool, limit))))
