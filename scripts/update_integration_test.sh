@@ -40,7 +40,7 @@ EOF
 integration:${PROTO_DIR_BASE}_${testname}:
   extends: .integration_python_template
   script:
-    - poetry run pytest "${test}" --exitfirst -s --log-dir=tmp "--junitxml=reports/${PROTO_DIR_BASE}_${testname}.xml" 2>&1 | tee "tmp/${PROTO_DIR_BASE}_${testname}.out" | tail
+    - poetry run pytest "${test}" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/${PROTO_DIR_BASE}_${testname}.xml" 2>&1 | tee "tmp/${PROTO_DIR_BASE}_${testname}.out" | tail
   stage: test
 
 EOF
