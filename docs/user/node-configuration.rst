@@ -101,10 +101,18 @@ P2P parameters
 P2P parameters allow to customize aspects related to the :doc:`peer-to-peer network layer <../shell/p2p>`, such as:
 
 - defining the bootstrap peers (and ports),
+- defining the ports listening to peers,
 - setting the greylist timeout,
 - running the node in private mode.
 
 .. _private-mode:
+
+Listening ports
+~~~~~~~~~~~~~~~
+
+By default, the node listens to incoming connections from peers on port ``9732``, on any of the available network interfaces on the node's host.
+This behavior can be changed by passing an IP address and optionally a port number (``addr:port``), using either the ``--net-addr`` configuration option or the P2P ``listen-addr`` configuration parameter.
+Note that the IP address is only used for selecting an active network interface (technically, it is only passed to the ``bind()`` function of the socket API). Thus, it is currently not possible to advertise to peers a different port than the binding port.
 
 Private node
 ~~~~~~~~~~~~

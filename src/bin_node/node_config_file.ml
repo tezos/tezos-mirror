@@ -692,7 +692,7 @@ let p2p =
           "listen-addr"
           ~description:
             "Host to listen to. If the port is not specified, the default \
-             port 8732 will be assumed."
+             port 9732 will be assumed."
           string)
        (dft
           "discovery-addr"
