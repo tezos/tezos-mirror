@@ -75,8 +75,8 @@ Gas improvements
 ----------------
 
 - The gas cost of serialization and deserialization of Micheline is divided by 10 thanks to an optimization of the data-encoding library. This reduces the cost of storage operations.
-- The gas cost of "small" instructions (e.g., stack manipulation and arithmetic instructions) is divided by 3 to 5 thanks to a significant rewriting of the Michelson interpreter. This reduces the cost of contract execution.
-- The gas cost of most instructions have been re-evaluated. (MR :gl:`!2966`)
+- The gas cost of "small" instructions (e.g., stack manipulation and arithmetic instructions) is divided by 3 to 5 thanks to a significant rewriting of the Michelson interpreter. This reduces the cost of contract execution. (MR :gl:`!2723` :gl:`!2990` :gl:`!3010` :gl:`!3012`)
+- The gas cost of most instructions have been re-evaluated. (MR :gl:`!2966` :gl:`!2986` :gl:`!2993`)
 - Typically, trading XTZ against a token in Dexter was costing ~50K units of gas, now this operation costs ~10K units of gas. We observed a decrease by a factor of 3 to 6 of the gas consumed by such contracts.
 
 RPC changes
@@ -131,4 +131,4 @@ Minor changes
 
 - Increased the max operation time to live (`max_op_ttl`) from 60 to 120. (MR :gl:`!2828`)
 
-- Other internal refactorings or documentation. (MRs :gl:`!2559` :gl:`!2563` :gl:`!2593` :gl:`!2741` :gl:`!2808` :gl:`!2862` :gl:`!2897` :gl:`!2932`)
+- Other internal refactorings or documentation. (MRs :gl:`!2559` :gl:`!2563` :gl:`!2593` :gl:`!2741` :gl:`!2808` :gl:`!2862` :gl:`!2897` :gl:`!2932` :gl:`!2995`)
