@@ -101,7 +101,7 @@ let collect_error_locations errs =
         | Inconsistent_type_annotations (loc, _, _)
         | Unexpected_annotation loc
         | Ungrouped_annotations loc
-        | Type_too_large (loc, _, _)
+        | Type_too_large (loc, _)
         | Invalid_namespace (loc, _, _, _)
         | Invalid_primitive (loc, _, _)
         | Invalid_kind (loc, _, _)
@@ -616,13 +616,12 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "@[<v 2>%aAnnotations of the same kind must be grouped."
               print_loc
               loc
-        | Type_too_large (loc, size, maximum_size) ->
+        | Type_too_large (loc, maximum_size) ->
             Format.fprintf
               ppf
-              "@[<v 2>%atype size (%d) exceeded maximum type size (%d)."
+              "@[<v 2>%atype exceeded maximum type size (%d)."
               print_loc
               loc
-              size
               maximum_size
         | Pair_bad_argument loc ->
             Format.fprintf

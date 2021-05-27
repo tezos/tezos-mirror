@@ -47,55 +47,6 @@ module Cost_of = struct
 
   let int_bytes (z : 'a Script_int.num) = z_bytes (Script_int.to_zint z)
 
-  let timestamp_bytes (t : Script_timestamp.t) =
-    let z = Script_timestamp.to_zint t in
-    z_bytes z
-
-  (* Upper-bound on the time to compare the given value.
-     For now, returns size in bytes, but this could get more complicated... *)
-  let[@coq_axiom_with_reason "gadt"] rec size_of_comparable :
-      type a. a Script_typed_ir.comparable_ty -> a -> S.may_saturate S.t =
-   fun wit v ->
-    match (wit, v) with
-    | (Unit_key _, _) ->
-        S.one
-    | (Never_key _, _) ->
-        .
-    | (Int_key _, _) ->
-        S.safe_int @@ int_bytes v
-    | (Nat_key _, _) ->
-        S.safe_int @@ int_bytes v
-    | (Signature_key _, _) ->
-        S.safe_int Signature.size
-    | (String_key _, _) ->
-        S.safe_int @@ String.length v
-    | (Bytes_key _, _) ->
-        S.safe_int @@ Bytes.length v
-    | (Bool_key _, _) ->
-        S.safe_int 8
-    | (Key_hash_key _, _) ->
-        S.safe_int Signature.Public_key_hash.size
-    | (Key_key _, k) ->
-        S.safe_int @@ Signature.Public_key.size k
-    | (Timestamp_key _, _) ->
-        S.safe_int @@ timestamp_bytes v
-    | (Address_key _, _) ->
-        S.safe_int Signature.Public_key_hash.size
-    | (Mutez_key _, _) ->
-        S.safe_int 8
-    | (Chain_id_key _, _) ->
-        S.safe_int Chain_id.size
-    | (Pair_key ((l, _), (r, _), _), (lval, rval)) ->
-        S.add (size_of_comparable l lval) (size_of_comparable r rval)
-    | (Union_key ((t, _), _, _), L x) ->
-        S.succ (size_of_comparable t x)
-    | (Union_key (_, (t, _), _), R x) ->
-        S.succ (size_of_comparable t x)
-    | (Option_key _, None) ->
-        S.one
-    | (Option_key (t, _), Some x) ->
-        S.succ (size_of_comparable t x)
-
   let manager_operation = step_cost @@ S.safe_int 1_000
 
   module Generated_costs = struct
@@ -407,16 +358,6 @@ module Cost_of = struct
 
     (* model N_IIs_nat *)
     let cost_N_IIs_nat = S.safe_int 15
-
-    (* model N_IJoin_Tickets *)
-    (* Approximating 0.024413 x term *)
-    (* Approximating 0.078712 x term *)
-    let cost_N_IJoin_tickets content_size_x content_size_y amount_size_x
-        amount_size_y =
-      let open S_syntax in
-      let v1 = S.min content_size_x content_size_y in
-      let v0 = S.safe_int (Compare.Int.max amount_size_x amount_size_y) in
-      S.safe_int 95 + ((v1 lsr 6) + (v1 lsr 7)) + ((v0 lsr 4) + (v0 lsr 6))
 
     (* model N_IKeccak *)
     (* Approximating 32.7522064274 x term *)
@@ -764,12 +705,12 @@ module Cost_of = struct
       | [] ->
           let open S_syntax in
           let v0 = S.safe_int size_ys in
-          S.safe_int 20 + (v0 + (v0 lsr 1) + (v0 lsr 3))
+          S.safe_int 40 + (v0 + (v0 lsr 1) + (v0 lsr 3))
       | _ :: _ ->
-          S.safe_int 35
+          S.safe_int 70
 
     (* model N_KList_exit_body *)
-    let cost_N_KList_exit_body = S.safe_int 15
+    let cost_N_KList_exit_body = S.safe_int 30
 
     (* model N_KLoop_in *)
     let cost_N_KLoop_in = S.safe_int 15
@@ -778,14 +719,7 @@ module Cost_of = struct
     let cost_N_KLoop_in_left = S.safe_int 15
 
     (* model N_KMap_enter_body *)
-    let cost_N_KMap_enter_body = S.safe_int 65
-
-    (* model N_KMap_exit_body *)
-    (* Approximating 0.097380 x term *)
-    let cost_N_KMap_exit_body size1 size2 =
-      let open S_syntax in
-      let v0 = size1 * log2 (S.safe_int size2) in
-      (v0 lsr 4) + (v0 lsr 5)
+    let cost_N_KMap_enter_body = S.safe_int 130
 
     (* model N_KNil *)
     let cost_N_KNil = S.safe_int 20
@@ -1355,50 +1289,9 @@ module Cost_of = struct
       atomic_step_cost
         (cost_N_ISplit_ticket (int_bytes amount_a) (int_bytes amount_b))
 
-    let join_tickets :
-        'a Script_typed_ir.comparable_ty ->
-        'a Script_typed_ir.ticket ->
-        'a Script_typed_ir.ticket ->
-        Gas.cost =
-     fun ty ticket_a ticket_b ->
-      atomic_step_cost
-        (cost_N_IJoin_tickets
-           (size_of_comparable ty ticket_a.contents)
-           (size_of_comparable ty ticket_b.contents)
-           (int_bytes ticket_a.amount)
-           (int_bytes ticket_b.amount))
-
-    (* Continuations *)
-    module Control = struct
-      let nil = atomic_step_cost cost_N_KNil
-
-      let cons = atomic_step_cost cost_N_KCons
-
-      let return = atomic_step_cost cost_N_KReturn
-
-      let undip = atomic_step_cost cost_N_KUndip
-
-      let loop_in = atomic_step_cost cost_N_KLoop_in
-
-      let loop_in_left = atomic_step_cost cost_N_KLoop_in_left
-
-      let iter = atomic_step_cost cost_N_KIter
-
-      let list_enter_body xs ys_len =
-        atomic_step_cost (cost_N_KList_enter_body xs ys_len)
-
-      let list_exit_body = atomic_step_cost cost_N_KList_exit_body
-
-      let map_enter_body = atomic_step_cost cost_N_KMap_enter_body
-
-      let map_exit_body (type k v) (key : k)
-          ((module Map) : (k, v) Script_typed_ir.map) =
-        let key_size = size_of_comparable Map.key_ty key in
-        atomic_step_cost (cost_N_KMap_exit_body key_size (snd Map.boxed))
-    end
-
     (* --------------------------------------------------------------------- *)
     (* Semi-hand-crafted models *)
+
     let compare_unit = atomic_step_cost (S.safe_int 10)
 
     let compare_pair_tag = atomic_step_cost (S.safe_int 10)
@@ -1446,69 +1339,84 @@ module Cost_of = struct
 
     let compare_chain_id = atomic_step_cost (S.safe_int 30)
 
-    let[@coq_axiom_with_reason "gadt"] rec compare :
-        type a. a Script_typed_ir.comparable_ty -> a -> a -> cost =
+    (* Defunctionalized CPS *)
+    type cont =
+      | Compare : 'a Script_typed_ir.comparable_ty * 'a * 'a * cont -> cont
+      | Return : cont
+
+    let compare : type a. a Script_typed_ir.comparable_ty -> a -> a -> cost =
      fun ty x y ->
-      match ty with
-      | Unit_key _ ->
-          compare_unit
-      | Never_key _ -> (
-        match x with _ -> . )
-      | Bool_key _ ->
-          compare_bool
-      | String_key _ ->
-          compare_string x y
-      | Signature_key _ ->
-          compare_signature
-      | Bytes_key _ ->
-          compare_bytes x y
-      | Mutez_key _ ->
-          compare_mutez
-      | Int_key _ ->
-          compare_int x y
-      | Nat_key _ ->
-          compare_nat x y
-      | Key_hash_key _ ->
-          compare_key_hash
-      | Key_key _ ->
-          compare_key
-      | Timestamp_key _ ->
-          compare_timestamp x y
-      | Address_key _ ->
-          compare_address
-      | Chain_id_key _ ->
-          compare_chain_id
-      | Pair_key ((tl, _), (tr, _), _) ->
-          (* Reasonable over-approximation of the cost of lexicographic comparison. *)
-          compare_pair_tag
-          +@
-          let (xl, xr) = x in
-          let (yl, yr) = y in
-          compare tl xl yl +@ compare tr xr yr
-      | Union_key ((tl, _), (tr, _), _) -> (
-          compare_union_tag
-          +@
+      let[@coq_axiom_with_reason "gadt"] rec compare :
+          type a.
+          a Script_typed_ir.comparable_ty -> a -> a -> cost -> cont -> cost =
+       fun ty x y acc k ->
+        match ty with
+        | Unit_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_unit) k
+        | Never_key _ -> (
+          match x with _ -> . )
+        | Bool_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_bool) k
+        | String_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_string x y) k
+        | Signature_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_signature) k
+        | Bytes_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_bytes x y) k
+        | Mutez_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_mutez) k
+        | Int_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_int x y) k
+        | Nat_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_nat x y) k
+        | Key_hash_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_key_hash) k
+        | Key_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_key) k
+        | Timestamp_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_timestamp x y) k
+        | Address_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_address) k
+        | Chain_id_key _ ->
+            (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
+        | Pair_key ((tl, _), (tr, _), _) ->
+            (* Reasonable over-approximation of the cost of lexicographic comparison. *)
+            let (xl, xr) = x in
+            let (yl, yr) = y in
+            (compare [@tailcall])
+              tl
+              xl
+              yl
+              Gas.(acc +@ compare_pair_tag)
+              (Compare (tr, xr, yr, k))
+        | Union_key ((tl, _), (tr, _), _) -> (
           match (x, y) with
           | (L x, L y) ->
-              compare tl x y
+              (compare [@tailcall]) tl x y Gas.(acc +@ compare_union_tag) k
           | (L _, R _) ->
-              free
+              (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
           | (R _, L _) ->
-              free
+              (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
           | (R x, R y) ->
-              compare tr x y )
-      | Option_key (t, _) -> (
-          compare_option_tag
-          +@
+              (compare [@tailcall]) tr x y Gas.(acc +@ compare_union_tag) k )
+        | Option_key (t, _) -> (
           match (x, y) with
           | (None, None) ->
-              free
+              (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
           | (None, Some _) ->
-              free
+              (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
           | (Some _, None) ->
-              free
+              (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
           | (Some x, Some y) ->
-              compare t x y )
+              (compare [@tailcall]) t x y Gas.(acc +@ compare_option_tag) k )
+      and apply cost k =
+        match k with
+        | Compare (ty, x, y, k) ->
+            (compare [@tailcall]) ty x y cost k
+        | Return ->
+            cost
+      in
+      compare ty x y Gas.free Return
 
     let set_mem (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
       let open S_syntax in
@@ -1555,6 +1463,47 @@ module Cost_of = struct
       (* The 3 factor reflects the update vs mem overhead as benchmarked
          on non-structured data *)
       Gas.(intercept +@ (S.safe_int 3 * log2 size *@ per_elt_cost))
+
+    let join_tickets :
+        'a Script_typed_ir.comparable_ty ->
+        'a Script_typed_ir.ticket ->
+        'a Script_typed_ir.ticket ->
+        Gas.cost =
+     fun ty ticket_a ticket_b ->
+      let contents_comparison =
+        compare ty ticket_a.contents ticket_b.contents
+      in
+      Gas.(
+        contents_comparison +@ compare_address
+        +@ add_natnat ticket_a.amount ticket_b.amount)
+
+    (* Continuations *)
+    module Control = struct
+      let nil = atomic_step_cost cost_N_KNil
+
+      let cons = atomic_step_cost cost_N_KCons
+
+      let return = atomic_step_cost cost_N_KReturn
+
+      let undip = atomic_step_cost cost_N_KUndip
+
+      let loop_in = atomic_step_cost cost_N_KLoop_in
+
+      let loop_in_left = atomic_step_cost cost_N_KLoop_in_left
+
+      let iter = atomic_step_cost cost_N_KIter
+
+      let list_enter_body xs ys_len =
+        atomic_step_cost (cost_N_KList_enter_body xs ys_len)
+
+      let list_exit_body = atomic_step_cost cost_N_KList_exit_body
+
+      let map_enter_body = atomic_step_cost cost_N_KMap_enter_body
+
+      let map_exit_body (type k v) (key : k) (map : (k, v) Script_typed_ir.map)
+          =
+        map_update key map
+    end
 
     (* --------------------------------------------------------------------- *)
     (* Hand-crafted models *)

@@ -119,7 +119,7 @@ type error +=
       Script.location * unparsed_stack_ty * unparsed_stack_ty
       -> error
 
-type error += Type_too_large : Script.location * int * int -> error
+type error += Type_too_large : Script.location * int -> error
 
 type error += Pair_bad_argument of Script.location
 
