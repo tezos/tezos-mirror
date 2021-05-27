@@ -92,6 +92,11 @@ opam:tezos-009-PsFLoren-test-helpers:
   variables:
     package: tezos-009-PsFLoren-test-helpers
 
+opam:tezos-010-PtGRANAD-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-010-PtGRANAD-test-helpers
+
 opam:tezos-accuser-008-PtEdo2Zk:
   extends: .opam_template
   variables:
@@ -111,6 +116,16 @@ opam:tezos-accuser-009-PsFLoren-commands:
   extends: .opam_template
   variables:
     package: tezos-accuser-009-PsFLoren-commands
+
+opam:tezos-accuser-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-accuser-010-PtGRANAD
+
+opam:tezos-accuser-010-PtGRANAD-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-accuser-010-PtGRANAD-commands
 
 opam:tezos-accuser-alpha:
   extends: .opam_template
@@ -137,6 +152,11 @@ opam:tezos-baker-009-PsFLoren:
   variables:
     package: tezos-baker-009-PsFLoren
 
+opam:tezos-baker-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-baker-010-PtGRANAD
+
 opam:tezos-baker-alpha:
   extends: .opam_template
   variables:
@@ -162,6 +182,16 @@ opam:tezos-baking-009-PsFLoren-commands:
   variables:
     package: tezos-baking-009-PsFLoren-commands
 
+opam:tezos-baking-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-010-PtGRANAD
+
+opam:tezos-baking-010-PtGRANAD-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-baking-010-PtGRANAD-commands
+
 opam:tezos-baking-alpha:
   extends: .opam_template
   variables:
@@ -182,6 +212,11 @@ opam:tezos-benchmark:
   variables:
     package: tezos-benchmark
 
+opam:tezos-benchmark-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmark-010-PtGRANAD
+
 opam:tezos-benchmark-alpha:
   extends: .opam_template
   variables:
@@ -197,10 +232,20 @@ opam:tezos-benchmark-tests:
   variables:
     package: tezos-benchmark-tests
 
+opam:tezos-benchmark-type-inference-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmark-type-inference-010-PtGRANAD
+
 opam:tezos-benchmark-type-inference-alpha:
   extends: .opam_template
   variables:
     package: tezos-benchmark-type-inference-alpha
+
+opam:tezos-benchmarks-proto-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-benchmarks-proto-010-PtGRANAD
 
 opam:tezos-benchmarks-proto-alpha:
   extends: .opam_template
@@ -327,6 +372,21 @@ opam:tezos-client-009-PsFLoren-commands-registration:
   variables:
     package: tezos-client-009-PsFLoren-commands-registration
 
+opam:tezos-client-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-client-010-PtGRANAD
+
+opam:tezos-client-010-PtGRANAD-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-client-010-PtGRANAD-commands
+
+opam:tezos-client-010-PtGRANAD-commands-registration:
+  extends: .opam_template
+  variables:
+    package: tezos-client-010-PtGRANAD-commands-registration
+
 opam:tezos-client-alpha:
   extends: .opam_template
   variables:
@@ -381,6 +441,11 @@ opam:tezos-client-sapling-009-PsFLoren:
   extends: .opam_template
   variables:
     package: tezos-client-sapling-009-PsFLoren
+
+opam:tezos-client-sapling-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-client-sapling-010-PtGRANAD
 
 opam:tezos-client-sapling-alpha:
   extends: .opam_template
@@ -462,6 +527,11 @@ opam:tezos-embedded-protocol-009-PsFLoren:
   variables:
     package: tezos-embedded-protocol-009-PsFLoren
 
+opam:tezos-embedded-protocol-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-embedded-protocol-010-PtGRANAD
+
 opam:tezos-embedded-protocol-alpha:
   extends: .opam_template
   variables:
@@ -506,6 +576,16 @@ opam:tezos-endorser-009-PsFLoren-commands:
   extends: .opam_template
   variables:
     package: tezos-endorser-009-PsFLoren-commands
+
+opam:tezos-endorser-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-endorser-010-PtGRANAD
+
+opam:tezos-endorser-010-PtGRANAD-commands:
+  extends: .opam_template
+  variables:
+    package: tezos-endorser-010-PtGRANAD-commands
 
 opam:tezos-endorser-alpha:
   extends: .opam_template
@@ -687,6 +767,21 @@ opam:tezos-protocol-009-PsFLoren-tests:
   variables:
     package: tezos-protocol-009-PsFLoren-tests
 
+opam:tezos-protocol-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-010-PtGRANAD
+
+opam:tezos-protocol-010-PtGRANAD-parameters:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-010-PtGRANAD-parameters
+
+opam:tezos-protocol-010-PtGRANAD-tests:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-010-PtGRANAD-tests
+
 opam:tezos-protocol-alpha:
   extends: .opam_template
   variables:
@@ -797,6 +892,11 @@ opam:tezos-protocol-functor-009-PsFLoren:
   variables:
     package: tezos-protocol-functor-009-PsFLoren
 
+opam:tezos-protocol-functor-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-functor-010-PtGRANAD
+
 opam:tezos-protocol-functor-alpha:
   extends: .opam_template
   variables:
@@ -861,6 +961,16 @@ opam:tezos-protocol-plugin-009-PsFLoren-registerer:
   extends: .opam_template
   variables:
     package: tezos-protocol-plugin-009-PsFLoren-registerer
+
+opam:tezos-protocol-plugin-010-PtGRANAD:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-010-PtGRANAD
+
+opam:tezos-protocol-plugin-010-PtGRANAD-registerer:
+  extends: .opam_template
+  variables:
+    package: tezos-protocol-plugin-010-PtGRANAD-registerer
 
 opam:tezos-protocol-plugin-alpha:
   extends: .opam_template

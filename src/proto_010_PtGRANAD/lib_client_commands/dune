@@ -1,0 +1,60 @@
+(library
+ (name tezos_client_010_PtGRANAD_commands)
+ (public_name tezos-client-010-PtGRANAD-commands)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-protocol-010-PtGRANAD
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-mockup
+            tezos-mockup-registration
+            tezos-mockup-commands
+            tezos-client-base-unix
+            tezos-client-010-PtGRANAD
+            tezos-client-commands
+            tezos-rpc
+            tezos-protocol-plugin-010-PtGRANAD)
+ (library_flags (:standard -linkall))
+ (modules (:standard \ alpha_commands_registration))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_010_PtGRANAD
+                   -open Tezos_stdlib_unix
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_010_PtGRANAD
+                   -open Tezos_client_commands
+                   -open Tezos_rpc
+                   -open Tezos_client_base_unix
+                   -open Tezos_protocol_plugin_010_PtGRANAD)))
+
+(library
+ (name tezos_client_010_PtGRANAD_commands_registration)
+ (public_name tezos-client-010-PtGRANAD-commands-registration)
+ (libraries tezos-base
+            tezos-protocol-010-PtGRANAD
+            tezos-protocol-environment
+            tezos-shell-services
+            tezos-client-base
+            tezos-client-010-PtGRANAD
+            tezos-client-commands
+            tezos-client-010-PtGRANAD-commands
+            tezos-client-sapling-010-PtGRANAD
+            tezos-rpc
+            tezos-protocol-plugin-010-PtGRANAD)
+ (library_flags (:standard -linkall))
+ (modules alpha_commands_registration)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_010_PtGRANAD
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_client_010_PtGRANAD
+                   -open Tezos_client_commands
+                   -open Tezos_client_010_PtGRANAD_commands
+                   -open Tezos_client_sapling_010_PtGRANAD
+                   -open Tezos_rpc
+                   -open Tezos_protocol_plugin_010_PtGRANAD)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

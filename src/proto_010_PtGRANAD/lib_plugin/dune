@@ -1,0 +1,26 @@
+(library
+ (name tezos_protocol_plugin_010_PtGRANAD)
+ (public_name tezos-protocol-plugin-010-PtGRANAD)
+ (libraries tezos-base
+            tezos-protocol-010-PtGRANAD)
+ (modules (:standard) \ Plugin_registerer)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_010_PtGRANAD)))
+
+(library
+ (name tezos_protocol_plugin_010_PtGRANAD_registerer)
+ (public_name tezos-protocol-plugin-010-PtGRANAD-registerer)
+ (libraries tezos-base
+            tezos-embedded-protocol-010-PtGRANAD
+            tezos-protocol-plugin-010-PtGRANAD
+            tezos-shell)
+ (modules Plugin_registerer)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_protocol_010_PtGRANAD
+                   -open Tezos_protocol_plugin_010_PtGRANAD
+                   -open Tezos_shell)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

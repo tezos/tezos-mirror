@@ -11,9 +11,11 @@ DOCERRORDIR   = $(DOCGENDIR)/errors
 DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
 ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+GRANADA_LONG = PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
 FLORENCE_LONG = PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i
 
 ALPHA_SHORT    = alpha
+GRANADA_SHORT = 010-PtGRANAD
 FLORENCE_SHORT = 009-PsFLoren
 
 SCRIPTSDIR		= scripts
@@ -30,6 +32,11 @@ manuals: main
 	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker-alpha.html
 	@../tezos-endorser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-endorser-alpha.html
 	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser-alpha.html
+    # 010 (Granada) protocol
+	@../tezos-client -protocol $(GRANADA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-client-010.html
+	@../tezos-baker-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-baker-010.html
+	@../tezos-endorser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-endorser-010.html
+	@../tezos-accuser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-accuser-010.html
     # 009 (Florence) protocol
 	@../tezos-client -protocol $(FLORENCE_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-client-009.html
 	@../tezos-baker-$(FLORENCE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 009/tezos-baker-009.html
@@ -63,6 +70,7 @@ redirectcheck:
 
 xrefscheck:
 	$(CHECKXREFS) 009
+	$(CHECKXREFS) 010
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
@@ -92,6 +100,7 @@ $(DOCGENDIR)/rpc_doc.exe:
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
 	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 009/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe 010 > 010/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe shell > shell/rpc.rst
 
@@ -111,5 +120,5 @@ html: Makefile api/errors.rst rpc p2p
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst 009/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt 009/tezos-*.html
+	@-rm -Rf api/errors.rst 009/rpc.rst 010/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt 009/tezos-*.html 010/tezos-*.html alpha/tezos-*.html
