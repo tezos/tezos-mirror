@@ -142,6 +142,8 @@ end) : Internal_event.SINK with type t = t = struct
     let t = {output; lwt_bad_citizen_hack = ref []; level_at_least; format} in
     return t
 
+  let write_mutex = Lwt_mutex.create ()
+
   let output_one output format event_json =
     let to_write =
       match format with
@@ -152,12 +154,9 @@ end) : Internal_event.SINK with type t = t = struct
           Fmt.str "%d:%s," (String.length bytes) bytes
     in
     protect (fun () ->
-        (*
-           If the write does happen at once (i.e. returns the same number of bytes),
-           POSIX (and Linux >= 3.14) ensure this is atomic.
-           Cf. http://man7.org/linux/man-pages/man2/write.2.html#BUGS
-           and `https://github.com/ocsigen/lwt/blob/master/src/unix/unix_c/unix_write.c` *)
-        Lwt_utils_unix.write_string output to_write >>= fun () -> return_unit)
+        Lwt_mutex.with_lock write_mutex (fun () ->
+            Lwt_utils_unix.write_string output to_write)
+        >>= fun () -> return_unit)
 
   let handle (type a) {output; lwt_bad_citizen_hack; level_at_least; format; _}
       m ?(section = Internal_event.Section.empty) (v : unit -> a) =

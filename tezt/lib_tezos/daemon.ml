@@ -215,7 +215,8 @@ module Make (X : PARAMETERS) = struct
             in
             loop [] events )
 
-  let run ?(on_terminate = fun _ -> unit) daemon session_state arguments =
+  let run ?(on_terminate = fun _ -> unit) ?event_level daemon session_state
+      arguments =
     ( match daemon.status with
     | Not_running ->
         ()
@@ -231,9 +232,16 @@ module Make (X : PARAMETERS) = struct
        spawn the daemon. *)
     let* event_input = Lwt_io.(open_file ~mode:input) daemon.event_pipe in
     let env =
+      let level_str =
+        match event_level with
+        | None ->
+            ""
+        | Some level ->
+            "?level-at-least=" ^ level
+      in
       String_map.singleton
         "TEZOS_EVENTS_CONFIG"
-        ("file-descriptor-path://" ^ daemon.event_pipe)
+        ("file-descriptor-path://" ^ daemon.event_pipe ^ level_str)
     in
     let process =
       Process.spawn

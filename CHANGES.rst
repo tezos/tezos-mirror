@@ -93,6 +93,9 @@ Node
   now allows to display ``Info`` logs using the ``v`` value. ``Debug``
   logs are now available through ``vv``.
 
+-  Fixed a potential interleaving of distinct events written to a file
+   descriptor sink simultaneously.
+
 Client
 ------
 
