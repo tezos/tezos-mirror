@@ -471,6 +471,28 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
      request our mempool, we advertise all our classified operations and
      all our pending operations. *)
 
+  let classify_pending_operations w (pv : state) state =
+    Operation_hash.Map.fold_es
+      (fun oph op (acc_validation_state, acc_mempool, limit) ->
+        if limit <= 0 then
+          (* Using Error as an early-return mechanism *)
+          Lwt.return_error (acc_validation_state, acc_mempool)
+        else (
+          (* Do not forget to remove the treated operation from
+                   the pendings *)
+          pv.pending <- Operation_hash.Map.remove oph pv.pending ;
+          classify_operation w pv acc_validation_state acc_mempool op oph
+          >|= fun (new_validation_state, new_mempool) ->
+          ok (new_validation_state, new_mempool, limit - 1)))
+      pv.pending
+      (state, Mempool.empty, pv.limits.operations_batch_size)
+    >>= function
+    | Error (state, advertised_mempool) ->
+        (* Early return after iteration limit was reached *)
+        Worker.Queue.push_request w Request.Leftover >>= fun () ->
+        Lwt.return (state, advertised_mempool)
+    | Ok (state, advertised_mempool, _) -> Lwt.return (state, advertised_mempool)
+
   let handle_unprocessed w pv =
     match pv.validation_state with
     | Error err ->
@@ -486,33 +508,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         | 0 -> Lwt.return_unit
         | n ->
             Worker.log_event w (Processing_n_operations n) >>= fun () ->
-            (Operation_hash.Map.fold_es
-               (fun oph op (acc_validation_state, acc_mempool, limit) ->
-                 if limit <= 0 then
-                   (* Using Error as an early-return mechanism *)
-                   Lwt.return_error (acc_validation_state, acc_mempool)
-                 else (
-                   (* Do not forget to remove the treated operation
-                            from the pendings *)
-                   pv.pending <- Operation_hash.Map.remove oph pv.pending ;
-                   classify_operation
-                     w
-                     pv
-                     acc_validation_state
-                     acc_mempool
-                     op
-                     oph
-                   >|= fun (new_validation_state, new_mempool) ->
-                   ok (new_validation_state, new_mempool, limit - 1)))
-               pv.pending
-               (state, Mempool.empty, pv.limits.operations_batch_size)
-             >>= function
-             | Error (state, advertised_mempool) ->
-                 (* Early return after iteration limit was reached *)
-                 Worker.Queue.push_request w Request.Leftover >>= fun () ->
-                 Lwt.return (state, advertised_mempool)
-             | Ok (state, advertised_mempool, _) ->
-                 Lwt.return (state, advertised_mempool))
+            classify_pending_operations w pv state
             >>= fun (state, advertised_mempool) ->
             let remaining_pendings =
               Operation_hash.Map.fold
