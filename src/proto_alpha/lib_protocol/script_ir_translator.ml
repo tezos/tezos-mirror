@@ -5508,7 +5508,7 @@ and parse_instr :
       let stack = Item_t (cast_t, stack, annot) in
       ( typed ctxt 0 loc instr stack
         : ((a, s) judgement * context) tzresult Lwt.t )
-  | (Prim (loc, I_RENAME, [], annot), Item_t (t, (Item_t _ as stack), _)) ->
+  | (Prim (loc, I_RENAME, [], annot), Item_t (t, stack, _)) ->
       parse_var_annot loc annot
       >>?= fun annot ->
       (* can erase annot *)
