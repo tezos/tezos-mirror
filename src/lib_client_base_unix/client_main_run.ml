@@ -110,7 +110,7 @@ let setup_remote_signer (module C : M) client_config
   let module Socket = Tezos_signer_backends_unix.Socket.Make (Remote_params) in
   Client_keys.register_signer
     ( module Tezos_signer_backends.Encrypted.Make (struct
-      let cctxt = (client_config :> Client_context.prompter)
+      let cctxt = (client_config :> Client_context.io)
     end) ) ;
   Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
   Client_keys.register_signer

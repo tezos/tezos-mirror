@@ -24,11 +24,11 @@
 (*****************************************************************************)
 
 module Make (C : sig
-  val cctxt : Client_context.prompter
+  val cctxt : Client_context.io
 end) : Client_keys.SIGNER
 
 val decrypt :
-  #Client_context.prompter ->
+  #Client_context.io ->
   ?name:string ->
   Client_keys.sk_uri ->
   Signature.secret_key tzresult Lwt.t

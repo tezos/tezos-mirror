@@ -75,6 +75,8 @@ let fake_ctx () =
               distributed <- false ;
               return
                 (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth passwords i))
+
+    method multiple_password_retries = true
   end
 
 let make_sk_uris =
@@ -138,7 +140,7 @@ let test_vectors () =
 let test_random algo =
   let open Encrypted in
   let ctx = fake_ctx () in
-  let decrypt_ctx = (ctx :> Client_context.prompter) in
+  let decrypt_ctx = (ctx :> Client_context.io) in
   let rec inner i =
     if i >= loops then return_unit
     else

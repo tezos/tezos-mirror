@@ -3,12 +3,13 @@
 
 import pytest
 from client.client import Client
+from tools.utils import bake
 
 
 @pytest.fixture(scope="class")
-def encrypted_account(client: Client):
+def encrypted_account_with_tez(client: Client):
     """
-    Import an encrypted account
+    Import an encrypted account with some tez
     """
     client.import_secret_key(
         "encrypted_account",
@@ -18,6 +19,10 @@ def encrypted_account(client: Client):
         ),
         "password",
     )
+    client.transfer(
+        100, "bootstrap1", "encrypted_account", ["--burn-cap", "1.0"]
+    )
+    bake(client, bake_for="bootstrap1")
 
 
 def pytest_addoption(parser) -> None:

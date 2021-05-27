@@ -129,6 +129,8 @@ class unix_prompter : Client_context.prompter =
             else read_line ()
           in
           return (Bytes.of_string line))
+
+    method multiple_password_retries = true
   end
 
 class unix_logger ~base_dir : Client_context.printer =

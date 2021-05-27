@@ -168,21 +168,45 @@ end
    asking the user all the time *)
 let passwords = ref []
 
-let rec interactive_decrypt_loop (cctxt : #Client_context.prompter) ?name
+(* Loop asking the user to give their password. Fails if a wrong password is
+   given more than `retries_left` *)
+let interactive_decrypt_loop (cctxt : #Client_context.io) ?name ~retries_left
     ~encrypted_sk algo =
-  ( match name with
-  | None ->
-      cctxt#prompt_password "Enter password for encrypted key: "
-  | Some name ->
-      cctxt#prompt_password "Enter password for encrypted key \"%s\": " name )
-  >>=? fun password ->
-  Raw.decrypt algo ~password ~encrypted_sk
-  >>=? function
-  | Some sk ->
-      passwords := password :: !passwords ;
-      return sk
-  | None ->
-      interactive_decrypt_loop cctxt ?name ~encrypted_sk algo
+  let rec interactive_decrypt_loop (cctxt : #Client_context.io) name
+      ~current_retries ~retries ~encrypted_sk algo =
+    match current_retries with
+    | n when n >= retries ->
+        failwith "%d incorrect password attempts" current_retries
+    | _ -> (
+        cctxt#prompt_password "Enter password for encrypted key%s: " name
+        >>=? fun password ->
+        Raw.decrypt algo ~password ~encrypted_sk
+        >>=? function
+        | Some sk ->
+            passwords := password :: !passwords ;
+            return sk
+        | None ->
+            ( if retries_left == 1 then Lwt.return_unit
+            else cctxt#message "Sorry, try again." )
+            >>= fun () ->
+            interactive_decrypt_loop
+              cctxt
+              name
+              ~current_retries:(current_retries + 1)
+              ~retries
+              ~encrypted_sk
+              algo )
+  in
+  let name =
+    Option.fold name ~some:(fun s -> Format.sprintf " \"%s\"" s) ~none:""
+  in
+  interactive_decrypt_loop
+    cctxt
+    name
+    ~current_retries:0
+    ~retries:retries_left
+    ~encrypted_sk
+    algo
 
 (* add all passwords obtained by [ctxt#load_passwords] to the list of known passwords *)
 let password_file_load ctxt =
@@ -222,7 +246,8 @@ let decrypt_payload cctxt ?name encrypted_sk =
   | Some sk ->
       return sk
   | None ->
-      interactive_decrypt_loop cctxt ?name ~encrypted_sk algo
+      let retries_left = if cctxt#multiple_password_retries then 3 else 1 in
+      interactive_decrypt_loop cctxt ?name ~retries_left ~encrypted_sk algo
 
 let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
   let payload = Uri.path (sk_uri : sk_uri :> Uri.t) in
@@ -353,7 +378,7 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
         return sapling_key
 
 module Make (C : sig
-  val cctxt : Client_context.prompter
+  val cctxt : Client_context.io
 end) =
 struct
   let scheme = "encrypted"

@@ -505,6 +505,7 @@ class Client:
         giver: str,
         receiver: str,
         args: List[str] = None,
+        stdin: str = "",
         chain: str = None,
     ) -> client_output.TransferResult:
         cmd = ['transfer', str(amount), 'from', giver, 'to', receiver]
@@ -513,8 +514,8 @@ class Client:
         if args is None:
             args = []
         cmd += args
-        res = self.run(cmd)
-        return client_output.TransferResult(res)
+        stdout, _, _ = self.run_generic(cmd, stdin=stdin)
+        return client_output.TransferResult(stdout)
 
     def transfer_json(
         self, amount: int, giver: str, receiver: str, args: List[str] = None
