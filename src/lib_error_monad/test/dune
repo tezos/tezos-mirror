@@ -1,5 +1,5 @@
 (executables
- (names test_recursive_registration)
+ (names test_registration)
  (libraries tezos-error-monad
             data-encoding
             lwt.unix
@@ -8,15 +8,15 @@
 
 (rule
  (alias buildtest)
- (deps test_recursive_registration.exe)
+ (deps test_registration.exe)
  (action (progn)))
 
 (rule
- (alias runtest_recursive_registration)
- (action (run %{exe:test_recursive_registration.exe})))
+ (alias runtest_registration)
+ (action (run %{exe:test_registration.exe})))
 
 (rule
  (alias runtest)
  (package tezos-error-monad)
- (deps (alias runtest_recursive_registration))
+ (deps (alias runtest_registration))
  (action (progn)))
