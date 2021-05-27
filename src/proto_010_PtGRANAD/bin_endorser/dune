@@ -1,0 +1,18 @@
+(executable
+ (name main_endorser_010_PtGRANAD)
+ (public_name tezos-endorser-010-PtGRANAD)
+ (libraries tezos-client-base-unix
+            tezos-client-commands
+            tezos-baking-010-PtGRANAD-commands)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_010_PtGRANAD
+                   -open Tezos_client_010_PtGRANAD
+                   -open Tezos_client_commands
+                   -open Tezos_baking_010_PtGRANAD_commands
+                   -open Tezos_stdlib_unix
+                   -open Tezos_client_base_unix)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

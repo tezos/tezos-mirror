@@ -1,0 +1,28 @@
+(library
+ (name tezos_client_010_PtGRANAD)
+ (public_name tezos-client-010-PtGRANAD)
+ (libraries tezos-base
+            tezos-protocol-010-PtGRANAD
+            tezos-shell-services
+            tezos-client-base
+            tezos-mockup-registration
+            tezos-proxy
+            tezos-rpc
+            tezos-signer-backends
+            tezos-protocol-010-PtGRANAD-parameters
+            tezos-protocol-plugin-010-PtGRANAD)
+ (inline_tests)
+ (preprocess (pps ppx_inline_test))
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_shell_services
+                   -open Tezos_client_base
+                   -open Tezos_protocol_010_PtGRANAD
+                   -open Tezos_protocol_plugin_010_PtGRANAD
+                   -open Tezos_protocol_010_PtGRANAD_parameters
+                   -open Tezos_rpc)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

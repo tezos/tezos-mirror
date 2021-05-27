@@ -1,0 +1,32 @@
+(executables
+ (names test_michelson_v1_macros)
+ (libraries tezos-base
+            tezos-micheline
+            tezos-protocol-010-PtGRANAD
+            tezos-client-010-PtGRANAD
+            alcotest-lwt)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_micheline
+                   -open Tezos_client_010_PtGRANAD
+                   -open Tezos_protocol_010_PtGRANAD)))
+
+
+(rule
+(alias buildtest)
+(deps test_michelson_v1_macros.exe)
+(action (progn)))
+
+(rule
+(alias runtest_michelson_v1_macros)
+(action (run %{exe:test_michelson_v1_macros.exe})))
+
+(rule
+(alias runtest)
+(package tezos-client-010-PtGRANAD)
+(deps (alias runtest_michelson_v1_macros))
+(action (progn)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

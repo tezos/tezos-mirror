@@ -39,7 +39,44 @@ unit:alltest:
     paths:
       - test_results
     expire_in: 1 day
+<<<<<<< HEAD
 #    when: on_failure
+=======
+    when: always
+
+# this section is updated using the script scripts/update_unit_test.sh
+##BEGIN_UNITTEST##
+unit:008_PtEdo2Zk:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_client 008_PtEdo2Zk_lib_client
+    - scripts/test_wrapper.sh src/proto_008_PtEdo2Zk/lib_protocol 008_PtEdo2Zk_lib_protocol
+
+unit:009_PsFLoren:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_client 009_PsFLoren_lib_client
+    - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_protocol 009_PsFLoren_lib_protocol
+
+unit:010_PtGRANAD:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_benchmark/lib_benchmark_type_inference 010_PtGRANAD_lib_benchmark_lib_benchmark_type_inference
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_benchmark 010_PtGRANAD_lib_benchmark
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_client 010_PtGRANAD_lib_client
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_protocol 010_PtGRANAD_lib_protocol
+
+unit:alpha:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_alpha/lib_benchmark/lib_benchmark_type_inference alpha_lib_benchmark_lib_benchmark_type_inference
+    - scripts/test_wrapper.sh src/proto_alpha/lib_benchmark alpha_lib_benchmark
+    - scripts/test_wrapper.sh src/proto_alpha/lib_client alpha_lib_client
+    - scripts/test_wrapper.sh src/proto_alpha/lib_protocol alpha_lib_protocol
+
+unit:non-proto:
+  extends: .unit_test_template
+>>>>>>> 655ca1e239... Granada: Snapshot
   script:
     - scripts/test_wrapper.sh src/bin_client client
     - scripts/test_wrapper.sh src/bin_snoop/latex snoop_latex
