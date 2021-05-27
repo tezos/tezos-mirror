@@ -611,22 +611,22 @@ let sample best other points =
     in
     let indexes = best_indexes @ other_indexes in
     (* Note: we are doing a [fold_left_i] by hand, passing [i] manually *)
-    (fun (_, _, result) -> result)
-    @@ List.fold_left
-         (fun (i, indexes, acc) point ->
-           match indexes with
-           | [] ->
-               (0, [], acc) (* TODO: early return *)
-           | index :: indexes when i >= index ->
-               (* We compare `i >= index` (rather than `i = index`) to avoid a
+    List.fold_left_e (* [_e] is for early return *)
+      (fun (i, indexes, acc) point ->
+        match indexes with
+        | [] ->
+            Error acc (* early return *)
+        | index :: indexes when i >= index ->
+            (* We compare `i >= index` (rather than `i = index`) to avoid a
                 corner case whereby two identical `index`es are present in the
                 list. In that case, using `>=` makes it so that if `i` overtakes
                 `index` we still pick elements. *)
-               (succ i, indexes, point :: acc)
-           | _ ->
-               (succ i, indexes, acc))
-         (0, indexes, [])
-         points
+            Ok (succ i, indexes, point :: acc)
+        | _ ->
+            Ok (succ i, indexes, acc))
+      (0, indexes, [])
+      points
+    |> function Ok (_, _, result) | Error result -> result
 
 let compare_known_point_info p1 p2 =
   (* The most-recently disconnected peers are greater. *)

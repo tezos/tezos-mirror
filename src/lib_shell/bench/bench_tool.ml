@@ -262,10 +262,11 @@ let step gen_state blk : Block.t tzresult Lwt.t =
   (* Generate random operations *)
   List.fold_left_es
     (fun inc _ ->
-      try
-        generate_random_operation inc gen_state
-        >>=? fun op -> Incremental.add_operation inc op
-      with No_transfer_left -> return inc)
+      Lwt.catch
+        (fun () ->
+          generate_random_operation inc gen_state
+          >>=? fun op -> Incremental.add_operation inc op)
+        (function No_transfer_left -> return inc | exc -> Lwt.fail exc))
     inc
     (1 -- nb_operations)
   >>=? fun inc ->

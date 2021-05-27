@@ -188,11 +188,9 @@ module Merkle = struct
 
   let sequence_result_unit (results : (unit, 'b) result list) :
       (unit, 'b) result =
-    List.fold_left
-      (fun next_result current_result ->
-        Result.bind current_result (fun () -> next_result))
-      (Result.ok ())
-      results
+    (* ignore the [()]s with [Fun.id], simply stop on the first [Error] with
+       [iter_e]. *)
+    List.iter_e Fun.id @@ List.rev results
 
   (** Whether [tree] contains [mnode]. Returns unit if yes, otherwise
       an explanation as to why [tree] doesn't contain [mnode]. *)
