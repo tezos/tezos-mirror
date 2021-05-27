@@ -163,6 +163,7 @@ class TestRawContext:
         assert show_foo.secret_key is not None
 
 
+@pytest.mark.incremental
 class TestRememberContract:
     @pytest.mark.parametrize(
         "contract_name,non_originated_contract_address",

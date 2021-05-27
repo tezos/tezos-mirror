@@ -59,6 +59,7 @@ def sandbox(request, sandbox: Sandbox, contract_name, session: dict):
     return sandbox
 
 
+@pytest.mark.incremental
 @pytest.mark.mempool
 @pytest.mark.multinode
 @pytest.mark.slow
