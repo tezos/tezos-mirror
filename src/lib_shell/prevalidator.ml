@@ -527,6 +527,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             advertise w pv mempool_to_advertise ;
             let our_mempool =
               {
+                (* Using List.rev_map is ok since the size of pv.applied
+                   cannot be too big. *)
                 Mempool.known_valid = List.rev_map fst pv.applied;
                 pending = remaining_pendings;
               }
