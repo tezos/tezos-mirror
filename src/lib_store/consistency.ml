@@ -72,9 +72,12 @@ let is_block_stored block_store (descriptor, expected_metadata, block_name) =
     (Block (fst descriptor, 0))
   >>=? function
   | None -> fail (Unexpected_missing_block {block_name})
-  | Some b ->
+  | Some _block ->
       if expected_metadata then
-        match Block_repr.metadata b with
+        (* Force read the metadata of a block to avoid false negatives
+           due to the cache.*)
+        Block_store.read_block_metadata block_store (Block (fst descriptor, 0))
+        >>=? function
         | None -> fail (Unexpected_missing_block_metadata {block_name})
         | Some _ -> return_unit
       else return_unit
