@@ -75,14 +75,9 @@ redirectcheck:
 	@cd $$(pwd)/.. ; ./src/tooling/lint.sh --check-redirects
 
 xrefscheck:
-<<<<<<< HEAD
-	$(CHECKXREFS) 008
-	$(CHECKXREFS) -l 009
-=======
 	$(CHECKXREFS) 009
 	$(CHECKXREFS) 010
 	$(CHECKXREFS) -l alpha
->>>>>>> 655ca1e239... Granada: Snapshot
 
 scriptsindoccheck:
 	introduction/test_howtoget.sh install-bin-bionic
@@ -110,13 +105,8 @@ $(DOCGENDIR)/rpc_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
-<<<<<<< HEAD
-	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 008/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe 009 > 009/rpc.rst
-=======
 	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > 009/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe 010 > 010/rpc.rst
->>>>>>> 655ca1e239... Granada: Snapshot
 	@dune exec $(DOCGENDIR)/rpc_doc.exe alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe shell > shell/rpc.rst
 
@@ -135,10 +125,5 @@ html: Makefile api/errors.rst rpc p2p
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-<<<<<<< HEAD
-	@-rm -Rf api/errors.rst 008/rpc.rst 009/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt 008/tezos-*.html 009/tezos-*.html
-=======
 	@-rm -Rf api/errors.rst 009/rpc.rst 010/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
 	@-rm -Rf api/tezos-*.html api/tezos-*.txt 009/tezos-*.html 010/tezos-*.html alpha/tezos-*.html
->>>>>>> 655ca1e239... Granada: Snapshot
