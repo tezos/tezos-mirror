@@ -85,16 +85,11 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
     >>= fun () -> return raw_context
 end
 
-let initial_context
-    (proxy_builder :
-      Tezos_proxy.Proxy_proto.proto_rpc ->
-      Tezos_proxy.Proxy_getter.proxy_m Lwt.t) (rpc_context : RPC_context.json)
+let initial_context (rpc_context : RPC_context.json)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
     Environment_context.Context.t Lwt.t =
-  let p_rpc = (module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC) in
-  proxy_builder p_rpc
-  >>= fun (module M) ->
+  let module M = Tezos_proxy.Proxy_getter.MakeProxy (ProtoRpc) in
   L.emit
     L.proxy_getter_created
     ( Tezos_shell_services.Block_services.chain_to_string chain,
@@ -118,16 +113,14 @@ let initial_context
     (Bytes.of_string version_value)
 
 let init_env_rpc_context (_printer : Tezos_client_base.Client_context.printer)
-    (proxy_builder :
-      Tezos_proxy.Proxy_proto.proto_rpc ->
-      Tezos_proxy.Proxy_getter.proxy_m Lwt.t) (rpc_context : RPC_context.json)
+    (rpc_context : RPC_context.json)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
     Tezos_protocol_environment.rpc_context tzresult Lwt.t =
   proxy_block_header rpc_context chain block
   >>=? fun {shell; hash; _} ->
   let block_hash = hash in
-  initial_context proxy_builder rpc_context chain block
+  initial_context rpc_context chain block
   >>= fun context ->
   return {Tezos_protocol_environment.block_hash; block_header = shell; context}
 
@@ -143,7 +136,5 @@ let () =
     let hash = Protocol_client_context.Alpha_block_services.hash
 
     let init_env_rpc_context = init_env_rpc_context
-
-    include Light.M
   end in
   register_proxy_context (module M)
