@@ -32,6 +32,7 @@
 
 (alias
   (name runtest)
+  (package tezos-benchmark-010-PtGRANAD)
   (deps (alias runtest_micheline_rewriting_data)
         (alias runtest_micheline_rewriting_code)
   ))
