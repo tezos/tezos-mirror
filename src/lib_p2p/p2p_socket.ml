@@ -171,7 +171,7 @@ module Connection_message = struct
     let len = TzEndian.get_uint16 header_buf 0 in
     let pos = Crypto.header_length in
     let buf = Bytes.create (pos + len) in
-    TzEndian.set_int16 buf 0 len ;
+    TzEndian.set_uint16 buf 0 len ;
     (* This call to [mk_buffer] is safe (it can't [Error] out)
        but we cannot use [mk_buffer_safe], because we need to specify
        ~len and ~pos. *)
