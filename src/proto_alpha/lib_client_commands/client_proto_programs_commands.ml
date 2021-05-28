@@ -737,11 +737,11 @@ let commands () =
       ~desc:
         "Conversion of Michelson script from Micheline, JSON or binary to \
          Micheline, JSON, binary or OCaml"
-      (args1 zero_loc_switch)
+      (args2 zero_loc_switch legacy_switch)
       (prefixes ["convert"; "script"]
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
-      (fun zero_loc
+      (fun (zero_loc, legacy)
            expr_string
            from_format
            to_format
@@ -755,6 +755,7 @@ let commands () =
                cctxt
                ~chain:cctxt#chain
                ~block:cctxt#block
+               ~legacy
                program
              >>= function
              | Error _ as res ->
