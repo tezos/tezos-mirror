@@ -225,7 +225,13 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
             match protocol_kind with
             | `Athens ->
                 ()
-            | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Alpha ->
+            | `Babylon
+            | `Carthage
+            | `Delphi
+            | `Edo
+            | `Florence
+            | `Granada
+            | `Alpha ->
                 wf
                   ppf
                   "From Babylon on, You will first be asked to provide the \
@@ -275,11 +281,18 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
                 match protocol_kind with
                 | `Athens ->
                     ()
-                | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Alpha ->
+                | `Babylon
+                | `Carthage
+                | `Delphi
+                | `Edo
+                | `Florence
+                | `Granada
+                | `Alpha ->
                     wf
                       ppf
-                      "On Alpha, Babylon and Carthage, You will first be \
-                       asked to provide the public key." ;
+                      "On Alpha, Babylon, Carthage, Edo, Florence and \
+                       Granada, You will first be asked to provide the public \
+                       key." ;
                     cut ppf () ;
                     wf
                       ppf
@@ -364,7 +377,8 @@ let originate_manager_tz_script state ~client ~name ~from ~bake ~protocol_kind
       @ ( match protocol_kind with
         | `Athens ->
             ["for"; from]
-        | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Alpha ->
+        | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha
+          ->
             [] )
       @ [ "transferring";
           "350";
@@ -737,7 +751,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
   match protocol_kind with
   | `Athens ->
       self_delegation ()
-  | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Alpha ->
+  | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha ->
       tz_account_delegation () >>= fun () -> self_delegation ()
 
 let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
@@ -915,7 +929,8 @@ let prepare_origination_of_id_script ?(spendable = false)
     @ ( match protocol_kind with
       | `Athens ->
           ["for"; from]
-      | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Alpha ->
+      | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha
+        ->
           [] )
     @ [ "transferring";
         amount;
@@ -1067,7 +1082,7 @@ let basic_contract_operations_tests state ~client ~src ~with_rejections
         ~init_storage:"\"delegatable contract\""
         ~delegatable:true
         ()
-  | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Alpha ->
+  | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha ->
       return () )
   >>= fun () ->
   let push_drops =
