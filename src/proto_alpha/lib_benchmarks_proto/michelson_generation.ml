@@ -128,9 +128,7 @@ module Samplers = (val michelson_samplers)
 
 (* ----------------------------------------------------------------------- *)
 
-let base_type_to_michelson_type
-    (typ : Tezos_benchmark_type_inference_alpha.Type.Base.t) =
-  let open Tezos_benchmark_type_inference_alpha in
+let base_type_to_michelson_type (typ : Type.Base.t) =
   let typ = Mikhailsky.map_var (fun _ -> Mikhailsky.unit_ty) typ in
   Mikhailsky.to_michelson typ
 
@@ -156,9 +154,7 @@ let base_type_to_ex_ty ty =
   michelson_type_to_ex_ty (base_type_to_michelson_type ty)
 
 (* Convert a Mikhailsky stack to a list of Micheline-encoded types *)
-let rec stack_type_to_michelson_type_list
-    (typ : Tezos_benchmark_type_inference_alpha.Type.Stack.t) =
-  let open Tezos_benchmark_type_inference_alpha in
+let rec stack_type_to_michelson_type_list (typ : Type.Stack.t) =
   let node = typ.node in
   match node with
   | Type.Stack.Stack_var_t _ ->
