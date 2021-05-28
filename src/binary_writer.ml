@@ -25,6 +25,13 @@
 
 open Binary_error_types
 
+let wrap_user_function f a =
+  try f a with
+  | (Out_of_memory | Stack_overflow) as exc -> raise exc
+  | exc ->
+      let s = Printexc.to_string exc in
+      raise (Write_error (Exception_raised_in_user_function s))
+
 let raise error = Stdlib.raise (Write_error error)
 
 (** Imperative state of the binary writer. *)
@@ -266,9 +273,11 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       let (v1, v2) = value in
       write_rec left state v1;
       write_rec right state v2
-  | Conv {encoding = e; proj; _} -> write_rec e state (proj value)
+  | Conv {encoding = e; proj; _} ->
+      let value = wrap_user_function proj value in
+      write_rec e state value
   | Union {tag_size; match_case; _} ->
-      let (Matched (tag, e, value)) = match_case value in
+      let (Matched (tag, e, value)) = wrap_user_function match_case value in
       Atom.tag tag_size state tag;
       write_rec e state value
   | Dynamic_size {kind; encoding = e} ->
@@ -285,8 +294,12 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | Check_size {limit; encoding = e} -> write_with_limit limit e state value
   | Describe {encoding = e; _} -> write_rec e state value
   | Splitted {encoding = e; _} -> write_rec e state value
-  | Mu {fix; _} -> write_rec (fix e) state value
-  | Delayed f -> write_rec (f ()) state value
+  | Mu {fix; _} ->
+      let e = wrap_user_function fix e in
+      write_rec e state value
+  | Delayed f ->
+      let e = wrap_user_function f () in
+      write_rec e state value
 
 and write_with_limit : type a. int -> a Encoding.t -> writer_state -> a -> unit
     =

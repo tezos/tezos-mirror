@@ -17,3 +17,8 @@ v0.3:
 - Improved documentation
 - Increase test coverage
 - Fix JSON encoding of Result
+
+v0.4:  
+- catch exceptions in user-provided functions
+- provide `conv_guard` to help enforce invariants
+- Remove unused `read_error` constructor: `Invalid_size`

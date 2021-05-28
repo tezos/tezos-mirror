@@ -54,12 +54,6 @@ let read_error_encoding : read_error Encoding.t =
         (function Unexpected_tag i -> Some i | _ -> None)
         (fun i -> Unexpected_tag i);
       case
-        (Tag 4)
-        ~title:"Invalid size"
-        int31
-        (function Invalid_size i -> Some i | _ -> None)
-        (fun i -> Invalid_size i);
-      case
         (Tag 5)
         ~title:"Invalid int"
         (obj3 (req "min" int31) (req "v" int31) (req "max" int31))
@@ -99,6 +93,20 @@ let read_error_encoding : read_error Encoding.t =
         empty
         (function (Array_too_long : read_error) -> Some () | _ -> None)
         (fun () -> Array_too_long);
+      case
+        (Tag 11)
+        ~title:"Exception raised in user function"
+        string
+        (function
+          | (Exception_raised_in_user_function s : read_error) -> Some s
+          | _ -> None)
+        (fun s -> Exception_raised_in_user_function s);
+      case
+        (Tag 12)
+        ~title:"User invariant guard"
+        string
+        (function User_invariant_guard s -> Some s | _ -> None)
+        (fun s -> User_invariant_guard s);
     ]
 
 let pp_read_error ppf = function
@@ -106,7 +114,6 @@ let pp_read_error ppf = function
   | Extra_bytes -> Format.fprintf ppf "Extra bytes"
   | No_case_matched -> Format.fprintf ppf "No case matched"
   | Unexpected_tag tag -> Format.fprintf ppf "Unexpected tag %d" tag
-  | Invalid_size sz -> Format.fprintf ppf "Invalid size %d" sz
   | Invalid_int {min; v; max} ->
       Format.fprintf ppf "Invalid int (%d <= %d <= %d) " min v max
   | Invalid_float {min; v; max} ->
@@ -115,6 +122,13 @@ let pp_read_error ppf = function
   | Size_limit_exceeded -> Format.fprintf ppf "Size limit exceeded"
   | List_too_long -> Format.fprintf ppf "List length limit exceeded"
   | Array_too_long -> Format.fprintf ppf "Array length limit exceeded"
+  | Exception_raised_in_user_function s ->
+      Format.fprintf ppf "Exception raised in user function: %s" s
+  | User_invariant_guard s ->
+      Format.fprintf
+        ppf
+        "User-specified invariant not respected in encoded data: %s"
+        s
 
 let write_error_encoding =
   let open Encoding in
@@ -179,6 +193,14 @@ let write_error_encoding =
         empty
         (function Array_too_long -> Some () | _ -> None)
         (fun () -> Array_too_long);
+      case
+        (Tag 9)
+        ~title:"Exception raised in user function"
+        string
+        (function
+          | (Exception_raised_in_user_function s : write_error) -> Some s
+          | _ -> None)
+        (fun s -> Exception_raised_in_user_function s);
     ]
 
 let pp_write_error ppf = function
@@ -203,3 +225,5 @@ let pp_write_error ppf = function
   | Invalid_natural -> Format.fprintf ppf "Negative natural"
   | List_too_long -> Format.fprintf ppf "List length limit exceeded"
   | Array_too_long -> Format.fprintf ppf "Array length limit exceeded"
+  | Exception_raised_in_user_function s ->
+      Format.fprintf ppf "Exception raised in user function: %s" s

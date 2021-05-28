@@ -23,18 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+exception Invariant_guard of string
+
 type read_error =
   | Not_enough_data
   | Extra_bytes
   | No_case_matched
   | Unexpected_tag of int
-  | Invalid_size of int
   | Invalid_int of {min: int; v: int; max: int}
   | Invalid_float of {min: float; v: float; max: float}
   | Trailing_zero
   | Size_limit_exceeded
   | List_too_long
   | Array_too_long
+  | Exception_raised_in_user_function of string
+  | User_invariant_guard of string
 
 exception Read_error of read_error
 
@@ -48,5 +51,6 @@ type write_error =
   | Invalid_natural
   | List_too_long
   | Array_too_long
+  | Exception_raised_in_user_function of string
 
 exception Write_error of write_error

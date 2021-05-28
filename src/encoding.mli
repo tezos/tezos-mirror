@@ -473,6 +473,16 @@ val conv :
   'b encoding ->
   'a encoding
 
+val conv_with_guard :
+  ('a -> 'b) ->
+  ('b -> ('a, string) result) ->
+  ?schema:Json_schema.schema ->
+  'b encoding ->
+  'a encoding
+
+val with_decoding_guard :
+  ('a -> (unit, string) result) -> 'a encoding -> 'a encoding
+
 val mu :
   string ->
   ?title:string ->
