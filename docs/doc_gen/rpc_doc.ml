@@ -31,19 +31,15 @@ let protocols =
       "Alpha",
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
-<<<<<<< HEAD
     ( "009",
-=======
-    (* TODO nomadic-labs/tezos#462: adapt rest of this list *)
+      "009 Florence",
+      Some "/include/rpc_introduction.rst.inc",
+      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" );
     ( "010",
       "010 Granada",
       Some "/include/rpc_introduction.rst.inc",
       "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV" );
-    ( "",
->>>>>>> 655ca1e239... Granada: Snapshot
-      "009 Florence",
-      Some "/include/rpc_introduction.rst.inc",
-      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" );
+    (* TODO nomadic-labs/tezos#462: adapt rest of this list *)
     ( "",
       "008 Edo",
       Some "/include/rpc_introduction.rst.inc",
