@@ -55,6 +55,14 @@ unit:009_PsFLoren:
     - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_client 009_PsFLoren_lib_client
     - scripts/test_wrapper.sh src/proto_009_PsFLoren/lib_protocol 009_PsFLoren_lib_protocol
 
+unit:010_PtGRANAD:
+  extends: .unit_test_template
+  script:
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_benchmark/lib_benchmark_type_inference 010_PtGRANAD_lib_benchmark_lib_benchmark_type_inference
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_benchmark 010_PtGRANAD_lib_benchmark
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_client 010_PtGRANAD_lib_client
+    - scripts/test_wrapper.sh src/proto_010_PtGRANAD/lib_protocol 010_PtGRANAD_lib_protocol
+
 unit:alpha:
   extends: .unit_test_template
   script:

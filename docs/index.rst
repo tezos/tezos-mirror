@@ -144,6 +144,19 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
+   :caption: 010 Granada Protocol doc:
+
+   010/michelson
+   010/proof_of_stake
+   010/sapling
+   010/voting
+   010/glossary
+   010/cli-commands
+   010/rpc
+   010/liquidity_baking
+
+.. toctree::
+   :maxdepth: 2
    :caption: Alpha Development Protocol doc:
 
    alpha/michelson
@@ -189,6 +202,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/007_delphi
    protocols/008_edo
    protocols/009_florence
+   protocols/010_granada
    protocols/alpha
 
 .. toctree::
