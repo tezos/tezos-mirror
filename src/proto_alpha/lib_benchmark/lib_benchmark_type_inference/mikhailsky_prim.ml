@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_alpha.Protocol
+open Protocol
 
 (** Mikhailsky primitives correspond to Michelson primitives plus special
     "holes" for instructions and data. *)

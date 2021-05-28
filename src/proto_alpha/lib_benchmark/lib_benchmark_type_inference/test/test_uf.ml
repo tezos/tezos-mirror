@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_benchmark_type_inference_alpha
-
 let _ =
   print_newline () ;
   Printf.printf "Testing union-find algorithm\n"

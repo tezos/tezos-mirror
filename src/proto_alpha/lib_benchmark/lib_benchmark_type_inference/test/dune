@@ -6,4 +6,5 @@
             tezos-benchmark-type-inference-alpha tezos-protocol-alpha
             tezos-error-monad tezos-client-alpha)
  (flags
-    (:standard -open Tezos_micheline)))
+    (:standard -open Tezos_micheline
+               -open Tezos_benchmark_type_inference_alpha)))
