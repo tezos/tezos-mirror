@@ -35,6 +35,7 @@ publish:docker_manual:
   variables:
     public_docker_image_name: ${CI_REGISTRY_IMAGE}/
     DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
     IMAGE_ARCH_PREFIX: "amd64-"
   rules:
     - if: '$CI_COMMIT_TAG || $CI_COMMIT_BRANCH =~ /docker/'
@@ -45,8 +46,6 @@ publish:docker_manual:
     - when: never
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-  tags:
-    -  gitlab-org-docker
 
 build_release:docker_amd64:
   extends: .build_docker_release_template
