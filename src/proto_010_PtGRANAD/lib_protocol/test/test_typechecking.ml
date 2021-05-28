@@ -122,7 +122,6 @@ let test_typecheck_stack_overflow () =
       Alcotest.fail "expected an error"
   | Error lst
     when List.mem
-           ~equal:( = )
            (Environment.Ecoproto_error
               Script_tc_errors.Typechecking_too_many_recursive_calls)
            lst ->

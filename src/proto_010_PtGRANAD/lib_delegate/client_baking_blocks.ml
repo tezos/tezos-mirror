@@ -107,8 +107,6 @@ module Block_seen_event = struct
   let make hash header occurrence () = {hash; header; occurrence}
 
   module Definition = struct
-    let section = None
-
     let name = "block-seen-" ^ Protocol.name
 
     type nonrec t = t

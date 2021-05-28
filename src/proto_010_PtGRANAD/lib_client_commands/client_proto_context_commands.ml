@@ -1457,7 +1457,9 @@ let commands network () =
                 List.iter
                   (fun (p : Protocol_hash.t) ->
                     if
-                      List.mem ~equal:Protocol_hash.equal p known_protos
+                      List.exists
+                        (fun h -> Protocol_hash.equal h p)
+                        known_protos
                       || Environment.Protocol_hash.Map.mem p known_proposals
                     then ()
                     else
@@ -1665,9 +1667,8 @@ let commands network () =
                             p
                             w
                             ( if
-                              List.mem
-                                ~equal:Protocol_hash.equal
-                                p
+                              List.exists
+                                (fun h -> Protocol_hash.equal h p)
                                 known_protos
                             then ""
                             else "not " ))

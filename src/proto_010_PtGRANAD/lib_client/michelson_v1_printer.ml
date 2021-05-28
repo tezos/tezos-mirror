@@ -136,15 +136,12 @@ let inject_types type_map parsed =
   and inject_loc which loc =
     let comment =
       let ( >?? ) = Option.bind in
-      List.assoc
-        ~equal:Int.equal
-        loc
-        parsed.Michelson_v1_parser.expansion_table
+      List.assoc loc parsed.Michelson_v1_parser.expansion_table
       >?? fun (_, locs) ->
       let locs = List.sort compare locs in
       List.hd locs
       >?? fun head_loc ->
-      List.assoc ~equal:Int.equal head_loc type_map
+      List.assoc head_loc type_map
       >?? fun (bef, aft) ->
       let stack = match which with `before -> bef | `after -> aft in
       Some (Format.asprintf "%a" print_stack stack)
@@ -176,9 +173,9 @@ let unparse ?type_map parse expanded =
         and inject_loc which loc =
           let comment =
             let ( >?? ) = Option.bind in
-            List.assoc ~equal:Int.equal loc unexpansion_table
+            List.assoc loc unexpansion_table
             >?? fun loc ->
-            List.assoc ~equal:Int.equal loc type_map
+            List.assoc loc type_map
             >?? fun (bef, aft) ->
             let stack = match which with `before -> bef | `after -> aft in
             Some (Format.asprintf "%a" print_stack stack)

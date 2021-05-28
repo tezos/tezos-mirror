@@ -32,12 +32,6 @@ open Michelson_v1_printer
 module Program = Client_aliases.Alias (struct
   type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 
-  include Compare.Make (struct
-    type nonrec t = t
-
-    let compare = Micheline_parser.compare Michelson_v1_parser.compare_parsed
-  end)
-
   let encoding =
     Data_encoding.conv
       (fun ({Michelson_v1_parser.source; _}, _) -> source)
