@@ -212,19 +212,11 @@ opam:tezos-benchmark:
   variables:
     package: tezos-benchmark
 
-<<<<<<< HEAD
-=======
 opam:tezos-benchmark-010-PtGRANAD:
   extends: .opam_template
   variables:
     package: tezos-benchmark-010-PtGRANAD
 
-opam:tezos-benchmark-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-benchmark-alpha
-
->>>>>>> 655ca1e239... Granada: Snapshot
 opam:tezos-benchmark-examples:
   extends: .opam_template
   variables:
@@ -235,29 +227,16 @@ opam:tezos-benchmark-tests:
   variables:
     package: tezos-benchmark-tests
 
-<<<<<<< HEAD
-=======
 opam:tezos-benchmark-type-inference-010-PtGRANAD:
   extends: .opam_template
   variables:
     package: tezos-benchmark-type-inference-010-PtGRANAD
-
-opam:tezos-benchmark-type-inference-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-benchmark-type-inference-alpha
 
 opam:tezos-benchmarks-proto-010-PtGRANAD:
   extends: .opam_template
   variables:
     package: tezos-benchmarks-proto-010-PtGRANAD
 
-opam:tezos-benchmarks-proto-alpha:
-  extends: .opam_template
-  variables:
-    package: tezos-benchmarks-proto-alpha
-
->>>>>>> 655ca1e239... Granada: Snapshot
 opam:tezos-clic:
   extends: .opam_template
   variables:
