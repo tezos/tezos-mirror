@@ -589,6 +589,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       (Tez.t, Tez.t * 's) kinfo * (Tez.t, 's, 'r, 'f) kinstr
       -> (Tez.t, Tez.t * 's, 'r, 'f) kinstr
   | ISub_tez :
+      (Tez.t, Tez.t * 's) kinfo * (Tez.t option, 's, 'r, 'f) kinstr
+      -> (Tez.t, Tez.t * 's, 'r, 'f) kinstr
+  | ISub_tez_legacy :
       (Tez.t, Tez.t * 's) kinfo * (Tez.t, 's, 'r, 'f) kinstr
       -> (Tez.t, Tez.t * 's, 'r, 'f) kinstr
   | IMul_teznat :
@@ -1437,6 +1440,8 @@ val option_t :
   Script.location -> 'v ty -> annot:type_annot option -> 'v option ty tzresult
 
 (* the quote is used to indicate where the annotation will go *)
+
+val option_mutez'_t : _ ty_metadata -> Tez.t option ty
 
 val option_string'_t : _ ty_metadata -> Script_string.t option ty
 

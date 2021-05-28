@@ -4421,10 +4421,19 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
+      if legacy then
+        parse_var_annot loc annot >>?= fun annot ->
+        merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+        let instr = {apply = (fun kinfo k -> ISub_tez_legacy (kinfo, k))} in
+        let stack = Item_t (Mutez_t tname, rest, annot) in
+        typed ctxt loc instr stack
+      else fail (Deprecated_instruction I_SUB)
+  | ( Prim (loc, I_SUB_MUTEZ, [], annot),
+      Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
       merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ISub_tez (kinfo, k))} in
-      let stack = Item_t (Mutez_t tname, rest, annot) in
+      let stack = Item_t (option_mutez'_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Mutez_t tname, Item_t (Nat_t _, rest, _), _) ) ->
@@ -5200,9 +5209,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ( loc,
           (( I_DUP | I_SWAP | I_SOME | I_UNIT | I_PAIR | I_UNPAIR | I_CAR
            | I_CDR | I_CONS | I_CONCAT | I_SLICE | I_MEM | I_UPDATE | I_GET
-           | I_EXEC | I_FAILWITH | I_SIZE | I_ADD | I_SUB | I_MUL | I_EDIV
-           | I_OR | I_AND | I_XOR | I_NOT | I_ABS | I_NEG | I_LSL | I_LSR
-           | I_COMPARE | I_EQ | I_NEQ | I_LT | I_GT | I_LE | I_GE
+           | I_EXEC | I_FAILWITH | I_SIZE | I_ADD | I_SUB | I_SUB_MUTEZ | I_MUL
+           | I_EDIV | I_OR | I_AND | I_XOR | I_NOT | I_ABS | I_NEG | I_LSL
+           | I_LSR | I_COMPARE | I_EQ | I_NEQ | I_LT | I_GT | I_LE | I_GE
            | I_TRANSFER_TOKENS | I_SET_DELEGATE | I_NOW | I_IMPLICIT_ACCOUNT
            | I_AMOUNT | I_BALANCE | I_LEVEL | I_CHECK_SIGNATURE | I_HASH_KEY
            | I_SOURCE | I_SENDER | I_BLAKE2B | I_SHA256 | I_SHA512 | I_ADDRESS
@@ -5237,8 +5246,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   (* Stack errors *)
   | ( Prim
         ( loc,
-          (( I_ADD | I_SUB | I_MUL | I_EDIV | I_AND | I_OR | I_XOR | I_LSL
-           | I_LSR | I_CONCAT | I_PAIRING_CHECK ) as name),
+          (( I_ADD | I_SUB | I_SUB_MUTEZ | I_MUL | I_EDIV | I_AND | I_OR | I_XOR
+           | I_LSL | I_LSR | I_CONCAT | I_PAIRING_CHECK ) as name),
           [],
           _ ),
       Item_t (ta, Item_t (tb, _, _), _) ) ->
@@ -5287,9 +5296,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim
         ( loc,
           (( I_SWAP | I_PAIR | I_CONS | I_GET | I_MEM | I_EXEC
-           | I_CHECK_SIGNATURE | I_ADD | I_SUB | I_MUL | I_EDIV | I_AND | I_OR
-           | I_XOR | I_LSL | I_LSR | I_COMPARE | I_PAIRING_CHECK | I_TICKET
-           | I_SPLIT_TICKET ) as name),
+           | I_CHECK_SIGNATURE | I_ADD | I_SUB | I_SUB_MUTEZ | I_MUL | I_EDIV
+           | I_AND | I_OR | I_XOR | I_LSL | I_LSR | I_COMPARE | I_PAIRING_CHECK
+           | I_TICKET | I_SPLIT_TICKET ) as name),
           _,
           _ ),
       stack ) ->
@@ -5329,6 +5338,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
              I_CONCAT;
              I_ADD;
              I_SUB;
+             I_SUB_MUTEZ;
              I_MUL;
              I_EDIV;
              I_OR;

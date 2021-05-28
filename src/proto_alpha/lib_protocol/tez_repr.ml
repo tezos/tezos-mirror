@@ -115,6 +115,8 @@ let ( -? ) t1 t2 =
   if t2 <= t1 then ok (Int64.sub t1 t2)
   else error (Subtraction_underflow (t1, t2))
 
+let sub_opt t1 t2 = if t2 <= t1 then Some (Int64.sub t1 t2) else None
+
 let ( +? ) t1 t2 =
   let t = Int64.add t1 t2 in
   if t < t1 then error (Addition_overflow (t1, t2)) else ok t

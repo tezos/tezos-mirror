@@ -632,6 +632,9 @@ module Cost_of = struct
     (* model N_ISub_tez *)
     let cost_N_ISub_tez = S.safe_int 25
 
+    (* model N_ISub_tez_legacy *)
+    let cost_N_ISub_tez_legacy = S.safe_int 25
+
     (* model N_ISub_timestamp_seconds *)
     (* Approximating 0.077794 x term *)
     let cost_N_ISub_timestamp_seconds = cost_linear_op_int
@@ -1052,6 +1055,8 @@ module Cost_of = struct
     let add_tez = atomic_step_cost cost_N_IAdd_tez
 
     let sub_tez = atomic_step_cost cost_N_ISub_tez
+
+    let sub_tez_legacy = atomic_step_cost cost_N_ISub_tez_legacy
 
     let mul_teznat = atomic_step_cost cost_N_IMul_teznat
 

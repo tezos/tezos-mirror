@@ -390,7 +390,7 @@ let ir_model ?specialization instr_or_cont =
       | N_IAdd_seconds_to_timestamp | N_IAdd_timestamp_to_seconds
       | N_ISub_timestamp_seconds | N_IDiff_timestamps ->
           model_2 instr_or_cont (linear_max_model name)
-      | N_IAdd_tez | N_ISub_tez | N_IEdiv_tez ->
+      | N_IAdd_tez | N_ISub_tez | N_ISub_tez_legacy | N_IEdiv_tez ->
           model_0 instr_or_cont (const1_model name)
       | N_IMul_teznat | N_IMul_nattez ->
           model_1 instr_or_cont (affine_model name)

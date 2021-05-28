@@ -484,6 +484,7 @@ and kinstr_size :
     | IDiff_timestamps (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IAdd_tez (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISub_tez (kinfo, _) -> ret_succ_adding accu (base kinfo)
+    | ISub_tez_legacy (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IMul_teznat (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IMul_nattez (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IEdiv_teznat (kinfo, _) -> ret_succ_adding accu (base kinfo)

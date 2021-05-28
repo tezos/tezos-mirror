@@ -1645,7 +1645,27 @@ module Registration_section = struct
     let () =
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ISub_tez
-        ~kinstr:(ISub_tez (kinfo (mutez @$ mutez @$ bot), halt (mutez @$ bot)))
+        ~kinstr:
+          (ISub_tez (kinfo (mutez @$ mutez @$ bot), halt (option mutez @$ bot)))
+        ~stack_sampler:(fun cfg rng_state ->
+          let (_, (module Samplers)) =
+            make_default_samplers cfg.Default_config.sampler
+          in
+          fun () ->
+            let a = Samplers.Random_value.value mutez rng_state in
+            let b =
+              match Alpha_context.Tez.(a /? 2L) with
+              | Error _ -> assert false
+              | Ok x -> x
+            in
+            (a, (b, eos)))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_ISub_tez_legacy
+        ~kinstr:
+          (ISub_tez_legacy (kinfo (mutez @$ mutez @$ bot), halt (mutez @$ bot)))
         ~stack_sampler:(fun cfg rng_state ->
           let (_, (module Samplers)) =
             make_default_samplers cfg.Default_config.sampler

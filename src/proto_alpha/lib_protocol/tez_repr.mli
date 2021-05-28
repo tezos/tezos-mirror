@@ -40,6 +40,9 @@ val one : t
 
 val ( -? ) : t -> t -> t tzresult
 
+(** Same as ( -? ) but returns None instead of an error. *)
+val sub_opt : t -> t -> t option
+
 val ( +? ) : t -> t -> t tzresult
 
 val ( *? ) : t -> int64 -> t tzresult
