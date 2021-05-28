@@ -308,7 +308,11 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | `Gone (Some err)
     | `Not_found (Some err) ->
         Lwt.return_error err
-    | `Conflict None | `Error None | `Forbidden None | `Unauthorized None ->
+    | `Unauthorized None ->
+        request_failed meth uri Unauthorized_uri
+    | `Forbidden None ->
+        request_failed meth uri Forbidden
+    | `Conflict None | `Error None ->
         fail (RPC_context.Generic_error {meth; uri})
     | `Unexpected_status_code (code, (content, _, media_type)) ->
         let media_type = Option.map Media_type.name media_type in

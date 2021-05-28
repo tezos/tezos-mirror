@@ -36,7 +36,7 @@ class TestRawContext:
             '/chains/main/blocks/head/context/raw/bytes/'
             'non-existent?depth=-1'
         )
-        expected = 'Command failed : Extraction depth -1 is invalid'
+        expected = 'Command failed: Extraction depth -1 is invalid'
         with assert_run_failure(expected):
             client.rpc('get', path)
 

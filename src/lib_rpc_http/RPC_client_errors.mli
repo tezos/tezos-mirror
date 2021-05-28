@@ -27,6 +27,7 @@ type rpc_error =
   | Empty_answer
   | Connection_failed of string
   | Bad_request of string
+  | Forbidden
   | Method_not_allowed of RPC_service.meth list
   | Unsupported_media_type of string option
   | Not_acceptable of {proposed : string; acceptable : string}
@@ -47,6 +48,7 @@ type rpc_error =
     }
   | OCaml_exception of string
   | Unauthorized_host of string option
+  | Unauthorized_uri
 
 type error +=
   | Request_failed of {meth : RPC_service.meth; uri : Uri.t; error : rpc_error}

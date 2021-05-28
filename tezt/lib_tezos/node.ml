@@ -68,7 +68,8 @@ module Parameters = struct
   type persistent_state = {
     data_dir : string;
     mutable net_port : int;
-    mutable rpc_port : int;
+    rpc_host : string;
+    rpc_port : int;
     default_expected_pow : int;
     mutable arguments : argument list;
     mutable pending_ready : unit option Lwt.u list;
@@ -109,6 +110,8 @@ let wait node =
 let name node = node.name
 
 let net_port node = node.persistent_state.net_port
+
+let rpc_host node = node.persistent_state.rpc_host
 
 let rpc_port node = node.persistent_state.rpc_port
 
@@ -166,11 +169,26 @@ let spawn_config_init node arguments =
     :: "--net-addr"
     :: ("127.0.0.1:" ^ string_of_int node.persistent_state.net_port)
     :: "--rpc-addr"
-    :: ("localhost:" ^ string_of_int node.persistent_state.rpc_port)
+    :: Format.sprintf
+         "%s:%d"
+         node.persistent_state.rpc_host
+         node.persistent_state.rpc_port
     :: make_arguments arguments )
 
 let config_init node arguments =
   spawn_config_init node arguments |> Process.check
+
+module Config_file = struct
+  let filename node = sf "%s/config.json" @@ data_dir node
+
+  let read node = JSON.parse_file (filename node)
+
+  let write node config =
+    with_open_out (filename node)
+    @@ fun chan -> output_string chan (JSON.encode config)
+
+  let update node update = read node |> update |> write node
+end
 
 let trigger_ready node value =
   let pending = node.persistent_state.pending_ready in
@@ -288,7 +306,7 @@ let wait_for_identity node =
       check_event node "read_identity.v0" promise
 
 let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
-    ?net_port ?rpc_port arguments =
+    ?net_port ?(rpc_host = "localhost") ?rpc_port arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -318,6 +336,7 @@ let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
       {
         data_dir;
         net_port;
+        rpc_host;
         rpc_port;
         arguments;
         default_expected_pow;
@@ -392,7 +411,7 @@ let run ?(on_terminate = fun _ -> ()) ?event_level node arguments =
     arguments
     ~on_terminate
 
-let init ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port
+let init ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_host ?rpc_port
     ?event_level arguments =
   let node =
     create
@@ -402,6 +421,7 @@ let init ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_port
       ?data_dir
       ?event_pipe
       ?net_port
+      ?rpc_host
       ?rpc_port
       arguments
   in

@@ -101,6 +101,7 @@ val create :
   ?data_dir:string ->
   ?event_pipe:string ->
   ?net_port:int ->
+  ?rpc_host:string ->
   ?rpc_port:int ->
   argument list ->
   t
@@ -137,6 +138,9 @@ val name : t -> string
 
 (** Get the network port given as [--net-addr] to a node. *)
 val net_port : t -> int
+
+(** Get the RPC host given as [--rpc-addr] to a node. *)
+val rpc_host : t -> string
 
 (** Get the RPC port given as [--rpc-addr] to a node. *)
 val rpc_port : t -> int
@@ -176,6 +180,21 @@ val show_history_mode : history_mode -> string
 
 (** Run [tezos-node config init]. *)
 val config_init : t -> argument list -> unit Lwt.t
+
+module Config_file : sig
+  (** Node configuration files. *)
+
+  (** Read the configuration file ([config.json]) of a node. *)
+  val read : t -> JSON.t
+
+  (** Write the configuration file of a node, replacing the existing one. *)
+  val write : t -> JSON.t -> unit
+
+  (** Update the configuration file of a node.
+
+      Example: [Node.Config_file.update node (JSON.put ("p2p", new_p2p_config))] *)
+  val update : t -> (JSON.t -> JSON.t) -> unit
+end
 
 (** Same as [config_init], but do not wait for the process to exit. *)
 val spawn_config_init : t -> argument list -> Process.t
@@ -289,6 +308,7 @@ val init :
   ?data_dir:string ->
   ?event_pipe:string ->
   ?net_port:int ->
+  ?rpc_host:string ->
   ?rpc_port:int ->
   ?event_level:string ->
   argument list ->

@@ -74,6 +74,7 @@ and rpc = {
   cors_origins : string list;
   cors_headers : string list;
   tls : tls option;
+  acl : RPC_server.Acl.policy;
 }
 
 and tls = {cert : string; key : string}

@@ -96,6 +96,10 @@ Node
 -  Fixed a potential interleaving of distinct events written to a file
    descriptor sink simultaneously.
 
+- Introduced Access Control Lists for RPC servers, which allow to
+  restrict access to selected RPC endpoints for different listening
+  addresses.
+
 Client
 ------
 

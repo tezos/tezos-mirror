@@ -102,6 +102,24 @@ val geti : int -> t -> t
 (** Same as {!geti}, with the arguments reversed. *)
 val ( |=> ) : t -> int -> t
 
+(** Updates an object with a [(key, value)] pair.
+
+    [put (key, value) obj] puts [value] under [key] in [obj]. If the [key]
+    already exists, it is overwritten. Otherwise a new key is added at the end
+    of the object.
+
+    @raise [Error] if [obj] is not a JSON object. *)
+val put : string * t -> t -> t
+
+(** Alters the value of a specific key in a JSON object by applying its value to a
+    function. Returns updated object.
+
+    [update key f obj] is equivalent to [put (key, f (get key obj)) obj].
+
+    Note: if [key] is not present in [obj], [`Null] is passed to [f] instead.
+    @raise [Error] if [obj] is not an object. *)
+val update : string -> (t -> t) -> t -> t
+
 (** Test whether a JSON value is [`Null]. *)
 val is_null : t -> bool
 

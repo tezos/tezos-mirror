@@ -29,3 +29,5 @@ include
   Resto.ENCODING with type 'a t = 'a Data_encoding.t and type schema := schema
 
 val uri_encoding : Uri.t Data_encoding.t
+
+val meth_encoding : Resto.meth Data_encoding.t

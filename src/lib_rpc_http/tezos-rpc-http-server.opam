@@ -11,6 +11,10 @@ depends: [
   "tezos-rpc-http"
   "resto-cohttp-server" { >= "0.6" & < "0.7" }
   "resto-acl" { >= "0.6" & < "0.7" }
+  "alcotest-lwt" { with-test }
+  "lib-test" { with-test }
+  "qcheck-alcotest" { with-test }
+  "tezos-test-services" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

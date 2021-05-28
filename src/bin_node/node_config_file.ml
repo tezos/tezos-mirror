@@ -334,6 +334,7 @@ and rpc = {
   cors_origins : string list;
   cors_headers : string list;
   tls : tls option;
+  acl : RPC_server.Acl.policy;
 }
 
 and tls = {cert : string; key : string}
@@ -394,7 +395,13 @@ let default_p2p =
   }
 
 let default_rpc =
-  {listen_addrs = []; cors_origins = []; cors_headers = []; tls = None}
+  {
+    listen_addrs = [];
+    cors_origins = [];
+    cors_headers = [];
+    tls = None;
+    acl = RPC_server.Acl.default_policy;
+  }
 
 let default_shell =
   {
@@ -742,7 +749,7 @@ let p2p =
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {cors_origins; cors_headers; listen_addrs; tls} ->
+    (fun {cors_origins; cors_headers; listen_addrs; tls; acl} ->
       let (cert, key) =
         match tls with
         | None ->
@@ -750,13 +757,14 @@ let rpc : rpc Data_encoding.t =
         | Some {cert; key} ->
             (Some cert, Some key)
       in
-      (Some listen_addrs, None, cors_origins, cors_headers, cert, key))
+      (Some listen_addrs, None, cors_origins, cors_headers, cert, key, acl))
     (fun ( listen_addrs,
            legacy_listen_addr,
            cors_origins,
            cors_headers,
            cert,
-           key ) ->
+           key,
+           acl ) ->
       let tls =
         match (cert, key) with
         | (None, _) | (_, None) ->
@@ -777,8 +785,8 @@ let rpc : rpc Data_encoding.t =
               "Config file: Use only \"listen-addrs\" and not (legacy) \
                \"listen-addr\"."
       in
-      {listen_addrs; cors_origins; cors_headers; tls})
-    (obj6
+      {listen_addrs; cors_origins; cors_headers; tls; acl})
+    (obj7
        (opt
           "listen-addrs"
           ~description:
@@ -804,7 +812,12 @@ let rpc : rpc Data_encoding.t =
           "crt"
           ~description:"Certificate file (necessary when TLS is used)."
           string)
-       (opt "key" ~description:"Key file (necessary when TLS is used)." string))
+       (opt "key" ~description:"Key file (necessary when TLS is used)." string)
+       (dft
+          "acl"
+          ~description:"A list of RPC ACLs for specific listening addresses."
+          RPC_server.Acl.policy_encoding
+          RPC_server.Acl.default_policy))
 
 let worker_limits_encoding default_size default_level =
   let open Data_encoding in
@@ -1242,6 +1255,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       cors_origins = unopt_list ~default:cfg.rpc.cors_origins cors_origins;
       cors_headers = unopt_list ~default:cfg.rpc.cors_headers cors_headers;
       tls = Option.either rpc_tls cfg.rpc.tls;
+      acl = cfg.rpc.acl;
     }
   and log : Lwt_log_sink_unix.cfg =
     {cfg.log with output = Option.value ~default:cfg.log.output log_output}

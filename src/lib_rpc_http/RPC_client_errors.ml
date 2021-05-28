@@ -27,6 +27,7 @@ type rpc_error =
   | Empty_answer
   | Connection_failed of string
   | Bad_request of string
+  | Forbidden
   | Method_not_allowed of RPC_service.meth list
   | Unsupported_media_type of string option
   | Not_acceptable of {proposed : string; acceptable : string}
@@ -47,6 +48,7 @@ type rpc_error =
     }
   | OCaml_exception of string
   | Unauthorized_host of string option
+  | Unauthorized_uri
 
 type error +=
   | Request_failed of {meth : RPC_service.meth; uri : Uri.t; error : rpc_error}
@@ -158,7 +160,13 @@ let rpc_error_encoding =
         ~title:"OCaml_exception"
         (obj2 (req "kind" (constant "ocaml_exception")) (req "content" string))
         (function OCaml_exception msg -> Some ((), msg) | _ -> None)
-        (function ((), msg) -> OCaml_exception msg) ]
+        (function ((), msg) -> OCaml_exception msg);
+      case
+        (Tag 10)
+        ~title:"Unauthorized URI"
+        unit
+        (function Unauthorized_uri -> Some () | _ -> None)
+        (function () -> Unauthorized_uri) ]
 
 let pp_rpc_error ppf err =
   match err with
@@ -171,6 +179,8 @@ let pp_rpc_error ppf err =
         ppf
         "@[<v 2>Oops! It looks like we forged an invalid HTTP request.@,%s@]"
         msg
+  | Forbidden ->
+      Format.fprintf ppf "@[<v 2>The server forbids access.@]"
   | Method_not_allowed meths ->
       Format.fprintf
         ppf
@@ -231,6 +241,10 @@ let pp_rpc_error ppf err =
         "@[<v 2>The server refused connection to host \"%s\", please check \
          the node settings for CORS allowed origins.@]"
         (Option.value ~default:"" host)
+  | Unauthorized_uri ->
+      Format.fprintf
+        ppf
+        "@[<v 2>The server doesn't authorize this endpoint (ACL filtering).@]"
 
 let () =
   register_error_kind
