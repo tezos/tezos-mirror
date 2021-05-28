@@ -12,7 +12,7 @@
             tezos-client-commands
             tezos-stdlib
             tezos-stdlib-unix
-            tezos-context
+            tezos-storage
             tezos-rpc-http
             tezos-rpc
             lwt-canceler
@@ -31,7 +31,7 @@
                    -open Tezos_stdlib
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_context
-                   -open Tezos_context
+                   -open Tezos_storage
                    -open Tezos_rpc
                    -open Tezos_rpc_http)))
 
