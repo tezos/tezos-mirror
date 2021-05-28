@@ -7,7 +7,7 @@ If you need help understanding how the Tezos protocol works or if you
 have technical questions about the software, here are a few resources
 to find answers.
 
-- `This documentation! <http://tezos.gitlab.io/>`_
+- :doc:`This documentation! <../index>`
   Make sure to go through this technical documentation before asking
   elsewhere, there is also a search box on the top left corner.
 - Tezos `Stack Exchange <https://tezos.stackexchange.com>`_ is live

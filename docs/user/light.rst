@@ -4,7 +4,7 @@ Light mode
 ----------
 
 The ``tezos-client`` described
-`here <https://tezos.gitlab.io/introduction/howtouse.html#client>`_ forwards all RPCs to a node.
+:ref:`here <howtouse_tezos_client>` forwards all RPCs to a node.
 This page describes the *light* mode, a mode where the client
 performs protocol RPCs locally; like the :ref:`proxy mode<proxy-mode>`.
 However, contrary to the proxy mode, the light mode provides

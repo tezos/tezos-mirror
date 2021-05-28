@@ -4,7 +4,7 @@ Proxy mode
 ----------
 
 The ``tezos-client`` described
-`here <https://tezos.gitlab.io/introduction/howtouse.html#client>`_ forwards all RPCs to a node.
+:ref:`here <howtouse_tezos_client>` forwards all RPCs to a node.
 This page describes the *proxy* mode, a mode where the client
 performs protocol RPCs locally. For the computations to be correct,
 the proxy client requests the data it needs from the node, and uses

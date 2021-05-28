@@ -172,6 +172,8 @@ Building from sources via OPAM
 The easiest way to build the binaries from the source code is to use the OPAM
 source package manager for OCaml.
 
+.. _build_environment:
+
 Environment
 ~~~~~~~~~~~
 

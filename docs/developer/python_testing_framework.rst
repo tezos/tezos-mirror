@@ -35,7 +35,7 @@ Installation
 
 Prerequisites:
 
-- A working environment (see `documentation <http://tezos.gitlab.io/introduction/howtoget.html#environment>`_) with the binaries compiled,
+- A working environment (see :ref:`documentation <build_environment>`) with the binaries compiled,
 - A local copy of the tezos `repository <https://gitlab.com/tezos/tezos>`_
 - `python 3.8.5`. It is recommended to use `pyenv
   <https://github.com/pyenv/pyenv>`_ to manage the python versions. If ``pyenv``
