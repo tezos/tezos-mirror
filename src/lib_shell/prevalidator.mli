@@ -56,6 +56,8 @@ type limits = {
   operations_batch_size : int;
 }
 
+type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
+
 (** Creates/tear-down a new prevalidator context. *)
 val create :
   limits ->
@@ -103,7 +105,7 @@ val running_workers : unit -> (Chain_id.t * Protocol_hash.t * t) list
 val protocol_hash : t -> Protocol_hash.t
 
 (** Returns the parameters the prevalidator was created with. *)
-val parameters : t -> limits * Distributed_db.chain_db
+val parameters : t -> parameters
 
 (** Worker status and events *)
 

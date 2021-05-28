@@ -63,6 +63,8 @@ module Logger =
       let worker_name = "node_prevalidator"
     end)
 
+type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
+
 type 'a bounded_map = {
   ring : Operation_hash.t Ringo.Ring.t;
   mutable map : (Operation.t * error list) Operation_hash.Map.t;
@@ -75,13 +77,10 @@ module type T = sig
 
   val name : Name.t
 
-  val parameters : limits * Distributed_db.chain_db
-
   module Prevalidation : Prevalidation.T with module Proto = Proto
 
   type types_state = {
-    chain_db : Distributed_db.chain_db;
-    limits : limits;
+    parameters : parameters;
     mutable predecessor : Store.Block.t;
     mutable timestamp : Time.System.t;
     mutable live_blocks : Block_hash.Set.t;
@@ -149,13 +148,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
   let name = (Arg.chain_id, Proto.hash)
 
-  let parameters = (Arg.limits, Arg.chain_db)
-
   module Prevalidation = Prevalidation.Make (Proto)
 
   type types_state = {
-    chain_db : Distributed_db.chain_db;
-    limits : limits;
+    parameters : parameters;
     mutable predecessor : Store.Block.t;
     mutable timestamp : Time.System.t;
     mutable live_blocks : Block_hash.Set.t;
@@ -368,7 +364,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (fun e ->
         pv.branch_refused.map <-
           Operation_hash.Map.remove e pv.branch_refused.map ;
-        Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+        Distributed_db.Operation.clear_or_cancel pv.parameters.chain_db oph ;
         pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
       (Ringo.Ring.add_and_return_erased pv.branch_refused.ring oph) ;
     pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
@@ -381,7 +377,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (fun e ->
         pv.branch_delayed.map <-
           Operation_hash.Map.remove e pv.branch_delayed.map ;
-        Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+        Distributed_db.Operation.clear_or_cancel pv.parameters.chain_db oph ;
         pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
       (Ringo.Ring.add_and_return_erased pv.branch_delayed.ring oph) ;
     pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool ;
@@ -394,11 +390,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (fun e ->
         pv.refused.map <- Operation_hash.Map.remove e pv.refused.map ;
         (* The line below is not necessary but just to be sure *)
-        Distributed_db.Operation.clear_or_cancel pv.chain_db e ;
+        Distributed_db.Operation.clear_or_cancel pv.parameters.chain_db e ;
         pv.in_mempool <- Operation_hash.Set.remove e pv.in_mempool)
       (Ringo.Ring.add_and_return_erased pv.refused.ring oph) ;
     pv.refused.map <- Operation_hash.Map.add oph (op, errors) pv.refused.map ;
-    Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+    Distributed_db.Operation.clear_or_cancel pv.parameters.chain_db oph ;
     pv.in_mempool <- Operation_hash.Set.add oph pv.in_mempool
 
   let handle_applied pv (op : Prevalidation.operation) =
@@ -432,7 +428,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
               in
               Lwt.return (new_validation_state, new_mempool))
             else (
-              Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+              Distributed_db.Operation.clear_or_cancel
+                pv.parameters.chain_db
+                oph ;
               Lwt.return (validation_state, mempool))
         | Branch_delayed errors ->
             handle_branch_delayed pv op.raw op.hash errors ;
@@ -472,14 +470,12 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           (* Using Error as an early-return mechanism *)
           Lwt.return_error (acc_validation_state, acc_mempool)
         else (
-          (* Do not forget to remove the treated operation from
-                   the pendings *)
           pv.pending <- Operation_hash.Map.remove oph pv.pending ;
           classify_operation w pv acc_validation_state acc_mempool op oph
           >|= fun (new_validation_state, new_mempool) ->
           ok (new_validation_state, new_mempool, limit - 1)))
       pv.pending
-      (state, Mempool.empty, pv.limits.operations_batch_size)
+      (state, Mempool.empty, pv.parameters.limits.operations_batch_size)
     >>= function
     | Error (state, advertised_mempool) ->
         (* Early return after iteration limit was reached *)
@@ -528,7 +524,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
               }
             in
             pv.mempool <- our_mempool ;
-            let chain_store = Distributed_db.chain_store pv.chain_db in
+            let chain_store =
+              Distributed_db.chain_store pv.parameters.chain_db
+            in
             Store.Chain.set_mempool
               chain_store
               ~head:(Store.Block.hash pv.predecessor)
@@ -538,8 +536,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   let fetch_operation w pv ?peer oph =
     Worker.log_event w (Fetching_operation oph) >>= fun () ->
     Distributed_db.Operation.fetch
-      ~timeout:pv.limits.operation_timeout
-      pv.chain_db
+      ~timeout:pv.parameters.limits.operation_timeout
+      pv.parameters.chain_db
       ?peer
       oph
       ()
@@ -635,7 +633,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
            !dir
            (Proto_services.S.Mempool.request_operations RPC_path.open_root)
            (fun pv () () ->
-             Distributed_db.Request.current_head pv.chain_db () ;
+             Distributed_db.Request.current_head pv.parameters.chain_db () ;
              return_unit) ;
        dir :=
          RPC_directory.gen_register
@@ -761,7 +759,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             advertise w pv {Mempool.empty with pending} ;
             return_unit
         | false ->
-            Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+            Distributed_db.Operation.clear_or_cancel pv.parameters.chain_db oph ;
             return_unit)
       else
         pre_filter w pv oph op >>= function
@@ -770,7 +768,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             pv.pending <- Operation_hash.Map.add oph op pv.pending ;
             return_unit
         | false ->
-            Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+            Distributed_db.Operation.clear_or_cancel pv.parameters.chain_db oph ;
             return_unit
 
     let on_inject _w pv op =
@@ -782,7 +780,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         Lwt.return (Prevalidation.parse op) >>=? fun parsed_op ->
         Prevalidation.apply_operation validation_state parsed_op >>= function
         | Applied (_, _result) ->
-            Distributed_db.inject_operation pv.chain_db oph op
+            Distributed_db.inject_operation pv.parameters.chain_db oph op
             >>= fun (_ : bool) ->
             pv.pending <- Operation_hash.Map.add parsed_op.hash op pv.pending ;
             return_unit
@@ -813,9 +811,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
     let on_flush w pv predecessor live_blocks live_operations =
       Lwt_watcher.shutdown_input pv.operation_stream ;
-      let chain_store = Distributed_db.chain_store pv.chain_db in
+      let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
       list_pendings
-        pv.chain_db
+        pv.parameters.chain_db
         ~from_block:pv.predecessor
         ~to_block:predecessor
         ~live_blocks
@@ -860,7 +858,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       | `Pending mempool ->
           pv.advertisement <- `None ;
           Distributed_db.Advertise.current_head
-            pv.chain_db
+            pv.parameters.chain_db
             ~mempool
             pv.predecessor
 
@@ -871,7 +869,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       | Request.Flush (hash, live_blocks, live_operations) ->
           on_advertise pv ;
           (* TODO: rebase the advertisement instead *)
-          let chain_store = Distributed_db.chain_store pv.chain_db in
+          let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
           Store.Block.read_block chain_store hash >>=? fun block ->
           on_flush w pv block live_blocks live_operations >>=? fun () ->
           return (() : r)
@@ -892,7 +890,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     let on_close w =
       let pv = Worker.state w in
       Operation_hash.Set.iter
-        (Distributed_db.Operation.clear_or_cancel pv.chain_db)
+        (Distributed_db.Operation.clear_or_cancel pv.parameters.chain_db)
         pv.fetching ;
       Lwt.return_unit
 
@@ -918,6 +916,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           Operation_hash.Set.empty
           mempool.known_valid
       in
+      let parameters = {limits; chain_db} in
       let make_bounded_operation_collections () =
         {
           ring = Ringo.Ring.create limits.max_refused_operations;
@@ -926,8 +925,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       in
       let pv =
         {
-          limits;
-          chain_db;
+          parameters;
           predecessor;
           timestamp = timestamp_system;
           live_blocks;
@@ -1119,7 +1117,8 @@ let protocol_hash (t : t) =
 
 let parameters (t : t) =
   let module Prevalidator : T = (val t) in
-  Prevalidator.parameters
+  let w = Lazy.force Prevalidator.worker in
+  (Prevalidator.Worker.state w).parameters
 
 let information (t : t) =
   let module Prevalidator : T = (val t) in
