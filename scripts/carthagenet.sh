@@ -1,1 +1,0 @@
-tezos-docker-manager.sh
