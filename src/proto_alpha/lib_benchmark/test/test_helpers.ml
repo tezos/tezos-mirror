@@ -23,21 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_alpha
 open Tezos_error_monad.Error_monad
 
 let rng_state = Random.State.make [|42; 987897; 54120|]
 
-let base_type_to_michelson_type
-    (typ : Tezos_benchmark_type_inference_alpha.Type.Base.t) =
-  let open Tezos_benchmark_type_inference_alpha in
+let base_type_to_michelson_type (typ : Type.Base.t) =
   let typ = Mikhailsky.map_var (fun _ -> Mikhailsky.unit_ty) typ in
   Mikhailsky.to_michelson typ
 
 (* Convert a Mikhailsky stack to a list of Micheline-encoded types *)
-let rec stack_type_to_michelson_type_list
-    (typ : Tezos_benchmark_type_inference_alpha.Type.Stack.t) =
-  let open Tezos_benchmark_type_inference_alpha in
+let rec stack_type_to_michelson_type_list (typ : Type.Stack.t) =
   let node = typ.node in
   match node with
   | Type.Stack.Stack_var_t _ ->
