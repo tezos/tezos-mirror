@@ -25,9 +25,9 @@
 
 open Binary_error_types
 
+(* Do not leak [Local_read_error] outside of this module.
+   It is intended as a local control-flow mechanism only. *)
 exception Local_read_error of read_error
-
-(* do not leak this exception outside of this module *)
 
 let raise_read_error e = raise (Local_read_error e)
 
