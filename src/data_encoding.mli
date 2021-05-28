@@ -237,7 +237,7 @@ module Encoding : sig
   (** [conv_with_guard] is similar to [conv] but the function that takes in the value
       from the outside (untrusted) world has a chance to fail.
 
-      Specificially, if the function returns [Error msg] then the decoding is
+      Specifically, if the function returns [Error msg] then the decoding is
       interrupted with an error carrying the message [msg]. If the function
       returns [Ok _] then the decoding proceeds normally. *)
   val conv_with_guard :
@@ -1084,7 +1084,7 @@ module Binary : sig
         an exception,
       - etc.
       In which case the returned error contains minimal diagnosis information
-      about the dicrepancy between the bytes and the encoding.
+      about the discrepancy between the bytes and the encoding.
 
       Other reading functions ({!of_string}, {!of_bytes}) may fail for the same
       reasons.
