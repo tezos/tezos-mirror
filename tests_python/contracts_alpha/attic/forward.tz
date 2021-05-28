@@ -58,7 +58,7 @@ code
               UNIT ; TRANSFER_TOKENS ; SWAP ;
               DIP { CONS } ;
               DUP ; CADAR ; DIP { DUP ; CADDR } ; ADD ;
-              BALANCE ; SUB ; # bonus to the warehouse
+              BALANCE ; SUB_MUTEZ ; ASSERT_SOME; # bonus to the warehouse
               DIP { DUP ; CDDDDR } ; # W
               DIP { CONTRACT unit ; ASSERT_SOME } ;
               UNIT ; TRANSFER_TOKENS ;
