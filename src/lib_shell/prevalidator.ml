@@ -115,14 +115,6 @@ module type T = sig
 
   type worker = Worker.infinite Worker.queue Worker.t
 
-  val list_pendings :
-    Distributed_db.chain_db ->
-    from_block:Store.Block.t ->
-    to_block:Store.Block.t ->
-    live_blocks:Block_hash.Set.t ->
-    Operation.t Operation_hash.Map.t ->
-    Operation.t Operation_hash.Map.t Lwt.t
-
   val validation_result : types_state -> error Preapply_result.t
 
   val fitness : unit -> Fitness.t Lwt.t
