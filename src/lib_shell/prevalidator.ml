@@ -991,6 +991,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (Arg.limits, Arg.chain_db)
       (module Handlers)
 
+  (* FIXME https://gitlab.com/tezos/tezos/-/merge_requests/2668
+
+     If the interface of worker would not use tzresult we would
+     see that this is not necessary since the function
+     [Handlers.on_launch] do not actually raise any error. *)
   let initialization_errors = worker_promise >>=? fun _ -> return_unit
 
   let worker =
