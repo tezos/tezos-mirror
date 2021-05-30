@@ -77,7 +77,7 @@ module type T = sig
 
   val name : Name.t
 
-  module Prevalidation : Prevalidation.T with module Proto = Proto
+  module Prevalidation : Prevalidation.T
 
   type types_state = {
     parameters : parameters;
@@ -146,9 +146,22 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   module Filter = Filter
   module Proto = Filter.Proto
 
+  (* [Tezos_protocol_environment.PROTOCOL] is a subtype of
+     [Registered_protocol.T]. The [Prevalidation.Make] expects the
+     former. However if we give [Proto] directly we will have a type
+     checking error since [with type] constraints of OCaml does not
+     allow subtyping. *)
+
+  module Protocol :
+    Tezos_protocol_environment.PROTOCOL
+      with type operation_data = Proto.P.operation_data
+       and type validation_state = Proto.P.validation_state
+       and type operation_receipt = Proto.P.operation_receipt =
+    Proto
+
   let name = (Arg.chain_id, Proto.hash)
 
-  module Prevalidation = Prevalidation.Make (Proto)
+  module Prevalidation = Prevalidation.Make (Protocol)
 
   type types_state = {
     parameters : parameters;

@@ -30,7 +30,7 @@
     prevalidation_state. *)
 
 module type T = sig
-  module Proto : Registered_protocol.T
+  module Proto : Tezos_protocol_environment.PROTOCOL
 
   type t
 
@@ -80,7 +80,8 @@ module type T = sig
   val pp_result : Format.formatter -> result -> unit
 end
 
-module Make (Proto : Registered_protocol.T) : T with module Proto = Proto
+module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
+  T with module Proto = Proto
 
 (** Pre-apply creates a new block and returns it. *)
 val preapply :
