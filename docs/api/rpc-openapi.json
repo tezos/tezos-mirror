@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "9.1"
+    "version": "9.2"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -1043,6 +1043,13 @@
                           "type": "string",
                           "enum": [
                             "florencenet"
+                          ]
+                        },
+                        {
+                          "title": "granadanet",
+                          "type": "string",
+                          "enum": [
+                            "granadanet"
                           ]
                         },
                         {
