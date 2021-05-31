@@ -1,6 +1,6 @@
 .. _version-9:
 
-Version 9.1
+Version 9.2
 ===========
 
 Version 9.0 contains a new version (V2) of the protocol environment,
@@ -17,23 +17,30 @@ florencenet``.
 Version 9.1 fixes a performance and memory usage regression issue
 and reintroduces ``/normalized`` RPCs.
 
+Version 9.2 adds Granada, a protocol proposal for Mainnet featuring,
+among others, the Emmy* consensus algorithm, Liquidity Baking, and
+reduced gas consumption. Version 9.2 also improves how the mempool
+chooses which operations to keep. This should result in fewer
+endorsements being missed.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v9.1
+  git checkout v9.2
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v9.1`` Docker images of Tezos.
+If you are using Docker instead, use the ``v9.2`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 9.2 <../CHANGES.html#version-9-2>`_
 - `Version 9.1 <../CHANGES.html#version-9-1>`_
 - `Version 9.0 <../CHANGES.html#version-9-0>`_
 - `Version 9.0~rc2 <../CHANGES.html#version-9-0-rc2>`_

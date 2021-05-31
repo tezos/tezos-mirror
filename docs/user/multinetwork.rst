@@ -56,9 +56,9 @@ the following built-in networks:
 
 - ``sandbox``
 
-- ``florencenet`` (available from version 9.0, see :ref:`version 8 release notes<v8_known_issues>` to run Florencenet with version 8.3)
+- ``florencenet`` (available from version 9.0)
 
-- ``florencenet`` (available since version 9.0)
+- ``granadanet`` (available from version 9.2)
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.

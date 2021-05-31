@@ -146,6 +146,35 @@ Docker Images
 Miscellaneous
 -------------
 
+Version 9.2
+===========
+
+Node
+----
+
+-  Added Granada, a protocol proposal for Mainnet featuring, among others,
+   the Emmy* consensus algorithm, Liquidity Baking, and reduced gas consumption.
+
+-  Added the configuration for Granadanet, a test network for Granada,
+   as a built-in network alias (``--network granadanet``).
+
+-  Updated the mempool to keep more than 50 non-included operations
+   when receiving a new block. In particular, this should result in
+   fewer endorsements being missed.
+
+Docker Images
+-------------
+
+-  File ``scripts/mainnet.sh`` is now deprecated and may be removed starting from
+   version 10.0. If you have a script that downloads this file (with
+   ``wget https://gitlab.com/tezos/tezos/raw/latest-release/scripts/mainnet.sh``
+   for instance), your script should now download ``scripts/tezos-docker-manager.sh``
+   instead and rename it into ``mainnet.sh`` (with
+   ``wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+   for instance).
+
+-  File ``scripts/carthagenet.sh`` may also be removed starting from version 10.0.
+
 Version 9.1
 ===========
 
