@@ -36,19 +36,19 @@
  (copy %{lib:tezos-protocol-011-PtHangzH-parameters:test-parameters.json}
        protocol_parameters.json))
 
-; runs only the `Quick tests
+; runs both `Quick and `Slow tests
 (rule
  (alias runtest_proto_011_PtHangzH)
  (deps (glob_files contracts/*))
  (package tezos-protocol-011-PtHangzH-tests)
- (action (run %{exe:main.exe} -q)))
+ (action (run %{exe:main.exe})))
 
-; runs both `Quick and `Slow tests
+; runs only `Quick tests
 (rule
- (alias runtest_slow)
+ (alias runtest_quick)
  (deps (glob_files contracts/*))
  (package tezos-protocol-011-PtHangzH-tests)
- (action (run %{exe:main.exe})))
+ (action (run %{exe:main.exe} -q)))
 
 (rule
  (alias runtest_saturation_fuzzing)
