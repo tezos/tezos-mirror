@@ -141,17 +141,41 @@ module type WITH_WRAPPED = sig
   type error
 
   module type Wrapped_error_monad = sig
+    (**
+       The purpose of this module is to wrap a specific error monad [E]
+       into a more general error monad [Eg].
+
+       The user implementing such an interface is responsible to
+       maintain the following assertions
+       - The [Eg] error is extended locally with a specific constructor [C]
+       - [unwrapped] is equal to the [error] type of [E]
+       - [wrap] builds an [Eg] [error] value from an [E] [error] value
+       - [unwrap] matches on [Eg] error cases and extracts [E]
+         error value from [C]
+
+       As a reference implementation,
+       see src/lib_protocol_environment/environment_V3.ml
+    *)
+
     type unwrapped = ..
 
     include CORE with type error := unwrapped
 
     include EXT with type error := unwrapped
 
+    (** [unwrap e] returns [Some] when [e] matches variant constructor [C]
+        and [None] otherwise *)
     val unwrap : error -> unwrapped option
 
+    (** [wrap e] returns a general [error] from a specific [unwrapped] error
+    [e] *)
     val wrap : unwrapped -> error
   end
 
+  (** Same as [register_error_kind] but for a wrapped error monad.
+      The codec is defined in the module parameter. It makes the category
+      of the error [Wrapped] instead of [Main].
+  *)
   val register_wrapped_error_kind :
     (module Wrapped_error_monad) ->
     id:string ->
