@@ -1,0 +1,4 @@
+(executable
+ (name main)
+ (libraries tezt-tezos cohttp-lwt-unix uri)
+ (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base)))

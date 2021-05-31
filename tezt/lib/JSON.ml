@@ -109,6 +109,8 @@ let fail_string origin message =
 
 let fail origin x = Printf.ksprintf (fail_string origin) x
 
+let error {origin; _} = fail origin
+
 let parse_file file =
   let node =
     try Base.with_open_in file Ezjsonm.from_channel with
@@ -185,6 +187,8 @@ let check as_opt error_message json =
 let test as_opt json = match as_opt json with None -> false | Some _ -> true
 
 let is_null {node; _} = match node with `Null -> true | _ -> false
+
+let as_opt json = match json.node with `Null -> None | _ -> Some json
 
 let as_bool_opt json = match json.node with `Bool b -> Some b | _ -> None
 
