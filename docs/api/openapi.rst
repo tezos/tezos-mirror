@@ -25,7 +25,7 @@ Shell RPCs
 The node provide some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi.json (version 9.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- `rpc-openapi.json (version 9.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
 .. TODO nomadic-labs/tezos#462: add/remove section(s)
 
@@ -35,12 +35,25 @@ Florence RPCs
 The OpenAPI specification for RPCs which are specific to the Florence
 protocol can be found at:
 
-- `florence-openapi.json (version 9.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/florence-openapi.json>`_
+- `florence-openapi.json (version 9.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/florence-openapi.json>`_
 
 The OpenAPI specification for RPCs which are related to the mempool
 and specific to the Florence protocol can be found at:
 
-- `florence-mempool-openapi.json (version 9.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/florence-mempool-openapi.json>`_
+- `florence-mempool-openapi.json (version 9.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/florence-mempool-openapi.json>`_
+
+Granada RPCs
+-------------
+
+The OpenAPI specification for RPCs which are specific to the Granada
+protocol can be found at:
+
+- `granada-openapi.json (version 9.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/granada-openapi.json>`_
+
+The OpenAPI specification for RPCs which are related to the mempool
+and specific to the Granada protocol can be found at:
+
+- `granada-mempool-openapi.json (version 9.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/granada-mempool-openapi.json>`_
 
 How to Generate
 ---------------

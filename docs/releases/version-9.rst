@@ -5,7 +5,7 @@ Version 9.2
 
 Version 9.0 contains a new version (V2) of the protocol environment,
 which is the set of functions that protocols can call. This new
-version is used by Florence, which is the current protocol proposal on
+version is used by Florence, which is the current protocol on
 Mainnet. The release also contains Florence itself as well as its
 daemons (baker, endorser and accuser).
 
