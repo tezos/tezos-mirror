@@ -1,33 +1,18 @@
 .opam_template:
-  extends: .runtime_build_test_dependencies_template
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development_opam
   stage: packaging
+  needs: []
+  # We set the dependencies to [] to force the job to run without any artifacts
+  # produced by previous stages.
   dependencies: []
-  rules:
-    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH == "proto-proposal"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /opam/'
-      when: on_success
-    - changes:
-        - /**/*.opam
-        - /**/dune
-        - /**/dune.inc
-        - /**/*.dune.inc
-        - /scripts/version.sh
-        - /.gitlab-ci.yml
-      when: on_success
-    - when: never
   script:
     - ./scripts/opam-pin.sh
     - opam depext --yes ${package}
     - opam install --yes ${package}
     - opam reinstall --yes --with-test ${package}
-  interruptible: true
 
 ##BEGIN_OPAM##
 # this section is updated using the script scripts/update_opam_test.sh

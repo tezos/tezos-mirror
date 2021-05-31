@@ -1,19 +1,14 @@
 .build_docker_release_template:
-  image: docker:latest
+  extends:
+    - .default_settings_template
+    - .image_template__latest
+    - .rules_template__master_and_releases
   services:
     - docker:dind
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: ""
   stage: build_release
-  rules:
-    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - when: never
   before_script:
     - mkdir ~/.docker || true
     - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
@@ -64,16 +59,11 @@ build_release:docker_arm64:
     - arm64
 
 .build_static_binaries_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_dependencies_template
+    - .rules_template__master_and_releases
   stage: build_release
-  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/'
-      when: on_success
-    - if: '$CI_COMMIT_TAG != null'
-      when: on_success
-    - when: never
   before_script:
     - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
     # TODO: include static version of this libraries to the default docker image
@@ -102,14 +92,6 @@ build_release:static-x86_64-linux-binaries:
 
 build_release:static-arm64-linux-binaries:
   extends: .build_static_binaries_template
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
-      when: on_success
-    - when: never
   script:
     - echo "No compression for now"
   tags:
@@ -203,10 +185,11 @@ merge-manifest:
   interruptible: false
 
 publish:documentation:
-  extends: .runtime_build_test_dependencies_template
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__master
   stage: doc
-  only:
-    - master@tezos/tezos
   before_script:
     - sudo apk add --no-cache openssh-client rsync
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
@@ -242,7 +225,11 @@ publish:documentation:
 #
 
 pages:
-  when: manual
+  extends:
+    - .default_settings_template
+    - .rules_template__development_coverage
+  needs: ["test_coverage"]
+  stage: publish_coverage
   # The cache rule ensures public (i.e. the static website) isn't erased
   # whenever we start a new pipeline
   # https://docs.gitlab.com/ee/ci/caching/
@@ -251,10 +238,6 @@ pages:
   cache:
     paths:
       - public
-  stage: publish_coverage
-  except:
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
   dependencies:
     - test_coverage
   script:

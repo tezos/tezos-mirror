@@ -1,29 +1,24 @@
 test-script-gen-genesis:
-  extends: .runtime_build_test_dependencies_template
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
   stage: test
-  except:
-    - master
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
+  needs: []
   before_script:
     - cd scripts/gen-genesis
   script:
     - dune build gen_genesis.exe
-  interruptible: true
-
-test-static-libs-patch:
-  extends: .runtime_build_test_dependencies_template
-  stage: test
-  except:
-    - master
-    - tags@tezos/tezos
-    - /-release$/@tezos/tezos
-  script:
-    - git apply packaging/build/static_libs.patch
 
 .test_template:
-  extends: .build_template
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
   stage: test
+  needs: ["build"]
+  before_script:
+    - . ./scripts/version.sh
   retry: 2
   # avoid pushing cache for testing stage
   cache:
