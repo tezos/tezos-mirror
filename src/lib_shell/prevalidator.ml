@@ -33,6 +33,10 @@ type limits = {
   operations_batch_size : int;
 }
 
+(* Minimal delay between two mempool advertisements except for
+   endorsements for which the branch is unknown. *)
+let advertisement_delay = 0.1
+
 module Name = struct
   type t = Chain_id.t * Protocol_hash.t
 
@@ -318,7 +322,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           (fun exc ->
             Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
           (fun () ->
-            Lwt_unix.sleep 0.1 >>= fun () ->
+            Lwt_unix.sleep advertisement_delay >>= fun () ->
             Worker.Queue.push_request_now w Advertise ;
             Lwt.return_unit)
 
