@@ -295,13 +295,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
     | _ ->
         None
   in
-  let connection_point_info =
-    match (point_info, remote_point_info) with
-    | (None, None) ->
-        None
-    | ((Some _ as point_info), _) | (_, (Some _ as point_info)) ->
-        point_info
-  in
+  let connection_point_info = Option.either point_info remote_point_info in
   (* Check if there is an expected peer id for this point. *)
   check_expected_peer_id connection_point_info info
   >>=? fun () ->

@@ -269,13 +269,8 @@ module Raw = struct
           (Data_encoding.Binary.to_bytes_exn address_encoding address)
       in
       let of_raw str =
-        match
-          Data_encoding.Binary.of_bytes address_encoding (Bytes.of_string str)
-        with
-        | Ok x ->
-            Some x
-        | Error _ ->
-            None
+        Option.of_result
+        @@ Data_encoding.Binary.of_bytes address_encoding (Bytes.of_string str)
       in
       Base58.register_encoding
         ~prefix:Base58.Prefix.sapling_address

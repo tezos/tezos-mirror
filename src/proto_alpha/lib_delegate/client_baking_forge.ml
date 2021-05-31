@@ -536,18 +536,8 @@ let unopt_timestamp ?(force = false) timestamp minimal_timestamp =
 
 let merge_preapps (old : error Preapply_result.t)
     (neu : error Preapply_result.t) =
-  let merge _ a b =
-    (* merge ops *)
-    match (a, b) with
-    | (None, None) ->
-        None
-    | (Some x, None) ->
-        Some x
-    | (_, Some y) ->
-        Some y
-  in
-  let merge = Operation_hash.Map.merge merge in
-  (* merge op maps *)
+  let merge _ a b = (* merge ops *) Option.either b a in
+  let merge = (* merge op maps *) Operation_hash.Map.merge merge in
   (* merge preapplies *)
   {
     Preapply_result.applied = [];

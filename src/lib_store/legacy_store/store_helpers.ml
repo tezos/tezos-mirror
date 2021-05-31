@@ -481,9 +481,5 @@ module Integer_index = struct
 
   let to_path x l = string_of_int x :: l
 
-  let of_path = function
-    | [x] -> (
-      try Some (int_of_string x) with _ -> None )
-    | _ ->
-        None
+  let of_path = function [x] -> int_of_string_opt x | _ -> None
 end

@@ -454,15 +454,12 @@ module Connection = struct
     random_elt candidates
 
   let propose_swap_request pool =
-    match random_connection ~no_private:true pool with
-    | Some recipient -> (
-      match random_addr ~different_than:recipient ~no_private:true pool with
-      | None ->
-          None
-      | Some (proposed_point, proposed_peer_id) ->
-          Some (proposed_point, proposed_peer_id, recipient) )
-    | None ->
-        None
+    let ( >?? ) = Option.bind in
+    random_connection ~no_private:true pool
+    >?? fun recipient ->
+    random_addr ~different_than:recipient ~no_private:true pool
+    >?? fun (proposed_point, proposed_peer_id) ->
+    Some (proposed_point, proposed_peer_id, recipient)
 
   let find_by_peer_id pool peer_id =
     Option.bind (Peers.info pool peer_id) (fun p ->

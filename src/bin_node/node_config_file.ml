@@ -1442,8 +1442,6 @@ let resolve_bootstrap_addrs peers =
     peers
 
 let bootstrap_peers config =
-  match config.p2p.bootstrap_peers with
-  | None ->
-      config.blockchain_network.default_bootstrap_peers
-  | Some peers ->
-      peers
+  Option.value
+    ~default:config.blockchain_network.default_bootstrap_peers
+    config.p2p.bootstrap_peers

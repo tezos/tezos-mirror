@@ -74,13 +74,7 @@ let info_of_peer_info pool i =
     | Some conn ->
         P2p_conn.stat conn
   in
-  let meta_opt =
-    match conn_opt with
-    | None ->
-        None
-    | Some conn ->
-        Some (P2p_conn.remote_metadata conn)
-  in
+  let meta_opt = Option.map P2p_conn.remote_metadata conn_opt in
   P2p_peer_state.Info.
     {
       score;
