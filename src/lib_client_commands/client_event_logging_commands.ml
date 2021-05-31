@@ -161,13 +161,7 @@ let commands () =
                       ~for_script:(script_row "unknown-event" "-" "-" path))
             in
             let time_query =
-              match (since, until) with
-              | (None, None) ->
-                  None
-              | (Some a, None) | (None, Some a) ->
-                  Some a
-              | (Some a, Some b) ->
-                  Some (`And (a, b))
+              Option.merge (fun a b -> `And (a, b)) since until
             in
             File_event_sink.Query.fold
               ?only_names

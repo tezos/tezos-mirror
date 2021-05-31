@@ -395,19 +395,7 @@ let fix_savepoint_and_caboose chain_dir block_store head =
          (None, None))
       floating_stores
     >>=? fun l ->
-    let min l =
-      List.fold_left
-        (fun v1 v2 ->
-          match (v1, v2) with
-          | (None, None) ->
-              None
-          | (Some v, None) | (None, Some v) ->
-              Some v
-          | (Some v, Some v') ->
-              Some (min v v'))
-        None
-        l
-    in
+    let min l = List.fold_left (Option.merge min) None l in
     let (lw, lwm) = List.split l in
     (* If we have failed getting a block with metadata from both the
        RO and RW floating stores, then it is not possible to determine

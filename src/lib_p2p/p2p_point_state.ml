@@ -185,18 +185,11 @@ module Info = struct
       (Time.System.recent s.last_established_connection s.last_disconnection)
 
   let last_miss s =
-    match
-      ( s.last_failed_connection,
-        Option.map snd
-        @@ Time.System.recent s.last_rejected_connection s.last_disconnection
-      )
-    with
-    | (None, None) ->
-        None
-    | (None, (Some _ as a)) | ((Some _ as a), None) ->
-        a
-    | ((Some t1 as a1), (Some t2 as a2)) ->
-        if Time.System.compare t1 t2 < 0 then a2 else a1
+    Option.merge
+      Time.System.max
+      s.last_failed_connection
+      ( Option.map snd
+      @@ Time.System.recent s.last_rejected_connection s.last_disconnection )
 
   let log {events; watchers; _} ~timestamp kind =
     let event = Time.System.stamp ~time:timestamp kind in
