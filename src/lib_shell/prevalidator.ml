@@ -33,7 +33,25 @@ type limits = {
   operations_batch_size : int;
 }
 
-type name_t = Chain_id.t * Protocol_hash.t
+module Name = struct
+  type t = Chain_id.t * Protocol_hash.t
+
+  let encoding = Data_encoding.tup2 Chain_id.encoding Protocol_hash.encoding
+
+  let base = ["prevalidator"]
+
+  let pp fmt (chain_id, proto_hash) =
+    Format.fprintf
+      fmt
+      "%a:%a"
+      Chain_id.pp_short
+      chain_id
+      Protocol_hash.pp_short
+      proto_hash
+
+  let equal (c1, p1) (c2, p2) =
+    Chain_id.equal c1 c2 && Protocol_hash.equal p1 p2
+end
 
 module Logger =
   Worker_logger.Make (Event) (Request)
@@ -51,7 +69,7 @@ module type T = sig
 
   module Filter : Prevalidator_filters.FILTER with module Proto = Proto
 
-  val name : name_t
+  val name : Name.t
 
   val parameters : limits * Distributed_db.chain_db
 
@@ -82,8 +100,6 @@ module type T = sig
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
     mutable filter_config : Data_encoding.json Protocol_hash.Map.t;
   }
-
-  module Name : Worker_intf.NAME with type t = name_t
 
   module Types : Worker_intf.TYPES with type state = types_state
 
@@ -160,32 +176,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
     mutable filter_config : Data_encoding.json Protocol_hash.Map.t;
   }
-
-  module Name = struct
-    type t = name_t
-
-    let encoding = Data_encoding.tup2 Chain_id.encoding Protocol_hash.encoding
-
-    let chain_id_string =
-      let (_ : string) = Format.flush_str_formatter () in
-      Chain_id.pp_short Format.str_formatter Arg.chain_id ;
-      Format.flush_str_formatter ()
-
-    let proto_hash_string =
-      let (_ : string) = Format.flush_str_formatter () in
-      Protocol_hash.pp_short Format.str_formatter Proto.hash ;
-      Format.flush_str_formatter ()
-
-    let base = ["prevalidator"; chain_id_string; proto_hash_string]
-
-    let pp fmt (chain_id, proto_hash) =
-      Chain_id.pp_short fmt chain_id ;
-      Format.pp_print_string fmt "." ;
-      Protocol_hash.pp_short fmt proto_hash
-
-    let equal (c1, p1) (c2, p2) =
-      Chain_id.equal c1 c2 && Protocol_hash.equal p1 p2
-  end
 
   module Types = struct
     (* Invariants:
