@@ -236,6 +236,175 @@ module Mempool = struct
             post_filter_manager ctxt op config)
 end
 
+module View_helpers = struct
+  open Tezos_micheline
+
+  type Environment.Error_monad.error += Viewed_contract_has_no_script
+
+  type Environment.Error_monad.error += View_callback_origination_failed
+
+  type Environment.Error_monad.error +=
+    | Illformed_view_type of string * Script.expr
+
+  type Environment.Error_monad.error +=
+    | View_never_returns of string * Contract.t
+
+  type Environment.Error_monad.error +=
+    | View_unexpected_return of string * Contract.t
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"viewedContractHasNoScript"
+      ~title:"Viewed contract has no script"
+      ~description:"A view was called on a contract with no script."
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "A view was called on a contract with no script.")
+      Data_encoding.(unit)
+      (function Viewed_contract_has_no_script -> Some () | _ -> None)
+      (fun () -> Viewed_contract_has_no_script) ;
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"viewCallbackOriginationFailed"
+      ~title:"View callback origination failed"
+      ~description:"View callback origination failed"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "Error during origination of view callback contract.")
+      Data_encoding.(unit)
+      (function View_callback_origination_failed -> Some () | _ -> None)
+      (fun () -> View_callback_origination_failed) ;
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"illformedViewType"
+      ~title:"An entrypoint type is incompatible with TZIP-4 view type."
+      ~description:"An entrypoint type is incompatible with TZIP-4 view type."
+      ~pp:(fun ppf (entrypoint, typ) ->
+        Format.fprintf
+          ppf
+          "The view %s has type %a, it is not compatible with a TZIP-4 view \
+           type."
+          entrypoint
+          Micheline_printer.print_expr
+          (Micheline_printer.printable
+             (fun x -> x)
+             (Michelson_v1_primitives.strings_of_prims typ)))
+      Data_encoding.(
+        obj2 (req "entrypoint" string) (req "type" Script.expr_encoding))
+      (function Illformed_view_type (etp, exp) -> Some (etp, exp) | _ -> None)
+      (fun (etp, exp) -> Illformed_view_type (etp, exp)) ;
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"viewNeverReturns"
+      ~title:
+        "A view never returned a transaction to the given callback contract"
+      ~description:
+        "A view never initiated a transaction to the given callback contract."
+      ~pp:(fun ppf (entrypoint, callback) ->
+        Format.fprintf
+          ppf
+          "The view %s never initiated a transaction to the given callback \
+           contract %a."
+          entrypoint
+          Contract.pp
+          callback)
+      Data_encoding.(
+        obj2 (req "entrypoint" string) (req "callback" Contract.encoding))
+      (function View_never_returns (e, c) -> Some (e, c) | _ -> None)
+      (fun (e, c) -> View_never_returns (e, c)) ;
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"viewUnexpectedReturn"
+      ~title:"A view returned an unexpected list of operations"
+      ~description:
+        "A view initiated a list of operations while the TZIP-4 standard \
+         expects only a transaction to the given callback contract."
+      ~pp:(fun ppf (entrypoint, callback) ->
+        Format.fprintf
+          ppf
+          "The view %s initiated a list of operations while the TZIP-4 \
+           standard expects only a transaction to the given callback contract \
+           %a."
+          entrypoint
+          Contract.pp
+          callback)
+      Data_encoding.(
+        obj2 (req "entrypoint" string) (req "callback" Contract.encoding))
+      (function View_never_returns (e, c) -> Some (e, c) | _ -> None)
+      (fun (e, c) -> View_never_returns (e, c))
+
+  (* This script is actually never run, its usage is to ensure a
+     contract that has the type `contract <ty>` is originated, which
+     will be required as callback of the view. *)
+  let make_viewer_script ty : Script.t =
+    let loc = 0 in
+    let ty = Micheline.root ty in
+    let code =
+      Micheline.strip_locations
+      @@ Micheline.Seq
+           ( loc,
+             [
+               Micheline.Prim (loc, Script.K_parameter, [ty], []);
+               Micheline.Prim
+                 ( loc,
+                   Script.K_storage,
+                   [Micheline.Prim (loc, Script.T_unit, [], [])],
+                   [] );
+               Micheline.Prim
+                 ( loc,
+                   Script.K_code,
+                   [Micheline.Prim (loc, Script.I_FAILWITH, [], [])],
+                   [] );
+             ] )
+    in
+    let storage =
+      Micheline.strip_locations (Micheline.Prim (loc, Script.D_Unit, [], []))
+    in
+    {code = Script.lazy_expr code; storage = Script.lazy_expr storage}
+
+  let make_view_parameter input callback =
+    let loc = 0 in
+    Micheline.strip_locations
+      (Micheline.Prim
+         ( loc,
+           Script.D_Pair,
+           [
+             input;
+             Micheline.Bytes
+               ( loc,
+                 Data_encoding.Binary.to_bytes_exn Contract.encoding callback );
+           ],
+           [] ))
+
+  let extract_view_output_type entrypoint ty =
+    match Micheline.root ty with
+    | Micheline.Prim
+        ( _,
+          Script.T_pair,
+          [_; Micheline.Prim (_, Script.T_contract, [ty], _)],
+          _ ) ->
+        ok (Micheline.strip_locations ty)
+    | _ -> Environment.Error_monad.error (Illformed_view_type (entrypoint, ty))
+
+  (* 'view' entrypoints returns their value by calling a callback contract, thus
+     the expected result is a unique internal transaction to this callback. *)
+  let extract_parameter_from_operations entrypoint operations callback =
+    let unexpected_return =
+      Environment.Error_monad.error
+      @@ View_unexpected_return (entrypoint, callback)
+    in
+    match operations with
+    | [
+     Internal_operation
+       {operation = Transaction {destination; parameters; _}; _};
+    ]
+      when Contract.equal destination callback ->
+        ok parameters
+    | [] ->
+        Environment.Error_monad.error
+          (View_never_returns (entrypoint, callback))
+    | _ -> unexpected_return
+end
+
 module RPC = struct
   open Environment
   open Alpha_context
@@ -391,6 +560,18 @@ module RPC = struct
              (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
              (opt "lazy_storage_diff" Lazy_storage.encoding))
 
+      let run_view_encoding =
+        let open Data_encoding in
+        obj8
+          (req "contract" Contract.encoding)
+          (req "entrypoint" string)
+          (req "input" Script.expr_encoding)
+          (req "chain_id" Chain_id.encoding)
+          (opt "source" Contract.encoding)
+          (opt "payer" Contract.encoding)
+          (opt "gas" Gas.Arith.z_integral_encoding)
+          (req "unparsing_mode" unparsing_mode_encoding)
+
       let run_code =
         RPC_service.post_service
           ~description:"Run a piece of code in the current context"
@@ -425,6 +606,16 @@ module RPC = struct
           ~input:trace_code_input_encoding
           ~output:trace_code_output_encoding
           RPC_path.(path / "trace_code" / "normalized")
+
+      let run_view =
+        RPC_service.post_service
+          ~description:
+            "Simulate a call to a view following the TZIP-4 standard. See \
+             https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints."
+          ~input:run_view_encoding
+          ~output:(obj1 (req "data" Script.expr_encoding))
+          ~query:RPC_query.empty
+          RPC_path.(path / "run_view")
 
       let typecheck_code =
         RPC_service.post_service
@@ -795,6 +986,22 @@ module RPC = struct
           ~script:(script, None)
         >>=? fun ctxt -> return (ctxt, dummy_contract)
       in
+      let script_entrypoint_type ctxt expr entrypoint =
+        let ctxt = Gas.set_unlimited ctxt in
+        let legacy = false in
+        let open Script_ir_translator in
+        Lwt.return
+          ( ( parse_toplevel ~legacy expr >>? fun (arg_type, _, _, root_name) ->
+              parse_parameter_ty ctxt ~legacy arg_type
+              >>? fun (Ex_ty arg_type, _) ->
+              Script_ir_translator.find_entrypoint
+                ~root_name
+                arg_type
+                entrypoint )
+          >>? fun (_f, Ex_ty ty) ->
+            unparse_ty ctxt ty >|? fun (ty_node, _) ->
+            Micheline.strip_locations ty_node )
+      in
       Registration.register0
         S.run_code
         (fun
@@ -904,6 +1111,73 @@ module RPC = struct
                        _;
                      },
                      trace ) -> (storage, operations, trace, lazy_storage_diff)) ;
+      Registration.register0
+        S.run_view
+        (fun
+          ctxt
+          ()
+          ( contract,
+            entrypoint,
+            input,
+            chain_id,
+            source,
+            payer,
+            gas,
+            unparsing_mode )
+        ->
+          Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
+          Option.fold
+            ~some:ok
+            ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
+            script_opt
+          >>?= fun script ->
+          Script_repr.(force_decode script.code) >>?= fun decoded_script ->
+          script_entrypoint_type ctxt decoded_script entrypoint
+          >>=? fun view_ty ->
+          View_helpers.extract_view_output_type entrypoint view_ty
+          >>?= fun ty ->
+          Error_monad.trace View_helpers.View_callback_origination_failed
+          @@ originate_dummy_contract
+               ctxt
+               (View_helpers.make_viewer_script ty)
+               Tez.zero
+          >>=? fun (ctxt, viewer_contract) ->
+          let (source, payer) =
+            match (source, payer) with
+            | (Some source, Some payer) -> (source, payer)
+            | (Some source, None) -> (source, source)
+            | (None, Some payer) -> (payer, payer)
+            | (None, None) -> (contract, contract)
+          in
+          let gas =
+            Option.value
+              ~default:(Constants.hard_gas_limit_per_operation ctxt)
+              gas
+          in
+          let ctxt = Gas.set_limit ctxt gas in
+          let step_constants =
+            let open Script_interpreter in
+            {source; payer; self = contract; amount = Tez.zero; chain_id}
+          in
+          let parameter =
+            View_helpers.make_view_parameter
+              (Micheline.root input)
+              viewer_contract
+          in
+          Script_interpreter.execute
+            ctxt
+            unparsing_mode
+            step_constants
+            ~script
+            ~entrypoint
+            ~parameter
+            ~internal:true
+          >>=? fun {Script_interpreter.operations; _} ->
+          View_helpers.extract_parameter_from_operations
+            entrypoint
+            operations
+            viewer_contract
+          >>?= fun parameter -> Lwt.return (Script_repr.force_decode parameter)) ;
       Registration.register0
         S.typecheck_code
         (fun ctxt () (expr, maybe_gas, legacy) ->
@@ -1091,21 +1365,7 @@ module RPC = struct
       Registration.register0
         S.entrypoint_type
         (fun ctxt () (expr, entrypoint) ->
-          let ctxt = Gas.set_unlimited ctxt in
-          let legacy = false in
-          let open Script_ir_translator in
-          Lwt.return
-            ( ( parse_toplevel ~legacy expr
-              >>? fun (arg_type, _, _, root_name) ->
-                parse_parameter_ty ctxt ~legacy arg_type
-                >>? fun (Ex_ty arg_type, _) ->
-                Script_ir_translator.find_entrypoint
-                  ~root_name
-                  arg_type
-                  entrypoint )
-            >>? fun (_f, Ex_ty ty) ->
-              unparse_ty ctxt ty >|? fun (ty_node, _) ->
-              Micheline.strip_locations ty_node )) ;
+          script_entrypoint_type ctxt expr entrypoint) ;
       Registration.register0 S.list_entrypoints (fun ctxt () expr ->
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = false in
@@ -1159,6 +1419,22 @@ module RPC = struct
             payer,
             gas,
             entrypoint ),
+          unparsing_mode )
+
+    let run_view ctxt block ?gas ~contract ~entrypoint ~input ~chain_id ?source
+        ?payer ~unparsing_mode =
+      RPC_context.make_call0
+        S.run_view
+        ctxt
+        block
+        ()
+        ( contract,
+          entrypoint,
+          input,
+          chain_id,
+          source,
+          payer,
+          gas,
           unparsing_mode )
 
     let typecheck_code ?gas ?legacy ~script ctxt block =
