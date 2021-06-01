@@ -13,6 +13,11 @@ misc_checks:
     - make -C tests_python typecheck
     # check the static-build patch applies cleanly
     - git apply packaging/build/static_libs.patch
+    # Ensure that all unit tests are restricted to their opam package
+    # (change 'tezos-test-helpers' to one the most elementary packages of
+    # the repo if you add "internal" dependencies to tezos-test-helpers)
+    - dune runtest -p tezos-test-helpers ||
+      echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."
 
 check_precommit_hook:
   extends: .build_template

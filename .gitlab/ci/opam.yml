@@ -47,11 +47,6 @@ opam:ledgerwallet-tezos:
   variables:
     package: ledgerwallet-tezos
 
-opam:lib-test:
-  extends: .opam_template
-  variables:
-    package: lib-test
-
 opam:numerics:
   extends: .opam_template
   variables:
@@ -1066,6 +1061,11 @@ opam:tezos-store:
   extends: .opam_template
   variables:
     package: tezos-store
+
+opam:tezos-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-test-helpers
 
 opam:tezos-test-services:
   extends: .opam_template
