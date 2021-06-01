@@ -1441,21 +1441,12 @@ let unexpand_fail = function
 
 let unexpand original =
   let try_unexpansions unexpanders =
-    match
-      List.fold_left
-        (fun acc f ->
-          match acc with
-          | None ->
-              f original
-          | Some rewritten ->
-              Some rewritten)
-        None
-        unexpanders
-    with
-    | None ->
-        original
-    | Some rewritten ->
-        rewritten
+    Option.value
+      ~default:original
+      (List.fold_left
+         (fun acc f -> Option.either_f acc (fun () -> f original))
+         None
+         unexpanders)
   in
   try_unexpansions
     [ unexpand_asserts;

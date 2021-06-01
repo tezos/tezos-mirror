@@ -203,7 +203,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
       in
       with_timeout
         ~canceler
-        (Option.fold ~some:timer ~none:(Lwt_utils.never_ending ()) timeout)
+        (Option.fold_f ~some:timer ~none:Lwt_utils.never_ending timeout)
         (fun _canceler ->
           let iteration = ref 0 in
           let sched =

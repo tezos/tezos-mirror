@@ -192,7 +192,7 @@ module Key_map = struct
     match (key, tree) with
     | ([], Leaf v) ->
         Some v
-    | (_, Leaf _) ->
+    | (_ :: _, Leaf _) ->
         None
     | ([], Node _) ->
         None

@@ -785,7 +785,7 @@ let gen_points () =
   let clients = !clients in
   let addr = !addr in
   let port =
-    Option.fold ~none:(49152 + Random.int 16384) ~some:(fun x -> x) !port
+    Option.value_f ~default:(fun () -> 49152 + Random.int 16384) !port
   in
   let ports = port -- (port + clients - 1) in
   points := List.map (fun port -> (addr, port)) ports

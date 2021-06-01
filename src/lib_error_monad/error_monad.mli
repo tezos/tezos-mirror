@@ -59,6 +59,19 @@ val failwith : ('a, Format.formatter, unit, 'b tzresult Lwt.t) format4 -> 'a
 
 val error_exn : exn -> 'a tzresult
 
+(** [error_of_exn e] is a trace that carries the exception [e]. This function is
+    intended to be used when interacting with a part of the code (most likely an
+    external library) which uses exception. E.g.,
+
+{[
+try
+  Ok (make_some_call parameter)
+with
+  | (Not_found | Failure _) as e ->
+    Error (error_of_exn e)
+]} *)
+val error_of_exn : exn -> error trace
+
 val record_trace_exn : exn -> 'a tzresult -> 'a tzresult
 
 val trace_exn : exn -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t

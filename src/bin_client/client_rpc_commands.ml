@@ -116,7 +116,7 @@ let fill_in ?(show_optionals = true) input schema =
             | false ->
                 Lwt.return (json :: acc)
         in
-        let max = match specs.max_items with None -> max_int | Some m -> m in
+        let max = Option.value specs.max_items ~default:max_int in
         fill_loop [] specs.min_items 0 max
         >>= fun acc -> Lwt.return (`A (List.rev acc))
     | Any ->
@@ -466,13 +466,11 @@ let call ?body meth raw_url (cctxt : #Client_context.full) =
            %!"
         >>= fun () -> return_unit
     | Some {input = None; _} ->
-        ( match body with
-        | None ->
-            Lwt.return_unit
-        | Some _ ->
+        Option.iter_s
+          (fun _ ->
             cctxt#warning
-              "This URL did not expect a JSON input but one was provided\n%!"
-        )
+              "This URL did not expect a JSON input but one was provided\n%!")
+          body
         >>= fun () ->
         cctxt#generic_json_call meth ?body uri
         >>=? fun answer -> display_answer cctxt answer >|= ok

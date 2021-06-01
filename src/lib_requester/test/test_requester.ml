@@ -77,12 +77,9 @@ module Test_disk_table_hash = struct
 
   let known (st : store) (k : test_key) = Lwt.return (mem st k)
 
-  let read st k =
-    Lwt.return
-      (Option.fold
-         ~some:(fun v -> Ok v)
-         ~none:(Error_monad.error_exn Not_found)
-         (find st k))
+  let not_found = Error_monad.error_of_exn Not_found
+
+  let read st k = Lwt.return (Option.to_result ~none:not_found (find st k))
 
   let read_opt st k = Lwt.return (find st k)
 end

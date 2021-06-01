@@ -249,8 +249,7 @@ let validate_addr ~field ~addr ~resolver =
       Lwt.return e
 
 let validate_addr_opt ~field ~addr ~resolver =
-  Option.fold addr ~none:return_none ~some:(fun addr ->
-      validate_addr ~field ~addr ~resolver)
+  Option.filter_map_es (fun addr -> validate_addr ~field ~addr ~resolver) addr
   >|=? Option.to_list
 
 let validate_rpc_listening_addrs (config : Node_config_file.t) =

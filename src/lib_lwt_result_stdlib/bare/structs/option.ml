@@ -81,6 +81,42 @@ let either oa ob = match oa with Some _ -> oa | None -> ob
 
 let either_f oa ob = match oa with Some _ -> oa | None -> ob ()
 
+let merge f oa ob =
+  match (oa, ob) with
+  | (None, None) ->
+      None
+  | (Some r, None) | (None, Some r) ->
+      Some r
+  | (Some a, Some b) ->
+      Some (f a b)
+
+let merge_e f oa ob =
+  match (oa, ob) with
+  | (None, None) ->
+      none_e
+  | (Some r, None) | (None, Some r) ->
+      some_e r
+  | (Some a, Some b) ->
+      f a b >>? some_e
+
+let merge_s f oa ob =
+  match (oa, ob) with
+  | (None, None) ->
+      none_s
+  | (Some r, None) | (None, Some r) ->
+      some_s r
+  | (Some a, Some b) ->
+      f a b >>= some_s
+
+let merge_es f oa ob =
+  match (oa, ob) with
+  | (None, None) ->
+      none_es
+  | (Some r, None) | (None, Some r) ->
+      some_es r
+  | (Some a, Some b) ->
+      f a b >>=? some_es
+
 let map_s f o =
   match o with None -> Lwt.return_none | Some v -> f v >>= Lwt.return_some
 

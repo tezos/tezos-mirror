@@ -644,7 +644,7 @@ module Consensus = struct
         in
         let dir_len = List.length keys in
         let (success, dir') =
-          List.fold_left f (false, []) @@ TzString.Map.bindings dir
+          Seq.fold_left f (false, []) @@ TzString.Map.to_seq dir
         in
         assert (dir_len = List.length dir') ;
         let dir' =

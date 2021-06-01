@@ -117,9 +117,7 @@ module Bifunctor = struct
 end
 
 let sdir_of_list l =
-  let dir =
-    List.fold_left (fun map (k, v) -> StringMap.add k v map) StringMap.empty l
-  in
+  let dir = StringMap.of_seq @@ List.to_seq l in
   SDir dir
 
 let rec raw_context_to_simple_tree raw_context : simple_tree =

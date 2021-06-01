@@ -99,6 +99,23 @@ module type S = sig
 
   val either_f : 'a option -> (unit -> 'a option) -> 'a option
 
+  val merge : ('a -> 'a -> 'a) -> 'a option -> 'a option -> 'a option
+
+  val merge_e :
+    ('a -> 'a -> ('a, 'e) result) ->
+    'a option ->
+    'a option ->
+    ('a option, 'e) result
+
+  val merge_s :
+    ('a -> 'a -> 'a Lwt.t) -> 'a option -> 'a option -> 'a option Lwt.t
+
+  val merge_es :
+    ('a -> 'a -> ('a, 'e) result Lwt.t) ->
+    'a option ->
+    'a option ->
+    ('a option, 'e) result Lwt.t
+
   val map : ('a -> 'b) -> 'a option -> 'b option
 
   val map_s : ('a -> 'b Lwt.t) -> 'a option -> 'b option Lwt.t
