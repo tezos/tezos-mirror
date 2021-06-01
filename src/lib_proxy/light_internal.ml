@@ -190,7 +190,7 @@ module Merkle = struct
       (unit, 'b) result =
     (* ignore the [()]s with [Fun.id], simply stop on the first [Error] with
        [iter_e]. *)
-    List.iter_e Fun.id @@ List.rev results
+    List.iter_e Fun.id results
 
   (** Whether [tree] contains [mnode]. Returns unit if yes, otherwise
       an explanation as to why [tree] doesn't contain [mnode]. *)
@@ -236,7 +236,7 @@ module Merkle = struct
 
   and contains_merkle_tree tree mtree =
     StringMap.bindings mtree
-    |> Lwt_list.map_p (fun (key, mnode) -> contains_merkle_node tree key mnode)
+    |> List.rev_map_p (fun (key, mnode) -> contains_merkle_node tree key mnode)
     >|= sequence_result_unit
 
   (** Wether we are on the path to ignore for tree shape comparison. Technically isomorphic
