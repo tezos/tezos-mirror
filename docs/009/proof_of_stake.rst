@@ -6,7 +6,7 @@ Proof-of-stake in Tezos
 
 This document provides an in-depth description of the Tezos
 proof-of-stake algorithm as implemented in the current protocol
-(namely `PsCARTHA` on `mainnet`).
+on `mainnet`.
 
 Brief Overview
 --------------
