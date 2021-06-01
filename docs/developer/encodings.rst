@@ -92,9 +92,9 @@ Binary schemas
 
 The descriptions of binary schemas are more complex to some extent, mainly for two reasons:
 
-- binary schemas is more low level than the JSON schemas.
+- Binary schemas are lower level than the JSON schemas.
   Thus, the encoding of elementary types has to be precisely defined: strings must include a field containing their length; discriminated unions must include a field containing a tag, whose possible values must be enumerated; the precise binary layout of various integer types must be made explicit, and so on.
-- the binary encodings are optimized for certain common cases, in order to save space.
+- The binary encodings are optimized for certain common cases, in order to save space.
   For instance, Micheline primitive applications with one or two arguments uses specialized encodings that are more compact (see the :ref:`binary encoding principles <micheline_bin>` for Micheline).
 
 To illustrate these differences, let us consider the same example as above, that of a Micheline expression::
@@ -251,14 +251,14 @@ Here:
 - The first byte ``00`` indicates that the type is integer.
 - The number is represented by the bytes ``80897a`` for 1000000 (1 million).
 
-Reading each byte from left to right, the first indicates whether more bytes are coming. The second bit of the first byte indicates if the number is positive or negative, 1 indicates negative, and 0 positive::
+Reading each byte from left to right, in binary form::
 
   0x80897a = 0b10000000, 0b10001001, 0b01111010
 
-The first bit in each byte indicates whether it is the last byte (0) in the sequence or if there is more to read (1).
-The second bit in the first byte indicates that this is a positive number.
-The remaining bits are then ``0b000000``, ``0b0001001``, ``0b1111010``.
-Reversing the byte order (because little-endian) we get: ``0b11110100001001000000`` = ``0xf4240`` = ``1000000``.
+- The first bit in each byte indicates whether it is the last byte (0) in the sequence or if there is more to read (1).
+- The second bit in the first byte indicates that this is a positive number.
+- The remaining bits are then ``0b000000``, ``0b0001001``, ``0b1111010``.
+  Reversing the byte order (because little-endian) we get: ``0b11110100001001000000`` = ``0xf4240`` = ``1000000``.
 
 Pairs
 ~~~~~
