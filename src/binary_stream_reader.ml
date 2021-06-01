@@ -129,7 +129,12 @@ module Atom = struct
 
   let int31 r =
     read_atom r Binary_size.int31 @@ fun buffer ofs ->
-    Int32.to_int (TzEndian.get_int32 buffer ofs)
+    let r32 = TzEndian.get_int32 buffer ofs in
+    let r = Int32.to_int r32 in
+    if not (-0x4000_0000l <= r32 && r32 <= 0x3fff_ffffl) then
+      raise_read_error
+        (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff});
+    r
 
   let int = function
     | `Int31 -> int31
