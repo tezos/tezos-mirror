@@ -636,6 +636,16 @@ cycle as many delegates receive back part of their unfrozen accounts.
 
 You can find more info in the :ref:`RPCs' page. <rpc>`
 
+Environment variables for the client
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The behavior of the client can be configured using the following environment variables:
+
+- `TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER`: Setting this variable to "YES" (or: "yes", "Y", "y") disables the warning displayed by the client at startup when it is not launched on Mainnet.
+- `TEZOS_CLIENT_DIR`: This variable may be used to supply the client data directory (by default, ``~/.tezos-client``).
+  Its value is overridden by option ``-d``.
+- `TEZOS_SIGNER_*`: These variables are used for connecting the client to a remote :ref:`signer <signer>`.
+
 Other binaries
 --------------
 
