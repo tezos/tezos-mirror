@@ -31,19 +31,26 @@
 *)
 
 open Tezos_mockup_registration.Mockup_args
+open Lib_test.Qcheck_helpers
 
-let chain_id_gen = Crowbar.map [Crowbar.bytes] Chain_id.of_string
+let chain_id_arb = QCheck.(map Chain_id.of_string string)
 
 (** {!val:Chain_id.choose} always prioritizes the config file over the default value *)
 let test_config_file_has_priority_over_default_value from_config_file_val =
   let expected = from_config_file_val in
   let actual = Chain_id.choose ~from_config_file:(Some from_config_file_val) in
-  Crowbar.check_eq ~pp:Tezos_crypto.Chain_id.pp expected actual
+  let pp = Tezos_crypto.Chain_id.pp in
+  qcheck_eq' ~pp ~expected ~actual ()
 
-let () =
-  Crowbar.add_test
+let test_prioritize_config_file =
+  QCheck.Test.make
     ~name:
       "Chain_id.choose always prioritizes the config file over the default \
        value"
-    [chain_id_gen]
+    chain_id_arb
     test_config_file_has_priority_over_default_value
+
+let () =
+  Alcotest.run
+    "Fuzzing_mockup_args"
+    [("Chain_id.choose", qcheck_wrap [test_prioritize_config_file])]
