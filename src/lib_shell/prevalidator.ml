@@ -65,6 +65,7 @@ module Logger =
 
 type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
 
+(* This type is used to represent a finite set of operations. *)
 type 'a bounded_map = {
   ring : Operation_hash.t Ringo.Ring.t;
   mutable map : (Operation.t * error list) Operation_hash.Map.t;
@@ -134,6 +135,137 @@ end
 
 type t = (module T)
 
+(* General description of the mempool:
+
+   The mempool manages a [validation state] based upon the current
+   head chosen by the validation sub-system. Each time the mempool
+   receives an operation, it tries to classify it on top of the
+   current validation state. If the operation was applied
+   successfully, the validation state is updated and the operation can
+   be propagated. Otherwise, the handling of the operation depends on
+   the error classification which is detailed below. Given an
+   operation, its classification may change if the head changes. When
+   the validation sub-system switches its head, it notifies the
+   mempool with the new [live_blocks] and [live_operations],
+   triggering also a [flush] of the mempool: Every classified
+   operation which is anchored (i.e, the [block hash] on which the
+   operation is based on when it was created) on a [live block] and
+   which is not in the [live operations] (operations which are
+   included in [live_blocks]) is set [pending], meaning they are
+   waiting to be classified again.
+
+   Error classification:
+
+     An operation can be classified as [`Refused; `Branch_refused;
+   `Branch_delayed; `Applied; `Outdated].
+
+     - An operation is [`Refused] if the operation cannot be parsed or
+   if the protocol rejects this operation with an error classified as
+   [Permanent].
+
+     - An operation is [`Branch_refused] if the operation is anchored
+   on a block that has not been validated by the node but could be in
+   the future or if the protocol rejects this operation with an error
+   classified as [Branch].
+
+     - An operation is [`Branch_delayed] if the initialisation of the
+   validation state failed (which presumably cannot happen currently)
+   or if the protocol rejects this operation with an error classified
+   as [Temporary].
+
+     - An operation is [`Applied] if the protocol applied the
+   operation on the current validation state. Operations are stored in
+   the reverse order of application so that adding a new [`Applied]
+   operation can be done at the head of the list.
+
+     - An operation is [`Outdated] if its branch is not in the
+   [live_blocks].
+
+   The prevalidator ensures that an operation cannot be at the same
+   time in two of the following fields: [Outdated; branch_refused;
+   branch_delayed; refused; applied].
+
+   The prevalidator maintains in the [in_mempool] field a set of
+   operation hashes corresponding to all the operations currently
+   classified by the prevalidator.
+
+   Operations are identified uniquely by their hash. Given an
+   operation hash, the status can be either: [`Fetching; `Pending;
+   `Classified].
+
+     - An operation is [`Fetching] if we only know its hash but we did
+   not receive yet the corresponding operation.
+
+     - An operation is [`Pending] if we know its hash and the
+   corresponding operation but this operation is not classified yet.
+
+     - An operation is [`Classified] if we know its hash, the
+   corresponding operation and was classified according to the
+   classification given above.
+
+     The prevalidator ensures that an operation cannot be at the same
+   time in two of the following fields: [fetching; pending;
+   in_mempool].
+
+   Propagation of operations:
+
+   An operation is propagated through the [distributed database]
+   component (aka [ddb]) which interacts directly with the [p2p]
+   network. The prevalidator advertises its mempool (containing only
+   operation hashes) through the [ddb]. If a remote peer requests an
+   operation, such request will be handled directly by the [ddb]
+   without going to the prevalidator. This is why every operation that
+   is propagated by the prevalidator should also be in the [ddb]. But
+   more important, an operation which we do not want to advertise
+   should be removed explicitly from the [ddb] via the
+   [Distributed_db.Operation.clear_or_cancel] function.
+
+   It is important that everytime an operation is removed from our
+   mempool (the [in_mempool] field), this operation is also cleaned up
+   from the [Distributed_db]. This is also true for all the operations
+   which were rejected before getting to the [in_mempool] field (for
+   example if they have been filtered out).
+
+     The [mempool] field contains only operations which are in the
+   [in_mempool] field and that we accept to propagate. In particular,
+   we do not propagate operations classified as [`Refused].
+
+     There are two ways to propagate our mempool:
+
+     - Either when we classify operations
+
+     - Either when a peer requests explicitly our mempool
+
+     In the first case, only the newly classified operations are
+   propagated. In the second case, current applied operations and
+   pending operations are sent to the peer.  Everytime an operation is
+   removed from the [in_mempool] field, this operation should be
+   cleaned up in the [Distributed_db.Operation] requester.
+
+   There is an [advertisement_delay] to postpone the next mempool
+   advertisement if we advertised our mempool not long ago.
+
+     To ensure that [consensus operations] (aka [endorsements]) are
+   propagated quickly, we classify [consensus_operation] for which
+   their branch is unknown (this may happen if the validation of a
+   block takes some time). In that case, we propagate the endorsement
+   if it is classified as [`Applied] or [`Branch_delayed]. This is
+   simply because the [consensus_operation] may not be valid on the
+   current block, but will be once we validate its branch.
+
+     Operations are unclassified everytime there is a [flush], meaning
+   the node changed its current head and every classified operation
+   which are still live, i.e. anchored on a [live_block] becomes
+   [`Pending] again. Classified operations which are not anchored on a
+   [live_block] are simply dropped.
+
+     Everytime an operation is classified (except for [`Outdated]),
+   this operation is recorded into the [operation_stream]. Such stream
+   can be used by an external service to get the classification of an
+   operation (such as a baker). This also means an operation can be
+   notified several times if it is classified again after a
+   [flush]. *)
+
 module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   module Filter = Filter
   module Proto = Filter.Proto
@@ -183,12 +315,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
   }
 
   module Types = struct
-    (* Invariants:
-       - an operation is in only one of these sets (map domains):
-         pv.refusals pv.pending pv.fetching pv.live_operations pv.in_mempool
-       - pv.in_mempool is the domain of all fields of pv.prevalidation_result
-       - pv.prevalidation_result.refused = Ø, refused ops are in pv.refused
-       - the 'applied' operations in pv.validation_result are in reverse order. *)
     type state = types_state
 
     type parameters = limits * Distributed_db.chain_db
