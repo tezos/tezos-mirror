@@ -34,6 +34,8 @@ variables:
   GET_SOURCES_ATTEMPTS: "2"
   ARTIFACT_DOWNLOAD_ATTEMPTS: "2"
 
+# The "manual" stage exists to fix a UI problem that occurs when mixing
+# manual and non-manual jobs.
 stages:
   - build
   - sanity_ci
@@ -44,6 +46,7 @@ stages:
   - publish_release
   - test_coverage
   - publish_coverage
+  - manual
 
 # Basic, specialised, minimal, orthogonal templates
 
