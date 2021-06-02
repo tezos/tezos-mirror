@@ -101,11 +101,11 @@ end = struct
   let create t = if t >= zero then Some t else None
 
   (* The create function is not used in the [mul] and [add] below to not add
-     extra Some | None pattern matching to handle since the overflow checks are
-     generic and apply as well to negative as positive integers .
+      extra Some | None pattern matching to handle since the overflow checks are
+      generic and apply as well to negative as positive integers .
 
-    To handle overflows, both [add] and [mul] return option types. [None] is
-     returned on detected overflow, [Some value] when everything went well. *)
+     To handle overflows, both [add] and [mul] return option types. [None] is
+      returned on detected overflow, [Some value] when everything went well. *)
   let mul a b =
     if a <> zero then
       let res = Int64.mul a b in
@@ -125,35 +125,26 @@ let to_seconds (t : Internal.t) = (t :> int64)
 
 let of_seconds secs =
   match Internal.create secs with
-  | Some v ->
-      ok v
-  | None ->
-      error Malformed_period
+  | Some v -> ok v
+  | None -> error Malformed_period
 
 let of_seconds_exn t =
   match Internal.create t with
-  | Some t ->
-      t
-  | None ->
-      invalid_arg "Period.of_seconds_exn"
+  | Some t -> t
+  | None -> invalid_arg "Period.of_seconds_exn"
 
 let mult i p =
   match Internal.create (Int64.of_int32 i) with
-  | None ->
-      error Invalid_arg
+  | None -> error Invalid_arg
   | Some iper -> (
-    match Internal.mul iper p with
-    | None ->
-        error Period_overflow
-    | Some res ->
-        ok res )
+      match Internal.mul iper p with
+      | None -> error Period_overflow
+      | Some res -> ok res)
 
 let add p1 p2 =
   match Internal.add p1 p2 with
-  | None ->
-      error Period_overflow
-  | Some res ->
-      ok res
+  | None -> error Period_overflow
+  | Some res -> ok res
 
 let ( +? ) = add
 

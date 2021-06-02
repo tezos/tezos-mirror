@@ -43,10 +43,8 @@ let encoding =
        (fun (peer_id_opt, public_key, secret_key, proof_of_work_stamp) ->
          let peer_id =
            match peer_id_opt with
-           | Some peer_id ->
-               peer_id
-           | None ->
-               Tezos_crypto.Crypto_box.hash public_key
+           | Some peer_id -> peer_id
+           | None -> Tezos_crypto.Crypto_box.hash public_key
          in
          {peer_id; public_key; secret_key; proof_of_work_stamp})
        (obj4

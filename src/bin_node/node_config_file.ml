@@ -97,13 +97,17 @@ let blockchain_network_mainnet =
     ~incompatible_chain_name:"INCOMPATIBLE"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS_MAINNET"
     ~user_activated_upgrades:
-      [ (28082l, "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt");
-        (204761l, "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP") ]
+      [
+        (28082l, "PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt");
+        (204761l, "PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP");
+      ]
     ~user_activated_protocol_overrides:
-      [ ( "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
+      [
+        ( "PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU",
           "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS" );
         ( "PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq",
-          "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA" ) ]
+          "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA" );
+      ]
     ~default_bootstrap_peers:["boot.tzbeta.net"; giganode_1; giganode_2]
 
 let blockchain_network_edo2net =
@@ -123,19 +127,23 @@ let blockchain_network_edo2net =
         context_key = "sandbox_parameter";
         values =
           `O
-            [ ( "genesis_pubkey",
-                `String
-                  "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu" ) ];
+            [
+              ( "genesis_pubkey",
+                `String "edpkugeDwmwuwyyD3Q5enapgEYDxZLtEUFFSrvVwXASQMVEqsvTqWu"
+              );
+            ];
       }
     ~chain_name:"TEZOS_EDO2NET_2021-02-11T14:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~default_bootstrap_peers:
-      [ "edonet.tezos.co.il";
+      [
+        "edonet.tezos.co.il";
         "188.40.128.216:29732";
         "51.79.165.131";
         "edo2net.kaml.fr";
         "edonet2.smartpy.io";
-        "edonetb.boot.tezostaquito.io" ]
+        "edonetb.boot.tezostaquito.io";
+      ]
 
 let blockchain_network_florencenet =
   make_blockchain_network
@@ -154,18 +162,22 @@ let blockchain_network_florencenet =
         context_key = "sandbox_parameter";
         values =
           `O
-            [ ( "genesis_pubkey",
-                `String
-                  "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n" ) ];
+            [
+              ( "genesis_pubkey",
+                `String "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n"
+              );
+            ];
       }
     ~chain_name:"TEZOS_FLORENCENOBANET_2021-03-04T20:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~default_bootstrap_peers:
-      [ "florencenoba.tznode.net";
+      [
+        "florencenoba.tznode.net";
         "florencenobanet.kaml.fr";
         "florencenobanet.tezos.co.il";
         "florencenobanet.boot.tez.ie";
-        "florencenobanet.smartpy.io:9733" ]
+        "florencenobanet.smartpy.io:9733";
+      ]
 
 let blockchain_network_granadanet =
   make_blockchain_network
@@ -184,19 +196,23 @@ let blockchain_network_granadanet =
         context_key = "sandbox_parameter";
         values =
           `O
-            [ ( "genesis_pubkey",
-                `String
-                  "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n" ) ];
+            [
+              ( "genesis_pubkey",
+                `String "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n"
+              );
+            ];
       }
     ~chain_name:"TEZOS_GRANADANET_2021-05-21T15:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~user_activated_upgrades:
       [(4095l, "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV")]
     ~default_bootstrap_peers:
-      [ "granadanet.smartpy.io";
+      [
+        "granadanet.smartpy.io";
         "granadanet.tezos.co.il";
         "granadanet.kaml.fr";
-        "granadanet.tznode.net" ]
+        "granadanet.tznode.net";
+      ]
 
 let blockchain_network_sandbox =
   make_blockchain_network
@@ -217,9 +233,11 @@ let blockchain_network_sandbox =
         context_key = "sandbox_parameter";
         values =
           `O
-            [ ( "genesis_pubkey",
-                `String
-                  "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2" ) ];
+            [
+              ( "genesis_pubkey",
+                `String "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2"
+              );
+            ];
       }
     ~chain_name:"TEZOS"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
@@ -227,7 +245,8 @@ let blockchain_network_sandbox =
 let blockchain_network_encoding : blockchain_network Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun { alias = _;
+    (fun {
+           alias = _;
            genesis;
            genesis_parameters;
            chain_name;
@@ -236,7 +255,8 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            sandboxed_chain_name;
            user_activated_upgrades;
            user_activated_protocol_overrides;
-           default_bootstrap_peers } ->
+           default_bootstrap_peers;
+         } ->
       ( genesis,
         genesis_parameters,
         chain_name,
@@ -288,18 +308,18 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
           []))
 
 let builtin_blockchain_networks_with_tags =
-  [ (1, blockchain_network_sandbox);
+  [
+    (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (12, blockchain_network_edo2net);
     (13, blockchain_network_florencenet);
     (* 14 was Florencenet with Baking Accounts. *)
-    (15, blockchain_network_granadanet) ]
+    (15, blockchain_network_granadanet);
+  ]
   |> List.map (fun (tag, network) ->
          match network.alias with
-         | None ->
-             assert false (* all built-in networks must have aliases *)
-         | Some alias ->
-             (tag, alias, network))
+         | None -> assert false (* all built-in networks must have aliases *)
+         | Some alias -> (tag, alias, network))
 
 let builtin_blockchain_networks =
   List.map
@@ -315,11 +335,9 @@ let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
       (constant network_alias)
       (fun candidate ->
         match candidate.alias with
-        | None ->
-            None
+        | None -> None
         | Some candidate_alias ->
-            if String.equal candidate_alias network_alias then Some ()
-            else None)
+            if String.equal candidate_alias network_alias then Some () else None)
       (fun () -> network)
   in
   (* It is important that built-in networks are listed before the Custom case,
@@ -330,13 +348,15 @@ let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
      to update the configuration file manually. *)
   union
     ~tag_size:`Uint8
-    ( List.map builtin_encoding builtin_blockchain_networks_with_tags
-    @ [ case
+    (List.map builtin_encoding builtin_blockchain_networks_with_tags
+    @ [
+        case
           (Tag 0)
           ~title:"Custom"
           blockchain_network_encoding
           (fun x -> Some x)
-          (fun x -> x) ] )
+          (fun x -> x);
+      ])
 
 type t = {
   data_dir : string;
@@ -380,10 +400,7 @@ and shell = {
 }
 
 let default_p2p_limits : P2p.limits =
-  let greylist_timeout =
-    Time.System.Span.of_seconds_exn 86400.
-    (* one day *)
-  in
+  let greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *) in
   {
     connection_timeout = Time.System.Span.of_seconds_exn 10.;
     authentication_timeout = Time.System.Span.of_seconds_exn 5.;
@@ -461,7 +478,8 @@ let default_config =
 let limit : P2p.limits Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun { P2p.connection_timeout;
+    (fun {
+           P2p.connection_timeout;
            authentication_timeout;
            greylist_timeout;
            maintenance_idle_time;
@@ -484,7 +502,8 @@ let limit : P2p.limits Data_encoding.t =
            ip_greylist_size_in_kilobytes;
            ip_greylist_cleanup_delay;
            swap_linger;
-           binary_chunks_size } ->
+           binary_chunks_size;
+         } ->
       ( ( ( connection_timeout,
             authentication_timeout,
             min_connections,
@@ -639,13 +658,11 @@ let limit : P2p.limits Data_encoding.t =
        (obj6
           (opt
              "max_known_peer_ids"
-             ~description:
-               "The max and target size for the known address table."
+             ~description:"The max and target size for the known address table."
              (tup2 uint16 uint16))
           (dft
              "peer_greylist_size"
-             ~description:
-               "The number of peer_ids kept in the peer_id greylist."
+             ~description:"The number of peer_ids kept in the peer_id greylist."
              uint16
              default_p2p_limits.peer_greylist_size)
           (dft
@@ -674,7 +691,8 @@ let limit : P2p.limits Data_encoding.t =
 let p2p =
   let open Data_encoding in
   conv
-    (fun { expected_pow;
+    (fun {
+           expected_pow;
            bootstrap_peers;
            listen_addr;
            discovery_addr;
@@ -682,7 +700,8 @@ let p2p =
            limits;
            disable_mempool;
            enable_testchain;
-           reconnection_config } ->
+           reconnection_config;
+         } ->
       ( expected_pow,
         bootstrap_peers,
         listen_addr,
@@ -730,8 +749,8 @@ let p2p =
        (opt
           "listen-addr"
           ~description:
-            "Host to listen to. If the port is not specified, the default \
-             port 9732 will be assumed."
+            "Host to listen to. If the port is not specified, the default port \
+             9732 will be assumed."
           string)
        (dft
           "discovery-addr"
@@ -746,8 +765,8 @@ let p2p =
             "Specify if the node is in private mode or not. A node in private \
              mode rejects incoming connections from untrusted peers and only \
              opens outgoing connections to peers listed in 'bootstrap-peers' \
-             or provided with '--peer' option. Moreover, these peers will \
-             keep the identity and the address of the private node secret."
+             or provided with '--peer' option. Moreover, these peers will keep \
+             the identity and the address of the private node secret."
           bool
           false)
        (dft "limits" ~description:"Network limits" limit default_p2p_limits)
@@ -764,9 +783,9 @@ let p2p =
           "enable_testchain"
           ~description:
             "If set to [true], the node will spawn a testchain during the \
-             protocol's testing voting period. Default value is [false]. It \
-             is disabled to decrease the node storage usage and computation \
-             by dropping the validation of the test network blocks."
+             protocol's testing voting period. Default value is [false]. It is \
+             disabled to decrease the node storage usage and computation by \
+             dropping the validation of the test network blocks."
           bool
           false)
        (let open P2p_point_state.Info in
@@ -784,10 +803,8 @@ let rpc : rpc Data_encoding.t =
     (fun {cors_origins; cors_headers; listen_addrs; tls; acl} ->
       let (cert, key) =
         match tls with
-        | None ->
-            (None, None)
-        | Some {cert; key} ->
-            (Some cert, Some key)
+        | None -> (None, None)
+        | Some {cert; key} -> (Some cert, Some key)
       in
       (Some listen_addrs, None, cors_origins, cors_headers, cert, key, acl))
     (fun ( listen_addrs,
@@ -799,19 +816,14 @@ let rpc : rpc Data_encoding.t =
            acl ) ->
       let tls =
         match (cert, key) with
-        | (None, _) | (_, None) ->
-            None
-        | (Some cert, Some key) ->
-            Some {cert; key}
+        | (None, _) | (_, None) -> None
+        | (Some cert, Some key) -> Some {cert; key}
       in
       let listen_addrs =
         match (listen_addrs, legacy_listen_addr) with
-        | (Some addrs, None) ->
-            addrs
-        | (None, Some addr) ->
-            [addr]
-        | (None, None) ->
-            default_rpc.listen_addrs
+        | (Some addrs, None) -> addrs
+        | (None, Some addr) -> [addr]
+        | (None, None) -> default_rpc.listen_addrs
         | (Some _, Some _) ->
             Stdlib.failwith
               "Config file: Use only \"listen-addrs\" and not (legacy) \
@@ -868,8 +880,7 @@ let block_validator_limits_encoding =
   conv
     (fun {Block_validator.protocol_timeout; worker_limits} ->
       (protocol_timeout, worker_limits))
-    (fun (protocol_timeout, worker_limits) ->
-      {protocol_timeout; worker_limits})
+    (fun (protocol_timeout, worker_limits) -> {protocol_timeout; worker_limits})
     (merge_objs
        (obj1
           (dft
@@ -883,10 +894,12 @@ let block_validator_limits_encoding =
 let prevalidator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun { Prevalidator.operation_timeout;
+    (fun {
+           Prevalidator.operation_timeout;
            max_refused_operations;
            operations_batch_size;
-           worker_limits } ->
+           worker_limits;
+         } ->
       ( (operation_timeout, max_refused_operations, operations_batch_size),
         worker_limits ))
     (fun ( (operation_timeout, max_refused_operations, operations_batch_size),
@@ -919,11 +932,13 @@ let peer_validator_limits_encoding =
   let open Data_encoding in
   let default_limits = default_shell.peer_validator_limits in
   conv
-    (fun { Peer_validator.block_header_timeout;
+    (fun {
+           Peer_validator.block_header_timeout;
            block_operations_timeout;
            protocol_timeout;
            new_head_request_timeout;
-           worker_limits } ->
+           worker_limits;
+         } ->
       ( ( block_header_timeout,
           block_operations_timeout,
           protocol_timeout,
@@ -982,8 +997,8 @@ let synchronisation_heuristic_encoding default_latency default_threshold =
        (dft
           "synchronisation_threshold"
           ~description:
-            "The minimal number of peers this peer should be synchronized \
-             with in order to be bootstrapped."
+            "The minimal number of peers this peer should be synchronized with \
+             in order to be bootstrapped."
           uint8
           default_threshold))
 
@@ -999,7 +1014,8 @@ let chain_validator_limits_encoding =
           options when parsing.  When printing, use the new
           synchronisation_threshold option. *)
        (union
-          [ case
+          [
+            case
               ~title:"synchronisation_heuristic_encoding"
               Json_only
               (synchronisation_heuristic_encoding
@@ -1027,7 +1043,8 @@ let chain_validator_limits_encoding =
                     latency =
                       default_shell.chain_validator_limits.synchronisation
                         .latency;
-                  }) ])
+                  });
+          ])
        (worker_limits_encoding
           default_shell.chain_validator_limits.worker_limits.backlog_size
           default_shell.chain_validator_limits.worker_limits.backlog_level))
@@ -1035,11 +1052,13 @@ let chain_validator_limits_encoding =
 let shell =
   let open Data_encoding in
   conv
-    (fun { peer_validator_limits;
+    (fun {
+           peer_validator_limits;
            block_validator_limits;
            prevalidator_limits;
            chain_validator_limits;
-           history_mode } ->
+           history_mode;
+         } ->
       ( peer_validator_limits,
         block_validator_limits,
         prevalidator_limits,
@@ -1079,14 +1098,16 @@ let shell =
 let encoding =
   let open Data_encoding in
   conv
-    (fun { data_dir;
+    (fun {
+           data_dir;
            disable_config_validation;
            rpc;
            p2p;
            log;
            internal_events;
            shell;
-           blockchain_network } ->
+           blockchain_network;
+         } ->
       ( data_dir,
         disable_config_validation,
         rpc,
@@ -1152,8 +1173,7 @@ let encoding =
           default_shell)
        (dft
           "network"
-          ~description:
-            "Configuration of which network/blockchain to connect to"
+          ~description:"Configuration of which network/blockchain to connect to"
           sugared_blockchain_network_encoding
           blockchain_network_mainnet))
 
@@ -1205,35 +1225,31 @@ let string_of_json_encoding_error exn =
 
 let read fp =
   if Sys.file_exists fp then
-    Lwt_utils_unix.Json.read_file fp
-    >>=? fun json ->
+    Lwt_utils_unix.Json.read_file fp >>=? fun json ->
     try return (Data_encoding.Json.destruct encoding json) with
     | Json_encoding.Cannot_destruct (path, exn) ->
         let path = Json_query.json_pointer_of_path path in
         let exn = string_of_json_encoding_error exn in
         fail (Invalid_content (Some path, exn))
-    | ( Json_encoding.Unexpected _
-      | Json_encoding.No_case_matched _
-      | Json_encoding.Bad_array_size _
-      | Json_encoding.Missing_field _
-      | Json_encoding.Unexpected_field _
-      | Json_encoding.Bad_schema _ ) as exn ->
+    | ( Json_encoding.Unexpected _ | Json_encoding.No_case_matched _
+      | Json_encoding.Bad_array_size _ | Json_encoding.Missing_field _
+      | Json_encoding.Unexpected_field _ | Json_encoding.Bad_schema _ ) as exn
+      ->
         let exn = string_of_json_encoding_error exn in
         fail (Invalid_content (None, exn))
   else return default_config
 
 let write fp cfg =
-  Node_data_version.ensure_data_dir (Filename.dirname fp)
-  >>=? fun () ->
+  Node_data_version.ensure_data_dir (Filename.dirname fp) >>=? fun () ->
   Lwt_utils_unix.Json.write_file fp (Data_encoding.Json.construct encoding cfg)
 
 let to_string cfg =
   Data_encoding.Json.to_string (Data_encoding.Json.construct encoding cfg)
 
 let update ?(disable_config_validation = false) ?data_dir ?min_connections
-    ?expected_connections ?max_connections ?max_download_speed
-    ?max_upload_speed ?binary_chunks_size ?peer_table_size ?expected_pow
-    ?bootstrap_peers ?listen_addr ?discovery_addr ?(rpc_listen_addrs = [])
+    ?expected_connections ?max_connections ?max_download_speed ?max_upload_speed
+    ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
+    ?listen_addr ?discovery_addr ?(rpc_listen_addrs = [])
     ?(private_mode = false) ?(disable_mempool = false)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
@@ -1242,8 +1258,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     cfg.disable_config_validation || disable_config_validation
   in
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
-  Node_data_version.ensure_data_dir data_dir
-  >>=? fun () ->
+  Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
   let limits : P2p.limits =
@@ -1354,8 +1369,7 @@ let to_ipv4 ipv6_l =
     | None ->
         Event.(emit cannot_convert_to_ipv4) (Ipaddr.V6.to_string ipv6)
         >>= fun () -> return_none
-    | Some ipv4 ->
-        return_some (ipv4, port)
+    | Some ipv4 -> return_some (ipv4, port)
   in
   List.filter_map_es convert_or_warn ipv6_l
 
@@ -1381,20 +1395,16 @@ let resolve_addr ~default_addr ?(no_peer_id_expected = true) ?default_port
            (peer, "no peer identity should be specified here"))
   | Error err ->
       fail
-        (Failed_to_parse_address
-           (peer, P2p_point.Id.string_of_parsing_error err))
+        (Failed_to_parse_address (peer, P2p_point.Id.string_of_parsing_error err))
   | Ok {addr; port; peer_id} ->
-      ( match (port, default_port) with
-      | (None, None) ->
-          return (string_of_int default_p2p_port)
-      | (None, Some default_port) ->
-          return (string_of_int default_port)
-      | (Some port, _) ->
-          return (string_of_int port) )
+      (match (port, default_port) with
+      | (None, None) -> return (string_of_int default_p2p_port)
+      | (None, Some default_port) -> return (string_of_int default_port)
+      | (Some port, _) -> return (string_of_int port))
       >>=? fun service ->
       let node = if addr = "" || addr = "_" then default_addr else addr in
-      Lwt_utils_unix.getaddrinfo ~passive ~node ~service
-      >>= fun l -> return (List.map (fun point -> (point, peer_id)) l)
+      Lwt_utils_unix.getaddrinfo ~passive ~node ~service >>= fun l ->
+      return (List.map (fun point -> (point, peer_id)) l)
 
 let resolve_addrs ?default_port ?passive addrs ?no_peer_id_expected
     ~default_addr =

@@ -59,8 +59,7 @@ module type S = sig
     Operation.t list list ->
     Block_validation.result tzresult Lwt.t
 
-  val commit_genesis :
-    t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
+  val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
   (** [init_test_chain] must only be called on a forking block. *)
   val init_test_chain : t -> Store.Block.t -> Block_header.t tzresult Lwt.t
@@ -87,12 +86,7 @@ module Internal_validator_process = struct
         ()
 
     let close =
-      declare_0
-        ~section
-        ~level:Notice
-        ~name:"seq_close"
-        ~msg:"shutting down"
-        ()
+      declare_0 ~section ~level:Notice ~name:"seq_close" ~msg:"shutting down" ()
 
     let validation_request =
       declare_2
@@ -128,8 +122,7 @@ module Internal_validator_process = struct
   let init
       ({user_activated_upgrades; user_activated_protocol_overrides; _} :
         validator_environment) chain_store =
-    Events.(emit init ())
-    >>= fun () ->
+    Events.(emit init ()) >>= fun () ->
     return
       {chain_store; user_activated_upgrades; user_activated_protocol_overrides}
 
@@ -145,13 +138,10 @@ module Internal_validator_process = struct
     let predecessor_block_header = Store.Block.header predecessor in
     let context_hash = predecessor_block_header.shell.context in
     let context_index = get_context_index chain_store in
-    Context.checkout context_index context_hash
-    >>= (function
-          | None ->
-              fail
-                (Block_validator_errors.Failed_to_checkout_context context_hash)
-          | Some ctx ->
-              return ctx)
+    (Context.checkout context_index context_hash >>= function
+     | None ->
+         fail (Block_validator_errors.Failed_to_checkout_context context_hash)
+     | Some ctx -> return ctx)
     >>=? fun predecessor_context ->
     let predecessor_block_metadata_hash =
       Store.Block.block_metadata_hash predecessor
@@ -177,16 +167,14 @@ module Internal_validator_process = struct
     >>=? fun env ->
     let now = Systime_os.now () in
     let block_hash = Block_header.hash block_header in
-    Events.(emit validation_request (block_hash, env.chain_id))
-    >>= fun () ->
-    Block_validation.apply env block_header operations
-    >>=? fun result ->
+    Events.(emit validation_request (block_hash, env.chain_id)) >>= fun () ->
+    Block_validation.apply env block_header operations >>=? fun result ->
     let timespan =
       let then_ = Systime_os.now () in
       Ptime.diff then_ now
     in
-    Events.(emit validation_success (block_hash, timespan))
-    >>= fun () -> return result
+    Events.(emit validation_success (block_hash, timespan)) >>= fun () ->
+    return result
 
   let commit_genesis validator ~chain_id =
     let context_index = get_context_index validator.chain_store in
@@ -199,8 +187,8 @@ module Internal_validator_process = struct
 
   let init_test_chain validator forking_block =
     let forked_header = Store.Block.header forking_block in
-    Store.Block.context validator.chain_store forking_block
-    >>=? fun context -> Block_validation.init_test_chain context forked_header
+    Store.Block.context validator.chain_store forking_block >>=? fun context ->
+    Block_validation.init_test_chain context forked_header
 
   let restore_context_integrity validator =
     let context_index = get_context_index validator.chain_store in
@@ -235,7 +223,8 @@ module External_validator_process = struct
       let process_status_encoding =
         let open Data_encoding in
         union
-          [ case
+          [
+            case
               (Tag 0)
               ~title:"wexited"
               int31
@@ -252,7 +241,8 @@ module External_validator_process = struct
               ~title:"wstopped"
               int31
               (function WSTOPPED i -> Some i | _ -> None)
-              (fun i -> WSTOPPED i) ]
+              (fun i -> WSTOPPED i);
+          ]
       in
       declare_1
         ~section
@@ -352,10 +342,7 @@ module External_validator_process = struct
     clean_up_callback_id : Lwt_exit.clean_up_callback_id;
   }
 
-  type process_status =
-    | Uninitialized
-    | Running of validator_process
-    | Exiting
+  type process_status = Uninitialized | Running of validator_process | Exiting
 
   type t = {
     data_dir : string;
@@ -382,10 +369,8 @@ module External_validator_process = struct
      is defined. Otherwise, the default temporary directory is used. *)
   let get_temporary_socket_dir () =
     match Sys.getenv_opt "XDG_RUNTIME_DIR" with
-    | Some xdg_runtime_dir when xdg_runtime_dir <> "" ->
-        xdg_runtime_dir
-    | Some _ | None ->
-        Filename.get_temp_dir_name ()
+    | Some xdg_runtime_dir when xdg_runtime_dir <> "" -> xdg_runtime_dir
+    | Some _ | None -> Filename.get_temp_dir_name ()
 
   let start_process vp =
     let canceler = Lwt_canceler.create () in
@@ -413,8 +398,7 @@ module External_validator_process = struct
           | Unix.Unix_error (EACCES, _, _) ->
               (* We ignore failing on EACCES as no file was created *)
               Lwt.return_unit
-          | exn ->
-              Lwt.fail exn)
+          | exn -> Lwt.fail exn)
     in
     let process_fd_cleaner =
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
@@ -446,8 +430,7 @@ module External_validator_process = struct
     in
     let process_stdin = Lwt_io.of_fd ~mode:Output process_socket in
     let process_stdout = Lwt_io.of_fd ~mode:Input process_socket in
-    Events.(emit validator_started process#pid)
-    >>= fun () ->
+    Events.(emit validator_started process#pid) >>= fun () ->
     let parameters =
       {
         External_validation.context_root = vp.context_root;
@@ -455,8 +438,7 @@ module External_validator_process = struct
         sandbox_parameters = vp.sandbox_parameters;
         genesis = vp.genesis;
         user_activated_upgrades = vp.user_activated_upgrades;
-        user_activated_protocol_overrides =
-          vp.user_activated_protocol_overrides;
+        user_activated_protocol_overrides = vp.user_activated_protocol_overrides;
       }
     in
     vp.validator_process <-
@@ -487,29 +469,27 @@ module External_validator_process = struct
     >>= fun () -> return (process, process_stdin, process_stdout)
 
   let send_request vp request result_encoding =
-    ( match vp.validator_process with
+    (match vp.validator_process with
     | Running
-        { process;
+        {
+          process;
           stdin = process_stdin;
           stdout = process_stdout;
           canceler;
-          clean_up_callback_id } -> (
-      match process#state with
-      | Running ->
-          return (process, process_stdin, process_stdout)
-      | Exited status ->
-          Error_monad.cancel_with_exceptions canceler
-          >>= fun () ->
-          Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
-          vp.validator_process <- Uninitialized ;
-          Events.(emit process_exited_abnormally status)
-          >>= fun () -> start_process vp )
-    | Uninitialized ->
-        start_process vp
+          clean_up_callback_id;
+        } -> (
+        match process#state with
+        | Running -> return (process, process_stdin, process_stdout)
+        | Exited status ->
+            Error_monad.cancel_with_exceptions canceler >>= fun () ->
+            Lwt_exit.unregister_clean_up_callback clean_up_callback_id ;
+            vp.validator_process <- Uninitialized ;
+            Events.(emit process_exited_abnormally status) >>= fun () ->
+            start_process vp)
+    | Uninitialized -> start_process vp
     | Exiting ->
-        Events.(emit cannot_start_process ())
-        >>= fun () ->
-        fail Block_validator_errors.Cannot_validate_while_shutting_down )
+        Events.(emit cannot_start_process ()) >>= fun () ->
+        fail Block_validator_errors.Cannot_validate_while_shutting_down)
     >>=? fun (process, process_stdin, process_stdout) ->
     Lwt.catch
       (fun () ->
@@ -517,8 +497,7 @@ module External_validator_process = struct
         Lwt.protected
           (Lwt_mutex.with_lock vp.lock (fun () ->
                let now = Systime_os.now () in
-               Events.(emit request_for request)
-               >>= fun () ->
+               Events.(emit request_for request) >>= fun () ->
                External_validation.send
                  process_stdin
                  External_validation.request_encoding
@@ -530,34 +509,30 @@ module External_validator_process = struct
                  let then_ = Systime_os.now () in
                  Ptime.diff then_ now
                in
-               Events.(emit request_result (request, timespan))
-               >>= fun () -> Lwt.return res))
+               Events.(emit request_result (request, timespan)) >>= fun () ->
+               Lwt.return res))
         >>=? fun res ->
         match process#state with
-        | Running ->
-            return res
+        | Running -> return res
         | Exited status ->
             vp.validator_process <- Uninitialized ;
-            Events.(emit process_exited_abnormally status)
-            >>= fun () -> return res)
+            Events.(emit process_exited_abnormally status) >>= fun () ->
+            return res)
       (function
         | errors ->
-            ( match process#state with
-            | Running ->
-                Lwt.return_unit
+            (match process#state with
+            | Running -> Lwt.return_unit
             | Exited status ->
-                Events.(emit process_exited_abnormally status)
-                >>= fun () ->
+                Events.(emit process_exited_abnormally status) >>= fun () ->
                 vp.validator_process <- Uninitialized ;
-                Lwt.return_unit )
+                Lwt.return_unit)
             >>= fun () -> Lwt.return (error_exn errors))
 
   let init
       ({user_activated_upgrades; user_activated_protocol_overrides} :
         validator_environment) ~genesis ~data_dir ~context_root ~protocol_root
       ~process_path ~sandbox_parameters =
-    Events.(emit init ())
-    >>= fun () ->
+    Events.(emit init ()) >>= fun () ->
     let validator =
       {
         data_dir;
@@ -616,13 +591,11 @@ module External_validator_process = struct
     send_request validator request Data_encoding.(option int31)
 
   let close vp =
-    Events.(emit close ())
-    >>= fun () ->
+    Events.(emit close ()) >>= fun () ->
     match vp.validator_process with
     | Running {process; stdin = process_stdin; canceler; _} ->
         let request = External_validation.Terminate in
-        Events.(emit request_for request)
-        >>= fun () ->
+        Events.(emit request_for request) >>= fun () ->
         Lwt.catch
           (fun () ->
             vp.validator_process <- Exiting ;
@@ -640,29 +613,24 @@ module External_validator_process = struct
                    responding (connection already closed) and is
                    killed afterward. No need to propagate the error. *)
                 Events.(emit cannot_close ()) >>= fun () -> Lwt.return_unit
-            | e ->
-                Lwt.fail e)
+            | e -> Lwt.fail e)
         >>= fun () ->
         Lwt.catch
           (fun () ->
             Lwt_unix.with_timeout shutdown_timeout (fun () ->
-                process#status
-                >>= function
-                | Unix.WEXITED 0 ->
-                    Events.(emit process_exited_normally ())
+                process#status >>= function
+                | Unix.WEXITED 0 -> Events.(emit process_exited_normally ())
                 | status ->
-                    Events.(emit process_exited_abnormally status)
-                    >>= fun () -> process#terminate ; Lwt.return_unit))
+                    Events.(emit process_exited_abnormally status) >>= fun () ->
+                    process#terminate ;
+                    Lwt.return_unit))
           (function
-            | Lwt_unix.Timeout ->
-                Events.(emit unresponsive_validator) ()
-            | err ->
-                Lwt.fail err)
+            | Lwt_unix.Timeout -> Events.(emit unresponsive_validator) ()
+            | err -> Lwt.fail err)
         >>= fun () ->
-        Error_monad.cancel_with_exceptions canceler
-        >>= fun () -> Lwt.return_unit
-    | Uninitialized | Exiting ->
+        Error_monad.cancel_with_exceptions canceler >>= fun () ->
         Lwt.return_unit
+    | Uninitialized | Exiting -> Lwt.return_unit
 end
 
 let init validator_environment validator_kind =
@@ -675,12 +643,14 @@ let init validator_environment validator_kind =
       in
       return (E {validator_process; validator})
   | External
-      { genesis;
+      {
+        genesis;
         data_dir;
         context_root;
         protocol_root;
         process_path;
-        sandbox_parameters } ->
+        sandbox_parameters;
+      } ->
       External_validator_process.init
         validator_environment
         ~genesis
@@ -697,14 +667,12 @@ let init validator_environment validator_kind =
 
 let close (E {validator_process = (module VP); validator}) = VP.close validator
 
-let restore_context_integrity (E {validator_process = (module VP); validator})
-    =
+let restore_context_integrity (E {validator_process = (module VP); validator}) =
   VP.restore_context_integrity validator
 
 let apply_block (E {validator_process = (module VP); validator}) chain_store
     ~predecessor header operations =
-  Store.Block.get_block_metadata chain_store predecessor
-  >>=? fun metadata ->
+  Store.Block.get_block_metadata chain_store predecessor >>=? fun metadata ->
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
   Store.Chain.compute_live_blocks chain_store ~block:predecessor
   >>=? fun (live_blocks, live_operations) ->

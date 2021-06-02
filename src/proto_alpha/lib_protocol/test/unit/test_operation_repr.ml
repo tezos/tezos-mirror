@@ -40,7 +40,8 @@ module Test_operation_repr = struct
   let test_of_list_single_case () =
     let contents_list =
       of_list
-        [ Contents
+        [
+          Contents
             (Manager_operation
                {
                  fee = Obj.magic 0;
@@ -49,18 +50,18 @@ module Test_operation_repr = struct
                  storage_limit = Obj.magic 0;
                  counter = Obj.magic 0;
                  source = Obj.magic 0;
-               }) ]
+               });
+        ]
     in
     match contents_list with
-    | Contents_list (Single _) ->
-        return_unit
-    | _ ->
-        failwith "Unexpected value"
+    | Contents_list (Single _) -> return_unit
+    | _ -> failwith "Unexpected value"
 
   let test_of_list_multiple_case () =
     let contents_list =
       of_list
-        [ Contents
+        [
+          Contents
             (Manager_operation
                {
                  fee = Obj.magic 0;
@@ -79,13 +80,12 @@ module Test_operation_repr = struct
                  storage_limit = Obj.magic 0;
                  counter = Obj.magic 0;
                  source = Obj.magic 0;
-               }) ]
+               });
+        ]
     in
     match contents_list with
-    | Contents_list (Cons (_, Single _)) ->
-        return_unit
-    | Contents_list (Single _) | _ ->
-        failwith "Unexpected value"
+    | Contents_list (Cons (_, Single _)) -> return_unit
+    | Contents_list (Single _) | _ -> failwith "Unexpected value"
 
   let test_of_list_empty_case () =
     try
@@ -95,7 +95,8 @@ module Test_operation_repr = struct
 end
 
 let tests =
-  [ tztest
+  [
+    tztest
       "of_list: single element input list"
       `Quick
       Test_operation_repr.test_of_list_single_case;
@@ -106,4 +107,5 @@ let tests =
     tztest
       "of_list: empty input list"
       `Quick
-      Test_operation_repr.test_of_list_empty_case ]
+      Test_operation_repr.test_of_list_empty_case;
+  ]

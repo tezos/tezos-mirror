@@ -30,7 +30,8 @@ open Client_context_unix
 
 let builtin_commands =
   let open Clic in
-  [ command
+  [
+    command
       ~desc:"List the protocol versions that this client understands."
       no_options
       (fixed ["list"; "understood"; "protocols"])
@@ -38,7 +39,8 @@ let builtin_commands =
         Seq.iter_s
           (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
           (Client_commands.get_versions ())
-        >>= fun () -> return_unit) ]
+        >>= fun () -> return_unit);
+  ]
 
 module type M = sig
   type t
@@ -75,8 +77,7 @@ let setup_remote_signer (module C : M) client_config
     (rpc_config : RPC_client_unix.config) parsed_config_file =
   let module Remote_params = struct
     let authenticate pkhs payload =
-      Client_keys.list_keys client_config
-      >>=? fun keys ->
+      Client_keys.list_keys client_config >>=? fun keys ->
       match
         List.filter_map
           (function
@@ -85,16 +86,14 @@ let setup_remote_signer (module C : M) client_config
                      (fun pkh -> Signature.Public_key_hash.equal pkh known_pkh)
                      pkhs ->
                 Some known_sk_uri
-            | _ ->
-                None)
+            | _ -> None)
           keys
       with
-      | sk_uri :: _ ->
-          Client_keys.sign client_config sk_uri payload
+      | sk_uri :: _ -> Client_keys.sign client_config sk_uri payload
       | [] ->
           failwith
-            "remote signer expects authentication signature, but no \
-             authorized key was found in the wallet"
+            "remote signer expects authentication signature, but no authorized \
+             key was found in the wallet"
 
     let logger =
       (* overriding the logger we might already have with the one from
@@ -109,9 +108,9 @@ let setup_remote_signer (module C : M) client_config
   in
   let module Socket = Tezos_signer_backends_unix.Socket.Make (Remote_params) in
   Client_keys.register_signer
-    ( module Tezos_signer_backends.Encrypted.Make (struct
+    (module Tezos_signer_backends.Encrypted.Make (struct
       let cctxt = (client_config :> Client_context.io)
-    end) ) ;
+    end)) ;
   Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
   Client_keys.register_signer
     (module Tezos_signer_backends_unix.Ledger.Signer_implementation) ;
@@ -120,14 +119,11 @@ let setup_remote_signer (module C : M) client_config
   Client_keys.register_signer (module Http) ;
   Client_keys.register_signer (module Https) ;
   match parsed_config_file with
-  | None ->
-      ()
+  | None -> ()
   | Some parsed_config_file -> (
-    match C.other_registrations with
-    | Some r ->
-        r parsed_config_file (module Remote_params)
-    | None ->
-        () )
+      match C.other_registrations with
+      | Some r -> r parsed_config_file (module Remote_params)
+      | None -> ())
 
 (** Warn the user if there are duplicate URIs in the sources (may or may
     not be a misconfiguration). *)
@@ -152,21 +148,18 @@ let warn_if_duplicates_light_sources (printer : unix_logger) uris =
       Format.(
         pp_print_list
           ~pp_sep:(fun ppf () -> pp_print_string ppf "; ")
-          (fun ppf (uri, nb) ->
-            fprintf ppf "%a (%i occurrences)" Uri.pp uri nb))
+          (fun ppf (uri, nb) -> fprintf ppf "%a (%i occurrences)" Uri.pp uri nb))
       (UriMap.bindings uri_duplicates)
   else Lwt.return_unit
 
 let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
   (* Make sure that base_dir is not a mockup. *)
-  Tezos_mockup.Persistence.M.classify_base_dir base_dir
-  >>=? (function
-         | Base_dir_is_mockup ->
-             failwith
-               "%s is setup as a mockup, yet mockup mode is not active"
-               base_dir
-         | _ ->
-             return_unit)
+  (Tezos_mockup.Persistence.M.classify_base_dir base_dir >>=? function
+   | Base_dir_is_mockup ->
+       failwith
+         "%s is setup as a mockup, yet mockup mode is not active"
+         base_dir
+   | _ -> return_unit)
   >>=? fun () ->
   let (chain, block, confirmations, password_filename, protocol, sources) =
     match parsed_args with
@@ -204,21 +197,20 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
       in
       let get_mode () =
         match (mode, sources) with
-        | (`Mode_proxy, _) ->
-            return Tezos_proxy.Proxy_services.Proxy
+        | (`Mode_proxy, _) -> return Tezos_proxy.Proxy_services.Proxy
         | (`Mode_light, None) ->
             failwith
               "--sources MUST be specified when --mode light is specified"
         | (`Mode_light, Some sources_config) ->
-            ( if
-              List.mem ~equal:Uri.equal rpc_config.endpoint sources_config.uris
+            (if
+             List.mem ~equal:Uri.equal rpc_config.endpoint sources_config.uris
             then return_unit
             else
               failwith
                 "Value of --endpoint is %a. Therefore, this URI MUST be in \
                  field 'uris' of --sources (whose value is: %a). If you did \
-                 not specify --endpoint, it is being defaulted; you may \
-                 hereby specify --endpoint %a to fix this error."
+                 not specify --endpoint, it is being defaulted; you may hereby \
+                 specify --endpoint %a to fix this error."
                 Uri.pp
                 rpc_config.endpoint
                 (Format.pp_print_list Uri.pp)
@@ -227,15 +219,15 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
                    cannot be empty, but we don't rely on this here. Hence the use
                    of pp_print_option. *)
                 (Format.pp_print_option Uri.pp)
-                (List.hd sources_config.uris) )
+                (List.hd sources_config.uris))
             >>=? fun () ->
             warn_if_duplicates_light_sources printer sources_config.uris
             >>= fun () ->
             let rpc_builder endpoint =
-              ( new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
-                  {rpc_config with endpoint}
-                  Media_type.all_media_types
-                :> RPC_context.simple )
+              (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+                 {rpc_config with endpoint}
+                 Media_type.all_media_types
+                :> RPC_context.simple)
             in
             let sources =
               Tezos_proxy.Light.sources_config_to_sources
@@ -252,8 +244,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
         chain
         block
       >>=? fun proxy_env ->
-      get_mode ()
-      >>=? fun mode ->
+      get_mode () >>=? fun mode ->
       return
       @@ new unix_proxy
            ~chain
@@ -270,8 +261,7 @@ let setup_mockup_rpc_client_config
     (args : Client_config.cli_args) base_dir =
   let in_memory_mockup (args : Client_config.cli_args) =
     match args.protocol with
-    | None ->
-        Tezos_mockup.Persistence.M.default_mockup_context cctxt
+    | None -> Tezos_mockup.Persistence.M.default_mockup_context cctxt
     | Some protocol_hash ->
         Tezos_mockup.Persistence.M.init_mockup_context_by_protocol_hash
           ~cctxt
@@ -279,21 +269,20 @@ let setup_mockup_rpc_client_config
           ~constants_overrides_json:None
           ~bootstrap_accounts_json:None
   in
-  Tezos_mockup.Persistence.M.classify_base_dir base_dir
-  >>=? (function
-         | Tezos_mockup.Persistence.M.Base_dir_is_empty
-         | Tezos_mockup.Persistence.M.Base_dir_is_file
-         | Tezos_mockup.Persistence.M.Base_dir_is_nonempty
-         | Tezos_mockup.Persistence.M.Base_dir_does_not_exist ->
-             let mem_only = true in
-             in_memory_mockup args >>=? fun res -> return (res, mem_only)
-         | Tezos_mockup.Persistence.M.Base_dir_is_mockup ->
-             let mem_only = false in
-             Tezos_mockup.Persistence.M.get_mockup_context_from_disk
-               ~base_dir
-               ~protocol_hash:args.protocol
-               cctxt
-             >>=? fun res -> return (res, mem_only))
+  (Tezos_mockup.Persistence.M.classify_base_dir base_dir >>=? function
+   | Tezos_mockup.Persistence.M.Base_dir_is_empty
+   | Tezos_mockup.Persistence.M.Base_dir_is_file
+   | Tezos_mockup.Persistence.M.Base_dir_is_nonempty
+   | Tezos_mockup.Persistence.M.Base_dir_does_not_exist ->
+       let mem_only = true in
+       in_memory_mockup args >>=? fun res -> return (res, mem_only)
+   | Tezos_mockup.Persistence.M.Base_dir_is_mockup ->
+       let mem_only = false in
+       Tezos_mockup.Persistence.M.get_mockup_context_from_disk
+         ~base_dir
+         ~protocol_hash:args.protocol
+         cctxt
+       >>=? fun res -> return (res, mem_only))
   >>=? fun ((mockup_env, (chain_id, rpc_context)), mem_only) ->
   return
     (new unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context)
@@ -304,14 +293,12 @@ let setup_client_config (cctxt : Tezos_client_base.Client_context.full)
     setup_default_proxy_client_config parsed_args base_dir rpc_config
   in
   match parsed_args with
-  | None ->
-      setup_non_mockup_rpc_client_config `Mode_client
+  | None -> setup_non_mockup_rpc_client_config `Mode_client
   | Some args -> (
-    match args.Client_config.client_mode with
-    | (`Mode_client | `Mode_light | `Mode_proxy) as m ->
-        setup_non_mockup_rpc_client_config m
-    | `Mode_mockup ->
-        setup_mockup_rpc_client_config cctxt args base_dir )
+      match args.Client_config.client_mode with
+      | (`Mode_client | `Mode_light | `Mode_proxy) as m ->
+          setup_non_mockup_rpc_client_config m
+      | `Mode_mockup -> setup_mockup_rpc_client_config cctxt args base_dir)
 
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
@@ -323,16 +310,12 @@ let main (module C : M) ~select_commands =
       | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: args ->
           let args = List.rev acc @ args in
           (args, Some (prev_arg, cur_arg, script))
-      | x :: rest ->
-          move_autocomplete_token_upfront (x :: acc) rest
-      | [] ->
-          (List.rev acc, None)
+      | x :: rest -> move_autocomplete_token_upfront (x :: acc) rest
+      | [] -> (List.rev acc, None)
     in
     match Array.to_list Sys.argv with
-    | _ :: args ->
-        move_autocomplete_token_upfront [] args
-    | [] ->
-        ([], None)
+    | _ :: args -> move_autocomplete_token_upfront [] args
+    | [] -> ([], None)
   in
   Random.self_init () ;
   ignore
@@ -347,8 +330,7 @@ let main (module C : M) ~select_commands =
         Format.err_formatter
         (if Unix.isatty Unix.stderr then Ansi else Plain)
         Short) ;
-  Internal_event_unix.init ()
-  >>= fun () ->
+  Internal_event_unix.init () >>= fun () ->
   Lwt.catch
     (fun () ->
       let full =
@@ -360,103 +342,93 @@ let main (module C : M) ~select_commands =
           ~base_dir:C.default_base_dir
           ~rpc_config:RPC_client_unix.default_config
       in
-      C.parse_config_args full original_args
-      >>=? (fun (parsed, remaining) ->
-             let parsed_config_file = parsed.Client_config.parsed_config_file
-             and parsed_args = parsed.Client_config.parsed_args
-             and config_commands = parsed.Client_config.config_commands in
-             let base_dir : string =
-               match parsed.Client_config.base_dir with
-               | Some p ->
-                   p
-               | None -> (
-                 match parsed_config_file with
-                 | None ->
-                     C.default_base_dir
-                 | Some p ->
-                     p.Client_config.Cfg_file.base_dir )
-             and require_auth = parsed.Client_config.require_auth in
-             let rpc_config =
-               let rpc_config : RPC_client_unix.config =
-                 match parsed_config_file with
-                 | None ->
-                     RPC_client_unix.default_config
-                 | Some cfg ->
-                     {
-                       RPC_client_unix.default_config with
-                       endpoint =
-                         Option.value
-                           cfg.endpoint
-                           ~default:Client_config.default_endpoint;
-                     }
-               in
-               match parsed_args with
-               | Some parsed_args ->
-                   if parsed_args.Client_config.print_timings then
-                     let gettimeofday = Unix.gettimeofday in
-                     {
-                       rpc_config with
-                       logger =
-                         RPC_client_unix.timings_logger
-                           ~gettimeofday
-                           Format.err_formatter;
-                     }
-                   else if parsed_args.Client_config.log_requests then
-                     {
-                       rpc_config with
-                       logger =
-                         RPC_client_unix.full_logger Format.err_formatter;
-                     }
-                   else rpc_config
-               | None ->
-                   rpc_config
-             in
-             setup_client_config full parsed_args base_dir rpc_config
-             >>=? fun client_config ->
-             setup_remote_signer
-               (module C)
-               client_config
-               rpc_config
-               parsed_config_file ;
-             ( match parsed_args with
-             | Some parsed_args ->
-                 select_commands
-                   (client_config :> RPC_client_unix.http_ctxt)
-                   parsed_args
-             | None ->
-                 return_nil )
-             >>=? fun other_commands ->
-             let commands =
-               Clic.add_manual
-                 ~executable_name
-                 ~global_options
-                 (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
-                 Format.std_formatter
-                 (C.clic_commands
-                    ~base_dir
-                    ~config_commands
-                    ~builtin_commands
-                    ~other_commands
-                    ~require_auth)
-             in
-             match autocomplete with
-             | Some (prev_arg, cur_arg, script) ->
-                 Clic.autocompletion
-                   ~script
-                   ~cur_arg
-                   ~prev_arg
-                   ~args:original_args
-                   ~global_options
-                   commands
-                   client_config
-                 >>=? fun completions ->
-                 List.iter print_endline completions ;
-                 return_unit
-             | None ->
-                 Clic.dispatch commands client_config remaining)
+      ( C.parse_config_args full original_args >>=? fun (parsed, remaining) ->
+        let parsed_config_file = parsed.Client_config.parsed_config_file
+        and parsed_args = parsed.Client_config.parsed_args
+        and config_commands = parsed.Client_config.config_commands in
+        let base_dir : string =
+          match parsed.Client_config.base_dir with
+          | Some p -> p
+          | None -> (
+              match parsed_config_file with
+              | None -> C.default_base_dir
+              | Some p -> p.Client_config.Cfg_file.base_dir)
+        and require_auth = parsed.Client_config.require_auth in
+        let rpc_config =
+          let rpc_config : RPC_client_unix.config =
+            match parsed_config_file with
+            | None -> RPC_client_unix.default_config
+            | Some cfg ->
+                {
+                  RPC_client_unix.default_config with
+                  endpoint =
+                    Option.value
+                      cfg.endpoint
+                      ~default:Client_config.default_endpoint;
+                }
+          in
+          match parsed_args with
+          | Some parsed_args ->
+              if parsed_args.Client_config.print_timings then
+                let gettimeofday = Unix.gettimeofday in
+                {
+                  rpc_config with
+                  logger =
+                    RPC_client_unix.timings_logger
+                      ~gettimeofday
+                      Format.err_formatter;
+                }
+              else if parsed_args.Client_config.log_requests then
+                {
+                  rpc_config with
+                  logger = RPC_client_unix.full_logger Format.err_formatter;
+                }
+              else rpc_config
+          | None -> rpc_config
+        in
+        setup_client_config full parsed_args base_dir rpc_config
+        >>=? fun client_config ->
+        setup_remote_signer
+          (module C)
+          client_config
+          rpc_config
+          parsed_config_file ;
+        (match parsed_args with
+        | Some parsed_args ->
+            select_commands
+              (client_config :> RPC_client_unix.http_ctxt)
+              parsed_args
+        | None -> return_nil)
+        >>=? fun other_commands ->
+        let commands =
+          Clic.add_manual
+            ~executable_name
+            ~global_options
+            (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
+            Format.std_formatter
+            (C.clic_commands
+               ~base_dir
+               ~config_commands
+               ~builtin_commands
+               ~other_commands
+               ~require_auth)
+        in
+        match autocomplete with
+        | Some (prev_arg, cur_arg, script) ->
+            Clic.autocompletion
+              ~script
+              ~cur_arg
+              ~prev_arg
+              ~args:original_args
+              ~global_options
+              commands
+              client_config
+            >>=? fun completions ->
+            List.iter print_endline completions ;
+            return_unit
+        | None -> Clic.dispatch commands client_config remaining )
       >>= function
-      | Ok () ->
-          Lwt.return 0
+      | Ok () -> Lwt.return 0
       | Error [Clic.Version] ->
           let version = Tezos_version.Bin_version.version_string in
           Format.printf "%s\n" version ;

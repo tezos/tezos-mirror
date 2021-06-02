@@ -46,9 +46,7 @@ let test_classify_does_not_exist =
       Lwt_utils_unix.with_tempdir "test_persistence" (fun base_dir ->
           Persistence.M.classify_base_dir
             (Filename.concat base_dir "non_existing_directory")
-          >|=? check_base_dir
-                 "A non existing directory"
-                 Base_dir_does_not_exist))
+          >|=? check_base_dir "A non existing directory" Base_dir_does_not_exist))
 
 (** [classify_base_dir] a file *)
 let test_classify_is_file =
@@ -63,8 +61,7 @@ let test_classify_is_mockup =
       Lwt_utils_unix.with_tempdir "test_persistence" (fun dirname ->
           let mockup_directory = (Files.get_mockup_directory ~dirname :> string)
           and mockup_file_name = Files.Context.get ~dirname in
-          Lwt_unix.mkdir mockup_directory 0o700
-          >>= fun () ->
+          Lwt_unix.mkdir mockup_directory 0o700 >>= fun () ->
           let () = close_out (open_out (mockup_file_name :> string)) in
           Persistence.M.classify_base_dir dirname
           >|=? check_base_dir "A mockup directory" Base_dir_is_mockup))
@@ -189,11 +186,11 @@ end
 
 let mock_mockup_module (protocol_hash' : Protocol_hash.t) :
     (module Registration_intf.MOCKUP) =
-  ( module struct
+  (module struct
     include Mock_mockup
 
     let protocol_hash = protocol_hash'
-  end )
+  end)
 
 let mock_printer () =
   let rev_logs : string list ref = ref [] in
@@ -215,10 +212,8 @@ let test_get_registered_mockup_no_env =
     (fun () ->
       let module Registration = Registration.Internal.Make () in
       let module Persistence = Persistence.Internal.Make (Registration) in
-      Persistence.get_registered_mockup None (mock_printer ())
-      >>= function
-      | Ok _ ->
-          Alcotest.fail "Should have failed"
+      Persistence.get_registered_mockup None (mock_printer ()) >>= function
+      | Ok _ -> Alcotest.fail "Should have failed"
       | Error ([_] as errors) ->
           let actual = Format.asprintf "%a" pp_print_error_first errors in
           return
@@ -229,8 +224,7 @@ let test_get_registered_mockup_no_env =
                  "Default protocol Alpha (no requested protocol) not found in \
                   available mockup environments. Available protocol hashes: []"
                ~actual
-      | Error _ ->
-          Alcotest.fail "There should be exactly 1 error")
+      | Error _ -> Alcotest.fail "There should be exactly 1 error")
 
 (** [get_registered_mockup] fails if the requested protocol is not found. *)
 let test_get_registered_mockup_not_found =
@@ -243,14 +237,11 @@ let test_get_registered_mockup_not_found =
       let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
       let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
       let proto_hash_3 = Protocol_hash.hash_string ["mock3"] in
-      Registration.register_mockup_environment
-        (mock_mockup_module proto_hash_1) ;
-      Registration.register_mockup_environment
-        (mock_mockup_module proto_hash_2) ;
+      Registration.register_mockup_environment (mock_mockup_module proto_hash_1) ;
+      Registration.register_mockup_environment (mock_mockup_module proto_hash_2) ;
       Persistence.get_registered_mockup (Some proto_hash_3) (mock_printer ())
       >>= function
-      | Ok _ ->
-          Alcotest.fail "Should have failed"
+      | Ok _ -> Alcotest.fail "Should have failed"
       | Error ([_] as errors) ->
           let actual = Format.asprintf "%a" pp_print_error_first errors in
           let expected =
@@ -270,8 +261,7 @@ let test_get_registered_mockup_not_found =
                ~msg:"The error message must be correct"
                ~expected
                ~actual
-      | Error _ ->
-          Alcotest.fail "There should be exactly 1 error")
+      | Error _ -> Alcotest.fail "There should be exactly 1 error")
 
 (** [get_registered_mockup] returns Alpha if none is specified. *)
 let test_get_registered_mockup_take_alpha =
@@ -288,14 +278,11 @@ let test_get_registered_mockup_take_alpha =
           "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
       in
       let proto_hash_3 = Protocol_hash.hash_string ["mock3"] in
-      Registration.register_mockup_environment
-        (mock_mockup_module proto_hash_1) ;
+      Registration.register_mockup_environment (mock_mockup_module proto_hash_1) ;
       Registration.register_mockup_environment
         (mock_mockup_module proto_hash_alpha) ;
-      Registration.register_mockup_environment
-        (mock_mockup_module proto_hash_3) ;
-      Persistence.get_registered_mockup None printer
-      >|=? fun (module Result) ->
+      Registration.register_mockup_environment (mock_mockup_module proto_hash_3) ;
+      Persistence.get_registered_mockup None printer >|=? fun (module Result) ->
       Alcotest.check'
         (Alcotest.testable Protocol_hash.pp Protocol_hash.equal)
         ~msg:"The Alpha protocol is returned"
@@ -318,10 +305,8 @@ let test_get_registered_mockup_take_requested =
       let module Persistence = Persistence.Internal.Make (Registration) in
       let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
       let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
-      Registration.register_mockup_environment
-        (mock_mockup_module proto_hash_1) ;
-      Registration.register_mockup_environment
-        (mock_mockup_module proto_hash_2) ;
+      Registration.register_mockup_environment (mock_mockup_module proto_hash_1) ;
+      Registration.register_mockup_environment (mock_mockup_module proto_hash_2) ;
       Persistence.get_registered_mockup (Some proto_hash_1) (mock_printer ())
       >|=? fun (module Result) ->
       Alcotest.check'
@@ -333,8 +318,10 @@ let test_get_registered_mockup_take_requested =
 let () =
   Alcotest_lwt.run
     "tezos-mockup"
-    [ ( "persistence",
-        [ test_classify_does_not_exist;
+    [
+      ( "persistence",
+        [
+          test_classify_does_not_exist;
           test_classify_is_file;
           test_classify_is_mockup;
           test_classify_is_nonempty;
@@ -342,5 +329,7 @@ let () =
           test_get_registered_mockup_no_env;
           test_get_registered_mockup_not_found;
           test_get_registered_mockup_take_alpha;
-          test_get_registered_mockup_take_requested ] ) ]
+          test_get_registered_mockup_take_requested;
+        ] );
+    ]
   |> Lwt_main.run

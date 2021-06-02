@@ -25,10 +25,8 @@
 
 let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
     ~tries f x =
-  f x
-  >>= function
-  | Ok _ as r ->
-      Lwt.return r
+  f x >>= function
+  | Ok _ as r -> Lwt.return r
   | Error
       (RPC_client_errors.Request_failed {error = Connection_failed _; _} :: _)
     as err
@@ -36,11 +34,12 @@ let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
       cctxt#message "Connection refused, retrying in %.2f seconds..." delay
       >>= fun () ->
       Lwt.pick
-        [ (Lwt_unix.sleep delay >|= fun () -> `Continue);
-          (Lwt_exit.clean_up_starts >|= fun _ -> `Killed) ]
+        [
+          (Lwt_unix.sleep delay >|= fun () -> `Continue);
+          (Lwt_exit.clean_up_starts >|= fun _ -> `Killed);
+        ]
       >>= function
-      | `Killed ->
-          Lwt.return err
+      | `Killed -> Lwt.return err
       | `Continue ->
           let next_delay = delay *. factor in
           let delay =
@@ -49,23 +48,19 @@ let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
               ~some:(fun max_delay -> Float.min next_delay max_delay)
               max_delay
           in
-          retry cctxt ?max_delay ~delay ~factor ~tries:(tries - 1) f x )
-  | Error _ as err ->
-      Lwt.return err
+          retry cctxt ?max_delay ~delay ~factor ~tries:(tries - 1) f x)
+  | Error _ as err -> Lwt.return err
 
 let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
-  f ()
-  >>= function
-  | Ok () ->
-      return_unit
+  f () >>= function
+  | Ok () -> return_unit
   | Error (Client_baking_scheduling.Node_connection_lost :: _) ->
       cctxt#warning
         "Lost connection with the node. Retrying to establish connection..."
       >>= fun () ->
       (* Wait forever when the node stops responding... *)
       Client_confirmations.wait_for_bootstrapped
-        ~retry:
-          (retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5 ~tries:max_int)
+        ~retry:(retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5 ~tries:max_int)
         cctxt
       >>=? fun () -> retry_on_disconnection cctxt f
   | Error err ->
@@ -74,13 +69,10 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
 let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
     ~cleanup_nonces =
   (* Waiting for the node to be synchronized *)
-  cctxt#message "Waiting for the test chain to be forked..."
-  >>= fun () ->
-  Shell_services.Monitor.active_chains cctxt
-  >>=? fun (stream, _) ->
+  cctxt#message "Waiting for the test chain to be forked..." >>= fun () ->
+  Shell_services.Monitor.active_chains cctxt >>=? fun (stream, _) ->
   let rec loop () =
-    Lwt_stream.next stream
-    >>= fun l ->
+    Lwt_stream.next stream >>= fun l ->
     let testchain =
       List.find_opt
         (function Shell_services.Monitor.Active_test _ -> true | _ -> false)
@@ -115,31 +107,30 @@ let monitor_fork_testchain (cctxt : #Protocol_client_context.full)
             Lwt_timeout.create delay (fun () ->
                 Lwt_canceler.cancel canceler |> ignore)
           in
-          Lwt_timeout.start timeout ; return_unit
-    | None ->
-        loop ()
-    | Some _ ->
-        loop ()
+          Lwt_timeout.start timeout ;
+          return_unit
+    | None -> loop ()
+    | Some _ -> loop ()
     (* Got a testchain for a different protocol, skipping *)
   in
   Lwt.pick
     [(Lwt_exit.clean_up_starts >>= fun _ -> failwith "Interrupted..."); loop ()]
-  >>=? fun () -> cctxt#message "Test chain forked." >>= fun () -> return_unit
+  >>=? fun () ->
+  cctxt#message "Test chain forked." >>= fun () -> return_unit
 
 module Endorser = struct
   let run (cctxt : #Protocol_client_context.full) ~chain ~delay ~keep_alive
       delegates =
     let process () =
-      ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:false
-      else return_unit )
+      (if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:false
+      else return_unit)
       >>=? fun () ->
       Client_baking_blocks.monitor_heads
         ~next_protocols:(Some [Protocol.hash])
         cctxt
         chain
       >>=? fun block_stream ->
-      cctxt#message "Endorser started."
-      >>= fun () ->
+      cctxt#message "Endorser started." >>= fun () ->
       Client_baking_endorsement.create cctxt ~delay delegates block_stream
     in
     Client_confirmations.wait_for_bootstrapped
@@ -156,16 +147,15 @@ module Baker = struct
     let process () =
       Config_services.user_activated_upgrades cctxt
       >>=? fun user_activated_upgrades ->
-      ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
-      else return_unit )
+      (if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
+      else return_unit)
       >>=? fun () ->
       Client_baking_blocks.monitor_heads
         ~next_protocols:(Some [Protocol.hash])
         cctxt
         chain
       >>=? fun block_stream ->
-      cctxt#message "Baker started."
-      >>= fun () ->
+      cctxt#message "Baker started." >>= fun () ->
       Client_baking_forge.create
         cctxt
         ~user_activated_upgrades
@@ -189,8 +179,8 @@ module Accuser = struct
   let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels
       ~keep_alive =
     let process () =
-      ( if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
-      else return_unit )
+      (if chain = `Test then monitor_fork_testchain cctxt ~cleanup_nonces:true
+      else return_unit)
       >>=? fun () ->
       Client_baking_blocks.monitor_valid_blocks
         ~next_protocols:(Some [Protocol.hash])
@@ -198,8 +188,7 @@ module Accuser = struct
         ~chains:[chain]
         ()
       >>=? fun valid_blocks_stream ->
-      cctxt#message "Accuser started."
-      >>= fun () ->
+      cctxt#message "Accuser started." >>= fun () ->
       Client_baking_denunciation.create
         cctxt
         ~preserved_levels

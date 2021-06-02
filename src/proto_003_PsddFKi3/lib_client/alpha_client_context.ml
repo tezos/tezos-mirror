@@ -45,14 +45,21 @@ class wrap_rpc_context (t : RPC_context.json) : rpc_context =
 
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
-          'q -> 'i -> 'o tzresult Lwt.t =
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          'p ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
       t#call_service
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
           (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
-          on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
+          on_chunk:('o -> unit) ->
+          on_close:(unit -> unit) ->
+          'p ->
+          'q ->
+          'i ->
           (unit -> unit) tzresult Lwt.t =
       t#call_streamed_service
 
@@ -88,8 +95,8 @@ class wrap_full (t : Client_context.full) : full =
         Shell_services.Blocks.path
   end
 
-let register_error_kind category ~id ~title ~description ?pp encoding
-    from_error to_error =
+let register_error_kind category ~id ~title ~description ?pp encoding from_error
+    to_error =
   let id = "client." ^ Protocol.name ^ "." ^ id in
   register_error_kind
     category

@@ -47,12 +47,9 @@ let check_import_invariants ~test_descr ~rolling
         (Store.Block.header exported_block)
         (Store.Block.header head) ;
       (* Check that we possess all the blocks wrt our descriptors *)
-      Store.Chain.savepoint imported_chain_store
-      >>= fun savepoint ->
-      Store.Chain.checkpoint imported_chain_store
-      >>= fun checkpoint ->
-      Store.Chain.caboose imported_chain_store
-      >>= fun caboose ->
+      Store.Chain.savepoint imported_chain_store >>= fun savepoint ->
+      Store.Chain.checkpoint imported_chain_store >>= fun checkpoint ->
+      Store.Chain.caboose imported_chain_store >>= fun caboose ->
       let (expected_present, expected_absent) =
         List.partition
           (fun b ->
@@ -68,14 +65,14 @@ let check_import_invariants ~test_descr ~rolling
       assert_absence_in_store imported_chain_store expected_absent
       >>=? fun () ->
       (* Check that the descriptors are consistent *)
-      ( if rolling then
-        (* In rolling: we expected to have at least the max_op_ttl
-              blocks from the head *)
-        Store.Block.get_block_metadata imported_chain_store head
-        >>=? fun metadata ->
-        let max_op_ttl = Store.Block.max_operations_ttl metadata in
-        return Int32.(sub (Store.Block.level head) (of_int max_op_ttl))
-      else return 0l )
+      (if rolling then
+       (* In rolling: we expected to have at least the max_op_ttl
+             blocks from the head *)
+       Store.Block.get_block_metadata imported_chain_store head
+       >>=? fun metadata ->
+       let max_op_ttl = Store.Block.max_operations_ttl metadata in
+       return Int32.(sub (Store.Block.level head) (of_int max_op_ttl))
+      else return 0l)
       >>=? fun expected_caboose_level ->
       Assert.equal
         ~msg:("savepoint consistency: " ^ test_descr)
@@ -95,17 +92,14 @@ let check_import_invariants ~test_descr ~rolling
 
 let export_import ~test_descr (store_dir, context_dir) chain_store
     ~previously_baked_blocks ?exported_block_hash ~rolling =
-  check_invariants chain_store
-  >>=? fun () ->
+  check_invariants chain_store >>=? fun () ->
   let open Filename.Infix in
   let snapshot_path = store_dir // "snapshot.full" in
   let chain_name = Distributed_db_version.Name.of_string "test" in
   let exported_block =
     match exported_block_hash with
-    | None ->
-        `Alias (`Checkpoint, 0)
-    | Some hash ->
-        `Hash (hash, 0)
+    | None -> `Alias (`Checkpoint, 0)
+    | Some hash -> `Hash (hash, 0)
   in
   (*FIXME test over Raw formats as well *)
   Snapshots.export
@@ -142,9 +136,8 @@ let export_import ~test_descr (store_dir, context_dir) chain_store
       Store.close_store store' >>= fun () -> Lwt.return (Error err))
     (fun () ->
       let chain_store' = Store.main_chain_store store' in
-      Store.Chain.current_head chain_store'
-      >>= fun head' ->
-      ( match exported_block_hash with
+      Store.Chain.current_head chain_store' >>= fun head' ->
+      (match exported_block_hash with
       | Some hash ->
           Assert.equal
             ~msg:("export with given hash: " ^ test_descr)
@@ -153,24 +146,20 @@ let export_import ~test_descr (store_dir, context_dir) chain_store
             hash ;
           Lwt.return head'
       | None ->
-          Store.Chain.checkpoint chain_store
-          >>= fun checkpoint ->
+          Store.Chain.checkpoint chain_store >>= fun checkpoint ->
           Assert.equal
             ~msg:("export checkpoint: " ^ test_descr)
             ~eq:Block_hash.equal
             (Store.Block.hash head')
             (fst checkpoint) ;
-          Lwt.return head' )
+          Lwt.return head')
       >>= fun exported_block ->
       let history_mode = Store.Chain.history_mode chain_store' in
       assert (
         match history_mode with
-        | Rolling _ when rolling ->
-            true
-        | Full _ when not rolling ->
-            true
-        | _ ->
-            false ) ;
+        | Rolling _ when rolling -> true
+        | Full _ when not rolling -> true
+        | _ -> false) ;
       check_import_invariants
         ~test_descr
         ~rolling
@@ -181,20 +170,17 @@ let export_import ~test_descr (store_dir, context_dir) chain_store
 let check_baking_continuity ~test_descr ~exported_chain_store
     ~imported_chain_store =
   let open Tezos_protocol_alpha.Protocol.Alpha_context in
-  Store.Chain.current_head imported_chain_store
-  >>= fun imported_head ->
+  Store.Chain.current_head imported_chain_store >>= fun imported_head ->
   Alpha_utils.get_constants imported_chain_store imported_head
-  >>=? fun {Constants.parametric = {blocks_per_cycle; preserved_cycles; _}; _} ->
+  >>=? fun {Constants.parametric = {blocks_per_cycle; preserved_cycles; _}; _}
+    ->
   let imported_history_mode = Store.Chain.history_mode imported_chain_store in
   let imported_offset =
     match imported_history_mode with
-    | History_mode.Rolling {offset} | Full {offset} ->
-        offset
-    | Archive ->
-        assert false
+    | History_mode.Rolling {offset} | Full {offset} -> offset
+    | Archive -> assert false
   in
-  Store.Chain.current_head exported_chain_store
-  >>= fun export_store_head ->
+  Store.Chain.current_head exported_chain_store >>= fun export_store_head ->
   let level_to_reach =
     let min_nb_blocks_to_bake =
       Int32.(
@@ -209,42 +195,36 @@ let check_baking_continuity ~test_descr ~exported_chain_store
   (* Bake until we have enough cycles to reach our offset (and a bit more) *)
   (* Check invariants after every baking *)
   let rec loop head = function
-    | 0 ->
-        return head
+    | 0 -> return head
     | n ->
-        Alpha_utils.bake imported_chain_store head
-        >>=? fun new_head ->
-        check_invariants imported_chain_store
-        >>=? fun () -> loop new_head (n - 1)
+        Alpha_utils.bake imported_chain_store head >>=? fun new_head ->
+        check_invariants imported_chain_store >>=? fun () ->
+        loop new_head (n - 1)
   in
   let nb_blocks_to_bake_in_import =
     Int32.(to_int (sub level_to_reach (Store.Block.level imported_head)))
   in
-  loop imported_head nb_blocks_to_bake_in_import
-  >>=? fun last' ->
+  loop imported_head nb_blocks_to_bake_in_import >>=? fun last' ->
   (* Also bake with the exported store so we make sure we bake the same blocks *)
-  Store.Chain.current_head exported_chain_store
-  >>= fun exported_head ->
-  ( if Compare.Int32.(Store.Block.level export_store_head < level_to_reach) then
-    let nb_blocks_to_bake_in_export =
-      Int32.(to_int (sub level_to_reach (Store.Block.level export_store_head)))
-    in
-    Alpha_utils.bake_n
-      exported_chain_store
-      nb_blocks_to_bake_in_export
-      exported_head
-    >>=? fun (_blocks, last) -> return last
-  else Store.Block.read_block_by_level exported_chain_store level_to_reach )
+  Store.Chain.current_head exported_chain_store >>= fun exported_head ->
+  (if Compare.Int32.(Store.Block.level export_store_head < level_to_reach) then
+   let nb_blocks_to_bake_in_export =
+     Int32.(to_int (sub level_to_reach (Store.Block.level export_store_head)))
+   in
+   Alpha_utils.bake_n
+     exported_chain_store
+     nb_blocks_to_bake_in_export
+     exported_head
+   >>=? fun (_blocks, last) -> return last
+  else Store.Block.read_block_by_level exported_chain_store level_to_reach)
   >>=? fun last ->
   Assert.equal_block
     ~msg:("check both head after baking: " ^ test_descr)
     (Store.Block.header last)
     (Store.Block.header last') ;
   (* Check that the checkpoint are the same *)
-  Store.Chain.checkpoint exported_chain_store
-  >>= fun checkpoint ->
-  Store.Chain.checkpoint imported_chain_store
-  >>= fun checkpoint' ->
+  Store.Chain.checkpoint exported_chain_store >>= fun checkpoint ->
+  Store.Chain.checkpoint imported_chain_store >>= fun checkpoint' ->
   Assert.equal
     ~msg:("checkpoint equality: " ^ test_descr)
     ~prn:(fun (hash, level) ->
@@ -256,19 +236,15 @@ let check_baking_continuity ~test_descr ~exported_chain_store
 let test store_path store ~test_descr ?exported_block_level
     ~nb_blocks_to_bake_before_export ~rolling =
   let chain_store = Store.main_chain_store store in
-  Store.Chain.genesis_block chain_store
-  >>= fun genesis_block ->
+  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
   Alpha_utils.bake_n chain_store nb_blocks_to_bake_before_export genesis_block
   >>=? fun (previously_baked_blocks, _current_head) ->
   (* We don't have a way to lock two stores in the same process =>
      force merges to trigger by setting a new head via [bake] *)
   let consistency_check () =
-    Store.Chain.checkpoint chain_store
-    >>= fun checkpoint ->
-    Store.Chain.savepoint chain_store
-    >>= fun savepoint ->
-    Store.Chain.caboose chain_store
-    >>= fun caboose ->
+    Store.Chain.checkpoint chain_store >>= fun checkpoint ->
+    Store.Chain.savepoint chain_store >>= fun savepoint ->
+    Store.Chain.caboose chain_store >>= fun caboose ->
     let export_import exported_block_hash =
       export_import
         ~test_descr
@@ -284,12 +260,11 @@ let test store_path store ~test_descr ?exported_block_level
     let open Snapshots in
     Store.Block.read_block_by_level_opt chain_store expected_level
     >>= fun block_opt ->
-    ( match block_opt with
-    | None ->
-        return_some `Unknown
+    (match block_opt with
+    | None -> return_some `Unknown
     | Some block ->
-        if Compare.Int32.(expected_level = Store.Block.level genesis_block)
-        then return_some `Genesis
+        if Compare.Int32.(expected_level = Store.Block.level genesis_block) then
+          return_some `Genesis
         else if Compare.Int32.(expected_level = snd caboose) then
           return_some `Caboose
         else if Compare.Int32.(expected_level = snd savepoint) then
@@ -299,8 +274,7 @@ let test store_path store ~test_descr ?exported_block_level
             return_some `Unknown
           else return_some `Pruned
         else
-          Store.Block.get_block_metadata chain_store block
-          >>=? fun metadata ->
+          Store.Block.get_block_metadata chain_store block >>=? fun metadata ->
           let min_level =
             Compare.Int32.(
               max
@@ -313,7 +287,7 @@ let test store_path store ~test_descr ?exported_block_level
           if Compare.Int32.(min_level < snd caboose) then
             return_some `Not_enough_pred
           else (* Should not fail *)
-            return_none )
+            return_none)
     >>=? function
     | None ->
         (* Normal behavior *)
@@ -327,25 +301,16 @@ let test store_path store ~test_descr ?exported_block_level
         else
           let block = WithExceptions.Option.get ~loc:__LOC__ block_opt in
           let reason_to_string = function
-            | `Pruned ->
-                "Pruned"
-            | `Pruned_pred ->
-                "Pruned_pred"
-            | `Unknown ->
-                "Unknown"
-            | `Unknown_ancestor ->
-                "Unknown ancestor"
-            | `Caboose ->
-                "Caboose"
-            | `Genesis ->
-                "Genesis"
-            | `Not_enough_pred ->
-                "Not_enough_pred"
-            | `Missing_context ->
-                "Missing_context"
+            | `Pruned -> "Pruned"
+            | `Pruned_pred -> "Pruned_pred"
+            | `Unknown -> "Unknown"
+            | `Unknown_ancestor -> "Unknown ancestor"
+            | `Caboose -> "Caboose"
+            | `Genesis -> "Genesis"
+            | `Not_enough_pred -> "Not_enough_pred"
+            | `Missing_context -> "Missing_context"
           in
-          export_import (Some (Store.Block.hash block))
-          >>= function
+          export_import (Some (Store.Block.hash block)) >>= function
           | Error [Invalid_export_block {block = _; reason = reason'}]
             when reason = reason' ->
               (* Expected error *)
@@ -359,10 +324,9 @@ let test store_path store ~test_descr ?exported_block_level
                 "Unexpected error in export. Expected error with %s - Got : %a"
                 (reason_to_string reason)
                 Error_monad.pp_print_error
-                err )
+                err)
   in
-  consistency_check ()
-  >>=? function
+  consistency_check () >>=? function
   | None ->
       (* Encountered an expected error, nothing to do *)
       return_unit
@@ -380,8 +344,10 @@ let test store_path store ~test_descr ?exported_block_level
 
 let make_tests speed genesis_parameters =
   let open Tezos_protocol_alpha.Protocol.Alpha_context in
-  let { Parameters.constants = {Constants.blocks_per_cycle; preserved_cycles; _};
-        _ } =
+  let {
+    Parameters.constants = {Constants.blocks_per_cycle; preserved_cycles; _};
+    _;
+  } =
     genesis_parameters
   in
   let blocks_per_cycle = Int32.to_int blocks_per_cycle in
@@ -389,45 +355,51 @@ let make_tests speed genesis_parameters =
   let nb_initial_blocks_list =
     match speed with
     | `Slow ->
-        [ preserved_cycles * blocks_per_cycle;
+        [
+          preserved_cycles * blocks_per_cycle;
           ((2 * preserved_cycles) + 1) * blocks_per_cycle;
           65;
           77;
-          89 ]
-    | `Quick ->
-        [((2 * preserved_cycles) + 1) * blocks_per_cycle; 77]
+          89;
+        ]
+    | `Quick -> [((2 * preserved_cycles) + 1) * blocks_per_cycle; 77]
   in
   let exporter_history_modes =
     let open History_mode in
     match speed with
     | `Slow ->
-        [ Archive;
+        [
+          Archive;
           Full {offset = 0};
           Full {offset = default_offset};
           Rolling {offset = 0};
-          Rolling {offset = default_offset} ]
+          Rolling {offset = default_offset};
+        ]
     | `Quick ->
-        [ Full {offset = default_offset};
+        [
+          Full {offset = default_offset};
           Rolling {offset = 0};
-          Rolling {offset = default_offset} ]
+          Rolling {offset = default_offset};
+        ]
   in
   let export_blocks_levels nb_initial_blocks =
     match speed with
     | `Slow ->
-        [ None;
+        [
+          None;
           Some Int32.(of_int (nb_initial_blocks - blocks_per_cycle));
-          Some (Int32.of_int nb_initial_blocks) ]
-    | `Quick ->
-        [None; Some (Int32.of_int nb_initial_blocks)]
+          Some (Int32.of_int nb_initial_blocks);
+        ]
+    | `Quick -> [None; Some (Int32.of_int nb_initial_blocks)]
   in
   let permutations =
     List.(
       product
         (product
            nb_initial_blocks_list
-           ( map export_blocks_levels nb_initial_blocks_list
+           (map export_blocks_levels nb_initial_blocks_list
            |> flatten
-           |> List.sort_uniq Stdlib.compare ))
+           |> List.sort_uniq Stdlib.compare))
         (product exporter_history_modes [false; true]))
     |> List.map (fun ((a, b), (c, d)) -> (a, b, c, d))
   in
@@ -441,44 +413,40 @@ let make_tests speed genesis_parameters =
           History_mode.pp
           history_mode
           (if rolling then "rolling" else "full")
-          ( match exported_block_level with
-          | None ->
-              "checkpoint"
-          | Some i ->
-              Format.sprintf "level %ld" i )
+          (match exported_block_level with
+          | None -> "checkpoint"
+          | Some i -> Format.sprintf "level %ld" i)
       in
       match history_mode with
-      | Rolling _ when rolling = false ->
-          None
+      | Rolling _ when rolling = false -> None
       | _ -> (
-        match exported_block_level with
-        | Some level
-          when Compare.Int32.(Int32.of_int nb_initial_blocks <= level) ->
-            None
-        | None | Some _ ->
-            Some
-              (wrap_test
-                 ~keep_dir:true
-                 ~history_mode
-                 ~patch_context:(fun ctxt ->
-                   Alpha_utils.default_patch_context ctxt)
-                 ( test_descr,
-                   fun store_path store ->
-                     test
-                       ?exported_block_level
-                       ~nb_blocks_to_bake_before_export:nb_initial_blocks
-                       ~rolling
-                       ~test_descr
-                       store_path
-                       store )) ))
+          match exported_block_level with
+          | Some level
+            when Compare.Int32.(Int32.of_int nb_initial_blocks <= level) ->
+              None
+          | None | Some _ ->
+              Some
+                (wrap_test
+                   ~keep_dir:true
+                   ~history_mode
+                   ~patch_context:(fun ctxt ->
+                     Alpha_utils.default_patch_context ctxt)
+                   ( test_descr,
+                     fun store_path store ->
+                       test
+                         ?exported_block_level
+                         ~nb_blocks_to_bake_before_export:nb_initial_blocks
+                         ~rolling
+                         ~test_descr
+                         store_path
+                         store ))))
     permutations
 
 let test_rolling () =
   let patch_context ctxt = Alpha_utils.default_patch_context ctxt in
   let test (store_dir, context_dir) store =
     let chain_store = Store.main_chain_store store in
-    Store.Chain.genesis_block chain_store
-    >>= fun genesis_block ->
+    Store.Chain.genesis_block chain_store >>= fun genesis_block ->
     let nb_cycles_to_bake = 6 in
     Alpha_utils.bake_until_n_cycle_end
       chain_store
@@ -523,10 +491,8 @@ let test_rolling () =
       genesis
     >>=? fun store' ->
     let chain_store' = Store.main_chain_store store' in
-    Alpha_utils.bake_until_n_cycle_end chain_store' 4 head
-    >>=? fun _head ->
-    Store.Chain.checkpoint chain_store'
-    >>= fun checkpoint ->
+    Alpha_utils.bake_until_n_cycle_end chain_store' 4 head >>=? fun _head ->
+    Store.Chain.checkpoint chain_store' >>= fun checkpoint ->
     let prn i = Format.sprintf "%ld" i in
     Store.Block.read_block chain_store' (fst checkpoint)
     >>=? fun checkpoint_block ->
@@ -536,8 +502,7 @@ let test_rolling () =
       Int32.(
         sub (snd checkpoint) (of_int (Store.Block.max_operations_ttl metadata)))
     in
-    Store.Chain.caboose chain_store'
-    >>= fun caboose ->
+    Store.Chain.caboose chain_store' >>= fun caboose ->
     Assert.equal
       ~prn
       ~msg:__LOC__

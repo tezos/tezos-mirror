@@ -26,13 +26,11 @@
 open Test_utils
 open Block_store
 
-let assert_presence_in_block_store ?(with_metadata = false) block_store blocks
-    =
+let assert_presence_in_block_store ?(with_metadata = false) block_store blocks =
   List.iter_es
     (fun b ->
       let hash = Block_repr.hash b in
-      Block_store.mem block_store (Block (hash, 0))
-      >>=? fun is_known ->
+      Block_store.mem block_store (Block (hash, 0)) >>=? fun is_known ->
       if not is_known then
         Alcotest.failf
           "assert_presence_in_block_store: block %a in not known"
@@ -55,36 +53,33 @@ let assert_presence_in_block_store ?(with_metadata = false) block_store blocks
               ~msg:"block equality with metadata"
               b
               b' ;
-            return_unit )
+            return_unit)
           else (
             Assert.equal_block
               ~msg:"block equality without metadata"
               (Block_repr.header b)
               (Block_repr.header b') ;
-            return_unit ))
+            return_unit))
     blocks
 
 let assert_absence_in_block_store block_store blocks =
   List.iter_es
     (fun b ->
       let hash = Block_repr.hash b in
-      Block_store.mem block_store (Block (hash, 0))
-      >>=? function
+      Block_store.mem block_store (Block (hash, 0)) >>=? function
       | true ->
           Alcotest.failf
             "assert_absence_in_block_store: found unexpected block %a"
             pp_raw_block
             b
-      | false ->
-          return_unit)
+      | false -> return_unit)
     blocks
 
 let assert_pruned_blocks_in_block_store block_store blocks =
   List.iter_es
     (fun b ->
       let hash = Block_repr.hash b in
-      Block_store.mem block_store (Block (hash, 0))
-      >>=? fun is_known ->
+      Block_store.mem block_store (Block (hash, 0)) >>=? fun is_known ->
       if not is_known then
         Alcotest.failf
           "assert_pruned_blocks_in_block_store: block %a in not known"
@@ -112,10 +107,8 @@ let assert_pruned_blocks_in_block_store block_store blocks =
 
 let assert_cemented_bound block_store (lowest, highest) =
   let unopt_level = function
-    | Some level ->
-        level
-    | None ->
-        Assert.fail_msg "could not retrieve cemented level"
+    | Some level -> level
+    | None -> Assert.fail_msg "could not retrieve cemented level"
   in
   let lowest_cemented_level =
     unopt_level
@@ -137,10 +130,8 @@ let assert_cemented_bound block_store (lowest, highest) =
 let test_storing_and_access_predecessors block_store =
   make_raw_block_list ~kind:`Full (genesis_hash, -1l) 50
   >>= fun (blocks, _head) ->
-  List.iter_es (Block_store.store_block block_store) blocks
-  >>=? fun () ->
-  assert_presence_in_block_store block_store blocks
-  >>=? fun () ->
+  List.iter_es (Block_store.store_block block_store) blocks >>=? fun () ->
+  assert_presence_in_block_store block_store blocks >>=? fun () ->
   List.iter_es
     (fun b ->
       let hash = Block_repr.hash b in
@@ -149,8 +140,7 @@ let test_storing_and_access_predecessors block_store =
         (fun distance ->
           Block_store.get_hash block_store (Block (hash, distance))
           >>=? function
-          | None ->
-              Alcotest.fail "expected predecessor but none found"
+          | None -> Alcotest.fail "expected predecessor but none found"
           | Some h ->
               Alcotest.check
                 (module Block_hash)
@@ -161,8 +151,8 @@ let test_storing_and_access_predecessors block_store =
                    hash
                    level)
                 h
-                ( List.nth blocks (Int32.to_int level - distance)
-                |> WithExceptions.Option.get ~loc:__LOC__ )
+                (List.nth blocks (Int32.to_int level - distance)
+                |> WithExceptions.Option.get ~loc:__LOC__)
                   .hash ;
               return_unit)
         (0 -- (Int32.to_int level - 1)))
@@ -170,8 +160,7 @@ let test_storing_and_access_predecessors block_store =
   >>=? fun () -> return_unit
 
 let make_raw_block_list_with_lafl pred size ~lafl =
-  make_raw_block_list ~kind:`Full pred size
-  >>= fun (chunk, head) ->
+  make_raw_block_list ~kind:`Full pred size >>= fun (chunk, head) ->
   let change_lafl block =
     let metadata =
       WithExceptions.Option.to_exn ~none:Not_found block.Block_repr.metadata
@@ -217,8 +206,7 @@ let test_simple_merge block_store =
     Block_repr.metadata head |> WithExceptions.Option.get ~loc:__LOC__
   in
   let all_blocks = List.concat cycles in
-  List.iter_es (Block_store.store_block block_store) all_blocks
-  >>=? fun () ->
+  List.iter_es (Block_store.store_block block_store) all_blocks >>=? fun () ->
   Block_store.merge_stores
     block_store
     ~on_error:(fun err ->
@@ -229,8 +217,7 @@ let test_simple_merge block_store =
     ~new_head_metadata:head_metadata
     ~cementing_highwatermark:0l
   >>=? fun () ->
-  Block_store.await_merging block_store
-  >>= fun () ->
+  Block_store.await_merging block_store >>= fun () ->
   assert_cemented_bound
     block_store
     (0l, Block_repr.last_allowed_fork_level head_metadata) ;
@@ -244,8 +231,7 @@ let test_consecutive_concurrent_merges block_store =
     Block_repr.metadata head |> WithExceptions.Option.get ~loc:__LOC__
   in
   let all_blocks = List.concat cycles in
-  List.iter_es (Block_store.store_block block_store) all_blocks
-  >>=? fun () ->
+  List.iter_es (Block_store.store_block block_store) all_blocks >>=? fun () ->
   let cycles_to_merge =
     List.fold_left
       (fun (acc, pred_cycle_lafl) cycle ->
@@ -281,17 +267,13 @@ let test_consecutive_concurrent_merges block_store =
       ~cementing_highwatermark:previous_cycle_lafl
   in
   let threads = List.map merge_cycle cycles_to_merge in
-  Lwt.all threads
-  >>= fun res ->
+  Lwt.all threads >>= fun res ->
   List.iter
     (function
-      | Ok () ->
-          ()
-      | Error err ->
-          Assert.fail_msg "merging failed: %a" pp_print_error err)
+      | Ok () -> ()
+      | Error err -> Assert.fail_msg "merging failed: %a" pp_print_error err)
     res ;
-  Block_store.await_merging block_store
-  >>= fun () ->
+  Block_store.await_merging block_store >>= fun () ->
   assert_presence_in_block_store ~with_metadata:true block_store all_blocks
   >>=? fun () ->
   assert_cemented_bound
@@ -304,8 +286,7 @@ let test_ten_cycles_merge block_store =
   make_n_initial_consecutive_cycles block_store ~cycle_length:100 ~nb_cycles:10
   >>= fun (cycles, head) ->
   let all_blocks = List.concat cycles in
-  List.iter_es (Block_store.store_block block_store) all_blocks
-  >>=? fun () ->
+  List.iter_es (Block_store.store_block block_store) all_blocks >>=? fun () ->
   Block_store.merge_stores
     block_store
     ~on_error:(fun err ->
@@ -314,8 +295,8 @@ let test_ten_cycles_merge block_store =
     ~history_mode:Archive
     ~new_head:head
     ~new_head_metadata:
-      ( head |> Block_repr.metadata
-      |> WithExceptions.Option.to_exn ~none:Not_found )
+      (head |> Block_repr.metadata
+      |> WithExceptions.Option.to_exn ~none:Not_found)
     ~cementing_highwatermark:0l
   >>=? fun () ->
   assert_presence_in_block_store ~with_metadata:true block_store all_blocks
@@ -331,8 +312,7 @@ let test_merge_with_branches block_store =
   make_n_initial_consecutive_cycles block_store ~cycle_length:100 ~nb_cycles:2
   >>= fun (cycles, head) ->
   let all_blocks = List.concat cycles in
-  List.iter_es (Block_store.store_block block_store) all_blocks
-  >>=? fun () ->
+  List.iter_es (Block_store.store_block block_store) all_blocks >>=? fun () ->
   let branches_fork_points_to_gc = [20; 40; 60; 80; 98] in
   (* 448 => we also keep the checkpoint *)
   List.map_es
@@ -356,8 +336,8 @@ let test_merge_with_branches block_store =
                   {metadata with Block_repr.last_allowed_fork_level = 99l})
                 block.metadata)
         blocks ;
-      List.iter_es (Block_store.store_block block_store) blocks
-      >>=? fun () -> return blocks)
+      List.iter_es (Block_store.store_block block_store) blocks >>=? fun () ->
+      return blocks)
     branches_fork_points_to_gc
   >>=? fun blocks_to_gc ->
   let branches_fork_points_to_keep = [120; 140; 160; 180] in
@@ -382,8 +362,8 @@ let test_merge_with_branches block_store =
                   {metadata with Block_repr.last_allowed_fork_level = 199l})
                 block.metadata)
         blocks ;
-      List.iter_es (Block_store.store_block block_store) blocks
-      >>=? fun () -> return blocks)
+      List.iter_es (Block_store.store_block block_store) blocks >>=? fun () ->
+      return blocks)
     branches_fork_points_to_keep
   >>=? fun blocks_to_keep ->
   (* merge 1st cycle *)
@@ -395,12 +375,11 @@ let test_merge_with_branches block_store =
     ~history_mode:Archive
     ~new_head:head
     ~new_head_metadata:
-      ( head |> Block_repr.metadata
-      |> WithExceptions.Option.to_exn ~none:Not_found )
+      (head |> Block_repr.metadata
+      |> WithExceptions.Option.to_exn ~none:Not_found)
     ~cementing_highwatermark:0l
   >>=? fun () ->
-  Block_store.await_merging block_store
-  >>= fun () ->
+  Block_store.await_merging block_store >>= fun () ->
   assert_presence_in_block_store
     block_store
     (all_blocks @ List.flatten blocks_to_keep)
@@ -412,8 +391,7 @@ let perform_n_cycles_merge ?(cycle_length = 10) block_store history_mode
   make_n_initial_consecutive_cycles block_store ~cycle_length ~nb_cycles
   >>= fun (cycles, head) ->
   let all_blocks = List.concat cycles in
-  List.iter_es (Block_store.store_block block_store) all_blocks
-  >>=? fun () ->
+  List.iter_es (Block_store.store_block block_store) all_blocks >>=? fun () ->
   assert_presence_in_block_store ~with_metadata:true block_store all_blocks
   >>=? fun () ->
   Block_store.merge_stores
@@ -424,25 +402,22 @@ let perform_n_cycles_merge ?(cycle_length = 10) block_store history_mode
     ~history_mode
     ~new_head:head
     ~new_head_metadata:
-      ( head |> Block_repr.metadata
-      |> WithExceptions.Option.to_exn ~none:Not_found )
+      (head |> Block_repr.metadata
+      |> WithExceptions.Option.to_exn ~none:Not_found)
     ~cementing_highwatermark:0l
   >>=? fun () ->
   Block_store.await_merging block_store >>= fun () -> return cycles
 
 let test_archive_merge block_store =
-  perform_n_cycles_merge block_store Archive 10
-  >>=? fun cycles ->
+  perform_n_cycles_merge block_store Archive 10 >>=? fun cycles ->
   assert_presence_in_block_store
     ~with_metadata:true
     block_store
     (List.concat cycles)
   >>=? fun () ->
-  Block_store.savepoint block_store
-  >>= fun savepoint ->
+  Block_store.savepoint block_store >>= fun savepoint ->
   Assert.equal ~prn:Int32.to_string ~msg:"savepoint" 0l (snd savepoint) ;
-  Block_store.caboose block_store
-  >>= fun caboose ->
+  Block_store.caboose block_store >>= fun caboose ->
   Assert.equal ~prn:Int32.to_string ~msg:"caboose" 0l (snd caboose) ;
   return_unit
 
@@ -451,11 +426,7 @@ let test_full_0_merge block_store =
      retaining them *)
   let cycle_length = 20 in
   let nb_cycles = 10 in
-  perform_n_cycles_merge
-    ~cycle_length
-    block_store
-    (Full {offset = 0})
-    nb_cycles
+  perform_n_cycles_merge ~cycle_length block_store (Full {offset = 0}) nb_cycles
   >>=? fun cycles ->
   let all_blocks = List.concat cycles in
   assert_presence_in_block_store
@@ -482,15 +453,13 @@ let test_full_0_merge block_store =
   >>=? fun () ->
   assert_pruned_blocks_in_block_store block_store expected_pruned_blocks
   >>=? fun () ->
-  Block_store.savepoint block_store
-  >>= fun savepoint ->
+  Block_store.savepoint block_store >>= fun savepoint ->
   Assert.equal
     ~prn:Int32.to_string
     ~msg:"savepoint"
     (Int32.of_int expected_savepoint_level)
     (snd savepoint) ;
-  Block_store.caboose block_store
-  >>= fun caboose ->
+  Block_store.caboose block_store >>= fun caboose ->
   Assert.equal ~prn:Int32.to_string ~msg:"caboose" 0l (snd caboose) ;
   return_unit
 
@@ -518,8 +487,7 @@ let test_full_2_merge block_store =
   (* First 7 cycles shouldn't have metadata *)
   assert_pruned_blocks_in_block_store block_store expected_pruned_blocks
   >>=? fun () ->
-  Block_store.savepoint block_store
-  >>= fun savepoint ->
+  Block_store.savepoint block_store >>= fun savepoint ->
   let expected_savepoint =
     List.nth cycles (10 - 3)
     |> WithExceptions.Option.get ~loc:__LOC__
@@ -532,8 +500,7 @@ let test_full_2_merge block_store =
     ~msg:"savepoint"
     expected_savepoint
     (snd savepoint) ;
-  Block_store.caboose block_store
-  >>= fun caboose ->
+  Block_store.caboose block_store >>= fun caboose ->
   Assert.equal ~prn:Int32.to_string ~msg:"caboose" 0l (snd caboose) ;
   return_unit
 
@@ -567,15 +534,13 @@ let test_rolling_0_merge block_store =
     block_store
     expected_preserved_blocks
   >>=? fun () ->
-  Block_store.savepoint block_store
-  >>= fun savepoint ->
+  Block_store.savepoint block_store >>= fun savepoint ->
   Assert.equal
     ~prn:Int32.to_string
     ~msg:"savepoint"
     (Int32.of_int expected_savepoint_level)
     (snd savepoint) ;
-  Block_store.caboose block_store
-  >>= fun caboose ->
+  Block_store.caboose block_store >>= fun caboose ->
   Assert.equal
     ~prn:Int32.to_string
     ~msg:"caboose"
@@ -601,8 +566,7 @@ let test_rolling_2_merge block_store =
   (* First 7 cycles shouldn't have metadata *)
   assert_absence_in_block_store block_store expected_pruned_blocks
   >>=? fun () ->
-  Block_store.savepoint block_store
-  >>= fun savepoint ->
+  Block_store.savepoint block_store >>= fun savepoint ->
   let expected_savepoint =
     List.nth cycles (10 - 3)
     |> WithExceptions.Option.get ~loc:__LOC__
@@ -615,8 +579,7 @@ let test_rolling_2_merge block_store =
     ~msg:"savepoint"
     expected_savepoint
     (snd savepoint) ;
-  Block_store.caboose block_store
-  >>= fun caboose ->
+  Block_store.caboose block_store >>= fun caboose ->
   Assert.equal
     ~prn:Int32.to_string
     ~msg:"caboose"
@@ -633,10 +596,8 @@ let wrap_test ?(keep_dir = false) (name, g) =
     in
     let store_dir = Naming.store_dir ~dir_path in
     let chain_dir = Naming.chain_dir store_dir Chain_id.zero in
-    Lwt_utils_unix.create_dir (Naming.dir_path chain_dir)
-    >>= fun () ->
-    Block_store.create chain_dir ~genesis_block
-    >>= function
+    Lwt_utils_unix.create_dir (Naming.dir_path chain_dir) >>= fun () ->
+    Block_store.create chain_dir ~genesis_block >>= function
     | Error err ->
         Format.printf
           "@\nCannot instanciate block store:@\n%a@."
@@ -648,14 +609,13 @@ let wrap_test ?(keep_dir = false) (name, g) =
           (fun () -> protect (fun () -> g block_store))
           (fun () -> Block_store.close block_store)
         >>= function
-        | Ok () ->
-            Lwt.return_unit
+        | Ok () -> Lwt.return_unit
         | Error err ->
             Format.printf
               "@\nTest failed:@\n%a@."
               Error_monad.pp_print_error
               err ;
-            Lwt.fail Alcotest.Test_error )
+            Lwt.fail Alcotest.Test_error)
   in
   let run _ _ =
     let prefix_dir = "tezos_block_store_test_" in
@@ -663,8 +623,8 @@ let wrap_test ?(keep_dir = false) (name, g) =
     else
       let base_dir = Filename.temp_file prefix_dir "" in
       Format.printf "temp dir: %s@." base_dir ;
-      Lwt_unix.unlink base_dir
-      >>= fun () -> Lwt_unix.mkdir base_dir 0o700 >>= fun () -> f base_dir
+      Lwt_unix.unlink base_dir >>= fun () ->
+      Lwt_unix.mkdir base_dir 0o700 >>= fun () -> f base_dir
   in
   Alcotest_lwt.test_case name `Quick run
 
@@ -672,7 +632,8 @@ let tests : string * unit Alcotest_lwt.test_case list =
   let test_cases =
     List.map
       wrap_test
-      [ ( "block storing and access predecessors (hash only)",
+      [
+        ( "block storing and access predecessors (hash only)",
           test_storing_and_access_predecessors );
         ("simple merge", test_simple_merge);
         ("consecutive & concurrent merge", test_consecutive_concurrent_merges);
@@ -682,6 +643,7 @@ let tests : string * unit Alcotest_lwt.test_case list =
         ("consecutive merge (Full + 0 cycles)", test_full_0_merge);
         ("consecutive merge (Full + 2 cycles)", test_full_2_merge);
         ("consecutive merge (Rolling + 0 cycles)", test_rolling_0_merge);
-        ("consecutive merge (Rolling + 2 cycles)", test_rolling_2_merge) ]
+        ("consecutive merge (Rolling + 2 cycles)", test_rolling_2_merge);
+      ]
   in
   ("block store", test_cases)

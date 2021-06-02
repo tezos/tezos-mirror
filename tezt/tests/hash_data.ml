@@ -61,7 +61,8 @@ let test_good_hash_data ~protocols =
   let data_n_type =
     let min_int64 = Int64.to_string Int64.min_int in
     let max_int64 = Int64.to_string Int64.max_int in
-    [ (* ints *)
+    [
+      (* ints *)
       (min_int64 ^ max_int64, "int");
       (min_int64, "int");
       (Int.to_string Int.min_int, "int");
@@ -134,7 +135,8 @@ let test_good_hash_data ~protocols =
       ("\"foo\"", "string");
       ("\"2019-09-26T10:59:51Z\"", "timestamp");
       ("1571659294", "timestamp");
-      ("Unit", "unit") ]
+      ("Unit", "unit");
+    ]
   in
   let hash_data (data, typ) =
     let* _ = Client.hash_data ~hooks ~data ~typ client in
@@ -155,12 +157,13 @@ let test_bad_hash_data ~protocols =
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =
-    [ ("True", "int");
+    [
+      ("True", "int");
       ("{}", "big_map nat bytes");
       ("{ Elt 0 0xCB ; Elt 1 0xAB }", "big_map nat bytes");
       ("{}", "sapling_state 8");
       ("Pair \"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq\" 0x01 42", "ticket bytes");
-      ("Pair \"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq\" Unit 42", "ticket unit")
+      ("Pair \"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq\" Unit 42", "ticket unit");
     ]
   in
   let hash_data (data, typ) =

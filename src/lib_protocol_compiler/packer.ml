@@ -33,11 +33,12 @@ let dump_file oc file =
       Printf.fprintf
         oc
         "%s"
-        ( if len = buflen then Bytes.unsafe_to_string buf
-        else Bytes.sub_string buf 0 len ) ;
-      loop () )
+        (if len = buflen then Bytes.unsafe_to_string buf
+        else Bytes.sub_string buf 0 len) ;
+      loop ())
   in
-  loop () ; close_in ic
+  loop () ;
+  close_in ic
 
 (** Check that each individual file is valid OCaml and does not use
     ["external"]. *)
@@ -65,13 +66,13 @@ let check_syntax kind file =
                 default_iterator.structure_item iterator struct_item);
       }
   in
-  ( match kind with
+  (match kind with
   | `Implementation ->
       let impl = Parse.implementation lexbuf in
       iterator.structure iterator impl
   | `Interface ->
       let intf = Parse.interface lexbuf in
-      iterator.signature iterator intf ) ;
+      iterator.signature iterator intf) ;
   close_in ic
 
 let include_ml oc file =
@@ -81,8 +82,7 @@ let include_ml oc file =
   let () =
     String.iter
       (function
-        | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' ->
-            ()
+        | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' -> ()
         | other ->
             Format.kasprintf
               Stdlib.failwith
@@ -98,7 +98,7 @@ let include_ml oc file =
     Printf.fprintf oc ": sig\n" ;
     Printf.fprintf oc "# 1 %S\n" mli ;
     dump_file oc mli ;
-    Printf.fprintf oc "end " ) ;
+    Printf.fprintf oc "end ") ;
   Printf.fprintf oc "= struct\n" ;
   Printf.fprintf oc "# 1 %S\n" file ;
   check_syntax `Implementation file ;

@@ -77,7 +77,8 @@ module Fitness = struct
 
   let int64_to_bytes i =
     let b = Bytes.make 8 '0' in
-    TzEndian.set_int64 b 0 i ; b
+    TzEndian.set_int64 b 0 i ;
+    b
 
   let int64_of_bytes b =
     if Compare.Int.(Bytes.length b <> 8) then fail Invalid_fitness2
@@ -86,24 +87,20 @@ module Fitness = struct
   let from_int64 fitness = [int64_to_bytes fitness]
 
   let to_int64 = function
-    | [fitness] ->
-        int64_of_bytes fitness
-    | [] ->
-        return 0L
-    | _ ->
-        fail Invalid_fitness
+    | [fitness] -> int64_of_bytes fitness
+    | [] -> return 0L
+    | _ -> fail Invalid_fitness
 
   let get {fitness} = fitness
 end
 
 let begin_application ~chain_id:_ ~predecessor_context:context
-    ~predecessor_timestamp:_ ~predecessor_fitness:_ (raw_block : block_header)
-    =
-  Fitness.to_int64 raw_block.shell.fitness
-  >>=? fun fitness -> return {context; fitness}
+    ~predecessor_timestamp:_ ~predecessor_fitness:_ (raw_block : block_header) =
+  Fitness.to_int64 raw_block.shell.fitness >>=? fun fitness ->
+  return {context; fitness}
 
-let begin_partial_application ~chain_id ~ancestor_context
-    ~predecessor_timestamp ~predecessor_fitness raw_block =
+let begin_partial_application ~chain_id ~ancestor_context ~predecessor_timestamp
+    ~predecessor_fitness raw_block =
   begin_application
     ~chain_id
     ~predecessor_context:ancestor_context
@@ -115,8 +112,7 @@ let begin_construction ~chain_id:_ ~predecessor_context:context
     ~predecessor_timestamp:_ ~predecessor_level:_
     ~predecessor_fitness:pred_fitness ~predecessor:_ ~timestamp:_
     ?protocol_data:_ () =
-  Fitness.to_int64 pred_fitness
-  >>=? fun pred_fitness ->
+  Fitness.to_int64 pred_fitness >>=? fun pred_fitness ->
   let fitness = Int64.succ pred_fitness in
   return {context; fitness}
 

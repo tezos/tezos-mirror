@@ -55,8 +55,8 @@ module TestIter = struct
           (let acc = ref init in
            Option.iter_e (IterEOf.fn acc fn) input >|? fun () -> !acc)
           (let acc = ref init in
-           List.iter_e (IterEOf.fn acc fn) (Option.to_list input)
-           >|? fun () -> !acc))
+           List.iter_e (IterEOf.fn acc fn) (Option.to_list input) >|? fun () ->
+           !acc))
 
   let iter_s =
     Test.make
@@ -67,8 +67,8 @@ module TestIter = struct
           (let acc = ref init in
            Option.iter_s (IterSOf.fn acc fn) input >|= fun () -> !acc)
           (let acc = ref init in
-           List.iter_s (IterSOf.fn acc fn) (Option.to_list input)
-           >|= fun () -> !acc))
+           List.iter_s (IterSOf.fn acc fn) (Option.to_list input) >|= fun () ->
+           !acc))
 
   let iter_es =
     Test.make
@@ -106,8 +106,8 @@ module TestFilter = struct
       (fun (fn, const, input) ->
         eq_e
           (Option.filter_e (CondEOf.fn fn const) input)
-          ( List.filter_e (CondEOf.fn fn const) (Option.to_list input)
-          >|? List.hd ))
+          (List.filter_e (CondEOf.fn fn const) (Option.to_list input)
+          >|? List.hd))
 
   let filter_s =
     Test.make
@@ -116,8 +116,8 @@ module TestFilter = struct
       (fun (fn, const, input) ->
         eq_s
           (Option.filter_s (CondSOf.fn fn const) input)
-          ( List.filter_s (CondSOf.fn fn const) (Option.to_list input)
-          >|= List.hd ))
+          (List.filter_s (CondSOf.fn fn const) (Option.to_list input)
+          >|= List.hd))
 
   let filter_es =
     Test.make
@@ -126,8 +126,8 @@ module TestFilter = struct
       (fun (fn, const, input) ->
         eq_es
           (Option.filter_es (CondESOf.fn fn const) input)
-          ( List.filter_es (CondESOf.fn fn const) (Option.to_list input)
-          >|=? List.hd ))
+          (List.filter_es (CondESOf.fn fn const) (Option.to_list input)
+          >|=? List.hd))
 
   let tests = [filter; filter_e; filter_s; filter_es]
 end
@@ -148,10 +148,10 @@ module TestFilterMap = struct
       (fun (pred, Fun (_, arith), const, input) ->
         eq
           (Option.filter_map (FilterMapOf.fns pred arith const) input)
-          ( List.filter_map
-              (FilterMapOf.fns pred arith const)
-              (Option.to_list input)
-          |> List.hd ))
+          (List.filter_map
+             (FilterMapOf.fns pred arith const)
+             (Option.to_list input)
+          |> List.hd))
 
   let filter_map_e =
     Test.make
@@ -164,10 +164,10 @@ module TestFilterMap = struct
       (fun (pred, Fun (_, arith), const, input) ->
         eq_e
           (Option.filter_map_e (FilterMapEOf.fns pred arith const) input)
-          ( List.filter_map_e
-              (FilterMapEOf.fns pred arith const)
-              (Option.to_list input)
-          >|? List.hd ))
+          (List.filter_map_e
+             (FilterMapEOf.fns pred arith const)
+             (Option.to_list input)
+          >|? List.hd))
 
   let filter_map_s =
     Test.make
@@ -180,10 +180,10 @@ module TestFilterMap = struct
       (fun (pred, Fun (_, arith), const, input) ->
         eq_s
           (Option.filter_map_s (FilterMapSOf.fns pred arith const) input)
-          ( List.filter_map_s
-              (FilterMapSOf.fns pred arith const)
-              (Option.to_list input)
-          >|= List.hd ))
+          (List.filter_map_s
+             (FilterMapSOf.fns pred arith const)
+             (Option.to_list input)
+          >|= List.hd))
 
   let filter_map_es =
     Test.make
@@ -196,10 +196,10 @@ module TestFilterMap = struct
       (fun (pred, Fun (_, arith), const, input) ->
         eq_es
           (Option.filter_map_es (FilterMapESOf.fns pred arith const) input)
-          ( List.filter_map_es
-              (FilterMapESOf.fns pred arith const)
-              (Option.to_list input)
-          >|=? List.hd ))
+          (List.filter_map_es
+             (FilterMapESOf.fns pred arith const)
+             (Option.to_list input)
+          >|=? List.hd))
 
   let tests = [filter_map; filter_map_e; filter_map_s; filter_map_es]
 end
@@ -243,17 +243,18 @@ module TestMap = struct
       (fun (Fun (_, fn), const, input) ->
         eq
           (Option.map_es (MapESOf.fn const fn) input)
-          ( List.map_es (MapESOf.fn const fn) (Option.to_list input)
-          >|=? List.hd ))
+          (List.map_es (MapESOf.fn const fn) (Option.to_list input) >|=? List.hd))
 
   let tests = [map; map_e; map_s; map_es]
 end
 
 let () =
   let tests =
-    [ ("iter*", Lib_test.Qcheck_helpers.qcheck_wrap TestIter.tests);
+    [
+      ("iter*", Lib_test.Qcheck_helpers.qcheck_wrap TestIter.tests);
       ("filter*", Lib_test.Qcheck_helpers.qcheck_wrap TestFilter.tests);
       ("filter_map*", Lib_test.Qcheck_helpers.qcheck_wrap TestFilterMap.tests);
-      ("map*", Lib_test.Qcheck_helpers.qcheck_wrap TestIter.tests) ]
+      ("map*", Lib_test.Qcheck_helpers.qcheck_wrap TestIter.tests);
+    ]
   in
   Alcotest.run "Option" tests

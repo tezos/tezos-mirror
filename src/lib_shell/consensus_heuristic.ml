@@ -54,11 +54,11 @@ let create (type a) ?(compare = compare) ~expected ~threshold () =
   (* We store the result of the functor application so that we don't
      do it at every call of `get_state`. *)
   let (values_map_module : (module Map.S with type key = a)) =
-    ( module Map.Make (struct
+    (module Map.Make (struct
       type t = a
 
       let compare = compare
-    end) )
+    end))
   in
   {
     expected;
@@ -87,8 +87,7 @@ let get_state (type a) (t : a t) =
         if P2p_peer_id.Table.length t.candidates < t.expected then
           Need_more_candidates
         else No_consensus (Map.bindings map)
-    | Error value ->
-        Consensus value
+    | Error value -> Consensus value
 
 module Worker = struct
   type 'a t = {
@@ -111,7 +110,7 @@ module Worker = struct
          heuristic. *)
     mutable next_consensus_hooks : ('a -> unit) list;
         (* Hooks to be executed for the next consensus value found by the
-       heuristic. *)
+           heuristic. *)
   }
 
   let create ~expire_time ~job ~restart_delay =
@@ -134,14 +133,13 @@ module Worker = struct
        [Need_more_candidates] for example, we will rerun the
        [loop]. To provent this, we wrap [t.job] as a cancelable
        promise. *)
-    Lwt.wrap_in_cancelable (t.job ())
-    >>= function
+    Lwt.wrap_in_cancelable (t.job ()) >>= function
     | Need_more_candidates | No_consensus _ ->
         Systime_os.sleep t.restart_delay >>= fun () -> loop t ()
     | Consensus data ->
         t.expired <- Systime_os.sleep t.expire_time ;
         (* We call [List.rev] to ensure hooks are called in the same
-          order they were registered. *)
+           order they were registered. *)
         let one_shot_hooks = List.rev t.next_consensus_hooks in
         t.next_consensus_hooks <- [] ;
         let forever_hooks = List.rev t.all_consensus_hooks in
@@ -154,17 +152,15 @@ module Worker = struct
        ([Lwt.Sleep]).  [t]'s result is expired if its [expired]
        promise is resolved ([Lwt.Return]). We start/restart the job if
        the current [result] has expired meaning the [result] promise
-       is not pending.  *)
+       is not pending. *)
     if Lwt.state t.result <> Lwt.Sleep && Lwt.state t.expired = Lwt.Return ()
     then t.result <- loop t () ;
     Lwt.protected t.result
 
   let on_next_consensus t hook =
     match Lwt.state t.result with
-    | Lwt.Return data ->
-        hook data
-    | _ ->
-        t.next_consensus_hooks <- hook :: t.next_consensus_hooks
+    | Lwt.Return data -> hook data
+    | _ -> t.next_consensus_hooks <- hook :: t.next_consensus_hooks
 
   let on_all_consensus t hook =
     t.all_consensus_hooks <- hook :: t.all_consensus_hooks ;

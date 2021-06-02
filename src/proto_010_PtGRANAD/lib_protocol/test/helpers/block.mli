@@ -170,10 +170,10 @@ val bake_n_with_origination_results :
   ?policy:baker_policy ->
   int ->
   t ->
-  ( block
+  (block
   * Alpha_context.Kind.origination
     Apply_results.successful_manager_operation_result
-    list )
+    list)
   tzresult
   Lwt.t
 

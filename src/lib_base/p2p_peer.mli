@@ -83,11 +83,7 @@ module Pool_event : sig
     | External_disconnection
         (** The connection was closed for external reason. *)
 
-  type t = {
-    kind : kind;
-    timestamp : Time.System.t;
-    point : P2p_connection.Id.t;
-  }
+  type t = {kind : kind; timestamp : Time.System.t; point : P2p_connection.Id.t}
 
   val encoding : t Data_encoding.t
 end

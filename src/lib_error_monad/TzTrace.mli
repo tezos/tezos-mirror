@@ -29,5 +29,4 @@
     It is implemented as a concrete [error list] for backwards compatibility
     but future improvements might modify the type or render the type
     abstract. *)
-include
-  Sig.TRACE with type 'err trace = 'err list
+include Sig.TRACE with type 'err trace = 'err list

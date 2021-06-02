@@ -44,72 +44,68 @@ let cons item t () = Lwt.return (Cons (item, t))
 let cons_s item t () = item >|= fun item -> Cons (item, t)
 
 let rec append ta tb () =
-  ta ()
-  >>= function
-  | Nil -> tb () | Cons (item, ta) -> Lwt.return (Cons (item, append ta tb))
+  ta () >>= function
+  | Nil -> tb ()
+  | Cons (item, ta) -> Lwt.return (Cons (item, append ta tb))
 
 let first s = s () >|= function Nil -> None | Cons (x, _) -> Some x
 
 let rec fold_left f acc seq =
-  seq ()
-  >>= function
-  | Nil -> Lwt.return acc | Cons (item, seq) -> fold_left f (f acc item) seq
+  seq () >>= function
+  | Nil -> Lwt.return acc
+  | Cons (item, seq) -> fold_left f (f acc item) seq
 
 let fold_left f acc seq = fold_left f acc @@ protect seq
 
 let rec fold_left_e f acc seq =
-  seq ()
-  >>= function
-  | Nil ->
-      Monad.return acc
+  seq () >>= function
+  | Nil -> Monad.return acc
   | Cons (item, seq) ->
       Result.bind_s (f acc item) (fun acc -> fold_left_e f acc seq)
 
 let fold_left_e f acc seq = fold_left_e f acc @@ protect seq
 
 let rec fold_left_s f acc seq =
-  seq ()
-  >>= function
-  | Nil ->
-      Lwt.return acc
-  | Cons (item, seq) ->
-      f acc item >>= fun acc -> fold_left_s f acc seq
+  seq () >>= function
+  | Nil -> Lwt.return acc
+  | Cons (item, seq) -> f acc item >>= fun acc -> fold_left_s f acc seq
 
 let fold_left_s f acc seq = fold_left_s f acc @@ protect seq
 
 let rec fold_left_es f acc seq =
-  seq ()
-  >>= function
-  | Nil ->
-      Monad.return acc
-  | Cons (item, seq) ->
-      f acc item >>=? fun acc -> fold_left_es f acc seq
+  seq () >>= function
+  | Nil -> Monad.return acc
+  | Cons (item, seq) -> f acc item >>=? fun acc -> fold_left_es f acc seq
 
 let fold_left_es f acc seq = fold_left_es f acc @@ protect seq
 
 let rec iter f seq =
-  seq () >>= function Nil -> unit_s | Cons (item, seq) -> f item ; iter f seq
+  seq () >>= function
+  | Nil -> unit_s
+  | Cons (item, seq) ->
+      f item ;
+      iter f seq
 
 let iter f seq = iter f @@ protect seq
 
 let rec iter_e f seq =
-  seq ()
-  >>= function
-  | Nil -> unit_es | Cons (item, seq) -> f item >>?= fun () -> iter_e f seq
+  seq () >>= function
+  | Nil -> unit_es
+  | Cons (item, seq) -> f item >>?= fun () -> iter_e f seq
 
 let iter_e f seq = iter_e f @@ protect seq
 
 let rec iter_s f seq =
-  seq ()
-  >>= function
-  | Nil -> unit_s | Cons (item, seq) -> f item >>= fun () -> iter_s f seq
+  seq () >>= function
+  | Nil -> unit_s
+  | Cons (item, seq) -> f item >>= fun () -> iter_s f seq
 
 let iter_s f seq = iter_s f @@ protect seq
 
 let rec iter_es f seq =
-  seq ()
-  >>= function
-  | Nil -> unit_es | Cons (item, seq) -> f item >>=? fun () -> iter_es f seq
+  seq () >>= function
+  | Nil -> unit_es
+  | Cons (item, seq) -> f item >>=? fun () -> iter_es f seq
 
 let iter_es f seq = iter_es f @@ protect seq
 
@@ -120,97 +116,71 @@ let iter_p f seq =
   fold_left (fun acc item -> Lwt.apply f item :: acc) [] seq >>= join_p
 
 let rec map f seq () =
-  seq ()
-  >|= function Nil -> Nil | Cons (item, seq) -> Cons (f item, map f seq)
+  seq () >|= function Nil -> Nil | Cons (item, seq) -> Cons (f item, map f seq)
 
 let map f seq = map f @@ protect seq
 
 let rec map_s f seq () =
-  seq ()
-  >>= function
-  | Nil ->
-      nil_s
-  | Cons (item, seq) ->
-      f item >|= fun item -> Cons (item, map_s f seq)
+  seq () >>= function
+  | Nil -> nil_s
+  | Cons (item, seq) -> f item >|= fun item -> Cons (item, map_s f seq)
 
 let map_s f seq = map_s f @@ protect seq
 
 let rec filter f seq () =
-  seq ()
-  >>= function
-  | Nil ->
-      nil_s
+  seq () >>= function
+  | Nil -> nil_s
   | Cons (item, seq) ->
       if f item then Lwt.return (Cons (item, seq)) else filter f seq ()
 
 let filter f seq = filter f @@ protect seq
 
 let rec filter_s f seq () =
-  seq ()
-  >>= function
-  | Nil ->
-      nil_s
+  seq () >>= function
+  | Nil -> nil_s
   | Cons (item, seq) -> (
-      f item
-      >>= function
-      | true ->
-          Lwt.return (Cons (item, filter_s f seq))
-      | false ->
-          filter_s f seq () )
+      f item >>= function
+      | true -> Lwt.return (Cons (item, filter_s f seq))
+      | false -> filter_s f seq ())
 
 let filter_s f seq = filter_s f @@ protect seq
 
 let rec filter_map f seq () =
-  seq ()
-  >>= function
-  | Nil ->
-      nil_s
+  seq () >>= function
+  | Nil -> nil_s
   | Cons (item, seq) -> (
-    match f item with
-    | None ->
-        filter_map f seq ()
-    | Some item ->
-        Lwt.return (Cons (item, filter_map f seq)) )
+      match f item with
+      | None -> filter_map f seq ()
+      | Some item -> Lwt.return (Cons (item, filter_map f seq)))
 
 let filter_map f seq = filter_map f @@ protect seq
 
 let rec filter_map_s f seq () =
-  seq ()
-  >>= function
-  | Nil ->
-      nil_s
+  seq () >>= function
+  | Nil -> nil_s
   | Cons (item, seq) -> (
-      f item
-      >>= function
-      | None ->
-          filter_map_s f seq ()
-      | Some item ->
-          Lwt.return (Cons (item, filter_map_s f seq)) )
+      f item >>= function
+      | None -> filter_map_s f seq ()
+      | Some item -> Lwt.return (Cons (item, filter_map_s f seq)))
 
 let filter_map_s f seq = filter_map_s f @@ protect seq
 
 let rec unfold f a () =
   match f a with
-  | None ->
-      nil_s
-  | Some (item, a) ->
-      Lwt.return (Cons (item, unfold f a))
+  | None -> nil_s
+  | Some (item, a) -> Lwt.return (Cons (item, unfold f a))
 
 let rec unfold_s f a () =
-  f a
-  >>= function
-  | None -> nil_s | Some (item, a) -> Lwt.return (Cons (item, unfold_s f a))
+  f a >>= function
+  | None -> nil_s
+  | Some (item, a) -> Lwt.return (Cons (item, unfold_s f a))
 
 let rec of_seq seq () =
   match seq () with
-  | Stdlib.Seq.Nil ->
-      nil_s
-  | Stdlib.Seq.Cons (e, seq) ->
-      Lwt.return (Cons (e, of_seq seq))
+  | Stdlib.Seq.Nil -> nil_s
+  | Stdlib.Seq.Cons (e, seq) -> Lwt.return (Cons (e, of_seq seq))
 
 let rec of_seq_s seq () =
   match seq () with
-  | Stdlib.Seq.Nil ->
-      nil_s
-  | Stdlib.Seq.Cons (p, seq) ->
-      p >|= fun e -> Cons (e, of_seq_s seq)
+  | Stdlib.Seq.Nil -> nil_s
+  | Stdlib.Seq.Cons (p, seq) -> p >|= fun e -> Cons (e, of_seq_s seq)

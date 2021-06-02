@@ -51,8 +51,7 @@ type _ annotated_manager_operation_list =
       'kind annotated_manager_operation
       -> 'kind annotated_manager_operation_list
   | Cons_manager :
-      'kind annotated_manager_operation
-      * 'rest annotated_manager_operation_list
+      'kind annotated_manager_operation * 'rest annotated_manager_operation_list
       -> ('kind * 'rest) annotated_manager_operation_list
 
 type packed_annotated_manager_operation_list =

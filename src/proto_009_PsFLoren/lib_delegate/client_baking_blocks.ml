@@ -44,31 +44,29 @@ type block_info = {
 
 let raw_info cctxt ?(chain = `Main) hash shell_header =
   let block = `Hash (hash, 0) in
-  Shell_services.Chain.chain_id cctxt ~chain ()
-  >>=? fun chain_id ->
+  Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
   Shell_services.Blocks.protocols cctxt ~chain ~block ()
   >>=? fun {current_protocol = protocol; next_protocol} ->
-  Shell_services.Blocks.metadata_hash cctxt ~chain ~block ()
-  >>= (function
-        | Ok predecessor_block_metadata_hash ->
-            return_some predecessor_block_metadata_hash
-        | Error _ ->
-            return_none)
+  (Shell_services.Blocks.metadata_hash cctxt ~chain ~block () >>= function
+   | Ok predecessor_block_metadata_hash ->
+       return_some predecessor_block_metadata_hash
+   | Error _ -> return_none)
   >>=? fun predecessor_block_metadata_hash ->
-  Shell_services.Blocks.Operation_metadata_hashes.root cctxt ~chain ~block ()
-  >>= (function
-        | Ok predecessor_operations_metadata_hash ->
-            return_some predecessor_operations_metadata_hash
-        | Error _ ->
-            return_none)
+  (Shell_services.Blocks.Operation_metadata_hashes.root cctxt ~chain ~block ()
+   >>= function
+   | Ok predecessor_operations_metadata_hash ->
+       return_some predecessor_operations_metadata_hash
+   | Error _ -> return_none)
   >>=? fun predecessor_operations_metadata_hash ->
-  let { Tezos_base.Block_header.predecessor;
-        fitness;
-        timestamp;
-        level;
-        context;
-        proto_level;
-        _ } =
+  let {
+    Tezos_base.Block_header.predecessor;
+    fitness;
+    timestamp;
+    level;
+    context;
+    proto_level;
+    _;
+  } =
     shell_header
   in
   match Raw_level.of_int32 level with
@@ -88,12 +86,10 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
           predecessor_block_metadata_hash;
           predecessor_operations_metadata_hash;
         }
-  | Error _ ->
-      failwith "Cannot convert level into int32"
+  | Error _ -> failwith "Cannot convert level into int32"
 
 let info cctxt ?(chain = `Main) block =
-  Shell_services.Blocks.hash cctxt ~chain ~block ()
-  >>=? fun hash ->
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
   >>=? fun shell_header -> raw_info cctxt ~chain hash shell_header
 
@@ -130,7 +126,8 @@ module Block_seen_event = struct
              (req
                 "occurrence"
                 (union
-                   [ case
+                   [
+                     case
                        ~title:"heads"
                        (Tag 0)
                        (obj1 (req "occurrence-kind" (constant "heads")))
@@ -144,7 +141,8 @@ module Block_seen_event = struct
                           (req "chain-id" Chain_id.encoding))
                        (function
                          | `Valid_blocks ch -> Some ((), ch) | _ -> None)
-                       (fun ((), ch) -> `Valid_blocks ch) ]))
+                       (fun ((), ch) -> `Valid_blocks ch);
+                   ]))
              (req "header" Tezos_base.Block_header.encoding))
       in
       With_version.(encoding ~name (first_version v0_encoding))
@@ -166,8 +164,7 @@ let monitor_valid_blocks cctxt ?chains ?protocols ~next_protocols () =
   return
     (Lwt_stream.map_s
        (fun ((chain, block), header) ->
-         Block_seen_event.(
-           Event.emit (make block header (`Valid_blocks chain)))
+         Block_seen_event.(Event.emit (make block header (`Valid_blocks chain)))
          >>=? fun () ->
          raw_info
            cctxt
@@ -182,31 +179,27 @@ let monitor_heads cctxt ~next_protocols chain =
   return
     (Lwt_stream.map_s
        (fun (block, ({Tezos_base.Block_header.shell; _} as header)) ->
-         Block_seen_event.(Event.emit (make block header `Heads))
-         >>=? fun () -> raw_info cctxt ~chain block shell)
+         Block_seen_event.(Event.emit (make block header `Heads)) >>=? fun () ->
+         raw_info cctxt ~chain block shell)
        block_stream)
 
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
-  Shell_services.Blocks.hash cctxt ~chain ~block ()
-  >>=? fun hash ->
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
   >>=? fun {level; _} ->
   Alpha_services.Helpers.levels_in_current_cycle cctxt ~offset (chain, block)
   >>= function
-  | Error (RPC_context.Not_found _ :: _) ->
-      return_nil
-  | Error _ as err ->
-      Lwt.return err
+  | Error (RPC_context.Not_found _ :: _) -> return_nil
+  | Error _ as err -> Lwt.return err
   | Ok (first, last) -> (
       let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in
       Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length ()
       >>=? function
-      | [] ->
-          return_nil
+      | [] -> return_nil
       | hd :: _ ->
           let blocks =
             List.remove (length - Int32.to_int (Raw_level.diff last first)) hd
           in
           if Int32.equal level (Raw_level.to_int32 last) then
             return (hash :: blocks)
-          else return blocks )
+          else return blocks)

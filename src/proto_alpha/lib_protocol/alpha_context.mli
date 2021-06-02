@@ -677,8 +677,7 @@ end
 module Seed : sig
   type seed
 
-  type error +=
-    | Unknown of {oldest : Cycle.t; cycle : Cycle.t; latest : Cycle.t}
+  type error += Unknown of {oldest : Cycle.t; cycle : Cycle.t; latest : Cycle.t}
 
   val for_cycle : context -> Cycle.t -> seed tzresult Lwt.t
 
@@ -838,9 +837,7 @@ module Lazy_storage : sig
   module IdSet : sig
     type t
 
-    type 'acc fold_f = {
-      f : 'i 'a 'u. ('i, 'a, 'u) Kind.t -> 'i -> 'acc -> 'acc;
-    }
+    type 'acc fold_f = {f : 'i 'a 'u. ('i, 'a, 'u) Kind.t -> 'i -> 'acc -> 'acc}
 
     val empty : t
 
@@ -1449,8 +1446,7 @@ module Operation : sig
 
   type error += Invalid_signature (* `Permanent *)
 
-  val check_signature :
-    public_key -> Chain_id.t -> _ operation -> unit tzresult
+  val check_signature : public_key -> Chain_id.t -> _ operation -> unit tzresult
 
   val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
@@ -1478,8 +1474,7 @@ module Operation : sig
 
     val endorsement_with_slot_case : Kind.endorsement_with_slot case
 
-    val double_endorsement_evidence_case :
-      Kind.double_endorsement_evidence case
+    val double_endorsement_evidence_case : Kind.double_endorsement_evidence case
 
     val double_baking_evidence_case : Kind.double_baking_evidence case
 
@@ -1505,8 +1500,7 @@ module Operation : sig
             tag : int;
             name : string;
             encoding : 'a Data_encoding.t;
-            select :
-              packed_manager_operation -> 'kind manager_operation option;
+            select : packed_manager_operation -> 'kind manager_operation option;
             proj : 'kind manager_operation -> 'a;
             inj : 'a -> 'kind manager_operation;
           }
@@ -1546,8 +1540,7 @@ module Roll : sig
 
   val delegate_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
 
-  val count_rolls :
-    context -> Signature.Public_key_hash.t -> int tzresult Lwt.t
+  val count_rolls : context -> Signature.Public_key_hash.t -> int tzresult Lwt.t
 
   val get_change :
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
@@ -1561,8 +1554,7 @@ module Commitment : sig
 
   val encoding : t Data_encoding.t
 
-  val find :
-    context -> Blinded_public_key_hash.t -> Tez.t option tzresult Lwt.t
+  val find : context -> Blinded_public_key_hash.t -> Tez.t option tzresult Lwt.t
 
   val remove_existing :
     context -> Blinded_public_key_hash.t -> context tzresult Lwt.t
@@ -1591,9 +1583,10 @@ end
 
 val prepare_first_block :
   Context.t ->
-  typecheck:(context ->
-            Script.t ->
-            ((Script.t * Lazy_storage.diffs option) * context) tzresult Lwt.t) ->
+  typecheck:
+    (context ->
+    Script.t ->
+    ((Script.t * Lazy_storage.diffs option) * context) tzresult Lwt.t) ->
   level:Int32.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->

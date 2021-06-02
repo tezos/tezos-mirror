@@ -83,8 +83,8 @@ let begin_application ~chain_id:_ ~predecessor_context:context
      not appear in a real protocol. *)
   return {context; fitness}
 
-let begin_partial_application ~chain_id ~ancestor_context
-    ~predecessor_timestamp ~predecessor_fitness block_header =
+let begin_partial_application ~chain_id ~ancestor_context ~predecessor_timestamp
+    ~predecessor_fitness block_header =
   Logging.log_notice "begin_partial_application%!" ;
   begin_application
     ~chain_id
@@ -97,7 +97,8 @@ let version_number = "\001"
 
 let int64_to_bytes i =
   let b = Bytes.make 8 '0' in
-  TzEndian.set_int64 b 0 i ; b
+  TzEndian.set_int64 b 0 i ;
+  b
 
 let fitness_from_level level =
   [Bytes.of_string version_number; int64_to_bytes level]
@@ -106,9 +107,7 @@ let begin_construction ~chain_id:_ ~predecessor_context:context
     ~predecessor_timestamp:_ ~predecessor_level ~predecessor_fitness
     ~predecessor:_ ~timestamp:_ ?protocol_data () =
   let fitness = fitness_from_level Int64.(succ (of_int32 predecessor_level)) in
-  let mode =
-    match protocol_data with Some _ -> "block" | None -> "mempool"
-  in
+  let mode = match protocol_data with Some _ -> "block" | None -> "mempool" in
   Logging.log_notice
     "begin_construction (%s): pred_fitness = %a  constructed fitness = %a%!"
     mode

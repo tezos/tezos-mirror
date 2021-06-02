@@ -55,10 +55,8 @@ let () =
         literal)
     Data_encoding.(obj2 (req "parameter" string) (req "literal" string))
     (function
-      | Bad_tez_arg (parameter, literal) ->
-          Some (parameter, literal)
-      | _ ->
-          None)
+      | Bad_tez_arg (parameter, literal) -> Some (parameter, literal)
+      | _ -> None)
     (fun (parameter, literal) -> Bad_tez_arg (parameter, literal)) ;
   register_error_kind
     `Permanent
@@ -196,8 +194,8 @@ let force_switch =
     ~short:'f'
     ~doc:
       "disables the node's injection checks\n\
-       Force the injection of branch-invalid operation or force  the \
-       injection of block without a fitness greater than the  current head."
+       Force the injection of branch-invalid operation or force  the injection \
+       of block without a fitness greater than the  current head."
     ()
 
 let minimal_timestamp_switch =
@@ -216,10 +214,8 @@ let tez_format =
 let tez_parameter param =
   parameter (fun _ s ->
       match Tez.of_string s with
-      | Some tez ->
-          return tez
-      | None ->
-          fail (Bad_tez_arg (param, s)))
+      | Some tez -> return tez
+      | None -> fail (Bad_tez_arg (param, s)))
 
 let tez_arg ~default ~parameter ~doc =
   default_arg
@@ -344,10 +340,8 @@ let minimal_fees_arg =
     ~default:(Tez.to_string default_minimal_fees)
     (parameter (fun _ s ->
          match Tez.of_string s with
-         | Some t ->
-             return t
-         | None ->
-             fail (Bad_minimal_fees s)))
+         | Some t -> return t
+         | None -> fail (Bad_minimal_fees s)))
 
 let minimal_nanotez_per_gas_unit_arg =
   default_arg
@@ -385,10 +379,8 @@ let fee_cap_arg =
     ~doc:"Set the fee cap"
     (parameter (fun _ s ->
          match Tez.of_string s with
-         | Some t ->
-             return t
-         | None ->
-             failwith "Bad fee cap"))
+         | Some t -> return t
+         | None -> failwith "Bad fee cap"))
 
 let burn_cap_arg =
   default_arg
@@ -398,10 +390,8 @@ let burn_cap_arg =
     ~doc:"Set the burn cap"
     (parameter (fun _ s ->
          match Tez.of_string s with
-         | Some t ->
-             return t
-         | None ->
-             failwith "Bad burn cap"))
+         | Some t -> return t
+         | None -> failwith "Bad burn cap"))
 
 let no_waiting_for_endorsements_arg =
   switch
@@ -427,8 +417,8 @@ let endorsement_delay_arg =
     (parameter (fun _ s ->
          try
            let i = int_of_string s in
-           fail_when (i < 0) (Bad_endorsement_delay s)
-           >>=? fun () -> return (int_of_string s)
+           fail_when (i < 0) (Bad_endorsement_delay s) >>=? fun () ->
+           return (int_of_string s)
          with _ -> fail (Bad_endorsement_delay s)))
 
 let preserved_levels_arg =
@@ -450,8 +440,8 @@ let no_print_source_flag =
     ~short:'q'
     ~doc:
       "don't print the source code\n\
-       If an error is encountered, the client will print the contract's \
-       source code by default.\n\
+       If an error is encountered, the client will print the contract's source \
+       code by default.\n\
        This option disables this behaviour."
     ()
 
@@ -464,10 +454,8 @@ let no_confirmation =
 let signature_parameter =
   parameter (fun _cctxt s ->
       match Signature.of_b58check_opt s with
-      | Some s ->
-          return s
-      | None ->
-          failwith "Not given a valid signature")
+      | Some s -> return s
+      | None -> failwith "Not given a valid signature")
 
 module Daemon = struct
   let baking_switch =
@@ -477,9 +465,5 @@ module Daemon = struct
     switch ~long:"endorsement" ~short:'E' ~doc:"run the endorsement daemon" ()
 
   let denunciation_switch =
-    switch
-      ~long:"denunciation"
-      ~short:'D'
-      ~doc:"run the denunciation daemon"
-      ()
+    switch ~long:"denunciation" ~short:'D' ~doc:"run the denunciation daemon" ()
 end

@@ -122,11 +122,7 @@ let test_simple_baking_event =
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
-  Log.info
-    "Transferring %s from %s to %s"
-    (Tez.to_string amount)
-    giver
-    receiver ;
+  Log.info "Transferring %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   Log.info "Baking pending operations..." ;
   Client.bake_for ~key:giver client
@@ -246,8 +242,7 @@ let get_candidates_to_migration () =
     List.filter_map
       (fun (protocol : Protocol.t) ->
         match Protocol.next_protocol protocol with
-        | None ->
-            None
+        | None -> None
         | Some next ->
             let next_hash = Protocol.hash next in
             if
@@ -274,15 +269,14 @@ let test_migration ?(migration_spec : (Protocol.t * Protocol.t) option)
           Log.info "Searching for protocols to migrate..." ;
           let* protocols = get_candidates_to_migration () in
           match protocols with
-          | [] ->
-              Test.fail "No protocol can be tested for migration!"
+          | [] -> Test.fail "No protocol can be tested for migration!"
           | (protocol, next_protocol) :: _ ->
               perform_migration
                 ~protocol
                 ~next_protocol
                 ~next_constants:Protocol.default_constants
                 ~pre_migration
-                ~post_migration )
+                ~post_migration)
       | Some (protocol, next_protocol) ->
           perform_migration
             ~protocol
@@ -311,9 +305,7 @@ let test_migration_transfer ?migration_spec () =
       return (giver_balance_before, receiver_balance_before))
     ~post_migration:
       (fun client (giver_balance_before, receiver_balance_before) ->
-      let* giver_balance_after =
-        Client.get_balance_for ~account:giver client
-      in
+      let* giver_balance_after = Client.get_balance_for ~account:giver client in
       let* receiver_balance_after =
         Client.get_balance_for ~account:receiver client
       in
@@ -357,8 +349,7 @@ let test_granada_migration_temp_big_maps =
       else
         let* val1_opt = big_map_get_opt ~id ~key_hash:key1 client in
         match val1_opt with
-        | None ->
-            aux acc (pred id)
+        | None -> aux acc (pred id)
         | Some val1 ->
             let* val2_opt = big_map_get_opt ~id ~key_hash:key2 client in
             aux ((id, val1, val2_opt) :: acc) (pred id)
@@ -467,7 +458,7 @@ let test_migration_constants ~migrate_from ~migrate_to =
           "constants (migrated from %s):\n%s\n"
           (Protocol.tag migrate_from)
           (JSON.encode const_migrated) ;
-        Test.fail "Protocol constants mismatch" ))
+        Test.fail "Protocol constants mismatch"))
 
 (** Test. Reproduce the scenario of https://gitlab.com/tezos/tezos/-/issues/1143 *)
 let test_origination_from_unrevealed_fees =

@@ -25,8 +25,8 @@
 
 class mockup_ctxt (base_dir : string) (mem_only : bool)
   (mockup_env : Tezos_mockup_registration.Registration.M.mockup_environment)
-  (chain_id : Chain_id.t)
-  (rpc_context : Tezos_protocol_environment.rpc_context) : RPC_context.json =
+  (chain_id : Chain_id.t) (rpc_context : Tezos_protocol_environment.rpc_context) :
+  RPC_context.json =
   let local_ctxt =
     Tezos_mockup_proxy.RPC_client.local_ctxt
       (Local_services.build_directory
@@ -44,15 +44,22 @@ class mockup_ctxt (base_dir : string) (mem_only : bool)
 
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
-          'q -> 'i -> 'o tzresult Lwt.t =
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          'p ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
       fun service params query body ->
         local_ctxt#call_service service params query body
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
           (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
-          on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
+          on_chunk:('o -> unit) ->
+          on_close:(unit -> unit) ->
+          'p ->
+          'q ->
+          'i ->
           (unit -> unit) tzresult Lwt.t =
       fun service ~on_chunk ~on_close params query body ->
         local_ctxt#call_streamed_service

@@ -287,9 +287,7 @@ struct
     | Bounded_buffer :
         (Time.System.t * message) Lwt_pipe.t
         -> bounded queue buffer
-    | Dropbox_buffer :
-        (Time.System.t * message) Lwt_dropbox.t
-        -> dropbox buffer
+    | Dropbox_buffer : (Time.System.t * message) Lwt_dropbox.t -> dropbox buffer
 
   and 'kind t = {
     limits : Worker_types.limits;
@@ -321,14 +319,12 @@ struct
     try
       match
         match Lwt_dropbox.peek message_box with
-        | None ->
-            merge w (Any_request request) None
+        | None -> merge w (Any_request request) None
         | Some (_, Message (old, _)) ->
             Lwt.ignore_result (Lwt_dropbox.take message_box) ;
             merge w (Any_request request) (Some (Any_request old))
       with
-      | None ->
-          ()
+      | None -> ()
       | Some (Any_request neu) ->
           Lwt_dropbox.put message_box (Systime_os.now (), Message (neu, None))
     with Lwt_dropbox.Closed -> ()
@@ -342,8 +338,7 @@ struct
         | Lwt_pipe.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
             fail (Closed {base = base_name; name})
-        | exn ->
-            fail (Exn exn))
+        | exn -> fail (Exn exn))
 
   let drop_request_and_wait w message_box request =
     let (t, u) = Lwt.wait () in
@@ -355,8 +350,7 @@ struct
         | Lwt_pipe.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
             fail (Closed {base = base_name; name})
-        | exn ->
-            fail (Exn exn))
+        | exn -> fail (Exn exn))
 
   module type BOX = sig
     type t
@@ -417,20 +411,16 @@ struct
     let push_request_and_wait (type a) (w : a queue t) request =
       let message_queue =
         match w.buffer with
-        | Queue_buffer message_queue ->
-            message_queue
-        | Bounded_buffer message_queue ->
-            message_queue
+        | Queue_buffer message_queue -> message_queue
+        | Bounded_buffer message_queue -> message_queue
       in
       push_request_and_wait w message_queue request
 
     let pending_requests (type a) (w : a queue t) =
       let message_queue =
         match w.buffer with
-        | Queue_buffer message_queue ->
-            message_queue
-        | Bounded_buffer message_queue ->
-            message_queue
+        | Queue_buffer message_queue -> message_queue
+        | Bounded_buffer message_queue -> message_queue
       in
       List.map
         (function (t, Message (req, _)) -> (t, Request.view req))
@@ -439,12 +429,9 @@ struct
     let pending_requests_length (type a) (w : a queue t) =
       let pipe_length (type a) (q : a buffer) =
         match q with
-        | Queue_buffer queue ->
-            Lwt_pipe.length queue
-        | Bounded_buffer queue ->
-            Lwt_pipe.length queue
-        | Dropbox_buffer _ ->
-            1
+        | Queue_buffer queue -> Lwt_pipe.length queue
+        | Bounded_buffer queue -> Lwt_pipe.length queue
+        | Dropbox_buffer _ -> 1
       in
       pipe_length w.buffer
   end
@@ -454,8 +441,7 @@ struct
       | (_, Message (_, Some u)) ->
           let name = Format.asprintf "%a" Name.pp w.name in
           Lwt.wakeup_later u (error (Closed {base = base_name; name}))
-      | (_, Message (_, None)) ->
-          ()
+      | (_, Message (_, None)) -> ()
     in
     let close_queue message_queue =
       let messages = Lwt_pipe.pop_all_now message_queue in
@@ -463,36 +449,30 @@ struct
       Lwt_pipe.close message_queue
     in
     match w.buffer with
-    | Queue_buffer message_queue ->
-        close_queue message_queue
-    | Bounded_buffer message_queue ->
-        close_queue message_queue
+    | Queue_buffer message_queue -> close_queue message_queue
+    | Bounded_buffer message_queue -> close_queue message_queue
     | Dropbox_buffer message_box ->
-        ( try Option.iter wakeup (Lwt_dropbox.peek message_box)
-          with Lwt_dropbox.Closed -> () ) ;
+        (try Option.iter wakeup (Lwt_dropbox.peek message_box)
+         with Lwt_dropbox.Closed -> ()) ;
         Lwt_dropbox.close message_box
 
   let pop (type a) (w : a t) =
     let pop_queue message_queue =
       match w.timeout with
-      | None ->
-          Lwt_pipe.pop message_queue >>= fun m -> return_some m
+      | None -> Lwt_pipe.pop message_queue >>= fun m -> return_some m
       | Some timeout ->
           Lwt_pipe.pop_with_timeout (Systime_os.sleep timeout) message_queue
           >>= fun m -> return m
     in
     match w.buffer with
-    | Queue_buffer message_queue ->
-        pop_queue message_queue
-    | Bounded_buffer message_queue ->
-        pop_queue message_queue
+    | Queue_buffer message_queue -> pop_queue message_queue
+    | Bounded_buffer message_queue -> pop_queue message_queue
     | Dropbox_buffer message_box -> (
-      match w.timeout with
-      | None ->
-          Lwt_dropbox.take message_box >>= fun m -> return_some m
-      | Some timeout ->
-          Lwt_dropbox.take_with_timeout (Systime_os.sleep timeout) message_box
-          >>= fun m -> return m )
+        match w.timeout with
+        | None -> Lwt_dropbox.take message_box >>= fun m -> return_some m
+        | Some timeout ->
+            Lwt_dropbox.take_with_timeout (Systime_os.sleep timeout) message_box
+            >>= fun m -> return m)
 
   let trigger_shutdown w = Lwt.ignore_result (Lwt_canceler.cancel w.canceler)
 
@@ -505,23 +485,14 @@ struct
       ~section:(Internal_event.Section.make_sanitized Name.base)
       (fun () -> Time.System.stamp ~time status)
     >>= function
-    | Ok () ->
-        Lwt.return_unit
+    | Ok () -> Lwt.return_unit
     | Error el ->
-        Format.kasprintf
-          Lwt.fail_with
-          "Worker_event.emit: %a"
-          pp_print_error
-          el
+        Format.kasprintf Lwt.fail_with "Worker_event.emit: %a" pp_print_error el
 
   let log_event w evt =
-    lwt_emit w (Logger.WorkerEvent (evt, Event.level evt))
-    >>= fun () ->
+    lwt_emit w (Logger.WorkerEvent (evt, Event.level evt)) >>= fun () ->
     if Event.level evt >= w.limits.backlog_level then
-      List.assoc
-        ~equal:Internal_event.Level.equal
-        (Event.level evt)
-        w.event_log
+      List.assoc ~equal:Internal_event.Level.equal (Event.level evt) w.event_log
       |> Option.iter (fun ring -> Ringo.Ring.add ring evt) ;
     Lwt.return_unit
 
@@ -558,23 +529,19 @@ struct
     let do_close errs =
       let t0 =
         match w.status with
-        | Running t0 ->
-            t0
-        | Launching _ | Closing _ | Closed _ ->
-            assert false
+        | Running t0 -> t0
+        | Launching _ | Closing _ | Closed _ -> assert false
       in
       w.status <- Closing (t0, Systime_os.now ()) ;
       close w ;
-      Error_monad.cancel_with_exceptions w.canceler
-      >>= fun () ->
+      Error_monad.cancel_with_exceptions w.canceler >>= fun () ->
       w.status <- Closed (t0, Systime_os.now (), errs) ;
-      Handlers.on_close w
-      >>= fun () ->
+      Handlers.on_close w >>= fun () ->
       Nametbl.remove w.table.instances w.name ;
       w.state <- None ;
       Lwt.ignore_result
-        ( List.iter (fun (_, ring) -> Ringo.Ring.clear ring) w.event_log ;
-          Lwt.return_unit ) ;
+        (List.iter (fun (_, ring) -> Ringo.Ring.clear ring) w.event_log ;
+         Lwt.return_unit) ;
       Lwt.return_unit
     in
     let rec loop () =
@@ -590,53 +557,44 @@ struct
          processed, the processing eventually resolves, at which point a
          recursive call to this [loop] at which point this call to [protect]
          fails immediately with [Canceled]. *)
-      protect ~canceler:w.canceler (fun () -> pop w)
-      >>=? (function
-             | None ->
-                 Handlers.on_no_request w
-             | Some (pushed, Message (request, u)) -> (
-                 let current_request = Request.view request in
-                 let treated_time = Systime_os.now () in
-                 w.current_request <-
-                   Some (pushed, treated_time, current_request) ;
-                 match u with
-                 | None ->
-                     Handlers.on_request w request
-                     >>=? fun res ->
-                     let completed_time = Systime_os.now () in
-                     let treated = Ptime.diff treated_time pushed in
-                     let completed = Ptime.diff completed_time treated_time in
-                     w.current_request <- None ;
-                     let status = Worker_types.{pushed; treated; completed} in
-                     Handlers.on_completion w request res status
-                     >>= fun () ->
-                     lwt_emit w (Request (current_request, status, None))
-                     >>= fun () -> return_unit
-                 | Some u ->
-                     Handlers.on_request w request
-                     >>= fun res ->
-                     Lwt.wakeup_later u res ;
-                     Lwt.return res
-                     >>=? fun res ->
-                     let completed_time = Systime_os.now () in
-                     let treated = Ptime.diff treated_time pushed in
-                     let completed = Ptime.diff completed_time treated_time in
-                     let status = Worker_types.{pushed; treated; completed} in
-                     w.current_request <- None ;
-                     Handlers.on_completion w request res status
-                     >>= fun () ->
-                     lwt_emit w (Request (current_request, status, None))
-                     >>= fun () -> return_unit ))
+      (protect ~canceler:w.canceler (fun () -> pop w) >>=? function
+       | None -> Handlers.on_no_request w
+       | Some (pushed, Message (request, u)) -> (
+           let current_request = Request.view request in
+           let treated_time = Systime_os.now () in
+           w.current_request <- Some (pushed, treated_time, current_request) ;
+           match u with
+           | None ->
+               Handlers.on_request w request >>=? fun res ->
+               let completed_time = Systime_os.now () in
+               let treated = Ptime.diff treated_time pushed in
+               let completed = Ptime.diff completed_time treated_time in
+               w.current_request <- None ;
+               let status = Worker_types.{pushed; treated; completed} in
+               Handlers.on_completion w request res status >>= fun () ->
+               lwt_emit w (Request (current_request, status, None))
+               >>= fun () -> return_unit
+           | Some u ->
+               Handlers.on_request w request >>= fun res ->
+               Lwt.wakeup_later u res ;
+               Lwt.return res >>=? fun res ->
+               let completed_time = Systime_os.now () in
+               let treated = Ptime.diff treated_time pushed in
+               let completed = Ptime.diff completed_time treated_time in
+               let status = Worker_types.{pushed; treated; completed} in
+               w.current_request <- None ;
+               Handlers.on_completion w request res status >>= fun () ->
+               lwt_emit w (Request (current_request, status, None))
+               >>= fun () -> return_unit))
       >>= function
-      | Ok () ->
-          loop ()
+      | Ok () -> loop ()
       | Error (Canceled :: _)
       | Error (Exn Lwt.Canceled :: _)
       | Error (Exn Lwt_pipe.Closed :: _)
       | Error (Exn Lwt_dropbox.Closed :: _) ->
           lwt_emit w Terminated >>= fun () -> do_close None
       | Error errs -> (
-          ( match w.current_request with
+          (match w.current_request with
           | Some (pushed, treated_time, request) ->
               let completed_time = Systime_os.now () in
               let treated = Ptime.diff treated_time pushed in
@@ -647,15 +605,13 @@ struct
                 request
                 Worker_types.{pushed; treated; completed}
                 errs
-          | None ->
-              assert false )
+          | None -> assert false)
           >>= function
-          | Ok () ->
-              loop ()
+          | Ok () -> loop ()
           | Error (Timeout :: _ as errs) ->
               lwt_emit w Terminated >>= fun () -> do_close (Some errs)
           | Error errs ->
-              lwt_emit w (Crashed errs) >>= fun () -> do_close (Some errs) )
+              lwt_emit w (Crashed errs) >>= fun () -> do_close (Some errs))
     in
     loop ()
 
@@ -688,12 +644,10 @@ struct
       let canceler = Lwt_canceler.create () in
       let buffer : kind buffer =
         match table.buffer_kind with
-        | Queue ->
-            Queue_buffer (Lwt_pipe.create ())
+        | Queue -> Queue_buffer (Lwt_pipe.create ())
         | Bounded {size} ->
             Bounded_buffer (Lwt_pipe.create ~size:(size, fun _ -> 1) ())
-        | Dropbox _ ->
-            Dropbox_buffer (Lwt_dropbox.create ())
+        | Dropbox _ -> Dropbox_buffer (Lwt_dropbox.create ())
       in
       let event_log =
         let levels =
@@ -720,11 +674,10 @@ struct
         }
       in
       Nametbl.add table.instances name w ;
-      ( if id_name = base_name then lwt_emit w (Started None)
-      else lwt_emit w (Started (Some name_s)) )
+      (if id_name = base_name then lwt_emit w (Started None)
+      else lwt_emit w (Started (Some name_s)))
       >>= fun () ->
-      Handlers.on_launch w name parameters
-      >>=? fun state ->
+      Handlers.on_launch w name parameters >>=? fun state ->
       w.status <- Running (Systime_os.now ()) ;
       w.state <- Some state ;
       w.worker <-
@@ -740,8 +693,7 @@ struct
        immediately because no hooks are registered on the canceler. However, the
        worker ([w.worker]) resolves only once the ongoing request has resolved
        (if any) and some clean-up operations have completed. *)
-    lwt_emit w Triggering_shutdown
-    >>= fun () ->
+    lwt_emit w Triggering_shutdown >>= fun () ->
     Error_monad.cancel_with_exceptions w.canceler >>= fun () -> w.worker
 
   let state w =
@@ -760,10 +712,8 @@ struct
              base_name
              Name.pp
              w.name)
-    | (None, _) ->
-        assert false
-    | (Some state, _) ->
-        state
+    | (None, _) -> assert false
+    | (Some state, _) -> state
 
   let pending_requests q = Queue.pending_requests q
 
@@ -781,13 +731,10 @@ struct
       Worker_types.instances_number = Nametbl.length w.table.instances;
       wstatus = w.status;
       queue_length =
-        ( match w.buffer with
-        | Queue_buffer pipe ->
-            Lwt_pipe.length pipe
-        | Bounded_buffer pipe ->
-            Lwt_pipe.length pipe
-        | Dropbox_buffer _ ->
-            1 );
+        (match w.buffer with
+        | Queue_buffer pipe -> Lwt_pipe.length pipe
+        | Bounded_buffer pipe -> Lwt_pipe.length pipe
+        | Dropbox_buffer _ -> 1);
     }
 
   let view w = Types.view (state w) w.parameters

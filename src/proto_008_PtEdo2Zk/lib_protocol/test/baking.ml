@@ -29,20 +29,15 @@ open Alpha_context
 
 (** Tests for [bake_n] and [bake_until_end_cycle]. *)
 let test_cycle () =
-  Context.init 5
-  >>=? fun (b, _) ->
-  Context.get_constants (B b)
-  >>=? fun csts ->
+  Context.init 5 >>=? fun (b, _) ->
+  Context.get_constants (B b) >>=? fun csts ->
   let blocks_per_cycle = csts.parametric.blocks_per_cycle in
   let pp fmt x = Format.fprintf fmt "%ld" x in
   (* Tests that [bake_until_cycle_end] returns a block at
      level [blocks_per_cycle]. *)
-  Block.bake b
-  >>=? fun b ->
-  Block.bake_until_cycle_end b
-  >>=? fun b ->
-  Context.get_level (B b)
-  >>?= fun curr_level ->
+  Block.bake b >>=? fun b ->
+  Block.bake_until_cycle_end b >>=? fun b ->
+  Context.get_level (B b) >>?= fun curr_level ->
   Assert.equal
     ~loc:__LOC__
     Int32.equal
@@ -52,12 +47,9 @@ let test_cycle () =
     blocks_per_cycle
   >>=? fun () ->
   (* Tests that [bake_n n] bakes [n] blocks. *)
-  Context.get_level (B b)
-  >>?= fun l ->
-  Block.bake_n 10 b
-  >>=? fun b ->
-  Context.get_level (B b)
-  >>?= fun curr_level ->
+  Context.get_level (B b) >>?= fun l ->
+  Block.bake_n 10 b >>=? fun b ->
+  Context.get_level (B b) >>?= fun curr_level ->
   Assert.equal
     ~loc:__LOC__
     Int32.equal
@@ -69,36 +61,34 @@ let test_cycle () =
 (** Check that after baking and/or endorsing a block the baker and the
     endorsers get their reward *)
 let test_rewards_retrieval () =
-  Context.init 256
-  >>=? fun (b, _) ->
+  Context.init 256 >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.
-             { parametric =
-                 { endorsers_per_block;
+             {
+               parametric =
+                 {
+                   endorsers_per_block;
                    block_security_deposit;
                    endorsement_security_deposit;
-                   _ };
-               _ } ->
+                   _;
+                 };
+               _;
+             } ->
   (* find block with 32 different endorsers *)
   let open Alpha_services.Delegate.Endorsing_rights in
   let rec find_block b =
-    Context.get_endorsers (B b)
-    >>=? fun endorsers ->
+    Context.get_endorsers (B b) >>=? fun endorsers ->
     if List.length endorsers = endorsers_per_block then return b
     else Block.bake b >>=? fun b -> find_block b
   in
   let balance_update delegate before after =
-    Context.Delegate.info (B before) delegate
-    >>=? fun info_before ->
-    Context.Delegate.info (B after) delegate
-    >>=? fun info_after ->
+    Context.Delegate.info (B before) delegate >>=? fun info_before ->
+    Context.Delegate.info (B after) delegate >>=? fun info_after ->
     Lwt.return
       Test_tez.Tez.(info_after.frozen_balance -? info_before.frozen_balance)
   in
-  find_block b
-  >>=? fun good_b ->
-  Context.get_endorsers (B good_b)
-  >>=? fun endorsers ->
+  find_block b >>=? fun good_b ->
+  Context.get_endorsers (B good_b) >>=? fun endorsers ->
   (* test 3 different priorities, too long otherwise *)
   let block_priorities = 0 -- 10 in
   let included_endorsements = 0 -- endorsers_per_block in
@@ -114,10 +104,8 @@ let test_rewards_retrieval () =
         real_endorsers
       >>=? fun operations ->
       let policy = Block.By_priority priority in
-      Block.get_next_baker ~policy good_b
-      >>=? fun (baker, _, _) ->
-      Block.bake ~policy ~operations good_b
-      >>=? fun b ->
+      Block.get_next_baker ~policy good_b >>=? fun (baker, _, _) ->
+      Block.bake ~policy ~operations good_b >>=? fun b ->
       Context.get_baking_reward (B b) ~priority ~endorsing_power
       >>=? fun baking_reward ->
       Test_tez.Tez.(block_security_deposit +? baking_reward)
@@ -127,25 +115,19 @@ let test_rewards_retrieval () =
       Test_tez.Tez.(endorsement_security_deposit +? endorsing_reward)
       >>?= fun endorsing_frozen_balance ->
       let baker_is_not_an_endorser =
-        List.for_all
-          (fun endorser -> endorser.delegate <> baker)
-          real_endorsers
+        List.for_all (fun endorser -> endorser.delegate <> baker) real_endorsers
       in
       Test_tez.Tez.(baking_frozen_balance +? endorsing_frozen_balance)
       >>?= fun accumulated_frozen_balance ->
       (* check the baker was rewarded the right amount *)
-      balance_update baker good_b b
-      >>=? fun baker_frozen_balance ->
-      ( if baker_is_not_an_endorser then
-        Assert.equal_tez
-          ~loc:__LOC__
-          baker_frozen_balance
-          baking_frozen_balance
+      balance_update baker good_b b >>=? fun baker_frozen_balance ->
+      (if baker_is_not_an_endorser then
+       Assert.equal_tez ~loc:__LOC__ baker_frozen_balance baking_frozen_balance
       else
         Assert.equal_tez
           ~loc:__LOC__
           baker_frozen_balance
-          accumulated_frozen_balance )
+          accumulated_frozen_balance)
       >>=? fun () ->
       (* check the each endorser was rewarded the right amount *)
       List.iter_ep
@@ -168,8 +150,7 @@ let test_rewards_retrieval () =
 (** Tests the baking and endorsing rewards formulas against a
     precomputed table *)
 let test_rewards_formulas () =
-  Context.init 1
-  >>=? fun (b, _) ->
+  Context.init 1 >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.{parametric = {endorsers_per_block; _}; _} ->
   let block_priorities = 0 -- 2 in
@@ -183,16 +164,15 @@ let test_rewards_formulas () =
         Test_tez.Tez.of_mutez_exn
           (Int64.of_int Rewards.baking_rewards.(priority).(endorsing_power))
       in
-      Assert.equal_tez ~loc:__LOC__ reward expected_reward
-      >>=? fun () ->
+      Assert.equal_tez ~loc:__LOC__ reward expected_reward >>=? fun () ->
       Context.get_endorsing_reward (B b) ~priority ~endorsing_power
       >>=? fun reward ->
       let expected_reward =
         Test_tez.Tez.of_mutez_exn
           (Int64.of_int Rewards.endorsing_rewards.(priority).(endorsing_power))
       in
-      Assert.equal_tez ~loc:__LOC__ reward expected_reward
-      >>=? fun () -> return_unit)
+      Assert.equal_tez ~loc:__LOC__ reward expected_reward >>=? fun () ->
+      return_unit)
     ranges
 
 let wrap e = Lwt.return (Environment.wrap_error e)
@@ -200,8 +180,7 @@ let wrap e = Lwt.return (Environment.wrap_error e)
 (* Check that the rewards formulas from Context are
    equivalent with the ones from Baking *)
 let test_rewards_formulas_equivalence () =
-  Context.init 1
-  >>=? fun (b, _) ->
+  Context.init 1 >>=? fun (b, _) ->
   Context.get_constants (B b)
   >>=? fun Constants.{parametric = {endorsers_per_block; _}; _} ->
   Alpha_context.prepare
@@ -225,10 +204,8 @@ let test_rewards_formulas_equivalence () =
       >>=? fun reward1 ->
       Context.get_baking_reward (B b) ~priority:block_priority ~endorsing_power
       >>=? fun reward2 ->
-      Assert.equal_tez ~loc:__LOC__ reward1 reward2
-      >>=? fun () ->
-      Baking.endorsing_reward ctxt ~block_priority endorsing_power
-      |> wrap
+      Assert.equal_tez ~loc:__LOC__ reward1 reward2 >>=? fun () ->
+      Baking.endorsing_reward ctxt ~block_priority endorsing_power |> wrap
       >>=? fun reward1 ->
       Context.get_endorsing_reward
         (B b)
@@ -240,8 +217,7 @@ let test_rewards_formulas_equivalence () =
 let test_bake_n_cycles n () =
   let open Block in
   let policy = By_priority 0 in
-  Context.init 1
-  >>=? fun (block, _contracts) ->
+  Context.init 1 >>=? fun (block, _contracts) ->
   Block.bake_until_n_cycle_end ~policy n block >>=? fun _block -> return ()
 
 (* gets the voting power *)
@@ -252,31 +228,24 @@ let get_voting_power block pkhash =
 let test_voting_power_cache () =
   let open Block in
   let policy = By_priority 0 in
-  Context.init 1
-  >>=? fun (block, _contracts) ->
-  Context.get_bakers (B block)
-  >>=? fun bakers ->
+  Context.init 1 >>=? fun (block, _contracts) ->
+  Context.get_bakers (B block) >>=? fun bakers ->
   let baker = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
   let assert_voting_power n block =
-    get_voting_power block baker
-    >>=? fun voting_power ->
+    get_voting_power block baker >>=? fun voting_power ->
     Assert.equal_int ~loc:__LOC__ n (Int32.to_int voting_power)
   in
+  assert_voting_power 500 block >>=? fun () ->
+  Block.bake_until_n_cycle_end ~policy 2 block >>=? fun block ->
+  assert_voting_power 500 block >>=? fun () ->
+  Block.bake_until_n_cycle_end ~policy 5 block >>=? fun block ->
+  assert_voting_power 500 block >>=? fun () ->
+  Block.bake_until_n_cycle_end ~policy 1 block >>=? fun block ->
   assert_voting_power 500 block
-  >>=? fun () ->
-  Block.bake_until_n_cycle_end ~policy 2 block
-  >>=? fun block ->
-  assert_voting_power 500 block
-  >>=? fun () ->
-  Block.bake_until_n_cycle_end ~policy 5 block
-  >>=? fun block ->
-  assert_voting_power 500 block
-  >>=? fun () ->
-  Block.bake_until_n_cycle_end ~policy 1 block
-  >>=? fun block -> assert_voting_power 500 block
 
 let tests =
-  [ Test_services.tztest "cycle" `Quick test_cycle;
+  [
+    Test_services.tztest "cycle" `Quick test_cycle;
     Test_services.tztest
       "test rewards are correctly accounted for"
       `Slow
@@ -293,4 +262,5 @@ let tests =
       "test_bake_n_cycles for 12 cycles"
       `Quick
       (test_bake_n_cycles 12);
-    Test_services.tztest "voting_power" `Quick test_voting_power_cache ]
+    Test_services.tztest "voting_power" `Quick test_voting_power_cache;
+  ]

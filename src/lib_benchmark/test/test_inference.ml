@@ -73,8 +73,7 @@ module T () = struct
         let arity = arity_1
 
         let model =
-          lam ~name:"size"
-          @@ fun size ->
+          lam ~name:"size" @@ fun size ->
           free ~name:fv_const + (free ~name:fv_quad * (size * size))
       end
     end in

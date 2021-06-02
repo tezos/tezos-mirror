@@ -19,8 +19,3 @@
  (package tezos-clic)
  (deps (alias runtest_clic))
  (action (progn)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

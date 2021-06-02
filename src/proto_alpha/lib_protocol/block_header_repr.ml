@@ -50,10 +50,12 @@ let contents_encoding =
   let open Data_encoding in
   def "block_header.alpha.unsigned_contents"
   @@ conv
-       (fun { priority;
+       (fun {
+              priority;
               seed_nonce_hash;
               proof_of_work_nonce;
-              liquidity_baking_escape_vote } ->
+              liquidity_baking_escape_vote;
+            } ->
          ( priority,
            proof_of_work_nonce,
            seed_nonce_hash,

@@ -57,8 +57,7 @@ module type Proxy_sig = sig
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
 
   (** Functions used to implement the light mode *)
-  include
-    Light_proto.PROTO_RPCS
+  include Light_proto.PROTO_RPCS
 end
 
 type proxy_environment = (module Proxy_sig)

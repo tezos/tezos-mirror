@@ -66,10 +66,10 @@ val trace :
   ?gas:Gas.Arith.integral ->
   ?entrypoint:string ->
   unit ->
-  ( Script.expr
+  (Script.expr
   * packed_internal_operation list
   * Script_typed_ir.execution_trace
-  * Lazy_storage.diffs option )
+  * Lazy_storage.diffs option)
   tzresult
   Lwt.t
 
@@ -77,9 +77,9 @@ val print_run_result :
   #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  ( Script_repr.expr
+  (Script_repr.expr
   * packed_internal_operation list
-  * Lazy_storage.diffs option )
+  * Lazy_storage.diffs option)
   tzresult ->
   unit tzresult Lwt.t
 
@@ -87,10 +87,10 @@ val print_trace_result :
   #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  ( Script_repr.expr
+  (Script_repr.expr
   * packed_internal_operation list
   * Script_typed_ir.execution_trace
-  * Lazy_storage.diffs option )
+  * Lazy_storage.diffs option)
   tzresult ->
   unit tzresult Lwt.t
 

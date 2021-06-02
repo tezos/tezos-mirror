@@ -167,8 +167,7 @@ module Solver = struct
               match node with
               | Redundant node | Solved node ->
                   (node :: solved_acc, unsolved_acc)
-              | Unsolved node ->
-                  (solved_acc, node :: unsolved_acc))
+              | Unsolved node -> (solved_acc, node :: unsolved_acc))
             n.provides
             (solved_acc, unsolved_acc))
         (solved_but_not_propagated, [])
@@ -179,10 +178,8 @@ module Solver = struct
 
   and propagate_solved_loop state solved_but_not_propagated =
     match solved_but_not_propagated with
-    | [] ->
-        state
-    | solved :: solved_list ->
-        propagate_solved state solved solved_list
+    | [] -> state
+    | solved :: solved_list -> propagate_solved state solved solved_list
 
   let solve {solved; unsolved} =
     assert (solved = []) ;
@@ -218,13 +215,12 @@ module Solver = struct
   let solve ~force state =
     let least_constrained = solve state in
     match state.unsolved with
-    | [] ->
-        least_constrained
+    | [] -> least_constrained
     | _ ->
         if force then (
           Format.eprintf
-            "Dep_graph.Solver.solve: forcing remaining unconstrained \
-             variables as solved.@." ;
+            "Dep_graph.Solver.solve: forcing remaining unconstrained variables \
+             as solved.@." ;
           List.iter
             (fun {dependencies; undecided_variables; _} ->
               Format.eprintf
@@ -233,7 +229,7 @@ module Solver = struct
                 (dependencies, undecided_variables))
             least_constrained.unsolved ;
           let set_solved = List.map force_solved least_constrained.unsolved in
-          {solved = least_constrained.solved @ set_solved; unsolved = []} )
+          {solved = least_constrained.solved @ set_solved; unsolved = []})
         else
           Stdlib.failwith
             "Dep_graph.Solver.solve: state is not completely solved, \
@@ -316,14 +312,13 @@ let () =
       | Missing_file_for_free_variable {free_var} ->
           let error =
             Format.asprintf
-              "Bug found: variable %a is not associated to any dataset. \
-               Please report.\n"
+              "Bug found: variable %a is not associated to any dataset. Please \
+               report.\n"
               Free_variable.pp
               free_var
           in
           Some error
-      | _ ->
-          None)
+      | _ -> None)
 
 let to_graph (solved : string Solver.solved list) =
   let len = List.length solved in
@@ -354,12 +349,12 @@ let to_graph (solved : string Solver.solved list) =
                   Format.eprintf
                     "Picking new dataset as it induces lower-dimensional \
                      problem@." ;
-                  Fv_map.add free_var (meta.data, dependencies) map )
+                  Fv_map.add free_var (meta.data, dependencies) map)
                 else (
                   Format.eprintf
                     "Keeping former dataset as it induces lower-dimensional \
                      problem@." ;
-                  map ))
+                  map))
           provides
           map)
       Fv_map.empty
@@ -372,20 +367,16 @@ let to_graph (solved : string Solver.solved list) =
         Fv_set.iter
           (fun dep ->
             match Fv_map.find dep solved_to_file with
-            | None ->
-                raise (Missing_file_for_free_variable {free_var = dep})
-            | Some (dep_file, _) ->
-                G.add_edge g dep_file meta.data)
+            | None -> raise (Missing_file_for_free_variable {free_var = dep})
+            | Some (dep_file, _) -> G.add_edge g dep_file meta.data)
           dependencies)
     solved ;
   g
 
 let find_model_or_generic model_name model_list =
   match List.assoc_opt ~equal:String.equal model_name model_list with
-  | None ->
-      List.assoc_opt ~equal:String.equal "*" model_list
-  | res ->
-      res
+  | None -> List.assoc_opt ~equal:String.equal "*" model_list
+  | res -> res
 
 let load_files (model_name : string) (files : string list) =
   (* Use a table to store loaded measurements *)
@@ -394,7 +385,7 @@ let load_files (model_name : string) (files : string list) =
     (* We assume filenames are of the form <dir>/<name>.workload, where <dir>
        is common amongst all files. This function extracts only the <name> component,
        and raises an exception if the suffix does not match.
-     *)
+    *)
     Filename.basename filename
     |> Filename.chop_suffix_opt ~suffix:".workload"
     |> WithExceptions.Option.get ~loc:__LOC__
@@ -406,23 +397,22 @@ let load_files (model_name : string) (files : string list) =
         let measurement = Measure.load ~filename in
         match measurement with
         | Tezos_benchmark.Measure.Measurement ((module Bench), m) -> (
-          match find_model_or_generic model_name Bench.models with
-          | None ->
-              graph
-          | Some model ->
-              let () =
-                Format.eprintf "Loading %s in dependency graph@." filename
-              in
-              Hashtbl.add table filename_short measurement ;
-              let names =
-                List.fold_left
-                  (fun acc {Measure.workload; _} ->
-                    let names = get_free_variables model workload in
-                    Free_variable.Set.union names acc)
-                  Free_variable.Set.empty
-                  m.Measure.workload_data
-              in
-              add_names graph filename_short names ))
+            match find_model_or_generic model_name Bench.models with
+            | None -> graph
+            | Some model ->
+                let () =
+                  Format.eprintf "Loading %s in dependency graph@." filename
+                in
+                Hashtbl.add table filename_short measurement ;
+                let names =
+                  List.fold_left
+                    (fun acc {Measure.workload; _} ->
+                      let names = get_free_variables model workload in
+                      Free_variable.Set.union names acc)
+                    Free_variable.Set.empty
+                    m.Measure.workload_data
+                in
+                add_names graph filename_short names))
       Solver.empty_state
       files
   in

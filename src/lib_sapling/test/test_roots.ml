@@ -12,9 +12,7 @@ let test_add_mem () =
   (* List of 10 random hashes *)
   let first_10_hashes = List.init 10 (fun _ -> random_hashes ()) in
   (* List of [size] random hashes *)
-  let size_hashes =
-    List.init (Int32.to_int size) (fun _ -> random_hashes ())
-  in
+  let size_hashes = List.init (Int32.to_int size) (fun _ -> random_hashes ()) in
   (* Roots buffer full of random hashes *)
   let buffer =
     List.fold_left

@@ -35,10 +35,12 @@ let () =
   Alcotest_lwt.run
     ~verbose:true
     "tezos-shell"
-    [ ("synchronisation heuristic", Test_synchronisation_heuristic.tests);
+    [
+      ("synchronisation heuristic", Test_synchronisation_heuristic.tests);
       ("consensus heuristic sync", Test_consensus_heuristic.tests);
       ("consensus heuristic", Test_consensus_heuristic.tests_lwt);
       ("test protocol validator", Test_protocol_validator.tests);
       ("test validator", Test_validator.tests);
-      ("test node", Test_node.tests) ]
+      ("test node", Test_node.tests);
+    ]
   |> Lwt_main.run

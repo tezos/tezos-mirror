@@ -111,10 +111,7 @@ module Make_with_hash_consing
                     and type label = Micheline_with_hash_consing.hcons_info)
     (Path : Path.S) : sig
   include
-    S
-      with type head = X.t
-       and type path = Path.t
-       and type node = Micheline.node
+    S with type head = X.t and type path = Path.t and type node = Micheline.node
 
   val all_matches_with_hash_consing : t -> node -> path list
 end

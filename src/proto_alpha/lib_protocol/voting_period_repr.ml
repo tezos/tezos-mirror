@@ -26,16 +26,11 @@
 type kind = Proposal | Exploration | Cooldown | Promotion | Adoption
 
 let string_of_kind = function
-  | Proposal ->
-      "proposal"
-  | Exploration ->
-      "exploration"
-  | Cooldown ->
-      "cooldown"
-  | Promotion ->
-      "promotion"
-  | Adoption ->
-      "adoption"
+  | Proposal -> "proposal"
+  | Exploration -> "exploration"
+  | Cooldown -> "cooldown"
+  | Promotion -> "promotion"
+  | Adoption -> "adoption"
 
 let pp_kind ppf kind = Format.fprintf ppf "%s" @@ string_of_kind kind
 
@@ -43,7 +38,8 @@ let kind_encoding =
   let open Data_encoding in
   union
     ~tag_size:`Uint8
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Proposal"
         (constant "proposal")
@@ -72,19 +68,15 @@ let kind_encoding =
         ~title:"Adoption"
         (constant "adoption")
         (function Adoption -> Some () | _ -> None)
-        (fun () -> Adoption) ]
+        (fun () -> Adoption);
+    ]
 
 let succ_kind = function
-  | Proposal ->
-      Exploration
-  | Exploration ->
-      Cooldown
-  | Cooldown ->
-      Promotion
-  | Promotion ->
-      Adoption
-  | Adoption ->
-      Proposal
+  | Proposal -> Exploration
+  | Exploration -> Cooldown
+  | Cooldown -> Promotion
+  | Promotion -> Adoption
+  | Adoption -> Proposal
 
 type voting_period = {index : int32; kind : kind; start_position : int32}
 

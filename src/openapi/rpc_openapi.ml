@@ -63,8 +63,7 @@ let rec convert_element (element : Json_schema.element) : Openapi.Schema.t =
         assert (specs.property_dependencies = []) ;
         let properties =
           let map l f = List.map f l in
-          map specs.properties
-          @@ fun (name, element, required, unknown) ->
+          map specs.properties @@ fun (name, element, required, unknown) ->
           (* [unknown] is not documented, is it a default value? *)
           assert (unknown = None) ;
           {Openapi.Schema.name; required; schema = convert_element element}
@@ -93,14 +92,14 @@ let rec convert_element (element : Json_schema.element) : Openapi.Schema.t =
           List.exists
             (function
               | e -> (
-                match e.Json_schema.kind with Null -> true | _ -> false ))
+                  match e.Json_schema.kind with Null -> true | _ -> false))
             elements
         in
         let elements =
           List.filter
             (function
               | e -> (
-                match e.Json_schema.kind with Null -> false | _ -> true ))
+                  match e.Json_schema.kind with Null -> false | _ -> true))
             elements
         in
         fun ?title ?description ?(nullable = false) () ->
@@ -118,13 +117,11 @@ let rec convert_element (element : Json_schema.element) : Openapi.Schema.t =
               let path = Json_query.json_pointer_of_path tail in
               assert (String.length path > 0 && path.[0] = '/') ;
               String.sub path 1 (String.length path - 1)
-          | _ ->
-              assert false
+          | _ -> assert false
         in
         fun ?title ?description ?(nullable = false) () ->
           match (title, description, nullable) with
-          | (None, None, false) ->
-              Openapi.Schema.reference name
+          | (None, None, false) -> Openapi.Schema.reference name
           | _ ->
               (* OpenAPI does not allow other fields next to "$ref" fields.
                  So we have to cheat a little bit. *)
@@ -133,7 +130,7 @@ let rec convert_element (element : Json_schema.element) : Openapi.Schema.t =
                 ?description
                 ~nullable
                 ~cases:[Openapi.Schema.reference name]
-                () )
+                ())
     | Id_ref _id ->
         assert (element.enum = None) ;
         assert false
@@ -144,15 +141,17 @@ let rec convert_element (element : Json_schema.element) : Openapi.Schema.t =
         assert (min_length <= 0) ;
         assert (max_length = None) ;
         let enum =
-          convert_enum element.enum
-          @@ function `String s -> s | _ -> assert false
+          convert_enum element.enum @@ function
+          | `String s -> s
+          | _ -> assert false
         in
         Openapi.Schema.string ?enum ?pattern
     | Integer {multiple_of; minimum; maximum} ->
         assert (multiple_of = None) ;
         let enum =
-          convert_enum element.enum
-          @@ function `Int s -> s | _ -> assert false
+          convert_enum element.enum @@ function
+          | `Int s -> s
+          | _ -> assert false
         in
         (* Note: there is currently a bug in Json_schema:
            `Exclusive and `Inclusive are inverted... *)
@@ -209,10 +208,8 @@ let empty_env = String_map.empty
 let merge_envs (a : env) (b : env) : env =
   let merge_key _name a b =
     match (a, b) with
-    | (None, None) ->
-        None
-    | (None, (Some _ as x)) | ((Some _ as x), None) ->
-        x
+    | (None, None) -> None
+    | (None, (Some _ as x)) | ((Some _ as x), None) -> x
     | (Some a, Some _b) ->
         (* TODO: check that a and b are equivalent *)
         Some a
@@ -229,28 +226,24 @@ let gather_definitions (schema : Json_schema.schema)
         if String_map.mem name acc then acc
         else
           match Json_schema.find_definition name schema with
-          | exception Not_found ->
-              assert false
+          | exception Not_found -> assert false
           | element ->
               let converted = convert_element element in
               let acc = String_map.add name converted acc in
-              gather acc converted )
+              gather acc converted)
     | Other x -> (
-      match x.kind with
-      | Boolean | Integer _ | Number _ | String _ | Any ->
-          acc
-      | Array items ->
-          gather acc items
-      | Object {properties; additional_properties} ->
-          let acc =
-            List.fold_left
-              (fun acc p -> gather acc p.Openapi.Schema.schema)
-              acc
-              properties
-          in
-          opt_fold gather acc additional_properties
-      | One_of cases ->
-          List.fold_left gather acc cases )
+        match x.kind with
+        | Boolean | Integer _ | Number _ | String _ | Any -> acc
+        | Array items -> gather acc items
+        | Object {properties; additional_properties} ->
+            let acc =
+              List.fold_left
+                (fun acc p -> gather acc p.Openapi.Schema.schema)
+                acc
+                properties
+            in
+            opt_fold gather acc additional_properties
+        | One_of cases -> List.fold_left gather acc cases)
   in
   gather String_map.empty converted_schema
 
@@ -263,15 +256,13 @@ let convert_schema (schema : Json.t) : env * Openapi.Schema.t =
 let convert_response ?code (schemas : Api.schemas option) :
     env * Openapi.Response.t list =
   match schemas with
-  | None ->
-      (empty_env, [])
+  | None -> (empty_env, [])
   | Some schemas ->
       let (env, schema) = convert_schema schemas.json_schema in
       (env, [Openapi.Response.make ?code ~description:"" schema])
 
 let opt_map_with_env f = function
-  | None ->
-      (empty_env, None)
+  | None -> (empty_env, None)
   | Some x ->
       let (env, y) = f x in
       (env, Some y)
@@ -286,10 +277,7 @@ let convert_query_parameter {Api.id = _; name; description; kind} :
   in
   (* Note: OpenAPI does not seem to have a field to specify that the parameter
      is repeatable (for [Multi]). *)
-  {
-    required;
-    parameter = {name; description; schema = Openapi.Schema.string ()};
-  }
+  {required; parameter = {name; description; schema = Openapi.Schema.string ()}}
 
 let convert_service expected_path expected_method
     ({meth; path; description; query; input; output; error} : Api.service) :
@@ -321,8 +309,7 @@ let convert_service expected_path expected_method
 
 let convert_path_item (path_item : Api.path_item) : Openapi.Path.item =
   match path_item with
-  | PI_static name ->
-      Openapi.Path.static name
+  | PI_static name -> Openapi.Path.static name
   | PI_dynamic arg ->
       Openapi.Path.dynamic
         ?description:arg.descr
@@ -372,15 +359,15 @@ let main () =
     if Array.length Sys.argv <> 3 then (
       prerr_endline
         "Usage: rpc_openapi <VERSION> <API.json>\n\n\
-         Version is the version of the API, to be put in the \"version\" \
-         field of the output.\n\n\
+         Version is the version of the API, to be put in the \"version\" field \
+         of the output.\n\n\
          Multiple input files are not supported." ;
-      exit (if Array.length Sys.argv = 1 then 0 else 1) )
+      exit (if Array.length Sys.argv = 1 then 0 else 1))
     else (Sys.argv.(1), Sys.argv.(2))
   in
   (* Parse input file and convert it. *)
-  Json.from_file filename |> Api.parse_tree |> Api.parse_services
-  |> Api.flatten |> convert_api version |> Openapi.to_json |> Json.output
+  Json.from_file filename |> Api.parse_tree |> Api.parse_services |> Api.flatten
+  |> convert_api version |> Openapi.to_json |> Json.output
 
 let () =
   Printexc.record_backtrace true ;

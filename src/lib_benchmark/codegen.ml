@@ -26,8 +26,6 @@
 (* ------------------------------------------------------------------------- *)
 (* OCaml codegen *)
 
-open Migrate_parsetree.Ast_408
-
 module Codegen_helpers = struct
   open Ast_helper
 
@@ -49,8 +47,8 @@ module Codegen_helpers = struct
   let string_of_fv fv = Format.asprintf "%a" Free_variable.pp fv
 end
 
-module Codegen : Costlang.S with type 'a repr = Parsetree.expr = struct
-  type 'a repr = Parsetree.expr
+module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
+  type 'a repr = Parsetree.expression
 
   type size = int
 
@@ -106,29 +104,21 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expr = struct
 end
 
 let make_module bindings =
-  let open Migrate_parsetree.Ast_408.Ast_helper in
+  let open Ast_helper in
   let structure_items =
     List.map
       (fun (name, expr) ->
         let name = Printf.sprintf "cost_%s" name in
-        Str.value
-          Migrate_parsetree.Ast_408.Asttypes.Nonrecursive
-          [Vb.mk (Codegen_helpers.pvar name) expr])
+        Str.value Asttypes.Nonrecursive [Vb.mk (Codegen_helpers.pvar name) expr])
       bindings
   in
   Str.module_
-    (Mb.mk (Codegen_helpers.loc "Generated") @@ Mod.structure structure_items)
+    (Mb.mk (Codegen_helpers.loc (Some "Generated"))
+    @@ Mod.structure structure_items)
 
-module Convert_to_current =
-  Migrate_parsetree.Convert
-    (Migrate_parsetree.OCaml_408)
-    (Migrate_parsetree.OCaml_current)
+let pp_expr fmtr expr = Pprintast.expression fmtr expr
 
-let pp_expr fmtr expr =
-  Pprintast.expression fmtr (Convert_to_current.copy_expression expr)
-
-let pp_structure_item fmtr generated =
-  Pprintast.structure fmtr (Convert_to_current.copy_structure [generated])
+let pp_structure_item fmtr generated = Pprintast.structure fmtr [generated]
 
 (* ------------------------------------------------------------------------- *)
 
@@ -144,7 +134,8 @@ let load_solution (fn : string) : solution =
   let infile = open_in fn in
   try
     let res = Marshal.from_channel infile in
-    close_in infile ; res
+    close_in infile ;
+    res
   with exn ->
     close_in infile ;
     Format.eprintf "Codegen.load_solution: could not load %s@." fn ;
@@ -163,8 +154,7 @@ let codegen (Model.For_codegen model) (sol : solution)
     match Free_variable.Map.find fv sol with
     | None ->
         raise (Fixed_point_transform.Codegen_error (Variable_not_found fv))
-    | Some f ->
-        f
+    | Some f -> f
   in
   let module T = (val transform) in
   let module Impl = T (Lift_then_print) in
@@ -176,8 +166,7 @@ let codegen (Model.For_codegen model) (sol : solution)
       (Impl)
   in
   match model with
-  | Model.Preapplied _ ->
-      None
+  | Model.Preapplied _ -> None
   | Model.Packaged {conv = _; model} ->
       let module M = (val model) in
       let module M = M.Def (Subst_impl) in

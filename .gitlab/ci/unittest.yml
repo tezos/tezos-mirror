@@ -97,7 +97,6 @@ unit:non-proto:
     - scripts/test_wrapper.sh src/lib_stdlib stdlib
     - scripts/test_wrapper.sh src/lib_store/legacy_store store_legacy_store
     - scripts/test_wrapper.sh src/lib_store store
-    - scripts/test_wrapper.sh src/tooling src_tooling
     - scripts/test_wrapper.sh vendors/ocaml-ledger-wallet ocaml-ledger-wallet
     - scripts/test_wrapper.sh vendors/ocaml-lmdb ocaml-lmdb
 ##END_UNITTEST##

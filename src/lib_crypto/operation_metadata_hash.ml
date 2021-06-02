@@ -23,16 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Blake2B.Make
-          (Base58)
-          (struct
-            let name = "Operation_metadata_hash"
+include
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Operation_metadata_hash"
 
-            let title = "A Tezos operation metadata ID"
+      let title = "A Tezos operation metadata ID"
 
-            let b58check_prefix = Base58.Prefix.operation_metadata_hash
+      let b58check_prefix = Base58.Prefix.operation_metadata_hash
 
-            let size = None
-          end)
+      let size = None
+    end)
 
 let () = Base58.check_encoded_prefix b58check_encoding "r" 51

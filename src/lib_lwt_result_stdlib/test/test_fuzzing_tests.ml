@@ -232,8 +232,7 @@ end
 module TestIteriAgainstStdlibList (M : sig
   include BASE with type 'a elt := int
 
-  include
-    Traits.ITERI_SEQUENTIAL with type 'a elt := int and type 'a t := int t
+  include Traits.ITERI_SEQUENTIAL with type 'a elt := int and type 'a t := int t
 end) : Test = struct
   open QCheck
 
@@ -280,8 +279,8 @@ end) : Test = struct
       (fun (Fun (_, fn), init, input) ->
         eq_es
           (let acc = ref init in
-           M.iteri_es (IteriESOf.fn acc fn) (M.of_list input)
-           >|=? fun () -> !acc)
+           M.iteri_es (IteriESOf.fn acc fn) (M.of_list input) >|=? fun () ->
+           !acc)
           (Lwt.return_ok @@ with_stdlib_iteri (fn, init, input)))
 
   let tests = [iteri; iteri_e; iteri_s; iteri_es]
@@ -558,8 +557,7 @@ end) : Test = struct
       (fun (const, Fun (_, fn), init, input) ->
         eq_es
           (M.fold_es
-             (fun x acc ->
-               FoldESOf.fn fn const x >|=? fun delta -> acc + delta)
+             (fun x acc -> FoldESOf.fn fn const x >|=? fun delta -> acc + delta)
              (M.of_list input)
              init)
           (Lwt.return_ok @@ with_stdlib_fold_left const (fn, init, input)))
@@ -843,8 +841,8 @@ end) : Test = struct
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
         eq
-          ( M.filter_map (FilterMapOf.fns pred arith const) (M.of_list input)
-          |> M.to_list )
+          (M.filter_map (FilterMapOf.fns pred arith const) (M.of_list input)
+          |> M.to_list)
           (with_stdlib_filter_map (pred, arith, const, input)))
 
   let filter_map_e =
@@ -853,8 +851,8 @@ end) : Test = struct
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
         eq_e
-          ( M.filter_map_e (FilterMapEOf.fns pred arith const) (M.of_list input)
-          >|? M.to_list )
+          (M.filter_map_e (FilterMapEOf.fns pred arith const) (M.of_list input)
+          >|? M.to_list)
           (Ok (with_stdlib_filter_map (pred, arith, const, input))))
 
   let filter_map_s =
@@ -863,8 +861,8 @@ end) : Test = struct
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
         eq_s
-          ( M.filter_map_s (FilterMapSOf.fns pred arith const) (M.of_list input)
-          >|= M.to_list )
+          (M.filter_map_s (FilterMapSOf.fns pred arith const) (M.of_list input)
+          >|= M.to_list)
           (Lwt.return @@ with_stdlib_filter_map (pred, arith, const, input)))
 
   let filter_map_es =
@@ -873,10 +871,10 @@ end) : Test = struct
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
         eq_es
-          ( M.filter_map_es
-              (FilterMapESOf.fns pred arith const)
-              (M.of_list input)
-          >|=? M.to_list )
+          (M.filter_map_es
+             (FilterMapESOf.fns pred arith const)
+             (M.of_list input)
+          >|=? M.to_list)
           (Lwt.return_ok @@ with_stdlib_filter_map (pred, arith, const, input)))
 
   let tests = [filter_map; filter_map_e; filter_map_s; filter_map_es]
@@ -898,8 +896,8 @@ end) : Test = struct
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
         eq_s
-          ( M.filter_map_p (FilterMapSOf.fns pred arith const) (M.of_list input)
-          >|= M.to_list )
+          (M.filter_map_p (FilterMapSOf.fns pred arith const) (M.of_list input)
+          >|= M.to_list)
           (Lwt.return @@ with_stdlib_filter_map (pred, arith, const, input)))
 
   let filter_map_ep =
@@ -908,10 +906,10 @@ end) : Test = struct
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
         eq_es
-          ( M.filter_map_ep
-              (FilterMapESOf.fns pred arith const)
-              (M.of_list input)
-          >|=? M.to_list )
+          (M.filter_map_ep
+             (FilterMapESOf.fns pred arith const)
+             (M.of_list input)
+          >|=? M.to_list)
           (Lwt.return_ok @@ with_stdlib_filter_map (pred, arith, const, input)))
 
   let tests = [filter_map_p; filter_map_ep]
@@ -993,8 +991,8 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
         eq
-          ( M.partition_e (CondEOf.fn pred const) (M.of_list input)
-          >|? to_list_pair )
+          (M.partition_e (CondEOf.fn pred const) (M.of_list input)
+          >|? to_list_pair)
           (Ok (with_stdlib_partition (pred, const, input))))
 
   let partition_s =
@@ -1003,8 +1001,8 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
         eq_s
-          ( M.partition_s (CondSOf.fn pred const) (M.of_list input)
-          >|= to_list_pair )
+          (M.partition_s (CondSOf.fn pred const) (M.of_list input)
+          >|= to_list_pair)
           (Lwt.return @@ with_stdlib_partition (pred, const, input)))
 
   let partition_es =
@@ -1013,8 +1011,8 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
         eq_s
-          ( M.partition_es (CondESOf.fn pred const) (M.of_list input)
-          >|=? to_list_pair )
+          (M.partition_es (CondESOf.fn pred const) (M.of_list input)
+          >|=? to_list_pair)
           (Lwt.return_ok @@ with_stdlib_partition (pred, const, input)))
 
   let partition_p =
@@ -1023,8 +1021,8 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
         eq_s
-          ( M.partition_p (CondSOf.fn pred const) (M.of_list input)
-          >|= to_list_pair )
+          (M.partition_p (CondSOf.fn pred const) (M.of_list input)
+          >|= to_list_pair)
           (Lwt.return @@ with_stdlib_partition (pred, const, input)))
 
   let partition_ep =
@@ -1033,17 +1031,19 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
         eq_s
-          ( M.partition_ep (CondESOf.fn pred const) (M.of_list input)
-          >|=? to_list_pair )
+          (M.partition_ep (CondESOf.fn pred const) (M.of_list input)
+          >|=? to_list_pair)
           (Lwt.return_ok @@ with_stdlib_partition (pred, const, input)))
 
   let tests =
-    [ partition;
+    [
+      partition;
       partition_e;
       partition_s;
       partition_es;
       partition_p;
-      partition_ep ]
+      partition_ep;
+    ]
 end
 
 module TestDoubleTraversorsStdlibList (M : sig
@@ -1112,8 +1112,7 @@ end) : Test = struct
            let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.iter_e (uncurry @@ Iter2EOf.fn_e acc fn) leftright
-           >>? fun () ->
+           M.iter_e (uncurry @@ Iter2EOf.fn_e acc fn) leftright >>? fun () ->
            match leftovers with None -> Ok !acc | Some _ -> Error 101))
 
   let iter_s =
@@ -1133,13 +1132,10 @@ end) : Test = struct
            let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.iter_s (uncurry @@ Iter2SOf.fn_s acc fn) leftright
-           >>= fun () ->
+           M.iter_s (uncurry @@ Iter2SOf.fn_s acc fn) leftright >>= fun () ->
            match leftovers with
-           | None ->
-               Lwt.return_ok !acc
-           | Some _ ->
-               Lwt.return_error 101))
+           | None -> Lwt.return_ok !acc
+           | Some _ -> Lwt.return_error 101))
 
   let iter_es =
     Test.make
@@ -1158,13 +1154,10 @@ end) : Test = struct
            let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.iter_es (uncurry @@ Iter2ESOf.fn_e acc fn) leftright
-           >>=? fun () ->
+           M.iter_es (uncurry @@ Iter2ESOf.fn_e acc fn) leftright >>=? fun () ->
            match leftovers with
-           | None ->
-               Lwt.return_ok !acc
-           | Some _ ->
-               Lwt.return_error 101))
+           | None -> Lwt.return_ok !acc
+           | Some _ -> Lwt.return_error 101))
 
   let tests_iter = [iter; iter_e; iter_s; iter_es]
 
@@ -1199,8 +1192,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.map_e (uncurry @@ Map2EOf.fn_e fn) leftright
-           >>? fun t ->
+           M.map_e (uncurry @@ Map2EOf.fn_e fn) leftright >>? fun t ->
            match leftovers with None -> Ok t | Some _ -> Error 101))
 
   let map_s =
@@ -1217,8 +1209,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.map_s (uncurry @@ Map2SOf.fn fn) leftright
-           >|= fun t ->
+           M.map_s (uncurry @@ Map2SOf.fn fn) leftright >|= fun t ->
            match leftovers with None -> Ok t | Some _ -> Error 101))
 
   let map_es =
@@ -1235,13 +1226,10 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.map_es (uncurry @@ Map2ESOf.fn_e fn) leftright
-           >>=? fun t ->
+           M.map_es (uncurry @@ Map2ESOf.fn_e fn) leftright >>=? fun t ->
            match leftovers with
-           | None ->
-               Lwt.return_ok t
-           | Some _ ->
-               Lwt.return_error 101))
+           | None -> Lwt.return_ok t
+           | Some _ -> Lwt.return_error 101))
 
   let tests_map = [map; map_e; map_s; map_es]
 
@@ -1276,8 +1264,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.rev_map_e (uncurry @@ Map2EOf.fn_e fn) leftright
-           >>? fun t ->
+           M.rev_map_e (uncurry @@ Map2EOf.fn_e fn) leftright >>? fun t ->
            match leftovers with None -> Ok t | Some _ -> Error 101))
 
   let rev_map_s =
@@ -1294,8 +1281,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.rev_map_s (uncurry @@ Map2SOf.fn fn) leftright
-           >|= fun t ->
+           M.rev_map_s (uncurry @@ Map2SOf.fn fn) leftright >|= fun t ->
            match leftovers with None -> Ok t | Some _ -> Error 101))
 
   let rev_map_es =
@@ -1312,13 +1298,10 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.rev_map_es (uncurry @@ Map2ESOf.fn_e fn) leftright
-           >>=? fun t ->
+           M.rev_map_es (uncurry @@ Map2ESOf.fn_e fn) leftright >>=? fun t ->
            match leftovers with
-           | None ->
-               Lwt.return_ok t
-           | Some _ ->
-               Lwt.return_error 101))
+           | None -> Lwt.return_ok t
+           | Some _ -> Lwt.return_error 101))
 
   let tests_rev_map = [rev_map; rev_map_e; rev_map_s; rev_map_es]
 
@@ -1396,10 +1379,8 @@ end) : Test = struct
            M.fold_left_es (uncurry_l @@ Fold2ESOf.fn_e fn) init leftright
            >>=? fun t ->
            match leftovers with
-           | None ->
-               Lwt.return_ok t
-           | Some _ ->
-               Lwt.return_error 101))
+           | None -> Lwt.return_ok t
+           | Some _ -> Lwt.return_error 101))
 
   let tests_fold_left = [fold_left; fold_left_e; fold_left_s; fold_left_es]
 
@@ -1420,7 +1401,7 @@ end) : Test = struct
               (M.of_list left)
               (M.of_list right)
           >|? fun leftright ->
-          M.fold_right (uncurry_r @@ Fold2Of.fn fn) leftright init ))
+            M.fold_right (uncurry_r @@ Fold2Of.fn fn) leftright init ))
 
   let fold_right_e =
     Test.make
@@ -1439,7 +1420,7 @@ end) : Test = struct
               (M.of_list left)
               (M.of_list right)
           >>? fun leftright ->
-          M.fold_right_e (uncurry_r @@ Fold2EOf.fn_e fn) leftright init ))
+            M.fold_right_e (uncurry_r @@ Fold2EOf.fn_e fn) leftright init ))
 
   let fold_right_s =
     Test.make
@@ -1453,17 +1434,16 @@ end) : Test = struct
              (M.of_list left)
              (M.of_list right)
              init)
-          ( match
-              M.combine
-                ~when_different_lengths:101
-                (M.of_list left)
-                (M.of_list right)
-            with
+          (match
+             M.combine
+               ~when_different_lengths:101
+               (M.of_list left)
+               (M.of_list right)
+           with
           | Ok leftright ->
               M.fold_right_s (uncurry_r @@ Fold2SOf.fn fn) leftright init
               >>= Lwt.return_ok
-          | Error _ as err ->
-              Lwt.return err ))
+          | Error _ as err -> Lwt.return err))
 
   let fold_right_es =
     Test.make
@@ -1478,12 +1458,12 @@ end) : Test = struct
              (M.of_list right)
              init)
           ( Lwt.return
-            @@ M.combine
-                 ~when_different_lengths:101
-                 (M.of_list left)
-                 (M.of_list right)
+          @@ M.combine
+               ~when_different_lengths:101
+               (M.of_list left)
+               (M.of_list right)
           >>=? fun leftright ->
-          M.fold_right_es (uncurry_r @@ Fold2ESOf.fn_es fn) leftright init ))
+            M.fold_right_es (uncurry_r @@ Fold2ESOf.fn_es fn) leftright init ))
 
   let tests_fold_right = [fold_right; fold_right_e; fold_right_s; fold_right_es]
 
@@ -1504,12 +1484,9 @@ end) : Test = struct
            in
            let t = M.for_all (uncurry @@ Cond2Of.fn pred) leftright in
            match (t, leftovers) with
-           | (false, _) ->
-               Ok false
-           | (true, None) ->
-               Ok true
-           | (true, Some _) ->
-               Error 101))
+           | (false, _) -> Ok false
+           | (true, None) -> Ok true
+           | (true, Some _) -> Error 101))
 
   let for_all_e =
     Test.make
@@ -1526,15 +1503,11 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.for_all_e (uncurry @@ Cond2EOf.fn pred) leftright
-           >>? fun t ->
+           M.for_all_e (uncurry @@ Cond2EOf.fn pred) leftright >>? fun t ->
            match (t, leftovers) with
-           | (false, _) ->
-               Ok false
-           | (true, None) ->
-               Ok true
-           | (true, Some _) ->
-               Error 101))
+           | (false, _) -> Ok false
+           | (true, None) -> Ok true
+           | (true, Some _) -> Error 101))
 
   let for_all_s =
     Test.make
@@ -1551,15 +1524,11 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.for_all_s (uncurry @@ Cond2SOf.fn pred) leftright
-           >|= fun t ->
+           M.for_all_s (uncurry @@ Cond2SOf.fn pred) leftright >|= fun t ->
            match (t, leftovers) with
-           | (false, _) ->
-               Ok false
-           | (true, None) ->
-               Ok true
-           | (true, Some _) ->
-               Error 101))
+           | (false, _) -> Ok false
+           | (true, None) -> Ok true
+           | (true, Some _) -> Error 101))
 
   let for_all_es =
     Test.make
@@ -1575,15 +1544,11 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.for_all_es (uncurry @@ Cond2ESOf.fn pred) leftright
-           >>=? fun t ->
+           M.for_all_es (uncurry @@ Cond2ESOf.fn pred) leftright >>=? fun t ->
            match (t, leftovers) with
-           | (false, _) ->
-               Lwt.return_ok false
-           | (true, None) ->
-               Lwt.return_ok true
-           | (true, Some _) ->
-               Lwt.return_error 101))
+           | (false, _) -> Lwt.return_ok false
+           | (true, None) -> Lwt.return_ok true
+           | (true, Some _) -> Lwt.return_error 101))
 
   let tests_for_all = [for_all; for_all_e; for_all_s; for_all_es]
 
@@ -1604,12 +1569,9 @@ end) : Test = struct
            in
            let t = M.exists (uncurry @@ Cond2Of.fn pred) leftright in
            match (t, leftovers) with
-           | (true, _) ->
-               Ok true
-           | (false, None) ->
-               Ok false
-           | (false, Some _) ->
-               Error 101))
+           | (true, _) -> Ok true
+           | (false, None) -> Ok false
+           | (false, Some _) -> Error 101))
 
   let exists_e =
     Test.make
@@ -1626,15 +1588,11 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.exists_e (uncurry @@ Cond2EOf.fn pred) leftright
-           >>? fun t ->
+           M.exists_e (uncurry @@ Cond2EOf.fn pred) leftright >>? fun t ->
            match (t, leftovers) with
-           | (true, _) ->
-               Ok true
-           | (false, None) ->
-               Ok false
-           | (false, Some _) ->
-               Error 101))
+           | (true, _) -> Ok true
+           | (false, None) -> Ok false
+           | (false, Some _) -> Error 101))
 
   let exists_s =
     Test.make
@@ -1651,15 +1609,11 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.exists_s (uncurry @@ Cond2SOf.fn pred) leftright
-           >|= fun t ->
+           M.exists_s (uncurry @@ Cond2SOf.fn pred) leftright >|= fun t ->
            match (t, leftovers) with
-           | (true, _) ->
-               Ok true
-           | (false, None) ->
-               Ok false
-           | (false, Some _) ->
-               Error 101))
+           | (true, _) -> Ok true
+           | (false, None) -> Ok false
+           | (false, Some _) -> Error 101))
 
   let exists_es =
     Test.make
@@ -1675,15 +1629,11 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.exists_es (uncurry @@ Cond2ESOf.fn pred) leftright
-           >>=? fun t ->
+           M.exists_es (uncurry @@ Cond2ESOf.fn pred) leftright >>=? fun t ->
            match (t, leftovers) with
-           | (true, _) ->
-               Lwt.return_ok true
-           | (false, None) ->
-               Lwt.return_ok false
-           | (false, Some _) ->
-               Lwt.return_error 101))
+           | (true, _) -> Lwt.return_ok true
+           | (false, None) -> Lwt.return_ok false
+           | (false, Some _) -> Lwt.return_error 101))
 
   let tests_exists = [exists; exists_e; exists_s; exists_es]
 

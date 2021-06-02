@@ -181,11 +181,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   open RPC_context
 
   val info :
-    #simple ->
-    ?chain:chain ->
-    ?block:block ->
-    unit ->
-    block_info tzresult Lwt.t
+    #simple -> ?chain:chain -> ?block:block -> unit -> block_info tzresult Lwt.t
 
   val hash :
     #simple ->
@@ -361,8 +357,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ?chain:chain ->
         ?block:block ->
         Next_proto.operation list ->
-        (Next_proto.operation_data * Next_proto.operation_receipt) list
-        tzresult
+        (Next_proto.operation_data * Next_proto.operation_receipt) list tzresult
         Lwt.t
     end
 
@@ -378,15 +373,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     type t = {
       applied : (Operation_hash.t * Next_proto.operation) list;
       refused : (Next_proto.operation * error list) Operation_hash.Map.t;
-      branch_refused :
-        (Next_proto.operation * error list) Operation_hash.Map.t;
-      branch_delayed :
-        (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_delayed : (Next_proto.operation * error list) Operation_hash.Map.t;
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
-    val pending_operations :
-      #simple -> ?chain:chain -> unit -> t tzresult Lwt.t
+    val pending_operations : #simple -> ?chain:chain -> unit -> t tzresult Lwt.t
 
     val monitor_operations :
       #streamed ->
@@ -417,8 +409,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val header :
       ([`GET], prefix, prefix, unit, unit, block_header) RPC_service.t
 
-    val raw_header :
-      ([`GET], prefix, prefix, unit, unit, Bytes.t) RPC_service.t
+    val raw_header : ([`GET], prefix, prefix, unit, unit, Bytes.t) RPC_service.t
 
     val metadata :
       ([`GET], prefix, prefix, unit, unit, block_metadata) RPC_service.t
@@ -457,13 +448,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ([`GET], prefix, prefix, unit, unit, operation list list) RPC_service.t
 
       val operations_in_pass :
-        ( [`GET],
-          prefix,
-          prefix * int,
-          unit,
-          unit,
-          operation list )
-        RPC_service.t
+        ([`GET], prefix, prefix * int, unit, unit, operation list) RPC_service.t
 
       val operation :
         ( [`GET],
@@ -600,13 +585,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       end
 
       val complete :
-        ( [`GET],
-          prefix,
-          prefix * string,
-          unit,
-          unit,
-          string list )
-        RPC_service.t
+        ([`GET], prefix, prefix * string, unit, unit, string list) RPC_service.t
     end
 
     module Mempool : sig
@@ -638,8 +617,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ([`POST], 'a, 'b, unit, Data_encoding.json, unit) RPC_service.t
 
       val request_operations :
-        ('a, 'b) RPC_path.t ->
-        ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
+        ('a, 'b) RPC_path.t -> ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
     end
 
     val live_blocks :

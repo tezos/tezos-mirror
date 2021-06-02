@@ -45,146 +45,141 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
   match target_mode with
   | Archive when previous_mode <> Archive ->
       invalid_history_mode_switch ~previous_mode ~target_mode
-  | Archive ->
-      return 0l
+  | Archive -> return 0l
   | Full {offset = target_offset} -> (
-    match previous_mode with
-    | Archive ->
-        (* We can comply to every mode *)
-        (* The preserved_level is the level to be kept to be able to
-           export snasphots.*)
-        let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
-        let target_offset_window =
-          Int32.(mul blocks_per_cycle (of_int target_offset))
-        in
-        (* The expected_savepoint is the savepoint we expect given an
-           offset. We take the succ to be on a block of the end of a
-           cycle. *)
-        let expected_savepoint =
-          Int32.(succ (sub head_lafl target_offset_window))
-        in
-        let preserved_savepoint = min preserved_level expected_savepoint in
-        return (max 0l preserved_savepoint)
-    | Full {offset = previous_offset} ->
-        (* We are limited by the previous savepoint available *)
-        let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
-        let target_offset_window =
-          Int32.(mul blocks_per_cycle (of_int target_offset))
-        in
-        let previous_offset_window =
-          Int32.(mul blocks_per_cycle (of_int previous_offset))
-        in
-        let expected_savepoint =
-          Int32.(succ (sub head_lafl target_offset_window))
-        in
-        let preserved_savepoint = min preserved_level expected_savepoint in
-        (* The available savepoint is the savepoint available in the
-           current store. Which is the one computed with the offset or
-           the preserved one. *)
-        let available_savepoint =
-          Int32.(
-            max
-              0l
-              (min
-                 preserved_level
-                 (succ (sub head_lafl previous_offset_window))))
-        in
-        return (max available_savepoint preserved_savepoint)
-    | Rolling _ ->
-        invalid_history_mode_switch ~previous_mode ~target_mode )
+      match previous_mode with
+      | Archive ->
+          (* We can comply to every mode *)
+          (* The preserved_level is the level to be kept to be able to
+             export snasphots.*)
+          let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
+          let target_offset_window =
+            Int32.(mul blocks_per_cycle (of_int target_offset))
+          in
+          (* The expected_savepoint is the savepoint we expect given an
+             offset. We take the succ to be on a block of the end of a
+             cycle. *)
+          let expected_savepoint =
+            Int32.(succ (sub head_lafl target_offset_window))
+          in
+          let preserved_savepoint = min preserved_level expected_savepoint in
+          return (max 0l preserved_savepoint)
+      | Full {offset = previous_offset} ->
+          (* We are limited by the previous savepoint available *)
+          let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
+          let target_offset_window =
+            Int32.(mul blocks_per_cycle (of_int target_offset))
+          in
+          let previous_offset_window =
+            Int32.(mul blocks_per_cycle (of_int previous_offset))
+          in
+          let expected_savepoint =
+            Int32.(succ (sub head_lafl target_offset_window))
+          in
+          let preserved_savepoint = min preserved_level expected_savepoint in
+          (* The available savepoint is the savepoint available in the
+             current store. Which is the one computed with the offset or
+             the preserved one. *)
+          let available_savepoint =
+            Int32.(
+              max
+                0l
+                (min
+                   preserved_level
+                   (succ (sub head_lafl previous_offset_window))))
+          in
+          return (max available_savepoint preserved_savepoint)
+      | Rolling _ -> invalid_history_mode_switch ~previous_mode ~target_mode)
   | Rolling {offset = target_offset} -> (
-    match previous_mode with
-    | Archive ->
-        (* We can comply to every mode *)
-        let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
-        let target_offset_window =
-          Int32.(mul blocks_per_cycle (of_int target_offset))
-        in
-        let expected_savepoint =
-          Int32.(succ (sub head_lafl target_offset_window))
-        in
-        let preserved_savepoint = min preserved_level expected_savepoint in
-        return (max 0l preserved_savepoint)
-    | Full {offset = previous_offset} ->
-        (* We are limited by the previous savepoint available *)
-        let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
-        let target_offset_window =
-          Int32.(mul blocks_per_cycle (of_int target_offset))
-        in
-        let previous_offset_window =
-          Int32.(mul blocks_per_cycle (of_int previous_offset))
-        in
-        let expected_savepoint =
-          Int32.(succ (sub head_lafl target_offset_window))
-        in
-        let preserved_savepoint = min preserved_level expected_savepoint in
-        let available_savepoint =
-          Int32.(
-            max
-              0l
-              (min
-                 preserved_level
-                 (succ (sub head_lafl previous_offset_window))))
-        in
-        return (max available_savepoint preserved_savepoint)
-    | Rolling {offset = previous_offset} ->
-        (* We are limited by the previous savepoint available *)
-        let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
-        let target_offset_window =
-          Int32.(mul blocks_per_cycle (of_int target_offset))
-        in
-        let previous_offset_window =
-          Int32.(mul blocks_per_cycle (of_int previous_offset))
-        in
-        let expected_savepoint =
-          Int32.(succ (sub head_lafl target_offset_window))
-        in
-        let preserved_savepoint = min preserved_level expected_savepoint in
-        let available_savepoint =
-          Int32.(
-            max
-              0l
-              (min
-                 preserved_level
-                 (succ (sub head_lafl previous_offset_window))))
-        in
-        return (max available_savepoint preserved_savepoint) )
+      match previous_mode with
+      | Archive ->
+          (* We can comply to every mode *)
+          let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
+          let target_offset_window =
+            Int32.(mul blocks_per_cycle (of_int target_offset))
+          in
+          let expected_savepoint =
+            Int32.(succ (sub head_lafl target_offset_window))
+          in
+          let preserved_savepoint = min preserved_level expected_savepoint in
+          return (max 0l preserved_savepoint)
+      | Full {offset = previous_offset} ->
+          (* We are limited by the previous savepoint available *)
+          let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
+          let target_offset_window =
+            Int32.(mul blocks_per_cycle (of_int target_offset))
+          in
+          let previous_offset_window =
+            Int32.(mul blocks_per_cycle (of_int previous_offset))
+          in
+          let expected_savepoint =
+            Int32.(succ (sub head_lafl target_offset_window))
+          in
+          let preserved_savepoint = min preserved_level expected_savepoint in
+          let available_savepoint =
+            Int32.(
+              max
+                0l
+                (min
+                   preserved_level
+                   (succ (sub head_lafl previous_offset_window))))
+          in
+          return (max available_savepoint preserved_savepoint)
+      | Rolling {offset = previous_offset} ->
+          (* We are limited by the previous savepoint available *)
+          let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
+          let target_offset_window =
+            Int32.(mul blocks_per_cycle (of_int target_offset))
+          in
+          let previous_offset_window =
+            Int32.(mul blocks_per_cycle (of_int previous_offset))
+          in
+          let expected_savepoint =
+            Int32.(succ (sub head_lafl target_offset_window))
+          in
+          let preserved_savepoint = min preserved_level expected_savepoint in
+          let available_savepoint =
+            Int32.(
+              max
+                0l
+                (min
+                   preserved_level
+                   (succ (sub head_lafl previous_offset_window))))
+          in
+          return (max available_savepoint preserved_savepoint))
 
 let expected_caboose chain_store current_head blocks_per_cycle ~previous_mode
     ~target_mode savepoint =
   match target_mode with
-  | Archive ->
-      return 0l
-  | Full _ ->
-      return 0l
+  | Archive -> return 0l
+  | Full _ -> return 0l
   | Rolling {offset = target_offset} -> (
-    match previous_mode with
-    | Archive ->
-        return savepoint
-    | Full _ ->
-        (* We can get everything *)
-        Store.Block.get_block_metadata chain_store current_head
-        >>=? fun current_head_metadata ->
-        let head_lafl =
-          Store.Block.last_allowed_fork_level current_head_metadata
-        in
-        let offset_window =
-          Int32.(sub head_lafl (mul blocks_per_cycle (of_int target_offset)))
-        in
-        let expected_caboose =
-          (* When the offset window exceeds the savepoint, we take the
-             succ of the expected caboose to be at the end of a cycle.*)
-          if offset_window < savepoint then
-            Int32.(succ (min offset_window savepoint))
-          else min offset_window savepoint
-        in
-        return (max 0l expected_caboose)
-    | Rolling _ ->
-        (* savepoint = caboose *)
-        return savepoint )
+      match previous_mode with
+      | Archive -> return savepoint
+      | Full _ ->
+          (* We can get everything *)
+          Store.Block.get_block_metadata chain_store current_head
+          >>=? fun current_head_metadata ->
+          let head_lafl =
+            Store.Block.last_allowed_fork_level current_head_metadata
+          in
+          let offset_window =
+            Int32.(sub head_lafl (mul blocks_per_cycle (of_int target_offset)))
+          in
+          let expected_caboose =
+            (* When the offset window exceeds the savepoint, we take the
+               succ of the expected caboose to be at the end of a cycle.*)
+            if offset_window < savepoint then
+              Int32.(succ (min offset_window savepoint))
+            else min offset_window savepoint
+          in
+          return (max 0l expected_caboose)
+      | Rolling _ ->
+          (* savepoint = caboose *)
+          return savepoint)
 
-let check_consistency_after_switch descr chain_store ~previous_mode
-    ~target_mode blocks =
+let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
+    blocks =
   let current_head =
     List.(hd (rev blocks)) |> WithExceptions.Option.get ~loc:__LOC__
   in
@@ -197,11 +192,9 @@ let check_consistency_after_switch descr chain_store ~previous_mode
     ~msg:("expected history mode: " ^ descr)
     stored_history_mode
     target_mode ;
-  Store.Chain.savepoint chain_store
-  >>= fun (_, savepoint_level) ->
-  Store.Chain.caboose chain_store
-  >>= fun (_, caboose_level) ->
-  ( match (previous_mode, target_mode) with
+  Store.Chain.savepoint chain_store >>= fun (_, savepoint_level) ->
+  Store.Chain.caboose chain_store >>= fun (_, caboose_level) ->
+  (match (previous_mode, target_mode) with
   | (Archive, Archive)
   | (Archive, Rolling _)
   | (Archive, Full _)
@@ -234,8 +227,7 @@ let check_consistency_after_switch descr chain_store ~previous_mode
         expected_caboose_level
         caboose_level ;
       return_unit
-  | _ ->
-      Alcotest.fail "Should not happen in test" )
+  | _ -> Alcotest.fail "Should not happen in test")
   >>=? fun () ->
   match (previous_mode, target_mode) with
   | (Archive, Full _) | (Full _, Full _) ->
@@ -253,22 +245,18 @@ let check_consistency_after_switch descr chain_store ~previous_mode
       let (below_savepoint, above_savepoint) =
         List.split_n (Int32.to_int savepoint_level) above_caboose
       in
-      assert_absence_in_store chain_store below_caboose
-      >>=? fun () ->
+      assert_absence_in_store chain_store below_caboose >>=? fun () ->
       assert_presence_in_store ~with_metadata:false chain_store below_savepoint
       >>=? fun () ->
       assert_presence_in_store ~with_metadata:false chain_store above_savepoint
       >>=? fun () -> return_unit
-  | (p, n) when History_mode.equal p n ->
-      return_unit
-  | _ ->
-      assert false
+  | (p, n) when History_mode.equal p n -> return_unit
+  | _ -> assert false
 
-let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake
-    (store_dir, context_dir) store ~patch_context =
+let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake (store_dir, context_dir)
+    store ~patch_context =
   let chain_store = Store.main_chain_store store in
-  Store.Chain.genesis_block chain_store
-  >>= fun genesis_block ->
+  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
   Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
   >>=? fun (previously_baked_blocks, _current_head) ->
   Block_store.await_merging (Store.Unsafe.get_block_store chain_store)
@@ -276,8 +264,7 @@ let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake
   Error_monad.protect
     (fun () ->
       let genesis = Store.Chain.genesis chain_store in
-      Store.close_store store
-      >>= fun () ->
+      Store.close_store store >>= fun () ->
       Store.may_switch_history_mode
         ~store_dir
         ~context_dir
@@ -287,13 +274,10 @@ let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake
     ~on_error:(function
       | [Store_errors.Cannot_switch_history_mode _] ->
           return
-            ( match (from_hm, to_hm) with
-            | (_, Archive) ->
-                true
-            | (Rolling _, Full _) ->
-                true
-            | _ ->
-                false )
+            (match (from_hm, to_hm) with
+            | (_, Archive) -> true
+            | (Rolling _, Full _) -> true
+            | _ -> false)
       | err ->
           Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
           Alcotest.fail "Should not fail")
@@ -324,7 +308,8 @@ let make_tests speed patch_context =
   let history_modes =
     match speed with
     | `Slow ->
-        [ Archive;
+        [
+          Archive;
           Full {offset = 0};
           Full {offset = 3};
           default_full;
@@ -335,13 +320,16 @@ let make_tests speed patch_context =
           default_rolling;
           Rolling {offset = 7};
           Rolling {offset = 10};
-          default ]
+          default;
+        ]
     | `Quick ->
-        [ Archive;
+        [
+          Archive;
           Full {offset = 0};
           default_full;
           Rolling {offset = 0};
-          default_rolling ]
+          default_rolling;
+        ]
   in
   let nb_blocks_to_bake = [72; 72 * 2] in
   let permutations =

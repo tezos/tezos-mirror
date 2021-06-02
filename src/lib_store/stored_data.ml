@@ -37,13 +37,11 @@ type _ t =
 let read_json_file file =
   Lwt.catch
     (fun () ->
-      Lwt_utils_unix.Json.read_file (Naming.encoded_file_path file)
-      >>= function
+      Lwt_utils_unix.Json.read_file (Naming.encoded_file_path file) >>= function
       | Ok json ->
           let encoding = Naming.file_encoding file in
           Lwt.return_some (Data_encoding.Json.destruct encoding json)
-      | _ ->
-          Lwt.return_none)
+      | _ -> Lwt.return_none)
     (fun _ -> Lwt.return_none)
 
 let read_file file =
@@ -73,7 +71,7 @@ let write_file encoded_file data =
       let bytes = encoder data in
       let tmp_filename = path ^ "_tmp" in
       (* Write in a new temporary file then swap the files to avoid
-     partial writes. *)
+         partial writes. *)
       Lwt_unix.openfile
         tmp_filename
         [Unix.O_WRONLY; O_CREAT; O_TRUNC; O_CLOEXEC]
@@ -81,10 +79,8 @@ let write_file encoded_file data =
       >>= fun fd ->
       Lwt.catch
         (fun () ->
-          Lwt_utils_unix.write_bytes fd bytes
-          >>= fun () ->
-          Lwt_unix.close fd
-          >>= fun () ->
+          Lwt_utils_unix.write_bytes fd bytes >>= fun () ->
+          Lwt_unix.close fd >>= fun () ->
           Lwt_unix.rename tmp_filename path >>= fun () -> return_unit)
         (fun exn -> Lwt_utils_unix.safe_close fd >>= fun _ -> Lwt.fail exn))
 
@@ -93,22 +89,21 @@ let write (Stored_data v) data =
       if v.cache = data then return_unit
       else (
         v.cache <- data ;
-        write_file v.file data ))
+        write_file v.file data))
 
 let create file data =
   let file = file in
   let scheduler = Lwt_idle_waiter.create () in
-  write_file file data
-  >>=? fun () -> return (Stored_data {cache = data; file; scheduler})
+  write_file file data >>=? fun () ->
+  return (Stored_data {cache = data; file; scheduler})
 
 let update_with (Stored_data v) f =
   Lwt_idle_waiter.force_idle v.scheduler (fun () ->
-      f v.cache
-      >>= fun new_data ->
+      f v.cache >>= fun new_data ->
       if v.cache = new_data then return_unit
       else (
         v.cache <- new_data ;
-        write_file v.file new_data ))
+        write_file v.file new_data))
 
 let load file =
   (if Naming.is_json_file file then read_json_file file else read_file file)
@@ -116,10 +111,10 @@ let load file =
   | Some cache ->
       let scheduler = Lwt_idle_waiter.create () in
       return (Stored_data {cache; file; scheduler})
-  | None ->
-      fail (Missing_stored_data (Naming.encoded_file_path file))
+  | None -> fail (Missing_stored_data (Naming.encoded_file_path file))
 
 let init file ~initial_data =
   let path = Naming.encoded_file_path file in
-  Lwt_unix.file_exists path
-  >>= function true -> load file | false -> create file initial_data
+  Lwt_unix.file_exists path >>= function
+  | true -> load file
+  | false -> create file initial_data

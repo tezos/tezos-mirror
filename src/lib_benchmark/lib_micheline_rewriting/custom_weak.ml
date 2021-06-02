@@ -65,10 +65,8 @@ module Make_table (H : Hashtbl.HashedType) = struct
       if i >= Weak.length b then accu
       else
         match Weak.get b i with
-        | Some v ->
-            fold_bucket (i + 1) b (f v accu)
-        | None ->
-            fold_bucket (i + 1) b accu
+        | Some v -> fold_bucket (i + 1) b (f v accu)
+        | None -> fold_bucket (i + 1) b accu
     in
     Array.fold_right (fold_bucket 0) t.table init
 
@@ -80,8 +78,7 @@ module Make_table (H : Hashtbl.HashedType) = struct
         | Some v ->
             f v ;
             iter_bucket (i + 1) b
-        | None ->
-            iter_bucket (i + 1) b
+        | None -> iter_bucket (i + 1) b
     in
     Array.iter (iter_bucket 0) t.table
 
@@ -93,8 +90,7 @@ module Make_table (H : Hashtbl.HashedType) = struct
         | true ->
             f b t.hashes.(j) i ;
             iter_bucket (i + 1) j b
-        | false ->
-            iter_bucket (i + 1) j b
+        | false -> iter_bucket (i + 1) j b
     in
     Array.iteri (iter_bucket 0) t.table
 
@@ -121,20 +117,19 @@ module Make_table (H : Hashtbl.HashedType) = struct
           else if Weak.check bucket j then (
             Weak.blit bucket j bucket i 1 ;
             hbucket.(i) <- hbucket.(j) ;
-            loop (i + 1) (j - 1) )
+            loop (i + 1) (j - 1))
           else loop i (j - 1)
       in
       loop 0 (Weak.length bucket - 1) ;
-      ( if prev_len = 0 then (
-        t.table.(t.rover) <- emptybucket ;
-        t.hashes.(t.rover) <- [||] )
+      (if prev_len = 0 then (
+       t.table.(t.rover) <- emptybucket ;
+       t.hashes.(t.rover) <- [||])
       else
         let newbucket = weak_create prev_len in
         Weak.blit bucket 0 newbucket 0 prev_len ;
         t.table.(t.rover) <- newbucket ;
-        t.hashes.(t.rover) <- Array.sub hbucket 0 prev_len ) ;
-      if len > t.limit && prev_len <= t.limit then t.oversize <- t.oversize - 1
-      ) ;
+        t.hashes.(t.rover) <- Array.sub hbucket 0 prev_len) ;
+      if len > t.limit && prev_len <= t.limit then t.oversize <- t.oversize - 1) ;
     t.rover <- (t.rover + 1) mod Array.length t.table
 
   let rec resize t =
@@ -152,11 +147,11 @@ module Make_table (H : Hashtbl.HashedType) = struct
       t.hashes <- newt.hashes ;
       t.limit <- newt.limit ;
       t.oversize <- newt.oversize ;
-      t.rover <- t.rover mod Array.length newt.table )
+      t.rover <- t.rover mod Array.length newt.table)
     else (
       t.limit <- max_int ;
       (* maximum size already reached *)
-      t.oversize <- 0 )
+      t.oversize <- 0)
 
   and add_aux t setter d h index =
     let bucket = t.table.(index) in
@@ -180,10 +175,12 @@ module Make_table (H : Hashtbl.HashedType) = struct
           t.oversize <- t.oversize + 1 ;
           for _i = 0 to over_limit do
             test_shrink_bucket t
-          done ) ;
-        if t.oversize > Array.length t.table / over_limit then resize t )
+          done) ;
+        if t.oversize > Array.length t.table / over_limit then resize t)
       else if Weak.check bucket i then loop (i + 1)
-      else (setter bucket i d ; hashes.(i) <- h)
+      else (
+        setter bucket i d ;
+        hashes.(i) <- h)
     in
     loop 0
 
@@ -202,9 +199,8 @@ module Make_table (H : Hashtbl.HashedType) = struct
       else if h = hashes.(i) then
         match Weak.get_copy bucket i with
         | Some v when H.equal v d -> (
-          match Weak.get bucket i with Some v -> v | None -> loop (i + 1) )
-        | _ ->
-            loop (i + 1)
+            match Weak.get bucket i with Some v -> v | None -> loop (i + 1))
+        | _ -> loop (i + 1)
       else loop (i + 1)
     in
     loop 0
@@ -227,10 +223,10 @@ module Make_table (H : Hashtbl.HashedType) = struct
       else if h = hashes.(i) then
         match Weak.get_copy bucket i with
         | Some v when H.equal v d -> (
-          match Weak.get bucket i with Some _ as v -> v | None -> loop (i + 1)
-          )
-        | _ ->
-            loop (i + 1)
+            match Weak.get bucket i with
+            | Some _ as v -> v
+            | None -> loop (i + 1))
+        | _ -> loop (i + 1)
       else loop (i + 1)
     in
     loop 0
@@ -245,10 +241,8 @@ module Make_table (H : Hashtbl.HashedType) = struct
       if i >= sz then ifnotfound
       else if h = hashes.(i) then
         match Weak.get_copy bucket i with
-        | Some v when H.equal v d ->
-            iffound bucket i
-        | _ ->
-            loop (i + 1)
+        | Some v when H.equal v d -> iffound bucket i
+        | _ -> loop (i + 1)
       else loop (i + 1)
     in
     loop 0
@@ -268,13 +262,10 @@ module Make_table (H : Hashtbl.HashedType) = struct
       else if h = hashes.(i) then
         match Weak.get_copy bucket i with
         | Some v when H.equal v d -> (
-          match Weak.get bucket i with
-          | Some v ->
-              loop (i + 1) (v :: accu)
-          | None ->
-              loop (i + 1) accu )
-        | _ ->
-            loop (i + 1) accu
+            match Weak.get bucket i with
+            | Some v -> loop (i + 1) (v :: accu)
+            | None -> loop (i + 1) accu)
+        | _ -> loop (i + 1) accu
       else loop (i + 1) accu
     in
     loop 0 []
@@ -289,13 +280,10 @@ module Make_table (H : Hashtbl.HashedType) = struct
       else if h = hashes.(i) then
         match Weak.get_copy bucket i with
         | Some _ -> (
-          match Weak.get bucket i with
-          | Some v ->
-              loop (i + 1) (v :: accu)
-          | None ->
-              loop (i + 1) accu )
-        | _ ->
-            loop (i + 1) accu
+            match Weak.get bucket i with
+            | Some v -> loop (i + 1) (v :: accu)
+            | None -> loop (i + 1) accu)
+        | _ -> loop (i + 1) accu
       else loop (i + 1) accu
     in
     loop 0 []

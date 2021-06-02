@@ -149,11 +149,7 @@ type error += Block_not_found of Block_hash.t
 type error += Block_contents_not_found of Block_hash.t
 
 module Block : sig
-  type t = {
-    chain_state : Chain.t;
-    hash : Block_hash.t;
-    header : Block_header.t;
-  }
+  type t = {chain_state : Chain.t; hash : Block_hash.t; header : Block_header.t}
 
   type block = t
 

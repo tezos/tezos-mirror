@@ -25,17 +25,18 @@
 (*****************************************************************************)
 
 module Public_key_hash = struct
-  include Blake2B.Make
-            (Base58)
-            (struct
-              let name = "Secp256k1.Public_key_hash"
+  include
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "Secp256k1.Public_key_hash"
 
-              let title = "A Secp256k1 public key hash"
+        let title = "A Secp256k1 public key hash"
 
-              let b58check_prefix = Base58.Prefix.secp256k1_public_key_hash
+        let b58check_prefix = Base58.Prefix.secp256k1_public_key_hash
 
-              let size = Some 20
-            end)
+        let size = Some 20
+      end)
 
   module Logging = struct
     let tag = Tag.def ~doc:title name pp
@@ -49,10 +50,8 @@ open Libsecp256k1.External
 let context =
   let ctx = Context.create () in
   match Context.randomize ctx (Bigstring.of_bytes (Hacl.Rand.gen 32)) with
-  | false ->
-      failwith "Secp256k1 context randomization failed. Aborting."
-  | true ->
-      ctx
+  | false -> failwith "Secp256k1 context randomization failed. Aborting."
+  | true -> ctx
 
 module Public_key = struct
   type t = Key.public Key.t
@@ -150,10 +149,8 @@ module Secret_key = struct
 
   let of_bytes_opt s =
     match Key.read_sk context (Bigstring.of_bytes s) with
-    | Ok x ->
-        Some x
-    | _ ->
-        None
+    | Ok x -> Some x
+    | _ -> None
 
   let to_bigstring = Key.to_bytes context
 
@@ -240,10 +237,8 @@ let size = Sign.plain_bytes
 
 let of_bytes_opt s =
   match Sign.read context (Bigstring.of_bytes s) with
-  | Ok s ->
-      Some s
-  | Error _ ->
-      None
+  | Ok s -> Some s
+  | Error _ -> None
 
 let to_bytes t = Bigstring.to_bytes (Sign.to_bytes ~der:false context t)
 

@@ -61,14 +61,11 @@ and 'a subdirs =
 and 'a suffix = {name : string; tree : 'a tree}
 
 let opt_mandatory name = function
-  | None ->
-      failwith ("missing mandatory value: " ^ name)
-  | Some x ->
-      x
+  | None -> failwith ("missing mandatory value: " ^ name)
+  | Some x -> x
 
 let parse_arg (json : Json.t) : arg =
-  Json.as_record json
-  @@ fun get ->
+  Json.as_record json @@ fun get ->
   {
     json;
     id = get "id" |> opt_mandatory "id" |> Json.as_string;
@@ -79,8 +76,7 @@ let parse_arg (json : Json.t) : arg =
 let rec parse_tree (json : Json.t) : Json.t tree =
   match Json.as_variant json with
   | ("static", static) ->
-      Json.as_record static
-      @@ fun get ->
+      Json.as_record static @@ fun get ->
       Static
         {
           get_service = get "get_service";
@@ -90,30 +86,25 @@ let rec parse_tree (json : Json.t) : Json.t tree =
           patch_service = get "patch_service";
           subdirs = get "subdirs" |> Option.map parse_subdirs;
         }
-  | ("dynamic", dynamic) ->
-      Dynamic dynamic
-  | (name, _) ->
-      failwith ("parse_tree: don't know what to do with: " ^ name)
+  | ("dynamic", dynamic) -> Dynamic dynamic
+  | (name, _) -> failwith ("parse_tree: don't know what to do with: " ^ name)
 
 and parse_subdirs (json : Json.t) : Json.t subdirs =
   match Json.as_variant json with
   | ("suffixes", suffixes) ->
       Suffixes (suffixes |> Json.as_list |> List.map parse_suffix)
   | ("dynamic_dispatch", dynamic_dispatch) ->
-      Json.as_record dynamic_dispatch
-      @@ fun get ->
+      Json.as_record dynamic_dispatch @@ fun get ->
       Dynamic_dispatch
         {
           arg = get "arg" |> opt_mandatory "dynamic_dispatch.arg" |> parse_arg;
           tree =
             get "tree" |> opt_mandatory "dynamic_dispatch.tree" |> parse_tree;
         }
-  | (name, _) ->
-      failwith ("parse_subdir: don't know what to do with: " ^ name)
+  | (name, _) -> failwith ("parse_subdir: don't know what to do with: " ^ name)
 
 and parse_suffix (json : Json.t) : Json.t suffix =
-  Json.as_record json
-  @@ fun get ->
+  Json.as_record json @@ fun get ->
   {
     name = get "name" |> opt_mandatory "suffixes.name" |> Json.as_string;
     tree = get "tree" |> opt_mandatory "suffixes.tree" |> parse_tree;
@@ -124,10 +115,8 @@ and parse_suffix (json : Json.t) : Json.t suffix =
 type path_item = PI_static of string | PI_dynamic of arg
 
 let show_path_item = function
-  | PI_static name ->
-      name
-  | PI_dynamic arg ->
-      "{" ^ arg.name ^ "}"
+  | PI_static name -> name
+  | PI_dynamic arg -> "{" ^ arg.name ^ "}"
 
 type path = path_item list
 
@@ -146,8 +135,7 @@ type 'a endpoint = {
    Return a list in reverse order as well (but paths are not returned in reverse order). *)
 let rec flatten_tree path acc tree =
   match tree with
-  | Static static ->
-      flatten_static path acc static
+  | Static static -> flatten_static path acc static
   | Dynamic _ ->
       (* We ignore those for now. *)
       acc
@@ -161,8 +149,7 @@ and flatten_static path acc static =
         static.delete_service,
         static.patch_service )
     with
-    | (None, None, None, None, None) ->
-        acc
+    | (None, None, None, None, None) -> acc
     | _ ->
         let endpoint =
           {
@@ -177,15 +164,12 @@ and flatten_static path acc static =
         endpoint :: acc
   in
   match static.subdirs with
-  | None ->
-      acc
-  | Some subdirs ->
-      flatten_subdirs path acc subdirs
+  | None -> acc
+  | Some subdirs -> flatten_subdirs path acc subdirs
 
 and flatten_subdirs path acc subdirs =
   match subdirs with
-  | Suffixes suffixes ->
-      List.fold_left (flatten_suffix path) acc suffixes
+  | Suffixes suffixes -> List.fold_left (flatten_suffix path) acc suffixes
   | Dynamic_dispatch {arg; tree} ->
       flatten_tree (PI_dynamic arg :: path) acc tree
 
@@ -201,16 +185,11 @@ type schemas = {json_schema : Json.t; binary_schema : Json.t}
 type meth = GET | POST | PUT | DELETE | PATCH
 
 let show_method = function
-  | GET ->
-      "GET"
-  | POST ->
-      "POST"
-  | PUT ->
-      "PUT"
-  | DELETE ->
-      "DELETE"
-  | PATCH ->
-      "PATCH"
+  | GET -> "GET"
+  | POST -> "POST"
+  | PUT -> "PUT"
+  | DELETE -> "DELETE"
+  | PATCH -> "PATCH"
 
 type query_parameter_kind =
   | Optional of {name : string}
@@ -236,22 +215,15 @@ type service = {
 }
 
 let parse_meth = function
-  | "GET" ->
-      GET
-  | "POST" ->
-      POST
-  | "PUT" ->
-      PUT
-  | "DELETE" ->
-      DELETE
-  | "PATCH" ->
-      PATCH
-  | meth ->
-      failwith ("unsupported HTTP method: " ^ meth)
+  | "GET" -> GET
+  | "POST" -> POST
+  | "PUT" -> PUT
+  | "DELETE" -> DELETE
+  | "PATCH" -> PATCH
+  | meth -> failwith ("unsupported HTTP method: " ^ meth)
 
 let parse_schemas (json : Json.t) : schemas =
-  Json.as_record json
-  @@ fun get ->
+  Json.as_record json @@ fun get ->
   {
     json_schema = get "json_schema" |> opt_mandatory "json_schema";
     binary_schema = get "binary_schema" |> opt_mandatory "binary_schema";
@@ -264,19 +236,16 @@ let parse_path (json : Json.t) : path =
   json |> Json.as_list |> List.map parse_path_item
 
 let parse_query_parameter (json : Json.t) : query_parameter =
-  Json.as_record json
-  @@ fun get ->
+  Json.as_record json @@ fun get ->
   (* First, fetch information which is at the top level of the record. *)
   let name = get "name" |> opt_mandatory "name" |> Json.as_string in
   let description = get "description" |> Option.map Json.as_string in
   (* Then, fetch information which is in the "kind" field. *)
   let (kind, id, descr) =
-    (get "kind" |> opt_mandatory "kind" |> Json.as_record)
-    @@ fun get ->
+    (get "kind" |> opt_mandatory "kind" |> Json.as_record) @@ fun get ->
     (* Function used for everything but kind "flag". *)
     let parse_kind_with_name make record =
-      Json.as_record record
-      @@ fun get ->
+      Json.as_record record @@ fun get ->
       let name = get "name" |> opt_mandatory "kind.name" |> Json.as_string in
       ( make name,
         get "id" |> Option.map Json.as_string,
@@ -293,30 +262,24 @@ let parse_query_parameter (json : Json.t) : query_parameter =
         parse_kind_with_name (fun name -> Single {name}) single
     | (None, None, None, Some flag) ->
         let () =
-          Json.as_record flag
-          @@ fun _get ->
+          Json.as_record flag @@ fun _get ->
           (* Flags have no fields. *)
           ()
         in
         (Flag, None, None)
-    | _ ->
-        fail "unsupported kind for query parameter %s" name
+    | _ -> fail "unsupported kind for query parameter %s" name
   in
   (* Both the top level and the kind can contain a description. Merge them. *)
   let description =
     match (description, descr) with
-    | (None, None) ->
-        None
-    | ((Some _ as x), None) | (None, (Some _ as x)) ->
-        x
-    | (Some x, Some y) ->
-        Some (y ^ " " ^ x)
+    | (None, None) -> None
+    | ((Some _ as x), None) | (None, (Some _ as x)) -> x
+    | (Some x, Some y) -> Some (y ^ " " ^ x)
   in
   {id; name; description; kind}
 
 let parse_service (json : Json.t) : service =
-  Json.as_record json
-  @@ fun get ->
+  Json.as_record json @@ fun get ->
   {
     meth = get "meth" |> opt_mandatory "meth" |> Json.as_string |> parse_meth;
     path = get "path" |> opt_mandatory "path" |> parse_path;
@@ -334,10 +297,8 @@ let parse_service (json : Json.t) : service =
 
 let rec map_tree f tree =
   match tree with
-  | Static static ->
-      Static (map_static f static)
-  | Dynamic json ->
-      Dynamic json
+  | Static static -> Static (map_static f static)
+  | Dynamic json -> Dynamic json
 
 and map_static f static =
   {
@@ -351,8 +312,7 @@ and map_static f static =
 
 and map_subdirs f subdirs =
   match subdirs with
-  | Suffixes suffixes ->
-      Suffixes (List.map (map_suffix f) suffixes)
+  | Suffixes suffixes -> Suffixes (List.map (map_suffix f) suffixes)
   | Dynamic_dispatch {arg; tree} ->
       Dynamic_dispatch {arg; tree = map_tree f tree}
 

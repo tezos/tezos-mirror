@@ -53,8 +53,3 @@
   (alias runtest_store)
   (alias runtest_store_legacy))
  (action (progn)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

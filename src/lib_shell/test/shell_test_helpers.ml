@@ -47,10 +47,8 @@ let genesis_time = Time.Protocol.of_seconds 0L
 
 let genesis_protocol =
   match Registered_protocol.get genesis_protocol_hash with
-  | None ->
-      assert false
-  | Some genesis_protocol ->
-      genesis_protocol
+  | None -> assert false
+  | Some genesis_protocol -> genesis_protocol
 
 module Genesis_proto = (val genesis_protocol)
 
@@ -88,8 +86,7 @@ let init_chain ?(history_mode = History_mode.Archive) base_dir =
   >>= function
   | Error err ->
       Format.kasprintf Lwt.fail_with "init error: %a" pp_print_error err
-  | Ok store ->
-      Lwt.return store
+  | Ok store -> Lwt.return store
 
 (** [init_mock_p2p] initializes a mock p2p *)
 let init_mock_p2p chain_name =

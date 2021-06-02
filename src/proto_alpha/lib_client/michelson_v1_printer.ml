@@ -47,8 +47,7 @@ let print_annot_expr_unwrapped ppf (expr, annot) =
   Format.fprintf ppf "%a%a" print_var_annots annot print_expr_unwrapped expr
 
 let print_stack ppf = function
-  | [] ->
-      Format.fprintf ppf "[]"
+  | [] -> Format.fprintf ppf "[]"
   | more ->
       Format.fprintf
         ppf
@@ -90,8 +89,7 @@ let print_big_map_diff ppf lazy_storage_diff =
   Format.fprintf
     ppf
     "@[<v 0>%a@]"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf ->
-       function
+    (Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf -> function
        | Contract.Legacy_big_map_diff.Clear id ->
            Format.fprintf ppf "Clear %a" pp_map id
        | Contract.Legacy_big_map_diff.Alloc {big_map; key_type; value_type} ->
@@ -116,8 +114,9 @@ let print_big_map_diff ppf lazy_storage_diff =
              big_map
              print_expr
              diff_key
-             (fun ppf -> function None -> () | Some x ->
-                   Format.fprintf ppf " to %a" print_expr x)
+             (fun ppf -> function
+               | None -> ()
+               | Some x -> Format.fprintf ppf " to %a" print_expr x)
              diff_value))
     (diff :> Contract.Legacy_big_map_diff.item list)
 
@@ -127,25 +126,17 @@ let inject_types type_map parsed =
         Seq (inject_loc `before loc, List.map inject_expr items)
     | Prim (loc, name, items, annot) ->
         Prim (inject_loc `after loc, name, List.map inject_expr items, annot)
-    | Int (loc, value) ->
-        Int (inject_loc `after loc, value)
-    | String (loc, value) ->
-        String (inject_loc `after loc, value)
-    | Bytes (loc, value) ->
-        Bytes (inject_loc `after loc, value)
+    | Int (loc, value) -> Int (inject_loc `after loc, value)
+    | String (loc, value) -> String (inject_loc `after loc, value)
+    | Bytes (loc, value) -> Bytes (inject_loc `after loc, value)
   and inject_loc which loc =
     let comment =
       let ( >?? ) = Option.bind in
-      List.assoc
-        ~equal:Int.equal
-        loc
-        parsed.Michelson_v1_parser.expansion_table
+      List.assoc ~equal:Int.equal loc parsed.Michelson_v1_parser.expansion_table
       >?? fun (_, locs) ->
       let locs = List.sort compare locs in
-      List.hd locs
-      >?? fun head_loc ->
-      List.assoc ~equal:Int.equal head_loc type_map
-      >?? fun (bef, aft) ->
+      List.hd locs >?? fun head_loc ->
+      List.assoc ~equal:Int.equal head_loc type_map >?? fun (bef, aft) ->
       let stack = match which with `before -> bef | `after -> aft in
       Some (Format.asprintf "%a" print_stack stack)
     in
@@ -167,19 +158,14 @@ let unparse ?type_map parse expanded =
           | Prim (loc, name, items, annot) ->
               Prim
                 (inject_loc `after loc, name, List.map inject_expr items, annot)
-          | Int (loc, value) ->
-              Int (inject_loc `after loc, value)
-          | String (loc, value) ->
-              String (inject_loc `after loc, value)
-          | Bytes (loc, value) ->
-              Bytes (inject_loc `after loc, value)
+          | Int (loc, value) -> Int (inject_loc `after loc, value)
+          | String (loc, value) -> String (inject_loc `after loc, value)
+          | Bytes (loc, value) -> Bytes (inject_loc `after loc, value)
         and inject_loc which loc =
           let comment =
             let ( >?? ) = Option.bind in
-            List.assoc ~equal:Int.equal loc unexpansion_table
-            >?? fun loc ->
-            List.assoc ~equal:Int.equal loc type_map
-            >?? fun (bef, aft) ->
+            List.assoc ~equal:Int.equal loc unexpansion_table >?? fun loc ->
+            List.assoc ~equal:Int.equal loc type_map >?? fun (bef, aft) ->
             let stack = match which with `before -> bef | `after -> aft in
             Some (Format.asprintf "%a" print_stack stack)
           in
@@ -194,10 +180,8 @@ let unparse ?type_map parse expanded =
         |> Format.asprintf "%a" Micheline_printer.print_expr
   in
   match parse source with
-  | (res, []) ->
-      res
-  | (_, _ :: _) ->
-      Stdlib.failwith "Michelson_v1_printer.unparse"
+  | (res, []) -> res
+  | (_, _ :: _) -> Stdlib.failwith "Michelson_v1_printer.unparse"
 
 let unparse_toplevel ?type_map =
   unparse ?type_map Michelson_v1_parser.parse_toplevel
@@ -230,16 +214,12 @@ let micheline_string_of_expression ~zero_loc expression =
     | Int (loc, i) ->
         let z =
           match Z.to_int i with
-          | 0 ->
-              "Z.zero"
-          | 1 ->
-              "Z.one"
-          | i ->
-              Format.asprintf "Z.of_int %d" i
+          | 0 -> "Z.zero"
+          | 1 -> "Z.one"
+          | i -> Format.asprintf "Z.of_int %d" i
         in
         Format.asprintf "Int (%d, %s)" (show_loc loc) z
-    | String (loc, s) ->
-        Format.asprintf "String (%d, \"%s\")" (show_loc loc) s
+    | String (loc, s) -> Format.asprintf "String (%d, \"%s\")" (show_loc loc) s
     | Bytes (loc, b) ->
         Format.asprintf
           "Bytes (%d, Bytes.of_string \"%s\")"

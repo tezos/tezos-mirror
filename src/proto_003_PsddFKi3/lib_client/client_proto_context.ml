@@ -29,12 +29,12 @@ open Alpha_client_context
 open Client_proto_contracts
 open Client_keys
 
-let get_balance (rpc : #Alpha_client_context.rpc_context) ~chain ~block
-    contract =
+let get_balance (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract
+    =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
-let get_storage (rpc : #Alpha_client_context.rpc_context) ~chain ~block
-    contract =
+let get_storage (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract
+    =
   Alpha_services.Contract.storage_opt rpc (chain, block) contract
 
 let get_big_map_value (rpc : #Alpha_client_context.rpc_context) ~chain ~block
@@ -46,35 +46,24 @@ let get_script (rpc : #Alpha_client_context.rpc_context) ~chain ~block contract
   Alpha_services.Contract.script_opt rpc (chain, block) contract
 
 let list_contract_labels (cctxt : #Alpha_client_context.full) ~chain ~block =
-  Alpha_services.Contract.list cctxt (chain, block)
-  >>=? fun contracts ->
+  Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
   List.map_es
     (fun h ->
-      ( match Contract.is_implicit h with
+      (match Contract.is_implicit h with
       | Some m -> (
-          Public_key_hash.rev_find cctxt m
-          >>=? function
-          | None ->
-              return ""
+          Public_key_hash.rev_find cctxt m >>=? function
+          | None -> return ""
           | Some nm -> (
-              RawContractAlias.find_opt cctxt nm
-              >>=? function
-              | None ->
-                  return (" (known as " ^ nm ^ ")")
-              | Some _ ->
-                  return (" (known as key:" ^ nm ^ ")") ) )
+              RawContractAlias.find_opt cctxt nm >>=? function
+              | None -> return (" (known as " ^ nm ^ ")")
+              | Some _ -> return (" (known as key:" ^ nm ^ ")")))
       | None -> (
-          RawContractAlias.rev_find cctxt h
-          >>=? function
-          | None -> return "" | Some nm -> return (" (known as " ^ nm ^ ")") )
-      )
+          RawContractAlias.rev_find cctxt h >>=? function
+          | None -> return ""
+          | Some nm -> return (" (known as " ^ nm ^ ")")))
       >>=? fun nm ->
       let kind =
-        match Contract.is_implicit h with
-        | Some _ ->
-            " (implicit)"
-        | None ->
-            ""
+        match Contract.is_implicit h with Some _ -> " (implicit)" | None -> ""
       in
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
@@ -83,8 +72,7 @@ let list_contract_labels (cctxt : #Alpha_client_context.full) ~chain ~block =
 let get_manager (cctxt : #Alpha_client_context.full) ~chain ~block source =
   Client_proto_contracts.get_manager cctxt ~chain ~block source
   >>=? fun src_pkh ->
-  Client_keys.get_key cctxt src_pkh
-  >>=? fun (src_name, src_pk, src_sk) ->
+  Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
   return (src_name, src_pkh, src_pk, src_sk)
 
 type period_info = {
@@ -104,12 +92,9 @@ type ballots_info = {
 let get_ballots_info (cctxt : #Alpha_client_context.full) ~chain ~block =
   (* Get the next level, not the current *)
   let cb = (chain, block) in
-  Alpha_services.Voting.ballots cctxt cb
-  >>=? fun ballots ->
-  Alpha_services.Voting.current_quorum cctxt cb
-  >>=? fun current_quorum ->
-  Alpha_services.Voting.listings cctxt cb
-  >>=? fun listings ->
+  Alpha_services.Voting.ballots cctxt cb >>=? fun ballots ->
+  Alpha_services.Voting.current_quorum cctxt cb >>=? fun current_quorum ->
+  Alpha_services.Voting.listings cctxt cb >>=? fun listings ->
   let max_participation =
     List.fold_left (fun acc (_, w) -> Int32.add w acc) 0l listings
   in
@@ -121,12 +106,9 @@ let get_ballots_info (cctxt : #Alpha_client_context.full) ~chain ~block =
 let get_period_info (cctxt : #Alpha_client_context.full) ~chain ~block =
   (* Get the next level, not the current *)
   let cb = (chain, block) in
-  Alpha_services.Helpers.current_level cctxt ~offset:1l cb
-  >>=? fun level ->
-  Alpha_services.Constants.all cctxt cb
-  >>=? fun constants ->
-  Alpha_services.Voting.current_proposal cctxt cb
-  >>=? fun current_proposal ->
+  Alpha_services.Helpers.current_level cctxt ~offset:1l cb >>=? fun level ->
+  Alpha_services.Constants.all cctxt cb >>=? fun constants ->
+  Alpha_services.Voting.current_proposal cctxt cb >>=? fun current_proposal ->
   let position = level.voting_period_position in
   let remaining =
     Int32.(sub constants.parametric.blocks_per_voting_period position)
@@ -142,19 +124,17 @@ let get_proposals (cctxt : #Alpha_client_context.full) ~chain ~block =
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match (a.receipt, a.protocol_data) with
   | (Some (Apply_results.Operation_metadata omd), Operation_data od) -> (
-    match Apply_results.kind_equal_list od.contents omd.contents with
-    | Some Apply_results.Eq ->
-        Operation_result.pp_operation_result
-          formatter
-          (od.contents, omd.contents)
-    | None ->
-        Stdlib.failwith "Unexpected result." )
+      match Apply_results.kind_equal_list od.contents omd.contents with
+      | Some Apply_results.Eq ->
+          Operation_result.pp_operation_result
+            formatter
+            (od.contents, omd.contents)
+      | None -> Stdlib.failwith "Unexpected result.")
   | (None, _) ->
       Stdlib.failwith
-        "Pruned metadata: the operation receipt was removed accordingly to \
-         the node's history mode."
-  | _ ->
-      Stdlib.failwith "Unexpected result."
+        "Pruned metadata: the operation receipt was removed accordingly to the \
+         node's history mode."
+  | _ -> Stdlib.failwith "Unexpected result."
 
 let get_operation_from_block (cctxt : #Client_context.full) ~chain predecessors
     operation_hash =
@@ -164,8 +144,7 @@ let get_operation_from_block (cctxt : #Client_context.full) ~chain predecessors
     ~predecessors
     operation_hash
   >>=? function
-  | None ->
-      return_none
+  | None -> return_none
   | Some (block, i, j) ->
       cctxt#message
         "Operation found in block: %a (pass: %d, offset: %d)"
@@ -186,7 +165,5 @@ let display_receipt_for_operation (cctxt : #Alpha_client_context.full) ~chain
     ?(predecessors = 10) operation_hash =
   get_operation_from_block cctxt ~chain predecessors operation_hash
   >>=? function
-  | None ->
-      failwith "Couldn't find operation"
-  | Some op ->
-      cctxt#message "%a" pp_operation op >>= fun () -> return_unit
+  | None -> failwith "Couldn't find operation"
+  | Some op -> cctxt#message "%a" pp_operation op >>= fun () -> return_unit

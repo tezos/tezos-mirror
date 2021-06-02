@@ -36,7 +36,7 @@ module Make (E : Set.OrderedType) = struct
           0 <= i < size /\ 0 <= j < size =>
           data.(j) = None \/ E.compare data.(i) data.(j) <= 0
        in \forall 0 <= i < size, P(i, 2 * i + 1) /\ P(i, 2 * (i + 1))
-   *)
+  *)
   type t = {mutable size : int; mutable data : E.t option array}
 
   let create bound =
@@ -60,7 +60,8 @@ module Make (E : Set.OrderedType) = struct
       if i > 0 then
         let j = (i - 1) / 2 in
         if E.compare (get_data data j) (get_data data i) > 0 then (
-          swap i j data ; loop j )
+          swap i j data ;
+          loop j)
     in
     loop i
 
@@ -81,13 +82,17 @@ module Make (E : Set.OrderedType) = struct
           let right_value = get_data data right_index in
           if E.compare right_value left_value < 0 then (
             if E.compare v right_value > 0 then (
-              swap i right_index data ; loop right_index ) )
+              swap i right_index data ;
+              loop right_index))
           else if E.compare v left_value > 0 then (
-            swap i left_index data ; loop left_index ) )
+            swap i left_index data ;
+            loop left_index))
         else if
           E.compare v left_value > 0
           (* swap the value with its left child, since the right one does not exist *)
-        then ( swap i left_index data ; loop left_index ) )
+        then (
+          swap i left_index data ;
+          loop left_index))
     in
     loop i
 
@@ -97,7 +102,7 @@ module Make (E : Set.OrderedType) = struct
     if pos < Array.length data then (
       data.(pos) <- Some x ;
       t.size <- pos + 1 ;
-      bubble_up pos t )
+      bubble_up pos t)
     else
       match peek t with
       | None ->
@@ -106,10 +111,13 @@ module Make (E : Set.OrderedType) = struct
           ()
       | Some hd ->
           (* if the inserted element is greater than the one at the top of the heap,
-         put it it in its place and bubble it down where it belongs *)
-          if E.compare x hd > 0 then (data.(0) <- Some x ; bubble_down 0 t)
+             put it it in its place and bubble it down where it belongs *)
+          if E.compare x hd > 0 then (
+            data.(0) <- Some x ;
+            bubble_down 0 t)
 
   let get t =
     let a = Array.init t.size (fun i -> get_data t.data i) in
-    Array.sort E.compare a ; Array.to_list a
+    Array.sort E.compare a ;
+    Array.to_list a
 end

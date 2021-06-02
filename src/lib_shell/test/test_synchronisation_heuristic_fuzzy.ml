@@ -72,8 +72,7 @@ module Reference : S = struct
      - does nothing if the [timestamp] provided as argument is older than the
      one associated to [peer] in [t]. *)
   let rec replace_or_add (ts, peer) = function
-    | [] ->
-        [(ts, peer)]
+    | [] -> [(ts, peer)]
     | (ts', peer') :: l ->
         if P2p_peer.Id.(peer = peer') then
           if Time.Protocol.(ts > ts') then (ts, peer) :: l
@@ -96,12 +95,9 @@ module Reference : S = struct
   let least_of = function [] -> assert false | a :: _ -> a
 
   let rec best_of = function
-    | [] ->
-        assert false
-    | [a] ->
-        a
-    | _ :: y :: l ->
-        best_of (y :: l)
+    | [] -> assert false
+    | [a] -> a
+    | _ :: y :: l -> best_of (y :: l)
 
   let get_status {threshold; latency; candidates} =
     if threshold < 0 then Not_synchronised
@@ -156,9 +152,10 @@ let peer_id =
     Format.asprintf "peer: %s" id
   in
   (map (fun () -> forge_peer_id ()) unit |> set_print pp_peer_id)
-  :: List.map
-       (fun p -> make ~print:pp_peer_id (Gen.return p))
-       [p1; p2; p3; p4; p5; p6; p7; p8; p9]
+  ::
+  List.map
+    (fun p -> make ~print:pp_peer_id (Gen.return p))
+    [p1; p2; p3; p4; p5; p6; p7; p8; p9]
   |> choose
 
 let now = Time.System.to_protocol @@ Systime_os.now ()
@@ -192,8 +189,7 @@ let pp fmt =
   function
   | Synchronised {is_chain_stuck = true} ->
       Format.fprintf fmt "Synchronised (stuck)"
-  | Not_synchronised ->
-      Format.fprintf fmt "Not synchronised"
+  | Not_synchronised -> Format.fprintf fmt "Not synchronised"
   | Synchronised {is_chain_stuck = false} ->
       Format.fprintf fmt "Synchronised (not stuck)"
 

@@ -70,7 +70,7 @@ type 'msg message_config = {
   chain_name : Distributed_db_version.Name.t;
       (** Identifier for this P2p protocol when establishing session. *)
   distributed_db_versions : Distributed_db_version.t list;
+      (** List of versions supported by this P2p protocol. *)
       (* TODO these last two fields aren't logically related to the `msg type,
          they should be moved somewhere else *)
-      (** List of versions supported by this P2p protocol. *)
 }

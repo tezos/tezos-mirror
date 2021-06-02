@@ -115,8 +115,8 @@ module Event = struct
       ~section
       ~name:"export_unspecified_hash"
       ~msg:
-        "There is no block hash specified with the `--block` option. Using \
-         the last checkpoint as the default value"
+        "There is no block hash specified with the `--block` option. Using the \
+         last checkpoint as the default value"
       ~level:Internal_event.Notice
       ()
 end
@@ -125,8 +125,7 @@ module Term = struct
   type subcommand = Export | Import | Info
 
   let check_snapshot_path = function
-    | None ->
-        fail Missing_file_argument
+    | None -> fail Missing_file_argument
     | Some path ->
         if Sys.file_exists path then return path
         else fail (Cannot_locate_file path)
@@ -134,36 +133,30 @@ module Term = struct
   let process subcommand args snapshot_path block disable_check export_format
       rolling reconstruct sandbox_file =
     let run =
-      Internal_event_unix.init ()
-      >>= fun () ->
+      Internal_event_unix.init () >>= fun () ->
       match subcommand with
       | Export ->
-          Node_shared_arg.read_data_dir args
-          >>=? fun data_dir ->
+          Node_shared_arg.read_data_dir args >>=? fun data_dir ->
           fail_unless
             (Sys.file_exists data_dir)
             (Data_dir_not_found {path = data_dir})
           >>=? fun () ->
           Node_shared_arg.read_and_patch_config_file args
           >>=? fun node_config ->
-          let ({genesis; chain_name; _} : Node_config_file.blockchain_network)
-              =
+          let ({genesis; chain_name; _} : Node_config_file.blockchain_network) =
             node_config.blockchain_network
           in
-          Node_data_version.ensure_data_dir data_dir
-          >>=? fun () ->
+          Node_data_version.ensure_data_dir data_dir >>=? fun () ->
           let context_dir = Node_data_version.context_dir data_dir in
           let store_dir = Node_data_version.store_dir data_dir in
-          ( match block with
+          (match block with
           | None ->
-              Event.(emit export_unspecified_hash) ()
-              >>= fun () -> return (`Alias (`Checkpoint, 0))
+              Event.(emit export_unspecified_hash) () >>= fun () ->
+              return (`Alias (`Checkpoint, 0))
           | Some block -> (
-            match Block_services.parse_block block with
-            | Error err ->
-                failwith "%s: %s" block err
-            | Ok block ->
-                return block ) )
+              match Block_services.parse_block block with
+              | Error err -> failwith "%s: %s" block err
+              | Ok block -> return block))
           >>=? fun block ->
           Snapshots.export
             ?snapshot_path
@@ -180,49 +173,39 @@ module Term = struct
               args.data_dir
               ~default:Node_config_file.default_data_dir
           in
-          Lwt_unix.file_exists data_dir
-          >>= fun existing_data_dir ->
+          Lwt_unix.file_exists data_dir >>= fun existing_data_dir ->
           Node_shared_arg.read_and_patch_config_file args
           >>=? fun node_config ->
           let ({genesis; _} : Node_config_file.blockchain_network) =
             node_config.blockchain_network
           in
-          check_snapshot_path snapshot_path
-          >>=? fun snapshot_path ->
+          check_snapshot_path snapshot_path >>=? fun snapshot_path ->
           let dir_cleaner () =
-            Event.(emit cleaning_up_after_failure) data_dir
-            >>= fun () ->
+            Event.(emit cleaning_up_after_failure) data_dir >>= fun () ->
             if existing_data_dir then
               (* Remove only context and store if the import directory
                  was previously existing. *)
               Lwt_utils_unix.remove_dir (Node_data_version.store_dir data_dir)
               >>= fun () ->
-              Lwt_utils_unix.remove_dir
-                (Node_data_version.context_dir data_dir)
+              Lwt_utils_unix.remove_dir (Node_data_version.context_dir data_dir)
             else Lwt_utils_unix.remove_dir data_dir
           in
-          Node_config_file.write args.config_file node_config
-          >>=? fun () ->
-          Node_data_version.ensure_data_dir ~bare:true data_dir
-          >>=? fun () ->
+          Node_config_file.write args.config_file node_config >>=? fun () ->
+          Node_data_version.ensure_data_dir ~bare:true data_dir >>=? fun () ->
           Lwt_lock_file.create
             ~unlink_on_exit:true
             (Node_data_version.lock_file data_dir)
           >>=? fun () ->
-          ( match
-              (node_config.blockchain_network.genesis_parameters, sandbox_file)
-            with
-          | (None, None) ->
-              return_none
+          (match
+             (node_config.blockchain_network.genesis_parameters, sandbox_file)
+           with
+          | (None, None) -> return_none
           | (Some parameters, None) ->
               return_some (parameters.context_key, parameters.values)
           | (_, Some filename) -> (
-              Lwt_utils_unix.Json.read_file filename
-              >>= function
-              | Error _err ->
-                  fail (Invalid_sandbox_file filename)
-              | Ok json ->
-                  return_some ("sandbox_parameter", json) ) )
+              Lwt_utils_unix.Json.read_file filename >>= function
+              | Error _err -> fail (Invalid_sandbox_file filename)
+              | Ok json -> return_some ("sandbox_parameter", json)))
           >>=? fun sandbox_parameters ->
           let context_root = Node_data_version.context_dir data_dir in
           let store_root = Node_data_version.store_dir data_dir in
@@ -233,15 +216,12 @@ module Term = struct
             ~on_error:(fun err ->
               dir_cleaner () >>= fun () -> Lwt.return (Error err))
             (fun () ->
-              ( match block with
+              (match block with
               | Some s -> (
-                match Block_hash.of_b58check_opt s with
-                | Some bh ->
-                    return_some bh
-                | None ->
-                    failwith "%s is not a valid block identifier." s )
-              | None ->
-                  return_none )
+                  match Block_hash.of_b58check_opt s with
+                  | Some bh -> return_some bh
+                  | None -> failwith "%s is not a valid block identifier." s)
+              | None -> return_none)
               >>=? fun block ->
               let check_consistency = not disable_check in
               Snapshots.import
@@ -268,14 +248,11 @@ module Term = struct
               ~user_activated_upgrades:
                 node_config.blockchain_network.user_activated_upgrades
               ~user_activated_protocol_overrides:
-                node_config.blockchain_network
-                  .user_activated_protocol_overrides
+                node_config.blockchain_network.user_activated_protocol_overrides
           else return_unit
       | Info -> (
-          check_snapshot_path snapshot_path
-          >>=? fun snapshot_path ->
-          Snapshots.read_snapshot_metadata ~snapshot_path
-          >>=? function
+          check_snapshot_path snapshot_path >>=? fun snapshot_path ->
+          Snapshots.read_snapshot_metadata ~snapshot_path >>=? function
           | Snapshots.Current_metadata metadata ->
               Format.printf
                 "@[<v 2>Snapshot information:@ %a@]@."
@@ -288,33 +265,24 @@ module Term = struct
                 version
                 History_mode.Legacy.pp
                 legacy_history_mode ;
-              return_unit )
+              return_unit)
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
-    | Ok () ->
-        `Ok ()
-    | Error err ->
-        `Error (false, Format.asprintf "%a" pp_print_error err)
+    | Ok () -> `Ok ()
+    | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
 
   open Cmdliner.Arg
 
   let subcommand_arg =
     let parser = function
-      | "export" ->
-          `Ok Export
-      | "import" ->
-          `Ok Import
-      | "info" ->
-          `Ok Info
-      | s ->
-          `Error ("invalid argument: " ^ s)
+      | "export" -> `Ok Export
+      | "import" -> `Ok Import
+      | "info" -> `Ok Info
+      | s -> `Error ("invalid argument: " ^ s)
     and printer ppf = function
-      | Export ->
-          Format.fprintf ppf "export"
-      | Import ->
-          Format.fprintf ppf "import"
-      | Info ->
-          Format.fprintf ppf "info"
+      | Export -> Format.fprintf ppf "export"
+      | Import -> Format.fprintf ppf "import"
+      | Info -> Format.fprintf ppf "info"
     in
     let doc =
       "Operation to perform. Possible values: $(b,export), $(b,import)."
@@ -327,9 +295,9 @@ module Term = struct
     let doc =
       "The name of the snapshot file to export. If no provided, it will be \
        automatically generated using the target block and following pattern: \
-       $(i,./<NETWORK>-<BLOCK_HASH>-<BLOCK_LEVEL>.<SNAPSHOT_KIND>). \
-       Otherwise, it must be given as a positional argument, just after the \
-       $(b,export) hint."
+       $(i,./<NETWORK>-<BLOCK_HASH>-<BLOCK_LEVEL>.<SNAPSHOT_KIND>). Otherwise, \
+       it must be given as a positional argument, just after the $(b,export) \
+       hint."
     in
     value & pos 1 (some string) None & info [] ~doc ~docv:"FILE"
 
@@ -357,17 +325,12 @@ module Term = struct
 
   let export_format =
     let parser = function
-      | "tar" ->
-          `Ok Snapshots.Tar
-      | "raw" ->
-          `Ok Raw
-      | s ->
-          `Error ("invalid argument: " ^ s)
+      | "tar" -> `Ok Snapshots.Tar
+      | "raw" -> `Ok Raw
+      | s -> `Error ("invalid argument: " ^ s)
     and printer ppf = function
-      | Snapshots.Tar ->
-          Format.fprintf ppf "tar"
-      | Raw ->
-          Format.fprintf ppf "raw"
+      | Snapshots.Tar -> Format.fprintf ppf "tar"
+      | Raw -> Format.fprintf ppf "raw"
     in
     let open Cmdliner.Arg in
     let doc =
@@ -404,12 +367,12 @@ module Term = struct
   let sandbox =
     let open Cmdliner in
     let doc =
-      "Run the snapshot import in sandbox mode. P2P to non-localhost \
-       addresses are disabled, and constants of the economic protocol can be \
-       altered with an optional JSON file. $(b,IMPORTANT): Using sandbox mode \
-       affects the node state and subsequent runs of Tezos node must also use \
-       sandbox mode. In order to run the node in normal mode afterwards, a \
-       full reset must be performed (by removing the node's data directory)."
+      "Run the snapshot import in sandbox mode. P2P to non-localhost addresses \
+       are disabled, and constants of the economic protocol can be altered \
+       with an optional JSON file. $(b,IMPORTANT): Using sandbox mode affects \
+       the node state and subsequent runs of Tezos node must also use sandbox \
+       mode. In order to run the node in normal mode afterwards, a full reset \
+       must be performed (by removing the node's data directory)."
     in
     Arg.(
       value
@@ -423,9 +386,9 @@ module Term = struct
   let term =
     let open Cmdliner.Term in
     ret
-      ( const process $ subcommand_arg $ Node_shared_arg.Term.args $ file_arg
-      $ block $ disable_check $ export_format $ export_rolling $ reconstruct
-      $ sandbox )
+      (const process $ subcommand_arg $ Node_shared_arg.Term.args $ file_arg
+     $ block $ disable_check $ export_format $ export_rolling $ reconstruct
+     $ sandbox)
 end
 
 module Manpage = struct
@@ -433,18 +396,21 @@ module Manpage = struct
     "The $(b,snapshot) command is meant to export and import snapshots files."
 
   let description =
-    [ `S "DESCRIPTION";
+    [
+      `S "DESCRIPTION";
       `P (command_description ^ " Several operations are possible: ");
       `P
         "$(b,export) allows to export a snapshot of the current node state \
          into a file.";
       `P "$(b,import) allows to import a snapshot from a given file.";
-      `P "$(b,info) displays information about the snapshot file." ]
+      `P "$(b,info) displays information about the snapshot file.";
+    ]
 
   let options = [`S "OPTIONS"]
 
   let examples =
-    [ `S "EXAMPLES";
+    [
+      `S "EXAMPLES";
       `I
         ( "$(b,Export a snapshot using the rolling mode)",
           "$(mname) snapshot export latest.rolling --rolling" );
@@ -459,13 +425,14 @@ module Manpage = struct
         ( "$(b,Import a snapshot located in file.full)",
           "$(mname) snapshot import file.full" );
       `I
-        ( "$(b,Import a snapshot and ensure that the imported data targets \
-           the given block hash (recommended))",
+        ( "$(b,Import a snapshot and ensure that the imported data targets the \
+           given block hash (recommended))",
           "$(mname) snapshot import file.full --block <BLOCK_HASH>" );
       `I
         ( "$(b,Import a full mode snapshot and then reconstruct the whole \
            storage to obtain an archive mode storage)",
-          "$(mname) snapshot import file.full --reconstruct" ) ]
+          "$(mname) snapshot import file.full --reconstruct" );
+    ]
 
   let man = description @ options @ examples @ Node_shared_arg.Manpage.bugs
 

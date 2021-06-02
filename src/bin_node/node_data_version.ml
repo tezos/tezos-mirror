@@ -58,10 +58,12 @@ let data_version = "0.0.5"
    converter), and to sequence them dynamically instead of
    statically. *)
 let upgradable_data_version =
-  [ ( "0.0.4",
+  [
+    ( "0.0.4",
       fun ~data_dir genesis ~chain_name ->
         let patch_context = Patch_context.patch_context genesis None in
-        Legacy.upgrade_0_0_4 ~data_dir ~patch_context ~chain_name genesis ) ]
+        Legacy.upgrade_0_0_4 ~data_dir ~patch_context ~chain_name genesis );
+  ]
 
 let version_encoding = Data_encoding.(obj1 (req "version" string))
 
@@ -92,10 +94,8 @@ let () =
     Data_encoding.(
       obj2 (req "expected_version" string) (req "actual_version" string))
     (function
-      | Invalid_data_dir_version (expected, actual) ->
-          Some (expected, actual)
-      | _ ->
-          None)
+      | Invalid_data_dir_version (expected, actual) -> Some (expected, actual)
+      | _ -> None)
     (fun (expected, actual) -> Invalid_data_dir_version (expected, actual)) ;
   register_error_kind
     `Permanent
@@ -157,10 +157,8 @@ let () =
     Data_encoding.(
       obj2 (req "expected_version" string) (req "actual_version" string))
     (function
-      | Data_dir_needs_upgrade {expected; actual} ->
-          Some (expected, actual)
-      | _ ->
-          None)
+      | Data_dir_needs_upgrade {expected; actual} -> Some (expected, actual)
+      | _ -> None)
     (fun (expected, actual) -> Data_dir_needs_upgrade {expected; actual})
 
 module Events = struct
@@ -259,25 +257,20 @@ let read_version_file version_file =
   >>=? fun json ->
   try return (Data_encoding.Json.destruct version_encoding json)
   with
-  | Data_encoding.Json.Cannot_destruct _
-  | Data_encoding.Json.Unexpected _
-  | Data_encoding.Json.No_case_matched _
-  | Data_encoding.Json.Bad_array_size _
-  | Data_encoding.Json.Missing_field _
-  | Data_encoding.Json.Unexpected_field _
+  | Data_encoding.Json.Cannot_destruct _ | Data_encoding.Json.Unexpected _
+  | Data_encoding.Json.No_case_matched _ | Data_encoding.Json.Bad_array_size _
+  | Data_encoding.Json.Missing_field _ | Data_encoding.Json.Unexpected_field _
   ->
     fail (Could_not_read_data_dir_version version_file)
 
 let check_data_dir_version files data_dir =
   let version_file = version_file data_dir in
-  Lwt_unix.file_exists version_file
-  >>= function
+  Lwt_unix.file_exists version_file >>= function
   | false ->
       let msg = Some (clean_directory files) in
       fail (Invalid_data_dir {data_dir; msg})
   | true -> (
-      read_version_file version_file
-      >>=? fun version ->
+      read_version_file version_file >>=? fun version ->
       if String.equal version data_version then return_none
       else
         match
@@ -285,10 +278,8 @@ let check_data_dir_version files data_dir =
             (fun (v, _) -> String.equal v version)
             upgradable_data_version
         with
-        | Some f ->
-            return_some f
-        | None ->
-            fail (Invalid_data_dir_version (data_version, version)) )
+        | Some f -> return_some f
+        | None -> fail (Invalid_data_dir_version (data_version, version)))
 
 let ensure_data_dir bare data_dir =
   let write_version () =
@@ -296,8 +287,7 @@ let ensure_data_dir bare data_dir =
   in
   Lwt.catch
     (fun () ->
-      Lwt_unix.file_exists data_dir
-      >>= function
+      Lwt_unix.file_exists data_dir >>= function
       | true -> (
           Lwt_stream.to_list (Lwt_unix.files_of_directory data_dir)
           >|= List.filter (fun s ->
@@ -306,62 +296,44 @@ let ensure_data_dir bare data_dir =
                   && s <> default_config_file_name
                   && s <> default_peers_file_name)
           >>= function
-          | [] ->
-              write_version ()
+          | [] -> write_version ()
           | files when bare ->
               let msg = Some (clean_directory files) in
               fail (Invalid_data_dir {data_dir; msg})
-          | files ->
-              check_data_dir_version files data_dir )
+          | files -> check_data_dir_version files data_dir)
       | false ->
-          Lwt_utils_unix.create_dir ~perm:0o700 data_dir
-          >>= fun () -> write_version ())
+          Lwt_utils_unix.create_dir ~perm:0o700 data_dir >>= fun () ->
+          write_version ())
     (function
-      | Unix.Unix_error _ ->
-          fail (Invalid_data_dir {data_dir; msg = None})
-      | exc ->
-          raise exc)
+      | Unix.Unix_error _ -> fail (Invalid_data_dir {data_dir; msg = None})
+      | exc -> raise exc)
 
 let check_data_dir_legacy_artifact data_dir =
-  let lmdb_store_artifact_path =
-    Legacy.temporary_former_store_path ~data_dir
-  in
-  Lwt_unix.file_exists lmdb_store_artifact_path
-  >>= function
-  | true ->
-      Events.(emit legacy_store_is_present) lmdb_store_artifact_path
-  | false ->
-      Lwt.return_unit
+  let lmdb_store_artifact_path = Legacy.temporary_former_store_path ~data_dir in
+  Lwt_unix.file_exists lmdb_store_artifact_path >>= function
+  | true -> Events.(emit legacy_store_is_present) lmdb_store_artifact_path
+  | false -> Lwt.return_unit
 
 let upgrade_data_dir ~data_dir genesis ~chain_name =
-  ensure_data_dir false data_dir
-  >>=? function
+  ensure_data_dir false data_dir >>=? function
   | None ->
-      Events.(emit dir_is_up_to_date ())
-      >>= fun () ->
+      Events.(emit dir_is_up_to_date ()) >>= fun () ->
       check_data_dir_legacy_artifact data_dir >>= fun () -> return_unit
   | Some (version, upgrade) -> (
-      Events.(emit upgrading_node (version, data_version))
-      >>= fun () ->
-      upgrade ~data_dir genesis ~chain_name
-      >>= function
+      Events.(emit upgrading_node (version, data_version)) >>= fun () ->
+      upgrade ~data_dir genesis ~chain_name >>= function
       | Ok _success_message ->
-          write_version_file data_dir
-          >>=? fun () ->
+          write_version_file data_dir >>=? fun () ->
           Events.(emit update_success ()) >>= fun () -> return_unit
-      | Error e ->
-          Events.(emit aborting_upgrade e) >>= fun () -> return_unit )
+      | Error e -> Events.(emit aborting_upgrade e) >>= fun () -> return_unit)
 
 let ensure_data_dir ?(bare = false) data_dir =
-  ensure_data_dir bare data_dir
-  >>=? function
-  | None ->
-      return_unit
+  ensure_data_dir bare data_dir >>=? function
+  | None -> return_unit
   | Some (version, _) ->
       fail (Data_dir_needs_upgrade {expected = data_version; actual = version})
 
 let upgrade_status data_dir =
-  read_version_file (version_file data_dir)
-  >>=? fun data_dir_version ->
-  Events.(emit upgrade_status (data_dir_version, data_version))
-  >>= fun () -> return_unit
+  read_version_file (version_file data_dir) >>=? fun data_dir_version ->
+  Events.(emit upgrade_status (data_dir_version, data_version)) >>= fun () ->
+  return_unit

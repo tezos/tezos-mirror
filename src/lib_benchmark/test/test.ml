@@ -26,17 +26,17 @@
 let tztest_assert name speed f =
   Alcotest_lwt.test_case name speed (fun _sw () ->
       match f () with
-      | true ->
-          Lwt.return_unit
-      | false ->
-          Lwt.fail Alcotest.Test_error
+      | true -> Lwt.return_unit
+      | false -> Lwt.fail Alcotest.Test_error
       | exception exn ->
           Format.printf "Uncaught exception %s" (Printexc.to_string exn) ;
           Lwt.fail Alcotest.Test_error)
 
 let tztest_nolwt name speed f =
   Alcotest_lwt.test_case name speed (fun _sw () ->
-      try f () ; Lwt.return_unit
+      try
+        f () ;
+        Lwt.return_unit
       with exn ->
         Format.printf "Uncaught exception %s" (Printexc.to_string exn) ;
         Lwt.fail Alcotest.Test_error)

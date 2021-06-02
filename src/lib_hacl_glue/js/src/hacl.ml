@@ -34,7 +34,8 @@ module Rand = struct
 
   let gen len =
     let buf = Bytes.create len in
-    write buf ; buf
+    write buf ;
+    buf
 end
 
 type haclstar_hash_state
@@ -236,10 +237,8 @@ module Nonce = struct
 
   let of_bytes_exn buf =
     match of_bytes buf with
-    | Some s ->
-        s
-    | None ->
-        invalid_arg "Hacl.Nonce.of_bytes_exn: invalid length"
+    | Some s -> s
+    | None -> invalid_arg "Hacl.Nonce.of_bytes_exn: invalid length"
 end
 
 module Secretbox = struct
@@ -316,33 +315,24 @@ module Box = struct
   let tagbytes = 16
 
   let unsafe_to_bytes : type a. a key -> Bytes.t = function
-    | Pk buf ->
-        buf
-    | Sk buf ->
-        buf
-    | Ck buf ->
-        buf
+    | Pk buf -> buf
+    | Sk buf -> buf
+    | Ck buf -> buf
 
   let blit_to_bytes : type a. a key -> ?pos:int -> Bytes.t -> unit =
    fun key ?(pos = 0) buf ->
     match key with
-    | Pk pk ->
-        Bytes.blit pk 0 buf pos pkbytes
-    | Sk sk ->
-        Bytes.blit sk 0 buf pos skbytes
-    | Ck ck ->
-        Bytes.blit ck 0 buf pos ckbytes
+    | Pk pk -> Bytes.blit pk 0 buf pos pkbytes
+    | Sk sk -> Bytes.blit sk 0 buf pos skbytes
+    | Ck ck -> Bytes.blit ck 0 buf pos ckbytes
 
   let equal : type a. a key -> a key -> bool =
    fun a b ->
     (* TODO re-group once coverage ppx is updated *)
     match (a, b) with
-    | (Pk a, Pk b) ->
-        Bytes.equal a b
-    | (Sk a, Sk b) ->
-        Bytes.equal a b
-    | (Ck a, Ck b) ->
-        Bytes.equal a b
+    | (Pk a, Pk b) -> Bytes.equal a b
+    | (Sk a, Sk b) -> Bytes.equal a b
+    | (Ck a, Ck b) -> Bytes.equal a b
 
   let unsafe_sk_of_bytes buf =
     if Bytes.length buf <> skbytes then
@@ -462,10 +452,8 @@ module Ed25519 : SIGNATURE = struct
   let sk_size = 32
 
   let to_bytes : type a. a key -> Bytes.t = function
-    | Pk buf ->
-        Bytes.copy buf
-    | Sk buf ->
-        Bytes.copy buf
+    | Pk buf -> Bytes.copy buf
+    | Sk buf -> Bytes.copy buf
 
   let sk_of_bytes seed =
     if Bytes.length seed <> sk_size then None else Some (Sk (Bytes.copy seed))
@@ -478,25 +466,20 @@ module Ed25519 : SIGNATURE = struct
   let blit_to_bytes : type a. a key -> ?pos:int -> Bytes.t -> unit =
    fun key ?(pos = 0) buf ->
     match key with
-    | Pk pk ->
-        Bytes.blit pk 0 buf pos pk_size
-    | Sk sk ->
-        Bytes.blit sk 0 buf pos sk_size
+    | Pk pk -> Bytes.blit pk 0 buf pos pk_size
+    | Sk sk -> Bytes.blit sk 0 buf pos sk_size
 
   let compare : type a. a key -> a key -> int =
    fun a b ->
     (* TODO re-group once coverage ppx is updated *)
     match (a, b) with
-    | (Pk a, Pk b) ->
-        Bytes.compare a b
-    | (Sk a, Sk b) ->
-        Bytes.compare a b
+    | (Pk a, Pk b) -> Bytes.compare a b
+    | (Sk a, Sk b) -> Bytes.compare a b
 
   let equal : type a. a key -> a key -> bool = fun a b -> compare a b = 0
 
   let neuterize : type a. a key -> public key = function
-    | Pk pk ->
-        Pk pk
+    | Pk pk -> Pk pk
     | Sk sk ->
         let pk = Bytes.create pk_size in
         js_Hacl_Ed25519_secret_to_public pk sk ;
@@ -588,16 +571,13 @@ module P256 : SIGNATURE = struct
    fun a b ->
     (* TODO re-group once coverage ppx is updated *)
     match (a, b) with
-    | (Pk a, Pk b) ->
-        Bytes.compare a b
-    | (Sk a, Sk b) ->
-        Bytes.compare a b
+    | (Pk a, Pk b) -> Bytes.compare a b
+    | (Sk a, Sk b) -> Bytes.compare a b
 
   let equal : type a. a key -> a key -> bool = fun a b -> compare a b = 0
 
   let neuterize : type a. a key -> public key = function
-    | Pk pk ->
-        Pk pk
+    | Pk pk -> Pk pk
     | Sk sk ->
         let pk = Bytes.create pk_size_raw in
         if not (pk_of_sk sk pk) then failwith "P256.neuterize: failure" ;
@@ -615,8 +595,7 @@ module P256 : SIGNATURE = struct
     | len when len = pk_size_uncompressed ->
         let decompress_ok = js_Hacl_P256_decompress_n buf pk in
         if decompress_ok then Some (Pk pk) else None
-    | _ ->
-        None
+    | _ -> None
 
   let pk_of_bytes : Bytes.t -> public key option =
    fun buf ->
@@ -631,12 +610,12 @@ module P256 : SIGNATURE = struct
 
   let to_bytes_with_compression : type a. ?compress:bool -> a key -> Bytes.t =
    fun ?compress:(comp = true) -> function
-    | Sk sk ->
-        Bytes.copy sk
+    | Sk sk -> Bytes.copy sk
     | Pk pk ->
         if comp then (
           let buf = Bytes.create pk_size in
-          compressed_from_raw pk buf ; buf )
+          compressed_from_raw pk buf ;
+          buf)
         else
           let buf = Bytes.create pk_size_uncompressed in
           uncompressed_from_raw pk buf ;
@@ -660,7 +639,7 @@ module P256 : SIGNATURE = struct
         else if comp then (
           let out = Bytes.create pk_size in
           compressed_from_raw pk out ;
-          Bytes.blit out 0 buf pos pk_size )
+          Bytes.blit out 0 buf pos pk_size)
         else
           let out = Bytes.create pk_size_uncompressed in
           uncompressed_from_raw pk out ;

@@ -42,7 +42,8 @@ let additional_info_encoding =
   let open Data_encoding in
   let open Version in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Dev"
         (constant "dev")
@@ -59,7 +60,8 @@ let additional_info_encoding =
         ~title:"Release"
         (constant "release")
         (function Release -> Some () | _ -> None)
-        (fun () -> Release) ]
+        (fun () -> Release);
+    ]
 
 (* Locally defined encoding for Version.t *)
 let current_version_encoding =

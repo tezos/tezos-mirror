@@ -96,10 +96,8 @@ let () =
         (req "file" string)
         (req "public_key_hash" Crypto_box.Public_key_hash.encoding))
     (function
-      | Identity_mismatch {filename; peer_id} ->
-          Some (filename, peer_id)
-      | _ ->
-          None)
+      | Identity_mismatch {filename; peer_id} -> Some (filename, peer_id)
+      | _ -> None)
     (fun (filename, peer_id) -> Identity_mismatch {filename; peer_id})
 
 let () =
@@ -108,8 +106,8 @@ let () =
     ~id:"main.identity.identity_keys_mismatch"
     ~title:"Identity keys mismatch"
     ~description:
-      "The current identity file has non-matching keys (secret key/ public \
-       key pair is not valid)"
+      "The current identity file has non-matching keys (secret key/ public key \
+       pair is not valid)"
     ~pp:(fun ppf (file, public_key) ->
       Format.fprintf
         ppf
@@ -120,25 +118,19 @@ let () =
         Crypto_box.pp_pk
         public_key)
     Data_encoding.(
-      obj2
-        (req "file" string)
-        (req "public_key" Crypto_box.public_key_encoding))
+      obj2 (req "file" string) (req "public_key" Crypto_box.public_key_encoding))
     (function
       | Identity_keys_mismatch {filename; expected_key} ->
           Some (filename, expected_key)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (filename, expected_key) ->
       Identity_keys_mismatch {filename; expected_key})
 
 let read ?expected_pow filename =
-  Lwt_unix.file_exists filename
-  >>= function
-  | false ->
-      fail (No_identity_file filename)
+  Lwt_unix.file_exists filename >>= function
+  | false -> fail (No_identity_file filename)
   | true -> (
-      Lwt_utils_unix.Json.read_file filename
-      >>=? fun json ->
+      Lwt_utils_unix.Json.read_file filename >>=? fun json ->
       let id = Data_encoding.Json.destruct P2p_identity.encoding json in
       let pkh = Crypto_box.hash id.public_key in
       (* check public_key hash *)
@@ -151,8 +143,7 @@ let read ?expected_pow filename =
       else
         (* check PoW level *)
         match expected_pow with
-        | None ->
-            return id
+        | None -> return id
         | Some expected ->
             let target = Crypto_box.make_pow_target expected in
             if
@@ -162,7 +153,7 @@ let read ?expected_pow filename =
                    id.proof_of_work_stamp
                    target)
             then fail (Insufficient_proof_of_work {expected})
-            else return id )
+            else return id)
 
 type error += Existent_identity_file of string
 
@@ -186,8 +177,7 @@ let () =
 let write file identity =
   if Sys.file_exists file then fail (Existent_identity_file file)
   else
-    Node_data_version.ensure_data_dir (Filename.dirname file)
-    >>=? fun () ->
+    Node_data_version.ensure_data_dir (Filename.dirname file) >>=? fun () ->
     Lwt_utils_unix.Json.write_file
       file
       (Data_encoding.Json.construct P2p_identity.encoding identity)
@@ -199,8 +189,7 @@ let generate_with_animation ppf target =
     ~make:(fun count ->
       Lwt.catch
         (fun () ->
-          P2p_identity.generate_with_bound ~max:count target
-          >|= fun id -> Ok id)
+          P2p_identity.generate_with_bound ~max:count target >|= fun id -> Ok id)
         (function
           | Not_found -> Lwt.return @@ Error count | exc -> Lwt.fail exc))
     ~on_retry:(fun time count ->
@@ -217,10 +206,8 @@ let generate identity_file expected_pow =
   else
     let target = Crypto_box.make_pow_target expected_pow in
     Format.eprintf "Generating a new identity... (level: %.2f) " expected_pow ;
-    generate_with_animation Format.err_formatter target
-    >>= fun id ->
-    write identity_file id
-    >>=? fun () ->
+    generate_with_animation Format.err_formatter target >>= fun id ->
+    write identity_file id >>=? fun () ->
     Format.eprintf
       "Stored the new identity (%a) into '%s'.@."
       P2p_peer.Id.pp

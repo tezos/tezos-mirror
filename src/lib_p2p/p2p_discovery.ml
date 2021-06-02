@@ -58,18 +58,14 @@ module Answer = struct
         let socket = Lwt_unix.socket PF_INET SOCK_DGRAM 0 in
         Lwt_unix.set_close_on_exec socket ;
         Lwt_canceler.on_cancel st.canceler (fun () ->
-            Lwt_utils_unix.safe_close socket
-            >>= function
+            Lwt_utils_unix.safe_close socket >>= function
             | Error trace ->
                 Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
                 Lwt.return_unit
-            | Ok () ->
-                Lwt.return_unit) ;
+            | Ok () -> Lwt.return_unit) ;
         Lwt_unix.setsockopt socket SO_BROADCAST true ;
         Lwt_unix.setsockopt socket SO_REUSEADDR true ;
-        let addr =
-          Lwt_unix.ADDR_INET (Unix.inet_addr_any, st.discovery_port)
-        in
+        let addr = Lwt_unix.ADDR_INET (Unix.inet_addr_any, st.discovery_port) in
         Lwt_unix.bind socket addr >>= fun () -> Lwt.return socket)
       (fun exn ->
         Events.(emit create_socket_error) () >>= fun () -> Lwt.fail exn)
@@ -82,48 +78,41 @@ module Answer = struct
     let rec aux () =
       let buf = Bytes.create Message.length in
       protect ~canceler:st.canceler (fun () ->
-          Lwt_unix.recvfrom socket buf 0 Message.length []
-          >>= fun content ->
+          Lwt_unix.recvfrom socket buf 0 Message.length [] >>= fun content ->
           Events.(emit message_received) () >>= fun () -> return content)
       >>=? function
       | (len, Lwt_unix.ADDR_INET (remote_addr, _))
         when Compare.Int.equal len Message.length -> (
-        match Data_encoding.Binary.of_bytes_opt Message.encoding buf with
-        | Some (key, remote_peer_id, remote_port)
-          when Compare.String.equal key Message.key
-               && not (P2p_peer.Id.equal remote_peer_id st.my_peer_id) -> (
-            let s_addr = Unix.string_of_inet_addr remote_addr in
-            match P2p_addr.of_string_opt s_addr with
-            | None ->
-                Events.(emit parse_error) s_addr >>= fun () -> aux ()
-            | Some addr ->
-                let (Pool pool) = st.pool in
-                Events.(emit register_new) (addr, remote_port)
-                >>= fun () ->
-                P2p_pool.register_new_point
-                  ~trusted:st.trust_discovered_peers
-                  pool
-                  (addr, remote_port)
-                |> ignore ;
-                aux () )
-        | _ ->
-            aux () )
-      | _ ->
-          aux ()
+          match Data_encoding.Binary.of_bytes_opt Message.encoding buf with
+          | Some (key, remote_peer_id, remote_port)
+            when Compare.String.equal key Message.key
+                 && not (P2p_peer.Id.equal remote_peer_id st.my_peer_id) -> (
+              let s_addr = Unix.string_of_inet_addr remote_addr in
+              match P2p_addr.of_string_opt s_addr with
+              | None -> Events.(emit parse_error) s_addr >>= fun () -> aux ()
+              | Some addr ->
+                  let (Pool pool) = st.pool in
+                  Events.(emit register_new) (addr, remote_port) >>= fun () ->
+                  P2p_pool.register_new_point
+                    ~trusted:st.trust_discovered_peers
+                    pool
+                    (addr, remote_port)
+                  |> ignore ;
+                  aux ())
+          | _ -> aux ())
+      | _ -> aux ()
     in
     aux ()
 
   let worker_loop st =
-    loop st
-    >>= function
-    | Error (Canceled :: _) ->
-        Lwt.return_unit
+    loop st >>= function
+    | Error (Canceled :: _) -> Lwt.return_unit
     | Error err ->
-        Events.(emit unexpected_error) ("answer", err)
-        >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
+        Events.(emit unexpected_error) ("answer", err) >>= fun () ->
+        Error_monad.cancel_with_exceptions st.canceler
     | Ok () ->
-        Events.(emit unexpected_exit) ()
-        >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
+        Events.(emit unexpected_exit) () >>= fun () ->
+        Error_monad.cancel_with_exceptions st.canceler
 
   let create my_peer_id pool ~trust_discovered_peers ~discovery_port =
     {
@@ -175,44 +164,37 @@ module Sender = struct
       (fun () ->
         let socket = Lwt_unix.(socket PF_INET SOCK_DGRAM 0) in
         Lwt_canceler.on_cancel st.canceler (fun () ->
-            Lwt_utils_unix.safe_close socket
-            >>= function
+            Lwt_utils_unix.safe_close socket >>= function
             | Error trace ->
                 Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
                 Lwt.return_unit
-            | Ok () ->
-                Lwt.return_unit) ;
+            | Ok () -> Lwt.return_unit) ;
         Lwt_unix.setsockopt socket Lwt_unix.SO_BROADCAST true ;
         let broadcast_ipv4 = Ipaddr_unix.V4.to_inet_addr st.discovery_addr in
         let addr = Lwt_unix.ADDR_INET (broadcast_ipv4, st.discovery_port) in
-        Lwt_unix.connect socket addr
-        >>= fun () ->
-        Events.(emit broadcast_message) ()
-        >>= fun () ->
-        Lwt_unix.sendto socket msg 0 Message.length [] addr
-        >>= fun _len ->
-        Lwt_utils_unix.safe_close socket
-        >>= function
+        Lwt_unix.connect socket addr >>= fun () ->
+        Events.(emit broadcast_message) () >>= fun () ->
+        Lwt_unix.sendto socket msg 0 Message.length [] addr >>= fun _len ->
+        Lwt_utils_unix.safe_close socket >>= function
         | Error trace ->
             Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
             Lwt.return_unit
-        | Ok () ->
-            Lwt.return_unit)
+        | Ok () -> Lwt.return_unit)
       (fun _exn -> Events.(emit broadcast_error) ())
 
   let rec worker_loop sender_config st =
-    protect ~canceler:st.canceler (fun () ->
-        broadcast_message st >>= fun () -> return_unit)
-    >>=? (fun () ->
-           protect ~canceler:st.canceler (fun () ->
-               Lwt.pick
-                 [ ( Lwt_condition.wait st.restart_discovery
-                   >>= fun () -> return Config.initial );
-                   ( Lwt_unix.sleep sender_config.Config.delay
-                   >>= fun () ->
-                   return
-                     {sender_config with Config.loop = succ sender_config.loop}
-                   ) ]))
+    ( protect ~canceler:st.canceler (fun () ->
+          broadcast_message st >>= fun () -> return_unit)
+    >>=? fun () ->
+      protect ~canceler:st.canceler (fun () ->
+          Lwt.pick
+            [
+              ( Lwt_condition.wait st.restart_discovery >>= fun () ->
+                return Config.initial );
+              ( Lwt_unix.sleep sender_config.Config.delay >>= fun () ->
+                return
+                  {sender_config with Config.loop = succ sender_config.loop} );
+            ]) )
     >>= function
     | Ok config when config.Config.loop = Config.max_loop ->
         let new_sender_config = {config with Config.loop = pred config.loop} in
@@ -220,11 +202,10 @@ module Sender = struct
     | Ok config ->
         let new_sender_config = Config.increase_delay config in
         worker_loop new_sender_config st
-    | Error (Canceled :: _) ->
-        Lwt.return_unit
+    | Error (Canceled :: _) -> Lwt.return_unit
     | Error err ->
-        Events.(emit unexpected_error) ("sender", err)
-        >>= fun () -> Error_monad.cancel_with_exceptions st.canceler
+        Events.(emit unexpected_error) ("sender", err) >>= fun () ->
+        Error_monad.cancel_with_exceptions st.canceler
 
   let create my_peer_id pool ~listening_port ~discovery_port ~discovery_addr =
     {
@@ -266,11 +247,15 @@ let create ~listening_port ~discovery_port ~discovery_addr
   in
   {answer; sender}
 
-let activate {answer; sender} = Answer.activate answer ; Sender.activate sender
+let activate {answer; sender} =
+  Answer.activate answer ;
+  Sender.activate sender
 
 let wakeup t = Lwt_condition.signal t.sender.restart_discovery ()
 
 let shutdown t =
   Lwt.join
-    [ Error_monad.cancel_with_exceptions t.answer.canceler;
-      Error_monad.cancel_with_exceptions t.sender.canceler ]
+    [
+      Error_monad.cancel_with_exceptions t.answer.canceler;
+      Error_monad.cancel_with_exceptions t.sender.canceler;
+    ]

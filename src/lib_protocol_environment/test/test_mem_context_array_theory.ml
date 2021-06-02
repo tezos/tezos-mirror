@@ -181,6 +181,8 @@ let () =
   in
   Alcotest.run
     "Memory context array theory"
-    [ ("domain", qcheck_wrap [test_domain]);
+    [
+      ("domain", qcheck_wrap [test_domain]);
       ("set", qcheck_wrap [test_set]);
-      ("get_set", qcheck_wrap [test_get_set_other; test_get_set]) ]
+      ("get_set", qcheck_wrap [test_get_set_other; test_get_set]);
+    ]

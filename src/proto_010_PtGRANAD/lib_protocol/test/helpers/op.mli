@@ -43,9 +43,7 @@ val endorsement_with_slot :
   Kind.endorsement_with_slot Operation.t tzresult Lwt.t
 
 val miss_signed_endorsement :
-  ?level:Raw_level.t ->
-  Context.t ->
-  Kind.endorsement Operation.t tzresult Lwt.t
+  ?level:Raw_level.t -> Context.t -> Kind.endorsement Operation.t tzresult Lwt.t
 
 val transaction :
   ?counter:Z.t ->

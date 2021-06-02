@@ -43,13 +43,10 @@ let json : Data_encoding.json testable = of_pp Data_encoding.Json.pp
     Note that the given function must still take care of test assertions. *)
 let tztest name speed f =
   Alcotest_lwt.test_case name speed (fun _sw () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
+      f () >>= function
+      | Ok () -> Lwt.return_unit
       | Error err ->
-          Tezos_stdlib_unix.Internal_event_unix.close ()
-          >>= fun () ->
+          Tezos_stdlib_unix.Internal_event_unix.close () >>= fun () ->
           Format.printf "@\n%a@." pp_print_error err ;
           Lwt.fail Alcotest.Test_error)
 
@@ -246,10 +243,8 @@ end = struct
       order. *)
   let get_events ?filter () : event list =
     match filter with
-    | None ->
-        !recorded_events
-    | Some f ->
-        List.filter (fun {section; _} -> section = f) !recorded_events
+    | None -> !recorded_events
+    | Some f -> List.filter (fun {section; _} -> section = f) !recorded_events
 
   let clear_events () : unit = recorded_events := []
 
@@ -260,8 +255,7 @@ end = struct
       (fun i {level = lvl; message = msg; section; _} ->
         let section_pp =
           match section with
-          | None ->
-              "[~]"
+          | None -> "[~]"
           | Some section ->
               Format.asprintf "%a" Internal_event.Section.pp section
         in
@@ -290,7 +284,7 @@ end = struct
     of_pp Internal_event.Section.pp
 
   let testable_event : event testable =
-    ( module struct
+    (module struct
       type t = event
 
       let equal (e1 : event) (e2 : event) =
@@ -310,14 +304,13 @@ end = struct
           Data_encoding.Json.pp
           event.json
     end : Alcotest.TESTABLE
-      with type t = event )
+      with type t = event)
 
   let assert_has_events msg ?filter ?(strict = true) (pats : Pattern.t list) =
     let events = get_events ?filter () in
     if strict then
       match List.combine_with_leftovers pats events with
-      | (pes, None) ->
-          List.iter (fun (p, e) -> Pattern.assert_event p e) pes
+      | (pes, None) -> List.iter (fun (p, e) -> Pattern.assert_event p e) pes
       | (_, Some (`Left pats)) ->
           Alcotest.fail ?here:None ?pos:None
           @@ Format.asprintf
@@ -352,18 +345,19 @@ let mock_sink : Mock_sink.t Internal_event.sink_definition =
  *)
 let with_empty_mock_sink (f : unit -> unit Lwt.t) : unit Lwt.t =
   ignore
-    ( if not (Mock_sink.is_activated ()) then (
-      Internal_event.All_sinks.register mock_sink ;
-      Internal_event.All_sinks.activate (Uri.of_string "mock-log://")
-      >>= function
-      | Ok _ ->
-          Lwt.return_unit
-      | Error errors ->
-          Format.printf
-            "Could not initialize mock sink:\n   %a\n"
-            pp_print_error
-            errors ;
-          Format.print_flush () ;
-          Lwt.return_unit )
-    else (Mock_sink.clear_events () ; Lwt.return_unit) ) ;
+    (if not (Mock_sink.is_activated ()) then (
+     Internal_event.All_sinks.register mock_sink ;
+     Internal_event.All_sinks.activate (Uri.of_string "mock-log://")
+     >>= function
+     | Ok _ -> Lwt.return_unit
+     | Error errors ->
+         Format.printf
+           "Could not initialize mock sink:\n   %a\n"
+           pp_print_error
+           errors ;
+         Format.print_flush () ;
+         Lwt.return_unit)
+    else (
+      Mock_sink.clear_events () ;
+      Lwt.return_unit)) ;
   f ()

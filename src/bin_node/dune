@@ -135,8 +135,3 @@
  (package tezos-node)
  (section bin)
  (files (tezos-sandboxed-node.sh as tezos-sandboxed-node.sh)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

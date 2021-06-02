@@ -53,8 +53,3 @@
                    -open Tezos_client_sapling_alpha
                    -open Tezos_rpc
                    -open Tezos_protocol_plugin_alpha)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

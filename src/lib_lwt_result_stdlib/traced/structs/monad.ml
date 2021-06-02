@@ -34,40 +34,28 @@ module Make (Trace : Traced_sigs.Trace.S) :
   let fail_trace e = fail (Trace.make e)
 
   let rec join_e_errors trace_acc = function
-    | Ok _ :: ts ->
-        join_e_errors trace_acc ts
-    | Error trace :: ts ->
-        join_e_errors (Trace.conp trace_acc trace) ts
-    | [] ->
-        Error trace_acc
+    | Ok _ :: ts -> join_e_errors trace_acc ts
+    | Error trace :: ts -> join_e_errors (Trace.conp trace_acc trace) ts
+    | [] -> Error trace_acc
 
   let rec join_e = function
-    | [] ->
-        unit_e
-    | Ok () :: ts ->
-        join_e ts
-    | Error trace :: ts ->
-        join_e_errors trace ts
+    | [] -> unit_e
+    | Ok () :: ts -> join_e ts
+    | Error trace :: ts -> join_e_errors trace ts
 
   let all_e ts =
     let rec aux acc = function
-      | [] ->
-          Ok (Stdlib.List.rev acc)
-      | Ok v :: ts ->
-          aux (v :: acc) ts
-      | Error trace :: ts ->
-          join_e_errors trace ts
+      | [] -> Ok (Stdlib.List.rev acc)
+      | Ok v :: ts -> aux (v :: acc) ts
+      | Error trace :: ts -> join_e_errors trace ts
     in
     aux [] ts
 
   let both_e a b =
     match (a, b) with
-    | (Ok a, Ok b) ->
-        Ok (a, b)
-    | (Error err, Ok _) | (Ok _, Error err) ->
-        Error err
-    | (Error erra, Error errb) ->
-        Error (Trace.conp erra errb)
+    | (Ok a, Ok b) -> Ok (a, b)
+    | (Error err, Ok _) | (Ok _, Error err) -> Error err
+    | (Error erra, Error errb) -> Error (Trace.conp erra errb)
 
   let join_ep ts = all_p ts >|= join_e
 

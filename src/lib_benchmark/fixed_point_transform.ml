@@ -100,7 +100,8 @@ let pp_fixed_point_transform_error fmtr (err : fixed_point_transform_error) =
 let cast_mode_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         ~title:"Ceil"
         (Tag 0)
         (constant "Ceil")
@@ -117,16 +118,15 @@ let cast_mode_encoding =
         (Tag 2)
         (constant "Round")
         (function Round -> Some () | _ -> None)
-        (fun () -> Round) ]
+        (fun () -> Round);
+    ]
 
 let options_encoding =
   let open Data_encoding in
   conv
-    (fun {precision; max_relative_error; cast_mode; inverse_scaling; resolution}
-         ->
+    (fun {precision; max_relative_error; cast_mode; inverse_scaling; resolution} ->
       (precision, max_relative_error, cast_mode, inverse_scaling, resolution))
-    (fun (precision, max_relative_error, cast_mode, inverse_scaling, resolution)
-         ->
+    (fun (precision, max_relative_error, cast_mode, inverse_scaling, resolution) ->
       {precision; max_relative_error; cast_mode; inverse_scaling; resolution})
     (obj5
        (req "precision" int31)
@@ -145,17 +145,12 @@ let () =
           let s =
             match error with
             | Bad_fpclass fpcl -> (
-              match fpcl with
-              | FP_subnormal ->
-                  "FP_subnormal"
-              | FP_infinite ->
-                  "FP_infinite"
-              | FP_nan ->
-                  "FP_nan"
-              | _ ->
-                  assert false )
-            | Negative_or_zero_fp ->
-                "<= 0"
+                match fpcl with
+                | FP_subnormal -> "FP_subnormal"
+                | FP_infinite -> "FP_infinite"
+                | FP_nan -> "FP_nan"
+                | _ -> assert false)
+            | Negative_or_zero_fp -> "<= 0"
           in
           Some
             (Printf.sprintf
@@ -164,8 +159,7 @@ let () =
       | Codegen_error err ->
           let s = Format.asprintf "%a" pp_fixed_point_transform_error err in
           Some s
-      | _ ->
-          None)
+      | _ -> None)
 
 (* ------------------------------------------------------------------------- *)
 (* Constant prettification *)
@@ -191,12 +185,9 @@ let snap_to_grid ~inverse_scaling ~resolution x =
 
 let int_of_float mode x =
   match mode with
-  | Ceil ->
-      int_of_float (Float.ceil x)
-  | Floor ->
-      int_of_float (Float.floor x)
-  | Round ->
-      int_of_float (Float.round x)
+  | Ceil -> int_of_float (Float.ceil x)
+  | Floor -> int_of_float (Float.floor x)
+  | Round -> int_of_float (Float.round x)
 
 (* Checks that a floating point number is 'good' *)
 let assert_fp_is_correct (x : float) =
@@ -206,8 +197,7 @@ let assert_fp_is_correct (x : float) =
       raise (Bad_floating_point_number (Bad_fpclass fpcl))
   | FP_normal when x <= 0.0 ->
       raise (Bad_floating_point_number Negative_or_zero_fp)
-  | _ ->
-      ()
+  | _ -> ()
 
 let cast_safely_to_int max_relative_error mode f : int =
   let i = int_of_float mode f in
@@ -263,10 +253,8 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
       if n <= 0 then (List.rev acc, l)
       else
         match l with
-        | [] ->
-            Stdlib.failwith "take"
-        | hd :: tl ->
-            take (n - 1) tl (hd :: acc)
+        | [] -> Stdlib.failwith "take"
+        | hd :: tl -> take (n - 1) tl (hd :: acc)
     in
     take n l []
 
@@ -281,8 +269,7 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
   let exponent_bits_to_int (l : int64 list) =
     let rec exponent_to_int (l : int64 list) (index : int) : int64 =
       match l with
-      | [] ->
-          -1023L
+      | [] -> -1023L
       | bit :: tail ->
           let tail = exponent_to_int tail (index + 1) in
           Int64.(add (shift_left bit index) tail)
@@ -314,10 +301,8 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) = struct
               else i
             in
             match term_opt with
-            | None ->
-                (k + 1, Some new_term)
-            | Some term ->
-                (k + 1, Some Lang.(term + new_term))
+            | None -> (k + 1, Some new_term)
+            | Some term -> (k + 1, Some Lang.(term + new_term))
           else (k + 1, term_opt))
         (0, None)
         bits
@@ -376,19 +361,15 @@ end = struct
      not too high. *)
   let cast_safe (type a) (x : a repr) : a repr =
     match x with
-    | Term _ ->
-        x
-    | Const f ->
-        Term (X.int (cast_safely_to_int cast_mode f))
+    | Term _ -> x
+    | Const f -> Term (X.int (cast_safely_to_int cast_mode f))
 
   let lift_unop op x = match x with Term x -> Term (op x) | _ -> cast_safe x
 
   let rec lift_binop op x y =
     match (x, y) with
-    | (Term x, Term y) ->
-        Term (op x y)
-    | _ ->
-        lift_binop op (cast_safe x) (cast_safe y)
+    | (Term x, Term y) -> Term (op x y)
+    | _ -> lift_binop op (cast_safe x) (cast_safe y)
 
   let gensym : unit -> string =
     let x = ref 0 in
@@ -411,14 +392,12 @@ end = struct
 
   let ( * ) x y =
     match (x, y) with
-    | (Term x, Term y) ->
-        Term X.(x * y)
+    | (Term x, Term y) -> Term X.(x * y)
     | (Term x, Const y) | (Const y, Term x) ->
         (* let-bind the non-constant term to avoid copying it. *)
         Term
           (X.let_ ~name:(gensym ()) x (fun x -> FPA.approx_mult precision x y))
-    | (Const x, Const y) ->
-        Const (x *. y)
+    | (Const x, Const y) -> Const (x *. y)
 
   let ( / ) = lift_binop X.( / )
 
@@ -445,12 +424,9 @@ end = struct
 
   let app (type a b) (fn : (a -> b) repr) (arg : a repr) : b repr =
     match (fn, arg) with
-    | (Term fn, Term arg) ->
-        Term (X.app fn arg)
-    | (Term fn, Const f) ->
-        Term (X.app fn (X.float f))
-    | (Const _, _) ->
-        assert false
+    | (Term fn, Term arg) -> Term (X.app fn arg)
+    | (Term fn, Const f) -> Term (X.app fn (X.float f))
+    | (Const _, _) -> assert false
 
   let let_ (type a b) ~name (m : a repr) (fn : a repr -> b repr) : b repr =
     match m with
@@ -469,4 +445,4 @@ end
 module Apply (P : sig
   val options : options
 end) : Costlang.Transform =
-  functor (X : Costlang.S) -> Convert_mult (P) (Prettify_constants (P) (X))
+functor (X : Costlang.S) -> Convert_mult (P) (Prettify_constants (P) (X))

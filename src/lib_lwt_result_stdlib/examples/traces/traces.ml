@@ -29,16 +29,10 @@ module type EXTENDED = sig
   include S
 
   val pp :
-    (Format.formatter -> 'err -> unit) ->
-    Format.formatter ->
-    'err trace ->
-    unit
+    (Format.formatter -> 'err -> unit) -> Format.formatter -> 'err trace -> unit
 
   val pp_top :
-    (Format.formatter -> 'err -> unit) ->
-    Format.formatter ->
-    'err trace ->
-    unit
+    (Format.formatter -> 'err -> unit) -> Format.formatter -> 'err trace -> unit
 
   val fold : ('a -> 'error -> 'a) -> 'a -> 'error trace -> 'a
 
@@ -109,10 +103,8 @@ module SingletonR : EXTENDED = struct
 
   let salvage_s f e =
     match f e with
-    | None ->
-        Lwt.return (Error e)
-    | Some x ->
-        x >>= Lwt.return_ok
+    | None -> Lwt.return (Error e)
+    | Some x -> x >>= Lwt.return_ok
 
   let salvage_e f e = match f e with None -> Error e | Some x -> x
 
@@ -155,10 +147,8 @@ module SingletonL : EXTENDED = struct
 
   let salvage_s f e =
     match f e with
-    | None ->
-        Lwt.return (Error e)
-    | Some x ->
-        x >>= Lwt.return_ok
+    | None -> Lwt.return (Error e)
+    | Some x -> x >>= Lwt.return_ok
 
   let salvage_e f e = match f e with None -> Error e | Some x -> x
 
@@ -182,10 +172,8 @@ module SingletonND : EXTENDED = struct
   let either a b = if Random.State.bool prng then a else b
 
   let rec any e = function
-    | [] ->
-        e
-    | x :: xs ->
-        if Random.State.bool prng then e else any x xs
+    | [] -> e
+    | x :: xs -> if Random.State.bool prng then e else any x xs
 
   type 'error trace = 'error
 
@@ -211,10 +199,8 @@ module SingletonND : EXTENDED = struct
 
   let salvage_s f e =
     match f e with
-    | None ->
-        Lwt.return (Error e)
-    | Some x ->
-        x >>= Lwt.return_ok
+    | None -> Lwt.return (Error e)
+    | Some x -> x >>= Lwt.return_ok
 
   let salvage_e f e = match f e with None -> Error e | Some x -> x
 
@@ -263,10 +249,8 @@ module Flat : EXTENDED = struct
   let salvage_s f t =
     let e = Stdlib.List.hd t in
     match f e with
-    | None ->
-        Lwt.return (Error t)
-    | Some x ->
-        x >>= Lwt.return_ok
+    | None -> Lwt.return (Error t)
+    | Some x -> x >>= Lwt.return_ok
 
   let salvage_e f t =
     let e = Stdlib.List.hd t in
@@ -303,10 +287,8 @@ module Full : EXTENDED = struct
 
   let cons_list e es =
     match List.rev es with
-    | [] ->
-        Singl e
-    | [ee] ->
-        Seq (e, Singl ee)
+    | [] -> Singl e
+    | [ee] -> Seq (e, Singl ee)
     | last :: rev_es ->
         Seq (e, List.fold_left (fun acc e -> Seq (e, acc)) (Singl last) rev_es)
 
@@ -324,42 +306,32 @@ module Full : EXTENDED = struct
         pp_error fmt e ;
         Format.pp_force_newline fmt () ;
         pp pp_error fmt t
-    | Singl e ->
-        pp_error fmt e
+    | Singl e -> pp_error fmt e
 
   let rec pp_top pp_error fmt = function
     | Par ts ->
         Format.pp_open_vbox fmt 2 ;
         List.iter (pp_top pp_error fmt) ts ;
         Format.pp_close_box fmt ()
-    | Seq (e, _) | Singl e ->
-        pp_error fmt e
+    | Seq (e, _) | Singl e -> pp_error fmt e
 
   let rec fold f acc = function
-    | Par ts ->
-        List.fold_left (fold f) acc ts
-    | Seq (e, t) ->
-        fold f (f acc e) t
-    | Singl e ->
-        f acc e
+    | Par ts -> List.fold_left (fold f) acc ts
+    | Seq (e, t) -> fold f (f acc e) t
+    | Singl e -> f acc e
 
   open Bare_structs.Monad
 
   let pre_salvage f t =
     let rec aux_t = function
-      | Par ts ->
-          aux_par ts
-      | Seq (e, _) | Singl e ->
-          f e
+      | Par ts -> aux_par ts
+      | Seq (e, _) | Singl e -> f e
     and aux_par = function
-      | [] ->
-          None
+      | [] -> None
       | t :: ts -> (
-        match aux_t t with
-        | Some _ as salvaged ->
-            salvaged
-        | None ->
-            aux_par ts )
+          match aux_t t with
+          | Some _ as salvaged -> salvaged
+          | None -> aux_par ts)
     in
     aux_t t
 
@@ -368,20 +340,15 @@ module Full : EXTENDED = struct
 
   let salvage_s f t =
     match pre_salvage f t with
-    | Some x ->
-        x >>= fun x -> Lwt.return (Ok x)
-    | None ->
-        Lwt.return (Error t)
+    | Some x -> x >>= fun x -> Lwt.return (Ok x)
+    | None -> Lwt.return (Error t)
 
-  let salvage_e f t =
-    match pre_salvage f t with Some x -> x | None -> Error t
+  let salvage_e f t = match pre_salvage f t with Some x -> x | None -> Error t
 
   let salvage_es f t =
     match pre_salvage f t with
-    | Some x ->
-        x >>= fun x -> Lwt.return x
-    | None ->
-        Lwt.return (Error t)
+    | Some x -> x >>= fun x -> Lwt.return x
+    | None -> Lwt.return (Error t)
 
   let recover f g t = match pre_salvage f t with Some x -> x | None -> g t
 
@@ -392,10 +359,7 @@ module Full : EXTENDED = struct
   let recover_es f g t = recover f g t
 
   let rec wrap f = function
-    | Par ts ->
-        Par (List.map (wrap f) ts)
-    | Seq (e, t) ->
-        Seq (f e, wrap f t)
-    | Singl e ->
-        Singl (f e)
+    | Par ts -> Par (List.map (wrap f) ts)
+    | Seq (e, t) -> Seq (f e, wrap f t)
+    | Singl e -> Singl (f e)
 end

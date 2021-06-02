@@ -132,7 +132,7 @@ type t = {
     (Block_hash.t * Block_header.t * Operation.t list list tzresult Lwt.t)
     Lwt_pipe.t;
   (* HACK, a worker should be able
-   to return the 'error'. *)
+     to return the 'error'. *)
   mutable errors : Error_monad.error list;
 }
 
@@ -162,12 +162,11 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
   Store.Chain.checkpoint chain_store
   >>= fun (checkpoint_hash, checkpoint_level) ->
   fail_when
-    ( Compare.Int32.(header.shell.level = checkpoint_level)
-    && not (Block_hash.equal hash checkpoint_hash) )
+    (Compare.Int32.(header.shell.level = checkpoint_level)
+    && not (Block_hash.equal hash checkpoint_hash))
     (Checkpoint_error (hash, Some pipeline.peer_id))
   >>=? fun () ->
-  Store.Chain.current_head chain_store
-  >>= fun current_head ->
+  Store.Chain.current_head chain_store >>= fun current_head ->
   let checkpoint_reached =
     Compare.Int32.(Store.Block.level current_head >= checkpoint_level)
   in
@@ -198,15 +197,13 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
     4. It loops on the predecessor of the current block. *)
 let fetch_step pipeline (step : Block_locator.step) =
   let rec fetch_loop acc hash cpt =
-    Lwt_unix.yield ()
-    >>= fun () ->
-    ( if
-      step.step > big_step_size && 0 <> cpt
-      && cpt mod big_step_size_announce = 0
+    Lwt_unix.yield () >>= fun () ->
+    (if
+     step.step > big_step_size && 0 <> cpt && cpt mod big_step_size_announce = 0
     then
-      Bootstrap_pipeline_event.(emit still_fetching_large_step_from_peer)
-        (pipeline.peer_id, cpt, step.step)
-    else Lwt.return_unit )
+     Bootstrap_pipeline_event.(emit still_fetching_large_step_from_peer)
+       (pipeline.peer_id, cpt, step.step)
+    else Lwt.return_unit)
     >>= fun () ->
     if cpt > step.step then
       Bootstrap_pipeline_event.(emit step_too_long) pipeline.peer_id
@@ -219,12 +216,10 @@ let fetch_step pipeline (step : Block_locator.step) =
       else return acc
     else
       let chain_store = Distributed_db.chain_store pipeline.chain_db in
-      Store.Block.read_block_opt chain_store hash
-      >>= (function
-            | Some b ->
-                Store.Chain.is_in_chain chain_store (hash, Store.Block.level b)
-            | None ->
-                Lwt.return_false)
+      (Store.Block.read_block_opt chain_store hash >>= function
+       | Some b ->
+           Store.Chain.is_in_chain chain_store (hash, Store.Block.level b)
+       | None -> Lwt.return_false)
       >>= fun in_chain ->
       if in_chain then return acc
       else
@@ -236,8 +231,7 @@ let fetch_step pipeline (step : Block_locator.step) =
               hash
               ())
         >>=? fun header ->
-        assert_acceptable_header pipeline hash header
-        >>=? fun () ->
+        assert_acceptable_header pipeline hash header >>=? fun () ->
         Bootstrap_pipeline_event.(emit fetching_block_header_from_peer)
           (hash, pipeline.peer_id, cpt, step.step)
         >>= fun () ->
@@ -263,19 +257,16 @@ let headers_fetch_worker_loop pipeline =
      {Block_locator.sender_id = pipeline.peer_id; receiver_id = sender_id}
    in
    let chain_store = Distributed_db.chain_store pipeline.chain_db in
-   ( match Store.Chain.history_mode chain_store with
-   | History_mode.Archive ->
-       Lwt.return_none
-   | Full _ | Rolling _ ->
-       Store.Chain.savepoint chain_store >>= Lwt.return_some )
+   (match Store.Chain.history_mode chain_store with
+   | History_mode.Archive -> Lwt.return_none
+   | Full _ | Rolling _ -> Store.Chain.savepoint chain_store >>= Lwt.return_some)
    >>= fun savepoint ->
    (* In Full and Rolling mode, we do not want to receive blocks that
       are past our savepoint's level, otherwise we would start
-      validating them again.  *)
+      validating them again. *)
    let steps =
      match savepoint with
-     | None ->
-         Block_locator.to_steps seed pipeline.locator
+     | None -> Block_locator.to_steps seed pipeline.locator
      | Some (savepoint_hash, savepoint_level) ->
          let (head, _) =
            (pipeline.locator : Block_locator.t :> Block_header.t * _)
@@ -294,11 +285,9 @@ let headers_fetch_worker_loop pipeline =
      (locator_length, pipeline.peer_id, number_of_steps)
    >>= fun () ->
    match steps with
-   | [] ->
-       fail (Too_short_locator (sender_id, pipeline.locator))
+   | [] -> fail (Too_short_locator (sender_id, pipeline.locator))
    | {Block_locator.predecessor; _} :: _ ->
-       Store.Block.is_known chain_store predecessor
-       >>= fun predecessor_known ->
+       Store.Block.is_known chain_store predecessor >>= fun predecessor_known ->
        (* Check that the locator is anchored in a block locally
           known. *)
        fail_unless
@@ -313,19 +302,16 @@ let headers_fetch_worker_loop pipeline =
            List.split_n header_batch_size headers
          in
          protect ~canceler:pipeline.canceler (fun () ->
-             Lwt_pipe.push pipeline.fetched_headers batch
-             >>= fun () -> return_unit)
+             Lwt_pipe.push pipeline.fetched_headers batch >>= fun () ->
+             return_unit)
          >>=? fun () ->
          match remaining_headers with
-         | [] ->
-             return_unit
-         | _ ->
-             process_headers remaining_headers
+         | [] -> return_unit
+         | _ -> process_headers remaining_headers
        in
        let rec loop counter steps =
          match steps with
-         | [] ->
-             return_unit
+         | [] -> return_unit
          | current :: rest ->
              let open Block_locator in
              Bootstrap_pipeline_event.(emit fetching_step_from_peer)
@@ -336,9 +322,8 @@ let headers_fetch_worker_loop pipeline =
                  current.predecessor,
                  pipeline.peer_id )
              >>= fun () ->
-             fetch_step pipeline current
-             >>=? process_headers
-             >>=? fun () -> loop (succ counter) rest
+             fetch_step pipeline current >>=? process_headers >>=? fun () ->
+             loop (succ counter) rest
        in
        loop 1 steps)
   >>= function
@@ -362,8 +347,8 @@ let headers_fetch_worker_loop pipeline =
       >>= fun () -> Error_monad.cancel_with_exceptions pipeline.canceler
   | Error (Too_short_locator _ :: _ as err) ->
       pipeline.errors <- pipeline.errors @ err ;
-      Bootstrap_pipeline_event.(emit locator_too_short) ()
-      >>= fun () -> Error_monad.cancel_with_exceptions pipeline.canceler
+      Bootstrap_pipeline_event.(emit locator_too_short) () >>= fun () ->
+      Error_monad.cancel_with_exceptions pipeline.canceler
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       Bootstrap_pipeline_event.(emit unexpected_error_while_fetching_headers)
@@ -377,45 +362,43 @@ let headers_fetch_worker_loop pipeline =
    successfuly in the queue. It is canceled if one operation could not
    be fetched. *)
 let rec operations_fetch_worker_loop pipeline =
-  Lwt_unix.yield ()
-  >>= (fun () ->
+  ( Lwt_unix.yield () >>= fun () ->
+    protect ~canceler:pipeline.canceler (fun () ->
+        Lwt_pipe.pop pipeline.fetched_headers >>= return)
+    >>=? fun batch ->
+    List.map_ep
+      (fun (hash, header) ->
+        Bootstrap_pipeline_event.(emit fetching_operations)
+          (hash, pipeline.peer_id)
+        >>= fun () ->
+        let operations =
+          List.map_ep
+            (fun i ->
+              protect ~canceler:pipeline.canceler (fun () ->
+                  Distributed_db.Operations.fetch
+                    ~timeout:pipeline.block_operations_timeout
+                    pipeline.chain_db
+                    ~peer:pipeline.peer_id
+                    (hash, i)
+                    header.Block_header.shell.operations_hash
+                  >>= fun res -> Lwt.return res))
+            (0 -- (header.shell.validation_passes - 1))
+          >>=? fun operations ->
+          Bootstrap_pipeline_event.(emit fetched_operations)
+            (hash, pipeline.peer_id)
+          >>= fun () -> return operations
+        in
+        return (hash, header, operations))
+      batch
+    >>=? fun operationss ->
+    List.iter_es
+      (fun (hash, header, operations) ->
         protect ~canceler:pipeline.canceler (fun () ->
-            Lwt_pipe.pop pipeline.fetched_headers >>= return)
-        >>=? fun batch ->
-        List.map_ep
-          (fun (hash, header) ->
-            Bootstrap_pipeline_event.(emit fetching_operations)
-              (hash, pipeline.peer_id)
-            >>= fun () ->
-            let operations =
-              List.map_ep
-                (fun i ->
-                  protect ~canceler:pipeline.canceler (fun () ->
-                      Distributed_db.Operations.fetch
-                        ~timeout:pipeline.block_operations_timeout
-                        pipeline.chain_db
-                        ~peer:pipeline.peer_id
-                        (hash, i)
-                        header.Block_header.shell.operations_hash
-                      >>= fun res -> Lwt.return res))
-                (0 -- (header.shell.validation_passes - 1))
-              >>=? fun operations ->
-              Bootstrap_pipeline_event.(emit fetched_operations)
-                (hash, pipeline.peer_id)
-              >>= fun () -> return operations
-            in
-            return (hash, header, operations))
-          batch
-        >>=? fun operationss ->
-        List.iter_es
-          (fun (hash, header, operations) ->
-            protect ~canceler:pipeline.canceler (fun () ->
-                Lwt_pipe.push pipeline.fetched_blocks (hash, header, operations)
-                >>= fun () -> return_unit))
-          operationss)
+            Lwt_pipe.push pipeline.fetched_blocks (hash, header, operations)
+            >>= fun () -> return_unit))
+      operationss )
   >>= function
-  | Ok () ->
-      operations_fetch_worker_loop pipeline
+  | Ok () -> operations_fetch_worker_loop pipeline
   | Error (Exn Lwt.Canceled :: _)
   | Error (Canceled :: _)
   | Error (Exn Lwt_pipe.Closed :: _) ->
@@ -437,39 +420,35 @@ let rec operations_fetch_worker_loop pipeline =
    fulfilled if every block from the locator was validated. It is
    canceled if the validation of one block fails. *)
 let rec validation_worker_loop pipeline =
-  Lwt_unix.yield ()
-  >>= (fun () ->
-        protect ~canceler:pipeline.canceler (fun () ->
-            Lwt_pipe.pop pipeline.fetched_blocks >>= return)
-        >>=? fun (hash, header, operations) ->
-        Bootstrap_pipeline_event.(emit requesting_validation)
-          (hash, pipeline.peer_id)
-        >>= fun () ->
-        operations
-        >>=? fun operations ->
-        protect ~canceler:pipeline.canceler (fun () ->
-            Block_validator.validate
-              ~canceler:pipeline.canceler
-              ~notify_new_block:pipeline.notify_new_block
-              pipeline.block_validator
-              pipeline.chain_db
-              hash
-              header
-              operations)
-        >>=? fun _block ->
-        Bootstrap_pipeline_event.(emit validated_block) (hash, pipeline.peer_id)
-        >>= fun () -> return_unit)
+  ( Lwt_unix.yield () >>= fun () ->
+    protect ~canceler:pipeline.canceler (fun () ->
+        Lwt_pipe.pop pipeline.fetched_blocks >>= return)
+    >>=? fun (hash, header, operations) ->
+    Bootstrap_pipeline_event.(emit requesting_validation)
+      (hash, pipeline.peer_id)
+    >>= fun () ->
+    operations >>=? fun operations ->
+    protect ~canceler:pipeline.canceler (fun () ->
+        Block_validator.validate
+          ~canceler:pipeline.canceler
+          ~notify_new_block:pipeline.notify_new_block
+          pipeline.block_validator
+          pipeline.chain_db
+          hash
+          header
+          operations)
+    >>=? fun _block ->
+    Bootstrap_pipeline_event.(emit validated_block) (hash, pipeline.peer_id)
+    >>= fun () -> return_unit )
   >>= function
-  | Ok () ->
-      validation_worker_loop pipeline
+  | Ok () -> validation_worker_loop pipeline
   | Error ((Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed) :: _) ->
       Lwt.return_unit
   | Error
-      ( ( Block_validator_errors.Invalid_block _
-        | Block_validator_errors.Unavailable_protocol _
-        | Block_validator_errors.System_error _
-        | Timeout )
-        :: _ as err ) ->
+      (( Block_validator_errors.Invalid_block _
+       | Block_validator_errors.Unavailable_protocol _
+       | Block_validator_errors.System_error _ | Timeout )
+       :: _ as err) ->
       (* Propagate the error to the peer validator. *)
       pipeline.errors <- pipeline.errors @ err ;
       Error_monad.cancel_with_exceptions pipeline.canceler
@@ -559,18 +538,14 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
   pipeline
 
 let wait_workers pipeline =
-  pipeline.headers_fetch_worker
-  >>= fun () ->
+  pipeline.headers_fetch_worker >>= fun () ->
   pipeline.operations_fetch_worker >>= fun () -> pipeline.validation_worker
 
 let wait pipeline =
-  wait_workers pipeline
-  >>= fun () ->
+  wait_workers pipeline >>= fun () ->
   match pipeline.errors with
-  | [] ->
-      return_unit
-  | errors ->
-      Lwt.return_error errors
+  | [] -> return_unit
+  | errors -> Lwt.return_error errors
 
 let cancel pipeline =
   Lwt_canceler.cancel pipeline.canceler >>= fun _res -> wait_workers pipeline

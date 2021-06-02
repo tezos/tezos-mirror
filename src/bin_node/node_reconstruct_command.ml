@@ -31,8 +31,7 @@ let () =
     `Permanent
     ~id:"main.reconstruct.locked_directory"
     ~title:"Locked directory"
-    ~description:
-      "The data directory to reconstruct is used by another process."
+    ~description:"The data directory to reconstruct is used by another process."
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
@@ -47,33 +46,27 @@ let () =
 module Term = struct
   let process args sandbox_file =
     let run =
-      Internal_event_unix.init ()
-      >>= fun () ->
-      Node_shared_arg.read_and_patch_config_file args
-      >>=? fun node_config ->
+      Internal_event_unix.init () >>= fun () ->
+      Node_shared_arg.read_and_patch_config_file args >>=? fun node_config ->
       let data_dir = node_config.data_dir in
       let ({genesis; _} : Node_config_file.blockchain_network) =
         node_config.blockchain_network
       in
-      ( match
-          (node_config.blockchain_network.genesis_parameters, sandbox_file)
-        with
-      | (None, None) ->
-          return_none
+      (match
+         (node_config.blockchain_network.genesis_parameters, sandbox_file)
+       with
+      | (None, None) -> return_none
       | (Some parameters, None) ->
           return_some (parameters.context_key, parameters.values)
       | (_, Some filename) -> (
-          Lwt_utils_unix.Json.read_file filename
-          >>= function
+          Lwt_utils_unix.Json.read_file filename >>= function
           | Error _err ->
               fail (Node_snapshot_command.Invalid_sandbox_file filename)
-          | Ok json ->
-              return_some ("sandbox_parameter", json) ) )
+          | Ok json -> return_some ("sandbox_parameter", json)))
       >>=? fun sandbox_parameters ->
       Lwt_lock_file.is_locked (Node_data_version.lock_file data_dir)
       >>=? fun is_locked ->
-      fail_when is_locked Locked_directory
-      >>=? fun () ->
+      fail_when is_locked Locked_directory >>=? fun () ->
       let context_dir = Node_data_version.context_dir data_dir in
       let store_dir = Node_data_version.store_dir data_dir in
       let patch_context =
@@ -91,10 +84,8 @@ module Term = struct
       >>=? fun () -> return_unit
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
-    | Ok () ->
-        `Ok ()
-    | Error err ->
-        `Error (false, Format.asprintf "%a" pp_print_error err)
+    | Ok () -> `Ok ()
+    | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
 
   let sandbox =
     let open Cmdliner in
@@ -131,10 +122,12 @@ module Manpage = struct
   let options = []
 
   let examples =
-    [ `S "EXAMPLES";
+    [
+      `S "EXAMPLES";
       `I
         ( "$(b,Reconstruct the storage of a full mode node )",
-          "./tezos-node reconstruct" ) ]
+          "./tezos-node reconstruct" );
+    ]
 
   let man = description @ options @ examples @ Node_shared_arg.Manpage.bugs
 

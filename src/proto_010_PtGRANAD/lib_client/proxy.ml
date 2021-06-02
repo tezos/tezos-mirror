@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module L = ( val Tezos_proxy.Logger.logger ~protocol_name:Protocol.name
-               : Tezos_proxy.Logger.S )
+module L = (val Tezos_proxy.Logger.logger ~protocol_name:Protocol.name
+              : Tezos_proxy.Logger.S)
 
 let proxy_block_header (rpc_context : RPC_context.json)
     (chain : Tezos_shell_services.Block_services.chain)
@@ -53,16 +53,13 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
         Some
           ( ["contracts"; index; hash0; hash1; hash2; hash3; hash4; hash5; id],
             tail )
-    | "cycle" :: i :: tail ->
-        Some (["cycle"; i], tail)
+    | "cycle" :: i :: tail -> Some (["cycle"; i], tail)
     (* matches paths like:
        rolls/owner/snapshot/19/1/tail *)
     | "rolls" :: "owner" :: "snapshot" :: i :: j :: tail ->
         Some (["rolls"; "owner"; "snapshot"; i; j], tail)
-    | "v1" :: tail ->
-        Some (["v1"], tail)
-    | _ ->
-        None
+    | "v1" :: tail -> Some (["v1"], tail)
+    | _ -> None
 
   let do_rpc (pgi : Tezos_proxy.Proxy.proxy_getter_input)
       (key : Proxy_context.M.key) =
@@ -93,8 +90,7 @@ let initial_context
     (block : Tezos_shell_services.Block_services.block) :
     Environment_context.Context.t Lwt.t =
   let p_rpc = (module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC) in
-  proxy_builder p_rpc
-  >>= fun (module M) ->
+  proxy_builder p_rpc >>= fun (module M) ->
   L.emit
     L.proxy_getter_created
     ( Tezos_shell_services.Block_services.chain_to_string chain,
@@ -124,11 +120,9 @@ let init_env_rpc_context (_printer : Tezos_client_base.Client_context.printer)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
     Tezos_protocol_environment.rpc_context tzresult Lwt.t =
-  proxy_block_header rpc_context chain block
-  >>=? fun {shell; hash; _} ->
+  proxy_block_header rpc_context chain block >>=? fun {shell; hash; _} ->
   let block_hash = hash in
-  initial_context proxy_builder rpc_context chain block
-  >>= fun context ->
+  initial_context proxy_builder rpc_context chain block >>= fun context ->
   return {Tezos_protocol_environment.block_hash; block_header = shell; context}
 
 let () =

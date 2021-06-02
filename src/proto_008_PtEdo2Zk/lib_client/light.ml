@@ -30,10 +30,8 @@ module M : Tezos_proxy.Light_proto.PROTO_RPCS = struct
       ~chain:pgi.chain
       ~block:pgi.block
       ~holey:
-        ( match leaf_kind with
-        | Tezos_shell_services.Block_services.Hole ->
-            true
-        | Tezos_shell_services.Block_services.Raw_context ->
-            false )
+        (match leaf_kind with
+        | Tezos_shell_services.Block_services.Hole -> true
+        | Tezos_shell_services.Block_services.Raw_context -> false)
       key
 end

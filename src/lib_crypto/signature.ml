@@ -72,7 +72,8 @@ module Public_key_hash = struct
     let open Data_encoding in
     def "public_key_hash" ~description:title
     @@ union
-         [ case
+         [
+           case
              (Tag 0)
              Ed25519.Public_key_hash.encoding
              ~title:"Ed25519"
@@ -89,7 +90,8 @@ module Public_key_hash = struct
              ~title:"P256"
              P256.Public_key_hash.encoding
              (function P256 x -> Some x | _ -> None)
-             (function x -> P256 x) ]
+             (function x -> P256 x);
+         ]
 
   let to_bytes s = Data_encoding.Binary.to_bytes_exn raw_encoding s
 
@@ -117,87 +119,60 @@ module Public_key_hash = struct
 
   let of_b58check_opt s =
     match Base58.decode s with
-    | Some (Ed25519.Public_key_hash.Data pkh) ->
-        Some (Ed25519 pkh)
-    | Some (Secp256k1.Public_key_hash.Data pkh) ->
-        Some (Secp256k1 pkh)
-    | Some (P256.Public_key_hash.Data pkh) ->
-        Some (P256 pkh)
-    | _ ->
-        None
+    | Some (Ed25519.Public_key_hash.Data pkh) -> Some (Ed25519 pkh)
+    | Some (Secp256k1.Public_key_hash.Data pkh) -> Some (Secp256k1 pkh)
+    | Some (P256.Public_key_hash.Data pkh) -> Some (P256 pkh)
+    | _ -> None
 
   let of_b58check_exn s =
     match of_b58check_opt s with
-    | Some x ->
-        x
-    | None ->
-        Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
+    | Some x -> x
+    | None -> Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
 
   let of_b58check s =
     match of_b58check_opt s with
-    | Some x ->
-        Ok x
+    | Some x -> Ok x
     | None ->
         generic_error "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check = function
-    | Ed25519 pkh ->
-        Ed25519.Public_key_hash.to_b58check pkh
-    | Secp256k1 pkh ->
-        Secp256k1.Public_key_hash.to_b58check pkh
-    | P256 pkh ->
-        P256.Public_key_hash.to_b58check pkh
+    | Ed25519 pkh -> Ed25519.Public_key_hash.to_b58check pkh
+    | Secp256k1 pkh -> Secp256k1.Public_key_hash.to_b58check pkh
+    | P256 pkh -> P256.Public_key_hash.to_b58check pkh
 
   let to_short_b58check = function
-    | Ed25519 pkh ->
-        Ed25519.Public_key_hash.to_short_b58check pkh
-    | Secp256k1 pkh ->
-        Secp256k1.Public_key_hash.to_short_b58check pkh
-    | P256 pkh ->
-        P256.Public_key_hash.to_short_b58check pkh
+    | Ed25519 pkh -> Ed25519.Public_key_hash.to_short_b58check pkh
+    | Secp256k1 pkh -> Secp256k1.Public_key_hash.to_short_b58check pkh
+    | P256 pkh -> P256.Public_key_hash.to_short_b58check pkh
 
   let to_path key l =
     match key with
-    | Ed25519 h ->
-        "ed25519" :: Ed25519.Public_key_hash.to_path h l
-    | Secp256k1 h ->
-        "secp256k1" :: Secp256k1.Public_key_hash.to_path h l
-    | P256 h ->
-        "p256" :: P256.Public_key_hash.to_path h l
+    | Ed25519 h -> "ed25519" :: Ed25519.Public_key_hash.to_path h l
+    | Secp256k1 h -> "secp256k1" :: Secp256k1.Public_key_hash.to_path h l
+    | P256 h -> "p256" :: P256.Public_key_hash.to_path h l
 
   let of_path = function
     | "ed25519" :: q -> (
-      match Ed25519.Public_key_hash.of_path q with
-      | Some pkh ->
-          Some (Ed25519 pkh)
-      | None ->
-          None )
+        match Ed25519.Public_key_hash.of_path q with
+        | Some pkh -> Some (Ed25519 pkh)
+        | None -> None)
     | "secp256k1" :: q -> (
-      match Secp256k1.Public_key_hash.of_path q with
-      | Some pkh ->
-          Some (Secp256k1 pkh)
-      | None ->
-          None )
+        match Secp256k1.Public_key_hash.of_path q with
+        | Some pkh -> Some (Secp256k1 pkh)
+        | None -> None)
     | "p256" :: q -> (
-      match P256.Public_key_hash.of_path q with
-      | Some pkh ->
-          Some (P256 pkh)
-      | None ->
-          None )
-    | _ ->
-        assert false
+        match P256.Public_key_hash.of_path q with
+        | Some pkh -> Some (P256 pkh)
+        | None -> None)
+    | _ -> assert false
 
   (* FIXME classification des erreurs *)
 
   let of_path_exn = function
-    | "ed25519" :: q ->
-        Ed25519 (Ed25519.Public_key_hash.of_path_exn q)
-    | "secp256k1" :: q ->
-        Secp256k1 (Secp256k1.Public_key_hash.of_path_exn q)
-    | "p256" :: q ->
-        P256 (P256.Public_key_hash.of_path_exn q)
-    | _ ->
-        assert false
+    | "ed25519" :: q -> Ed25519 (Ed25519.Public_key_hash.of_path_exn q)
+    | "secp256k1" :: q -> Secp256k1 (Secp256k1.Public_key_hash.of_path_exn q)
+    | "p256" :: q -> P256 (P256.Public_key_hash.of_path_exn q)
+    | _ -> assert false
 
   (* FIXME classification des erreurs *)
 
@@ -220,14 +195,10 @@ module Public_key_hash = struct
 
     let compare a b =
       match (a, b) with
-      | (Ed25519 x, Ed25519 y) ->
-          Ed25519.Public_key_hash.compare x y
-      | (Secp256k1 x, Secp256k1 y) ->
-          Secp256k1.Public_key_hash.compare x y
-      | (P256 x, P256 y) ->
-          P256.Public_key_hash.compare x y
-      | _ ->
-          Stdlib.compare a b
+      | (Ed25519 x, Ed25519 y) -> Ed25519.Public_key_hash.compare x y
+      | (Secp256k1 x, Secp256k1 y) -> Secp256k1.Public_key_hash.compare x y
+      | (P256 x, P256 y) -> P256.Public_key_hash.compare x y
+      | _ -> Stdlib.compare a b
   end)
 
   include Helpers.MakeEncoder (struct
@@ -287,32 +258,22 @@ module Public_key = struct
 
   let hash pk =
     match pk with
-    | Ed25519 pk ->
-        Public_key_hash.Ed25519 (Ed25519.Public_key.hash pk)
-    | Secp256k1 pk ->
-        Public_key_hash.Secp256k1 (Secp256k1.Public_key.hash pk)
-    | P256 pk ->
-        Public_key_hash.P256 (P256.Public_key.hash pk)
+    | Ed25519 pk -> Public_key_hash.Ed25519 (Ed25519.Public_key.hash pk)
+    | Secp256k1 pk -> Public_key_hash.Secp256k1 (Secp256k1.Public_key.hash pk)
+    | P256 pk -> Public_key_hash.P256 (P256.Public_key.hash pk)
 
   include Compare.Make (struct
     type nonrec t = t
 
     let compare a b =
       match (a, b) with
-      | (Ed25519 x, Ed25519 y) ->
-          Ed25519.Public_key.compare x y
-      | (Secp256k1 x, Secp256k1 y) ->
-          Secp256k1.Public_key.compare x y
-      | (P256 x, P256 y) ->
-          P256.Public_key.compare x y
-      | (Ed25519 _, (Secp256k1 _ | P256 _)) ->
-          -1
-      | (Secp256k1 _, P256 _) ->
-          -1
-      | (P256 _, (Secp256k1 _ | Ed25519 _)) ->
-          1
-      | (Secp256k1 _, Ed25519 _) ->
-          1
+      | (Ed25519 x, Ed25519 y) -> Ed25519.Public_key.compare x y
+      | (Secp256k1 x, Secp256k1 y) -> Secp256k1.Public_key.compare x y
+      | (P256 x, P256 y) -> P256.Public_key.compare x y
+      | (Ed25519 _, (Secp256k1 _ | P256 _)) -> -1
+      | (Secp256k1 _, P256 _) -> -1
+      | (P256 _, (Secp256k1 _ | Ed25519 _)) -> 1
+      | (Secp256k1 _, Ed25519 _) -> 1
   end)
 
   type Base58.data += Data of t (* unused *)
@@ -328,44 +289,31 @@ module Public_key = struct
 
   let of_b58check_opt s =
     match Base58.decode s with
-    | Some (Ed25519.Public_key.Data public_key) ->
-        Some (Ed25519 public_key)
-    | Some (Secp256k1.Public_key.Data public_key) ->
-        Some (Secp256k1 public_key)
-    | Some (P256.Public_key.Data public_key) ->
-        Some (P256 public_key)
-    | _ ->
-        None
+    | Some (Ed25519.Public_key.Data public_key) -> Some (Ed25519 public_key)
+    | Some (Secp256k1.Public_key.Data public_key) -> Some (Secp256k1 public_key)
+    | Some (P256.Public_key.Data public_key) -> Some (P256 public_key)
+    | _ -> None
 
   let of_b58check_exn s =
     match of_b58check_opt s with
-    | Some x ->
-        x
-    | None ->
-        Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
+    | Some x -> x
+    | None -> Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
 
   let of_b58check s =
     match of_b58check_opt s with
-    | Some x ->
-        Ok x
+    | Some x -> Ok x
     | None ->
         generic_error "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check = function
-    | Ed25519 pk ->
-        Ed25519.Public_key.to_b58check pk
-    | Secp256k1 pk ->
-        Secp256k1.Public_key.to_b58check pk
-    | P256 pk ->
-        P256.Public_key.to_b58check pk
+    | Ed25519 pk -> Ed25519.Public_key.to_b58check pk
+    | Secp256k1 pk -> Secp256k1.Public_key.to_b58check pk
+    | P256 pk -> P256.Public_key.to_b58check pk
 
   let to_short_b58check = function
-    | Ed25519 pk ->
-        Ed25519.Public_key.to_short_b58check pk
-    | Secp256k1 pk ->
-        Secp256k1.Public_key.to_short_b58check pk
-    | P256 pk ->
-        P256.Public_key.to_short_b58check pk
+    | Ed25519 pk -> Ed25519.Public_key.to_short_b58check pk
+    | Secp256k1 pk -> Secp256k1.Public_key.to_short_b58check pk
+    | P256 pk -> P256.Public_key.to_short_b58check pk
 
   let of_bytes_without_validation b =
     let tag = Bytes.(get_int8 b 0) in
@@ -382,8 +330,7 @@ module Public_key = struct
     | 2 ->
         Option.bind (P256.Public_key.of_bytes_without_validation b) (fun pk ->
             Some (P256 pk))
-    | _ ->
-        None
+    | _ -> None
 
   include Helpers.MakeEncoder (struct
     type nonrec t = t
@@ -396,7 +343,8 @@ module Public_key = struct
       let open Data_encoding in
       def "public_key" ~description:title
       @@ union
-           [ case
+           [
+             case
                (Tag 0)
                Ed25519.Public_key.encoding
                ~title:"Ed25519"
@@ -413,7 +361,8 @@ module Public_key = struct
                (Tag 2)
                P256.Public_key.encoding
                (function P256 x -> Some x | _ -> None)
-               (function x -> P256 x) ]
+               (function x -> P256 x);
+           ]
 
     let of_b58check = of_b58check
 
@@ -442,26 +391,20 @@ module Secret_key = struct
   let title = "A Ed25519, Secp256k1 or P256 secret key"
 
   let to_public_key = function
-    | Ed25519 sk ->
-        Public_key.Ed25519 (Ed25519.Secret_key.to_public_key sk)
+    | Ed25519 sk -> Public_key.Ed25519 (Ed25519.Secret_key.to_public_key sk)
     | Secp256k1 sk ->
         Public_key.Secp256k1 (Secp256k1.Secret_key.to_public_key sk)
-    | P256 sk ->
-        Public_key.P256 (P256.Secret_key.to_public_key sk)
+    | P256 sk -> Public_key.P256 (P256.Secret_key.to_public_key sk)
 
   include Compare.Make (struct
     type nonrec t = t
 
     let compare a b =
       match (a, b) with
-      | (Ed25519 x, Ed25519 y) ->
-          Ed25519.Secret_key.compare x y
-      | (Secp256k1 x, Secp256k1 y) ->
-          Secp256k1.Secret_key.compare x y
-      | (P256 x, P256 y) ->
-          P256.Secret_key.compare x y
-      | _ ->
-          Stdlib.compare a b
+      | (Ed25519 x, Ed25519 y) -> Ed25519.Secret_key.compare x y
+      | (Secp256k1 x, Secp256k1 y) -> Secp256k1.Secret_key.compare x y
+      | (P256 x, P256 y) -> P256.Secret_key.compare x y
+      | _ -> Stdlib.compare a b
   end)
 
   type Base58.data += Data of t (* unused *)
@@ -477,44 +420,31 @@ module Secret_key = struct
 
   let of_b58check_opt b =
     match Base58.decode b with
-    | Some (Ed25519.Secret_key.Data sk) ->
-        Some (Ed25519 sk)
-    | Some (Secp256k1.Secret_key.Data sk) ->
-        Some (Secp256k1 sk)
-    | Some (P256.Secret_key.Data sk) ->
-        Some (P256 sk)
-    | _ ->
-        None
+    | Some (Ed25519.Secret_key.Data sk) -> Some (Ed25519 sk)
+    | Some (Secp256k1.Secret_key.Data sk) -> Some (Secp256k1 sk)
+    | Some (P256.Secret_key.Data sk) -> Some (P256 sk)
+    | _ -> None
 
   let of_b58check_exn s =
     match of_b58check_opt s with
-    | Some x ->
-        x
-    | None ->
-        Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
+    | Some x -> x
+    | None -> Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
 
   let of_b58check s =
     match of_b58check_opt s with
-    | Some x ->
-        Ok x
+    | Some x -> Ok x
     | None ->
         generic_error "Failed to read a b58check_encoding data (%s): %S" name s
 
   let to_b58check = function
-    | Ed25519 sk ->
-        Ed25519.Secret_key.to_b58check sk
-    | Secp256k1 sk ->
-        Secp256k1.Secret_key.to_b58check sk
-    | P256 sk ->
-        P256.Secret_key.to_b58check sk
+    | Ed25519 sk -> Ed25519.Secret_key.to_b58check sk
+    | Secp256k1 sk -> Secp256k1.Secret_key.to_b58check sk
+    | P256 sk -> P256.Secret_key.to_b58check sk
 
   let to_short_b58check = function
-    | Ed25519 sk ->
-        Ed25519.Secret_key.to_short_b58check sk
-    | Secp256k1 sk ->
-        Secp256k1.Secret_key.to_short_b58check sk
-    | P256 sk ->
-        P256.Secret_key.to_short_b58check sk
+    | Ed25519 sk -> Ed25519.Secret_key.to_short_b58check sk
+    | Secp256k1 sk -> Secp256k1.Secret_key.to_short_b58check sk
+    | P256 sk -> P256.Secret_key.to_short_b58check sk
 
   include Helpers.MakeEncoder (struct
     type nonrec t = t
@@ -527,7 +457,8 @@ module Secret_key = struct
       let open Data_encoding in
       def "secret_key" ~description:title
       @@ union
-           [ case
+           [
+             case
                (Tag 0)
                Ed25519.Secret_key.encoding
                ~title:"Ed25519"
@@ -544,7 +475,8 @@ module Secret_key = struct
                ~title:"P256"
                P256.Secret_key.encoding
                (function P256 x -> Some x | _ -> None)
-               (function x -> P256 x) ]
+               (function x -> P256 x);
+           ]
 
     let of_b58check = of_b58check
 
@@ -575,14 +507,10 @@ let size =
   Ed25519.size
 
 let to_bytes = function
-  | Ed25519 b ->
-      Ed25519.to_bytes b
-  | Secp256k1 b ->
-      Secp256k1.to_bytes b
-  | P256 b ->
-      P256.to_bytes b
-  | Unknown b ->
-      b
+  | Ed25519 b -> Ed25519.to_bytes b
+  | Secp256k1 b -> Secp256k1.to_bytes b
+  | P256 b -> P256.to_bytes b
+  | Unknown b -> b
 
 let of_bytes_opt s = if Bytes.length s = size then Some (Unknown s) else None
 
@@ -623,8 +551,8 @@ include Compare.Make (struct
 end)
 
 let of_b58check_opt s =
-  if TzString.has_prefix ~prefix:Ed25519.b58check_encoding.encoded_prefix s
-  then Option.map (fun x -> Ed25519 x) (Ed25519.of_b58check_opt s)
+  if TzString.has_prefix ~prefix:Ed25519.b58check_encoding.encoded_prefix s then
+    Option.map (fun x -> Ed25519 x) (Ed25519.of_b58check_opt s)
   else if
     TzString.has_prefix ~prefix:Secp256k1.b58check_encoding.encoded_prefix s
   then Option.map (fun x -> Secp256k1 x) (Secp256k1.of_b58check_opt s)
@@ -634,37 +562,26 @@ let of_b58check_opt s =
 
 let of_b58check_exn s =
   match of_b58check_opt s with
-  | Some x ->
-      x
-  | None ->
-      Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
+  | Some x -> x
+  | None -> Format.kasprintf Stdlib.failwith "Unexpected data (%s)" name
 
 let of_b58check s =
   match of_b58check_opt s with
-  | Some x ->
-      Ok x
+  | Some x -> Ok x
   | None ->
       generic_error "Failed to read a b58check_encoding data (%s): %S" name s
 
 let to_b58check = function
-  | Ed25519 b ->
-      Ed25519.to_b58check b
-  | Secp256k1 b ->
-      Secp256k1.to_b58check b
-  | P256 b ->
-      P256.to_b58check b
-  | Unknown b ->
-      Base58.simple_encode b58check_encoding (Unknown b)
+  | Ed25519 b -> Ed25519.to_b58check b
+  | Secp256k1 b -> Secp256k1.to_b58check b
+  | P256 b -> P256.to_b58check b
+  | Unknown b -> Base58.simple_encode b58check_encoding (Unknown b)
 
 let to_short_b58check = function
-  | Ed25519 b ->
-      Ed25519.to_short_b58check b
-  | Secp256k1 b ->
-      Secp256k1.to_short_b58check b
-  | P256 b ->
-      P256.to_short_b58check b
-  | Unknown b ->
-      Base58.simple_encode b58check_encoding (Unknown b)
+  | Ed25519 b -> Ed25519.to_short_b58check b
+  | Secp256k1 b -> Secp256k1.to_short_b58check b
+  | P256 b -> P256.to_short_b58check b
+  | Unknown b -> Base58.simple_encode b58check_encoding (Unknown b)
 
 include Helpers.MakeEncoder (struct
   type nonrec t = t
@@ -702,20 +619,15 @@ let bytes_of_watermark = function
       Bytes.cat (Bytes.of_string "\x01") (Chain_id.to_bytes chain_id)
   | Endorsement chain_id ->
       Bytes.cat (Bytes.of_string "\x02") (Chain_id.to_bytes chain_id)
-  | Generic_operation ->
-      Bytes.of_string "\x03"
-  | Custom bytes ->
-      bytes
+  | Generic_operation -> Bytes.of_string "\x03"
+  | Custom bytes -> bytes
 
 let pp_watermark ppf =
   let open Format in
   function
-  | Block_header chain_id ->
-      fprintf ppf "Block-header: %a" Chain_id.pp chain_id
-  | Endorsement chain_id ->
-      fprintf ppf "Endorsement: %a" Chain_id.pp chain_id
-  | Generic_operation ->
-      pp_print_string ppf "Generic-operation"
+  | Block_header chain_id -> fprintf ppf "Block-header: %a" Chain_id.pp chain_id
+  | Endorsement chain_id -> fprintf ppf "Endorsement: %a" Chain_id.pp chain_id
+  | Generic_operation -> pp_print_string ppf "Generic-operation"
   | Custom bytes ->
       let hexed = Hex.of_bytes bytes |> Hex.show in
       fprintf
@@ -726,45 +638,34 @@ let pp_watermark ppf =
 let sign ?watermark secret_key message =
   let watermark = Option.map bytes_of_watermark watermark in
   match secret_key with
-  | Secret_key.Ed25519 sk ->
-      of_ed25519 (Ed25519.sign ?watermark sk message)
-  | Secp256k1 sk ->
-      of_secp256k1 (Secp256k1.sign ?watermark sk message)
-  | P256 sk ->
-      of_p256 (P256.sign ?watermark sk message)
+  | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign ?watermark sk message)
+  | Secp256k1 sk -> of_secp256k1 (Secp256k1.sign ?watermark sk message)
+  | P256 sk -> of_p256 (P256.sign ?watermark sk message)
 
 let check ?watermark public_key signature message =
   let watermark = Option.map bytes_of_watermark watermark in
   match (public_key, signature) with
   | (Public_key.Ed25519 pk, Unknown signature) -> (
-    match Ed25519.of_bytes_opt signature with
-    | Some s ->
-        Ed25519.check ?watermark pk s message
-    | None ->
-        false )
+      match Ed25519.of_bytes_opt signature with
+      | Some s -> Ed25519.check ?watermark pk s message
+      | None -> false)
   | (Public_key.Secp256k1 pk, Unknown signature) -> (
-    match Secp256k1.of_bytes_opt signature with
-    | Some s ->
-        Secp256k1.check ?watermark pk s message
-    | None ->
-        false )
+      match Secp256k1.of_bytes_opt signature with
+      | Some s -> Secp256k1.check ?watermark pk s message
+      | None -> false)
   | (Public_key.P256 pk, Unknown signature) -> (
-    match P256.of_bytes_opt signature with
-    | Some s ->
-        P256.check ?watermark pk s message
-    | None ->
-        false )
+      match P256.of_bytes_opt signature with
+      | Some s -> P256.check ?watermark pk s message
+      | None -> false)
   | (Public_key.Ed25519 pk, Ed25519 signature) ->
       Ed25519.check ?watermark pk signature message
   | (Public_key.Secp256k1 pk, Secp256k1 signature) ->
       Secp256k1.check ?watermark pk signature message
   | (Public_key.P256 pk, P256 signature) ->
       P256.check ?watermark pk signature message
-  | _ ->
-      false
+  | _ -> false
 
-let append ?watermark sk msg =
-  Bytes.cat msg (to_bytes (sign ?watermark sk msg))
+let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
 
 let concat msg signature = Bytes.cat msg (to_bytes signature)
 
@@ -774,9 +675,7 @@ let generate_key ?(algo = Ed25519) ?seed () =
   match algo with
   | Ed25519 ->
       let (pkh, pk, sk) = Ed25519.generate_key ?seed () in
-      ( Public_key_hash.Ed25519 pkh,
-        Public_key.Ed25519 pk,
-        Secret_key.Ed25519 sk )
+      (Public_key_hash.Ed25519 pkh, Public_key.Ed25519 pk, Secret_key.Ed25519 sk)
   | Secp256k1 ->
       let (pkh, pk, sk) = Secp256k1.generate_key ?seed () in
       ( Public_key_hash.Secp256k1 pkh,
@@ -788,18 +687,12 @@ let generate_key ?(algo = Ed25519) ?seed () =
 
 let deterministic_nonce sk msg =
   match sk with
-  | Secret_key.Ed25519 sk ->
-      Ed25519.deterministic_nonce sk msg
-  | Secret_key.Secp256k1 sk ->
-      Secp256k1.deterministic_nonce sk msg
-  | Secret_key.P256 sk ->
-      P256.deterministic_nonce sk msg
+  | Secret_key.Ed25519 sk -> Ed25519.deterministic_nonce sk msg
+  | Secret_key.Secp256k1 sk -> Secp256k1.deterministic_nonce sk msg
+  | Secret_key.P256 sk -> P256.deterministic_nonce sk msg
 
 let deterministic_nonce_hash sk msg =
   match sk with
-  | Secret_key.Ed25519 sk ->
-      Ed25519.deterministic_nonce_hash sk msg
-  | Secret_key.Secp256k1 sk ->
-      Secp256k1.deterministic_nonce_hash sk msg
-  | Secret_key.P256 sk ->
-      P256.deterministic_nonce_hash sk msg
+  | Secret_key.Ed25519 sk -> Ed25519.deterministic_nonce_hash sk msg
+  | Secret_key.Secp256k1 sk -> Secp256k1.deterministic_nonce_hash sk msg
+  | Secret_key.P256 sk -> P256.deterministic_nonce_hash sk msg

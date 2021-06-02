@@ -706,8 +706,7 @@ module Cost_of = struct
           let open S_syntax in
           let v0 = S.safe_int size_ys in
           S.safe_int 40 + (v0 + (v0 lsr 1) + (v0 lsr 3))
-      | _ :: _ ->
-          S.safe_int 70
+      | _ :: _ -> S.safe_int 70
 
     (* model N_KList_exit_body *)
     let cost_N_KList_exit_body = S.safe_int 30
@@ -999,8 +998,7 @@ module Cost_of = struct
     let big_map_update ({size; _} : _ Script_typed_ir.big_map_overlay) =
       atomic_step_cost (cost_N_IMap_update big_map_elt_size (S.safe_int size))
 
-    let big_map_get_and_update ({size; _} : _ Script_typed_ir.big_map_overlay)
-        =
+    let big_map_get_and_update ({size; _} : _ Script_typed_ir.big_map_overlay) =
       atomic_step_cost
         (cost_N_IMap_get_and_update big_map_elt_size (S.safe_int size))
 
@@ -1121,11 +1119,9 @@ module Cost_of = struct
 
     let eq = atomic_step_cost cost_N_IEq
 
-    let lsl_nat shifted =
-      atomic_step_cost (cost_N_ILsl_nat (int_bytes shifted))
+    let lsl_nat shifted = atomic_step_cost (cost_N_ILsl_nat (int_bytes shifted))
 
-    let lsr_nat shifted =
-      atomic_step_cost (cost_N_ILsr_nat (int_bytes shifted))
+    let lsr_nat shifted = atomic_step_cost (cost_N_ILsr_nat (int_bytes shifted))
 
     let or_nat n1 n2 =
       atomic_step_cost (cost_N_IOr_nat (int_bytes n1) (int_bytes n2))
@@ -1154,12 +1150,9 @@ module Cost_of = struct
     let check_signature (pkey : Signature.public_key) b =
       let cost =
         match pkey with
-        | Ed25519 _ ->
-            cost_N_ICheck_signature_ed25519 (Bytes.length b)
-        | Secp256k1 _ ->
-            cost_N_ICheck_signature_secp256k1 (Bytes.length b)
-        | P256 _ ->
-            cost_N_ICheck_signature_p256 (Bytes.length b)
+        | Ed25519 _ -> cost_N_ICheck_signature_ed25519 (Bytes.length b)
+        | Secp256k1 _ -> cost_N_ICheck_signature_secp256k1 (Bytes.length b)
+        | P256 _ -> cost_N_ICheck_signature_p256 (Bytes.length b)
       in
       atomic_step_cost cost
 
@@ -1351,34 +1344,22 @@ module Cost_of = struct
           a Script_typed_ir.comparable_ty -> a -> a -> cost -> cont -> cost =
        fun ty x y acc k ->
         match ty with
-        | Unit_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_unit) k
-        | Never_key _ -> (
-          match x with _ -> . )
-        | Bool_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_bool) k
-        | String_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_string x y) k
+        | Unit_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_unit) k
+        | Never_key _ -> ( match x with _ -> .)
+        | Bool_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_bool) k
+        | String_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_string x y) k
         | Signature_key _ ->
             (apply [@tailcall]) Gas.(acc +@ compare_signature) k
-        | Bytes_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_bytes x y) k
-        | Mutez_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_mutez) k
-        | Int_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_int x y) k
-        | Nat_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_nat x y) k
-        | Key_hash_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_key_hash) k
-        | Key_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_key) k
+        | Bytes_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_bytes x y) k
+        | Mutez_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_mutez) k
+        | Int_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_int x y) k
+        | Nat_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_nat x y) k
+        | Key_hash_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_key_hash) k
+        | Key_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_key) k
         | Timestamp_key _ ->
             (apply [@tailcall]) Gas.(acc +@ compare_timestamp x y) k
-        | Address_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_address) k
-        | Chain_id_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
+        | Address_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_address) k
+        | Chain_id_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
         | Pair_key ((tl, _), (tr, _), _) ->
             (* Reasonable over-approximation of the cost of lexicographic comparison. *)
             let (xl, xr) = x in
@@ -1390,31 +1371,27 @@ module Cost_of = struct
               Gas.(acc +@ compare_pair_tag)
               (Compare (tr, xr, yr, k))
         | Union_key ((tl, _), (tr, _), _) -> (
-          match (x, y) with
-          | (L x, L y) ->
-              (compare [@tailcall]) tl x y Gas.(acc +@ compare_union_tag) k
-          | (L _, R _) ->
-              (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
-          | (R _, L _) ->
-              (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
-          | (R x, R y) ->
-              (compare [@tailcall]) tr x y Gas.(acc +@ compare_union_tag) k )
+            match (x, y) with
+            | (L x, L y) ->
+                (compare [@tailcall]) tl x y Gas.(acc +@ compare_union_tag) k
+            | (L _, R _) -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
+            | (R _, L _) -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
+            | (R x, R y) ->
+                (compare [@tailcall]) tr x y Gas.(acc +@ compare_union_tag) k)
         | Option_key (t, _) -> (
-          match (x, y) with
-          | (None, None) ->
-              (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
-          | (None, Some _) ->
-              (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
-          | (Some _, None) ->
-              (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
-          | (Some x, Some y) ->
-              (compare [@tailcall]) t x y Gas.(acc +@ compare_option_tag) k )
+            match (x, y) with
+            | (None, None) ->
+                (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
+            | (None, Some _) ->
+                (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
+            | (Some _, None) ->
+                (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
+            | (Some x, Some y) ->
+                (compare [@tailcall]) t x y Gas.(acc +@ compare_option_tag) k)
       and apply cost k =
         match k with
-        | Compare (ty, x, y, k) ->
-            (compare [@tailcall]) ty x y cost k
-        | Return ->
-            cost
+        | Compare (ty, x, y, k) -> (compare [@tailcall]) ty x y cost k
+        | Return -> cost
       in
       compare ty x y Gas.free Return
 
@@ -1434,8 +1411,8 @@ module Cost_of = struct
          on non-structured data *)
       Gas.(intercept +@ (S.safe_int 2 * log2 size *@ per_elt_cost))
 
-    let map_mem (type k v) (elt : k)
-        ((module Box) : (k, v) Script_typed_ir.map) =
+    let map_mem (type k v) (elt : k) ((module Box) : (k, v) Script_typed_ir.map)
+        =
       let open S_syntax in
       let per_elt_cost = compare Box.key_ty elt elt in
       let size = S.safe_int (snd Box.boxed) in
@@ -1516,7 +1493,7 @@ module Cost_of = struct
        the actual gas (so it's meta-gas): indeed, one needs to run through the
        list of strings to compute the total allocated cost.
        [concat_string_precheck] corresponds to the meta-gas cost of this computation.
-     *)
+    *)
     let concat_string_precheck (l : 'a Script_typed_ir.boxed_list) =
       (* we set the precheck to be slightly more expensive than cost_N_IList_iter *)
       atomic_step_cost (S.mul (S.safe_int l.length) (S.safe_int 10))
@@ -1658,8 +1635,7 @@ module Cost_of = struct
     (* Assuming unflattened storage: /contracts/hash1/.../hash6/key/balance,
        balance stored on 64 bits *)
     let contract_exists =
-      Gas.cost_of_repr
-      @@ Storage_costs.read_access ~path_length:9 ~read_bytes:8
+      Gas.cost_of_repr @@ Storage_costs.read_access ~path_length:9 ~read_bytes:8
 
     (* Constructing proof arguments consists in a decreasing loop in the result
        monad, allocating at each step. We charge a reasonable overapproximation. *)

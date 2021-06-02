@@ -37,8 +37,7 @@ let test_rt_opt name testable enc dec input =
 
 let test_decode_opt_safe name testable dec encoded =
   match dec encoded with
-  | Some _ | None ->
-      ()
+  | Some _ | None -> ()
   | exception exc ->
       Alcotest.failf
         "%s failed for %a: exception whilst decoding: %s"

@@ -29,7 +29,8 @@ module Request = struct
   let encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"New_head"
           (obj2
@@ -45,11 +46,11 @@ module Request = struct
              (req "block" Block_hash.encoding)
              (req "locators" int31))
           (function New_branch (h, l) -> Some ((), h, l) | _ -> None)
-          (fun ((), h, l) -> New_branch (h, l)) ]
+          (fun ((), h, l) -> New_branch (h, l));
+      ]
 
   let pp ppf = function
-    | New_head hash ->
-        Format.fprintf ppf "New head %a" Block_hash.pp hash
+    | New_head hash -> Format.fprintf ppf "New head %a" Block_hash.pp hash
     | New_branch (hash, len) ->
         Format.fprintf
           ppf
@@ -87,28 +88,17 @@ module Event = struct
 
   let level req =
     match req with
-    | Validating_new_branch _
-    | New_branch_validated _
-    | Fetching_operations_for_head _
-    | Requesting_new_head_validation _
-    | New_head_validation_end _
-    | Ignoring_head _
-    | Ignoring_previously_validated_block _
-    | Ignoring_invalid_block _
-    | Missing_new_head_predecessor _
-    | Ignoring_branch_with_invalid_locator _
-    | Ignoring_branch_without_common_ancestor _
-    | No_new_head_from_peer _
-    | Processing_new_head _
-    | Processing_new_branch _
-    | Terminating_worker _ ->
+    | Validating_new_branch _ | New_branch_validated _
+    | Fetching_operations_for_head _ | Requesting_new_head_validation _
+    | New_head_validation_end _ | Ignoring_head _
+    | Ignoring_previously_validated_block _ | Ignoring_invalid_block _
+    | Missing_new_head_predecessor _ | Ignoring_branch_with_invalid_locator _
+    | Ignoring_branch_without_common_ancestor _ | No_new_head_from_peer _
+    | Processing_new_head _ | Processing_new_branch _ | Terminating_worker _ ->
         Internal_event.Debug
-    | Request (_, _, Some _) ->
-        Internal_event.Notice
-    | Request (Request.New_head _, _, None) ->
-        Internal_event.Debug
-    | Request (Request.New_branch (_, _), _, None) ->
-        Internal_event.Info
+    | Request (_, _, Some _) -> Internal_event.Notice
+    | Request (Request.New_head _, _, None) -> Internal_event.Debug
+    | Request (Request.New_branch (_, _), _, None) -> Internal_event.Info
 
   let block_received_encoding =
     let open Data_encoding in
@@ -118,7 +108,8 @@ module Event = struct
     let open Data_encoding in
     union
       ~tag_size:`Uint8
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Request"
           (obj2
@@ -141,50 +132,39 @@ module Event = struct
           ~title:"validating_new_branch"
           (obj2 (req "peer" P2p_peer.Id.encoding) (req "nb_blocks" int31))
           (function
-            | Validating_new_branch {peer; nb_blocks} ->
-                Some (peer, nb_blocks)
-            | _ ->
-                None)
+            | Validating_new_branch {peer; nb_blocks} -> Some (peer, nb_blocks)
+            | _ -> None)
           (fun (peer, nb_blocks) -> Validating_new_branch {peer; nb_blocks});
         case
           (Tag 3)
           ~title:"new_branch_validated"
           block_received_encoding
           (function
-            | New_branch_validated {peer; hash} ->
-                Some (peer, hash)
-            | _ ->
-                None)
+            | New_branch_validated {peer; hash} -> Some (peer, hash) | _ -> None)
           (fun (peer, hash) -> New_branch_validated {peer; hash});
         case
           (Tag 4)
           ~title:"fetching_operations_for_head"
           block_received_encoding
           (function
-            | Fetching_operations_for_head {peer; hash} ->
-                Some (peer, hash)
-            | _ ->
-                None)
+            | Fetching_operations_for_head {peer; hash} -> Some (peer, hash)
+            | _ -> None)
           (fun (peer, hash) -> Fetching_operations_for_head {peer; hash});
         case
           (Tag 5)
           ~title:"Requesting_new_head_validation"
           block_received_encoding
           (function
-            | Requesting_new_head_validation {peer; hash} ->
-                Some (peer, hash)
-            | _ ->
-                None)
+            | Requesting_new_head_validation {peer; hash} -> Some (peer, hash)
+            | _ -> None)
           (fun (peer, hash) -> Requesting_new_head_validation {peer; hash});
         case
           (Tag 6)
           ~title:"new_head_validation_end"
           block_received_encoding
           (function
-            | New_head_validation_end {peer; hash} ->
-                Some (peer, hash)
-            | _ ->
-                None)
+            | New_head_validation_end {peer; hash} -> Some (peer, hash)
+            | _ -> None)
           (fun (peer, hash) -> New_head_validation_end {peer; hash});
         case
           (Tag 7)
@@ -200,29 +180,23 @@ module Event = struct
           (function
             | Ignoring_previously_validated_block {peer; hash} ->
                 Some (peer, hash)
-            | _ ->
-                None)
-          (fun (peer, hash) ->
-            Ignoring_previously_validated_block {peer; hash});
+            | _ -> None)
+          (fun (peer, hash) -> Ignoring_previously_validated_block {peer; hash});
         case
           (Tag 9)
           ~title:"ignoring_invalid_block"
           block_received_encoding
           (function
-            | Ignoring_invalid_block {peer; hash} ->
-                Some (peer, hash)
-            | _ ->
-                None)
+            | Ignoring_invalid_block {peer; hash} -> Some (peer, hash)
+            | _ -> None)
           (fun (peer, hash) -> Ignoring_invalid_block {peer; hash});
         case
           (Tag 10)
           ~title:"missing_new_head_predecessor"
           block_received_encoding
           (function
-            | Missing_new_head_predecessor {peer; hash} ->
-                Some (peer, hash)
-            | _ ->
-                None)
+            | Missing_new_head_predecessor {peer; hash} -> Some (peer, hash)
+            | _ -> None)
           (fun (peer, hash) -> Missing_new_head_predecessor {peer; hash});
         case
           (Tag 11)
@@ -231,8 +205,7 @@ module Event = struct
           (function
             | Ignoring_branch_with_invalid_locator {peer; hash} ->
                 Some (peer, hash)
-            | _ ->
-                None)
+            | _ -> None)
           (fun (peer, hash) ->
             Ignoring_branch_with_invalid_locator {peer; hash});
         case
@@ -242,8 +215,7 @@ module Event = struct
           (function
             | Ignoring_branch_without_common_ancestor {peer; hash} ->
                 Some (peer, hash)
-            | _ ->
-                None)
+            | _ -> None)
           (fun (peer, hash) ->
             Ignoring_branch_without_common_ancestor {peer; hash});
         case
@@ -251,10 +223,8 @@ module Event = struct
           ~title:"no_new_head_from_peer"
           (obj2 (req "peer" P2p_peer.Id.encoding) (req "timespan" float))
           (function
-            | No_new_head_from_peer {peer; timespan} ->
-                Some (peer, timespan)
-            | _ ->
-                None)
+            | No_new_head_from_peer {peer; timespan} -> Some (peer, timespan)
+            | _ -> None)
           (fun (peer, timespan) -> No_new_head_from_peer {peer; timespan});
         case
           (Tag 14)
@@ -268,21 +238,18 @@ module Event = struct
           ~title:"processing_new_branch"
           block_received_encoding
           (function
-            | Processing_new_branch {peer; hash} ->
-                Some (peer, hash)
-            | _ ->
-                None)
+            | Processing_new_branch {peer; hash} -> Some (peer, hash)
+            | _ -> None)
           (fun (peer, hash) -> Processing_new_branch {peer; hash});
         case
           (Tag 16)
           ~title:"terminating_worker"
           (obj2 (req "peer" P2p_peer.Id.encoding) (req "reason" string))
           (function
-            | Terminating_worker {peer; reason} ->
-                Some (peer, reason)
-            | _ ->
-                None)
-          (fun (peer, reason) -> Terminating_worker {peer; reason}) ]
+            | Terminating_worker {peer; reason} -> Some (peer, reason)
+            | _ -> None)
+          (fun (peer, reason) -> Terminating_worker {peer; reason});
+      ]
 
   let pp_block_received ppf {peer; hash} =
     Format.fprintf ppf "%a from %a" Block_hash.pp hash P2p_peer.Id.pp peer

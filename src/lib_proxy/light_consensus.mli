@@ -26,8 +26,7 @@
 (** A container of input data needed to process a consensus. *)
 type input = {
   printer : Tezos_client_base.Client_context.printer;
-  min_agreement : float;
-      (** The same value as [Light.sources.min_agreement] *)
+  min_agreement : float;  (** The same value as [Light.sources.min_agreement] *)
   chain : Tezos_shell_services.Block_services.chain;
       (** The chain considered *)
   block : Tezos_shell_services.Block_services.block;

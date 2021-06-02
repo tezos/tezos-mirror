@@ -46,5 +46,4 @@ end
 
 (** Key/value index associated to a floating block store where the key
     is a {!Block_hash.t} and the value is {!Block_info.t}. *)
-include
-  Index.S with type key = Block_hash.t and type value = Block_info.t
+include Index.S with type key = Block_hash.t and type value = Block_info.t

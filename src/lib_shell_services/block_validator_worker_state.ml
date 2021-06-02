@@ -49,10 +49,8 @@ module Request = struct
       Chain_id.pp_short
       chain_id ;
     match peer with
-    | None ->
-        ()
-    | Some peer ->
-        Format.fprintf ppf "from peer %a" P2p_peer.Id.pp_short peer
+    | None -> ()
+    | Some peer -> Format.fprintf ppf "from peer %a" P2p_peer.Id.pp_short peer
 end
 
 module Event = struct
@@ -70,15 +68,15 @@ module Event = struct
 
   let level req =
     match req with
-    | Validation_success _ | Validation_failure _ ->
-        Internal_event.Notice
+    | Validation_success _ | Validation_failure _ -> Internal_event.Notice
     | Could_not_find_context _ | Previously_validated _ | Validating_block _ ->
         Internal_event.Debug
 
   let encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"validation_success"
           (obj2
@@ -113,7 +111,8 @@ module Event = struct
           ~title:"validating_block"
           (obj1 (req "block" Block_hash.encoding))
           (function Validating_block block -> Some block | _ -> None)
-          (fun block -> Validating_block block) ]
+          (fun block -> Validating_block block);
+      ]
 
   let pp ppf = function
     | Validation_success (req, {pushed; treated; completed}) ->

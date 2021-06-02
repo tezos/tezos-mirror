@@ -36,13 +36,11 @@ module Make_value (V : ENCODED_VALUE) = struct
           "Cannot parse data: %a"
           Data_encoding.Binary.pp_read_error
           re
-    | Ok v ->
-        ok v
+    | Ok v -> ok v
 
   let to_bytes v =
     match Data_encoding.Binary.to_bytes V.encoding v with
-    | Ok b ->
-        b
+    | Ok b -> b
     | Error we ->
         (* this debug event is asyncronous, and we don't have lwt here *)
         Events.(emit__dont_wait__use_with_care serializing_error we) ;
@@ -163,17 +161,13 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let rec dig i path acc =
       if i <= 0 then
         match I.of_path path with
-        | None ->
-            assert false
-        | Some path ->
-            f path acc
+        | None -> assert false
+        | Some path -> f path acc
       else
         S.fold t path ~init:acc ~f:(fun k acc ->
             match k with
-            | `Dir k ->
-                dig (i - 1) k acc
-            | `Key _ ->
-                Lwt.return acc)
+            | `Dir k -> dig (i - 1) k acc
+            | `Key _ -> Lwt.return acc)
     in
     dig I.path_length [] init
 
@@ -185,22 +179,18 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
   let resolve_index t prefix =
     let rec loop i prefix = function
       | [] when i = I.path_length -> (
-        match I.of_path prefix with
-        | None ->
-            assert false
-        | Some path ->
-            Lwt.return [path] )
+          match I.of_path prefix with
+          | None -> assert false
+          | Some path -> Lwt.return [path])
       | [] ->
-          list t prefix
-          >>= fun prefixes ->
+          list t prefix >>= fun prefixes ->
           List.map_p
             (function `Key prefix | `Dir prefix -> loop (i + 1) prefix [])
             prefixes
           >|= List.flatten
       | [d] when i = I.path_length - 1 ->
           if i >= I.path_length then invalid_arg "IO.resolve" ;
-          list t prefix
-          >>= fun prefixes ->
+          list t prefix >>= fun prefixes ->
           List.map_p
             (function
               | `Key prefix | `Dir prefix ->
@@ -212,17 +202,16 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
             prefixes
           >|= List.flatten
       | "" :: ds ->
-          list t prefix
-          >>= fun prefixes ->
+          list t prefix >>= fun prefixes ->
           List.map_p
             (function `Key prefix | `Dir prefix -> loop (i + 1) prefix ds)
             prefixes
           >|= List.flatten
       | d :: ds -> (
           if i >= I.path_length then invalid_arg "IO.resolve" ;
-          S.known_dir t (prefix @ [d])
-          >>= function
-          | true -> loop (i + 1) (prefix @ [d]) ds | false -> Lwt.return_nil )
+          S.known_dir t (prefix @ [d]) >>= function
+          | true -> loop (i + 1) (prefix @ [d]) ds
+          | false -> Lwt.return_nil)
     in
     loop 0 [] prefix
 
@@ -250,8 +239,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let iter s ~f = fold s ~init:() ~f:(fun p () -> f p)
   end
 
-  module Make_buffered_set (N : NAME) (Set : Set.S with type elt = I.t) =
-  struct
+  module Make_buffered_set (N : NAME) (Set : Set.S with type elt = I.t) = struct
     include Make_set (N)
     module Set = Set
 
@@ -259,10 +247,9 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
       fold s ~init:Set.empty ~f:(fun i set -> Lwt.return (Set.add i set))
 
     let store_all s new_set =
-      read_all s
-      >>= fun old_set ->
-      Set.iter_p (remove s) (Set.diff old_set new_set)
-      >>= fun () -> Set.iter_p (store s) (Set.diff new_set old_set)
+      read_all s >>= fun old_set ->
+      Set.iter_p (remove s) (Set.diff old_set new_set) >>= fun () ->
+      Set.iter_p (store s) (Set.diff new_set old_set)
   end
 
   module Make_map (N : NAME) (V : VALUE) = struct
@@ -278,8 +265,9 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
       Store.read (s, i) N.name >>=? fun b -> Lwt.return (V.of_bytes b)
 
     let read_opt s i =
-      read s i
-      >>= function Error _ -> Lwt.return_none | Ok v -> Lwt.return_some v
+      read s i >>= function
+      | Error _ -> Lwt.return_none
+      | Ok v -> Lwt.return_some v
 
     let store s i v = Store.store (s, i) N.name (V.to_bytes v)
 
@@ -289,8 +277,9 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
 
     let fold s ~init ~f =
       fold_indexes s ~init ~f:(fun i acc ->
-          read_opt s i
-          >>= function None -> Lwt.return acc | Some v -> f i v acc)
+          read_opt s i >>= function
+          | None -> Lwt.return acc
+          | Some v -> f i v acc)
 
     let bindings s =
       fold s ~init:[] ~f:(fun p v acc -> Lwt.return ((p, v) :: acc))
@@ -341,21 +330,16 @@ module Make_set (S : STORE) (I : INDEX) = struct
       if i <= 1 then
         S.fold s path ~init:acc ~f:(fun k acc ->
             match k with
-            | `Dir _ ->
-                Lwt.return acc
+            | `Dir _ -> Lwt.return acc
             | `Key file -> (
-              match I.of_path file with
-              | None ->
-                  assert false
-              | Some p ->
-                  f p acc ))
+                match I.of_path file with
+                | None -> assert false
+                | Some p -> f p acc))
       else
         S.fold s path ~init:acc ~f:(fun k acc ->
             match k with
-            | `Dir k ->
-                dig (i - 1) k acc
-            | `Key _ ->
-                Lwt.return acc)
+            | `Dir k -> dig (i - 1) k acc
+            | `Key _ -> Lwt.return acc)
     in
     dig I.path_length [] init
 
@@ -376,10 +360,9 @@ struct
     fold s ~init:Set.empty ~f:(fun i set -> Lwt.return (Set.add i set))
 
   let store_all s new_set =
-    read_all s
-    >>= fun old_set ->
-    Set.iter_p (remove s) (Set.diff old_set new_set)
-    >>= fun () -> Set.iter_p (store s) (Set.diff new_set old_set)
+    read_all s >>= fun old_set ->
+    Set.iter_p (remove s) (Set.diff old_set new_set) >>= fun () ->
+    Set.iter_p (store s) (Set.diff new_set old_set)
 end
 
 module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
@@ -395,8 +378,9 @@ module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
     S.read s (I.to_path i []) >>=? fun b -> Lwt.return (V.of_bytes b)
 
   let read_opt s i =
-    read s i
-    >>= function Error _ -> Lwt.return_none | Ok v -> Lwt.return_some v
+    read s i >>= function
+    | Error _ -> Lwt.return_none
+    | Ok v -> Lwt.return_some v
 
   let store s i v = S.store s (I.to_path i []) (V.to_bytes v)
 
@@ -409,31 +393,24 @@ module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
       if i <= 1 then
         S.fold s path ~init:acc ~f:(fun k acc ->
             match k with
-            | `Dir _ ->
-                Lwt.return acc
+            | `Dir _ -> Lwt.return acc
             | `Key file -> (
-                S.read_opt s file
-                >>= function
-                | None ->
-                    Lwt.return acc
+                S.read_opt s file >>= function
+                | None -> Lwt.return acc
                 | Some b -> (
-                  match V.of_bytes b with
-                  | Error _ ->
-                      (* Silently ignore unparsable data *)
-                      Lwt.return acc
-                  | Ok v -> (
-                    match I.of_path file with
-                    | None ->
-                        assert false
-                    | Some path ->
-                        f path v acc ) ) ))
+                    match V.of_bytes b with
+                    | Error _ ->
+                        (* Silently ignore unparsable data *)
+                        Lwt.return acc
+                    | Ok v -> (
+                        match I.of_path file with
+                        | None -> assert false
+                        | Some path -> f path v acc))))
       else
         S.fold s path ~init:acc ~f:(fun k acc ->
             match k with
-            | `Dir k ->
-                dig (i - 1) k acc
-            | `Key _ ->
-                Lwt.return acc)
+            | `Dir k -> dig (i - 1) k acc
+            | `Key _ -> Lwt.return acc)
     in
     dig I.path_length [] init
 
@@ -445,14 +422,11 @@ module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
   let fold_keys s ~init ~f =
     S.fold s [] ~init ~f:(fun p acc ->
         match p with
-        | `Dir _ ->
-            Lwt.return acc
+        | `Dir _ -> Lwt.return acc
         | `Key p -> (
-          match I.of_path p with
-          | None ->
-              assert false
-          | Some path ->
-              f path acc ))
+            match I.of_path p with
+            | None -> assert false
+            | Some path -> f path acc))
 
   let keys s = fold_keys s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 

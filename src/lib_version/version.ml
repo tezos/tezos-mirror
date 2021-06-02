@@ -29,12 +29,9 @@
 type additional_info = Dev | RC of int | Release
 
 let string_of_additional_info = function
-  | Dev ->
-      "+dev"
-  | RC n ->
-      "~rc" ^ string_of_int n
-  | Release ->
-      ""
+  | Dev -> "+dev"
+  | RC n -> "~rc" ^ string_of_int n
+  | Release -> ""
 
 type t = {major : int; minor : int; additional_info : additional_info}
 

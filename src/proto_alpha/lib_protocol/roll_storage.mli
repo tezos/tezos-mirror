@@ -159,9 +159,7 @@ module Delegate : sig
         [dlg]'s number of rolls prior to inactivation.
   *)
   val set_inactive :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
   (**
      If the delegate [dlg] is already active then [set_active ctxt dlg]
@@ -187,9 +185,7 @@ module Delegate : sig
         [(nr * tokens_per_roll) + chg], where [chg < tokens_per_roll].
   *)
   val set_active :
-    Raw_context.t ->
-    Signature.Public_key_hash.t ->
-    Raw_context.t tzresult Lwt.t
+    Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 end
 
 module Contract : sig

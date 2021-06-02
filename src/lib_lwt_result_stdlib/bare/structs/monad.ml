@@ -67,10 +67,8 @@ let ( >>?= ) v f = match v with Error _ as e -> Lwt.return e | Ok v -> f v
 
 let ( >|?= ) v f =
   match v with
-  | Error _ as e ->
-      Lwt.return e
-  | Ok v ->
-      f v >>= fun v -> Lwt.return (Ok v)
+  | Error _ as e -> Lwt.return e
+  | Ok v -> f v >>= fun v -> Lwt.return (Ok v)
 
 let unit_s = Lwt.return_unit
 
@@ -121,40 +119,28 @@ let all_p = Lwt.all
 let both_p = Lwt.both
 
 let rec join_e_errors errors = function
-  | Ok _ :: ts ->
-      join_e_errors errors ts
-  | Error error :: ts ->
-      join_e_errors (error :: errors) ts
-  | [] ->
-      Error errors
+  | Ok _ :: ts -> join_e_errors errors ts
+  | Error error :: ts -> join_e_errors (error :: errors) ts
+  | [] -> Error errors
 
 let rec join_e = function
-  | [] ->
-      unit_e
-  | Ok () :: ts ->
-      join_e ts
-  | Error error :: ts ->
-      join_e_errors [error] ts
+  | [] -> unit_e
+  | Ok () :: ts -> join_e ts
+  | Error error :: ts -> join_e_errors [error] ts
 
 let all_e ts =
   let rec aux acc = function
-    | [] ->
-        Ok (Stdlib.List.rev acc)
-    | Ok v :: ts ->
-        aux (v :: acc) ts
-    | Error error :: ts ->
-        join_e_errors [error] ts
+    | [] -> Ok (Stdlib.List.rev acc)
+    | Ok v :: ts -> aux (v :: acc) ts
+    | Error error :: ts -> join_e_errors [error] ts
   in
   aux [] ts
 
 let both_e a b =
   match (a, b) with
-  | (Ok a, Ok b) ->
-      Ok (a, b)
-  | (Error err, Ok _) | (Ok _, Error err) ->
-      Error [err]
-  | (Error erra, Error errb) ->
-      Error [erra; errb]
+  | (Ok a, Ok b) -> Ok (a, b)
+  | (Error err, Ok _) | (Ok _, Error err) -> Error [err]
+  | (Error erra, Error errb) -> Error [erra; errb]
 
 let join_ep ts = all_p ts >|= join_e
 

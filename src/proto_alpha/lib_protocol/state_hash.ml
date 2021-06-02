@@ -25,16 +25,17 @@
 
 let random_state_hash = "\076\064\204" (* rng(53): never used... *)
 
-include Blake2B.Make
-          (Base58)
-          (struct
-            let name = "random"
+include
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "random"
 
-            let title = "A random generation state"
+      let title = "A random generation state"
 
-            let b58check_prefix = random_state_hash
+      let b58check_prefix = random_state_hash
 
-            let size = None
-          end)
+      let size = None
+    end)
 
 let () = Base58.check_encoded_prefix b58check_encoding "rng" 53

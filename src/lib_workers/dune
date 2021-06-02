@@ -8,9 +8,3 @@
                    -open Tezos_base
                    -open Tezos_stdlib_unix
 )))
-
-(rule
- (alias runtest_lint)
- (package tezos-workers)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

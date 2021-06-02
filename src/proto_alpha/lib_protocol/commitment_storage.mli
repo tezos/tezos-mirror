@@ -27,9 +27,7 @@ val init :
   Raw_context.t -> Commitment_repr.t list -> Raw_context.t tzresult Lwt.t
 
 val find :
-  Raw_context.t ->
-  Blinded_public_key_hash.t ->
-  Tez_repr.t option tzresult Lwt.t
+  Raw_context.t -> Blinded_public_key_hash.t -> Tez_repr.t option tzresult Lwt.t
 
 val remove_existing :
   Raw_context.t -> Blinded_public_key_hash.t -> Raw_context.t tzresult Lwt.t

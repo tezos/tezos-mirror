@@ -36,14 +36,12 @@ let ( >>= ) = Lwt.bind
 
 (* Same as [>>=], but handle errors using [Assert.fail_msg]. *)
 let ( >>=! ) x f =
-  x
-  >>= fun result ->
+  x >>= fun result ->
   match result with
   | Error trace ->
       let message = Format.asprintf "%a" Error_monad.pp_print_error trace in
       Assert.fail_msg "%s" message
-  | Ok x ->
-      f x
+  | Ok x -> f x
 
 open Filename.Infix
 
@@ -66,37 +64,27 @@ let chain_id = Chain_id.of_block_hash genesis_block
 let commit = commit ~time:Time.Protocol.epoch ~message:""
 
 let create_block2 idx genesis_commit =
-  checkout idx genesis_commit
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout genesis_block"
+  checkout idx genesis_commit >>= function
+  | None -> Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
-      add ctxt ["a"; "b"] (Bytes.of_string "Novembre")
-      >>= fun ctxt ->
-      add ctxt ["a"; "c"] (Bytes.of_string "Juin")
-      >>= fun ctxt ->
+      add ctxt ["a"; "b"] (Bytes.of_string "Novembre") >>= fun ctxt ->
+      add ctxt ["a"; "c"] (Bytes.of_string "Juin") >>= fun ctxt ->
       add ctxt ["version"] (Bytes.of_string "0.0") >>= fun ctxt -> commit ctxt
 
 let create_block3a idx block2_commit =
-  checkout idx block2_commit
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout block2"
+  checkout idx block2_commit >>= function
+  | None -> Assert.fail_msg "checkout block2"
   | Some ctxt ->
-      remove ctxt ["a"; "b"]
-      >>= fun ctxt ->
+      remove ctxt ["a"; "b"] >>= fun ctxt ->
       add ctxt ["a"; "d"] (Bytes.of_string "Mars") >>= fun ctxt -> commit ctxt
 
 let create_block3b idx block2_commit =
-  checkout idx block2_commit
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout block3b"
+  checkout idx block2_commit >>= function
+  | None -> Assert.fail_msg "checkout block3b"
   | Some ctxt ->
-      remove ctxt ["a"; "c"]
-      >>= fun ctxt ->
-      add ctxt ["a"; "d"] (Bytes.of_string "Février")
-      >>= fun ctxt -> commit ctxt
+      remove ctxt ["a"; "c"] >>= fun ctxt ->
+      add ctxt ["a"; "d"] (Bytes.of_string "Février") >>= fun ctxt ->
+      commit ctxt
 
 type t = {
   idx : Context.index;
@@ -109,20 +97,17 @@ type t = {
 let wrap_context_init f _ () =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
       let root = base_dir // "context" in
-      Context.init root
-      >>= fun idx ->
+      Context.init root >>= fun idx ->
       Context.commit_genesis
         idx
         ~chain_id
         ~time:genesis_time
         ~protocol:genesis_protocol
       >>=! fun genesis ->
-      create_block2 idx genesis
-      >>= fun block2 ->
-      create_block3a idx block2
-      >>= fun block3a ->
-      create_block3b idx block2
-      >>= fun block3b -> f {idx; genesis; block2; block3a; block3b})
+      create_block2 idx genesis >>= fun block2 ->
+      create_block3a idx block2 >>= fun block3a ->
+      create_block3b idx block2 >>= fun block3b ->
+      f {idx; genesis; block2; block3a; block3b})
 
 (** Simple test *)
 
@@ -134,30 +119,22 @@ let c = function None -> None | Some s -> Some (Bytes.to_string s)
     - (["a"; "b"], ["Novembre"])
     - (["a; "c""], ["Juin"]) *)
 let test_simple {idx; block2; _} =
-  checkout idx block2
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout block2"
+  checkout idx block2 >>= function
+  | None -> Assert.fail_msg "checkout block2"
   | Some ctxt ->
-      find ctxt ["version"]
-      >>= fun version ->
+      find ctxt ["version"] >>= fun version ->
       Assert.equal_string_option ~msg:__LOC__ (c version) (Some "0.0") ;
-      find ctxt ["a"; "b"]
-      >>= fun novembre ->
+      find ctxt ["a"; "b"] >>= fun novembre ->
       Assert.equal_string_option (Some "Novembre") (c novembre) ;
-      find ctxt ["a"; "c"]
-      >>= fun juin ->
+      find ctxt ["a"; "c"] >>= fun juin ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
       Lwt.return_unit
 
 let test_list {idx; block2; _} =
-  checkout idx block2
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout block2"
+  checkout idx block2 >>= function
+  | None -> Assert.fail_msg "checkout block2"
   | Some ctxt ->
-      list ctxt ["a"]
-      >>= fun ls ->
+      list ctxt ["a"] >>= fun ls ->
       let ls = List.sort compare (List.map fst ls) in
       Assert.equal_string_list ~msg:__LOC__ ["b"; "c"] ls ;
       Lwt.return_unit
@@ -170,22 +147,16 @@ let test_list {idx; block2; _} =
     Additionally, the key ["a"; "b"] is associated with nothing as it
     has been removed by block [block3a]. *)
 let test_continuation {idx; block3a; _} =
-  checkout idx block3a
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout block3a"
+  checkout idx block3a >>= function
+  | None -> Assert.fail_msg "checkout block3a"
   | Some ctxt ->
-      find ctxt ["version"]
-      >>= fun version ->
+      find ctxt ["version"] >>= fun version ->
       Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
-      find ctxt ["a"; "b"]
-      >>= fun novembre ->
+      find ctxt ["a"; "b"] >>= fun novembre ->
       Assert.is_none ~msg:__LOC__ (c novembre) ;
-      find ctxt ["a"; "c"]
-      >>= fun juin ->
+      find ctxt ["a"; "c"] >>= fun juin ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
-      find ctxt ["a"; "d"]
-      >>= fun mars ->
+      find ctxt ["a"; "d"] >>= fun mars ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Mars") (c mars) ;
       Lwt.return_unit
 
@@ -197,69 +168,48 @@ let test_continuation {idx; block3a; _} =
     Additionally, the key ["a"; "c"] is associated with nothing as it
     has been removed by block [block3b]. *)
 let test_fork {idx; block3b; _} =
-  checkout idx block3b
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout block3b"
+  checkout idx block3b >>= function
+  | None -> Assert.fail_msg "checkout block3b"
   | Some ctxt ->
-      find ctxt ["version"]
-      >>= fun version ->
+      find ctxt ["version"] >>= fun version ->
       Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
-      find ctxt ["a"; "b"]
-      >>= fun novembre ->
+      find ctxt ["a"; "b"] >>= fun novembre ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
-      find ctxt ["a"; "c"]
-      >>= fun juin ->
+      find ctxt ["a"; "c"] >>= fun juin ->
       Assert.is_none ~msg:__LOC__ (c juin) ;
-      find ctxt ["a"; "d"]
-      >>= fun mars ->
+      find ctxt ["a"; "d"] >>= fun mars ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
       Lwt.return_unit
 
 (** Checkout the context at [genesis] and explicitly replay
     setting/getting key-values. *)
 let test_replay {idx; genesis; _} =
-  checkout idx genesis
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout genesis_block"
+  checkout idx genesis >>= function
+  | None -> Assert.fail_msg "checkout genesis_block"
   | Some ctxt0 ->
-      add ctxt0 ["version"] (Bytes.of_string "0.0")
-      >>= fun ctxt1 ->
-      add ctxt1 ["a"; "b"] (Bytes.of_string "Novembre")
-      >>= fun ctxt2 ->
-      add ctxt2 ["a"; "c"] (Bytes.of_string "Juin")
-      >>= fun ctxt3 ->
-      add ctxt3 ["a"; "d"] (Bytes.of_string "July")
-      >>= fun ctxt4a ->
-      add ctxt3 ["a"; "d"] (Bytes.of_string "Juillet")
-      >>= fun ctxt4b ->
-      add ctxt4a ["a"; "b"] (Bytes.of_string "November")
-      >>= fun ctxt5a ->
-      find ctxt4a ["a"; "b"]
-      >>= fun novembre ->
+      add ctxt0 ["version"] (Bytes.of_string "0.0") >>= fun ctxt1 ->
+      add ctxt1 ["a"; "b"] (Bytes.of_string "Novembre") >>= fun ctxt2 ->
+      add ctxt2 ["a"; "c"] (Bytes.of_string "Juin") >>= fun ctxt3 ->
+      add ctxt3 ["a"; "d"] (Bytes.of_string "July") >>= fun ctxt4a ->
+      add ctxt3 ["a"; "d"] (Bytes.of_string "Juillet") >>= fun ctxt4b ->
+      add ctxt4a ["a"; "b"] (Bytes.of_string "November") >>= fun ctxt5a ->
+      find ctxt4a ["a"; "b"] >>= fun novembre ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
-      find ctxt5a ["a"; "b"]
-      >>= fun november ->
+      find ctxt5a ["a"; "b"] >>= fun november ->
       Assert.equal_string_option ~msg:__LOC__ (Some "November") (c november) ;
-      find ctxt5a ["a"; "d"]
-      >>= fun july ->
+      find ctxt5a ["a"; "d"] >>= fun july ->
       Assert.equal_string_option ~msg:__LOC__ (Some "July") (c july) ;
-      find ctxt4b ["a"; "b"]
-      >>= fun novembre ->
+      find ctxt4b ["a"; "b"] >>= fun novembre ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
-      find ctxt4b ["a"; "d"]
-      >>= fun juillet ->
+      find ctxt4b ["a"; "d"] >>= fun juillet ->
       Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
       Lwt.return_unit
 
 let fold_keys s root ~init ~f =
   fold s root ~init ~f:(fun k v acc ->
       match Tree.kind v with
-      | `Value ->
-          f (root @ k) acc
-      | `Tree ->
-          Lwt.return acc)
+      | `Value -> f (root @ k) acc
+      | `Tree -> Lwt.return acc)
 
 let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
@@ -289,48 +239,34 @@ let bindings =
   List.map (fun x -> (["root"; x], zero)) steps
 
 let test_fold_keys {idx; genesis; _} =
-  checkout idx genesis
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout genesis_block"
+  checkout idx genesis >>= function
+  | None -> Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
-      add ctxt ["a"; "b"] (Bytes.of_string "Novembre")
-      >>= fun ctxt ->
-      add ctxt ["a"; "c"] (Bytes.of_string "Juin")
-      >>= fun ctxt ->
-      add ctxt ["a"; "d"; "e"] (Bytes.of_string "Septembre")
-      >>= fun ctxt ->
-      add ctxt ["f"] (Bytes.of_string "Avril")
-      >>= fun ctxt ->
-      add ctxt ["g"; "h"] (Bytes.of_string "Avril")
-      >>= fun ctxt ->
-      keys ctxt []
-      >>= fun l ->
+      add ctxt ["a"; "b"] (Bytes.of_string "Novembre") >>= fun ctxt ->
+      add ctxt ["a"; "c"] (Bytes.of_string "Juin") >>= fun ctxt ->
+      add ctxt ["a"; "d"; "e"] (Bytes.of_string "Septembre") >>= fun ctxt ->
+      add ctxt ["f"] (Bytes.of_string "Avril") >>= fun ctxt ->
+      add ctxt ["g"; "h"] (Bytes.of_string "Avril") >>= fun ctxt ->
+      keys ctxt [] >>= fun l ->
       Assert.equal_string_list_list
         ~msg:__LOC__
         [["a"; "b"]; ["a"; "c"]; ["a"; "d"; "e"]; ["f"]; ["g"; "h"]]
         (List.sort compare l) ;
-      keys ctxt ["a"]
-      >>= fun l ->
+      keys ctxt ["a"] >>= fun l ->
       Assert.equal_string_list_list
         ~msg:__LOC__
         [["a"; "b"]; ["a"; "c"]; ["a"; "d"; "e"]]
         (List.sort compare l) ;
-      keys ctxt ["f"]
-      >>= fun l ->
+      keys ctxt ["f"] >>= fun l ->
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
-      keys ctxt ["g"]
-      >>= fun l ->
+      keys ctxt ["g"] >>= fun l ->
       Assert.equal_string_list_list ~msg:__LOC__ [["g"; "h"]] l ;
-      keys ctxt ["i"]
-      >>= fun l ->
+      keys ctxt ["i"] >>= fun l ->
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       Lwt_list.fold_left_s (fun ctxt (k, v) -> add ctxt k v) ctxt bindings
       >>= fun ctxt ->
-      commit ctxt
-      >>= fun h ->
-      checkout_exn idx h
-      >>= fun ctxt ->
+      commit ctxt >>= fun h ->
+      checkout_exn idx h >>= fun ctxt ->
       fold_keys ctxt ["root"] ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
       >>= fun bs ->
       let bs = List.rev bs in
@@ -340,24 +276,18 @@ let test_fold_keys {idx; genesis; _} =
 (** Checkout the context at [genesis] and fold upon a context a series
     of key settings. *)
 let test_fold {idx; genesis; _} =
-  checkout idx genesis
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout genesis_block"
+  checkout idx genesis >>= function
+  | None -> Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
       let foo1 = Bytes.of_string "foo1" in
       let foo2 = Bytes.of_string "foo2" in
-      add ctxt ["foo"; "toto"] foo1
-      >>= fun ctxt ->
-      add ctxt ["foo"; "bar"; "toto"] foo2
-      >>= fun ctxt ->
+      add ctxt ["foo"; "toto"] foo1 >>= fun ctxt ->
+      add ctxt ["foo"; "bar"; "toto"] foo2 >>= fun ctxt ->
       let fold depth ecs ens =
         fold ?depth ctxt [] ~init:([], []) ~f:(fun path t (cs, ns) ->
             match Tree.kind t with
-            | `Tree ->
-                Lwt.return (cs, path :: ns)
-            | `Value ->
-                Lwt.return (path :: cs, ns))
+            | `Tree -> Lwt.return (cs, path :: ns)
+            | `Value -> Lwt.return (path :: cs, ns))
         >>= fun (cs, ns) ->
         Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;
         Assert.equal_string_list_list ~msg:__LOC__ ens ns ;
@@ -368,14 +298,10 @@ let test_fold {idx; genesis; _} =
         [["foo"; "toto"]; ["foo"; "bar"; "toto"]]
         [["foo"; "bar"]; ["foo"]; []]
       >>= fun () ->
-      fold (Some (`Eq 0)) [] [[]]
-      >>= fun () ->
-      fold (Some (`Eq 1)) [] [["foo"]]
-      >>= fun () ->
-      fold (Some (`Eq 2)) [["foo"; "toto"]] [["foo"; "bar"]]
-      >>= fun () ->
-      fold (Some (`Lt 2)) [] [["foo"]; []]
-      >>= fun () ->
+      fold (Some (`Eq 0)) [] [[]] >>= fun () ->
+      fold (Some (`Eq 1)) [] [["foo"]] >>= fun () ->
+      fold (Some (`Eq 2)) [["foo"; "toto"]] [["foo"; "bar"]] >>= fun () ->
+      fold (Some (`Lt 2)) [] [["foo"]; []] >>= fun () ->
       fold (Some (`Le 2)) [["foo"; "toto"]] [["foo"; "bar"]; ["foo"]; []]
       >>= fun () ->
       fold
@@ -385,10 +311,8 @@ let test_fold {idx; genesis; _} =
       >>= fun () -> fold (Some (`Gt 2)) [["foo"; "bar"; "toto"]] []
 
 let test_trees {idx; genesis; _} =
-  checkout idx genesis
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout genesis_block"
+  checkout idx genesis >>= function
+  | None -> Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
       Tree.fold ~depth:(`Eq 1) ~init:() (Tree.empty ctxt) [] ~f:(fun k _ () ->
           assert (List.length k = 1) ;
@@ -396,19 +320,14 @@ let test_trees {idx; genesis; _} =
       >>= fun () ->
       let foo1 = Bytes.of_string "foo1" in
       let foo2 = Bytes.of_string "foo2" in
-      Tree.empty ctxt
-      |> fun v1 ->
-      Tree.add v1 ["foo"; "toto"] foo1
-      >>= fun v1 ->
-      Tree.add v1 ["foo"; "bar"; "toto"] foo2
-      >>= fun v1 ->
+      Tree.empty ctxt |> fun v1 ->
+      Tree.add v1 ["foo"; "toto"] foo1 >>= fun v1 ->
+      Tree.add v1 ["foo"; "bar"; "toto"] foo2 >>= fun v1 ->
       let fold depth ecs ens =
         Tree.fold v1 ?depth [] ~init:([], []) ~f:(fun path t (cs, ns) ->
             match Tree.kind t with
-            | `Tree ->
-                Lwt.return (cs, path :: ns)
-            | `Value ->
-                Lwt.return (path :: cs, ns))
+            | `Tree -> Lwt.return (cs, path :: ns)
+            | `Value -> Lwt.return (path :: cs, ns))
         >>= fun (cs, ns) ->
         Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;
         Assert.equal_string_list_list ~msg:__LOC__ ens ns ;
@@ -419,14 +338,10 @@ let test_trees {idx; genesis; _} =
         [["foo"; "toto"]; ["foo"; "bar"; "toto"]]
         [["foo"; "bar"]; ["foo"]; []]
       >>= fun () ->
-      fold (Some (`Eq 0)) [] [[]]
-      >>= fun () ->
-      fold (Some (`Eq 1)) [] [["foo"]]
-      >>= fun () ->
-      fold (Some (`Eq 2)) [["foo"; "toto"]] [["foo"; "bar"]]
-      >>= fun () ->
-      fold (Some (`Lt 2)) [] [["foo"]; []]
-      >>= fun () ->
+      fold (Some (`Eq 0)) [] [[]] >>= fun () ->
+      fold (Some (`Eq 1)) [] [["foo"]] >>= fun () ->
+      fold (Some (`Eq 2)) [["foo"; "toto"]] [["foo"; "bar"]] >>= fun () ->
+      fold (Some (`Lt 2)) [] [["foo"]; []] >>= fun () ->
       fold (Some (`Le 2)) [["foo"; "toto"]] [["foo"; "bar"]; ["foo"]; []]
       >>= fun () ->
       fold
@@ -434,51 +349,34 @@ let test_trees {idx; genesis; _} =
         [["foo"; "toto"]; ["foo"; "bar"; "toto"]]
         [["foo"; "bar"]]
       >>= fun () ->
-      fold (Some (`Gt 2)) [["foo"; "bar"; "toto"]] []
-      >>= fun () ->
-      Tree.remove v1 ["foo"; "bar"; "toto"]
-      >>= fun v1 ->
-      Tree.find v1 ["foo"; "bar"; "toto"]
-      >>= fun v ->
+      fold (Some (`Gt 2)) [["foo"; "bar"; "toto"]] [] >>= fun () ->
+      Tree.remove v1 ["foo"; "bar"; "toto"] >>= fun v1 ->
+      Tree.find v1 ["foo"; "bar"; "toto"] >>= fun v ->
       Assert.equal_bytes_option ~msg:__LOC__ None v ;
-      Tree.find v1 ["foo"; "toto"]
-      >>= fun v ->
+      Tree.find v1 ["foo"; "toto"] >>= fun v ->
       Assert.equal_bytes_option ~msg:__LOC__ (Some foo1) v ;
-      Tree.empty ctxt
-      |> fun v1 ->
-      Tree.add v1 ["foo"; "1"] foo1
-      >>= fun v1 ->
-      Tree.add v1 ["foo"; "2"] foo2
-      >>= fun v1 ->
-      Tree.remove v1 ["foo"; "1"]
-      >>= fun v1 ->
-      Tree.remove v1 ["foo"; "2"]
-      >>= fun v1 ->
-      Tree.find v1 ["foo"; "1"]
-      >>= fun v ->
+      Tree.empty ctxt |> fun v1 ->
+      Tree.add v1 ["foo"; "1"] foo1 >>= fun v1 ->
+      Tree.add v1 ["foo"; "2"] foo2 >>= fun v1 ->
+      Tree.remove v1 ["foo"; "1"] >>= fun v1 ->
+      Tree.remove v1 ["foo"; "2"] >>= fun v1 ->
+      Tree.find v1 ["foo"; "1"] >>= fun v ->
       Assert.equal_bytes_option ~msg:__LOC__ None v ;
-      Tree.remove v1 []
-      >>= fun v1 ->
+      Tree.remove v1 [] >>= fun v1 ->
       Assert.equal_bool ~msg:__LOC__ true (Tree.is_empty v1) ;
       Lwt.return ()
 
 let test_raw {idx; genesis; _} =
-  checkout idx genesis
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout genesis_block"
+  checkout idx genesis >>= function
+  | None -> Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
       let foo1 = Bytes.of_string "foo1" in
       let foo2 = Bytes.of_string "foo2" in
-      add ctxt ["foo"; "toto"] foo1
-      >>= fun ctxt ->
-      add ctxt ["foo"; "bar"; "toto"] foo2
-      >>= fun ctxt ->
-      find_tree ctxt []
-      >>= fun tree ->
+      add ctxt ["foo"; "toto"] foo1 >>= fun ctxt ->
+      add ctxt ["foo"; "bar"; "toto"] foo2 >>= fun ctxt ->
+      find_tree ctxt [] >>= fun tree ->
       let tree = WithExceptions.Option.get ~loc:__LOC__ tree in
-      Tree.to_raw tree
-      >>= fun raw ->
+      Tree.to_raw tree >>= fun raw ->
       let a = TzString.Map.singleton "toto" (`Value foo1) in
       let b = TzString.Map.singleton "toto" (`Value foo2) in
       let c = TzString.Map.add "bar" (`Tree b) a in
@@ -490,36 +388,25 @@ let test_raw {idx; genesis; _} =
 let string n = String.make n 'a'
 
 let test_encoding {idx; genesis; _} =
-  checkout idx genesis
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout genesis_block"
+  checkout idx genesis >>= function
+  | None -> Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
       let foo1 = Bytes.of_string "foo1" in
       let foo2 = Bytes.of_string "foo2" in
-      add ctxt ["a"; string 7] foo1
-      >>= fun ctxt ->
-      add ctxt ["a"; string 8] foo2
-      >>= fun ctxt ->
-      add ctxt [string 16] foo2
-      >>= fun ctxt ->
-      add ctxt [string 32] foo2
-      >>= fun ctxt ->
-      add ctxt [string 64] foo2
-      >>= fun ctxt ->
-      add ctxt [string 127] foo2
-      >>= fun ctxt ->
-      commit ctxt
-      >>= fun h ->
+      add ctxt ["a"; string 7] foo1 >>= fun ctxt ->
+      add ctxt ["a"; string 8] foo2 >>= fun ctxt ->
+      add ctxt [string 16] foo2 >>= fun ctxt ->
+      add ctxt [string 32] foo2 >>= fun ctxt ->
+      add ctxt [string 64] foo2 >>= fun ctxt ->
+      add ctxt [string 127] foo2 >>= fun ctxt ->
+      commit ctxt >>= fun h ->
       Assert.equal_context_hash
         ~msg:__LOC__
         (Context_hash.of_b58check_exn
            "CoWJsL2ehZ39seTr8inBCJb5tVjW8KGNweJ5cvuVq51mAASrRmim")
         h ;
-      add ctxt [string 255] foo2
-      >>= fun ctxt ->
-      commit ctxt
-      >>= fun h ->
+      add ctxt [string 255] foo2 >>= fun ctxt ->
+      commit ctxt >>= fun h ->
       Assert.equal_context_hash
         ~msg:__LOC__
         (Context_hash.of_b58check_exn
@@ -554,18 +441,16 @@ let test_dump {idx; block3b; _} =
       let empty_block_header = mk_empty_block_header ctxt_hash in
       let nb_context_elements = 0 in
       let target_context_hash = empty_block_header.shell.context in
-      Lwt_unix.openfile dumpfile Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o644
-      >>= (fun context_fd ->
-            Lwt.finalize
-              (fun () ->
-                Context.dump_context idx target_context_hash ~fd:context_fd)
-              (fun () -> Lwt_unix.close context_fd))
+      ( Lwt_unix.openfile dumpfile Lwt_unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o644
+      >>= fun context_fd ->
+        Lwt.finalize
+          (fun () ->
+            Context.dump_context idx target_context_hash ~fd:context_fd)
+          (fun () -> Lwt_unix.close context_fd) )
       >>=? fun _ ->
       let root = base_dir2 // "context" in
-      Context.init ?patch_context:None root
-      >>= fun idx2 ->
-      Lwt_unix.openfile dumpfile Lwt_unix.[O_RDONLY] 0o444
-      >>= fun context_fd ->
+      Context.init ?patch_context:None root >>= fun idx2 ->
+      Lwt_unix.openfile dumpfile Lwt_unix.[O_RDONLY] 0o444 >>= fun context_fd ->
       Lwt.finalize
         (fun () ->
           Context.restore_context
@@ -577,25 +462,18 @@ let test_dump {idx; block3b; _} =
   >>=! Lwt.return
 
 let test_is_empty {idx; block2; _} =
-  checkout idx block2
-  >>= function
-  | None ->
-      Assert.fail_msg "checkout block2"
+  checkout idx block2 >>= function
+  | None -> Assert.fail_msg "checkout block2"
   | Some ctxt -> (
       (* By [create_block2] above, [ctxt] maps "a/b", "a/c", and "version" *)
       let etree = Context.Tree.empty ctxt in
       Assert.equal_bool true (Tree.is_empty etree) ;
-      Context.find_tree ctxt ["a"]
-      >>= function
-      | None ->
-          Assert.fail_msg "dir 'a/' not found"
+      Context.find_tree ctxt ["a"] >>= function
+      | None -> Assert.fail_msg "dir 'a/' not found"
       | Some dir_a ->
-          Tree.remove dir_a ["b"]
-          >>= fun dir_a ->
-          Tree.remove dir_a ["c"]
-          >>= fun dir_a ->
-          Tree.list dir_a []
-          >>= fun ls ->
+          Tree.remove dir_a ["b"] >>= fun dir_a ->
+          Tree.remove dir_a ["c"] >>= fun dir_a ->
+          Tree.list dir_a [] >>= fun ls ->
           let assert_equal_ls = Assert.make_equal_list ( = ) fst in
           assert_equal_ls
             ~msg:"length of directory /a/ is unexpectedly not 0"
@@ -611,12 +489,13 @@ let test_is_empty {idx; block2; _} =
             ~msg:"directory /a/ is unexpectedly not empty"
             true
             (Context.Tree.is_empty dir_a) ;
-          Lwt.return_unit )
+          Lwt.return_unit)
 
 (******************************************************************************)
 
 let tests : (string * (t -> unit Lwt.t)) list =
-  [ ("is_empty", test_is_empty);
+  [
+    ("is_empty", test_is_empty);
     ("simple", test_simple);
     ("list", test_list);
     ("continuation", test_continuation);
@@ -627,7 +506,8 @@ let tests : (string * (t -> unit Lwt.t)) list =
     ("trees", test_trees);
     ("raw", test_raw);
     ("dump", test_dump);
-    ("encoding", test_encoding) ]
+    ("encoding", test_encoding);
+  ]
 
 let tests =
   List.map

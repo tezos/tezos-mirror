@@ -45,12 +45,9 @@ let hooks = Tezos_regression.hooks
 type client_mode_tag = Client | Light | Proxy
 
 let client_mode_tag_to_suffix = function
-  | Client ->
-      "client"
-  | Light ->
-      "light"
-  | Proxy ->
-      "proxy"
+  | Client -> "client"
+  | Light -> "light"
+  | Proxy -> "proxy"
 
 let create_client client_mode_tag : Client.t Lwt.t =
   let node_args = Node.[Synchronisation_threshold 0; Connections 0] in
@@ -96,8 +93,7 @@ let check_rpc ~group_name ~protocols ~client_mode_tag
       let* client = create_client client_mode_tag in
       let* parameter_file =
         match parameter_overrides with
-        | None ->
-            Lwt.return_none
+        | None -> Lwt.return_none
         | Some overrides ->
             let* file = Protocol.write_parameter_file ~protocol overrides in
             Lwt.return_some file
@@ -154,10 +150,12 @@ let test_contracts client =
           ~contract_id:simple_implicit_key.public_key_hash
           client
         |> Process.check ~expect_failure:true)
-      [ RPC.Contracts.spawn_get_delegate;
+      [
+        RPC.Contracts.spawn_get_delegate;
         RPC.Contracts.spawn_get_entrypoints;
         RPC.Contracts.spawn_get_script;
-        RPC.Contracts.spawn_get_storage ]
+        RPC.Contracts.spawn_get_storage;
+      ]
   in
   Log.info "Test delegated implicit contract" ;
   let delegated_implicit = "delegated" in
@@ -195,9 +193,11 @@ let test_contracts client =
           ~contract_id:delegated_implicit_key.public_key_hash
           client
         |> Process.check ~expect_failure:true)
-      [ RPC.Contracts.spawn_get_entrypoints;
+      [
+        RPC.Contracts.spawn_get_entrypoints;
         RPC.Contracts.spawn_get_script;
-        RPC.Contracts.spawn_get_storage ]
+        RPC.Contracts.spawn_get_storage;
+      ]
   in
   let test_originated_contract contract_id =
     let* _ = RPC.Contracts.get ~hooks ~contract_id client in
@@ -252,8 +252,8 @@ let test_contracts client =
   let* () = test_originated_contract originated_contract_advanced in
   let unique_big_map_key =
     Ezjsonm.value_from_string
-      "{ \"key\": { \"string\": \"test\" }, \"type\": { \"prim\": \"string\" \
-       } }"
+      "{ \"key\": { \"string\": \"test\" }, \"type\": { \"prim\": \"string\" } \
+       }"
   in
   let* _ =
     RPC.Contracts.big_map_get
@@ -285,9 +285,7 @@ let test_delegates_alpha client =
   let* _ = RPC.Delegates.get_balance ~hooks ~pkh:bootstrap client in
   let* _ = RPC.Delegates.get_deactivated ~hooks ~pkh:bootstrap client in
   let* _ = RPC.Delegates.get_delegated_balance ~hooks ~pkh:bootstrap client in
-  let* _ =
-    RPC.Delegates.get_delegated_contracts ~hooks ~pkh:bootstrap client
-  in
+  let* _ = RPC.Delegates.get_delegated_contracts ~hooks ~pkh:bootstrap client in
   let* _ = RPC.Delegates.get_frozen_balance ~hooks ~pkh:bootstrap client in
   let* _ =
     RPC.Delegates.get_frozen_balance_by_cycle ~hooks ~pkh:bootstrap client
@@ -350,9 +348,7 @@ let test_delegates_current_mainnet client =
   let* _ = RPC.Delegates.get_balance ~hooks ~pkh:bootstrap client in
   let* _ = RPC.Delegates.get_deactivated ~hooks ~pkh:bootstrap client in
   let* _ = RPC.Delegates.get_delegated_balance ~hooks ~pkh:bootstrap client in
-  let* _ =
-    RPC.Delegates.get_delegated_contracts ~hooks ~pkh:bootstrap client
-  in
+  let* _ = RPC.Delegates.get_delegated_contracts ~hooks ~pkh:bootstrap client in
   let* _ = RPC.Delegates.get_frozen_balance ~hooks ~pkh:bootstrap client in
   let* _ =
     RPC.Delegates.get_frozen_balance_by_cycle ~hooks ~pkh:bootstrap client
@@ -500,10 +496,13 @@ let test_whitelist address () =
   let whitelist =
     JSON.annotate ~origin:"whitelist"
     @@ `A
-         [ `O
-             [ ("address", `String address);
+         [
+           `O
+             [
+               ("address", `String address);
                ( "whitelist",
-                 `A [`String "GET /describe/**"; `String "GET /chains/**"] ) ]
+                 `A [`String "GET /describe/**"; `String "GET /chains/**"] );
+             ];
          ]
   in
   let* client = start_with_acl address whitelist in
@@ -525,9 +524,13 @@ let test_blacklist address () =
   let blacklist =
     JSON.annotate ~origin:"blacklist"
     @@ `A
-         [ `O
-             [ ("address", `String address);
-               ("blacklist", `A [`String "GET /chains/**"]) ] ]
+         [
+           `O
+             [
+               ("address", `String address);
+               ("blacklist", `A [`String "GET /chains/**"]);
+             ];
+         ]
   in
   let* client = start_with_acl address blacklist in
   let* () =
@@ -544,15 +547,19 @@ let register () =
       ~protocols:[Protocol.Alpha]
       ~client_mode_tag
       ~rpcs:
-        [ ("contracts", test_contracts, None);
+        [
+          ("contracts", test_contracts, None);
           ("delegates", test_delegates_alpha, None);
           ( "votes",
             test_votes_alpha,
             Some
               (* reduced periods duration to get to testing vote period faster *)
-              [ (["blocks_per_cycle"], Some "4");
-                (["blocks_per_voting_period"], Some "4") ] );
-          ("others", test_others, None) ]
+              [
+                (["blocks_per_cycle"], Some "4");
+                (["blocks_per_voting_period"], Some "4");
+              ] );
+          ("others", test_others, None);
+        ]
       ()
   in
   let register_current_mainnet client_mode_tag =
@@ -561,15 +568,19 @@ let register () =
       ~protocols:[Protocol.current_mainnet]
       ~client_mode_tag
       ~rpcs:
-        [ ("contracts", test_contracts, None);
+        [
+          ("contracts", test_contracts, None);
           ("delegates", test_delegates_current_mainnet, None);
           ( "votes",
             test_votes_current_mainnet,
             Some
               (* reduced periods duration to get to testing vote period faster *)
-              [ (["blocks_per_cycle"], Some "4");
-                (["blocks_per_voting_period"], Some "4") ] );
-          ("others", test_others, None) ]
+              [
+                (["blocks_per_cycle"], Some "4");
+                (["blocks_per_voting_period"], Some "4");
+              ] );
+          ("others", test_others, None);
+        ]
       ()
   in
   let modes = [Client; Proxy; Light] in

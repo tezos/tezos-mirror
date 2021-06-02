@@ -9,18 +9,10 @@ Where <action> can be:
 * --update-ocamlformat: update all the \`.ocamlformat\` files and
   git-commit (requires clean repo).
 * --check-ocamlformat: check the above does nothing.
-* --check-dune: check formatting while assuming running under Dune's
-  rule (\`dune build @runtest_lint\`).
-* --check-ci: check formatting using git (for GitLab CI's verbose run).
 * --check-gitlab-ci-yml: check .gitlab-ci.yml has been updated.
 * --check-scripts: check the .sh files
 * --check-redirects: check docs/_build/_redirects.
-* --format: format all the files, see also \`make fmt\`.
 * --help: display this and return 0.
-
-If no action is given, \`--check-dune\` is assumed.
-
-If no files are provided all .ml, .mli, mlt files are formatted/checked.
 EOF
 }
 
@@ -45,18 +37,23 @@ say () {
 make_dot_ocamlformat () {
     local path="$1"
     cat > "$path" <<EOF
-version=0.10
+version=0.18.0
 wrap-fun-args=false
 let-binding-spacing=compact
 field-space=loose
-break-separators=after-and-docked
+break-separators=after
+space-around-arrays=false
+space-around-lists=false
+space-around-records=false
+space-around-variants=false
+dock-collection-brackets=true
+space-around-records=false
 sequence-style=separator
 doc-comments=before
 margin=80
 module-item-spacing=sparse
 parens-tuple=always
 parens-tuple-patterns=always
-break-string-literals=newlines-and-wrap
 EOF
 }
 
@@ -90,25 +87,6 @@ update_all_dot_ocamlformats () {
                 ;;
         esac
         git add "$ofmt"
-    done
-}
-
-check_with_dune () {
-    for f in "$@" ; do
-        case "$PWD" in
-            */src/proto_alpha/lib_protocol$ | \
-            */src/proto_demo_noops/lib_protocol$ )
-                make_dot_ocamlformat .ocamlformat
-                ocamlformat --check "$f"
-                ;;
-            */src/proto_*/lib_protocol$ )
-                say "This a protocol file, ignoring"
-                ;;
-            * )
-                make_dot_ocamlformat .ocamlformat
-                ocamlformat --check "$f"
-                ;;
-        esac
     done
 }
 
@@ -148,10 +126,6 @@ check_redirects () {
     exit $exit_code
 }
 
-format_inplace () {
-    ocamlformat --inplace "$@"
-}
-
 update_gitlab_ci_yml () {
     # Check that a rule is not defined twice, which would result in the first
     # one being ignored. Gitlab linter doesn't warn for it
@@ -169,7 +143,8 @@ update_gitlab_ci_yml () {
 }
 
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then
-    action="--check-dune"
+    say "provide one action (see --help)"
+    exit 1
 else
     action="$1"
     shift
@@ -186,13 +161,6 @@ case "$action" in
     "--check-ocamlformat" )
         action=update_all_dot_ocamlformats
         check_clean=true ;;
-    "--check-dune" )
-        on_files=true
-        action=check_with_dune ;;
-    "--check-ci" )
-        on_files=true
-        action=format_inplace
-        check_clean=true ;;
     "--check-gitlab-ci-yml" )
         action=update_gitlab_ci_yml
         check_clean=true ;;
@@ -200,9 +168,6 @@ case "$action" in
         action=check_scripts ;;
     "--check-redirects" )
         action=check_redirects ;;
-    "--format" )
-        on_files=true
-        action=format_inplace ;;
     "help" | "-help" | "--help" | "-h" )
         usage
         exit 0 ;;

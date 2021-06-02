@@ -42,8 +42,7 @@ let load_file ~filename map =
     match lines with
     | [] | [_] | _ :: _ :: _ :: _ ->
         Stdlib.failwith "Override.load: invalid csv"
-    | [header; overrides] ->
-        (header, overrides)
+    | [header; overrides] -> (header, overrides)
   in
   List.fold_left2
     ~when_different_lengths:()
@@ -58,7 +57,7 @@ let load_file ~filename map =
     header
     values
   |> (* {!Csv.import} fails before this can *)
-     WithExceptions.Result.get_ok ~loc:__LOC__
+  WithExceptions.Result.get_ok ~loc:__LOC__
 
 let load ~filenames : t =
   List.fold_left

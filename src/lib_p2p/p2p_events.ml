@@ -26,14 +26,12 @@
 let pp_first_element elem_enc ppf l =
   let open Format in
   pp_print_string ppf "[ " ;
-  ( match l with
-  | [] ->
-      ()
-  | [element] ->
-      elem_enc ppf element
+  (match l with
+  | [] -> ()
+  | [element] -> elem_enc ppf element
   | element :: _ ->
       elem_enc ppf element ;
-      pp_print_string ppf "; ..." ) ;
+      pp_print_string ppf "; ...") ;
   pp_print_string ppf " ]"
 
 module P2p_protocol = struct
@@ -581,8 +579,8 @@ module P2p_io_scheduler = struct
       ~section
       ~name:"unexpected_error_scheduler"
       ~msg:
-        "unexpected error in connection ({direction}: \
-         {connection_id},{name}): {error}"
+        "unexpected error in connection ({direction}: {connection_id},{name}): \
+         {error}"
       ~level:Error
       ("direction", Data_encoding.string)
       ("connection_id", Data_encoding.int31)

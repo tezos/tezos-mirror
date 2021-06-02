@@ -35,20 +35,15 @@ let () =
     match !anonymous with
     | [source_dir] when Filename.basename source_dir = "TEZOS_PROTOCOL" ->
         Filename.dirname source_dir
-    | [source_dir] ->
-        source_dir
+    | [source_dir] -> source_dir
     | _ ->
         Arg.usage args_spec usage_msg ;
         Stdlib.exit 1
   in
   let (hash, protocol) =
-    match
-      Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir)
-    with
-    | Ok (None, proto) ->
-        (Protocol.hash proto, proto)
-    | Ok (Some hash, proto) ->
-        (hash, proto)
+    match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir) with
+    | Ok (None, proto) -> (Protocol.hash proto, proto)
+    | Ok (Some hash, proto) -> (hash, proto)
     | Error err ->
         Format.kasprintf
           Stdlib.failwith

@@ -24,8 +24,7 @@
 (*****************************************************************************)
 
 (** Storage for keys that have been authorized for baking. *)
-module Authorized_key :
-  Client_aliases.Alias with type t := Signature.public_key
+module Authorized_key : Client_aliases.Alias with type t := Signature.public_key
 
 (** [public_key cctxt pkh] returns the public key whose hash is [pkh]
     iff it is present if [cctxt]. *)

@@ -141,8 +141,7 @@ module Pool_event : sig
         (** The remote peer rejected our connection. *)
     | Connection_established of P2p_peer_id.t
         (** We successfully established a authentified connection. *)
-    | Disconnection of P2p_peer_id.t
-        (** We decided to close the connection. *)
+    | Disconnection of P2p_peer_id.t  (** We decided to close the connection. *)
     | External_disconnection of P2p_peer_id.t
         (** The connection was closed for external reason. *)
 

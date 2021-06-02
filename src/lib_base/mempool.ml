@@ -43,8 +43,7 @@ let encoding =
 
 let bounded_encoding ?max_operations () =
   match max_operations with
-  | None ->
-      encoding
+  | None -> encoding
   | Some max_operations ->
       Data_encoding.check_size
         (8 + (max_operations * Operation_hash.size))

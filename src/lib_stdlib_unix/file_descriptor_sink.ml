@@ -69,12 +69,9 @@ end) : Internal_event.SINK with type t = t = struct
 
   let uri_scheme =
     match K.kind with
-    | `Path ->
-        "file-descriptor-path"
-    | `Stdout ->
-        "file-descriptor-stdout"
-    | `Stderr ->
-        "file-descriptor-stderr"
+    | `Path -> "file-descriptor-path"
+    | `Stdout -> "file-descriptor-stdout"
+    | `Stderr -> "file-descriptor-stderr"
 
   let configure uri =
     let level_at_least =
@@ -86,36 +83,29 @@ end) : Internal_event.SINK with type t = t = struct
     let fail_parsing fmt =
       Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt
     in
-    ( match Uri.get_query_param uri "format" with
-    | Some "netstring" ->
-        return `Netstring
-    | None | Some "one-per-line" ->
-        return `One_per_line
-    | Some other ->
-        fail_parsing "Unknown format: %S" other )
+    (match Uri.get_query_param uri "format" with
+    | Some "netstring" -> return `Netstring
+    | None | Some "one-per-line" -> return `One_per_line
+    | Some other -> fail_parsing "Unknown format: %S" other)
     >>=? fun format ->
-    ( match K.kind with
+    (match K.kind with
     | `Path -> (
         let flag name =
           match Uri.get_query_param uri name with
-          | Some "true" ->
-              true
-          | _ ->
-              false
+          | Some "true" -> true
+          | _ -> false
         in
         let with_pid = flag "with-pid" in
         let fresh = flag "fresh" in
-        ( match Uri.get_query_param uri "chmod" with
+        (match Uri.get_query_param uri "chmod" with
         | Some n -> (
-          try return (int_of_string n)
-          with _ ->
-            fail_parsing "Access-rights parameter should be an integer: %S" n )
-        | None ->
-            return 0o600 )
+            try return (int_of_string n)
+            with _ ->
+              fail_parsing "Access-rights parameter should be an integer: %S" n)
+        | None -> return 0o600)
         >>=? fun rights ->
         match Uri.path uri with
-        | "" | "/" ->
-            fail_parsing "Missing path configuration."
+        | "" | "/" -> fail_parsing "Missing path configuration."
         | path ->
             let fixed_path =
               if with_pid then
@@ -133,11 +123,9 @@ end) : Internal_event.SINK with type t = t = struct
                     @ if fresh then [O_TRUNC] else [O_APPEND]
                   in
                   openfile fixed_path flags rights)
-                >>= fun fd -> return fd) )
-    | `Stdout ->
-        return Lwt_unix.stdout
-    | `Stderr ->
-        return Lwt_unix.stderr )
+                >>= fun fd -> return fd))
+    | `Stdout -> return Lwt_unix.stdout
+    | `Stderr -> return Lwt_unix.stderr)
     >>=? fun output ->
     let t = {output; lwt_bad_citizen_hack = ref []; level_at_least; format} in
     return t
@@ -147,8 +135,7 @@ end) : Internal_event.SINK with type t = t = struct
   let output_one output format event_json =
     let to_write =
       match format with
-      | `One_per_line ->
-          Ezjsonm.value_to_string ~minify:true event_json ^ "\n"
+      | `One_per_line -> Ezjsonm.value_to_string ~minify:true event_json ^ "\n"
       | `Netstring ->
           let bytes = Ezjsonm.value_to_string ~minify:true event_json in
           Fmt.str "%d:%s," (String.length bytes) bytes
@@ -167,30 +154,27 @@ end) : Internal_event.SINK with type t = t = struct
     if Internal_event.Level.compare level level_at_least >= 0 then (
       let wrapped_event = wrap now section forced_event in
       let event_json =
-        Data_encoding.Json.construct
-          (wrapped_encoding M.encoding)
-          wrapped_event
+        Data_encoding.Json.construct (wrapped_encoding M.encoding) wrapped_event
       in
       lwt_bad_citizen_hack := event_json :: !lwt_bad_citizen_hack ;
-      output_one output format event_json
-      >>= function
+      output_one output format event_json >>= function
       | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
           (* The file descriptor was closed before the event arrived,
              ignore it. *)
           return_unit
-      | Error _ as err ->
-          Lwt.return err
+      | Error _ as err -> Lwt.return err
       | Ok () ->
           lwt_bad_citizen_hack :=
             List.filter (( = ) event_json) !lwt_bad_citizen_hack ;
-          return_unit )
+          return_unit)
     else return_unit
 
   let close {lwt_bad_citizen_hack; output; format; _} =
     List.iter_es
       (fun event_json -> output_one output format event_json)
       !lwt_bad_citizen_hack
-    >>=? fun () -> Lwt_unix.close output >>= fun () -> return_unit
+    >>=? fun () ->
+    Lwt_unix.close output >>= fun () -> return_unit
 end
 
 module Sink_implementation_path = Make_sink (struct

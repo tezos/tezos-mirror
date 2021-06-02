@@ -317,8 +317,7 @@ let load_config file =
     Example implementations of traces are provided in the [traces/] directory.
 *)
 module Traced (Trace : Traced_sigs.Trace.S) : sig
-  module Monad :
-    Traced_sigs.Monad.S with type 'error trace = 'error Trace.trace
+  module Monad : Traced_sigs.Monad.S with type 'error trace = 'error Trace.trace
 
   module Hashtbl :
     Traced_sigs.Hashtbl.S with type 'error trace := 'error Trace.trace

@@ -70,8 +70,7 @@ let () =
     `Permanent
     ~id:"node.network.invalid_config"
     ~title:"Invalid network config"
-    ~description:
-      "The network config provided by --network argument is invalid."
+    ~description:"The network config provided by --network argument is invalid."
     ~pp:(fun ppf (path, error) ->
       Format.fprintf ppf "The network config at %s is invalid (%s)." path error)
     Data_encoding.(
@@ -112,29 +111,23 @@ let decode_net_config source json =
   | Json_encoding.Cannot_destruct (path, exn) ->
       let path = Json_query.json_pointer_of_path path in
       fail (Invalid_network_config (path, Printexc.to_string exn))
-  | ( Json_encoding.Unexpected _
-    | Json_encoding.No_case_matched _
-    | Json_encoding.Bad_array_size _
-    | Json_encoding.Missing_field _
-    | Json_encoding.Unexpected_field _
-    | Json_encoding.Bad_schema _ ) as exn ->
+  | ( Json_encoding.Unexpected _ | Json_encoding.No_case_matched _
+    | Json_encoding.Bad_array_size _ | Json_encoding.Missing_field _
+    | Json_encoding.Unexpected_field _ | Json_encoding.Bad_schema _ ) as exn ->
       fail (Invalid_network_config (source, Printexc.to_string exn))
 
 let load_net_config = function
-  | BuiltIn net ->
-      return net
+  | BuiltIn net -> return net
   | Url uri ->
-      Cohttp_lwt_unix.Client.get uri
-      >>= fun (resp, body) ->
-      Cohttp_lwt.Body.to_string body
-      >>= fun body_str ->
-      ( match resp.status with
+      Cohttp_lwt_unix.Client.get uri >>= fun (resp, body) ->
+      Cohttp_lwt.Body.to_string body >>= fun body_str ->
+      (match resp.status with
       | `OK -> (
-        try return (Ezjsonm.from_string body_str)
-        with Ezjsonm.Parse_error (_, msg) ->
-          fail (Invalid_network_config (Uri.to_string uri, msg)) )
+          try return (Ezjsonm.from_string body_str)
+          with Ezjsonm.Parse_error (_, msg) ->
+            fail (Invalid_network_config (Uri.to_string uri, msg)))
       | #Cohttp.Code.status_code ->
-          fail (Network_http_error (resp.status, body_str)) )
+          fail (Network_http_error (resp.status, body_str)))
       >>=? decode_net_config (Uri.to_string uri)
   | Filename filename ->
       Lwt_utils_unix.Json.read_file filename >>=? decode_net_config filename
@@ -195,18 +188,17 @@ module Manpage = struct
   let args = [`S p2p_section; `S rpc_section; `S misc_section]
 
   let bugs =
-    [ `S "BUGS";
-      `P "Check bug reports at https://gitlab.com/tezos/tezos/issues." ]
+    [
+      `S "BUGS"; `P "Check bug reports at https://gitlab.com/tezos/tezos/issues.";
+    ]
 end
 
 module Term = struct
   let log_output_converter =
     ( (fun s ->
         match Lwt_log_sink_unix.Output.of_string s with
-        | Some res ->
-            `Ok res
-        | None ->
-            `Error s),
+        | Some res -> `Ok res
+        | None -> `Error s),
       Lwt_log_sink_unix.Output.pp )
 
   let history_mode_converter =
@@ -219,27 +211,20 @@ module Term = struct
       let delim = ':' in
       let args = String.split_on_char delim s in
       match args with
-      | ["archive"] | ["Archive"] ->
-          Some Archive
-      | ["full"] | ["Full"] ->
-          Some default_full
+      | ["archive"] | ["Archive"] -> Some Archive
+      | ["full"] | ["Full"] -> Some default_full
       | ["full"; n] | ["Full"; n] ->
           Option.map (fun offset -> Full {offset}) (int_of_string_opt n)
-      | ["rolling"] | ["Rolling"] ->
-          Some default_rolling
+      | ["rolling"] | ["Rolling"] -> Some default_rolling
       | ["rolling"; n] | ["Rolling"; n] ->
           Option.map (fun offset -> Rolling {offset}) (int_of_string_opt n)
-      | ["experimental-rolling"] ->
-          Some default_rolling
-      | _ ->
-          None
+      | ["experimental-rolling"] -> Some default_rolling
+      | _ -> None
     in
     ( (fun arg ->
         match parse_history_mode arg with
-        | Some hm ->
-            `Ok hm
-        | None ->
-            `Error arg),
+        | Some hm -> `Ok hm
+        | None -> `Error arg),
       pp )
 
   let network_printer ppf = function
@@ -247,10 +232,8 @@ module Term = struct
         (* Should not fail by construction of Node_config_file.block_chain_network *)
         let alias = WithExceptions.Option.get ~loc:__LOC__ alias in
         Format.fprintf ppf "built-in network: %s" alias
-    | Url url ->
-        Format.fprintf ppf "URL network: %s" (Uri.to_string url)
-    | Filename file ->
-        Format.fprintf ppf "local file network: %s" file
+    | Url url -> Format.fprintf ppf "URL network: %s" (Uri.to_string url)
+    | Filename file -> Format.fprintf ppf "local file network: %s" file
 
   let network_parser =
     let parse_network_name s =
@@ -263,10 +246,8 @@ module Term = struct
     let parse_network_url s =
       let uri = Uri.of_string s in
       match Uri.scheme uri with
-      | Some "http" | Some "https" ->
-          Some (Ok (Url uri))
-      | Some _ | None ->
-          None
+      | Some "http" | Some "https" -> Some (Ok (Url uri))
+      | Some _ | None -> None
     in
     let parse_file_config filename =
       if Sys.file_exists filename then Some (Result.ok (Filename filename))
@@ -288,9 +269,8 @@ module Term = struct
       let ( <||> ) = Option.either_f
       and ( <|!> ) opt default = Option.value_f ~default opt in
       (* Select the first parsing result that is not None. *)
-      parse_network_name s
-      <||> (fun () -> parse_network_url s)
-      <||> (fun () -> parse_file_config s)
+      ( (parse_network_name s <||> fun () -> parse_network_url s) <||> fun () ->
+        parse_file_config s )
       <|!> fun () -> parse_error s
     in
     ( (parser : string -> (net_config, [`Msg of string]) result),
@@ -309,15 +289,15 @@ module Term = struct
       Format.sprintf
         "Set the mode for the chain's data history storage. Possible values \
          are $(i,archive), $(i,full) $(b,(default)), $(i,full:N), \
-         $(i,rolling), $(i,rolling:N). Archive mode retains all data since \
-         the genesis block. Full mode only maintains block headers and \
-         operations allowing replaying the chain since the genesis if wanted. \
-         Rolling mode retains only the most recent data and deletes the rest. \
-         For both Full and Rolling modes, it is possible to adjust the number \
-         of cycles to preserve by using the $(i,:N) annotation. The default \
-         number of preserved cycles is %d. The value \
-         $(i,experimental-rolling) is deprecated but is equivalent to \
-         $(i,rolling) which should be used instead."
+         $(i,rolling), $(i,rolling:N). Archive mode retains all data since the \
+         genesis block. Full mode only maintains block headers and operations \
+         allowing replaying the chain since the genesis if wanted. Rolling \
+         mode retains only the most recent data and deletes the rest. For both \
+         Full and Rolling modes, it is possible to adjust the number of cycles \
+         to preserve by using the $(i,:N) annotation. The default number of \
+         preserved cycles is %d. The value $(i,experimental-rolling) is \
+         deprecated but is equivalent to $(i,rolling) which should be used \
+         instead."
         History_mode.default_offset
     in
     Arg.(
@@ -360,15 +340,14 @@ module Term = struct
       ^ String.concat
           ", "
           (List.map fst Node_config_file.builtin_blockchain_networks)
-      ^ ". Default is mainnet. You can also specify custom networks by \
-         passing a path to a file containing the custom network \
-         configuration, or by passing a URL from which such a file can be \
-         downloaded. If you have a file named after a built-in network, you \
-         can prefix its name with './' so that the node treats it as a file. \
-         Otherwise it will be treated as a proper name of the built-in \
-         network. With commands other than 'config init', specifying this \
-         option causes the node to fail if the configuration implies another \
-         network."
+      ^ ". Default is mainnet. You can also specify custom networks by passing \
+         a path to a file containing the custom network configuration, or by \
+         passing a URL from which such a file can be downloaded. If you have a \
+         file named after a built-in network, you can prefix its name with \
+         './' so that the node treats it as a file. Otherwise it will be \
+         treated as a proper name of the built-in network. With commands other \
+         than 'config init', specifying this option causes the node to fail if \
+         the configuration implies another network."
     in
     Arg.(
       value
@@ -381,8 +360,8 @@ module Term = struct
 
   let connections =
     let doc =
-      "Sets min_connections, expected_connections, max_connections to NUM / \
-       2, NUM, (3 * NUM) / 2, respectively. Sets peer_table_size to 8 * NUM \
+      "Sets min_connections, expected_connections, max_connections to NUM / 2, \
+       NUM, (3 * NUM) / 2, respectively. Sets peer_table_size to 8 * NUM \
        unless it is already defined on the command line. Sets \
        synchronisation_threshold to max(NUM / 4, 2) unless it is already \
        defined on the command line."
@@ -415,8 +394,8 @@ module Term = struct
 
   let peer_table_size =
     let doc =
-      "Maximum size of internal peer tables, used to store metadata/logs \
-       about a peer or about a to-be-authenticated host:port couple."
+      "Maximum size of internal peer tables, used to store metadata/logs about \
+       a peer or about a to-be-authenticated host:port couple."
     in
     Arg.(
       value
@@ -448,8 +427,8 @@ module Term = struct
 
   let bootstrap_threshold =
     let doc =
-      "[DEPRECATED: use synchronisation_threshold instead] The number of \
-       peers to synchronize with before declaring the node bootstrapped."
+      "[DEPRECATED: use synchronisation_threshold instead] The number of peers \
+       to synchronize with before declaring the node bootstrapped."
     in
     Arg.(
       value
@@ -490,10 +469,10 @@ module Term = struct
 
   let enable_testchain =
     let doc =
-      "If set to [true], the node will spawn a testchain during the \
-       protocol's testing voting period. Default value is [false]. It will \
-       increase the node storage usage and computation by additionally \
-       validating the test network blocks."
+      "If set to [true], the node will spawn a testchain during the protocol's \
+       testing voting period. Default value is [false]. It will increase the \
+       node storage usage and computation by additionally validating the test \
+       network blocks."
     in
     Arg.(value & flag & info ~docs ~doc ["enable-testchain"])
 
@@ -509,11 +488,11 @@ module Term = struct
 
   let latency =
     let doc =
-      "[latency] is the time interval (in seconds) used to determine if a \
-       peer is synchronized with a chain. For instance, a peer whose known \
-       head has a timestamp T is considered synchronized if T >= now - \
-       max_latency. This parameter's default value was set with the chain's \
-       current protocol's baking rate in mind (and some allowance for network \
+      "[latency] is the time interval (in seconds) used to determine if a peer \
+       is synchronized with a chain. For instance, a peer whose known head has \
+       a timestamp T is considered synchronized if T >= now - max_latency. \
+       This parameter's default value was set with the chain's current \
+       protocol's baking rate in mind (and some allowance for network \
        latency)."
     in
     Arg.(
@@ -573,8 +552,7 @@ let read_config_file args =
   else return Node_config_file.default_config
 
 let read_data_dir args =
-  read_config_file args
-  >>=? fun cfg ->
+  read_config_file args >>=? fun cfg ->
   let {data_dir; _} = args in
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
   return data_dir
@@ -593,8 +571,8 @@ let () =
     ~id:"node.config.network_configuration_mismatch"
     ~title:"Network configuration mismatch"
     ~description:
-      "You specified a --network argument on the command line, but it does \
-       not match your current configuration"
+      "You specified a --network argument on the command line, but it does not \
+       match your current configuration"
     ~pp:(fun ppf (configuration_file_chain_name, command_line_chain_name) ->
       Format.fprintf
         ppf
@@ -613,8 +591,7 @@ let () =
           Some
             ( (configuration_file_chain_name :> string),
               (command_line_chain_name :> string) )
-      | _ ->
-          None)
+      | _ -> None)
     (fun (configuration_file_chain_name, command_line_chain_name) ->
       Network_configuration_mismatch
         {
@@ -650,62 +627,58 @@ end
 
 let read_and_patch_config_file ?(may_override_network = false)
     ?(ignore_bootstrap_peers = false) args =
-  read_config_file args
-  >>=? fun cfg ->
-  let { data_dir;
-        disable_config_validation;
-        connections;
-        max_download_speed;
-        max_upload_speed;
-        binary_chunks_size;
-        peer_table_size;
-        expected_pow;
-        peers;
-        no_bootstrap_peers;
-        listen_addr;
-        private_mode;
-        discovery_addr;
-        disable_mempool;
-        enable_testchain;
-        rpc_listen_addrs;
-        rpc_tls;
-        cors_origins;
-        cors_headers;
-        log_output;
-        bootstrap_threshold;
-        history_mode;
-        network;
-        config_file = _;
-        synchronisation_threshold;
-        latency } =
+  read_config_file args >>=? fun cfg ->
+  let {
+    data_dir;
+    disable_config_validation;
+    connections;
+    max_download_speed;
+    max_upload_speed;
+    binary_chunks_size;
+    peer_table_size;
+    expected_pow;
+    peers;
+    no_bootstrap_peers;
+    listen_addr;
+    private_mode;
+    discovery_addr;
+    disable_mempool;
+    enable_testchain;
+    rpc_listen_addrs;
+    rpc_tls;
+    cors_origins;
+    cors_headers;
+    log_output;
+    bootstrap_threshold;
+    history_mode;
+    network;
+    config_file = _;
+    synchronisation_threshold;
+    latency;
+  } =
     args
   in
-  ( match (bootstrap_threshold, synchronisation_threshold) with
+  (match (bootstrap_threshold, synchronisation_threshold) with
   | (Some _, Some _) ->
       fail
         (Invalid_command_line_arguments
            "--bootstrap-threshold is deprecated; use \
             --synchronisation-threshold instead. Do not use both at the same \
             time.")
-  | (None, Some threshold) | (Some threshold, None) ->
-      return_some threshold
-  | (None, None) ->
-      return_none )
+  | (None, Some threshold) | (Some threshold, None) -> return_some threshold
+  | (None, None) -> return_none)
   >>=? fun synchronisation_threshold ->
-  ( match network with
-  | None ->
-      return None
-  | Some n ->
-      load_net_config n >>=? fun x -> return (Some x) )
+  (match network with
+  | None -> return None
+  | Some n -> load_net_config n >>=? fun x -> return (Some x))
   >>=? fun network_data ->
   (* Overriding the network with [--network] is a bad idea if the configuration
      file already specifies it. Essentially, [--network] tells the node
      "if there is no config file, use this network; otherwise, check that the
      config file uses the network I expect". This behavior can be overridden
      by [may_override_network], which is used when doing [config init]. *)
-  ( match network_data with
-  | None ->
-      return_unit
+  (match network_data with
+  | None -> return_unit
   | Some net ->
       if may_override_network then return_unit
       else if
@@ -719,25 +692,22 @@ let read_and_patch_config_file ?(may_override_network = false)
              {
                configuration_file_chain_name = cfg.blockchain_network.chain_name;
                command_line_chain_name = net.chain_name;
-             }) )
+             }))
   >>=? fun () ->
   (* Update bootstrap peers must take into account the updated config file
      with the [--network] argument, so we cannot use [Node_config_file]. *)
-  ( if no_bootstrap_peers || ignore_bootstrap_peers then
-    Event.(emit disabled_bootstrap_peers) () >>= fun () -> return peers
+  (if no_bootstrap_peers || ignore_bootstrap_peers then
+   Event.(emit disabled_bootstrap_peers) () >>= fun () -> return peers
   else
     let cfg_peers =
       match cfg.p2p.bootstrap_peers with
-      | Some peers ->
-          peers
+      | Some peers -> peers
       | None -> (
-        match network_data with
-        | Some net ->
-            net.default_bootstrap_peers
-        | None ->
-            cfg.blockchain_network.default_bootstrap_peers )
+          match network_data with
+          | Some net -> net.default_bootstrap_peers
+          | None -> cfg.blockchain_network.default_bootstrap_peers)
     in
-    return (cfg_peers @ peers) )
+    return (cfg_peers @ peers))
   >>=? fun bootstrap_peers ->
   Option.iter_es
     (fun connections ->
@@ -759,15 +729,12 @@ let read_and_patch_config_file ?(may_override_network = false)
         max_connections,
         peer_table_size ) =
     match connections with
-    | None ->
-        (synchronisation_threshold, None, None, None, peer_table_size)
+    | None -> (synchronisation_threshold, None, None, None, peer_table_size)
     | Some x -> (
         let peer_table_size =
           match peer_table_size with
-          | None ->
-              Some (8 * x)
-          | Some _ ->
-              peer_table_size
+          | None -> Some (8 * x)
+          | Some _ -> peer_table_size
         in
         (* connections sets a new value for the
            [synchronisation_threshold] except if a value for it was
@@ -775,12 +742,12 @@ let read_and_patch_config_file ?(may_override_network = false)
         match synchronisation_threshold with
         | None ->
             (* We want to synchronise with at least 2 peers and to a
-              number of people proportional to the number of peers we
-              are connected with. Because a heuristic is used, we only
-              need to be synchronised with a sufficiently large number
-              of our peers. To avoid the lack of connections when x is
-              1, we define the minimum to 1 manually. (x/4) is enough
-              if the `synchronisation-threshold` is not set. *)
+               number of people proportional to the number of peers we
+               are connected with. Because a heuristic is used, we only
+               need to be synchronised with a sufficiently large number
+               of our peers. To avoid the lack of connections when x is
+               1, we define the minimum to 1 manually. (x/4) is enough
+               if the `synchronisation-threshold` is not set. *)
             ( Some (max (x / 4) 2),
               Some (if x = 1 then x else x / 2),
               Some x,
@@ -791,7 +758,7 @@ let read_and_patch_config_file ?(may_override_network = false)
               Some (if x = 1 then x else x / 2),
               Some x,
               Some (3 * x / 2),
-              peer_table_size ) )
+              peer_table_size ))
   in
   Node_config_file.update
     ~disable_config_validation

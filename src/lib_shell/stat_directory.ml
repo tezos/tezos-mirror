@@ -28,6 +28,6 @@ let rpc_directory () =
       RPC_answer.return @@ Gc.stat ())
   |> fun dir ->
   RPC_directory.gen_register dir Stat_services.S.memory (fun () () () ->
-      Sys_info.memory_stats ()
-      >>= function
-      | Ok stats -> RPC_answer.return stats | Error err -> RPC_answer.fail [err])
+      Sys_info.memory_stats () >>= function
+      | Ok stats -> RPC_answer.return stats
+      | Error err -> RPC_answer.fail [err])

@@ -279,8 +279,7 @@ let () =
 let check_constants constants =
   let min_time_between_blocks =
     match constants.time_between_blocks with
-    | first_time_between_blocks :: _ ->
-        first_time_between_blocks
+    | first_time_between_blocks :: _ -> first_time_between_blocks
     | [] ->
         (* this constant is used in the Baking module *)
         Period_repr.one_minute

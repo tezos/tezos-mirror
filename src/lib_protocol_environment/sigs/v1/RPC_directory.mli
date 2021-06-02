@@ -112,13 +112,7 @@ val register4 :
 
 val register5 :
   'prefix directory ->
-  ( 'm,
-    'prefix,
-    ((((unit * 'a) * 'b) * 'c) * 'd) * 'e,
-    'q,
-    'i,
-    'o )
-  RPC_service.t ->
+  ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
@@ -154,13 +148,7 @@ val opt_register4 :
 
 val opt_register5 :
   'prefix directory ->
-  ( 'm,
-    'prefix,
-    ((((unit * 'a) * 'b) * 'c) * 'd) * 'e,
-    'q,
-    'i,
-    'o )
-  RPC_service.t ->
+  ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
@@ -196,13 +184,7 @@ val gen_register4 :
 
 val gen_register5 :
   'prefix directory ->
-  ( 'm,
-    'prefix,
-    ((((unit * 'a) * 'b) * 'c) * 'd) * 'e,
-    'q,
-    'i,
-    'o )
-  RPC_service.t ->
+  ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> [< 'o RPC_answer.t] Lwt.t) ->
   'prefix directory
 
@@ -238,13 +220,7 @@ val lwt_register4 :
 
 val lwt_register5 :
   'prefix directory ->
-  ( 'm,
-    'prefix,
-    ((((unit * 'a) * 'b) * 'c) * 'd) * 'e,
-    'q,
-    'i,
-    'o )
-  RPC_service.t ->
+  ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 

@@ -41,10 +41,8 @@ let keywords words =
   let matcher _ w =
     let w = String.lowercase_ascii w in
     match List.assoc_opt w words with
-    | None ->
-        failwith "wrong argument %s" w
-    | Some v ->
-        return v
+    | None -> failwith "wrong argument %s" w
+    | Some v -> return v
   in
   let autocomplete _ = return (fst (List.split words)) in
   Clic.parameter ~autocomplete matcher
@@ -81,30 +79,23 @@ let dispatch cmds argv () =
   Clic.dispatch cmds () argv >>=? fun () -> return !res
 
 let expect_result line pr exp got =
-  protect got
-  >>= fun got ->
+  protect got >>= fun got ->
   if
     match (got, exp) with
-    | (Ok got, Ok exp) ->
-        got = exp
+    | (Ok got, Ok exp) -> got = exp
     | (Error got, Error exp) ->
         let got = Format.asprintf "%a" pp_print_error got in
         Stringext.find_from got ~pattern:exp <> None
-    | _ ->
-        false
+    | _ -> false
   then Lwt.return_unit
   else
     let pr_got ppf = function
-      | Ok v ->
-          pr ppf v
-      | Error e ->
-          pp_print_error ppf e
+      | Ok v -> pr ppf v
+      | Error e -> pp_print_error ppf e
     in
     let pr_exp ppf = function
-      | Ok v ->
-          pr ppf v
-      | Error e ->
-          Format.pp_print_string ppf e
+      | Ok v -> pr ppf v
+      | Error e -> Format.pp_print_string ppf e
     in
     Lwt.fail_with
       (Format.asprintf
@@ -131,17 +122,13 @@ let test_dispatch_basic () =
       (fun () () -> return name)
   in
   let expect line = expect_result line Format.pp_print_string in
-  expect __LINE__ (Ok "empty") (dispatch [empty] [])
-  >>= fun () ->
+  expect __LINE__ (Ok "empty") (dispatch [empty] []) >>= fun () ->
   expect __LINE__ (Error "Extra_arguments") (dispatch [empty] ["one"])
   >>= fun () ->
   let cmds = [empty; prefixes ["one"]; prefixes ["one"; "two"]] in
-  expect __LINE__ (Ok "empty") (dispatch cmds [])
-  >>= fun () ->
-  expect __LINE__ (Ok "one") (dispatch cmds ["one"])
-  >>= fun () ->
-  expect __LINE__ (Ok "one-two") (dispatch cmds ["one"; "two"])
-  >>= fun () ->
+  expect __LINE__ (Ok "empty") (dispatch cmds []) >>= fun () ->
+  expect __LINE__ (Ok "one") (dispatch cmds ["one"]) >>= fun () ->
+  expect __LINE__ (Ok "one-two") (dispatch cmds ["one"; "two"]) >>= fun () ->
   expect __LINE__ (Error "Command_not_found") (dispatch cmds ["saucisse"])
   >>= fun () ->
   expect
@@ -161,8 +148,8 @@ let test_dispatch_advanced () =
     Clic.command
       ~desc:"seq-abcd-en"
       Clic.no_options
-      ( Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
-      @@ Clic.stop )
+      (Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
+      @@ Clic.stop)
       (fun () l () ->
         return ("E" ^ String.concat "" (List.map string_of_abcd l)))
   in
@@ -170,20 +157,18 @@ let test_dispatch_advanced () =
     Clic.command
       ~desc:"seq-abcd-en"
       Clic.no_options
-      ( Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
-      @@ Clic.prefix "of" @@ efgh_param ~name:"last" @@ Clic.stop )
+      (Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
+      @@ Clic.prefix "of" @@ efgh_param ~name:"last" @@ Clic.stop)
       (fun () l p () ->
         return
-          ( "E"
-          ^ String.concat "" (List.map string_of_abcd l)
-          ^ string_of_efgh p ))
+          ("E" ^ String.concat "" (List.map string_of_abcd l) ^ string_of_efgh p))
   in
   let fr return =
     Clic.command
       ~desc:"seq-abcd-fr"
       Clic.no_options
-      ( Clic.non_terminal_seq ~suffix:["la"; "fin"] (abcd_param ~name:"item")
-      @@ Clic.stop )
+      (Clic.non_terminal_seq ~suffix:["la"; "fin"] (abcd_param ~name:"item")
+      @@ Clic.stop)
       (fun () l () ->
         return ("F" ^ String.concat "" (List.map string_of_abcd l)))
   in
@@ -191,9 +176,9 @@ let test_dispatch_advanced () =
     Clic.command
       ~desc:"en-seq-abcd"
       Clic.no_options
-      ( Clic.prefix "en"
+      (Clic.prefix "en"
       @@ Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
-      @@ Clic.stop )
+      @@ Clic.stop)
       (fun () l () ->
         return ("E" ^ String.concat "" (List.map string_of_abcd l)))
   in
@@ -201,27 +186,22 @@ let test_dispatch_advanced () =
     Clic.command
       ~desc:"fr-seq-abcd"
       Clic.no_options
-      ( Clic.prefix "fr"
+      (Clic.prefix "fr"
       @@ Clic.non_terminal_seq ~suffix:["la"; "fin"] (abcd_param ~name:"item")
-      @@ Clic.stop )
+      @@ Clic.stop)
       (fun () l () ->
         return ("F" ^ String.concat "" (List.map string_of_abcd l)))
   in
   let expect line = expect_result line Format.pp_print_string in
   expect __LINE__ (Error "Unterminated_command") (dispatch [en] ["saucisse"])
   >>= fun () ->
-  expect __LINE__ (Ok "E") (dispatch [en] ["the"; "end"])
-  >>= fun () ->
-  expect __LINE__ (Ok "EB") (dispatch [en] ["b"; "the"; "end"])
-  >>= fun () ->
+  expect __LINE__ (Ok "E") (dispatch [en] ["the"; "end"]) >>= fun () ->
+  expect __LINE__ (Ok "EB") (dispatch [en] ["b"; "the"; "end"]) >>= fun () ->
   expect __LINE__ (Ok "EDB") (dispatch [en] ["d"; "b"; "the"; "end"])
   >>= fun () ->
   expect __LINE__ (Ok "EB") (dispatch [en; enp] ["b"; "the"; "end"])
   >>= fun () ->
-  expect
-    __LINE__
-    (Ok "EBE")
-    (dispatch [en; enp] ["b"; "the"; "end"; "of"; "e"])
+  expect __LINE__ (Ok "EBE") (dispatch [en; enp] ["b"; "the"; "end"; "of"; "e"])
   >>= fun () ->
   expect __LINE__ (Ok "EBE") (dispatch [enp] ["b"; "the"; "end"; "of"; "e"])
   >>= fun () ->
@@ -230,10 +210,8 @@ let test_dispatch_advanced () =
     (Error "wrong argument")
     (dispatch [en] ["d"; "x"; "the"; "end"])
   >>= fun () ->
-  expect __LINE__ (Ok "F") (dispatch [fr] ["la"; "fin"])
-  >>= fun () ->
-  expect __LINE__ (Ok "FA") (dispatch [fr] ["a"; "la"; "fin"])
-  >>= fun () ->
+  expect __LINE__ (Ok "F") (dispatch [fr] ["la"; "fin"]) >>= fun () ->
+  expect __LINE__ (Ok "FA") (dispatch [fr] ["a"; "la"; "fin"]) >>= fun () ->
   expect __LINE__ (Ok "FCB") (dispatch [fr] ["c"; "b"; "la"; "fin"])
   >>= fun () ->
   expect
@@ -285,12 +263,9 @@ let test_autocompletion_case ~commands ~args ~expected () =
   let script = "script" in
   let (prev_arg, cur_arg) =
     match List.rev args with
-    | [] ->
-        (script, "")
-    | [cur_arg] ->
-        (script, cur_arg)
-    | cur_arg :: prev_arg :: _ ->
-        (prev_arg, cur_arg)
+    | [] -> (script, "")
+    | [cur_arg] -> (script, cur_arg)
+    | cur_arg :: prev_arg :: _ -> (prev_arg, cur_arg)
   in
   let global_options = Clic.no_options in
   let ctxt = () in
@@ -318,17 +293,20 @@ let test_autocompletion_case ~commands ~args ~expected () =
 let test_parameters_autocompletion =
   let param_commands =
     Clic.
-      [ command
+      [
+        command
           ~desc:"command with a param"
           no_options
-          ( int_param ~autocomplete:(fun _ctxt -> return ["0"; "1"; "2"; "10"])
+          (int_param ~autocomplete:(fun _ctxt -> return ["0"; "1"; "2"; "10"])
           @@ string_param ~autocomplete:(fun _ctxt ->
                  return ["oranges"; "pineapples"])
-          @@ stop )
-          (fun () _int _string () -> return_unit) ]
+          @@ stop)
+          (fun () _int _string () -> return_unit);
+      ]
   in
   let param_cases =
-    [ ( "param: when no arg given, suggests all options",
+    [
+      ( "param: when no arg given, suggests all options",
         let args = [] in
         let expected = ["0"; "1"; "2"; "10"] in
         test_autocompletion_case ~commands:param_commands ~args ~expected );
@@ -349,11 +327,13 @@ let test_parameters_autocompletion =
          next word, suggests that word",
         let args = ["0"; "o"] in
         let expected = ["oranges"] in
-        test_autocompletion_case ~commands:param_commands ~args ~expected ) ]
+        test_autocompletion_case ~commands:param_commands ~args ~expected );
+    ]
   in
   let prefix_commands =
     Clic.
-      [ command
+      [
+        command
           ~desc:"command with prefixes"
           no_options
           (prefixes ["show"; "test"] @@ stop)
@@ -372,10 +352,12 @@ let test_parameters_autocompletion =
           ~desc:"command with prefixes"
           no_options
           (prefixes ["stop"; "test"] @@ stop)
-          (fun () () -> return_unit) ]
+          (fun () () -> return_unit);
+      ]
   in
   let prefix_cases =
-    [ ( "prefix: when no arg given, suggests all options",
+    [
+      ( "prefix: when no arg given, suggests all options",
         let args = [] in
         let expected = ["show"; "run"; "stop"] in
         test_autocompletion_case ~commands:prefix_commands ~args ~expected );
@@ -392,38 +374,42 @@ let test_parameters_autocompletion =
         let args = ["show"; ""] in
         let expected = ["test"; "result"] in
         test_autocompletion_case ~commands:prefix_commands ~args ~expected );
-      ( "prefix: when given prev arg matches first word and arg matches \
-         unique next word, suggests that word",
+      ( "prefix: when given prev arg matches first word and arg matches unique \
+         next word, suggests that word",
         let args = ["show"; "r"] in
         let expected = ["result"] in
         test_autocompletion_case ~commands:prefix_commands ~args ~expected );
-      ( "prefix: when given prev arg matches a unique first word, suggests \
-         the next word",
+      ( "prefix: when given prev arg matches a unique first word, suggests the \
+         next word",
         let args = ["run"; ""] in
         let expected = ["test"] in
-        test_autocompletion_case ~commands:prefix_commands ~args ~expected ) ]
+        test_autocompletion_case ~commands:prefix_commands ~args ~expected );
+    ]
   in
   let seq_commands =
     Clic.
-      [ command
+      [
+        command
           ~desc:"command with a seq"
           no_options
-          ( prefix "number"
+          (prefix "number"
           @@ seq_of_param
                (int_param ~autocomplete:(fun _ctxt ->
-                    return ["0"; "1"; "2"; "10"])) )
+                    return ["0"; "1"; "2"; "10"])))
           (fun () _ints () -> return_unit);
         command
           ~desc:"command with a seq"
           no_options
-          ( prefix "fruit"
+          (prefix "fruit"
           @@ seq_of_param
                (string_param ~autocomplete:(fun _ctxt ->
-                    return ["oranges"; "pineapples"])) )
-          (fun () _strings () -> return_unit) ]
+                    return ["oranges"; "pineapples"])))
+          (fun () _strings () -> return_unit);
+      ]
   in
   let seq_cases =
-    [ ( "seq: when no arg given, suggests all options",
+    [
+      ( "seq: when no arg given, suggests all options",
         let args = ["fruit"; ""] in
         let expected = ["oranges"; "pineapples"] in
         test_autocompletion_case ~commands:seq_commands ~args ~expected );
@@ -440,34 +426,36 @@ let test_parameters_autocompletion =
          all options in seq",
         let args = ["fruit"; "oranges"; "pineapples"; ""] in
         let expected = ["oranges"; "pineapples"] in
-        test_autocompletion_case ~commands:seq_commands ~args ~expected ) ]
+        test_autocompletion_case ~commands:seq_commands ~args ~expected );
+    ]
   in
   let non_terminal_seq_commands =
     Clic.
-      [ command
+      [
+        command
           ~desc:"command with a non-terminal-seq"
           no_options
-          ( prefix "number"
+          (prefix "number"
           @@ non_terminal_seq
                ~suffix:["squared"]
                (int_param ~autocomplete:(fun _ctxt ->
                     return ["0"; "1"; "2"; "10"]))
-          @@ stop )
+          @@ stop)
           (fun () _ints () -> return_unit);
         command
           ~desc:"command with a non-terminal-seq"
           no_options
-          ( prefix "fruit"
+          (prefix "fruit"
           @@ non_terminal_seq
                ~suffix:["juiced"]
                (string_param ~autocomplete:(fun _ctxt ->
                     return ["oranges"; "pineapples"]))
-          @@ stop )
+          @@ stop)
           (fun () _strings () -> return_unit);
         command
           ~desc:"command with a non-terminal-seq"
           no_options
-          ( prefixes ["two"; "lists"]
+          (prefixes ["two"; "lists"]
           @@ non_terminal_seq
                ~suffix:["and"; "numbers"]
                (string_param ~autocomplete:(fun _ctxt ->
@@ -476,11 +464,13 @@ let test_parameters_autocompletion =
                ~suffix:["squared"]
                (int_param ~autocomplete:(fun _ctxt ->
                     return ["0"; "1"; "2"; "10"]))
-          @@ stop )
-          (fun () _strings _ints () -> return_unit) ]
+          @@ stop)
+          (fun () _strings _ints () -> return_unit);
+      ]
   in
   let non_terminal_seq_cases =
-    [ ( "non-terminal-seq: fails when given an empty suffix",
+    [
+      ( "non-terminal-seq: fails when given an empty suffix",
         fun () ->
           return
           @@ Alcotest.check_raises
@@ -538,8 +528,8 @@ let test_parameters_autocompletion =
           ~args
           ~expected );
       ( "non-terminal-seq: when first non-terminal-seq and its suffix are \
-         matched and args given, suggests all matching options in the next \
-         seq and its suffix",
+         matched and args given, suggests all matching options in the next seq \
+         and its suffix",
         let args =
           ["two"; "lists"; "oranges"; "pineapples"; "and"; "numbers"; "2"; "1"]
         in
@@ -547,27 +537,29 @@ let test_parameters_autocompletion =
         test_autocompletion_case
           ~commands:non_terminal_seq_commands
           ~args
-          ~expected ) ]
+          ~expected );
+    ]
   in
   param_cases @ prefix_cases @ seq_cases @ non_terminal_seq_cases
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
-      f ()
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
-      | Error err ->
-          Format.kasprintf Lwt.fail_with "%a" pp_print_error err)
+      f () >>= function
+      | Ok () -> Lwt.return_unit
+      | Error err -> Format.kasprintf Lwt.fail_with "%a" pp_print_error err)
 
 (* main *)
 
 let () =
   Alcotest_lwt.run
     "Clic"
-    [ ( "dispatch",
-        [ ("basic", `Quick, test_dispatch_basic);
-          ("advanced", `Quick, test_dispatch_advanced) ] );
+    [
+      ( "dispatch",
+        [
+          ("basic", `Quick, test_dispatch_basic);
+          ("advanced", `Quick, test_dispatch_advanced);
+        ] );
       ( "auto-completion-parameters",
-        List.map wrap test_parameters_autocompletion ) ]
+        List.map wrap test_parameters_autocompletion );
+    ]
   |> Lwt_main.run

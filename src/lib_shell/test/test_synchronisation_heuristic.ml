@@ -50,12 +50,9 @@
 open Synchronisation_heuristic
 
 let prn = function
-  | Synchronised {is_chain_stuck = true} ->
-      "Synchronised (stuck)"
-  | Not_synchronised ->
-      "Not synchronised"
-  | Synchronised {is_chain_stuck = false} ->
-      "Synchronised (not stuck)"
+  | Synchronised {is_chain_stuck = true} -> "Synchronised (stuck)"
+  | Not_synchronised -> "Not synchronised"
+  | Synchronised {is_chain_stuck = false} -> "Synchronised (not stuck)"
 
 let forge_peer_id () =
   let identity = P2p_identity.generate_with_pow_target_0 () in
@@ -70,10 +67,8 @@ let forge_value ?delay ?timestamp ?peer () =
   let peer = match peer with Some peer -> peer | None -> forge_peer_id () in
   let timestamp =
     match timestamp with
-    | Some timestamp ->
-        timestamp
-    | None ->
-        forge_timestamp ?delay ()
+    | Some timestamp -> timestamp
+    | None -> forge_timestamp ?delay ()
   in
   (timestamp, peer)
 
@@ -438,7 +433,8 @@ let test_counterexample_1 () =
   Assert.equal ~prn Not_synchronised (get_status heuristic)
 
 let tests_raw : (string * (unit -> unit)) list =
-  [ ("Threshold negative", test_threshold_negative);
+  [
+    ("Threshold negative", test_threshold_negative);
     ("Threshold is zero", test_threshold_is_zero);
     ("Threshold is one, update in the present", test_threshold_is_one);
     ( "Threshold is one, update in the past",
@@ -456,7 +452,8 @@ let tests_raw : (string * (unit -> unit)) list =
       test_threshold_is_two_two_in_the_past );
     ("Threshold is three", test_threshold_is_three);
     ("Threshold is three, three in the past", test_threshold_is_three_and_stuck);
-    ("Crowbar counterexample 1", test_counterexample_1) ]
+    ("Crowbar counterexample 1", test_counterexample_1);
+  ]
 
 let tests =
   List.map (fun (s, f) -> Alcotest_lwt.test_case_sync s `Quick f) tests_raw

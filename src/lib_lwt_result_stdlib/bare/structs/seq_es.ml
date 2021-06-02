@@ -55,346 +55,259 @@ let cons item t () = Monad.return (Cons (item, t))
 
 let cons_e item t () =
   match item with
-  | Error _ as e ->
-      Lwt.return e
-  | Ok item ->
-      Monad.return (Cons (item, t))
+  | Error _ as e -> Lwt.return e
+  | Ok item -> Monad.return (Cons (item, t))
 
 let cons_s item t () = item >>= fun item -> Monad.return (Cons (item, t))
 
 let cons_es item t () = item >>=? fun item -> Monad.return (Cons (item, t))
 
 let rec append ta tb () =
-  ta ()
-  >>=? function
-  | Nil -> tb () | Cons (item, ta) -> Monad.return (Cons (item, append ta tb))
+  ta () >>=? function
+  | Nil -> tb ()
+  | Cons (item, ta) -> Monad.return (Cons (item, append ta tb))
 
 let first s =
-  s ()
-  >>= function
-  | Ok Nil ->
-      Lwt.return_none
-  | Ok (Cons (x, _)) ->
-      Lwt.return_some (Ok x)
-  | Error _ as error ->
-      Lwt.return_some error
+  s () >>= function
+  | Ok Nil -> Lwt.return_none
+  | Ok (Cons (x, _)) -> Lwt.return_some (Ok x)
+  | Error _ as error -> Lwt.return_some error
 
 let rec fold_left f acc seq =
-  seq ()
-  >>=? function
-  | Nil -> Monad.return acc | Cons (item, seq) -> fold_left f (f acc item) seq
+  seq () >>=? function
+  | Nil -> Monad.return acc
+  | Cons (item, seq) -> fold_left f (f acc item) seq
 
 let fold_left f acc seq = fold_left f acc @@ protect seq
 
 let rec fold_left_e f acc seq =
-  seq ()
-  >>=? function
-  | Nil ->
-      Monad.return acc
-  | Cons (item, seq) ->
-      f acc item >>?= fun acc -> fold_left_e f acc seq
+  seq () >>=? function
+  | Nil -> Monad.return acc
+  | Cons (item, seq) -> f acc item >>?= fun acc -> fold_left_e f acc seq
 
 let fold_left_e f acc seq = fold_left_e f acc @@ protect seq
 
 let rec fold_left_s f acc seq =
-  seq ()
-  >>=? function
-  | Nil ->
-      Monad.return acc
-  | Cons (item, seq) ->
-      f acc item >>= fun acc -> fold_left_s f acc seq
+  seq () >>=? function
+  | Nil -> Monad.return acc
+  | Cons (item, seq) -> f acc item >>= fun acc -> fold_left_s f acc seq
 
 let fold_left_s f acc seq = fold_left_s f acc @@ protect seq
 
 let rec fold_left_es f acc seq =
-  seq ()
-  >>=? function
-  | Nil ->
-      Monad.return acc
-  | Cons (item, seq) ->
-      f acc item >>=? fun acc -> fold_left_es f acc seq
+  seq () >>=? function
+  | Nil -> Monad.return acc
+  | Cons (item, seq) -> f acc item >>=? fun acc -> fold_left_es f acc seq
 
 let fold_left_es f acc seq = fold_left_es f acc @@ protect seq
 
 let rec iter f seq =
-  seq ()
-  >>=? function Nil -> unit_es | Cons (item, seq) -> f item ; iter f seq
+  seq () >>=? function
+  | Nil -> unit_es
+  | Cons (item, seq) ->
+      f item ;
+      iter f seq
 
 let iter f seq = iter f @@ protect seq
 
 let rec iter_e f seq =
-  seq ()
-  >>=? function
-  | Nil -> unit_es | Cons (item, seq) -> f item >>?= fun () -> iter_e f seq
+  seq () >>=? function
+  | Nil -> unit_es
+  | Cons (item, seq) -> f item >>?= fun () -> iter_e f seq
 
 let iter_e f seq = iter_e f @@ protect seq
 
 let rec iter_s f seq =
-  seq ()
-  >>=? function
-  | Nil -> unit_es | Cons (item, seq) -> f item >>= fun () -> iter_s f seq
+  seq () >>=? function
+  | Nil -> unit_es
+  | Cons (item, seq) -> f item >>= fun () -> iter_s f seq
 
 let iter_s f seq = iter_s f @@ protect seq
 
 let rec iter_es f seq =
-  seq ()
-  >>=? function
-  | Nil -> unit_es | Cons (item, seq) -> f item >>=? fun () -> iter_es f seq
+  seq () >>=? function
+  | Nil -> unit_es
+  | Cons (item, seq) -> f item >>=? fun () -> iter_es f seq
 
 let iter_es f seq = iter_es f @@ protect seq
 
 let rec map f seq () =
-  seq ()
-  >>=? function
-  | Nil -> nil_es | Cons (item, seq) -> Monad.return (Cons (f item, map f seq))
+  seq () >>=? function
+  | Nil -> nil_es
+  | Cons (item, seq) -> Monad.return (Cons (f item, map f seq))
 
 let map f seq = map f @@ protect seq
 
 let rec map_e f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) ->
       f item >>?= fun item -> Monad.return (Cons (item, map_e f seq))
 
 let map_e f seq = map_e f @@ protect seq
 
 let rec map_s f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) ->
       f item >>= fun item -> Monad.return (Cons (item, map_s f seq))
 
 let map_s f seq = map_s f @@ protect seq
 
 let rec map_es f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) ->
       f item >>=? fun item -> Monad.return (Cons (item, map_es f seq))
 
 let map_es f seq = map_es f @@ protect seq
 
 let rec map_error f seq () =
-  seq ()
-  >>= function
-  | Ok Nil ->
-      nil_es
-  | Ok (Cons (item, seq)) ->
-      Monad.return (Cons (item, map_error f seq))
-  | Error e ->
-      Lwt.return (Error (f e))
+  seq () >>= function
+  | Ok Nil -> nil_es
+  | Ok (Cons (item, seq)) -> Monad.return (Cons (item, map_error f seq))
+  | Error e -> Lwt.return (Error (f e))
 
 let map_error f seq = map_error f @@ protect seq
 
 let rec map_error_s f seq () =
-  seq ()
-  >>= function
-  | Ok Nil ->
-      nil_es
-  | Ok (Cons (item, seq)) ->
-      Monad.return (Cons (item, map_error_s f seq))
-  | Error e ->
-      f e >>= fun e -> Lwt.return (Error e)
+  seq () >>= function
+  | Ok Nil -> nil_es
+  | Ok (Cons (item, seq)) -> Monad.return (Cons (item, map_error_s f seq))
+  | Error e -> f e >>= fun e -> Lwt.return (Error e)
 
 let rec filter f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) ->
       if f item then Monad.return (Cons (item, seq)) else filter f seq ()
 
 let filter f seq = filter f @@ protect seq
 
 let rec filter_e f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) -> (
-      f item
-      >>?= function
-      | true ->
-          Monad.return (Cons (item, filter_e f seq))
-      | false ->
-          filter_e f seq () )
+      f item >>?= function
+      | true -> Monad.return (Cons (item, filter_e f seq))
+      | false -> filter_e f seq ())
 
 let filter_e f seq = filter_e f @@ protect seq
 
 let rec filter_s f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) -> (
-      f item
-      >>= function
-      | true ->
-          Monad.return (Cons (item, filter_s f seq))
-      | false ->
-          filter_s f seq () )
+      f item >>= function
+      | true -> Monad.return (Cons (item, filter_s f seq))
+      | false -> filter_s f seq ())
 
 let filter_s f seq = filter_s f @@ protect seq
 
 let rec filter_es f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) -> (
-      f item
-      >>=? function
-      | true ->
-          Monad.return (Cons (item, filter_es f seq))
-      | false ->
-          filter_es f seq () )
+      f item >>=? function
+      | true -> Monad.return (Cons (item, filter_es f seq))
+      | false -> filter_es f seq ())
 
 let filter_es f seq = filter_es f @@ protect seq
 
 let rec filter_map f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) -> (
-    match f item with
-    | None ->
-        filter_map f seq ()
-    | Some item ->
-        Monad.return (Cons (item, filter_map f seq)) )
+      match f item with
+      | None -> filter_map f seq ()
+      | Some item -> Monad.return (Cons (item, filter_map f seq)))
 
 let filter_map f seq = filter_map f @@ protect seq
 
 let rec filter_map_e f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) -> (
-      f item
-      >>?= function
-      | None ->
-          filter_map_e f seq ()
-      | Some item ->
-          Monad.return (Cons (item, filter_map_e f seq)) )
+      f item >>?= function
+      | None -> filter_map_e f seq ()
+      | Some item -> Monad.return (Cons (item, filter_map_e f seq)))
 
 let filter_map_e f seq = filter_map_e f @@ protect seq
 
 let rec filter_map_s f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) -> (
-      f item
-      >>= function
-      | None ->
-          filter_map_s f seq ()
-      | Some item ->
-          Monad.return (Cons (item, filter_map_s f seq)) )
+      f item >>= function
+      | None -> filter_map_s f seq ()
+      | Some item -> Monad.return (Cons (item, filter_map_s f seq)))
 
 let filter_map_s f seq = filter_map_s f @@ protect seq
 
 let rec filter_map_es f seq () =
-  seq ()
-  >>=? function
-  | Nil ->
-      nil_es
+  seq () >>=? function
+  | Nil -> nil_es
   | Cons (item, seq) -> (
-      f item
-      >>=? function
-      | None ->
-          filter_map_es f seq ()
-      | Some item ->
-          Monad.return (Cons (item, filter_map_es f seq)) )
+      f item >>=? function
+      | None -> filter_map_es f seq ()
+      | Some item -> Monad.return (Cons (item, filter_map_es f seq)))
 
 let filter_map_es f seq = filter_map_es f @@ protect seq
 
 let rec unfold f a () =
   match f a with
-  | None ->
-      nil_es
-  | Some (item, a) ->
-      Monad.return (Cons (item, unfold f a))
+  | None -> nil_es
+  | Some (item, a) -> Monad.return (Cons (item, unfold f a))
 
 let rec unfold_s f a () =
-  f a
-  >>= function
-  | None -> nil_es | Some (item, a) -> Monad.return (Cons (item, unfold_s f a))
+  f a >>= function
+  | None -> nil_es
+  | Some (item, a) -> Monad.return (Cons (item, unfold_s f a))
 
 let rec unfold_e f a () =
   match f a with
-  | Error _ as e ->
-      Lwt.return e
-  | Ok None ->
-      nil_es
-  | Ok (Some (item, a)) ->
-      Monad.return (Cons (item, unfold_e f a))
+  | Error _ as e -> Lwt.return e
+  | Ok None -> nil_es
+  | Ok (Some (item, a)) -> Monad.return (Cons (item, unfold_e f a))
 
 let rec unfold_es f a () =
-  f a
-  >>= function
-  | Error _ as e ->
-      Lwt.return e
-  | Ok None ->
-      nil_es
-  | Ok (Some (item, a)) ->
-      Monad.return (Cons (item, unfold_es f a))
+  f a >>= function
+  | Error _ as e -> Lwt.return e
+  | Ok None -> nil_es
+  | Ok (Some (item, a)) -> Monad.return (Cons (item, unfold_es f a))
 
 let rec of_seq seq () =
   match seq () with
-  | Stdlib.Seq.Nil ->
-      nil_es
-  | Stdlib.Seq.Cons (e, seq) ->
-      Monad.return (Cons (e, of_seq seq))
+  | Stdlib.Seq.Nil -> nil_es
+  | Stdlib.Seq.Cons (e, seq) -> Monad.return (Cons (e, of_seq seq))
 
 let rec of_seq_e seq () =
   match seq () with
-  | Stdlib.Seq.Nil ->
-      nil_es
-  | Stdlib.Seq.Cons (Ok e, seq) ->
-      Monad.return (Cons (e, of_seq_e seq))
-  | Stdlib.Seq.Cons ((Error _ as e), _) ->
-      Lwt.return e
+  | Stdlib.Seq.Nil -> nil_es
+  | Stdlib.Seq.Cons (Ok e, seq) -> Monad.return (Cons (e, of_seq_e seq))
+  | Stdlib.Seq.Cons ((Error _ as e), _) -> Lwt.return e
 
 let rec of_seqe seq () =
   match seq () with
-  | Ok Seq_e.Nil ->
-      nil_es
-  | Ok (Seq_e.Cons (item, seq)) ->
-      Monad.return (Cons (item, of_seqe seq))
-  | Error _ as e ->
-      Lwt.return e
+  | Ok Seq_e.Nil -> nil_es
+  | Ok (Seq_e.Cons (item, seq)) -> Monad.return (Cons (item, of_seqe seq))
+  | Error _ as e -> Lwt.return e
 
 let rec of_seq_s seq () =
   match seq () with
-  | Stdlib.Seq.Nil ->
-      nil_es
+  | Stdlib.Seq.Nil -> nil_es
   | Stdlib.Seq.Cons (p, seq) ->
       p >>= fun e -> Monad.return (Cons (e, of_seq_s seq))
 
 let rec of_seqs seq () =
-  seq ()
-  >>= function
-  | Seq_s.Nil ->
-      nil_es
-  | Seq_s.Cons (e, seq) ->
-      Monad.return (Cons (e, of_seqs seq))
+  seq () >>= function
+  | Seq_s.Nil -> nil_es
+  | Seq_s.Cons (e, seq) -> Monad.return (Cons (e, of_seqs seq))
 
 let rec of_seq_es seq () =
   match seq () with
-  | Stdlib.Seq.Nil ->
-      nil_es
+  | Stdlib.Seq.Nil -> nil_es
   | Stdlib.Seq.Cons (p, seq) -> (
-      p
-      >>= function
-      | Error _ as e ->
-          Lwt.return e
-      | Ok e ->
-          Monad.return (Cons (e, of_seq_es seq)) )
+      p >>= function
+      | Error _ as e -> Lwt.return e
+      | Ok e -> Monad.return (Cons (e, of_seq_es seq)))

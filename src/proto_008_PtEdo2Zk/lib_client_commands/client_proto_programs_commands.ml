@@ -107,8 +107,7 @@ let commands () =
         Alpha_services.Constants.all cctxt (cctxt#chain, block)
         >>=? fun {parametric = {hard_gas_limit_per_operation; _}; _} ->
         return hard_gas_limit_per_operation
-    | Some gas ->
-        return gas
+    | Some gas -> return gas
   in
   let parse_expr expr =
     Lwt.return @@ Micheline_parser.no_parsing_error
@@ -129,10 +128,8 @@ let commands () =
   let signature_parameter =
     parameter (fun _cctxt s ->
         match Signature.of_b58check_opt s with
-        | Some s ->
-            return s
-        | None ->
-            failwith "Not given a valid signature")
+        | Some s -> return s
+        | None -> failwith "Not given a valid signature")
   in
   let convert_input_format_param =
     param
@@ -142,12 +139,9 @@ let commands () =
          ~autocomplete:(fun _ -> return ["michelson"; "json"; "binary"])
          (fun _ s ->
            match String.lowercase_ascii s with
-           | "michelson" ->
-               return `Michelson
-           | "json" ->
-               return `JSON
-           | "binary" ->
-               return `Binary
+           | "michelson" -> return `Michelson
+           | "json" -> return `JSON
+           | "binary" -> return `Binary
            | _ ->
                failwith
                  "invalid input format, expecting one of \"michelson\", \
@@ -162,14 +156,10 @@ let commands () =
            return ["michelson"; "json"; "binary"; "ocaml"])
          (fun _ s ->
            match String.lowercase_ascii s with
-           | "michelson" ->
-               return `Michelson
-           | "json" ->
-               return `JSON
-           | "binary" ->
-               return `Binary
-           | "ocaml" ->
-               return `OCaml
+           | "michelson" -> return `Michelson
+           | "json" -> return `JSON
+           | "binary" -> return `Binary
+           | "ocaml" -> return `OCaml
            | _ ->
                failwith
                  "invalid output format, expecting one of \"michelson\", \
@@ -180,28 +170,29 @@ let commands () =
       ~name:"source"
       ~desc:"literal or a path to a file"
       (parameter (fun cctxt s ->
-           cctxt#read_file s
-           >>= function Ok v -> return v | Error _ -> return s))
+           cctxt#read_file s >>= function
+           | Ok v -> return v
+           | Error _ -> return s))
   in
-  [ command
+  [
+    command
       ~group
       ~desc:"Lists all scripts in the library."
       no_options
       (fixed ["list"; "known"; "scripts"])
       (fun () (cctxt : Protocol_client_context.full) ->
-        Program.load cctxt
-        >>=? fun list ->
-        List.iter_s (fun (n, _) -> cctxt#message "%s" n) list
-        >>= fun () -> return_unit);
+        Program.load cctxt >>=? fun list ->
+        List.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
+        return_unit);
     command
       ~group
       ~desc:"Add a script to the library."
       (args1 (Program.force_switch ()))
-      ( prefixes ["remember"; "script"]
-      @@ Program.fresh_alias_param @@ Program.source_param @@ stop )
+      (prefixes ["remember"; "script"]
+      @@ Program.fresh_alias_param @@ Program.source_param @@ stop)
       (fun force name hash cctxt ->
-        Program.of_fresh cctxt force name
-        >>=? fun name -> Program.add ~force cctxt name hash);
+        Program.of_fresh cctxt force name >>=? fun name ->
+        Program.add ~force cctxt name hash);
     command
       ~group
       ~desc:"Remove a script from the library."
@@ -214,8 +205,7 @@ let commands () =
       no_options
       (prefixes ["show"; "known"; "script"] @@ Program.alias_param @@ stop)
       (fun () (_, program) (cctxt : Protocol_client_context.full) ->
-        Program.to_source program
-        >>=? fun source ->
+        Program.to_source program >>=? fun source ->
         cctxt#message "%s\n" source >>= fun () -> return_unit);
     command
       ~group
@@ -230,13 +220,13 @@ let commands () =
          custom_gas_flag
          entrypoint_arg
          (unparsing_mode_arg ~default:"Readable"))
-      ( prefixes ["run"; "script"]
+      (prefixes ["run"; "script"]
       @@ Program.source_param
       @@ prefixes ["on"; "storage"]
       @@ param ~name:"storage" ~desc:"the storage data" data_parameter
       @@ prefixes ["and"; "input"]
       @@ param ~name:"input" ~desc:"the input data" data_parameter
-      @@ stop )
+      @@ stop)
       (fun ( trace_exec,
              amount,
              balance,
@@ -289,8 +279,7 @@ let commands () =
             ?gas
             ?entrypoint
             ()
-          >>= fun res ->
-          print_run_result cctxt ~show_source ~parsed:program res);
+          >>= fun res -> print_run_result cctxt ~show_source ~parsed:program res);
     command
       ~group
       ~desc:"Ask the node to typecheck a script."
@@ -345,14 +334,13 @@ let commands () =
       ~group
       ~desc:"Ask the node to typecheck a data expression."
       (args3 no_print_source_flag custom_gas_flag legacy_switch)
-      ( prefixes ["typecheck"; "data"]
+      (prefixes ["typecheck"; "data"]
       @@ param ~name:"data" ~desc:"the data to typecheck" data_parameter
       @@ prefixes ["against"; "type"]
       @@ param ~name:"type" ~desc:"the expected type" data_parameter
-      @@ stop )
+      @@ stop)
       (fun (no_print_source, custom_gas, legacy) data ty cctxt ->
-        resolve_max_gas cctxt cctxt#block custom_gas
-        >>=? fun original_gas ->
+        resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
         Client_proto_programs.typecheck_data
           cctxt
           ~chain:cctxt#chain
@@ -387,14 +375,13 @@ let commands () =
          Also displays the result of hashing this packed data with `BLAKE2B`, \
          `SHA256` or `SHA512` instruction."
       (args1 custom_gas_flag)
-      ( prefixes ["hash"; "data"]
+      (prefixes ["hash"; "data"]
       @@ param ~name:"data" ~desc:"the data to hash" data_parameter
       @@ prefixes ["of"; "type"]
       @@ param ~name:"type" ~desc:"type of the data" data_parameter
-      @@ stop )
+      @@ stop)
       (fun custom_gas data typ cctxt ->
-        resolve_max_gas cctxt cctxt#block custom_gas
-        >>=? fun original_gas ->
+        resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
         Alpha_services.Helpers.Scripts.pack_data
           cctxt
           (cctxt#chain, cctxt#block)
@@ -455,17 +442,17 @@ let commands () =
     command
       ~group
       ~desc:
-        "Parse a byte sequence (in hexadecimal notation) as a data \
-         expression, as per Michelson instruction `UNPACK`."
+        "Parse a byte sequence (in hexadecimal notation) as a data expression, \
+         as per Michelson instruction `UNPACK`."
       no_options
-      ( prefixes ["unpack"; "michelson"; "data"]
+      (prefixes ["unpack"; "michelson"; "data"]
       @@ bytes_parameter ~name:"bytes" ~desc:"the packed data to parse"
-      @@ stop )
+      @@ stop)
       (fun () bytes cctxt ->
-        ( if Bytes.get bytes 0 != '\005' then
-          failwith
-            "Not a piece of packed Michelson data (must start with `0x05`)"
-        else return_unit )
+        (if Bytes.get bytes 0 != '\005' then
+         failwith
+           "Not a piece of packed Michelson data (must start with `0x05`)"
+        else return_unit)
         >>=? fun () ->
         (* Remove first byte *)
         let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
@@ -474,8 +461,7 @@ let commands () =
             Alpha_context.Script.expr_encoding
             bytes
         with
-        | None ->
-            failwith "Could not decode bytes"
+        | None -> failwith "Could not decode bytes"
         | Some expr ->
             cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
             >>= fun () -> return_unit);
@@ -483,14 +469,14 @@ let commands () =
       ~group
       ~desc:"Ask the node to normalize a data expression."
       (args2 (unparsing_mode_arg ~default:"Readable") legacy_switch)
-      ( prefixes ["normalize"; "data"]
+      (prefixes ["normalize"; "data"]
       @@ param
            ~name:"data"
            ~desc:"the data expression to normalize"
            data_parameter
       @@ prefixes ["of"; "type"]
       @@ param ~name:"type" ~desc:"type of the data expression" data_parameter
-      @@ stop )
+      @@ stop)
       (fun (unparsing_mode, legacy) data typ cctxt ->
         Plugin.RPC.normalize_data
           cctxt
@@ -544,12 +530,12 @@ let commands () =
       ~group
       ~desc:"Ask the node to normalize a type."
       no_options
-      ( prefixes ["normalize"; "type"]
+      (prefixes ["normalize"; "type"]
       @@ param
            ~name:"typ"
            ~desc:"the Michelson type to normalize"
            data_parameter
-      @@ stop )
+      @@ stop)
       (fun () typ cctxt ->
         Plugin.RPC.normalize_type
           cctxt
@@ -571,25 +557,24 @@ let commands () =
     command
       ~group
       ~desc:
-        "Sign a raw sequence of bytes and display it using the format \
-         expected by Michelson instruction `CHECK_SIGNATURE`."
+        "Sign a raw sequence of bytes and display it using the format expected \
+         by Michelson instruction `CHECK_SIGNATURE`."
       no_options
-      ( prefixes ["sign"; "bytes"]
+      (prefixes ["sign"; "bytes"]
       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
       @@ prefixes ["for"]
-      @@ Client_keys.Secret_key.source_param @@ stop )
+      @@ Client_keys.Secret_key.source_param @@ stop)
       (fun () bytes sk cctxt ->
-        Client_keys.sign cctxt sk bytes
-        >>=? fun signature ->
-        cctxt#message "Signature: %a" Signature.pp signature
-        >>= fun () -> return_unit);
+        Client_keys.sign cctxt sk bytes >>=? fun signature ->
+        cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
+        return_unit);
     command
       ~group
       ~desc:
         "Check the signature of a byte sequence as per Michelson instruction \
          `CHECK_SIGNATURE`."
       (args1 (switch ~doc:"Use only exit codes" ~short:'q' ~long:"quiet" ()))
-      ( prefixes ["check"; "that"]
+      (prefixes ["check"; "that"]
       @@ bytes_parameter ~name:"bytes" ~desc:"the signed data"
       @@ prefixes ["was"; "signed"; "by"]
       @@ Client_keys.Public_key.alias_param ~name:"key"
@@ -598,29 +583,27 @@ let commands () =
            ~name:"signature"
            ~desc:"the signature to check"
            signature_parameter
-      @@ stop )
+      @@ stop)
       (fun quiet
            bytes
            (_, (key_locator, _))
            signature
            (cctxt : #Protocol_client_context.full) ->
-        Client_keys.check key_locator signature bytes
-        >>=? function
-        | false ->
-            cctxt#error "invalid signature"
+        Client_keys.check key_locator signature bytes >>=? function
+        | false -> cctxt#error "invalid signature"
         | true ->
             if quiet then return_unit
             else
-              cctxt#message "Signature check successful."
-              >>= fun () -> return_unit);
+              cctxt#message "Signature check successful." >>= fun () ->
+              return_unit);
     command
       ~group
       ~desc:"Ask the type of an entrypoint of a script."
       (args2 emacs_mode_switch no_print_source_flag)
-      ( prefixes ["get"; "script"; "entrypoint"; "type"; "of"]
+      (prefixes ["get"; "script"; "entrypoint"; "type"; "of"]
       @@ string ~name:"entrypoint" ~desc:"the entrypoint to describe"
       @@ prefixes ["for"]
-      @@ Program.source_param @@ stop )
+      @@ Program.source_param @@ stop)
       (fun (emacs_mode, no_print_source) entrypoint program cctxt ->
         match program with
         | (program, []) ->
@@ -660,16 +643,12 @@ let commands () =
       ~group
       ~desc:"Ask the node to list the entrypoints of a script."
       (args2 emacs_mode_switch no_print_source_flag)
-      ( prefixes ["get"; "script"; "entrypoints"; "for"]
-      @@ Program.source_param @@ stop )
+      (prefixes ["get"; "script"; "entrypoints"; "for"]
+      @@ Program.source_param @@ stop)
       (fun (emacs_mode, no_print_source) program cctxt ->
         match program with
         | (program, []) ->
-            list_entrypoints
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              program
+            list_entrypoints cctxt ~chain:cctxt#chain ~block:cctxt#block program
             >>= fun entrypoints ->
             print_entrypoints_list
               ~emacs:emacs_mode
@@ -701,8 +680,8 @@ let commands () =
         "Ask the node to list the unreachable paths in a script's parameter \
          type."
       (args2 emacs_mode_switch no_print_source_flag)
-      ( prefixes ["get"; "script"; "unreachable"; "paths"; "for"]
-      @@ Program.source_param @@ stop )
+      (prefixes ["get"; "script"; "unreachable"; "paths"; "for"]
+      @@ Program.source_param @@ stop)
       (fun (emacs_mode, no_print_source) program cctxt ->
         match program with
         | (program, []) ->
@@ -746,9 +725,8 @@ let commands () =
         >>=? fun program ->
         cctxt#message
           "%a"
-          (fun ppf () ->
-            ( Michelson_v1_printer.print_expr_unwrapped ppf program.expanded
-              : unit ))
+          (fun ppf () : unit ->
+            Michelson_v1_printer.print_expr_unwrapped ppf program.expanded)
           ()
         >>= fun () -> return_unit);
     command
@@ -756,58 +734,52 @@ let commands () =
         "Conversion of Michelson script from Micheline, JSON or binary to \
          Micheline, JSON, binary or OCaml"
       (args1 zero_loc_switch)
-      ( prefixes ["convert"; "script"]
-      @@ file_or_literal_param () @@ prefix "from"
-      @@ convert_input_format_param @@ prefix "to"
-      @@ convert_output_format_param @@ stop )
+      (prefixes ["convert"; "script"]
+      @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
+      @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun zero_loc
            expr_string
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
-        ( match from_format with
+        (match from_format with
         | `Michelson ->
             let program = Michelson_v1_parser.parse_toplevel expr_string in
             Lwt.return @@ Micheline_parser.no_parsing_error program
             >>=? fun program ->
-            typecheck_program
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              program
-            >>= (function
-                  | Error _ as res ->
-                      print_typecheck_result
-                        ~emacs:false
-                        ~show_types:true
-                        ~print_source_on_error:true
-                        program
-                        res
-                        cctxt
-                  | Ok _ ->
-                      return_unit)
+            (typecheck_program
+               cctxt
+               ~chain:cctxt#chain
+               ~block:cctxt#block
+               program
+             >>= function
+             | Error _ as res ->
+                 print_typecheck_result
+                   ~emacs:false
+                   ~show_types:true
+                   ~print_source_on_error:true
+                   program
+                   res
+                   cctxt
+             | Ok _ -> return_unit)
             >>=? fun () -> return program.expanded
         | `JSON -> (
-          match Data_encoding.Json.from_string expr_string with
-          | Error err ->
-              cctxt#error "%s" err
-          | Ok json ->
-              return
-              @@ Data_encoding.Json.destruct
-                   Alpha_context.Script.expr_encoding
-                   json )
+            match Data_encoding.Json.from_string expr_string with
+            | Error err -> cctxt#error "%s" err
+            | Ok json ->
+                return
+                @@ Data_encoding.Json.destruct
+                     Alpha_context.Script.expr_encoding
+                     json)
         | `Binary -> (
-            bytes_of_prefixed_string expr_string
-            >>=? fun bytes ->
+            bytes_of_prefixed_string expr_string >>=? fun bytes ->
             match
               Data_encoding.Binary.of_bytes_opt
                 Alpha_context.Script.expr_encoding
                 bytes
             with
-            | None ->
-                failwith "Could not decode bytes"
-            | Some expr ->
-                return expr ) )
+            | None -> failwith "Could not decode bytes"
+            | Some expr -> return expr))
         >>=? fun (expression : Alpha_context.Script.expr) ->
         let output =
           match to_format with
@@ -823,9 +795,9 @@ let commands () =
           | `Binary ->
               Format.asprintf
                 "0x%s"
-                ( Data_encoding.Binary.(
-                    to_bytes_exn Alpha_context.Script.expr_encoding expression)
-                |> Hex.of_bytes |> Hex.show )
+                (Data_encoding.Binary.(
+                   to_bytes_exn Alpha_context.Script.expr_encoding expression)
+                |> Hex.of_bytes |> Hex.show)
           | `OCaml ->
               Michelson_v1_printer.micheline_string_of_expression
                 ~zero_loc
@@ -837,10 +809,9 @@ let commands () =
         "Conversion of Micheline expression from Micheline, JSON or binary to \
          Micheline, JSON, binary or OCaml"
       (args2 zero_loc_switch data_type_arg)
-      ( prefixes ["convert"; "data"]
-      @@ file_or_literal_param () @@ prefix "from"
-      @@ convert_input_format_param @@ prefix "to"
-      @@ convert_output_format_param @@ stop )
+      (prefixes ["convert"; "data"]
+      @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
+      @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun (zero_loc, data_ty)
            data_string
            from_format
@@ -869,58 +840,46 @@ let commands () =
                    ~show_source:false
                    ?parsed:None)
                 errs
-          | Ok _gas ->
-              return data.expanded
+          | Ok _gas -> return data.expanded
         in
         let typecheck_expr ~expr ~ty =
           let data_string = micheline_of_expr expr in
           parse_expr data_string >>=? fun data -> typecheck_parsed ~data ~ty
         in
-        ( match from_format with
+        (match from_format with
         | `Michelson -> (
-            parse_expr data_string
-            >>=? fun data ->
+            parse_expr data_string >>=? fun data ->
             match data_ty with
-            | Some ty ->
-                typecheck_parsed ~data ~ty
-            | None ->
-                return data.expanded )
+            | Some ty -> typecheck_parsed ~data ~ty
+            | None -> return data.expanded)
         | `JSON -> (
-          match Data_encoding.Json.from_string data_string with
-          | Error err ->
-              cctxt#error "%s" err
-          | Ok json -> (
-              return
-              @@ Data_encoding.Json.destruct
-                   Alpha_context.Script.expr_encoding
-                   json
-              >>=? fun expr ->
-              match data_ty with
-              | None ->
-                  return expr
-              | Some ty ->
-                  typecheck_expr ~expr ~ty ) )
+            match Data_encoding.Json.from_string data_string with
+            | Error err -> cctxt#error "%s" err
+            | Ok json -> (
+                return
+                @@ Data_encoding.Json.destruct
+                     Alpha_context.Script.expr_encoding
+                     json
+                >>=? fun expr ->
+                match data_ty with
+                | None -> return expr
+                | Some ty -> typecheck_expr ~expr ~ty))
         | `Binary -> (
-            bytes_of_prefixed_string data_string
-            >>=? fun bytes ->
+            bytes_of_prefixed_string data_string >>=? fun bytes ->
             match
               Data_encoding.Binary.of_bytes_opt
                 Alpha_context.Script.expr_encoding
                 bytes
             with
-            | None ->
-                failwith "Could not decode bytes"
+            | None -> failwith "Could not decode bytes"
             | Some expr -> (
-              match data_ty with
-              | None ->
-                  return expr
-              | Some ty ->
-                  typecheck_expr ~expr ~ty ) ) )
+                match data_ty with
+                | None -> return expr
+                | Some ty -> typecheck_expr ~expr ~ty)))
         >>=? fun (expression : Alpha_context.Script.expr) ->
         let output =
           match to_format with
-          | `Michelson ->
-              micheline_of_expr expression
+          | `Michelson -> micheline_of_expr expression
           | `JSON ->
               Data_encoding.Json.(
                 construct Alpha_context.Script.expr_encoding expression
@@ -928,12 +887,13 @@ let commands () =
           | `Binary ->
               Format.asprintf
                 "0x%s"
-                ( Data_encoding.Binary.(
-                    to_bytes_exn Alpha_context.Script.expr_encoding expression)
-                |> Hex.of_bytes |> Hex.show )
+                (Data_encoding.Binary.(
+                   to_bytes_exn Alpha_context.Script.expr_encoding expression)
+                |> Hex.of_bytes |> Hex.show)
           | `OCaml ->
               Michelson_v1_printer.micheline_string_of_expression
                 ~zero_loc
                 expression
         in
-        cctxt#message "%s" output >>= fun () -> return_unit) ]
+        cctxt#message "%s" output >>= fun () -> return_unit);
+  ]

@@ -56,7 +56,8 @@ module Nonce = struct
   let info_encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Revealed"
           (obj1 (req "nonce" Nonce.encoding))
@@ -73,7 +74,8 @@ module Nonce = struct
           ~title:"Forgotten"
           empty
           (function Forgotten -> Some () | _ -> None)
-          (fun () -> Forgotten) ]
+          (fun () -> Forgotten);
+      ]
 
   module S = struct
     let get =
@@ -88,17 +90,12 @@ module Nonce = struct
     let open Services_registration in
     register1 S.get (fun ctxt raw_level () () ->
         let level = Level.from_raw ctxt raw_level in
-        Nonce.get ctxt level
-        >|= function
-        | Ok (Revealed nonce) ->
-            ok (Revealed nonce)
-        | Ok (Unrevealed {nonce_hash; _}) ->
-            ok (Missing nonce_hash)
-        | Error _ ->
-            ok Forgotten)
+        Nonce.get ctxt level >|= function
+        | Ok (Revealed nonce) -> ok (Revealed nonce)
+        | Ok (Unrevealed {nonce_hash; _}) -> ok (Missing nonce_hash)
+        | Error _ -> ok Forgotten)
 
-  let get ctxt block level =
-    RPC_context.make_call1 S.get ctxt block level () ()
+  let get ctxt block level = RPC_context.make_call1 S.get ctxt block level () ()
 end
 
 module Contract = Contract_services
@@ -114,8 +111,7 @@ module Liquidity_baking = struct
         ~description:"Liquidity baking CPMM address"
         ~query:RPC_query.empty
         ~output:Alpha_context.Contract.encoding
-        RPC_path.(
-          custom_root / "context" / "liquidity_baking" / "cpmm_address")
+        RPC_path.(custom_root / "context" / "liquidity_baking" / "cpmm_address")
   end
 
   let register () =

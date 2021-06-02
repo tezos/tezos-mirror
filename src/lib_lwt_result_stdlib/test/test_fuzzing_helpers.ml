@@ -41,11 +41,13 @@ module Fn = struct
 
   let pred =
     QCheck.oneof
-      [ lambda "(fun x _ -> x > 0)" (fun x _ -> x > 0);
+      [
+        lambda "(fun x _ -> x > 0)" (fun x _ -> x > 0);
         lambda "(fun _ y -> y < 0)" (fun _ y -> y < 0);
         lambda "(fun _ _ -> false)" (fun _ _ -> false);
         lambda "(fun _ _ -> true)" (fun _ _ -> true);
-        lambda "(fun x y -> x < y)" (fun x y -> x < y) ]
+        lambda "(fun x y -> x < y)" (fun x y -> x < y);
+      ]
 
   let basic_int =
     QCheck.(oneof [int; Gen.return 0 |> make; Gen.return 1 |> make])
@@ -69,8 +71,8 @@ module Fn = struct
   let es
       (cond, QCheck.Fun (_, pauses), QCheck.Fun (_, ok), QCheck.Fun (_, error))
       x y =
-    log_pause (pauses x y)
-    >|= fun () -> if cond x y then Ok (ok x y) else Error (error x y)
+    log_pause (pauses x y) >|= fun () ->
+    if cond x y then Ok (ok x y) else Error (error x y)
 
   let arith_es = QCheck.(map es (quad pred arith arith arith))
 end
@@ -130,7 +132,9 @@ module IteriEOf = struct
     r := fn !r (fn i y) ;
     Ok ()
 
-  let fn_e r fn i y = fn i y >>? fun z -> fn !r z >|? fun t -> r := t
+  let fn_e r fn i y =
+    fn i y >>? fun z ->
+    fn !r z >|? fun t -> r := t
 end
 
 module Iter2EOf = struct
@@ -204,7 +208,9 @@ module IteriSOf = struct
     r := fn !r (fn i y) ;
     Lwt.return_unit
 
-  let fn_s r fn i y = fn i y >>= fun z -> fn !r z >|= fun t -> r := t
+  let fn_s r fn i y =
+    fn i y >>= fun z ->
+    fn !r z >|= fun t -> r := t
 end
 
 module Iter2SOf = struct
@@ -273,8 +279,7 @@ module IterESOf = struct
   let fn_e r fn y = Lwt.return @@ fn !r y >|=? fun t -> r := t
 
   let fn_s r fn y =
-    fn !r y
-    >|= fun t ->
+    fn !r y >|= fun t ->
     r := t ;
     Ok ()
 
@@ -287,18 +292,18 @@ module IteriESOf = struct
     unit_es
 
   let fn_e r fn i y =
-    Lwt.return @@ fn i y
-    >>=? fun z -> Lwt.return @@ fn !r z >|=? fun t -> r := t
+    Lwt.return @@ fn i y >>=? fun z ->
+    Lwt.return @@ fn !r z >|=? fun t -> r := t
 
   let fn_s r fn i y =
-    fn i y
-    >>= fun z ->
-    fn !r z
-    >|= fun t ->
+    fn i y >>= fun z ->
+    fn !r z >|= fun t ->
     r := t ;
     Ok ()
 
-  let fn_es r fn i y = fn i y >>=? fun z -> fn !r z >|=? fun t -> r := t
+  let fn_es r fn i y =
+    fn i y >>=? fun z ->
+    fn !r z >|=? fun t -> r := t
 end
 
 module Iter2ESOf = struct
@@ -309,8 +314,7 @@ module Iter2ESOf = struct
   let fn_e r fn x y = Lwt.return @@ fn x y >|=? fun t -> r := t
 
   let fn_s r fn x y =
-    fn x y
-    >|= fun t ->
+    fn x y >|= fun t ->
     r := t ;
     Ok ()
 
@@ -352,10 +356,8 @@ module MapEPOf = struct
 
   let fn_e const fn elt =
     match fn const elt with
-    | Ok _ as ok ->
-        Lwt.return ok
-    | Error err ->
-        fail err
+    | Ok _ as ok -> Lwt.return ok
+    | Error err -> fail err
 
   let fn_s const fn elt = fn const elt >>= Lwt.return_ok
 
@@ -363,9 +365,9 @@ module MapEPOf = struct
     fn const elt >>= function Ok ok -> return ok | Error err -> fail err
 
   let fn_ep const fn elt =
-    fn const elt
-    >>= function
-    | Ok ok -> return ok | Error err -> fail (Support.Test_trace.make err)
+    fn const elt >>= function
+    | Ok ok -> return ok
+    | Error err -> fail (Support.Test_trace.make err)
 end
 
 module Map2ESOf = struct
@@ -409,11 +411,10 @@ let maybe = QCheck.(option int)
 let manymany =
   let open QCheck in
   oneof
-    [ map
-        ~rev:(fun (input, _) -> input)
-        (fun input -> (input, input))
-        (list int);
-      pair (list int) (list int) ]
+    [
+      map ~rev:(fun (input, _) -> input) (fun input -> (input, input)) (list int);
+      pair (list int) (list int);
+    ]
 
 (* equality and lwt/error variants *)
 
@@ -429,7 +430,10 @@ let eq ?pp a b = qcheck_eq ?pp a b
 *)
 let eq_e ?pp (a : ('a, 'trace) result) (b : ('a, 'trace) result) = eq ?pp a b
 
-let eq_s ?pp a b = Lwt_main.run (a >>= fun a -> b >|= fun b -> eq ?pp a b)
+let eq_s ?pp a b =
+  Lwt_main.run
+    ( a >>= fun a ->
+      b >|= fun b -> eq ?pp a b )
 
 (** [eq_es] is a duplicate of {!eq_s} for consistency
 
@@ -451,47 +455,37 @@ let eq_es ?pp (a : ('a, 'b) result Lwt.t) (b : ('a, 'b) result Lwt.t) =
 
 let eq_es_ep ?pp es ep =
   Lwt_main.run
-    ( es
-    >>= fun es ->
-    ep
-    >|= fun ep ->
-    match (es, ep) with
-    | (Ok ok_es, Ok ok_ep) ->
-        eq ?pp ok_es ok_ep
-    | (Error error_es, Error trace_ep) ->
-        let trace_ep_has_error_es =
-          Support.Test_trace.fold
-            (fun has error -> has || error = error_es)
-            false
-            trace_ep
-        in
-        if trace_ep_has_error_es then true
-        else
-          QCheck.Test.fail_reportf
-            "%d not in %a"
-            error_es
-            (Support.Test_trace.pp Format.pp_print_int)
-            trace_ep
-    | (Ok _, Error _) ->
-        QCheck.Test.fail_report "Ok _ is not Error _"
-    | (Error _, Ok _) ->
-        QCheck.Test.fail_report "Error _ is not Ok _" )
+    ( es >>= fun es ->
+      ep >|= fun ep ->
+      match (es, ep) with
+      | (Ok ok_es, Ok ok_ep) -> eq ?pp ok_es ok_ep
+      | (Error error_es, Error trace_ep) ->
+          let trace_ep_has_error_es =
+            Support.Test_trace.fold
+              (fun has error -> has || error = error_es)
+              false
+              trace_ep
+          in
+          if trace_ep_has_error_es then true
+          else
+            QCheck.Test.fail_reportf
+              "%d not in %a"
+              error_es
+              (Support.Test_trace.pp Format.pp_print_int)
+              trace_ep
+      | (Ok _, Error _) -> QCheck.Test.fail_report "Ok _ is not Error _"
+      | (Error _, Ok _) -> QCheck.Test.fail_report "Error _ is not Ok _" )
 
 let eq_ep ?pp a b =
   Lwt_main.run
-    ( a
-    >>= fun a ->
-    b
-    >|= fun b ->
-    match (a, b) with
-    | (Ok ok_es, Ok ok_ep) ->
-        eq ?pp ok_es ok_ep
-    | (Error _, Error _) ->
-        true (* Not as precise as we could be, but precise enough *)
-    | (Ok _, Error _) ->
-        QCheck.Test.fail_report "Ok _ is not Error _"
-    | (Error _, Ok _) ->
-        QCheck.Test.fail_report "Error _ is not Ok _" )
+    ( a >>= fun a ->
+      b >|= fun b ->
+      match (a, b) with
+      | (Ok ok_es, Ok ok_ep) -> eq ?pp ok_es ok_ep
+      | (Error _, Error _) ->
+          true (* Not as precise as we could be, but precise enough *)
+      | (Ok _, Error _) -> QCheck.Test.fail_report "Ok _ is not Error _"
+      | (Error _, Ok _) -> QCheck.Test.fail_report "Error _ is not Ok _" )
 
 module PP = struct
   let int = Format.pp_print_int

@@ -38,14 +38,10 @@ type t =
 
 let pp ppf motive =
   match motive with
-  | No_motive ->
-      Format.fprintf ppf "No motive"
-  | Too_many_connections ->
-      Format.fprintf ppf "Too many connections"
-  | Already_connected ->
-      Format.fprintf ppf "Already connected/connecting"
-  | Unknown_chain_name ->
-      Format.fprintf ppf "Unknown chain name"
+  | No_motive -> Format.fprintf ppf "No motive"
+  | Too_many_connections -> Format.fprintf ppf "Too many connections"
+  | Already_connected -> Format.fprintf ppf "Already connected/connecting"
+  | Unknown_chain_name -> Format.fprintf ppf "Unknown chain name"
   | Deprecated_distributed_db_version ->
       Format.fprintf ppf "Running a deprecated distributed db version"
   | Deprecated_p2p_version ->
@@ -55,18 +51,13 @@ let pp ppf motive =
 
 let pp_short ppf motive =
   match motive with
-  | No_motive ->
-      Format.fprintf ppf "No motive"
-  | Too_many_connections ->
-      Format.fprintf ppf "Too many connections"
-  | Already_connected ->
-      Format.fprintf ppf "Already connected"
-  | Unknown_chain_name ->
-      Format.fprintf ppf "Unknown chain name"
+  | No_motive -> Format.fprintf ppf "No motive"
+  | Too_many_connections -> Format.fprintf ppf "Too many connections"
+  | Already_connected -> Format.fprintf ppf "Already connected"
+  | Unknown_chain_name -> Format.fprintf ppf "Unknown chain name"
   | Deprecated_distributed_db_version ->
       Format.fprintf ppf "Deprecated ddb version"
-  | Deprecated_p2p_version ->
-      Format.fprintf ppf "Deprecated p2p version"
+  | Deprecated_p2p_version -> Format.fprintf ppf "Deprecated p2p version"
   | Unknown_motive error_code ->
       Format.fprintf ppf "unknown code (%i)" error_code
 
@@ -74,35 +65,21 @@ let encoding =
   let open Data_encoding in
   conv
     (function
-      | No_motive ->
-          0
-      | Too_many_connections ->
-          1
-      | Unknown_chain_name ->
-          2
-      | Deprecated_p2p_version ->
-          3
-      | Deprecated_distributed_db_version ->
-          4
-      | Already_connected ->
-          5
-      | Unknown_motive error_code ->
-          error_code)
+      | No_motive -> 0
+      | Too_many_connections -> 1
+      | Unknown_chain_name -> 2
+      | Deprecated_p2p_version -> 3
+      | Deprecated_distributed_db_version -> 4
+      | Already_connected -> 5
+      | Unknown_motive error_code -> error_code)
     (function
-      | 0 ->
-          No_motive
-      | 1 ->
-          Too_many_connections
-      | 2 ->
-          Unknown_chain_name
-      | 3 ->
-          Deprecated_p2p_version
-      | 4 ->
-          Deprecated_distributed_db_version
-      | 5 ->
-          Already_connected
-      | error_code ->
-          Unknown_motive error_code)
+      | 0 -> No_motive
+      | 1 -> Too_many_connections
+      | 2 -> Unknown_chain_name
+      | 3 -> Deprecated_p2p_version
+      | 4 -> Deprecated_distributed_db_version
+      | 5 -> Already_connected
+      | error_code -> Unknown_motive error_code)
     Data_encoding.int16
 
 type error += Rejecting of {motive : t}

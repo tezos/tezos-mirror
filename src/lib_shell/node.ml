@@ -56,33 +56,24 @@ let connection_metadata_cfg cfg : _ P2p_params.conn_meta_config =
 let init_connection_metadata opt disable_mempool =
   let open Connection_metadata in
   match opt with
-  | None ->
-      {disable_mempool = false; private_node = false}
-  | Some c ->
-      {disable_mempool; private_node = c.P2p.private_mode}
+  | None -> {disable_mempool = false; private_node = false}
+  | Some c -> {disable_mempool; private_node = c.P2p.private_mode}
 
 let init_p2p chain_name p2p_params disable_mempool =
   let message_cfg = Distributed_db_message.cfg chain_name in
   match p2p_params with
   | None ->
       let c_meta = init_connection_metadata None disable_mempool in
-      Node_event.(emit p2p_event) "p2p_layer_disabled"
-      >>= fun () ->
+      Node_event.(emit p2p_event) "p2p_layer_disabled" >>= fun () ->
       return (P2p.faked_network message_cfg peer_metadata_cfg c_meta)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) disable_mempool in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
-      Node_event.(emit p2p_event) "bootstrapping"
-      >>= fun () ->
-      P2p.create
-        ~config
-        ~limits
-        peer_metadata_cfg
-        conn_metadata_cfg
-        message_cfg
+      Node_event.(emit p2p_event) "bootstrapping" >>= fun () ->
+      P2p.create ~config ~limits peer_metadata_cfg conn_metadata_cfg message_cfg
       >>=? fun p2p ->
-      Node_event.(emit p2p_event) "p2p_maintain_started"
-      >>= fun () -> return p2p
+      Node_event.(emit p2p_event) "p2p_maintain_started" >>= fun () ->
+      return p2p
 
 type config = {
   genesis : Genesis.t;
@@ -149,43 +140,42 @@ let default_chain_validator_limits =
 let test_protocol_hashes =
   List.map
     (fun s -> Protocol_hash.of_b58check_exn s)
-    [ "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
+    [
+      "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
       "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT";
       "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp";
-      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ]
+      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
+    ]
 
 let store_known_protocols store =
   let embedded_protocols = Registered_protocol.seq_embedded () in
   Seq.iter_s
     (fun protocol_hash ->
       match Store.Protocol.mem store protocol_hash with
-      | true ->
-          Node_event.(emit store_protocol_already_included) protocol_hash
+      | true -> Node_event.(emit store_protocol_already_included) protocol_hash
       | false -> (
-        match Registered_protocol.get_embedded_sources protocol_hash with
-        | None ->
-            Node_event.(emit store_protocol_missing_files) protocol_hash
-        | Some protocol -> (
-            let hash = Protocol.hash protocol in
-            if not (Protocol_hash.equal hash protocol_hash) then
-              if
-                List.mem
-                  ~equal:Protocol_hash.equal
-                  protocol_hash
-                  test_protocol_hashes
-              then Lwt.return_unit
-                (* noop. test protocol should not be stored *)
+          match Registered_protocol.get_embedded_sources protocol_hash with
+          | None -> Node_event.(emit store_protocol_missing_files) protocol_hash
+          | Some protocol -> (
+              let hash = Protocol.hash protocol in
+              if not (Protocol_hash.equal hash protocol_hash) then
+                if
+                  List.mem
+                    ~equal:Protocol_hash.equal
+                    protocol_hash
+                    test_protocol_hashes
+                then Lwt.return_unit
+                  (* noop. test protocol should not be stored *)
+                else
+                  Node_event.(emit store_protocol_incorrect_hash) protocol_hash
               else
-                Node_event.(emit store_protocol_incorrect_hash) protocol_hash
-            else
-              Store.Protocol.store store hash protocol
-              >>= function
-              | Some hash' ->
-                  assert (hash = hash') ;
-                  Node_event.(emit store_protocol_success) protocol_hash
-              | None ->
-                  Node_event.(emit store_protocol_already_included)
-                    protocol_hash ) ))
+                Store.Protocol.store store hash protocol >>= function
+                | Some hash' ->
+                    assert (hash = hash') ;
+                    Node_event.(emit store_protocol_success) protocol_hash
+                | None ->
+                    Node_event.(emit store_protocol_already_included)
+                      protocol_hash)))
     embedded_protocols
 
 type error += Non_recoverable_context
@@ -208,19 +198,18 @@ let () =
 
 let check_context_consistency store =
   let main_chain_store = Store.main_chain_store store in
-  Store.Chain.current_head main_chain_store
-  >>= fun block ->
-  Store.Block.context_exists main_chain_store block
-  >>= function
+  Store.Chain.current_head main_chain_store >>= fun block ->
+  Store.Block.context_exists main_chain_store block >>= function
   | true ->
-      Node_event.(emit storage_context_already_consistent ())
-      >>= fun () -> return_unit
+      Node_event.(emit storage_context_already_consistent ()) >>= fun () ->
+      return_unit
   | false ->
-      Node_event.(emit storage_corrupted_context_detected ())
-      >>= fun () -> fail Non_recoverable_context
+      Node_event.(emit storage_corrupted_context_detected ()) >>= fun () ->
+      fail Non_recoverable_context
 
 let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
-    { genesis;
+    {
+      genesis;
       chain_name;
       sandboxed_chain_name;
       user_activated_upgrades;
@@ -233,14 +222,13 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       p2p = p2p_params;
       target;
       disable_mempool;
-      enable_testchain } peer_validator_limits block_validator_limits
-    prevalidator_limits chain_validator_limits history_mode =
+      enable_testchain;
+    } peer_validator_limits block_validator_limits prevalidator_limits
+    chain_validator_limits history_mode =
   let (start_prevalidator, start_testchain) =
     match p2p_params with
-    | Some _ ->
-        (not disable_mempool, enable_testchain)
-    | None ->
-        (true, true)
+    | Some _ -> (not disable_mempool, enable_testchain)
+    | None -> (true, true)
   in
   init_p2p
     (if sandboxed then sandboxed_chain_name else chain_name)
@@ -289,16 +277,14 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       genesis
     >>=? fun store -> return (validator_process, store))
   >>=? fun (validator_process, store) ->
-  check_context_consistency store
-  >>=? fun () ->
+  check_context_consistency store >>=? fun () ->
   let main_chain_store = Store.main_chain_store store in
   Option.iter_es
     (fun target_descr -> Store.Chain.set_target main_chain_store target_descr)
     target
   >>=? fun () ->
   let distributed_db = Distributed_db.create store p2p in
-  store_known_protocols store
-  >>= fun () ->
+  store_known_protocols store >>= fun () ->
   Validator.create
     store
     distributed_db
@@ -317,20 +303,14 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
   >>=? fun mainchain_validator ->
   let shutdown () =
     (* Shutdown workers in the reverse order of creation *)
-    Node_event.(emit shutdown_validator) ()
-    >>= fun () ->
-    Validator.shutdown validator
-    >>= fun () ->
-    Node_event.(emit shutdown_ddb) ()
-    >>= fun () ->
-    Distributed_db.shutdown distributed_db
-    >>= fun () ->
-    Node_event.(emit shutdown_store) ()
-    >>= fun () ->
-    Store.close_store store
-    >>= fun _ ->
-    Node_event.(emit shutdown_p2p_layer) ()
-    >>= fun () -> P2p.shutdown p2p >>= fun () -> Lwt.return_unit
+    Node_event.(emit shutdown_validator) () >>= fun () ->
+    Validator.shutdown validator >>= fun () ->
+    Node_event.(emit shutdown_ddb) () >>= fun () ->
+    Distributed_db.shutdown distributed_db >>= fun () ->
+    Node_event.(emit shutdown_store) () >>= fun () ->
+    Store.close_store store >>= fun _ ->
+    Node_event.(emit shutdown_p2p_layer) () >>= fun () ->
+    P2p.shutdown p2p >>= fun () -> Lwt.return_unit
   in
   return
     {
@@ -364,8 +344,7 @@ let build_rpc_directory node =
   merge
     (Chain_directory.build_rpc_directory
        ~user_activated_upgrades:node.user_activated_upgrades
-       ~user_activated_protocol_overrides:
-         node.user_activated_protocol_overrides
+       ~user_activated_protocol_overrides:node.user_activated_protocol_overrides
        node.validator) ;
   merge (P2p_directory.build_rpc_directory node.p2p) ;
   merge (Worker_directory.build_rpc_directory node.store) ;
@@ -373,8 +352,7 @@ let build_rpc_directory node =
   merge
     (Config_directory.build_rpc_directory
        ~user_activated_upgrades:node.user_activated_upgrades
-       ~user_activated_protocol_overrides:
-         node.user_activated_protocol_overrides) ;
+       ~user_activated_protocol_overrides:node.user_activated_protocol_overrides) ;
   merge (Version_directory.rpc_directory node.p2p) ;
   register0 RPC_service.error_service (fun () () ->
       return (Data_encoding.Json.schema Error_monad.error_encoding)) ;

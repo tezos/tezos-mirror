@@ -50,10 +50,8 @@ module Secretbox = struct
     let cmsglen = Bytes.length cmsg in
     let msg = Bytes.create (cmsglen - tagbytes) in
     match secretbox_open ~key ~nonce ~cmsg ~msg with
-    | false ->
-        None
-    | true ->
-        Some msg
+    | false -> None
+    | true -> Some msg
 end
 
 module Public_key_hash =
@@ -172,12 +170,12 @@ let rec generate_proof_of_work ?(yield_every = 10000) ?max pk pow_target =
   let open Lwt.Infix in
   match max with
   | None -> (
-    try
-      let pow = generate_proof_of_work_n_attempts yield_every pk pow_target in
-      Lwt.return pow
-    with Not_found ->
-      Lwt.pause ()
-      >>= fun () -> generate_proof_of_work ~yield_every pk pow_target )
+      try
+        let pow = generate_proof_of_work_n_attempts yield_every pk pow_target in
+        Lwt.return pow
+      with Not_found ->
+        Lwt.pause () >>= fun () ->
+        generate_proof_of_work ~yield_every pk pow_target)
   | Some max -> (
       if max <= 0 then Lwt.apply raise Not_found
       else
@@ -186,10 +184,9 @@ let rec generate_proof_of_work ?(yield_every = 10000) ?max pk pow_target =
           let pow = generate_proof_of_work_n_attempts attempts pk pow_target in
           Lwt.return pow
         with Not_found ->
-          Lwt.pause ()
-          >>= fun () ->
+          Lwt.pause () >>= fun () ->
           let max = max - attempts in
-          generate_proof_of_work ~yield_every ~max pk pow_target )
+          generate_proof_of_work ~yield_every ~max pk pow_target)
 
 let public_key_to_bytes pk = Bytes.copy (Box.unsafe_to_bytes pk)
 

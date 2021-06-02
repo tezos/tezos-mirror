@@ -32,9 +32,9 @@ type t = {
   mutable worker : unit Lwt.t;
   request : unit Lwt_condition.t;
   mutable pending :
-    ( Protocol.t
+    (Protocol.t
     * Registered_protocol.t tzresult Lwt.t
-    * Registered_protocol.t tzresult Lwt.u )
+    * Registered_protocol.t tzresult Lwt.u)
     Protocol_hash.Map.t;
   canceler : Lwt_canceler.t;
 }
@@ -42,39 +42,34 @@ type t = {
 (** Block validation *)
 
 let rec worker_loop bv =
-  ( match Protocol_hash.Map.choose bv.pending with
-  | None ->
-      Lwt_condition.wait bv.request >>= return
+  (match Protocol_hash.Map.choose bv.pending with
+  | None -> Lwt_condition.wait bv.request >>= return
   | Some (hash, (protocol, _, wakener)) ->
       bv.pending <- Protocol_hash.Map.remove hash bv.pending ;
-      Updater.compile hash protocol
-      >>= fun valid ->
+      Updater.compile hash protocol >>= fun valid ->
       if valid then (
-        Distributed_db.commit_protocol bv.db hash protocol
-        >>=? fun _ ->
-        ( match Registered_protocol.get hash with
-        | Some protocol ->
-            Lwt.wakeup_later wakener (Ok protocol)
+        Distributed_db.commit_protocol bv.db hash protocol >>=? fun _ ->
+        (match Registered_protocol.get hash with
+        | Some protocol -> Lwt.wakeup_later wakener (Ok protocol)
         | None ->
             Lwt.wakeup_later
               wakener
-              (error (Invalid_protocol {hash; error = Dynlinking_failed})) ) ;
-        return_unit )
+              (error (Invalid_protocol {hash; error = Dynlinking_failed}))) ;
+        return_unit)
       else (
         (* no need to tag 'invalid' protocol on disk, the economic protocol
-         prevents us from being spammed with protocol validation. *)
+           prevents us from being spammed with protocol validation. *)
         Lwt.wakeup_later
           wakener
           (error (Invalid_protocol {hash; error = Compilation_failed})) ;
-        return_unit ) )
+        return_unit))
   >>= function
-  | Ok () ->
-      worker_loop bv
+  | Ok () -> worker_loop bv
   | Error (Canceled :: _) | Error (Exn Lwt_pipe.Closed :: _) ->
       Event.(emit validator_terminated) ()
   | Error err ->
-      Event.(emit unexpected_worker_error) err
-      >>= fun () -> Error_monad.cancel_with_exceptions bv.canceler
+      Event.(emit unexpected_worker_error) err >>= fun () ->
+      Error_monad.cancel_with_exceptions bv.canceler
 
 let create db =
   let canceler = Lwt_canceler.create () in
@@ -111,22 +106,17 @@ let validate state hash protocol =
             Protocol_hash.Map.add hash (protocol, res, wakener) state.pending ;
           if broadcast then Lwt_condition.broadcast state.request () ;
           res
-      | Some (_, res, _) ->
-          res )
+      | Some (_, res, _) -> res)
 
 let fetch_and_compile_protocol pv ?peer ?timeout hash =
   match Registered_protocol.get hash with
-  | Some proto ->
-      return proto
+  | Some proto -> return proto
   | None ->
-      Distributed_db.Protocol.read_opt pv.db hash
-      >>= (function
-            | Some protocol ->
-                return protocol
-            | None ->
-                Event.(emit fetching_protocol) (hash, peer)
-                >>= fun () ->
-                Distributed_db.Protocol.fetch pv.db ?peer ?timeout hash ())
+      (Distributed_db.Protocol.read_opt pv.db hash >>= function
+       | Some protocol -> return protocol
+       | None ->
+           Event.(emit fetching_protocol) (hash, peer) >>= fun () ->
+           Distributed_db.Protocol.fetch pv.db ?peer ?timeout hash ())
       >>=? fun protocol ->
       validate pv hash protocol >>=? fun proto -> return proto
 
@@ -134,24 +124,21 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block : Store.Block.t) =
   let protocol_level = Store.Block.proto_level block in
   let hash = Store.Block.hash block in
   let state = Distributed_db.store pv.db in
-  Store.all_chain_stores state
-  >>= fun chain_stores ->
+  Store.all_chain_stores state >>= fun chain_stores ->
   Lwt_utils.find_map_s
     (fun chain_store ->
-      Store.Block.is_known chain_store hash
-      >>= function
-      | false -> Lwt.return_none | true -> Lwt.return_some chain_store)
+      Store.Block.is_known chain_store hash >>= function
+      | false -> Lwt.return_none
+      | true -> Lwt.return_some chain_store)
     chain_stores
   >>= function
   | None ->
       failwith
         "protocol_validator.fetch_and_compile_protocols: chain state not found"
   | Some chain_store ->
-      Store.Block.context chain_store block
-      >>=? fun context ->
+      Store.Block.context chain_store block >>=? fun context ->
       let protocol =
-        Context.get_protocol context
-        >>= fun protocol_hash ->
+        Context.get_protocol context >>= fun protocol_hash ->
         fetch_and_compile_protocol pv ?peer ?timeout protocol_hash
         >>=? fun _p ->
         Store.Chain.may_update_protocol_level
@@ -159,25 +146,18 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block : Store.Block.t) =
           ~protocol_level
           (block, protocol_hash)
       and test_protocol =
-        Context.get_test_chain context
-        >>= function
-        | Not_running ->
-            return_unit
+        Context.get_test_chain context >>= function
+        | Not_running -> return_unit
         | Forking {protocol; _} | Running {protocol; _} -> (
-            fetch_and_compile_protocol pv ?peer ?timeout protocol
-            >>=? fun _ ->
-            Store.Chain.testchain chain_store
-            >>= function
-            | None ->
-                return_unit
+            fetch_and_compile_protocol pv ?peer ?timeout protocol >>=? fun _ ->
+            Store.Chain.testchain chain_store >>= function
+            | None -> return_unit
             | Some test_chain ->
-                let test_chain_store =
-                  Store.Chain.testchain_store test_chain
-                in
+                let test_chain_store = Store.Chain.testchain_store test_chain in
                 Store.Chain.may_update_protocol_level
                   test_chain_store
                   ~protocol_level
                   (block, protocol)
-                >>=? fun () -> return_unit )
+                >>=? fun () -> return_unit)
       in
       protocol >>=? fun () -> test_protocol

@@ -40,10 +40,7 @@ val create : unit -> 'key t
 
 (** Register a single key accessor at a given path. *)
 val register_value :
-  'key t ->
-  get:('key -> 'a option tzresult Lwt.t) ->
-  'a Data_encoding.t ->
-  unit
+  'key t -> get:('key -> 'a option tzresult Lwt.t) -> 'a Data_encoding.t -> unit
 
 (** Return a description for a prefixed fragment of the given context.
     All keys registered in the subcontext will be shared by the external

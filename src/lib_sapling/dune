@@ -16,9 +16,3 @@
                    -open Tezos_crypto
                    -open Tezos_error_monad
                    -open Tezos_error_monad.TzLwtreslib)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
-  ;; Must ignore the files created by ctypes
- (action (run %{lib:tezos-tooling:lint.sh} %{deps} --ignore rustzcash_ctypes_bindings.ml rustzcash_ctypes_stubs.ml)))

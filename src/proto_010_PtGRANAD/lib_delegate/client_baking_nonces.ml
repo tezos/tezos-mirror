@@ -71,27 +71,23 @@ let remove_all nonces nonces_to_remove =
     nonces
 
 let get_block_level_opt cctxt ~chain ~block =
-  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
-  >>= function
-  | Ok {level; _} ->
-      Lwt.return_some level
+  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block () >>= function
+  | Ok {level; _} -> Lwt.return_some level
   | Error errs ->
       Events.(emit cannot_retrieve_block_header)
         (Block_services.to_string block, errs)
       >>= fun () -> Lwt.return_none
 
 let get_outdated_nonces cctxt ?constants ~chain nonces =
-  ( match constants with
+  (match constants with
+  | None -> Alpha_services.Constants.all cctxt (chain, `Head 0)
+  | Some constants -> return constants)
+  >>=? fun {Constants.parametric = {blocks_per_cycle; preserved_cycles; _}; _}
+    ->
+  get_block_level_opt cctxt ~chain ~block:(`Head 0) >>= function
   | None ->
-      Alpha_services.Constants.all cctxt (chain, `Head 0)
-  | Some constants ->
-      return constants )
-  >>=? fun {Constants.parametric = {blocks_per_cycle; preserved_cycles; _}; _} ->
-  get_block_level_opt cctxt ~chain ~block:(`Head 0)
-  >>= function
-  | None ->
-      Events.(emit cannot_retrieve_head_level) ()
-      >>= fun () -> return (empty, empty)
+      Events.(emit cannot_retrieve_head_level) () >>= fun () ->
+      return (empty, empty)
   | Some current_level ->
       let current_cycle = Int32.(div current_level blocks_per_cycle) in
       let is_older_than_preserved_cycles block_level =
@@ -100,16 +96,13 @@ let get_outdated_nonces cctxt ?constants ~chain nonces =
       in
       Block_hash.Map.fold
         (fun hash nonce acc ->
-          acc
-          >>=? fun (orphans, outdated) ->
-          get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0))
-          >>= function
+          acc >>=? fun (orphans, outdated) ->
+          get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
           | Some level ->
               if is_older_than_preserved_cycles level then
                 return (orphans, add outdated hash nonce)
               else acc
-          | None ->
-              return (add orphans hash nonce, outdated))
+          | None -> return (add orphans hash nonce, outdated))
         nonces
         (return (empty, empty))
 
@@ -117,10 +110,10 @@ let filter_outdated_nonces cctxt ?constants location nonces =
   let chain = Client_baking_files.chain location in
   get_outdated_nonces cctxt ?constants ~chain nonces
   >>=? fun (orphans, outdated_nonces) ->
-  ( if Block_hash.Map.cardinal orphans >= 50 then
-    Events.(emit too_many_orphans) (Client_baking_files.filename location)
-    >>= fun () -> Lwt.return_unit
-  else Lwt.return_unit )
+  (if Block_hash.Map.cardinal orphans >= 50 then
+   Events.(emit too_many_orphans) (Client_baking_files.filename location)
+   >>= fun () -> Lwt.return_unit
+  else Lwt.return_unit)
   >>= fun () -> return (remove_all nonces outdated_nonces)
 
 let get_unrevealed_nonces cctxt location nonces =
@@ -135,25 +128,20 @@ let get_unrevealed_nonces cctxt location nonces =
   List.filter_map_es
     (fun hash ->
       match find_opt nonces hash with
-      | None ->
-          return_none
+      | None -> return_none
       | Some nonce -> (
-          get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0))
-          >>= function
+          get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
           | Some level -> (
               Environment.wrap_tzresult (Raw_level.of_int32 level)
               >>?= fun level ->
               Alpha_services.Nonce.get cctxt (chain, `Head 0) level
               >>=? function
               | Missing nonce_hash when Nonce.check_hash nonce nonce_hash ->
-                  Events.(emit found_nonce) (hash, level)
-                  >>= fun () -> return_some (level, nonce)
+                  Events.(emit found_nonce) (hash, level) >>= fun () ->
+                  return_some (level, nonce)
               | Missing _nonce_hash ->
                   Events.(emit bad_nonce) level >>= fun () -> return_none
-              | Forgotten ->
-                  return_none
-              | Revealed _ ->
-                  return_none )
-          | None ->
-              return_none ))
+              | Forgotten -> return_none
+              | Revealed _ -> return_none)
+          | None -> return_none))
     blocks

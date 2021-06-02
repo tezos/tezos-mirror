@@ -187,10 +187,8 @@ module Event = struct
 
   let fix_cementing_highwatermark =
     let option_pp ~default pp fmt = function
-      | None ->
-          Format.fprintf fmt "%s" default
-      | Some x ->
-          Format.fprintf fmt "%a" pp x
+      | None -> Format.fprintf fmt "%s" default
+      | Some x -> Format.fprintf fmt "%a" pp x
     in
     declare_1
       ~section
@@ -264,7 +262,6 @@ module Event = struct
       ~section
       ~level:Internal_event.Error
       ~name:"notify_merge_error"
-      ~msg:
-        "store merge has failed, restart the node to restore the consistency"
+      ~msg:"store merge has failed, restart the node to restore the consistency"
       ()
 end

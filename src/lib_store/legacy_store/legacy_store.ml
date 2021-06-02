@@ -187,12 +187,14 @@ module Block = struct
         let encoding =
           let open Data_encoding in
           conv
-            (fun { header;
+            (fun {
+                   header;
                    message;
                    max_operations_ttl;
                    last_allowed_fork_level;
                    context;
-                   metadata } ->
+                   metadata;
+                 } ->
               ( message,
                 max_operations_ttl,
                 last_allowed_fork_level,
@@ -327,8 +329,8 @@ module Block = struct
     Base58.register_resolver Block_hash.b58check_encoding (fun str ->
         let pstr = Block_hash.prefix_path str in
         Chain.Indexed_store.fold_indexes s ~init:[] ~f:(fun chain acc ->
-            Indexed_store.resolve_index (s, chain) pstr
-            >>= fun l -> Lwt.return (List.rev_append l acc)))
+            Indexed_store.resolve_index (s, chain) pstr >>= fun l ->
+            Lwt.return (List.rev_append l acc)))
 
   module Predecessors =
     Store_helpers.Make_map
@@ -455,8 +457,10 @@ module Protocol = struct
 end
 
 let init ?readonly ?mapsize dir =
-  Raw_store.init ?readonly ?mapsize dir
-  >>=? fun s -> Block.register s ; Protocol.register s ; return s
+  Raw_store.init ?readonly ?mapsize dir >>=? fun s ->
+  Block.register s ;
+  Protocol.register s ;
+  return s
 
 let close = Raw_store.close
 

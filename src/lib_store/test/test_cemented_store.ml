@@ -43,32 +43,26 @@ let assert_presence_in_cemented_store ?(with_metadata = true) cemented_store
       | Some b' ->
           if with_metadata then (
             Assert.equal ~msg:"block equality with metadata" b b' ;
-            return_unit )
+            return_unit)
           else (
             Assert.equal_block
               ~msg:"block equality without metadata"
               (Block_repr.header b)
               (Block_repr.header b') ;
-            return_unit ))
+            return_unit))
     blocks
 
 let test_cement_pruned_blocks cemented_store =
   make_raw_block_list ~kind:`Pruned (genesis_hash, -1l) 4095
   >>= fun (blocks, _head) ->
-  Cemented_block_store.cement_blocks
-    cemented_store
-    ~write_metadata:false
-    blocks
+  Cemented_block_store.cement_blocks cemented_store ~write_metadata:false blocks
   >>=? fun () ->
   assert_presence_in_cemented_store ~with_metadata:true cemented_store blocks
 
 let test_cement_full_blocks cemented_store =
   make_raw_block_list ~kind:`Full (genesis_hash, -1l) 4095
   >>= fun (blocks, _head) ->
-  Cemented_block_store.cement_blocks
-    cemented_store
-    ~write_metadata:false
-    blocks
+  Cemented_block_store.cement_blocks cemented_store ~write_metadata:false blocks
   >>=? fun () ->
   assert_presence_in_cemented_store ~with_metadata:false cemented_store blocks
 
@@ -87,13 +81,11 @@ let wrap_cemented_store_test (name, f) =
         run (fun base_dir ->
             let store_dir = Naming.store_dir ~dir_path:base_dir in
             let chain_dir = Naming.chain_dir store_dir Chain_id.zero in
-            Lwt_unix.mkdir (Naming.dir_path chain_dir) 0o700
-            >>= fun () ->
+            Lwt_unix.mkdir (Naming.dir_path chain_dir) 0o700 >>= fun () ->
             Cemented_block_store.init ~readonly:false chain_dir
             >>=? fun cemented_store ->
             Error_monad.protect (fun () ->
-                f cemented_store
-                >>=? fun () ->
+                f cemented_store >>=? fun () ->
                 Cemented_block_store.close cemented_store ;
                 return_unit))
         >>= function
@@ -103,8 +95,7 @@ let wrap_cemented_store_test (name, f) =
               Error_monad.pp_print_error
               err ;
             Lwt.fail Alcotest.Test_error
-        | Ok () ->
-            Lwt.return_unit)
+        | Ok () -> Lwt.return_unit)
   in
   Alcotest_lwt.test_case name `Quick (cemented_store_init f)
 
@@ -112,8 +103,10 @@ let tests =
   let test_cases =
     List.map
       wrap_cemented_store_test
-      [ ("cementing pruned blocks", test_cement_pruned_blocks);
+      [
+        ("cementing pruned blocks", test_cement_pruned_blocks);
         ("cementing full blocks", test_cement_full_blocks);
-        ("retrieve cemented metadata", test_metadata_retrieval) ]
+        ("retrieve cemented metadata", test_metadata_retrieval);
+      ]
   in
   ("cemented store", test_cases)

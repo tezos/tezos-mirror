@@ -49,35 +49,26 @@ module Acl = struct
     point1.addr = point2.addr && point1.port = point2.port
 
   let rec put_policy (addr, acl) = function
-    | [] ->
-        [(addr, acl)]
+    | [] -> [(addr, acl)]
     | (a, _) :: policy when match_address_and_port addr a ->
         (addr, acl) :: policy
-    | entry :: policy ->
-        entry :: put_policy (addr, acl) policy
+    | entry :: policy -> entry :: put_policy (addr, acl) policy
 
   (* FIXME (https://gitlab.com/tezos/tezos/-/issues/1320).
      Use resto functions instead.
   *)
   let meth_to_string = function
-    | Any ->
-        ""
-    | Exact `GET ->
-        "GET"
-    | Exact `PUT ->
-        "PUT"
-    | Exact `POST ->
-        "POST"
-    | Exact `PATCH ->
-        "PATCH"
-    | Exact `DELETE ->
-        "DELETE"
+    | Any -> ""
+    | Exact `GET -> "GET"
+    | Exact `PUT -> "PUT"
+    | Exact `POST -> "POST"
+    | Exact `PATCH -> "PATCH"
+    | Exact `DELETE -> "DELETE"
 
   let escaped_asterisk_seq = String.to_seq "%2A"
 
   let chunk_to_string = function
-    | Wildcard ->
-        "*"
+    | Wildcard -> "*"
     | Literal l ->
         let s = Uri.pct_encode l in
         if String.contains s '*' then
@@ -92,13 +83,10 @@ module Acl = struct
     "/" ^ String.concat "/" (List.map chunk_to_string l)
 
   let path_to_string = function
-    | FollowedByAnySuffix l ->
-        chunk_list_to_string l ^ "/**"
-    | Exact l ->
-        chunk_list_to_string l
+    | FollowedByAnySuffix l -> chunk_list_to_string l ^ "/**"
+    | Exact l -> chunk_list_to_string l
 
-  let matcher_to_string {meth; path} =
-    meth_to_string meth ^ path_to_string path
+  let matcher_to_string {meth; path} = meth_to_string meth ^ path_to_string path
 
   let matcher_encoding : matcher Data_encoding.t =
     let open Data_encoding in
@@ -109,8 +97,7 @@ module Acl = struct
     let open P2p_point.Id in
     let parse str =
       match parse_addr_port_id str with
-      | Ok endpoint ->
-          endpoint
+      | Ok endpoint -> endpoint
       | Error e ->
           raise
             (Invalid_argument
@@ -122,7 +109,8 @@ module Acl = struct
     let open Data_encoding in
     list
     @@ union
-         [ case
+         [
+           case
              ~title:"Whitelist"
              (Tag 0)
              (obj2
@@ -139,7 +127,8 @@ module Acl = struct
                 (req "blacklist" @@ list matcher_encoding))
              (function
                | (addr, Allow_all {except}) -> Some (addr, except) | _ -> None)
-             (fun (addr, except) -> (addr, Allow_all {except})) ]
+             (fun (addr, except) -> (addr, Allow_all {except}));
+         ]
 
   let policy_to_string policy =
     let open Data_encoding in
@@ -149,16 +138,12 @@ module Acl = struct
     let match_addr searched_port searched_addr (endpoint, acl) =
       let open P2p_point.Id in
       match (endpoint.addr = searched_addr, endpoint.port, searched_port) with
-      | (true, None, _) ->
-          Some acl
+      | (true, None, _) -> Some acl
       | (true, Some port, Some searched_port) when port = searched_port ->
           Some acl
-      | _ ->
-          None
+      | _ -> None
     in
     match P2p_point.Id.parse_addr_port_id address with
-    | Error _ ->
-        None
-    | Ok {addr; port; _} ->
-        List.find_map (match_addr port addr) policies
+    | Error _ -> None
+    | Ok {addr; port; _} -> List.find_map (match_addr port addr) policies
 end

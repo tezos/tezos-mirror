@@ -105,12 +105,9 @@ module Make_Storage (C : Core_sig.Validator) = struct
     let get_root_height tree height =
       assert (Compare.Int.(height >= 0 && height <= 32)) ;
       match tree with
-      | Empty ->
-          H.uncommitted ~height
-      | Node (h, _, _) ->
-          h
-      | Leaf h ->
-          H.of_commitment h
+      | Empty -> H.uncommitted ~height
+      | Node (h, _, _) -> h
+      | Leaf h -> H.of_commitment h
 
     let pow2 h = Int64.(shift_left 1L h)
 
@@ -119,8 +116,7 @@ module Make_Storage (C : Core_sig.Validator) = struct
       if Compare.Int64.(n = 0L) then ([], l)
       else
         match l with
-        | [] ->
-            ([], l)
+        | [] -> ([], l)
         | x :: xs ->
             let (l1, l2) = split_at Int64.(pred n) xs in
             (x :: l1, l2)
@@ -144,20 +140,16 @@ module Make_Storage (C : Core_sig.Validator) = struct
       assert (Compare.Int64.(pos >= 0L && pos <= pow2 height)) ;
       assert (Compare.Int.(height >= 0 && height <= 32)) ;
       match (tree, height, cms) with
-      | (_, _, []) ->
-          tree
-      | (Empty, 0, [cm]) ->
-          Leaf cm
+      | (_, _, []) -> tree
+      | (Empty, 0, [cm]) -> Leaf cm
       | (Leaf _, _, _)
       (* The second conjuntion of the precondition is violated by a Leaf (which
          is already full) and a non empty cms. *)
       | (_, 0, _) ->
           (* Only leaves can be at height 0. *)
           assert false
-      | (Empty, height, _) ->
-          insert_node Empty Empty (height - 1) pos cms
-      | (Node (_, t1, t2), height, _) ->
-          insert_node t1 t2 (height - 1) pos cms
+      | (Empty, height, _) -> insert_node Empty Empty (height - 1) pos cms
+      | (Node (_, t1, t2), height, _) -> insert_node t1 t2 (height - 1) pos cms
 
     and insert_node t1 t2 height pos cms =
       let (t1, t2) =
@@ -167,12 +159,12 @@ module Make_Storage (C : Core_sig.Validator) = struct
           let (cml, cmr) = split_at at cms in
           let t1 = insert t1 height pos cml in
           let t2 = insert t2 height 0L cmr in
-          (t1, t2) )
+          (t1, t2))
         else (
           assert (t1 <> Empty) ;
           let pos = Int64.(sub pos (pow2 height)) in
           let t2 = insert t2 height pos cms in
-          (t1, t2) )
+          (t1, t2))
       in
       let h = hash ~height t1 t2 in
       Node (h, t1, t2)
@@ -181,8 +173,7 @@ module Make_Storage (C : Core_sig.Validator) = struct
       assert (Compare.Int64.(pos >= 0L && pos <= pow2 height)) ;
       assert (Compare.Int.(height >= 0 && height <= 32)) ;
       match tree with
-      | Empty ->
-          assert false
+      | Empty -> assert false
       | Node (_, l, r) ->
           let full = pow2 (height - 1) in
           if Compare.Int64.(pos < full) then get_cm_height l pos (height - 1)
@@ -202,10 +193,8 @@ module Make_Storage (C : Core_sig.Validator) = struct
       assert (Compare.Int.(height >= 0 && height <= 32)) ;
       (* get the neighbors hashes *)
       let rec aux height acc pos = function
-        | Empty ->
-            assert false
-        | Leaf _ ->
-            acc
+        | Empty -> assert false
+        | Leaf _ -> acc
         | Node (_, l, r) ->
             let full = pow2 (height - 1) in
             if Compare.Int64.(pos < full) then
@@ -221,7 +210,8 @@ module Make_Storage (C : Core_sig.Validator) = struct
       let hs = List.rev_map (fun h -> Bytes.cat d @@ H.to_bytes h) hashes in
       let p =
         let b = Bytes.create 8 in
-        Bytes.set_int64_le b 0 pos ; b
+        Bytes.set_int64_le b 0 pos ;
+        b
       in
       Bytes.concat Bytes.empty ([d] @ hs @ [p])
 
@@ -229,10 +219,8 @@ module Make_Storage (C : Core_sig.Validator) = struct
       assert (Compare.Int64.(pos >= 0L && pos <= pow2 height)) ;
       assert (Compare.Int.(height >= 0 && height <= 32)) ;
       match tree with
-      | Empty ->
-          init
-      | Leaf c ->
-          f init c
+      | Empty -> init
+      | Leaf c -> f init c
       | Node (_, t1, t2) ->
           let full = pow2 (height - 1) in
           if Compare.Int64.(pos < full) then
@@ -386,10 +374,8 @@ module Make_Storage (C : Core_sig.Validator) = struct
     let get_from t pos =
       let rec aux pos acc =
         match Map.find pos t with
-        | None ->
-            acc
-        | Some e ->
-            aux (Int64.succ pos) (e :: acc)
+        | None -> acc
+        | Some e -> aux (Int64.succ pos) (e :: acc)
       in
       List.rev (aux pos [])
   end
@@ -450,7 +436,7 @@ module Make_Storage (C : Core_sig.Validator) = struct
     assert (
       List.for_all
         (fun cipher -> C.Ciphertext.get_memo_size cipher = state.memo_size)
-        cipher_list ) ;
+        cipher_list) ;
     let new_tree = Tree.add state.tree cm_list in
     let new_roots = Roots.add (Tree.get_root new_tree) state.roots in
     let new_ciphertexts =
@@ -480,21 +466,16 @@ module Make_Storage (C : Core_sig.Validator) = struct
 
   let get_witness state pos =
     match Tree.get_witness state.tree pos with
-    | None ->
-        failwith "Position greater or equal than size."
-    | Some w ->
-        w
+    | None -> failwith "Position greater or equal than size."
+    | Some w -> w
 
   let get state pos =
     match Tree.get_cm state.tree pos with
-    | None ->
-        failwith "Position greater or equal than size."
+    | None -> failwith "Position greater or equal than size."
     | Some cm -> (
-      match Ciphertexts.find_opt pos state.ciphertexts with
-      | None ->
-          assert false
-      | Some ciphertext ->
-          (cm, ciphertext) )
+        match Ciphertexts.find_opt pos state.ciphertexts with
+        | None -> assert false
+        | Some ciphertext -> (cm, ciphertext))
 
   let mem state pos = Ciphertexts.mem pos state.ciphertexts
 end

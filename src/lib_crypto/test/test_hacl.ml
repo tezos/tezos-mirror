@@ -45,10 +45,12 @@ type vector = {
 }
 
 let vectors =
-  [ {
+  [
+    {
       data_in =
-        [ hex
-            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"
+        [
+          hex
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f";
         ];
       data_key = None;
       data_out =
@@ -57,10 +59,11 @@ let vectors =
     };
     {
       data_in =
-        [ hex "000102030405060708090a0b0c0d0e0f101112131415";
+        [
+          hex "000102030405060708090a0b0c0d0e0f101112131415";
           hex "161718";
           hex
-            "191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"
+            "191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f";
         ];
       data_key = None;
       data_out =
@@ -69,8 +72,9 @@ let vectors =
     };
     {
       data_in =
-        [ hex
-            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3"
+        [
+          hex
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3";
         ];
       data_key =
         Some
@@ -79,7 +83,8 @@ let vectors =
       data_out =
         hex
           "b39614268fdd8781515e2cfebf89b4d5402bab10c226e6344e6b9ae000fb0d6c79cb2f3ec80e80eaeb1980d2f8698916bd2e9f747236655116649cd3ca23a837";
-    } ]
+    };
+  ]
 
 let msg = Bytes.of_string "Longtemps, je me suis couche de bonne heure"
 
@@ -155,7 +160,8 @@ let test_hmac_sha256 () =
 (** Checks HMAC-SHA512. *)
 let test_hmac_sha512 () =
   let vectors =
-    [ ( Bytes.unsafe_of_string "key",
+    [
+      ( Bytes.unsafe_of_string "key",
         Bytes.unsafe_of_string "The quick brown fox jumps over the lazy dog",
         of_hex
           "b42af09057bac1e2d41708e48a902e09b5ff7f12ab428a4fe86653c73dd248fb82f948a549f7b791a5b41915ee4d1ec3935357e4e2317250d0372afa2ebeeb3a"
@@ -164,7 +170,8 @@ let test_hmac_sha512 () =
         Bytes.empty,
         of_hex
           "b936cee86c9f87aa5d3c6f2e84cb5a4239a5fe50480a6ec66b70ab5b1f4ac6730c6c515421b327ec1d69402e53dfb49ad7381eb067b338fd7b0cb22247225d47"
-      ) ]
+      );
+    ]
   in
   List.iter
     (fun (key, msg, resp) ->
@@ -198,14 +205,16 @@ let test_keccak_256 () =
   Alcotest.(check check_bytes "keccak_256" resp digest)
 
 let hash =
-  [ ("hmac_sha256", `Quick, test_hmac_sha256);
+  [
+    ("hmac_sha256", `Quick, test_hmac_sha256);
     ("hmac_sha512", `Quick, test_hmac_sha512);
     ("sha256", `Quick, test_sha256);
     ("sha256_seq", `Quick, test_sha256_seq);
     ("sha512", `Quick, test_sha512);
     ("sha3_256", `Quick, test_sha3_256);
     ("sha3_512", `Quick, test_sha3_512);
-    ("keccak_256", `Quick, test_keccak_256) ]
+    ("keccak_256", `Quick, test_keccak_256);
+  ]
 
 (** Compares a Blake2b hash from [data_in] with [key] to the expected
    output [data_out].
@@ -272,8 +281,7 @@ let test_keypair_ed25519 () =
       let pk_bytes = to_bytes pk in
       let pk_bytes_length = Bytes.length pk_bytes in
       Alcotest.(check int "to_bytes" pk_size pk_bytes_length)
-  | _ ->
-      assert false
+  | _ -> assert false
 
 (** Signs the message [msg] with [Sign.sign] and then verifies that it
     is accepted by [Sign.verify].
@@ -293,9 +301,11 @@ let test_public_ed25519 () =
   Alcotest.check check_bytes "public" pk' psk
 
 let ed25519 =
-  [ ("keypair", `Quick, test_keypair_ed25519);
+  [
+    ("keypair", `Quick, test_keypair_ed25519);
     ("sign", `Quick, test_sign_ed25519);
-    ("public", `Quick, test_public_ed25519) ]
+    ("public", `Quick, test_public_ed25519);
+  ]
 
 open P256
 
@@ -316,8 +326,7 @@ let test_export_p256 () =
       assert (equal pk pk') ;
       assert (equal pk pk'') ;
       assert (equal pk' pk')
-  | _ ->
-      assert false
+  | _ -> assert false
 
 let test_export_p256 () =
   for _i = 0 to nb_iterations - 1 do
@@ -353,8 +362,7 @@ let test_write_key_with_ledger () =
   let pk_bytes = to_bytes pk in
   let buf = Bytes.create (pk_size + 1) in
   match pk_of_bytes pk_bytes with
-  | None ->
-      Stdlib.failwith "Impossible to read P256 public key from Ledger"
+  | None -> Stdlib.failwith "Impossible to read P256 public key from Ledger"
   | Some pk ->
       TzEndian.set_int8 buf 0 2 ;
       blit_to_bytes pk ~pos:1 buf ;
@@ -393,10 +401,8 @@ let test_vectors_p256 () =
     List.map
       (fun (sk, pk) ->
         match (sk_of_bytes (of_hex sk), pk_of_bytes (of_hex pk)) with
-        | (Some sk, Some pk) ->
-            (sk, pk)
-        | _ ->
-            failwith "invalid key")
+        | (Some sk, Some pk) -> (sk, pk)
+        | _ -> failwith "invalid key")
       Vectors_p256.keys
   in
   let expected_sigs =
@@ -424,24 +430,26 @@ let test_vectors_p256 () =
     keys
     expected_sigs
   |> function
-  | Ok () ->
-      ()
-  | Error () ->
-      failwith "unequal number of keys, messages, and signatures"
+  | Ok () -> ()
+  | Error () -> failwith "unequal number of keys, messages, and signatures"
 
 let p256 =
-  [ ("export", `Quick, test_export_p256);
+  [
+    ("export", `Quick, test_export_p256);
     ("write_key", `Quick, test_write_key_p256);
     ("keypair", `Quick, test_keypair_p256);
     ("sign", `Quick, test_sign_p256);
-    ("test_vectors", `Quick, test_vectors_p256) ]
+    ("test_vectors", `Quick, test_vectors_p256);
+  ]
 
 let () =
   Alcotest.run
     "hacl"
-    [ ("hash", hash);
+    [
+      ("hash", hash);
       ("blake2b", blake2b_tests);
       ("secretbox", secretbox);
       ("box", box);
       ("ed25519", ed25519);
-      ("p256", p256) ]
+      ("p256", p256);
+    ]

@@ -23,17 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Blake2B.Make
-          (Base58)
-          (struct
-            let name = "Block_metadata_hash"
+include
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Block_metadata_hash"
 
-            let title = "A Tezos block metadata ID"
+      let title = "A Tezos block metadata ID"
 
-            let b58check_prefix = Base58.Prefix.block_metadata_hash
+      let b58check_prefix = Base58.Prefix.block_metadata_hash
 
-            let size = None
-          end)
+      let size = None
+    end)
 
 let () = Base58.check_encoded_prefix b58check_encoding "bm" 52
 

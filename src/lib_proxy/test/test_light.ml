@@ -103,8 +103,10 @@ let test_wrong_uris_parsing _ =
 let () =
   Alcotest.run
     "tezos-light"
-    [ ( "light",
-        [ Alcotest.test_case
+    [
+      ( "light",
+        [
+          Alcotest.test_case
             "test valid min_agreement parsing"
             `Quick
             test_good_min_agreement_parsing;
@@ -119,4 +121,6 @@ let () =
           Alcotest.test_case
             "test default min agreement"
             `Quick
-            test_good_min_agreement_parsing_default_agreement ] ) ]
+            test_good_min_agreement_parsing_default_agreement;
+        ] );
+    ]

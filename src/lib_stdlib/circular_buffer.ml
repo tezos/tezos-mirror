@@ -89,9 +89,8 @@ let get_buf_with_offset t write_len =
      may save some space. *)
   if t.data_start = t.data_end && not t.full then (
     t.data_start <- 0 ;
-    t.data_end <- 0 ) ;
-  if t.data_start < t.data_end || (t.data_start = t.data_end && not t.full)
-  then
+    t.data_end <- 0) ;
+  if t.data_start < t.data_end || (t.data_start = t.data_end && not t.full) then
     if t.data_end + write_len <= Bytes.length t.buffer then
       (* case 1.1 and 3.1: we write after END *)
       (t.buffer, t.data_end)
@@ -185,13 +184,12 @@ let write ~maxlen ~fill_using t =
     let maxlen =
       if buf == t.buffer then maxlen else min t.fresh_buf_size maxlen
     in
-    fill_using buf offset maxlen
-    >>= fun written ->
+    fill_using buf offset maxlen >>= fun written ->
     if written > maxlen then
       invalid_arg "Circular_buffer.write: written more bytes than maxlen" ;
     if t.buffer == buf then (
       t.data_end <- written + offset ;
-      if t.data_end = t.data_start then t.full <- true ) ;
+      if t.data_end = t.data_start then t.full <- true) ;
     Lwt.return {offset; length = written; buf}
 
 (* [read data ?len t ~into ~offset]  will read [len] data from
@@ -275,16 +273,12 @@ let read data ?(len = data.length) t ~into ~offset =
        buffer, and [len] is at most the length of data, so we have
        previously written [len] data in [t.buffer] starting at
        [offset]. So the following assertion must hold. *)
-      assert (t.data_start <= Bytes.length t.buffer) ) ;
+      assert (t.data_start <= Bytes.length t.buffer)) ;
     (* computing remainder *)
     if len = data.length then None
     else
       (* Return a new handler if we did not read the whole chunck *)
       Some
-        {
-          offset = data.offset + len;
-          length = data.length - len;
-          buf = data.buf;
-        } )
+        {offset = data.offset + len; length = data.length - len; buf = data.buf})
 
 let length {length; _} = length

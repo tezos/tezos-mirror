@@ -34,31 +34,28 @@ let gen_register dir service handler =
           | Not_found -> RPC_answer.not_found | exn -> RPC_answer.fail [Exn exn]))
 
 let gen_register =
-  ( gen_register
+  (gen_register
     : _ -> _ -> (_ -> _ -> _ -> _ RPC_answer.t Lwt.t) -> _
-    :> _ -> _ -> (_ -> _ -> _ -> [< _ RPC_answer.t] Lwt.t) -> _ )
+    :> _ -> _ -> (_ -> _ -> _ -> [< _ RPC_answer.t] Lwt.t) -> _)
 
 let register dir service handler =
   gen_register dir service (fun p q i ->
-      handler p q i
-      >>= function Ok o -> RPC_answer.return o | Error e -> RPC_answer.fail e)
+      handler p q i >>= function
+      | Ok o -> RPC_answer.return o
+      | Error e -> RPC_answer.fail e)
 
 let register_chunked dir service handler =
   gen_register dir service (fun p q i ->
-      handler p q i
-      >>= function
-      | Ok o -> RPC_answer.return_chunked o | Error e -> RPC_answer.fail e)
+      handler p q i >>= function
+      | Ok o -> RPC_answer.return_chunked o
+      | Error e -> RPC_answer.fail e)
 
 let opt_register dir service handler =
   gen_register dir service (fun p q i ->
-      handler p q i
-      >>= function
-      | Ok (Some o) ->
-          RPC_answer.return o
-      | Ok None ->
-          RPC_answer.not_found
-      | Error e ->
-          RPC_answer.fail e)
+      handler p q i >>= function
+      | Ok (Some o) -> RPC_answer.return o
+      | Ok None -> RPC_answer.not_found
+      | Error e -> RPC_answer.fail e)
 
 let lwt_register dir service handler =
   gen_register dir service (fun p q i ->
@@ -90,8 +87,7 @@ let opt_register3 root s f = opt_register root s (curry (S (S (S Z))) f)
 
 let opt_register4 root s f = opt_register root s (curry (S (S (S (S Z)))) f)
 
-let opt_register5 root s f =
-  opt_register root s (curry (S (S (S (S (S Z))))) f)
+let opt_register5 root s f = opt_register root s (curry (S (S (S (S (S Z))))) f)
 
 let gen_register0 root s f = gen_register root s (curry Z f)
 
@@ -103,8 +99,7 @@ let gen_register3 root s f = gen_register root s (curry (S (S (S Z))) f)
 
 let gen_register4 root s f = gen_register root s (curry (S (S (S (S Z)))) f)
 
-let gen_register5 root s f =
-  gen_register root s (curry (S (S (S (S (S Z))))) f)
+let gen_register5 root s f = gen_register root s (curry (S (S (S (S (S Z))))) f)
 
 let lwt_register0 root s f = lwt_register root s (curry Z f)
 
@@ -116,5 +111,4 @@ let lwt_register3 root s f = lwt_register root s (curry (S (S (S Z))) f)
 
 let lwt_register4 root s f = lwt_register root s (curry (S (S (S (S Z)))) f)
 
-let lwt_register5 root s f =
-  lwt_register root s (curry (S (S (S (S (S Z))))) f)
+let lwt_register5 root s f = lwt_register root s (curry (S (S (S (S (S Z))))) f)

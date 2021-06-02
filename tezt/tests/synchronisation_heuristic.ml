@@ -35,10 +35,8 @@ open Base
 let wait_for_sync node =
   let filter json =
     match JSON.(json |=> 1 |-> "event" |> as_string_opt) with
-    | None ->
-        None
-    | Some status ->
-        if status = "synced" then Some () else None
+    | None -> None
+    | Some status -> if status = "synced" then Some () else None
   in
   Node.wait_for node "node_chain_validator.v0" filter
 

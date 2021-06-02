@@ -134,23 +134,18 @@ type error +=
   | Invalid_constant : Script.location * Script.expr * Script.expr -> error
 
 type error +=
-  | Invalid_syntactic_constant :
-      Script.location * Script.expr * string
-      -> error
+  | Invalid_syntactic_constant : Script.location * Script.expr * string -> error
 
 type error += Invalid_contract of Script.location * Contract.t
 
 type error += Invalid_big_map of Script.location * Big_map.Id.t
 
-type error +=
-  | Comparable_type_expected : Script.location * Script.expr -> error
+type error += Comparable_type_expected : Script.location * Script.expr -> error
 
 type error += Inconsistent_types : Script.expr * Script.expr -> error
 
 type error +=
-  | Inconsistent_memo_sizes :
-      Sapling.Memo_size.t * Sapling.Memo_size.t
-      -> error
+  | Inconsistent_memo_sizes : Sapling.Memo_size.t * Sapling.Memo_size.t -> error
 
 type error += Unordered_map_keys of Script.location * Script.expr
 
@@ -164,8 +159,7 @@ type error += Duplicate_set_values of Script.location * Script.expr
 type error +=
   | Ill_typed_data : string option * Script.expr * Script.expr -> error
 
-type error +=
-  | Ill_formed_type of string option * Script.expr * Script.location
+type error += Ill_formed_type of string option * Script.expr * Script.location
 
 type error += Ill_typed_contract : Script.expr * type_map -> error
 

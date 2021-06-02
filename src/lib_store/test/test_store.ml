@@ -32,8 +32,8 @@ let test_cycles store =
   let chain_store = Store.main_chain_store store in
   List.fold_left_es
     (fun acc _ ->
-      append_cycle ~should_set_head:true chain_store
-      >>=? fun (blocks, _head) -> return (blocks @ acc))
+      append_cycle ~should_set_head:true chain_store >>=? fun (blocks, _head) ->
+      return (blocks @ acc))
     []
     (1 -- 10)
   >>=? fun blocks -> assert_presence_in_store chain_store blocks
@@ -55,12 +55,9 @@ open Example_tree
 
 let rec compare_path is_eq p1 p2 =
   match (p1, p2) with
-  | ([], []) ->
-      true
-  | (h1 :: p1, h2 :: p2) ->
-      is_eq h1 h2 && compare_path is_eq p1 p2
-  | _ ->
-      false
+  | ([], []) -> true
+  | (h1 :: p1, h2 :: p2) -> is_eq h1 h2 && compare_path is_eq p1 p2
+  | _ -> false
 
 let vblock tbl k =
   Nametbl.find tbl k |> WithExceptions.Option.to_exn ~none:Not_found
@@ -79,24 +76,19 @@ let test_path chain_store tbl =
       ~from_block:(vblock tbl h1)
       ~to_block:(vblock tbl h2)
     >>= function
-    | None ->
-        Assert.fail_msg "cannot compute path %s -> %s" h1 h2
+    | None -> Assert.fail_msg "cannot compute path %s -> %s" h1 h2
     | Some (p : Store.Block.t list) ->
         let p2 = List.map (fun b -> vblock tbl b) p2 in
         if not (compare_path Store.Block.equal p p2) then (
           Format.printf "expected:\t%a@." pp_print_list p2 ;
           Format.printf "got:\t\t%a@." pp_print_list p ;
-          Assert.fail_msg "bad path %s -> %s" h1 h2 ) ;
+          Assert.fail_msg "bad path %s -> %s" h1 h2) ;
         Lwt.return_unit
   in
-  check_path "Genesis" "Genesis" []
-  >>= fun () ->
-  check_path "A1" "A1" []
-  >>= fun () ->
-  check_path "A2" "A6" ["A3"; "A4"; "A5"; "A6"]
-  >>= fun () ->
-  check_path "B2" "B6" ["B3"; "B4"; "B5"; "B6"]
-  >>= fun () ->
+  check_path "Genesis" "Genesis" [] >>= fun () ->
+  check_path "A1" "A1" [] >>= fun () ->
+  check_path "A2" "A6" ["A3"; "A4"; "A5"; "A6"] >>= fun () ->
+  check_path "B2" "B6" ["B3"; "B4"; "B5"; "B6"] >>= fun () ->
   check_path "A1" "B3" ["A2"; "A3"; "B1"; "B2"; "B3"] >>= fun () -> return_unit
 
 (****************************************************************************)
@@ -110,8 +102,7 @@ let test_ancestor chain_store tbl =
       (vblock tbl h1)
       (vblock tbl h2)
     >>= function
-    | None ->
-        Assert.fail_msg "not ancestor found"
+    | None -> Assert.fail_msg "not ancestor found"
     | Some a ->
         if
           not
@@ -119,32 +110,19 @@ let test_ancestor chain_store tbl =
         then Assert.fail_msg "bad ancestor %s %s" h1 h2 ;
         Lwt.return_unit
   in
-  check_ancestor "Genesis" "Genesis" (vblock tbl "Genesis")
-  >>= fun () ->
-  check_ancestor "Genesis" "A3" (vblock tbl "Genesis")
-  >>= fun () ->
-  check_ancestor "A3" "Genesis" (vblock tbl "Genesis")
-  >>= fun () ->
-  check_ancestor "A1" "A1" (vblock tbl "A1")
-  >>= fun () ->
-  check_ancestor "A1" "A3" (vblock tbl "A1")
-  >>= fun () ->
-  check_ancestor "A3" "A1" (vblock tbl "A1")
-  >>= fun () ->
-  check_ancestor "A6" "B6" (vblock tbl "A3")
-  >>= fun () ->
-  check_ancestor "B6" "A6" (vblock tbl "A3")
-  >>= fun () ->
-  check_ancestor "A4" "B1" (vblock tbl "A3")
-  >>= fun () ->
-  check_ancestor "B1" "A4" (vblock tbl "A3")
-  >>= fun () ->
-  check_ancestor "A3" "B1" (vblock tbl "A3")
-  >>= fun () ->
-  check_ancestor "B1" "A3" (vblock tbl "A3")
-  >>= fun () ->
-  check_ancestor "A2" "B1" (vblock tbl "A2")
-  >>= fun () ->
+  check_ancestor "Genesis" "Genesis" (vblock tbl "Genesis") >>= fun () ->
+  check_ancestor "Genesis" "A3" (vblock tbl "Genesis") >>= fun () ->
+  check_ancestor "A3" "Genesis" (vblock tbl "Genesis") >>= fun () ->
+  check_ancestor "A1" "A1" (vblock tbl "A1") >>= fun () ->
+  check_ancestor "A1" "A3" (vblock tbl "A1") >>= fun () ->
+  check_ancestor "A3" "A1" (vblock tbl "A1") >>= fun () ->
+  check_ancestor "A6" "B6" (vblock tbl "A3") >>= fun () ->
+  check_ancestor "B6" "A6" (vblock tbl "A3") >>= fun () ->
+  check_ancestor "A4" "B1" (vblock tbl "A3") >>= fun () ->
+  check_ancestor "B1" "A4" (vblock tbl "A3") >>= fun () ->
+  check_ancestor "A3" "B1" (vblock tbl "A3") >>= fun () ->
+  check_ancestor "B1" "A3" (vblock tbl "A3") >>= fun () ->
+  check_ancestor "A2" "B1" (vblock tbl "A2") >>= fun () ->
   check_ancestor "B1" "A2" (vblock tbl "A2") >>= fun () -> return_unit
 
 (****************************************************************************)
@@ -159,8 +137,9 @@ let seed =
   {Block_locator.receiver_id; sender_id}
 
 let iter2_exn f l1 l2 =
-  List.iter2 ~when_different_lengths:(Failure "iter2_exn") f l1 l2
-  |> function Ok () -> () | _ -> assert false
+  List.iter2 ~when_different_lengths:(Failure "iter2_exn") f l1 l2 |> function
+  | Ok () -> ()
+  | _ -> assert false
 
 (** Block_locator *)
 
@@ -187,16 +166,13 @@ let test_locator chain_store tbl =
       expected ;
     Lwt.return_unit
   in
-  check_locator 6 "A8" ["A7"; "A6"; "A5"; "A4"; "A3"; "A2"]
-  >>= fun () ->
+  check_locator 6 "A8" ["A7"; "A6"; "A5"; "A4"; "A3"; "A2"] >>= fun () ->
   check_locator 8 "B8" ["B7"; "B6"; "B5"; "B4"; "B3"; "B2"; "B1"; "A3"]
   >>= fun () ->
-  check_locator 4 "B8" ["B7"; "B6"; "B5"; "B4"]
-  >>= fun () ->
-  check_locator 0 "A5" []
-  >>= fun () ->
-  check_locator 100 "A5" ["A4"; "A3"; "A2"; "A1"; "Genesis"]
-  >>= fun () -> return_unit
+  check_locator 4 "B8" ["B7"; "B6"; "B5"; "B4"] >>= fun () ->
+  check_locator 0 "A5" [] >>= fun () ->
+  check_locator 100 "A5" ["A4"; "A3"; "A2"; "A1"; "Genesis"] >>= fun () ->
+  return_unit
 
 (****************************************************************************)
 
@@ -218,16 +194,12 @@ let compare s name heads l =
     l
 
 let test_known_heads chain_store tbl =
-  Store.Chain.known_heads chain_store
-  >>= fun heads ->
+  Store.Chain.known_heads chain_store >>= fun heads ->
   let heads = List.map fst heads in
   compare tbl "initial" heads ["Genesis"] ;
-  Store.Chain.set_head chain_store (vblock tbl "A8")
-  >>=? fun _ ->
-  Store.Chain.set_head chain_store (vblock tbl "B8")
-  >>=? fun _ ->
-  Store.Chain.known_heads chain_store
-  >>= fun heads ->
+  Store.Chain.set_head chain_store (vblock tbl "A8") >>=? fun _ ->
+  Store.Chain.set_head chain_store (vblock tbl "B8") >>=? fun _ ->
+  Store.Chain.known_heads chain_store >>= fun heads ->
   let heads = List.map fst heads in
   compare tbl "initial" heads ["A8"; "B8"] ;
   return_unit
@@ -237,21 +209,16 @@ let test_known_heads chain_store tbl =
 (** Chain.head/set_head *)
 
 let test_head chain_store tbl =
-  Store.Chain.current_head chain_store
-  >>= fun head ->
-  Store.Chain.genesis_block chain_store
-  >>= fun genesis_block ->
+  Store.Chain.current_head chain_store >>= fun head ->
+  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
   if not (Store.Block.equal head genesis_block) then
     Assert.fail_msg "unexpected head" ;
-  Store.Chain.set_head chain_store (vblock tbl "A6")
-  >>=? function
-  | None ->
-      Assert.fail_msg "unexpected previous head"
+  Store.Chain.set_head chain_store (vblock tbl "A6") >>=? function
+  | None -> Assert.fail_msg "unexpected previous head"
   | Some prev_head ->
       if not (Store.Block.equal prev_head genesis_block) then
         Assert.fail_msg "unexpected previous head" ;
-      Store.Chain.current_head chain_store
-      >>= fun head ->
+      Store.Chain.current_head chain_store >>= fun head ->
       if not (Store.Block.equal head (vblock tbl "A6")) then
         Assert.fail_msg "unexpected head" ;
       return_unit
@@ -273,90 +240,55 @@ let test_mem chain_store tbl =
     Store.Chain.is_in_chain chain_store b_descr
   in
   let test_mem x =
-    mem x
-    >>= function
-    | true -> Lwt.return_unit | false -> Assert.fail_msg "mem %s" x
+    mem x >>= function
+    | true -> Lwt.return_unit
+    | false -> Assert.fail_msg "mem %s" x
   in
   let test_not_mem x =
-    mem x
-    >>= function
-    | false -> Lwt.return_unit | true -> Assert.fail_msg "not (mem %s)" x
+    mem x >>= function
+    | false -> Lwt.return_unit
+    | true -> Assert.fail_msg "not (mem %s)" x
   in
-  test_not_mem "A3"
-  >>= fun () ->
-  test_not_mem "A6"
-  >>= fun () ->
-  test_not_mem "A8"
-  >>= fun () ->
-  test_not_mem "B1"
-  >>= fun () ->
-  test_not_mem "B6"
-  >>= fun () ->
-  test_not_mem "B8"
-  >>= fun () ->
-  Store.Chain.set_head chain_store (vblock tbl "A8")
-  >>=? fun _ ->
-  test_mem "A3"
-  >>= fun () ->
-  test_mem "A6"
-  >>= fun () ->
-  test_mem "A8"
-  >>= fun () ->
-  test_not_mem "B1"
-  >>= fun () ->
-  test_not_mem "B6"
-  >>= fun () ->
-  test_not_mem "B8"
-  >>= fun () ->
-  Store.Chain.set_head chain_store (vblock tbl "A6")
-  >>=? (function
-         | Some _prev_head ->
-             Assert.fail_msg "unexpected head switch"
-         | None ->
-             return_unit)
+  test_not_mem "A3" >>= fun () ->
+  test_not_mem "A6" >>= fun () ->
+  test_not_mem "A8" >>= fun () ->
+  test_not_mem "B1" >>= fun () ->
+  test_not_mem "B6" >>= fun () ->
+  test_not_mem "B8" >>= fun () ->
+  Store.Chain.set_head chain_store (vblock tbl "A8") >>=? fun _ ->
+  test_mem "A3" >>= fun () ->
+  test_mem "A6" >>= fun () ->
+  test_mem "A8" >>= fun () ->
+  test_not_mem "B1" >>= fun () ->
+  test_not_mem "B6" >>= fun () ->
+  test_not_mem "B8" >>= fun () ->
+  (Store.Chain.set_head chain_store (vblock tbl "A6") >>=? function
+   | Some _prev_head -> Assert.fail_msg "unexpected head switch"
+   | None -> return_unit)
   >>=? fun () ->
   (* A6 is a predecessor of A8. A8 remains the new head. *)
-  test_mem "A3"
-  >>= fun () ->
-  test_mem "A6"
-  >>= fun () ->
-  test_mem "A8"
-  >>= fun () ->
-  test_not_mem "B1"
-  >>= fun () ->
-  test_not_mem "B6"
-  >>= fun () ->
-  test_not_mem "B8"
-  >>= fun () ->
-  Store.Chain.set_head chain_store (vblock tbl "B6")
-  >>=? fun _ ->
-  test_mem "A3"
-  >>= fun () ->
-  test_not_mem "A4"
-  >>= fun () ->
-  test_not_mem "A6"
-  >>= fun () ->
-  test_not_mem "A8"
-  >>= fun () ->
-  test_mem "B1"
-  >>= fun () ->
-  test_mem "B6"
-  >>= fun () ->
-  test_not_mem "B8"
-  >>= fun () ->
-  Store.Chain.set_head chain_store (vblock tbl "B8")
-  >>=? fun _ ->
-  test_mem "A3"
-  >>= fun () ->
-  test_not_mem "A4"
-  >>= fun () ->
-  test_not_mem "A6"
-  >>= fun () ->
-  test_not_mem "A8"
-  >>= fun () ->
-  test_mem "B1"
-  >>= fun () ->
-  test_mem "B6" >>= fun () -> test_mem "B8" >>= fun () -> return_unit
+  test_mem "A3" >>= fun () ->
+  test_mem "A6" >>= fun () ->
+  test_mem "A8" >>= fun () ->
+  test_not_mem "B1" >>= fun () ->
+  test_not_mem "B6" >>= fun () ->
+  test_not_mem "B8" >>= fun () ->
+  Store.Chain.set_head chain_store (vblock tbl "B6") >>=? fun _ ->
+  test_mem "A3" >>= fun () ->
+  test_not_mem "A4" >>= fun () ->
+  test_not_mem "A6" >>= fun () ->
+  test_not_mem "A8" >>= fun () ->
+  test_mem "B1" >>= fun () ->
+  test_mem "B6" >>= fun () ->
+  test_not_mem "B8" >>= fun () ->
+  Store.Chain.set_head chain_store (vblock tbl "B8") >>=? fun _ ->
+  test_mem "A3" >>= fun () ->
+  test_not_mem "A4" >>= fun () ->
+  test_not_mem "A6" >>= fun () ->
+  test_not_mem "A8" >>= fun () ->
+  test_mem "B1" >>= fun () ->
+  test_mem "B6" >>= fun () ->
+  test_mem "B8" >>= fun () -> return_unit
 
 (****************************************************************************)
 
@@ -392,19 +324,13 @@ let test_new_blocks chain_store tbl =
                (Store.Block.hash h1)
                (Store.Block.hash @@ vblock tbl h2))
         then
-          Assert.fail_msg
-            "Invalid new blocks %s -> %s (expected: %s)"
-            head
-            h
-            h2)
+          Assert.fail_msg "Invalid new blocks %s -> %s (expected: %s)" head h h2)
       blocks
       expected ;
     Lwt.return_unit
   in
-  test "A6" "A6" "A6" []
-  >>= fun () ->
-  test "A8" "A6" "A6" ["A7"; "A8"]
-  >>= fun () ->
+  test "A6" "A6" "A6" [] >>= fun () ->
+  test "A8" "A6" "A6" ["A7"; "A8"] >>= fun () ->
   test "A8" "B7" "A3" ["A4"; "A5"; "A6"; "A7"; "A8"] >>= fun () -> return_unit
 
 (** Store.Chain.checkpoint *)
@@ -426,22 +352,17 @@ does not prevent a future good block from correctly being reached
 
 let test_basic_checkpoint chain_store table =
   let block = vblock table "A1" in
-  Store.Chain.set_head chain_store block
-  >>=? fun _prev_head ->
+  Store.Chain.set_head chain_store block >>=? fun _prev_head ->
   (* Setting target for A1 *)
   Store.Chain.set_target
     chain_store
     (Store.Block.hash block, Store.Block.level block)
   >>=? fun () ->
-  Store.Chain.checkpoint chain_store
-  >>= fun (c_block, c_level) ->
+  Store.Chain.checkpoint chain_store >>= fun (c_block, c_level) ->
   (* Target should not be set, only the checkpoint. *)
-  Store.Chain.target chain_store
-  >>= (function
-        | Some _target ->
-            Assert.fail_msg "unexpected target"
-        | None ->
-            return_unit)
+  (Store.Chain.target chain_store >>= function
+   | Some _target -> Assert.fail_msg "unexpected target"
+   | None -> return_unit)
   >>=? fun () ->
   if
     (not (Block_hash.equal c_block (Store.Block.hash block)))
@@ -464,10 +385,8 @@ let test_acceptable_block chain_store table =
   let block = vblock table "A2" in
   let block_hash = Store.Block.hash block in
   let level = Store.Block.level block in
-  Store.Chain.set_head chain_store block
-  >>=? fun _prev_head ->
-  Store.Chain.set_target chain_store (block_hash, level)
-  >>=? fun () ->
+  Store.Chain.set_head chain_store block >>=? fun _prev_head ->
+  Store.Chain.set_target chain_store (block_hash, level) >>=? fun () ->
   (* it is accepted if the new head is greater than the checkpoint *)
   let block_1 = vblock table "A1" in
   Store.Chain.is_acceptable_block
@@ -487,10 +406,8 @@ let test_is_valid_target chain_store table =
   let block = vblock table "A2" in
   let block_hash = Store.Block.hash block in
   let level = Store.Block.level block in
-  Store.Chain.set_head chain_store block
-  >>=? fun _prev_head ->
-  Store.Chain.set_target chain_store (block_hash, level)
-  >>=? fun () ->
+  Store.Chain.set_head chain_store block >>=? fun _prev_head ->
+  Store.Chain.set_target chain_store (block_hash, level) >>=? fun () ->
   (* "b3" is valid because:
      a1 - a2 (checkpoint) - b1 - b2 - b3
   *)
@@ -504,12 +421,9 @@ let test_best_know_head_for_checkpoint chain_store table =
   let block_hash = Store.Block.hash block in
   let level = Store.Block.level block in
   let checkpoint = (block_hash, level) in
-  Store.Chain.set_head chain_store block
-  >>=? fun _prev_head ->
-  Store.Chain.set_target chain_store checkpoint
-  >>=? fun () ->
-  Store.Chain.set_head chain_store (vblock table "B3")
-  >>=? fun _head ->
+  Store.Chain.set_head chain_store block >>=? fun _prev_head ->
+  Store.Chain.set_target chain_store checkpoint >>=? fun () ->
+  Store.Chain.set_head chain_store (vblock table "B3") >>=? fun _head ->
   Store.Chain.best_known_head_for_checkpoint chain_store ~checkpoint
   >>= fun _block ->
   (* the block returns with the best fitness is B3 at level 5 *)
@@ -522,15 +436,11 @@ let test_best_know_head_for_checkpoint chain_store table =
  *)
 
 let test_future_target chain_store _ =
-  Store.Chain.genesis_block chain_store
-  >>= fun genesis_block ->
+  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
   let genesis_descr = Store.Block.descriptor genesis_block in
-  make_raw_block_list genesis_descr 5
-  >>= fun (bad_chain, bad_head) ->
-  make_raw_block_list genesis_descr 5
-  >>= fun (good_chain, good_head) ->
-  Store.Chain.set_target chain_store (raw_descriptor good_head)
-  >>=? fun () ->
+  make_raw_block_list genesis_descr 5 >>= fun (bad_chain, bad_head) ->
+  make_raw_block_list genesis_descr 5 >>= fun (good_chain, good_head) ->
+  Store.Chain.set_target chain_store (raw_descriptor good_head) >>=? fun () ->
   List.iter_es
     (fun b ->
       Format.printf "storing : %a@." pp_raw_block b ;
@@ -538,12 +448,9 @@ let test_future_target chain_store _ =
     (List.rev
        (List.tl (List.rev bad_chain) |> WithExceptions.Option.get ~loc:__LOC__))
   >>=? fun () ->
-  store_raw_block chain_store bad_head
-  >>= (function
-        | Error [Validation_errors.Checkpoint_error _] ->
-            return_unit
-        | Ok _ | _ ->
-            Assert.fail_msg "incompatible head accepted")
+  (store_raw_block chain_store bad_head >>= function
+   | Error [Validation_errors.Checkpoint_error _] -> return_unit
+   | Ok _ | _ -> Assert.fail_msg "incompatible head accepted")
   >>=? fun () ->
   List.iter_es
     (fun b -> store_raw_block chain_store b >>=? fun _ -> return_unit)
@@ -566,25 +473,23 @@ let test_reach_target chain_store table =
     Store.Chain.is_in_chain chain_store Store.Block.(hash b, level b)
   in
   let test_mem x =
-    mem x
-    >>= function
-    | true -> Lwt.return_unit | false -> Assert.fail_msg "mem %s" x
+    mem x >>= function
+    | true -> Lwt.return_unit
+    | false -> Assert.fail_msg "mem %s" x
   in
   let test_not_mem x =
-    mem x
-    >>= function
-    | false -> Lwt.return_unit | true -> Assert.fail_msg "not (mem %s)" x
+    mem x >>= function
+    | false -> Lwt.return_unit
+    | true -> Assert.fail_msg "not (mem %s)" x
   in
   let block = vblock table "A1" in
   let header = Store.Block.header block in
   let checkpoint_hash = Store.Block.hash block in
   let checkpoint_level = Store.Block.level block in
-  Store.Chain.set_head chain_store block
-  >>=? fun _pred_head ->
+  Store.Chain.set_head chain_store block >>=? fun _pred_head ->
   Store.Chain.set_target chain_store (checkpoint_hash, checkpoint_level)
   >>=? fun () ->
-  Store.Chain.checkpoint chain_store
-  >>= fun (c_hash, _c_level) ->
+  Store.Chain.checkpoint chain_store >>= fun (c_hash, _c_level) ->
   let time_now = Time.System.to_protocol (Systime_os.now ()) in
   if
     Time.Protocol.compare
@@ -597,10 +502,8 @@ let test_reach_target chain_store table =
       && not (Block_hash.equal checkpoint_hash c_hash)
     then Assert.fail_msg "checkpoint error"
     else
-      Store.Chain.set_head chain_store (vblock table "A2")
-      >>=? fun _ ->
-      Store.Chain.current_head chain_store
-      >>= fun head ->
+      Store.Chain.set_head chain_store (vblock table "A2") >>=? fun _ ->
+      Store.Chain.current_head chain_store >>= fun head ->
       let checkpoint_reached =
         (Store.Block.header head).shell.level >= checkpoint_level
       in
@@ -608,14 +511,11 @@ let test_reach_target chain_store table =
         (* if reached the checkpoint, every block before the checkpoint
            must be the part of the chain *)
         if header.shell.level <= checkpoint_level then
-          test_mem "Genesis"
-          >>= fun () ->
-          test_mem "A1"
-          >>= fun () ->
-          test_mem "A2"
-          >>= fun () ->
-          test_not_mem "A3"
-          >>= fun () -> test_not_mem "B1" >>= fun () -> return_unit
+          test_mem "Genesis" >>= fun () ->
+          test_mem "A1" >>= fun () ->
+          test_mem "A2" >>= fun () ->
+          test_not_mem "A3" >>= fun () ->
+          test_not_mem "B1" >>= fun () -> return_unit
         else Assert.fail_msg "checkpoint error"
       else Assert.fail_msg "checkpoint error"
   else Assert.fail_msg "fail future block header"
@@ -639,10 +539,8 @@ let test_not_may_update_target chain_store table =
   let target_hash = Store.Block.hash block_a2 in
   let target_level = Store.Block.level block_a2 in
   let target = (target_hash, target_level) in
-  Store.Chain.set_head chain_store block_a2
-  >>=? fun _pred_head ->
-  Store.Chain.set_target chain_store target
-  >>=? fun () ->
+  Store.Chain.set_head chain_store block_a2 >>=? fun _pred_head ->
+  Store.Chain.set_target chain_store target >>=? fun () ->
   (* set new target at (1l, A1) in the past *)
   let block_a1 = vblock table "A1" in
   let target_hash = Store.Block.hash block_a1 in
@@ -650,15 +548,16 @@ let test_not_may_update_target chain_store table =
   let new_target = (target_hash, target_level) in
   Lwt.catch
     (fun () ->
-      Store.Chain.set_target chain_store new_target
-      >>=? fun () -> Assert.fail_msg "Unexpected target update")
+      Store.Chain.set_target chain_store new_target >>=? fun () ->
+      Assert.fail_msg "Unexpected target update")
     (function _ -> return_unit)
 
 let tests =
   let test_tree_cases =
     List.map
       wrap_test
-      [ ("path between blocks", test_path);
+      [
+        ("path between blocks", test_path);
         ("common ancestor", test_ancestor);
         ("block locators", test_locator);
         ("known heads", test_known_heads);
@@ -671,6 +570,7 @@ let tests =
         ("best know head", test_best_know_head_for_checkpoint);
         ("future target", test_future_target);
         ("reach target", test_reach_target);
-        ("update target in node", test_not_may_update_target) ]
+        ("update target in node", test_not_may_update_target);
+      ]
   in
   ("store", test_cases @ test_tree_cases)

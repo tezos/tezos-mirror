@@ -215,8 +215,7 @@ end = struct
   let request t p k = assert (Lwt_pipe.push_now t.queue (Request (p, k)))
 
   let notify t p k =
-    Events.(emit notify_push) (k, p)
-    >>= fun () ->
+    Events.(emit notify_push) (k, p) >>= fun () ->
     assert (Lwt_pipe.push_now t.queue (Notify (p, k))) ;
     Lwt.return ()
 
@@ -229,20 +228,17 @@ end = struct
     assert (Lwt_pipe.push_now t.queue (Notify_cancellation k))
 
   let notify_invalid t p k =
-    Events.(emit notify_push_invalid) (k, p)
-    >>= fun () ->
+    Events.(emit notify_push_invalid) (k, p) >>= fun () ->
     assert (Lwt_pipe.push_now t.queue (Notify_invalid (p, k))) ;
     Lwt.return ()
 
   let notify_duplicate t p k =
-    Events.(emit notify_push_duplicate) (k, p)
-    >>= fun () ->
+    Events.(emit notify_push_duplicate) (k, p) >>= fun () ->
     assert (Lwt_pipe.push_now t.queue (Notify_duplicate (p, k))) ;
     Lwt.return ()
 
   let notify_unrequested t p k =
-    Events.(emit notify_push_unrequested) (k, p)
-    >>= fun () ->
+    Events.(emit notify_push_unrequested) (k, p) >>= fun () ->
     assert (Lwt_pipe.push_now t.queue (Notify_unrequested (p, k))) ;
     Lwt.return ()
 
@@ -251,16 +247,13 @@ end = struct
       Table.fold
         (fun _ {next_request; _} acc ->
           match acc with
-          | None ->
-              Some next_request
-          | Some x ->
-              Some (Time.System.min x next_request))
+          | None -> Some next_request
+          | Some x -> Some (Time.System.min x next_request))
         state.pending
         None
     in
     match next with
-    | None ->
-        fst @@ Lwt.task ()
+    | None -> fst @@ Lwt.task ()
     | Some next ->
         let now = Systime_os.now () in
         let delay = Ptime.diff next now in
@@ -269,16 +262,13 @@ end = struct
 
   let process_event state now = function
     | Request (peer, key) -> (
-        Events.(emit registering_request) (key, peer)
-        >>= fun () ->
+        Events.(emit registering_request) (key, peer) >>= fun () ->
         match Table.find state.pending key with
         | Some data ->
             let peers =
               match peer with
-              | None ->
-                  data.peers
-              | Some peer ->
-                  P2p_peer.Set.add peer data.peers
+              | None -> data.peers
+              | Some peer -> P2p_peer.Set.add peer data.peers
             in
             Table.replace
               state.pending
@@ -288,16 +278,14 @@ end = struct
         | None ->
             let peers =
               match peer with
-              | None ->
-                  P2p_peer.Set.empty
-              | Some peer ->
-                  P2p_peer.Set.singleton peer
+              | None -> P2p_peer.Set.empty
+              | Some peer -> P2p_peer.Set.singleton peer
             in
             Table.add
               state.pending
               key
               {peers; next_request = now; delay = Request.initial_delay} ;
-            Events.(emit registering_request_added) (key, peer) )
+            Events.(emit registering_request_added) (key, peer))
     | Notify (peer, key) ->
         Table.remove state.pending key ;
         Events.(emit notify_received) (key, peer)
@@ -323,13 +311,11 @@ end = struct
       if Lwt.state shutdown <> Lwt.Sleep then Events.(emit terminated) ()
       else if Lwt.state state.events <> Lwt.Sleep then (
         let now = Systime_os.now () in
-        state.events
-        >>= fun events ->
+        state.events >>= fun events ->
         state.events <- Lwt_pipe.pop_all state.queue ;
-        List.iter_s (process_event state now) events >>= fun () -> loop state )
+        List.iter_s (process_event state now) events >>= fun () -> loop state)
       else
-        Events.(emit timeout) ()
-        >>= fun () ->
+        Events.(emit timeout) () >>= fun () ->
         let now = Systime_os.now () in
         let active_peers = Request.active state.param in
         let requests =
@@ -343,13 +329,13 @@ end = struct
                   && not (P2p_peer.Set.is_empty peers)
                 then (
                   Table.remove state.pending key ;
-                  acc )
+                  acc)
                 else
                   let requested_peer =
                     P2p_peer.Id.Set.random_elt
-                      ( if P2p_peer.Set.is_empty remaining_peers then
-                        active_peers
-                      else remaining_peers )
+                      (if P2p_peer.Set.is_empty remaining_peers then
+                       active_peers
+                      else remaining_peers)
                   in
                   let next_request =
                     Option.value ~default:Ptime.max (Ptime.add_span now delay)
@@ -364,9 +350,10 @@ end = struct
                   Table.replace state.pending key next ;
                   let requests =
                     key
-                    :: Option.value
-                         ~default:[]
-                         (P2p_peer.Map.find requested_peer acc)
+                    ::
+                    Option.value
+                      ~default:[]
+                      (P2p_peer.Map.find requested_peer acc)
                   in
                   P2p_peer.Map.add requested_peer requests acc)
             state.pending
@@ -462,21 +449,15 @@ end = struct
 
   let known s k =
     match Memory_table.find s.memory k with
-    | None ->
-        Disk_table.known s.disk k
-    | Some (Pending _) ->
-        Lwt.return_false
-    | Some (Found _) ->
-        Lwt.return_true
+    | None -> Disk_table.known s.disk k
+    | Some (Pending _) -> Lwt.return_false
+    | Some (Found _) -> Lwt.return_true
 
   let read_opt s k =
     match Memory_table.find s.memory k with
-    | None ->
-        Disk_table.read_opt s.disk k
-    | Some (Found v) ->
-        Lwt.return_some v
-    | Some (Pending _) ->
-        Lwt.return_none
+    | None -> Disk_table.read_opt s.disk k
+    | Some (Found v) -> Lwt.return_some v
+    | Some (Pending _) -> Lwt.return_none
 
   type error += Missing_data of key
 
@@ -521,30 +502,24 @@ end = struct
 
   let read s k =
     match Memory_table.find s.memory k with
-    | None ->
-        trace (Missing_data k) @@ Disk_table.read s.disk k
-    | Some (Found v) ->
-        return v
-    | Some (Pending _) ->
-        fail (Missing_data k)
+    | None -> trace (Missing_data k) @@ Disk_table.read s.disk k
+    | Some (Found v) -> return v
+    | Some (Pending _) -> fail (Missing_data k)
 
   let wrap s k ?timeout t =
     let t = Lwt.protected t in
     Lwt.on_cancel t (fun () ->
         match Memory_table.find s.memory k with
-        | None ->
-            ()
-        | Some (Found _) ->
-            ()
+        | None -> ()
+        | Some (Found _) -> ()
         | Some (Pending ({wakener = w; _} as data)) ->
             data.waiters <- data.waiters - 1 ;
             if data.waiters = 0 then (
               Memory_table.remove s.memory k ;
               Scheduler.notify_cancellation s.scheduler k ;
-              Lwt.wakeup_later w (error (Canceled k)) )) ;
+              Lwt.wakeup_later w (error (Canceled k)))) ;
     match timeout with
-    | None ->
-        t
+    | None -> t
     | Some delay ->
         let timeout = Systime_os.sleep delay >>= fun () -> fail (Timeout k) in
         Lwt.pick [t; timeout]
@@ -552,43 +527,37 @@ end = struct
   let fetch s ?peer ?timeout k param =
     match Memory_table.find s.memory k with
     | None -> (
-        Disk_table.read_opt s.disk k
-        >>= function
-        | Some v ->
-            return v
+        Disk_table.read_opt s.disk k >>= function
+        | Some v -> return v
         | None -> (
-          (* It is necessary to check the memory-table again in case another
-            promise has altered it whilst this one was waiting for the
-            disk-table query. *)
-          match Memory_table.find s.memory k with
-          | None ->
-              let (waiter, wakener) = Lwt.wait () in
-              Memory_table.add
-                s.memory
-                k
-                (Pending {waiter; wakener; waiters = 1; param}) ;
-              Scheduler.request s.scheduler peer k ;
-              wrap s k ?timeout waiter
-          | Some (Pending data) ->
-              Scheduler.request s.scheduler peer k ;
-              data.waiters <- data.waiters + 1 ;
-              wrap s k ?timeout data.waiter
-          | Some (Found v) ->
-              return v ) )
+            (* It is necessary to check the memory-table again in case another
+               promise has altered it whilst this one was waiting for the
+               disk-table query. *)
+            match Memory_table.find s.memory k with
+            | None ->
+                let (waiter, wakener) = Lwt.wait () in
+                Memory_table.add
+                  s.memory
+                  k
+                  (Pending {waiter; wakener; waiters = 1; param}) ;
+                Scheduler.request s.scheduler peer k ;
+                wrap s k ?timeout waiter
+            | Some (Pending data) ->
+                Scheduler.request s.scheduler peer k ;
+                data.waiters <- data.waiters + 1 ;
+                wrap s k ?timeout data.waiter
+            | Some (Found v) -> return v))
     | Some (Pending data) ->
         Scheduler.request s.scheduler peer k ;
         data.waiters <- data.waiters + 1 ;
         wrap s k ?timeout data.waiter
-    | Some (Found v) ->
-        return v
+    | Some (Found v) -> return v
 
   let notify_when_pending s p k w param v =
     match Precheck.precheck k param v with
-    | None ->
-        Scheduler.notify_invalid s.scheduler p k
+    | None -> Scheduler.notify_invalid s.scheduler p k
     | Some v ->
-        Scheduler.notify s.scheduler p k
-        >>= fun () ->
+        Scheduler.notify s.scheduler p k >>= fun () ->
         Memory_table.replace s.memory k (Found v) ;
         Lwt.wakeup_later w (Ok v) ;
         Option.iter
@@ -600,56 +569,45 @@ end = struct
   let notify s p k v =
     match Memory_table.find s.memory k with
     | None -> (
-        Disk_table.known s.disk k
-        >>= function
-        | true ->
-            Scheduler.notify_duplicate s.scheduler p k
+        Disk_table.known s.disk k >>= function
+        | true -> Scheduler.notify_duplicate s.scheduler p k
         | false -> (
-          (* It is necessary to check the memory-table again in case another
-            promise has altered it whilst this one was waiting for the
-            disk-table query. *)
-          match Memory_table.find s.memory k with
-          | None ->
-              Scheduler.notify_unrequested s.scheduler p k
-          | Some (Pending {wakener = w; param; _}) ->
-              notify_when_pending s p k w param v
-          | Some (Found _) ->
-              Scheduler.notify_duplicate s.scheduler p k ) )
+            (* It is necessary to check the memory-table again in case another
+               promise has altered it whilst this one was waiting for the
+               disk-table query. *)
+            match Memory_table.find s.memory k with
+            | None -> Scheduler.notify_unrequested s.scheduler p k
+            | Some (Pending {wakener = w; param; _}) ->
+                notify_when_pending s p k w param v
+            | Some (Found _) -> Scheduler.notify_duplicate s.scheduler p k))
     | Some (Pending {wakener = w; param; _}) ->
         notify_when_pending s p k w param v
-    | Some (Found _) ->
-        Scheduler.notify_duplicate s.scheduler p k
+    | Some (Found _) -> Scheduler.notify_duplicate s.scheduler p k
 
   let inject s k v =
     match Memory_table.find s.memory k with
     | None -> (
-        Disk_table.known s.disk k
-        >>= function
-        | true ->
-            Lwt.return_false
+        Disk_table.known s.disk k >>= function
+        | true -> Lwt.return_false
         | false -> (
-          (* It is necessary to check the memory-table again in case another
-            promise has altered it whilst this one was waiting for the
-            disk-table query. *)
-          match Memory_table.find s.memory k with
-          | None ->
-              Memory_table.add s.memory k (Found v) ;
-              Lwt.return_true
-          | Some (Pending _) | Some (Found _) ->
-              Lwt.return_false ) )
-    | Some (Pending _) | Some (Found _) ->
-        Lwt.return_false
+            (* It is necessary to check the memory-table again in case another
+               promise has altered it whilst this one was waiting for the
+               disk-table query. *)
+            match Memory_table.find s.memory k with
+            | None ->
+                Memory_table.add s.memory k (Found v) ;
+                Lwt.return_true
+            | Some (Pending _) | Some (Found _) -> Lwt.return_false))
+    | Some (Pending _) | Some (Found _) -> Lwt.return_false
 
   let clear_or_cancel s k =
     match Memory_table.find s.memory k with
-    | None ->
-        ()
+    | None -> ()
     | Some (Pending {wakener = w; _}) ->
         Scheduler.notify_cancellation s.scheduler k ;
         Memory_table.remove s.memory k ;
         Lwt.wakeup_later w (error (Canceled k))
-    | Some (Found _) ->
-        Memory_table.remove s.memory k
+    | Some (Found _) -> Memory_table.remove s.memory k
 
   let watch s = Lwt_watcher.create_stream s.input
 
@@ -661,12 +619,9 @@ end = struct
 
   let pending s k =
     match Memory_table.find s.memory k with
-    | None ->
-        false
-    | Some (Found _) ->
-        false
-    | Some (Pending _) ->
-        true
+    | None -> false
+    | Some (Found _) -> false
+    | Some (Pending _) -> true
 
   let memory_table_length s = Memory_table.length s.memory
 

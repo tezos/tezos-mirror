@@ -166,10 +166,9 @@ test: lint-opam-dune test-code
 .PHONY: check-linting check-python-linting
 
 check-linting:
-	@src/tooling/lint.sh --check-ci --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
 	@src/tooling/lint.sh --check-scripts
 	@src/tooling/lint.sh --check-ocamlformat
-	@dune build @runtest_lint
+	@dune build @fmt
 
 check-python-linting:
 	@make -C tests_python lint
@@ -178,7 +177,7 @@ check-python-linting:
 fmt: fmt-ocaml fmt-python
 
 fmt-ocaml:
-	@src/tooling/lint.sh --format --ignore src/tooling/test/test_not_well_formatted.ml src/tooling/test/test_not_well_formatted.mli tezt/lib/base.ml tezt/lib/base.mli
+	@dune build @fmt --auto-promote
 
 fmt-python:
 	@make -C tests_python fmt

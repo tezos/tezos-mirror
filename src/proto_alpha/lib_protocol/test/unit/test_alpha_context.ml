@@ -44,8 +44,7 @@ let create () =
 module Test_Script = struct
   (** Force serialise of lazy [Big_map.t] in a given [alpha_context] *)
   let test_force_bytes_in_context () =
-    create ()
-    >>=? fun alpha_context ->
+    create () >>=? fun alpha_context ->
     let mbytes_pp ppf t =
       Format.pp_print_string ppf (Environment.Bytes.to_string t)
     in
@@ -67,57 +66,49 @@ end
 module Test_Big_map = struct
   (** Test failure path: look for a non-existent key in a [Big_map] *)
   let test_mem () =
-    create ()
-    >>=? (fun alpha_context ->
-           Big_map.fresh ~temporary:true alpha_context
-           >|= Environment.wrap_tzresult
-           >>=? fun (alpha_context, big_map_id) ->
-           Big_map.mem
-             alpha_context
-             big_map_id
-             (Script_expr_hash.hash_string ["0"; "0"])
-           >|= Environment.wrap_tzresult)
+    ( create () >>=? fun alpha_context ->
+      Big_map.fresh ~temporary:true alpha_context >|= Environment.wrap_tzresult
+      >>=? fun (alpha_context, big_map_id) ->
+      Big_map.mem
+        alpha_context
+        big_map_id
+        (Script_expr_hash.hash_string ["0"; "0"])
+      >|= Environment.wrap_tzresult )
     >>=? fun (_alpha_context, is_member) ->
     Assert.equal_bool ~loc:__LOC__ is_member false
 
   (** Test failure code path of [get_opt] by looking for missing key in a [Big_map.t] *)
   let test_get_opt () =
-    create ()
-    >>=? (fun alpha_context ->
-           Big_map.fresh ~temporary:true alpha_context
-           >|= Environment.wrap_tzresult
-           >>=? fun (alpha_context, big_map_id) ->
-           Big_map.get_opt
-             alpha_context
-             big_map_id
-             (Script_expr_hash.hash_string ["0"; "0"])
-           >|= Environment.wrap_tzresult)
+    ( create () >>=? fun alpha_context ->
+      Big_map.fresh ~temporary:true alpha_context >|= Environment.wrap_tzresult
+      >>=? fun (alpha_context, big_map_id) ->
+      Big_map.get_opt
+        alpha_context
+        big_map_id
+        (Script_expr_hash.hash_string ["0"; "0"])
+      >|= Environment.wrap_tzresult )
     >>=? fun (_alpha_context, value) ->
     match value with
     | Some _ ->
         failwith "get_opt should have failed looking for a non-existent key"
-    | None ->
-        return_unit
+    | None -> return_unit
 
   (** Test existence of a non-existent [Big_map] in an [Alpha_context.t] *)
   let test_exists () =
-    create ()
-    >>=? (fun alpha_context ->
-           Big_map.fresh ~temporary:true alpha_context
-           >|= Environment.wrap_tzresult
-           >>=? fun (alpha_context, big_map_id) ->
-           Big_map.exists alpha_context big_map_id
-           >|= Environment.wrap_tzresult)
+    ( create () >>=? fun alpha_context ->
+      Big_map.fresh ~temporary:true alpha_context >|= Environment.wrap_tzresult
+      >>=? fun (alpha_context, big_map_id) ->
+      Big_map.exists alpha_context big_map_id >|= Environment.wrap_tzresult )
     >>=? fun (_alpha_context, value) ->
     match value with
     | Some _ ->
         failwith "exists should have failed looking for a non-existent big_map"
-    | None ->
-        return_unit
+    | None -> return_unit
 end
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "Script.force_bytes_in_context: checks if it serialises a simple \
        michelson expression"
       `Quick
@@ -134,4 +125,5 @@ let tests =
     Test_services.tztest
       "Big_map.exists: failure case - looking up big_map that doesn't exist"
       `Quick
-      Test_Big_map.test_exists ]
+      Test_Big_map.test_exists;
+  ]

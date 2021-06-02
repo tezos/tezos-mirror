@@ -71,8 +71,7 @@ let secrets () =
   (* Exported from proto_alpha client - TODO : remove when relocated to lib_crypto *)
   let read_key mnemonic email password =
     match Tezos_client_base.Bip39.of_words mnemonic with
-    | None ->
-        assert false
+    | None -> assert false
     | Some t ->
         (* TODO: unicode normalization (NFKD)... *)
         let passphrase = Bytes.(cat (of_string email) (of_string password)) in
@@ -101,7 +100,9 @@ let secrets () =
             ~none:(Invalid_argument "tez conversion")
             (Tez.of_mutez (Int64.of_string amount));
       })
-    [ ( [ "envelope";
+    [
+      ( [
+          "envelope";
           "hospital";
           "mind";
           "sunset";
@@ -115,13 +116,15 @@ let secrets () =
           "lucky";
           "style";
           "picnic";
-          "success" ],
+          "success";
+        ],
         "0f39ed0b656509c2ecec4771712d9cddefe2afac",
         "23932454669343",
         "tz1MawerETND6bqJqx8GV3YHUrvMBCDasRBF",
         "z0eZHQQGKt",
         "cjgfoqmk.wpxnvnup@tezos.example.org" );
-      ( [ "flag";
+      ( [
+          "flag";
           "quote";
           "will";
           "valley";
@@ -135,13 +138,15 @@ let secrets () =
           "cause";
           "demise";
           "bottom";
-          "practice" ],
+          "practice";
+        ],
         "41f98b15efc63fa893d61d7d6eee4a2ce9427ac4",
         "72954577464032",
         "tz1X4maqF9tC1Yn4jULjHRAyzjAtc25Z68TX",
         "MHErskWPE6",
         "oklmcktr.ztljnpzc@tezos.example.org" );
-      ( [ "library";
+      ( [
+          "library";
           "away";
           "inside";
           "paper";
@@ -155,13 +160,15 @@ let secrets () =
           "planet";
           "zone";
           "reflect";
-          "finger" ],
+          "finger";
+        ],
         "411dfef031eeecc506de71c9df9f8e44297cf5ba",
         "217487035428348",
         "tz1SWBY7rWMutEuWS54Pt33MkzAS6eWkUuTc",
         "0AO6BzQNfN",
         "ctgnkvqm.kvtiybky@tezos.example.org" );
-      ( [ "cruel";
+      ( [
+          "cruel";
           "fluid";
           "damage";
           "demand";
@@ -175,13 +182,15 @@ let secrets () =
           "uniform";
           "fire";
           "asthma";
-          "milk" ],
+          "milk";
+        ],
         "08d7d355bc3391d12d140780b39717d9f46fcf87",
         "4092742372031",
         "tz1amUjiZaevaxQy5wKn4SSRvVoERCip3nZS",
         "9kbZ7fR6im",
         "bnyxxzqr.tdszcvqb@tezos.example.org" );
-      ( [ "opera";
+      ( [
+          "opera";
           "divorce";
           "easy";
           "myself";
@@ -195,13 +204,15 @@ let secrets () =
           "humor";
           "ticket";
           "client";
-          "edge" ],
+          "edge";
+        ],
         "9b7cad042fba557618bdc4b62837c5f125b50e56",
         "17590039016550",
         "tz1Zaee3QBtD4ErY1SzqUvyYTrENrExu6yQM",
         "suxT5H09yY",
         "iilkhohu.otnyuvna@tezos.example.org" );
-      ( [ "token";
+      ( [
+          "token";
           "similar";
           "ginger";
           "tongue";
@@ -215,13 +226,15 @@ let secrets () =
           "success";
           "hobby";
           "shell";
-          "cart" ],
+          "cart";
+        ],
         "124c0ca217f11ffc6c7b76a743d867c8932e5afd",
         "26322312350555",
         "tz1geDUUhfXK1EMj7VQdRjug1MoFe6gHWnCU",
         "4odVdLykaa",
         "kwhlglvr.slriitzy@tezos.example.org" );
-      ( [ "shield";
+      ( [
+          "shield";
           "warrior";
           "gorilla";
           "birth";
@@ -235,13 +248,15 @@ let secrets () =
           "extend";
           "pulse";
           "suffer";
-          "vapor" ],
+          "vapor";
+        ],
         "ac7a2125beea68caf5266a647f24dce9fea018a7",
         "244951387881443",
         "tz1h3nY7jcZciJgAwRhWcrEwqfVp7VQoffur",
         "A6yeMqBFG8",
         "lvrmlbyj.yczltcxn@tezos.example.org" );
-      ( [ "waste";
+      ( [
+          "waste";
           "open";
           "scan";
           "tip";
@@ -255,13 +270,15 @@ let secrets () =
           "clerk";
           "another";
           "staff";
-          "liar" ],
+          "liar";
+        ],
         "2b3e94be133a960fa0ef87f6c0922c19f9d87ca2",
         "80065050465525",
         "tz1VzL4Xrb3fL3ckvqCWy6bdGMzU2w9eoRqs",
         "oVZqpq60sk",
         "rfodmrha.zzdndvyk@tezos.example.org" );
-      ( [ "fiber";
+      ( [
+          "fiber";
           "next";
           "property";
           "cradle";
@@ -275,13 +292,15 @@ let secrets () =
           "minimum";
           "nice";
           "boil";
-          "age" ],
+          "age";
+        ],
         "dac31640199f2babc157aadc0021cd71128ca9ea",
         "3569618927693",
         "tz1RUHg536oRKhPLFfttcB5gSWAhh4E9TWjX",
         "FfytQTTVbu",
         "owecikdy.gxnyttya@tezos.example.org" );
-      ( [ "print";
+      ( [
+          "print";
           "labor";
           "budget";
           "speak";
@@ -295,26 +314,26 @@ let secrets () =
           "ankle";
           "happy";
           "only";
-          "exclude" ],
+          "exclude";
+        ],
         "bb841227f250a066eb8429e56937ad504d7b34dd",
         "9034781424478",
         "tz1M1LFbgctcPWxstrao9aLr2ECW1fV4pH5u",
         "zknAl3lrX2",
-        "ettilrvh.zsrqrbud@tezos.example.org" ) ]
+        "ettilrvh.zsrqrbud@tezos.example.org" );
+    ]
 
 let activation_init () =
-  Context.init ~with_commitments:true 1
-  >|=? fun (b, cs) -> secrets () |> fun ss -> (b, cs, ss)
+  Context.init ~with_commitments:true 1 >|=? fun (b, cs) ->
+  secrets () |> fun ss -> (b, cs, ss)
 
 let simple_init_with_commitments () =
-  activation_init ()
-  >>=? fun (blk, _contracts, _secrets) ->
+  activation_init () >>=? fun (blk, _contracts, _secrets) ->
   Block.bake blk >>=? fun _ -> return_unit
 
 (** A single activation *)
 let single_activation () =
-  activation_init ()
-  >>=? fun (blk, _contracts, secrets) ->
+  activation_init () >>=? fun (blk, _contracts, secrets) ->
   let ({account; activation_code; amount = expected_amount; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
@@ -325,10 +344,8 @@ let single_activation () =
     (Contract.implicit_contract account)
     Tez.zero
   >>=? fun () ->
-  Op.activation (B blk) account activation_code
-  >>=? fun operation ->
-  Block.bake ~operation blk
-  >>=? fun blk ->
+  Op.activation (B blk) account activation_code >>=? fun operation ->
+  Block.bake ~operation blk >>=? fun blk ->
   (* Contract does exist *)
   Assert.balance_is
     ~loc:__LOC__
@@ -338,14 +355,11 @@ let single_activation () =
 
 (** 10 activations, one per bake *)
 let multi_activation_1 () =
-  activation_init ()
-  >>=? fun (blk, _contracts, secrets) ->
+  activation_init () >>=? fun (blk, _contracts, secrets) ->
   List.fold_left_es
     (fun blk {account; activation_code; amount = expected_amount; _} ->
-      Op.activation (B blk) account activation_code
-      >>=? fun operation ->
-      Block.bake ~operation blk
-      >>=? fun blk ->
+      Op.activation (B blk) account activation_code >>=? fun operation ->
+      Block.bake ~operation blk >>=? fun blk ->
       Assert.balance_is
         ~loc:__LOC__
         (B blk)
@@ -358,16 +372,14 @@ let multi_activation_1 () =
 
 (** All in one bake *)
 let multi_activation_2 () =
-  activation_init ()
-  >>=? fun (blk, _contracts, secrets) ->
+  activation_init () >>=? fun (blk, _contracts, secrets) ->
   List.fold_left_es
     (fun ops {account; activation_code; _} ->
       Op.activation (B blk) account activation_code >|=? fun op -> op :: ops)
     []
     secrets
   >>=? fun ops ->
-  Block.bake ~operations:ops blk
-  >>=? fun blk ->
+  Block.bake ~operations:ops blk >>=? fun blk ->
   List.iter_es
     (fun {account; amount = expected_amount; _} ->
       (* Contract does exist *)
@@ -380,8 +392,7 @@ let multi_activation_2 () =
 
 (** Transfer with activated account *)
 let activation_and_transfer () =
-  activation_init ()
-  >>=? fun (blk, contracts, secrets) ->
+  activation_init () >>=? fun (blk, contracts, secrets) ->
   let ({account; activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
@@ -389,20 +400,15 @@ let activation_and_transfer () =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts
   in
   let first_contract = Contract.implicit_contract account in
-  Op.activation (B blk) account activation_code
-  >>=? fun operation ->
-  Block.bake ~operation blk
-  >>=? fun blk ->
-  Context.Contract.balance (B blk) bootstrap_contract
-  >>=? fun amount ->
-  Tez.( /? ) amount 2L
-  >>?= fun half_amount ->
+  Op.activation (B blk) account activation_code >>=? fun operation ->
+  Block.bake ~operation blk >>=? fun blk ->
+  Context.Contract.balance (B blk) bootstrap_contract >>=? fun amount ->
+  Tez.( /? ) amount 2L >>?= fun half_amount ->
   Context.Contract.balance (B blk) first_contract
   >>=? fun activated_amount_before ->
   Op.transaction (B blk) bootstrap_contract first_contract half_amount
   >>=? fun operation ->
-  Block.bake ~operation blk
-  >>=? fun blk ->
+  Block.bake ~operation blk >>=? fun blk ->
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk)
@@ -412,8 +418,7 @@ let activation_and_transfer () =
 
 (** Transfer to an unactivated account and then activating it *)
 let transfer_to_unactivated_then_activate () =
-  activation_init ()
-  >>=? fun (blk, contracts, secrets) ->
+  activation_init () >>=? fun (blk, contracts, secrets) ->
   let ({account; activation_code; amount} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
@@ -421,26 +426,19 @@ let transfer_to_unactivated_then_activate () =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts
   in
   let unactivated_commitment_contract = Contract.implicit_contract account in
-  Context.Contract.balance (B blk) bootstrap_contract
-  >>=? fun b_amount ->
-  Tez.( /? ) b_amount 2L
-  >>?= fun b_half_amount ->
-  Incremental.begin_construction blk
-  >>=? fun inc ->
+  Context.Contract.balance (B blk) bootstrap_contract >>=? fun b_amount ->
+  Tez.( /? ) b_amount 2L >>?= fun b_half_amount ->
+  Incremental.begin_construction blk >>=? fun inc ->
   Op.transaction
     (I inc)
     bootstrap_contract
     unactivated_commitment_contract
     b_half_amount
   >>=? fun op ->
-  Incremental.add_operation inc op
-  >>=? fun inc ->
-  Op.activation (I inc) account activation_code
-  >>=? fun op' ->
-  Incremental.add_operation inc op'
-  >>=? fun inc ->
-  Incremental.finalize_block inc
-  >>=? fun blk2 ->
+  Incremental.add_operation inc op >>=? fun inc ->
+  Op.activation (I inc) account activation_code >>=? fun op' ->
+  Incremental.add_operation inc op' >>=? fun inc ->
+  Incremental.finalize_block inc >>=? fun blk2 ->
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk2)
@@ -455,47 +453,36 @@ let transfer_to_unactivated_then_activate () =
 (** Invalid pkh activation : expected to fail as the context does not
     contain any commitment *)
 let invalid_activation_with_no_commitments () =
-  Context.init 1
-  >>=? fun (blk, _) ->
+  Context.init 1 >>=? fun (blk, _) ->
   let secrets = secrets () in
   let ({account; activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
-  Op.activation (B blk) account activation_code
-  >>=? fun operation ->
-  Block.bake ~operation blk
-  >>= fun res ->
+  Op.activation (B blk) account activation_code >>=? fun operation ->
+  Block.bake ~operation blk >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_activation _ ->
-          true
-      | _ ->
-          false)
+      | Apply.Invalid_activation _ -> true
+      | _ -> false)
 
 (** Wrong activation : wrong secret given in the operation *)
 let invalid_activation_wrong_secret () =
-  activation_init ()
-  >>=? fun (blk, _, secrets) ->
+  activation_init () >>=? fun (blk, _, secrets) ->
   let ({account; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth secrets 0
   in
   let ({activation_code; _} as _second_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth secrets 1
   in
-  Op.activation (B blk) account activation_code
-  >>=? fun operation ->
-  Block.bake ~operation blk
-  >>= fun res ->
+  Op.activation (B blk) account activation_code >>=? fun operation ->
+  Block.bake ~operation blk >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_activation _ ->
-          true
-      | _ ->
-          false)
+      | Apply.Invalid_activation _ -> true
+      | _ -> false)
 
 (** Invalid pkh activation : expected to fail as the context does not
     contain an associated commitment *)
 let invalid_activation_inexistent_pkh () =
-  activation_init ()
-  >>=? fun (blk, _, secrets) ->
+  activation_init () >>=? fun (blk, _, secrets) ->
   let ({activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
@@ -503,44 +490,31 @@ let invalid_activation_inexistent_pkh () =
     Signature.Public_key_hash.of_b58check_exn
       "tz1PeQHGKPWSpNoozvxgqLN9TFsj6rDqNV3o"
   in
-  Op.activation (B blk) inexistent_pkh activation_code
-  >>=? fun operation ->
-  Block.bake ~operation blk
-  >>= fun res ->
+  Op.activation (B blk) inexistent_pkh activation_code >>=? fun operation ->
+  Block.bake ~operation blk >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_activation _ ->
-          true
-      | _ ->
-          false)
+      | Apply.Invalid_activation _ -> true
+      | _ -> false)
 
 (** Invalid pkh activation : expected to fail as the commitment has
     already been claimed *)
 let invalid_double_activation () =
-  activation_init ()
-  >>=? fun (blk, _, secrets) ->
+  activation_init () >>=? fun (blk, _, secrets) ->
   let ({account; activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
-  Incremental.begin_construction blk
-  >>=? fun inc ->
-  Op.activation (I inc) account activation_code
-  >>=? fun op ->
-  Incremental.add_operation inc op
-  >>=? fun inc ->
-  Op.activation (I inc) account activation_code
-  >>=? fun op' ->
-  Incremental.add_operation inc op'
-  >>= fun res ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  Op.activation (I inc) account activation_code >>=? fun op ->
+  Incremental.add_operation inc op >>=? fun inc ->
+  Op.activation (I inc) account activation_code >>=? fun op' ->
+  Incremental.add_operation inc op' >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_activation _ ->
-          true
-      | _ ->
-          false)
+      | Apply.Invalid_activation _ -> true
+      | _ -> false)
 
 (** Transfer from an unactivated commitment account *)
 let invalid_transfer_from_unactivated_account () =
-  activation_init ()
-  >>=? fun (blk, contracts, secrets) ->
+  activation_init () >>=? fun (blk, contracts, secrets) ->
   let ({account; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
@@ -555,24 +529,20 @@ let invalid_transfer_from_unactivated_account () =
     bootstrap_contract
     Tez.one
   >>=? fun operation ->
-  Block.bake ~operation blk
-  >>= fun res ->
+  Block.bake ~operation blk >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Contract_storage.Empty_implicit_contract pkh ->
           if pkh = account then true else false
-      | _ ->
-          false)
+      | _ -> false)
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "init with commitments"
       `Quick
       simple_init_with_commitments;
     Test_services.tztest "single activation" `Quick single_activation;
-    Test_services.tztest
-      "multi-activation one-by-one"
-      `Quick
-      multi_activation_1;
+    Test_services.tztest "multi-activation one-by-one" `Quick multi_activation_1;
     Test_services.tztest
       "multi-activation all at a time"
       `Quick
@@ -604,4 +574,5 @@ let tests =
     Test_services.tztest
       "invalid transfer from unactivated account"
       `Quick
-      invalid_transfer_from_unactivated_account ]
+      invalid_transfer_from_unactivated_account;
+  ]

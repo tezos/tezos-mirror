@@ -43,18 +43,19 @@ let build_rpc_directory validator mainchain_validator =
         if !first_run then (
           first_run := false ;
           let chain_store = Chain_validator.chain_store mainchain_validator in
-          Store.Chain.current_head chain_store
-          >>= fun head ->
+          Store.Chain.current_head chain_store >>= fun head ->
           let head_hash = Store.Block.hash head in
           let head_header = Store.Block.header head in
-          Lwt.return_some (head_hash, head_header.shell.timestamp) )
+          Lwt.return_some (head_hash, head_header.shell.timestamp))
         else
           Lwt.pick
-            [ Lwt_stream.get block_stream
+            [
+              Lwt_stream.get block_stream
               >|= Option.map (fun b ->
                       (Store.Block.hash b, Store.Block.timestamp b));
-              ( Chain_validator.bootstrapped mainchain_validator
-              >|= fun () -> None ) ]
+              ( Chain_validator.bootstrapped mainchain_validator >|= fun () ->
+                None );
+            ]
       in
       let shutdown () = Lwt_watcher.shutdown stopper in
       RPC_answer.return_stream {next; shutdown}) ;
@@ -63,58 +64,44 @@ let build_rpc_directory validator mainchain_validator =
       let shutdown () = Lwt_watcher.shutdown stopper in
       let in_chains (chain_store, _block) =
         match q#chains with
-        | [] ->
-            Lwt.return_true
+        | [] -> Lwt.return_true
         | chains ->
             let that_chain_id = Store.Chain.chain_id chain_store in
             List.exists_p
               (fun chain ->
-                Chain_directory.get_chain_id_opt store chain
-                >|= function
-                | None ->
-                    false
+                Chain_directory.get_chain_id_opt store chain >|= function
+                | None -> false
                 | Some this_chain_id ->
                     Chain_id.equal this_chain_id that_chain_id)
               chains
       in
       let in_protocols (chain_store, block) =
         match q#protocols with
-        | [] ->
-            Lwt.return_true
+        | [] -> Lwt.return_true
         | protocols -> (
-            Store.Block.read_predecessor_opt chain_store block
-            >>= function
-            | None ->
-                Lwt.return_false (* won't happen *)
+            Store.Block.read_predecessor_opt chain_store block >>= function
+            | None -> Lwt.return_false (* won't happen *)
             | Some pred ->
-                Store.Block.context_exn chain_store pred
-                >>= fun context ->
-                Context.get_protocol context
-                >>= fun protocol ->
+                Store.Block.context_exn chain_store pred >>= fun context ->
+                Context.get_protocol context >>= fun protocol ->
                 Lwt.return
-                  (List.exists (Protocol_hash.equal protocol) protocols) )
+                  (List.exists (Protocol_hash.equal protocol) protocols))
       in
       let in_next_protocols (chain_store, block) =
         match q#next_protocols with
-        | [] ->
-            Lwt.return_true
+        | [] -> Lwt.return_true
         | protocols ->
-            Store.Block.context_exn chain_store block
-            >>= fun context ->
-            Context.get_protocol context
-            >>= fun next_protocol ->
+            Store.Block.context_exn chain_store block >>= fun context ->
+            Context.get_protocol context >>= fun next_protocol ->
             Lwt.return
               (List.exists (Protocol_hash.equal next_protocol) protocols)
       in
       let stream =
         Lwt_stream.filter_map_s
           (fun ((chain_store, block) as elt) ->
-            in_chains elt
-            >>= fun in_chains ->
-            in_next_protocols elt
-            >>= fun in_next_protocols ->
-            in_protocols elt
-            >>= fun in_protocols ->
+            in_chains elt >>= fun in_chains ->
+            in_next_protocols elt >>= fun in_next_protocols ->
+            in_protocols elt >>= fun in_protocols ->
             if in_chains && in_protocols && in_next_protocols then
               let chain_id = Store.Chain.chain_id chain_store in
               Lwt.return_some
@@ -126,44 +113,36 @@ let build_rpc_directory validator mainchain_validator =
       RPC_answer.return_stream {next; shutdown}) ;
   gen_register1 Monitor_services.S.heads (fun chain q () ->
       (* TODO: when `chain = `Test`, should we reset then stream when
-       the `testnet` change, or dias we currently do ?? *)
-      Chain_directory.get_chain_store_exn store chain
-      >>= fun chain_store ->
+         the `testnet` change, or dias we currently do ?? *)
+      Chain_directory.get_chain_store_exn store chain >>= fun chain_store ->
       match Validator.get validator (Store.Chain.chain_id chain_store) with
-      | Error _ ->
-          Lwt.fail Not_found
+      | Error _ -> Lwt.fail Not_found
       | Ok chain_validator ->
           let (block_stream, stopper) =
             Chain_validator.new_head_watcher chain_validator
           in
-          Store.Chain.current_head chain_store
-          >>= fun head ->
+          Store.Chain.current_head chain_store >>= fun head ->
           let shutdown () = Lwt_watcher.shutdown stopper in
           let in_next_protocols block =
             match q#next_protocols with
-            | [] ->
-                Lwt.return_true
+            | [] -> Lwt.return_true
             | protocols ->
-                Store.Block.context_exn chain_store block
-                >>= fun context ->
-                Context.get_protocol context
-                >>= fun next_protocol ->
+                Store.Block.context_exn chain_store block >>= fun context ->
+                Context.get_protocol context >>= fun next_protocol ->
                 Lwt.return
                   (List.exists (Protocol_hash.equal next_protocol) protocols)
           in
           let stream =
             Lwt_stream.filter_map_s
               (fun block ->
-                in_next_protocols block
-                >>= fun in_next_protocols ->
+                in_next_protocols block >>= fun in_next_protocols ->
                 if in_next_protocols then
                   Lwt.return_some
                     (Store.Block.hash block, Store.Block.header block)
                 else Lwt.return_none)
               block_stream
           in
-          in_next_protocols head
-          >>= fun first_block_is_among_next_protocols ->
+          in_next_protocols head >>= fun first_block_is_among_next_protocols ->
           let first_call =
             (* Skip the first block if this is false *)
             ref first_block_is_among_next_protocols
@@ -171,8 +150,7 @@ let build_rpc_directory validator mainchain_validator =
           let next () =
             if !first_call then (
               first_call := false ;
-              Lwt.return_some (Store.Block.hash head, Store.Block.header head)
-              )
+              Lwt.return_some (Store.Block.hash head, Store.Block.header head))
             else Lwt_stream.get stream
           in
           RPC_answer.return_stream {next; shutdown}) ;
@@ -199,10 +177,8 @@ let build_rpc_directory validator mainchain_validator =
               chain_id
           then Lwt.return (Monitor_services.Active_main chain_id)
           else
-            Store.get_chain_store_opt store chain_id
-            >>= function
-            | None ->
-                Lwt.fail Not_found
+            Store.get_chain_store_opt store chain_id >>= function
+            | None -> Lwt.fail Not_found
             | Some chain_store ->
                 let {Genesis.protocol; _} = Store.Chain.genesis chain_store in
                 let expiration_date =
@@ -225,14 +201,11 @@ let build_rpc_directory validator mainchain_validator =
           List.map_p
             (fun c -> convert (c, true))
             (Validator.get_active_chains validator)
-          >>= fun l -> Lwt.return_some l )
+          >>= fun l -> Lwt.return_some l)
         else
-          Lwt_stream.get stream
-          >>= function
-          | None ->
-              Lwt.return_none
-          | Some c ->
-              convert c >>= fun status -> Lwt.return_some [status]
+          Lwt_stream.get stream >>= function
+          | None -> Lwt.return_none
+          | Some c -> convert c >>= fun status -> Lwt.return_some [status]
       in
       RPC_answer.return_stream {next; shutdown}) ;
   !dir

@@ -64,8 +64,7 @@ let run_node =
   let* () = Node.add_peer_with_id node_2 node_1 in
   let* () = Node.run node_2 [] in
   let* () = wait in
-  let* _ = Node.wait_for_level node_1 1
-  and* _ = Node.wait_for_level node_2 1 in
+  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
   unit
 
 let register ~protocols = run_node ~protocols

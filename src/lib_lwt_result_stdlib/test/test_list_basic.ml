@@ -27,10 +27,8 @@ open Support.Lib.Monad
 
 let assert_eq_s pa pb =
   let open Lwt.Infix in
-  pa
-  >>= fun a ->
-  pb
-  >>= fun b ->
+  pa >>= fun a ->
+  pb >>= fun b ->
   assert (a = b) ;
   Lwt.return_unit
 
@@ -38,15 +36,13 @@ let assert_err e = e = Error ()
 
 let assert_err_s e =
   let open Lwt.Infix in
-  e
-  >>= fun e ->
+  e >>= fun e ->
   assert (e = Error ()) ;
   Lwt.return_unit
 
 let assert_err_p e =
   let open Lwt.Infix in
-  e
-  >>= fun e ->
+  e >>= fun e ->
   assert (e = Error (Support.Test_trace.make ())) ;
   Lwt.return_unit
 
@@ -95,8 +91,10 @@ module Last = struct
     ()
 
   let tests =
-    [ Alcotest_lwt.test_case_sync "last" `Quick last;
-      Alcotest_lwt.test_case_sync "last_opt" `Quick last_opt ]
+    [
+      Alcotest_lwt.test_case_sync "last" `Quick last;
+      Alcotest_lwt.test_case_sync "last_opt" `Quick last_opt;
+    ]
 end
 
 module Init = struct
@@ -157,12 +155,14 @@ module Init = struct
     >>= fun () -> Lwt.return_unit
 
   let tests =
-    [ Alcotest_lwt.test_case_sync "init" `Quick init;
+    [
+      Alcotest_lwt.test_case_sync "init" `Quick init;
       Alcotest_lwt.test_case_sync "init_e" `Quick init_e;
       Alcotest_lwt.test_case "init_s" `Quick init_s;
       Alcotest_lwt.test_case "init_es" `Quick init_es;
       Alcotest_lwt.test_case "init_p" `Quick init_p;
-      Alcotest_lwt.test_case "init_ep" `Quick init_ep ]
+      Alcotest_lwt.test_case "init_ep" `Quick init_ep;
+    ]
 end
 
 module FilterSmthg = struct
@@ -178,7 +178,7 @@ module FilterSmthg = struct
       let right =
         base |> map (fun x -> if cond x then Some x else None) |> filter_some
       in
-      left = right ) ;
+      left = right) ;
     ()
 
   let filter_ok () =
@@ -193,7 +193,7 @@ module FilterSmthg = struct
         |> map (fun x -> if cond x then Ok x else Error (4 * x))
         |> filter_ok
       in
-      left = right ) ;
+      left = right) ;
     ()
 
   let filter_error () =
@@ -208,13 +208,15 @@ module FilterSmthg = struct
         |> map (fun x -> if cond x then Error x else Ok (4 * x))
         |> filter_error
       in
-      left = right ) ;
+      left = right) ;
     ()
 
   let tests =
-    [ Alcotest_lwt.test_case_sync "filter_some" `Quick filter_some;
+    [
+      Alcotest_lwt.test_case_sync "filter_some" `Quick filter_some;
       Alcotest_lwt.test_case_sync "filter_ok" `Quick filter_ok;
-      Alcotest_lwt.test_case_sync "filter_error" `Quick filter_error ]
+      Alcotest_lwt.test_case_sync "filter_error" `Quick filter_error;
+    ]
 end
 
 module Combine = struct
@@ -229,14 +231,14 @@ module Combine = struct
     assert (combine ~when_different_lengths:() [0] [1] = Ok [(0, 1)]) ;
     assert (
       combine ~when_different_lengths:() (up 100) (down 100)
-      = init ~when_negative_length:() 101 (fun i -> (i, 100 - i)) ) ;
+      = init ~when_negative_length:() 101 (fun i -> (i, 100 - i))) ;
     ()
 
   let combine_drop () =
     assert (combine_drop [] [] = []) ;
     assert (
       Ok (combine_drop (up 100) (down 100))
-      = init ~when_negative_length:() 101 (fun i -> (i, 100 - i)) ) ;
+      = init ~when_negative_length:() 101 (fun i -> (i, 100 - i))) ;
     assert (combine_drop [0] [1] = [(0, 1)]) ;
     assert (combine_drop [] [0] = []) ;
     assert (combine_drop [0] [] = []) ;
@@ -249,23 +251,25 @@ module Combine = struct
       combine_with_leftovers (up 100) (down 100)
       = ( Stdlib.Result.get_ok
           @@ init ~when_negative_length:() 101 (fun i -> (i, 100 - i)),
-          None ) ) ;
+          None )) ;
     assert (combine_with_leftovers [0] [1] = ([(0, 1)], None)) ;
     assert (combine_with_leftovers [] [0] = ([], Some (`Right [0]))) ;
     assert (combine_with_leftovers [0] [] = ([], Some (`Left [0]))) ;
     assert (
       combine_with_leftovers (up 100) (up 99)
-      = (map (fun i -> (i, i)) (up 99), Some (`Left [100])) ) ;
+      = (map (fun i -> (i, i)) (up 99), Some (`Left [100]))) ;
     ()
 
   let tests =
-    [ Alcotest_lwt.test_case_sync "combine-error" `Quick combine_error;
+    [
+      Alcotest_lwt.test_case_sync "combine-error" `Quick combine_error;
       Alcotest_lwt.test_case_sync "combine-ok" `Quick combine_ok;
       Alcotest_lwt.test_case_sync "combine_drop" `Quick combine_drop;
       Alcotest_lwt.test_case_sync
         "combine_with_leftovers"
         `Quick
-        combine_with_leftovers ]
+        combine_with_leftovers;
+    ]
 end
 
 module Partition = struct
@@ -279,7 +283,7 @@ module Partition = struct
     assert (partition_result (map (fun x -> Error x) (up 11)) = ([], up 11)) ;
     assert (
       let input = map (fun x -> if cond x then Ok x else Error x) (up 101) in
-      partition_result input = (filter_ok input, filter_error input) ) ;
+      partition_result input = (filter_ok input, filter_error input)) ;
     ()
 
   let tests =
@@ -289,10 +293,12 @@ end
 let () =
   Alcotest_lwt.run
     "list-basic"
-    [ ("nth", Nth.tests);
+    [
+      ("nth", Nth.tests);
       ("last", Last.tests);
       ("init", Init.tests);
       ("filter_*", FilterSmthg.tests);
       ("combine_*", Combine.tests);
-      ("partition_*", Partition.tests) ]
+      ("partition_*", Partition.tests);
+    ]
   |> Lwt_main.run

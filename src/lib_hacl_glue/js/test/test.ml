@@ -17,7 +17,8 @@ type 'a ed25519_test = {
 }
 
 let ed25519_tests =
-  [ {
+  [
+    {
       name = "Test 1";
       sk =
         Bytes.of_string
@@ -29,12 +30,14 @@ let ed25519_tests =
       expected_sig =
         Bytes.of_string
           "\xe5\x56\x43\x00\xc3\x60\xac\x72\x90\x86\xe2\xcc\x80\x6e\x82\x8a\x84\x87\x7f\x1e\xb8\xe5\xd9\x74\xd8\x73\xe0\x65\x22\x49\x01\x55\x5f\xb8\x82\x15\x90\xa3\x3b\xac\xc6\x1e\x39\x70\x1c\xf9\xb4\x6b\xd2\x5b\xf5\xf0\x59\x5b\xbe\x24\x65\x51\x41\x43\x8e\x7a\x10\x0b";
-    } ]
+    };
+  ]
 
 type 'a curve25519_test = {name : string; sk : 'a; pk : 'a}
 
 let curve25519_tests =
-  [ {
+  [
+    {
       name = "Test 1";
       sk =
         Bytes.of_string
@@ -42,12 +45,14 @@ let curve25519_tests =
       pk =
         Bytes.of_string
           "\x52\x19\x01\x0a\x3d\xd8\x97\x9f\xd8\x4a\x5b\xb9\x7f\x53\x6d\x78\xe7\x77\x5f\xe0\x36\x7b\x11\x20\x77\x71\x12\xd0\x0d\xc5\x45\x5c";
-    } ]
+    };
+  ]
 
 type 'a blake2_test = {name : string; plaintext : 'a; key : 'a; expected : 'a}
 
 let blake2b_tests =
-  [ {
+  [
+    {
       name = "Test 1";
       plaintext =
         Bytes.of_string
@@ -58,50 +63,60 @@ let blake2b_tests =
       expected =
         Bytes.of_string
           "\xc8\xf6\x8e\x69\x6e\xd2\x82\x42\xbf\x99\x7f\x5b\x3b\x34\x95\x95\x08\xe4\x2d\x61\x38\x10\xf1\xe2\xa4\x35\xc9\x6e\xd2\xff\x56\x0c\x70\x22\xf3\x61\xa9\x23\x4b\x98\x37\xfe\xee\x90\xbf\x47\x92\x2e\xe0\xfd\x5f\x8d\xdf\x82\x37\x18\xd8\x6d\x1e\x16\xc6\x09\x00\x71";
-    } ]
+    };
+  ]
 
 type 'a hash_test = {name : string; plaintext : 'a; expected : 'a}
 
 let sha2_256_tests =
-  [ {
+  [
+    {
       name = "SHA2_256 Test 1";
       plaintext = Bytes.of_string "\x61\x62\x63";
       expected =
         Bytes.of_string
           "\xba\x78\x16\xbf\x8f\x01\xcf\xea\x41\x41\x40\xde\x5d\xae\x22\x23\xb0\x03\x61\xa3\x96\x17\x7a\x9c\xb4\x10\xff\x61\xf2\x00\x15\xad";
-    } ]
+    };
+  ]
 
 let sha2_512_tests =
-  [ {
+  [
+    {
       name = "SHA2_512 Test 1";
       plaintext = Bytes.of_string "\x61\x62\x63";
       expected =
         Bytes.of_string
           "\xdd\xaf\x35\xa1\x93\x61\x7a\xba\xcc\x41\x73\x49\xae\x20\x41\x31\x12\xe6\xfa\x4e\x89\xa9\x7e\xa2\x0a\x9e\xee\xe6\x4b\x55\xd3\x9a\x21\x92\x99\x2a\x27\x4f\xc1\xa8\x36\xba\x3c\x23\xa3\xfe\xeb\xbd\x45\x4d\x44\x23\x64\x3c\xe8\x0e\x2a\x9a\xc9\x4f\xa5\x4c\xa4\x9f";
-    } ]
+    };
+  ]
 
 let sha3_256_tests =
-  [ {
+  [
+    {
       name = "SHA3_256 Test 1";
       plaintext = Bytes.of_string "\x61\x62\x63";
       expected =
         Bytes.of_string
           "\x3a\x98\x5d\xa7\x4f\xe2\x25\xb2\x04\x5c\x17\x2d\x6b\xd3\x90\xbd\x85\x5f\x08\x6e\x3e\x9d\x52\x5b\x46\xbf\xe2\x45\x11\x43\x15\x32";
-    } ]
+    };
+  ]
 
 let sha3_512_tests =
-  [ {
+  [
+    {
       name = "SHA3_512 Test 1";
       plaintext = Bytes.of_string "\x61\x62\x63";
       expected =
         Bytes.of_string
           "\xb7\x51\x85\x0b\x1a\x57\x16\x8a\x56\x93\xcd\x92\x4b\x6b\x09\x6e\x08\xf6\x21\x82\x74\x44\xf7\x0d\x88\x4f\x5d\x02\x40\xd2\x71\x2e\x10\xe1\x16\xe9\x19\x2a\xf3\xc9\x1a\x7e\xc5\x76\x47\xe3\x93\x40\x57\x34\x0b\x4c\xf4\x08\xd5\xa5\x65\x92\xf8\x27\x4e\xec\x53\xf0";
-    } ]
+    };
+  ]
 
 type 'a hmac_test = {name : string; key : 'a; data : 'a; expected : 'a}
 
 let hmac_sha256_tests =
-  [ {
+  [
+    {
       name = "SHA2_256 Test 1";
       key = Bytes.of_string "\x4a\x65\x66\x65";
       data =
@@ -110,10 +125,12 @@ let hmac_sha256_tests =
       expected =
         Bytes.of_string
           "\x5b\xdc\xc1\x46\xbf\x60\x75\x4e\x6a\x04\x24\x26\x08\x95\x75\xc7\x5a\x00\x3f\x08\x9d\x27\x39\x83\x9d\xec\x58\xb9\x64\xec\x38\x43";
-    } ]
+    };
+  ]
 
 let hmac_sha512_tests =
-  [ {
+  [
+    {
       name = "SHA2_512 Test 1";
       key = Bytes.of_string "\x4a\x65\x66\x65";
       data =
@@ -122,7 +139,8 @@ let hmac_sha512_tests =
       expected =
         Bytes.of_string
           "\x16\x4b\x7a\x7b\xfc\xf8\x19\xe2\xe3\x95\xfb\xe7\x3b\x56\xe0\xa3\x87\xbd\x64\x22\x2e\x83\x1f\xd6\x10\x27\x0c\xd7\xea\x25\x05\x54\x97\x58\xbf\x75\xc0\x5a\x99\x4a\x6d\x03\x4f\x65\xf8\xf0\xe6\xfd\xca\xea\xb1\xa3\x4d\x4a\x6b\x4b\x63\x6e\x07\x0a\x38\xbc\xe7\x37";
-    } ]
+    };
+  ]
 
 type 'a secretbox_test = {
   name : string;
@@ -133,7 +151,8 @@ type 'a secretbox_test = {
 }
 
 let secretbox_tests =
-  [ {
+  [
+    {
       name = "Test 1";
       key =
         Bytes.of_string
@@ -160,7 +179,8 @@ let secretbox_tests =
       expected_ct =
         Bytes.of_string
           "\x00\x21\xf4\x17\x24\xbe\x3a\xc9\xa4\x6b\xd5\x6c\x19\x64\x4d\x32\x0e\xb9\xcb\x66\x30\x3b\x98\xed\xa2\x9e\x22\x81\xed\x5e";
-    } ]
+    };
+  ]
 
 type 'a box_test = {
   name : string;
@@ -172,7 +192,8 @@ type 'a box_test = {
 }
 
 let box_tests =
-  [ {
+  [
+    {
       name = "Test 1";
       pk =
         Bytes.of_string
@@ -199,7 +220,8 @@ let box_tests =
       expected_ct =
         Bytes.of_string
           "\x77\x87\x8b\x2b\xce\x5a\xbf\x2f\xac\x5a\x14\xec\xd9\x58\x09\x68\xa6\x97\x6a\x8a\xf3\x41\x15\xce\x02\x3c\x95\x0e";
-    } ]
+    };
+  ]
 
 type 'a p256_test = {
   name : string;
@@ -211,7 +233,8 @@ type 'a p256_test = {
 }
 
 let p256_tests =
-  [ {
+  [
+    {
       name = "Test 1";
       msg =
         Bytes.of_string
@@ -228,7 +251,8 @@ let p256_tests =
       expected_sig =
         Bytes.of_string
           "\xf3\xac\x80\x61\xb5\x14\x79\x5b\x88\x43\xe3\xd6\x62\x95\x27\xed\x2a\xfd\x6b\x1f\x6a\x55\x5a\x7a\xca\xbb\x5e\x6f\x79\xc8\xc2\xac\xcf\xa7\x40\xfe\xc7\x67\x96\xd2\xe3\x92\x16\xbe\x7e\xbf\x58\x0e\xa3\xc0\xef\x4b\xb0\x0a\xb2\xe7\xe4\x20\x84\x34\xf4\x5f\x8c\x9c";
-    } ]
+    };
+  ]
 
 let test_ed25519 (v : Bytes.t ed25519_test) : unit =
   log_s "Testing Ed25519" ;
@@ -255,9 +279,7 @@ let test_p256 (v : Bytes.t p256_test) : unit =
   log_s "[P256.keypair] Success" ;
   assert (pk1 = Hacl.P256.neuterize sk1) ;
   let pk = Option.get @@ Hacl.P256.pk_of_bytes v.pk in
-  let pk_unsafe =
-    Option.get @@ Hacl.P256.pk_of_bytes_without_validation v.pk
-  in
+  let pk_unsafe = Option.get @@ Hacl.P256.pk_of_bytes_without_validation v.pk in
   assert (Hacl.P256.equal pk pk_unsafe) ;
   let sk = Option.get @@ Hacl.P256.sk_of_bytes v.sk in
   assert (pk = Hacl.P256.neuterize sk) ;
@@ -425,10 +447,7 @@ let[@ocaml.warning "-21"] () =
     @@ fun hacl -> Js.Unsafe.(set global (Js.string "_HACL") hacl)
   in
   let main = Js.Unsafe.inject @@ Js.wrap_callback main in
-  init_promise
-  |> fun p ->
-  Js.Unsafe.meth_call p "then" [|global_setter|]
-  |> fun p ->
-  Js.Unsafe.meth_call p "then" [|main|]
-  |> fun p ->
+  init_promise |> fun p ->
+  Js.Unsafe.meth_call p "then" [|global_setter|] |> fun p ->
+  Js.Unsafe.meth_call p "then" [|main|] |> fun p ->
   Js.Unsafe.meth_call p "catch" [|Js.Unsafe.inject @@ Js.wrap_callback log|]

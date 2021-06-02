@@ -48,8 +48,7 @@ module Proto_nonce = struct
         let hash = Alpha_context.Nonce.hash nonce in
         Table.add known_nonces hash nonce ;
         (hash, nonce)
-    | Error _ ->
-        assert false
+    | Error _ -> assert false
 
   let forget_all () = Table.clear known_nonces
 
@@ -92,8 +91,8 @@ module Account = struct
   let find pkh =
     try
       return
-        ( Signature.Public_key_hash.Table.find known_accounts pkh
-        |> WithExceptions.Option.to_exn ~none:Not_found )
+        (Signature.Public_key_hash.Table.find known_accounts pkh
+        |> WithExceptions.Option.to_exn ~none:Not_found)
     with Not_found ->
       failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
 
@@ -176,10 +175,12 @@ let get_next_baker_by_account ctxt pkh block =
     ~max_priority:256
     block
   >>=? fun bakers ->
-  let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
-        timestamp;
-        priority;
-        _ } =
+  let {
+    Alpha_services.Delegate.Baking_rights.delegate = pkh;
+    timestamp;
+    priority;
+    _;
+  } =
     List.hd bakers |> WithExceptions.Option.get ~loc:__LOC__
   in
   return (pkh, priority, WithExceptions.Option.get ~loc:__LOC__ timestamp)
@@ -190,10 +191,12 @@ let get_next_baker_excluding ctxt excludes block =
     ~max_priority:256
     block
   >>=? fun bakers ->
-  let { Alpha_services.Delegate.Baking_rights.delegate = pkh;
-        timestamp;
-        priority;
-        _ } =
+  let {
+    Alpha_services.Delegate.Baking_rights.delegate = pkh;
+    timestamp;
+    priority;
+    _;
+  } =
     List.find
       (fun {Alpha_services.Delegate.Baking_rights.delegate; _} ->
         not (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
@@ -203,12 +206,9 @@ let get_next_baker_excluding ctxt excludes block =
   return (pkh, priority, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let dispatch_policy ctxt = function
-  | By_priority p ->
-      get_next_baker_by_priority ctxt p
-  | By_account a ->
-      get_next_baker_by_account ctxt a
-  | Excluding al ->
-      get_next_baker_excluding ctxt al
+  | By_priority p -> get_next_baker_by_priority ctxt p
+  | By_account a -> get_next_baker_by_account ctxt a
+  | Excluding al -> get_next_baker_excluding ctxt al
 
 let get_next_baker chain_store ?(policy = By_priority 0) =
   dispatch_policy chain_store policy
@@ -256,8 +256,7 @@ module Forge = struct
   let set_baker baker header = {header with baker}
 
   let sign_header ~chain_id {baker; shell; contents} =
-    Account.find baker
-    >>=? fun delegate ->
+    Account.find baker >>=? fun delegate ->
     let unsigned_bytes =
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding
@@ -273,8 +272,7 @@ module Forge = struct
 
   let forge_header ctxt ?(policy = By_priority 0) ?timestamp ~operations pred =
     let proto_level = Store.Block.proto_level pred in
-    dispatch_policy ctxt policy pred
-    >>=? fun (pkh, priority, _timestamp) ->
+    dispatch_policy ctxt policy pred >>=? fun (pkh, priority, _timestamp) ->
     Alpha_services.Delegate.Minimal_valid_time.get
       (rpc_ctxt ctxt)
       pred
@@ -284,19 +282,15 @@ module Forge = struct
     let timestamp = Option.value ~default:expected_timestamp timestamp in
     let level = Int32.succ (Store.Block.level pred) in
     let fitness = Fitness_repr.to_int64 (Store.Block.fitness pred) in
-    ( match fitness with
+    (match fitness with
     | Ok old_fitness ->
         return
           (Fitness_repr.from_int64 (Int64.add (Int64.of_int 1) old_fitness))
-    | Error _ ->
-        assert false )
+    | Error _ -> assert false)
     >>=? fun fitness ->
-    Plugin.RPC.current_level ~offset:1l (rpc_ctxt ctxt) pred
-    >|=? (function
-           | {expected_commitment = true; _} ->
-               Some (fst (Proto_nonce.generate ()))
-           | {expected_commitment = false; _} ->
-               None)
+    (Plugin.RPC.current_level ~offset:1l (rpc_ctxt ctxt) pred >|=? function
+     | {expected_commitment = true; _} -> Some (fst (Proto_nonce.generate ()))
+     | {expected_commitment = false; _} -> None)
     >>=? fun seed_nonce_hash ->
     let operations_hash =
       Operation_list_list_hash.compute
@@ -352,7 +346,8 @@ let check_constants_consistency constants =
 
 let default_accounts =
   let initial_accounts =
-    [ ( "tz1Wi61aZXxBDTa3brfPfYgMawojnAFTjy8u",
+    [
+      ( "tz1Wi61aZXxBDTa3brfPfYgMawojnAFTjy8u",
         "edpkvMmiFiAs9Uj9a53dZVPGNJDxMDkAcsEAyVG6dau7GF9vfGWGEY",
         "edsk3UqeiQWXX7NFEY1wUs6J1t2ez5aQ3hEWdqX5Jr5edZiGLW8nZr" );
       ( "tz1Y5JfsJXF4ip1RUQHCgaMbqHAzMDWaiJFf",
@@ -366,7 +361,8 @@ let default_accounts =
         "edsk3Dn8hFgHKxvjK89tMnU2fCrR6AxSprTM8cR9WaBZcysEa2uird" );
       ( "tz1c7arDAi3tDzAXEmYHprwuNsJiFBQJKtjc",
         "edpku6BBVDhWUBCrcVEYjjAdizR1NQGF24v5bAEL34A71oLr9QqzNo",
-        "edsk2q6rzFB35micz8ZauYcUMUFyF9rVPvP3PQXZyuYPSzuEYbSMkG" ) ]
+        "edsk2q6rzFB35micz8ZauYcUMUFyF9rVPvP3PQXZyuYPSzuEYbSMkG" );
+    ]
   in
   let default_amount = Tez.of_mutez_exn 4_000_000_000_000L in
   let open Account in
@@ -404,31 +400,25 @@ let default_patch_context ctxt =
     }
   in
   let open Tezos_protocol_alpha_parameters in
-  let json =
-    Default_parameters.json_of_parameters default_genesis_parameters
-  in
+  let json = Default_parameters.json_of_parameters default_genesis_parameters in
   let proto_params =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
-  Context.add ctxt ["version"] (Bytes.of_string "genesis")
-  >>= fun ctxt ->
-  Context.add ctxt protocol_param_key proto_params
-  >>= fun ctxt ->
+  Context.add ctxt ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
+  Context.add ctxt protocol_param_key proto_params >>= fun ctxt ->
   let ctxt = Shell_context.wrap_disk_context ctxt in
-  Main.init ctxt shell >|= Environment.wrap_tzresult
-  >>= function
-  | Error _ ->
-      assert false
-  | Ok {context; _} ->
-      return (Shell_context.unwrap_disk_context context)
+  Main.init ctxt shell >|= Environment.wrap_tzresult >>= function
+  | Error _ -> assert false
+  | Ok {context; _} -> return (Shell_context.unwrap_disk_context context)
 
 (********* Baking *************)
 
 let nb_validation_passes = List.length Main.validation_passes
 
 let list_init_exn n f =
-  List.init ~when_negative_length:(Failure "list init exn") n f
-  |> function Ok x -> x | _ -> assert false
+  List.init ~when_negative_length:(Failure "list init exn") n f |> function
+  | Ok x -> x
+  | _ -> assert false
 
 let empty_operations = list_init_exn nb_validation_passes (fun _ -> [])
 
@@ -436,17 +426,13 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   Forge.forge_header ctxt ?policy ~operations pred
   >>=? fun {shell; contents; baker} ->
   let protocol_data = {Block_header.contents; signature = Signature.zero} in
-  ( match Store.Block.block_metadata_hash pred with
-  | None ->
-      Lwt.return ctxt
-  | Some hash ->
-      Context.add_predecessor_block_metadata_hash ctxt hash )
+  (match Store.Block.block_metadata_hash pred with
+  | None -> Lwt.return ctxt
+  | Some hash -> Context.add_predecessor_block_metadata_hash ctxt hash)
   >>= fun context ->
-  ( match Store.Block.all_operations_metadata_hash pred with
-  | None ->
-      Lwt.return context
-  | Some hash ->
-      Context.add_predecessor_ops_metadata_hash context hash )
+  (match Store.Block.all_operations_metadata_hash pred with
+  | None -> Lwt.return context
+  | Some hash -> Context.add_predecessor_ops_metadata_hash context hash)
   >>= fun ctxt ->
   (let open Environment.Error_monad in
   Main.begin_construction
@@ -485,8 +471,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       block_header_metadata
   in
   let shell = {shell with context = context_hash} in
-  Forge.sign_header ~chain_id {baker; shell; contents}
-  >>=? fun header ->
+  Forge.sign_header ~chain_id {baker; shell; contents} >>=? fun header ->
   let protocol_data =
     Data_encoding.Binary.to_bytes_exn
       Main.block_header_data_encoding
@@ -513,8 +498,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
 
 let apply_and_store chain_store ?(synchronous_merge = true) ?policy
     ?(operations = empty_operations) pred =
-  Store.Block.context chain_store pred
-  >>=? fun ctxt ->
+  Store.Block.context chain_store pred >>=? fun ctxt ->
   let chain_id = Store.Chain.chain_id chain_store in
   apply ctxt chain_id ~policy ~operations pred
   >>=? fun ( block_header,
@@ -554,18 +538,13 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
   | Some b ->
       if synchronous_merge then (
         let block_store = Store.Unsafe.get_block_store chain_store in
-        Block_store.await_merging block_store
-        >>= fun () ->
-        Store.Chain.set_head chain_store b
-        >>=? fun _ ->
-        Block_store.await_merging block_store
-        >>= fun () ->
-        ( match Block_store.get_merge_status block_store with
-        | Merge_failed err ->
-            Assert.fail_msg "%a" pp_print_error err
-        | Running | Not_running ->
-            () ) ;
-        return b )
+        Block_store.await_merging block_store >>= fun () ->
+        Store.Chain.set_head chain_store b >>=? fun _ ->
+        Block_store.await_merging block_store >>= fun () ->
+        (match Block_store.get_merge_status block_store with
+        | Merge_failed err -> Assert.fail_msg "%a" pp_print_error err
+        | Running | Not_running -> ()) ;
+        return b)
       else Store.Chain.set_head chain_store b >>=? fun _ -> return b
   | None ->
       let h = Tezos_base.Block_header.hash block_header in
@@ -575,14 +554,10 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
 let bake chain_store ?synchronous_merge ?policy ?operation ?operations pred =
   let operations =
     match (operation, operations) with
-    | (Some op, Some ops) ->
-        Some (op :: ops)
-    | (Some op, None) ->
-        Some [op]
-    | (None, Some ops) ->
-        Some ops
-    | (None, None) ->
-        None
+    | (Some op, Some ops) -> Some (op :: ops)
+    | (Some op, None) -> Some [op]
+    | (None, Some ops) -> Some ops
+    | (None, None) -> None
   in
   apply_and_store ?synchronous_merge chain_store ?policy ?operations pred
 
@@ -590,14 +565,14 @@ let bake chain_store ?synchronous_merge ?policy ?operation ?operations pred =
 
 (* This function is duplicated from Context to avoid a cyclic dependency *)
 let get_constants chain_store b =
-  Store.Block.context chain_store b
-  >>=? fun ctxt -> Alpha_services.Constants.all (rpc_ctxt ctxt) b
+  Store.Block.context chain_store b >>=? fun ctxt ->
+  Alpha_services.Constants.all (rpc_ctxt ctxt) b
 
 let bake_n chain_store ?synchronous_merge ?policy n b =
   List.fold_left_es
     (fun (bl, last) _ ->
-      bake ?synchronous_merge chain_store ?policy last
-      >>=? fun b -> return (b :: bl, b))
+      bake ?synchronous_merge chain_store ?policy last >>=? fun b ->
+      return (b :: bl, b))
     ([], b)
     (1 -- n)
   >>=? fun (bl, last) -> return (List.rev bl, last)

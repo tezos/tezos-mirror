@@ -56,11 +56,7 @@ module Int31_index : INDEX with type t = int = struct
 
   let to_path c l = string_of_int c :: l
 
-  let of_path = function
-    | [] | _ :: _ :: _ ->
-        None
-    | [c] ->
-        int_of_string_opt c
+  let of_path = function [] | _ :: _ :: _ -> None | [c] -> int_of_string_opt c
 
   type 'a ipath = 'a * t
 
@@ -231,41 +227,37 @@ module Contract = struct
       Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost value)
 
     let get ctxt contract =
-      I.get ctxt contract
-      >>=? fun (ctxt, value) ->
+      I.get ctxt contract >>=? fun (ctxt, value) ->
       Lwt.return
         (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
 
     let find ctxt contract =
-      I.find ctxt contract
-      >>=? fun (ctxt, value_opt) ->
+      I.find ctxt contract >>=? fun (ctxt, value_opt) ->
       Lwt.return
       @@
       match value_opt with
-      | None ->
-          ok (ctxt, None)
+      | None -> ok (ctxt, None)
       | Some value ->
           consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
 
     let update ctxt contract value =
-      consume_serialize_gas ctxt value
-      >>?= fun ctxt -> I.update ctxt contract value
+      consume_serialize_gas ctxt value >>?= fun ctxt ->
+      I.update ctxt contract value
 
     let add_or_remove ctxt contract value_opt =
       match value_opt with
-      | None ->
-          I.add_or_remove ctxt contract None
+      | None -> I.add_or_remove ctxt contract None
       | Some value ->
-          consume_serialize_gas ctxt value
-          >>?= fun ctxt -> I.add_or_remove ctxt contract value_opt
+          consume_serialize_gas ctxt value >>?= fun ctxt ->
+          I.add_or_remove ctxt contract value_opt
 
     let init ctxt contract value =
-      consume_serialize_gas ctxt value
-      >>?= fun ctxt -> I.init ctxt contract value
+      consume_serialize_gas ctxt value >>?= fun ctxt ->
+      I.init ctxt contract value
 
     let add ctxt contract value =
-      consume_serialize_gas ctxt value
-      >>?= fun ctxt -> I.add ctxt contract value
+      consume_serialize_gas ctxt value >>?= fun ctxt ->
+      I.add ctxt contract value
   end
 
   module Code = Make_carbonated_map_expr (struct
@@ -317,17 +309,17 @@ module Big_map = struct
       end)
 
   module Next = struct
-    include Make_single_data_storage (Registered) (Raw_context)
-              (struct
-                let name = ["next"]
-              end)
-              (Lazy_storage_kind.Big_map.Id)
+    include
+      Make_single_data_storage (Registered) (Raw_context)
+        (struct
+          let name = ["next"]
+        end)
+        (Lazy_storage_kind.Big_map.Id)
 
     let incr ctxt =
-      get ctxt
-      >>=? fun i ->
-      update ctxt (Lazy_storage_kind.Big_map.Id.next i)
-      >|=? fun ctxt -> (ctxt, i)
+      get ctxt >>=? fun i ->
+      update ctxt (Lazy_storage_kind.Big_map.Id.next i) >|=? fun ctxt ->
+      (ctxt, i)
 
     let init ctxt = init ctxt Lazy_storage_kind.Big_map.Id.init
   end
@@ -342,8 +334,13 @@ module Big_map = struct
     let to_path c l =
       let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
       let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
-      String.sub index_key 0 2 :: String.sub index_key 2 2
-      :: String.sub index_key 4 2 :: String.sub index_key 6 2
+      String.sub index_key 0 2
+      ::
+      String.sub index_key 2 2
+      ::
+      String.sub index_key 4 2
+      ::
+      String.sub index_key 6 2
       :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: to_path c l
 
     let of_path = function
@@ -461,19 +458,16 @@ module Big_map = struct
       Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
 
     let get ctxt contract =
-      I.get ctxt contract
-      >>=? fun (ctxt, value) ->
+      I.get ctxt contract >>=? fun (ctxt, value) ->
       Lwt.return
         (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
 
     let find ctxt contract =
-      I.find ctxt contract
-      >>=? fun (ctxt, value_opt) ->
+      I.find ctxt contract >>=? fun (ctxt, value_opt) ->
       Lwt.return
       @@
       match value_opt with
-      | None ->
-          ok (ctxt, None)
+      | None -> ok (ctxt, None)
       | Some value ->
           consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
   end
@@ -489,17 +483,17 @@ module Sapling = struct
       end)
 
   module Next = struct
-    include Make_single_data_storage (Registered) (Raw_context)
-              (struct
-                let name = ["next"]
-              end)
-              (Lazy_storage_kind.Sapling_state.Id)
+    include
+      Make_single_data_storage (Registered) (Raw_context)
+        (struct
+          let name = ["next"]
+        end)
+        (Lazy_storage_kind.Sapling_state.Id)
 
     let incr ctxt =
-      get ctxt
-      >>=? fun i ->
-      update ctxt (Lazy_storage_kind.Sapling_state.Id.next i)
-      >|=? fun ctxt -> (ctxt, i)
+      get ctxt >>=? fun i ->
+      update ctxt (Lazy_storage_kind.Sapling_state.Id.next i) >|=? fun ctxt ->
+      (ctxt, i)
 
     let init ctxt = init ctxt Lazy_storage_kind.Sapling_state.Id.init
   end
@@ -554,10 +548,8 @@ module Sapling = struct
              let construct = Int64.to_string in
              let destruct hash =
                match Int64.of_string_opt hash with
-               | None ->
-                   Error "Cannot parse node position"
-               | Some id ->
-                   Ok id
+               | None -> Error "Cannot parse node position"
+               | Some id -> Ok id
              in
              RPC_arg.make
                ~descr:"The position of a node in a sapling commitment tree"
@@ -601,10 +593,8 @@ module Sapling = struct
              let construct = Int64.to_string in
              let destruct hash =
                match Int64.of_string_opt hash with
-               | None ->
-                   Error "Cannot parse ciphertext position"
-               | Some id ->
-                   Ok id
+               | None -> Error "Cannot parse ciphertext position"
+               | Some id -> Ok id
              in
              RPC_arg.make
                ~descr:"The position of a sapling ciphertext"
@@ -655,10 +645,8 @@ module Sapling = struct
              let construct = Int64.to_string in
              let destruct hash =
                match Int64.of_string_opt hash with
-               | None ->
-                   Error "Cannot parse nullifier position"
-               | Some id ->
-                   Ok id
+               | None -> Error "Cannot parse nullifier position"
+               | Some id -> Ok id
              in
              RPC_arg.make
                ~descr:"A sapling nullifier position"
@@ -699,10 +687,8 @@ module Sapling = struct
            let of_string hexstring =
              let b = Hex.to_bytes (`Hex hexstring) in
              match Data_encoding.Binary.of_bytes encoding b with
-             | None ->
-                 Error "Cannot parse sapling nullifier"
-             | Some nf ->
-                 Ok nf
+             | None -> Error "Cannot parse sapling nullifier"
+             | Some nf -> Ok nf
 
            let to_string nf =
              let b = Data_encoding.Binary.to_bytes_exn encoding nf in
@@ -725,14 +711,12 @@ module Sapling = struct
 
            let of_path = function
              | [c] -> (
-               match of_string c with Error _ -> None | Ok nf -> Some nf )
-             | _ ->
-                 None
+                 match of_string c with Error _ -> None | Ok nf -> Some nf)
+             | _ -> None
          end))
 
   let nullifiers_init ctx id =
-    Nullifiers_size.add (ctx, id) Int64.zero
-    >>= fun ctx ->
+    Nullifiers_size.add (ctx, id) Int64.zero >>= fun ctx ->
     Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_ordered"]
     >>= fun (ctx, id) ->
     Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_hashed"]
@@ -751,10 +735,8 @@ module Sapling = struct
              let construct = Int32.to_string in
              let destruct hash =
                match Int32.of_string_opt hash with
-               | None ->
-                   Error "Cannot parse nullifier position"
-               | Some id ->
-                   Ok id
+               | None -> Error "Cannot parse nullifier position"
+               | Some id -> Ok id
              in
              RPC_arg.make
                ~descr:"A sapling root"
@@ -865,7 +847,8 @@ module Cycle = struct
   let nonce_status_encoding =
     let open Data_encoding in
     union
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Unrevealed"
           (tup4
@@ -876,8 +859,7 @@ module Cycle = struct
           (function
             | Unrevealed {nonce_hash; delegate; rewards; fees} ->
                 Some (nonce_hash, delegate, rewards, fees)
-            | _ ->
-                None)
+            | _ -> None)
           (fun (nonce_hash, delegate, rewards, fees) ->
             Unrevealed {nonce_hash; delegate; rewards; fees});
         case
@@ -885,7 +867,8 @@ module Cycle = struct
           ~title:"Revealed"
           Seed_repr.nonce_encoding
           (function Revealed nonce -> Some nonce | _ -> None)
-          (fun nonce -> Revealed nonce) ]
+          (fun nonce -> Revealed nonce);
+      ]
 
   module Nonce =
     Make_indexed_data_storage
@@ -979,14 +962,11 @@ module Roll = struct
 
     let of_path l =
       match Misc.take Cycle_repr.Index.path_length l with
-      | None | Some (_, ([] | _ :: _ :: _)) ->
-          None
+      | None | Some (_, ([] | _ :: _ :: _)) -> None
       | Some (l1, [l2]) -> (
-        match (Cycle_repr.Index.of_path l1, int_of_string_opt l2) with
-        | (None, _) | (_, None) ->
-            None
-        | (Some c, Some i) ->
-            Some (c, i) )
+          match (Cycle_repr.Index.of_path l1, int_of_string_opt l2) with
+          | (None, _) | (_, None) -> None
+          | (Some c, Some i) -> Some (c, i))
 
     type 'a ipath = ('a * Cycle_repr.t) * int
 
@@ -1208,8 +1188,7 @@ module Ramp_up = struct
          (struct
            type t = Tez_repr.t * Tez_repr.t
 
-           let encoding =
-             Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
+           let encoding = Data_encoding.tup2 Tez_repr.encoding Tez_repr.encoding
          end)
 end
 
@@ -1238,31 +1217,24 @@ module Pending_migration = struct
 
   let remove ctxt =
     let balance_updates ctxt =
-      Balance_updates.find ctxt
-      >>=? function
+      Balance_updates.find ctxt >>=? function
       | Some balance_updates ->
-          Balance_updates.remove ctxt
-          >>= fun ctxt ->
+          Balance_updates.remove ctxt >>= fun ctxt ->
           (* When applying balance updates in a migration, we must attach receipts.
-         The balance updates returned from here will be applied in the first
-         block of the new protocol. *)
+             The balance updates returned from here will be applied in the first
+             block of the new protocol. *)
           return (ctxt, balance_updates)
-      | None ->
-          return (ctxt, [])
+      | None -> return (ctxt, [])
     in
     let operation_results ctxt =
-      Operation_results.find ctxt
-      >>=? function
+      Operation_results.find ctxt >>=? function
       | Some operation_results ->
-          Operation_results.remove ctxt
-          >>= fun ctxt -> return (ctxt, operation_results)
-      | None ->
-          return (ctxt, [])
+          Operation_results.remove ctxt >>= fun ctxt ->
+          return (ctxt, operation_results)
+      | None -> return (ctxt, [])
     in
-    balance_updates ctxt
-    >>=? fun (ctxt, balance_updates) ->
-    operation_results ctxt
-    >>=? fun (ctxt, operation_results) ->
+    balance_updates ctxt >>=? fun (ctxt, balance_updates) ->
+    operation_results ctxt >>=? fun (ctxt, operation_results) ->
     return (ctxt, balance_updates, operation_results)
 end
 

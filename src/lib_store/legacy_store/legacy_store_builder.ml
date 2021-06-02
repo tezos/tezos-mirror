@@ -27,17 +27,15 @@ open Filename.Infix
 
 (* Inlined from Tezos_shell.Patch_context to avoid cyclic dependencies *)
 let patch_context (genesis : Genesis.t) key_json ctxt =
-  ( match key_json with
-  | None ->
-      Lwt.return ctxt
+  (match key_json with
+  | None -> Lwt.return ctxt
   | Some (key, json) ->
       Tezos_context.Context.add
         ctxt
         [key]
-        (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )
+        (Data_encoding.Binary.to_bytes_exn Data_encoding.json json))
   >>= fun ctxt ->
-  Registered_protocol.get_result genesis.protocol
-  >>=? fun proto ->
+  Registered_protocol.get_result genesis.protocol >>=? fun proto ->
   let module Proto = (val proto) in
   let ctxt = Tezos_shell_context.Shell_context.wrap_disk_context ctxt in
   Proto.init
@@ -78,27 +76,21 @@ let load_protocol proto protocol_root =
 
 (* From "legacy chain_validator"*)
 let may_update_checkpoint chain_state new_head =
-  Legacy_state.Chain.checkpoint chain_state
-  >>= fun checkpoint ->
-  Legacy_state.Block.last_allowed_fork_level new_head
-  >>=? fun new_level ->
+  Legacy_state.Chain.checkpoint chain_state >>= fun checkpoint ->
+  Legacy_state.Block.last_allowed_fork_level new_head >>=? fun new_level ->
   if new_level <= checkpoint.shell.level then return_unit
   else
     let state = Legacy_state.Chain.global_state chain_state in
-    Legacy_state.history_mode state
-    >>= fun history_mode ->
+    Legacy_state.history_mode state >>= fun history_mode ->
     let head_level = Legacy_state.Block.level new_head in
     Legacy_state.Block.predecessor_n
       new_head
       (Int32.to_int (Int32.sub head_level new_level))
     >>= function
-    | None ->
-        assert false (* should not happen *)
+    | None -> assert false (* should not happen *)
     | Some new_checkpoint -> (
-        Legacy_state.Block.read_opt chain_state new_checkpoint
-        >>= function
-        | None ->
-            assert false (* should not happen *)
+        Legacy_state.Block.read_opt chain_state new_checkpoint >>= function
+        | None -> assert false (* should not happen *)
         | Some new_checkpoint -> (
             let new_checkpoint = Legacy_state.Block.header new_checkpoint in
             match history_mode with
@@ -112,13 +104,12 @@ let may_update_checkpoint chain_state new_head =
             | Rolling ->
                 Legacy_state.Chain.set_checkpoint_then_purge_rolling
                   chain_state
-                  new_checkpoint ) )
+                  new_checkpoint))
 
 let generate identity_file pow =
   let target = Crypto_box.make_pow_target pow in
   Format.eprintf "Generating a new identity... (level: %.2f) " pow ;
-  P2p_identity.generate_with_bound target
-  >>= fun id ->
+  P2p_identity.generate_with_bound target >>= fun id ->
   Lwt_utils_unix.Json.write_file
     identity_file
     (Data_encoding.Json.construct P2p_identity.encoding id)
@@ -136,13 +127,11 @@ let dump_config data_dir =
       version_file
       (Data_encoding.Json.construct version_encoding data_version)
   in
-  write_version_file data_dir
-  >>=? fun () ->
+  write_version_file data_dir >>=? fun () ->
   (* identity *)
   let identity_file_name = "identity.json" in
   let identity_file = data_dir // identity_file_name in
-  generate identity_file 0.
-  >>=? fun () ->
+  generate identity_file 0. >>=? fun () ->
   (* config *)
   (* TODO write a config ? *)
   let _config_file_name = "config.json" in
@@ -174,10 +163,8 @@ let run () =
       in
       if Sys.file_exists output_dir then
         Format.ksprintf Stdlib.failwith "%s already exists" output_dir ;
-      Lwt_utils_unix.create_dir output_dir
-      >>= fun () ->
-      dump_config output_dir
-      >>=? fun () ->
+      Lwt_utils_unix.create_dir output_dir >>= fun () ->
+      dump_config output_dir >>=? fun () ->
       let store_root = Filename.concat output_dir "store" in
       let context_root = Filename.concat output_dir "context" in
       (* Start listening for messages on stdin *)
@@ -188,12 +175,14 @@ let run () =
             History_mode.Legacy.encoding
             External_validation.parameters_encoding)
       >>= fun ( history_mode,
-                { External_validation.context_root = _;
+                {
+                  External_validation.context_root = _;
                   protocol_root;
                   sandbox_parameters;
                   genesis;
                   user_activated_upgrades;
-                  user_activated_protocol_overrides } ) ->
+                  user_activated_protocol_overrides;
+                } ) ->
       let sandbox_param =
         Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
       in
@@ -214,8 +203,7 @@ let run () =
             Registered_protocol.get_embedded_sources P.hash
             |> WithExceptions.Option.get ~loc:__LOC__
           in
-          Legacy_state.Protocol.store state proto
-          >>= function
+          Legacy_state.Protocol.store state proto >>= function
           | None ->
               Format.kasprintf
                 ok
@@ -232,84 +220,75 @@ let run () =
           External_validation.request_encoding
         >>= function
         | External_validation.Fork_test_chain _ (* TODO *)
-        | External_validation.Init
-        | External_validation.Commit_genesis _
+        | External_validation.Init | External_validation.Commit_genesis _
         (* commit_genesis is done by [Legacy_state.init] *)
         | External_validation.Restore_context_integrity ->
             (* noop *) ok "noop"
-        | External_validation.Terminate ->
-            ok "exiting" >>=? fun () -> exit 0
+        | External_validation.Terminate -> ok "exiting" >>=? fun () -> exit 0
         | External_validation.Validate
-            { chain_id;
+            {
+              chain_id;
               block_header;
               predecessor_block_header;
               operations;
               max_operations_ttl;
               predecessor_block_metadata_hash;
-              predecessor_ops_metadata_hash } ->
+              predecessor_ops_metadata_hash;
+            } ->
             let pred_context_hash = predecessor_block_header.shell.context in
-            Context.checkout context_index pred_context_hash
-            >>= (function
-                  | Some context ->
-                      return context
-                  | None ->
-                      fail
-                        (Block_validator_errors.Failed_to_checkout_context
-                           pred_context_hash))
-            >>=? (fun predecessor_context ->
-                   Context.get_protocol predecessor_context
-                   >>= fun protocol_hash ->
-                   load_protocol protocol_hash protocol_root
-                   >>=? fun () ->
-                   (* This call commits in the context *)
-                   let apply_environment =
-                     {
-                       Block_validation.max_operations_ttl;
-                       chain_id;
-                       predecessor_block_header;
-                       predecessor_context;
-                       predecessor_block_metadata_hash;
-                       predecessor_ops_metadata_hash;
-                       user_activated_upgrades;
-                       user_activated_protocol_overrides;
-                     }
-                   in
-                   Block_validation.apply
-                     apply_environment
-                     block_header
-                     operations
-                   >>= function
-                   | Error
-                       [ Block_validator_errors.Unavailable_protocol
-                           {protocol; _} ] as err -> (
-                       (* If `next_protocol` is missing, try to load it *)
-                       load_protocol protocol protocol_root
-                       >>= function
-                       | Error _ ->
-                           Lwt.return err
-                       | Ok () ->
-                           Block_validation.apply
-                             apply_environment
-                             block_header
-                             operations )
-                   | result ->
-                       Lwt.return result)
-            >>=? fun ( { validation_store;
-                         block_metadata;
-                         ops_metadata;
-                         block_metadata_hash;
-                         ops_metadata_hashes } as res ) ->
-            Context.checkout context_index validation_store.context_hash
-            >>= (function
-                  | Some context ->
-                      return context
-                  | None ->
-                      fail
-                        (Block_validator_errors.Failed_to_checkout_context
-                           validation_store.context_hash))
+            ( (Context.checkout context_index pred_context_hash >>= function
+               | Some context -> return context
+               | None ->
+                   fail
+                     (Block_validator_errors.Failed_to_checkout_context
+                        pred_context_hash))
+            >>=? fun predecessor_context ->
+              Context.get_protocol predecessor_context >>= fun protocol_hash ->
+              load_protocol protocol_hash protocol_root >>=? fun () ->
+              (* This call commits in the context *)
+              let apply_environment =
+                {
+                  Block_validation.max_operations_ttl;
+                  chain_id;
+                  predecessor_block_header;
+                  predecessor_context;
+                  predecessor_block_metadata_hash;
+                  predecessor_ops_metadata_hash;
+                  user_activated_upgrades;
+                  user_activated_protocol_overrides;
+                }
+              in
+              Block_validation.apply apply_environment block_header operations
+              >>= function
+              | Error
+                  [Block_validator_errors.Unavailable_protocol {protocol; _}] as
+                err -> (
+                  (* If `next_protocol` is missing, try to load it *)
+                  load_protocol protocol protocol_root
+                  >>= function
+                  | Error _ -> Lwt.return err
+                  | Ok () ->
+                      Block_validation.apply
+                        apply_environment
+                        block_header
+                        operations)
+              | result -> Lwt.return result )
+            >>=? fun ({
+                        validation_store;
+                        block_metadata;
+                        ops_metadata;
+                        block_metadata_hash;
+                        ops_metadata_hashes;
+                      } as res) ->
+            (Context.checkout context_index validation_store.context_hash
+             >>= function
+             | Some context -> return context
+             | None ->
+                 fail
+                   (Block_validator_errors.Failed_to_checkout_context
+                      validation_store.context_hash))
             >>=? fun commited_context ->
-            Context.get_protocol commited_context
-            >>= fun protocol_hash ->
+            Context.get_protocol commited_context >>= fun protocol_hash ->
             Legacy_state.Chain.update_level_indexed_protocol_store
               chain
               chain_id
@@ -333,10 +312,8 @@ let run () =
                 ~none:(Failure "failed to store")
                 block
             in
-            Legacy_chain.set_head chain block
-            >>=? fun _prev_head ->
-            may_update_checkpoint chain block
-            >>=? fun () ->
+            Legacy_chain.set_head chain block >>=? fun _prev_head ->
+            may_update_checkpoint chain block >>=? fun () ->
             let msg =
               Data_encoding.Json.(
                 construct Block_validation.result_encoding res |> to_string)
@@ -356,8 +333,7 @@ let run () =
 
 let () =
   match Lwt_main.run (run ()) with
-  | Ok () ->
-      ()
+  | Ok () -> ()
   | Error err ->
       Format.eprintf "%a@." pp_print_error err ;
       exit 1

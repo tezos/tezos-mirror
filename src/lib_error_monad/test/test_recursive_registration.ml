@@ -76,7 +76,7 @@ module Make () = struct
   let () =
     assert (
       parsha_cube
-      = Data_encoding.Binary.of_bytes_exn error_encoding b_parsha_cube )
+      = Data_encoding.Binary.of_bytes_exn error_encoding b_parsha_cube)
 
   let (_ : string) = Format.asprintf "%a" pp parsha_cube
 
@@ -87,7 +87,8 @@ module Make () = struct
     let j = Json.construct Json.schema_encoding s in
     let d = Json.destruct Json.schema_encoding j in
     let ds = Format.asprintf "%a" Json_schema.pp d in
-    ignore ss ; ignore ds
+    ignore ss ;
+    ignore ds
 
   (* "Normal", non-parallel error *)
   type error += A
@@ -108,8 +109,7 @@ module Make () = struct
 
   let () =
     assert (
-      parsha_aa = Data_encoding.Binary.of_bytes_exn error_encoding b_parsha_aa
-    )
+      parsha_aa = Data_encoding.Binary.of_bytes_exn error_encoding b_parsha_aa)
 
   let (_ : string) = Format.asprintf "%a" pp parsha_aa
 
@@ -152,7 +152,8 @@ module Make () = struct
     let j = Json.construct Json.schema_encoding s in
     let d = Json.destruct Json.schema_encoding j in
     let ds = Format.asprintf "%a" Json_schema.pp d in
-    ignore ss ; ignore ds
+    ignore ss ;
+    ignore ds
 
   let main () = ()
 end

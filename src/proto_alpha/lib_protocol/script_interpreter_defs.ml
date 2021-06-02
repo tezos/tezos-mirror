@@ -130,10 +130,8 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | ISlice_bytes _ ->
       let (_, (s, _)) = stack in
       Interp_costs.slice_bytes s
-  | IMul_teznat _ ->
-      Interp_costs.mul_teznat
-  | IMul_nattez _ ->
-      Interp_costs.mul_nattez
+  | IMul_teznat _ -> Interp_costs.mul_teznat
+  | IMul_nattez _ -> Interp_costs.mul_nattez
   | IAbs_int _ ->
       let x = accu in
       Interp_costs.abs_int x
@@ -247,224 +245,123 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IJoin_tickets (_, ty, _) ->
       let (ticket_a, ticket_b) = accu in
       Interp_costs.join_tickets ty ticket_a ticket_b
-  | IHalt _ ->
-      Interp_costs.halt
-  | IDrop _ ->
-      Interp_costs.drop
-  | IDup _ ->
-      Interp_costs.dup
-  | ISwap _ ->
-      Interp_costs.swap
-  | IConst _ ->
-      Interp_costs.const
-  | ICons_some _ ->
-      Interp_costs.cons_some
-  | ICons_none _ ->
-      Interp_costs.cons_none
-  | IIf_none _ ->
-      Interp_costs.if_none
-  | ICons_pair _ ->
-      Interp_costs.cons_pair
-  | IUnpair _ ->
-      Interp_costs.unpair
-  | ICar _ ->
-      Interp_costs.car
-  | ICdr _ ->
-      Interp_costs.cdr
-  | ICons_left _ ->
-      Interp_costs.cons_left
-  | ICons_right _ ->
-      Interp_costs.cons_right
-  | IIf_left _ ->
-      Interp_costs.if_left
-  | ICons_list _ ->
-      Interp_costs.cons_list
-  | INil _ ->
-      Interp_costs.nil
-  | IIf_cons _ ->
-      Interp_costs.if_cons
-  | IList_size _ ->
-      Interp_costs.list_size
-  | IEmpty_set _ ->
-      Interp_costs.empty_set
-  | ISet_size _ ->
-      Interp_costs.set_size
-  | IEmpty_map _ ->
-      Interp_costs.empty_map
-  | IMap_size _ ->
-      Interp_costs.map_size
-  | IEmpty_big_map _ ->
-      Interp_costs.empty_big_map
-  | IString_size _ ->
-      Interp_costs.string_size
-  | IBytes_size _ ->
-      Interp_costs.bytes_size
-  | IAdd_tez _ ->
-      Interp_costs.add_tez
-  | ISub_tez _ ->
-      Interp_costs.sub_tez
-  | IOr _ ->
-      Interp_costs.bool_or
-  | IAnd _ ->
-      Interp_costs.bool_and
-  | IXor _ ->
-      Interp_costs.bool_xor
-  | INot _ ->
-      Interp_costs.bool_not
-  | IIs_nat _ ->
-      Interp_costs.is_nat
-  | IInt_nat _ ->
-      Interp_costs.int_nat
-  | IInt_bls12_381_fr _ ->
-      Interp_costs.int_bls12_381_fr
-  | IEdiv_tez _ ->
-      Interp_costs.ediv_tez
-  | IIf _ ->
-      Interp_costs.if_
-  | ILoop _ ->
-      Interp_costs.loop
-  | ILoop_left _ ->
-      Interp_costs.loop_left
-  | IDip _ ->
-      Interp_costs.dip
-  | IExec _ ->
-      Interp_costs.exec
-  | IApply _ ->
-      Interp_costs.apply
-  | ILambda _ ->
-      Interp_costs.lambda
-  | IFailwith _ ->
-      Gas.free
-  | IEq _ ->
-      Interp_costs.eq
-  | INeq _ ->
-      Interp_costs.neq
-  | ILt _ ->
-      Interp_costs.lt
-  | ILe _ ->
-      Interp_costs.le
-  | IGt _ ->
-      Interp_costs.gt
-  | IGe _ ->
-      Interp_costs.ge
-  | IPack _ ->
-      Gas.free
+  | IHalt _ -> Interp_costs.halt
+  | IDrop _ -> Interp_costs.drop
+  | IDup _ -> Interp_costs.dup
+  | ISwap _ -> Interp_costs.swap
+  | IConst _ -> Interp_costs.const
+  | ICons_some _ -> Interp_costs.cons_some
+  | ICons_none _ -> Interp_costs.cons_none
+  | IIf_none _ -> Interp_costs.if_none
+  | ICons_pair _ -> Interp_costs.cons_pair
+  | IUnpair _ -> Interp_costs.unpair
+  | ICar _ -> Interp_costs.car
+  | ICdr _ -> Interp_costs.cdr
+  | ICons_left _ -> Interp_costs.cons_left
+  | ICons_right _ -> Interp_costs.cons_right
+  | IIf_left _ -> Interp_costs.if_left
+  | ICons_list _ -> Interp_costs.cons_list
+  | INil _ -> Interp_costs.nil
+  | IIf_cons _ -> Interp_costs.if_cons
+  | IList_size _ -> Interp_costs.list_size
+  | IEmpty_set _ -> Interp_costs.empty_set
+  | ISet_size _ -> Interp_costs.set_size
+  | IEmpty_map _ -> Interp_costs.empty_map
+  | IMap_size _ -> Interp_costs.map_size
+  | IEmpty_big_map _ -> Interp_costs.empty_big_map
+  | IString_size _ -> Interp_costs.string_size
+  | IBytes_size _ -> Interp_costs.bytes_size
+  | IAdd_tez _ -> Interp_costs.add_tez
+  | ISub_tez _ -> Interp_costs.sub_tez
+  | IOr _ -> Interp_costs.bool_or
+  | IAnd _ -> Interp_costs.bool_and
+  | IXor _ -> Interp_costs.bool_xor
+  | INot _ -> Interp_costs.bool_not
+  | IIs_nat _ -> Interp_costs.is_nat
+  | IInt_nat _ -> Interp_costs.int_nat
+  | IInt_bls12_381_fr _ -> Interp_costs.int_bls12_381_fr
+  | IEdiv_tez _ -> Interp_costs.ediv_tez
+  | IIf _ -> Interp_costs.if_
+  | ILoop _ -> Interp_costs.loop
+  | ILoop_left _ -> Interp_costs.loop_left
+  | IDip _ -> Interp_costs.dip
+  | IExec _ -> Interp_costs.exec
+  | IApply _ -> Interp_costs.apply
+  | ILambda _ -> Interp_costs.lambda
+  | IFailwith _ -> Gas.free
+  | IEq _ -> Interp_costs.eq
+  | INeq _ -> Interp_costs.neq
+  | ILt _ -> Interp_costs.lt
+  | ILe _ -> Interp_costs.le
+  | IGt _ -> Interp_costs.gt
+  | IGe _ -> Interp_costs.ge
+  | IPack _ -> Gas.free
   | IUnpack _ ->
       let b = accu in
       Interp_costs.unpack b
-  | IAddress _ ->
-      Interp_costs.address
-  | IContract _ ->
-      Interp_costs.contract
-  | ITransfer_tokens _ ->
-      Interp_costs.transfer_tokens
-  | IImplicit_account _ ->
-      Interp_costs.implicit_account
-  | ISet_delegate _ ->
-      Interp_costs.set_delegate
-  | IBalance _ ->
-      Interp_costs.balance
-  | ILevel _ ->
-      Interp_costs.level
-  | INow _ ->
-      Interp_costs.now
-  | ISapling_empty_state _ ->
-      Interp_costs.sapling_empty_state
-  | ISource _ ->
-      Interp_costs.source
-  | ISender _ ->
-      Interp_costs.sender
-  | ISelf _ ->
-      Interp_costs.self
-  | ISelf_address _ ->
-      Interp_costs.self_address
-  | IAmount _ ->
-      Interp_costs.amount
-  | IDig (_, n, _, _) ->
-      Interp_costs.dign n
-  | IDug (_, n, _, _) ->
-      Interp_costs.dugn n
-  | IDipn (_, n, _, _, _) ->
-      Interp_costs.dipn n
-  | IDropn (_, n, _, _) ->
-      Interp_costs.dropn n
-  | IChainId _ ->
-      Interp_costs.chain_id
-  | ICreate_contract _ ->
-      Interp_costs.create_contract
-  | INever _ -> (
-    match accu with _ -> . )
-  | IVoting_power _ ->
-      Interp_costs.voting_power
-  | ITotal_voting_power _ ->
-      Interp_costs.total_voting_power
-  | IAdd_bls12_381_g1 _ ->
-      Interp_costs.add_bls12_381_g1
-  | IAdd_bls12_381_g2 _ ->
-      Interp_costs.add_bls12_381_g2
-  | IAdd_bls12_381_fr _ ->
-      Interp_costs.add_bls12_381_fr
-  | IMul_bls12_381_g1 _ ->
-      Interp_costs.mul_bls12_381_g1
-  | IMul_bls12_381_g2 _ ->
-      Interp_costs.mul_bls12_381_g2
-  | IMul_bls12_381_fr _ ->
-      Interp_costs.mul_bls12_381_fr
-  | INeg_bls12_381_g1 _ ->
-      Interp_costs.neg_bls12_381_g1
-  | INeg_bls12_381_g2 _ ->
-      Interp_costs.neg_bls12_381_g2
-  | INeg_bls12_381_fr _ ->
-      Interp_costs.neg_bls12_381_fr
+  | IAddress _ -> Interp_costs.address
+  | IContract _ -> Interp_costs.contract
+  | ITransfer_tokens _ -> Interp_costs.transfer_tokens
+  | IImplicit_account _ -> Interp_costs.implicit_account
+  | ISet_delegate _ -> Interp_costs.set_delegate
+  | IBalance _ -> Interp_costs.balance
+  | ILevel _ -> Interp_costs.level
+  | INow _ -> Interp_costs.now
+  | ISapling_empty_state _ -> Interp_costs.sapling_empty_state
+  | ISource _ -> Interp_costs.source
+  | ISender _ -> Interp_costs.sender
+  | ISelf _ -> Interp_costs.self
+  | ISelf_address _ -> Interp_costs.self_address
+  | IAmount _ -> Interp_costs.amount
+  | IDig (_, n, _, _) -> Interp_costs.dign n
+  | IDug (_, n, _, _) -> Interp_costs.dugn n
+  | IDipn (_, n, _, _, _) -> Interp_costs.dipn n
+  | IDropn (_, n, _, _) -> Interp_costs.dropn n
+  | IChainId _ -> Interp_costs.chain_id
+  | ICreate_contract _ -> Interp_costs.create_contract
+  | INever _ -> ( match accu with _ -> .)
+  | IVoting_power _ -> Interp_costs.voting_power
+  | ITotal_voting_power _ -> Interp_costs.total_voting_power
+  | IAdd_bls12_381_g1 _ -> Interp_costs.add_bls12_381_g1
+  | IAdd_bls12_381_g2 _ -> Interp_costs.add_bls12_381_g2
+  | IAdd_bls12_381_fr _ -> Interp_costs.add_bls12_381_fr
+  | IMul_bls12_381_g1 _ -> Interp_costs.mul_bls12_381_g1
+  | IMul_bls12_381_g2 _ -> Interp_costs.mul_bls12_381_g2
+  | IMul_bls12_381_fr _ -> Interp_costs.mul_bls12_381_fr
+  | INeg_bls12_381_g1 _ -> Interp_costs.neg_bls12_381_g1
+  | INeg_bls12_381_g2 _ -> Interp_costs.neg_bls12_381_g2
+  | INeg_bls12_381_fr _ -> Interp_costs.neg_bls12_381_fr
   | IMul_bls12_381_fr_z _ ->
       let z = accu in
       Interp_costs.mul_bls12_381_fr_z z
   | IMul_bls12_381_z_fr _ ->
       let (z, _) = stack in
       Interp_costs.mul_bls12_381_z_fr z
-  | IDup_n (_, n, _, _) ->
-      Interp_costs.dupn n
-  | IComb (_, n, _, _) ->
-      Interp_costs.comb n
-  | IUncomb (_, n, _, _) ->
-      Interp_costs.uncomb n
-  | IComb_get (_, n, _, _) ->
-      Interp_costs.comb_get n
-  | IComb_set (_, n, _, _) ->
-      Interp_costs.comb_set n
-  | ITicket _ ->
-      Interp_costs.ticket
-  | IRead_ticket _ ->
-      Interp_costs.read_ticket
-  | ILog _ ->
-      Gas.free
+  | IDup_n (_, n, _, _) -> Interp_costs.dupn n
+  | IComb (_, n, _, _) -> Interp_costs.comb n
+  | IUncomb (_, n, _, _) -> Interp_costs.uncomb n
+  | IComb_get (_, n, _, _) -> Interp_costs.comb_get n
+  | IComb_set (_, n, _, _) -> Interp_costs.comb_set n
+  | ITicket _ -> Interp_costs.ticket
+  | IRead_ticket _ -> Interp_costs.read_ticket
+  | ILog _ -> Gas.free
  [@@ocaml.inline always]
 
 let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
  fun ks ->
   match ks with
-  | KLog _ ->
-      Gas.free
-  | KNil ->
-      Interp_costs.Control.nil
-  | KCons (_, _) ->
-      Interp_costs.Control.cons
-  | KReturn _ ->
-      Interp_costs.Control.return
-  | KUndip (_, _) ->
-      Interp_costs.Control.undip
-  | KLoop_in (_, _) ->
-      Interp_costs.Control.loop_in
-  | KLoop_in_left (_, _) ->
-      Interp_costs.Control.loop_in_left
-  | KIter (_, _, _) ->
-      Interp_costs.Control.iter
+  | KLog _ -> Gas.free
+  | KNil -> Interp_costs.Control.nil
+  | KCons (_, _) -> Interp_costs.Control.cons
+  | KReturn _ -> Interp_costs.Control.return
+  | KUndip (_, _) -> Interp_costs.Control.undip
+  | KLoop_in (_, _) -> Interp_costs.Control.loop_in
+  | KLoop_in_left (_, _) -> Interp_costs.Control.loop_in_left
+  | KIter (_, _, _) -> Interp_costs.Control.iter
   | KList_enter_body (_, xs, _, len, _) ->
       Interp_costs.Control.list_enter_body xs len
-  | KList_exit_body (_, _, _, _, _) ->
-      Interp_costs.Control.list_exit_body
-  | KMap_enter_body (_, _, _, _) ->
-      Interp_costs.Control.map_enter_body
+  | KList_exit_body (_, _, _, _, _) -> Interp_costs.Control.list_exit_body
+  | KMap_enter_body (_, _, _, _) -> Interp_costs.Control.map_enter_body
   | KMap_exit_body (_, _, map, key, _) ->
       Interp_costs.Control.map_exit_body key map
 
@@ -529,8 +426,8 @@ let context_from_outdated_context (OutDatedContext ctxt) =
 
 let use_gas_counter_in_ctxt ctxt local_gas_counter f =
   let ctxt = update_context local_gas_counter ctxt in
-  f ctxt
-  >>=? fun (y, ctxt) -> return (y, outdated ctxt, update_local_gas_counter ctxt)
+  f ctxt >>=? fun (y, ctxt) ->
+  return (y, outdated ctxt, update_local_gas_counter ctxt)
   [@@ocaml.inline always]
 
 (*
@@ -556,10 +453,8 @@ let consume local_gas_counter k accu stack =
 
 let consume' ctxt local_gas_counter cost =
   match update_and_check local_gas_counter cost with
-  | None ->
-      Gas.gas_exhausted_error (update_context local_gas_counter ctxt)
-  | Some local_gas_counter ->
-      Ok local_gas_counter
+  | None -> Gas.gas_exhausted_error (update_context local_gas_counter ctxt)
+  | Some local_gas_counter -> Ok local_gas_counter
   [@@ocaml.inline always]
 
 let consume_control local_gas_counter ks =
@@ -587,10 +482,8 @@ let log_exit logger ctxt gas kinfo_prev k accu stack =
 let log_control logger ks = logger.log_control ks
 
 let get_log = function
-  | None ->
-      Lwt.return (Ok None)
-  | Some logger ->
-      logger.get_log ()
+  | None -> Lwt.return (Ok None)
+  | Some logger -> logger.get_log ()
   [@@ocaml.inline always]
 
 (* [log_kinstr logger i] emits an instruction to instrument the
@@ -659,8 +552,7 @@ let rec kundip :
       let k = IConst (kinfo, accu, k) in
       let (accu, stack) = stack in
       kundip w accu stack k
-  | KRest ->
-      (accu, stack, k)
+  | KRest -> (accu, stack, k)
 
 (* [apply ctxt gas ty v lam] specializes [lam] by fixing its first
    formal argument to [v]. The type of [v] is represented by [ty]. *)
@@ -668,10 +560,8 @@ let apply ctxt gas capture_ty capture lam =
   let (Lam (descr, expr)) = lam in
   let (Item_t (full_arg_ty, _, _)) = descr.kbef in
   let ctxt = update_context gas ctxt in
-  unparse_data ctxt Optimized capture_ty capture
-  >>=? fun (const_expr, ctxt) ->
-  unparse_ty ctxt capture_ty
-  >>?= fun (ty_expr, ctxt) ->
+  unparse_data ctxt Optimized capture_ty capture >>=? fun (const_expr, ctxt) ->
+  unparse_ty ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
   match full_arg_ty with
   | Pair_t ((capture_ty, _, _), (arg_ty, _, _), _) ->
       let arg_stack_ty = Item_t (arg_ty, Bot_t, None) in
@@ -688,22 +578,22 @@ let apply ctxt gas capture_ty capture lam =
                  kstack_ty = Item_t (capture_ty, arg_stack_ty, None);
                }
              in
-             IConst
-               (kinfo_const, capture, ICons_pair (kinfo_pair, descr.kinstr)));
+             IConst (kinfo_const, capture, ICons_pair (kinfo_pair, descr.kinstr)));
         }
       in
       let full_expr =
         Micheline.Seq
           ( 0,
-            [ Prim (0, I_PUSH, [ty_expr; const_expr], []);
+            [
+              Prim (0, I_PUSH, [ty_expr; const_expr], []);
               Prim (0, I_PAIR, [], []);
-              expr ] )
+              expr;
+            ] )
       in
       let lam' = Lam (full_descr, full_expr) in
       let gas = update_local_gas_counter ctxt in
       return (lam', outdated ctxt, gas)
-  | _ ->
-      assert false
+  | _ -> assert false
 
 (* [transfer (ctxt, sc) gas tez tp p destination entrypoint]
    creates an operation that transfers an amount of [tez] to
@@ -711,8 +601,7 @@ let apply ctxt gas capture_ty capture lam =
    instantiated with argument [p] of type [tp]. *)
 let transfer (ctxt, sc) gas amount tp p destination entrypoint =
   let ctxt = update_context gas ctxt in
-  collect_lazy_storage ctxt tp p
-  >>?= fun (to_duplicate, ctxt) ->
+  collect_lazy_storage ctxt tp p >>?= fun (to_duplicate, ctxt) ->
   let to_update = no_lazy_storage_id in
   extract_lazy_storage_diff
     ctxt
@@ -723,10 +612,8 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
     ~to_update
     ~temporary:true
   >>=? fun (p, lazy_storage_diff, ctxt) ->
-  unparse_data ctxt Optimized tp p
-  >>=? fun (p, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost p)
-  >>?= fun ctxt ->
+  unparse_data ctxt Optimized tp p >>=? fun (p, ctxt) ->
+  Gas.consume ctxt (Script.strip_locations_cost p) >>?= fun ctxt ->
   let operation =
     Transaction
       {
@@ -736,8 +623,7 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
         parameters = Script.lazy_expr (Micheline.strip_locations p);
       }
   in
-  fresh_internal_nonce ctxt
-  >>?= fun (ctxt, nonce) ->
+  fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in
   let res = (Internal_operation iop, lazy_storage_diff) in
   let gas = update_local_gas_counter ctxt in
@@ -753,23 +639,22 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
 let create_contract (ctxt, sc) gas storage_type param_type code root_name
     delegate credit init =
   let ctxt = update_context gas ctxt in
-  unparse_ty ctxt param_type
-  >>?= fun (unparsed_param_type, ctxt) ->
+  unparse_ty ctxt param_type >>?= fun (unparsed_param_type, ctxt) ->
   let unparsed_param_type =
     Script_ir_translator.add_field_annot root_name None unparsed_param_type
   in
-  unparse_ty ctxt storage_type
-  >>?= fun (unparsed_storage_type, ctxt) ->
+  unparse_ty ctxt storage_type >>?= fun (unparsed_storage_type, ctxt) ->
   let code =
     Micheline.strip_locations
       (Seq
          ( 0,
-           [ Prim (0, K_parameter, [unparsed_param_type], []);
+           [
+             Prim (0, K_parameter, [unparsed_param_type], []);
              Prim (0, K_storage, [unparsed_storage_type], []);
-             Prim (0, K_code, [code], []) ] ))
+             Prim (0, K_code, [code], []);
+           ] ))
   in
-  collect_lazy_storage ctxt storage_type init
-  >>?= fun (to_duplicate, ctxt) ->
+  collect_lazy_storage ctxt storage_type init >>?= fun (to_duplicate, ctxt) ->
   let to_update = no_lazy_storage_id in
   extract_lazy_storage_diff
     ctxt
@@ -780,13 +665,10 @@ let create_contract (ctxt, sc) gas storage_type param_type code root_name
     ~to_update
     ~temporary:true
   >>=? fun (init, lazy_storage_diff, ctxt) ->
-  unparse_data ctxt Optimized storage_type init
-  >>=? fun (storage, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost storage)
-  >>?= fun ctxt ->
+  unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
+  Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
   let storage = Micheline.strip_locations storage in
-  Contract.fresh_contract_from_current_nonce ctxt
-  >>?= fun (ctxt, contract) ->
+  Contract.fresh_contract_from_current_nonce ctxt >>?= fun (ctxt, contract) ->
   let operation =
     Origination
       {
@@ -797,8 +679,7 @@ let create_contract (ctxt, sc) gas storage_type param_type code root_name
           {code = Script.lazy_expr code; storage = Script.lazy_expr storage};
       }
   in
-  fresh_internal_nonce ctxt
-  >>?= fun (ctxt, nonce) ->
+  fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let res =
     (Internal_operation {source = sc.self; operation; nonce}, lazy_storage_diff)
   in
@@ -820,8 +701,8 @@ let unpack ctxt ~ty ~bytes =
     match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
     | None ->
         Lwt.return
-          ( Gas.consume ctxt (Interp_costs.unpack_failed bytes)
-          >|? fun ctxt -> (None, ctxt) )
+          ( Gas.consume ctxt (Interp_costs.unpack_failed bytes) >|? fun ctxt ->
+            (None, ctxt) )
     | Some expr -> (
         parse_data
           ctxt
@@ -830,11 +711,10 @@ let unpack ctxt ~ty ~bytes =
           ty
           (Micheline.root expr)
         >|= function
-        | Ok (value, ctxt) ->
-            ok (Some value, ctxt)
+        | Ok (value, ctxt) -> ok (Some value, ctxt)
         | Error _ignored ->
-            Gas.consume ctxt (Interp_costs.unpack_failed bytes)
-            >|? fun ctxt -> (None, ctxt) )
+            Gas.consume ctxt (Interp_costs.unpack_failed bytes) >|? fun ctxt ->
+            (None, ctxt))
   else return (None, ctxt)
 
 (* [interp_stack_prefix_preserving_operation f w accu stack] applies
@@ -853,8 +733,7 @@ let rec interp_stack_prefix_preserving_operation :
   | (KPrefix (_, n), rest) ->
       interp_stack_prefix_preserving_operation f n (fst rest) (snd rest)
       |> fun ((v, rest'), result) -> ((accu, (v, rest')), result)
-  | (KRest, v) ->
-      f accu v
+  | (KRest, v) -> f accu v
 
 (*
 

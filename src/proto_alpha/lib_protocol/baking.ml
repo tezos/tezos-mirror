@@ -62,15 +62,13 @@ let () =
     ~pp:(fun ppf (minimal_time, provided_time, priority, endorsing_power) ->
       let message_regarding_endorsements =
         match endorsing_power with
-        | None ->
-            ""
-        | Some power ->
-            Format.asprintf " and endorsing power %d" power
+        | None -> ""
+        | Some power -> Format.asprintf " and endorsing power %d" power
       in
       Format.fprintf
         ppf
-        "Block forged too early: %a is before the minimal time %a for \
-         priority %d%s)"
+        "Block forged too early: %a is before the minimal time %a for priority \
+         %d%s)"
         Time.pp_hum
         provided_time
         Time.pp_hum
@@ -87,8 +85,7 @@ let () =
       | Timestamp_too_early
           {minimal_time; provided_time; priority; endorsing_power_opt} ->
           Some (minimal_time, provided_time, priority, endorsing_power_opt)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (minimal_time, provided_time, priority, endorsing_power_opt) ->
       Timestamp_too_early
         {minimal_time; provided_time; priority; endorsing_power_opt}) ;
@@ -192,13 +189,10 @@ let minimal_time_slowpath_case time_between_blocks priority pred_timestamp =
     if Compare.Int32.( <= ) p 0l then ok acc
     else
       match durations with
-      | [] ->
-          cumsum_time_between_blocks acc [Period.one_minute] p
-      | [last] ->
-          Period.mult p last >>? fun period -> Timestamp.(acc +? period)
+      | [] -> cumsum_time_between_blocks acc [Period.one_minute] p
+      | [last] -> Period.mult p last >>? fun period -> Timestamp.(acc +? period)
       | first :: durations ->
-          Timestamp.(acc +? first)
-          >>? fun acc ->
+          Timestamp.(acc +? first) >>? fun acc ->
           let p = Int32.pred p in
           cumsum_time_between_blocks acc durations p
   in
@@ -227,8 +221,8 @@ let earlier_predecessor_timestamp ctxt level =
   if Compare.Int32.(gap < 1l) then
     failwith "Baking.earlier_block_timestamp: past block."
   else
-    Period.mult (Int32.pred gap) step
-    >>? fun delay -> Timestamp.(current_timestamp +? delay)
+    Period.mult (Int32.pred gap) step >>? fun delay ->
+    Timestamp.(current_timestamp +? delay)
 
 let check_timestamp c ~priority pred_timestamp =
   minimal_time (Constants.parametric c) priority pred_timestamp
@@ -281,8 +275,7 @@ let rec reward_for_priority reward_per_prio prio =
   | [] ->
       (* Empty reward list in parameters means no rewards *)
       Tez.zero
-  | [last] ->
-      last
+  | [last] -> last
   | first :: rest ->
       if Compare.Int.(prio <= 0) then first
       else reward_for_priority rest (pred prio)
@@ -313,23 +306,20 @@ let endorsing_reward ctxt ~block_priority num_slots =
 
 let baking_priorities c level =
   let rec f priority =
-    Roll.baking_rights_owner c level ~priority
-    >|=? fun delegate -> LCons (delegate, fun () -> f (succ priority))
+    Roll.baking_rights_owner c level ~priority >|=? fun delegate ->
+    LCons (delegate, fun () -> f (succ priority))
   in
   f 0
 
 let endorsement_rights ctxt level =
   fold_right_s
     (fun slot acc ->
-      Roll.endorsement_rights_owner ctxt level ~slot
-      >|=? fun pk ->
+      Roll.endorsement_rights_owner ctxt level ~slot >|=? fun pk ->
       let pkh = Signature.Public_key.hash pk in
       let right =
         match Signature.Public_key_hash.Map.find_opt pkh acc with
-        | None ->
-            (pk, [slot], false)
-        | Some (pk, slots, used) ->
-            (pk, slot :: slots, used)
+        | None -> (pk, [slot], false)
+        | Some (pk, slots, used) -> (pk, slot :: slots, used)
       in
       Signature.Public_key_hash.Map.add pkh right acc)
     (0 --> (Constants.endorsers_per_block ctxt - 1))
@@ -348,21 +338,19 @@ let[@coq_axiom_with_reason "gadt"] check_endorsement_rights ctxt chain_id ~slot
     >>=? fun pk ->
     let pkh = Signature.Public_key.hash pk in
     match Operation.check_signature pk chain_id op with
-    | Error _ ->
-        fail Unexpected_endorsement
+    | Error _ -> fail Unexpected_endorsement
     | Ok () -> (
-        ( if Raw_level.(succ level = current_level.level) then
-          return (Alpha_context.allowed_endorsements ctxt)
-        else endorsement_rights ctxt (Level.from_raw ctxt level) )
+        (if Raw_level.(succ level = current_level.level) then
+         return (Alpha_context.allowed_endorsements ctxt)
+        else endorsement_rights ctxt (Level.from_raw ctxt level))
         >>=? fun endorsements ->
         match Signature.Public_key_hash.Map.find_opt pkh endorsements with
-        | None ->
-            fail Unexpected_endorsement (* unexpected *)
+        | None -> fail Unexpected_endorsement (* unexpected *)
         | Some (_pk, slots, v) ->
             error_unless
               Compare.Int.(slot = List.hd slots)
               (Unexpected_endorsement_slot slot)
-            >>?= fun () -> return (pkh, slots, v) )
+            >>?= fun () -> return (pkh, slots, v))
 
 let select_delegate delegate delegate_list max_priority =
   let rec loop acc l n =
@@ -382,8 +370,8 @@ let select_delegate delegate delegate_list max_priority =
   loop [] delegate_list 0
 
 let first_baking_priorities ctxt ?(max_priority = 32) delegate level =
-  baking_priorities ctxt level
-  >>=? fun delegate_list -> select_delegate delegate delegate_list max_priority
+  baking_priorities ctxt level >>=? fun delegate_list ->
+  select_delegate delegate delegate_list max_priority
 
 let check_hash hash stamp_threshold =
   let bytes = Block_hash.to_bytes hash in
@@ -431,8 +419,7 @@ let max_fitness_gap _ctxt = 1L
 
 let check_fitness_gap ctxt (block : Block_header.t) =
   let current_fitness = Fitness.current ctxt in
-  Fitness.to_int64 block.shell.fitness
-  >>? fun announced_fitness ->
+  Fitness.to_int64 block.shell.fitness >>? fun announced_fitness ->
   let gap = Int64.sub announced_fitness current_fitness in
   if Compare.Int64.(gap <= 0L || max_fitness_gap ctxt < gap) then
     error (Invalid_fitness_gap (max_fitness_gap ctxt, gap))

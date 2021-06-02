@@ -63,9 +63,9 @@ let any_in_range_inclusive min max = Random.int (max + 1 - min) + min
 let rpc_big_map_get_all ?offset ?length client =
   let* json = RPC.Big_maps.get_all ~big_map_id:"4" ?offset ?length client in
   Lwt.return
-    ( json |> JSON.as_list
+    (json |> JSON.as_list
     |> List.map (fun elem ->
-           elem |> JSON.get "int" |> JSON.as_string |> int_of_string) )
+           elem |> JSON.get "int" |> JSON.as_string |> int_of_string))
 
 let check error_message ~actual ~expected =
   if not (actual = expected) then

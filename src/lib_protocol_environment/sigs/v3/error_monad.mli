@@ -72,8 +72,7 @@ type 'err trace
 
 type 'a tzresult = ('a, error trace) result
 
-val make_trace_encoding :
-  'error Data_encoding.t -> 'error trace Data_encoding.t
+val make_trace_encoding : 'error Data_encoding.t -> 'error trace Data_encoding.t
 
 val trace_encoding : error trace Data_encoding.t
 
@@ -186,14 +185,10 @@ val mapi :
   (int -> 'a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
 
 val map_s :
-  ('a -> ('b, 'trace) result Lwt.t) ->
-  'a list ->
-  ('b list, 'trace) result Lwt.t
+  ('a -> ('b, 'trace) result Lwt.t) -> 'a list -> ('b list, 'trace) result Lwt.t
 
 val rev_map_s :
-  ('a -> ('b, 'trace) result Lwt.t) ->
-  'a list ->
-  ('b list, 'trace) result Lwt.t
+  ('a -> ('b, 'trace) result Lwt.t) -> 'a list -> ('b list, 'trace) result Lwt.t
 
 val mapi_s :
   (int -> 'a -> ('b, 'trace) result Lwt.t) ->

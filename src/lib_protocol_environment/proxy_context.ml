@@ -97,55 +97,40 @@ module C = struct
     Local.Tree.to_value t >|= function Some v -> Key v | None -> Dir t
 
   let raw_find (t : tree) k =
-    Local.Tree.find_tree t.tree k
-    >>= function
-    | Some x ->
-        Lwt.return_some x
+    Local.Tree.find_tree t.tree k >>= function
+    | Some x -> Lwt.return_some x
     | None -> (
-        L.(S.emit proxy_context_missing) k
-        >>= fun () ->
+        L.(S.emit proxy_context_missing) k >>= fun () ->
         match t.proxy with
-        | None ->
-            Lwt.return_none
+        | None -> Lwt.return_none
         | Some (module ProxyDelegation) -> (
-            ProxyDelegation.proxy_get (t.path @ k)
-            >>= function
+            ProxyDelegation.proxy_get (t.path @ k) >>= function
             | Error err ->
-                L.(S.emit delegation_error ("get", err))
-                >>= fun () -> Lwt.return_none
-            | Ok x ->
-                Lwt.return x ) )
+                L.(S.emit delegation_error ("get", err)) >>= fun () ->
+                Lwt.return_none
+            | Ok x -> Lwt.return x))
 
   let raw_mem_aux kind (t : tree) k =
-    Local.Tree.find_tree t.tree k
-    >|= Option.map Local.Tree.kind
-    >>= function
-    | Some `Value ->
-        Lwt.return (kind = `Value)
-    | Some `Tree ->
-        Lwt.return (kind = `Tree)
+    Local.Tree.find_tree t.tree k >|= Option.map Local.Tree.kind >>= function
+    | Some `Value -> Lwt.return (kind = `Value)
+    | Some `Tree -> Lwt.return (kind = `Tree)
     | None -> (
-      match t.proxy with
-      | None ->
-          Lwt.return_false
-      | Some (module ProxyDelegation) -> (
-          let mem =
-            match kind with
-            | `Value ->
-                ProxyDelegation.proxy_mem
-            | `Tree ->
-                ProxyDelegation.proxy_dir_mem
-          in
-          mem (t.path @ k)
-          >>= function
-          | Error err ->
-              let msg =
-                match kind with `Value -> "mem" | `Tree -> "dir_mem"
-              in
-              L.(S.emit delegation_error (msg, err))
-              >>= fun () -> Lwt.return_false
-          | Ok x ->
-              Lwt.return x ) )
+        match t.proxy with
+        | None -> Lwt.return_false
+        | Some (module ProxyDelegation) -> (
+            let mem =
+              match kind with
+              | `Value -> ProxyDelegation.proxy_mem
+              | `Tree -> ProxyDelegation.proxy_dir_mem
+            in
+            mem (t.path @ k) >>= function
+            | Error err ->
+                let msg =
+                  match kind with `Value -> "mem" | `Tree -> "dir_mem"
+                in
+                L.(S.emit delegation_error (msg, err)) >>= fun () ->
+                Lwt.return_false
+            | Ok x -> Lwt.return x))
 
   let raw_mem = raw_mem_aux `Value
 
@@ -153,49 +138,40 @@ module C = struct
 
   (* The tree under /data *)
   let data_tree (t : t) =
-    Local.find_tree t.local []
-    >|= function
-    | None ->
-        {proxy = t.proxy; path = []; tree = Local.Tree.empty t.local}
-    | Some tree ->
-        {proxy = t.proxy; path = []; tree}
+    Local.find_tree t.local [] >|= function
+    | None -> {proxy = t.proxy; path = []; tree = Local.Tree.empty t.local}
+    | Some tree -> {proxy = t.proxy; path = []; tree}
 
   let mem t k = data_tree t >>= fun tree -> raw_mem tree k
 
   let mem_tree t k = data_tree t >>= fun tree -> raw_mem_tree tree k
 
   let find t k =
-    data_tree t
-    >>= fun tree ->
-    raw_find tree k
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some v -> (
-        elt v >|= function Key v -> Some v | _ -> None )
+    data_tree t >>= fun tree ->
+    raw_find tree k >>= function
+    | None -> Lwt.return_none
+    | Some v -> ( elt v >|= function Key v -> Some v | _ -> None)
 
   let find_tree t k =
-    data_tree t
-    >>= fun tree ->
-    raw_find tree k
-    >|= function
-    | None -> None | Some tree -> Some {proxy = t.proxy; path = k; tree}
+    data_tree t >>= fun tree ->
+    raw_find tree k >|= function
+    | None -> None
+    | Some tree -> Some {proxy = t.proxy; path = k; tree}
 
   let add_tree (t : t) k (v : tree) =
-    Local.add_tree t.local k v.tree
-    >|= fun local -> if t.local == local then t else {t with local}
+    Local.add_tree t.local k v.tree >|= fun local ->
+    if t.local == local then t else {t with local}
 
   let add (t : t) k v =
-    Local.add t.local k v
-    >|= fun local -> if t.local == local then t else {t with local}
+    Local.add t.local k v >|= fun local ->
+    if t.local == local then t else {t with local}
 
   let remove (t : t) k =
-    Local.remove t.local k
-    >|= fun local -> if t.local == local then t else {t with local}
+    Local.remove t.local k >|= fun local ->
+    if t.local == local then t else {t with local}
 
   let raw_list (t : tree) ?offset ?length k =
-    Local.Tree.list t.tree ?offset ?length k
-    >|= fun ls ->
+    Local.Tree.list t.tree ?offset ?length k >|= fun ls ->
     List.fold_left
       (fun acc (k, tree) ->
         let v = {proxy = t.proxy; path = t.path @ [k]; tree} in
@@ -207,10 +183,8 @@ module C = struct
     data_tree t >>= fun tree -> raw_list tree ?offset ?length k
 
   let fold ?depth (t : t) root ~init ~f =
-    find_tree t root
-    >>= function
-    | None ->
-        Lwt.return init
+    find_tree t root >>= function
+    | None -> Lwt.return init
     | Some tr ->
         Local.Tree.fold ?depth tr.tree [] ~init ~f:(fun k tree acc ->
             let tree = {proxy = t.proxy; path = root @ k; tree} in
@@ -235,34 +209,32 @@ module C = struct
     let is_empty t = Local.Tree.is_empty t.tree
 
     let add t k v =
-      Local.Tree.add t.tree k v
-      >|= fun tree -> if tree == t.tree then t else {t with tree}
+      Local.Tree.add t.tree k v >|= fun tree ->
+      if tree == t.tree then t else {t with tree}
 
     let add_tree t k v =
-      Local.Tree.add_tree t.tree k v.tree
-      >|= fun tree -> if tree == t.tree then t else {t with tree}
+      Local.Tree.add_tree t.tree k v.tree >|= fun tree ->
+      if tree == t.tree then t else {t with tree}
 
     let mem = raw_mem
 
     let mem_tree = raw_mem_tree
 
     let find t k =
-      raw_find t k
-      >>= function
-      | None -> Lwt.return_none | Some tree -> Local.Tree.to_value tree
+      raw_find t k >>= function
+      | None -> Lwt.return_none
+      | Some tree -> Local.Tree.to_value tree
 
     let find_tree t k =
-      raw_find t k
-      >|= function
-      | None ->
-          None
+      raw_find t k >|= function
+      | None -> None
       | Some tree ->
           if k = [] then Some t
           else Some {proxy = t.proxy; path = t.path @ k; tree}
 
     let remove t k =
-      Local.Tree.remove t.tree k
-      >|= fun tree -> if tree == t.tree then t else {t with tree}
+      Local.Tree.remove t.tree k >|= fun tree ->
+      if tree == t.tree then t else {t with tree}
 
     let fold ?depth (t : tree) k ~init ~f =
       Local.Tree.fold ?depth t.tree k ~init ~f:(fun k tree acc ->
@@ -274,8 +246,8 @@ module C = struct
     let to_value t = Local.Tree.to_value t.tree
 
     let of_value t v =
-      Local.Tree.of_value t.M.local v
-      >|= fun tree -> {proxy = t.proxy; path = []; tree}
+      Local.Tree.of_value t.M.local v >|= fun tree ->
+      {proxy = t.proxy; path = []; tree}
 
     let list = raw_list
 

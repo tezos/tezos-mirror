@@ -40,23 +40,21 @@ let report_michelson_errors ?(no_print_source = false) ~msg
            ~show_source:(not no_print_source)
            ?parsed:None)
         errs
-      >>= fun () -> cctxt#error "%s" msg >>= fun () -> Lwt.return_none
-  | Ok data ->
-      Lwt.return_some data
+      >>= fun () ->
+      cctxt#error "%s" msg >>= fun () -> Lwt.return_none
+  | Ok data -> Lwt.return_some data
 
 let data_parameter =
   Clic.parameter (fun _ data ->
       Lwt.return
-        ( Micheline_parser.no_parsing_error
-        @@ Michelson_v1_parser.parse_expression data ))
+        (Micheline_parser.no_parsing_error
+        @@ Michelson_v1_parser.parse_expression data))
 
 let non_negative_param =
   Clic.parameter (fun _ s ->
       match int_of_string_opt s with
-      | Some i when i >= 0 ->
-          return i
-      | _ ->
-          failwith "Parameter should be a non-negative integer literal")
+      | Some i when i >= 0 -> return i
+      | _ -> failwith "Parameter should be a non-negative integer literal")
 
 let group =
   {
@@ -69,7 +67,8 @@ let binary_description =
 
 let commands () =
   let open Clic in
-  [ command
+  [
+    command
       ~group
       ~desc:"Access the timestamp of the block."
       (args1
@@ -82,8 +81,8 @@ let commands () =
           ~block:cctxt#block
           ()
         >>=? fun {timestamp = v; _} ->
-        ( if seconds then cctxt#message "%Ld" (Time.Protocol.to_seconds v)
-        else cctxt#message "%s" (Time.Protocol.to_notation v) )
+        (if seconds then cctxt#message "%Ld" (Time.Protocol.to_seconds v)
+        else cctxt#message "%s" (Time.Protocol.to_notation v))
         >>= fun () -> return_unit);
     command
       ~group
@@ -101,9 +100,9 @@ let commands () =
       ~group
       ~desc:"Get the balance of a contract."
       no_options
-      ( prefixes ["get"; "balance"; "for"]
+      (prefixes ["get"; "balance"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop )
+      @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? fun amount ->
@@ -113,14 +112,13 @@ let commands () =
       ~group
       ~desc:"Get the storage of a contract."
       no_options
-      ( prefixes ["get"; "script"; "storage"; "for"]
+      (prefixes ["get"; "script"; "storage"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop )
+      @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_storage cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? function
-        | None ->
-            cctxt#error "This is not a smart contract."
+        | None -> cctxt#error "This is not a smart contract."
         | Some storage ->
             cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped storage
             >>= fun () -> return_unit);
@@ -130,13 +128,13 @@ let commands () =
         "Get the value associated to a key in the big map storage of a \
          contract."
       no_options
-      ( prefixes ["get"; "big"; "map"; "value"; "for"]
+      (prefixes ["get"; "big"; "map"; "value"; "for"]
       @@ Clic.param ~name:"key" ~desc:"the key to look for" data_parameter
       @@ prefixes ["of"; "type"]
       @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop )
+      @@ stop)
       (fun () key key_type (_, contract) (cctxt : Alpha_client_context.full) ->
         get_big_map_value
           cctxt
@@ -145,8 +143,7 @@ let commands () =
           contract
           (key.expanded, key_type.expanded)
         >>=? function
-        | None ->
-            cctxt#error "No value associated to this key."
+        | None -> cctxt#error "No value associated to this key."
         | Some value ->
             cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped value
             >>= fun () -> return_unit);
@@ -154,35 +151,34 @@ let commands () =
       ~group
       ~desc:"Get the storage of a contract."
       no_options
-      ( prefixes ["get"; "script"; "code"; "for"]
+      (prefixes ["get"; "script"; "code"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop )
+      @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         get_script cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? function
-        | None ->
-            cctxt#error "This is not a smart contract."
+        | None -> cctxt#error "This is not a smart contract."
         | Some {code; storage = _} -> (
-          match Script_repr.force_decode code with
-          | Error errs ->
-              cctxt#error
-                "%a"
-                (Format.pp_print_list
-                   ~pp_sep:Format.pp_print_newline
-                   Environment.Error_monad.pp)
-                errs
-          | Ok (code, _) ->
-              let {Michelson_v1_parser.source; _} =
-                Michelson_v1_printer.unparse_toplevel code
-              in
-              cctxt#answer "%s" source >>= return ));
+            match Script_repr.force_decode code with
+            | Error errs ->
+                cctxt#error
+                  "%a"
+                  (Format.pp_print_list
+                     ~pp_sep:Format.pp_print_newline
+                     Environment.Error_monad.pp)
+                  errs
+            | Ok (code, _) ->
+                let {Michelson_v1_parser.source; _} =
+                  Michelson_v1_printer.unparse_toplevel code
+                in
+                cctxt#answer "%s" source >>= return));
     command
       ~group
       ~desc:"Get the manager of a contract."
       no_options
-      ( prefixes ["get"; "manager"; "for"]
+      (prefixes ["get"; "manager"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop )
+      @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         Client_proto_contracts.get_manager
           cctxt
@@ -190,10 +186,8 @@ let commands () =
           ~block:cctxt#block
           contract
         >>=? fun manager ->
-        Public_key_hash.rev_find cctxt manager
-        >>=? fun mn ->
-        Public_key_hash.to_source manager
-        >>=? fun m ->
+        Public_key_hash.rev_find cctxt manager >>=? fun mn ->
+        Public_key_hash.to_source manager >>=? fun m ->
         cctxt#message
           "%s (%s)"
           m
@@ -203,9 +197,9 @@ let commands () =
       ~group
       ~desc:"Get the delegate of a contract."
       no_options
-      ( prefixes ["get"; "delegate"; "for"]
+      (prefixes ["get"; "delegate"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop )
+      @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
         Client_proto_contracts.get_delegate
           cctxt
@@ -213,13 +207,10 @@ let commands () =
           ~block:cctxt#block
           contract
         >>=? function
-        | None ->
-            cctxt#message "none" >>= fun () -> return_unit
+        | None -> cctxt#message "none" >>= fun () -> return_unit
         | Some delegate ->
-            Public_key_hash.rev_find cctxt delegate
-            >>=? fun mn ->
-            Public_key_hash.to_source delegate
-            >>=? fun m ->
+            Public_key_hash.rev_find cctxt delegate >>=? fun mn ->
+            Public_key_hash.to_source delegate >>=? fun m ->
             cctxt#message
               "%s (%s)"
               m
@@ -234,17 +225,15 @@ let commands () =
             ~doc:"number of previous blocks to check"
             ~default:"10"
             non_negative_param))
-      ( prefixes ["get"; "receipt"; "for"]
+      (prefixes ["get"; "receipt"; "for"]
       @@ param
            ~name:"operation"
            ~desc:"Operation to be looked up"
            (parameter (fun _ x ->
                 match Operation_hash.of_b58check_opt x with
-                | None ->
-                    Error_monad.failwith "Invalid operation hash: '%s'" x
-                | Some hash ->
-                    return hash))
-      @@ stop )
+                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
+                | Some hash -> return hash))
+      @@ stop)
       (fun predecessors operation_hash (ctxt : Alpha_client_context.full) ->
         display_receipt_for_operation
           ctxt
@@ -292,8 +281,7 @@ let commands () =
              info.current_period_kind)
           info.remaining
         >>= fun () ->
-        Shell_services.Protocol.list cctxt
-        >>=? fun known_protos ->
+        Shell_services.Protocol.list cctxt >>=? fun known_protos ->
         get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
         >>=? fun props ->
         let ranks =
@@ -301,8 +289,7 @@ let commands () =
           |> List.sort (fun (_, v1) (_, v2) -> Int32.(compare v2 v1))
         in
         let print_proposal = function
-          | None ->
-              assert false (* not called during proposal phase *)
+          | None -> assert false (* not called during proposal phase *)
           | Some proposal ->
               cctxt#message "Current proposal: %a" Protocol_hash.pp proposal
         in
@@ -322,15 +309,14 @@ let commands () =
                         Protocol_hash.pp
                         p
                         w
-                        ( if List.mem ~equal:Protocol_hash.equal p known_protos
+                        (if List.mem ~equal:Protocol_hash.equal p known_protos
                         then ""
-                        else "not " ))
+                        else "not "))
                     ranks ;
                   pp_close_box ppf ())
             >>= fun () -> return_unit
         | Testing_vote | Promotion_vote ->
-            print_proposal info.current_proposal
-            >>= fun () ->
+            print_proposal info.current_proposal >>= fun () ->
             get_ballots_info ~chain:cctxt#chain ~block:cctxt#block cctxt
             >>=? fun ballots_info ->
             cctxt#answer
@@ -347,4 +333,5 @@ let commands () =
               ballots_info.supermajority
             >>= fun () -> return_unit
         | Testing ->
-            print_proposal info.current_proposal >>= fun () -> return_unit) ]
+            print_proposal info.current_proposal >>= fun () -> return_unit);
+  ]

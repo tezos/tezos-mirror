@@ -64,8 +64,7 @@ module type S = sig
     (unit, 'error trace) result Lwt.t list -> (unit, 'error trace) result Lwt.t
 
   val all_ep :
-    ('a, 'error trace) result Lwt.t list ->
-    ('a list, 'error trace) result Lwt.t
+    ('a, 'error trace) result Lwt.t list -> ('a list, 'error trace) result Lwt.t
 
   val both_ep :
     ('a, 'error trace) result Lwt.t ->

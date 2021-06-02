@@ -28,22 +28,21 @@ let () =
     try
       let s = Sys.getenv "SLOW_TEST" in
       match String.(trim (uncapitalize_ascii s)) with
-      | "true" | "1" | "yes" ->
-          `Slow
-      | _ ->
-          `Quick
+      | "true" | "1" | "yes" -> `Slow
+      | _ -> `Quick
     with Not_found -> `Quick
   in
   Lwt_main.run
-    ( Internal_event_unix.init ()
-    >>= fun () ->
-    Alcotest_lwt.run
-      "tezos-store"
-      [ Test_cemented_store.tests;
-        Test_block_store.tests;
-        Test_store.tests;
-        Test_protocol_store.tests;
-        Test_testchain.tests;
-        Test_snapshots.tests speed;
-        Test_reconstruct.tests speed;
-        Test_history_mode_switch.tests speed ] )
+    ( Internal_event_unix.init () >>= fun () ->
+      Alcotest_lwt.run
+        "tezos-store"
+        [
+          Test_cemented_store.tests;
+          Test_block_store.tests;
+          Test_store.tests;
+          Test_protocol_store.tests;
+          Test_testchain.tests;
+          Test_snapshots.tests speed;
+          Test_reconstruct.tests speed;
+          Test_history_mode_switch.tests speed;
+        ] )

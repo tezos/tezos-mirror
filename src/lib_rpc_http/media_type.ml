@@ -42,8 +42,7 @@ let json =
                %s@]@]"
               err
               raw
-        | Ok json ->
-            Data_encoding.Json.pp ppf json);
+        | Ok json -> Data_encoding.Json.pp ppf json);
     construct =
       (fun enc v ->
         Data_encoding.Json.to_string ~newline:true ~minify:true
@@ -58,16 +57,15 @@ let json =
     destruct =
       (fun enc body ->
         match Data_encoding.Json.from_string body with
-        | Error _ as err ->
-            err
+        | Error _ as err -> err
         | Ok json -> (
-          try Ok (Data_encoding.Json.destruct enc json)
-          with Data_encoding.Json.Cannot_destruct (_, exn) ->
-            Error
-              (Format.asprintf
-                 "%a"
-                 (fun fmt -> Data_encoding.Json.print_error fmt)
-                 exn) ));
+            try Ok (Data_encoding.Json.destruct enc json)
+            with Data_encoding.Json.Cannot_destruct (_, exn) ->
+              Error
+                (Format.asprintf
+                   "%a"
+                   (fun fmt -> Data_encoding.Json.print_error fmt)
+                   exn)));
   }
 
 let bson =
@@ -112,13 +110,13 @@ let bson =
         | exception Json_repr_bson.Bson_decoding_error (msg, _, pos) ->
             Error (Format.asprintf "(at offset: %d) %s" pos msg)
         | bson -> (
-          try Ok (Data_encoding.Bson.destruct enc bson)
-          with Data_encoding.Json.Cannot_destruct (_, exn) ->
-            Error
-              (Format.asprintf
-                 "%a"
-                 (fun fmt -> Data_encoding.Json.print_error fmt)
-                 exn) ));
+            try Ok (Data_encoding.Bson.destruct enc bson)
+            with Data_encoding.Json.Cannot_destruct (_, exn) ->
+              Error
+                (Format.asprintf
+                   "%a"
+                   (fun fmt -> Data_encoding.Json.print_error fmt)
+                   exn)));
   }
 
 let octet_stream =
@@ -157,8 +155,7 @@ let octet_stream =
                  "Failed to parse binary data: %a."
                  Data_encoding.Binary.pp_read_error
                  re)
-        | Ok data ->
-            Ok data);
+        | Ok data -> Ok data);
   }
 
 let all_media_types = [json; bson; octet_stream]

@@ -36,10 +36,8 @@ let print_var_annot ppf annot = List.iter (Format.fprintf ppf "@ %s") annot
 
 let print_stack_ty ?(depth = max_int) ppf s =
   let rec loop depth ppf = function
-    | [] ->
-        ()
-    | _ when depth <= 0 ->
-        Format.fprintf ppf "..."
+    | [] -> ()
+    | _ when depth <= 0 -> Format.fprintf ppf "..."
     | [(last, annot)] ->
         Format.fprintf ppf "%a%a" print_ty last print_var_annot annot
     | (last, annot) :: rest ->
@@ -54,14 +52,11 @@ let print_stack_ty ?(depth = max_int) ppf s =
           rest
   in
   match s with
-  | [] ->
-      Format.fprintf ppf "[]"
-  | sty ->
-      Format.fprintf ppf "@[<hov 2>[ %a ]@]" (loop depth) sty
+  | [] -> Format.fprintf ppf "[]"
+  | sty -> Format.fprintf ppf "@[<hov 2>[ %a ]@]" (loop depth) sty
 
 let rec print_enumeration ppf = function
-  | [single] ->
-      Format.fprintf ppf "%a" Format.pp_print_text single
+  | [single] -> Format.fprintf ppf "%a" Format.pp_print_text single
   | [prev; last] ->
       Format.fprintf
         ppf
@@ -78,15 +73,13 @@ let rec print_enumeration ppf = function
         first
         print_enumeration
         rest
-  | [] ->
-      assert false
+  | [] -> assert false
 
 let collect_error_locations errs =
   let rec collect acc = function
     | Environment.Ecoproto_error
         ( Ill_formed_type (_, _, _)
-        | No_such_entrypoint _
-        | Duplicate_entrypoint _
+        | No_such_entrypoint _ | Duplicate_entrypoint _
         | Unreachable_entrypoint _
         | Runtime_contract_error (_, _)
         | Michelson_v1_primitives.Invalid_primitive_name (_, _)
@@ -122,8 +115,7 @@ let collect_error_locations errs =
         | Reject (loc, _, _) )
       :: rest ->
         collect (loc :: acc) rest
-    | _ :: rest ->
-        collect acc rest
+    | _ :: rest -> collect acc rest
   in
   collect [] errs
 
@@ -131,8 +123,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
   let rec print_trace locations errs =
     let print_loc ppf loc =
       match locations loc with
-      | None ->
-          Format.fprintf ppf "At (unshown) location %d, " loc
+      | None -> Format.fprintf ppf "At (unshown) location %d, " loc
       | Some loc ->
           Format.fprintf
             ppf
@@ -151,9 +142,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
       >?? fun (ploc, _) -> Some ploc
     in
     let print_source ppf (parsed, _hilights) (* TODO *) =
-      let lines =
-        String.split_on_char '\n' parsed.Michelson_v1_parser.source
-      in
+      let lines = String.split_on_char '\n' parsed.Michelson_v1_parser.source in
       let cols = String.length (string_of_int (List.length lines)) in
       Format.fprintf
         ppf
@@ -163,8 +152,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         (List.mapi (fun i l -> (i + 1, l)) lines)
     in
     match errs with
-    | [] ->
-        ()
+    | [] -> ()
     | Environment.Ecoproto_error
         (Michelson_v1_primitives.Invalid_primitive_name (expr, loc))
       :: rest ->
@@ -177,8 +165,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 = parsed.Michelson_v1_parser.unexpanded
               then parsed
               else Michelson_v1_printer.unparse_invalid expr
-          | None ->
-              Michelson_v1_printer.unparse_invalid expr
+          | None -> Michelson_v1_printer.unparse_invalid expr
         in
         let hilights = loc :: collect_error_locations rest in
         if show_source then
@@ -195,16 +182,16 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           match parsed with
           | Some parsed when expr = parsed.Michelson_v1_parser.expanded ->
               parsed
-          | Some _ | None ->
-              Michelson_v1_printer.unparse_expression expr
+          | Some _ | None -> Michelson_v1_printer.unparse_expression expr
         in
         let hilights = collect_error_locations rest in
         Format.fprintf
           ppf
           "@[<hov 0>@[<hov 2>Ill typed %adata:@ %a@]@ @[<hov 2>is not an \
            expression of type@ %a@]@]"
-          (fun ppf -> function None -> () | Some s ->
-                Format.fprintf ppf "%s " s)
+          (fun ppf -> function
+            | None -> ()
+            | Some s -> Format.fprintf ppf "%s " s)
           name
           print_source
           (parsed, hilights)
@@ -234,8 +221,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           match parsed with
           | Some parsed when expr = parsed.Michelson_v1_parser.expanded ->
               parsed
-          | Some _ | None ->
-              Michelson_v1_printer.unparse_expression expr
+          | Some _ | None -> Michelson_v1_printer.unparse_expression expr
         in
         let hilights = loc :: collect_error_locations errs in
         if show_source then
@@ -339,8 +325,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           match parsed with
           | Some parsed when expr = parsed.Michelson_v1_parser.expanded ->
               parsed
-          | Some _ | None ->
-              Michelson_v1_printer.unparse_toplevel expr
+          | Some _ | None -> Michelson_v1_printer.unparse_toplevel expr
         in
         let hilights = collect_error_locations rest in
         Format.fprintf
@@ -352,8 +337,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           (parsed, hilights) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | Environment.Ecoproto_error (Apply.Internal_operation_replay op) :: rest
-      ->
+    | Environment.Ecoproto_error (Apply.Internal_operation_replay op) :: rest ->
         Format.fprintf
           ppf
           "@[<v 2>Internal operation replay attempt:@,%a@]"
@@ -398,7 +382,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           Contract.pp
           c
     | Environment.Ecoproto_error err :: rest ->
-        ( match err with
+        (match err with
         | Script_interpreter.Bad_contract_parameter c ->
             Format.fprintf
               ppf
@@ -416,14 +400,10 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               got
         | Invalid_namespace (loc, name, exp, got) ->
             let human_namespace = function
-              | Instr_namespace ->
-                  ("an", "instruction")
-              | Type_namespace ->
-                  ("a", "type name")
-              | Constant_namespace ->
-                  ("a", "constant constructor")
-              | Keyword_namespace ->
-                  ("a", "keyword")
+              | Instr_namespace -> ("an", "instruction")
+              | Type_namespace -> ("a", "type name")
+              | Constant_namespace -> ("a", "constant constructor")
+              | Keyword_namespace -> ("a", "keyword")
             in
             Format.fprintf
               ppf
@@ -445,16 +425,11 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               (List.map Michelson_v1_primitives.string_of_prim exp)
         | Invalid_kind (loc, exp, got) ->
             let human_kind = function
-              | Seq_kind ->
-                  ("a", "sequence")
-              | Prim_kind ->
-                  ("a", "primitive")
-              | Int_kind ->
-                  ("an", "int")
-              | String_kind ->
-                  ("a", "string")
-              | Bytes_kind ->
-                  ("a", "byte sequence")
+              | Seq_kind -> ("a", "sequence")
+              | Prim_kind -> ("a", "primitive")
+              | Int_kind -> ("an", "int")
+              | String_kind -> ("a", "string")
+              | Bytes_kind -> ("a", "byte sequence")
             in
             Format.fprintf
               ppf
@@ -606,10 +581,8 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "%aThe SELF instruction cannot appear in a lambda."
               print_loc
               loc
-        | Bad_stack_length ->
-            Format.fprintf ppf "Bad stack length."
-        | Bad_stack_item lvl ->
-            Format.fprintf ppf "Bad stack item %d." lvl
+        | Bad_stack_length -> Format.fprintf ppf "Bad stack length."
+        | Bad_stack_item lvl -> Format.fprintf ppf "Bad stack item %d." lvl
         | Invalid_constant (loc, got, exp) ->
             Format.fprintf
               ppf
@@ -624,8 +597,8 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         | Invalid_syntactic_constant (loc, got, exp) ->
             Format.fprintf
               ppf
-              "@[<hov 0>@[<hov 2>%avalue@ %a@]@ @[<hov 2>is invalid, \
-               expected@ %s@]@]"
+              "@[<hov 0>@[<hov 2>%avalue@ %a@]@ @[<hov 2>is invalid, expected@ \
+               %s@]@]"
               print_loc
               loc
               print_expr
@@ -663,7 +636,9 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               loc
               print_expr
               v
-              (fun ppf -> function None -> () | Some trace ->
+              (fun ppf -> function
+                | None -> ()
+                | Some trace ->
                     Format.fprintf
                       ppf
                       "@,@[<v 2>trace@,%a@]"
@@ -676,15 +651,16 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "%aunexpected arithmetic overflow%a"
               print_loc
               loc
-              (fun ppf -> function None -> () | Some trace ->
+              (fun ppf -> function
+                | None -> ()
+                | Some trace ->
                     Format.fprintf
                       ppf
                       "@,@[<v 2>trace@,%a@]"
                       print_execution_trace
                       trace)
               trace
-        | err ->
-            Format.fprintf ppf "%a" Environment.Error_monad.pp err ) ;
+        | err -> Format.fprintf ppf "%a" Environment.Error_monad.pp err) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | err :: rest ->

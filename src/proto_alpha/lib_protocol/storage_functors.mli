@@ -64,10 +64,7 @@ module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :
   Carbonated_data_set_storage with type t = C.t and type elt = I.t
 
 module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
-  Indexed_data_storage
-    with type t = C.t
-     and type key = I.t
-     and type value = V.t
+  Indexed_data_storage with type t = C.t and type key = I.t and type value = V.t
 
 module Make_indexed_carbonated_data_storage
     (C : Raw_context.T)

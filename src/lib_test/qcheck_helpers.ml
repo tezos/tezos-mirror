@@ -29,12 +29,9 @@ let qcheck_wrap ?verbose ?long ?rand =
 let qcheck_eq ?pp ?cmp ?eq expected actual =
   let pass =
     match (eq, cmp) with
-    | (Some eq, _) ->
-        eq expected actual
-    | (None, Some cmp) ->
-        cmp expected actual = 0
-    | (None, None) ->
-        Stdlib.compare expected actual = 0
+    | (Some eq, _) -> eq expected actual
+    | (None, Some cmp) -> cmp expected actual = 0
+    | (None, None) -> Stdlib.compare expected actual = 0
   in
   if pass then true
   else
@@ -79,9 +76,7 @@ let of_option_arb QCheck.{gen; print; small; shrink; collect; stats} =
   let collect =
     Option.map (fun collect_opt a -> collect_opt (Some a)) collect
   in
-  let stats =
-    List.map (fun (s, f_opt) -> (s, fun a -> f_opt (Some a))) stats
-  in
+  let stats = List.map (fun (s, f_opt) -> (s, fun a -> f_opt (Some a))) stats in
   QCheck.make ?print ?small ?shrink ?collect ~stats gen
 
 let uint16 = QCheck.(0 -- 65535)
@@ -125,8 +120,7 @@ module MakeMapArb (Map : Stdlib.Map.S) = struct
     let open Shrink in
     let kv_list = map |> Map.to_seq |> List.of_seq in
     list
-      ~shrink:
-        (pair (of_option_shrink key_shrink) (of_option_shrink val_shrink))
+      ~shrink:(pair (of_option_shrink key_shrink) (of_option_shrink val_shrink))
       kv_list
       (fun smaller_kv_list ->
         smaller_kv_list |> List.to_seq |> Map.of_seq |> yield)

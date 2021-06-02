@@ -76,8 +76,7 @@ let opt_register0_fullctxt s f =
     RPC_directory.opt_register !rpc_services s (fun ctxt q i ->
         rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
 
-let opt_register0 s f =
-  opt_register0_fullctxt s (fun {context; _} -> f context)
+let opt_register0 s f = opt_register0_fullctxt s (fun {context; _} -> f context)
 
 let opt_register1_fullctxt s f =
   rpc_services :=

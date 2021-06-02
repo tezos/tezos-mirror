@@ -34,12 +34,9 @@ include Compare.Make (struct
     match (l1, l2) with
     | (Implicit pkh1, Implicit pkh2) ->
         Signature.Public_key_hash.compare pkh1 pkh2
-    | (Originated h1, Originated h2) ->
-        Contract_hash.compare h1 h2
-    | (Implicit _, Originated _) ->
-        -1
-    | (Originated _, Implicit _) ->
-        1
+    | (Originated h1, Originated h2) -> Contract_hash.compare h1 h2
+    | (Implicit _, Originated _) -> -1
+    | (Originated _, Implicit _) -> 1
 end)
 
 type contract = t
@@ -47,35 +44,25 @@ type contract = t
 type error += Invalid_contract_notation of string (* `Permanent *)
 
 let to_b58check = function
-  | Implicit pbk ->
-      Signature.Public_key_hash.to_b58check pbk
-  | Originated h ->
-      Contract_hash.to_b58check h
+  | Implicit pbk -> Signature.Public_key_hash.to_b58check pbk
+  | Originated h -> Contract_hash.to_b58check h
 
 let of_b58check s =
   match Base58.decode s with
-  | Some (Ed25519.Public_key_hash.Data h) ->
-      ok (Implicit (Signature.Ed25519 h))
+  | Some (Ed25519.Public_key_hash.Data h) -> ok (Implicit (Signature.Ed25519 h))
   | Some (Secp256k1.Public_key_hash.Data h) ->
       ok (Implicit (Signature.Secp256k1 h))
-  | Some (P256.Public_key_hash.Data h) ->
-      ok (Implicit (Signature.P256 h))
-  | Some (Contract_hash.Data h) ->
-      ok (Originated h)
-  | _ ->
-      error (Invalid_contract_notation s)
+  | Some (P256.Public_key_hash.Data h) -> ok (Implicit (Signature.P256 h))
+  | Some (Contract_hash.Data h) -> ok (Originated h)
+  | _ -> error (Invalid_contract_notation s)
 
 let pp ppf = function
-  | Implicit pbk ->
-      Signature.Public_key_hash.pp ppf pbk
-  | Originated h ->
-      Contract_hash.pp ppf h
+  | Implicit pbk -> Signature.Public_key_hash.pp ppf pbk
+  | Originated h -> Contract_hash.pp ppf h
 
 let pp_short ppf = function
-  | Implicit pbk ->
-      Signature.Public_key_hash.pp_short ppf pbk
-  | Originated h ->
-      Contract_hash.pp_short ppf h
+  | Implicit pbk -> Signature.Public_key_hash.pp_short ppf pbk
+  | Originated h -> Contract_hash.pp_short ppf h
 
 let encoding =
   let open Data_encoding in
@@ -89,7 +76,8 @@ let encoding =
        ~binary:
          (union
             ~tag_size:`Uint8
-            [ case
+            [
+              case
                 (Tag 0)
                 ~title:"Implicit"
                 Signature.Public_key_hash.encoding
@@ -100,16 +88,15 @@ let encoding =
                 (Fixed.add_padding Contract_hash.encoding 1)
                 ~title:"Originated"
                 (function Originated k -> Some k | _ -> None)
-                (fun k -> Originated k) ])
+                (fun k -> Originated k);
+            ])
        ~json:
          (conv
             to_b58check
             (fun s ->
               match of_b58check s with
-              | Ok s ->
-                  s
-              | Error _ ->
-                  Json.cannot_destruct "Invalid contract notation.")
+              | Ok s -> s
+              | Error _ -> Json.cannot_destruct "Invalid contract notation.")
             string)
 
 let () =
@@ -153,8 +140,9 @@ let originated_contract nonce =
 
 let originated_contracts
     ~since:{origination_index = first; operation_hash = first_hash}
-    ~until:( {origination_index = last; operation_hash = last_hash} as
-           origination_nonce ) =
+    ~until:
+      ({origination_index = last; operation_hash = last_hash} as
+      origination_nonce) =
   assert (Operation_hash.equal first_hash last_hash) ;
   let rec contracts acc origination_index =
     if Compare.Int32.(origination_index < first) then acc
@@ -176,10 +164,8 @@ let rpc_arg =
   let construct = to_b58check in
   let destruct hash =
     match of_b58check hash with
-    | Error _ ->
-        Error "Cannot parse contract id"
-    | Ok contract ->
-        Ok contract
+    | Error _ -> Error "Cannot parse contract id"
+    | Ok contract -> Ok contract
   in
   RPC_arg.make
     ~descr:"A contract identifier encoded in b58check."
@@ -197,8 +183,13 @@ module Index = struct
     let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
     let (`Hex key) = Hex.of_bytes raw_key in
     let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
-    String.sub index_key 0 2 :: String.sub index_key 2 2
-    :: String.sub index_key 4 2 :: String.sub index_key 6 2
+    String.sub index_key 0 2
+    ::
+    String.sub index_key 2 2
+    ::
+    String.sub index_key 4 2
+    ::
+    String.sub index_key 6 2
     :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: key :: l
 
   let of_path = function

@@ -53,8 +53,8 @@ let () =
       else
         Format.fprintf
           ppf
-          "The seed for cycle %a has not been computed yet  (latest known \
-           seed is for cycle %a)"
+          "The seed for cycle %a has not been computed yet  (latest known seed \
+           is for cycle %a)"
           Cycle_repr.pp
           cycle
           Cycle_repr.pp
@@ -65,33 +65,27 @@ let () =
         (req "requested" Cycle_repr.encoding)
         (req "latest" Cycle_repr.encoding))
     (function
-      | Unknown {oldest; cycle; latest} ->
-          Some (oldest, cycle, latest)
-      | _ ->
-          None)
+      | Unknown {oldest; cycle; latest} -> Some (oldest, cycle, latest)
+      | _ -> None)
     (fun (oldest, cycle, latest) -> Unknown {oldest; cycle; latest})
 
 let compute_for_cycle c ~revealed cycle =
   match Cycle_repr.pred cycle with
-  | None ->
-      assert false (* should not happen *)
+  | None -> assert false (* should not happen *)
   | Some previous_cycle ->
       let levels = Level_storage.levels_with_commitments_in_cycle c revealed in
       let combine (c, random_seed, unrevealed) level =
-        Storage.Seed.Nonce.get c level
-        >>=? function
+        Storage.Seed.Nonce.get c level >>=? function
         | Revealed nonce ->
-            Storage.Seed.Nonce.remove_existing c level
-            >|=? fun c -> (c, Seed_repr.nonce random_seed nonce, unrevealed)
+            Storage.Seed.Nonce.remove_existing c level >|=? fun c ->
+            (c, Seed_repr.nonce random_seed nonce, unrevealed)
         | Unrevealed u ->
-            Storage.Seed.Nonce.remove_existing c level
-            >|=? fun c -> (c, random_seed, u :: unrevealed)
+            Storage.Seed.Nonce.remove_existing c level >|=? fun c ->
+            (c, random_seed, u :: unrevealed)
       in
-      Storage.Seed.For_cycle.get c previous_cycle
-      >>=? fun prev_seed ->
+      Storage.Seed.For_cycle.get c previous_cycle >>=? fun prev_seed ->
       let seed = Seed_repr.deterministic_seed prev_seed in
-      fold_left_s combine (c, seed, []) levels
-      >>=? fun (c, seed, unrevealed) ->
+      fold_left_s combine (c, seed, []) levels >>=? fun (c, seed, unrevealed) ->
       Storage.Seed.For_cycle.init c cycle seed >|=? fun c -> (c, unrevealed)
 
 let for_cycle ctxt cycle =
@@ -105,10 +99,8 @@ let for_cycle ctxt cycle =
   in
   let oldest =
     match Cycle_repr.sub current_cycle preserved with
-    | None ->
-        Cycle_repr.root
-    | Some oldest ->
-        oldest
+    | None -> Cycle_repr.root
+    | Some oldest -> oldest
   in
   error_unless
     Cycle_repr.(oldest <= cycle && cycle <= latest)
@@ -121,8 +113,7 @@ let init ctxt =
   let preserved = Constants_storage.preserved_cycles ctxt in
   List.fold_left2
     (fun ctxt c seed ->
-      ctxt
-      >>=? fun ctxt ->
+      ctxt >>=? fun ctxt ->
       let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
       Storage.Seed.For_cycle.init ctxt cycle seed)
     (return ctxt)
@@ -131,15 +122,12 @@ let init ctxt =
 
 let cycle_end ctxt last_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
-  ( match Cycle_repr.sub last_cycle preserved with
-  | None ->
-      return ctxt
-  | Some cleared_cycle ->
-      clear_cycle ctxt cleared_cycle )
+  (match Cycle_repr.sub last_cycle preserved with
+  | None -> return ctxt
+  | Some cleared_cycle -> clear_cycle ctxt cleared_cycle)
   >>=? fun ctxt ->
   match Cycle_repr.pred last_cycle with
-  | None ->
-      return (ctxt, [])
+  | None -> return (ctxt, [])
   | Some revealed ->
       (* cycle with revelations *)
       let inited_seed_cycle = Cycle_repr.add last_cycle (preserved + 1) in

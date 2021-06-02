@@ -8,8 +8,3 @@
             tezos-context.helpers)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib)))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

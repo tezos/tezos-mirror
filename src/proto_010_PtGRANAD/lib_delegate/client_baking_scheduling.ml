@@ -48,23 +48,17 @@ let sleep_until time =
   else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
 
 let rec wait_for_first_event ~name stream =
-  Lwt_stream.get stream
-  >>= function
+  Lwt_stream.get stream >>= function
   | None | Some (Error _) ->
-      Events.(emit cannot_fetch_event) name
-      >>= fun () ->
+      Events.(emit cannot_fetch_event) name >>= fun () ->
       (* NOTE: this is not a tight loop because of Lwt_stream.get *)
       wait_for_first_event ~name stream
-  | Some (Ok bi) ->
-      Lwt.return bi
+  | Some (Ok bi) -> Lwt.return bi
 
 let log_errors_and_continue ~name p =
-  p
-  >>= function
-  | Ok () ->
-      Lwt.return_unit
-  | Error errs ->
-      Events.(emit daemon_error) (name, errs)
+  p >>= function
+  | Ok () -> Lwt.return_unit
+  | Error errs -> Events.(emit daemon_error) (name, errs)
 
 let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
     ~(stream : 'event tzresult Lwt_stream.t)
@@ -80,10 +74,8 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
     ~(event_k :
        #Protocol_client_context.full -> 'state -> 'event -> unit tzresult Lwt.t)
     ~finalizer =
-  Events.(emit daemon_setup) name
-  >>= fun () ->
-  wait_for_first_event ~name stream
-  >>= fun first_event ->
+  Events.(emit daemon_setup) name >>= fun () ->
+  wait_for_first_event ~name stream >>= fun first_event ->
   (* statefulness *)
   let last_get_event = ref None in
   let get_event () =
@@ -92,45 +84,42 @@ let main ~(name : string) ~(cctxt : #Protocol_client_context.full)
         let t = Lwt_stream.get stream in
         last_get_event := Some t ;
         t
-    | Some t ->
-        t
+    | Some t -> t
   in
-  state_maker first_event
-  >>=? fun state ->
+  state_maker first_event >>=? fun state ->
   (* main loop *)
   let rec worker_loop () =
     (* event construction *)
     let timeout = compute_timeout state in
     Lwt.choose
-      [ (Lwt_exit.clean_up_starts >|= fun _ -> `Termination);
+      [
+        (Lwt_exit.clean_up_starts >|= fun _ -> `Termination);
         (timeout >|= fun timesup -> `Timeout timesup);
-        (get_event () >|= fun e -> `Event e) ]
+        (get_event () >|= fun e -> `Event e);
+      ]
     >>= function
     (* event matching *)
-    | `Termination ->
-        return_unit
+    | `Termination -> return_unit
     | `Event (None | Some (Error _)) ->
         (* exit when the node is unavailable *)
         last_get_event := None ;
-        Events.(emit daemon_connection_lost) name
-        >>= fun () -> fail Node_connection_lost
+        Events.(emit daemon_connection_lost) name >>= fun () ->
+        fail Node_connection_lost
     | `Event (Some (Ok event)) ->
         (* new event: cancel everything and execute callback *)
         last_get_event := None ;
         (* TODO: pretty-print events (requires passing a pp as argument) *)
-        log_errors_and_continue ~name @@ event_k cctxt state event
-        >>= fun () -> worker_loop ()
+        log_errors_and_continue ~name @@ event_k cctxt state event >>= fun () ->
+        worker_loop ()
     | `Timeout timesup ->
         (* main event: it's time *)
-        Events.(emit daemon_wakeup) name
-        >>= fun () ->
+        Events.(emit daemon_wakeup) name >>= fun () ->
         (* core functionality *)
         log_errors_and_continue ~name @@ timeout_k cctxt state timesup
         >>= fun () -> worker_loop ()
   in
   (* ignition *)
-  Events.(emit daemon_start) name
-  >>= fun () ->
+  Events.(emit daemon_start) name >>= fun () ->
   Lwt.finalize
     (fun () ->
       log_errors_and_continue ~name @@ pre_loop cctxt state first_event

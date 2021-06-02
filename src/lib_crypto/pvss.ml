@@ -127,16 +127,15 @@ module MakeDleq (G : CYCLIC_GROUP) :
 
   type proof = exponent * exponent list
 
-  let proof_encoding =
-    Data_encoding.(tup2 G.Z_m.encoding (list G.Z_m.encoding))
+  let proof_encoding = Data_encoding.(tup2 G.Z_m.encoding (list G.Z_m.encoding))
 
   (* Fiat-Shamir heuristic to derive a random element of ℤ/mℤ from the
        hash of a list of group elements *)
   let fiat_shamir ?(exponents = []) elements =
     String.concat
       "||"
-      ( ("tezosftw" :: List.map G.to_bits elements)
-      @ List.map G.Z_m.to_bits exponents )
+      ("tezosftw" :: List.map G.to_bits elements
+      @ List.map G.Z_m.to_bits exponents)
     |> (fun x -> H.hash_string [x])
     |> H.to_string |> G.Z_m.of_bits_exn
 
@@ -178,10 +177,10 @@ module MakeDleq (G : CYCLIC_GROUP) :
     else
       let a1_n =
         (* Original, non-optimized form
-        List.map2
-          G.( * )
-          (List.map (G.pow b1) r_n)
-          (List.map (fun h1 -> G.pow h1 c) h1_n)
+           List.map2
+             G.( * )
+             (List.map (G.pow b1) r_n)
+             (List.map (fun h1 -> G.pow h1 c) h1_n)
         *)
         List.map2
           (fun r h1 ->
@@ -191,20 +190,18 @@ module MakeDleq (G : CYCLIC_GROUP) :
           h1_n
       and a2_n =
         (* Original, non-optimized form
-        List.map2
-          G.( * )
-          (List.map2 G.pow b2_n r_n)
-          (List.map (fun h2 -> G.pow h2 c) h2_n)
+           List.map2
+             G.( * )
+             (List.map2 G.pow b2_n r_n)
+             (List.map (fun h2 -> G.pow h2 c) h2_n)
         *)
         let rec map3 f xs ys zs =
           match (xs, ys, zs) with
-          | ([], [], []) ->
-              []
+          | ([], [], []) -> []
           | (x :: xs, y :: ys, z :: zs) ->
               let r = f x y z in
               r :: map3 f xs ys zs
-          | _ ->
-              invalid_arg "Pvss: List.map3"
+          | _ -> invalid_arg "Pvss: List.map3"
         in
         map3
           (fun b2 r h2 ->
@@ -327,8 +324,7 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
     in
     (* TODO: guard against buffer overflow *)
     let rec make_coefs = function
-      | 0 ->
-          []
+      | 0 -> []
       | k ->
           let h =
             H.hash_string [string_of_int k; "||"; nonce]
@@ -347,8 +343,8 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
   let dealer_shares_and_proof ~secret ~threshold ~public_keys =
     let (coefs, poly) = random_polynomial secret threshold in
     let
-        (*  Cⱼ represents the commitment to the coefficients of the polynomial
-          Cⱼ = g₁^(aⱼ) for j in 0 to t-1  *)
+        (* Cⱼ represents the commitment to the coefficients of the polynomial
+           Cⱼ = g₁^(aⱼ) for j in 0 to t-1 *)
         cC_j =
       List.map G.(pow g1) coefs
     and
@@ -360,8 +356,8 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
     in
     let
         (* yᵢ = pkᵢᵖ⁽ⁱ⁾ for i ∈ 1…n: the value of p(i) encrypted with pkᵢ,
-         the public key of the party receiving the iᵗʰ party. The public
-         keys use the g₂ generator of G. Thus pkᵢ = g₂ˢᵏⁱ *)
+           the public key of the party receiving the iᵗʰ party. The public
+           keys use the g₂ generator of G. Thus pkᵢ = g₂ˢᵏⁱ *)
         y_i =
       List.map2 G.pow public_keys p_i
     and
@@ -379,8 +375,8 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
       (* prod_C_j_to_the__i_to_the_j = i ↦ Πⱼ₌₀ᵗ⁻¹ Cⱼ^(iʲ) *)
       let prod_C_j_to_the__i_to_the_j i =
         (* Original, non-optimized form
-        List.mapi (fun j cC -> G.pow cC (G.Z_m.pow i (Z.of_int j))) cC_j
-        |> List.fold_left G.( * ) G.e
+           List.mapi (fun j cC -> G.pow cC (G.Z_m.pow i (Z.of_int j))) cC_j
+           |> List.fold_left G.( * ) G.e
         *)
         List.fold_left
           (fun (power, acc) cC ->
@@ -400,8 +396,7 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
   (* reveal a share *)
   let reveal_share y ~secret_key ~public_key =
     match G.Z_m.inv secret_key with
-    | None ->
-        failwith "Invalid secret key"
+    | None -> failwith "Invalid secret key"
     | Some inverse_key ->
         let reveal = G.(pow y inverse_key) in
         (* y = g₂^(private_key) and public_key = reveal^(private_key) *)
@@ -420,27 +415,26 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
     let indices = List.map (fun x -> G.Z_m.of_int (1 + x)) int_indices in
     let lagrange i =
       (* Original, non-optimized form
-      List.fold_left
-        G.Z_m.( * )
-        G.Z_m.one
-        (List.map
-           (fun j ->
-             if G.Z_m.(j = i) then G.Z_m.one
-             else
-               match G.Z_m.(inv (j - i)) with
-               | None ->
-                   failwith "Unexpected error inverting scalar."
-               | Some inverse ->
-                   G.Z_m.(j * inverse))
-           indices)
+         List.fold_left
+           G.Z_m.( * )
+           G.Z_m.one
+           (List.map
+              (fun j ->
+                if G.Z_m.(j = i) then G.Z_m.one
+                else
+                  match G.Z_m.(inv (j - i)) with
+                  | None ->
+                      failwith "Unexpected error inverting scalar."
+                  | Some inverse ->
+                      G.Z_m.(j * inverse))
+              indices)
       *)
       List.fold_left
         (fun acc indice ->
           if G.Z_m.( = ) indice i then acc
           else
             match G.Z_m.(inv (indice - i)) with
-            | None ->
-                failwith "Unexpected error inverting scalar."
+            | None -> failwith "Unexpected error inverting scalar."
             | Some inverse ->
                 let open G.Z_m in
                 acc * indice * inverse)
@@ -448,8 +442,8 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
         indices
     in
     (* Original, non-optimized form
-    let lagrange = List.map lagrange indices in
-    List.fold_left G.( * ) G.e (List.map2 G.pow reveals lagrange)
+       let lagrange = List.map lagrange indices in
+       List.fold_left G.( * ) G.e (List.map2 G.pow reveals lagrange)
     *)
     List.fold_left2
       (fun acc reveal indice ->

@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val init :
-  Raw_context.t -> Voting_period_repr.t -> Raw_context.t tzresult Lwt.t
+val init : Raw_context.t -> Voting_period_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** Sets the initial period to [{voting_period = root; kind = Proposal;
     start_position}]. *)

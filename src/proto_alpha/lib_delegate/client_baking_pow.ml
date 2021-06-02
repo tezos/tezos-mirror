@@ -52,7 +52,7 @@ let init_proof_of_work_nonce () =
     if z_len > max_z_len then Seq.Nil
     else (
       Bytes.blit_string (Z.to_bits z) 0 buf is_updated_constant_len z_len ;
-      Seq.Cons (buf, fun () -> aux (Z.succ z)) )
+      Seq.Cons (buf, fun () -> aux (Z.succ z)))
   in
   aux Z.zero
 
@@ -65,8 +65,7 @@ let empty_proof_of_work_nonce =
   Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
 
 let mine cctxt chain block shell builder =
-  Alpha_services.Constants.all cctxt (chain, block)
-  >>=? fun constants ->
+  Alpha_services.Constants.all cctxt (chain, block) >>=? fun constants ->
   let threshold = constants.parametric.proof_of_work_threshold in
   let rec loop nonce_seq =
     match nonce_seq with

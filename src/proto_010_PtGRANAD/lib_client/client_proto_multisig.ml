@@ -145,9 +145,9 @@ let () =
     ~id:"notEnoughSignatures"
     ~title:"Not enough signatures were provided for this multisig action"
     ~description:
-      "To run an action on a multisig contract, you should provide at least \
-       as many signatures as indicated by the threshold stored in the \
-       multisig contract."
+      "To run an action on a multisig contract, you should provide at least as \
+       many signatures as indicated by the threshold stored in the multisig \
+       contract."
     ~pp:(fun ppf (threshold, nsigs) ->
       Format.fprintf
         ppf
@@ -157,10 +157,8 @@ let () =
         threshold)
     Data_encoding.(obj1 (req "threshold_nsigs" (tup2 int31 int31)))
     (function
-      | Not_enough_signatures (threshold, nsigs) ->
-          Some (threshold, nsigs)
-      | _ ->
-          None)
+      | Not_enough_signatures (threshold, nsigs) -> Some (threshold, nsigs)
+      | _ -> None)
     (fun (threshold, nsigs) -> Not_enough_signatures (threshold, nsigs)) ;
   register_error_kind
     `Permanent
@@ -214,8 +212,8 @@ let () =
     ~id:"Bad deserialized counter"
     ~title:"Deserialized counter does not match the stored one"
     ~description:
-      "The byte sequence references a multisig counter that does not match \
-       the one currently stored in the given multisig contract"
+      "The byte sequence references a multisig counter that does not match the \
+       one currently stored in the given multisig contract"
     ~pp:(fun ppf (received, expected) ->
       Format.fprintf
         ppf
@@ -224,10 +222,8 @@ let () =
         expected)
     Data_encoding.(obj1 (req "received_expected" (tup2 int31 int31)))
     (function
-      | Bad_deserialized_counter (c1, c2) ->
-          Some (Z.to_int c1, Z.to_int c2)
-      | _ ->
-          None)
+      | Bad_deserialized_counter (c1, c2) -> Some (Z.to_int c1, Z.to_int c2)
+      | _ -> None)
     (fun (c1, c2) -> Bad_deserialized_counter (Z.of_int c1, Z.of_int c2)) ;
   register_error_kind
     `Permanent
@@ -327,11 +323,9 @@ let () =
         (req "parameter_ty" Script.expr_encoding)
         (req "parameter" Script.expr_encoding))
     (function
-      | Ill_typed_argument (destination, entrypoint, parameter_ty, parameter)
-        ->
+      | Ill_typed_argument (destination, entrypoint, parameter_ty, parameter) ->
           Some (destination, entrypoint, parameter_ty, parameter)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (destination, entrypoint, parameter_ty, parameter) ->
       Ill_typed_argument (destination, entrypoint, parameter_ty, parameter)) ;
   register_error_kind
@@ -459,8 +453,7 @@ let multisig_script : Script.expr =
   | Error _ ->
       assert false
       (* This is a top level assertion, it is asserted when the client's process runs. *)
-  | Ok parsing_result ->
-      parsing_result.Michelson_v1_parser.expanded
+  | Ok parsing_result -> parsing_result.Michelson_v1_parser.expanded
 
 let multisig_script_hash =
   let bytes =
@@ -492,7 +485,8 @@ let script_hash_of_hex_string s =
 
 (* List of known multisig contracts hashes with their kinds *)
 let known_multisig_contracts : multisig_contract_description list =
-  [ {
+  [
+    {
       (* First supported version of the generic multisig contract. Supports incoming
          transfers from unauthenticated senders and outgoing transfers of
          arbitrary operation lists.
@@ -550,7 +544,8 @@ let known_multisig_contracts : multisig_contract_description list =
       requires_chain_id = false;
       main_entrypoint = None;
       generic = false;
-    } ]
+    };
+  ]
 
 let known_multisig_hashes =
   List.map (fun descr -> descr.hash) known_multisig_contracts
@@ -562,10 +557,8 @@ let check_multisig_script_hash hash :
       (fun d -> Script_expr_hash.(d.hash = hash))
       known_multisig_contracts
   with
-  | None ->
-      fail (Not_a_supported_multisig_contract hash)
-  | Some d ->
-      return d
+  | None -> fail (Not_a_supported_multisig_contract hash)
+  | Some d -> return d
 
 (* Returns [Ok ()] if [~contract] is an originated contract whose code
    is [multisig_script] *)
@@ -573,10 +566,8 @@ let check_multisig_contract (cctxt : #Protocol_client_context.full) ~chain
     ~block contract =
   Client_proto_context.get_script_hash cctxt ~chain ~block contract
   >>=? function
-  | None ->
-      fail (Contract_has_no_script contract)
-  | Some hash ->
-      check_multisig_script_hash hash
+  | None -> fail (Contract_has_no_script contract)
+  | Some hash -> check_multisig_script_hash hash
 
 (* Some Michelson building functions, specific to the needs of the multisig
    interface.*)
@@ -623,22 +614,22 @@ type multisig_action =
 
 let action_to_expr_generic ~loc = function
   | Transfer {amount; destination; entrypoint; parameter_type; parameter} -> (
-    match Contract.is_implicit destination with
-    | Some destination ->
-        lambda_from_string
-        @@ Managed_contract.build_lambda_for_transfer_to_implicit
-             ~destination
-             ~amount
-        >|? left ~loc
-    | None ->
-        lambda_from_string
-        @@ Managed_contract.build_lambda_for_transfer_to_originated
-             ~destination
-             ~entrypoint
-             ~parameter_type
-             ~parameter
-             ~amount
-        >|? left ~loc )
+      match Contract.is_implicit destination with
+      | Some destination ->
+          lambda_from_string
+          @@ Managed_contract.build_lambda_for_transfer_to_implicit
+               ~destination
+               ~amount
+          >|? left ~loc
+      | None ->
+          lambda_from_string
+          @@ Managed_contract.build_lambda_for_transfer_to_originated
+               ~destination
+               ~entrypoint
+               ~parameter_type
+               ~parameter
+               ~amount
+          >|? left ~loc)
   | Lambda code ->
       Error_monad.ok Tezos_micheline.Micheline.(left ~loc (root code))
   | Change_delegate delegate ->
@@ -667,15 +658,12 @@ let action_to_expr_legacy ~loc = function
                 ~loc
                 (mutez ~loc amount)
                 (optimized_address ~loc ~address:destination ~entrypoint))
-  | Lambda _ ->
-      Error_monad.error @@ Unsupported_feature_lambda ""
+  | Lambda _ -> Error_monad.error @@ Unsupported_feature_lambda ""
   | Change_delegate delegate ->
       let delegate_opt =
         match delegate with
-        | None ->
-            none ~loc ()
-        | Some delegate ->
-            some ~loc (optimized_key_hash ~loc delegate)
+        | None -> none ~loc ()
+        | Some delegate -> some ~loc (optimized_key_hash ~loc delegate)
       in
       Error_monad.ok @@ right ~loc (left ~loc delegate_opt)
   | Change_keys (threshold, keys) ->
@@ -699,12 +687,16 @@ let action_of_expr_generic e =
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,
-        [ Tezos_micheline.Micheline.Prim
+        [
+          Tezos_micheline.Micheline.Prim
             ( _,
               Script.D_Pair,
-              [ Tezos_micheline.Micheline.Int (_, threshold);
-                Tezos_micheline.Micheline.Seq (_, key_bytes) ],
-              [] ) ],
+              [
+                Tezos_micheline.Micheline.Int (_, threshold);
+                Tezos_micheline.Micheline.Seq (_, key_bytes);
+              ],
+              [] );
+        ],
         [] ) ->
       List.map_es
         (function
@@ -713,12 +705,10 @@ let action_of_expr_generic e =
               @@ Data_encoding.Binary.of_bytes_exn
                    Signature.Public_key.encoding
                    s
-          | _ ->
-              fail ())
+          | _ -> fail ())
         key_bytes
       >>=? fun keys -> return @@ Change_keys (threshold, keys)
-  | _ ->
-      fail ()
+  | _ -> fail ()
 
 let action_of_expr_not_generic e =
   let fail () =
@@ -730,51 +720,60 @@ let action_of_expr_not_generic e =
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Left,
-        [ Tezos_micheline.Micheline.Prim
+        [
+          Tezos_micheline.Micheline.Prim
             ( _,
               Script.D_Pair,
-              [ Tezos_micheline.Micheline.Int (_, i);
-                Tezos_micheline.Micheline.Bytes (_, s) ],
-              [] ) ],
+              [
+                Tezos_micheline.Micheline.Int (_, i);
+                Tezos_micheline.Micheline.Bytes (_, s);
+              ],
+              [] );
+        ],
         [] ) -> (
-    match Tez.of_mutez (Z.to_int64 i) with
-    | None ->
-        fail ()
-    | Some amount ->
-        return
-        @@ Transfer
-             {
-               amount;
-               destination =
-                 Data_encoding.Binary.of_bytes_exn Contract.encoding s;
-               entrypoint = "default";
-               parameter_type =
-                 Tezos_micheline.Micheline.strip_locations @@ unit_t ~loc:0;
-               parameter =
-                 Tezos_micheline.Micheline.strip_locations @@ unit ~loc:0;
-             } )
+      match Tez.of_mutez (Z.to_int64 i) with
+      | None -> fail ()
+      | Some amount ->
+          return
+          @@ Transfer
+               {
+                 amount;
+                 destination =
+                   Data_encoding.Binary.of_bytes_exn Contract.encoding s;
+                 entrypoint = "default";
+                 parameter_type =
+                   Tezos_micheline.Micheline.strip_locations @@ unit_t ~loc:0;
+                 parameter =
+                   Tezos_micheline.Micheline.strip_locations @@ unit ~loc:0;
+               })
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,
-        [ Tezos_micheline.Micheline.Prim
+        [
+          Tezos_micheline.Micheline.Prim
             ( _,
               Script.D_Left,
               [Tezos_micheline.Micheline.Prim (_, Script.D_None, [], [])],
-              [] ) ],
+              [] );
+        ],
         [] ) ->
       return @@ Change_delegate None
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,
-        [ Tezos_micheline.Micheline.Prim
+        [
+          Tezos_micheline.Micheline.Prim
             ( _,
               Script.D_Left,
-              [ Tezos_micheline.Micheline.Prim
+              [
+                Tezos_micheline.Micheline.Prim
                   ( _,
                     Script.D_Some,
                     [Tezos_micheline.Micheline.Bytes (_, s)],
-                    [] ) ],
-              [] ) ],
+                    [] );
+              ],
+              [] );
+        ],
         [] ) ->
       return
       @@ Change_delegate
@@ -785,16 +784,22 @@ let action_of_expr_not_generic e =
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,
-        [ Tezos_micheline.Micheline.Prim
+        [
+          Tezos_micheline.Micheline.Prim
             ( _,
               Script.D_Right,
-              [ Tezos_micheline.Micheline.Prim
+              [
+                Tezos_micheline.Micheline.Prim
                   ( _,
                     Script.D_Pair,
-                    [ Tezos_micheline.Micheline.Int (_, threshold);
-                      Tezos_micheline.Micheline.Seq (_, key_bytes) ],
-                    [] ) ],
-              [] ) ],
+                    [
+                      Tezos_micheline.Micheline.Int (_, threshold);
+                      Tezos_micheline.Micheline.Seq (_, key_bytes);
+                    ],
+                    [] );
+              ],
+              [] );
+        ],
         [] ) ->
       List.map_es
         (function
@@ -803,12 +808,10 @@ let action_of_expr_not_generic e =
               @@ Data_encoding.Binary.of_bytes_exn
                    Signature.Public_key.encoding
                    s
-          | _ ->
-              fail ())
+          | _ -> fail ())
         key_bytes
       >>=? fun keys -> return @@ Change_keys (threshold, keys)
-  | _ ->
-      fail ()
+  | _ -> fail ()
 
 let action_of_expr ~generic =
   if generic then action_of_expr_generic else action_of_expr_not_generic
@@ -829,25 +832,22 @@ let multisig_get_information (cctxt : #Protocol_client_context.full) ~chain
   get_storage cctxt ~chain ~block ~unparsing_mode:Readable contract
   >>=? fun storage_opt ->
   match storage_opt with
-  | None ->
-      fail (Contract_has_no_storage contract)
+  | None -> fail (Contract_has_no_storage contract)
   | Some storage -> (
-    match root storage with
-    | Prim
-        ( _,
-          D_Pair,
-          [Int (_, counter); Int (_, threshold); Seq (_, key_nodes)],
-          _ ) ->
-        List.map_es
-          (function
-            | String (_, key_str) ->
-                return @@ Signature.Public_key.of_b58check_exn key_str
-            | _ ->
-                fail (Contract_has_unexpected_storage contract))
-          key_nodes
-        >>=? fun keys -> return {counter; threshold; keys}
-    | _ ->
-        fail (Contract_has_unexpected_storage contract) )
+      match root storage with
+      | Prim
+          ( _,
+            D_Pair,
+            [Int (_, counter); Int (_, threshold); Seq (_, key_nodes)],
+            _ ) ->
+          List.map_es
+            (function
+              | String (_, key_str) ->
+                  return @@ Signature.Public_key.of_b58check_exn key_str
+              | _ -> fail (Contract_has_unexpected_storage contract))
+            key_nodes
+          >>=? fun keys -> return {counter; threshold; keys}
+      | _ -> fail (Contract_has_unexpected_storage contract))
 
 let multisig_create_storage ~counter ~threshold ~keys () :
     Script.expr tzresult Lwt.t =
@@ -864,8 +864,7 @@ let multisig_create_storage ~counter ~threshold ~keys () :
 
 (* Client_proto_context.originate expects the initial storage as a string *)
 let multisig_storage_string ~counter ~threshold ~keys () =
-  multisig_create_storage ~counter ~threshold ~keys ()
-  >>=? fun expr ->
+  multisig_create_storage ~counter ~threshold ~keys () >>=? fun expr ->
   return @@ Format.asprintf "%a" Michelson_v1_printer.print_expr expr
 
 let multisig_create_param ~counter ~generic ~action ~optional_signatures () :
@@ -875,14 +874,12 @@ let multisig_create_param ~counter ~generic ~action ~optional_signatures () :
   List.map_es
     (fun sig_opt ->
       match sig_opt with
-      | None ->
-          return @@ none ~loc ()
+      | None -> return @@ none ~loc ()
       | Some signature ->
           return @@ some ~loc (String (loc, Signature.to_b58check signature)))
     optional_signatures
   >>=? fun l ->
-  Lwt.return @@ action_to_expr ~loc:0 ~generic action
-  >>=? fun expr ->
+  Lwt.return @@ action_to_expr ~loc:0 ~generic action >>=? fun expr ->
   return @@ strip_locations
   @@ pair ~loc (pair ~loc (int ~loc counter) expr) (Seq (loc, l))
 
@@ -929,12 +926,11 @@ let check_threshold ~threshold ~keys () =
 
 let originate_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?confirmations ?dry_run ?branch ?fee ?gas_limit ?storage_limit
-    ?verbose_signing ~delegate ~threshold ~keys ~balance ~source ~src_pk
-    ~src_sk ~fee_parameter () =
+    ?verbose_signing ~delegate ~threshold ~keys ~balance ~source ~src_pk ~src_sk
+    ~fee_parameter () =
   multisig_storage_string ~counter:Z.zero ~threshold ~keys ()
   >>=? fun initial_storage ->
-  check_threshold ~threshold ~keys ()
-  >>=? fun () ->
+  check_threshold ~threshold ~keys () >>=? fun () ->
   Client_proto_context.originate_contract
     cctxt
     ~chain
@@ -1012,18 +1008,15 @@ let check_action (cctxt : #Protocol_client_context.full) ~action ~balance ?gas
            ?gas
            ?legacy
       >>=? fun _remaining_gas -> return_unit
-  | _ ->
-      return_unit
+  | _ -> return_unit
 
 let prepare_multisig_transaction (cctxt : #Protocol_client_context.full) ~chain
     ~block ~multisig_contract ~action () =
   let contract = multisig_contract in
-  check_multisig_contract cctxt ~chain ~block contract
-  >>=? fun descr ->
+  check_multisig_contract cctxt ~chain ~block contract >>=? fun descr ->
   multisig_get_information cctxt ~chain ~block contract
   >>=? fun {counter; threshold; keys} ->
-  Chain_services.chain_id cctxt ~chain ()
-  >>=? fun chain_id ->
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   multisig_bytes ~counter ~action ~contract ~descr ~chain_id ()
   >>=? fun bytes ->
   Client_proto_context.get_balance
@@ -1032,8 +1025,7 @@ let prepare_multisig_transaction (cctxt : #Protocol_client_context.full) ~chain
     ~block:cctxt#block
     contract
   >>=? fun balance ->
-  check_action cctxt ~action ~balance ()
-  >>=? fun () ->
+  check_action cctxt ~action ~balance () >>=? fun () ->
   return
     {
       bytes;
@@ -1052,7 +1044,7 @@ let check_multisig_signatures ~bytes ~threshold ~keys signatures =
   let check_signature_against_key_number signature i key =
     if Signature.check key signature bytes then (
       matching_key_found := true ;
-      opt_sigs_arr.(i) <- Some signature )
+      opt_sigs_arr.(i) <- Some signature)
   in
   List.iter_ep
     (fun signature ->
@@ -1076,19 +1068,15 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk ~src_sk
     ~multisig_contract ~action ~signatures ~amount ?fee ?gas_limit
     ?storage_limit ?counter ~fee_parameter () =
-  prepare_multisig_transaction
-    cctxt
-    ~chain
-    ~block
-    ~multisig_contract
-    ~action
-    ()
-  >>=? fun { bytes;
+  prepare_multisig_transaction cctxt ~chain ~block ~multisig_contract ~action ()
+  >>=? fun {
+             bytes;
              threshold;
              keys;
              counter = stored_counter;
              entrypoint;
-             generic } ->
+             generic;
+           } ->
   check_multisig_signatures ~bytes ~threshold ~keys signatures
   >>=? fun optional_signatures ->
   multisig_param_string
@@ -1127,70 +1115,75 @@ let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
   then
     let nbytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
     match Data_encoding.Binary.of_bytes_opt Script.expr_encoding nbytes with
-    | None ->
-        fail (Bytes_deserialisation_error bytes)
+    | None -> fail (Bytes_deserialisation_error bytes)
     | Some e -> (
-      match Tezos_micheline.Micheline.root e with
-      | Tezos_micheline.Micheline.Prim
-          ( _,
-            Script.D_Pair,
-            [ Tezos_micheline.Micheline.Bytes (_, contract_bytes);
-              Tezos_micheline.Micheline.Prim
-                ( _,
-                  Script.D_Pair,
-                  [Tezos_micheline.Micheline.Int (_, counter); e],
-                  [] ) ],
-            [] )
-        when not descr.requires_chain_id ->
-          let contract =
-            Data_encoding.Binary.of_bytes_exn Contract.encoding contract_bytes
-          in
-          if counter = stored_counter then
-            if Contract.(multisig_contract = contract) then
-              action_of_expr ~generic:descr.generic e
-            else fail (Bad_deserialized_contract (contract, multisig_contract))
-          else fail (Bad_deserialized_counter (counter, stored_counter))
-      | Tezos_micheline.Micheline.Prim
-          ( _,
-            Script.D_Pair,
-            [ Tezos_micheline.Micheline.Prim
-                ( _,
-                  Script.D_Pair,
-                  [ Tezos_micheline.Micheline.Bytes (_, chain_id_bytes);
-                    Tezos_micheline.Micheline.Bytes (_, contract_bytes) ],
-                  [] );
-              Tezos_micheline.Micheline.Prim
-                ( _,
-                  Script.D_Pair,
-                  [Tezos_micheline.Micheline.Int (_, counter); e],
-                  [] ) ],
-            [] )
-        when descr.requires_chain_id ->
-          let contract =
-            Data_encoding.Binary.of_bytes_exn Contract.encoding contract_bytes
-          in
-          let cid =
-            Data_encoding.Binary.of_bytes_exn Chain_id.encoding chain_id_bytes
-          in
-          if counter = stored_counter then
-            if multisig_contract = contract && chain_id = cid then
-              action_of_expr ~generic:descr.generic e
-            else fail (Bad_deserialized_contract (contract, multisig_contract))
-          else fail (Bad_deserialized_counter (counter, stored_counter))
-      | _ ->
-          fail (Bytes_deserialisation_error bytes) )
+        match Tezos_micheline.Micheline.root e with
+        | Tezos_micheline.Micheline.Prim
+            ( _,
+              Script.D_Pair,
+              [
+                Tezos_micheline.Micheline.Bytes (_, contract_bytes);
+                Tezos_micheline.Micheline.Prim
+                  ( _,
+                    Script.D_Pair,
+                    [Tezos_micheline.Micheline.Int (_, counter); e],
+                    [] );
+              ],
+              [] )
+          when not descr.requires_chain_id ->
+            let contract =
+              Data_encoding.Binary.of_bytes_exn Contract.encoding contract_bytes
+            in
+            if counter = stored_counter then
+              if Contract.(multisig_contract = contract) then
+                action_of_expr ~generic:descr.generic e
+              else
+                fail (Bad_deserialized_contract (contract, multisig_contract))
+            else fail (Bad_deserialized_counter (counter, stored_counter))
+        | Tezos_micheline.Micheline.Prim
+            ( _,
+              Script.D_Pair,
+              [
+                Tezos_micheline.Micheline.Prim
+                  ( _,
+                    Script.D_Pair,
+                    [
+                      Tezos_micheline.Micheline.Bytes (_, chain_id_bytes);
+                      Tezos_micheline.Micheline.Bytes (_, contract_bytes);
+                    ],
+                    [] );
+                Tezos_micheline.Micheline.Prim
+                  ( _,
+                    Script.D_Pair,
+                    [Tezos_micheline.Micheline.Int (_, counter); e],
+                    [] );
+              ],
+              [] )
+          when descr.requires_chain_id ->
+            let contract =
+              Data_encoding.Binary.of_bytes_exn Contract.encoding contract_bytes
+            in
+            let cid =
+              Data_encoding.Binary.of_bytes_exn Chain_id.encoding chain_id_bytes
+            in
+            if counter = stored_counter then
+              if multisig_contract = contract && chain_id = cid then
+                action_of_expr ~generic:descr.generic e
+              else
+                fail (Bad_deserialized_contract (contract, multisig_contract))
+            else fail (Bad_deserialized_counter (counter, stored_counter))
+        | _ -> fail (Bytes_deserialisation_error bytes))
   else fail (Bytes_deserialisation_error bytes)
 
-let call_multisig_on_bytes (cctxt : #Protocol_client_context.full) ~chain
-    ~block ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk
-    ~src_sk ~multisig_contract ~bytes ~signatures ~amount ?fee ?gas_limit
-    ?storage_limit ?counter ~fee_parameter () =
+let call_multisig_on_bytes (cctxt : #Protocol_client_context.full) ~chain ~block
+    ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk ~src_sk
+    ~multisig_contract ~bytes ~signatures ~amount ?fee ?gas_limit ?storage_limit
+    ?counter ~fee_parameter () =
   multisig_get_information cctxt ~chain ~block multisig_contract
   >>=? fun info ->
   check_multisig_contract cctxt ~chain ~block multisig_contract
   >>=? fun descr ->
-  Chain_services.chain_id cctxt ~chain ()
-  >>=? fun chain_id ->
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   action_of_bytes
     ~multisig_contract
     ~stored_counter:info.counter

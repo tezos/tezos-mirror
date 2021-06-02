@@ -212,10 +212,7 @@ val get_hash : block_store -> key -> Block_hash.t option tzresult Lwt.t
     in [block_store] if present. Return [None] if the block is
     unknown. *)
 val read_block :
-  read_metadata:bool ->
-  block_store ->
-  key ->
-  Block_repr.t option tzresult Lwt.t
+  read_metadata:bool -> block_store -> key -> Block_repr.t option tzresult Lwt.t
 
 (** [read_block_metadata block_store key] reads the metadata for the
    block [key] in [block_store] if present. Return [None] if the block

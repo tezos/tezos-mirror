@@ -29,27 +29,21 @@ open Legacy_utils
 
 (* From "legacy chain_validator"*)
 let may_update_checkpoint chain_state new_head =
-  Legacy_state.Chain.checkpoint chain_state
-  >>= fun checkpoint ->
-  Legacy_state.Block.last_allowed_fork_level new_head
-  >>=? fun new_level ->
+  Legacy_state.Chain.checkpoint chain_state >>= fun checkpoint ->
+  Legacy_state.Block.last_allowed_fork_level new_head >>=? fun new_level ->
   if new_level <= checkpoint.shell.level then return_unit
   else
     let state = Legacy_state.Chain.global_state chain_state in
-    Legacy_state.history_mode state
-    >>= fun history_mode ->
+    Legacy_state.history_mode state >>= fun history_mode ->
     let head_level = Legacy_state.Block.level new_head in
     Legacy_state.Block.predecessor_n
       new_head
       (Int32.to_int (Int32.sub head_level new_level))
     >>= function
-    | None ->
-        assert false (* should not happen *)
+    | None -> assert false (* should not happen *)
     | Some new_checkpoint -> (
-        Legacy_state.Block.read_opt chain_state new_checkpoint
-        >>= function
-        | None ->
-            assert false (* should not happen *)
+        Legacy_state.Block.read_opt chain_state new_checkpoint >>= function
+        | None -> assert false (* should not happen *)
         | Some new_checkpoint -> (
             let new_checkpoint = Legacy_state.Block.header new_checkpoint in
             match history_mode with
@@ -63,7 +57,7 @@ let may_update_checkpoint chain_state new_head =
             | Rolling ->
                 Legacy_state.Chain.set_checkpoint_then_purge_rolling
                   chain_state
-                  new_checkpoint ) )
+                  new_checkpoint))
 
 let assert_presence new_chain_store previously_baked_blocks ?savepoint ?caboose
     = function
@@ -108,20 +102,16 @@ let check_flags new_chain_store previously_baked_blocks history_mode =
     ~msg:"history mode consistency: "
     history_mode
     (Store.Chain.history_mode new_chain_store) ;
-  Store.Chain.checkpoint new_chain_store
-  >>= fun checkpoint ->
-  Store.Block.get_block_metadata new_chain_store last
-  >>=? fun metadata ->
+  Store.Chain.checkpoint new_chain_store >>= fun checkpoint ->
+  Store.Block.get_block_metadata new_chain_store last >>=? fun metadata ->
   let expected_checkpoint = Store.Block.last_allowed_fork_level metadata in
   Assert.equal
     ~prn:(Format.sprintf "%ld")
     ~msg:"checkpoint consistency: "
     expected_checkpoint
     (snd checkpoint) ;
-  Store.Chain.savepoint new_chain_store
-  >>= fun savepoint ->
-  Store.Chain.caboose new_chain_store
-  >>= fun caboose ->
+  Store.Chain.savepoint new_chain_store >>= fun savepoint ->
+  Store.Chain.caboose new_chain_store >>= fun caboose ->
   match history_mode with
   | History_mode.Archive ->
       Assert.equal
@@ -157,8 +147,7 @@ let check_flags new_chain_store previously_baked_blocks history_mode =
         ~msg:"savepoint consistency: "
         expected_checkpoint
         (snd savepoint) ;
-      Store.Block.get_block_metadata new_chain_store last
-      >>=? fun metadata ->
+      Store.Block.get_block_metadata new_chain_store last >>=? fun metadata ->
       let max_op_ttl = Store.Block.max_operations_ttl metadata in
       let expected_caboose =
         max 0l Int32.(add (sub expected_checkpoint (of_int max_op_ttl)) 0l)
@@ -179,16 +168,15 @@ let test_upgrade store (legacy_dir, (legacy_state : Legacy_state.t)) blocks =
   let patch_context ctxt = Alpha_utils.default_patch_context ctxt in
   let chain_store = Store.main_chain_store store in
   let genesis = Store.Chain.genesis chain_store in
-  Lwt_utils_unix.create_dir legacy_dir
-  >>= fun () ->
+  Lwt_utils_unix.create_dir legacy_dir >>= fun () ->
   let chain_name = Distributed_db_version.Name.of_string "TEZOS" in
   Legacy_state.Chain.get_exn legacy_state (Store.Chain.chain_id chain_store)
   >>= fun legacy_chain ->
   Lwt_list.map_p
     (fun block ->
       let hash = Store.Block.hash block in
-      Legacy_state.Block.known legacy_chain hash
-      >>= fun known -> Lwt.return (hash, known))
+      Legacy_state.Block.known legacy_chain hash >>= fun known ->
+      Lwt.return (hash, known))
     blocks
   >>= fun present_blocks_in_legacy ->
   Legacy.upgrade_0_0_4 ~data_dir:legacy_dir ~patch_context ~chain_name genesis
@@ -209,8 +197,7 @@ let test_upgrade store (legacy_dir, (legacy_state : Legacy_state.t)) blocks =
       let upgraded_chain_store = Store.main_chain_store upgraded_store in
       Lwt_list.iter_s
         (fun (hash, is_known) ->
-          Store.Block.is_known upgraded_chain_store hash
-          >>= fun is_known' ->
+          Store.Block.is_known upgraded_chain_store hash >>= fun is_known' ->
           Assert.equal
             ~msg:
               (Format.asprintf
@@ -222,13 +209,10 @@ let test_upgrade store (legacy_dir, (legacy_state : Legacy_state.t)) blocks =
           Lwt.return_unit)
         present_blocks_in_legacy
       >>= fun () ->
-      check_flags upgraded_chain_store blocks history_mode
-      >>=? fun () ->
-      Test_utils.check_invariants upgraded_chain_store
-      >>=? fun () ->
+      check_flags upgraded_chain_store blocks history_mode >>=? fun () ->
+      Test_utils.check_invariants upgraded_chain_store >>=? fun () ->
       (* Try baking a bit after upgrading... *)
-      Store.Chain.current_head upgraded_chain_store
-      >>= fun head ->
+      Store.Chain.current_head upgraded_chain_store >>= fun head ->
       Alpha_utils.bake_until_n_cycle_end upgraded_chain_store 10 head
       >>=? fun _ -> return_unit)
     (fun () -> Store.close_store upgraded_store)
@@ -238,20 +222,18 @@ let test_legacy_snapshot legacy_snapshot_history_mode store
   let patch_context ctxt = Alpha_utils.default_patch_context ctxt in
   let chain_store = Store.main_chain_store store in
   let genesis = Store.Chain.genesis chain_store in
-  Lwt_utils_unix.create_dir legacy_dir
-  >>= fun () ->
+  Lwt_utils_unix.create_dir legacy_dir >>= fun () ->
   let chain_name = Distributed_db_version.Name.of_string "TEZOS" in
   Legacy_state.Chain.get_exn legacy_state (Store.Chain.chain_id chain_store)
   >>= fun legacy_chain ->
   Lwt_list.map_p
     (fun block ->
       let descr = Store.Block.descriptor block in
-      Legacy_state.Block.known legacy_chain (fst descr)
-      >>= fun known -> Lwt.return (descr, known))
+      Legacy_state.Block.known legacy_chain (fst descr) >>= fun known ->
+      Lwt.return (descr, known))
     blocks
   >>= fun present_blocks_in_legacy ->
-  Legacy_chain.head legacy_chain
-  >>= fun legacy_head ->
+  Legacy_chain.head legacy_chain >>= fun legacy_head ->
   let open Filename.Infix in
   let snapshot_file = legacy_dir // "legacy_snapshot" in
   let head_hash = Legacy_state.Block.hash legacy_head in
@@ -304,12 +286,10 @@ let test_legacy_snapshot legacy_snapshot_history_mode store
                 >>= fun (_, caboose_level) ->
                 Assert.is_true
                   ~msg:"check block absence consistency with history mode"
-                  ( match history_mode with
-                  | Rolling _ ->
-                      caboose_level > level
-                  | _ ->
-                      false ) ;
-                Lwt.return_unit )
+                  (match history_mode with
+                  | Rolling _ -> caboose_level > level
+                  | _ -> false) ;
+                Lwt.return_unit)
               else (
                 Assert.equal
                   ~msg:
@@ -319,11 +299,10 @@ let test_legacy_snapshot legacy_snapshot_history_mode store
                        hash)
                   is_known
                   is_known' ;
-                Lwt.return_unit ))
+                Lwt.return_unit))
             present_blocks_in_legacy
           >>= fun () ->
-          Test_utils.check_invariants imported_chain_store
-          >>=? fun () ->
+          Test_utils.check_invariants imported_chain_store >>=? fun () ->
           (* Try baking a bit after importing... *)
           Store.Chain.current_head imported_chain_store
           >>= fun head_after_import ->
@@ -334,12 +313,11 @@ let test_legacy_snapshot legacy_snapshot_history_mode store
           >>=? fun _ ->
           let highest_cemented_block =
             Cemented_block_store.get_highest_cemented_level
-              ( Store.Unsafe.get_block_store imported_chain_store
-              |> Block_store.cemented_block_store )
+              (Store.Unsafe.get_block_store imported_chain_store
+              |> Block_store.cemented_block_store)
           in
           match highest_cemented_block with
-          | None ->
-              return_unit
+          | None -> return_unit
           | Some highest_cemented_level ->
               Assert.is_true
                 ~msg:"is the highest cemented block above the new head"
@@ -347,8 +325,7 @@ let test_legacy_snapshot legacy_snapshot_history_mode store
                   highest_cemented_level > Store.Block.level head_after_import) ;
               return_unit)
         (fun e ->
-          Store.make_pp_store imported_store
-          >>= fun pp ->
+          Store.make_pp_store imported_store >>= fun pp ->
           Format.printf "DEBUG-IMPORTED: %a@." pp () ;
           Lwt.fail e))
     (fun () -> Store.close_store imported_store)
@@ -358,20 +335,18 @@ let test_upgrade_from_snapshot legacy_snapshot_history_mode store
   let patch_context ctxt = Alpha_utils.default_patch_context ctxt in
   let chain_store = Store.main_chain_store store in
   let genesis = Store.Chain.genesis chain_store in
-  Lwt_utils_unix.create_dir legacy_dir
-  >>= fun () ->
+  Lwt_utils_unix.create_dir legacy_dir >>= fun () ->
   let chain_name = Distributed_db_version.Name.of_string "TEZOS" in
   Legacy_state.Chain.get_exn legacy_state (Store.Chain.chain_id chain_store)
   >>= fun legacy_chain ->
   Lwt_list.map_p
     (fun block ->
       let descr = Store.Block.descriptor block in
-      Legacy_state.Block.known legacy_chain (fst descr)
-      >>= fun known -> Lwt.return (descr, known))
+      Legacy_state.Block.known legacy_chain (fst descr) >>= fun known ->
+      Lwt.return (descr, known))
     blocks
   >>= fun present_blocks_in_legacy ->
-  Legacy_chain.head legacy_chain
-  >>= fun legacy_head ->
+  Legacy_chain.head legacy_chain >>= fun legacy_head ->
   let open Filename.Infix in
   let snapshot_file = legacy_dir // "legacy_snapshot" in
   let head_hash = Legacy_state.Block.hash legacy_head in
@@ -388,8 +363,7 @@ let test_upgrade_from_snapshot legacy_snapshot_history_mode store
   in
   let imported_store_dir = imported_root_dir // "store" in
   let imported_context_dir = imported_root_dir // "context" in
-  Lwt_unix.mkdir imported_root_dir 0o700
-  >>= fun () ->
+  Lwt_unix.mkdir imported_root_dir 0o700 >>= fun () ->
   Legacy_snapshots.import
     ~patch_context
     ~data_dir:imported_root_dir
@@ -406,17 +380,14 @@ let test_upgrade_from_snapshot legacy_snapshot_history_mode store
     ~context_root:imported_context_dir
     genesis
   >>=? fun (state, chain_state, _, _) ->
-  Legacy_state.Chain.checkpoint chain_state
-  >|= (fun bh -> Some (Block_header.hash bh, bh.shell.level))
+  ( Legacy_state.Chain.checkpoint chain_state >|= fun bh ->
+    Some (Block_header.hash bh, bh.shell.level) )
   >>= fun expected_checkpoint ->
-  Legacy_state.Chain.save_point chain_state
-  >|= (fun (l, bh) -> Some (bh, l))
+  (Legacy_state.Chain.save_point chain_state >|= fun (l, bh) -> Some (bh, l))
   >>= fun expected_savepoint ->
-  Legacy_state.Chain.caboose chain_state
-  >|= (fun (l, bh) -> Some (bh, l))
+  (Legacy_state.Chain.caboose chain_state >|= fun (l, bh) -> Some (bh, l))
   >>= fun expected_caboose ->
-  Legacy_state.close state
-  >>= fun () ->
+  Legacy_state.close state >>= fun () ->
   Legacy.upgrade_0_0_4
     ~data_dir:imported_root_dir
     ~patch_context
@@ -438,19 +409,16 @@ let test_upgrade_from_snapshot legacy_snapshot_history_mode store
     (fun () ->
       Lwt_list.iter_s
         (fun ((hash, level), is_known) ->
-          Store.Block.is_known upgraded_chain_store hash
-          >>= fun is_known' ->
+          Store.Block.is_known upgraded_chain_store hash >>= fun is_known' ->
           if is_known && not is_known' then (
             Store.Chain.caboose upgraded_chain_store
             >>= fun (_, caboose_level) ->
             Assert.is_true
               ~msg:"check block absence consistency with history mode"
-              ( match history_mode with
-              | Rolling _ ->
-                  caboose_level > level
-              | _ ->
-                  false ) ;
-            Lwt.return_unit )
+              (match history_mode with
+              | Rolling _ -> caboose_level > level
+              | _ -> false) ;
+            Lwt.return_unit)
           else (
             Assert.equal
               ~msg:
@@ -460,7 +428,7 @@ let test_upgrade_from_snapshot legacy_snapshot_history_mode store
                    hash)
               is_known
               is_known' ;
-            Lwt.return_unit ))
+            Lwt.return_unit))
         present_blocks_in_legacy
       >>= fun () ->
       Test_utils.check_invariants
@@ -470,8 +438,7 @@ let test_upgrade_from_snapshot legacy_snapshot_history_mode store
         ~expected_caboose
       >>=? fun () ->
       (* Try baking a bit after importing... *)
-      Store.Chain.current_head upgraded_chain_store
-      >>= fun head ->
+      Store.Chain.current_head upgraded_chain_store >>= fun head ->
       Alpha_utils.bake_until_n_cycle_end upgraded_chain_store 10 head
       >>=? fun _ -> return_unit)
     (fun () -> Store.close_store upgraded_store)
@@ -523,8 +490,8 @@ let make_legacy_snapshot_test_cases ~keep_dir speed =
     |> List.sort_uniq compare
   in
   List.map
-    (fun ( nb_blocks_to_bake,
-           (legacy_history_mode, legacy_snapshot_history_mode) ) ->
+    (fun (nb_blocks_to_bake, (legacy_history_mode, legacy_snapshot_history_mode))
+         ->
       let name =
         Format.asprintf
           "Import legacy snapshot in %a from %a with %d blocks"
@@ -579,22 +546,20 @@ let upgrade_tests : string Alcotest_lwt.test list =
     try
       let s = Sys.getenv "SLOW_TEST" in
       match String.(trim (uncapitalize_ascii s)) with
-      | "true" | "1" | "yes" ->
-          `Slow
-      | _ ->
-          `Quick
+      | "true" | "1" | "yes" -> `Slow
+      | _ -> `Quick
     with Not_found -> `Quick
   in
   let upgrade_cases = make_upgrade_test_cases ~keep_dir:false speed in
-  let snapshots_cases =
-    make_legacy_snapshot_test_cases ~keep_dir:false speed
-  in
+  let snapshots_cases = make_legacy_snapshot_test_cases ~keep_dir:false speed in
   let upgrade_snapshots_cases =
     make_upgrade_after_snapshot_import_test_cases ~keep_dir:false speed
   in
-  [ ("legacy store upgrade", upgrade_cases);
+  [
+    ("legacy store upgrade", upgrade_cases);
     ("legacy snapshot import", snapshots_cases);
-    ("legacy store upgrade after snapshot import", upgrade_snapshots_cases) ]
+    ("legacy store upgrade after snapshot import", upgrade_snapshots_cases);
+  ]
 
 let () =
   let open Cmdliner in
@@ -605,6 +570,5 @@ let () =
       & info ~docv:"[LEGACY_STORE_BUILDER_PATH]" ["builder-path"])
   in
   Lwt_main.run
-    ( Internal_event_unix.init ()
-    >>= fun () ->
-    Alcotest_lwt.run_with_args "tezos-store-legacy" arg upgrade_tests )
+    ( Internal_event_unix.init () >>= fun () ->
+      Alcotest_lwt.run_with_args "tezos-store-legacy" arg upgrade_tests )

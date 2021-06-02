@@ -37,9 +37,10 @@ let dump_file oc file =
         oc
         "%s"
         (Bytes.to_string (if len = buflen then buf else Bytes.sub buf 0 len)) ;
-      loop () )
+      loop ())
   in
-  loop () ; close_in ic
+  loop () ;
+  close_in ic
 
 let opened_modules = ["Pervasives"; "Error_monad"]
 
@@ -47,11 +48,9 @@ let include_ mode oc file =
   let unit =
     String.capitalize_ascii (Filename.chop_extension (Filename.basename file))
   in
-  ( match mode with
-  | Struct ->
-      Printf.fprintf oc "module %s = struct\n" unit
-  | Sig ->
-      Printf.fprintf oc "module %s : sig\n" unit ) ;
+  (match mode with
+  | Struct -> Printf.fprintf oc "module %s = struct\n" unit
+  | Sig -> Printf.fprintf oc "module %s : sig\n" unit) ;
   Printf.fprintf oc "# 1 %S\n" file ;
   dump_file oc file ;
   Printf.fprintf oc "end\n" ;
@@ -66,11 +65,9 @@ let () =
   let mode =
     match Sys.argv.(1) with "structs" -> Struct | "sigs" -> Sig | _ -> exit 1
   in
-  ( match mode with
-  | Struct ->
-      Printf.fprintf stdout "module M = struct\n"
-  | Sig ->
-      Printf.fprintf stdout "module type T = sig\n" ) ;
+  (match mode with
+  | Struct -> Printf.fprintf stdout "module M = struct\n"
+  | Sig -> Printf.fprintf stdout "module type T = sig\n") ;
   for i = 2 to Array.length Sys.argv - 1 do
     let file = Sys.argv.(i) in
     include_ mode stdout file

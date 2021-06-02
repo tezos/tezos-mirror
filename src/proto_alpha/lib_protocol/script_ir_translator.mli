@@ -54,7 +54,8 @@ type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
 type ('a, 's, 'b, 'u) cinstr = {
   apply :
-    'r 'f. ('a, 's) Script_typed_ir.kinfo ->
+    'r 'f.
+    ('a, 's) Script_typed_ir.kinfo ->
     ('b, 'u, 'r, 'f) Script_typed_ir.kinstr ->
     ('a, 's, 'r, 'f) Script_typed_ir.kinstr;
 }
@@ -80,8 +81,7 @@ type tc_context =
 type ('a, 's) judgement =
   | Typed : ('a, 's, 'b, 'u) descr -> ('a, 's) judgement
   | Failed : {
-      descr :
-        'b 'u. ('b, 'u) Script_typed_ir.stack_ty -> ('a, 's, 'b, 'u) descr;
+      descr : 'b 'u. ('b, 'u) Script_typed_ir.stack_ty -> ('a, 's, 'b, 'u) descr;
     }
       -> ('a, 's) judgement
 
@@ -111,8 +111,7 @@ val set_mem : 'elt -> 'elt Script_typed_ir.set -> bool
 
 val set_size : 'elt Script_typed_ir.set -> Script_int.n Script_int.num
 
-val empty_map :
-  'a Script_typed_ir.comparable_ty -> ('a, 'b) Script_typed_ir.map
+val empty_map : 'a Script_typed_ir.comparable_ty -> ('a, 'b) Script_typed_ir.map
 
 val map_fold :
   ('key -> 'value -> 'acc -> 'acc) ->
@@ -358,8 +357,8 @@ val list_entrypoints :
   't Script_typed_ir.ty ->
   context ->
   root_name:Script_typed_ir.field_annot option ->
-  ( Michelson_v1_primitives.prim list list
-  * (Michelson_v1_primitives.prim list * Script.node) Entrypoints_map.t )
+  (Michelson_v1_primitives.prim list list
+  * (Michelson_v1_primitives.prim list * Script.node) Entrypoints_map.t)
   tzresult
 
 val pack_data :

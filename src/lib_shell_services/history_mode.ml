@@ -43,21 +43,15 @@ module Legacy = struct
       [("archive", Archive); ("full", Full); ("rolling", Rolling)]
 
   let pp ppf = function
-    | Archive ->
-        Format.fprintf ppf "archive"
-    | Full ->
-        Format.fprintf ppf "full"
-    | Rolling ->
-        Format.fprintf ppf "rolling"
+    | Archive -> Format.fprintf ppf "archive"
+    | Full -> Format.fprintf ppf "full"
+    | Rolling -> Format.fprintf ppf "rolling"
 end
 
 let convert = function
-  | Legacy.Rolling ->
-      Rolling {offset = default_offset}
-  | Legacy.Full ->
-      default
-  | Legacy.Archive ->
-      Archive
+  | Legacy.Rolling -> Rolling {offset = default_offset}
+  | Legacy.Full -> default
+  | Legacy.Archive -> Archive
 
 let encoding =
   let open Data_encoding in
@@ -79,7 +73,8 @@ let encoding =
     ~description:"Storage mode for the Tezos shell."
     (union
        ~tag_size:`Uint8
-       [ case
+       [
+         case
            ~title:"archive"
            ~description:
              "Archive mode retains every block and operations since the \
@@ -107,21 +102,19 @@ let encoding =
            (Tag 2)
            (obj1 (req "rolling" additional_cycles_encoding))
            (function Rolling {offset} -> Some offset | _ -> None)
-           (fun offset -> Rolling {offset}) ])
+           (fun offset -> Rolling {offset});
+       ])
 
 let equal hm1 hm2 =
   match (hm1, hm2) with
-  | (Archive, Archive) ->
-      true
+  | (Archive, Archive) -> true
   | (Full {offset}, Full {offset = offset'})
   | (Rolling {offset}, Rolling {offset = offset'}) ->
       Compare.Int.(offset = offset')
-  | _ ->
-      false
+  | _ -> false
 
 let pp ppf = function
-  | Archive ->
-      Format.fprintf ppf "Archive mode"
+  | Archive -> Format.fprintf ppf "Archive mode"
   | Full {offset} ->
       Format.fprintf
         ppf
@@ -134,11 +127,8 @@ let pp ppf = function
         (if offset = 0 then "" else Format.sprintf " + %d extra cycles" offset)
 
 let pp_short ppf = function
-  | Archive ->
-      Format.fprintf ppf "archive"
-  | Full _ ->
-      Format.fprintf ppf "full"
-  | Rolling _ ->
-      Format.fprintf ppf "rolling"
+  | Archive -> Format.fprintf ppf "archive"
+  | Full _ -> Format.fprintf ppf "full"
+  | Rolling _ -> Format.fprintf ppf "rolling"
 
 let tag = Tag.def "history_mode" pp

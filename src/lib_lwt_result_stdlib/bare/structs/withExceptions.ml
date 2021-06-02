@@ -28,10 +28,8 @@ let invalid name loc =
 
 module Option = struct
   let get ~loc = function
-    | Some v ->
-        v
-    | None ->
-        raise (invalid "Lwtreslib.WithExceptions.Option.get" loc)
+    | Some v -> v
+    | None -> raise (invalid "Lwtreslib.WithExceptions.Option.get" loc)
 
   let to_exn ~none = function Some v -> v | None -> raise none
 
@@ -40,16 +38,12 @@ end
 
 module Result = struct
   let get_ok ~loc = function
-    | Ok v ->
-        v
-    | Error _ ->
-        raise (invalid "Lwtreslib.WithExceptions.Result.get_ok" loc)
+    | Ok v -> v
+    | Error _ -> raise (invalid "Lwtreslib.WithExceptions.Result.get_ok" loc)
 
   let get_error ~loc = function
-    | Error e ->
-        e
-    | Ok _ ->
-        raise (invalid "Lwtreslib.WithExceptions.Result.get_error" loc)
+    | Error e -> e
+    | Ok _ -> raise (invalid "Lwtreslib.WithExceptions.Result.get_error" loc)
 
   let to_exn = function Ok v -> v | Error exc -> raise exc
 
@@ -60,10 +54,8 @@ module List = struct
   let rev_combine ~loc xs ys =
     let rec aux acc xs ys =
       match (xs, ys) with
-      | ([], []) ->
-          acc
-      | (x :: xs, y :: ys) ->
-          aux ((x, y) :: acc) xs ys
+      | ([], []) -> acc
+      | (x :: xs, y :: ys) -> aux ((x, y) :: acc) xs ys
       | ([], _ :: _) | (_ :: _, []) ->
           raise (invalid "Lwtreslib.WithExceptions.List.rev_combine" loc)
     in
@@ -72,10 +64,8 @@ module List = struct
   let combine ~loc xs ys =
     let rec aux acc xs ys =
       match (xs, ys) with
-      | ([], []) ->
-          acc
-      | (x :: xs, y :: ys) ->
-          aux ((x, y) :: acc) xs ys
+      | ([], []) -> acc
+      | (x :: xs, y :: ys) -> aux ((x, y) :: acc) xs ys
       | ([], _ :: _) | (_ :: _, []) ->
           raise (invalid "Lwtreslib.WithExceptions.List.combine" loc)
     in

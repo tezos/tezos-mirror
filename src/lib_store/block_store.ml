@@ -29,9 +29,8 @@ open Store_errors
 
 module Block_cache =
   Ringo_lwt.Functors.Make_opt
-    (( val Ringo.(
-             map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise)
-       )
+    ((val Ringo.(
+            map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
        (Block_hash))
 
 (* TODO: make limits configurable *)
@@ -101,37 +100,31 @@ let global_predecessor_lookup block_store hash pow_nth =
      cemented store *)
   Lwt_utils.find_map_s
     (fun floating_store ->
-      Floating_block_store.find_predecessors floating_store hash
-      >>= function
-      | None ->
-          Lwt.return_none
-      | Some predecessors ->
-          Lwt.return (List.nth_opt predecessors pow_nth))
-    ( block_store.rw_floating_block_store
-    :: block_store.ro_floating_block_stores )
+      Floating_block_store.find_predecessors floating_store hash >>= function
+      | None -> Lwt.return_none
+      | Some predecessors -> Lwt.return (List.nth_opt predecessors pow_nth))
+    (block_store.rw_floating_block_store :: block_store.ro_floating_block_stores)
   >>= function
-  | Some hash ->
-      Lwt.return_some hash
+  | Some hash -> Lwt.return_some hash
   | None -> (
-    (* It must be cemented *)
-    match
-      Cemented_block_store.get_cemented_block_level
-        block_store.cemented_store
-        hash
-    with
-    | None ->
-        Lwt.return_none
-    | Some level ->
-        (* level - 2^n *)
-        let pred_level =
-          max
-            (Block_repr.level block_store.genesis_block)
-            Int32.(sub level (shift_left 1l pow_nth))
-        in
-        Lwt.return
-          (Cemented_block_store.get_cemented_block_hash
-             block_store.cemented_store
-             pred_level) )
+      (* It must be cemented *)
+      match
+        Cemented_block_store.get_cemented_block_level
+          block_store.cemented_store
+          hash
+      with
+      | None -> Lwt.return_none
+      | Some level ->
+          (* level - 2^n *)
+          let pred_level =
+            max
+              (Block_repr.level block_store.genesis_block)
+              Int32.(sub level (shift_left 1l pow_nth))
+          in
+          Lwt.return
+            (Cemented_block_store.get_cemented_block_hash
+               block_store.cemented_store
+               pred_level))
 
 (**
    Takes a block_store and a block and returns the block's known
@@ -155,20 +148,17 @@ let compute_predecessors block_store block =
     if dist = Floating_block_index.Block_info.max_predecessors then
       Lwt.return predecessors_acc
     else
-      global_predecessor_lookup block_store pred (dist - 1)
-      >>= function
-      | None ->
-          Lwt.return predecessors_acc
-      | Some pred' ->
-          loop (pred' :: predecessors_acc) pred' (dist + 1)
+      global_predecessor_lookup block_store pred (dist - 1) >>= function
+      | None -> Lwt.return predecessors_acc
+      | Some pred' -> loop (pred' :: predecessors_acc) pred' (dist + 1)
   in
   let predecessor = predecessor block in
   if Block_hash.equal block.hash predecessor then
     (* genesis *)
     Lwt.return [block.hash]
   else
-    loop [predecessor] predecessor 1
-    >>= fun rev_preds -> Lwt.return (List.rev rev_preds)
+    loop [predecessor] predecessor 1 >>= fun rev_preds ->
+    Lwt.return (List.rev rev_preds)
 
 (** [get_hash block_store key] retrieves the block which is at
     [distance] from the block with corresponding [hash] by every store
@@ -178,9 +168,7 @@ let get_hash block_store (Block (block_hash, offset)) =
       let closest_power_two n =
         if n < 0 then assert false
         else
-          let rec loop cnt n =
-            if n <= 1 then cnt else loop (cnt + 1) (n / 2)
-          in
+          let rec loop cnt n = if n <= 1 then cnt else loop (cnt + 1) (n / 2) in
           loop 0 n
       in
       (* actual predecessor function *)
@@ -189,8 +177,8 @@ let get_hash block_store (Block (block_hash, offset)) =
       else
         let rec loop block_hash offset =
           if offset = 1 then
-            global_predecessor_lookup block_store block_hash 0
-            >>= fun pred -> return pred
+            global_predecessor_lookup block_store block_hash 0 >>= fun pred ->
+            return pred
           else
             let power = closest_power_two offset in
             let power =
@@ -202,10 +190,8 @@ let get_hash block_store (Block (block_hash, offset)) =
                 in
                 power
             in
-            global_predecessor_lookup block_store block_hash power
-            >>= function
-            | None ->
-                return_none
+            global_predecessor_lookup block_store block_hash power >>= function
+            | None -> return_none
             | Some pred ->
                 let rest = offset - (1 lsl power) in
                 if rest = 0 then return_some pred
@@ -217,33 +203,28 @@ let get_hash block_store (Block (block_hash, offset)) =
 
 let mem block_store key =
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
-      get_hash block_store key
-      >>=? function
-      | None ->
-          return_false
+      get_hash block_store key >>=? function
+      | None -> return_false
       | Some predecessor_hash
-        when Block_hash.equal block_store.genesis_block.hash predecessor_hash
-        ->
+        when Block_hash.equal block_store.genesis_block.hash predecessor_hash ->
           return_true
       | Some predecessor_hash ->
           Lwt_list.exists_s
             (fun store -> Floating_block_store.mem store predecessor_hash)
-            ( block_store.rw_floating_block_store
-            :: block_store.ro_floating_block_stores )
+            (block_store.rw_floating_block_store
+             :: block_store.ro_floating_block_stores)
           >>= fun is_known_in_floating ->
           return
-            ( is_known_in_floating
+            (is_known_in_floating
             || Cemented_block_store.is_cemented
                  block_store.cemented_store
-                 predecessor_hash ))
+                 predecessor_hash))
 
 let read_block ~read_metadata block_store key_kind =
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       (* Resolve the hash *)
-      get_hash block_store key_kind
-      >>=? function
-      | None ->
-          return_none
+      get_hash block_store key_kind >>=? function
+      | None -> return_none
       | Some adjusted_hash ->
           if Block_hash.equal block_store.genesis_block.hash adjusted_hash then
             return_some block_store.genesis_block
@@ -253,11 +234,10 @@ let read_block ~read_metadata block_store key_kind =
               Lwt_utils.find_map_s
                 (fun store ->
                   Floating_block_store.read_block store adjusted_hash)
-                ( block_store.rw_floating_block_store
-                :: block_store.ro_floating_block_stores )
+                (block_store.rw_floating_block_store
+                 :: block_store.ro_floating_block_stores)
               >>= function
-              | Some block ->
-                  Lwt.return_some block
+              | Some block -> Lwt.return_some block
               | None -> (
                   (* Lastly, look in the cemented blocks *)
                   Cemented_block_store.get_cemented_block_by_hash
@@ -265,7 +245,8 @@ let read_block ~read_metadata block_store key_kind =
                     block_store.cemented_store
                     adjusted_hash
                   >>= function
-                  | Ok v -> Lwt.return v | Error _ -> Lwt.return_none )
+                  | Ok v -> Lwt.return v
+                  | Error _ -> Lwt.return_none)
             in
             Block_cache.find_or_replace
               block_store.block_cache
@@ -276,44 +257,37 @@ let read_block ~read_metadata block_store key_kind =
 let read_block_metadata block_store key_kind =
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       (* Resolve the hash *)
-      get_hash block_store key_kind
-      >>=? function
-      | None ->
-          return_none
+      get_hash block_store key_kind >>=? function
+      | None -> return_none
       | Some adjusted_hash -> (
           if Block_hash.equal block_store.genesis_block.hash adjusted_hash then
             return (Block_repr.metadata block_store.genesis_block)
           else
             (* First look in the floating stores *)
             Lwt_utils.find_map_s
-              (fun store ->
-                Floating_block_store.read_block store adjusted_hash)
-              ( block_store.rw_floating_block_store
-              :: block_store.ro_floating_block_stores )
+              (fun store -> Floating_block_store.read_block store adjusted_hash)
+              (block_store.rw_floating_block_store
+               :: block_store.ro_floating_block_stores)
             >>= function
-            | Some block ->
-                return block.metadata
+            | Some block -> return block.metadata
             | None -> (
-              (* Lastly, look in the cemented blocks *)
-              match
-                Cemented_block_store.get_cemented_block_level
-                  block_store.cemented_store
-                  adjusted_hash
-              with
-              | None ->
-                  return_none
-              | Some level ->
-                  Cemented_block_store.read_block_metadata
+                (* Lastly, look in the cemented blocks *)
+                match
+                  Cemented_block_store.get_cemented_block_level
                     block_store.cemented_store
-                    level ) ))
+                    adjusted_hash
+                with
+                | None -> return_none
+                | Some level ->
+                    Cemented_block_store.read_block_metadata
+                      block_store.cemented_store
+                      level)))
 
 let store_block block_store block =
-  fail_when block_store.readonly Cannot_write_in_readonly
-  >>=? fun () ->
+  fail_when block_store.readonly Cannot_write_in_readonly >>=? fun () ->
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       protect (fun () ->
-          compute_predecessors block_store block
-          >>= fun predecessors ->
+          compute_predecessors block_store block >>= fun predecessors ->
           Block_cache.replace
             block_store.block_cache
             block.hash
@@ -326,8 +300,7 @@ let store_block block_store block =
 
 let check_blocks_consistency blocks =
   let rec loop = function
-    | [] | [_] ->
-        true
+    | [] | [_] -> true
     | pred :: (curr :: _ as r) ->
         let is_consistent =
           Block_hash.equal (predecessor curr) pred.hash
@@ -337,13 +310,12 @@ let check_blocks_consistency blocks =
   in
   loop blocks
 
-let cement_blocks ?(check_consistency = true) ~write_metadata block_store
-    blocks =
+let cement_blocks ?(check_consistency = true) ~write_metadata block_store blocks
+    =
   (* No need to lock *)
   let {cemented_store; _} = block_store in
   let are_blocks_consistent = check_blocks_consistency blocks in
-  fail_unless are_blocks_consistent Invalid_blocks_to_cement
-  >>=? fun () ->
+  fail_unless are_blocks_consistent Invalid_blocks_to_cement >>=? fun () ->
   Cemented_block_store.cement_blocks
     ~check_consistency
     cemented_store
@@ -380,8 +352,7 @@ let read_predecessor_block_by_level_opt block_store ?(read_metadata = false)
     block_store
     ~read_metadata
     (Block
-       ( Block_repr.hash head,
-         Int32.(to_int (sub (Block_repr.level head) level)) ))
+       (Block_repr.hash head, Int32.(to_int (sub (Block_repr.level head) level))))
 
 let read_predecessor_block_by_level block_store ?(read_metadata = false) ~head
     level =
@@ -391,17 +362,14 @@ let read_predecessor_block_by_level block_store ?(read_metadata = false) ~head
     ~read_metadata
     (Block (Block_repr.hash head, Int32.(to_int (sub head_level level))))
   >>=? function
-  | None ->
-      fail (Bad_level {head_level; given_level = level})
-  | Some b ->
-      return b
+  | None -> fail (Bad_level {head_level; given_level = level})
+  | Some b -> return b
 
 (* TODO optimize this by reading chunks of contiguous data and
    filtering it afterwards? *)
 let read_block_range_in_floating_stores block_store ~ro_store ~rw_store ~head
     (low, high) =
-  read_predecessor_block_by_level block_store ~head high
-  >>=? fun high_block ->
+  read_predecessor_block_by_level block_store ~head high >>=? fun high_block ->
   let nb_blocks =
     Int32.(add one (sub high low) |> to_int)
     (* +1, it's a size *)
@@ -423,14 +391,14 @@ let expected_savepoint block_store ~target_offset =
   let cemented_store = cemented_block_store block_store in
   match Cemented_block_store.cemented_blocks_files cemented_store with
   | None ->
-      savepoint block_store
-      >>= fun current_savepoint -> Lwt.return (snd current_savepoint)
+      savepoint block_store >>= fun current_savepoint ->
+      Lwt.return (snd current_savepoint)
   | Some cemented_block_files ->
       let nb_files = Array.length cemented_block_files in
       if target_offset > nb_files || nb_files = 0 then
         (* We cannot provide a savepoint from the cemented block store *)
-        savepoint block_store
-        >>= fun current_savepoint -> Lwt.return (snd current_savepoint)
+        savepoint block_store >>= fun current_savepoint ->
+        Lwt.return (snd current_savepoint)
       else if target_offset = 0 then
         (* We get the successor of the highest cemented level *)
         let cycle = cemented_block_files.(nb_files - 1) in
@@ -445,8 +413,7 @@ let expected_savepoint block_store ~target_offset =
    say, contains metadata). It returns the [expected_level] if it is
    valid. Returns the current savepoint otherwise .*)
 let available_savepoint block_store expected_level =
-  savepoint block_store
-  >>= fun current_savepoint ->
+  savepoint block_store >>= fun current_savepoint ->
   if expected_level < snd current_savepoint then
     Lwt.return (snd current_savepoint)
   else Lwt.return expected_level
@@ -470,12 +437,10 @@ let preserved_block block_store current_head expected_level =
   let distance =
     Int32.(to_int (sub (Block_repr.level current_head) new_block_level))
   in
-  read_block ~read_metadata:false block_store (Block (head_hash, distance))
-  >>=? (function
-         | Some b ->
-             return b
-         | None ->
-             fail (Wrong_predecessor (head_hash, distance)))
+  (read_block ~read_metadata:false block_store (Block (head_hash, distance))
+   >>=? function
+   | Some b -> return b
+   | None -> fail (Wrong_predecessor (head_hash, distance)))
   >>=? fun block -> return (descriptor block)
 
 (* [infer_savepoint block_store current_head ~target_offset] returns
@@ -493,8 +458,7 @@ let infer_savepoint block_store current_head ~target_offset =
 let expected_caboose block_store ~target_offset =
   let cemented_store = cemented_block_store block_store in
   match Cemented_block_store.cemented_blocks_files cemented_store with
-  | None ->
-      None
+  | None -> None
   | Some cemented_block_files ->
       let nb_files = Array.length cemented_block_files in
       if target_offset > nb_files || nb_files = 0 then
@@ -516,24 +480,21 @@ let infer_caboose block_store savepoint current_head ~target_offset
     ~new_history_mode ~previous_history_mode =
   match previous_history_mode with
   | History_mode.Archive -> (
-    match new_history_mode with
-    | History_mode.Archive ->
-        fail
-          (Cannot_switch_history_mode
-             {
-               previous_mode = previous_history_mode;
-               next_mode = new_history_mode;
-             })
-    | Full _ ->
-        caboose block_store >>= return
-    | Rolling _ ->
-        return savepoint )
+      match new_history_mode with
+      | History_mode.Archive ->
+          fail
+            (Cannot_switch_history_mode
+               {
+                 previous_mode = previous_history_mode;
+                 next_mode = new_history_mode;
+               })
+      | Full _ -> caboose block_store >>= return
+      | Rolling _ -> return savepoint)
   | Full _ -> (
-    match expected_caboose block_store ~target_offset with
-    | Some expected_caboose ->
-        preserved_block block_store current_head expected_caboose
-    | None ->
-        return savepoint )
+      match expected_caboose block_store ~target_offset with
+      | Some expected_caboose ->
+          preserved_block block_store current_head expected_caboose
+      | None -> return savepoint)
   | Rolling r ->
       if r.offset < target_offset then caboose block_store >>= return
       else return savepoint
@@ -557,8 +518,7 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
       let cemented_block_store = cemented_block_store block_store in
       Cemented_block_store.trigger_gc cemented_block_store new_history_mode
       >>= fun () ->
-      write_savepoint block_store new_savepoint
-      >>=? fun () ->
+      write_savepoint block_store new_savepoint >>=? fun () ->
       write_caboose block_store new_caboose >>=? fun () -> return_unit
   | (Full _, Full m) ->
       (* Only the savepoint can be updated *)
@@ -585,23 +545,18 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
         (cemented_block_store block_store)
         new_history_mode
       >>= fun () ->
-      write_savepoint block_store new_savepoint
-      >>=? fun () ->
+      write_savepoint block_store new_savepoint >>=? fun () ->
       write_caboose block_store new_caboose >>=? fun () -> return_unit
   | _ ->
       fail
         (Cannot_switch_history_mode
-           {
-             previous_mode = previous_history_mode;
-             next_mode = new_history_mode;
-           })
+           {previous_mode = previous_history_mode; next_mode = new_history_mode})
 
 let compute_new_savepoint block_store history_mode ~min_level_to_preserve
     ~new_head ~cycles_to_cement =
   let nb_cycles_to_cement = List.length cycles_to_cement in
   assert (nb_cycles_to_cement > 0) ;
-  Stored_data.get block_store.savepoint
-  >>= fun savepoint ->
+  Stored_data.get block_store.savepoint >>= fun savepoint ->
   match history_mode with
   | History_mode.Archive ->
       (* new_savepoint = savepoint = genesis *)
@@ -622,13 +577,12 @@ let compute_new_savepoint block_store history_mode ~min_level_to_preserve
               Cemented_block_store.cemented_blocks_files
                 block_store.cemented_store
             with
-            | None ->
-                cycles_to_cement
+            | None -> cycles_to_cement
             | Some table ->
-                ( Array.to_list table
+                (Array.to_list table
                 |> List.map
                      (fun {Cemented_block_store.start_level; end_level; _} ->
-                       (start_level, end_level)) )
+                       (start_level, end_level)))
                 @ cycles_to_cement
           in
           if Compare.Int32.(snd savepoint >= min_block_level) then
@@ -649,8 +603,8 @@ let compute_new_savepoint block_store history_mode ~min_level_to_preserve
               let shifted_savepoint_level =
                 (* new lowest cemented block  *)
                 fst
-                  ( List.nth cemented_cycles (cemented_cycles_len - offset)
-                  |> WithExceptions.Option.get ~loc:__LOC__ )
+                  (List.nth cemented_cycles (cemented_cycles_len - offset)
+                  |> WithExceptions.Option.get ~loc:__LOC__)
               in
               (* If the savepoint is still higher than the shifted
                  savepoint, preserve the savepoint *)
@@ -663,7 +617,7 @@ let compute_new_savepoint block_store history_mode ~min_level_to_preserve
               then return min_block_descr
               else
                 (* Else the new savepoint is the one-cycle shifted
-                 savepoint. *)
+                   savepoint. *)
                 read_predecessor_block_by_level_opt
                   block_store
                   ~head:new_head
@@ -671,13 +625,11 @@ let compute_new_savepoint block_store history_mode ~min_level_to_preserve
                 >>=? function
                 | None ->
                     fail (Cannot_retrieve_savepoint shifted_savepoint_level)
-                | Some savepoint ->
-                    return (Block_repr.descriptor savepoint) ) )
+                | Some savepoint -> return (Block_repr.descriptor savepoint)))
 
 let compute_new_caboose block_store history_mode ~new_savepoint
     ~min_level_to_preserve ~new_head =
-  Stored_data.get block_store.caboose
-  >>= fun caboose ->
+  Stored_data.get block_store.caboose >>= fun caboose ->
   match history_mode with
   | History_mode.Archive | Full _ ->
       (* caboose = genesis *)
@@ -786,8 +738,8 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
               let hash = Block_repr.hash block in
               visited := Block_hash.Set.add hash !visited ;
               Floating_block_store.append_block new_store predecessors block
-              >>= return )
-            else return_unit ))
+              >>= return)
+            else return_unit))
         store)
     [ro_store; rw_store]
   >>=? fun () ->
@@ -797,8 +749,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   in
   (* Return the range of cycles to cement. *)
   let rec loop acc pred = function
-    | [] ->
-        fail (Cannot_cement_blocks `Empty)
+    | [] -> fail (Cannot_cement_blocks `Empty)
     | [h] ->
         assert (Compare.Int32.(h = new_head_lafl)) ;
         return (List.rev ((Int32.succ pred, h) :: acc))
@@ -817,8 +768,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   let sorted_lafl =
     List.sort Compare.Int32.compare (BlocksLAFL.elements !blocks_lafl)
   in
-  loop [] initial_pred sorted_lafl
-  >>=? fun cycles_to_cement ->
+  loop [] initial_pred sorted_lafl >>=? fun cycles_to_cement ->
   compute_new_savepoint
     block_store
     history_mode
@@ -837,15 +787,13 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
 let find_floating_store_by_kind block_store kind =
   List.find_opt
     (fun floating_store -> kind = Floating_block_store.kind floating_store)
-    ( block_store.rw_floating_block_store
-    :: block_store.ro_floating_block_stores )
+    (block_store.rw_floating_block_store :: block_store.ro_floating_block_stores)
 
 let move_floating_store block_store ~src:floating_store ~dst_kind =
   let src_kind = Floating_block_store.kind floating_store in
-  fail_when (src_kind = dst_kind) Wrong_floating_kind_swap
-  >>=? fun () ->
+  fail_when (src_kind = dst_kind) Wrong_floating_kind_swap >>=? fun () ->
   (* If the destination floating store exists, try closing it. *)
-  ( match find_floating_store_by_kind block_store dst_kind with
+  (match find_floating_store_by_kind block_store dst_kind with
   | Some old_floating_store ->
       Floating_block_store.swap ~src:floating_store ~dst:old_floating_store
   | None ->
@@ -855,8 +803,7 @@ let move_floating_store block_store ~src:floating_store ~dst_kind =
       let dst_floating_store_dir_path =
         Naming.(floating_blocks_dir block_store.chain_dir dst_kind |> dir_path)
       in
-      Lwt_unix.rename src_floating_store_dir_path dst_floating_store_dir_path
-  )
+      Lwt_unix.rename src_floating_store_dir_path dst_floating_store_dir_path)
   >>= fun () -> return_unit
 
 (* This function must be called after the former [RO] and [RW] were
@@ -868,22 +815,18 @@ let move_all_floating_stores block_store ~new_ro_store =
       (* on error: restore all stores *)
       Lwt_list.iter_s
         Floating_block_store.close
-        ( block_store.rw_floating_block_store
-        :: block_store.ro_floating_block_stores )
+        (block_store.rw_floating_block_store
+         :: block_store.ro_floating_block_stores)
       >>= fun () ->
       protect (fun () ->
-          Floating_block_store.init chain_dir ~readonly:false RO
-          >>= fun ro ->
+          Floating_block_store.init chain_dir ~readonly:false RO >>= fun ro ->
           block_store.ro_floating_block_stores <- [ro] ;
-          Floating_block_store.init chain_dir ~readonly:false RW
-          >>= fun rw ->
+          Floating_block_store.init chain_dir ~readonly:false RW >>= fun rw ->
           block_store.rw_floating_block_store <- rw ;
           return_unit)
       >>= function
-      | Ok () ->
-          Lwt.return (Error err)
-      | Error errs' ->
-          Lwt.return_error (TzTrace.conp errs' err))
+      | Ok () -> Lwt.return (Error err)
+      | Error errs' -> Lwt.return_error (TzTrace.conp errs' err))
     (fun () ->
       (* (atomically?) Promote [new_ro] to [ro] *)
       move_floating_store block_store ~src:new_ro_store ~dst_kind:RO
@@ -895,11 +838,9 @@ let move_all_floating_stores block_store ~new_ro_store =
         ~dst_kind:RW
       >>=? fun () ->
       (* Load the swapped stores *)
-      Floating_block_store.init chain_dir ~readonly:false RO
-      >>= fun ro ->
+      Floating_block_store.init chain_dir ~readonly:false RO >>= fun ro ->
       block_store.ro_floating_block_stores <- [ro] ;
-      Floating_block_store.init chain_dir ~readonly:false RW
-      >>= fun rw ->
+      Floating_block_store.init chain_dir ~readonly:false RW >>= fun rw ->
       block_store.rw_floating_block_store <- rw ;
       return_unit)
 
@@ -936,46 +877,40 @@ let compute_lowest_bound_to_preserve_in_floating block_store ~new_head
     (Int32.sub
        lafl
        (Int32.of_int
-          ( match Block_repr.metadata lafl_block with
+          (match Block_repr.metadata lafl_block with
           | None ->
               (* FIXME: this is not valid but it is a good
-                approximation of the max_op_ttl of a block where the
-                metadata is missing. *)
+                 approximation of the max_op_ttl of a block where the
+                 metadata is missing. *)
               Block_repr.max_operations_ttl new_head_metadata
-          | Some metadata ->
-              Block_repr.max_operations_ttl metadata )))
+          | Some metadata -> Block_repr.max_operations_ttl metadata)))
 
 let instanciate_temporary_floating_store block_store =
   protect
     ~on_error:(fun err ->
-      ( match block_store.ro_floating_block_stores with
+      (match block_store.ro_floating_block_stores with
       | [old_rw; old_ro] ->
           block_store.rw_floating_block_store <- old_rw ;
           block_store.ro_floating_block_stores <- [old_ro]
-      | [_] ->
-          ()
-      | _ ->
-          assert false ) ;
+      | [_] -> ()
+      | _ -> assert false) ;
       Lwt.return (Error err))
     (fun () ->
       trace
         Cannot_instanciate_temporary_floating_store
-        ( assert (List.length block_store.ro_floating_block_stores = 1) ;
-          let ro_store =
-            List.hd block_store.ro_floating_block_stores
-            |> WithExceptions.Option.get ~loc:__LOC__
-          in
-          let rw_store = block_store.rw_floating_block_store in
-          block_store.ro_floating_block_stores <-
-            block_store.rw_floating_block_store
-            :: block_store.ro_floating_block_stores ;
-          Floating_block_store.init
-            block_store.chain_dir
-            ~readonly:false
-            RW_TMP
-          >>= fun new_rw_store ->
-          block_store.rw_floating_block_store <- new_rw_store ;
-          return (ro_store, rw_store, new_rw_store) ))
+        (assert (List.length block_store.ro_floating_block_stores = 1) ;
+         let ro_store =
+           List.hd block_store.ro_floating_block_stores
+           |> WithExceptions.Option.get ~loc:__LOC__
+         in
+         let rw_store = block_store.rw_floating_block_store in
+         block_store.ro_floating_block_stores <-
+           block_store.rw_floating_block_store
+           :: block_store.ro_floating_block_stores ;
+         Floating_block_store.init block_store.chain_dir ~readonly:false RW_TMP
+         >>= fun new_rw_store ->
+         block_store.rw_floating_block_store <- new_rw_store ;
+         return (ro_store, rw_store, new_rw_store)))
 
 let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
     ~new_head ~new_head_lafl ~lowest_bound_to_preserve_in_floating
@@ -1006,8 +941,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
       | History_mode.Archive ->
           List.iter_es
             (fun cycle_range ->
-              cycle_reader cycle_range
-              >>=? fun cycle ->
+              cycle_reader cycle_range >>=? fun cycle ->
               (* In archive, we store the metadatas *)
               cement_blocks ~write_metadata:true block_store cycle)
             cycles_interval_to_cement
@@ -1021,8 +955,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
           in
           List.iter_es
             (fun cycle_range ->
-              cycle_reader cycle_range
-              >>=? fun cycle ->
+              cycle_reader cycle_range >>=? fun cycle ->
               cement_blocks ~write_metadata:true block_store cycle)
             cycles_interval_to_cement
           >>=? fun () ->
@@ -1033,11 +966,10 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
           >>= fun () -> return (new_savepoint, new_caboose)
       | Full {offset} when offset > 0 ->
           (* If the [offset] > 0 then the cemented store's GC should be
-            called to clean-up old cycles. *)
+             called to clean-up old cycles. *)
           List.iter_es
             (fun cycle_range ->
-              cycle_reader cycle_range
-              >>=? fun cycle ->
+              cycle_reader cycle_range >>=? fun cycle ->
               cement_blocks ~write_metadata:true block_store cycle)
             cycles_interval_to_cement
           >>=? fun () ->
@@ -1050,8 +982,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
           assert (offset = 0) ;
           List.iter_es
             (fun cycle_range ->
-              cycle_reader cycle_range
-              >>=? fun cycle ->
+              cycle_reader cycle_range >>=? fun cycle ->
               (* In full 0, we do not store the metadata *)
               cement_blocks ~write_metadata:false block_store cycle)
             cycles_interval_to_cement
@@ -1068,31 +999,26 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
 let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
     ~finalizer ~history_mode ~new_head ~new_head_metadata
     ~cementing_highwatermark =
-  fail_when block_store.readonly Cannot_write_in_readonly
-  >>=? fun () ->
+  fail_when block_store.readonly Cannot_write_in_readonly >>=? fun () ->
   (* Do not allow multiple merges: force waiting for a potential
      previous merge. *)
-  Lwt_mutex.lock block_store.merge_mutex
-  >>= fun () ->
+  Lwt_mutex.lock block_store.merge_mutex >>= fun () ->
   protect
     ~on_error:(fun err ->
       Lwt_mutex.unlock block_store.merge_mutex ;
       Lwt.return (Error err))
     (fun () ->
-      status block_store
-      >>= fun store_status ->
+      status block_store >>= fun store_status ->
       fail_unless
         (store_status = Idle)
         (Cannot_merge_store {status = status_to_string store_status})
       >>=? fun () ->
       (* Mark the store's status as Merging *)
-      write_status block_store Merging
-      >>=? fun () ->
+      write_status block_store Merging >>=? fun () ->
       let new_head_lafl =
         Block_repr.last_allowed_fork_level new_head_metadata
       in
-      Store_events.Event.(emit start_merging_stores) new_head_lafl
-      >>= fun () ->
+      Store_events.Event.(emit start_merging_stores) new_head_lafl >>= fun () ->
       check_store_consistency block_store ~cementing_highwatermark
       >>=? fun () ->
       compute_lowest_bound_to_preserve_in_floating
@@ -1145,8 +1071,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                     (* Don't call the finalizer in the critical
                        section, in case it needs to access the block
                        store. *)
-                    finalizer new_head_lafl
-                    >>=? fun () ->
+                    finalizer new_head_lafl >>=? fun () ->
                     (* The merge operation succeeded, the store is now idle. *)
                     block_store.merging_thread <- None ;
                     write_status block_store Idle >>=? fun () -> return_unit))
@@ -1167,36 +1092,27 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
 
 let get_merge_status block_store =
   match block_store.merging_thread with
-  | None ->
-      Not_running
+  | None -> Not_running
   | Some (_target, th) -> (
-    match Lwt.state th with
-    | Lwt.Sleep ->
-        Running
-    | Lwt.Return (Ok ()) ->
-        Not_running
-    | Lwt.Return (Error errs) ->
-        Merge_failed errs
-    | Lwt.Fail exn ->
-        Merge_failed [Exn exn] )
+      match Lwt.state th with
+      | Lwt.Sleep -> Running
+      | Lwt.Return (Ok ()) -> Not_running
+      | Lwt.Return (Error errs) -> Merge_failed errs
+      | Lwt.Fail exn -> Merge_failed [Exn exn])
 
 let may_recover_merge block_store =
   let chain_dir = block_store.chain_dir in
-  fail_when block_store.readonly Cannot_write_in_readonly
-  >>=? fun () ->
+  fail_when block_store.readonly Cannot_write_in_readonly >>=? fun () ->
   Lwt_idle_waiter.force_idle block_store.merge_scheduler (fun () ->
       Lwt_mutex.with_lock block_store.merge_mutex (fun () ->
-          Stored_data.get block_store.status_data
-          >>= function
-          | Idle ->
-              return_unit
+          Stored_data.get block_store.status_data >>= function
+          | Idle -> return_unit
           | Merging ->
-              Store_events.Event.(emit recover_merge ())
-              >>= fun () ->
+              Store_events.Event.(emit recover_merge ()) >>= fun () ->
               Lwt_list.iter_s
                 Floating_block_store.close
-                ( block_store.rw_floating_block_store
-                :: block_store.ro_floating_block_stores )
+                (block_store.rw_floating_block_store
+                 :: block_store.ro_floating_block_stores)
               >>= fun () ->
               (* Remove RO_TMP if it still exists *)
               let ro_tmp_floating_store_dir_path =
@@ -1227,12 +1143,11 @@ let may_recover_merge block_store =
                     ~from:rw_tmp
                     ~into:rw_restore
                   >>=? fun () ->
-                  Floating_block_store.close rw_restore
-                  >>= fun () ->
+                  Floating_block_store.close rw_restore >>= fun () ->
                   Floating_block_store.swap ~src:rw_restore ~dst:rw
                   >>= fun () ->
-                  Floating_block_store.delete_files rw_tmp
-                  >>= fun () -> return_unit)
+                  Floating_block_store.delete_files rw_tmp >>= fun () ->
+                  return_unit)
                 (fun () -> Floating_block_store.delete_files rw_restore)
               >>=? fun () ->
               (* Re-instantiate RO and RW *)
@@ -1245,23 +1160,18 @@ let may_recover_merge block_store =
               write_status block_store Idle >>=? fun () -> return_unit))
 
 let load chain_dir ~genesis_block ~readonly =
-  Cemented_block_store.init chain_dir ~readonly
-  >>=? fun cemented_store ->
+  Cemented_block_store.init chain_dir ~readonly >>=? fun cemented_store ->
   Floating_block_store.init chain_dir ~readonly RO
   >>= fun ro_floating_block_store ->
   let ro_floating_block_stores = [ro_floating_block_store] in
   Floating_block_store.init chain_dir ~readonly RW
   >>= fun rw_floating_block_store ->
   let genesis_descr = Block_repr.descriptor genesis_block in
-  Stored_data.init
-    (Naming.savepoint_file chain_dir)
-    ~initial_data:genesis_descr
+  Stored_data.init (Naming.savepoint_file chain_dir) ~initial_data:genesis_descr
   >>=? fun savepoint ->
   Stored_data.init (Naming.caboose_file chain_dir) ~initial_data:genesis_descr
   >>=? fun caboose ->
-  Stored_data.init
-    (Naming.block_store_status_file chain_dir)
-    ~initial_data:Idle
+  Stored_data.init (Naming.block_store_status_file chain_dir) ~initial_data:Idle
   >>=? fun status_data ->
   let block_cache = Block_cache.create block_cache_limit in
   let merge_scheduler = Lwt_idle_waiter.create () in
@@ -1285,50 +1195,40 @@ let load chain_dir ~genesis_block ~readonly =
   in
   (if not readonly then may_recover_merge block_store else return_unit)
   >>=? fun () ->
-  Stored_data.get status_data
-  >>= fun status ->
-  fail_unless (status = Idle) Cannot_load_degraded_store
-  >>=? fun () -> return block_store
+  Stored_data.get status_data >>= fun status ->
+  fail_unless (status = Idle) Cannot_load_degraded_store >>=? fun () ->
+  return block_store
 
 let create chain_dir ~genesis_block =
-  load chain_dir ~genesis_block ~readonly:false
-  >>=? fun block_store ->
+  load chain_dir ~genesis_block ~readonly:false >>=? fun block_store ->
   store_block block_store genesis_block >>=? fun () -> return block_store
 
 let pp_merge_status fmt status =
   match status with
-  | Not_running ->
-      Format.fprintf fmt "not running"
-  | Running ->
-      Format.fprintf fmt "running"
-  | Merge_failed err ->
-      Format.fprintf fmt "merge failed %a" pp_print_error err
+  | Not_running -> Format.fprintf fmt "not running"
+  | Running -> Format.fprintf fmt "running"
+  | Merge_failed err -> Format.fprintf fmt "merge failed %a" pp_print_error err
 
 let await_merging block_store =
-  Lwt_mutex.lock block_store.merge_mutex
-  >>= fun () ->
+  Lwt_mutex.lock block_store.merge_mutex >>= fun () ->
   let thread = block_store.merging_thread in
   Lwt_mutex.unlock block_store.merge_mutex ;
   match thread with
-  | None ->
-      Lwt.return_unit
-  | Some (_, th) ->
-      th >>= fun _ -> Lwt.return_unit
+  | None -> Lwt.return_unit
+  | Some (_, th) -> th >>= fun _ -> Lwt.return_unit
 
 let close block_store =
   (* Wait a bit for the merging to end but hard-stop it if it takes
      too long. *)
-  ( match get_merge_status block_store with
-  | Not_running | Merge_failed _ ->
-      Lwt.return_unit
+  (match get_merge_status block_store with
+  | Not_running | Merge_failed _ -> Lwt.return_unit
   | Running ->
       Store_events.Event.(emit try_waiting_for_merge_termination) ()
       >>= fun () ->
       Lwt_unix.with_timeout 5. (fun () ->
-          await_merging block_store >>= fun () -> Lwt.return_unit) )
+          await_merging block_store >>= fun () -> Lwt.return_unit))
   >>= fun () ->
   Cemented_block_store.close block_store.cemented_store ;
   Lwt_list.iter_s
     Floating_block_store.close
-    ( block_store.rw_floating_block_store
-    :: block_store.ro_floating_block_stores )
+    (block_store.rw_floating_block_store :: block_store.ro_floating_block_stores)

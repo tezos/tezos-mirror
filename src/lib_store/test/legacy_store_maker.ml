@@ -30,12 +30,9 @@ open Legacy_utils
 open Filename.Infix
 
 let available_snapshots = function
-  | History_mode.Legacy.Archive ->
-      [History_mode.Legacy.Full; Rolling]
-  | Full ->
-      [Full; Rolling]
-  | Rolling ->
-      [Rolling]
+  | History_mode.Legacy.Archive -> [History_mode.Legacy.Full; Rolling]
+  | Full -> [Full; Rolling]
+  | Rolling -> [Rolling]
 
 let run ~base_dir ~legacy_store_builder_exe ~with_snapshots nb_blocks =
   (* Build a new store un archive mode *)
@@ -68,35 +65,34 @@ let run ~base_dir ~legacy_store_builder_exe ~with_snapshots nb_blocks =
         ~legacy_store_builder_exe
         blocks
       >>=? fun _ ->
-      ( if with_snapshots then
-        List.iter_es
-          (fun snapshot_mode ->
-            let snapshot_file =
-              base_dir
-              // Format.asprintf
-                   "snapshot_from_%a_storage.%a"
-                   History_mode.Legacy.pp
-                   legacy_history_mode
-                   History_mode.Legacy.pp
-                   snapshot_mode
-            in
-            let head_hash =
-              Store.Block.hash
-                List.(
-                  last_opt blocks |> WithExceptions.Option.get ~loc:__LOC__)
-            in
-            Format.printf
-              "[Legacy store maker] Exporting snapshot file: %s@.@."
-              snapshot_file ;
-            Legacy_snapshots.export
-              ~export_rolling:(snapshot_mode = History_mode.Legacy.Rolling)
-              ~store_root:legacy_store_dir
-              ~context_root:legacy_context_dir
-              ~genesis
-              snapshot_file
-              head_hash)
-          (available_snapshots legacy_history_mode)
-      else return_unit )
+      (if with_snapshots then
+       List.iter_es
+         (fun snapshot_mode ->
+           let snapshot_file =
+             base_dir
+             // Format.asprintf
+                  "snapshot_from_%a_storage.%a"
+                  History_mode.Legacy.pp
+                  legacy_history_mode
+                  History_mode.Legacy.pp
+                  snapshot_mode
+           in
+           let head_hash =
+             Store.Block.hash
+               List.(last_opt blocks |> WithExceptions.Option.get ~loc:__LOC__)
+           in
+           Format.printf
+             "[Legacy store maker] Exporting snapshot file: %s@.@."
+             snapshot_file ;
+           Legacy_snapshots.export
+             ~export_rolling:(snapshot_mode = History_mode.Legacy.Rolling)
+             ~store_root:legacy_store_dir
+             ~context_root:legacy_context_dir
+             ~genesis
+             snapshot_file
+             head_hash)
+         (available_snapshots legacy_history_mode)
+      else return_unit)
       >>=? fun () -> return_unit)
     history_modes
   >>=? fun () -> return_unit
@@ -110,8 +106,7 @@ let () =
     Lwt_main.run
       (run ~base_dir ~legacy_store_builder_exe ~with_snapshots nb_blocks)
   with
-  | Ok () ->
-      ()
+  | Ok () -> ()
   | Error err ->
       Format.eprintf "%a@." pp_print_error err ;
       exit 1

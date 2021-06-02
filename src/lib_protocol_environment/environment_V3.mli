@@ -77,8 +77,7 @@ module type V3 = sig
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
             ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
-       and type 'a Error_monad.shell_tzresult =
-            ('a, Error_monad.tztrace) result
+       and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
        and type Timelock.chest = Timelock.chest
        and type Timelock.chest_key = Timelock.chest_key
        and type Timelock.opening_result = Timelock.opening_result

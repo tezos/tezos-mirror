@@ -34,8 +34,7 @@ let pp ppf (hd, h_lst) =
   (* list of hashes *)
   let rec pp_hash_list ppf (h_lst, acc, d, r) =
     match h_lst with
-    | [] ->
-        Format.fprintf ppf ""
+    | [] -> Format.fprintf ppf ""
     | hd :: tl ->
         let new_d = if r > 1 then d else d * coef in
         let new_r = if r > 1 then r - 1 else repeats in
@@ -109,9 +108,11 @@ end = struct
     let st = SHA256.init () in
     List.iter
       (update st)
-      [ P2p_peer.Id.to_bytes seed.sender_id;
+      [
+        P2p_peer.Id.to_bytes seed.sender_id;
         P2p_peer.Id.to_bytes seed.receiver_id;
-        Block_hash.to_bytes head ] ;
+        Block_hash.to_bytes head;
+      ] ;
     (1l, 9, SHA256.finish st)
 
   let draw seed n =
@@ -131,8 +132,7 @@ end
 
 let estimated_length seed (head, hist) =
   let rec loop acc state = function
-    | [] ->
-        acc
+    | [] -> acc
     | _ :: hist ->
         let (step, state) = Step.next state in
         loop (acc + step) state hist
@@ -143,8 +143,7 @@ let estimated_length seed (head, hist) =
 
 let fold ~f ~init (head, hist) seed =
   let rec loop state acc = function
-    | [] | [_] ->
-        acc
+    | [] | [_] -> acc
     | block :: (pred :: rem as hist) ->
         let (step, state) = Step.next state in
         let acc = f acc ~block ~pred ~step ~strict_step:(rem <> []) in
@@ -170,8 +169,7 @@ let to_steps seed locator =
 
 let fold_truncate ~f ~init ~save_point ~limit (head, hist) seed =
   let rec loop state step_sum acc = function
-    | [] | [_] ->
-        acc
+    | [] | [_] -> acc
     | block :: (pred :: rem as hist) ->
         let (step, state) = Step.next state in
         let new_step_sum = step + step_sum in
@@ -200,8 +198,7 @@ let compute ~get_predecessor ~caboose ~size block_hash header seed =
     if size = 0 then Lwt.return acc
     else
       let (step, state) = Step.next state in
-      get_predecessor current_block_hash step
-      >>= function
+      get_predecessor current_block_hash step >>= function
       | None ->
           if Block_hash.equal caboose current_block_hash then Lwt.return acc
           else Lwt.return (caboose :: acc)
@@ -214,8 +211,8 @@ let compute ~get_predecessor ~caboose ~size block_hash header seed =
   if size <= 0 then Lwt.return (header, [])
   else
     let initial_state = Step.init seed block_hash in
-    loop [] size initial_state block_hash
-    >>= fun hist -> Lwt.return (header, List.rev hist)
+    loop [] size initial_state block_hash >>= fun hist ->
+    Lwt.return (header, List.rev hist)
 
 type validity = Unknown | Known_valid | Known_invalid
 
@@ -223,25 +220,17 @@ let unknown_prefix ~is_known locator =
   let (head, history) = locator in
   let rec loop hist acc =
     match hist with
-    | [] ->
-        Lwt.return (Unknown, locator)
+    | [] -> Lwt.return (Unknown, locator)
     | h :: t -> (
-        is_known h
-        >>= function
-        | Known_valid ->
-            Lwt.return (Known_valid, (head, List.rev (h :: acc)))
+        is_known h >>= function
+        | Known_valid -> Lwt.return (Known_valid, (head, List.rev (h :: acc)))
         | Known_invalid ->
             Lwt.return (Known_invalid, (head, List.rev (h :: acc)))
-        | Unknown ->
-            loop t (h :: acc) )
+        | Unknown -> loop t (h :: acc))
   in
-  is_known (Block_header.hash head)
-  >>= function
-  | Known_valid ->
-      Lwt.return (Known_valid, (head, []))
-  | Known_invalid ->
-      Lwt.return (Known_invalid, (head, []))
-  | Unknown ->
-      loop history []
+  is_known (Block_header.hash head) >>= function
+  | Known_valid -> Lwt.return (Known_valid, (head, []))
+  | Known_invalid -> Lwt.return (Known_invalid, (head, []))
+  | Unknown -> loop history []
 
 let () = Data_encoding.Registration.register ~pp:pp_short encoding

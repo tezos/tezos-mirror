@@ -339,12 +339,14 @@ module T : Rustzcash_sig.T = struct
   let of_zip32_expanded_spending_key (sk : zip32_expanded_spending_key) =
     Bytes.concat
       Bytes.empty
-      [ sk.depth;
+      [
+        sk.depth;
         sk.parent_fvk_tag;
         sk.child_index;
         sk.chain_code;
         of_expanded_spending_key sk.expsk;
-        sk.dk ]
+        sk.dk;
+      ]
 
   let of_full_viewing_key fvk =
     Bytes.concat Bytes.empty [of_ak fvk.ak; of_nk fvk.nk; of_ovk fvk.ovk]
@@ -352,12 +354,14 @@ module T : Rustzcash_sig.T = struct
   let of_zip32_full_viewing_key xfvk =
     Bytes.concat
       Bytes.empty
-      [ xfvk.depth;
+      [
+        xfvk.depth;
         xfvk.parent_fvk_tag;
         xfvk.child_index;
         xfvk.chain_code;
         of_full_viewing_key xfvk.fvk;
-        xfvk.dk ]
+        xfvk.dk;
+      ]
 
   let hash_compare = Stdlib.compare
 
@@ -538,8 +542,7 @@ let verification_ctx_free ctx = RS.verification_ctx_free ctx
 let tree_uncommitted =
   to_hash
     (Hex.to_bytes
-       (`Hex
-         "0100000000000000000000000000000000000000000000000000000000000000"))
+       (`Hex "0100000000000000000000000000000000000000000000000000000000000000"))
 
 let merkle_hash ~height a b =
   (* TODO: Change height to size_t. It is an int for the moment *)
@@ -669,7 +672,7 @@ let zip32_xfvk_address xfvk j =
       (* This value is returned from the lib, it is a valid diversifier *)
       WithExceptions.Option.get ~loc:__LOC__ @@ to_diversifier diversifier
     in
-    Some (to_diversifier_index j_ret, diversifier, to_pkd pkd) )
+    Some (to_diversifier_index j_ret, diversifier, to_pkd pkd))
   else None
 
 let to_scalar input =
@@ -706,8 +709,7 @@ let zip32_xfvk_derive parent index =
 exception Params_not_found of string list
 
 let () =
-  Printexc.register_printer
-  @@ function
+  Printexc.register_printer @@ function
   | Params_not_found locations ->
       (* We tend to look at the same location several times,
          but there is no need to confuse the user about it. *)
@@ -719,8 +721,7 @@ let () =
             https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh@]@."
            (Format.pp_print_list (fun fmt -> Format.fprintf fmt "- %s"))
            locations)
-  | _ ->
-      None
+  | _ -> None
 
 type parameter_files = {spend_path : string; output_path : string}
 
@@ -737,14 +738,12 @@ let find_params ?(getenv_opt = Sys.getenv_opt) ?(getcwd = Sys.getcwd)
      Otherwise the environment variable is expected to contain a single path. *)
   let env ?split name path =
     match getenv_opt name with
-    | None ->
-        []
+    | None -> []
     | Some value -> (
-      match split with
-      | None ->
-          [Filename.concat value path]
-      | Some char ->
-          List.map (fun dir -> dir // path) (String.split_on_char char value) )
+        match split with
+        | None -> [Filename.concat value path]
+        | Some char ->
+            List.map (fun dir -> dir // path) (String.split_on_char char value))
   in
   (* [cwd path] is the current directory concatenated to [path]. *)
   let cwd path = try [getcwd () // path] with Sys_error _ -> [] in
@@ -770,10 +769,8 @@ let find_params ?(getenv_opt = Sys.getenv_opt) ?(getcwd = Sys.getcwd)
       && file_exists (directory // output_path)
     in
     match List.find_opt contains_zcash_files candidate_directories with
-    | None ->
-        raise (Params_not_found candidate_directories)
-    | Some directory ->
-        directory
+    | None -> raise (Params_not_found candidate_directories)
+    | Some directory -> directory
   in
   let spend_path = directory // spend_path in
   let output_path = directory // output_path in

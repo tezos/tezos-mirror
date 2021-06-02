@@ -30,10 +30,10 @@ module Prevalidators : sig
 
   val list :
     #simple ->
-    ( Chain_id.t
+    (Chain_id.t
     * Worker_types.worker_status
     * Worker_types.worker_information
-    * int )
+    * int)
     list
     tzresult
     Lwt.t
@@ -50,10 +50,10 @@ module Prevalidators : sig
         unit,
         unit,
         unit,
-        ( Chain_id.t
+        (Chain_id.t
         * Worker_types.worker_status
         * Worker_types.worker_information
-        * int )
+        * int)
         list )
       RPC_service.t
 
@@ -92,10 +92,10 @@ module Peer_validators : sig
   val list :
     #simple ->
     Chain_services.chain ->
-    ( P2p_peer.Id.t
+    (P2p_peer.Id.t
     * Worker_types.worker_status
     * Worker_types.worker_information
-    * Peer_validator_worker_state.Worker_state.pipeline_length )
+    * Peer_validator_worker_state.Worker_state.pipeline_length)
     list
     tzresult
     Lwt.t
@@ -113,10 +113,10 @@ module Peer_validators : sig
         unit * Chain_services.chain,
         unit,
         unit,
-        ( P2p_peer.Id.t
+        (P2p_peer.Id.t
         * Worker_types.worker_status
         * Worker_types.worker_information
-        * Peer_validator_worker_state.Worker_state.pipeline_length )
+        * Peer_validator_worker_state.Worker_state.pipeline_length)
         list )
       RPC_service.t
 
@@ -136,10 +136,10 @@ module Chain_validators : sig
 
   val list :
     #simple ->
-    ( Chain_id.t
+    (Chain_id.t
     * Worker_types.worker_status
     * Worker_types.worker_information
-    * int )
+    * int)
     list
     tzresult
     Lwt.t
@@ -159,10 +159,10 @@ module Chain_validators : sig
         unit,
         unit,
         unit,
-        ( Chain_id.t
+        (Chain_id.t
         * Worker_types.worker_status
         * Worker_types.worker_information
-        * int )
+        * int)
         list )
       RPC_service.t
 

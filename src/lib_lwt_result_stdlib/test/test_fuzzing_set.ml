@@ -67,8 +67,10 @@ let wrap (name, (module Test : F)) =
 let () =
   let name = "Test_fuzzing_set" in
   let tests =
-    [ ("Iterp", (module TestIterMonotoneAgainstStdlibList : F));
-      ("Fold", (module TestFoldMonotonicAgainstStdlibList : F)) ]
+    [
+      ("Iterp", (module TestIterMonotoneAgainstStdlibList : F));
+      ("Fold", (module TestFoldMonotonicAgainstStdlibList : F));
+    ]
   in
   let tests = List.map wrap tests in
   Alcotest.run name tests

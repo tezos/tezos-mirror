@@ -65,11 +65,13 @@ let cpmm_init_storage ~token_address ~lqt_address =
        (Prim
           ( 0,
             D_Pair,
-            [ Int (1, Z.one);
+            [
+              Int (1, Z.one);
               Int (2, Z.of_int 100);
               Int (3, Z.of_int 100);
               String (4, token_address);
-              String (5, lqt_address) ],
+              String (5, lqt_address);
+            ],
             [] )))
 
 let lqt_init_storage cpmm_address =
@@ -78,16 +80,20 @@ let lqt_init_storage cpmm_address =
        (Prim
           ( 0,
             D_Pair,
-            [ Seq
+            [
+              Seq
                 ( 1,
-                  [ Prim
+                  [
+                    Prim
                       ( 2,
                         D_Elt,
                         [Bytes (3, null_address); Int (4, Z.of_int 100)],
-                        [] ) ] );
+                        [] );
+                  ] );
               Seq (5, []);
               String (6, cpmm_address);
-              Int (7, Z.of_int 100) ],
+              Int (7, Z.of_int 100);
+            ],
             [] )))
 
 let test_fa12_init_storage manager =
@@ -96,10 +102,12 @@ let test_fa12_init_storage manager =
        (Prim
           ( 0,
             D_Pair,
-            [ Seq (1, []);
+            [
+              Seq (1, []);
               Seq (2, []);
               String (3, manager);
-              Int (4, Z.of_int 10_000) ],
+              Int (4, Z.of_int 10_000);
+            ],
             [] )))
 
 let originate ctxt address ~balance script =
@@ -129,13 +137,8 @@ let originate_test_fa12 ~typecheck ctxt admin =
           test_fa12_init_storage (Signature.Public_key_hash.to_b58check admin);
       }
   in
-  typecheck ctxt script
-  >>=? fun (script, ctxt) ->
-  originate
-    ctxt
-    fa12_address
-    ~balance:(Tez_repr.of_mutez_exn 1_000_000L)
-    script
+  typecheck ctxt script >>=? fun (script, ctxt) ->
+  originate ctxt fa12_address ~balance:(Tez_repr.of_mutez_exn 1_000_000L) script
   >|=? fun (ctxt, origination_result) ->
   (ctxt, fa12_address, [origination_result])
 
@@ -146,17 +149,15 @@ let first_bootstrap_account =
        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav")
 
 let check_tzBTC ~typecheck current_level ctxt f =
-  Contract_repr.of_b58check mainnet_tzBTC_address
-  >>?= fun tzBTC ->
-  Contract_storage.exists ctxt tzBTC
-  >>=? function
+  Contract_repr.of_b58check mainnet_tzBTC_address >>?= fun tzBTC ->
+  Contract_storage.exists ctxt tzBTC >>=? function
   | true ->
       (* If tzBTC exists, we're on mainnet and we use it as the token address in the CPMM. *)
       f ctxt tzBTC []
   | false ->
       (* If the tzBTC contract does not exist, we originate a test FA1.2 contract using the same script as the LQT. This is so that we can test the contracts after performing the same protocol migration that will be done on mainnet.
 
-     First, we check current level is below mainnet level roughly around 010 injection so we do not accidentally originate the test token contract on mainnet. *)
+         First, we check current level is below mainnet level roughly around 010 injection so we do not accidentally originate the test token contract on mainnet. *)
       if Compare.Int32.(current_level < 1_437_862l) then
         originate_test_fa12 typecheck ctxt first_bootstrap_account
         (* Token contract admin *)
@@ -168,12 +169,9 @@ let check_tzBTC ~typecheck current_level ctxt f =
 
 let init ctxt ~typecheck =
   (* We use a custom origination nonce because it is unset when stitching from 009 *)
-  let nonce =
-    Operation_hash.hash_bytes [Bytes.of_string "Drip, drip, drip."]
-  in
+  let nonce = Operation_hash.hash_bytes [Bytes.of_string "Drip, drip, drip."] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
-  Storage.Liquidity_baking.Escape_ema.init ctxt 0l
-  >>=? fun ctxt ->
+  Storage.Liquidity_baking.Escape_ema.init ctxt 0l >>=? fun ctxt ->
   let current_level =
     Raw_level_repr.to_int32 (Level_storage.current ctxt).level
   in
@@ -181,8 +179,7 @@ let init ctxt ~typecheck =
   >>?= fun (ctxt, cpmm_address) ->
   Contract_storage.fresh_contract_from_current_nonce ctxt
   >>?= fun (ctxt, lqt_address) ->
-  Storage.Liquidity_baking.Cpmm_address.init ctxt cpmm_address
-  >>=? fun ctxt ->
+  Storage.Liquidity_baking.Cpmm_address.init ctxt cpmm_address >>=? fun ctxt ->
   check_tzBTC
     ~typecheck
     current_level
@@ -198,8 +195,7 @@ let init ctxt ~typecheck =
                 ~lqt_address:(Contract_repr.to_b58check lqt_address);
           }
       in
-      typecheck ctxt cpmm_script
-      >>=? fun (cpmm_script, ctxt) ->
+      typecheck ctxt cpmm_script >>=? fun (cpmm_script, ctxt) ->
       let lqt_script =
         Script_repr.
           {
@@ -207,8 +203,7 @@ let init ctxt ~typecheck =
             storage = lqt_init_storage (Contract_repr.to_b58check cpmm_address);
           }
       in
-      typecheck ctxt lqt_script
-      >>=? fun (lqt_script, ctxt) ->
+      typecheck ctxt lqt_script >>=? fun (lqt_script, ctxt) ->
       originate
         ctxt
         cpmm_address

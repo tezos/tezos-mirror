@@ -8,11 +8,10 @@ license: "MIT"
 depends: [
   "coq-of-ocaml" { = "2.4.1" }
   "dune" { >= "2.0" }
-  "ocamlformat" { = "0.10" }
+  "ocamlformat" { = "0.18.0" }
   "bisect_ppx" { >= "2.3" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
-  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: tooling for the project"

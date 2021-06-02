@@ -30,14 +30,12 @@
  *)
 
 let rec permut = function
-  | [] ->
-      [[]]
+  | [] -> [[]]
   | x :: xs ->
       let insert xs =
         let rec loop acc left right =
           match right with
-          | [] ->
-              List.rev (x :: left) :: acc
+          | [] -> List.rev (x :: left) :: acc
           | y :: ys ->
               loop (List.rev_append left (x :: right) :: acc) (y :: left) ys
         in
@@ -104,6 +102,10 @@ let test_shuffle_preserves_values =
 let () =
   Alcotest.run
     "stdlib"
-    [ ( "tzList",
-        [ ("take_n", `Quick, test_take_n);
-          QCheck_alcotest.to_alcotest test_shuffle_preserves_values ] ) ]
+    [
+      ( "tzList",
+        [
+          ("take_n", `Quick, test_take_n);
+          QCheck_alcotest.to_alcotest test_shuffle_preserves_values;
+        ] );
+    ]

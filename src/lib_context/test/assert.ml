@@ -71,19 +71,15 @@ let make_equal_list eq prn ?(msg = "") x y =
             (List.map prn y)
         in
         fail_msg "%s" fm
-    | ([], []) ->
-        ()
+    | ([], []) -> ()
   in
   iter 0 x y
 
-let equal_string_list ?msg l1 l2 =
-  make_equal_list ?msg ( = ) (fun x -> x) l1 l2
+let equal_string_list ?msg l1 l2 = make_equal_list ?msg ( = ) (fun x -> x) l1 l2
 
 let equal_string_list_list ?msg l1 l2 =
   let pr_persist l =
-    let res =
-      String.concat ";" (List.map (fun s -> Printf.sprintf "%S" s) l)
-    in
+    let res = String.concat ";" (List.map (fun s -> Printf.sprintf "%S" s) l) in
     Printf.sprintf "[%s]" res
   in
   make_equal_list ?msg ( = ) pr_persist l1 l2
@@ -93,10 +89,8 @@ let equal_key_dir_list ?msg l1 l2 =
     ?msg
     ( = )
     (function
-      | `Key k ->
-          "Key " ^ String.concat "/" k
-      | `Dir k ->
-          "Dir " ^ String.concat "/" k)
+      | `Key k -> "Key " ^ String.concat "/" k
+      | `Dir k -> "Dir " ^ String.concat "/" k)
     l1
     l2
 
@@ -116,10 +110,8 @@ let equal_raw_tree ?(msg = "") r1 r2 =
     | (`Tree t1, `Tree t2) ->
         if not (TzString.Map.equal aux t1 t2) then fail "<tree>" "<tree>" msg ;
         true
-    | (`Tree _, `Value v) ->
-        fail "<tree>" (Bytes.to_string v) msg
-    | (`Value v, `Tree _) ->
-        fail "<tree>" (Bytes.to_string v) msg
+    | (`Tree _, `Value v) -> fail "<tree>" (Bytes.to_string v) msg
+    | (`Value v, `Tree _) -> fail "<tree>" (Bytes.to_string v) msg
   in
   let (_ : bool) = aux r1 r2 in
   ()

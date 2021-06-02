@@ -23,18 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Blake2B.Make_merkle_tree
-          (Base58)
-          (struct
-            let name = "Operation_metadata_list_list_hash"
+include
+  Blake2B.Make_merkle_tree
+    (Base58)
+    (struct
+      let name = "Operation_metadata_list_list_hash"
 
-            let title = "A list of list of operation metadata"
+      let title = "A list of list of operation metadata"
 
-            let b58check_prefix =
-              Base58.Prefix.operation_metadata_list_list_hash
+      let b58check_prefix = Base58.Prefix.operation_metadata_list_list_hash
 
-            let size = None
-          end)
-          (Operation_metadata_list_hash)
+      let size = None
+    end)
+    (Operation_metadata_list_hash)
 
 let () = Base58.check_encoded_prefix b58check_encoding "LLr" 53

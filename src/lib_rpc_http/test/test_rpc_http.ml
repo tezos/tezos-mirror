@@ -68,8 +68,10 @@ module Arbitrary = struct
   let path_matcher : path_matcher arbitrary =
     let cm = list_of_size Gen.(1 -- 5) chunk_matcher in
     choose
-      [ map (fun l -> FollowedByAnySuffix l) cm;
-        map (fun l -> (Exact l : path_matcher)) cm ]
+      [
+        map (fun l -> FollowedByAnySuffix l) cm;
+        map (fun l : path_matcher -> Exact l) cm;
+      ]
 
   let matcher : matcher arbitrary =
     pair meth_matcher path_matcher
@@ -83,8 +85,10 @@ module Arbitrary = struct
   let acl : t arbitrary =
     let m = list_of_size Gen.(1 -- 10) matcher in
     choose
-      [ map (fun m -> Deny_all {except = m}) m;
-        map (fun m -> Allow_all {except = m}) m ]
+      [
+        map (fun m -> Deny_all {except = m}) m;
+        map (fun m -> Allow_all {except = m}) m;
+      ]
     |> set_print (function
            | Allow_all {except} ->
                Format.asprintf "Blacklist: [%a]" pp_matchers except
@@ -139,20 +143,29 @@ end
 
 let example_policy =
   `A
-    [ `O
-        [ ("address", `String "localhost");
-          ("whitelist", `A [`String "/chains/**"]) ];
+    [
       `O
-        [ ("address", `String "localhost:8732");
-          ("blacklist", `A [`String "POST/**"; `String "PUT/**"]) ];
+        [
+          ("address", `String "localhost");
+          ("whitelist", `A [`String "/chains/**"]);
+        ];
       `O
-        [ ("address", `String "192.168.0.3");
-          ("blacklist", `A [`String "/monitor/**"]) ];
+        [
+          ("address", `String "localhost:8732");
+          ("blacklist", `A [`String "POST/**"; `String "PUT/**"]);
+        ];
       `O
-        [ ("address", `String "192.168.1.5:8732");
+        [
+          ("address", `String "192.168.0.3");
+          ("blacklist", `A [`String "/monitor/**"]);
+        ];
+      `O
+        [
+          ("address", `String "192.168.1.5:8732");
           ( "whitelist",
-            `A [`String "GET/**"; `String "DELETE/chains/*/invalid_blocks/*"]
-          ) ] ]
+            `A [`String "GET/**"; `String "DELETE/chains/*/invalid_blocks/*"] );
+        ];
+    ]
   |> Data_encoding.Json.destruct RPC_server.Acl.policy_encoding
 
 let acl_testable =
@@ -173,14 +186,12 @@ let acl_testable =
         Format.fprintf fmt "Whitelist:@ [" ;
         pp_matchers fmt except
   in
-  Alcotest.testable pp
-  @@ fun left right ->
+  Alcotest.testable pp @@ fun left right ->
   match (left, right) with
   | (Allow_all {except = l}, Allow_all {except = r})
   | (Deny_all {except = l}, Deny_all {except = r}) ->
       l = r
-  | _ ->
-      false
+  | _ -> false
 
 let pp_policy ppf policy =
   Format.fprintf ppf "%s" (RPC_server.Acl.policy_to_string policy)
@@ -212,10 +223,8 @@ let check_find_policy =
   let open QCheck in
   let assert_results_satisfactory before_put after_put =
     match (before_put, after_put) with
-    | (Some _, None) ->
-        false
-    | (_, _) ->
-        true
+    | (Some _, None) -> false
+    | (_, _) -> true
   in
   Test.make
     ~name:"put_policy preserves existing entries."
@@ -231,10 +240,8 @@ let mk_acl ((tag, matchers) : [`Whitelist | `Blacklist] * string list) =
   let open RPC_server.Acl in
   let except = List.map parse matchers in
   match tag with
-  | `Whitelist ->
-      Deny_all {except}
-  | `Blacklist ->
-      Allow_all {except}
+  | `Whitelist -> Deny_all {except}
+  | `Blacklist -> Allow_all {except}
 
 let check_acl_search (description : string)
     (expected : ([`Whitelist | `Blacklist] * string list) option)
@@ -273,5 +280,7 @@ let () =
   let open Qcheck_helpers in
   Alcotest.run
     "tezos-rpc-http"
-    [ ("qcheck", qcheck_wrap [test_codec_identity; check_find_policy]);
-      ("find_policy_matching_rules", [test_finding_policy]) ]
+    [
+      ("qcheck", qcheck_wrap [test_codec_identity; check_find_policy]);
+      ("find_policy_matching_rules", [test_finding_policy]);
+    ]

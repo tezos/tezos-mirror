@@ -114,16 +114,14 @@ module P2p_event : sig
         (** A swap ack has been received *)
     | Swap_request_sent of {source : P2p_peer_id.t}
         (** A swap request has been sent *)
-    | Swap_ack_sent of {source : P2p_peer_id.t}
-        (** A swap ack has been sent *)
+    | Swap_ack_sent of {source : P2p_peer_id.t}  (** A swap ack has been sent *)
     | Swap_request_ignored of {source : P2p_peer_id.t}
         (** A swap request has been ignored *)
     | Swap_success of {source : P2p_peer_id.t}
         (** A swap operation has succeeded *)
     | Swap_failure of {source : P2p_peer_id.t}
         (** A swap operation has failed *)
-    | Disconnection of P2p_peer_id.t
-        (** We decided to close the connection. *)
+    | Disconnection of P2p_peer_id.t  (** We decided to close the connection. *)
     | External_disconnection of P2p_peer_id.t
         (** The connection was closed for external reason. *)
 

@@ -27,15 +27,18 @@ let update_config_with_user_activated config_file level protocol =
   let user_activated =
     Ezjsonm.(
       dict
-        [ ( "genesis",
+        [
+          ( "genesis",
             dict
-              [ ("timestamp", string "2018-06-30T16:07:32Z");
+              [
+                ("timestamp", string "2018-06-30T16:07:32Z");
                 ( "block",
                   string "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
                 );
                 ( "protocol",
                   string "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
-                ) ] );
+                );
+              ] );
           ("chain_name", string "TEZOS_MAINNET");
           ("old_chain_name", string "TEZOS_BETANET_2018-06-30T16:07:32Z");
           ("incompatible_chain_name", string "INCOMPATIBLE");
@@ -43,8 +46,10 @@ let update_config_with_user_activated config_file level protocol =
           ( "user_activated_upgrades",
             list
               dict
-              [ [ ("level", int level);
-                  ("replacement_protocol", string protocol) ] ] ) ])
+              [
+                [("level", int level); ("replacement_protocol", string protocol)];
+              ] );
+        ])
   in
   let config_json = JSON.parse_file config_file in
   let config_json =
@@ -121,12 +126,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
     migration_level
     protocol ;
   let node =
-    Node.create
-      ?path:yes_node_path
-      ~rpc_port:19731
-      ~net_port:18731
-      ~data_dir
-      []
+    Node.create ?path:yes_node_path ~rpc_port:19731 ~net_port:18731 ~data_dir []
   in
   let* () = Node.run node [Connections 0] in
   let* () = Node.wait_for_ready node in
@@ -137,8 +137,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
         let base_dir = Temp.dir "client" in
         let* () = Process.run "cp" ["-R"; yes_wallet ^ "/."; base_dir] in
         Lwt.return base_dir
-    | None ->
-        Lwt.return @@ create_yes_wallet ()
+    | None -> Lwt.return @@ create_yes_wallet ()
   in
   let client = Client.create ~base_dir ~node () in
   Log.info "Bake and wait until migration is finished" ;

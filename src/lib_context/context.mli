@@ -206,20 +206,22 @@ val legacy_restore_context :
   ?expected_block:string ->
   index ->
   snapshot_file:string ->
-  handle_block:(History_mode.Legacy.t ->
-               Block_hash.t * Pruned_block_legacy.t ->
-               unit tzresult Lwt.t) ->
+  handle_block:
+    (History_mode.Legacy.t ->
+    Block_hash.t * Pruned_block_legacy.t ->
+    unit tzresult Lwt.t) ->
   handle_protocol_data:(Protocol_data_legacy.t -> unit tzresult Lwt.t) ->
-  block_validation:(Block_header.t option ->
-                   Block_hash.t ->
-                   Pruned_block_legacy.t ->
-                   unit tzresult Lwt.t) ->
-  ( Block_header.t
+  block_validation:
+    (Block_header.t option ->
+    Block_hash.t ->
+    Pruned_block_legacy.t ->
+    unit tzresult Lwt.t) ->
+  (Block_header.t
   * Block_data_legacy.t
   * Block_metadata_hash.t option
   * Tezos_crypto.Operation_metadata_hash.t list list option
   * Block_header.t option
-  * History_mode.Legacy.t )
+  * History_mode.Legacy.t)
   tzresult
   Lwt.t
 
@@ -235,21 +237,21 @@ val legacy_restore_contexts :
   Block_hash.t ->
   Pruned_block_legacy.t ->
   unit tzresult Lwt.t) ->
-  ( Block_header.t
+  (Block_header.t
   * Block_data_legacy.t
   * Block_metadata_hash.t option
   * Operation_metadata_hash.t list list option
   * History_mode.Legacy.t
   * Block_header.t option
   * Block_hash.t list
-  * Protocol_data_legacy.t list )
+  * Protocol_data_legacy.t list)
   tzresult
   Lwt.t
 
 val retrieve_commit_info :
   index ->
   Block_header.t ->
-  ( Protocol_hash.t
+  (Protocol_hash.t
   * string
   * string
   * Time.Protocol.t
@@ -257,7 +259,7 @@ val retrieve_commit_info :
   * Context_hash.t
   * Block_metadata_hash.t option
   * Operation_metadata_list_list_hash.t option
-  * Context_hash.t list )
+  * Context_hash.t list)
   tzresult
   Lwt.t
 

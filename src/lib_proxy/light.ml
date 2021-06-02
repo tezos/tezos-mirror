@@ -55,8 +55,8 @@ let mk_sources_config ~min_agreement ~uris =
     Error
       Format.(
         asprintf
-          "A minimum of 2 endpoints is required in Light mode: one endpoint \
-           to retrieve data and one to validate data. You only provided %a"
+          "A minimum of 2 endpoints is required in Light mode: one endpoint to \
+           retrieve data and one to validate data. You only provided %a"
           (pp_print_list Uri.pp_hum)
           uris)
   else Ok {min_agreement; uris}
@@ -79,7 +79,5 @@ let sources_config_to_sources rpc_context_builder {min_agreement; uris} =
 let hash_of_block (block : Tezos_shell_services.Block_services.block) :
     Block_hash.t option =
   match block with
-  | `Hash (h, 0) ->
-      Some h
-  | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) ->
-      None
+  | `Hash (h, 0) -> Some h
+  | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) -> None

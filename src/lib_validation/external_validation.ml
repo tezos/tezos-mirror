@@ -54,8 +54,7 @@ type request =
   | Restore_context_integrity
 
 let request_pp ppf = function
-  | Init ->
-      Format.fprintf ppf "process handshake"
+  | Init -> Format.fprintf ppf "process handshake"
   | Validate {block_header; chain_id; _} ->
       Format.fprintf
         ppf
@@ -76,22 +75,22 @@ let request_pp ppf = function
         "test chain fork on block %a"
         Block_hash.pp_short
         (Block_header.hash forked_header)
-  | Terminate ->
-      Format.fprintf ppf "terminate validation process"
-  | Restore_context_integrity ->
-      Format.fprintf ppf "restore context integrity"
+  | Terminate -> Format.fprintf ppf "terminate validation process"
+  | Restore_context_integrity -> Format.fprintf ppf "restore context integrity"
 
 let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
 let parameters_encoding =
   let open Data_encoding in
   conv
-    (fun { context_root;
+    (fun {
+           context_root;
            protocol_root;
            genesis;
            user_activated_upgrades;
            user_activated_protocol_overrides;
-           sandbox_parameters } ->
+           sandbox_parameters;
+         } ->
       ( context_root,
         protocol_root,
         genesis,
@@ -125,7 +124,8 @@ let parameters_encoding =
 let request_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"init"
         empty
@@ -146,13 +146,15 @@ let request_encoding =
            (req "operations" (list (list (dynamic_size Operation.encoding)))))
         (function
           | Validate
-              { chain_id;
+              {
+                chain_id;
                 block_header;
                 predecessor_block_header;
                 predecessor_block_metadata_hash;
                 predecessor_ops_metadata_hash;
                 max_operations_ttl;
-                operations } ->
+                operations;
+              } ->
               Some
                 ( chain_id,
                   block_header,
@@ -161,8 +163,7 @@ let request_encoding =
                   predecessor_ops_metadata_hash,
                   max_operations_ttl,
                   operations )
-          | _ ->
-              None)
+          | _ -> None)
         (fun ( chain_id,
                block_header,
                predecessor_block_header,
@@ -185,12 +186,8 @@ let request_encoding =
         ~title:"commit_genesis"
         (obj1 (req "chain_id" Chain_id.encoding))
         (function
-          | Commit_genesis {chain_id} ->
-              Some chain_id
-          | Init
-          | Validate _
-          | Fork_test_chain _
-          | Terminate
+          | Commit_genesis {chain_id} -> Some chain_id
+          | Init | Validate _ | Fork_test_chain _ | Terminate
           | Restore_context_integrity ->
               None)
         (fun chain_id -> Commit_genesis {chain_id});
@@ -203,8 +200,7 @@ let request_encoding =
         (function
           | Fork_test_chain {context_hash; forked_header} ->
               Some (context_hash, forked_header)
-          | _ ->
-              None)
+          | _ -> None)
         (fun (context_hash, forked_header) ->
           Fork_test_chain {context_hash; forked_header});
       case
@@ -218,31 +214,28 @@ let request_encoding =
         ~title:"restore_integrity"
         unit
         (function Restore_context_integrity -> Some () | _ -> None)
-        (fun () -> Restore_context_integrity) ]
+        (fun () -> Restore_context_integrity);
+    ]
 
 let send pin encoding data =
   let msg = Data_encoding.Binary.to_bytes_exn encoding data in
-  Lwt_io.write_int pin (Bytes.length msg)
-  >>= fun () ->
+  Lwt_io.write_int pin (Bytes.length msg) >>= fun () ->
   Lwt_io.write pin (Bytes.to_string msg) >>= fun () -> Lwt_io.flush pin
 
 let recv_result pout encoding =
-  Lwt_io.read_int pout
-  >>= fun count ->
+  Lwt_io.read_int pout >>= fun count ->
   let buf = Bytes.create count in
-  Lwt_io.read_into_exactly pout buf 0 count
-  >>= fun () ->
+  Lwt_io.read_into_exactly pout buf 0 count >>= fun () ->
   Lwt.return
     (Data_encoding.Binary.of_bytes_exn
        (Error_monad.result_encoding encoding)
        buf)
 
 let recv pout encoding =
-  Lwt_io.read_int pout
-  >>= fun count ->
+  Lwt_io.read_int pout >>= fun count ->
   let buf = Bytes.create count in
-  Lwt_io.read_into_exactly pout buf 0 count
-  >>= fun () -> Lwt.return (Data_encoding.Binary.of_bytes_exn encoding buf)
+  Lwt_io.read_into_exactly pout buf 0 count >>= fun () ->
+  Lwt.return (Data_encoding.Binary.of_bytes_exn encoding buf)
 
 let socket_path_prefix = "tezos-validation-socket-"
 
@@ -263,22 +256,21 @@ let create_socket ~canceler =
   Lwt.return socket
 
 let create_socket_listen ~canceler ~max_requests ~socket_path =
-  create_socket ~canceler
-  >>= fun socket ->
+  create_socket ~canceler >>= fun socket ->
   Lwt.catch
     (fun () -> Lwt_unix.bind socket (make_socket socket_path) >>= return)
     (function
       | Unix.Unix_error (ENAMETOOLONG, _, _) ->
           (* Unix.ENAMETOOLONG (Filename too long (POSIX.1-2001)) can
-            be thrown if the given directory has a too long path. *)
+             be thrown if the given directory has a too long path. *)
           fail
             Block_validator_errors.(
               Validation_process_failed (Socket_path_too_long socket_path))
       | Unix.Unix_error (EACCES, _, _) ->
           (* Unix.EACCES (Permission denied (POSIX.1-2001)) can be
-            thrown when the given directory has wrong access rights.
-            Unix.EPERM (Operation not permitted (POSIX.1-2001)) should
-            not be thrown in this case. *)
+             thrown when the given directory has wrong access rights.
+             Unix.EPERM (Operation not permitted (POSIX.1-2001)) should
+             not be thrown in this case. *)
           fail
             Block_validator_errors.(
               Validation_process_failed
@@ -292,7 +284,6 @@ let create_socket_listen ~canceler ~max_requests ~socket_path =
   return socket
 
 let create_socket_connect ~canceler ~socket_path =
-  create_socket ~canceler
-  >>= fun socket ->
-  Lwt_unix.connect socket (make_socket socket_path)
-  >>= fun () -> Lwt.return socket
+  create_socket ~canceler >>= fun socket ->
+  Lwt_unix.connect socket (make_socket socket_path) >>= fun () ->
+  Lwt.return socket

@@ -76,10 +76,7 @@ module type S = sig
   (** Similar to {!fold_left} but wraps the traversal in {!result}. The
       traversal is interrupted if one of the step returns an [Error _]. *)
   val fold_left_e :
-    ('a -> 'b -> ('a, 'trace) result) ->
-    'a ->
-    'b t ->
-    ('a, 'trace) result Lwt.t
+    ('a -> 'b -> ('a, 'trace) result) -> 'a -> 'b t -> ('a, 'trace) result Lwt.t
 
   (** Similar to {!fold_left} but the folder is within Lwt. *)
   val fold_left_s : ('a -> 'b -> 'a Lwt.t) -> 'a -> 'b t -> 'a Lwt.t

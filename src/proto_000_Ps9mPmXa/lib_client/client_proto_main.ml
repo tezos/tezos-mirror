@@ -33,10 +33,8 @@ let protocol =
 let bake cctxt ?timestamp block command sk =
   let timestamp =
     match timestamp with
-    | Some t ->
-        t
-    | None ->
-        Time.System.(to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
+    | Some t -> t
+    | None -> Time.System.(to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
   in
   let protocol_data = {command; signature = Signature.zero} in
   Genesis_block_services.Helpers.Preapply.block
@@ -47,8 +45,7 @@ let bake cctxt ?timestamp block command sk =
     []
   >>=? fun (shell_header, _) ->
   let blk = Data.Command.forge shell_header command in
-  Shell_services.Chain.chain_id cctxt ~chain:`Main ()
-  >>=? fun chain_id ->
+  Shell_services.Chain.chain_id cctxt ~chain:`Main () >>=? fun chain_id ->
   Client_keys.append cctxt sk ~watermark:(Block_header chain_id) blk
   >>=? fun signed_blk -> Shell_services.Injection.block cctxt signed_blk []
 
@@ -67,7 +64,8 @@ let fitness_from_int64 fitness =
   (* definitions taken from src/proto_003_PsddFKi3/lib_protocol/src/fitness_repr.ml *)
   let int64_to_bytes i =
     let b = Bytes.create 8 in
-    TzEndian.set_int64 b 0 i ; b
+    TzEndian.set_int64 b 0 i ;
+    b
   in
   [Bytes.of_string version_number; int64_to_bytes fitness]
 
@@ -81,8 +79,7 @@ let timestamp_arg =
          | None ->
              Error_monad.failwith
                "Could not parse value provided to -timestamp option"
-         | Some t ->
-             return t))
+         | Some t -> return t))
 
 let test_delay_arg =
   Clic.default_arg
@@ -95,8 +92,7 @@ let test_delay_arg =
          | None ->
              Error_monad.failwith
                "Could not parse value provided to -delay option"
-         | Some t ->
-             return t))
+         | Some t -> return t))
 
 let proto_param ~name ~desc t =
   Clic.param
@@ -108,10 +104,11 @@ let proto_param ~name ~desc t =
 let commands () =
   let open Clic in
   let args = args1 timestamp_arg in
-  [ command
+  [
+    command
       ~desc:"Activate a protocol"
       args
-      ( prefixes ["activate"; "protocol"]
+      (prefixes ["activate"; "protocol"]
       @@ proto_param ~name:"version" ~desc:"Protocol version (b58check)"
       @@ prefixes ["with"; "fitness"]
       @@ param
@@ -127,7 +124,7 @@ let commands () =
            ~name:"parameters"
            ~desc:"Protocol parameters (as JSON file)"
            file_parameter
-      @@ stop )
+      @@ stop)
       (fun timestamp
            hash
            fitness
@@ -147,18 +144,18 @@ let commands () =
           (Activate {protocol = hash; fitness; protocol_parameters})
           sk
         >>=? fun hash ->
-        cctxt#answer "Injected %a" Block_hash.pp_short hash
-        >>= fun () -> return_unit);
+        cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+        return_unit);
     command
       ~desc:"Fork a test protocol"
       (args2 timestamp_arg test_delay_arg)
-      ( prefixes ["fork"; "test"; "protocol"]
+      (prefixes ["fork"; "test"; "protocol"]
       @@ proto_param ~name:"version" ~desc:"Protocol version (b58check)"
       @@ prefixes ["with"; "key"]
       @@ Client_keys.Secret_key.source_param
            ~name:"password"
            ~desc:"Activator's key"
-      @@ stop )
+      @@ stop)
       (fun (timestamp, delay) hash sk cctxt ->
         bake
           cctxt
@@ -167,7 +164,8 @@ let commands () =
           (Activate_testchain {protocol = hash; delay})
           sk
         >>=? fun hash ->
-        cctxt#answer "Injected %a" Block_hash.pp_short hash
-        >>= fun () -> return_unit) ]
+        cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+        return_unit);
+  ]
 
 let () = Client_commands.register protocol @@ fun _network -> commands ()

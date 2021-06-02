@@ -355,10 +355,7 @@ module type Indexed_raw_context = sig
     Data_set_storage with type t = t and type elt = key
 
   module Make_map (N : NAME) (V : VALUE) :
-    Indexed_data_storage
-      with type t = t
-       and type key = key
-       and type value = V.t
+    Indexed_data_storage with type t = t and type key = key and type value = V.t
 
   module Make_carbonated_map (N : NAME) (V : VALUE) :
     Non_iterable_indexed_carbonated_data_storage

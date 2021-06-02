@@ -56,10 +56,8 @@ type result = {
 }
 
 let update_testchain_status ctxt predecessor_header timestamp =
-  Context.get_test_chain ctxt
-  >>= function
-  | Not_running ->
-      Lwt.return ctxt
+  Context.get_test_chain ctxt >>= function
+  | Not_running -> Lwt.return ctxt
   | Running {expiration; _} ->
       if Time.Protocol.(expiration <= timestamp) then
         Context.add_test_chain ctxt Not_running
@@ -74,35 +72,31 @@ let update_testchain_status ctxt predecessor_header timestamp =
         (Running {chain_id; genesis; protocol; expiration})
 
 let init_test_chain ctxt forked_header =
-  Context.get_test_chain ctxt
-  >>= function
-  | Not_running | Running _ ->
-      assert false
+  Context.get_test_chain ctxt >>= function
+  | Not_running | Running _ -> assert false
   | Forking {protocol; _} ->
-      ( match Registered_protocol.get protocol with
-      | Some proto ->
-          return proto
-      | None ->
-          fail (Missing_test_protocol protocol) )
+      (match Registered_protocol.get protocol with
+      | Some proto -> return proto
+      | None -> fail (Missing_test_protocol protocol))
       >>=? fun (module Proto_test) ->
       let test_ctxt = Shell_context.wrap_disk_context ctxt in
       Proto_test.init test_ctxt forked_header.Block_header.shell
       >>=? fun {context = test_ctxt; _} ->
       let test_ctxt = Shell_context.unwrap_disk_context test_ctxt in
-      Context.add_test_chain test_ctxt Not_running
-      >>= fun test_ctxt ->
-      Context.add_protocol test_ctxt protocol
-      >>= fun test_ctxt ->
+      Context.add_test_chain test_ctxt Not_running >>= fun test_ctxt ->
+      Context.add_protocol test_ctxt protocol >>= fun test_ctxt ->
       Context.commit_test_chain_genesis test_ctxt forked_header >>= return
 
 let result_encoding =
   let open Data_encoding in
   conv
-    (fun { validation_store;
+    (fun {
+           validation_store;
            block_metadata;
            ops_metadata;
            block_metadata_hash;
-           ops_metadata_hashes } ->
+           ops_metadata_hashes;
+         } ->
       ( validation_store,
         block_metadata,
         ops_metadata,
@@ -134,12 +128,10 @@ let may_force_protocol_upgrade ~user_activated_upgrades ~level
   match
     Block_header.get_forced_protocol_upgrade ~user_activated_upgrades ~level
   with
-  | None ->
-      Lwt.return validation_result
+  | None -> Lwt.return validation_result
   | Some hash ->
       let ctxt = Shell_context.unwrap_disk_context validation_result.context in
-      Context.add_protocol ctxt hash
-      >|= fun ctxt ->
+      Context.add_protocol ctxt hash >|= fun ctxt ->
       let context = Shell_context.wrap_disk_context ctxt in
       {validation_result with context}
 
@@ -149,8 +141,7 @@ let may_patch_protocol ~user_activated_upgrades
     ~user_activated_protocol_overrides ~level
     (validation_result : Tezos_protocol_environment.validation_result) =
   let context = Shell_context.unwrap_disk_context validation_result.context in
-  Context.get_protocol context
-  >>= fun protocol ->
+  Context.get_protocol context >>= fun protocol ->
   match
     Block_header.get_voted_protocol_overrides
       ~user_activated_protocol_overrides
@@ -162,8 +153,7 @@ let may_patch_protocol ~user_activated_upgrades
         ~level
         validation_result
   | Some replacement_protocol ->
-      Context.add_protocol context replacement_protocol
-      >|= fun ctxt ->
+      Context.add_protocol context replacement_protocol >|= fun ctxt ->
       let context = Shell_context.wrap_disk_context ctxt in
       {validation_result with context}
 
@@ -172,14 +162,14 @@ module Make (Proto : Registered_protocol.T) = struct
       (block_header : Block_header.t) =
     let validation_passes = List.length Proto.validation_passes in
     fail_unless
-      ( Int32.succ predecessor_block_header.shell.level
-      = block_header.shell.level )
-      ( invalid_block hash
+      (Int32.succ predecessor_block_header.shell.level
+      = block_header.shell.level)
+      (invalid_block hash
       @@ Invalid_level
            {
              expected = Int32.succ predecessor_block_header.shell.level;
              found = block_header.shell.level;
-           } )
+           })
     >>=? fun () ->
     fail_unless
       Time.Protocol.(
@@ -205,8 +195,7 @@ module Make (Proto : Registered_protocol.T) = struct
         Proto.block_header_data_encoding
         block_header.protocol_data
     with
-    | None ->
-        fail (invalid_block block_hash Cannot_parse_block_header)
+    | None -> fail (invalid_block block_hash Cannot_parse_block_header)
     | Some protocol_data ->
         return
           ({shell = block_header.shell; protocol_data} : Proto.block_header)
@@ -237,16 +226,15 @@ module Make (Proto : Registered_protocol.T) = struct
                       max = Proto.max_operation_data_length;
                     })))
           ops)
-      ( match
-          List.combine
-            ~when_different_lengths:()
-            operations
-            Proto.validation_passes
-        with
-      | Ok combined ->
-          combined
+      (match
+         List.combine
+           ~when_different_lengths:()
+           operations
+           Proto.validation_passes
+       with
+      | Ok combined -> combined
       | Error () ->
-          raise (Invalid_argument "Block_validation.check_operation_quota") )
+          raise (Invalid_argument "Block_validation.check_operation_quota"))
 
   let parse_operations block_hash operations =
     let invalid_block = invalid_block block_hash in
@@ -259,8 +247,7 @@ module Make (Proto : Registered_protocol.T) = struct
                 Proto.operation_data_encoding
                 op.Operation.proto
             with
-            | None ->
-                fail (invalid_block (Cannot_parse_operation op_hash))
+            | None -> fail (invalid_block (Cannot_parse_operation op_hash))
             | Some protocol_data ->
                 let op = {Proto.shell = op.shell; protocol_data} in
                 let allowed_pass = Proto.acceptable_passes op in
@@ -271,69 +258,57 @@ module Make (Proto : Registered_protocol.T) = struct
                 >>=? fun () -> return op))
       operations
 
-  let apply chain_id ~user_activated_upgrades
-      ~user_activated_protocol_overrides ~max_operations_ttl
-      ~(predecessor_block_header : Block_header.t)
+  let apply chain_id ~user_activated_upgrades ~user_activated_protocol_overrides
+      ~max_operations_ttl ~(predecessor_block_header : Block_header.t)
       ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
       ~predecessor_context ~(block_header : Block_header.t) operations =
     let block_hash = Block_header.hash block_header in
     let invalid_block = invalid_block block_hash in
     check_block_header ~predecessor_block_header block_hash block_header
     >>=? fun () ->
-    parse_block_header block_hash block_header
-    >>=? fun block_header ->
-    check_operation_quota block_hash operations
-    >>=? fun () ->
+    parse_block_header block_hash block_header >>=? fun block_header ->
+    check_operation_quota block_hash operations >>=? fun () ->
     update_testchain_status
       predecessor_context
       predecessor_block_header
       block_header.shell.timestamp
     >>= fun context ->
-    parse_operations block_hash operations
-    >>=? fun operations ->
-    ( match predecessor_block_metadata_hash with
-    | None ->
-        Lwt.return context
-    | Some hash ->
-        Context.add_predecessor_block_metadata_hash context hash )
+    parse_operations block_hash operations >>=? fun operations ->
+    (match predecessor_block_metadata_hash with
+    | None -> Lwt.return context
+    | Some hash -> Context.add_predecessor_block_metadata_hash context hash)
     >>= fun context ->
-    ( match predecessor_ops_metadata_hash with
-    | None ->
-        Lwt.return context
-    | Some hash ->
-        Context.add_predecessor_ops_metadata_hash context hash )
+    (match predecessor_ops_metadata_hash with
+    | None -> Lwt.return context
+    | Some hash -> Context.add_predecessor_ops_metadata_hash context hash)
     >>= fun context ->
     let context = Shell_context.wrap_disk_context context in
-    Proto.begin_application
-      ~chain_id
-      ~predecessor_context:context
-      ~predecessor_timestamp:predecessor_block_header.shell.timestamp
-      ~predecessor_fitness:predecessor_block_header.shell.fitness
-      block_header
-    >>=? (fun state ->
+    (( Proto.begin_application
+         ~chain_id
+         ~predecessor_context:context
+         ~predecessor_timestamp:predecessor_block_header.shell.timestamp
+         ~predecessor_fitness:predecessor_block_header.shell.fitness
+         block_header
+     >>=? fun state ->
+       List.fold_left_es
+         (fun (state, acc) ops ->
            List.fold_left_es
-             (fun (state, acc) ops ->
-               List.fold_left_es
-                 (fun (state, acc) op ->
-                   Proto.apply_operation state op
-                   >>=? fun (state, op_metadata) ->
-                   return (state, op_metadata :: acc))
-                 (state, [])
-                 ops
-               >>=? fun (state, ops_metadata) ->
-               return (state, List.rev ops_metadata :: acc))
+             (fun (state, acc) op ->
+               Proto.apply_operation state op >>=? fun (state, op_metadata) ->
+               return (state, op_metadata :: acc))
              (state, [])
-             operations
+             ops
            >>=? fun (state, ops_metadata) ->
-           let ops_metadata = List.rev ops_metadata in
-           Proto.finalize_block state
-           >>=? fun (validation_result, block_data) ->
-           return (validation_result, block_data, ops_metadata))
-    >>= (function
-          | Error err ->
-              fail (invalid_block (Economic_protocol_error err))
-          | Ok o ->
-              return o)
+           return (state, List.rev ops_metadata :: acc))
+         (state, [])
+         operations
+       >>=? fun (state, ops_metadata) ->
+       let ops_metadata = List.rev ops_metadata in
+       Proto.finalize_block state >>=? fun (validation_result, block_data) ->
+       return (validation_result, block_data, ops_metadata) )
+     >>= function
+     | Error err -> fail (invalid_block (Economic_protocol_error err))
+     | Ok o -> return o)
     >>=? fun (validation_result, block_data, ops_metadata) ->
     may_patch_protocol
       ~user_activated_upgrades
@@ -341,11 +316,8 @@ module Make (Proto : Registered_protocol.T) = struct
       ~level:block_header.shell.level
       validation_result
     >>= fun validation_result ->
-    let context =
-      Shell_context.unwrap_disk_context validation_result.context
-    in
-    Context.get_protocol context
-    >>= fun new_protocol ->
+    let context = Shell_context.unwrap_disk_context validation_result.context in
+    Context.get_protocol context >>= fun new_protocol ->
     let expected_proto_level =
       if Protocol_hash.equal new_protocol Proto.hash then
         predecessor_block_header.shell.proto_level
@@ -369,8 +341,8 @@ module Make (Proto : Registered_protocol.T) = struct
               found = validation_result.fitness;
             }))
     >>=? fun () ->
-    ( if Protocol_hash.equal new_protocol Proto.hash then
-      return (validation_result, Proto.environment_version)
+    (if Protocol_hash.equal new_protocol Proto.hash then
+     return (validation_result, Proto.environment_version)
     else
       match Registered_protocol.get new_protocol with
       | None ->
@@ -379,7 +351,7 @@ module Make (Proto : Registered_protocol.T) = struct
       | Some (module NewProto) ->
           NewProto.init validation_result.context block_header.shell
           >|=? fun validation_result ->
-          (validation_result, NewProto.environment_version) )
+          (validation_result, NewProto.environment_version))
     >>=? fun (validation_result, new_protocol_env_version) ->
     let max_operations_ttl =
       max 0 (min (max_operations_ttl + 1) validation_result.max_operations_ttl)
@@ -390,42 +362,39 @@ module Make (Proto : Registered_protocol.T) = struct
         Proto.block_header_metadata_encoding
         block_data
     in
-    ( try
-        return
-          (List.map
-             (List.map (fun receipt ->
-                  (* Check that the metadata are
-                     serializable/deserializable *)
-                  let bytes =
-                    Data_encoding.Binary.to_bytes_exn
-                      Proto.operation_receipt_encoding
-                      receipt
-                  in
-                  let _ =
-                    Data_encoding.Binary.of_bytes_exn
-                      Proto.operation_receipt_encoding
-                      bytes
-                  in
-                  bytes))
-             ops_metadata)
-      with exn ->
-        trace
-          Validation_errors.Cannot_serialize_operation_metadata
-          (fail (Exn exn)) )
+    (try
+       return
+         (List.map
+            (List.map (fun receipt ->
+                 (* Check that the metadata are
+                    serializable/deserializable *)
+                 let bytes =
+                   Data_encoding.Binary.to_bytes_exn
+                     Proto.operation_receipt_encoding
+                     receipt
+                 in
+                 let _ =
+                   Data_encoding.Binary.of_bytes_exn
+                     Proto.operation_receipt_encoding
+                     bytes
+                 in
+                 bytes))
+            ops_metadata)
+     with exn ->
+       trace
+         Validation_errors.Cannot_serialize_operation_metadata
+         (fail (Exn exn)))
     >>=? fun ops_metadata ->
-    let context =
-      Shell_context.unwrap_disk_context validation_result.context
-    in
-    ( match new_protocol_env_version with
-    | Protocol.V0 ->
-        return (None, None)
+    let context = Shell_context.unwrap_disk_context validation_result.context in
+    (match new_protocol_env_version with
+    | Protocol.V0 -> return (None, None)
     | Protocol.V1 | Protocol.V2 | Protocol.V3 ->
         return
           ( Some
               (List.map
                  (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
                  ops_metadata),
-            Some (Block_metadata_hash.hash_bytes [block_metadata]) ) )
+            Some (Block_metadata_hash.hash_bytes [block_metadata]) ))
     >>=? fun (ops_metadata_hashes, block_metadata_hash) ->
     Context.commit
       ~time:block_header.shell.timestamp
@@ -501,24 +470,24 @@ type apply_environment = {
 }
 
 let apply
-    { chain_id;
+    {
+      chain_id;
       user_activated_upgrades;
       user_activated_protocol_overrides;
       max_operations_ttl;
       predecessor_block_header;
       predecessor_block_metadata_hash;
       predecessor_ops_metadata_hash;
-      predecessor_context } block_header operations =
+      predecessor_context;
+    } block_header operations =
   let block_hash = Block_header.hash block_header in
-  Context.get_protocol predecessor_context
-  >>= fun pred_protocol_hash ->
-  ( match Registered_protocol.get pred_protocol_hash with
+  Context.get_protocol predecessor_context >>= fun pred_protocol_hash ->
+  (match Registered_protocol.get pred_protocol_hash with
   | None ->
       fail
         (Unavailable_protocol
            {block = block_hash; protocol = pred_protocol_hash})
-  | Some p ->
-      return p )
+  | Some p -> return p)
   >>=? fun (module Proto) ->
   let module Block_validation = Make (Proto) in
   Block_validation.apply
@@ -535,5 +504,4 @@ let apply
   >>= function
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
       fail (System_error {errno = Unix.error_message errno; fn; msg})
-  | (Ok _ | Error _) as res ->
-      Lwt.return res
+  | (Ok _ | Error _) as res -> Lwt.return res

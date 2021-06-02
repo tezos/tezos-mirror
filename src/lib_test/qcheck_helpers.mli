@@ -127,9 +127,7 @@ module MakeMapArb (Map : Stdlib.Map.S) : sig
       The arbitrary shrinks on the number of entries as well as on entries
       if either the key or value arbitrary has a shrinker. *)
   val arb :
-    Map.key QCheck.arbitrary ->
-    'v QCheck.arbitrary ->
-    'v Map.t QCheck.arbitrary
+    Map.key QCheck.arbitrary -> 'v QCheck.arbitrary -> 'v Map.t QCheck.arbitrary
 
   (** [gen_of_size size_gen key_gen val_gen] is a generator of Map where the keys
       are generated with [key_gen] and the values with [val_gen].

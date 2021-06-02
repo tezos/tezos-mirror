@@ -91,11 +91,13 @@ module Script = struct
 
   let force_decode_in_context ctxt lexpr =
     Raw_context.consume_gas ctxt (Script_repr.force_decode_cost lexpr)
-    >>? fun ctxt -> Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
+    >>? fun ctxt ->
+    Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
 
   let force_bytes_in_context ctxt lexpr =
     Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
-    >>? fun ctxt -> Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
+    >>? fun ctxt ->
+    Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
 end
 
 module Fees = Fees_storage
@@ -123,8 +125,7 @@ module Gas = struct
 
   type error += Block_quota_exceeded = Raw_context.Block_quota_exceeded
 
-  type error +=
-    | Operation_quota_exceeded = Raw_context.Operation_quota_exceeded
+  type error += Operation_quota_exceeded = Raw_context.Operation_quota_exceeded
 
   let check_limit_is_valid = Raw_context.check_gas_limit_is_valid
 
@@ -195,13 +196,10 @@ module Big_map = struct
     Storage.Big_map.Contents.list_values ?offset ?length (c, m)
 
   let exists c id =
-    Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost 0)
-    >>?= fun c ->
-    Storage.Big_map.Key_type.find c id
-    >>=? fun kt ->
+    Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost 0) >>?= fun c ->
+    Storage.Big_map.Key_type.find c id >>=? fun kt ->
     match kt with
-    | None ->
-        return (c, None)
+    | None -> return (c, None)
     | Some kt ->
         Storage.Big_map.Value_type.get c id >|=? fun kv -> (c, Some (kt, kv))
 end

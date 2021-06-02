@@ -44,9 +44,7 @@ let check_voting_period_invariants ~blocks_per_voting_period ~blocks_per_cycle
     ~level ~cycle_position voting_period_info =
   let voting_period = JSON.(voting_period_info |-> "voting_period") in
   let start_position = JSON.(voting_period |-> "start_position" |> as_int) in
-  let position_in_period =
-    JSON.(voting_period_info |-> "position" |> as_int)
-  in
+  let position_in_period = JSON.(voting_period_info |-> "position" |> as_int) in
   let remaining = JSON.(voting_period_info |-> "remaining" |> as_int) in
   let* () =
     if blocks_per_voting_period <> 1 + position_in_period + remaining then
@@ -97,8 +95,8 @@ let check_level_invariants ~blocks_per_commitment level_info =
   let* () =
     if
       expected_commitment
-      <> ( 1 + (cycle_position mod blocks_per_commitment)
-         == blocks_per_commitment )
+      <> (1 + (cycle_position mod blocks_per_commitment)
+         == blocks_per_commitment)
     then
       Test.fail
         "Level info invariant failed for expected_commitment %b \
@@ -120,9 +118,7 @@ let check_rpcs client ~blocks_per_voting_period ~blocks_per_cycle
     JSON.(metadata_level_info |-> "cycle_position" |> as_int)
   in
   let metadata_voting_period_info = JSON.(metadata |-> "voting_period_info") in
-  let* () =
-    check_level_invariants ~blocks_per_commitment metadata_level_info
-  in
+  let* () = check_level_invariants ~blocks_per_commitment metadata_level_info in
   let* () =
     check_voting_period_invariants
       ~blocks_per_cycle
@@ -168,15 +164,18 @@ let update_config_with_user_activated config_file level protocol =
   let user_activated =
     Ezjsonm.(
       dict
-        [ ( "genesis",
+        [
+          ( "genesis",
             dict
-              [ ("timestamp", string "2018-06-30T16:07:32Z");
+              [
+                ("timestamp", string "2018-06-30T16:07:32Z");
                 ( "block",
                   string "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
                 );
                 ( "protocol",
                   string "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
-                ) ] );
+                );
+              ] );
           ("chain_name", string "TEZOS_MAINNET");
           ("old_chain_name", string "TEZOS_BETANET_2018-06-30T16:07:32Z");
           ("incompatible_chain_name", string "INCOMPATIBLE");
@@ -184,8 +183,10 @@ let update_config_with_user_activated config_file level protocol =
           ( "user_activated_upgrades",
             list
               dict
-              [ [ ("level", int level);
-                  ("replacement_protocol", string protocol) ] ] ) ])
+              [
+                [("level", int level); ("replacement_protocol", string protocol)];
+              ] );
+        ])
   in
   let config_json = JSON.parse_file config_file in
   let config_json =
@@ -258,12 +259,7 @@ let prepare_migration ?yes_node_path ?yes_wallet context protocol
     migration_level
     protocol ;
   let node =
-    Node.create
-      ?path:yes_node_path
-      ~rpc_port:19731
-      ~net_port:18731
-      ~data_dir
-      []
+    Node.create ?path:yes_node_path ~rpc_port:19731 ~net_port:18731 ~data_dir []
   in
   let* () = Node.run node [Connections 0] in
   let* () = Node.wait_for_ready node in
@@ -274,8 +270,7 @@ let prepare_migration ?yes_node_path ?yes_wallet context protocol
         let base_dir = Temp.dir "client" in
         let* () = Process.run "cp" ["-R"; yes_wallet ^ "/."; base_dir] in
         Lwt.return base_dir
-    | None ->
-        Lwt.return @@ create_yes_wallet ()
+    | None -> Lwt.return @@ create_yes_wallet ()
   in
   let client = Client.create ~base_dir ~node () in
   Lwt.return (node, client, level)
@@ -357,14 +352,13 @@ let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
           i
           (level + i)
           (if edo then "Edo" else "Alpha")
-          ( if edo_cycle then
-            blocks_per_cycle_edo - levels_till_migration + i - 2
-          else (i - 2 - levels_till_migration) mod blocks_per_cycle_alpha )
-          ( if edo then
-            blocks_per_voting_period_edo - levels_till_migration + i - 1
+          (if edo_cycle then
+           blocks_per_cycle_edo - levels_till_migration + i - 2
+          else (i - 2 - levels_till_migration) mod blocks_per_cycle_alpha)
+          (if edo then
+           blocks_per_voting_period_edo - levels_till_migration + i - 1
           else
-            (i - 2 - levels_till_migration) mod blocks_per_voting_period_alpha
-          )
+            (i - 2 - levels_till_migration) mod blocks_per_voting_period_alpha)
           (if check_rpcs_flag then "*" else "") ;
         let expected_period_index =
           if i <= levels_till_migration then period_index else period_index + 1
@@ -386,7 +380,7 @@ let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
           else unit
         in
         let* _ = Node.wait_for_level node (level + i) in
-        iter (i + 1) )
+        iter (i + 1))
       else unit
     in
     iter 1

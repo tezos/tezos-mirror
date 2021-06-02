@@ -36,21 +36,14 @@ module Filter = struct
     RPC_arg.make
       ~name:"p2p.point.state_filter"
       ~destruct:(function
-        | "accepted" ->
-            Ok Accepted
-        | "running" ->
-            Ok Running
-        | "disconnected" ->
-            Ok Disconnected
-        | s ->
-            Error (Format.asprintf "Invalid state: %s" s))
+        | "accepted" -> Ok Accepted
+        | "running" -> Ok Running
+        | "disconnected" -> Ok Disconnected
+        | s -> Error (Format.asprintf "Invalid state: %s" s))
       ~construct:(function
-        | Accepted ->
-            "accepted"
-        | Running ->
-            "running"
-        | Disconnected ->
-            "disconnected")
+        | Accepted -> "accepted"
+        | Running -> "running"
+        | Disconnected -> "disconnected")
       ()
 end
 
@@ -58,12 +51,9 @@ module State = struct
   type t = Accepted | Running | Disconnected
 
   let pp_digram ppf = function
-    | Accepted ->
-        Format.fprintf ppf "⚎"
-    | Running ->
-        Format.fprintf ppf "⚌"
-    | Disconnected ->
-        Format.fprintf ppf "⚏"
+    | Accepted -> Format.fprintf ppf "⚎"
+    | Running -> Format.fprintf ppf "⚌"
+    | Disconnected -> Format.fprintf ppf "⚏"
 
   let encoding =
     let open Data_encoding in
@@ -74,23 +64,21 @@ module State = struct
          is being established), running (when the connection is already \
          established), disconnected (otherwise)."
     @@ string_enum
-         [ ("accepted", Accepted);
+         [
+           ("accepted", Accepted);
            ("running", Running);
-           ("disconnected", Disconnected) ]
+           ("disconnected", Disconnected);
+         ]
 
   let raw_filter (f : Filter.t) (s : t) =
     match (f, s) with
-    | (Accepted, Accepted) ->
-        true
-    | (Accepted, (Running | Disconnected))
-    | ((Running | Disconnected), Accepted) ->
+    | (Accepted, Accepted) -> true
+    | (Accepted, (Running | Disconnected)) | ((Running | Disconnected), Accepted)
+      ->
         false
-    | (Running, Running) ->
-        true
-    | (Disconnected, Disconnected) ->
-        true
-    | (Running, Disconnected) | (Disconnected, Running) ->
-        false
+    | (Running, Running) -> true
+    | (Disconnected, Disconnected) -> true
+    | (Running, Disconnected) | (Disconnected, Running) -> false
 
   let filter filters state = List.exists (fun f -> raw_filter f state) filters
 end
@@ -115,7 +103,8 @@ module Info = struct
   let encoding peer_metadata_encoding conn_metadata_encoding =
     let open Data_encoding in
     conv
-      (fun { score;
+      (fun {
+             score;
              trusted;
              conn_metadata;
              peer_metadata;
@@ -127,7 +116,8 @@ module Info = struct
              last_established_connection;
              last_disconnection;
              last_seen;
-             last_miss } ->
+             last_miss;
+           } ->
         ( (score, trusted, conn_metadata, peer_metadata, state, id_point, stat),
           ( last_failed_connection,
             last_rejected_connection,
@@ -204,18 +194,16 @@ module Pool_event = struct
 
   let kind_encoding =
     Data_encoding.string_enum
-      [ ("incoming_request", Accepting_request);
+      [
+        ("incoming_request", Accepting_request);
         ("rejecting_request", Rejecting_request);
         ("request_rejected", Request_rejected);
         ("connection_established", Connection_established);
         ("disconnection", Disconnection);
-        ("external_disconnection", External_disconnection) ]
+        ("external_disconnection", External_disconnection);
+      ]
 
-  type t = {
-    kind : kind;
-    timestamp : Time.System.t;
-    point : P2p_connection.Id.t;
-  }
+  type t = {kind : kind; timestamp : Time.System.t; point : P2p_connection.Id.t}
 
   let encoding =
     let open Data_encoding in

@@ -54,17 +54,13 @@ let expected_lqt_hash =
 
 (* Test that the scripts of the Liquidity Baking contracts (CPMM and LQT) have the expected hashes. *)
 let liquidity_baking_origination () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
-  Context.get_liquidity_baking_cpmm_address (B blk)
-  >>=? fun cpmm_address ->
-  Context.Contract.script_hash (B blk) cpmm_address
-  >>=? fun cpmm_hash ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun cpmm_address ->
+  Context.Contract.script_hash (B blk) cpmm_address >>=? fun cpmm_hash ->
   Lwt.return @@ Environment.wrap_tzresult
   @@ Alpha_context.Contract.of_b58check "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
   >>=? fun lqt_address ->
-  Context.Contract.script_hash (B blk) lqt_address
-  >>=? fun lqt_hash ->
+  Context.Contract.script_hash (B blk) lqt_address >>=? fun lqt_hash ->
   Assert.equal
     ~loc:__LOC__
     Script_expr_hash.equal
@@ -84,10 +80,8 @@ let liquidity_baking_origination () =
 
 (* Test that the CPMM address in storage is correct *)
 let liquidity_baking_cpmm_address () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
-  Context.get_liquidity_baking_cpmm_address (B blk)
-  >>=? fun liquidity_baking ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Assert.equal
     ~loc:__LOC__
     String.equal
@@ -99,18 +93,13 @@ let liquidity_baking_cpmm_address () =
 
 (* Test that after [n] blocks, the liquidity baking CPMM contract is credited [n] times the subsidy amount. *)
 let liquidity_baking_subsidies n () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
-  Context.get_liquidity_baking_cpmm_address (B blk)
-  >>=? fun liquidity_baking ->
-  Context.Contract.balance (B blk) liquidity_baking
-  >>=? fun old_balance ->
-  Block.bake_n n blk
-  >>=? fun blk ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
+  Block.bake_n n blk >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
-  Tez.(liquidity_baking_subsidy *? Int64.(of_int n))
-  >>?= fun expected_credit ->
+  Tez.(liquidity_baking_subsidy *? Int64.(of_int n)) >>?= fun expected_credit ->
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk)
@@ -123,17 +112,12 @@ let liquidity_baking_subsidies n () =
    More precisely, after the sunset, the total amount credited to the subsidy is only proportional
    to the sunset level and in particular it does not depend on [n]. *)
 let liquidity_baking_sunset_level n () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
-  Context.get_liquidity_baking_cpmm_address (B blk)
-  >>=? fun liquidity_baking ->
-  Context.get_constants (B blk)
-  >>=? fun csts ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
-  Context.Contract.balance (B blk) liquidity_baking
-  >>=? fun old_balance ->
-  Block.bake_n (Int32.to_int sunset + n) blk
-  >>=? fun blk ->
+  Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
+  Block.bake_n (Int32.to_int sunset + n) blk >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
   Tez.(liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
@@ -150,24 +134,18 @@ let liquidity_baking_sunset_level n () =
 (* Escape level is roughly 2*(log(1-1/(2*percent_flagging)) / log(0.999)) *)
 let liquidity_baking_escape_hatch n_vote_false n_vote_true escape_level
     bake_after_escape () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
-  Context.get_liquidity_baking_cpmm_address (B blk)
-  >>=? fun liquidity_baking ->
-  Context.Contract.balance (B blk) liquidity_baking
-  >>=? fun old_balance ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
   let rec bake_escaping blk i =
     if i < escape_level then
-      Block.bake_n n_vote_false blk
-      >>=? fun blk ->
+      Block.bake_n n_vote_false blk >>=? fun blk ->
       Block.bake_n ~liquidity_baking_escape_vote:true n_vote_true blk
       >>=? fun blk -> bake_escaping blk (i + n_vote_false + n_vote_true)
     else return blk
   in
-  bake_escaping blk 0
-  >>=? fun blk ->
-  Block.bake_n bake_after_escape blk
-  >>=? fun blk ->
+  bake_escaping blk 0 >>=? fun blk ->
+  Block.bake_n bake_after_escape blk >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
   Tez.(liquidity_baking_subsidy *? Int64.of_int escape_level)
@@ -195,25 +173,19 @@ let liquidity_baking_escape_hatch_60 n () =
 (* 50% of blocks have liquidity_baking_escape_vote = true.
    Escape hatch should not be activated. *)
 let liquidity_baking_escape_hatch_50 n () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
-  Context.get_liquidity_baking_cpmm_address (B blk)
-  >>=? fun liquidity_baking ->
-  Context.get_constants (B blk)
-  >>=? fun csts ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
-  Context.Contract.balance (B blk) liquidity_baking
-  >>=? fun old_balance ->
+  Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
   let rec bake_50_percent_escaping blk i =
     if i < Int32.to_int sunset + n then
-      Block.bake blk
-      >>=? fun blk ->
-      Block.bake ~liquidity_baking_escape_vote:true blk
-      >>=? fun blk -> bake_50_percent_escaping blk (i + 2)
+      Block.bake blk >>=? fun blk ->
+      Block.bake ~liquidity_baking_escape_vote:true blk >>=? fun blk ->
+      bake_50_percent_escaping blk (i + 2)
     else return blk
   in
-  bake_50_percent_escaping blk 0
-  >>=? fun blk ->
+  bake_50_percent_escaping blk 0 >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
   Tez.(liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
@@ -229,18 +201,15 @@ let liquidity_baking_escape_hatch_50 n () =
 (* Test that the escape EMA in block metadata is correct. *)
 let liquidity_baking_escape_ema n_vote_false n_vote_true escape_level
     bake_after_escape expected_escape_ema () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
   let rec bake_escaping blk i =
     if i < escape_level then
-      Block.bake_n n_vote_false blk
-      >>=? fun blk ->
+      Block.bake_n n_vote_false blk >>=? fun blk ->
       Block.bake_n ~liquidity_baking_escape_vote:true n_vote_true blk
       >>=? fun blk -> bake_escaping blk (i + n_vote_false + n_vote_true)
     else return blk
   in
-  bake_escaping blk 0
-  >>=? fun blk ->
+  bake_escaping blk 0 >>=? fun blk ->
   (* We only need to return the escape EMA at the end. *)
   Block.bake_n_with_liquidity_baking_escape_ema bake_after_escape blk
   >>=? fun (_blk, escape_ema) ->
@@ -256,12 +225,9 @@ let liquidity_baking_escape_ema_threshold () =
   liquidity_baking_escape_ema 0 1 1387 1 1_050_000 ()
 
 let liquidity_baking_storage n () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
-  Context.get_liquidity_baking_cpmm_address (B blk)
-  >>=? fun liquidity_baking ->
-  Context.get_liquidity_baking_subsidy (B blk)
-  >>=? fun subsidy ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  Context.get_liquidity_baking_subsidy (B blk) >>=? fun subsidy ->
   let expected_storage =
     Expr.from_string
       (Printf.sprintf
@@ -272,10 +238,8 @@ let liquidity_baking_storage n () =
          \        \"KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo\""
          (100 + (n * Int64.to_int (Tez.to_mutez subsidy))))
   in
-  Block.bake_n n blk
-  >>=? fun blk ->
-  Context.Contract.storage (B blk) liquidity_baking
-  >>=? fun storage ->
+  Block.bake_n n blk >>=? fun blk ->
+  Context.Contract.storage (B blk) liquidity_baking >>=? fun storage ->
   let to_string expr =
     Format.asprintf "%a" Michelson_v1_printer.print_expr expr
   in
@@ -289,12 +253,9 @@ let liquidity_baking_storage n () =
   >>=? fun () -> return_unit
 
 let liquidity_baking_balance_update () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
-  Context.get_liquidity_baking_cpmm_address (B blk)
-  >>=? fun liquidity_baking ->
-  Context.get_constants (B blk)
-  >>=? fun csts ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
   let subsidy = csts.parametric.liquidity_baking_subsidy in
   Block.bake_n_with_all_balance_updates Int32.(to_int (add sunset 100l)) blk
@@ -307,17 +268,14 @@ let liquidity_baking_balance_update () =
             Alpha_context.Receipt.Credited _,
             Alpha_context.Receipt.Subsidy ) ->
             Alpha_context.Contract.(contract = liquidity_baking)
-        | _ ->
-            false)
+        | _ -> false)
       balance_updates
   in
   List.fold_left_e
     (fun accum (_, update, _) ->
       match update with
-      | Alpha_context.Receipt.Credited x ->
-          Tez.(accum +? x)
-      | Alpha_context.Receipt.Debited _ ->
-          assert false)
+      | Alpha_context.Receipt.Credited x -> Tez.(accum +? x)
+      | Alpha_context.Receipt.Debited _ -> assert false)
     Tez.(of_int 0)
     liquidity_baking_updates
   >>?= fun credits ->
@@ -329,35 +287,28 @@ let liquidity_baking_balance_update () =
 
 let get_cpmm_result results =
   match results with
-  | cpmm_result :: _results ->
-      cpmm_result
-  | _ ->
-      assert false
+  | cpmm_result :: _results -> cpmm_result
+  | _ -> assert false
 
 let get_lqt_result results =
   match results with
-  | _cpmm_result :: lqt_result :: _results ->
-      lqt_result
-  | _ ->
-      assert false
+  | _cpmm_result :: lqt_result :: _results -> lqt_result
+  | _ -> assert false
 
 let get_address_in_result result =
   match result with
   | Apply_results.Origination_result {originated_contracts; _} -> (
-    match originated_contracts with [c] -> c | _ -> assert false )
+      match originated_contracts with [c] -> c | _ -> assert false)
 
 let get_balance_update_in_result result =
   match result with
   | Apply_results.Origination_result {balance_updates; _} -> (
-    match balance_updates with
-    | [(Contract _, Credited balance, Protocol_migration)] ->
-        balance
-    | _ ->
-        assert false )
+      match balance_updates with
+      | [(Contract _, Credited balance, Protocol_migration)] -> balance
+      | _ -> assert false)
 
 let liquidity_baking_origination_result_cpmm_address () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk)
   >>=? fun cpmm_address_in_storage ->
   Block.bake_n_with_origination_results 1 blk
@@ -374,8 +325,7 @@ let liquidity_baking_origination_result_cpmm_address () =
   >>=? fun () -> return_unit
 
 let liquidity_baking_origination_result_cpmm_balance () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
   Block.bake_n_with_origination_results 1 blk
   >>=? fun (_blk, origination_results) ->
   let result = get_cpmm_result origination_results in
@@ -384,8 +334,7 @@ let liquidity_baking_origination_result_cpmm_balance () =
   >>=? fun () -> return_unit
 
 let liquidity_baking_origination_result_lqt_address () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
   Block.bake_n_with_origination_results 1 blk
   >>=? fun (_blk, origination_results) ->
   let result = get_lqt_result origination_results in
@@ -400,19 +349,17 @@ let liquidity_baking_origination_result_lqt_address () =
   >>=? fun () -> return_unit
 
 let liquidity_baking_origination_result_lqt_balance () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
   Block.bake_n_with_origination_results 1 blk
   >>=? fun (_blk, origination_results) ->
   let result = get_lqt_result origination_results in
   let balance_update = get_balance_update_in_result result in
-  Assert.equal_tez ~loc:__LOC__ balance_update Tez.zero
-  >>=? fun () -> return_unit
+  Assert.equal_tez ~loc:__LOC__ balance_update Tez.zero >>=? fun () ->
+  return_unit
 
 (* Test that with no contract at the tzBTC address and the level low enough to indicate we're not on mainnet, three contracts are originated in stitching. *)
 let liquidity_baking_origination_test_migration () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
   Block.bake_n_with_origination_results 1 blk
   >>=? fun (_blk, origination_results) ->
   let num_results = List.length origination_results in
@@ -420,8 +367,7 @@ let liquidity_baking_origination_test_migration () =
 
 (* Test that with no contract at the tzBTC address and the level high enough to indicate we could be on mainnet, no contracts are originated in stitching. *)
 let liquidity_baking_origination_no_tzBTC_mainnet_migration () =
-  Context.init 1 ~level:1_437_862l
-  >>=? fun (blk, _contracts) ->
+  Context.init 1 ~level:1_437_862l >>=? fun (blk, _contracts) ->
   (* By baking a bit we also check that the subsidy application with no CPMM present does nothing rather than stopping the chain.*)
   Block.bake_n_with_origination_results 64 blk
   >>=? fun (_blk, origination_results) ->
@@ -429,7 +375,8 @@ let liquidity_baking_origination_no_tzBTC_mainnet_migration () =
   Assert.equal_int ~loc:__LOC__ num_results 0
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "test liquidity baking script hashes"
       `Quick
       liquidity_baking_origination;
@@ -560,4 +507,5 @@ let tests =
       "test liquidity baking originates three contracts when tzBTC does not \
        exist and level indicates we might be on mainnet"
       `Quick
-      liquidity_baking_origination_no_tzBTC_mainnet_migration ]
+      liquidity_baking_origination_no_tzBTC_mainnet_migration;
+  ]

@@ -32,9 +32,7 @@ class unix_prompter : Client_context.prompter
 class unix_logger : base_dir:string -> Client_context.printer
 
 class unix_io_wallet :
-  base_dir:string
-  -> password_filename:string option
-  -> Client_context.io_wallet
+  base_dir:string -> password_filename:string option -> Client_context.io_wallet
 
 class unix_ui : Client_context.ui
 

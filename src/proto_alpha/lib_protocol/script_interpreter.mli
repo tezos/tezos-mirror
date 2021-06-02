@@ -36,8 +36,7 @@
 open Alpha_context
 open Script_typed_ir
 
-type error +=
-  | Reject of Script.location * Script.expr * execution_trace option
+type error += Reject of Script.location * Script.expr * execution_trace option
 
 type error += Overflow of Script.location * execution_trace option
 

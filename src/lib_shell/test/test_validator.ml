@@ -43,34 +43,33 @@ let init_validator
       'a ->
       unit ->
       unit Lwt.t) test_dir switch () : unit Lwt.t =
-  Shell_test_helpers.init_chain test_dir
-  >>= (fun store ->
-        Shell_test_helpers.init_mock_p2p Distributed_db_version.Name.zero
-        >>=? fun p2p ->
-        let chain_store = Store.(main_chain_store store) in
-        let db = Distributed_db.create store p2p in
-        let validator_environment =
-          {
-            Block_validator_process.user_activated_upgrades = [];
-            user_activated_protocol_overrides = [];
-          }
-        in
-        Block_validator_process.init
-          validator_environment
-          (Block_validator_process.Internal chain_store)
-        >>=? fun block_validator ->
-        Validator.create
-          store
-          db
-          Node.default_peer_validator_limits
-          Node.default_block_validator_limits
-          block_validator
-          Node.default_prevalidator_limits
-          Node.default_chain_validator_limits
-          ~start_testchain:false
-        >>=? fun validator ->
-        Lwt.return
-          (ok (block_validator, validator, Store.main_chain_store store)))
+  ( Shell_test_helpers.init_chain test_dir >>= fun store ->
+    Shell_test_helpers.init_mock_p2p Distributed_db_version.Name.zero
+    >>=? fun p2p ->
+    let chain_store = Store.(main_chain_store store) in
+    let db = Distributed_db.create store p2p in
+    let validator_environment =
+      {
+        Block_validator_process.user_activated_upgrades = [];
+        user_activated_protocol_overrides = [];
+      }
+    in
+    Block_validator_process.init
+      validator_environment
+      (Block_validator_process.Internal chain_store)
+    >>=? fun block_validator ->
+    Validator.create
+      store
+      db
+      Node.default_peer_validator_limits
+      Node.default_block_validator_limits
+      block_validator
+      Node.default_prevalidator_limits
+      Node.default_chain_validator_limits
+      ~start_testchain:false
+    >>=? fun validator ->
+    Lwt.return (ok (block_validator, validator, Store.main_chain_store store))
+  )
   >>= function
   | Ok (block_validator, validator, chain) ->
       f validator block_validator chain switch ()
@@ -121,13 +120,13 @@ let validator_events validator block_validator chain _switch () =
       Mock_sink.clear_events () ;
       (* now shutdown the validator and verify that shutdown events are emitted
         *)
-      Validator.shutdown validator
-      >>= fun () ->
+      Validator.shutdown validator >>= fun () ->
       Mock_sink.assert_has_events
         "Should have an shutdown_block_validator"
         ?filter
         Mock_sink.Pattern.
-          [ {
+          [
+            {
               level = Some Internal_event.Notice;
               section = Some section;
               name = "shutdown_chain_validator";
@@ -136,7 +135,8 @@ let validator_events validator block_validator chain _switch () =
               level = Some Internal_event.Notice;
               section = Some section;
               name = "shutdown_block_validator";
-            } ] ;
+            };
+          ] ;
       Lwt.return_unit
 
 let tests =

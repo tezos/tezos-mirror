@@ -39,12 +39,9 @@ module Authentication = struct
     dynamic_size @@ option @@ string
 
   let server _ch sched socket =
-    accept sched socket
-    >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd encoding
-    >>=? fun conn ->
-    P2p_socket.close conn
-    >>= fun () ->
+    accept sched socket >>=? fun (_info, auth_fd) ->
+    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
+    P2p_socket.close conn >>= fun () ->
     Mock_sink.assert_has_event
       ~strict:false
       "authentication should be sent"
@@ -56,14 +53,10 @@ module Authentication = struct
     return_unit
 
   let client _ch sched addr port =
-    id2
-    >>= fun id2 ->
-    connect sched addr port id2
-    >>=? fun (_, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd encoding
-    >>=? fun conn ->
-    P2p_socket.close conn
-    >>= fun () ->
+    id2 >>= fun id2 ->
+    connect sched addr port id2 >>=? fun (_, auth_fd) ->
+    P2p_socket.accept ~canceler auth_fd encoding >>=? fun conn ->
+    P2p_socket.close conn >>= fun () ->
     Mock_sink.assert_has_event
       ~strict:false
       "authentication should be sent"
@@ -95,10 +88,8 @@ module Nack = struct
       }
 
   let server ch sched socket =
-    accept sched socket
-    >>=? fun (_info, auth_fd) ->
-    P2p_socket.nack auth_fd P2p_rejection.No_motive []
-    >>= fun () ->
+    accept sched socket >>=? fun (_info, auth_fd) ->
+    P2p_socket.nack auth_fd P2p_rejection.No_motive [] >>= fun () ->
     Mock_sink.assert_has_event
       ~strict:false
       "nack point without list should have happened"
@@ -106,12 +97,10 @@ module Nack = struct
     sync ch
 
   let client ch sched addr port =
-    id2
-    >>= fun id2 ->
-    connect sched addr port id2
-    >>=? fun (_, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd Data_encoding.bytes
-    >>= fun _conn -> sync ch
+    id2 >>= fun id2 ->
+    connect sched addr port id2 >>=? fun (_, auth_fd) ->
+    P2p_socket.accept ~canceler auth_fd Data_encoding.bytes >>= fun _conn ->
+    sync ch
 
   let run _ = run_nodes client server
 end
@@ -148,18 +137,13 @@ module Read_and_write = struct
       }
 
   let server ch sched socket =
-    accept sched socket
-    >>=? fun (_info, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd Data_encoding.bytes
-    >>=? fun conn ->
+    accept sched socket >>=? fun (_info, auth_fd) ->
+    P2p_socket.accept ~canceler auth_fd Data_encoding.bytes >>=? fun conn ->
     P2p_socket.write_sync conn @@ Bytes.of_string "a polite greeting"
     >>=? fun () ->
-    P2p_socket.read conn
-    >>=? fun (_msg_size, _msg) ->
-    sync ch
-    >>=? fun () ->
-    P2p_socket.close conn
-    >>= fun () ->
+    P2p_socket.read conn >>=? fun (_msg_size, _msg) ->
+    sync ch >>=? fun () ->
+    P2p_socket.close conn >>= fun () ->
     Mock_sink.assert_has_event
       ~strict:false
       "socket should have been read"
@@ -175,20 +159,14 @@ module Read_and_write = struct
     return_unit
 
   let client ch sched addr port =
-    id2
-    >>= fun id2 ->
-    connect sched addr port id2
-    >>=? fun (_, auth_fd) ->
-    P2p_socket.accept ~canceler auth_fd Data_encoding.bytes
-    >>=? fun conn ->
+    id2 >>= fun id2 ->
+    connect sched addr port id2 >>=? fun (_, auth_fd) ->
+    P2p_socket.accept ~canceler auth_fd Data_encoding.bytes >>=? fun conn ->
     P2p_socket.write_sync conn @@ Bytes.of_string "a polite request"
     >>=? fun () ->
-    P2p_socket.read conn
-    >>=? fun (_msg_size, _msg) ->
-    sync ch
-    >>=? fun () ->
-    P2p_socket.close conn
-    >>= fun _stat ->
+    P2p_socket.read conn >>=? fun (_msg_size, _msg) ->
+    sync ch >>=? fun () ->
+    P2p_socket.close conn >>= fun _stat ->
     Mock_sink.assert_has_event
       ~strict:false
       "socket should have been read"
@@ -229,7 +207,8 @@ module P2p_net = struct
     P2p_params.
       {
         encoding =
-          [ Encoding
+          [
+            Encoding
               {
                 tag = 0;
                 title = "fake-net";
@@ -237,7 +216,8 @@ module P2p_net = struct
                 wrap = Fun.id;
                 unwrap = Option.some;
                 max_length = Some 255;
-              } ];
+              };
+          ];
         chain_name = Distributed_db_version.Name.of_string "test-chain";
         distributed_db_versions = [Distributed_db_version.one];
       }
@@ -298,13 +278,11 @@ module P2p_net = struct
       }
 
   let run () =
-    P2p_test_utils.id1
-    >>= fun identity ->
+    P2p_test_utils.id1 >>= fun identity ->
     P2p.create ~config:(conf identity) ~limits peer_conf conn p2p_conf
     >>=? fun net ->
     P2p.activate net ;
-    P2p.shutdown net
-    >>= fun () ->
+    P2p.shutdown net >>= fun () ->
     Mock_sink.assert_has_event
       ~strict:false
       "layer should have been activated"
@@ -340,13 +318,10 @@ let lwt_log_sink = Lwt_log_sink_unix.create_cfg ~rules:"* -> debug" ()
 
 let testcase (module T : TEST) =
   Alcotest_lwt.test_case T.name `Quick (fun _switch () ->
-      Internal_event_unix.init ~lwt_log_sink ()
-      >>= fun () ->
+      Internal_event_unix.init ~lwt_log_sink () >>= fun () ->
       Test_services.with_empty_mock_sink (fun () ->
-          T.run ()
-          >>= function
-          | Ok () ->
-              Lwt.return_unit
+          T.run () >>= function
+          | Ok () -> Lwt.return_unit
           | Error error ->
               Format.kasprintf Stdlib.failwith "%a" pp_print_error error))
 
@@ -354,11 +329,15 @@ let main () =
   Alcotest_lwt.run
     ~argv:[|""|]
     "tezos-p2p"
-    [ ( "p2p-logging.",
-        [ testcase (module Authentication);
+    [
+      ( "p2p-logging.",
+        [
+          testcase (module Authentication);
           testcase (module Nack);
           testcase (module Read_and_write);
-          testcase (module P2p_net) ] ) ]
+          testcase (module P2p_net);
+        ] );
+    ]
 
 let () =
   Sys.catch_break true ;

@@ -44,10 +44,8 @@ let () =
         literal)
     Data_encoding.(obj2 (req "parameter" string) (req "literal" string))
     (function
-      | Bad_tez_arg (parameter, literal) ->
-          Some (parameter, literal)
-      | _ ->
-          None)
+      | Bad_tez_arg (parameter, literal) -> Some (parameter, literal)
+      | _ -> None)
     (fun (parameter, literal) -> Bad_tez_arg (parameter, literal))
 
 let tez_sym = "\xEA\x9C\xA9"
@@ -55,10 +53,8 @@ let tez_sym = "\xEA\x9C\xA9"
 let tez_parameter param =
   parameter (fun _ s ->
       match Tez.of_string s with
-      | Some tez ->
-          return tez
-      | None ->
-          fail (Bad_tez_arg (param, s)))
+      | Some tez -> return tez
+      | None -> fail (Bad_tez_arg (param, s)))
 
 let tez_arg ~default ~parameter ~doc =
   default_arg
@@ -74,7 +70,7 @@ let no_print_source_flag =
     ~short:'q'
     ~doc:
       "don't print the source code\n\
-       If an error is encountered, the client will print the contract's \
-       source code by default.\n\
+       If an error is encountered, the client will print the contract's source \
+       code by default.\n\
        This option disables this behaviour."
     ()

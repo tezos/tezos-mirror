@@ -52,8 +52,7 @@ let nn = Z.neg n
 let basic_arith name (module A : Arith) =
   let err msg = err (Format.asprintf "%s test: %s" name msg) in
   let x = A.random () in
-  fail_unless A.(add zero x = x) (err "zero is neutral for +")
-  >>=? fun () ->
+  fail_unless A.(add zero x = x) (err "zero is neutral for +") >>=? fun () ->
   let x = A.random () in
   let y = A.random () in
   fail_unless A.(add x y = add y x) (err "addition is commutative")
@@ -137,8 +136,8 @@ let integral_tests decimals () =
   fail_unless FP.(add (integral n) (integral nn) = zero) (err "x + -x = zero")
   >>=? fun () ->
   fail_unless
-    ( Format.asprintf "%a" FP.pp FP.(fp (integral n))
-    = Format.asprintf "%a" FP.pp_integral (FP.integral n) )
+    (Format.asprintf "%a" FP.pp FP.(fp (integral n))
+    = Format.asprintf "%a" FP.pp_integral (FP.integral n))
     (err "pp_integral(integral) = pp(fp(integral))")
   >>=? fun () -> basic_arith "integral arith" (arith_from_integral (module FP))
 
@@ -158,11 +157,10 @@ let fp_zero () =
     (err "ceil (fp (i1 + i2)) = i1 + i2")
   >>=? fun () ->
   fail_unless
-    ( Format.asprintf "%a" FP.pp FP.(unsafe_fp n)
-    = Format.asprintf "%a" FP.pp_integral (FP.integral n) )
+    (Format.asprintf "%a" FP.pp FP.(unsafe_fp n)
+    = Format.asprintf "%a" FP.pp_integral (FP.integral n))
     (err "pp_integral(integral) = pp(fp(integral))")
-  >>=? fun () ->
-  basic_arith "fp (0 decimals) arith" (arith_from_fp (module FP))
+  >>=? fun () -> basic_arith "fp (0 decimals) arith" (arith_from_fp (module FP))
 
 let fp_nonzero decimals () =
   let module FP = Fixed_point_repr.Make (struct
@@ -172,8 +170,7 @@ let fp_nonzero decimals () =
   let err msg = err (prefix msg) in
   basic_arith (prefix "integral arith") (arith_from_integral (module FP))
   >>=? fun () ->
-  basic_arith (prefix "fp arith") (arith_from_fp (module FP))
-  >>=? fun () ->
+  basic_arith (prefix "fp arith") (arith_from_fp (module FP)) >>=? fun () ->
   let epsilon = FP.unsafe_fp Z.one in
   let neg_epsilon = FP.unsafe_fp Z.minus_one in
   fail_unless FP.(ceil epsilon = integral Z.one) (err "ceil eps = 1")
@@ -200,10 +197,8 @@ let fp_pp () =
   let epsilon = FP.unsafe_fp Z.one in
   let neg_epsilon = FP.unsafe_fp Z.minus_one in
   let ( =:= ) x expected = Format.asprintf "%a" FP.pp x = expected in
-  fail_unless (epsilon =:= "0.001") (err "eps = 0.001")
-  >>=? fun () ->
-  fail_unless (neg_epsilon =:= "-0.001") (err "eps = -0.001")
-  >>=? fun () ->
+  fail_unless (epsilon =:= "0.001") (err "eps = 0.001") >>=? fun () ->
+  fail_unless (neg_epsilon =:= "-0.001") (err "eps = -0.001") >>=? fun () ->
   fail_unless (FP.unsafe_fp (Z.of_int 1000) =:= "1") (err "1.000 = 1")
   >>=? fun () ->
   fail_unless (FP.unsafe_fp (Z.of_int 1001) =:= "1.001") (err "1.001")
@@ -216,11 +211,9 @@ let fp_pp () =
   >>=? fun () -> fail_unless (FP.zero =:= "0") (err "0")
 
 let tests =
-  [ Test_services.tztest "Integral tests (0 decimals)" `Quick (integral_tests 0);
-    Test_services.tztest
-      "Integral tests (1 decimals)"
-      `Quick
-      (integral_tests 1);
+  [
+    Test_services.tztest "Integral tests (0 decimals)" `Quick (integral_tests 0);
+    Test_services.tztest "Integral tests (1 decimals)" `Quick (integral_tests 1);
     Test_services.tztest
       "Integral tests (10 decimals)"
       `Quick
@@ -228,4 +221,5 @@ let tests =
     Test_services.tztest "FP tests (0 decimals)" `Quick fp_zero;
     Test_services.tztest "FP tests (1 decimals)" `Quick (fp_nonzero 1);
     Test_services.tztest "FP tests (3 decimals)" `Quick (fp_nonzero 3);
-    Test_services.tztest "FP pp tests (3 decimals)" `Quick fp_pp ]
+    Test_services.tztest "FP pp tests (3 decimals)" `Quick fp_pp;
+  ]

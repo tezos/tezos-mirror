@@ -53,40 +53,31 @@ let uname =
         ("uname", [|"uname"|])
         (fun pc -> Lwt_io.read_line pc#stdout)
       >>= function
-      | "Linux" ->
-          Lwt.return_ok Linux
-      | "Darwin" ->
-          Lwt.return_ok Darwin
-      | os ->
-          Lwt.return_ok (Unknown os))
+      | "Linux" -> Lwt.return_ok Linux
+      | "Darwin" -> Lwt.return_ok Darwin
+      | os -> Lwt.return_ok (Unknown os))
     (function
       | exn -> Lwt.return_error (error_info "uname" (Printexc.to_string exn)))
 
 let page_size () =
   let get_conf_process =
-    uname
-    >>= function
-    | Ok Linux ->
-        Lwt.return_ok ("getconf", [|"getconf"; "PAGE_SIZE"|])
-    | Ok Darwin ->
-        Lwt.return_ok ("pagesize", [|"pagesize"|])
+    uname >>= function
+    | Ok Linux -> Lwt.return_ok ("getconf", [|"getconf"; "PAGE_SIZE"|])
+    | Ok Darwin -> Lwt.return_ok ("pagesize", [|"pagesize"|])
     | Ok (Unknown _) ->
         Lwt.return_error (error_info "pagesize" "Unknown unix system")
     | Error (Unix_system_info_failure e) ->
         Lwt.return_error (error_info "pagesize" e)
-    | Error e ->
-        Lwt.return_error e
+    | Error e -> Lwt.return_error e
   in
-  get_conf_process
-  >>= function
-  | Error e ->
-      Lwt.return_error e
+  get_conf_process >>= function
+  | Error e -> Lwt.return_error e
   | Ok process ->
       Lwt.catch
         (fun () ->
           Lwt_process.with_process_in process ~env:[|"LC_ALL=C"|] (fun pc ->
-              Lwt_io.read_line pc#stdout
-              >>= fun ps -> Lwt.return_ok (int_of_string ps)))
+              Lwt_io.read_line pc#stdout >>= fun ps ->
+              Lwt.return_ok (int_of_string ps)))
         (function
           | exn ->
               Lwt.return_error (error_info "pagesize" (Printexc.to_string exn)))
@@ -95,19 +86,15 @@ let linux_statm pid =
   Lwt.catch
     (fun () ->
       let fname = Format.asprintf "/proc/%d/statm" pid in
-      Lwt_unix.file_exists fname
-      >>= function
+      Lwt_unix.file_exists fname >>= function
       | true ->
           Lwt_io.with_file ~mode:Input fname (fun ic ->
-              Lwt_io.read_line ic
-              >>= fun line ->
+              Lwt_io.read_line ic >>= fun line ->
               match List.map Int64.of_string @@ TzString.split ' ' line with
               | size :: resident :: shared :: text :: lib :: data :: dt :: _
                 -> (
-                  page_size ()
-                  >>= function
-                  | Error e ->
-                      Lwt.return_error e
+                  page_size () >>= function
+                  | Error e -> Lwt.return_error e
                   | Ok page_size ->
                       Lwt.return_ok
                         (Statm
@@ -120,7 +107,7 @@ let linux_statm pid =
                              lib;
                              data;
                              dt;
-                           }) )
+                           }))
               | _ ->
                   Lwt.return_error
                     (error_info
@@ -140,8 +127,7 @@ let darwin_ps pid =
         ~env:[|"LC_ALL=C"|]
         ("ps", [|"ps"; "-o"; "pid,%mem,rss"; "-p"; string_of_int pid|])
         (fun pc ->
-          Lwt_io.read_line_opt pc#stdout
-          >>= function
+          Lwt_io.read_line_opt pc#stdout >>= function
           | None ->
               Lwt.return_error
                 (error_info "ps" "Unexpected ps answer (1st line)")
@@ -153,34 +139,27 @@ let darwin_ps pid =
                   Lwt.return_error
                     (error_info "ps" "Unexpected ps answer (2nd line)")
               | Some ps_stats -> (
-                match TzString.split ' ' ps_stats with
-                | _pid :: mem :: resident :: _ -> (
-                    page_size ()
-                    >>= function
-                    | Error e ->
-                        Lwt.return_error e
-                    | Ok page_size ->
-                        Lwt.return_ok
-                          (Ps
-                             {
-                               page_size;
-                               mem = float_of_string mem;
-                               resident = Int64.of_string resident;
-                             }) )
-                | _ ->
-                    Lwt.return_error (error_info "ps" "Unexpected answer") ) )))
+                  match TzString.split ' ' ps_stats with
+                  | _pid :: mem :: resident :: _ -> (
+                      page_size () >>= function
+                      | Error e -> Lwt.return_error e
+                      | Ok page_size ->
+                          Lwt.return_ok
+                            (Ps
+                               {
+                                 page_size;
+                                 mem = float_of_string mem;
+                                 resident = Int64.of_string resident;
+                               }))
+                  | _ -> Lwt.return_error (error_info "ps" "Unexpected answer"))
+              )))
     (function
       | exn -> Lwt.return_error (error_info "ps" (Printexc.to_string exn)))
 
 let memory_stats () =
   let pid = Unix.getpid () in
-  uname
-  >>= function
-  | Error e ->
-      Lwt.return_error e
-  | Ok Linux ->
-      linux_statm pid
-  | Ok Darwin ->
-      darwin_ps pid
-  | _ ->
-      Lwt.return_error (error_info "memory_stats" "Unknown unix system")
+  uname >>= function
+  | Error e -> Lwt.return_error e
+  | Ok Linux -> linux_statm pid
+  | Ok Darwin -> darwin_ps pid
+  | _ -> Lwt.return_error (error_info "memory_stats" "Unknown unix system")

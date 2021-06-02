@@ -49,8 +49,7 @@ let build_rpc_directory state =
       in
       return statuses) ;
   register1 Worker_services.Prevalidators.S.state (fun chain () () ->
-      Chain_directory.get_chain_id state chain
-      >>= fun chain_id ->
+      Chain_directory.get_chain_id state chain >>= fun chain_id ->
       let workers = Prevalidator.running_workers () in
       let (_, _, t) =
         (* NOTE: it is technically possible to use the Prevalidator interface to
@@ -76,8 +75,7 @@ let build_rpc_directory state =
         }) ;
   (* Workers : Peer validators *)
   register1 Worker_services.Peer_validators.S.list (fun chain () () ->
-      Chain_directory.get_chain_id state chain
-      >>= fun chain_id ->
+      Chain_directory.get_chain_id state chain >>= fun chain_id ->
       return
         (List.filter_map
            (fun ((id, peer_id), w) ->
@@ -90,8 +88,7 @@ let build_rpc_directory state =
              else None)
            (Peer_validator.running_workers ()))) ;
   register2 Worker_services.Peer_validators.S.state (fun chain peer_id () () ->
-      Chain_directory.get_chain_id state chain
-      >>= fun chain_id ->
+      Chain_directory.get_chain_id state chain >>= fun chain_id ->
       let equal (acid, apid) (bcid, bpid) =
         Chain_id.equal acid bcid && P2p_peer.Id.equal apid bpid
       in
@@ -120,8 +117,7 @@ let build_rpc_directory state =
                Chain_validator.pending_requests_length w ))
            (Chain_validator.running_workers ()))) ;
   register1 Worker_services.Chain_validators.S.state (fun chain () () ->
-      Chain_directory.get_chain_id state chain
-      >>= fun chain_id ->
+      Chain_directory.get_chain_id state chain >>= fun chain_id ->
       let w =
         WithExceptions.Option.to_exn ~none:Not_found
         @@ List.assoc
@@ -138,8 +134,7 @@ let build_rpc_directory state =
         }) ;
   (* DistributedDB *)
   register1 Worker_services.Chain_validators.S.ddb_state (fun chain () () ->
-      Chain_directory.get_chain_id state chain
-      >>= fun chain_id ->
+      Chain_directory.get_chain_id state chain >>= fun chain_id ->
       let w =
         WithExceptions.Option.to_exn ~none:Not_found
         @@ List.assoc

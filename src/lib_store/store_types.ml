@@ -99,13 +99,15 @@ module Protocol_levels = struct
   let commit_info_encoding =
     let open Data_encoding in
     conv
-      (fun { author;
+      (fun {
+             author;
              message;
              test_chain_status;
              data_merkle_root;
              predecessor_block_metadata_hash;
              predecessor_ops_metadata_hash;
-             parents_contexts } ->
+             parents_contexts;
+           } ->
         ( author,
           message,
           test_chain_status,

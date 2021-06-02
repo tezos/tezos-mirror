@@ -48,11 +48,9 @@ let asynchronous_flag =
 
 let load_json_file (cctxt : Protocol_client_context.full) json_file =
   match json_file with
-  | None ->
-      return None
+  | None -> return None
   | Some filename ->
-      cctxt#read_file filename
-      >>=? fun json_string ->
+      cctxt#read_file filename >>=? fun json_string ->
       return (Some (Ezjsonm.from_string json_string :> Data_encoding.json))
 
 let create_mockup_command_handler

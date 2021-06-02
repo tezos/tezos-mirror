@@ -32,14 +32,12 @@ let identity_file data_dir =
   data_dir // Node_data_version.default_identity_file_name
 
 let show {Node_config_file.data_dir; _} =
-  Node_identity_file.read (identity_file data_dir)
-  >>=? fun id ->
+  Node_identity_file.read (identity_file data_dir) >>=? fun id ->
   Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
   return_unit
 
 let check {Node_config_file.data_dir; p2p = {expected_pow; _}; _} =
-  Node_identity_file.read ~expected_pow (identity_file data_dir)
-  >>=? fun id ->
+  Node_identity_file.read ~expected_pow (identity_file data_dir) >>=? fun id ->
   Format.printf
     "Peer_id: %a. Proof of work is higher than %.2f.@."
     P2p_peer.Id.pp
@@ -58,7 +56,7 @@ module Term = struct
 
   let process subcommand data_dir config_file expected_pow =
     let res =
-      ( match (data_dir, config_file) with
+      (match (data_dir, config_file) with
       | (None, None) ->
           let default_config =
             Node_config_file.default_data_dir
@@ -67,49 +65,35 @@ module Term = struct
           if Sys.file_exists default_config then
             Node_config_file.read default_config
           else return Node_config_file.default_config
-      | (None, Some config_file) ->
-          Node_config_file.read config_file
+      | (None, Some config_file) -> Node_config_file.read config_file
       | (Some data_dir, None) ->
           Node_config_file.read
             (data_dir // Node_data_version.default_config_file_name)
           >>=? fun cfg -> return {cfg with data_dir}
       | (Some data_dir, Some config_file) ->
-          Node_config_file.read config_file
-          >>=? fun cfg -> return {cfg with data_dir} )
+          Node_config_file.read config_file >>=? fun cfg ->
+          return {cfg with data_dir})
       >>=? fun cfg ->
-      Node_config_file.update ?expected_pow cfg
-      >>=? fun cfg ->
+      Node_config_file.update ?expected_pow cfg >>=? fun cfg ->
       match subcommand with
-      | Show ->
-          show cfg
-      | Generate ->
-          generate cfg
-      | Check ->
-          check cfg
+      | Show -> show cfg
+      | Generate -> generate cfg
+      | Check -> check cfg
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit res with
-    | Ok () ->
-        `Ok ()
-    | Error err ->
-        `Error (false, Format.asprintf "%a" pp_print_error err)
+    | Ok () -> `Ok ()
+    | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
 
   let subcommand_arg =
     let parser = function
-      | "show" ->
-          `Ok Show
-      | "generate" ->
-          `Ok Generate
-      | "check" ->
-          `Ok Check
-      | s ->
-          `Error ("invalid argument: " ^ s)
+      | "show" -> `Ok Show
+      | "generate" -> `Ok Generate
+      | "check" -> `Ok Check
+      | s -> `Error ("invalid argument: " ^ s)
     and printer fmt = function
-      | Show ->
-          Format.fprintf fmt "show"
-      | Generate ->
-          Format.fprintf fmt "generate"
-      | Check ->
-          Format.fprintf fmt "check"
+      | Show -> Format.fprintf fmt "show"
+      | Generate -> Format.fprintf fmt "generate"
+      | Check -> Format.fprintf fmt "check"
     in
     let doc =
       "Operation to perform. Possible values: $(b,show), $(b,generate), \
@@ -130,8 +114,8 @@ module Term = struct
   let term =
     Cmdliner.Term.(
       ret
-        ( const process $ subcommand_arg $ Node_shared_arg.Term.data_dir
-        $ Node_shared_arg.Term.config_file $ expected_pow ))
+        (const process $ subcommand_arg $ Node_shared_arg.Term.data_dir
+       $ Node_shared_arg.Term.config_file $ expected_pow))
 end
 
 module Manpage = struct
@@ -145,7 +129,8 @@ module Manpage = struct
      is necessary to launch Tezos the first time."
 
   let description =
-    [ `S "DESCRIPTION";
+    [
+      `S "DESCRIPTION";
       `P (command_description ^ " Several options are possible:");
       `P
         "$(b,show) reads, parses and displays the current identity of the \
@@ -160,12 +145,14 @@ module Manpage = struct
          proof-of-work, and the difficulty doubles for each increment of 1 in \
          the difficulty value.";
       `P
-        "$(b,check [difficulty]) checks that an identity is valid and that \
-         its proof of work stamp difficulty is at least equal to \
-         $(i,difficulty)." ]
+        "$(b,check [difficulty]) checks that an identity is valid and that its \
+         proof of work stamp difficulty is at least equal to $(i,difficulty).";
+    ]
 
-  let man = description @ (* [ `S misc_docs ] @ *)
-                          Node_shared_arg.Manpage.bugs
+  let man =
+    description
+    @ (* [ `S misc_docs ] @ *)
+    Node_shared_arg.Manpage.bugs
 
   let info = Cmdliner.Term.info ~doc:"Manage node identities" ~man "identity"
 end

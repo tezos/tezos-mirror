@@ -25,8 +25,8 @@
 (*****************************************************************************)
 
 module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t =
-  ( val Ringo.set_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise
-      : Ringo.SET_MAKER )
+  (val Ringo.set_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise
+     : Ringo.SET_MAKER)
     (P2p_peer.Id)
 
 module IPV6 = struct
@@ -44,8 +44,8 @@ end
    This is different from the module above that is used to keep the list of
    greylisted peers *)
 module IpFIFOCache : Ringo.CACHE_SET with type elt = IPV6.t =
-  ( val Ringo.set_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise
-      : Ringo.SET_MAKER )
+  (val Ringo.set_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise
+     : Ringo.SET_MAKER)
     (IPV6)
 
 module IpTable = Hashtbl.Make (struct
@@ -90,8 +90,9 @@ let create ~peer_id_size ~ip_size ~ip_cleanup_delay =
   in
   let delay = Time.System.Span.multiply_exn (1. /. 16.) ip_cleanup_delay in
   let rec cleanup_loop () =
-    Systime_os.sleep delay
-    >>= fun () -> Bloomer.countdown bloomer ; cleanup_loop ()
+    Systime_os.sleep delay >>= fun () ->
+    Bloomer.countdown bloomer ;
+    cleanup_loop ()
   in
   let rec cleanup_start () =
     Lwt_utils.dont_wait

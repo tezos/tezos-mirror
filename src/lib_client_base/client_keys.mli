@@ -109,8 +109,7 @@ module type SIGNER = sig
   val import_secret_key :
     io:Client_context.io_wallet ->
     pk_uri ->
-    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult
-    Lwt.t
+    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
 
   (** [public_key pk] is the Ed25519 version of [pk].*)
   val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
@@ -120,8 +119,7 @@ module type SIGNER = sig
       it can be optionally returned to reduce the amount of queries. *)
   val public_key_hash :
     pk_uri ->
-    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult
-    Lwt.t
+    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
 
   (** [sign ?watermark sk data] is signature obtained by signing [data] with
         [sk]. *)

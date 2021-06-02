@@ -24,8 +24,3 @@
   (name runtest)
   (package tezos-benchmark-type-inference-alpha)
   (deps (alias runtest_inference) (alias runtest_union_find)))
-
-(alias
- (name runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
