@@ -65,8 +65,7 @@ val validate_block :
 (** Monitor all the valid block (for all activate chains). *)
 val watcher : t -> Store.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
-val chains_watcher :
-  t -> (Chain_id.t * bool) Lwt_stream.t * Lwt_watcher.stopper
+val chains_watcher : t -> (Chain_id.t * bool) Lwt_stream.t * Lwt_watcher.stopper
 
 val inject_operation :
   t -> ?chain_id:Chain_id.t -> Operation.t -> unit tzresult Lwt.t

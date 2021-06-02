@@ -29,30 +29,25 @@ let resolve_location (cctxt : #Client_context.full) ~chain (kind : 'a) :
     'a location tzresult Lwt.t =
   let basename =
     match kind with
-    | `Block ->
-        "block"
-    | `Endorsement ->
-        "endorsement"
-    | `Nonce ->
-        "nonce"
+    | `Block -> "block"
+    | `Endorsement -> "endorsement"
+    | `Nonce -> "nonce"
   in
   let test_filename chain_id =
     Format.kasprintf return "test_%a_%s" Chain_id.pp_short chain_id basename
   in
-  ( match chain with
-  | `Main ->
-      return basename
+  (match chain with
+  | `Main -> return basename
   | `Test ->
       (* FIXME: dead code. Cannot be removed because the type
                 Chain_services.chain is common to all the
                 protocols. *)
-      Chain_services.chain_id cctxt ~chain:`Test ()
-      >>=? fun chain_id -> test_filename chain_id
+      Chain_services.chain_id cctxt ~chain:`Test () >>=? fun chain_id ->
+      test_filename chain_id
   | `Hash chain_id ->
-      Chain_services.chain_id cctxt ~chain:`Main ()
-      >>=? fun main_chain_id ->
+      Chain_services.chain_id cctxt ~chain:`Main () >>=? fun main_chain_id ->
       if Chain_id.(chain_id = main_chain_id) then return basename
-      else test_filename chain_id )
+      else test_filename chain_id)
   >>=? fun filename -> return {filename; chain}
 
 let filename {filename; _} = filename

@@ -42,79 +42,77 @@ let encoding msg_encoding =
      + MAX SIZE of encoding *)
   @@ union (* MAX SIZE: max MAX SIZE of cases *)
        ~tag_size:`Uint16
-       ( [ (* MAX SIZE: 2(tag)
-              Note that tags can be 1 or 2 bytes depending on the size of the
-              union. This union is of unknown size because it depends on
-              [msg_encoding]. As a result, we assume a maximum tag size of 2
-              bytes. *)
-           case
-             (Tag 0x01)
-             ~title:"Disconnect"
-             (obj1 (req "kind" (constant "Disconnect")))
-             (function Disconnect -> Some () | _ -> None)
-             (fun () -> Disconnect);
-           (* MAX SIZE: 2(tag) *)
-           case
-             (Tag 0x02)
-             ~title:"Bootstrap"
-             (obj1 (req "kind" (constant "Bootstrap")))
-             (function Bootstrap -> Some () | _ -> None)
-             (fun () -> Bootstrap);
-           (* MAX SIZE:
-              2(tag)
-              + (100(list length)
-                * ((8(number of IPv6 chunks) * 4(size of IPv6 chunks))
-                   + 7(IPv6 chunk separators)
-                   + 1(port separator)
-                   + 5(size of port number))
-              = 4502
-           *)
-           case
-             (Tag 0x03)
-             ~title:"Advertise"
-             (obj2
-                (req "id" (Variable.list ~max_length:100 P2p_point.Id.encoding))
-                (req "kind" (constant "Advertise")))
-             (function Advertise points -> Some (points, ()) | _ -> None)
-             (fun (points, ()) -> Advertise points);
-           (* MAX SIZE:
-              2(tag)
-              + (8 * 4) + 7 + 1 + 5 (point)
-              + 16 (peer)
-              = 63
-           *)
-           case
-             (Tag 0x04)
-             ~title:"Swap_request"
-             (obj3
-                (req "point" P2p_point.Id.encoding)
-                (req "peer_id" P2p_peer.Id.encoding)
-                (req "kind" (constant "Swap_request")))
-             (function
-               | Swap_request (point, peer_id) ->
-                   Some (point, peer_id, ())
-               | _ ->
-                   None)
-             (fun (point, peer_id, ()) -> Swap_request (point, peer_id));
-           (* MAX SIZE:
-              2(tag)
-              + (8 * 4) + 7 + 1 + 5 (point)
-              + 16 (peer)
-              = 63
-           *)
-           case
-             (Tag 0x05)
-             ~title:"Swap_ack"
-             (obj3
-                (req "point" P2p_point.Id.encoding)
-                (req "peer_id" P2p_peer.Id.encoding)
-                (req "kind" (constant "Swap_ack")))
-             (function
-               | Swap_ack (point, peer_id) ->
-                   Some (point, peer_id, ())
-               | _ ->
-                   None)
-             (fun (point, peer_id, ()) -> Swap_ack (point, peer_id)) ]
+       ([
+          (* MAX SIZE: 2(tag)
+             Note that tags can be 1 or 2 bytes depending on the size of the
+             union. This union is of unknown size because it depends on
+             [msg_encoding]. As a result, we assume a maximum tag size of 2
+             bytes. *)
+          case
+            (Tag 0x01)
+            ~title:"Disconnect"
+            (obj1 (req "kind" (constant "Disconnect")))
+            (function Disconnect -> Some () | _ -> None)
+            (fun () -> Disconnect);
+          (* MAX SIZE: 2(tag) *)
+          case
+            (Tag 0x02)
+            ~title:"Bootstrap"
+            (obj1 (req "kind" (constant "Bootstrap")))
+            (function Bootstrap -> Some () | _ -> None)
+            (fun () -> Bootstrap);
+          (* MAX SIZE:
+             2(tag)
+             + (100(list length)
+               * ((8(number of IPv6 chunks) * 4(size of IPv6 chunks))
+                  + 7(IPv6 chunk separators)
+                  + 1(port separator)
+                  + 5(size of port number))
+             = 4502
+          *)
+          case
+            (Tag 0x03)
+            ~title:"Advertise"
+            (obj2
+               (req "id" (Variable.list ~max_length:100 P2p_point.Id.encoding))
+               (req "kind" (constant "Advertise")))
+            (function Advertise points -> Some (points, ()) | _ -> None)
+            (fun (points, ()) -> Advertise points);
+          (* MAX SIZE:
+             2(tag)
+             + (8 * 4) + 7 + 1 + 5 (point)
+             + 16 (peer)
+             = 63
+          *)
+          case
+            (Tag 0x04)
+            ~title:"Swap_request"
+            (obj3
+               (req "point" P2p_point.Id.encoding)
+               (req "peer_id" P2p_peer.Id.encoding)
+               (req "kind" (constant "Swap_request")))
+            (function
+              | Swap_request (point, peer_id) -> Some (point, peer_id, ())
+              | _ -> None)
+            (fun (point, peer_id, ()) -> Swap_request (point, peer_id));
+          (* MAX SIZE:
+             2(tag)
+             + (8 * 4) + 7 + 1 + 5 (point)
+             + 16 (peer)
+             = 63
+          *)
+          case
+            (Tag 0x05)
+            ~title:"Swap_ack"
+            (obj3
+               (req "point" P2p_point.Id.encoding)
+               (req "peer_id" P2p_peer.Id.encoding)
+               (req "kind" (constant "Swap_ack")))
+            (function
+              | Swap_ack (point, peer_id) -> Some (point, peer_id, ())
+              | _ -> None)
+            (fun (point, peer_id, ()) -> Swap_ack (point, peer_id));
+        ]
        @ ListLabels.map msg_encoding ~f:(function
              | P2p_params.Encoding
                  {tag; title; encoding; wrap; unwrap; max_length = _ (* ?? *)}
@@ -124,4 +122,4 @@ let encoding msg_encoding =
                ~title
                encoding
                (function Message msg -> unwrap msg | _ -> None)
-               (fun msg -> Message (wrap msg))) )
+               (fun msg -> Message (wrap msg))))

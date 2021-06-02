@@ -27,8 +27,7 @@ open Error_monad
 
 type 'a parsing_result = 'a * error list
 
-val compare :
-  ('a -> 'a -> int) -> 'a parsing_result -> 'a parsing_result -> int
+val compare : ('a -> 'a -> int) -> 'a parsing_result -> 'a parsing_result -> int
 
 val no_parsing_error : 'a parsing_result -> 'a tzresult
 

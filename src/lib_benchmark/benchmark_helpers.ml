@@ -37,7 +37,8 @@ let load_json file =
       Format.eprintf "load_json: file %s could not be parsed, exiting" file ;
       exit 1
   in
-  close_in ic ; json
+  close_in ic ;
+  json
 
 let make_progress_printer fmtr total message =
   let counter = ref 1 in
@@ -59,8 +60,7 @@ let rec enumerate_injections n l current_pick acc =
 
 and enumerate_picks n l current_pick acc =
   match l with
-  | [] ->
-      acc
+  | [] -> acc
   | x :: tl ->
       let extended_pick = x :: current_pick in
       let acc = enumerate_injections (n - 1) tl extended_pick acc in

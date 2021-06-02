@@ -74,8 +74,8 @@ let test_gas_storage_limits =
   in
   if giver_balance <> expected_giver_balance then
     Test.fail
-      "test_gas_storage_limits: unexpected balance for giver (got %f, \
-       expected %f)"
+      "test_gas_storage_limits: unexpected balance for giver (got %f, expected \
+       %f)"
       giver_balance
       expected_giver_balance
   else return ()

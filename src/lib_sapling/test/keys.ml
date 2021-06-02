@@ -25,8 +25,8 @@ module Vector = struct
   }
 
   let vectors =
-    let vector_of_strings sk ask nsk ovk ak nk ivk default_d default_pk_d
-        note_v note_r note_cm note_pos note_nf =
+    let vector_of_strings sk ask nsk ovk ak nk ivk default_d default_pk_d note_v
+        note_r note_cm note_pos note_nf =
       let note_v =
         let amount = Int64.of_string note_v in
         assert (R.valid_amount amount) ;
@@ -69,20 +69,7 @@ module Vector = struct
       (fun line ->
         Scanf.sscanf
           line
-          "%s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s@,\
-          \ %s"
+          "%s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s@, %s"
           vector_of_strings)
       lines
 end
@@ -167,8 +154,7 @@ let xsks_raw =
   List.fold_left
     (fun acc v ->
       match v.xsk with
-      | None ->
-          acc
+      | None -> acc
       | Some xsk ->
           xsk |> R.of_zip32_expanded_spending_key |> Sk.of_bytes
           |> Stdlib.Option.get

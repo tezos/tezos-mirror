@@ -77,10 +77,12 @@ type _ successful_manager_operation_result =
       -> Kind.delegation successful_manager_operation_result
 
 let migration_origination_result_to_successful_manager_operation_result
-    ({ balance_updates;
+    ({
+       balance_updates;
        originated_contracts;
        storage_size;
-       paid_storage_size_diff } :
+       paid_storage_size_diff;
+     } :
       Migration.origination_result) =
   Origination_result
     {
@@ -140,20 +142,18 @@ module Manager_result = struct
       def (Format.asprintf "operation.alpha.operation_result.%s" name)
       @@ union
            ~tag_size:`Uint8
-           [ case
+           [
+             case
                (Tag 0)
                ~title:"Applied"
                (merge_objs (obj1 (req "status" (constant "applied"))) encoding)
                (fun o ->
                  match o with
-                 | Skipped _ | Failed _ | Backtracked _ ->
-                     None
+                 | Skipped _ | Failed _ | Backtracked _ -> None
                  | Applied o -> (
-                   match select (Successful_manager_result o) with
-                   | None ->
-                       None
-                   | Some o ->
-                       Some ((), proj o) ))
+                     match select (Successful_manager_result o) with
+                     | None -> None
+                     | Some o -> Some ((), proj o)))
                (fun ((), x) -> Applied (inj x));
              case
                (Tag 1)
@@ -179,15 +179,13 @@ module Manager_result = struct
                   encoding)
                (fun o ->
                  match o with
-                 | Skipped _ | Failed _ | Applied _ ->
-                     None
+                 | Skipped _ | Failed _ | Applied _ -> None
                  | Backtracked (o, errs) -> (
-                   match select (Successful_manager_result o) with
-                   | None ->
-                       None
-                   | Some o ->
-                       Some (((), errs), proj o) ))
-               (fun (((), errs), x) -> Backtracked (inj x, errs)) ]
+                     match select (Successful_manager_result o) with
+                     | None -> None
+                     | Some o -> Some (((), errs), proj o)))
+               (fun (((), errs), x) -> Backtracked (inj x, errs));
+           ]
     in
     MCase {op_case; encoding; kind; iselect; select; proj; inj; t}
 
@@ -202,13 +200,10 @@ module Manager_result = struct
       ~iselect:(function
         | Internal_operation_result (({operation = Reveal _; _} as op), res) ->
             Some (op, res)
-        | _ ->
-            None)
+        | _ -> None)
       ~select:(function
-        | Successful_manager_result (Reveal_result _ as op) ->
-            Some op
-        | _ ->
-            None)
+        | Successful_manager_result (Reveal_result _ as op) -> Some op
+        | _ -> None)
       ~kind:Kind.Reveal_manager_kind
       ~proj:(function
         | Reveal_result {consumed_gas} ->
@@ -238,27 +233,26 @@ module Manager_result = struct
            (dft "allocated_destination_contract" bool false)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
       ~iselect:(function
-        | Internal_operation_result
-            (({operation = Transaction _; _} as op), res) ->
+        | Internal_operation_result (({operation = Transaction _; _} as op), res)
+          ->
             Some (op, res)
-        | _ ->
-            None)
+        | _ -> None)
       ~select:(function
-        | Successful_manager_result (Transaction_result _ as op) ->
-            Some op
-        | _ ->
-            None)
+        | Successful_manager_result (Transaction_result _ as op) -> Some op
+        | _ -> None)
       ~kind:Kind.Transaction_manager_kind
       ~proj:(function
         | Transaction_result
-            { storage;
+            {
+              storage;
               lazy_storage_diff;
               balance_updates;
               originated_contracts;
               consumed_gas;
               storage_size;
               paid_storage_size_diff;
-              allocated_destination_contract } ->
+              allocated_destination_contract;
+            } ->
             ( storage,
               lazy_storage_diff,
               balance_updates,
@@ -315,24 +309,23 @@ module Manager_result = struct
            (dft "paid_storage_size_diff" z Z.zero)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
       ~iselect:(function
-        | Internal_operation_result
-            (({operation = Origination _; _} as op), res) ->
+        | Internal_operation_result (({operation = Origination _; _} as op), res)
+          ->
             Some (op, res)
-        | _ ->
-            None)
+        | _ -> None)
       ~select:(function
-        | Successful_manager_result (Origination_result _ as op) ->
-            Some op
-        | _ ->
-            None)
+        | Successful_manager_result (Origination_result _ as op) -> Some op
+        | _ -> None)
       ~proj:(function
         | Origination_result
-            { lazy_storage_diff;
+            {
+              lazy_storage_diff;
               balance_updates;
               originated_contracts;
               consumed_gas;
               storage_size;
-              paid_storage_size_diff } ->
+              paid_storage_size_diff;
+            } ->
             ( lazy_storage_diff,
               balance_updates,
               originated_contracts,
@@ -377,13 +370,10 @@ module Manager_result = struct
         | Internal_operation_result (({operation = Delegation _; _} as op), res)
           ->
             Some (op, res)
-        | _ ->
-            None)
+        | _ -> None)
       ~select:(function
-        | Successful_manager_result (Delegation_result _ as op) ->
-            Some op
-        | _ ->
-            None)
+        | Successful_manager_result (Delegation_result _ as op) -> Some op
+        | _ -> None)
       ~kind:Kind.Delegation_manager_kind
       ~proj:(function
         | Delegation_result {consumed_gas} ->
@@ -413,18 +403,19 @@ let internal_operation_result_encoding :
         match res_case.iselect op with
         | Some (op, res) ->
             Some (((), op.source, op.nonce), (op_case.proj op.operation, res))
-        | None ->
-            None)
+        | None -> None)
       (fun (((), source, nonce), (op, res)) ->
         let op = {source; operation = op_case.inj op; nonce} in
         Internal_operation_result (op, res))
   in
   def "operation.alpha.internal_operation_result"
   @@ union
-       [ make Manager_result.reveal_case;
+       [
+         make Manager_result.reveal_case;
          make Manager_result.transaction_case;
          make Manager_result.origination_case;
-         make Manager_result.delegation_case ]
+         make Manager_result.delegation_case;
+       ]
 
 let successful_manager_operation_result_encoding :
     packed_successful_manager_operation_result Data_encoding.t =
@@ -439,18 +430,18 @@ let successful_manager_operation_result_encoding :
       (merge_objs (obj1 (req "kind" (constant op_case.name))) res_case.encoding)
       (fun res ->
         match res_case.select res with
-        | Some res ->
-            Some ((), res_case.proj res)
-        | None ->
-            None)
+        | Some res -> Some ((), res_case.proj res)
+        | None -> None)
       (fun ((), res) -> Successful_manager_result (res_case.inj res))
   in
   def "operation.alpha.successful_manager_operation_result"
   @@ union
-       [ make Manager_result.reveal_case;
+       [
+         make Manager_result.reveal_case;
          make Manager_result.transaction_case;
          make Manager_result.origination_case;
-         make Manager_result.delegation_case ]
+         make Manager_result.delegation_case;
+       ]
 
 type 'kind contents_result =
   | Endorsement_result : {
@@ -497,22 +488,14 @@ let equal_manager_kind :
     type a b. a Kind.manager -> b Kind.manager -> (a, b) eq option =
  fun ka kb ->
   match (ka, kb) with
-  | (Kind.Reveal_manager_kind, Kind.Reveal_manager_kind) ->
-      Some Eq
-  | (Kind.Reveal_manager_kind, _) ->
-      None
-  | (Kind.Transaction_manager_kind, Kind.Transaction_manager_kind) ->
-      Some Eq
-  | (Kind.Transaction_manager_kind, _) ->
-      None
-  | (Kind.Origination_manager_kind, Kind.Origination_manager_kind) ->
-      Some Eq
-  | (Kind.Origination_manager_kind, _) ->
-      None
-  | (Kind.Delegation_manager_kind, Kind.Delegation_manager_kind) ->
-      Some Eq
-  | (Kind.Delegation_manager_kind, _) ->
-      None
+  | (Kind.Reveal_manager_kind, Kind.Reveal_manager_kind) -> Some Eq
+  | (Kind.Reveal_manager_kind, _) -> None
+  | (Kind.Transaction_manager_kind, Kind.Transaction_manager_kind) -> Some Eq
+  | (Kind.Transaction_manager_kind, _) -> None
+  | (Kind.Origination_manager_kind, Kind.Origination_manager_kind) -> Some Eq
+  | (Kind.Origination_manager_kind, _) -> None
+  | (Kind.Delegation_manager_kind, Kind.Delegation_manager_kind) -> Some Eq
+  | (Kind.Delegation_manager_kind, _) -> None
 
 module Encoding = struct
   type 'kind case =
@@ -551,10 +534,8 @@ module Encoding = struct
           | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Endorsement _ as op), res) ->
-              Some (op, res)
-          | _ ->
-              None);
+          | Contents_and_result ((Endorsement _ as op), res) -> Some (op, res)
+          | _ -> None);
         proj =
           (function
           | Endorsement_result {balance_updates; delegate; slots} ->
@@ -568,20 +549,16 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.seed_nonce_revelation_case;
-        encoding =
-          obj1 (req "balance_updates" Receipt.balance_updates_encoding);
+        encoding = obj1 (req "balance_updates" Receipt.balance_updates_encoding);
         select =
           (function
-          | Contents_result (Seed_nonce_revelation_result _ as op) ->
-              Some op
-          | _ ->
-              None);
+          | Contents_result (Seed_nonce_revelation_result _ as op) -> Some op
+          | _ -> None);
         mselect =
           (function
           | Contents_and_result ((Seed_nonce_revelation _ as op), res) ->
               Some (op, res)
-          | _ ->
-              None);
+          | _ -> None);
         proj = (fun (Seed_nonce_revelation_result bus) -> bus);
         inj = (fun bus -> Seed_nonce_revelation_result bus);
       }
@@ -597,16 +574,13 @@ module Encoding = struct
             (req "slots" (list uint16));
         select =
           (function
-          | Contents_result (Endorsement_with_slot_result _ as op) ->
-              Some op
-          | _ ->
-              None);
+          | Contents_result (Endorsement_with_slot_result _ as op) -> Some op
+          | _ -> None);
         mselect =
           (function
           | Contents_and_result ((Endorsement_with_slot _ as op), res) ->
               Some (op, res)
-          | _ ->
-              None);
+          | _ -> None);
         proj =
           (function
           | Endorsement_with_slot_result
@@ -622,20 +596,17 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.double_endorsement_evidence_case;
-        encoding =
-          obj1 (req "balance_updates" Receipt.balance_updates_encoding);
+        encoding = obj1 (req "balance_updates" Receipt.balance_updates_encoding);
         select =
           (function
           | Contents_result (Double_endorsement_evidence_result _ as op) ->
               Some op
-          | _ ->
-              None);
+          | _ -> None);
         mselect =
           (function
           | Contents_and_result ((Double_endorsement_evidence _ as op), res) ->
               Some (op, res)
-          | _ ->
-              None);
+          | _ -> None);
         proj = (fun (Double_endorsement_evidence_result bus) -> bus);
         inj = (fun bus -> Double_endorsement_evidence_result bus);
       }
@@ -644,20 +615,16 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.double_baking_evidence_case;
-        encoding =
-          obj1 (req "balance_updates" Receipt.balance_updates_encoding);
+        encoding = obj1 (req "balance_updates" Receipt.balance_updates_encoding);
         select =
           (function
-          | Contents_result (Double_baking_evidence_result _ as op) ->
-              Some op
-          | _ ->
-              None);
+          | Contents_result (Double_baking_evidence_result _ as op) -> Some op
+          | _ -> None);
         mselect =
           (function
           | Contents_and_result ((Double_baking_evidence _ as op), res) ->
               Some (op, res)
-          | _ ->
-              None);
+          | _ -> None);
         proj = (fun (Double_baking_evidence_result bus) -> bus);
         inj = (fun bus -> Double_baking_evidence_result bus);
       }
@@ -666,20 +633,16 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.activate_account_case;
-        encoding =
-          obj1 (req "balance_updates" Receipt.balance_updates_encoding);
+        encoding = obj1 (req "balance_updates" Receipt.balance_updates_encoding);
         select =
           (function
-          | Contents_result (Activate_account_result _ as op) ->
-              Some op
-          | _ ->
-              None);
+          | Contents_result (Activate_account_result _ as op) -> Some op
+          | _ -> None);
         mselect =
           (function
           | Contents_and_result ((Activate_account _ as op), res) ->
               Some (op, res)
-          | _ ->
-              None);
+          | _ -> None);
         proj = (fun (Activate_account_result bus) -> bus);
         inj = (fun bus -> Activate_account_result bus);
       }
@@ -694,10 +657,8 @@ module Encoding = struct
           | Contents_result (Proposals_result as op) -> Some op | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Proposals _ as op), res) ->
-              Some (op, res)
-          | _ ->
-              None);
+          | Contents_and_result ((Proposals _ as op), res) -> Some (op, res)
+          | _ -> None);
         proj = (fun Proposals_result -> ());
         inj = (fun () -> Proposals_result);
       }
@@ -712,10 +673,8 @@ module Encoding = struct
           | Contents_result (Ballot_result as op) -> Some op | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Ballot _ as op), res) ->
-              Some (op, res)
-          | _ ->
-              None);
+          | Contents_and_result ((Ballot _ as op), res) -> Some (op, res)
+          | _ -> None);
         proj = (fun Ballot_result -> ());
         inj = (fun () -> Ballot_result);
       }
@@ -740,65 +699,55 @@ module Encoding = struct
           | Contents_result
               (Manager_operation_result
                 ({operation_result = Applied res; _} as op)) -> (
-            match res_case.select (Successful_manager_result res) with
-            | Some res ->
-                Some
-                  (Manager_operation_result
-                     {op with operation_result = Applied res})
-            | None ->
-                None )
+              match res_case.select (Successful_manager_result res) with
+              | Some res ->
+                  Some
+                    (Manager_operation_result
+                       {op with operation_result = Applied res})
+              | None -> None)
           | Contents_result
               (Manager_operation_result
                 ({operation_result = Backtracked (res, errs); _} as op)) -> (
-            match res_case.select (Successful_manager_result res) with
-            | Some res ->
-                Some
-                  (Manager_operation_result
-                     {op with operation_result = Backtracked (res, errs)})
-            | None ->
-                None )
+              match res_case.select (Successful_manager_result res) with
+              | Some res ->
+                  Some
+                    (Manager_operation_result
+                       {op with operation_result = Backtracked (res, errs)})
+              | None -> None)
           | Contents_result
               (Manager_operation_result
                 ({operation_result = Skipped kind; _} as op)) -> (
-            match equal_manager_kind kind res_case.kind with
-            | None ->
-                None
-            | Some Eq ->
-                Some
-                  (Manager_operation_result
-                     {op with operation_result = Skipped kind}) )
+              match equal_manager_kind kind res_case.kind with
+              | None -> None
+              | Some Eq ->
+                  Some
+                    (Manager_operation_result
+                       {op with operation_result = Skipped kind}))
           | Contents_result
               (Manager_operation_result
                 ({operation_result = Failed (kind, errs); _} as op)) -> (
-            match equal_manager_kind kind res_case.kind with
-            | None ->
-                None
-            | Some Eq ->
-                Some
-                  (Manager_operation_result
-                     {op with operation_result = Failed (kind, errs)}) )
-          | Contents_result Ballot_result ->
-              None
-          | Contents_result (Endorsement_result _) ->
-              None
-          | Contents_result (Seed_nonce_revelation_result _) ->
-              None
-          | Contents_result (Endorsement_with_slot_result _) ->
-              None
-          | Contents_result (Double_endorsement_evidence_result _) ->
-              None
-          | Contents_result (Double_baking_evidence_result _) ->
-              None
-          | Contents_result (Activate_account_result _) ->
-              None
-          | Contents_result Proposals_result ->
-              None);
+              match equal_manager_kind kind res_case.kind with
+              | None -> None
+              | Some Eq ->
+                  Some
+                    (Manager_operation_result
+                       {op with operation_result = Failed (kind, errs)}))
+          | Contents_result Ballot_result -> None
+          | Contents_result (Endorsement_result _) -> None
+          | Contents_result (Seed_nonce_revelation_result _) -> None
+          | Contents_result (Endorsement_with_slot_result _) -> None
+          | Contents_result (Double_endorsement_evidence_result _) -> None
+          | Contents_result (Double_baking_evidence_result _) -> None
+          | Contents_result (Activate_account_result _) -> None
+          | Contents_result Proposals_result -> None);
         mselect;
         proj =
           (fun (Manager_operation_result
-                 { balance_updates = bus;
+                 {
+                   balance_updates = bus;
                    operation_result = r;
-                   internal_operation_results = rs }) ->
+                   internal_operation_results = rs;
+                 }) ->
             (bus, r, rs));
         inj =
           (fun (bus, r, rs) ->
@@ -818,8 +767,7 @@ module Encoding = struct
         | Contents_and_result
             ((Manager_operation {operation = Reveal _; _} as op), res) ->
             Some (op, res)
-        | _ ->
-            None)
+        | _ -> None)
 
   let[@coq_axiom_with_reason "gadt"] transaction_case =
     make_manager_case
@@ -829,8 +777,7 @@ module Encoding = struct
         | Contents_and_result
             ((Manager_operation {operation = Transaction _; _} as op), res) ->
             Some (op, res)
-        | _ ->
-            None)
+        | _ -> None)
 
   let[@coq_axiom_with_reason "gadt"] origination_case =
     make_manager_case
@@ -840,8 +787,7 @@ module Encoding = struct
         | Contents_and_result
             ((Manager_operation {operation = Origination _; _} as op), res) ->
             Some (op, res)
-        | _ ->
-            None)
+        | _ -> None)
 
   let[@coq_axiom_with_reason "gadt"] delegation_case =
     make_manager_case
@@ -851,29 +797,29 @@ module Encoding = struct
         | Contents_and_result
             ((Manager_operation {operation = Delegation _; _} as op), res) ->
             Some (op, res)
-        | _ ->
-            None)
+        | _ -> None)
 end
 
 let contents_result_encoding =
   let open Encoding in
   let make
       (Case
-        { op_case = Operation.Encoding.Case {tag; name; _};
+        {
+          op_case = Operation.Encoding.Case {tag; name; _};
           encoding;
           mselect = _;
           select;
           proj;
-          inj }) =
-    let proj x =
-      match select x with None -> None | Some x -> Some (proj x)
-    in
+          inj;
+        }) =
+    let proj x = match select x with None -> None | Some x -> Some (proj x) in
     let inj x = Contents_result (inj x) in
     tagged_case (Tag tag) name encoding proj inj
   in
   def "operation.alpha.contents_result"
   @@ union
-       [ make endorsement_case;
+       [
+         make endorsement_case;
          make seed_nonce_revelation_case;
          make endorsement_with_slot_case;
          make double_endorsement_evidence_case;
@@ -884,24 +830,25 @@ let contents_result_encoding =
          make reveal_case;
          make transaction_case;
          make origination_case;
-         make delegation_case ]
+         make delegation_case;
+       ]
 
 let contents_and_result_encoding =
   let open Encoding in
   let make
       (Case
-        { op_case = Operation.Encoding.Case {tag; name; encoding; proj; inj; _};
+        {
+          op_case = Operation.Encoding.Case {tag; name; encoding; proj; inj; _};
           mselect;
           encoding = meta_encoding;
           proj = meta_proj;
           inj = meta_inj;
-          _ }) =
+          _;
+        }) =
     let proj c =
       match mselect c with
-      | Some (op, res) ->
-          Some (proj op, meta_proj res)
-      | _ ->
-          None
+      | Some (op, res) -> Some (proj op, meta_proj res)
+      | _ -> None
     in
     let inj (op, res) = Contents_and_result (inj op, meta_inj res) in
     let encoding = merge_objs encoding (obj1 (req "metadata" meta_encoding)) in
@@ -909,7 +856,8 @@ let contents_and_result_encoding =
   in
   def "operation.alpha.operation_contents_and_result"
   @@ union
-       [ make endorsement_case;
+       [
+         make endorsement_case;
          make seed_nonce_revelation_case;
          make endorsement_with_slot_case;
          make double_endorsement_evidence_case;
@@ -920,7 +868,8 @@ let contents_and_result_encoding =
          make reveal_case;
          make transaction_case;
          make origination_case;
-         make delegation_case ]
+         make delegation_case;
+       ]
 
 type 'kind contents_result_list =
   | Single_result : 'kind contents_result -> 'kind contents_result_list
@@ -936,16 +885,13 @@ type packed_contents_result_list =
 
 let contents_result_list_encoding =
   let rec to_list = function
-    | Contents_result_list (Single_result o) ->
-        [Contents_result o]
+    | Contents_result_list (Single_result o) -> [Contents_result o]
     | Contents_result_list (Cons_result (o, os)) ->
         Contents_result o :: to_list (Contents_result_list os)
   in
   let rec of_list = function
-    | [] ->
-        Pervasives.failwith "cannot decode empty operation result"
-    | [Contents_result o] ->
-        Contents_result_list (Single_result o)
+    | [] -> Pervasives.failwith "cannot decode empty operation result"
+    | [Contents_result o] -> Contents_result_list (Single_result o)
     | Contents_result o :: os -> (
         let (Contents_result_list os) = of_list os in
         match (o, os) with
@@ -954,8 +900,7 @@ let contents_result_list_encoding =
             Contents_result_list (Cons_result (o, os))
         | (Manager_operation_result _, Cons_result _) ->
             Contents_result_list (Cons_result (o, os))
-        | _ ->
-            Pervasives.failwith "cannot decode ill-formed operation result" )
+        | _ -> Pervasives.failwith "cannot decode ill-formed operation result")
   in
   def "operation.alpha.contents_list_result"
   @@ conv to_list of_list (list contents_result_encoding)
@@ -980,12 +925,10 @@ let contents_and_result_list_encoding =
     | Contents_and_result_list (Single_and_result (op, res)) ->
         [Contents_and_result (op, res)]
     | Contents_and_result_list (Cons_and_result (op, res, rest)) ->
-        Contents_and_result (op, res)
-        :: to_list (Contents_and_result_list rest)
+        Contents_and_result (op, res) :: to_list (Contents_and_result_list rest)
   in
   let rec of_list = function
-    | [] ->
-        Pervasives.failwith "cannot decode empty combined operation result"
+    | [] -> Pervasives.failwith "cannot decode empty combined operation result"
     | [Contents_and_result (op, res)] ->
         Contents_and_result_list (Single_and_result (op, res))
     | Contents_and_result (op, res) :: rest -> (
@@ -997,7 +940,7 @@ let contents_and_result_list_encoding =
             Contents_and_result_list (Cons_and_result (op, res, rest))
         | _ ->
             Pervasives.failwith
-              "cannot decode ill-formed combined operation result" )
+              "cannot decode ill-formed combined operation result")
   in
   conv to_list of_list (Variable.list contents_and_result_encoding)
 
@@ -1010,15 +953,15 @@ type packed_operation_metadata =
 let operation_metadata_encoding =
   def "operation.alpha.result"
   @@ union
-       [ case
+       [
+         case
            (Tag 0)
            ~title:"Operation_metadata"
            contents_result_list_encoding
            (function
              | Operation_metadata {contents} ->
                  Some (Contents_result_list contents)
-             | _ ->
-                 None)
+             | _ -> None)
            (fun (Contents_result_list contents) ->
              Operation_metadata {contents});
          case
@@ -1026,45 +969,31 @@ let operation_metadata_encoding =
            ~title:"No_operation_metadata"
            empty
            (function No_operation_metadata -> Some () | _ -> None)
-           (fun () -> No_operation_metadata) ]
+           (fun () -> No_operation_metadata);
+       ]
 
 let kind_equal :
     type kind kind2.
     kind contents -> kind2 contents_result -> (kind, kind2) eq option =
  fun op res ->
   match (op, res) with
-  | (Endorsement _, Endorsement_result _) ->
-      Some Eq
-  | (Endorsement _, _) ->
-      None
-  | (Seed_nonce_revelation _, Seed_nonce_revelation_result _) ->
-      Some Eq
-  | (Seed_nonce_revelation _, _) ->
-      None
-  | (Endorsement_with_slot _, Endorsement_with_slot_result _) ->
-      Some Eq
-  | (Endorsement_with_slot _, _) ->
-      None
+  | (Endorsement _, Endorsement_result _) -> Some Eq
+  | (Endorsement _, _) -> None
+  | (Seed_nonce_revelation _, Seed_nonce_revelation_result _) -> Some Eq
+  | (Seed_nonce_revelation _, _) -> None
+  | (Endorsement_with_slot _, Endorsement_with_slot_result _) -> Some Eq
+  | (Endorsement_with_slot _, _) -> None
   | (Double_endorsement_evidence _, Double_endorsement_evidence_result _) ->
       Some Eq
-  | (Double_endorsement_evidence _, _) ->
-      None
-  | (Double_baking_evidence _, Double_baking_evidence_result _) ->
-      Some Eq
-  | (Double_baking_evidence _, _) ->
-      None
-  | (Activate_account _, Activate_account_result _) ->
-      Some Eq
-  | (Activate_account _, _) ->
-      None
-  | (Proposals _, Proposals_result) ->
-      Some Eq
-  | (Proposals _, _) ->
-      None
-  | (Ballot _, Ballot_result) ->
-      Some Eq
-  | (Ballot _, _) ->
-      None
+  | (Double_endorsement_evidence _, _) -> None
+  | (Double_baking_evidence _, Double_baking_evidence_result _) -> Some Eq
+  | (Double_baking_evidence _, _) -> None
+  | (Activate_account _, Activate_account_result _) -> Some Eq
+  | (Activate_account _, _) -> None
+  | (Proposals _, Proposals_result) -> Some Eq
+  | (Proposals _, _) -> None
+  | (Ballot _, Ballot_result) -> Some Eq
+  | (Ballot _, _) -> None
   | (Failing_noop _, _) ->
       (* the Failing_noop operation always fails and can't have result *)
       None
@@ -1078,16 +1007,17 @@ let kind_equal :
       Some Eq
   | ( Manager_operation {operation = Reveal _; _},
       Manager_operation_result
-        { operation_result = Failed (Alpha_context.Kind.Reveal_manager_kind, _);
-          _ } ) ->
+        {
+          operation_result = Failed (Alpha_context.Kind.Reveal_manager_kind, _);
+          _;
+        } ) ->
       Some Eq
   | ( Manager_operation {operation = Reveal _; _},
       Manager_operation_result
         {operation_result = Skipped Alpha_context.Kind.Reveal_manager_kind; _}
     ) ->
       Some Eq
-  | (Manager_operation {operation = Reveal _; _}, _) ->
-      None
+  | (Manager_operation {operation = Reveal _; _}, _) -> None
   | ( Manager_operation {operation = Transaction _; _},
       Manager_operation_result
         {operation_result = Applied (Transaction_result _); _} ) ->
@@ -1098,17 +1028,20 @@ let kind_equal :
       Some Eq
   | ( Manager_operation {operation = Transaction _; _},
       Manager_operation_result
-        { operation_result =
+        {
+          operation_result =
             Failed (Alpha_context.Kind.Transaction_manager_kind, _);
-          _ } ) ->
+          _;
+        } ) ->
       Some Eq
   | ( Manager_operation {operation = Transaction _; _},
       Manager_operation_result
-        { operation_result = Skipped Alpha_context.Kind.Transaction_manager_kind;
-          _ } ) ->
+        {
+          operation_result = Skipped Alpha_context.Kind.Transaction_manager_kind;
+          _;
+        } ) ->
       Some Eq
-  | (Manager_operation {operation = Transaction _; _}, _) ->
-      None
+  | (Manager_operation {operation = Transaction _; _}, _) -> None
   | ( Manager_operation {operation = Origination _; _},
       Manager_operation_result
         {operation_result = Applied (Origination_result _); _} ) ->
@@ -1119,17 +1052,20 @@ let kind_equal :
       Some Eq
   | ( Manager_operation {operation = Origination _; _},
       Manager_operation_result
-        { operation_result =
+        {
+          operation_result =
             Failed (Alpha_context.Kind.Origination_manager_kind, _);
-          _ } ) ->
+          _;
+        } ) ->
       Some Eq
   | ( Manager_operation {operation = Origination _; _},
       Manager_operation_result
-        { operation_result = Skipped Alpha_context.Kind.Origination_manager_kind;
-          _ } ) ->
+        {
+          operation_result = Skipped Alpha_context.Kind.Origination_manager_kind;
+          _;
+        } ) ->
       Some Eq
-  | (Manager_operation {operation = Origination _; _}, _) ->
-      None
+  | (Manager_operation {operation = Origination _; _}, _) -> None
   | ( Manager_operation {operation = Delegation _; _},
       Manager_operation_result
         {operation_result = Applied (Delegation_result _); _} ) ->
@@ -1140,17 +1076,20 @@ let kind_equal :
       Some Eq
   | ( Manager_operation {operation = Delegation _; _},
       Manager_operation_result
-        { operation_result =
+        {
+          operation_result =
             Failed (Alpha_context.Kind.Delegation_manager_kind, _);
-          _ } ) ->
+          _;
+        } ) ->
       Some Eq
   | ( Manager_operation {operation = Delegation _; _},
       Manager_operation_result
-        { operation_result = Skipped Alpha_context.Kind.Delegation_manager_kind;
-          _ } ) ->
+        {
+          operation_result = Skipped Alpha_context.Kind.Delegation_manager_kind;
+          _;
+        } ) ->
       Some Eq
-  | (Manager_operation {operation = Delegation _; _}, _) ->
-      None
+  | (Manager_operation {operation = Delegation _; _}, _) -> None
 
 let rec kind_equal_list :
     type kind kind2.
@@ -1159,15 +1098,15 @@ let rec kind_equal_list :
  fun contents res ->
   match (contents, res) with
   | (Single op, Single_result res) -> (
-    match kind_equal op res with None -> None | Some Eq -> Some Eq )
+      match kind_equal op res with None -> None | Some Eq -> Some Eq)
   | (Cons (op, ops), Cons_result (res, ress)) -> (
-    match kind_equal op res with
-    | None ->
-        None
-    | Some Eq -> (
-      match kind_equal_list ops ress with None -> None | Some Eq -> Some Eq ) )
-  | _ ->
-      None
+      match kind_equal op res with
+      | None -> None
+      | Some Eq -> (
+          match kind_equal_list ops ress with
+          | None -> None
+          | Some Eq -> Some Eq))
+  | _ -> None
 
 let[@coq_axiom_with_reason "gadt"] rec pack_contents_list :
     type kind.
@@ -1176,8 +1115,7 @@ let[@coq_axiom_with_reason "gadt"] rec pack_contents_list :
     kind contents_and_result_list =
  fun contents res ->
   match (contents, res) with
-  | (Single op, Single_result res) ->
-      Single_and_result (op, res)
+  | (Single op, Single_result res) -> Single_and_result (op, res)
   | (Cons (op, ops), Cons_result (res, ress)) ->
       Cons_and_result (op, res, pack_contents_list ops ress)
   | ( Single (Manager_operation _),
@@ -1188,41 +1126,36 @@ let[@coq_axiom_with_reason "gadt"] rec pack_contents_list :
     ) ->
       .
   | ( Cons (_, _),
-      Single_result
-        (Manager_operation_result {operation_result = Skipped _; _}) ) ->
+      Single_result (Manager_operation_result {operation_result = Skipped _; _})
+    ) ->
       .
   | ( Cons (_, _),
-      Single_result
-        (Manager_operation_result {operation_result = Applied _; _}) ) ->
+      Single_result (Manager_operation_result {operation_result = Applied _; _})
+    ) ->
       .
   | ( Cons (_, _),
       Single_result
         (Manager_operation_result {operation_result = Backtracked _; _}) ) ->
       .
-  | (Single _, Cons_result _) ->
-      .
+  | (Single _, Cons_result _) -> .
 
 let rec unpack_contents_list :
     type kind.
     kind contents_and_result_list ->
     kind contents_list * kind contents_result_list = function
-  | Single_and_result (op, res) ->
-      (Single op, Single_result res)
+  | Single_and_result (op, res) -> (Single op, Single_result res)
   | Cons_and_result (op, res, rest) ->
       let (ops, ress) = unpack_contents_list rest in
       (Cons (op, ops), Cons_result (res, ress))
 
 let rec to_list = function
-  | Contents_result_list (Single_result o) ->
-      [Contents_result o]
+  | Contents_result_list (Single_result o) -> [Contents_result o]
   | Contents_result_list (Cons_result (o, os)) ->
       Contents_result o :: to_list (Contents_result_list os)
 
 let rec of_list = function
-  | [] ->
-      assert false
-  | [Contents_result o] ->
-      Contents_result_list (Single_result o)
+  | [] -> assert false
+  | [Contents_result o] -> Contents_result_list (Single_result o)
   | Contents_result o :: os -> (
       let (Contents_result_list os) = of_list os in
       match (o, os) with
@@ -1234,30 +1167,30 @@ let rec of_list = function
       | _ ->
           Pervasives.failwith
             "Operation result list of length > 1 should only contains manager \
-             operations result." )
+             operations result.")
 
 let operation_data_and_metadata_encoding =
   def "operation.alpha.operation_with_metadata"
   @@ union
-       [ case
+       [
+         case
            (Tag 0)
            ~title:"Operation_with_metadata"
            (obj2
               (req "contents" (dynamic_size contents_and_result_list_encoding))
               (opt "signature" Signature.encoding))
            (function
-             | (Operation_data _, No_operation_metadata) ->
-                 None
+             | (Operation_data _, No_operation_metadata) -> None
              | (Operation_data op, Operation_metadata res) -> (
-               match kind_equal_list op.contents res.contents with
-               | None ->
-                   Pervasives.failwith
-                     "cannot decode inconsistent combined operation result"
-               | Some Eq ->
-                   Some
-                     ( Contents_and_result_list
-                         (pack_contents_list op.contents res.contents),
-                       op.signature ) ))
+                 match kind_equal_list op.contents res.contents with
+                 | None ->
+                     Pervasives.failwith
+                       "cannot decode inconsistent combined operation result"
+                 | Some Eq ->
+                     Some
+                       ( Contents_and_result_list
+                           (pack_contents_list op.contents res.contents),
+                         op.signature )))
            (fun (Contents_and_result_list contents, signature) ->
              let (op_contents, res_contents) = unpack_contents_list contents in
              ( Operation_data {contents = op_contents; signature},
@@ -1271,10 +1204,10 @@ let operation_data_and_metadata_encoding =
            (function
              | (Operation_data op, No_operation_metadata) ->
                  Some (Contents_list op.contents, op.signature)
-             | (Operation_data _, Operation_metadata _) ->
-                 None)
+             | (Operation_data _, Operation_metadata _) -> None)
            (fun (Contents_list contents, signature) ->
-             (Operation_data {contents; signature}, No_operation_metadata)) ]
+             (Operation_data {contents; signature}, No_operation_metadata));
+       ]
 
 type block_metadata = {
   baker : Signature.Public_key_hash.t;
@@ -1292,7 +1225,8 @@ let block_metadata_encoding =
   let open Data_encoding in
   def "block_header.alpha.metadata"
   @@ conv
-       (fun { baker;
+       (fun {
+              baker;
               level_info;
               voting_period_info;
               nonce_hash;
@@ -1300,7 +1234,8 @@ let block_metadata_encoding =
               deactivated;
               balance_updates;
               liquidity_baking_escape_ema;
-              implicit_operations_results } ->
+              implicit_operations_results;
+            } ->
          ( baker,
            level_info,
            voting_period_info,

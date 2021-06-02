@@ -45,7 +45,7 @@ let guess_version () =
           "Cannot guess protocol version in path!@.Looking for `%s*` in `%s`@."
           prefix
           current_dir ;
-        exit 1 ) ;
+        exit 1) ;
       loop updir
   in
   loop (Sys.getcwd ())
@@ -75,26 +75,27 @@ let replace ~template ~destination vars =
             let matched = Str.matched_string s in
             let var = String.sub matched 2 (String.length matched - 4) in
             match StringMap.find var vars with
-            | Some value ->
-                value
+            | Some value -> value
             | None ->
                 prerr_endline ("Unknown variable: " ^ var) ;
                 exit 1)
           line
       in
-      output_string outch line ; output_string outch "\n"
+      output_string outch line ;
+      output_string outch "\n"
     done
-  with End_of_file -> flush outch ; close_out outch ; ()
+  with End_of_file ->
+    flush outch ;
+    close_out outch ;
+    ()
 
 let module_name (c : Protocol.component) = String.capitalize_ascii c.name
 
 let sources_name (c : Protocol.component) =
   let name = String.lowercase_ascii c.name in
   match c.interface with
-  | None ->
-      Printf.sprintf "%s.ml" name
-  | Some _ ->
-      Printf.sprintf "%s.mli %s.ml" name name
+  | None -> Printf.sprintf "%s.ml" name
+  | Some _ -> Printf.sprintf "%s.mli %s.ml" name name
 
 let process ~template ~destination (protocol : Protocol.t) lib_version hash
     check_hash =
@@ -126,25 +127,22 @@ let read_proto destination final_protocol_file =
     else Filename.dirname destination
   in
   Lwt_main.run
-    ( Lwt_utils_unix.read_file final_protocol_file
-    >>= fun final_protocol ->
-    let final_protocol =
-      List.map Protocol_hash.of_b58check_exn
-      @@ String.split_on_char '\n' final_protocol
-    in
-    Tezos_base_unix.Protocol_files.read_dir source_dir
-    >|= function
-    | Ok (None, proto) ->
-        (Protocol.hash proto, proto, false)
-    | Ok (Some hash, proto) ->
-        (hash, proto, List.mem ~equal:Protocol_hash.equal hash final_protocol)
-    | Error err ->
-        Format.kasprintf
-          Stdlib.failwith
-          "Failed to read TEZOS_PROTOCOL in %s:@ %a"
-          source_dir
-          pp_print_error
-          err )
+    ( Lwt_utils_unix.read_file final_protocol_file >>= fun final_protocol ->
+      let final_protocol =
+        List.map Protocol_hash.of_b58check_exn
+        @@ String.split_on_char '\n' final_protocol
+      in
+      Tezos_base_unix.Protocol_files.read_dir source_dir >|= function
+      | Ok (None, proto) -> (Protocol.hash proto, proto, false)
+      | Ok (Some hash, proto) ->
+          (hash, proto, List.mem ~equal:Protocol_hash.equal hash final_protocol)
+      | Error err ->
+          Format.kasprintf
+            Stdlib.failwith
+            "Failed to read TEZOS_PROTOCOL in %s:@ %a"
+            source_dir
+            pp_print_error
+            err )
 
 let main () =
   let template = Sys.argv.(1) in

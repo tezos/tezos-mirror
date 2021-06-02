@@ -46,15 +46,14 @@ let test_raw_scenario time () =
   let c = Timelock.encrypt sym_key message in
   let message_decrypted_opt = Timelock.decrypt sym_key c in
   match message_decrypted_opt with
-  | None ->
-      assert false
+  | None -> assert false
   | Some message_decrypted ->
       assert (message = message_decrypted) ;
       assert (unlocked = same_unlocked) ;
       assert (
-        Timelock.verify_time_lock public ~time locked_value unlocked proof_1 ) ;
+        Timelock.verify_time_lock public ~time locked_value unlocked proof_1) ;
       assert (
-        Timelock.verify_time_lock public ~time locked_value unlocked proof_2 )
+        Timelock.verify_time_lock public ~time locked_value unlocked proof_2)
 
 let bench () =
   let time = Z.of_int 10_000 in
@@ -138,11 +137,13 @@ let test_negative () =
   ()
 
 let tests =
-  [ ("timelock raw scenario short", `Quick, test_raw_scenario (Z.of_int 5));
+  [
+    ("timelock raw scenario short", `Quick, test_raw_scenario (Z.of_int 5));
     ("timelock raw scenario", `Quick, test_raw_scenario (Z.of_int 1000));
     ("timelock raw scenario long", `Slow, test_raw_scenario (Z.of_int 100000));
     ("timelock high level scenario", `Quick, test_high_level_scenario);
     ("bench", `Slow, bench);
-    ("timelock negative test", `Quick, test_negative) ]
+    ("timelock negative test", `Quick, test_negative);
+  ]
 
 let () = Alcotest.run "tezos-crypto" [("timelock", tests)]

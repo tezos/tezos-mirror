@@ -64,12 +64,11 @@ let with_node f =
       Node.default_prevalidator_limits
       Node.default_chain_validator_limits
       None
-    >>=? fun node -> f node >>=? fun () -> return ()
+    >>=? fun node ->
+    f node >>=? fun () -> return ()
   in
-  Lwt_utils_unix.with_tempdir "tezos_rpcdoc_" run
-  >>= function
-  | Ok () ->
-      Lwt.return_unit
+  Lwt_utils_unix.with_tempdir "tezos_rpcdoc_" run >>= function
+  | Ok () -> Lwt.return_unit
   | Error err ->
       Format.eprintf "%a@." pp_print_error err ;
       Stdlib.exit 1

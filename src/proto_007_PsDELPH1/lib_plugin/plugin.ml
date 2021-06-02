@@ -57,10 +57,12 @@ module Mempool = struct
   let config_encoding : config Data_encoding.t =
     let open Data_encoding in
     conv
-      (fun { minimal_fees;
+      (fun {
+             minimal_fees;
              minimal_nanotez_per_gas_unit;
              minimal_nanotez_per_byte;
-             allow_script_failure } ->
+             allow_script_failure;
+           } ->
         ( minimal_fees,
           minimal_nanotez_per_gas_unit,
           minimal_nanotez_per_byte,
@@ -101,15 +103,14 @@ module Mempool = struct
     List.fold_left
       (fun acc -> function
         | Contents (Manager_operation {fee; gas_limit; _}) -> (
-          match acc with
-          | Error _ as e ->
-              e
-          | Ok (total_fee, total_gas) -> (
-            match Tez.(total_fee +? fee) with
-            | Ok total_fee ->
-                Ok (total_fee, Gas.Arith.add total_gas gas_limit)
-            | Error _ as e ->
-                e ) ) | _ -> acc)
+            match acc with
+            | Error _ as e -> e
+            | Ok (total_fee, total_gas) -> (
+                match Tez.(total_fee +? fee) with
+                | Ok total_fee ->
+                    Ok (total_fee, Gas.Arith.add total_gas gas_limit)
+                | Error _ as e -> e))
+        | _ -> acc)
       (Ok (Tez.zero, Gas.Arith.zero))
       l
 
@@ -117,8 +118,7 @@ module Mempool = struct
       type t. config -> t Kind.manager contents_list -> int -> bool =
    fun config op size ->
     match get_manager_operation_gas_and_fee op with
-    | Error _ ->
-        false
+    | Error _ -> false
     | Ok (fee, gas) ->
         let fees_in_nanotez =
           Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
@@ -146,30 +146,21 @@ module Mempool = struct
   let pre_filter config
       (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
     let bytes =
-      ( WithExceptions.Option.get ~loc:__LOC__
+      (WithExceptions.Option.get ~loc:__LOC__
       @@ Data_encoding.Binary.fixed_length
-           Tezos_base.Operation.shell_header_encoding )
+           Tezos_base.Operation.shell_header_encoding)
       + Data_encoding.Binary.length Operation.protocol_data_encoding op
     in
     match contents with
-    | Single (Endorsement _) ->
-        true
-    | Single (Seed_nonce_revelation _) ->
-        true
-    | Single (Double_endorsement_evidence _) ->
-        true
-    | Single (Double_baking_evidence _) ->
-        true
-    | Single (Activate_account _) ->
-        true
-    | Single (Proposals _) ->
-        true
-    | Single (Ballot _) ->
-        true
-    | Single (Manager_operation _) as op ->
-        pre_filter_manager config op bytes
-    | Cons (Manager_operation _, _) as op ->
-        pre_filter_manager config op bytes
+    | Single (Endorsement _) -> true
+    | Single (Seed_nonce_revelation _) -> true
+    | Single (Double_endorsement_evidence _) -> true
+    | Single (Double_baking_evidence _) -> true
+    | Single (Activate_account _) -> true
+    | Single (Proposals _) -> true
+    | Single (Ballot _) -> true
+    | Single (Manager_operation _) as op -> pre_filter_manager config op bytes
+    | Cons (Manager_operation _, _) as op -> pre_filter_manager config op bytes
 
   open Apply_results
 
@@ -182,47 +173,37 @@ module Mempool = struct
    fun ctxt op config ->
     match op with
     | Single_result (Manager_operation_result {operation_result; _}) -> (
-      match operation_result with
-      | Applied _ ->
-          Lwt.return_true
-      | Skipped _ | Failed _ | Backtracked _ ->
-          Lwt.return config.allow_script_failure )
+        match operation_result with
+        | Applied _ -> Lwt.return_true
+        | Skipped _ | Failed _ | Backtracked _ ->
+            Lwt.return config.allow_script_failure)
     | Cons_result (Manager_operation_result res, rest) -> (
         post_filter_manager
           ctxt
           (Single_result (Manager_operation_result res))
           config
         >>= function
-        | false ->
-            Lwt.return_false
-        | true ->
-            post_filter_manager ctxt rest config )
+        | false -> Lwt.return_false
+        | true -> post_filter_manager ctxt rest config)
 
   let post_filter config ~validation_state_before:_
       ~validation_state_after:({ctxt; _} : validation_state) (_op, receipt) =
     match receipt with
-    | No_operation_metadata ->
-        assert false (* only for multipass validator *)
+    | No_operation_metadata -> assert false (* only for multipass validator *)
     | Operation_metadata {contents} -> (
-      match contents with
-      | Single_result (Endorsement_result _) ->
-          Lwt.return_true
-      | Single_result (Seed_nonce_revelation_result _) ->
-          Lwt.return_true
-      | Single_result (Double_endorsement_evidence_result _) ->
-          Lwt.return_true
-      | Single_result (Double_baking_evidence_result _) ->
-          Lwt.return_true
-      | Single_result (Activate_account_result _) ->
-          Lwt.return_true
-      | Single_result Proposals_result ->
-          Lwt.return_true
-      | Single_result Ballot_result ->
-          Lwt.return_true
-      | Single_result (Manager_operation_result _) as op ->
-          post_filter_manager ctxt op config
-      | Cons_result (Manager_operation_result _, _) as op ->
-          post_filter_manager ctxt op config )
+        match contents with
+        | Single_result (Endorsement_result _) -> Lwt.return_true
+        | Single_result (Seed_nonce_revelation_result _) -> Lwt.return_true
+        | Single_result (Double_endorsement_evidence_result _) ->
+            Lwt.return_true
+        | Single_result (Double_baking_evidence_result _) -> Lwt.return_true
+        | Single_result (Activate_account_result _) -> Lwt.return_true
+        | Single_result Proposals_result -> Lwt.return_true
+        | Single_result Ballot_result -> Lwt.return_true
+        | Single_result (Manager_operation_result _) as op ->
+            post_filter_manager ctxt op config
+        | Cons_result (Manager_operation_result _, _) as op ->
+            post_filter_manager ctxt op config)
 end
 
 module RPC = struct

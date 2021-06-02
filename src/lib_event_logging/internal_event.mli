@@ -510,8 +510,7 @@ module Lwt_worker_event : sig
 
   (** [on_event msg status] emits an event of type [t] and matches
         the signature required by {!Lwt_utils.worker}.  *)
-  val on_event :
-    string -> [`Ended | `Failed of string | `Started] -> unit Lwt.t
+  val on_event : string -> [`Ended | `Failed of string | `Started] -> unit Lwt.t
 end
 
 (** {3 Compatibility With Legacy Logging } *)
@@ -544,8 +543,7 @@ module Legacy_logging : sig
 
     val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
-    val lwt_fatal_error :
-      ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+    val lwt_fatal_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   end
 
   open Tezos_stdlib

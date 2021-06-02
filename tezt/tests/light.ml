@@ -36,10 +36,8 @@ open Lwt.Infix
 let init_light ~protocol =
   let get_current_level =
     match protocol with
-    | Protocol.Alpha ->
-        RPC.get_current_level
-    | _ ->
-        Test.fail "Unsupported protocol: %s" @@ Protocol.name protocol
+    | Protocol.Alpha -> RPC.get_current_level
+    | _ -> Test.fail "Unsupported protocol: %s" @@ Protocol.name protocol
   in
   (* Note that this code CANNOT be in tezt/lib_tezos/client.ml
      because it uses RPC.*.get_current_level, which depends on client.ml
@@ -56,12 +54,8 @@ let init_light ~protocol =
   let is_light_mode = function Client.Light _ -> true | _ -> false in
   assert (is_light_mode mode_received) ;
   Client.set_mode (Client.Client (Some node0)) client ;
-  let* () =
-    Client.bake_for ~node:node0 ~key:Constant.bootstrap1.alias client
-  in
-  let* () =
-    Client.bake_for ~node:node0 ~key:Constant.bootstrap2.alias client
-  in
+  let* () = Client.bake_for ~node:node0 ~key:Constant.bootstrap1.alias client in
+  let* () = Client.bake_for ~node:node0 ~key:Constant.bootstrap2.alias client in
   let* level_json = get_current_level ~node:node0 client in
   let level = JSON.(level_json |-> "level" |> as_int) in
   let* () =
@@ -143,8 +137,7 @@ module NoUselessRpc = struct
     in
     let context_queries = lines |> List.filter_map extract_rpc_path in
     let rec test_no_overlap_rpc = function
-      | [] ->
-          ()
+      | [] -> ()
       | query_after :: queries_before ->
           List.iter
             (fun query_before ->
@@ -172,7 +165,8 @@ module NoUselessRpc = struct
     @@ fun protocol ->
     let* (_, client) = init_light ~protocol in
     let paths =
-      [ (["helpers"; "baking_rights"], []);
+      [
+        (["helpers"; "baking_rights"], []);
         (["helpers"; "baking_rights"], [("all", "true")]);
         (["context"; "delegates"], []);
         (["context"; "nonces"; "3"], []);
@@ -183,7 +177,8 @@ module NoUselessRpc = struct
         (["votes"; "current_proposal"], []);
         (["votes"; "current_quorum"], []);
         (["votes"; "listings"], []);
-        (["votes"; "proposals"], []) ]
+        (["votes"; "proposals"], []);
+      ]
     in
     Lwt_list.iter_s
       (fun (sub_path, query_string) ->
@@ -230,9 +225,11 @@ let test_compare_light =
   let* vanilla = Client.init ~node () in
   let clients = {vanilla; alternative = light_client} in
   let tz_log =
-    [ ("alpha.proxy_rpc", "debug");
+    [
+      ("alpha.proxy_rpc", "debug");
       ("light_mode", "debug");
-      ("proxy_getter", "debug") ]
+      ("proxy_getter", "debug");
+    ]
   in
   check_equivalence ~tz_log protocol alt_mode clients
 

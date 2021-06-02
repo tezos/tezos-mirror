@@ -28,10 +28,8 @@ open Protocol
 module Common = struct
   let memo_size_of_int i =
     match Alpha_context.Sapling.Memo_size.parse_z @@ Z.of_int i with
-    | Ok memo_size ->
-        memo_size
-    | Error _ ->
-        assert false
+    | Ok memo_size -> memo_size
+    | Error _ -> assert false
 
   let int_of_memo_size ms =
     Alpha_context.Sapling.Memo_size.unparse_to_z ms |> Z.to_int
@@ -126,9 +124,11 @@ module Common = struct
         Ciphertext.encoding
         (Bytes.concat
            Bytes.empty
-           [ Bytes.create (32 + 32);
+           [
+             Bytes.create (32 + 32);
              payload_enc;
-             Bytes.create (24 + 64 + 16 + 24) ])
+             Bytes.create (24 + 64 + 16 + 24);
+           ])
     in
     (cm, cipher)
 
@@ -151,8 +151,7 @@ module Alpha_context_helpers = struct
   include Common
 
   let init () =
-    Context.init 1
-    >>=? fun (b, _) ->
+    Context.init 1 >>=? fun (b, _) ->
     Alpha_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -163,45 +162,39 @@ module Alpha_context_helpers = struct
     >|=? fun (ctxt, _, _) -> ctxt
 
   (* takes a state obtained from Sapling.empty_state or Sapling.state_from_id and
-   passed through Sapling.verify_update *)
+     passed through Sapling.verify_update *)
   let finalize ctx =
     let open Alpha_context in
     let open Sapling in
     function
     | {id = None; diff; memo_size} ->
-        Sapling.fresh ~temporary:false ctx
-        >>= wrap
-        >>=? fun (ctx, id) ->
+        Sapling.fresh ~temporary:false ctx >>= wrap >>=? fun (ctx, id) ->
         let init = Lazy_storage.Alloc {memo_size} in
         let lazy_storage_diff = Lazy_storage.Update {init; updates = diff} in
         let diffs = [Lazy_storage.make Sapling_state id lazy_storage_diff] in
-        Lazy_storage.apply ctx diffs
-        >>= wrap
-        >|=? fun (ctx, _added_size) -> (ctx, id)
+        Lazy_storage.apply ctx diffs >>= wrap >|=? fun (ctx, _added_size) ->
+        (ctx, id)
     | {id = Some id; diff; _} ->
         let init = Lazy_storage.Existing in
         let lazy_storage_diff = Lazy_storage.Update {init; updates = diff} in
         let diffs = [Lazy_storage.make Sapling_state id lazy_storage_diff] in
-        Lazy_storage.apply ctx diffs
-        >>= wrap
-        >|=? fun (ctx, _added_size) -> (ctx, id)
+        Lazy_storage.apply ctx diffs >>= wrap >|=? fun (ctx, _added_size) ->
+        (ctx, id)
 
   (* disk only version *)
   let verify_update ctx ?memo_size ?id vt =
     let anti_replay = "anti-replay" in
-    ( match id with
+    (match id with
     | None ->
-        ( match memo_size with
+        (match memo_size with
         | None -> (
-          match vt.Environment.Sapling.UTXO.outputs with
-          | [] ->
-              failwith "Can't infer memo_size from empty outputs"
-          | output :: _ ->
-              return
-              @@ Environment.Sapling.Ciphertext.get_memo_size output.ciphertext
-          )
-        | Some memo_size ->
-            return memo_size )
+            match vt.Environment.Sapling.UTXO.outputs with
+            | [] -> failwith "Can't infer memo_size from empty outputs"
+            | output :: _ ->
+                return
+                @@ Environment.Sapling.Ciphertext.get_memo_size
+                     output.ciphertext)
+        | Some memo_size -> return memo_size)
         >>=? fun memo_size ->
         let memo_size = memo_size_of_int memo_size in
         let vs = Alpha_context.Sapling.empty_state ~memo_size () in
@@ -211,17 +204,14 @@ module Alpha_context_helpers = struct
         (*       >>= wrap *)
         (*       >>=? fun (_, root) -> *)
         (*       print ~prefix:"verify: " Environment.Sapling.Hash.encoding root ; *)
-        Alpha_context.Sapling.state_from_id ctx id >>= wrap )
+        Alpha_context.Sapling.state_from_id ctx id >>= wrap)
     >>=? fun (vs, ctx) ->
-    Alpha_context.Sapling.verify_update ctx vs vt anti_replay
-    >>= wrap
+    Alpha_context.Sapling.verify_update ctx vs vt anti_replay >>= wrap
     >>=? fun (ctx, res) ->
     match res with
-    | None ->
-        return_none
+    | None -> return_none
     | Some (_balance, vs) ->
-        finalize ctx vs
-        >>=? fun (ctx, id) ->
+        finalize ctx vs >>=? fun (ctx, id) ->
         let ectx = (Alpha_context.finalize ctx).context in
         (* bump the level *)
         Alpha_context.prepare
@@ -264,11 +254,8 @@ module Alpha_context_helpers = struct
     Tezos_sapling.Forge.forge_transaction ins outs w.sk anti_replay cs
 
   let client_state_alpha ctx id =
-    Alpha_context.Sapling.get_diff ctx id ()
-    >>= wrap
-    >>=? fun diff ->
-    Alpha_context.Sapling.state_from_id ctx id
-    >>= wrap
+    Alpha_context.Sapling.get_diff ctx id () >>= wrap >>=? fun diff ->
+    Alpha_context.Sapling.state_from_id ctx id >>= wrap
     >|=? fun ({memo_size; _}, _ctx) ->
     let memo_size = int_of_memo_size memo_size in
     client_state_of_diff ~memo_size diff
@@ -285,8 +272,7 @@ module Interpreter_helpers = struct
   (** Returns a block in which the contract is originated.
       Also returns the associated anti-replay string and KT1 address. *)
   let originate_contract file storage src b baker =
-    originate_contract file storage src b baker
-    >|=? fun (dst, b) ->
+    originate_contract file storage src b baker >|=? fun (dst, b) ->
     let anti_replay =
       Format.asprintf
         "%a%a"
@@ -308,12 +294,7 @@ module Interpreter_helpers = struct
       Tezos_sapling.Forge.make_output addr 15L (Bytes.create memo_size)
     in
     let pt =
-      Tezos_sapling.Forge.forge_transaction
-        []
-        [output]
-        wallet.sk
-        anti_replay
-        ps
+      Tezos_sapling.Forge.forge_transaction [] [output] wallet.sk anti_replay ps
     in
     let hex_string =
       "0x"
@@ -329,17 +310,14 @@ module Interpreter_helpers = struct
   (* Make a transaction and sync a local client state. [to_exclude] is the list
      of addresses that cannot bake the block*)
   let transac_and_sync ~memo_size block parameters amount src dst baker =
-    Test_tez.Tez.(one_mutez *? Int64.of_int amount)
-    >>?= fun amount_tez ->
+    Test_tez.Tez.(one_mutez *? Int64.of_int amount) >>?= fun amount_tez ->
     let fee = Test_tez.Tez.of_int 10 in
     Op.transaction ~fee (B block) src dst amount_tez ~parameters
     >>=? fun operation ->
     Incremental.begin_construction ~policy:Block.(By_account baker) block
     >>=? fun incr ->
-    Incremental.add_operation incr operation
-    >>=? fun incr ->
-    Incremental.finalize_block incr
-    >>=? fun block ->
+    Incremental.add_operation incr operation >>=? fun incr ->
+    Incremental.finalize_block incr >>=? fun block ->
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt
       block
@@ -370,10 +348,8 @@ module Interpreter_helpers = struct
                 amount_output
                 (Bytes.create memo_size))
           |> function
-          | Error () ->
-              assert false (* conditional above guards against this *)
-          | Ok outputs ->
-              outputs
+          | Error () -> assert false (* conditional above guards against this *)
+          | Ok outputs -> outputs
         in
         let tr_hex =
           to_hex
@@ -405,8 +381,7 @@ module Interpreter_helpers = struct
 
   (* This fails if the operation is not correct wrt the block *)
   let next_block block operation =
-    Incremental.begin_construction block
-    >>=? fun incr ->
-    Incremental.add_operation incr operation
-    >>=? fun incr -> Incremental.finalize_block incr
+    Incremental.begin_construction block >>=? fun incr ->
+    Incremental.add_operation incr operation >>=? fun incr ->
+    Incremental.finalize_block incr
 end

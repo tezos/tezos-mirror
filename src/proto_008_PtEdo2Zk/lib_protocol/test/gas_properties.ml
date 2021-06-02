@@ -37,41 +37,26 @@ type cost_kind =
 let random_cost_kind () =
   let i = Random.int 7 in
   match i with
-  | 0 ->
-      Atomic_step
-  | 1 ->
-      Step
-  | 2 ->
-      Alloc
-  | 3 ->
-      Alloc_bytes
-  | 4 ->
-      Alloc_mbytes
-  | 5 ->
-      Read_bytes
-  | 6 ->
-      Write_bytes
-  | _ ->
-      assert false
+  | 0 -> Atomic_step
+  | 1 -> Step
+  | 2 -> Alloc
+  | 3 -> Alloc_bytes
+  | 4 -> Alloc_mbytes
+  | 5 -> Read_bytes
+  | 6 -> Write_bytes
+  | _ -> assert false
 
 let random_cost_of_kind (cost_kind : cost_kind) =
   let open Alpha_context.Gas in
   let rand = Random.int 1000 in
   match cost_kind with
-  | Atomic_step ->
-      atomic_step_cost (Z.of_int rand)
-  | Step ->
-      step_cost (Z.of_int rand)
-  | Alloc ->
-      alloc_cost (Z.of_int rand)
-  | Alloc_bytes ->
-      alloc_bytes_cost rand
-  | Alloc_mbytes ->
-      alloc_mbytes_cost rand
-  | Read_bytes ->
-      read_bytes_cost (Z.of_int rand)
-  | Write_bytes ->
-      write_bytes_cost (Z.of_int rand)
+  | Atomic_step -> atomic_step_cost (Z.of_int rand)
+  | Step -> step_cost (Z.of_int rand)
+  | Alloc -> alloc_cost (Z.of_int rand)
+  | Alloc_bytes -> alloc_bytes_cost rand
+  | Alloc_mbytes -> alloc_mbytes_cost rand
+  | Read_bytes -> read_bytes_cost (Z.of_int rand)
+  | Write_bytes -> write_bytes_cost (Z.of_int rand)
 
 let random_cost () = random_cost_of_kind (random_cost_kind ())
 
@@ -79,12 +64,9 @@ let free_neutral since =
   let open Alpha_context in
   let open Environment.Error_monad in
   let cost = random_cost () in
-  Gas.consume since cost
-  >>? fun ctxt ->
-  Gas.consume ctxt Gas.free
-  >>? fun branch1 ->
-  Gas.consume since cost
-  >>? fun branch2 ->
+  Gas.consume since cost >>? fun ctxt ->
+  Gas.consume ctxt Gas.free >>? fun branch1 ->
+  Gas.consume since cost >>? fun branch2 ->
   if
     Gas.Arith.(
       Gas.consumed ~since:ctxt ~until:branch1
@@ -97,12 +79,9 @@ let consume_commutes since =
   let open Environment.Error_monad in
   let cost1 = random_cost () in
   let cost2 = random_cost () in
-  Gas.consume since cost1
-  >>? fun ctxt ->
-  Gas.consume ctxt cost2
-  >>? fun branch1 ->
-  Gas.consume since Gas.(cost1 +@ cost2)
-  >>? fun branch2 ->
+  Gas.consume since cost1 >>? fun ctxt ->
+  Gas.consume ctxt cost2 >>? fun branch1 ->
+  Gas.consume since Gas.(cost1 +@ cost2) >>? fun branch2 ->
   if
     Gas.Arith.(
       Gas.consumed ~since:ctxt ~until:branch1
@@ -114,19 +93,14 @@ let rec loop_check check n ctxt =
   let open Environment.Error_monad in
   if n = 0 then ok_none
   else
-    check ctxt
-    >>? function
-    | None ->
-        loop_check check (n - 1) ctxt
-    | counterexample ->
-        Ok counterexample
+    check ctxt >>? function
+    | None -> loop_check check (n - 1) ctxt
+    | counterexample -> Ok counterexample
 
 let check_property prop () =
   Random.init 89809344 ;
-  Context.init 1
-  >>=? fun (b, _contracts) ->
-  Incremental.begin_construction b
-  >>=? fun inc ->
+  Context.init 1 >>=? fun (b, _contracts) ->
+  Incremental.begin_construction b >>=? fun inc ->
   let state = Incremental.validation_state inc in
   let ctxt =
     Alpha_context.Gas.set_limit
@@ -135,8 +109,7 @@ let check_property prop () =
   in
   let result = prop ctxt in
   match result with
-  | Ok None ->
-      return_unit
+  | Ok None -> return_unit
   | Ok (Some (cost1, cost2)) ->
       let msg =
         Format.asprintf
@@ -147,15 +120,16 @@ let check_property prop () =
           cost2
       in
       failwith "%s" msg
-  | Error _err ->
-      failwith "gas_consume_commutes: protocol error"
+  | Error _err -> failwith "gas_consume_commutes: protocol error"
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "Gas.free is a neutral element"
       `Quick
       (check_property (loop_check free_neutral 1000));
     Test_services.tztest
       "Gas.consume commutes"
       `Quick
-      (check_property (loop_check consume_commutes 1000)) ]
+      (check_property (loop_check consume_commutes 1000));
+  ]

@@ -41,22 +41,19 @@ let from_file filename =
   let ch = open_in filename in
   match Ezjsonm.value_from_channel ch with
   | exception exn ->
-      close_in ch ; raise exn
+      close_in ch ;
+      raise exn
   | json ->
-      close_in ch ; json
+      close_in ch ;
+      json
 
 let rec show ?(indent = "") ?(depth = 1) (json : t) =
   match json with
-  | `Null ->
-      "null"
-  | `Bool x ->
-      string_of_bool x
-  | `Float x ->
-      string_of_float x
-  | `String x ->
-      "\"" ^ String.escaped x ^ "\""
-  | `O [] ->
-      "{}"
+  | `Null -> "null"
+  | `Bool x -> string_of_bool x
+  | `Float x -> string_of_float x
+  | `String x -> "\"" ^ String.escaped x ^ "\""
+  | `O [] -> "{}"
   | `O fields ->
       if depth <= 0 then "{ ... }"
       else
@@ -84,23 +81,21 @@ let output json =
 let get field json =
   match json with
   | `O l -> (
-    match List.filter (fun (name, _) -> name = field) l with
-    | [] ->
-        None
-    | [(_, value)] ->
-        Some value
-    | _ :: _ :: _ ->
-        output_debug json ;
-        failwith ("found multiple occurrences of: " ^ field) )
+      match List.filter (fun (name, _) -> name = field) l with
+      | [] -> None
+      | [(_, value)] -> Some value
+      | _ :: _ :: _ ->
+          output_debug json ;
+          failwith ("found multiple occurrences of: " ^ field))
   | _ ->
       output_debug json ;
       failwith "expected an object"
 
 let as_list = function
-  | `A s ->
-      s
+  | `A s -> s
   | json ->
-      output_debug json ; failwith "expected a list"
+      output_debug json ;
+      failwith "expected a list"
 
 let as_int = function
   | `Float f ->
@@ -111,15 +106,13 @@ let as_int = function
       failwith "expected an integer"
 
 let as_string = function
-  | `String s ->
-      s
+  | `String s -> s
   | json ->
       output_debug json ;
       failwith "expected a string"
 
 let as_variant = function
-  | `O [(name, value)] ->
-      (name, value)
+  | `O [(name, value)] -> (name, value)
   | json ->
       output_debug json ;
       failwith "expected an object with a single field"
@@ -135,12 +128,11 @@ let as_record json make =
       let fields = ref fields in
       let get (field : string) =
         let rec find previous = function
-          | [] ->
-              None
+          | [] -> None
           | ((head_name, head_value) as head) :: tail ->
               if head_name = field then (
                 fields := List.rev_append previous tail ;
-                Some head_value )
+                Some head_value)
               else find (head :: previous) tail
         in
         find [] !fields
@@ -149,8 +141,8 @@ let as_record json make =
       if !fields <> [] then (
         output_debug ~depth:2 json ;
         failwith
-          ( "some fields were ignored: "
-          ^ String.concat ", " (List.map fst !fields) ) ) ;
+          ("some fields were ignored: "
+          ^ String.concat ", " (List.map fst !fields))) ;
       result
   | _ ->
       output_debug ~depth:2 json ;
@@ -158,8 +150,7 @@ let as_record json make =
 
 let rec remove_nodes name (json : t) : t =
   match json with
-  | `Null | `Bool _ | `Float _ | `String _ ->
-      json
+  | `Null | `Bool _ | `Float _ | `String _ -> json
   | `O fields ->
       let fields =
         fields
@@ -167,5 +158,4 @@ let rec remove_nodes name (json : t) : t =
         |> List.map (fun (n, x) -> (n, remove_nodes name x))
       in
       `O fields
-  | `A items ->
-      `A (List.map (remove_nodes name) items)
+  | `A items -> `A (List.map (remove_nodes name) items)

@@ -37,18 +37,13 @@ let equal ?(eq = ( = )) ?(prn = default_printer) ?(msg = "") x y =
 let equal_operation ?msg op1 op2 =
   let eq op1 op2 =
     match (op1, op2) with
-    | (None, None) ->
-        true
-    | (Some op1, Some op2) ->
-        Operation.equal op1 op2
-    | _ ->
-        false
+    | (None, None) -> true
+    | (Some op1, Some op2) -> Operation.equal op1 op2
+    | _ -> false
   in
   let prn = function
-    | None ->
-        "none"
-    | Some op ->
-        Operation_hash.to_b58check (Operation.hash op)
+    | None -> "none"
+    | Some op -> Operation_hash.to_b58check (Operation.hash op)
   in
   equal ?msg ~prn ~eq op1 op2
 
@@ -66,32 +61,30 @@ let equal_block ?msg st1 st2 =
 let equal_metadata ?msg m1 m2 =
   let eq m1 m2 =
     match (m1, m2) with
-    | (None, None) ->
-        true
-    | (Some m1, Some m2) ->
-        m1 = m2
-    | _ ->
-        false
+    | (None, None) -> true
+    | (Some m1, Some m2) -> m1 = m2
+    | _ -> false
   in
   let prn (md : Store.Block.metadata option) =
     let option_pp ~default pp fmt = function
-      | None ->
-          Format.fprintf fmt "%s" default
-      | Some x ->
-          Format.fprintf fmt "%a" pp x
+      | None -> Format.fprintf fmt "%s" default
+      | Some x -> Format.fprintf fmt "%a" pp x
     in
     Format.asprintf
       "%a"
       (option_pp
          ~default:"None"
-         (fun fmt
-              ({ message;
-                 max_operations_ttl;
-                 last_allowed_fork_level;
-                 block_metadata = _;
-                 operations_metadata = _ } :
-                Store.Block.metadata)
-              ->
+         (fun
+           fmt
+           ({
+              message;
+              max_operations_ttl;
+              last_allowed_fork_level;
+              block_metadata = _;
+              operations_metadata = _;
+            } :
+             Store.Block.metadata)
+         ->
            Format.fprintf
              fmt
              "message: %a@.max_operations_ttl: %d@. last_allowed_fork_level: \
@@ -124,26 +117,21 @@ let make_equal_list eq prn ?(msg = "") x y =
           msg
           (List.length x)
           (List.length y)
-    | ([], []) ->
-        ()
+    | ([], []) -> ()
   in
   iter 0 x y
 
-let equal_string_list ?msg l1 l2 =
-  make_equal_list ?msg ( = ) (fun x -> x) l1 l2
+let equal_string_list ?msg l1 l2 = make_equal_list ?msg ( = ) (fun x -> x) l1 l2
 
 let equal_string_list_list ?msg l1 l2 =
   let pr_persist l =
-    let res =
-      String.concat ";" (List.map (fun s -> Printf.sprintf "%S" s) l)
-    in
+    let res = String.concat ";" (List.map (fun s -> Printf.sprintf "%S" s) l) in
     Printf.sprintf "[%s]" res
   in
   make_equal_list ?msg ( = ) pr_persist l1 l2
 
 let equal_block_set ?msg set1 set2 =
-  let b1 = Block_hash.Set.elements set1
-  and b2 = Block_hash.Set.elements set2 in
+  let b1 = Block_hash.Set.elements set1 and b2 = Block_hash.Set.elements set2 in
   make_equal_list
     ?msg
     (fun h1 h2 -> Block_hash.equal h1 h2)
@@ -152,8 +140,7 @@ let equal_block_set ?msg set1 set2 =
     b2
 
 let equal_block_map ?msg ~eq map1 map2 =
-  let b1 = Block_hash.Map.bindings map1
-  and b2 = Block_hash.Map.bindings map2 in
+  let b1 = Block_hash.Map.bindings map1 and b2 = Block_hash.Map.bindings map2 in
   make_equal_list
     ?msg
     (fun (h1, b1) (h2, b2) -> Block_hash.equal h1 h2 && eq b1 b2)

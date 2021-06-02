@@ -9,7 +9,8 @@
 type vector = {entropy : Hex.t; words : string; seed : Hex.t}
 
 let vectors =
-  [ {
+  [
+    {
       entropy = `Hex "00000000000000000000000000000000";
       words =
         "abandon abandon abandon abandon abandon abandon abandon abandon \
@@ -126,8 +127,8 @@ let vectors =
     {
       entropy = `Hex "9e885d952ad362caeb4efe34a8e91bd2";
       words =
-        "ozone drill grab fiber curtain grace pudding thank cruise elder \
-         eight picnic";
+        "ozone drill grab fiber curtain grace pudding thank cruise elder eight \
+         picnic";
       seed =
         `Hex
           "274ddc525802f7c828d8ef7ddbcdc5304e87ac3535913611fbbfa986d0c9e5476c91689f9c8a54fd55bd38606aa6a8595ad213d4c9c9f9aca3fb217069a41028";
@@ -164,8 +165,8 @@ let vectors =
     {
       entropy = `Hex "6d9be1ee6ebd27a258115aad99b7317b9c8d28b6d76431c3";
       words =
-        "horn tenant knee talent sponsor spell gate clip pulse soap slush \
-         warm silver nephew swap uncle crack brave";
+        "horn tenant knee talent sponsor spell gate clip pulse soap slush warm \
+         silver nephew swap uncle crack brave";
       seed =
         `Hex
           "fd579828af3da1d32544ce4db5c73d53fc8acc4ddb1e3b251a31179cdb71e853c56d2fcb11aed39898ce6c34b10b5382772db8796e52837b54468aeb312cfc3d";
@@ -203,9 +204,9 @@ let vectors =
       entropy =
         `Hex "066dca1a2bb7e8a1db2832148ce9933eea0f3ac9548d793112d9a95c9407efad";
       words =
-        "all hour make first leader extend hole alien behind guard gospel \
-         lava path output census museum junior mass reopen famous sing \
-         advance salt reform";
+        "all hour make first leader extend hole alien behind guard gospel lava \
+         path output census museum junior mass reopen famous sing advance salt \
+         reform";
       seed =
         `Hex
           "26e975ec644423f4a4c4f4215ef09b4bd7ef924e85d1d17c4cf3f136c2863cf6df0a475045652c57eb5fb41513ca2a2d67722b77e954b4b3fc11f7590449191d";
@@ -238,7 +239,8 @@ let vectors =
       seed =
         `Hex
           "01f5bced59dec48e362f2c45b5de68b9fd6c92c6634f44d6d40aab69056506f0e35524a518034ddc1192e1dacd32c1ed3eaa3c3b131c88ed8e7e54c49a5d0998";
-    } ]
+    };
+  ]
 
 let pp_diff ppf (l1, l2) =
   match (List.length l1, List.length l2) with

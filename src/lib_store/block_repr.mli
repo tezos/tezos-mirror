@@ -137,8 +137,7 @@ val protocol_data : t -> Bytes.t
 
 val block_metadata_hash : t -> Block_metadata_hash.t option
 
-val operations_metadata_hashes :
-  t -> Operation_metadata_hash.t list list option
+val operations_metadata_hashes : t -> Operation_metadata_hash.t list list option
 
 (** {2 Metadata accessors} *)
 

@@ -29,14 +29,10 @@ type ballot = Yay | Nay | Pass
 
 let ballot_encoding =
   let of_int8 = function
-    | 0 ->
-        Yay
-    | 1 ->
-        Nay
-    | 2 ->
-        Pass
-    | _ ->
-        invalid_arg "ballot_of_int8"
+    | 0 -> Yay
+    | 1 -> Nay
+    | 2 -> Pass
+    | _ -> invalid_arg "ballot_of_int8"
   in
   let to_int8 = function Yay -> 0 | Nay -> 1 | Pass -> 2 in
   let open Data_encoding in

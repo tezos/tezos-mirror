@@ -33,19 +33,17 @@
 module ACL = struct
   (* Test.
 
-   Check IP address greylisting mechanism with unauthenticated connection.
+     Check IP address greylisting mechanism with unauthenticated connection.
 
-   1. Start a node,
-   2. Write noise on the welcome worker of this node,
-   3. Check the IP greylist with a RPC,
-   4. Try to connect to a greylisted node. *)
+     1. Start a node,
+     2. Write noise on the welcome worker of this node,
+     3. Check the IP greylist with a RPC,
+     4. Try to connect to a greylisted node. *)
   let check_ip_greylisting () =
     let pp_list ~elt_pp l =
       let rec pp_rec ~elt_pp ppf = function
-        | [] ->
-            ()
-        | [elt] ->
-            Format.fprintf ppf "%a" elt_pp elt
+        | [] -> ()
+        | [elt] -> Format.fprintf ppf "%a" elt_pp elt
         | head :: tail ->
             Format.fprintf ppf "%a, " elt_pp head ;
             pp_rec ~elt_pp ppf tail
@@ -58,12 +56,14 @@ module ACL = struct
       ~tags:["p2p"; "acl"; "greylist"]
     @@ fun () ->
     let localhost_ips =
-      [ (* 127.0.0.1 *)
+      [
+        (* 127.0.0.1 *)
         Unix.inet_addr_loopback;
         (* ::1 *)
         Unix.inet6_addr_loopback;
         Unix.inet_addr_of_string "::ffff:127.0.0.1";
-        Unix.inet_addr_of_string "::ffff:7f00:0001" ]
+        Unix.inet_addr_of_string "::ffff:7f00:0001";
+      ]
     in
     let* target = Node.init [] in
     let* node = Node.init [] in
@@ -128,8 +128,7 @@ let check_peer_option =
   let* () = Node.add_peer_with_id node_2 node_1 in
   let* () = Node.run node_2 [] in
   let* () = wait in
-  let* _ = Node.wait_for_level node_1 1
-  and* _ = Node.wait_for_level node_2 1 in
+  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
   unit
 
 (* Test.
@@ -157,8 +156,7 @@ let test_one_connection =
   let* () = Node.add_peer_with_id node_2 node_1 in
   let* () = Node.run node_2 [] in
   let* () = wait in
-  let* _ = Node.wait_for_level node_1 1
-  and* _ = Node.wait_for_level node_2 1 in
+  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
   unit
 
 (* [wait_pred] waits until [pred arg] is true. An active wait with Lwt
@@ -260,8 +258,8 @@ module Maintenance = struct
     let* nb_active_connections = get_nb_connections ~client:target_client in
     if nb_active_connections > max_target then
       Test.fail
-        "There are too many active connections (actual: %d, expected less \
-         than %d)"
+        "There are too many active connections (actual: %d, expected less than \
+         %d)"
         nb_active_connections
         max_target ;
     Lwt.return_unit

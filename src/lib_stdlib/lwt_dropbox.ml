@@ -37,8 +37,7 @@ let create () = {data = None; closed = false; put_waiter = None}
 
 let notify_put dropbox =
   match dropbox.put_waiter with
-  | None ->
-      ()
+  | None -> ()
   | Some (_waiter, wakener) ->
       dropbox.put_waiter <- None ;
       Lwt.wakeup_later wakener ()
@@ -47,19 +46,18 @@ let put dropbox elt =
   if dropbox.closed then raise Closed
   else (
     dropbox.data <- Some elt ;
-    notify_put dropbox )
+    notify_put dropbox)
 
 let peek dropbox = if dropbox.closed then raise Closed else dropbox.data
 
 let close dropbox =
   if not dropbox.closed then (
     dropbox.closed <- true ;
-    notify_put dropbox )
+    notify_put dropbox)
 
 let wait_put_with_timeout ~timeout dropbox =
   match dropbox.put_waiter with
-  | Some (waiter, _wakener) ->
-      Lwt.pick [timeout; Lwt.protected waiter]
+  | Some (waiter, _wakener) -> Lwt.pick [timeout; Lwt.protected waiter]
   | None ->
       let (waiter, wakener) = Lwt.wait () in
       dropbox.put_waiter <- Some (waiter, wakener) ;
@@ -67,8 +65,7 @@ let wait_put_with_timeout ~timeout dropbox =
 
 let wait_put_no_timeout dropbox =
   match dropbox.put_waiter with
-  | Some (waiter, _wakener) ->
-      Lwt.protected waiter
+  | Some (waiter, _wakener) -> Lwt.protected waiter
   | None ->
       let (waiter, wakener) = Lwt.wait () in
       dropbox.put_waiter <- Some (waiter, wakener) ;
@@ -76,10 +73,8 @@ let wait_put_no_timeout dropbox =
 
 let wait_put ?timeout dropbox =
   match timeout with
-  | None ->
-      wait_put_no_timeout dropbox
-  | Some timeout ->
-      wait_put_with_timeout ~timeout dropbox
+  | None -> wait_put_no_timeout dropbox
+  | Some timeout -> wait_put_with_timeout ~timeout dropbox
 
 let rec take dropbox =
   match dropbox.data with
@@ -100,6 +95,6 @@ let rec take_with_timeout timeout dropbox =
       if Lwt.is_sleeping timeout then
         if dropbox.closed then Lwt.fail Closed
         else
-          wait_put ~timeout dropbox
-          >>= fun () -> take_with_timeout timeout dropbox
+          wait_put ~timeout dropbox >>= fun () ->
+          take_with_timeout timeout dropbox
       else Lwt.return_none

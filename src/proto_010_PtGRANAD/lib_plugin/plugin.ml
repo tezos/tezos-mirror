@@ -83,10 +83,12 @@ module Mempool = struct
   let config_encoding : config Data_encoding.t =
     let open Data_encoding in
     conv
-      (fun { minimal_fees;
+      (fun {
+             minimal_fees;
              minimal_nanotez_per_gas_unit;
              minimal_nanotez_per_byte;
-             allow_script_failure } ->
+             allow_script_failure;
+           } ->
         ( minimal_fees,
           minimal_nanotez_per_gas_unit,
           minimal_nanotez_per_byte,
@@ -127,15 +129,14 @@ module Mempool = struct
     List.fold_left
       (fun acc -> function
         | Contents (Manager_operation {fee; gas_limit; _}) -> (
-          match acc with
-          | Error _ as e ->
-              e
-          | Ok (total_fee, total_gas) -> (
-            match Tez.(total_fee +? fee) with
-            | Ok total_fee ->
-                Ok (total_fee, Gas.Arith.add total_gas gas_limit)
-            | Error _ as e ->
-                e ) ) | _ -> acc)
+            match acc with
+            | Error _ as e -> e
+            | Ok (total_fee, total_gas) -> (
+                match Tez.(total_fee +? fee) with
+                | Ok total_fee ->
+                    Ok (total_fee, Gas.Arith.add total_gas gas_limit)
+                | Error _ as e -> e))
+        | _ -> acc)
       (Ok (Tez.zero, Gas.Arith.zero))
       l
 
@@ -143,8 +144,7 @@ module Mempool = struct
       type t. config -> t Kind.manager contents_list -> int -> bool =
    fun config op size ->
     match get_manager_operation_gas_and_fee op with
-    | Error _ ->
-        false
+    | Error _ -> false
     | Ok (fee, gas) ->
         let fees_in_nanotez =
           Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
@@ -172,34 +172,23 @@ module Mempool = struct
   let pre_filter config
       (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
     let bytes =
-      ( WithExceptions.Option.get ~loc:__LOC__
+      (WithExceptions.Option.get ~loc:__LOC__
       @@ Data_encoding.Binary.fixed_length
-           Tezos_base.Operation.shell_header_encoding )
+           Tezos_base.Operation.shell_header_encoding)
       + Data_encoding.Binary.length Operation.protocol_data_encoding op
     in
     match contents with
-    | Single (Endorsement _) ->
-        false (* legacy format *)
-    | Single (Failing_noop _) ->
-        false
-    | Single (Endorsement_with_slot _) ->
-        true
-    | Single (Seed_nonce_revelation _) ->
-        true
-    | Single (Double_endorsement_evidence _) ->
-        true
-    | Single (Double_baking_evidence _) ->
-        true
-    | Single (Activate_account _) ->
-        true
-    | Single (Proposals _) ->
-        true
-    | Single (Ballot _) ->
-        true
-    | Single (Manager_operation _) as op ->
-        pre_filter_manager config op bytes
-    | Cons (Manager_operation _, _) as op ->
-        pre_filter_manager config op bytes
+    | Single (Endorsement _) -> false (* legacy format *)
+    | Single (Failing_noop _) -> false
+    | Single (Endorsement_with_slot _) -> true
+    | Single (Seed_nonce_revelation _) -> true
+    | Single (Double_endorsement_evidence _) -> true
+    | Single (Double_baking_evidence _) -> true
+    | Single (Activate_account _) -> true
+    | Single (Proposals _) -> true
+    | Single (Ballot _) -> true
+    | Single (Manager_operation _) as op -> pre_filter_manager config op bytes
+    | Cons (Manager_operation _, _) as op -> pre_filter_manager config op bytes
 
   open Apply_results
 
@@ -212,49 +201,39 @@ module Mempool = struct
    fun ctxt op config ->
     match op with
     | Single_result (Manager_operation_result {operation_result; _}) -> (
-      match operation_result with
-      | Applied _ ->
-          Lwt.return_true
-      | Skipped _ | Failed _ | Backtracked _ ->
-          Lwt.return config.allow_script_failure )
+        match operation_result with
+        | Applied _ -> Lwt.return_true
+        | Skipped _ | Failed _ | Backtracked _ ->
+            Lwt.return config.allow_script_failure)
     | Cons_result (Manager_operation_result res, rest) -> (
         post_filter_manager
           ctxt
           (Single_result (Manager_operation_result res))
           config
         >>= function
-        | false ->
-            Lwt.return_false
-        | true ->
-            post_filter_manager ctxt rest config )
+        | false -> Lwt.return_false
+        | true -> post_filter_manager ctxt rest config)
 
   let post_filter config ~validation_state_before:_
       ~validation_state_after:({ctxt; _} : validation_state) (_op, receipt) =
     match receipt with
-    | No_operation_metadata ->
-        assert false (* only for multipass validator *)
+    | No_operation_metadata -> assert false (* only for multipass validator *)
     | Operation_metadata {contents} -> (
-      match contents with
-      | Single_result (Endorsement_result _) ->
-          Lwt.return_false (* legacy format *)
-      | Single_result (Endorsement_with_slot_result _) ->
-          Lwt.return_true
-      | Single_result (Seed_nonce_revelation_result _) ->
-          Lwt.return_true
-      | Single_result (Double_endorsement_evidence_result _) ->
-          Lwt.return_true
-      | Single_result (Double_baking_evidence_result _) ->
-          Lwt.return_true
-      | Single_result (Activate_account_result _) ->
-          Lwt.return_true
-      | Single_result Proposals_result ->
-          Lwt.return_true
-      | Single_result Ballot_result ->
-          Lwt.return_true
-      | Single_result (Manager_operation_result _) as op ->
-          post_filter_manager ctxt op config
-      | Cons_result (Manager_operation_result _, _) as op ->
-          post_filter_manager ctxt op config )
+        match contents with
+        | Single_result (Endorsement_result _) ->
+            Lwt.return_false (* legacy format *)
+        | Single_result (Endorsement_with_slot_result _) -> Lwt.return_true
+        | Single_result (Seed_nonce_revelation_result _) -> Lwt.return_true
+        | Single_result (Double_endorsement_evidence_result _) ->
+            Lwt.return_true
+        | Single_result (Double_baking_evidence_result _) -> Lwt.return_true
+        | Single_result (Activate_account_result _) -> Lwt.return_true
+        | Single_result Proposals_result -> Lwt.return_true
+        | Single_result Ballot_result -> Lwt.return_true
+        | Single_result (Manager_operation_result _) as op ->
+            post_filter_manager ctxt op config
+        | Cons_result (Manager_operation_result _, _) as op ->
+            post_filter_manager ctxt op config)
 end
 
 module RPC = struct
@@ -266,10 +245,8 @@ module RPC = struct
     match
       Data_encoding.Binary.of_bytes Operation.protocol_data_encoding op.proto
     with
-    | Some protocol_data ->
-        ok {shell = op.shell; protocol_data}
-    | None ->
-        error Cannot_parse_operation
+    | Some protocol_data -> ok {shell = op.shell; protocol_data}
+    | None -> error Cannot_parse_operation
 
   let path = RPC_path.(open_root / "helpers")
 
@@ -301,8 +278,7 @@ module RPC = struct
         RPC_directory.register !patched_services s (fun (ctxt, arg) q i ->
             Services_registration.rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
 
-    let register1 s f =
-      register1_fullctxt s (fun {context; _} x -> f context x)
+    let register1 s f = register1_fullctxt s (fun {context; _} x -> f context x)
 
     let register2_fullctxt s f =
       patched_services :=
@@ -310,8 +286,8 @@ module RPC = struct
           !patched_services
           s
           (fun ((ctxt, arg1), arg2) q i ->
-            Services_registration.rpc_init ctxt
-            >>=? fun ctxt -> f ctxt arg1 arg2 q i)
+            Services_registration.rpc_init ctxt >>=? fun ctxt ->
+            f ctxt arg1 arg2 q i)
 
     let register2 s f =
       register2_fullctxt s (fun {context; _} a1 a2 q i -> f context a1 a2 q i)
@@ -322,7 +298,8 @@ module RPC = struct
     let open Data_encoding in
     union
       ~tag_size:`Uint8
-      [ case
+      [
+        case
           (Tag 0)
           ~title:"Readable"
           (constant "Readable")
@@ -342,7 +319,8 @@ module RPC = struct
           (constant "Optimized_legacy")
           (function
             | Optimized_legacy -> Some () | Readable | Optimized -> None)
-          (fun () -> Optimized_legacy) ]
+          (fun () -> Optimized_legacy);
+      ]
 
   module Scripts = struct
     module S = struct
@@ -369,10 +347,8 @@ module RPC = struct
         conv
           (fun (storage, operations, lazy_storage_diff) ->
             (storage, operations, lazy_storage_diff, lazy_storage_diff))
-          (fun ( storage,
-                 operations,
-                 legacy_lazy_storage_diff,
-                 lazy_storage_diff ) ->
+          (fun (storage, operations, legacy_lazy_storage_diff, lazy_storage_diff)
+               ->
             let lazy_storage_diff =
               Option.either lazy_storage_diff legacy_lazy_storage_diff
             in
@@ -483,8 +459,8 @@ module RPC = struct
       let pack_data =
         RPC_service.post_service
           ~description:
-            "Computes the serialized version of some data expression using \
-             the same algorithm as script instruction PACK"
+            "Computes the serialized version of some data expression using the \
+             same algorithm as script instruction PACK"
           ~input:
             (obj3
                (req "data" Script.expr_encoding)
@@ -523,8 +499,8 @@ module RPC = struct
       let normalize_type =
         RPC_service.post_service
           ~description:
-            "Normalizes some Michelson type by expanding `pair a b c` as \
-             `pair a (pair b c)"
+            "Normalizes some Michelson type by expanding `pair a b c` as `pair \
+             a (pair b c)"
           ~input:(obj1 (req "type" Script.expr_encoding))
           ~output:(obj1 (req "normalized" Script.expr_encoding))
           ~query:RPC_query.empty
@@ -592,8 +568,7 @@ module RPC = struct
             type a s.
             (a, s) Script_typed_ir.stack_ty * (a * s) ->
             (Script.expr * string option) list tzresult Lwt.t = function
-          | (Bot_t, (EmptyCell, EmptyCell)) ->
-              return_nil
+          | (Bot_t, (EmptyCell, EmptyCell)) -> return_nil
           | (Item_t (ty, rest_ty, annot), (v, rest)) ->
               Script_ir_translator.unparse_data
                 ctxt
@@ -601,16 +576,12 @@ module RPC = struct
                 ty
                 v
               >>=? fun (data, _ctxt) ->
-              unparse_stack (rest_ty, rest)
-              >|=? fun rest ->
+              unparse_stack (rest_ty, rest) >|=? fun rest ->
               let annot =
                 match Script_ir_annot.unparse_var_annot annot with
-                | [] ->
-                    None
-                | [a] ->
-                    Some a
-                | _ ->
-                    assert false
+                | [] -> None
+                | [a] -> Some a
+                | _ -> assert false
               in
               let data = Micheline.strip_locations data in
               (data, annot) :: rest
@@ -650,8 +621,7 @@ module RPC = struct
           ~parameter
           ~internal:true
         >>=? fun {ctxt; storage; lazy_storage_diff; operations} ->
-        logger.get_log ()
-        >|=? fun trace ->
+        logger.get_log () >|=? fun trace ->
         let trace = Option.value ~default:[] trace in
         ({ctxt; storage; lazy_storage_diff; operations}, trace)
     end
@@ -674,7 +644,7 @@ module RPC = struct
           Lwt.return
             ( Script_ir_translator.serialize_ty_for_error ctxt exp_ty
             >|? fun (exp_ty, _ctxt) ->
-            Script_tc_errors.Ill_typed_data (None, data, exp_ty) ))
+              Script_tc_errors.Ill_typed_data (None, data, exp_ty) ))
         (let allow_forged =
            true
            (* Safe since we ignore the value afterwards. *)
@@ -689,7 +659,7 @@ module RPC = struct
 
     module Unparse_types = struct
       (* Same as the unparsing functions for types in Script_ir_translator but
-       does not consume gas and never folds (pair a (pair b c)) *)
+         does not consume gas and never folds (pair a (pair b c)) *)
 
       open Script_ir_translator
       open Micheline
@@ -699,32 +669,22 @@ module RPC = struct
 
       let rec unparse_comparable_ty : type a. a comparable_ty -> Script.node =
         function
-        | Unit_key tname ->
-            Prim (-1, T_unit, [], unparse_type_annot tname)
-        | Never_key tname ->
-            Prim (-1, T_never, [], unparse_type_annot tname)
-        | Int_key tname ->
-            Prim (-1, T_int, [], unparse_type_annot tname)
-        | Nat_key tname ->
-            Prim (-1, T_nat, [], unparse_type_annot tname)
+        | Unit_key tname -> Prim (-1, T_unit, [], unparse_type_annot tname)
+        | Never_key tname -> Prim (-1, T_never, [], unparse_type_annot tname)
+        | Int_key tname -> Prim (-1, T_int, [], unparse_type_annot tname)
+        | Nat_key tname -> Prim (-1, T_nat, [], unparse_type_annot tname)
         | Signature_key tname ->
             Prim (-1, T_signature, [], unparse_type_annot tname)
-        | String_key tname ->
-            Prim (-1, T_string, [], unparse_type_annot tname)
-        | Bytes_key tname ->
-            Prim (-1, T_bytes, [], unparse_type_annot tname)
-        | Mutez_key tname ->
-            Prim (-1, T_mutez, [], unparse_type_annot tname)
-        | Bool_key tname ->
-            Prim (-1, T_bool, [], unparse_type_annot tname)
+        | String_key tname -> Prim (-1, T_string, [], unparse_type_annot tname)
+        | Bytes_key tname -> Prim (-1, T_bytes, [], unparse_type_annot tname)
+        | Mutez_key tname -> Prim (-1, T_mutez, [], unparse_type_annot tname)
+        | Bool_key tname -> Prim (-1, T_bool, [], unparse_type_annot tname)
         | Key_hash_key tname ->
             Prim (-1, T_key_hash, [], unparse_type_annot tname)
-        | Key_key tname ->
-            Prim (-1, T_key, [], unparse_type_annot tname)
+        | Key_key tname -> Prim (-1, T_key, [], unparse_type_annot tname)
         | Timestamp_key tname ->
             Prim (-1, T_timestamp, [], unparse_type_annot tname)
-        | Address_key tname ->
-            Prim (-1, T_address, [], unparse_type_annot tname)
+        | Address_key tname -> Prim (-1, T_address, [], unparse_type_annot tname)
         | Chain_id_key tname ->
             Prim (-1, T_chain_id, [], unparse_type_annot tname)
         | Pair_key ((l, al), (r, ar), pname) ->
@@ -737,10 +697,7 @@ module RPC = struct
             Prim (-1, T_or, [tl; tr], unparse_type_annot tname)
         | Option_key (t, tname) ->
             Prim
-              ( -1,
-                T_option,
-                [unparse_comparable_ty t],
-                unparse_type_annot tname )
+              (-1, T_option, [unparse_comparable_ty t], unparse_type_annot tname)
 
       let unparse_memo_size memo_size =
         let z = Alpha_context.Sapling.Memo_size.unparse_to_z memo_size in
@@ -750,36 +707,21 @@ module RPC = struct
        fun ty ->
         let return (name, args, annot) = Prim (-1, name, args, annot) in
         match ty with
-        | Unit_t tname ->
-            return (T_unit, [], unparse_type_annot tname)
-        | Int_t tname ->
-            return (T_int, [], unparse_type_annot tname)
-        | Nat_t tname ->
-            return (T_nat, [], unparse_type_annot tname)
-        | Signature_t tname ->
-            return (T_signature, [], unparse_type_annot tname)
-        | String_t tname ->
-            return (T_string, [], unparse_type_annot tname)
-        | Bytes_t tname ->
-            return (T_bytes, [], unparse_type_annot tname)
-        | Mutez_t tname ->
-            return (T_mutez, [], unparse_type_annot tname)
-        | Bool_t tname ->
-            return (T_bool, [], unparse_type_annot tname)
-        | Key_hash_t tname ->
-            return (T_key_hash, [], unparse_type_annot tname)
-        | Key_t tname ->
-            return (T_key, [], unparse_type_annot tname)
-        | Timestamp_t tname ->
-            return (T_timestamp, [], unparse_type_annot tname)
-        | Address_t tname ->
-            return (T_address, [], unparse_type_annot tname)
-        | Operation_t tname ->
-            return (T_operation, [], unparse_type_annot tname)
-        | Chain_id_t tname ->
-            return (T_chain_id, [], unparse_type_annot tname)
-        | Never_t tname ->
-            return (T_never, [], unparse_type_annot tname)
+        | Unit_t tname -> return (T_unit, [], unparse_type_annot tname)
+        | Int_t tname -> return (T_int, [], unparse_type_annot tname)
+        | Nat_t tname -> return (T_nat, [], unparse_type_annot tname)
+        | Signature_t tname -> return (T_signature, [], unparse_type_annot tname)
+        | String_t tname -> return (T_string, [], unparse_type_annot tname)
+        | Bytes_t tname -> return (T_bytes, [], unparse_type_annot tname)
+        | Mutez_t tname -> return (T_mutez, [], unparse_type_annot tname)
+        | Bool_t tname -> return (T_bool, [], unparse_type_annot tname)
+        | Key_hash_t tname -> return (T_key_hash, [], unparse_type_annot tname)
+        | Key_t tname -> return (T_key, [], unparse_type_annot tname)
+        | Timestamp_t tname -> return (T_timestamp, [], unparse_type_annot tname)
+        | Address_t tname -> return (T_address, [], unparse_type_annot tname)
+        | Operation_t tname -> return (T_operation, [], unparse_type_annot tname)
+        | Chain_id_t tname -> return (T_chain_id, [], unparse_type_annot tname)
+        | Never_t tname -> return (T_never, [], unparse_type_annot tname)
         | Bls12_381_g1_t tname ->
             return (T_bls12_381_g1, [], unparse_type_annot tname)
         | Bls12_381_g2_t tname ->
@@ -855,20 +797,21 @@ module RPC = struct
       in
       Registration.register0
         S.run_code
-        (fun ctxt
-             ()
-             ( ( code,
-                 storage,
-                 parameter,
-                 amount,
-                 balance,
-                 chain_id,
-                 source,
-                 payer,
-                 gas,
-                 entrypoint ),
-               unparsing_mode )
-             ->
+        (fun
+          ctxt
+          ()
+          ( ( code,
+              storage,
+              parameter,
+              amount,
+              balance,
+              chain_id,
+              source,
+              payer,
+              gas,
+              entrypoint ),
+            unparsing_mode )
+        ->
           let unparsing_mode = Option.value ~default:Readable unparsing_mode in
           let storage = Script.lazy_expr storage in
           let code = Script.lazy_expr code in
@@ -876,21 +819,15 @@ module RPC = struct
           >>=? fun (ctxt, dummy_contract) ->
           let (source, payer) =
             match (source, payer) with
-            | (Some source, Some payer) ->
-                (source, payer)
-            | (Some source, None) ->
-                (source, source)
-            | (None, Some payer) ->
-                (payer, payer)
-            | (None, None) ->
-                (dummy_contract, dummy_contract)
+            | (Some source, Some payer) -> (source, payer)
+            | (Some source, None) -> (source, source)
+            | (None, Some payer) -> (payer, payer)
+            | (None, None) -> (dummy_contract, dummy_contract)
           in
           let gas =
             match gas with
-            | Some gas ->
-                gas
-            | None ->
-                Constants.hard_gas_limit_per_operation ctxt
+            | Some gas -> gas
+            | None -> Constants.hard_gas_limit_per_operation ctxt
           in
           let ctxt = Gas.set_limit ctxt gas in
           let step_constants =
@@ -905,27 +842,29 @@ module RPC = struct
             ~entrypoint
             ~parameter
             ~internal:true
-          >|=? fun { Script_interpreter.storage;
+          >|=? fun {
+                     Script_interpreter.storage;
                      operations;
                      lazy_storage_diff;
-                     _ } ->
-          (storage, operations, lazy_storage_diff)) ;
+                     _;
+                   } -> (storage, operations, lazy_storage_diff)) ;
       Registration.register0
         S.trace_code
-        (fun ctxt
-             ()
-             ( ( code,
-                 storage,
-                 parameter,
-                 amount,
-                 balance,
-                 chain_id,
-                 source,
-                 payer,
-                 gas,
-                 entrypoint ),
-               unparsing_mode )
-             ->
+        (fun
+          ctxt
+          ()
+          ( ( code,
+              storage,
+              parameter,
+              amount,
+              balance,
+              chain_id,
+              source,
+              payer,
+              gas,
+              entrypoint ),
+            unparsing_mode )
+        ->
           let unparsing_mode = Option.value ~default:Readable unparsing_mode in
           let storage = Script.lazy_expr storage in
           let code = Script.lazy_expr code in
@@ -933,21 +872,15 @@ module RPC = struct
           >>=? fun (ctxt, dummy_contract) ->
           let (source, payer) =
             match (source, payer) with
-            | (Some source, Some payer) ->
-                (source, payer)
-            | (Some source, None) ->
-                (source, source)
-            | (None, Some payer) ->
-                (payer, payer)
-            | (None, None) ->
-                (dummy_contract, dummy_contract)
+            | (Some source, Some payer) -> (source, payer)
+            | (Some source, None) -> (source, source)
+            | (None, Some payer) -> (payer, payer)
+            | (None, None) -> (dummy_contract, dummy_contract)
           in
           let gas =
             match gas with
-            | Some gas ->
-                gas
-            | None ->
-                Constants.hard_gas_limit_per_operation ctxt
+            | Some gas -> gas
+            | None -> Constants.hard_gas_limit_per_operation ctxt
           in
           let ctxt = Gas.set_limit ctxt gas in
           let step_constants =
@@ -964,22 +897,21 @@ module RPC = struct
             ~script:{storage; code}
             ~entrypoint
             ~parameter
-          >|=? fun ( { Script_interpreter.storage;
+          >|=? fun ( {
+                       Script_interpreter.storage;
                        operations;
                        lazy_storage_diff;
-                       _ },
-                     trace ) ->
-          (storage, operations, trace, lazy_storage_diff)) ;
+                       _;
+                     },
+                     trace ) -> (storage, operations, trace, lazy_storage_diff)) ;
       Registration.register0
         S.typecheck_code
         (fun ctxt () (expr, maybe_gas, legacy) ->
           let legacy = Option.value ~default:false legacy in
           let ctxt =
             match maybe_gas with
-            | None ->
-                Gas.set_unlimited ctxt
-            | Some gas ->
-                Gas.set_limit ctxt gas
+            | None -> Gas.set_unlimited ctxt
+            | Some gas -> Gas.set_limit ctxt gas
           in
           Script_ir_translator.typecheck_code ~legacy ctxt expr
           >|=? fun (res, ctxt) -> (res, Gas.level ctxt)) ;
@@ -989,21 +921,16 @@ module RPC = struct
           let legacy = Option.value ~default:false legacy in
           let ctxt =
             match maybe_gas with
-            | None ->
-                Gas.set_unlimited ctxt
-            | Some gas ->
-                Gas.set_limit ctxt gas
+            | None -> Gas.set_unlimited ctxt
+            | Some gas -> Gas.set_limit ctxt gas
           in
-          typecheck_data ~legacy ctxt (data, ty)
-          >|=? fun ctxt -> Gas.level ctxt) ;
+          typecheck_data ~legacy ctxt (data, ty) >|=? fun ctxt -> Gas.level ctxt) ;
       Registration.register0 S.pack_data (fun ctxt () (expr, typ, maybe_gas) ->
           let open Script_ir_translator in
           let ctxt =
             match maybe_gas with
-            | None ->
-                Gas.set_unlimited ctxt
-            | Some gas ->
-                Gas.set_limit ctxt gas
+            | None -> Gas.set_unlimited ctxt
+            | Some gas -> Gas.set_limit ctxt gas
           in
           parse_packable_ty ctxt ~legacy:true (Micheline.root typ)
           >>?= fun (Ex_ty typ, ctxt) ->
@@ -1014,8 +941,8 @@ module RPC = struct
             typ
             (Micheline.root expr)
           >>=? fun (data, ctxt) ->
-          Script_ir_translator.pack_data ctxt typ data
-          >|=? fun (bytes, ctxt) -> (bytes, Gas.level ctxt)) ;
+          Script_ir_translator.pack_data ctxt typ data >|=? fun (bytes, ctxt) ->
+          (bytes, Gas.level ctxt)) ;
       Registration.register0
         S.normalize_data
         (fun ctxt () (expr, typ, unparsing_mode, legacy) ->
@@ -1054,30 +981,26 @@ module RPC = struct
           return @@ Micheline.strip_locations normalized) ;
       Registration.register0
         S.run_operation
-        (fun ctxt
-             ()
-             ({shell; protocol_data = Operation_data protocol_data}, chain_id)
-             ->
+        (fun
+          ctxt
+          ()
+          ({shell; protocol_data = Operation_data protocol_data}, chain_id)
+        ->
           (* this code is a duplicate of Apply without signature check *)
           let partial_precheck_manager_contents (type kind) ctxt
               (op : kind Kind.manager contents) : context tzresult Lwt.t =
             let (Manager_operation
-                  {source; fee; counter; operation; gas_limit; storage_limit})
-                =
+                  {source; fee; counter; operation; gas_limit; storage_limit}) =
               op
             in
-            Gas.consume_limit_in_block ctxt gas_limit
-            >>?= fun ctxt ->
+            Gas.consume_limit_in_block ctxt gas_limit >>?= fun ctxt ->
             let ctxt = Gas.set_limit ctxt gas_limit in
-            Fees.check_storage_limit ctxt ~storage_limit
-            >>?= fun () ->
+            Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
             Contract.must_be_allocated ctxt (Contract.implicit_contract source)
             >>=? fun () ->
-            Contract.check_counter_increment ctxt source counter
-            >>=? fun () ->
-            ( match operation with
-            | Reveal pk ->
-                Contract.reveal_manager_key ctxt source pk
+            Contract.check_counter_increment ctxt source counter >>=? fun () ->
+            (match operation with
+            | Reveal pk -> Contract.reveal_manager_key ctxt source pk
             | Transaction {parameters; _} ->
                 (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
                 let arg_bytes =
@@ -1091,16 +1014,14 @@ module RPC = struct
                       Script.lazy_expr_encoding
                       arg_bytes
                   with
-                  | Some arg ->
-                      arg
-                  | None ->
-                      assert false
+                  | Some arg -> arg
+                  | None -> assert false
                 in
                 Lwt.return
                 @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
                 @@ (* Fail if not enough gas for complete deserialization cost *)
-                   ( Script.force_decode_in_context ctxt arg
-                   >|? fun (_arg, ctxt) -> ctxt )
+                ( Script.force_decode_in_context ctxt arg >|? fun (_arg, ctxt) ->
+                  ctxt )
             | Origination {script; _} ->
                 (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
                 let script_bytes =
@@ -1110,26 +1031,21 @@ module RPC = struct
                   match
                     Data_encoding.Binary.of_bytes Script.encoding script_bytes
                   with
-                  | Some script ->
-                      script
-                  | None ->
-                      assert false
+                  | Some script -> script
+                  | None -> assert false
                 in
                 Lwt.return
                 @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
                 @@ (* Fail if not enough gas for complete deserialization cost *)
-                   ( Script.force_decode_in_context ctxt script.code
-                   >>? fun (_code, ctxt) ->
-                   Script.force_decode_in_context ctxt script.storage
-                   >|? fun (_storage, ctxt) -> ctxt )
-            | _ ->
-                return ctxt )
+                ( Script.force_decode_in_context ctxt script.code
+                >>? fun (_code, ctxt) ->
+                  Script.force_decode_in_context ctxt script.storage
+                  >|? fun (_storage, ctxt) -> ctxt )
+            | _ -> return ctxt)
             >>=? fun ctxt ->
-            Contract.get_manager_key ctxt source
-            >>=? fun _public_key ->
+            Contract.get_manager_key ctxt source >>=? fun _public_key ->
             (* signature check unplugged from here *)
-            Contract.increment_counter ctxt source
-            >>=? fun ctxt ->
+            Contract.increment_counter ctxt source >>=? fun ctxt ->
             Contract.spend ctxt (Contract.implicit_contract source) fee
           in
           let rec partial_precheck_manager_contents_list :
@@ -1142,8 +1058,7 @@ module RPC = struct
             | Single (Manager_operation _ as op) ->
                 partial_precheck_manager_contents ctxt op
             | Cons ((Manager_operation _ as op), rest) ->
-                partial_precheck_manager_contents ctxt op
-                >>=? fun ctxt ->
+                partial_precheck_manager_contents ctxt op >>=? fun ctxt ->
                 partial_precheck_manager_contents_list ctxt rest
           in
           let ret contents =
@@ -1156,24 +1071,12 @@ module RPC = struct
           let baker = Signature.Public_key_hash.zero in
           match protocol_data.contents with
           | Single (Manager_operation _) as op ->
-              partial_precheck_manager_contents_list ctxt op
-              >>=? fun ctxt ->
-              Apply.apply_manager_contents_list
-                ctxt
-                Optimized
-                baker
-                chain_id
-                op
+              partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
+              Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
               >|= fun (_ctxt, result) -> ok @@ ret result
           | Cons (Manager_operation _, _) as op ->
-              partial_precheck_manager_contents_list ctxt op
-              >>=? fun ctxt ->
-              Apply.apply_manager_contents_list
-                ctxt
-                Optimized
-                baker
-                chain_id
-                op
+              partial_precheck_manager_contents_list ctxt op >>=? fun ctxt ->
+              Apply.apply_manager_contents_list ctxt Optimized baker chain_id op
               >|= fun (_ctxt, result) -> ok @@ ret result
           | _ ->
               Apply.apply_contents_list
@@ -1192,34 +1095,33 @@ module RPC = struct
           let legacy = false in
           let open Script_ir_translator in
           Lwt.return
-            ( parse_toplevel ~legacy expr
-            >>? (fun (arg_type, _, _, root_name) ->
-                  parse_parameter_ty ctxt ~legacy arg_type
-                  >>? fun (Ex_ty arg_type, _) ->
-                  Script_ir_translator.find_entrypoint
-                    ~root_name
-                    arg_type
-                    entrypoint)
+            ( ( parse_toplevel ~legacy expr
+              >>? fun (arg_type, _, _, root_name) ->
+                parse_parameter_ty ctxt ~legacy arg_type
+                >>? fun (Ex_ty arg_type, _) ->
+                Script_ir_translator.find_entrypoint
+                  ~root_name
+                  arg_type
+                  entrypoint )
             >>? fun (_f, Ex_ty ty) ->
-            unparse_ty ctxt ty
-            >|? fun (ty_node, _) -> Micheline.strip_locations ty_node )) ;
+              unparse_ty ctxt ty >|? fun (ty_node, _) ->
+              Micheline.strip_locations ty_node )) ;
       Registration.register0 S.list_entrypoints (fun ctxt () expr ->
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = false in
           let open Script_ir_translator in
           Lwt.return
-            ( parse_toplevel ~legacy expr
-            >>? fun (arg_type, _, _, root_name) ->
-            parse_parameter_ty ctxt ~legacy arg_type
-            >>? fun (Ex_ty arg_type, _) ->
-            Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
-            >|? fun (unreachable_entrypoint, map) ->
-            ( unreachable_entrypoint,
-              Entrypoints_map.fold
-                (fun entry (_, ty) acc ->
-                  (entry, Micheline.strip_locations ty) :: acc)
-                map
-                [] ) ))
+            ( parse_toplevel ~legacy expr >>? fun (arg_type, _, _, root_name) ->
+              parse_parameter_ty ctxt ~legacy arg_type
+              >>? fun (Ex_ty arg_type, _) ->
+              Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
+              >|? fun (unreachable_entrypoint, map) ->
+              ( unreachable_entrypoint,
+                Entrypoints_map.fold
+                  (fun entry (_, ty) acc ->
+                    (entry, Micheline.strip_locations ty) :: acc)
+                  map
+                  [] ) ))
 
     let run_code ctxt block ?unparsing_mode ?gas ?(entrypoint = "default")
         ~script ~storage ~input ~amount ~balance ~chain_id ~source ~payer =
@@ -1260,12 +1162,7 @@ module RPC = struct
           unparsing_mode )
 
     let typecheck_code ctxt block ?gas ?legacy ~script =
-      RPC_context.make_call0
-        S.typecheck_code
-        ctxt
-        block
-        ()
-        (script, gas, legacy)
+      RPC_context.make_call0 S.typecheck_code ctxt block () (script, gas, legacy)
 
     let typecheck_data ctxt block ?gas ?legacy ~data ~ty =
       RPC_context.make_call0
@@ -1301,12 +1198,7 @@ module RPC = struct
       RPC_context.make_call0 S.run_operation ctxt block () (op, chain_id)
 
     let entrypoint_type ctxt block ~script ~entrypoint =
-      RPC_context.make_call0
-        S.entrypoint_type
-        ctxt
-        block
-        ()
-        (script, entrypoint)
+      RPC_context.make_call0 S.entrypoint_type ctxt block () (script, entrypoint)
 
     let list_entrypoints ctxt block ~script =
       RPC_context.make_call0 S.list_entrypoints ctxt block () script
@@ -1315,8 +1207,8 @@ module RPC = struct
   module Contract = struct
     module S = struct
       let path =
-        ( RPC_path.(open_root / "context" / "contracts")
-          : RPC_context.t RPC_path.context )
+        (RPC_path.(open_root / "context" / "contracts")
+          : RPC_context.t RPC_path.context)
 
       let get_storage_normalized =
         let open Data_encoding in
@@ -1346,11 +1238,9 @@ module RPC = struct
       Registration.register1
         S.get_storage_normalized
         (fun ctxt contract () unparsing_mode ->
-          Contract.get_script ctxt contract
-          >>=? fun (ctxt, script) ->
+          Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
           match script with
-          | None ->
-              return_none
+          | None -> return_none
           | Some script ->
               let ctxt = Gas.set_unlimited ctxt in
               let open Script_ir_translator in
@@ -1368,11 +1258,9 @@ module RPC = struct
       Registration.register1
         S.get_script_normalized
         (fun ctxt contract () unparsing_mode ->
-          Contract.get_script ctxt contract
-          >>=? fun (ctxt, script) ->
+          Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
           match script with
-          | None ->
-              return_none
+          | None -> return_none
           | Some script ->
               let ctxt = Gas.set_unlimited ctxt in
               let open Script_ir_translator in
@@ -1407,8 +1295,8 @@ module RPC = struct
   module Big_map = struct
     module S = struct
       let path =
-        ( RPC_path.(open_root / "context" / "big_maps")
-          : RPC_context.t RPC_path.context )
+        (RPC_path.(open_root / "context" / "big_maps")
+          : RPC_context.t RPC_path.context)
 
       let big_map_get_normalized =
         let open Data_encoding in
@@ -1430,22 +1318,18 @@ module RPC = struct
         (fun ctxt id key () unparsing_mode ->
           let open Script_ir_translator in
           let ctxt = Gas.set_unlimited ctxt in
-          Big_map.exists ctxt id
-          >>=? fun (ctxt, types) ->
+          Big_map.exists ctxt id >>=? fun (ctxt, types) ->
           match types with
-          | None ->
-              raise Not_found
+          | None -> raise Not_found
           | Some (_, value_type) -> (
               parse_big_map_value_ty
                 ctxt
                 ~legacy:true
                 (Micheline.root value_type)
               >>?= fun (Ex_ty value_type, ctxt) ->
-              Big_map.get_opt ctxt id key
-              >>=? fun (_ctxt, value) ->
+              Big_map.get_opt ctxt id key >>=? fun (_ctxt, value) ->
               match value with
-              | None ->
-                  raise Not_found
+              | None -> raise Not_found
               | Some value ->
                   parse_data
                     ctxt
@@ -1455,7 +1339,7 @@ module RPC = struct
                     (Micheline.root value)
                   >>=? fun (value, ctxt) ->
                   unparse_data ctxt unparsing_mode value_type value
-                  >|=? fun (value, _ctxt) -> Micheline.strip_locations value ))
+                  >|=? fun (value, _ctxt) -> Micheline.strip_locations value))
 
     let big_map_get_normalized ctxt block id key ~unparsing_mode =
       RPC_context.make_call2
@@ -1510,12 +1394,13 @@ module RPC = struct
                (shell, proto))) ;
       Registration.register0_noctxt
         S.protocol_data
-        (fun ()
-             ( priority,
-               seed_nonce_hash,
-               proof_of_work_nonce,
-               liquidity_baking_escape_vote )
-             ->
+        (fun
+          ()
+          ( priority,
+            seed_nonce_hash,
+            proof_of_work_nonce,
+            liquidity_baking_escape_vote )
+        ->
           return
             (Data_encoding.Binary.to_bytes_exn
                Block_header.contents_encoding
@@ -1530,10 +1415,8 @@ module RPC = struct
       let[@coq_axiom_with_reason "cast on e"] operations ctxt block ~branch
           ~source ?sourcePubKey ~counter ~fee ~gas_limit ~storage_limit
           operations =
-        Contract_services.manager_key ctxt block source
-        >>= function
-        | Error _ as e ->
-            Lwt.return e
+        Contract_services.manager_key ctxt block source >>= function
+        | Error _ as e -> Lwt.return e
         | Ok revealed ->
             let ops =
               List.map
@@ -1552,8 +1435,7 @@ module RPC = struct
             in
             let ops =
               match (sourcePubKey, revealed) with
-              | (None, _) | (_, Some _) ->
-                  ops
+              | (None, _) | (_, Some _) -> ops
               | (Some pk, None) ->
                   let operation = Reveal pk in
                   Contents
@@ -1609,8 +1491,8 @@ module RPC = struct
           ~storage_limit
           [Manager (Transaction {amount; parameters; destination; entrypoint})]
 
-      let origination ctxt block ~branch ~source ?sourcePubKey ~counter
-          ~balance ?delegatePubKey ~script ~gas_limit ~storage_limit ~fee () =
+      let origination ctxt block ~branch ~source ?sourcePubKey ~counter ~balance
+          ?delegatePubKey ~script ~gas_limit ~storage_limit ~fee () =
         operations
           ctxt
           block
@@ -1621,14 +1503,16 @@ module RPC = struct
           ~fee
           ~gas_limit
           ~storage_limit
-          [ Manager
+          [
+            Manager
               (Origination
                  {
                    delegate = delegatePubKey;
                    script;
                    credit = balance;
                    preorigination = None;
-                 }) ]
+                 });
+          ]
 
       let delegation ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
           delegate =
@@ -1727,24 +1611,19 @@ module RPC = struct
           Block_header.protocol_data_encoding
           protocol_data
       with
-      | None ->
-          Stdlib.failwith "Cant_parse_protocol_data"
-      | Some protocol_data ->
-          protocol_data
+      | None -> Stdlib.failwith "Cant_parse_protocol_data"
+      | Some protocol_data -> protocol_data
 
     let register () =
       Registration.register0 S.operations (fun _ctxt () (operations, check) ->
           map_s
             (fun raw ->
-              parse_operation raw
-              >>?= fun op ->
-              ( match check with
-              | Some true ->
-                  return_unit (* FIXME *)
+              parse_operation raw >>?= fun op ->
+              (match check with
+              | Some true -> return_unit (* FIXME *)
               (* I.check_signature ctxt *)
               (* op.protocol_data.signature op.shell op.protocol_data.contents *)
-              | Some false | None ->
-                  return_unit )
+              | Some false | None -> return_unit)
               >|=? fun () -> op)
             operations) ;
       Registration.register0_noctxt S.block (fun () raw_block ->
@@ -1808,10 +1687,8 @@ module RPC = struct
           Level.levels_in_current_cycle ctxt ~offset:q.offset ()
         in
         match rev_levels with
-        | [] ->
-            return_none
-        | [level] ->
-            return (Some (level.level, level.level))
+        | [] -> return_none
+        | [level] -> return (Some (level.level, level.level))
         | last :: (_ :: _ as rest) ->
             (* The [rev_levels] list is reversed, the last level is the head *)
             let first = List.hd (List.rev rest) in

@@ -29,10 +29,8 @@ let rec read_partial_context context path depth =
   if depth = 0 then Lwt.return Block_services.Cut
   else
     (* try to read as file *)
-    Context.find context path
-    >>= function
-    | Some v ->
-        Lwt.return (Block_services.Key v)
+    Context.find context path >>= function
+    | Some v -> Lwt.return (Block_services.Key v)
     | None ->
         (* try to read as directory *)
         Context.fold
@@ -46,8 +44,7 @@ let rec read_partial_context context path depth =
                 (* This is an invariant of {!Context.fold} *)
                 assert false
             | khd :: ktl as k ->
-                read_partial_context context k (depth - 1)
-                >>= fun v ->
+                read_partial_context context k (depth - 1) >>= fun v ->
                 let k = List.last khd ktl in
                 Lwt.return (TzString.Map.add k v acc))
         >|= fun map -> Block_services.Dir map
@@ -159,8 +156,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
       >>=? fun (live_blocks, _) -> return live_blocks) ;
   (* block metadata *)
   let block_metadata chain_store block =
-    Store.Block.get_block_metadata chain_store block
-    >>=? fun metadata ->
+    Store.Block.get_block_metadata chain_store block >>=? fun metadata ->
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn
         Proto.block_header_metadata_encoding
@@ -223,8 +219,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
   let operations chain_store block =
     let chain_id = Store.Chain.chain_id chain_store in
     let ops = Store.Block.operations block in
-    Store.Block.get_block_metadata_opt chain_store block
-    >>= function
+    Store.Block.get_block_metadata_opt chain_store block >>= function
     | None ->
         return (List.map (List.map (convert_without_metadata chain_id)) ops)
     | Some metadata ->
@@ -238,25 +233,22 @@ let build_raw_rpc_directory ~user_activated_upgrades
                  (convert_with_metadata chain_id))
               ops
               ops_metadata
-            |> function Ok v -> return v | Error () -> raise Not_found)
+            |> function
+            | Ok v -> return v
+            | Error () -> raise Not_found)
           (fun _ ->
-            return
-              (List.map (List.map (convert_without_metadata chain_id)) ops))
+            return (List.map (List.map (convert_without_metadata chain_id)) ops))
   in
   (*****************************************************************)
   register0 S.Operations.operations (fun (chain_store, block) () () ->
       operations chain_store block) ;
-  register1
-    S.Operations.operations_in_pass
-    (fun (chain_store, block) i () () ->
+  register1 S.Operations.operations_in_pass (fun (chain_store, block) i () () ->
       let chain_id = Store.Chain.chain_id chain_store in
       let (ops, _path) = Store.Block.operations_path block i in
       Lwt.catch
         (fun () ->
-          Store.Block.get_block_metadata_opt chain_store block
-          >>= function
-          | None ->
-              return (List.map (convert_without_metadata chain_id) ops)
+          Store.Block.get_block_metadata_opt chain_store block >>= function
+          | None -> return (List.map (convert_without_metadata chain_id) ops)
           | Some metadata -> (
               let opss_metadata = Store.Block.operations_metadata metadata in
               let ops_metadata =
@@ -268,7 +260,9 @@ let build_raw_rpc_directory ~user_activated_upgrades
                 (convert_with_metadata chain_id)
                 ops
                 ops_metadata
-              |> function Ok x -> return x | _ -> raise Not_found ))
+              |> function
+              | Ok x -> return x
+              | _ -> raise Not_found))
         (fun _ -> Lwt.fail Not_found)) ;
   register2 S.Operations.operation (fun (chain_store, block) i j () () ->
       let chain_id = Store.Chain.chain_id chain_store in
@@ -278,10 +272,8 @@ let build_raw_rpc_directory ~user_activated_upgrades
           let op =
             List.nth ops j |> WithExceptions.Option.to_exn ~none:Not_found
           in
-          Store.Block.get_block_metadata_opt chain_store block
-          >>= function
-          | None ->
-              return (convert_without_metadata chain_id op)
+          Store.Block.get_block_metadata_opt chain_store block >>= function
+          | None -> return (convert_without_metadata chain_id op)
           | Some metadata ->
               let opss_metadata = Store.Block.operations_metadata metadata in
               let ops_metadata =
@@ -305,8 +297,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
       Lwt.catch
         (fun () ->
           let (ops, _) = Store.Block.operations_hashes_path block i in
-          return
-            (List.nth ops j |> WithExceptions.Option.to_exn ~none:Not_found))
+          return (List.nth ops j |> WithExceptions.Option.to_exn ~none:Not_found))
         (fun _ -> Lwt.fail Not_found)) ;
   (* operation_metadata_hashes *)
   register0 S.Operation_metadata_hashes.root (fun (_, block) () () ->
@@ -338,19 +329,14 @@ let build_raw_rpc_directory ~user_activated_upgrades
         (depth >= 0)
         (Tezos_shell_services.Block_services.Invalid_depth_arg depth)
       >>=? fun () ->
-      Store.Block.context chain_store block
-      >>=? fun context ->
-      Context.mem context path
-      >>= fun mem ->
-      Context.mem_tree context path
-      >>= fun dir_mem ->
+      Store.Block.context chain_store block >>=? fun context ->
+      Context.mem context path >>= fun mem ->
+      Context.mem_tree context path >>= fun dir_mem ->
       if not (mem || dir_mem) then Lwt.fail Not_found
       else read_partial_context context path depth >>= fun dir -> return dir) ;
   register1 S.Context.merkle_tree (fun (chain_store, block) path query () ->
-      Store.Block.context_opt chain_store block
-      >>= function
-      | None ->
-          return None
+      Store.Block.context_opt chain_store block >>= function
+      | None -> return None
       | Some context ->
           let holey = Option.value ~default:false query#holey in
           let leaf_kind =
@@ -369,12 +355,11 @@ let build_raw_rpc_directory ~user_activated_upgrades
           Proto.block_header_data_encoding
           header.protocol_data
       in
-      block_metadata chain_store block
-      >>= (function
-            | Ok metadata -> return_some metadata | Error _ -> return_none)
+      (block_metadata chain_store block >>= function
+       | Ok metadata -> return_some metadata
+       | Error _ -> return_none)
       >>=? fun metadata ->
-      operations chain_store block
-      >>=? fun operations ->
+      operations chain_store block >>=? fun operations ->
       return
         {
           Block_services.hash;
@@ -387,10 +372,8 @@ let build_raw_rpc_directory ~user_activated_upgrades
   register0 S.Helpers.Preapply.block (fun (chain_store, block) q p ->
       let timestamp =
         match q#timestamp with
-        | None ->
-            Time.System.to_protocol (Systime_os.now ())
-        | Some time ->
-            time
+        | None -> Time.System.to_protocol (Systime_os.now ())
+        | Some time -> time
       in
       let protocol_data =
         Data_encoding.Binary.to_bytes_exn
@@ -425,8 +408,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
         ~protocol_data
         operations) ;
   register0 S.Helpers.Preapply.operations (fun (chain_store, block) () ops ->
-      Store.Block.context chain_store block
-      >>=? fun ctxt ->
+      Store.Block.context chain_store block >>=? fun ctxt ->
       let predecessor = Store.Block.hash block in
       let header = Store.Block.shell_header block in
       let predecessor_context = Shell_context.wrap_disk_context ctxt in
@@ -442,18 +424,15 @@ let build_raw_rpc_directory ~user_activated_upgrades
       >>=? fun state ->
       List.fold_left_es
         (fun (state, acc) op ->
-          Next_proto.apply_operation state op
-          >>=? fun (state, result) ->
+          Next_proto.apply_operation state op >>=? fun (state, result) ->
           return (state, (op.protocol_data, result) :: acc))
         (state, [])
         ops
       >>=? fun (state, acc) ->
       Next_proto.finalize_block state >>=? fun _ -> return (List.rev acc)) ;
   register1 S.Helpers.complete (fun (chain_store, block) prefix () () ->
-      Store.Block.context chain_store block
-      >>=? fun ctxt ->
-      Base58.complete prefix
-      >>= fun l1 ->
+      Store.Block.context chain_store block >>=? fun ctxt ->
+      Base58.complete prefix >>= fun l1 ->
       let ctxt = Shell_context.wrap_disk_context ctxt in
       Next_proto.complete_b58prefix ctxt prefix >>= fun l2 -> return (l1 @ l2)) ;
   (* merge protocol rpcs... *)
@@ -466,16 +445,13 @@ let build_raw_rpc_directory ~user_activated_upgrades
        (build_raw_header_rpc_directory (module Proto))) ;
   let proto_services =
     match Prevalidator_filters.find Next_proto.hash with
-    | Some (module Filters) ->
-        Filters.RPC.rpc_services
-    | None ->
-        Next_proto.rpc_services
+    | Some (module Filters) -> Filters.RPC.rpc_services
+    | None -> Next_proto.rpc_services
   in
   merge
     (RPC_directory.map
        (fun (chain_store, block) ->
-         Store.Block.context_exn chain_store block
-         >|= fun context ->
+         Store.Block.context_exn chain_store block >|= fun context ->
          let context = Shell_context.wrap_disk_context context in
          {
            Tezos_protocol_environment.block_hash = Store.Block.hash block;
@@ -487,17 +463,13 @@ let build_raw_rpc_directory ~user_activated_upgrades
 
 let get_protocol hash =
   match Registered_protocol.get hash with
-  | None ->
-      raise Not_found
-  | Some protocol ->
-      protocol
+  | None -> raise Not_found
+  | Some protocol -> protocol
 
 let get_directory ~user_activated_upgrades ~user_activated_protocol_overrides
     chain_store block =
-  Store.Chain.get_rpc_directory chain_store block
-  >>= function
-  | Some dir ->
-      Lwt.return dir
+  Store.Chain.get_rpc_directory chain_store block >>= function
+  | Some dir -> Lwt.return dir
   | None -> (
       Store.Block.protocol_hash_exn chain_store block
       >>= fun next_protocol_hash ->
@@ -512,35 +484,29 @@ let get_directory ~user_activated_upgrades ~user_activated_protocol_overrides
       if Store.Block.is_genesis chain_store (Store.Block.hash block) then
         Lwt.return (build_fake_rpc_directory ())
       else
-        Store.Block.read_predecessor_opt chain_store block
-        >>= (function
-              | None ->
-                  (* No predecessors (e.g. pruned caboose), return the
-                     current protocol *)
-                  Lwt.return (module Next_proto : Registered_protocol.T)
-              | Some pred ->
-                  Store.Chain.savepoint chain_store
-                  >>= fun (_, savepoint_level) ->
-                  ( if Compare.Int32.(Store.Block.level pred < savepoint_level)
-                  then
-                    Store.Chain.find_protocol
-                      chain_store
-                      ~protocol_level:(Store.Block.proto_level pred)
-                    >>= fun predecessor_protocol ->
-                    let protocol_hash =
-                      WithExceptions.Option.to_exn
-                        ~none:Not_found
-                        predecessor_protocol
-                    in
-                    Lwt.return protocol_hash
-                  else Store.Block.protocol_hash_exn chain_store pred )
-                  >>= fun protocol_hash ->
-                  Lwt.return (get_protocol protocol_hash))
+        (Store.Block.read_predecessor_opt chain_store block >>= function
+         | None ->
+             (* No predecessors (e.g. pruned caboose), return the
+                current protocol *)
+             Lwt.return (module Next_proto : Registered_protocol.T)
+         | Some pred ->
+             Store.Chain.savepoint chain_store >>= fun (_, savepoint_level) ->
+             (if Compare.Int32.(Store.Block.level pred < savepoint_level) then
+              Store.Chain.find_protocol
+                chain_store
+                ~protocol_level:(Store.Block.proto_level pred)
+              >>= fun predecessor_protocol ->
+              let protocol_hash =
+                WithExceptions.Option.to_exn
+                  ~none:Not_found
+                  predecessor_protocol
+              in
+              Lwt.return protocol_hash
+             else Store.Block.protocol_hash_exn chain_store pred)
+             >>= fun protocol_hash -> Lwt.return (get_protocol protocol_hash))
         >>= fun (module Proto) ->
-        Store.Chain.get_rpc_directory chain_store block
-        >>= function
-        | Some dir ->
-            Lwt.return dir
+        Store.Chain.get_rpc_directory chain_store block >>= function
+        | Some dir -> Lwt.return dir
         | None ->
             let dir =
               build_raw_rpc_directory
@@ -550,15 +516,14 @@ let get_directory ~user_activated_upgrades ~user_activated_protocol_overrides
                 (module Next_proto)
             in
             Store.Chain.set_rpc_directory chain_store Proto.hash dir
-            >>= fun () -> Lwt.return dir )
+            >>= fun () -> Lwt.return dir)
 
 let get_block chain_store = function
   | `Genesis ->
-      Store.Chain.genesis_block chain_store
-      >>= fun block -> Lwt.return_some block
+      Store.Chain.genesis_block chain_store >>= fun block ->
+      Lwt.return_some block
   | `Head n ->
-      Store.Chain.current_head chain_store
-      >>= fun current_head ->
+      Store.Chain.current_head chain_store >>= fun current_head ->
       if n < 0 then Lwt.return_none
       else if n = 0 then Lwt.return_some current_head
       else
@@ -567,27 +532,23 @@ let get_block chain_store = function
           ~distance:n
           (Store.Block.hash current_head)
   | (`Alias (_, n) | `Hash (_, n)) as b ->
-      ( match b with
+      (match b with
       | `Alias (`Checkpoint, _) ->
-          Store.Chain.checkpoint chain_store
-          >>= fun (checkpoint_hash, _) -> Lwt.return checkpoint_hash
+          Store.Chain.checkpoint chain_store >>= fun (checkpoint_hash, _) ->
+          Lwt.return checkpoint_hash
       | `Alias (`Savepoint, _) ->
-          Store.Chain.savepoint chain_store
-          >>= fun (savepoint_hash, _) -> Lwt.return savepoint_hash
+          Store.Chain.savepoint chain_store >>= fun (savepoint_hash, _) ->
+          Lwt.return savepoint_hash
       | `Alias (`Caboose, _) ->
-          Store.Chain.caboose chain_store
-          >>= fun (caboose_hash, _) -> Lwt.return caboose_hash
-      | `Hash (h, _) ->
-          Lwt.return h )
+          Store.Chain.caboose chain_store >>= fun (caboose_hash, _) ->
+          Lwt.return caboose_hash
+      | `Hash (h, _) -> Lwt.return h)
       >>= fun hash ->
       if n < 0 then
-        Store.Block.read_block_opt chain_store hash
-        >>= function
-        | None ->
-            Lwt.fail Not_found
+        Store.Block.read_block_opt chain_store hash >>= function
+        | None -> Lwt.fail Not_found
         | Some block ->
-            Store.Chain.current_head chain_store
-            >>= fun current_head ->
+            Store.Chain.current_head chain_store >>= fun current_head ->
             let head_level = Store.Block.level current_head in
             let block_level = Store.Block.level block in
             let distance =
@@ -607,10 +568,8 @@ let get_block chain_store = function
 
 let build_rpc_directory ~user_activated_upgrades
     ~user_activated_protocol_overrides chain_store block =
-  get_block chain_store block
-  >>= function
-  | None ->
-      Lwt.fail Not_found
+  get_block chain_store block >>= function
+  | None -> Lwt.fail Not_found
   | Some b ->
       get_directory
         ~user_activated_upgrades

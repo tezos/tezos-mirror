@@ -46,8 +46,7 @@ type t = (module T)
 
 let build hash =
   match Tezos_protocol_registerer.Registerer.get hash with
-  | None ->
-      None
+  | None -> None
   | Some (V0 protocol) ->
       let (module F) = protocol in
       let module Name = struct
@@ -55,7 +54,7 @@ let build hash =
       end in
       let module Env = Tezos_protocol_environment.MakeV0 (Name) () in
       Some
-        ( module struct
+        (module struct
           module Raw = F (Env)
 
           module P = struct
@@ -68,7 +67,7 @@ let build hash =
           module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
-        end : T )
+        end : T)
   | Some (V1 protocol) ->
       let (module F) = protocol in
       let module Name = struct
@@ -76,7 +75,7 @@ let build hash =
       end in
       let module Env = Tezos_protocol_environment.MakeV1 (Name) () in
       Some
-        ( module struct
+        (module struct
           module Raw = F (Env)
 
           module P = struct
@@ -89,7 +88,7 @@ let build hash =
           module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
-        end : T )
+        end : T)
   | Some (V2 protocol) ->
       let (module F) = protocol in
       let module Name = struct
@@ -97,7 +96,7 @@ let build hash =
       end in
       let module Env = Tezos_protocol_environment.MakeV2 (Name) () in
       Some
-        ( module struct
+        (module struct
           module Raw = F (Env)
 
           module P = struct
@@ -110,7 +109,7 @@ let build hash =
           module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
-        end : T )
+        end : T)
 
 module VersionTable = Protocol_hash.Table
 
@@ -124,15 +123,13 @@ let mem hash =
 
 let get hash =
   match VersionTable.find versions hash with
-  | Some proto ->
-      Some proto
+  | Some proto -> Some proto
   | None -> (
-    match build hash with
-    | Some proto ->
-        VersionTable.add versions hash proto ;
-        Some proto
-    | None ->
-        None )
+      match build hash with
+      | Some proto ->
+          VersionTable.add versions hash proto ;
+          Some proto
+      | None -> None)
 
 type error += Unregistered_protocol of Protocol_hash.t
 
@@ -154,10 +151,8 @@ let () =
 
 let get_result hash =
   match get hash with
-  | Some hash ->
-      return hash
-  | None ->
-      fail (Unregistered_protocol hash)
+  | Some hash -> return hash
+  | None -> fail (Unregistered_protocol hash)
 
 let seq () = VersionTable.to_seq_values versions
 
@@ -178,10 +173,8 @@ module Register_embedded_V0
 struct
   let hash =
     match Source.hash with
-    | None ->
-        Protocol.hash Source.sources
-    | Some hash ->
-        hash
+    | None -> Protocol.hash Source.sources
+    | Some hash -> hash
 
   module Self = struct
     module P = struct
@@ -210,10 +203,8 @@ module Register_embedded_V1
 struct
   let hash =
     match Source.hash with
-    | None ->
-        Protocol.hash Source.sources
-    | Some hash ->
-        hash
+    | None -> Protocol.hash Source.sources
+    | Some hash -> hash
 
   module Self = struct
     module P = struct
@@ -242,10 +233,8 @@ module Register_embedded_V2
 struct
   let hash =
     match Source.hash with
-    | None ->
-        Protocol.hash Source.sources
-    | Some hash ->
-        hash
+    | None -> Protocol.hash Source.sources
+    | Some hash -> hash
 
   module Self = struct
     module P = struct

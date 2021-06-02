@@ -48,7 +48,8 @@ let test_roundtrip_raw input =
     input
 
 let inputs =
-  [ "abc";
+  [
+    "abc";
     string_of_int max_int;
     "0";
     "00";
@@ -72,7 +73,8 @@ let inputs =
     String.make 2048 'z';
     (*loads of ascii characters: codes between 32 and 126 *)
     String.init 1000 (fun i -> Char.chr (32 + (i mod (126 - 32))));
-    "" ]
+    "";
+  ]
 
 (** Safe Base58Check-encoding then decoding (provided with error
     detections)
@@ -93,8 +95,10 @@ let test_safety input =
 let test_safetys () = List.iter test_safety inputs
 
 let tests =
-  [ ("safe decoding", `Quick, test_safetys);
+  [
+    ("safe decoding", `Quick, test_safetys);
     ("safe encoding/decoding", `Quick, test_roundtrip_safes);
-    ("raw encoding/decoding", `Quick, test_roundtrip_raws) ]
+    ("raw encoding/decoding", `Quick, test_roundtrip_raws);
+  ]
 
 let () = Alcotest.run "tezos-crypto" [("base58", tests)]

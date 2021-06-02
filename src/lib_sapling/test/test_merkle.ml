@@ -94,7 +94,7 @@ let test_merkle () =
       let t = insert t depth (Int64.of_int i) [hash2] in
       let _w = get_witness_height t depth (Int64.of_int i) in
       assert (get_cm_height t (Int64.of_int i) depth = hash2) ;
-      loop t (i + 1) )
+      loop t (i + 1))
     else t
   in
   let _t_final = loop t 1 in
@@ -105,106 +105,108 @@ let test_merkle () =
   (* test vectors from zcash-master/src/test/data/merkle_commitments_sapling.json & merkle_roots_sapling.json
      adding to the empty tree the first commitment we get the first root, the second the second etc... *)
   let expected_merkle_root =
-    [| Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "8c3daa300c9710bf24d2595536e7c80ff8d147faca726636d28e8683a0c27703";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "8611f17378eb55e8c3c3f0a5f002e2b0a7ca39442fc928322b8072d1079c213d";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "3db73b998d536be0e1c2ec124df8e0f383ae7b602968ff6a5276ca0695023c46";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "7ac2e6442fec5970e116dfa4f2ee606f395366cafb1fa7dfd6c3de3ce18c4363";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "6a8f11ab2a11c262e39ed4ea3825ae6c94739ccf94479cb69402c5722b034532";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "149595eed0b54a7e694cc8a68372525b9ae2c7b102514f527460db91eb690565";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "8c0432f1994a2381a7a4b5fda770336011f9e0b30784f9a5597901619c797045";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "e780c48d70420601f3313ff8488d7766b70c059c53aa3cda2ff1ef57ff62383c";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "f919f03caaed8a2c60f58c0d43838f83e670dc7e8ccd25daa04a13f3e8f45541";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "74f32b36629724038e71cbd6823b5a666440205a7d1a9242e95870b53d81f34a";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "a4af205a4e1ee02102866b23a68930ac33efda9235832f49b17fcc4939be4525";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "a946a42f1636045a16e65b2308e036d9da70089686c87c692e45912bd1cab772";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "a1db2dbac055364c1cb43cbeb49c7e2815bff855122602a2ad0fb981a91e0e39";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "16329b3ba4f0640f4d306532d9ea6ba0fbf0e70e44ed57d27b4277ed9cda6849";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "7b6523b2d9b23f72fec6234aa6a1f8fae3dba1c6a266023ea8b1826feba7a25c";
-       Core.Hash.of_bytes_exn
-       @@ ba_of_hex
-            "5c0bea7e17bde5bee4eb795c2eec3d389a68da587b36dd687b134826ecc09308"
+    [|
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "8c3daa300c9710bf24d2595536e7c80ff8d147faca726636d28e8683a0c27703";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "8611f17378eb55e8c3c3f0a5f002e2b0a7ca39442fc928322b8072d1079c213d";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "3db73b998d536be0e1c2ec124df8e0f383ae7b602968ff6a5276ca0695023c46";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "7ac2e6442fec5970e116dfa4f2ee606f395366cafb1fa7dfd6c3de3ce18c4363";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "6a8f11ab2a11c262e39ed4ea3825ae6c94739ccf94479cb69402c5722b034532";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "149595eed0b54a7e694cc8a68372525b9ae2c7b102514f527460db91eb690565";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "8c0432f1994a2381a7a4b5fda770336011f9e0b30784f9a5597901619c797045";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "e780c48d70420601f3313ff8488d7766b70c059c53aa3cda2ff1ef57ff62383c";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "f919f03caaed8a2c60f58c0d43838f83e670dc7e8ccd25daa04a13f3e8f45541";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "74f32b36629724038e71cbd6823b5a666440205a7d1a9242e95870b53d81f34a";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "a4af205a4e1ee02102866b23a68930ac33efda9235832f49b17fcc4939be4525";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "a946a42f1636045a16e65b2308e036d9da70089686c87c692e45912bd1cab772";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "a1db2dbac055364c1cb43cbeb49c7e2815bff855122602a2ad0fb981a91e0e39";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "16329b3ba4f0640f4d306532d9ea6ba0fbf0e70e44ed57d27b4277ed9cda6849";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "7b6523b2d9b23f72fec6234aa6a1f8fae3dba1c6a266023ea8b1826feba7a25c";
+      Core.Hash.of_bytes_exn
+      @@ ba_of_hex
+           "5c0bea7e17bde5bee4eb795c2eec3d389a68da587b36dd687b134826ecc09308";
     |]
   in
   (* commitments are in bigendian *)
   let commitments =
-    [| Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "556f3af94225d46b1ef652abc9005dee873b2e245eef07fd5be587e0f21023b0";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "5814b127a6c6b8f07ed03f0f6e2843ff04c9851ff824a4e5b4dad5b5f3475722";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "6c030e6d7460f91668cc842ceb78cdb54470469e78cd59cf903d3a6e1aa03e7c";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "30a0d08406b9e3693ee4c062bd1e6816f95bf14f5a13aafa1d57942c6c1d4250";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "12fc3e7298eb327a88abcc406fbe595e45dddd9b4209803b2e0baa3a8663ecaa";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "021a35cfe13d16891c1409d0f6e8865f51dd54792e5108a6f9e55e0dd44867f7";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "2e0bfc1e123edcb6252251611650f3667371f781b60302385c414716c75e8abc";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "11a5e54bf9a9b57e1c163904999ad1527f1e126c685111e18193decca2dd1ada";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "4674f7836089063143fc18b673b2d92f888c63380e3680385d47bcdbd5fe273a";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "0830165f36a69e416d51cc09cc5668692dee35d98539d3317999fdf87d8fcac7";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "02372c746664e0898576972ca6d0500c7c8ec42f144622349d133b06e837faf0";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "08c6d7dd3d2e387f7b84d6769f2b6cbe308918ab81e0f7321bd0945868d7d4e6";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "26e8c4061f2ad984d19f2c0a4436b9800e529069c0b0d3186d4683e83bb7eb8c";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "037cc2391338956026521beca5c81b541b7f2d1ead7758bf4d1588dbbcb8fa22";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "1cc467cfd2b504e156c9a38bc5c0e4f5ea6cc208054d2d0653a7e561ac3a3ef4";
-       Core.Commitment.of_bytes_exn
-       @@ ba_of_hex_be
-            "15ac4057a9a94536eca9802de65e985319e89627c9c64bc94626b712bc61363a"
+    [|
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "556f3af94225d46b1ef652abc9005dee873b2e245eef07fd5be587e0f21023b0";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "5814b127a6c6b8f07ed03f0f6e2843ff04c9851ff824a4e5b4dad5b5f3475722";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "6c030e6d7460f91668cc842ceb78cdb54470469e78cd59cf903d3a6e1aa03e7c";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "30a0d08406b9e3693ee4c062bd1e6816f95bf14f5a13aafa1d57942c6c1d4250";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "12fc3e7298eb327a88abcc406fbe595e45dddd9b4209803b2e0baa3a8663ecaa";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "021a35cfe13d16891c1409d0f6e8865f51dd54792e5108a6f9e55e0dd44867f7";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "2e0bfc1e123edcb6252251611650f3667371f781b60302385c414716c75e8abc";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "11a5e54bf9a9b57e1c163904999ad1527f1e126c685111e18193decca2dd1ada";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "4674f7836089063143fc18b673b2d92f888c63380e3680385d47bcdbd5fe273a";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "0830165f36a69e416d51cc09cc5668692dee35d98539d3317999fdf87d8fcac7";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "02372c746664e0898576972ca6d0500c7c8ec42f144622349d133b06e837faf0";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "08c6d7dd3d2e387f7b84d6769f2b6cbe308918ab81e0f7321bd0945868d7d4e6";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "26e8c4061f2ad984d19f2c0a4436b9800e529069c0b0d3186d4683e83bb7eb8c";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "037cc2391338956026521beca5c81b541b7f2d1ead7758bf4d1588dbbcb8fa22";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "1cc467cfd2b504e156c9a38bc5c0e4f5ea6cc208054d2d0653a7e561ac3a3ef4";
+      Core.Commitment.of_bytes_exn
+      @@ ba_of_hex_be
+           "15ac4057a9a94536eca9802de65e985319e89627c9c64bc94626b712bc61363a";
     |]
   in
   (* We check by inserting one by one *)
@@ -214,9 +216,8 @@ let test_merkle () =
     if i < 15 then (
       let new_tree = insert t 4 (Int64.of_int (i + 1)) [commitments.(i + 1)] in
       assert (
-        get_cm_height new_tree (Int64.of_int (i + 1)) 4 = commitments.(i + 1)
-      ) ;
-      loop (i + 1) new_tree )
+        get_cm_height new_tree (Int64.of_int (i + 1)) 4 = commitments.(i + 1)) ;
+      loop (i + 1) new_tree)
   in
   loop 0 t ;
   (* We check by inserting by batch *)
@@ -328,8 +329,7 @@ let test_batch_insertion () =
      inserted all at once *)
   let rec build_partial_trees_batch list_todo list_done res =
     match list_todo with
-    | [] ->
-        res
+    | [] -> res
     | cm :: list_todo ->
         let list_done = list_done @ [cm] in
         build_partial_trees_batch
@@ -344,17 +344,14 @@ let test_batch_insertion () =
      This tests insertion on a tree that is not empty, unlike the above. *)
   let rec build_partial_trees_2_batches list_todo list_done res =
     match list_todo with
-    | [] ->
-        res
+    | [] -> res
     | cm :: list_todo ->
         let list_done = list_done @ [cm] in
         let n = List.length list_done in
         let n1 = Random.int n in
         let n2 = n - n1 in
         let list_todo_1 = List.init n1 (fun i -> List.nth list_done i) in
-        let list_todo_2 =
-          List.init n2 (fun i -> List.nth list_done (i + n1))
-        in
+        let list_todo_2 = List.init n2 (fun i -> List.nth list_done (i + n1)) in
         build_partial_trees_2_batches
           list_todo
           list_done
@@ -384,11 +381,13 @@ let bench_batch_insertion () =
   assert (time_batch < time_once)
 
 let tests =
-  [ ("hash", `Quick, test_hash);
+  [
+    ("hash", `Quick, test_hash);
     ("merkle", `Quick, test_merkle);
     ("merkle2", `Quick, test_merkle2);
     ("merkle3", `Quick, test_merkle3);
     ("test_batch_insertion", `Quick, test_batch_insertion);
-    ("bench_batch_insertion", `Quick, bench_batch_insertion) ]
+    ("bench_batch_insertion", `Quick, bench_batch_insertion);
+  ]
 
 let () = Alcotest.run "sapling" [("merkle", tests)]

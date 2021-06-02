@@ -75,8 +75,7 @@ let () =
     ~pp:(fun ppf (size, max) ->
       Format.fprintf ppf "Oversized operation (size: %d, max: %d)" size max)
     Data_encoding.(obj2 (req "size" int31) (req "max_size" int31))
-    (function
-      | Oversized_operation {size; max} -> Some (size, max) | _ -> None)
+    (function Oversized_operation {size; max} -> Some (size, max) | _ -> None)
     (fun (size, max) -> Oversized_operation {size; max}) ;
   (* Block from the future *)
   register_error_kind
@@ -102,8 +101,7 @@ let () =
     (function
       | Future_block_header {block; block_time; time} ->
           Some (block, block_time, time)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (block, block_time, time) ->
       Future_block_header {block; block_time; time}) ;
   Error_monad.register_error_kind
@@ -288,7 +286,8 @@ type error +=
 let protocol_error_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Compilation failed"
         (obj1 (req "error" (constant "compilation_failed")))
@@ -299,13 +298,12 @@ let protocol_error_encoding =
         ~title:"Dynlinking failed"
         (obj1 (req "error" (constant "dynlinking_failed")))
         (function Dynlinking_failed -> Some () | _ -> None)
-        (fun () -> Dynlinking_failed) ]
+        (fun () -> Dynlinking_failed);
+    ]
 
 let pp_protocol_error ppf = function
-  | Compilation_failed ->
-      Format.fprintf ppf "compilation error"
-  | Dynlinking_failed ->
-      Format.fprintf ppf "dynlinking error"
+  | Compilation_failed -> Format.fprintf ppf "compilation error"
+  | Dynlinking_failed -> Format.fprintf ppf "dynlinking error"
 
 let () =
   (* Invalid protocol *)

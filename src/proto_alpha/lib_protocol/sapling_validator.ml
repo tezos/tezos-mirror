@@ -27,18 +27,16 @@
    Important to avoid spending the same input twice in a transaction. *)
 let rec check_and_update_nullifiers ctxt state inputs =
   match inputs with
-  | [] ->
-      return (ctxt, Some state)
+  | [] -> return (ctxt, Some state)
   | input :: inputs -> (
       Sapling_storage.nullifiers_mem ctxt state Sapling.UTXO.(input.nf)
       >>=? function
-      | (ctxt, true) ->
-          return (ctxt, None)
+      | (ctxt, true) -> return (ctxt, None)
       | (ctxt, false) ->
           let state =
             Sapling_storage.nullifiers_add state Sapling.UTXO.(input.nf)
           in
-          check_and_update_nullifiers ctxt state inputs )
+          check_and_update_nullifiers ctxt state inputs)
 
 let verify_update :
     Raw_context.t ->
@@ -65,14 +63,11 @@ let verify_update :
   if not pass then return (ctxt, None)
   else
     (* Check the root is a recent state *)
-    Sapling_storage.root_mem ctxt state transaction.root
-    >>=? fun pass ->
+    Sapling_storage.root_mem ctxt state transaction.root >>=? fun pass ->
     if not pass then return (ctxt, None)
     else
-      check_and_update_nullifiers ctxt state transaction.inputs
-      >|=? function
-      | (ctxt, None) ->
-          (ctxt, None)
+      check_and_update_nullifiers ctxt state transaction.inputs >|=? function
+      | (ctxt, None) -> (ctxt, None)
       | (ctxt, Some state) ->
           Sapling.Verification.with_verification_ctx (fun vctx ->
               let pass =

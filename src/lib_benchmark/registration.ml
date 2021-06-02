@@ -34,7 +34,7 @@ let codegen_table : Model.for_codegen String_table.t = String_table.create 51
 let register ((module Bench) : Benchmark.t) =
   if String_table.mem bench_table Bench.name then (
     Format.eprintf "Benchmark %s already registered! exiting@." Bench.name ;
-    exit 1 )
+    exit 1)
   else String_table.add bench_table Bench.name (module Bench)
 
 let register_for_codegen name model =
@@ -72,12 +72,9 @@ let all_benchmarks_with_all_of (tags : string list) : Benchmark.t list =
 
 let rec list_equal l1 l2 =
   match (l1, l2) with
-  | ([], []) ->
-      true
-  | (x :: t, y :: u) ->
-      String.equal x y && list_equal t u
-  | _ ->
-      false
+  | ([], []) -> true
+  | (x :: t, y :: u) -> String.equal x y && list_equal t u
+  | _ -> false
 
 let all_benchmarks_with_exactly (tags : string list) : Benchmark.t list =
   let sorted_requested_tags = List.sort String.compare tags in

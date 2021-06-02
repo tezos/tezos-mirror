@@ -26,8 +26,8 @@
 open Alpha_context
 
 let custom_root =
-  ( RPC_path.(open_root / "context" / "sapling")
-    : RPC_context.t RPC_path.context )
+  (RPC_path.(open_root / "context" / "sapling")
+    : RPC_context.t RPC_path.context)
 
 type diff_query = {
   offset_commitment : Int64.t option;
@@ -57,8 +57,8 @@ module S = struct
            (fun {offset_commitment; _} -> offset_commitment)
       |+ opt_field
            ~descr:
-             "Nullifiers are returned from the specified offset up to the \
-              most recent."
+             "Nullifiers are returned from the specified offset up to the most \
+              recent."
            "offset_nullifier"
            RPC_arg.int64
            (fun {offset_nullifier; _} -> offset_nullifier)
@@ -66,9 +66,7 @@ module S = struct
 
     let encoding =
       let open Data_encoding in
-      merge_objs
-        (obj1 (req "root" Sapling.root_encoding))
-        Sapling.diff_encoding
+      merge_objs (obj1 (req "root" Sapling.root_encoding)) Sapling.diff_encoding
 
     let get_diff =
       {

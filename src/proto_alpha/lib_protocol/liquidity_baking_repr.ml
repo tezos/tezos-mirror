@@ -30,15 +30,12 @@ let get_escape_ema = Storage.Liquidity_baking.Escape_ema.get
 type escape_ema = Int32.t
 
 let on_cpmm_exists ctxt f =
-  get_cpmm_address ctxt
-  >>=? fun cpmm_contract ->
-  Contract_storage.exists ctxt cpmm_contract
-  >>=? function
+  get_cpmm_address ctxt >>=? fun cpmm_contract ->
+  Contract_storage.exists ctxt cpmm_contract >>=? function
   | false ->
       (* do nothing if the cpmm is not found *)
       return (ctxt, [])
-  | true ->
-      f ctxt cpmm_contract
+  | true -> f ctxt cpmm_contract
 
 let on_below_sunset ctxt f =
   let sunset_level = Constants_storage.liquidity_baking_sunset_level ctxt in
@@ -50,8 +47,7 @@ let on_below_sunset ctxt f =
    ema[n+1] = (1999 * ema[n] // 2000) + (1000 if escape_vote[n] else 0)
    where escape_vote is protocol_data.contents.liquidity_baking_escape_vote *)
 let update_escape_ema ctxt ~escape_vote =
-  get_escape_ema ctxt
-  >>=? fun old_ema ->
+  get_escape_ema ctxt >>=? fun old_ema ->
   (* if ema is over threshold, we don't update it because liquidity baking is permanently off *)
   if
     Compare.Int32.(
@@ -61,8 +57,8 @@ let update_escape_ema ctxt ~escape_vote =
       Int32.(
         add (div (mul 1999l old_ema) 2000l) (if escape_vote then 1000l else 0l))
     in
-    Storage.Liquidity_baking.Escape_ema.update ctxt new_ema
-    >|=? fun ctxt -> (ctxt, new_ema, false)
+    Storage.Liquidity_baking.Escape_ema.update ctxt new_ema >|=? fun ctxt ->
+    (ctxt, new_ema, false)
   else return (ctxt, old_ema, true)
 
 let on_subsidy_allowed ctxt ~escape_vote f =
@@ -71,5 +67,5 @@ let on_subsidy_allowed ctxt ~escape_vote f =
   (* liquidity baking permanently shuts off if threshold is reached once *)
   if threshold_reached then return (ctxt, [], escape_ema)
   else
-    on_below_sunset ctxt f
-    >|=? fun (ctxt, operation_results) -> (ctxt, operation_results, escape_ema)
+    on_below_sunset ctxt f >|=? fun (ctxt, operation_results) ->
+    (ctxt, operation_results, escape_ema)

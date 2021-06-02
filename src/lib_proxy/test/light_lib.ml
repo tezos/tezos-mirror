@@ -33,7 +33,8 @@ open Lib_test.Qcheck_helpers
    [tezos-client rpc get /chains/main/blocks/head/context/merkle_tree/active_delegates_with_rolls]
  *)
 let irmin_hashes =
-  [ "CoVbip7pyXZDp1umo3cGUbCWJUA8wDkPbWR56wKqS434DiDSwGWC";
+  [
+    "CoVbip7pyXZDp1umo3cGUbCWJUA8wDkPbWR56wKqS434DiDSwGWC";
     "CoVuTbwGSJyu9xD7vYYxxcqCFwCPf55UBqu8iqRcHYrs3Gu31v8y";
     "CoUiEnajKeukmYFUgWTJF2z3v24MycpTaomF8a9hRzVy7as9hvgy";
     "CoVngnGTJfudgcayQqtz2ZyWTUFB6zHmhvV1itjncRzYS4wndhH8";
@@ -44,7 +45,8 @@ let irmin_hashes =
     "CoVZDcjRgjmKnAhetUtb1AVQYwuUi3fBK7js11vjBETPuG5FcU8o";
     "CoWRLgT2SwZkCWCwyTBxxkxPxYFvTWtHfKqX8MFQ1hNWL4SS1qdU";
     "CoWVK1YzoDnMGrNioKL9Mze6s4XX8Uw9Vp9hPHYXqHfaFpwnmXmA";
-    "CoVnWzSVjbYHCQLD53JGJfWRSjUBrkbtCrNMgmsXX6bMhy7CE7E6" ]
+    "CoVnWzSVjbYHCQLD53JGJfWRSjUBrkbtCrNMgmsXX6bMhy7CE7E6";
+  ]
 
 let check_irmin_tree_eq t1 t2 =
   qcheck_eq ~pp:Store.Tree.pp ~eq:Store.Tree.equal t1 t2
@@ -56,10 +58,8 @@ let filter_map f map =
   TzString.Map.fold
     (fun key value acc ->
       match f value with
-      | None ->
-          acc
-      | Some value' ->
-          TzString.Map.add key value' acc)
+      | None -> acc
+      | Some value' -> TzString.Map.add key value' acc)
     map
     TzString.Map.empty
 
@@ -68,19 +68,16 @@ let filter_map f map =
 let rec raw_context_rm_empty =
   let open Tezos_shell_services.Block_services in
   function
-  | Key _ as rc ->
-      Some rc
+  | Key _ as rc -> Some rc
   | Dir dir ->
       let dir' = filter_map raw_context_rm_empty dir in
       if TzString.Map.is_empty dir' then None else Some (Dir dir')
-  | Cut ->
-      None
+  | Cut -> None
 
 let rec merkle_node_rm_empty =
   let open Tezos_shell_services.Block_services in
   function
-  | Hash _ as h ->
-      Some h
+  | Hash _ as h -> Some h
   | Data raw_context ->
       Option.map (fun x -> Data x) @@ raw_context_rm_empty raw_context
   | Continue mtree ->
@@ -102,8 +99,7 @@ module StringMap = TzString.Map
 type simple_tree = SLeaf | SDir of simple_tree StringMap.t
 
 let rec pp_simple_tree ppf = function
-  | SLeaf ->
-      Format.fprintf ppf "leaf"
+  | SLeaf -> Format.fprintf ppf "leaf"
   | SDir pairs ->
       Format.fprintf
         ppf
@@ -123,19 +119,15 @@ let sdir_of_list l =
 let rec raw_context_to_simple_tree raw_context : simple_tree =
   let open Tezos_shell_services.Block_services in
   match raw_context with
-  | Cut ->
-      SLeaf
-  | Key _ ->
-      SLeaf
-  | Dir dir ->
-      SDir (TzString.Map.map raw_context_to_simple_tree dir)
+  | Cut -> SLeaf
+  | Key _ -> SLeaf
+  | Dir dir -> SDir (TzString.Map.map raw_context_to_simple_tree dir)
 
 let is_empty = function SLeaf -> true | SDir dir -> StringMap.is_empty dir
 
 let rec simple_tree_eq t1 t2 =
   match (t1, t2) with
-  | (SLeaf, SLeaf) ->
-      true
+  | (SLeaf, SLeaf) -> true
   | (SDir dir1, SDir dir2) ->
       let b1 = StringMap.bindings dir1 in
       let b2 = StringMap.bindings dir2 in
@@ -144,16 +136,13 @@ let rec simple_tree_eq t1 t2 =
         List.for_all (fun ((k1, t1), (k2, t2)) ->
             k1 = k2 && simple_tree_eq t1 t2)
         @@ List.combine_drop b1 b2
-  | (SLeaf, d) | (d, SLeaf) ->
-      is_empty d
+  | (SLeaf, d) | (d, SLeaf) -> is_empty d
 
 let rec irmin_tree_to_simple_tree tree =
   match Store.Tree.kind tree with
-  | `Value ->
-      Lwt.return SLeaf
+  | `Value -> Lwt.return SLeaf
   | `Tree ->
-      Store.Tree.list tree []
-      >>= fun pairs ->
+      Store.Tree.list tree [] >>= fun pairs ->
       Lwt_list.map_s
         (fun (k, i) -> irmin_tree_to_simple_tree i >|= fun st -> (k, st))
         pairs
@@ -162,12 +151,9 @@ let rec irmin_tree_to_simple_tree tree =
 let rec merkle_node_to_simple_tree node =
   let open Tezos_shell_services.Block_services in
   match node with
-  | Hash _ ->
-      SLeaf
-  | Data raw_context ->
-      raw_context_to_simple_tree raw_context
-  | Continue tree ->
-      merkle_tree_to_simple_tree tree
+  | Hash _ -> SLeaf
+  | Data raw_context -> raw_context_to_simple_tree raw_context
+  | Continue tree -> merkle_tree_to_simple_tree tree
 
 and merkle_tree_to_simple_tree tree =
   sdir_of_list

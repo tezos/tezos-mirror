@@ -32,15 +32,16 @@ let unique_switch =
 
 let commands () =
   Clic.
-    [ command
+    [
+      command
         ~desc:
           "Autocomplete a prefix of Base58Check-encoded hash.\n\
            This actually works only for blocks, operations, public key and \
            contract identifiers."
         (args1 unique_switch)
-        ( prefixes ["complete"]
+        (prefixes ["complete"]
         @@ string ~name:"prefix" ~desc:"the prefix of the hash to complete"
-        @@ stop )
+        @@ stop)
         (fun unique prefix (cctxt : #Client_context.full) ->
           Shell_services.Blocks.Helpers.complete
             cctxt
@@ -49,10 +50,8 @@ let commands () =
             prefix
           >>=? fun completions ->
           match completions with
-          | [] ->
-              Stdlib.exit 3
-          | _ :: _ :: _ when unique ->
-              Stdlib.exit 3
+          | [] -> Stdlib.exit 3
+          | _ :: _ :: _ when unique -> Stdlib.exit 3
           | completions ->
               List.iter print_endline completions ;
               return_unit);
@@ -65,28 +64,29 @@ let commands () =
       command
         ~desc:"Computes the chain id corresponding to a block hash."
         no_options
-        ( prefixes ["compute"; "chain"; "id"; "from"; "block"; "hash"]
+        (prefixes ["compute"; "chain"; "id"; "from"; "block"; "hash"]
         @@ string
              ~name:"hash"
              ~desc:"the block hash from which to compute the chain id"
-        @@ stop )
+        @@ stop)
         (fun () block_hash_str (cctxt : #Client_context.full) ->
           Lwt.return (Tezos_crypto.Block_hash.of_b58check block_hash_str)
           >>=? fun block_hash ->
           let chain_id = Tezos_crypto.Chain_id.of_block_hash block_hash in
-          cctxt#message "%a" Tezos_crypto.Chain_id.pp chain_id
-          >>= fun () -> return_unit);
+          cctxt#message "%a" Tezos_crypto.Chain_id.pp chain_id >>= fun () ->
+          return_unit);
       command
         ~desc:"Computes a chain id from a seed"
         no_options
-        ( prefixes ["compute"; "chain"; "id"; "from"; "seed"]
+        (prefixes ["compute"; "chain"; "id"; "from"; "seed"]
         @@ string
              ~name:"string"
              ~desc:"the seed from which to compute the chain id"
-        @@ stop )
+        @@ stop)
         (fun () seed_str (cctxt : #Client_context.full) ->
           let chain_id =
             Tezos_crypto.Chain_id.hash_bytes [Bytes.of_string seed_str]
           in
-          cctxt#message "%a" Tezos_crypto.Chain_id.pp chain_id
-          >>= fun () -> return_unit) ]
+          cctxt#message "%a" Tezos_crypto.Chain_id.pp chain_id >>= fun () ->
+          return_unit);
+    ]

@@ -66,20 +66,17 @@ let load_context ~context_path = Context.init ~readonly:true context_path
 let check_context_consistency index context_hash =
   (* Hypothesis : the version key exists *)
   let version_key = ["version"] in
-  Context.checkout index context_hash
-  >>= function
-  | None ->
-      fail Failed_to_checkout_context
+  Context.checkout index context_hash >>= function
+  | None -> fail Failed_to_checkout_context
   | Some context -> (
-      Context.mem context version_key
-      >>= function true -> return_unit | false -> fail Invalid_context )
+      Context.mem context version_key >>= function
+      | true -> return_unit
+      | false -> fail Invalid_context)
 
 let begin_construction ~timestamp ?protocol_data index predecessor =
   let {Client_baking_blocks.context; _} = predecessor in
-  Shell_context.checkout index context
-  >>= function
-  | None ->
-      fail Failed_to_checkout_context
+  Shell_context.checkout index context >>= function
+  | None -> fail Failed_to_checkout_context
   | Some context ->
       let header : Tezos_base.Block_header.shell_header =
         Tezos_base.Block_header.
@@ -108,8 +105,7 @@ let begin_construction ~timestamp ?protocol_data index predecessor =
       return {predecessor; context; state; rev_operations = []; header}
 
 let add_operation st (op : Operation.packed) =
-  Protocol.apply_operation st.state op
-  >>=?? fun (state, receipt) ->
+  Protocol.apply_operation st.state op >>=?? fun (state, receipt) ->
   return ({st with state; rev_operations = op :: st.rev_operations}, receipt)
 
 let finalize_construction inc = Protocol.finalize_block inc.state >>=?? return

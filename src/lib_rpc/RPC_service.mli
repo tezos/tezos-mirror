@@ -104,7 +104,6 @@ val description_service :
     RPC_encoding.schema Resto.Description.directory )
   service
 
-val error_service :
-  ([`GET], unit, unit, unit, unit, Json_schema.schema) service
+val error_service : ([`GET], unit, unit, unit, unit, Json_schema.schema) service
 
 val error_encoding : error Data_encoding.t

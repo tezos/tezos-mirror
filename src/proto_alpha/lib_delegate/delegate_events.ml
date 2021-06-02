@@ -459,8 +459,8 @@ module Baking_forge = struct
       ~level:Debug
       ~name:"try_forging"
       ~msg:
-        "try forging locally the block header for {hash} (slot {priority}) \
-         for {client} ({timestamp})"
+        "try forging locally the block header for {hash} (slot {priority}) for \
+         {client} ({timestamp})"
       ("hash", Block_hash.encoding)
       ("priority", Data_encoding.int31)
       ("client", Data_encoding.string)
@@ -472,8 +472,8 @@ module Baking_forge = struct
       ~level:Info
       ~name:"start_injecting_block"
       ~msg:
-        "injecting block (priority {priority}, fitness {fitness}) for \
-         {client} after {predecessor}"
+        "injecting block (priority {priority}, fitness {fitness}) for {client} \
+         after {predecessor}"
       ("priority", Data_encoding.int31)
       ("fitness", Fitness.encoding)
       ("client", Data_encoding.string)

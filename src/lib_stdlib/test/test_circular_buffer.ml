@@ -48,9 +48,10 @@ let random_bytes size =
       done
     else (
       Bytes.set_int64_ne buff offset data ;
-      fill_random (size - 8) (offset + 8) buff )
+      fill_random (size - 8) (offset + 8) buff)
   in
-  fill_random size 0 buff ; buff
+  fill_random size 0 buff ;
+  buff
 
 (** Tests with constant size allocation requests  *)
 module Constant = struct
@@ -101,13 +102,12 @@ module Constant = struct
     Array.iteri
       (fun i data ->
         ignore
-          ( data
-          >>= fun data ->
-          let _ = Buff.read data circular_buffer ~into:buff ~offset:0 in
-          assert (
-            Bytes.sub buff 0 (Buff.length data)
-            = Bytes.sub seed_chunks.(i mod seed_count) 0 (Buff.length data) ) ;
-          Lwt.return_unit ))
+          ( data >>= fun data ->
+            let _ = Buff.read data circular_buffer ~into:buff ~offset:0 in
+            assert (
+              Bytes.sub buff 0 (Buff.length data)
+              = Bytes.sub seed_chunks.(i mod seed_count) 0 (Buff.length data)) ;
+            Lwt.return_unit ))
       data_store
 
   (** Reads each data chunk fragement by fragment (10 fragments max,
@@ -120,32 +120,29 @@ module Constant = struct
     Array.iter
       (fun (i, data) ->
         ignore
-          ( data
-          >>= fun data ->
-          let max_iter = 10 in
-          let rec exhaust data offset iter =
-            let length = Buff.length data in
-            let len =
-              if iter > max_iter then length
-              else try Random.int length with _ -> length
-              (* length might be 0 *)
+          ( data >>= fun data ->
+            let max_iter = 10 in
+            let rec exhaust data offset iter =
+              let length = Buff.length data in
+              let len =
+                if iter > max_iter then length
+                else try Random.int length with _ -> length
+                (* length might be 0 *)
+              in
+              let remainder =
+                Buff.read ~len data circular_buffer ~into:buff ~offset
+              in
+              let offset = offset + len in
+              match remainder with
+              | None -> offset
+              | Some remainder -> exhaust remainder offset (iter + 1)
             in
-            let remainder =
-              Buff.read ~len data circular_buffer ~into:buff ~offset
-            in
-            let offset = offset + len in
-            match remainder with
-            | None ->
-                offset
-            | Some remainder ->
-                exhaust remainder offset (iter + 1)
-          in
-          let read_length = exhaust data 0 0 in
-          assert (read_length = Buff.length data) ;
-          assert (
-            Bytes.sub buff 0 (Buff.length data)
-            = Bytes.sub seed_chunks.(i mod seed_count) 0 (Buff.length data) ) ;
-          Lwt.return_unit ))
+            let read_length = exhaust data 0 0 in
+            assert (read_length = Buff.length data) ;
+            assert (
+              Bytes.sub buff 0 (Buff.length data)
+              = Bytes.sub seed_chunks.(i mod seed_count) 0 (Buff.length data)) ;
+            Lwt.return_unit ))
       data_store
 
   (**{1} Tests  *)
@@ -200,8 +197,7 @@ module Constant = struct
      data.
 
       Data are randoms bits.  *)
-  let run_partial_read_writes ~buffer_size ~chunks_size ~chunks_count ~iter ()
-      =
+  let run_partial_read_writes ~buffer_size ~chunks_size ~chunks_count ~iter () =
     let seed_count = 20 in
     let seed_chunks =
       Array.init seed_count (fun _ -> random_bytes chunks_size)
@@ -260,9 +256,10 @@ module Constant = struct
                    seed_chunks
                    circular_buffer
                    chunks_size
-                   chunks_count))) )
+                   chunks_count))))
     in
-    loop iter data_store ; return_unit
+    loop iter data_store ;
+    return_unit
 end
 
 module Fail_Test = struct
@@ -337,78 +334,82 @@ let wrap n f =
              (fun () -> f () >>= fun x -> Lwt.return @@ `Ok x)
              (fun exn -> Lwt.return @@ `Exn exn))
       with
-      | `Ok _ ->
-          ()
-      | `Exn exn ->
-          raise exn)
+      | `Ok _ -> ()
+      | `Exn exn -> raise exn)
 
 let () =
   Alcotest.run
     ~argv:[|""|]
     "tezos-stdlib"
-    ( List.map
-        (fun (run, descr) ->
-          ( "circular_buffer.constant-chunks." ^ descr,
-            [ wrap "bad-fit" (fun () ->
-                  let buffer_size = !buffer_size in
-                  let chunks_size = (buffer_size / 13) + 1 in
-                  let chunks_count = buffer_size / chunks_size in
-                  run ~buffer_size ~chunks_size ~chunks_count ~iter:15 ());
-              wrap "bad-fit-underflow" (fun () ->
-                  let buffer_size = !buffer_size in
-                  let chunks_size = (buffer_size / 13) + 1 in
-                  let chunks_count = (buffer_size / chunks_size) - 1 in
-                  run
-                    ~buffer_size
-                    ~chunks_size
-                    ~chunks_count
-                    ~iter:(chunks_count + 2)
-                    ());
-              wrap "bad-fit-overflow" (fun () ->
-                  let buffer_size = !buffer_size in
-                  let chunks_size = (buffer_size / 13) + 1 in
-                  let chunks_count = (buffer_size / chunks_size) + 3 in
-                  run ~buffer_size ~chunks_size ~chunks_count ~iter:15 ());
-              wrap "perfect-fit" (fun () ->
-                  let buffer_size = !buffer_size in
-                  let chunks_size = buffer_size / (buffer_size lsr 3) in
-                  let chunks_count = buffer_size / chunks_size in
-                  run ~buffer_size ~chunks_size ~chunks_count ~iter:2 ());
-              wrap "perfect-fit-underflow" (fun () ->
-                  let buffer_size = !buffer_size in
-                  let chunks_size = buffer_size / (buffer_size lsr 3) in
-                  let chunks_count = (buffer_size / chunks_size) - 1 in
-                  run
-                    ~buffer_size
-                    ~chunks_size
-                    ~chunks_count
-                    ~iter:(chunks_count + 2)
-                    ());
-              wrap "perfect-fit-overflow" (fun () ->
-                  let buffer_size = !buffer_size in
-                  let chunks_size = buffer_size / (buffer_size lsr 3) in
-                  let chunks_count = (buffer_size / chunks_size) + 2 in
-                  run
-                    ~buffer_size
-                    ~chunks_size
-                    ~chunks_count
-                    ~iter:((1 lsl 3) + 1)
-                    ()) ] ))
-        [ (Constant.run, "full");
-          (Constant.run_partial_write, "partial-write");
-          (Constant.run_partial_read_writes, "partial-read-write");
-          ( Constant.run_partial_read_writes_interleaving,
-            "partial-read-write-interleaving" ) ]
-    @ [ ( "circular_buffer.fail_cases",
-          [ wrap
+    (List.map
+       (fun (run, descr) ->
+         ( "circular_buffer.constant-chunks." ^ descr,
+           [
+             wrap "bad-fit" (fun () ->
+                 let buffer_size = !buffer_size in
+                 let chunks_size = (buffer_size / 13) + 1 in
+                 let chunks_count = buffer_size / chunks_size in
+                 run ~buffer_size ~chunks_size ~chunks_count ~iter:15 ());
+             wrap "bad-fit-underflow" (fun () ->
+                 let buffer_size = !buffer_size in
+                 let chunks_size = (buffer_size / 13) + 1 in
+                 let chunks_count = (buffer_size / chunks_size) - 1 in
+                 run
+                   ~buffer_size
+                   ~chunks_size
+                   ~chunks_count
+                   ~iter:(chunks_count + 2)
+                   ());
+             wrap "bad-fit-overflow" (fun () ->
+                 let buffer_size = !buffer_size in
+                 let chunks_size = (buffer_size / 13) + 1 in
+                 let chunks_count = (buffer_size / chunks_size) + 3 in
+                 run ~buffer_size ~chunks_size ~chunks_count ~iter:15 ());
+             wrap "perfect-fit" (fun () ->
+                 let buffer_size = !buffer_size in
+                 let chunks_size = buffer_size / (buffer_size lsr 3) in
+                 let chunks_count = buffer_size / chunks_size in
+                 run ~buffer_size ~chunks_size ~chunks_count ~iter:2 ());
+             wrap "perfect-fit-underflow" (fun () ->
+                 let buffer_size = !buffer_size in
+                 let chunks_size = buffer_size / (buffer_size lsr 3) in
+                 let chunks_count = (buffer_size / chunks_size) - 1 in
+                 run
+                   ~buffer_size
+                   ~chunks_size
+                   ~chunks_count
+                   ~iter:(chunks_count + 2)
+                   ());
+             wrap "perfect-fit-overflow" (fun () ->
+                 let buffer_size = !buffer_size in
+                 let chunks_size = buffer_size / (buffer_size lsr 3) in
+                 let chunks_count = (buffer_size / chunks_size) + 2 in
+                 run
+                   ~buffer_size
+                   ~chunks_size
+                   ~chunks_count
+                   ~iter:((1 lsl 3) + 1)
+                   ());
+           ] ))
+       [
+         (Constant.run, "full");
+         (Constant.run_partial_write, "partial-write");
+         (Constant.run_partial_read_writes, "partial-read-write");
+         ( Constant.run_partial_read_writes_interleaving,
+           "partial-read-write-interleaving" );
+       ]
+    @ [
+        ( "circular_buffer.fail_cases",
+          [
+            wrap
               "Write_too_long-in_buffer"
               Fail_Test.run_write_too_long_in_buffer;
             wrap
               "Write_too_long-extra_allocated_buffer"
               Fail_Test.run_write_too_long_extra_alloc;
-            wrap
-              "Read_too_long-in_buffer"
-              Fail_Test.run_read_too_long_in_buffer;
+            wrap "Read_too_long-in_buffer" Fail_Test.run_read_too_long_in_buffer;
             wrap
               "Read_too_long-extra_allocated_buffer"
-              Fail_Test.run_read_too_long_extra_alloc ] ) ] )
+              Fail_Test.run_read_too_long_extra_alloc;
+          ] );
+      ])

@@ -100,18 +100,16 @@ let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
   let mode_str =
     match mode with `Mode_light -> "light mode" | `Mode_proxy -> "proxy"
   in
-  ( match protocol_hash_opt with
+  (match protocol_hash_opt with
   | None ->
-      get_node_protocol rpc_context chain block
-      >>=? fun protocol_hash ->
+      get_node_protocol rpc_context chain block >>=? fun protocol_hash ->
       printer#warning
         "protocol of %s unspecified, using the node's protocol: %a"
         mode_str
         Protocol_hash.pp
         protocol_hash
       >>= fun _ -> return protocol_hash
-  | Some protocol_hash ->
-      return protocol_hash )
+  | Some protocol_hash -> return protocol_hash)
   >>=? fun protocol_hash ->
   check_client_node_proto_agree rpc_context protocol_hash chain block
   >>=? fun _ ->
@@ -123,27 +121,29 @@ let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
       available
   in
   match proxy_opt with
-  | Some proxy ->
-      return proxy
+  | Some proxy -> return proxy
   | None -> (
-    match available with
-    | [] ->
-        failwith
-          "There are no proxy environments registered. --mode proxy cannot be \
-           honored."
-    | fst_available :: _ ->
-        let (module Proxy : Proxy_sig) = fst_available in
-        let fst_available_proto = Proxy.protocol_hash in
-        printer#warning
-          "requested protocol (%a) not found in available proxy environments: \
-           %a@;\
-           Proceeding with the first available protocol (%a). This will work \
-           if the mismatch is harmless, otherwise deserialization is the \
-           failure most likely to happen."
-          Protocol_hash.pp
-          protocol_hash
-          (Format.pp_print_list ~pp_sep:Format.pp_print_space Protocol_hash.pp)
-          ((List.map (fun (module P : Proxy_sig) -> P.protocol_hash)) available)
-          Protocol_hash.pp
-          fst_available_proto
-        >>= fun () -> return fst_available )
+      match available with
+      | [] ->
+          failwith
+            "There are no proxy environments registered. --mode proxy cannot \
+             be honored."
+      | fst_available :: _ ->
+          let (module Proxy : Proxy_sig) = fst_available in
+          let fst_available_proto = Proxy.protocol_hash in
+          printer#warning
+            "requested protocol (%a) not found in available proxy \
+             environments: %a@;\
+             Proceeding with the first available protocol (%a). This will work \
+             if the mismatch is harmless, otherwise deserialization is the \
+             failure most likely to happen."
+            Protocol_hash.pp
+            protocol_hash
+            (Format.pp_print_list
+               ~pp_sep:Format.pp_print_space
+               Protocol_hash.pp)
+            ((List.map (fun (module P : Proxy_sig) -> P.protocol_hash))
+               available)
+            Protocol_hash.pp
+            fst_available_proto
+          >>= fun () -> return fst_available)

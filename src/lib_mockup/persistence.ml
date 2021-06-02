@@ -74,7 +74,7 @@ module Internal = struct
         (printer : #Tezos_client_base.Client_context.printer) :
         Registration.mockup_environment tzresult Lwt.t =
       let mockup_environments = Registration.get_registered_environments () in
-      ( match protocol_hash_opt with
+      (match protocol_hash_opt with
       | Some protocol_hash ->
           Lwt.return (fun (module Mockup : Registration_intf.MOCKUP) ->
               Protocol_hash.equal protocol_hash Mockup.protocol_hash)
@@ -85,11 +85,10 @@ module Internal = struct
           Re.Str.string_match
             is_proto_alpha_regexp
             (Protocol_hash.to_b58check Mockup.protocol_hash)
-            0 )
+            0)
       >>= fun criterion ->
       match List.find criterion mockup_environments with
-      | Some mockup ->
-          return mockup
+      | Some mockup -> return mockup
       | None ->
           let requested_protocol =
             match protocol_hash_opt with
@@ -98,8 +97,7 @@ module Internal = struct
                   "Requested protocol with hash %a"
                   Protocol_hash.pp
                   requested
-            | None ->
-                "Default protocol Alpha (no requested protocol)"
+            | None -> "Default protocol Alpha (no requested protocol)"
           in
           let protocol_hashes =
             List.map
@@ -108,8 +106,8 @@ module Internal = struct
               mockup_environments
           in
           failwith
-            "%s not found in available mockup environments. Available \
-             protocol hashes: [%a]"
+            "%s not found in available mockup environments. Available protocol \
+             hashes: [%a]"
             requested_protocol
             Format.(
               pp_print_list
@@ -119,12 +117,10 @@ module Internal = struct
 
     let default_mockup_context :
         Tezos_client_base.Client_context.full ->
-        (Registration.mockup_environment * Registration.mockup_context)
-        tzresult
+        (Registration.mockup_environment * Registration.mockup_context) tzresult
         Lwt.t =
      fun cctxt ->
-      get_registered_mockup None cctxt
-      >>=? fun mockup ->
+      get_registered_mockup None cctxt >>=? fun mockup ->
       let (module Mockup) = mockup in
       Mockup.init
         ~cctxt
@@ -138,15 +134,13 @@ module Internal = struct
         protocol_hash:Protocol_hash.t ->
         constants_overrides_json:Data_encoding.json option ->
         bootstrap_accounts_json:Data_encoding.json option ->
-        (Registration.mockup_environment * Registration.mockup_context)
-        tzresult
+        (Registration.mockup_environment * Registration.mockup_context) tzresult
         Lwt.t =
      fun ~cctxt
          ~protocol_hash
          ~constants_overrides_json
          ~bootstrap_accounts_json ->
-      get_registered_mockup (Some protocol_hash) cctxt
-      >>=? fun mockup ->
+      get_registered_mockup (Some protocol_hash) cctxt >>=? fun mockup ->
       let (module Mockup) = mockup in
       Mockup.init
         ~cctxt
@@ -159,8 +153,8 @@ module Internal = struct
         ({protocol_hash; chain_id; rpc_context} :
           Persistent_mockup_environment.t)
         (printer : #Tezos_client_base.Client_context.printer) =
-      get_registered_mockup (Some protocol_hash) printer
-      >>=? fun mockup -> return (mockup, (chain_id, rpc_context))
+      get_registered_mockup (Some protocol_hash) printer >>=? fun mockup ->
+      return (mockup, (chain_id, rpc_context))
 
     let get_mockup_context_from_disk ~base_dir ~protocol_hash
         (printer : #Tezos_client_base.Client_context.printer) =
@@ -174,9 +168,8 @@ module Internal = struct
         | persisted_mockup ->
             mockup_context_from_persisted persisted_mockup printer
             >>=? fun (((module Mockup_environment), _) as res) ->
-            ( match protocol_hash with
-            | None ->
-                return_unit
+            (match protocol_hash with
+            | None -> return_unit
             | Some desired_protocol
               when Protocol_hash.equal
                      Mockup_environment.protocol_hash
@@ -190,7 +183,7 @@ module Internal = struct
                   desired_protocol
                   base_dir
                   Protocol_hash.pp_short
-                  Mockup_environment.protocol_hash )
+                  Mockup_environment.protocol_hash)
             >>=? fun () -> return res
         | exception _e ->
             failwith "get_mockup_context_from_disk: could not read %s" file
@@ -216,16 +209,11 @@ module Internal = struct
         ppf
         "base_dir_%s"
         ((function
-           | Base_dir_does_not_exist ->
-               "does_not_exist"
-           | Base_dir_is_file ->
-               "is_file"
-           | Base_dir_is_mockup ->
-               "is_mockup"
-           | Base_dir_is_empty ->
-               "is_empty"
-           | Base_dir_is_nonempty ->
-               "is_non_empty")
+           | Base_dir_does_not_exist -> "does_not_exist"
+           | Base_dir_is_file -> "is_file"
+           | Base_dir_is_mockup -> "is_mockup"
+           | Base_dir_is_empty -> "is_empty"
+           | Base_dir_is_nonempty -> "is_non_empty")
            bclass)
 
     let is_directory_empty dir = Array.length (Sys.readdir dir) = 0
@@ -236,42 +224,31 @@ module Internal = struct
       else if is_directory_empty base_dir then return Base_dir_is_empty
       else
         let dirname = base_dir in
-        Files.exists_mockup_directory ~dirname
-        >>= function
+        Files.exists_mockup_directory ~dirname >>= function
         | true -> (
-            Files.Context.exists ~dirname
-            >>= function
-            | true ->
-                return Base_dir_is_mockup
-            | false ->
-                return Base_dir_is_nonempty )
-        | false ->
-            return Base_dir_is_nonempty
+            Files.Context.exists ~dirname >>= function
+            | true -> return Base_dir_is_mockup
+            | false -> return Base_dir_is_nonempty)
+        | false -> return Base_dir_is_nonempty
 
     let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
         ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json
         ~asynchronous =
       let base_dir = cctxt#get_base_dir in
       let create_base_dir () =
-        Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir
-        >>= fun () ->
+        Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir >>= fun () ->
         cctxt#message "Created mockup client base dir in %s" base_dir
         >>= fun () -> return_unit
       in
-      classify_base_dir base_dir
-      >>=? (function
-             | Base_dir_does_not_exist | Base_dir_is_empty ->
-                 create_base_dir ()
-             | Base_dir_is_file ->
-                 failwith "%s is a file" base_dir
-             | Base_dir_is_mockup ->
-                 failwith
-                   "%s is already initialized as a mockup directory"
-                   base_dir
-             | Base_dir_is_nonempty ->
-                 failwith
-                   "%s is not empty, please specify a fresh base directory"
-                   base_dir)
+      (classify_base_dir base_dir >>=? function
+       | Base_dir_does_not_exist | Base_dir_is_empty -> create_base_dir ()
+       | Base_dir_is_file -> failwith "%s is a file" base_dir
+       | Base_dir_is_mockup ->
+           failwith "%s is already initialized as a mockup directory" base_dir
+       | Base_dir_is_nonempty ->
+           failwith
+             "%s is not empty, please specify a fresh base directory"
+             base_dir)
       >>=? fun () ->
       init_mockup_context_by_protocol_hash
         ~cctxt
@@ -282,8 +259,7 @@ module Internal = struct
       let mockup_dir =
         (Files.get_mockup_directory ~dirname:base_dir :> string)
       in
-      Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir
-      >>= fun () ->
+      Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir >>= fun () ->
       let context_file = (Files.Context.get ~dirname:base_dir :> string) in
       Persistent_mockup_environment.(
         to_json {protocol_hash; chain_id; rpc_context})

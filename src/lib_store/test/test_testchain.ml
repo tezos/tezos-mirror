@@ -73,12 +73,10 @@ let fork_testchain chain_store (blocks, forked_block) =
     ~kind:`Full
     10
   >>=? fun (test_blocks, head) ->
-  assert_absence_in_store testchain_store blocks
-  >>=? fun () ->
-  assert_absence_in_store chain_store test_blocks
-  >>=? fun () ->
-  assert_presence_in_store testchain_store test_blocks
-  >>=? fun () -> return (testchain, test_blocks, head)
+  assert_absence_in_store testchain_store blocks >>=? fun () ->
+  assert_absence_in_store chain_store test_blocks >>=? fun () ->
+  assert_presence_in_store testchain_store test_blocks >>=? fun () ->
+  return (testchain, test_blocks, head)
 
 let test_simple store =
   let chain_store = Store.main_chain_store store in
@@ -118,30 +116,22 @@ let test_shutdown store =
   >>=? fun (testchain, blocks, _head) ->
   let testchain_store = Store.Chain.testchain_store testchain in
   let testchain_id = Store.Chain.chain_id testchain_store in
-  Store.Chain.testchain chain_store
-  >>= function
-  | None ->
-      Assert.fail_msg "testchain not found"
+  Store.Chain.testchain chain_store >>= function
+  | None -> Assert.fail_msg "testchain not found"
   | Some testchain' -> (
       Assert.equal ~eq:( == ) testchain testchain' ;
-      Store.Chain.shutdown_testchain chain_store
-      >>=? fun () ->
-      Store.Chain.testchain chain_store
-      >>= function
-      | Some _ ->
-          Assert.fail_msg "test chain still initialized"
+      Store.Chain.shutdown_testchain chain_store >>=? fun () ->
+      Store.Chain.testchain chain_store >>= function
+      | Some _ -> Assert.fail_msg "test chain still initialized"
       | None -> (
           Store.Unsafe.load_testchain chain_store ~chain_id:testchain_id
           >>=? function
-          | None ->
-              Assert.fail_msg "failed to load the existing test chain"
+          | None -> Assert.fail_msg "failed to load the existing test chain"
           | Some testchain'' ->
-              let testchain_store'' =
-                Store.Chain.testchain_store testchain''
-              in
+              let testchain_store'' = Store.Chain.testchain_store testchain'' in
               let testchain_id'' = Store.Chain.chain_id testchain_store'' in
               Assert.equal ~eq:Chain_id.equal testchain_id testchain_id'' ;
-              assert_presence_in_store testchain_store'' blocks ) )
+              assert_presence_in_store testchain_store'' blocks))
 
 let tests =
   let wrap_test (s, f) =
@@ -151,8 +141,10 @@ let tests =
   let test_cases =
     List.map
       wrap_test
-      [ ("forking a test chain", test_simple);
+      [
+        ("forking a test chain", test_simple);
         ("spawning a test chain", test_inner);
-        ("shutdown test chain then load it", test_shutdown) ]
+        ("shutdown test chain then load it", test_shutdown);
+      ]
   in
   ("test chain", test_cases)

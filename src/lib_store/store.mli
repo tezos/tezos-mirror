@@ -1017,10 +1017,8 @@ module Unsafe : sig
     genesis_context_hash:Context_hash.t ->
     floating_blocks_stream:Block_repr.block Lwt_stream.t ->
     new_head_with_metadata:Block_repr.block ->
-    partial_protocol_levels:( int32
-                            * Protocol_hash.t
-                            * Protocol_levels.commit_info option )
-                            list ->
+    partial_protocol_levels:
+      (int32 * Protocol_hash.t * Protocol_levels.commit_info option) list ->
     history_mode:History_mode.t ->
     unit tzresult Lwt.t
 

@@ -41,7 +41,8 @@ type info = {
 let info_encoding =
   let open Data_encoding in
   conv
-    (fun { balance;
+    (fun {
+           balance;
            frozen_balance;
            frozen_balance_by_cycle;
            staking_balance;
@@ -49,7 +50,8 @@ let info_encoding =
            delegated_balance;
            deactivated;
            grace_period;
-           voting_power } ->
+           voting_power;
+         } ->
       ( balance,
         frozen_balance,
         frozen_balance_by_cycle,
@@ -141,8 +143,8 @@ module S = struct
   let frozen_balance_by_cycle =
     RPC_service.get_service
       ~description:
-        "Returns the frozen balances of a given delegate, indexed by the \
-         cycle by which it will be unfrozen"
+        "Returns the frozen balances of a given delegate, indexed by the cycle \
+         by which it will be unfrozen"
       ~query:RPC_query.empty
       ~output:Delegate.frozen_balance_by_cycle_encoding
       RPC_path.(path / "frozen_balance_by_cycle")
@@ -190,10 +192,9 @@ module S = struct
       ~description:
         "Returns the cycle by the end of which the delegate might be \
          deactivated if she fails to execute any delegate action. A \
-         deactivated delegate might be reactivated (without loosing any \
-         rolls) by simply re-registering as a delegate. For deactivated \
-         delegates, this value contains the cycle by which they were \
-         deactivated."
+         deactivated delegate might be reactivated (without loosing any rolls) \
+         by simply re-registering as a delegate. For deactivated delegates, \
+         this value contains the cycle by which they were deactivated."
       ~query:RPC_query.empty
       ~output:Cycle.encoding
       RPC_path.(path / "grace_period")
@@ -210,36 +211,24 @@ end
 let register () =
   let open Services_registration in
   register0 S.list_delegate (fun ctxt q () ->
-      Delegate.list ctxt
-      >>= fun delegates ->
+      Delegate.list ctxt >>= fun delegates ->
       match q with
       | {active = true; inactive = false} ->
-          filter_s
-            (fun pkh -> Delegate.deactivated ctxt pkh >|=? not)
-            delegates
+          filter_s (fun pkh -> Delegate.deactivated ctxt pkh >|=? not) delegates
       | {active = false; inactive = true} ->
           filter_s (fun pkh -> Delegate.deactivated ctxt pkh) delegates
-      | _ ->
-          return delegates) ;
+      | _ -> return delegates) ;
   register1 S.info (fun ctxt pkh () () ->
-      Delegate.full_balance ctxt pkh
-      >>=? fun balance ->
-      Delegate.frozen_balance ctxt pkh
-      >>=? fun frozen_balance ->
+      Delegate.full_balance ctxt pkh >>=? fun balance ->
+      Delegate.frozen_balance ctxt pkh >>=? fun frozen_balance ->
       Delegate.frozen_balance_by_cycle ctxt pkh
       >>= fun frozen_balance_by_cycle ->
-      Delegate.staking_balance ctxt pkh
-      >>=? fun staking_balance ->
-      Delegate.delegated_contracts ctxt pkh
-      >>= fun delegated_contracts ->
-      Delegate.delegated_balance ctxt pkh
-      >>=? fun delegated_balance ->
-      Delegate.deactivated ctxt pkh
-      >>=? fun deactivated ->
-      Delegate.grace_period ctxt pkh
-      >>=? fun grace_period ->
-      Vote.get_voting_power_free ctxt pkh
-      >|=? fun voting_power ->
+      Delegate.staking_balance ctxt pkh >>=? fun staking_balance ->
+      Delegate.delegated_contracts ctxt pkh >>= fun delegated_contracts ->
+      Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
+      Delegate.deactivated ctxt pkh >>=? fun deactivated ->
+      Delegate.grace_period ctxt pkh >>=? fun grace_period ->
+      Vote.get_voting_power_free ctxt pkh >|=? fun voting_power ->
       {
         balance;
         frozen_balance;
@@ -302,8 +291,7 @@ let voting_power ctxt block pkh =
 
 let requested_levels ~default ctxt cycles levels =
   match (levels, cycles) with
-  | ([], []) ->
-      ok [default]
+  | ([], []) -> ok [default]
   | (levels, cycles) ->
       (* explicitly fail when requested levels or cycle are in the past...
          or too far in the future... *)
@@ -311,16 +299,16 @@ let requested_levels ~default ctxt cycles levels =
         List.sort_uniq
           Level.compare
           (List.concat
-             ( List.map (Level.from_raw ctxt) levels
-             :: List.map (Level.levels_in_cycle ctxt) cycles ))
+             (List.map (Level.from_raw ctxt) levels
+              :: List.map (Level.levels_in_cycle ctxt) cycles))
       in
       map
         (fun level ->
           let current_level = Level.current ctxt in
           if Level.(level <= current_level) then ok (level, None)
           else
-            Baking.earlier_predecessor_timestamp ctxt level
-            >|? fun timestamp -> (level, Some timestamp))
+            Baking.earlier_predecessor_timestamp ctxt level >|? fun timestamp ->
+            (level, Some timestamp))
         levels
 
 module Baking_rights = struct
@@ -382,8 +370,8 @@ module Baking_rights = struct
            opportunities are given by default up to the priority 8.\n\
            Parameter `delegate` can be used to restrict the results to the \
            given delegates. If parameter `all` is set, all the baking \
-           opportunities for each baker at each level are returned, instead \
-           of just the first one.\n\
+           opportunities for each baker at each level are returned, instead of \
+           just the first one.\n\
            Returns the list of baking slots. Also returns the minimal \
            timestamps that correspond to these slots. The timestamps are \
            omitted for levels in the past, and are only estimates for levels \
@@ -395,67 +383,58 @@ module Baking_rights = struct
   end
 
   let baking_priorities ctxt max_prio (level, pred_timestamp) =
-    Baking.baking_priorities ctxt level
-    >>=? fun contract_list ->
+    Baking.baking_priorities ctxt level >>=? fun contract_list ->
     let rec loop l acc priority =
       if Compare.Int.(priority > max_prio) then return (List.rev acc)
       else
         let (Misc.LCons (pk, next)) = l in
         let delegate = Signature.Public_key.hash pk in
-        ( match pred_timestamp with
-        | None ->
-            ok_none
+        (match pred_timestamp with
+        | None -> ok_none
         | Some pred_timestamp ->
             Baking.minimal_time
               (Constants.parametric ctxt)
               priority
               pred_timestamp
-            >|? fun t -> Some t )
+            >|? fun t -> Some t)
         >>?= fun timestamp ->
-        let acc =
-          {level = level.level; delegate; priority; timestamp} :: acc
-        in
+        let acc = {level = level.level; delegate; priority; timestamp} :: acc in
         next () >>=? fun l -> loop l acc (priority + 1)
     in
     loop contract_list [] 0
 
   let baking_priorities_of_delegates ctxt ~all ~max_prio delegates
       (level, pred_timestamp) =
-    Baking.baking_priorities ctxt level
-    >>=? fun contract_list ->
+    Baking.baking_priorities ctxt level >>=? fun contract_list ->
     let rec loop l acc priority delegates =
       match delegates with
-      | [] ->
-          return (List.rev acc)
+      | [] -> return (List.rev acc)
       | _ :: _ -> (
           if Compare.Int.(priority > max_prio) then return (List.rev acc)
           else
             let (Misc.LCons (pk, next)) = l in
-            next ()
-            >>=? fun l ->
+            next () >>=? fun l ->
             match
               List.partition
                 (fun (pk', _) -> Signature.Public_key.equal pk pk')
                 delegates
             with
-            | ([], _) ->
-                loop l acc (priority + 1) delegates
+            | ([], _) -> loop l acc (priority + 1) delegates
             | ((_, delegate) :: _, delegates') ->
-                ( match pred_timestamp with
-                | None ->
-                    ok_none
+                (match pred_timestamp with
+                | None -> ok_none
                 | Some pred_timestamp ->
                     Baking.minimal_time
                       (Constants.parametric ctxt)
                       priority
                       pred_timestamp
-                    >|? fun t -> Some t )
+                    >|? fun t -> Some t)
                 >>?= fun timestamp ->
                 let acc =
                   {level = level.level; delegate; priority; timestamp} :: acc
                 in
                 let delegates'' = if all then delegates else delegates' in
-                loop l acc (priority + 1) delegates'' )
+                loop l acc (priority + 1) delegates'')
     in
     loop contract_list [] 0 delegates
 
@@ -465,8 +444,7 @@ module Baking_rights = struct
          (fun (acc, previous) r ->
            if Signature.Public_key_hash.Set.mem r.delegate previous then
              (acc, previous)
-           else
-             (r :: acc, Signature.Public_key_hash.Set.add r.delegate previous))
+           else (r :: acc, Signature.Public_key_hash.Set.add r.delegate previous))
          ([], Signature.Public_key_hash.Set.empty)
          rights
 
@@ -475,18 +453,15 @@ module Baking_rights = struct
     register0 S.baking_rights (fun ctxt q () ->
         requested_levels
           ~default:
-            ( Level.succ ctxt (Level.current ctxt),
-              Some (Timestamp.current ctxt) )
+            (Level.succ ctxt (Level.current ctxt), Some (Timestamp.current ctxt))
           ctxt
           q.cycles
           q.levels
         >>?= fun levels ->
         let max_priority =
           match q.max_priority with
-          | Some max ->
-              max
-          | None -> (
-            match q.cycles with [] -> 64 | _ :: _ -> 8 )
+          | Some max -> max
+          | None -> ( match q.cycles with [] -> 64 | _ :: _ -> 8)
         in
         match q.delegates with
         | [] ->
@@ -500,12 +475,9 @@ module Baking_rights = struct
         | _ :: _ as delegates ->
             Lwt_list.filter_map_s
               (fun delegate ->
-                Contract.get_manager_key ctxt delegate
-                >>= function
-                | Ok pk ->
-                    Lwt.return (Some (pk, delegate))
-                | Error _ ->
-                    Lwt.return_none)
+                Contract.get_manager_key ctxt delegate >>= function
+                | Ok pk -> Lwt.return (Some (pk, delegate))
+                | Error _ -> Lwt.return_none)
               delegates
             >>= fun delegates ->
             map_s
@@ -577,9 +549,9 @@ module Endorsing_rights = struct
            By default, it gives the endorsement slots for delegates that have \
            at least one in the next block.\n\
            Parameters `level` and `cycle` can be used to specify the (valid) \
-           level(s) in the past or future at which the endorsement rights \
-           have to be returned. Parameter `delegate` can be used to restrict \
-           the results to the given delegates.\n\
+           level(s) in the past or future at which the endorsement rights have \
+           to be returned. Parameter `delegate` can be used to restrict the \
+           results to the given delegates.\n\
            Returns the list of endorsement slots. Also returns the minimal \
            timestamps that correspond to these slots. The timestamps are \
            omitted for levels in the past, and are only estimates for levels \
@@ -591,8 +563,7 @@ module Endorsing_rights = struct
   end
 
   let endorsement_slots ctxt (level, estimated_time) =
-    Baking.endorsement_rights ctxt level
-    >|=? fun rights ->
+    Baking.endorsement_rights ctxt level >|=? fun rights ->
     Signature.Public_key_hash.Map.fold
       (fun delegate (_, slots, _) acc ->
         {level = level.level; delegate; slots; estimated_time} :: acc)
@@ -608,17 +579,13 @@ module Endorsing_rights = struct
           q.cycles
           q.levels
         >>?= fun levels ->
-        map_s (endorsement_slots ctxt) levels
-        >|=? fun rights ->
+        map_s (endorsement_slots ctxt) levels >|=? fun rights ->
         let rights = List.concat rights in
         match q.delegates with
-        | [] ->
-            rights
+        | [] -> rights
         | _ :: _ as delegates ->
             let is_requested p =
-              List.exists
-                (Signature.Public_key_hash.equal p.delegate)
-                delegates
+              List.exists (Signature.Public_key_hash.equal p.delegate) delegates
             in
             List.filter is_requested rights)
 
@@ -638,8 +605,7 @@ module Endorsing_power = struct
     | Single (Endorsement_with_slot {endorsement; slot}) ->
         Baking.check_endorsement_rights ctxt chain_id endorsement ~slot
         >|=? fun (_, slots, _) -> List.length slots
-    | _ ->
-        failwith "Operation is not a wrapped endorsement"
+    | _ -> failwith "Operation is not a wrapped endorsement"
 
   module S = struct
     let endorsing_power =
@@ -723,14 +689,13 @@ let register () =
   Minimal_valid_time.register ()
 
 let endorsement_rights ctxt level =
-  Endorsing_rights.endorsement_slots ctxt (level, None)
-  >|=? fun l -> List.map (fun {Endorsing_rights.delegate; _} -> delegate) l
+  Endorsing_rights.endorsement_slots ctxt (level, None) >|=? fun l ->
+  List.map (fun {Endorsing_rights.delegate; _} -> delegate) l
 
 let baking_rights ctxt max_priority =
   let max = match max_priority with None -> 64 | Some m -> m in
   let level = Level.current ctxt in
-  Baking_rights.baking_priorities ctxt max (level, None)
-  >|=? fun l ->
+  Baking_rights.baking_priorities ctxt max (level, None) >|=? fun l ->
   ( level.level,
     List.map
       (fun {Baking_rights.delegate; timestamp; _} -> (delegate, timestamp))

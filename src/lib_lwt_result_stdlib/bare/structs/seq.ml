@@ -35,91 +35,69 @@ let first s = match s () with Nil -> None | Cons (x, _) -> Some x
 
 let rec fold_left_e f acc seq =
   match seq () with
-  | Nil ->
-      Ok acc
-  | Cons (item, seq) ->
-      f acc item >>? fun acc -> fold_left_e f acc seq
+  | Nil -> Ok acc
+  | Cons (item, seq) -> f acc item >>? fun acc -> fold_left_e f acc seq
 
 let rec fold_left_s f acc seq =
   match seq () with
-  | Nil ->
-      Lwt.return acc
-  | Cons (item, seq) ->
-      f acc item >>= fun acc -> fold_left_s f acc seq
+  | Nil -> Lwt.return acc
+  | Cons (item, seq) -> f acc item >>= fun acc -> fold_left_s f acc seq
 
 let fold_left_s f acc seq =
   match seq () with
-  | Nil ->
-      Lwt.return acc
+  | Nil -> Lwt.return acc
   | Cons (item, seq) ->
       lwt_apply2 f acc item >>= fun acc -> fold_left_s f acc seq
 
 let rec fold_left_es f acc seq =
   match seq () with
-  | Nil ->
-      Monad.return acc
-  | Cons (item, seq) ->
-      f acc item >>=? fun acc -> fold_left_es f acc seq
+  | Nil -> Monad.return acc
+  | Cons (item, seq) -> f acc item >>=? fun acc -> fold_left_es f acc seq
 
 let fold_left_es f acc seq =
   match seq () with
-  | Nil ->
-      Monad.return acc
+  | Nil -> Monad.return acc
   | Cons (item, seq) ->
       lwt_apply2 f acc item >>=? fun acc -> fold_left_es f acc seq
 
 let rec iter_e f seq =
   match seq () with
-  | Nil ->
-      unit_e
-  | Cons (item, seq) ->
-      f item >>? fun () -> iter_e f seq
+  | Nil -> unit_e
+  | Cons (item, seq) -> f item >>? fun () -> iter_e f seq
 
 let rec iter_s f seq =
   match seq () with
-  | Nil ->
-      unit_s
-  | Cons (item, seq) ->
-      f item >>= fun () -> iter_s f seq
+  | Nil -> unit_s
+  | Cons (item, seq) -> f item >>= fun () -> iter_s f seq
 
 let iter_s f seq =
   match seq () with
-  | Nil ->
-      unit_s
-  | Cons (item, seq) ->
-      Lwt.apply f item >>= fun () -> iter_s f seq
+  | Nil -> unit_s
+  | Cons (item, seq) -> Lwt.apply f item >>= fun () -> iter_s f seq
 
 let rec iter_es f seq =
   match seq () with
-  | Nil ->
-      unit_es
-  | Cons (item, seq) ->
-      f item >>=? fun () -> iter_es f seq
+  | Nil -> unit_es
+  | Cons (item, seq) -> f item >>=? fun () -> iter_es f seq
 
 let iter_es f seq =
   match seq () with
-  | Nil ->
-      unit_es
-  | Cons (item, seq) ->
-      Lwt.apply f item >>=? fun () -> iter_es f seq
+  | Nil -> unit_es
+  | Cons (item, seq) -> Lwt.apply f item >>=? fun () -> iter_es f seq
 
 let iter_ep f seq =
   let rec iter_ep f seq (acc : (unit, 'error) result Lwt.t list) =
     match seq () with
-    | Nil ->
-        join_ep acc
-    | Cons (item, seq) ->
-        iter_ep f seq (Lwt.apply f item :: acc)
+    | Nil -> join_ep acc
+    | Cons (item, seq) -> iter_ep f seq (Lwt.apply f item :: acc)
   in
   iter_ep f seq []
 
 let iter_p f seq =
   let rec iter_p f seq acc =
     match seq () with
-    | Nil ->
-        join_p acc
-    | Cons (item, seq) ->
-        iter_p f seq (Lwt.apply f item :: acc)
+    | Nil -> join_p acc
+    | Cons (item, seq) -> iter_p f seq (Lwt.apply f item :: acc)
   in
   iter_p f seq []
 

@@ -64,8 +64,8 @@ let pp_mempool_count fmt
     {applied; branch_delayed; branch_refused; refused; unprocessed; total} =
   Format.fprintf
     fmt
-    "total: %d - applied: %d, branch_delayed: %d, branch_refused: %d, \
-     refused: %d, unprocessed: %d"
+    "total: %d - applied: %d, branch_delayed: %d, branch_refused: %d, refused: \
+     %d, unprocessed: %d"
     total
     applied
     branch_delayed
@@ -96,13 +96,10 @@ let pp_mempool_count fmt
 let wait_for_injection node =
   let filter json =
     match
-      JSON.(
-        json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
+      JSON.(json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
     with
-    | Some s when s = "inject" ->
-        Some s
-    | Some _ | None ->
-        None
+    | Some s when s = "inject" -> Some s
+    | Some _ | None -> None
   in
   let* _ = Node.wait_for node "node_prevalidator.v0" filter in
   return ()
@@ -126,13 +123,10 @@ let wait_for_injection node =
 let wait_for_flush node =
   let filter json =
     match
-      JSON.(
-        json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
+      JSON.(json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
     with
-    | Some s when s = "flush" ->
-        Some s
-    | Some _ | None ->
-        None
+    | Some s when s = "flush" -> Some s
+    | Some _ | None -> None
   in
   let* _ = Node.wait_for node "node_prevalidator.v0" filter in
   return ()
@@ -158,10 +152,8 @@ let sign_operation_bytes (signer : Constant.key) (msg : Bytes.t) =
   let open Tezos_crypto in
   let b58_secret_key =
     match String.split_on_char ':' signer.secret with
-    | ["unencrypted"; rest] ->
-        rest
-    | _ ->
-        Test.fail "Could not parse secret key"
+    | ["unencrypted"; rest] -> rest
+    | _ -> Test.fail "Could not parse secret key"
   in
   let sk = Signature.Secret_key.of_b58check_exn b58_secret_key in
   Signature.(sign ~watermark:Generic_operation sk msg)
@@ -185,8 +177,7 @@ let forge_and_inject_operation ~branch ~sender ~receiver ~client =
 
 let forge_and_inject_n_operations ~branch ~sender ~receiver ~client ~node n =
   let rec loop acc = function
-    | 0 ->
-        return acc
+    | 0 -> return acc
     | n ->
         let transfer_1 = wait_for_injection node in
         let* oph =
@@ -241,9 +232,7 @@ let flush_mempool =
   (* Step 2 *)
   (* Get the counter and the current branch *)
   let* base_counter =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap1.identity
-      client_1
+    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
   in
   counter := JSON.as_int base_counter ;
   let* branch = RPC.get_branch client_1 in
@@ -267,12 +256,8 @@ let flush_mempool =
   in
   (* Step 4 *)
   (* Check that forged operation are in the mempool *)
-  let* mempool_after_injections =
-    RPC.get_mempool_pending_operations client_1
-  in
-  let mempool_count_after_injections =
-    count_mempool mempool_after_injections
-  in
+  let* mempool_after_injections = RPC.get_mempool_pending_operations client_1 in
+  let mempool_count_after_injections = count_mempool mempool_after_injections in
   Format.kasprintf
     (Log.info "%s")
     "Mempool count after injections: %a"

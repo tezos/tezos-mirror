@@ -112,12 +112,9 @@ let eq l r =
   in
   let eq_peer_id idl idr =
     match (idl, idr) with
-    | (None, None) ->
-        true
-    | (Some idl, Some idr) ->
-        P2p_peer_id.(idl = idr)
-    | _ ->
-        false
+    | (None, None) -> true
+    | (Some idl, Some idr) -> P2p_peer_id.(idl = idr)
+    | _ -> false
   in
   eq_addr l.addr r.addr && l.port = r.port && eq_peer_id l.peer_id r.peer_id
 
@@ -139,10 +136,8 @@ let ip_to_string_from_string =
       let open P2p_addr in
       let s = to_string t in
       match of_string_opt s with
-      | None ->
-          Test.fail_report "cannot parse printed address"
-      | Some t' ->
-          qcheck_eq' ~pp ~expected:t ~actual:t' ())
+      | None -> Test.fail_report "cannot parse printed address"
+      | Some t' -> qcheck_eq' ~pp ~expected:t ~actual:t' ())
 
 let ipv6_to_string_from_string =
   let open QCheck in
@@ -159,8 +154,7 @@ let ipv6_to_string_from_string =
                "cannot parse address '%s': %s"
                s
                (P2p_point.Id.string_of_parsing_error err))
-      | Ok res ->
-          qcheck_eq' ~pp:pp_addr_port_id ~eq ~expected:t ~actual:res ())
+      | Ok res -> qcheck_eq' ~pp:pp_addr_port_id ~eq ~expected:t ~actual:res ())
 
 let ipv4_to_string_from_string =
   let open QCheck in
@@ -177,8 +171,7 @@ let ipv4_to_string_from_string =
                "cannot parse address '%s': %s"
                s
                (P2p_point.Id.string_of_parsing_error err))
-      | Ok res ->
-          qcheck_eq' ~pp:pp_addr_port_id ~eq ~expected:t ~actual:res ())
+      | Ok res -> qcheck_eq' ~pp:pp_addr_port_id ~eq ~expected:t ~actual:res ())
 
 (* Data are not generated but retrieved from [point.ok] file *)
 let domain_to_string_from_string_ok () =
@@ -202,8 +195,7 @@ let domain_to_string_from_string_ok () =
 let domain_to_string_from_string_ko () =
   let f addr =
     match P2p_point.Id.parse_addr_port_id addr with
-    | Error _ ->
-        ()
+    | Error _ -> ()
     | Ok _ ->
         Alcotest.fail
           (Format.asprintf
@@ -244,16 +236,14 @@ let p2p_point_encoding_eager_fail =
       Bytes.set_int32_be size_header 0 (Int32.of_int excessive_size) ;
       let continue =
         match Data_encoding.Binary.read_stream P2p_point.Id.encoding with
-        | Await continue ->
-            continue
+        | Await continue -> continue
         | _ ->
             Test.fail_report
-              "Opening an empty reading stream should await for further \
-               input, but status is already Success or Error"
+              "Opening an empty reading stream should await for further input, \
+               but status is already Success or Error"
       in
       match continue size_header with
-      | Error Data_encoding.Binary.Size_limit_exceeded ->
-          true
+      | Error Data_encoding.Binary.Size_limit_exceeded -> true
       | _ ->
           Test.fail_report
             "Binary stream reading of a point should fail fast when the size \
@@ -262,24 +252,30 @@ let p2p_point_encoding_eager_fail =
 let p2p_addr = [ip_to_string_from_string]
 
 let p2p_point =
-  [ ipv6_to_string_from_string;
+  [
+    ipv6_to_string_from_string;
     ipv4_to_string_from_string;
     encode_decode;
-    p2p_point_encoding_eager_fail ]
+    p2p_point_encoding_eager_fail;
+  ]
 
 let tests =
-  [ Alcotest.test_case
+  [
+    Alcotest.test_case
       "domain_to_string_from_string_ok"
       `Quick
       domain_to_string_from_string_ok;
     Alcotest.test_case
       "domain_to_string_from_string_ko"
       `Quick
-      domain_to_string_from_string_ko ]
+      domain_to_string_from_string_ko;
+  ]
 
 let () =
   Alcotest.run
     "Base.P2p"
-    [ ("P2p_addr", qcheck_wrap p2p_addr);
+    [
+      ("P2p_addr", qcheck_wrap p2p_addr);
       ("P2p_point", qcheck_wrap p2p_point);
-      ("P2p_point.domain", tests) ]
+      ("P2p_point.domain", tests);
+    ]

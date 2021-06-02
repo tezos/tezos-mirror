@@ -62,10 +62,8 @@ module Testing = struct
     let int = string_of_int
 
     let res f g = function
-      | Ok o ->
-          "ok(" ^ f o ^ ")"
-      | Error e ->
-          "error(" ^ g e ^ ")"
+      | Ok o -> "ok(" ^ f o ^ ")"
+      | Error e -> "error(" ^ g e ^ ")"
 
     let str = Fun.id
 
@@ -136,8 +134,7 @@ module Testing = struct
 
     let exn_s n m = Lwt.return @@ if n = m then raise (Nope m) else m + 1000
 
-    let exn_es n m =
-      Lwt.return_ok @@ if n = m then raise (Nope m) else m + 1000
+    let exn_es n m = Lwt.return_ok @@ if n = m then raise (Nope m) else m + 1000
 
     let exn_now _ = raise (Nope 2048)
 
@@ -188,8 +185,14 @@ struct
     iter (fun _ -> incr witness) (up 10) ;
     Assert.equal ~msg:"vanilla iter" ~prn:Testing.Prn.int 11 !witness ;
     (* error interrupted iter *)
-    let ie = iter_e (fun m -> incr witness ; e 10 m) (up 23) in
-    ( match ie with
+    let ie =
+      iter_e
+        (fun m ->
+          incr witness ;
+          e 10 m)
+        (up 23)
+    in
+    (match ie with
     | Error n ->
         Assert.equal
           ~msg:"unexpected error in result iter"
@@ -197,10 +200,13 @@ struct
           10
           n ;
         Assert.equal ~msg:"result iter" ~prn:Testing.Prn.int 22 !witness
-    | Ok () ->
-        Assert.equal ~msg:"unexpected success in result iter" true false ) ;
+    | Ok () -> Assert.equal ~msg:"unexpected success in result iter" true false) ;
     (* lwt-error interrupted iter *)
-    iter_es (fun m -> incr witness ; es 10 m) (up 29)
+    iter_es
+      (fun m ->
+        incr witness ;
+        es 10 m)
+      (up 29)
     >|= function
     | Error n ->
         Assert.equal
@@ -213,8 +219,10 @@ struct
         Assert.equal ~msg:"unexpected success in lwt-result iter" true false
 
   let tests =
-    [ Alcotest_lwt.test_case "fail-early" `Quick test_fail_early;
-      Alcotest_lwt.test_case "has-side-effects" `Quick test_has_side_effects ]
+    [
+      Alcotest_lwt.test_case "fail-early" `Quick test_fail_early;
+      Alcotest_lwt.test_case "has-side-effects" `Quick test_has_side_effects;
+    ]
 end
 
 module SeqIterTest = MakeItererTest (SeqGen)
@@ -247,8 +255,8 @@ struct
     (eq_s_catch (Error 2048) @@ fun () -> fold_left_es exn_now (-10) (up 100))
     >>= fun () ->
     (* error-lwt with error *)
-    eq_s (Error 6) @@ fold_left_es (es 6) (-10) (up 100)
-    >>= fun () -> Lwt.return_unit
+    eq_s (Error 6) @@ fold_left_es (es 6) (-10) (up 100) >>= fun () ->
+    Lwt.return_unit
 
   let tests = [Alcotest_lwt.test_case "fail-early" `Quick test_fail_early]
 end
@@ -271,17 +279,13 @@ struct
     (* error with error *)
     eq (Error 3) @@ map_e (e 3) (up 100) ;
     (* lwt with exception *)
-    (eq_s_catch (Error 4) @@ fun () -> map_es (exn_es 4) (up 100))
-    >>= fun () ->
+    (eq_s_catch (Error 4) @@ fun () -> map_es (exn_es 4) (up 100)) >>= fun () ->
     (* lwt with immediate exception *)
-    (eq_s_catch (Error 2048) @@ fun () -> map_es exn_now (up 100))
-    >>= fun () ->
+    (eq_s_catch (Error 2048) @@ fun () -> map_es exn_now (up 100)) >>= fun () ->
     (* error-lwt with exception *)
-    (eq_s_catch (Error 5) @@ fun () -> map_es (exn_es 5) (up 100))
-    >>= fun () ->
+    (eq_s_catch (Error 5) @@ fun () -> map_es (exn_es 5) (up 100)) >>= fun () ->
     (* error-lwt with immediate exception *)
-    (eq_s_catch (Error 2048) @@ fun () -> map_es exn_now (up 100))
-    >>= fun () ->
+    (eq_s_catch (Error 2048) @@ fun () -> map_es exn_now (up 100)) >>= fun () ->
     (* error-lwt with error *)
     eq_s (Error 6) @@ map_es (es 6) (up 100) >>= fun () -> Lwt.return_unit
 
@@ -318,10 +322,12 @@ module ListMapTest = MakeMapperTest (ListGen)
 let () =
   Alcotest_lwt.run
     "traversor-generic"
-    [ ("seq-iter", SeqIterTest.tests);
+    [
+      ("seq-iter", SeqIterTest.tests);
       ("seq-fold", SeqFoldTest.tests);
       ("seq-map", SeqMapTest.tests);
       ("list-iter", ListIterTest.tests);
       ("list-fold", ListFoldTest.tests);
-      ("list-map", ListMapTest.tests) ]
+      ("list-map", ListMapTest.tests);
+    ]
   |> Lwt_main.run

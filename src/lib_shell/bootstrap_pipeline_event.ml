@@ -34,8 +34,8 @@ let fetching_locator =
     ~section
     ~name:"fetching_locator"
     ~msg:
-      "fetching branch of about {locator_length} blocks from peer {peer_id} \
-       in {steps_number} steps"
+      "fetching branch of about {locator_length} blocks from peer {peer_id} in \
+       {steps_number} steps"
     ~level:Notice
     ("locator_length", Data_encoding.int31)
     ("peer_id", P2p_peer.Id.encoding)
@@ -170,8 +170,7 @@ let locator_contains_future_block =
   declare_4
     ~section
     ~name:"locator_contains_future_block"
-    ~msg:
-      "block locator {block_hash} from peer {peer_id} contains future blocks"
+    ~msg:"block locator {block_hash} from peer {peer_id} contains future blocks"
     ~level:Warning
     ("block_hash", Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)

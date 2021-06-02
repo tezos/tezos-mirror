@@ -60,8 +60,8 @@ module Handler = struct
       ~name:"request_for_signing"
       ~pp3:(fun fmt -> Format.fprintf fmt "%02X")
       ~msg:
-        "request for signing {bytes} bytes of data for key {key}, magic byte \
-         = {magic}"
+        "request for signing {bytes} bytes of data for key {key}, magic byte = \
+         {magic}"
       ("bytes", Data_encoding.int31)
       ("key", Signature.Public_key_hash.encoding)
       ("magic", Data_encoding.uint8)
@@ -79,8 +79,7 @@ module Handler = struct
       ~section
       ~level
       ~name:"request_for_deterministic_nonce"
-      ~msg:
-        "request for creating a nonce from {bytes} input bytes for key {key}"
+      ~msg:"request for creating a nonce from {bytes} input bytes for key {key}"
       ("bytes", Data_encoding.int31)
       ("key", Signature.Public_key_hash.encoding)
 
@@ -117,8 +116,8 @@ module Handler = struct
       ~level
       ~name:"request_for_supports_deterministic_nonces"
       ~msg:
-        "request for checking whether the signer supports deterministic \
-         nonces for key {key}"
+        "request for checking whether the signer supports deterministic nonces \
+         for key {key}"
       ("key", Signature.Public_key_hash.encoding)
 
   let supports_deterministic_nonces =

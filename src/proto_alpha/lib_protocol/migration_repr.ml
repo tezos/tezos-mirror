@@ -36,10 +36,12 @@ let origination_result_list_encoding =
   @@ list
        (conv
           (function
-            | { balance_updates;
+            | {
+                balance_updates;
                 originated_contracts;
                 storage_size;
-                paid_storage_size_diff } ->
+                paid_storage_size_diff;
+              } ->
                 ( balance_updates,
                   originated_contracts,
                   storage_size,

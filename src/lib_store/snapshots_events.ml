@@ -56,10 +56,8 @@ module Event = struct
 
   let import_info =
     let option_pp ~default pp fmt = function
-      | None ->
-          Format.fprintf fmt "%s" default
-      | Some x ->
-          Format.fprintf fmt "%a" pp x
+      | None -> Format.fprintf fmt "%s" default
+      | Some x -> Format.fprintf fmt "%a" pp x
     in
     declare_2
       ~section

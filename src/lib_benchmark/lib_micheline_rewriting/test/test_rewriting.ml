@@ -36,27 +36,23 @@ open Tezos_protocol_alpha.Protocol
 let rec update_contract_script :
     ('l, 'p) Micheline.node -> ('l, 'p) Micheline.node = function
   | Micheline.Seq
-      (_, Micheline.Prim (_, Michelson_v1_primitives.I_ADDRESS, [], []) :: l)
-    ->
+      (_, Micheline.Prim (_, Michelson_v1_primitives.I_ADDRESS, [], []) :: l) ->
       Micheline.Seq
         ( 0,
           Micheline.Prim (0, Michelson_v1_primitives.I_ADDRESS, [], [])
-          :: Micheline.Prim (0, Michelson_v1_primitives.I_CHAIN_ID, [], [])
-          :: Micheline.Prim (0, Michelson_v1_primitives.I_PAIR, [], [])
-          :: l )
+          ::
+          Micheline.Prim (0, Michelson_v1_primitives.I_CHAIN_ID, [], [])
+          :: Micheline.Prim (0, Michelson_v1_primitives.I_PAIR, [], []) :: l )
   | Micheline.Seq (_, a :: l) -> (
       let a' = update_contract_script a in
       let b = Micheline.Seq (0, l) in
       let b' = update_contract_script b in
       match b' with
-      | Micheline.Seq (_, l') ->
-          Micheline.Seq (0, a' :: l')
-      | _ ->
-          assert false )
+      | Micheline.Seq (_, l') -> Micheline.Seq (0, a' :: l')
+      | _ -> assert false)
   | Micheline.Prim (_, p, l, annot) ->
       Micheline.Prim (0, p, List.map update_contract_script l, annot)
-  | script ->
-      script
+  | script -> script
 
 let update_contract_script : Script_repr.expr -> Script_repr.expr =
  fun script ->
@@ -94,16 +90,18 @@ module Michelson_rewriter =
 let pattern =
   let open Michelson_pattern in
   seq
-    ( any @. any @. any
+    (any @. any @. any
     @. focus (prim Michelson_v1_primitives.I_ADDRESS list_empty)
-    @. list_any )
+    @. list_any)
 
 let replacement =
   let open Michelson in
   seq
-    [ prim Michelson_v1_primitives.I_ADDRESS [] [];
+    [
+      prim Michelson_v1_primitives.I_ADDRESS [] [];
       prim Michelson_v1_primitives.I_CHAIN_ID [] [];
-      prim Michelson_v1_primitives.I_PAIR [] [] ]
+      prim Michelson_v1_primitives.I_PAIR [] [];
+    ]
 
 let rewrite_contract : Script_repr.expr -> Script_repr.expr =
  fun script ->
@@ -113,8 +111,7 @@ let rewrite_contract : Script_repr.expr -> Script_repr.expr =
   in
   let focuses = Michelson_rewriter.all_matches pattern node in
   match focuses with
-  | [] ->
-      assert false
+  | [] -> assert false
   | paths ->
       let result =
         List.fold_left
@@ -226,10 +223,8 @@ let multisig_script : Script_repr.expr =
     >>? fun parsing_result -> ok parsing_result.Michelson_v1_parser.expanded
   in
   match result with
-  | Ok script ->
-      script
-  | Error _err ->
-      Stdlib.failwith "Error while parsing script"
+  | Ok script -> script
+  | Error _err -> Stdlib.failwith "Error while parsing script"
 
 let original_script_oracle =
   "{ parameter\n\

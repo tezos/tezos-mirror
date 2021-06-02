@@ -42,8 +42,7 @@ let to_raw_context (b : Block.t) =
   >|= Environment.wrap_tzresult
 
 let check_no_dangling_temp_big_map b =
-  to_raw_context b
-  >>=? fun ctxt ->
+  to_raw_context b >>=? fun ctxt ->
   Storage.Big_map.fold ctxt ~init:() ~f:(fun id () ->
       assert (not (Lazy_storage_kind.Big_map.Id.is_temp id)) ;
       Lwt.return_unit)
@@ -61,8 +60,8 @@ let call_the_contract b ~baker ~src contract param_left param_right =
   >>=? fun operation ->
   Incremental.begin_construction ~policy:Block.(By_account baker) b
   >>=? fun incr ->
-  Incremental.add_operation incr operation
-  >>=? fun incr -> Incremental.finalize_block incr
+  Incremental.add_operation incr operation >>=? fun incr ->
+  Incremental.finalize_block incr
 
 (** Originates the contract at contracts/temp_big_maps.tz and calls it with
     the pair [(param_left, param_right)].
@@ -71,8 +70,7 @@ let call_the_contract b ~baker ~src contract param_left param_right =
     All combinations are exercised.
 *)
 let test_temp_big_maps_contract param_left param_right () =
-  Contract_helpers.init ()
-  >>=? fun (b, baker, src, _src2) ->
+  Contract_helpers.init () >>=? fun (b, baker, src, _src2) ->
   Contract_helpers.originate_contract
     "contracts/temp_big_maps.tz"
     "{}"
@@ -80,10 +78,9 @@ let test_temp_big_maps_contract param_left param_right () =
     b
     baker
   >>=? fun (contract, b) ->
+  check_no_dangling_temp_big_map b >>=? fun () ->
+  call_the_contract b ~baker ~src contract param_left param_right >>=? fun b ->
   check_no_dangling_temp_big_map b
-  >>=? fun () ->
-  call_the_contract b ~baker ~src contract param_left param_right
-  >>=? fun b -> check_no_dangling_temp_big_map b
 
 let param_left_values = ["Left True"; "Left False"; "Right {}"]
 

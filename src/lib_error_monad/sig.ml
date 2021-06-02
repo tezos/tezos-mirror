@@ -31,21 +31,15 @@ type error_category =
   | `Permanent  (** Errors that will happen no matter the context *) ]
 
 let string_of_category = function
-  | `Permanent ->
-      "permanent"
-  | `Temporary ->
-      "temporary"
-  | `Branch ->
-      "branch"
+  | `Permanent -> "permanent"
+  | `Temporary -> "temporary"
+  | `Branch -> "branch"
 
 let combine_category c1 c2 =
   match (c1, c2) with
-  | (`Permanent, _) | (_, `Permanent) ->
-      `Permanent
-  | (`Branch, _) | (_, `Branch) ->
-      `Branch
-  | (`Temporary, `Temporary) ->
-      `Temporary
+  | (`Permanent, _) | (_, `Permanent) -> `Permanent
+  | (`Branch, _) | (_, `Branch) -> `Branch
+  | (`Temporary, `Temporary) -> `Temporary
 
 module type PREFIX = sig
   (** The identifier for parts of the code that need their own error monad. It
@@ -251,17 +245,11 @@ module type TRACE = sig
 
   (** [pp_print] pretty-prints a trace of errors *)
   val pp_print :
-    (Format.formatter -> 'err -> unit) ->
-    Format.formatter ->
-    'err trace ->
-    unit
+    (Format.formatter -> 'err -> unit) -> Format.formatter -> 'err trace -> unit
 
   (** [pp_print_top] pretty-prints the top errors of the trace *)
   val pp_print_top :
-    (Format.formatter -> 'err -> unit) ->
-    Format.formatter ->
-    'err trace ->
-    unit
+    (Format.formatter -> 'err -> unit) -> Format.formatter -> 'err trace -> unit
 
   val encoding : 'error Data_encoding.t -> 'error trace Data_encoding.t
 
@@ -398,14 +386,10 @@ module type MONAD = sig
   val fail_when : bool -> 'err -> (unit, 'err trace) result Lwt.t
 
   val unless :
-    bool ->
-    (unit -> (unit, 'trace) result Lwt.t) ->
-    (unit, 'trace) result Lwt.t
+    bool -> (unit -> (unit, 'trace) result Lwt.t) -> (unit, 'trace) result Lwt.t
 
   val when_ :
-    bool ->
-    (unit -> (unit, 'trace) result Lwt.t) ->
-    (unit, 'trace) result Lwt.t
+    bool -> (unit -> (unit, 'trace) result Lwt.t) -> (unit, 'trace) result Lwt.t
 
   (** Wrapper around [Lwt_utils.dont_wait] *)
   val dont_wait :

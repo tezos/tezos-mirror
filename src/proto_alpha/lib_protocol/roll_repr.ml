@@ -46,16 +46,12 @@ module Index = struct
 
   let to_path roll l =
     (Int32.to_string @@ Int32.logand roll (Int32.of_int 0xff))
-    :: ( Int32.to_string
-       @@ Int32.logand (Int32.shift_right_logical roll 8) (Int32.of_int 0xff)
-       )
+    ::
+    (Int32.to_string
+    @@ Int32.logand (Int32.shift_right_logical roll 8) (Int32.of_int 0xff))
     :: Int32.to_string roll :: l
 
-  let of_path = function
-    | _ :: _ :: s :: _ ->
-        Int32.of_string_opt s
-    | _ ->
-        None
+  let of_path = function _ :: _ :: s :: _ -> Int32.of_string_opt s | _ -> None
 
   let rpc_arg = rpc_arg
 

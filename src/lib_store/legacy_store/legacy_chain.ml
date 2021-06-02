@@ -65,8 +65,7 @@ let data chain_state =
       Lwt.return data)
 
 let locator chain_state seed =
-  data chain_state
-  >>= fun data ->
+  data chain_state >>= fun data ->
   Legacy_state.compute_locator chain_state data.current_head seed
 
 let locked_set_head chain_store data block =
@@ -74,22 +73,17 @@ let locked_set_head chain_store data block =
     let hash = Legacy_state.Block.hash block in
     if Block_hash.equal hash ancestor then Lwt.return_unit
     else
-      Events.(emit pop_block hash)
-      >>= fun () ->
+      Events.(emit pop_block hash) >>= fun () ->
       Legacy_store.Chain_data.In_main_branch.remove (chain_store, hash)
       >>= fun () ->
-      Legacy_state.Block.predecessor block
-      >>= function
-      | Some predecessor ->
-          pop_blocks ancestor predecessor
-      | None ->
-          assert false
+      Legacy_state.Block.predecessor block >>= function
+      | Some predecessor -> pop_blocks ancestor predecessor
+      | None -> assert false
     (* Cannot pop the genesis... *)
   in
   let push_block pred_hash block =
     let hash = Legacy_state.Block.hash block in
-    Events.(emit push_block hash)
-    >>= fun () ->
+    Events.(emit push_block hash) >>= fun () ->
     Legacy_store.Chain_data.In_main_branch.store (chain_store, pred_hash) hash
     >>= fun () -> Lwt.return hash
   in
@@ -98,10 +92,8 @@ let locked_set_head chain_store data block =
     ~to_block:block
   >>= fun (ancestor, path) ->
   let ancestor = Legacy_state.Block.hash ancestor in
-  pop_blocks ancestor data.current_head
-  >>= fun () ->
-  List.fold_left_s push_block ancestor path
-  >>= fun _ ->
+  pop_blocks ancestor data.current_head >>= fun () ->
+  List.fold_left_s push_block ancestor path >>= fun _ ->
   Legacy_store.Chain_data.Current_head.store
     chain_store
     (Legacy_state.Block.hash block)
@@ -125,8 +117,7 @@ let set_head chain_state block =
   (* Chain_traversal.live_blocks block max_op_ttl
    * >>=? fun (live_blocks, live_operations) -> *)
   Legacy_state.update_chain_data chain_state (fun chain_store data ->
-      locked_set_head chain_store data block
-      >>= fun new_chain_data ->
+      locked_set_head chain_store data block >>= fun new_chain_data ->
       Lwt.return (Some new_chain_data, data.current_head))
   >>= fun chain_state -> return chain_state
 
@@ -145,6 +136,5 @@ let test_and_set_head chain_state ~old block =
   >>= fun chain_state -> return chain_state
 
 let init_head chain_state =
-  head chain_state
-  >>= fun block ->
+  head chain_state >>= fun block ->
   set_head chain_state block >>=? fun (_ : Legacy_state.Block.t) -> return_unit

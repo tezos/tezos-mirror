@@ -31,10 +31,8 @@ module Term = struct
 
   let subcommand_arg =
     let parser = function
-      | "storage" ->
-          `Ok Storage
-      | s ->
-          `Error ("invalid argument: " ^ s)
+      | "storage" -> `Ok Storage
+      | s -> `Error ("invalid argument: " ^ s)
     and printer ppf = function Storage -> Format.fprintf ppf "storage" in
     let open Cmdliner.Arg in
     let doc = "Upgrade to perform. Possible values: $(b, storage)." in
@@ -44,8 +42,7 @@ module Term = struct
 
   let process subcommand args status =
     let run =
-      Internal_event_unix.init ()
-      >>= fun () ->
+      Internal_event_unix.init () >>= fun () ->
       match subcommand with
       | Storage ->
           Node_config_file.read args.Node_shared_arg.config_file
@@ -67,10 +64,8 @@ module Term = struct
               ~chain_name:node_config.blockchain_network.chain_name
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
-    | Ok () ->
-        `Ok ()
-    | Error err ->
-        `Error (false, Format.asprintf "%a" pp_print_error err)
+    | Ok () -> `Ok ()
+    | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
 
   let status =
     let open Cmdliner.Arg in
@@ -87,13 +82,17 @@ module Manpage = struct
     "The $(b,upgrade) command is meant to manage upgrades of the node."
 
   let description =
-    [ `S "DESCRIPTION";
+    [
+      `S "DESCRIPTION";
       `P command_description;
       `P "Available upgrades are:";
-      `P "$(b,storage) will upgrade the node disk storage (if needed)." ]
+      `P "$(b,storage) will upgrade the node disk storage (if needed).";
+    ]
 
-  let man = description @ (* [ `S misc_docs ] @ *)
-                          Node_shared_arg.Manpage.bugs
+  let man =
+    description
+    @ (* [ `S misc_docs ] @ *)
+    Node_shared_arg.Manpage.bugs
 
   let info = Cmdliner.Term.info ~doc:"Manage node upgrades" ~man "upgrade"
 end

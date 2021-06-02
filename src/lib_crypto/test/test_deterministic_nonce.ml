@@ -48,8 +48,10 @@ let p256 = (module P256 : S.SIGNATURE)
 let secp256k1 = (module Secp256k1 : S.SIGNATURE)
 
 let tests =
-  [ ("hash_matches_ed25519", `Quick, test_hash_matches ed25519);
+  [
+    ("hash_matches_ed25519", `Quick, test_hash_matches ed25519);
     ("hash_matches_p256", `Quick, test_hash_matches p256);
-    ("hash_matches_secp256k1", `Quick, test_hash_matches secp256k1) ]
+    ("hash_matches_secp256k1", `Quick, test_hash_matches secp256k1);
+  ]
 
 let () = Alcotest.run "tezos-crypto" [("deterministic_nonce", tests)]

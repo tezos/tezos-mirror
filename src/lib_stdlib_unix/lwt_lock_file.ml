@@ -33,21 +33,18 @@ let create ?(close_on_exec = true) ?(unlink_on_exit = false) fn =
         let flags = [O_TRUNC; O_CREAT; O_WRONLY] in
         if close_on_exec then O_CLOEXEC :: flags else flags
       in
-      Lwt_unix.openfile fn flags 0o644
-      >>= fun fd ->
-      Lwt_unix.lockf fd Unix.F_TLOCK 0
-      >>= fun () ->
+      Lwt_unix.openfile fn flags 0o644 >>= fun fd ->
+      Lwt_unix.lockf fd Unix.F_TLOCK 0 >>= fun () ->
       if unlink_on_exit then Lwt_main.at_exit (fun () -> Lwt_unix.unlink fn) ;
       let pid_str = string_of_int @@ Unix.getpid () in
-      Lwt_unix.write_string fd pid_str 0 (String.length pid_str)
-      >>= fun _ -> return_unit)
+      Lwt_unix.write_string fd pid_str 0 (String.length pid_str) >>= fun _ ->
+      return_unit)
 
 let is_locked fn =
   if not @@ Sys.file_exists fn then return_false
   else
     protect (fun () ->
-        Lwt_unix.openfile fn Unix.[O_RDONLY; O_CLOEXEC] 0o644
-        >>= fun fd ->
+        Lwt_unix.openfile fn Unix.[O_RDONLY; O_CLOEXEC] 0o644 >>= fun fd ->
         Lwt.finalize
           (fun () ->
             Lwt.try_bind

@@ -11,18 +11,14 @@ open Alpha_context
 open Script_interpreter
 
 let ( >>=?? ) x y =
-  x
-  >>= function
-  | Ok s ->
-      y s
-  | Error err ->
-      Lwt.return @@ Error (Environment.wrap_tztrace err)
+  x >>= function
+  | Ok s -> y s
+  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
 
 let test_context () =
-  Context.init 3
-  >>=? fun (b, _cs) ->
-  Incremental.begin_construction b
-  >>=? fun v -> return (Incremental.alpha_ctxt v)
+  Context.init 3 >>=? fun (b, _cs) ->
+  Incremental.begin_construction b >>=? fun v ->
+  return (Incremental.alpha_ctxt v)
 
 let default_source = Contract.implicit_contract Signature.Public_key_hash.zero
 
@@ -79,8 +75,7 @@ let run_step ctxt code accu stack =
 (** Runs a script with an ill-typed parameter and verifies that a
     Bad_contract_parameter error is returned. *)
 let test_bad_contract_parameter () =
-  test_context ()
-  >>=? fun ctx ->
+  test_context () >>=? fun ctx ->
   (* Run script with a parameter of wrong type *)
   run_script
     ctx
@@ -89,8 +84,7 @@ let test_bad_contract_parameter () =
     ~parameter:"0"
     ()
   >>= function
-  | Ok _ ->
-      Alcotest.fail "expected an error"
+  | Ok _ -> Alcotest.fail "expected an error"
   | Error (Environment.Ecoproto_error (Bad_contract_parameter source') :: _) ->
       Test_services.(check Testable.contract)
         "incorrect field in Bad_contract_parameter"
@@ -101,8 +95,7 @@ let test_bad_contract_parameter () =
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
 
 let test_multiplication_close_to_overflow_passes () =
-  test_context ()
-  >>=? fun ctx ->
+  test_context () >>=? fun ctx ->
   (* Get sure that multiplication deals with numbers between 2^62 and
      2^63 without overflowing *)
   run_script
@@ -113,21 +106,20 @@ let test_multiplication_close_to_overflow_passes () =
     ~parameter:"Unit"
     ()
   >>= function
-  | Ok _ ->
-      return_unit
+  | Ok _ -> return_unit
   | Error errs ->
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
 
 let read_file filename =
   let ch = open_in filename in
   let s = really_input_string ch (in_channel_length ch) in
-  close_in ch ; s
+  close_in ch ;
+  s
 
 (* Confront the Michelson interpreter to deep recursions. *)
 let test_stack_overflow () =
   let open Script_typed_ir in
-  test_context ()
-  >>=? fun ctxt ->
+  test_context () >>=? fun ctxt ->
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
   let kinfo = {iloc = -1; kstack_ty = stack} in
@@ -141,8 +133,7 @@ let test_stack_overflow () =
   in
   run_step ctxt (descr (enorme_et_seq 1_000_000)) EmptyCell EmptyCell
   >>= function
-  | Ok _ ->
-      return_unit
+  | Ok _ -> return_unit
   | Error trace ->
       let trace_string =
         Format.asprintf "%a" Environment.Error_monad.pp_trace trace
@@ -151,8 +142,7 @@ let test_stack_overflow () =
 
 let test_stack_overflow_in_lwt () =
   let open Script_typed_ir in
-  test_context ()
-  >>=? fun ctxt ->
+  test_context () >>=? fun ctxt ->
   let stack = Bot_t in
   let item ty s = Item_t (ty, s, None) in
   let unit_t = Unit_t None in
@@ -184,10 +174,8 @@ let test_stack_overflow_in_lwt () =
     aux n (IDrop (kinfo stack1, IHalt (kinfo stack)))
   in
   let script = push_empty_big_map (large_mem_seq 1_000_000) in
-  run_step ctxt (descr script) EmptyCell EmptyCell
-  >>= function
-  | Ok _ ->
-      return_unit
+  run_step ctxt (descr script) EmptyCell EmptyCell >>= function
+  | Ok _ -> return_unit
   | Error trace ->
       let trace_string =
         Format.asprintf "%a" Environment.Error_monad.pp_trace trace
@@ -218,25 +206,26 @@ let error_encoding_tests =
   let contract_zero =
     Contract.implicit_contract Signature.Public_key_hash.zero
   in
-  let script_expr_int =
-    Micheline.strip_locations (Micheline.Int (0, Z.zero))
-  in
+  let script_expr_int = Micheline.strip_locations (Micheline.Int (0, Z.zero)) in
   List.map
     (fun (name, e) ->
       Test_services.tztest
         (Format.asprintf "test error encoding: %s" name)
         `Quick
         (test_json_roundtrip_err name e))
-    [ ("Reject", Reject (0, script_expr_int, None));
+    [
+      ("Reject", Reject (0, script_expr_int, None));
       ("Overflow", Overflow (0, None));
       ( "Runtime_contract_error",
         Runtime_contract_error (contract_zero, script_expr_int) );
       ("Bad_contract_parameter", Bad_contract_parameter contract_zero);
       ("Cannot_serialize_failure", Cannot_serialize_failure);
-      ("Cannot_serialize_storage", Cannot_serialize_storage) ]
+      ("Cannot_serialize_storage", Cannot_serialize_storage);
+    ]
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "test bad contract error"
       `Quick
       test_bad_contract_parameter;
@@ -252,6 +241,6 @@ let tests =
       "test multiplication no illegitimate overflow"
       `Quick
       test_multiplication_close_to_overflow_passes;
-    Test_services.tztest "test stack overflow error" `Slow test_stack_overflow
+    Test_services.tztest "test stack overflow error" `Slow test_stack_overflow;
   ]
   @ error_encoding_tests

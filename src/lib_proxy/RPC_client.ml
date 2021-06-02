@@ -29,10 +29,8 @@ module Events = Proxy_events
 let rec print_path : type pr p. (pr, p) Resto.Internal.path -> string list =
  fun path ->
   match path with
-  | Root ->
-      []
-  | Static (path, s) ->
-      s :: print_path path
+  | Root -> []
+  | Static (path, s) -> s :: print_path path
   | Dynamic (path, arg) ->
       Printf.sprintf "<%s>" arg.descr.name :: print_path path
   | DynamicTail (path, arg) ->
@@ -50,10 +48,8 @@ let print_service : type p q i o. (_, _, p, q, i, o) Service.t -> string =
   String.concat "/" (List.rev (print_path iserv.path))
 
 let method_is_writer = function
-  | `POST | `DELETE | `PUT | `PATCH ->
-      true
-  | `GET ->
-      false
+  | `POST | `DELETE | `PUT | `PATCH -> true
+  | `GET -> false
 
 class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
   (http_ctxt : RPC_context.json) (mode : Proxy_services.mode)
@@ -65,28 +61,27 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
   let dispatch_local_or_distant ~debug_name ~local ~distant meth path =
     let meth_string = RPC_service.string_of_meth meth in
     let delegate () =
-      Events.(emit delegate_to_http) (meth_string, debug_name, path)
-      >>= distant
+      Events.(emit delegate_to_http) (meth_string, debug_name, path) >>= distant
     in
     if method_is_writer meth then delegate ()
     else
-      local ()
-      >>= function
+      local () >>= function
       | Ok x ->
           Events.(emit done_locally) (meth_string, debug_name, path)
           >>= fun () -> return x
-      | Error [Tezos_rpc.RPC_context.Not_found _] ->
-          delegate ()
-      | Error _ as err ->
-          Lwt.return err
+      | Error [Tezos_rpc.RPC_context.Not_found _] -> delegate ()
+      | Error _ as err -> Lwt.return err
   in
   object
     method base = Uri.empty
 
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
-          'q -> 'i -> 'o tzresult Lwt.t =
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          'p ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
       fun service params query input ->
         let local () = local_ctxt#call_service service params query input in
         let distant () = http_ctxt#call_service service params query input in
@@ -101,7 +96,11 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
           (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-          on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
+          on_chunk:('o -> unit) ->
+          on_close:(unit -> unit) ->
+          'p ->
+          'q ->
+          'i ->
           (unit -> unit) tzresult Lwt.t =
       fun service ~on_chunk ~on_close params query input ->
         let local () =
@@ -147,14 +146,12 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
         in
         if method_is_writer meth then delegate ()
         else
-          local_ctxt#generic_json_call meth ?body uri
-          >>= fun y ->
+          local_ctxt#generic_json_call meth ?body uri >>= fun y ->
           match y with
           | Ok (`Not_found _) | Error [Tezos_rpc.RPC_context.Not_found _] ->
               delegate ()
           | Ok x ->
               Events.(emit done_json_call_locally) (meth_string, uri_string)
               >>= fun () -> return x
-          | Error _ as err ->
-              Lwt.return err
+          | Error _ as err -> Lwt.return err
   end

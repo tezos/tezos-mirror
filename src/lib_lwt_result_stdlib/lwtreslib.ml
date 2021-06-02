@@ -38,5 +38,4 @@ module Bare = struct
   module WithExceptions = Bare_structs.WithExceptions
 end
 
-module Traced (Trace : Traced_sigs.Trace.S) =
-  Traced_structs.Structs.Make (Trace)
+module Traced (Trace : Traced_sigs.Trace.S) = Traced_structs.Structs.Make (Trace)

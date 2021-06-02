@@ -29,8 +29,11 @@ class type ['pr] gen_simple =
   object
     method call_service :
       'm 'p 'q 'i 'o.
-      (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
-      'q -> 'i -> 'o tzresult Lwt.t
+      (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+      'p ->
+      'q ->
+      'i ->
+      'o tzresult Lwt.t
   end
 
 class type ['pr] gen_streamed =
@@ -38,7 +41,11 @@ class type ['pr] gen_streamed =
     method call_streamed_service :
       'm 'p 'q 'i 'o.
       (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-      on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
+      on_chunk:('o -> unit) ->
+      on_close:(unit -> unit) ->
+      'p ->
+      'q ->
+      'i ->
       (unit -> unit) tzresult Lwt.t
   end
 

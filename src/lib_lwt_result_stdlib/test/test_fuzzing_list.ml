@@ -51,7 +51,8 @@ let wrap (name, (module Test : F)) =
 let () =
   let name = "Test_fuzzing_list" in
   let tests =
-    [ (* Test internal consistency *)
+    [
+      (* Test internal consistency *)
       ("TestIterFold", (module TestIterFold : F));
       ("TestRevMapRevMap", (module TestRevMapRevMap : F));
       (* Test consistency with Stdlib *)
@@ -69,7 +70,8 @@ let () =
       ("Mapp", (module TestMappAgainstStdlibList : F));
       ("Find", (module TestFindStdlibList : F));
       ("Partition", (module TestPartitionStdlibList : F));
-      ("Double", (module TestDoubleTraversorsStdlibList : F)) ]
+      ("Double", (module TestDoubleTraversorsStdlibList : F));
+    ]
   in
   let tests = List.map wrap tests in
   Alcotest.run name tests

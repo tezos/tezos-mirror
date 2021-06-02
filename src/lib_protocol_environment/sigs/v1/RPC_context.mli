@@ -29,23 +29,29 @@ class type ['pr] simple =
   object
     method call_proto_service0 :
       'm 'q 'i 'o.
-      (([< RPC_service.meth] as 'm), t, t, 'q, 'i, 'o) RPC_service.t -> 'pr ->
-      'q -> 'i -> 'o Error_monad.shell_tzresult Lwt.t
+      (([< RPC_service.meth] as 'm), t, t, 'q, 'i, 'o) RPC_service.t ->
+      'pr ->
+      'q ->
+      'i ->
+      'o Error_monad.shell_tzresult Lwt.t
 
     method call_proto_service1 :
       'm 'a 'q 'i 'o.
       (([< RPC_service.meth] as 'm), t, t * 'a, 'q, 'i, 'o) RPC_service.t ->
-      'pr -> 'a -> 'q -> 'i -> 'o Error_monad.shell_tzresult Lwt.t
+      'pr ->
+      'a ->
+      'q ->
+      'i ->
+      'o Error_monad.shell_tzresult Lwt.t
 
     method call_proto_service2 :
       'm 'a 'b 'q 'i 'o.
-      ( ([< RPC_service.meth] as 'm),
-        t,
-        (t * 'a) * 'b,
-        'q,
-        'i,
-        'o )
-      RPC_service.t -> 'pr -> 'a -> 'b -> 'q -> 'i ->
+      (([< RPC_service.meth] as 'm), t, (t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
+      'pr ->
+      'a ->
+      'b ->
+      'q ->
+      'i ->
       'o Error_monad.shell_tzresult Lwt.t
 
     method call_proto_service3 :
@@ -56,7 +62,13 @@ class type ['pr] simple =
         'q,
         'i,
         'o )
-      RPC_service.t -> 'pr -> 'a -> 'b -> 'c -> 'q -> 'i ->
+      RPC_service.t ->
+      'pr ->
+      'a ->
+      'b ->
+      'c ->
+      'q ->
+      'i ->
       'o Error_monad.shell_tzresult Lwt.t
   end
 

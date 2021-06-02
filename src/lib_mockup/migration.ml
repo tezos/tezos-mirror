@@ -30,16 +30,15 @@ let migrate_mockup ~(cctxt : Tezos_client_base.Client_context.full)
   let base_dir = cctxt#get_base_dir in
   let explain_will_not_work explain =
     cctxt#error
-      "@[<hv>Base directory %s %a@ This command will not work.@ Please \
-       specify a correct mockup base directory.@]"
+      "@[<hv>Base directory %s %a@ This command will not work.@ Please specify \
+       a correct mockup base directory.@]"
       base_dir
       explain
       ()
     >>= fun () -> return_unit
   in
-  classify_base_dir base_dir
-  >>=? fun base_dir_class ->
-  ( match base_dir_class with
+  classify_base_dir base_dir >>=? fun base_dir_class ->
+  (match base_dir_class with
   | Base_dir_does_not_exist ->
       explain_will_not_work (fun fmtr () ->
           Format.fprintf fmtr "does not exist.")
@@ -50,8 +49,7 @@ let migrate_mockup ~(cctxt : Tezos_client_base.Client_context.full)
   | Base_dir_is_nonempty ->
       explain_will_not_work (fun fmtr () ->
           Format.fprintf fmtr "is not a mockup base directory.")
-  | Base_dir_is_mockup ->
-      return_unit )
+  | Base_dir_is_mockup -> return_unit)
   >>=? fun () ->
   get_mockup_context_from_disk ~base_dir ~protocol_hash cctxt
   >>=? fun ((module Current_mockup_env), (chain_id, rpc_context)) ->

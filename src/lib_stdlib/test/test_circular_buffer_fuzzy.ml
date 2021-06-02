@@ -70,8 +70,8 @@ module Reference : S = struct
 
   let write ~maxlen ~fill_using () =
     let bytes = Bytes.create maxlen in
-    fill_using bytes 0 maxlen
-    >>= fun written_bytes -> Lwt.return (Bytes.sub bytes 0 written_bytes)
+    fill_using bytes 0 maxlen >>= fun written_bytes ->
+    Lwt.return (Bytes.sub bytes 0 written_bytes)
 
   let read data ?(len = Bytes.length data) () ~into ~offset =
     let data_length = Bytes.length data in
@@ -101,7 +101,7 @@ let pp_op fmt = function
         len
   | Read read_len ->
       (* if [read_len] is too long, we may truncate to the correct size
-        depending on the test (see below). *)
+         depending on the test (see below). *)
       Format.fprintf fmt "Read at most %d bytes." read_len
 
 let pp = Format.pp_print_list ~pp_sep:Format.pp_print_newline pp_op
@@ -126,14 +126,13 @@ let rec ops_gen acc i =
     let open QCheck in
     let open Gen in
     ops_gen
-      ( acc
-      >>= fun (nb_writes, ops) ->
-      let gen = if nb_writes > 0 then op else write_op in
-      map
-        (fun op ->
-          let delta = match op with Write _ -> 1 | Read _ -> -1 in
-          (nb_writes + delta, op :: ops))
-        gen )
+      ( acc >>= fun (nb_writes, ops) ->
+        let gen = if nb_writes > 0 then op else write_op in
+        map
+          (fun op ->
+            let delta = match op with Write _ -> 1 | Read _ -> -1 in
+            (nb_writes + delta, op :: ops))
+          gen )
       (i - 1)
 
 (* Scenarios start with a write operation. *)
@@ -146,7 +145,7 @@ let values =
   (* 1000 is a good trade-off between:
      - testing long scenarii using a long sequence of operations
      - quick execution
-   *)
+  *)
   let size_gen = Gen.int_range 0 1000 in
   Gen.(size_gen >>= ops_gen)
 
@@ -168,9 +167,10 @@ let random_bytes =
         done
       else (
         Bytes.set_int64_ne buff offset data ;
-        fill_random (size - 8) (offset + 8) buff )
+        fill_random (size - 8) (offset + 8) buff)
     in
-    fill_random size 0 buff ; buff
+    fill_random size 0 buff ;
+    buff
 
 let pp_buf fmt buf =
   Format.fprintf fmt "Length: %d@." (Bytes.length buf) ;
@@ -209,8 +209,7 @@ let () =
     let (module M) = state.implementation in
     let data_to_read =
       match state.partial_read with
-      | None ->
-          Queue.take state.data_to_be_read
+      | None -> Queue.take state.data_to_be_read
       | Some p ->
           state.partial_read <- None ;
           p
@@ -235,27 +234,27 @@ let () =
     | Write (write_len, maxlen) ->
         let len = min write_len maxlen in
         let bytes_to_write = random_bytes len in
-        write_data write_len maxlen bytes_to_write left_state
-        >>= fun () ->
-        write_data write_len maxlen bytes_to_write right_state
-        >>= fun () -> Lwt.return_false
+        write_data write_len maxlen bytes_to_write left_state >>= fun () ->
+        write_data write_len maxlen bytes_to_write right_state >>= fun () ->
+        Lwt.return_false
     | Read read_len -> (
-      try
-        let (left_has_raised, left_buf) =
-          read_data ~without_invalid_argument read_len left_state
-        in
-        let (right_has_raised, right_buf) =
-          read_data ~without_invalid_argument read_len right_state
-        in
-        if left_has_raised then
-          if right_has_raised then Lwt.return true
-          else QCheck.Test.fail_report "Different behaviors (invalid_argument)"
-        else
-          let _ =
-            qcheck_eq' ~pp:pp_buf ~expected:left_buf ~actual:right_buf ()
+        try
+          let (left_has_raised, left_buf) =
+            read_data ~without_invalid_argument read_len left_state
           in
-          Lwt.return_false
-      with Queue.Empty -> QCheck.assume_fail () )
+          let (right_has_raised, right_buf) =
+            read_data ~without_invalid_argument read_len right_state
+          in
+          if left_has_raised then
+            if right_has_raised then Lwt.return true
+            else
+              QCheck.Test.fail_report "Different behaviors (invalid_argument)"
+          else
+            let _ =
+              qcheck_eq' ~pp:pp_buf ~expected:left_buf ~actual:right_buf ()
+            in
+            Lwt.return_false
+        with Queue.Empty -> QCheck.assume_fail ())
   in
   let test_invalid_argument =
     QCheck.Test.make
@@ -264,7 +263,7 @@ let () =
       values
       (fun ops ->
         (* To ensure that the number of [write] is greater than the
-         number of [read] we reverse the list. *)
+           number of [read] we reverse the list. *)
         let ops = List.rev ops in
         let left_state =
           E
@@ -298,8 +297,8 @@ let () =
   in
   let test_with_reference =
     (* The test below do not try to avoid the `invalid_argument`
-     exception. It checks that both implementations raise this
-     exception at the same time. *)
+       exception. It checks that both implementations raise this
+       exception at the same time. *)
     QCheck.Test.make
       ~name:"Stdlib.circular_buffer.equivalence-with-reference-implementation"
       values
@@ -329,8 +328,8 @@ let () =
                (fun raised value ->
                  if raised then Lwt.return raised
                  else
-                   update_state left_state right_state value
-                   >>= fun raised' -> Lwt.return (raised || raised'))
+                   update_state left_state right_state value >>= fun raised' ->
+                   Lwt.return (raised || raised'))
                false
                ops)
         in
@@ -338,5 +337,7 @@ let () =
   in
   Alcotest.run
     "Stdlib.circular_buffer"
-    [ ("Invalid argument", qcheck_wrap [test_invalid_argument]);
-      ("With reference", qcheck_wrap [test_with_reference]) ]
+    [
+      ("Invalid argument", qcheck_wrap [test_invalid_argument]);
+      ("With reference", qcheck_wrap [test_with_reference]);
+    ]

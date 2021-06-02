@@ -69,8 +69,8 @@ let lwt_fail str = Lwt.return (Alcotest.(check bool) str false true)
 
 let lwt_assert_catch (p : unit -> 'a Lwt.t) (e : exn) =
   let catcher e' = Lwt.return (Alcotest.check exn "foo" e e') in
-  Lwt.catch p catcher
-  >>= fun () -> lwt_fail ("Expected an exception " ^ Printexc.to_string e)
+  Lwt.catch p catcher >>= fun () ->
+  lwt_fail ("Expected an exception " ^ Printexc.to_string e)
 
 let contains (type a) (m : a testable) str (x : a) (ls : a list) : unit =
   let (module M) = m in

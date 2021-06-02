@@ -78,14 +78,13 @@ let commands () =
         Alpha_services.Constants.all cctxt (cctxt#chain, block)
         >>=? fun {parametric = {hard_gas_limit_per_operation}} ->
         return hard_gas_limit_per_operation
-    | Some gas ->
-        return gas
+    | Some gas -> return gas
   in
   let data_parameter =
     Clic.parameter (fun _ data ->
         Lwt.return
-          ( Micheline_parser.no_parsing_error
-          @@ Michelson_v1_parser.parse_expression data ))
+          (Micheline_parser.no_parsing_error
+          @@ Michelson_v1_parser.parse_expression data))
   in
   let bytes_parameter ~name ~desc =
     Clic.param
@@ -105,30 +104,28 @@ let commands () =
   let signature_parameter =
     Clic.parameter (fun _cctxt s ->
         match Signature.of_b58check_opt s with
-        | Some s ->
-            return s
-        | None ->
-            failwith "Not given a valid signature")
+        | Some s -> return s
+        | None -> failwith "Not given a valid signature")
   in
-  [ command
+  [
+    command
       ~group
       ~desc:"Lists all scripts in the library."
       no_options
       (fixed ["list"; "known"; "scripts"])
       (fun () (cctxt : Alpha_client_context.full) ->
-        Program.load cctxt
-        >>=? fun list ->
-        List.iter_s (fun (n, _) -> cctxt#message "%s" n) list
-        >>= fun () -> return_unit);
+        Program.load cctxt >>=? fun list ->
+        List.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
+        return_unit);
     command
       ~group
       ~desc:"Add a script to the library."
       (args1 (Program.force_switch ()))
-      ( prefixes ["remember"; "script"]
-      @@ Program.fresh_alias_param @@ Program.source_param @@ stop )
+      (prefixes ["remember"; "script"]
+      @@ Program.fresh_alias_param @@ Program.source_param @@ stop)
       (fun force name hash cctxt ->
-        Program.of_fresh cctxt force name
-        >>=? fun name -> Program.add ~force cctxt name hash);
+        Program.of_fresh cctxt force name >>=? fun name ->
+        Program.add ~force cctxt name hash);
     command
       ~group
       ~desc:"Remove a script from the library."
@@ -141,20 +138,19 @@ let commands () =
       no_options
       (prefixes ["show"; "known"; "script"] @@ Program.alias_param @@ stop)
       (fun () (_, program) (cctxt : Alpha_client_context.full) ->
-        Program.to_source program
-        >>=? fun source ->
+        Program.to_source program >>=? fun source ->
         cctxt#message "%s\n" source >>= fun () -> return_unit);
     command
       ~group
       ~desc:"Ask the node to run a script."
       (args3 trace_stack_switch amount_arg no_print_source_flag)
-      ( prefixes ["run"; "script"]
+      (prefixes ["run"; "script"]
       @@ Program.source_param
       @@ prefixes ["on"; "storage"]
       @@ Clic.param ~name:"storage" ~desc:"the storage data" data_parameter
       @@ prefixes ["and"; "input"]
       @@ Clic.param ~name:"storage" ~desc:"the input data" data_parameter
-      @@ stop )
+      @@ stop)
       (fun (trace_exec, amount, no_print_source) program storage input cctxt ->
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
@@ -181,8 +177,7 @@ let commands () =
             ~storage
             ~input
             ()
-          >>= fun res ->
-          print_run_result cctxt ~show_source ~parsed:program res);
+          >>= fun res -> print_run_result cctxt ~show_source ~parsed:program res);
     command
       ~group
       ~desc:"Ask the node to typecheck a script."
@@ -192,9 +187,7 @@ let commands () =
          no_print_source_flag
          custom_gas_flag)
       (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
-      (fun (show_types, emacs_mode, no_print_source, original_gas)
-           program
-           cctxt ->
+      (fun (show_types, emacs_mode, no_print_source, original_gas) program cctxt ->
         match program with
         | (program, []) ->
             resolve_max_gas cctxt cctxt#block original_gas
@@ -235,14 +228,13 @@ let commands () =
       ~group
       ~desc:"Ask the node to typecheck a data expression."
       (args2 no_print_source_flag custom_gas_flag)
-      ( prefixes ["typecheck"; "data"]
+      (prefixes ["typecheck"; "data"]
       @@ Clic.param ~name:"data" ~desc:"the data to typecheck" data_parameter
       @@ prefixes ["against"; "type"]
       @@ Clic.param ~name:"type" ~desc:"the expected type" data_parameter
-      @@ stop )
+      @@ stop)
       (fun (no_print_source, custom_gas) data ty cctxt ->
-        resolve_max_gas cctxt cctxt#block custom_gas
-        >>=? fun original_gas ->
+        resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
         Client_proto_programs.typecheck_data
           cctxt
           ~chain:cctxt#chain
@@ -276,14 +268,13 @@ let commands () =
          Also displays the result of hashing this packed data with `BLAKE2B`, \
          `SHA256` or `SHA512` instruction."
       (args1 custom_gas_flag)
-      ( prefixes ["hash"; "data"]
+      (prefixes ["hash"; "data"]
       @@ Clic.param ~name:"data" ~desc:"the data to hash" data_parameter
       @@ prefixes ["of"; "type"]
       @@ Clic.param ~name:"type" ~desc:"type of the data" data_parameter
-      @@ stop )
+      @@ stop)
       (fun custom_gas data typ cctxt ->
-        resolve_max_gas cctxt cctxt#block custom_gas
-        >>=? fun original_gas ->
+        resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
         Alpha_services.Helpers.Scripts.pack_data
           cctxt
           (cctxt#chain, cctxt#block)
@@ -323,17 +314,17 @@ let commands () =
     command
       ~group
       ~desc:
-        "Parse a byte sequence (in hexadecimal notation) as a data \
-         expression, as per Michelson instruction `UNPACK`."
+        "Parse a byte sequence (in hexadecimal notation) as a data expression, \
+         as per Michelson instruction `UNPACK`."
       Clic.no_options
-      ( prefixes ["unpack"; "michelson"; "data"]
+      (prefixes ["unpack"; "michelson"; "data"]
       @@ bytes_parameter ~name:"bytes" ~desc:"the packed data to parse"
-      @@ stop )
+      @@ stop)
       (fun () bytes cctxt ->
-        ( if Bytes.get bytes 0 != '\005' then
-          failwith
-            "Not a piece of packed Michelson data (must start with `0x05`)"
-        else return_unit )
+        (if Bytes.get bytes 0 != '\005' then
+         failwith
+           "Not a piece of packed Michelson data (must start with `0x05`)"
+        else return_unit)
         >>=? fun () ->
         (* Remove first byte *)
         let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
@@ -342,33 +333,31 @@ let commands () =
             Alpha_context.Script.expr_encoding
             bytes
         with
-        | None ->
-            failwith "Could not decode bytes"
+        | None -> failwith "Could not decode bytes"
         | Some expr ->
             cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
             >>= fun () -> return_unit);
     command
       ~group
       ~desc:
-        "Sign a raw sequence of bytes and display it using the format \
-         expected by Michelson instruction `CHECK_SIGNATURE`."
+        "Sign a raw sequence of bytes and display it using the format expected \
+         by Michelson instruction `CHECK_SIGNATURE`."
       no_options
-      ( prefixes ["sign"; "bytes"]
+      (prefixes ["sign"; "bytes"]
       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
       @@ prefixes ["for"]
-      @@ Client_keys.Secret_key.source_param @@ stop )
+      @@ Client_keys.Secret_key.source_param @@ stop)
       (fun () bytes sk cctxt ->
-        Client_keys.sign cctxt sk bytes
-        >>=? fun signature ->
-        cctxt#message "Signature: %a" Signature.pp signature
-        >>= fun () -> return_unit);
+        Client_keys.sign cctxt sk bytes >>=? fun signature ->
+        cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
+        return_unit);
     command
       ~group
       ~desc:
         "Check the signature of a byte sequence as per Michelson instruction \
          `CHECK_SIGNATURE`."
       (args1 (switch ~doc:"Use only exit codes" ~short:'q' ~long:"quiet" ()))
-      ( prefixes ["check"; "that"]
+      (prefixes ["check"; "that"]
       @@ bytes_parameter ~name:"bytes" ~desc:"the signed data"
       @@ prefixes ["was"; "signed"; "by"]
       @@ Client_keys.Public_key.alias_param ~name:"key"
@@ -377,18 +366,17 @@ let commands () =
            ~name:"signature"
            ~desc:"the signature to check"
            signature_parameter
-      @@ stop )
+      @@ stop)
       (fun quiet
            bytes
            (_, (key_locator, _))
            signature
            (cctxt : #Alpha_client_context.full) ->
-        Client_keys.check key_locator signature bytes
-        >>=? function
-        | false ->
-            cctxt#error "invalid signature"
+        Client_keys.check key_locator signature bytes >>=? function
+        | false -> cctxt#error "invalid signature"
         | true ->
             if quiet then return_unit
             else
-              cctxt#message "Signature check successful."
-              >>= fun () -> return_unit) ]
+              cctxt#message "Signature check successful." >>= fun () ->
+              return_unit);
+  ]

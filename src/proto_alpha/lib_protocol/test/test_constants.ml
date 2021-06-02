@@ -50,10 +50,8 @@ let test_max_operations_ttl () =
     Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
       .time_between_blocks
   in
-  Context.init ~time_between_blocks ~minimal_block_delay 1
-  >>=? fun (b, _) ->
-  Context.get_constants (Context.B b)
-  >>=? fun constants ->
+  Context.init ~time_between_blocks ~minimal_block_delay 1 >>=? fun (b, _) ->
+  Context.get_constants (Context.B b) >>=? fun constants ->
   Environment.wrap_tzresult
     (Alpha_context.Period.mult
        (Int32.of_int Alpha_context.max_operations_ttl)
@@ -70,15 +68,12 @@ let test_max_operations_ttl () =
 (* Test that the amount of the liquidity baking subsidy is 1/16th of total rewards
    of a fully-endorsed block with priority zero. *)
 let liquidity_baking_subsidy_param () =
-  Context.init 1
-  >>=? fun (blk, _contracts) ->
-  Context.get_constants (B blk)
-  >>=? fun csts ->
+  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.get_constants (B blk) >>=? fun csts ->
   let hd l = Option.value_fe ~error:(fun () -> assert false) (List.hd l) in
   hd csts.parametric.baking_reward_per_endorsement
   >>?= fun baking_reward_per_endorsement ->
-  hd csts.parametric.endorsement_reward
-  >>?= fun endorsement_reward ->
+  hd csts.parametric.endorsement_reward >>?= fun endorsement_reward ->
   let endorsers_per_block = csts.parametric.endorsers_per_block in
   let actual_subsidy = csts.parametric.liquidity_baking_subsidy in
   Tez.(baking_reward_per_endorsement +? endorsement_reward)
@@ -88,7 +83,8 @@ let liquidity_baking_subsidy_param () =
   Assert.equal_tez ~loc:__LOC__ actual_subsidy expected_subsidy
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "constants consistency"
       `Quick
       test_constants_consistency;
@@ -97,4 +93,5 @@ let tests =
       "test liquidity_baking_subsidy parameter is 1/16th of total baking \
        rewards"
       `Quick
-      liquidity_baking_subsidy_param ]
+      liquidity_baking_subsidy_param;
+  ]

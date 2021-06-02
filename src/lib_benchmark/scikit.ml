@@ -48,26 +48,25 @@ module LinearModel = struct
         (Pyinit.linear_model ())
         "Ridge"
         [||]
-        [ ("alpha", Py.Float.of_float alpha);
+        [
+          ("alpha", Py.Float.of_float alpha);
           ("fit_intercept", Py.Bool.of_bool fit_intercept);
-          ("normalize", Py.Bool.of_bool normalize) ]
+          ("normalize", Py.Bool.of_bool normalize);
+        ]
     in
     let _ =
       match Py.Object.get_attr_string ridge_object "fit" with
-      | None ->
-          Stdlib.failwith "Scikit.LinearModel.ridge: method fit not found"
-      | Some meth ->
-          Py.Callable.to_function meth [|input; output|]
+      | None -> Stdlib.failwith "Scikit.LinearModel.ridge: method fit not found"
+      | Some meth -> Py.Callable.to_function meth [|input; output|]
     in
     match Py.Object.get_attr_string ridge_object "coef_" with
     | None ->
         Stdlib.failwith "Scikit.LinearModel.ridge: attribute coef_ not found"
-    | Some coef ->
-        Matrix.of_numpy (Numpy.transpose coef)
+    | Some coef -> Matrix.of_numpy (Numpy.transpose coef)
 
   let lasso ~(alpha : float) ?(fit_intercept : bool = false)
-      ?(normalize : bool = false) ?(positive : bool = false)
-      ~(input : Matrix.t) ~(output : Matrix.t) () =
+      ?(normalize : bool = false) ?(positive : bool = false) ~(input : Matrix.t)
+      ~(output : Matrix.t) () =
     assert_matrix_nontrivial input ;
     assert_matrix_nontrivial output ;
     let input = Matrix.to_numpy input in
@@ -77,23 +76,22 @@ module LinearModel = struct
         (Pyinit.linear_model ())
         "Lasso"
         [||]
-        [ ("alpha", Py.Float.of_float alpha);
+        [
+          ("alpha", Py.Float.of_float alpha);
           ("fit_intercept", Py.Bool.of_bool fit_intercept);
           ("normalize", Py.Bool.of_bool normalize);
-          ("positive", Py.Bool.of_bool positive) ]
+          ("positive", Py.Bool.of_bool positive);
+        ]
     in
     let _ =
       match Py.Object.get_attr_string lasso_object "fit" with
-      | None ->
-          Stdlib.failwith "Scikit.LinearModel.lasso: method fit not found"
-      | Some meth ->
-          Py.Callable.to_function meth [|input; output|]
+      | None -> Stdlib.failwith "Scikit.LinearModel.lasso: method fit not found"
+      | Some meth -> Py.Callable.to_function meth [|input; output|]
     in
     match Py.Object.get_attr_string lasso_object "coef_" with
     | None ->
         Stdlib.failwith "Scikit.LinearModel.lasso: attribute coef_ not found"
-    | Some coef ->
-        Matrix.of_numpy coef
+    | Some coef -> Matrix.of_numpy coef
 
   let nnls ~(input : Matrix.t) ~(output : Matrix.t) =
     assert_matrix_nontrivial input ;

@@ -59,10 +59,8 @@ let encoding =
           (req "p2p_version" P2p_version.encoding))
 
 let greatest = function
-  | [] ->
-      raise (Invalid_argument "Network_version.greatest")
-  | h :: t ->
-      List.fold_left max h t
+  | [] -> raise (Invalid_argument "Network_version.greatest")
+  | h :: t -> List.fold_left max h t
 
 let announced ~chain_name ~distributed_db_versions ~p2p_versions =
   assert (distributed_db_versions <> []) ;

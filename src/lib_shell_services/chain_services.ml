@@ -34,11 +34,7 @@ let to_string = Block_services.chain_to_string
 
 let parse_chain = Block_services.parse_chain
 
-type invalid_block = {
-  hash : Block_hash.t;
-  level : Int32.t;
-  errors : error list;
-}
+type invalid_block = {hash : Block_hash.t; level : Int32.t; errors : error list}
 
 type prefix = Block_services.chain_prefix
 
@@ -115,8 +111,8 @@ module S = struct
       |+ opt_field
            "length"
            ~descr:
-             "The requested number of predecessors to return (per request; \
-              see next argument)."
+             "The requested number of predecessors to return (per request; see \
+              next argument)."
            RPC_arg.int
            (fun x -> x#length)
       |+ multi_field

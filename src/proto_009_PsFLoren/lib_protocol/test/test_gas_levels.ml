@@ -47,8 +47,7 @@ let succeed x = match x with Ok _ -> true | _ -> false
 let failed x = not (succeed x)
 
 let dummy_context () =
-  Context.init 1
-  >>=? fun (block, _) ->
+  Context.init 1 >>=? fun (block, _) ->
   Raw_context.prepare
     ~level:Int32.zero
     ~predecessor_timestamp:Time.Protocol.epoch
@@ -58,50 +57,43 @@ let dummy_context () =
   >|= Environment.wrap_tzresult
 
 let test_detect_gas_exhaustion_in_fresh_context () =
-  dummy_context ()
-  >>=? fun context ->
+  dummy_context () >>=? fun context ->
   fail_unless
     (consume_gas context (S.safe_int opg) |> succeed)
     (err "In a fresh context, gas consumption is unlimited.")
 
 let make_context initial_operation_gas =
-  dummy_context ()
-  >>=? fun context ->
+  dummy_context () >>=? fun context ->
   return
-    ( Gas_limit_repr.Arith.integral_of_int_exn initial_operation_gas
-    |> set_gas_limit context )
+    (Gas_limit_repr.Arith.integral_of_int_exn initial_operation_gas
+    |> set_gas_limit context)
 
 let test_detect_gas_exhaustion_when_operation_gas_hits_zero () =
-  make_context 10
-  >>=? fun context ->
+  make_context 10 >>=? fun context ->
   fail_unless
     (consume_gas context (S.safe_int opg) |> failed)
     (err "Fail when consuming more than the remaining operation gas.")
 
 let test_detect_gas_exhaustion_when_block_gas_hits_zero () =
-  make_context opg
-  >>=? fun context ->
+  make_context opg >>=? fun context ->
   fail_unless
     (consume_gas context (S.safe_int opg) |> failed)
     (err "Fail when consuming more than the remaining block gas.")
 
 let monitor initial_operation_level gas_level expectation () =
   let open Gas_limit_repr.Arith in
-  make_context initial_operation_level
-  >>=? fun context ->
+  make_context initial_operation_level >>=? fun context ->
   fail_unless
-    ( match consume_gas context (S.safe_int 10000) (* in milligas. *) with
+    (match consume_gas context (S.safe_int 10000) (* in milligas. *) with
     | Ok context ->
         let remaining = gas_level context in
         remaining = integral_of_int_exn expectation
-    | _ ->
-        false )
+    | _ -> false)
     (err "Monitor operation gas at each gas consumption")
 
 let operation_gas_level context =
   match gas_level context with
-  | Gas_limit_repr.Limited {remaining} ->
-      remaining
+  | Gas_limit_repr.Limited {remaining} -> remaining
   | _ ->
       (* because this function is called after [set_gas_limit]. *)
       assert false
@@ -124,7 +116,8 @@ let quick (what, how) = Test_services.tztest what `Quick how
 let tests =
   List.map
     quick
-    [ ( "Detect gas exhaustion in fresh context",
+    [
+      ( "Detect gas exhaustion in fresh context",
         test_detect_gas_exhaustion_in_fresh_context );
       ( "Detect gas exhaustion when operation gas as hits zero",
         test_detect_gas_exhaustion_when_operation_gas_hits_zero );
@@ -139,4 +132,5 @@ let tests =
         test_monitor_block_gas_level );
       ( "Each gas consumption has an impact on block gas level (block < \
          operation)",
-        test_monitor_block_gas_level' ) ]
+        test_monitor_block_gas_level' );
+    ]

@@ -74,24 +74,21 @@ let read_block_and_predecessors floating_store hash =
           in
           Block_repr.pread_block floating_store.fd ~file_offset:offset
           >>= function
-          | Some (block, _) ->
-              Lwt.return_some (block, predecessors)
+          | Some (block, _) -> Lwt.return_some (block, predecessors)
           | None ->
               (* May be the case when a stored block is corrupted *)
               Lwt.return_none)
         (fun _exn -> Lwt.return_none))
 
 let read_block floating_store hash =
-  read_block_and_predecessors floating_store hash
-  >>= function
-  | Some (block, _) -> Lwt.return_some block | None -> Lwt.return_none
+  read_block_and_predecessors floating_store hash >>= function
+  | Some (block, _) -> Lwt.return_some block
+  | None -> Lwt.return_none
 
 let locked_write_block floating_store ~offset ~block ~predecessors =
-  ( match Data_encoding.Binary.to_bytes_opt Block_repr.encoding block with
-  | None ->
-      fail (Cannot_encode_block block.Block_repr.hash)
-  | Some bytes ->
-      return bytes )
+  (match Data_encoding.Binary.to_bytes_opt Block_repr.encoding block with
+  | None -> fail (Cannot_encode_block block.Block_repr.hash)
+  | Some bytes -> return bytes)
   >>=? fun block_bytes ->
   let block_length = Bytes.length block_bytes in
   Lwt_utils_unix.write_bytes
@@ -109,8 +106,7 @@ let locked_write_block floating_store ~offset ~block ~predecessors =
 let append_block ?(flush = true) floating_store predecessors
     (block : Block_repr.t) =
   Lwt_idle_waiter.force_idle floating_store.scheduler (fun () ->
-      Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END
-      >>= fun offset ->
+      Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END >>= fun offset ->
       locked_write_block floating_store ~offset ~block ~predecessors
       >>= fun _written_len ->
       if flush then
@@ -120,8 +116,7 @@ let append_block ?(flush = true) floating_store predecessors
 let append_all floating_store
     (blocks : (Block_hash.t list * Block_repr.t) Seq.t) =
   Lwt_idle_waiter.force_idle floating_store.scheduler (fun () ->
-      Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END
-      >>= fun eof_offset ->
+      Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END >>= fun eof_offset ->
       Seq.fold_left_es
         (fun offset (predecessors, block) ->
           locked_write_block floating_store ~offset ~block ~predecessors
@@ -133,17 +128,13 @@ let append_all floating_store
       return_unit)
 
 let iter_s_raw_fd f fd =
-  Lwt_unix.lseek fd 0 Unix.SEEK_END
-  >>= fun eof_offset ->
-  Lwt_unix.lseek fd 0 Unix.SEEK_SET
-  >>= fun _file_start ->
+  Lwt_unix.lseek fd 0 Unix.SEEK_END >>= fun eof_offset ->
+  Lwt_unix.lseek fd 0 Unix.SEEK_SET >>= fun _file_start ->
   let rec loop nb_bytes_left =
     if nb_bytes_left = 0 then return_unit
     else
-      Block_repr.read_next_block fd
-      >>= function
-      | None ->
-          return_unit
+      Block_repr.read_next_block fd >>= function
+      | None -> return_unit
       | Some (block, length) ->
           f block >>=? fun () -> loop (nb_bytes_left - length)
   in
@@ -168,8 +159,7 @@ let folder f floating_store =
         Naming.floating_blocks_file floating_store.floating_blocks_dir
         |> Naming.file_path
       in
-      Lwt_unix.openfile path flags perms
-      >>= fun fd ->
+      Lwt_unix.openfile path flags perms >>= fun fd ->
       Lwt.finalize
         (fun () -> f fd)
         (fun () ->
@@ -181,8 +171,7 @@ let fold_left_s f e floating_store =
       let acc = ref e in
       iter_s_raw_fd
         (fun block ->
-          f !acc block
-          >>=? fun new_acc ->
+          f !acc block >>=? fun new_acc ->
           acc := new_acc ;
           return_unit)
         fd
@@ -195,8 +184,7 @@ let fold_left_with_pred_s f e floating_store =
       let acc = ref e in
       iter_with_pred_s_raw_fd
         (fun (b, preds) ->
-          f !acc (b, preds)
-          >>=? fun new_acc ->
+          f !acc (b, preds) >>=? fun new_acc ->
           acc := new_acc ;
           return_unit)
         fd
@@ -223,12 +211,9 @@ let init chain_dir ~readonly kind =
     Naming.floating_blocks_index_dir floating_blocks_dir
   in
   (* Create the floating store directory if it does not yet exist *)
-  Lwt_unix.file_exists floating_blocks_dir_path
-  >>= (function
-        | false ->
-            Lwt_unix.mkdir floating_blocks_dir_path 0o777
-        | true ->
-            Lwt.return_unit)
+  (Lwt_unix.file_exists floating_blocks_dir_path >>= function
+   | false -> Lwt_unix.mkdir floating_blocks_dir_path 0o777
+   | true -> Lwt.return_unit)
   >>= fun () ->
   Lwt_unix.openfile
     (Naming.file_path floating_blocks_file)
@@ -246,8 +231,8 @@ let init chain_dir ~readonly kind =
 
 let close {floating_block_index; fd; scheduler; _} =
   Lwt_idle_waiter.force_idle scheduler (fun () ->
-      ( try Floating_block_index.close floating_block_index
-        with Index.Closed -> () ) ;
+      (try Floating_block_index.close floating_block_index
+       with Index.Closed -> ()) ;
       Lwt_utils_unix.safe_close fd >>= fun _ignore -> Lwt.return_unit)
 
 let append_floating_store ~from ~into =
@@ -271,9 +256,11 @@ let all_files_exists chain_dir kind =
   in
   Lwt_list.for_all_s
     Lwt_unix.file_exists
-    [ floating_blocks_dir_path;
+    [
+      floating_blocks_dir_path;
       floating_blocks_file_path;
-      floating_blocks_index_dir_path ]
+      floating_blocks_index_dir_path;
+    ]
 
 (** [full_integrity_check ~chain_dir kind] performs a full read of the
     floating store [kind] in [chain_dir] and returns [false] if the
@@ -281,32 +268,27 @@ let all_files_exists chain_dir kind =
 let full_integrity_check chain_dir kind =
   Lwt.catch
     (fun () ->
-      all_files_exists chain_dir kind
-      >>= function
-      | false ->
-          Lwt.return_false
+      all_files_exists chain_dir kind >>= function
+      | false -> Lwt.return_false
       | true ->
           let rec loop index fd nb_bytes_left count =
             if nb_bytes_left = 0 then Lwt.return_false
             else
-              Block_repr.read_next_block fd
-              >>= function
+              Block_repr.read_next_block fd >>= function
               | None ->
                   (* Returns None if the next block could not be
-                   read. Might have some corrupted data. *)
+                     read. Might have some corrupted data. *)
                   Lwt.return_false
               | Some (block, length) ->
                   (* For each block read from the file, we check that it
-                   is correctly indexed. *)
+                     is correctly indexed. *)
                   let h = Block_repr.(hash block) in
                   if Floating_block_index.mem index h then
                     loop index fd (nb_bytes_left - length) (succ count)
                   else Lwt.return_false
           in
           let (flag, perms) = (Unix.O_RDWR, 0o644) in
-          let floating_blocks_dir =
-            Naming.floating_blocks_dir chain_dir kind
-          in
+          let floating_blocks_dir = Naming.floating_blocks_dir chain_dir kind in
           let floating_blocks_file_path =
             Naming.floating_blocks_file floating_blocks_dir |> Naming.file_path
           in
@@ -325,15 +307,12 @@ let full_integrity_check chain_dir kind =
               ~readonly:false
               floating_blocks_index_dir_path
           in
-          Lwt_unix.lseek fd 0 Unix.SEEK_END
-          >>= fun eof_offset ->
-          Lwt_unix.lseek fd 0 Unix.SEEK_SET
-          >>= fun _file_start ->
+          Lwt_unix.lseek fd 0 Unix.SEEK_END >>= fun eof_offset ->
+          Lwt_unix.lseek fd 0 Unix.SEEK_SET >>= fun _file_start ->
           Lwt.finalize
             (fun () -> loop index fd eof_offset 0)
             (fun () ->
-              Lwt_unix.close fd
-              >>= fun () ->
+              Lwt_unix.close fd >>= fun () ->
               Floating_block_index.close index ;
               Lwt.return_unit))
     (function _exn -> Lwt.return_false)
@@ -341,8 +320,7 @@ let full_integrity_check chain_dir kind =
 let delete_files floating_store =
   Lwt.catch
     (fun () ->
-      close floating_store
-      >>= fun () ->
+      close floating_store >>= fun () ->
       let floating_store_dir_path =
         Naming.dir_path floating_store.floating_blocks_dir
       in
@@ -350,34 +328,29 @@ let delete_files floating_store =
     (fun _ignore -> (* ignore errors *) Lwt.return_unit)
 
 let swap ~src ~dst =
-  close src
-  >>= fun () ->
-  close dst
-  >>= fun () ->
+  close src >>= fun () ->
+  close dst >>= fun () ->
   let dst_floating_store_dir_path = Naming.dir_path dst.floating_blocks_dir in
   let src_floating_store_dir_path = Naming.dir_path src.floating_blocks_dir in
-  delete_files dst
-  >>= fun () ->
+  delete_files dst >>= fun () ->
   (* Replace dst's directory by src's directory *)
   Lwt_unix.rename src_floating_store_dir_path dst_floating_store_dir_path
   >>= fun () -> Lwt.return_unit
 
 (* Call this function when full_integrity_check has failed. *)
 let fix_integrity chain_dir kind =
-  full_integrity_check chain_dir kind
-  >>= function
-  | true ->
-      (* Nothing to do *) return_unit
+  full_integrity_check chain_dir kind >>= function
+  | true -> (* Nothing to do *) return_unit
   | false ->
       protect (fun () ->
           (* Both errors implies to reconstruct a proper floating store from
-           scratch. *)
+             scratch. *)
           init chain_dir ~readonly:true kind
           >>= fun inconsistent_floating_store ->
           let restore_kind = Restore kind in
           Lwt_utils_unix.remove_dir
-            ( Naming.floating_blocks_dir chain_dir restore_kind
-            |> Naming.dir_path )
+            (Naming.floating_blocks_dir chain_dir restore_kind
+            |> Naming.dir_path)
           >>= fun () ->
           init chain_dir ~readonly:false restore_kind
           >>= fun fresh_floating_store ->
@@ -399,8 +372,7 @@ let fix_integrity chain_dir kind =
                               (* TODO: should we retrieve info ? e.g. highest_level, highest_fitness ? *)
                               append_block fresh_floating_store preds block
                               >>= return
-                          | None ->
-                              Lwt.fail Exit)
+                          | None -> Lwt.fail Exit)
                         inconsistent_floating_store)
                     (function Exit -> return_unit | exn -> Lwt.fail exn)
                   >>=? fun () ->
@@ -410,11 +382,9 @@ let fix_integrity chain_dir kind =
                   >>= fun () -> return_unit)
                 (fun exn ->
                   (* Restoring integrity failed: delete the fresh_floating_store files *)
-                  close inconsistent_floating_store
-                  >>= fun () ->
+                  close inconsistent_floating_store >>= fun () ->
                   close fresh_floating_store >>= fun () -> Lwt.fail exn))
             (fun () ->
-              close inconsistent_floating_store
-              >>= fun () ->
-              close fresh_floating_store
-              >>= fun () -> delete_files fresh_floating_store))
+              close inconsistent_floating_store >>= fun () ->
+              close fresh_floating_store >>= fun () ->
+              delete_files fresh_floating_store))

@@ -118,11 +118,10 @@ module Micheline_size = struct
     let open Micheline in
     match nodes with
     | [] -> (
-      match more_nodes with
-      | [] ->
-          acc
-      | nodes :: more_nodes ->
-          (of_nodes [@ocaml.tailcall]) acc nodes more_nodes )
+        match more_nodes with
+        | [] -> acc
+        | nodes :: more_nodes ->
+            (of_nodes [@ocaml.tailcall]) acc nodes more_nodes)
     | Int (_, n) :: nodes ->
         let acc = add_int acc n in
         (of_nodes [@ocaml.tailcall]) acc nodes more_nodes
@@ -219,8 +218,7 @@ let cost_micheline_strip_locations size =
   Gas_limit_repr.atomic_step_cost @@ S.mul (S.safe_int size) (S.safe_int 51)
 
 (* This is currently used to estimate the cost of serializing an operation. *)
-let bytes_node_cost s =
-  serialization_cost_estimated_from_bytes (Bytes.length s)
+let bytes_node_cost s = serialization_cost_estimated_from_bytes (Bytes.length s)
 
 let deserialized_cost expr =
   Gas_limit_repr.atomic_step_cost @@ deserialization_cost (expr_size expr)
@@ -239,10 +237,8 @@ let force_decode_cost lexpr =
 
 let force_decode lexpr =
   match Data_encoding.force_decode lexpr with
-  | Some v ->
-      ok v
-  | None ->
-      error Lazy_script_decode
+  | Some v -> ok v
+  | None -> error Lazy_script_decode
 
 let force_bytes_cost expr =
   (* Estimating the cost directly from the bytes would be cheaper, but
@@ -255,10 +251,8 @@ let force_bytes_cost expr =
 
 let force_bytes expr =
   match Data_encoding.force_bytes expr with
-  | bytes ->
-      ok bytes
-  | exception _ ->
-      error Lazy_script_decode
+  | bytes -> ok bytes
+  | exception _ -> error Lazy_script_decode
 
 let unit =
   Micheline.strip_locations (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
@@ -270,40 +264,31 @@ let is_unit_parameter =
   Data_encoding.apply_lazy
     ~fun_value:(fun v ->
       match Micheline.root v with
-      | Prim (_, Michelson_v1_primitives.D_Unit, [], []) ->
-          true
-      | _ ->
-          false)
+      | Prim (_, Michelson_v1_primitives.D_Unit, [], []) -> true
+      | _ -> false)
     ~fun_bytes:(fun b -> Compare.Bytes.equal b unit_bytes)
     ~fun_combine:(fun res _ -> res)
 
 let rec strip_annotations node =
   let open Micheline in
   match node with
-  | (Int (_, _) | String (_, _) | Bytes (_, _)) as leaf ->
-      leaf
+  | (Int (_, _) | String (_, _) | Bytes (_, _)) as leaf -> leaf
   | Prim (loc, name, args, _) ->
       Prim (loc, name, List.map strip_annotations args, [])
-  | Seq (loc, args) ->
-      Seq (loc, List.map strip_annotations args)
+  | Seq (loc, args) -> Seq (loc, List.map strip_annotations args)
 
 let rec micheline_nodes node acc k =
   match node with
-  | Micheline.Int (_, _) ->
-      k (acc + 1)
-  | Micheline.String (_, _) ->
-      k (acc + 1)
-  | Micheline.Bytes (_, _) ->
-      k (acc + 1)
+  | Micheline.Int (_, _) -> k (acc + 1)
+  | Micheline.String (_, _) -> k (acc + 1)
+  | Micheline.Bytes (_, _) -> k (acc + 1)
   | Micheline.Prim (_, _, subterms, _) ->
       micheline_nodes_list subterms (acc + 1) k
-  | Micheline.Seq (_, subterms) ->
-      micheline_nodes_list subterms (acc + 1) k
+  | Micheline.Seq (_, subterms) -> micheline_nodes_list subterms (acc + 1) k
 
 and micheline_nodes_list subterms acc k =
   match subterms with
-  | [] ->
-      k acc
+  | [] -> k acc
   | n :: nodes ->
       micheline_nodes_list nodes acc (fun acc -> micheline_nodes n acc k)
 

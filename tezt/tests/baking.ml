@@ -74,22 +74,17 @@ let signature_encoding : signature Data_encoding.t = Data_encoding.string
 let operation_content_encoding : operation_content Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun { kind;
+    (fun {
+           kind;
            source;
            fee;
            counter;
            gas_limit;
            storage_limit;
            amount;
-           destination } ->
-      ( kind,
-        source,
-        fee,
-        counter,
-        gas_limit,
-        storage_limit,
-        amount,
-        destination ))
+           destination;
+         } ->
+      (kind, source, fee, counter, gas_limit, storage_limit, amount, destination))
     (fun ( kind,
            source,
            fee,
@@ -256,10 +251,8 @@ let sign_operation_bytes (signer : Constant.key) (msg : Bytes.t) =
   let open Tezos_crypto in
   let b58_secret_key =
     match String.split_on_char ':' signer.secret with
-    | ["unencrypted"; rest] ->
-        rest
-    | _ ->
-        Test.fail "Could not parse secret key"
+    | ["unencrypted"; rest] -> rest
+    | _ -> Test.fail "Could not parse secret key"
   in
   let sk = Signature.Secret_key.of_b58check_exn b58_secret_key in
   Signature.(sign ~watermark:Generic_operation sk msg)
@@ -281,8 +274,7 @@ let mempool_operation_from_op state signer op :
 let mempool_from_list_of_ops state operations =
   let rec loop state operations acc =
     match operations with
-    | [] ->
-        return (List.rev acc)
+    | [] -> return (List.rev acc)
     | (account, op) :: tl ->
         let* (mempool_op, binary_proto_data) =
           mempool_operation_from_op state account op
@@ -308,10 +300,8 @@ let sample_next_transfer_for state ~fee ~branch ~account =
   let receiver = sample_bootstrap () in
   let fee =
     match fee with
-    | Fee_auto ->
-        fees.(Random.int (Array.length fees))
-    | Fee_mutez fee ->
-        fee
+    | Fee_auto -> fees.(Random.int (Array.length fees))
+    | Fee_mutez fee -> fee
   in
   let amount = 1 + Random.int 500 in
   let operation =
@@ -320,7 +310,8 @@ let sample_next_transfer_for state ~fee ~branch ~account =
       protocol_data =
         {
           contents =
-            [ {
+            [
+              {
                 kind = "transaction";
                 source = account.Constant.identity;
                 fee = string_of_int fee;
@@ -329,7 +320,8 @@ let sample_next_transfer_for state ~fee ~branch ~account =
                 storage_limit = string_of_int 0;
                 amount = string_of_int amount;
                 destination = receiver.Constant.identity;
-              } ];
+              };
+            ];
           signature = None;
         };
     }
@@ -385,8 +377,7 @@ let get_fees_manager_and_counter op_json =
       let storage_limit = as_int (contents |-> "storage_limit") in
       let counter = as_int (contents |-> "counter") in
       {source; fee; gas_limit; storage_limit; counter}
-  | _ ->
-      Test.fail "unexpected packed operation"
+  | _ -> Test.fail "unexpected packed operation"
 
 let check_ordering ops =
   let ops' = List.sort compare_info ops in
@@ -402,8 +393,7 @@ let assert_block_is_well_baked block =
           (JSON.as_list manager_ops)
       in
       check_ordering fees_managers_and_counters
-  | _ ->
-      Test.fail "ill-formed operation list list"
+  | _ -> Test.fail "ill-formed operation list list"
 
 (* ------------------------------------------------------------------------- *)
 (* Random mempools *)
@@ -434,11 +424,13 @@ let distinct_bakers_increasing_fees state : mempool Lwt.t =
   let fees = random_permutation [1_000; 2_000; 3_000; 4_000; 5_000] in
   let accounts =
     random_permutation
-      [ Constant.bootstrap1;
+      [
+        Constant.bootstrap1;
         Constant.bootstrap2;
         Constant.bootstrap3;
         Constant.bootstrap4;
-        Constant.bootstrap5 ]
+        Constant.bootstrap5;
+      ]
   in
   let* ops =
     Lwt_list.map_s

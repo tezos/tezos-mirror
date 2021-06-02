@@ -225,9 +225,7 @@ module Protocol : sig
        and type value := Protocol.t
 
   module RawContents :
-    SINGLE_STORE
-      with type t = store * Protocol_hash.t
-       and type value := Bytes.t
+    SINGLE_STORE with type t = store * Protocol_hash.t and type value := Bytes.t
 end
 
 (** {2 Temporary test chain forking block store} *)

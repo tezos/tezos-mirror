@@ -81,12 +81,10 @@ let test_cache_at_most_once ?query_string path =
   let find_duplicate l =
     let rec go with_duplicates without_duplicates =
       match (with_duplicates, without_duplicates) with
-      | ([], []) ->
-          None
+      | ([], []) -> None
       | (hd_dup :: tl_dup, hd_nodup :: tl_nodup) ->
           if hd_dup = hd_nodup then go tl_dup tl_nodup else Some hd_dup
-      | _ ->
-          assert false
+      | _ -> assert false
     in
     go (List.sort Stdlib.compare l) (List.sort_uniq Stdlib.compare l)
   in
@@ -104,7 +102,8 @@ let test_cache_at_most_once ?query_string path =
 
 let test_cache_at_most_once ~protocols =
   let paths =
-    [ (["helpers"; "baking_rights"], []);
+    [
+      (["helpers"; "baking_rights"], []);
       (["helpers"; "baking_rights"], [("all", "true")]);
       (["helpers"; "current_level"], []);
       (["minimal_valid_time"], []);
@@ -122,7 +121,8 @@ let test_cache_at_most_once ~protocols =
       (["votes"; "current_proposal"], []);
       (["votes"; "current_quorum"], []);
       (["votes"; "listings"], []);
-      (["votes"; "proposals"], []) ]
+      (["votes"; "proposals"], []);
+    ]
   in
   List.iter
     (fun (sub_path, query_string) ->
@@ -195,8 +195,7 @@ let test_context_suffix_no_rpc ?query_string path =
   in
   let context_queries = lines |> List.filter_map extract_rpc_path in
   let rec test_no_overlap_rpc = function
-    | [] ->
-        ()
+    | [] -> ()
     | query_after :: queries_before ->
         List.iter
           (fun query_before ->
@@ -216,15 +215,13 @@ let test_context_suffix_no_rpc ?query_string path =
 
 let test_context_suffix_no_rpc ~protocols =
   let iter l f = List.iter f l in
-  iter protocols
-  @@ fun protocol ->
+  iter protocols @@ fun protocol ->
   let paths =
-    ( match protocol with
-    | Protocol.Alpha ->
-        []
-    | _ ->
-        [(["votes"; "current_period_kind"], [])] )
-    @ [ (["helpers"; "baking_rights"], []);
+    (match protocol with
+    | Protocol.Alpha -> []
+    | _ -> [(["votes"; "current_period_kind"], [])])
+    @ [
+        (["helpers"; "baking_rights"], []);
         (["helpers"; "baking_rights"], [("all", "true")]);
         (["context"; "delegates"], []);
         (["context"; "nonces"; "3"], []);
@@ -237,10 +234,10 @@ let test_context_suffix_no_rpc ~protocols =
         (["votes"; "current_proposal"], []);
         (["votes"; "current_quorum"], []);
         (["votes"; "listings"], []);
-        (["votes"; "proposals"], []) ]
+        (["votes"; "proposals"], []);
+      ]
   in
-  iter paths
-  @@ fun (sub_path, query_string) ->
+  iter paths @@ fun (sub_path, query_string) ->
   test_context_suffix_no_rpc
     ~query_string
     ("chains" :: "main" :: "blocks" :: "head" :: sub_path)
@@ -257,8 +254,7 @@ let wrong_proto protocol client =
         Test.fail
           "No other protocol than %s is available."
           (Protocol.name protocol)
-    | Some other_proto ->
-        other_proto
+    | Some other_proto -> other_proto
   in
   let* stderr =
     Client.spawn_bake_for ~protocol:other_proto client
@@ -348,12 +344,9 @@ module Location = struct
     | Unknown  (** Client doesn't output location info (vanilla mode) *)
 
   let location_to_string = function
-    | Local ->
-        "Local"
-    | Distant ->
-        "Distant"
-    | Unknown ->
-        "Unknown"
+    | Local -> "Local"
+    | Distant -> "Distant"
+    | Unknown -> "Unknown"
 
   type clients = {vanilla : Client.t; alternative : Client.t}
 
@@ -376,8 +369,8 @@ module Location = struct
         Printf.sprintf
           "%s[ a-zA-Z]*: [A-Z]+\\(\n\\| \\)%s"
           prefix
-          ( Re.Str.quote
-          @@ Client.rpc_path_query_to_string ?query_string rpc_path )
+          (Re.Str.quote
+          @@ Client.rpc_path_query_to_string ?query_string rpc_path)
       in
       Re.Str.regexp re_str
     in
@@ -397,8 +390,8 @@ module Location = struct
       (fun (k, v) ->
         if k = proxy_key && v = proxy_value then
           Test.fail
-            "TEZOS_LOG key %s bound both to '%s' and '%s': impossible to \
-             honor both"
+            "TEZOS_LOG key %s bound both to '%s' and '%s': impossible to honor \
+             both"
             proxy_key
             proxy_value
             v
@@ -431,10 +424,11 @@ module Location = struct
   (* [tz_log] can be used to augment TEZOS_LOG (useful for debugging). *)
   let check_locations ?tz_log alt_mode client =
     let paths_n_locations =
-      [ ( ["chains"; chain_id; "blocks"; block_id; "context"; "delegates"],
-          Local );
+      [
+        (["chains"; chain_id; "blocks"; block_id; "context"; "delegates"], Local);
         (["chains"; chain_id; "blocks"], Distant);
-        (["network"; "self"], Distant) ]
+        (["network"; "self"], Distant);
+      ]
     in
     Lwt_list.iter_s
       (fun (rpc_path, expected_loc) ->
@@ -465,12 +459,11 @@ module Location = struct
       let add_rpc_path_prefix rpc_path =
         "chains" :: chain_id :: "blocks" :: block_id :: rpc_path
       in
-      ( match protocol with
-      | Protocol.Alpha ->
-          []
-      | _ ->
-          [(add_rpc_path_prefix ["votes"; "current_period_kind"], [])] )
-      @ [ (add_rpc_path_prefix ["context"; "constants"], []);
+      (match protocol with
+      | Protocol.Alpha -> []
+      | _ -> [(add_rpc_path_prefix ["votes"; "current_period_kind"], [])])
+      @ [
+          (add_rpc_path_prefix ["context"; "constants"], []);
           (add_rpc_path_prefix ["helpers"; "baking_rights"], []);
           (add_rpc_path_prefix ["helpers"; "baking_rights"], [("all", "true")]);
           (add_rpc_path_prefix ["helpers"; "current_level"], []);
@@ -489,7 +482,8 @@ module Location = struct
           (add_rpc_path_prefix ["votes"; "current_proposal"], []);
           (add_rpc_path_prefix ["votes"; "current_quorum"], []);
           (add_rpc_path_prefix ["votes"; "listings"], []);
-          (add_rpc_path_prefix ["votes"; "proposals"], []) ]
+          (add_rpc_path_prefix ["votes"; "proposals"], []);
+        ]
     in
     let perform (rpc_path, query_string) =
       let* (vanilla_out, vanilla_err) =

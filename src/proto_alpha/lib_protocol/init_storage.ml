@@ -55,14 +55,10 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
   match previous_protocol with
   | Genesis param ->
       (* This is the genesis protocol: initialise the state *)
-      Commitment_storage.init ctxt param.commitments
-      >>=? fun ctxt ->
-      Roll_storage.init ctxt
-      >>=? fun ctxt ->
-      Seed_storage.init ctxt
-      >>=? fun ctxt ->
-      Contract_storage.init ctxt
-      >>=? fun ctxt ->
+      Commitment_storage.init ctxt param.commitments >>=? fun ctxt ->
+      Roll_storage.init ctxt >>=? fun ctxt ->
+      Seed_storage.init ctxt >>=? fun ctxt ->
+      Contract_storage.init ctxt >>=? fun ctxt ->
       Bootstrap_storage.init
         ctxt
         ~typecheck
@@ -71,27 +67,23 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp ~fitness =
         param.bootstrap_accounts
         param.bootstrap_contracts
       >>=? fun ctxt ->
-      Roll_storage.init_first_cycles ctxt
-      >>=? fun ctxt ->
+      Roll_storage.init_first_cycles ctxt >>=? fun ctxt ->
       Vote_storage.init
         ctxt
         ~start_position:(Level_storage.current ctxt).level_position
       >>=? fun ctxt ->
-      Storage.Block_priority.init ctxt 0
-      >>=? fun ctxt ->
-      Vote_storage.update_listings ctxt
-      >>=? fun ctxt ->
+      Storage.Block_priority.init ctxt 0 >>=? fun ctxt ->
+      Vote_storage.update_listings ctxt >>=? fun ctxt ->
       (* Must be called after other originations since it unsets the origination nonce.*)
       Liquidity_baking_migration.init ctxt ~typecheck
       >>=? fun (ctxt, operation_results) ->
       Storage.Pending_migration.Operation_results.init ctxt operation_results
   | Florence_009 ->
       (* Only the starting position of the voting period is shifted by
-       one level into the future, so that voting periods are again
-       aligned with cycles. The period kind does not change, as a new
-       voting period has just started. *)
-      Voting_period_storage.get_current ctxt
-      >>=? fun voting_period ->
+         one level into the future, so that voting periods are again
+         aligned with cycles. The period kind does not change, as a new
+         voting period has just started. *)
+      Voting_period_storage.get_current ctxt >>=? fun voting_period ->
       Storage.Vote.Current_period.update
         ctxt
         {

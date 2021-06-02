@@ -81,9 +81,6 @@ let remove_prefix ~prefix s =
   else None
 
 let rec remove_elem_from_list nb = function
-  | [] ->
-      []
-  | _ :: _ as l when Compare.Int.(nb <= 0) ->
-      l
-  | _ :: tl ->
-      remove_elem_from_list (nb - 1) tl
+  | [] -> []
+  | _ :: _ as l when Compare.Int.(nb <= 0) -> l
+  | _ :: tl -> remove_elem_from_list (nb - 1) tl

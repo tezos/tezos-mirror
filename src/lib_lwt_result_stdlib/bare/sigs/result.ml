@@ -49,8 +49,7 @@ module type S = sig
   val bind_s :
     ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
 
-  val bind_error :
-    ('a, 'e) result -> ('e -> ('a, 'f) result) -> ('a, 'f) result
+  val bind_error : ('a, 'e) result -> ('e -> ('a, 'f) result) -> ('a, 'f) result
 
   val bind_error_s :
     ('a, 'e) result -> ('e -> ('a, 'f) result Lwt.t) -> ('a, 'f) result Lwt.t
@@ -74,8 +73,7 @@ module type S = sig
   val map_error_e :
     ('e -> ('a, 'f) result) -> ('a, 'e) result -> ('a, 'f) result
 
-  val map_error_s :
-    ('e -> 'f Lwt.t) -> ('a, 'e) result -> ('a, 'f) result Lwt.t
+  val map_error_s : ('e -> 'f Lwt.t) -> ('a, 'e) result -> ('a, 'f) result Lwt.t
 
   (* NOTE: [map_error_es] is [bind_error_s] *)
   val map_error_es :

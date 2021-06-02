@@ -30,7 +30,7 @@ open Apply_results
 let pp_manager_operation_content (type kind) source internal pp_result ppf
     ((operation, result) : kind manager_operation * _) =
   Format.fprintf ppf "@[<v 0>" ;
-  ( match operation with
+  (match operation with
   | Transaction {destination; amount; parameters; entrypoint} ->
       Format.fprintf
         ppf
@@ -43,23 +43,22 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         Contract.pp
         destination ;
-      ( match entrypoint with
-      | "default" ->
-          ()
-      | _ ->
-          Format.fprintf ppf "@,Entrypoint: %s" entrypoint ) ;
-      ( if not (Script_repr.is_unit_parameter parameters) then
-        let expr =
-          WithExceptions.Option.to_exn
-            ~none:(Failure "ill-serialized argument")
-            (Data_encoding.force_decode parameters)
-        in
-        Format.fprintf
-          ppf
-          "@,Parameter: @[<v 0>%a@]"
-          Michelson_v1_printer.print_expr
-          expr ) ;
-      pp_result ppf result ; Format.fprintf ppf "@]"
+      (match entrypoint with
+      | "default" -> ()
+      | _ -> Format.fprintf ppf "@,Entrypoint: %s" entrypoint) ;
+      (if not (Script_repr.is_unit_parameter parameters) then
+       let expr =
+         WithExceptions.Option.to_exn
+           ~none:(Failure "ill-serialized argument")
+           (Data_encoding.force_decode parameters)
+       in
+       Format.fprintf
+         ppf
+         "@,Parameter: @[<v 0>%a@]"
+         Michelson_v1_printer.print_expr
+         expr) ;
+      pp_result ppf result ;
+      Format.fprintf ppf "@]"
   | Origination {delegate; credit; script = {code; storage}; preorigination = _}
     ->
       Format.fprintf
@@ -90,16 +89,16 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         Michelson_v1_printer.print_expr
         storage ;
-      ( match delegate with
-      | None ->
-          Format.fprintf ppf "@,No delegate for this contract"
+      (match delegate with
+      | None -> Format.fprintf ppf "@,No delegate for this contract"
       | Some delegate ->
           Format.fprintf
             ppf
             "@,Delegate: %a"
             Signature.Public_key_hash.pp
-            delegate ) ;
-      pp_result ppf result ; Format.fprintf ppf "@]"
+            delegate) ;
+      pp_result ppf result ;
+      Format.fprintf ppf "@]"
   | Reveal key ->
       Format.fprintf
         ppf
@@ -130,12 +129,11 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         Signature.Public_key_hash.pp
         delegate
         pp_result
-        result ) ;
+        result) ;
   Format.fprintf ppf "@]"
 
 let pp_balance_updates ppf = function
-  | [] ->
-      ()
+  | [] -> ()
   | balance_updates ->
       let open Delegate in
       (* For dry runs, the baker's key is zero
@@ -151,8 +149,7 @@ let pp_balance_updates ppf = function
           (fun (balance, update) ->
             let balance =
               match balance with
-              | Contract c ->
-                  Format.asprintf "%a" Contract.pp c
+              | Contract c -> Format.asprintf "%a" Contract.pp c
               | Rewards (pkh, l) ->
                   Format.asprintf "rewards(%a,%a)" pp_baker pkh Cycle.pp l
               | Fees (pkh, l) ->
@@ -192,8 +189,7 @@ let pp_manager_operation_contents_and_result ppf
       Manager_operation_result
         {balance_updates; operation_result; internal_operation_results} ) =
   let pp_big_map_diff = function
-    | None | Some [] ->
-        ()
+    | None | Some [] -> ()
     | Some diff ->
         Format.fprintf
           ppf
@@ -203,32 +199,32 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_transaction_result
       (Transaction_result
-        { balance_updates;
+        {
+          balance_updates;
           consumed_gas;
           storage;
           originated_contracts;
           storage_size;
           paid_storage_size_diff;
           big_map_diff;
-          allocated_destination_contract = _ }) =
-    ( match originated_contracts with
-    | [] ->
-        ()
+          allocated_destination_contract = _;
+        }) =
+    (match originated_contracts with
+    | [] -> ()
     | contracts ->
         Format.fprintf
           ppf
           "@,@[<v 2>Originated contracts:@,%a@]"
           (Format.pp_print_list Contract.pp)
-          contracts ) ;
-    ( match storage with
-    | None ->
-        ()
+          contracts) ;
+    (match storage with
+    | None -> ()
     | Some expr ->
         Format.fprintf
           ppf
           "@,@[<hv 2>Updated storage:@ %a@]"
           Michelson_v1_printer.print_expr
-          expr ) ;
+          expr) ;
     pp_big_map_diff big_map_diff ;
     if storage_size <> Z.zero then
       Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size) ;
@@ -239,8 +235,7 @@ let pp_manager_operation_contents_and_result ppf
         (Z.to_string paid_storage_size_diff) ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     match balance_updates with
-    | [] ->
-        ()
+    | [] -> ()
     | balance_updates ->
         Format.fprintf
           ppf
@@ -250,21 +245,22 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_origination_result
       (Origination_result
-        { big_map_diff;
+        {
+          big_map_diff;
           balance_updates;
           consumed_gas;
           originated_contracts;
           storage_size;
-          paid_storage_size_diff }) =
-    ( match originated_contracts with
-    | [] ->
-        ()
+          paid_storage_size_diff;
+        }) =
+    (match originated_contracts with
+    | [] -> ()
     | contracts ->
         Format.fprintf
           ppf
           "@,@[<v 2>Originated contracts:@,%a@]"
           (Format.pp_print_list Contract.pp)
-          contracts ) ;
+          contracts) ;
     if storage_size <> Z.zero then
       Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string storage_size) ;
     pp_big_map_diff big_map_diff ;
@@ -275,8 +271,7 @@ let pp_manager_operation_contents_and_result ppf
         (Z.to_string paid_storage_size_diff) ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     match balance_updates with
-    | [] ->
-        ()
+    | [] -> ()
     | balance_updates ->
         Format.fprintf
           ppf
@@ -287,10 +282,8 @@ let pp_manager_operation_contents_and_result ppf
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
     match result with
-    | Skipped _ ->
-        Format.fprintf ppf "This operation was skipped"
-    | Failed (_, _errs) ->
-        Format.fprintf ppf "This operation FAILED."
+    | Skipped _ -> Format.fprintf ppf "This operation was skipped"
+    | Failed (_, _errs) -> Format.fprintf ppf "This operation FAILED."
     | Applied (Reveal_result {consumed_gas}) ->
         Format.fprintf ppf "This revelation was successfully applied" ;
         Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
@@ -343,15 +336,14 @@ let pp_manager_operation_contents_and_result ppf
     Gas.Arith.pp_integral
     gas_limit
     (Z.to_string storage_limit) ;
-  ( match balance_updates with
-  | [] ->
-      ()
+  (match balance_updates with
+  | [] -> ()
   | balance_updates ->
       Format.fprintf
         ppf
         "@,Balance updates:@,  %a"
         pp_balance_updates
-        balance_updates ) ;
+        balance_updates) ;
   Format.fprintf
     ppf
     "@,%a"
@@ -360,9 +352,8 @@ let pp_manager_operation_contents_and_result ppf
        false
        pp_result)
     (operation, operation_result) ;
-  ( match internal_operation_results with
-  | [] ->
-      ()
+  (match internal_operation_results with
+  | [] -> ()
   | _ :: _ ->
       Format.fprintf
         ppf
@@ -374,7 +365,7 @@ let pp_manager_operation_contents_and_result ppf
                pp_result
                ppf
                (op.operation, res)))
-        internal_operation_results ) ;
+        internal_operation_results) ;
   Format.fprintf ppf "@]"
 
 let rec pp_contents_and_result_list :
@@ -427,8 +418,7 @@ let rec pp_contents_and_result_list :
         (Operation.hash op2)
         pp_balance_updates
         bus
-  | Single_and_result (Activate_account {id; _}, Activate_account_result bus)
-    ->
+  | Single_and_result (Activate_account {id; _}, Activate_account_result bus) ->
       Format.fprintf
         ppf
         "@[<v 2>Genesis account activation:@,\

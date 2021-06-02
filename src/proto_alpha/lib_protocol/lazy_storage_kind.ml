@@ -109,10 +109,8 @@ module MakeId (Title : Title) : TitleWithId = struct
       let construct = Z.to_string in
       let destruct hash =
         match Z.of_string hash with
-        | exception _ ->
-            Error rpc_arg_error
-        | id ->
-            Ok id
+        | exception _ -> Error rpc_arg_error
+        | id -> Ok id
       in
       RPC_arg.make ~descr:description ~name ~construct ~destruct ()
 
@@ -149,10 +147,8 @@ module MakeId (Title : Title) : TitleWithId = struct
     let to_path z l = Z.to_string z :: l
 
     let of_path = function
-      | [] | _ :: _ :: _ ->
-          None
-      | [z] ->
-          Some (Z.of_string z)
+      | [] | _ :: _ :: _ -> None
+      | [z] -> Some (Z.of_string z)
   end
 
   module IdSet = Set.Make (Id)
@@ -241,14 +237,10 @@ let equal :
     (i1, a1, u1) t -> (i2, a2, u2) t -> (i1 * a1 * u1, i2 * a2 * u2) cmp =
  fun k1 k2 ->
   match (k1, k2) with
-  | (Big_map, Big_map) ->
-      Eq
-  | (Sapling_state, Sapling_state) ->
-      Eq
-  | (Big_map, _) ->
-      Neq
-  | (_, Big_map) ->
-      Neq
+  | (Big_map, Big_map) -> Eq
+  | (Sapling_state, Sapling_state) -> Eq
+  | (Big_map, _) -> Neq
+  | (_, Big_map) -> Neq
 
 type ('i, 'a, 'u) kind = ('i, 'a, 'u) t
 
@@ -259,17 +251,13 @@ module Temp_ids = struct
   }
 
   let init =
-    {
-      big_map = Big_map.Id.Temp.init;
-      sapling_state = Sapling_state.Id.Temp.init;
-    }
+    {big_map = Big_map.Id.Temp.init; sapling_state = Sapling_state.Id.Temp.init}
 
   (* Remove me after Granada *)
   let threshold_for_edo_florence_dangling_lazy_storage_cleanup =
     {
       big_map =
-        Big_map.Id.Temp
-        .threshold_for_edo_florence_dangling_lazy_storage_cleanup;
+        Big_map.Id.Temp.threshold_for_edo_florence_dangling_lazy_storage_cleanup;
       sapling_state =
         Sapling_state.Id.Temp
         .threshold_for_edo_florence_dangling_lazy_storage_cleanup;
@@ -282,9 +270,7 @@ module Temp_ids = struct
         let big_map = Big_map.Id.Temp.next temp_ids.big_map in
         ({temp_ids with big_map}, (temp_ids.big_map :> Big_map.Id.t))
     | Sapling_state ->
-        let sapling_state =
-          Sapling_state.Id.Temp.next temp_ids.sapling_state
-        in
+        let sapling_state = Sapling_state.Id.Temp.next temp_ids.sapling_state in
         ( {temp_ids with sapling_state},
           (temp_ids.sapling_state :> Sapling_state.Id.t) )
    [@@coq_axiom_with_reason "gadt"]
@@ -324,8 +310,7 @@ module IdSet = struct
 
   let mem (type i a u) (kind : (i, a, u) kind) (id : i) set =
     match (kind, set) with
-    | (Big_map, {big_map}) ->
-        Big_map.IdSet.mem id big_map
+    | (Big_map, {big_map}) -> Big_map.IdSet.mem id big_map
     | (Sapling_state, {sapling_state}) ->
         Sapling_state.IdSet.mem id sapling_state
 
@@ -348,8 +333,7 @@ module IdSet = struct
   let fold (type i a u) (kind : (i, a, u) kind) (f : i -> 'acc -> 'acc) set
       (acc : 'acc) =
     match (kind, set) with
-    | (Big_map, {big_map}) ->
-        Big_map.IdSet.fold f big_map acc
+    | (Big_map, {big_map}) -> Big_map.IdSet.fold f big_map acc
     | (Sapling_state, {sapling_state}) ->
         Sapling_state.IdSet.fold f sapling_state acc
 

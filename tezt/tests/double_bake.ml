@@ -84,13 +84,10 @@ let wait_for_denunciation accuser =
 let wait_for_denunciation_injection node client oph_promise =
   let filter json =
     match
-      JSON.(
-        json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
+      JSON.(json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
     with
-    | Some s when s = "inject" ->
-        Some s
-    | Some _ | None ->
-        None
+    | Some s when s = "inject" -> Some s
+    | Some _ | None -> None
   in
   let* _ = Node.wait_for node "node_prevalidator.v0" filter in
   let* oph = oph_promise in

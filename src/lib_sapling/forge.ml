@@ -49,8 +49,7 @@ module Input = struct
   let get state pos vk =
     let (existing_cm, cipher) = S.get state pos in
     match of_ciphertext ~pos cipher vk with
-    | None ->
-        None
+    | None -> None
     | Some (memo, forge_input) ->
         if check_cm forge_input existing_cm then Some (memo, forge_input)
         else None
@@ -58,8 +57,7 @@ module Input = struct
   let get_out state pos ovk =
     let (existing_cm, cipher) = S.get state pos in
     match of_ciphertext_out ~pos cipher ovk existing_cm with
-    | None ->
-        None
+    | None -> None
     | Some (memo, forge_input) ->
         if check_cm forge_input existing_cm then Some (memo, forge_input)
         else None
@@ -107,8 +105,8 @@ let create_dummy_inputs n state anti_replay ctx =
     let root = S.get_root state in
     WithExceptions.Result.get_ok ~loc:__LOC__
     @@ (* n is checked above *)
-       List.init ~when_negative_length:() n (fun _ ->
-           dummy_input anti_replay ctx dummy_witness root)
+    List.init ~when_negative_length:() n (fun _ ->
+        dummy_input anti_replay ctx dummy_witness root)
   else []
 
 let dummy_output pctx ~memo_size =
@@ -182,10 +180,10 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
           (fun forge_output ->
             let rcm = Core.Rcm.random () in
             (* encryption of the ciphertext containing diversifier, amount,
-              commitment randomness, natural language memo *)
+               commitment randomness, natural language memo *)
             (* the encoding of the amount to string is done by default in decimal.
-              We fill the bigstring with 0s to get it at a length of 22
-              which is enough to hold 2^64 *)
+               We fill the bigstring with 0s to get it at a length of 22
+               which is enough to hold 2^64 *)
             let open Core.Forge.Output in
             let esk = Core.DH.esk_random () in
             let (cv_o, proof_o) =
@@ -196,9 +194,7 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
                 rcm
                 ~amount:forge_output.amount
             in
-            let (ciphertext, cm) =
-              to_ciphertext forge_output cv_o vk rcm esk
-            in
+            let (ciphertext, cm) = to_ciphertext forge_output cv_o vk rcm esk in
             Core.UTXO.{cm; proof_o; ciphertext})
           forge_outputs
       in
@@ -222,8 +218,8 @@ let forge_transaction ?(number_dummy_inputs = 0) ?(number_dummy_outputs = 0)
       let dummy_outputs =
         WithExceptions.Result.get_ok ~loc:__LOC__
         @@ (* checked at entrance of function *)
-           List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
-               dummy_output ctx ~memo_size)
+        List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
+            dummy_output ctx ~memo_size)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =
@@ -241,8 +237,8 @@ let forge_shield_transaction ?(number_dummy_inputs = 0)
   if number_dummy_inputs < 0 then
     raise
       (Invalid_argument
-         "Tezos_sapling.Forge.forge_shield_transaction: number_dummy_inputs \
-          is negative") ;
+         "Tezos_sapling.Forge.forge_shield_transaction: number_dummy_inputs is \
+          negative") ;
   if number_dummy_outputs < 0 then
     raise
       (Invalid_argument
@@ -261,10 +257,10 @@ let forge_shield_transaction ?(number_dummy_inputs = 0)
           (fun forge_output ->
             let rcm = Core.Rcm.random () in
             (* encryption of the ciphertext containing diversifier, amount,
-              commitment randomness, natural language memo *)
+               commitment randomness, natural language memo *)
             (* the encoding of the amount to string is done by default in decimal.
-              We fill the bigstring with 0s to get it at a length of 22
-              which is enough to hold 2^64 *)
+               We fill the bigstring with 0s to get it at a length of 22
+               which is enough to hold 2^64 *)
             let open Core.Forge.Output in
             let esk = Core.DH.esk_random () in
             let (cv_o, proof_o) =
@@ -294,8 +290,8 @@ let forge_shield_transaction ?(number_dummy_inputs = 0)
       let dummy_outputs =
         WithExceptions.Result.get_ok ~loc:__LOC__
         @@ (* checked at entrance of function *)
-           List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
-               dummy_output ctx ~memo_size)
+        List.init ~when_negative_length:() number_dummy_outputs (fun _ ->
+            dummy_output ctx ~memo_size)
       in
       let outputs = real_outputs @ dummy_outputs in
       let binding_sig =

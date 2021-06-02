@@ -49,8 +49,7 @@ let of_string s =
         name
         (String.length s)
         size
-  | Some h ->
-      Ok h
+  | Some h -> Ok h
 
 let of_string_exn s =
   match of_string_opt s with
@@ -61,8 +60,7 @@ let of_string_exn s =
         name
         (String.length s)
         size
-  | Some h ->
-      h
+  | Some h -> h
 
 let to_string s = s
 
@@ -88,15 +86,12 @@ let of_bytes_exn b =
           size
       in
       raise (Invalid_argument msg)
-  | Some h ->
-      h
+  | Some h -> h
 
 let of_bytes s =
   match of_bytes_opt s with
-  | Some x ->
-      Ok x
-  | None ->
-      generic_error "Failed to deserialize a hash (%s)" name
+  | Some x -> Ok x
+  | None -> generic_error "Failed to deserialize a hash (%s)" name
 
 let to_bytes = Bytes.of_string
 

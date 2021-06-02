@@ -58,8 +58,8 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
         Lwt.return
         @@ Invalid
              (Format.asprintf
-                "Light mode: endpoint %s failed to provide merkle tree for \
-                 key %s. Error is: %a"
+                "Light mode: endpoint %s failed to provide merkle tree for key \
+                 %s. Error is: %a"
                 (Uri.to_string uri)
                 (Internal.key_to_string key)
                 pp_print_error
@@ -72,34 +72,32 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
                 (Uri.to_string uri)
                 (Internal.key_to_string key))
     | Ok (Some mtree) -> (
-      match Internal.Merkle.trees_shape_match key data_tree mtree with
-      | Error errors ->
-          assert (errors <> []) ;
-          Lwt.return
-          @@ Invalid
-               Format.(
-                 asprintf
-                   "@[<v 0>Shape of Merkle tree provided by endpoint %a \
-                    doesn't match shape of data tree sent by the first \
-                    endpoint:@,\
-                    %a@]"
-                   Uri.pp
-                   uri
-                   (pp_print_list pp_print_string)
-                   errors)
-      | Ok () -> (
-          Merkle.contains_merkle_tree store_tree mtree
-          >>= function
-          | Ok _ ->
-              Lwt.return Valid
-          | Error err ->
-              Lwt.return
-              @@ Invalid
-                   (Format.sprintf
-                      "When checking that local in-memory tree contains the \
-                       merkle tree provided by endpoint %s: %s"
-                      (Uri.to_string uri)
-                      err) ) )
+        match Internal.Merkle.trees_shape_match key data_tree mtree with
+        | Error errors ->
+            assert (errors <> []) ;
+            Lwt.return
+            @@ Invalid
+                 Format.(
+                   asprintf
+                     "@[<v 0>Shape of Merkle tree provided by endpoint %a \
+                      doesn't match shape of data tree sent by the first \
+                      endpoint:@,\
+                      %a@]"
+                     Uri.pp
+                     uri
+                     (pp_print_list pp_print_string)
+                     errors)
+        | Ok () -> (
+            Merkle.contains_merkle_tree store_tree mtree >>= function
+            | Ok _ -> Lwt.return Valid
+            | Error err ->
+                Lwt.return
+                @@ Invalid
+                     (Format.sprintf
+                        "When checking that local in-memory tree contains the \
+                         merkle tree provided by endpoint %s: %s"
+                        (Uri.to_string uri)
+                        err)))
 
   let count_valids validations =
     let count_valid = function Valid -> 1 | Invalid _ -> 0 in
@@ -113,10 +111,8 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
     Lwt_list.iter_s
       (fun v ->
         match v with
-        | Valid ->
-            Lwt.return_unit
-        | Invalid errmsg ->
-            printer#warning "%s\n" errmsg)
+        | Valid -> Lwt.return_unit
+        | Invalid errmsg -> printer#warning "%s\n" errmsg)
       validations
 
   let consensus
@@ -144,9 +140,8 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
     (* +1 because the endpoint that provided data obviously agrees *)
     let nb_agreements = count_valids validations + 1 in
     let agreement_reached = nb_agreements >= min_agreeing_endpoints in
-    warn_invalids printer validations
-    >>= fun () ->
-    ( if agreement_reached then Lwt.return_unit
+    warn_invalids printer validations >>= fun () ->
+    (if agreement_reached then Lwt.return_unit
     else
       printer#warning
         "Light mode: min_agreement=%f, %d endpoints, %s%d agreeing endpoints, \
@@ -157,6 +152,6 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
         nb_agreements
         min_agreeing_endpoints
         nb_endpoints
-        min_agreement )
+        min_agreement)
     >>= fun () -> return agreement_reached
 end

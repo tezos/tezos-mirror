@@ -59,16 +59,13 @@ module Test_contract_repr = struct
     in
     Contract_hash.hash_bytes [data]
 
-  let dummy_implicit_contract =
-    implicit_contract Signature.Public_key_hash.zero
+  let dummy_implicit_contract = implicit_contract Signature.Public_key_hash.zero
 
-  let dummy_originated_contract =
-    originated_contract @@ dummy_origination_nonce
+  let dummy_originated_contract = originated_contract @@ dummy_origination_nonce
 
   let test_implicit () =
     match is_implicit dummy_implicit_contract with
-    | Some _ ->
-        return_unit
+    | Some _ -> return_unit
     | None ->
         failwith
           "must have returned the public key hash of implicit contract. \n\
@@ -77,15 +74,12 @@ module Test_contract_repr = struct
   (** Check if [is_implicit] catches a non-implicit (originated) contract and returns None *)
   let test_not_implicit () =
     match is_implicit dummy_originated_contract with
-    | None ->
-        return_unit
-    | Some _ ->
-        failwith "must have returned the None. Instead, returned Some _"
+    | None -> return_unit
+    | Some _ -> failwith "must have returned the None. Instead, returned Some _"
 
   let test_originated () =
     match is_originated dummy_originated_contract with
-    | Some _ ->
-        return_unit
+    | Some _ -> return_unit
     | None ->
         failwith
           "must have returned the origination nonce correctly. Instead \
@@ -93,10 +87,8 @@ module Test_contract_repr = struct
 
   let test_not_originated () =
     match is_originated dummy_implicit_contract with
-    | None ->
-        return_unit
-    | Some _ ->
-        failwith "must have returned the None. Instead, returned Some _"
+    | None -> return_unit
+    | Some _ -> failwith "must have returned the None. Instead, returned Some _"
 
   let test_to_b58check_implicit () =
     Assert.equal
@@ -119,10 +111,8 @@ module Test_contract_repr = struct
   let test_originated_contracts_basic () =
     let since = dummy_origination_nonce in
     let rec incr_n_times nonce = function
-      | 0 ->
-          nonce
-      | n ->
-          incr_n_times (Contract_repr.incr_origination_nonce nonce) (n - 1)
+      | 0 -> nonce
+      | n -> incr_n_times (Contract_repr.incr_origination_nonce nonce) (n - 1)
     in
     let until = incr_n_times since 5 in
     let contracts = originated_contracts ~since ~until in
@@ -130,7 +120,8 @@ module Test_contract_repr = struct
 end
 
 let tests =
-  [ tztest
+  [
+    tztest
       "Contract_repr.is_implicit: must correctly identify a valid implicit \
        contract"
       `Quick
@@ -146,8 +137,8 @@ let tests =
       `Quick
       Test_contract_repr.test_originated;
     tztest
-      "Contract_repr.is_originated: must correctly return None for an \
-       implicit contract contract"
+      "Contract_repr.is_originated: must correctly return None for an implicit \
+       contract contract"
       `Quick
       Test_contract_repr.test_not_originated;
     tztest
@@ -164,4 +155,5 @@ let tests =
       "Contract_repr.to_b58check: must correctly stringify, b58check encoded, \
        an originated contract"
       `Quick
-      Test_contract_repr.test_to_b58check_originated ]
+      Test_contract_repr.test_to_b58check_originated;
+  ]

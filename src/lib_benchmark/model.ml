@@ -42,12 +42,10 @@ let rec elim_arities :
     type elt m1 m2 a. (elt, m1, a) arity -> (elt, m2, a) arity -> (m1, m2) eq =
   fun (type elt m1 m2 a) (ar1 : (elt, m1, a) arity) (ar2 : (elt, m2, a) arity) ->
    match (ar1, ar2) with
-   | (Zero_arity, Zero_arity) ->
-       (Eq : (m1, m2) eq)
+   | (Zero_arity, Zero_arity) -> (Eq : (m1, m2) eq)
    | (Succ_arity a1, Succ_arity a2) -> (
-     match elim_arities a1 a2 with Eq -> (Eq : (m1, m2) eq) )
-   | _ ->
-       .
+       match elim_arities a1 a2 with Eq -> (Eq : (m1, m2) eq))
+   | _ -> .
 
 (** Models are strongly typed: [Model_impl.arg_type] exposes what a model
     expects on input. The relation between [arg_type] and [model_type]
@@ -102,8 +100,7 @@ let apply_model : 'arg -> 'arg model -> applied =
          (int -> c X.repr) -> (c, a, b) arity -> a X.repr -> b -> c X.repr =
       fun conv arity f arg ->
        match arity with
-       | Zero_arity ->
-           f
+       | Zero_arity -> f
        | Succ_arity ar ->
            let (arg, rest) = arg in
            apply conv ar (X.app f (conv arg)) rest
@@ -129,8 +126,7 @@ module Instantiate (X : Costlang.S) (M : Model_impl) :
       (int -> c X.repr) -> (c, a, b) arity -> a X.repr -> b -> c X.repr =
    fun conv arity f arg ->
     match arity with
-    | Zero_arity ->
-        f
+    | Zero_arity -> f
     | Succ_arity ar ->
         let (arg, rest) = arg in
         apply conv ar (X.app f (conv arg)) rest
@@ -144,10 +140,8 @@ let make_preapplied ~model = Preapplied {model}
 
 let apply model workload =
   match model with
-  | Packaged {conv; model} ->
-      apply_model (conv workload) model
-  | Preapplied {model} ->
-      model workload
+  | Packaged {conv; model} -> apply_model (conv workload) model
+  | Preapplied {model} -> model workload
 
 let add_model : 'arg model -> 'arg model -> 'arg model =
   fun (type arg) ((module M1) : arg model) ((module M2) : arg model) ->
@@ -170,8 +164,7 @@ let add_model : 'arg model -> 'arg model -> 'arg model =
                  type a b. (size, a, b) arity -> a repr -> a repr -> a repr =
               fun arity m1 m2 ->
                match arity with
-               | Zero_arity ->
-                   (m1 + m2 : a repr)
+               | Zero_arity -> (m1 + m2 : a repr)
                | Succ_arity ar ->
                    lam ~name:"gensym" (fun x ->
                        let m1' = app m1 x in
@@ -189,8 +182,7 @@ let precompose : type a b. (a -> b) -> b t -> a t =
   | Packaged {conv; model} ->
       let conv x = conv (f x) in
       Packaged {conv; model}
-  | Preapplied {model} ->
-      Preapplied {model = (fun x -> model (f x))}
+  | Preapplied {model} -> Preapplied {model = (fun x -> model (f x))}
 
 (* -------------------------------------------------------------------------- *)
 (* Commonly used models *)
@@ -255,8 +247,8 @@ let affine ~intercept ~coeff =
       let arity = arity_1
 
       let model =
-        lam ~name:"size"
-        @@ fun size -> free ~name:intercept + (free ~name:coeff * size)
+        lam ~name:"size" @@ fun size ->
+        free ~name:intercept + (free ~name:coeff * size)
     end
   end in
   (module M : Model_impl with type arg_type = int * unit)
@@ -273,10 +265,8 @@ let affine_split_const ~intercept1 ~intercept2 ~coeff =
       let arity = arity_1
 
       let model =
-        lam ~name:"size"
-        @@ fun size ->
-        free ~name:intercept1 + free ~name:intercept2
-        + (free ~name:coeff * size)
+        lam ~name:"size" @@ fun size ->
+        free ~name:intercept1 + free ~name:intercept2 + (free ~name:coeff * size)
     end
   end in
   (module M : Model_impl with type arg_type = int * unit)
@@ -310,8 +300,7 @@ let nlogn ~intercept ~coeff =
       let arity = arity_1
 
       let model =
-        lam ~name:"size"
-        @@ fun size ->
+        lam ~name:"size" @@ fun size ->
         free ~name:intercept + (free ~name:coeff * (size * log2 (int 1 + size)))
     end
   end in
@@ -329,10 +318,8 @@ let linear_sum ~intercept ~coeff =
       let arity = arity_2
 
       let model =
-        lam ~name:"size1"
-        @@ fun size1 ->
-        lam ~name:"size2"
-        @@ fun size2 ->
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
         free ~name:intercept + (free ~name:coeff * (size1 + size2))
     end
   end in
@@ -350,10 +337,8 @@ let linear_max ~intercept ~coeff =
       let arity = arity_2
 
       let model =
-        lam ~name:"size1"
-        @@ fun size1 ->
-        lam ~name:"size2"
-        @@ fun size2 ->
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
         free ~name:intercept + (free ~name:coeff * max size1 size2)
     end
   end in
@@ -371,10 +356,8 @@ let linear_min ~intercept ~coeff =
       let arity = arity_2
 
       let model =
-        lam ~name:"size1"
-        @@ fun size1 ->
-        lam ~name:"size2"
-        @@ fun size2 ->
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
         free ~name:intercept + (free ~name:coeff * min size1 size2)
     end
   end in
@@ -392,10 +375,8 @@ let linear_mul ~intercept ~coeff =
       let arity = arity_2
 
       let model =
-        lam ~name:"size1"
-        @@ fun size1 ->
-        lam ~name:"size2"
-        @@ fun size2 ->
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
         free ~name:intercept + (free ~name:coeff * (size1 * size2))
     end
   end in
@@ -413,10 +394,8 @@ let bilinear ~coeff1 ~coeff2 =
       let arity = arity_2
 
       let model =
-        lam ~name:"size1"
-        @@ fun size1 ->
-        lam ~name:"size2"
-        @@ fun size2 ->
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
         (free ~name:coeff1 * size1) + (free ~name:coeff2 * size2)
     end
   end in
@@ -434,10 +413,8 @@ let bilinear_affine ~intercept ~coeff1 ~coeff2 =
       let arity = arity_2
 
       let model =
-        lam ~name:"size1"
-        @@ fun size1 ->
-        lam ~name:"size2"
-        @@ fun size2 ->
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
         free ~name:intercept
         + (free ~name:coeff1 * size1)
         + (free ~name:coeff2 * size2)
@@ -457,10 +434,8 @@ let nlogm ~intercept ~coeff =
       let arity = arity_2
 
       let model =
-        lam ~name:"size1"
-        @@ fun size1 ->
-        lam ~name:"size2"
-        @@ fun size2 ->
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
         free ~name:intercept
         + (free ~name:coeff * (size1 * log2 (int 1 + size2)))
     end
@@ -479,12 +454,9 @@ let trilinear ~coeff1 ~coeff2 ~coeff3 =
       let arity = arity_3
 
       let model =
-        lam ~name:"size1"
-        @@ fun size1 ->
-        lam ~name:"size2"
-        @@ fun size2 ->
-        lam ~name:"size3"
-        @@ fun size3 ->
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
+        lam ~name:"size3" @@ fun size3 ->
         (free ~name:coeff1 * size1)
         + (free ~name:coeff2 * size2)
         + (free ~name:coeff3 * size3)
@@ -506,8 +478,7 @@ let breakdown ~coeff1 ~coeff2 ~break =
       let arity = arity_1
 
       let model =
-        lam ~name:"size"
-        @@ fun size ->
+        lam ~name:"size" @@ fun size ->
         (free ~name:coeff1 * max (int 0) (min (int break) size))
         + (free ~name:coeff2 * max (int 0) (size - int break))
     end
@@ -530,8 +501,7 @@ let breakdown2 ~coeff1 ~coeff2 ~coeff3 ~break1 ~break2 =
       let arity = arity_1
 
       let model =
-        lam ~name:"size"
-        @@ fun size ->
+        lam ~name:"size" @@ fun size ->
         (free ~name:coeff1 * max (int 0) (min (int break1) size))
         + (free ~name:coeff2 * max (int 0) (min (int break2) size - int break1))
         + (free ~name:coeff3 * max (int 0) (size - int break2))
@@ -553,8 +523,7 @@ let breakdown2_const ~coeff1 ~coeff2 ~coeff3 ~const ~break1 ~break2 =
       let arity = arity_1
 
       let model =
-        lam ~name:"size"
-        @@ fun size ->
+        lam ~name:"size" @@ fun size ->
         (free ~name:coeff1 * max (int 0) (min (int break1) size))
         + (free ~name:coeff2 * max (int 0) (min (int break2) size - int break1))
         + (free ~name:coeff3 * max (int 0) (size - int break2))

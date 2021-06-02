@@ -50,8 +50,7 @@ let current_slots_tag =
 
 let future_slots_tag =
   Tag.def
-    ~doc:
-      "Number of baking slots in the foreseeable future but not yet bakeable"
+    ~doc:"Number of baking slots in the foreseeable future but not yet bakeable"
     "future_slots"
     Format.pp_print_int
 

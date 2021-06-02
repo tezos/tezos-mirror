@@ -46,21 +46,15 @@ let check_invariants ?(expected_checkpoint = None) ?(expected_savepoint = None)
   Lwt.catch
     (fun () ->
       let open Store in
-      Chain.current_head chain_store
-      >>= fun current_head ->
-      Chain.checkpoint chain_store
-      >>= fun checkpoint ->
-      ( match expected_savepoint with
-      | Some savepoint ->
-          Lwt.return savepoint
-      | None ->
-          Chain.savepoint chain_store )
+      Chain.current_head chain_store >>= fun current_head ->
+      Chain.checkpoint chain_store >>= fun checkpoint ->
+      (match expected_savepoint with
+      | Some savepoint -> Lwt.return savepoint
+      | None -> Chain.savepoint chain_store)
       >>= fun savepoint ->
-      ( match expected_caboose with
-      | Some caboose ->
-          Lwt.return caboose
-      | None ->
-          Chain.caboose chain_store )
+      (match expected_caboose with
+      | Some caboose -> Lwt.return caboose
+      | None -> Chain.caboose chain_store)
       >>= fun caboose ->
       Format.eprintf
         "head %ld - savepoint %ld - checkpoint %ld - caboose %ld@."
@@ -68,20 +62,15 @@ let check_invariants ?(expected_checkpoint = None) ?(expected_savepoint = None)
         (snd savepoint)
         (snd checkpoint)
         (snd caboose) ;
-      Block.get_block_metadata_opt chain_store current_head
-      >>= (function
-            | None ->
-                Assert.fail_msg
-                  "check_invariant: could not find head's metadata"
-            | Some metadata ->
-                Lwt.return metadata)
+      (Block.get_block_metadata_opt chain_store current_head >>= function
+       | None ->
+           Assert.fail_msg "check_invariant: could not find head's metadata"
+       | Some metadata -> Lwt.return metadata)
       >>= fun head_metadata ->
       let expected_checkpoint_level =
         match expected_checkpoint with
-        | Some l ->
-            snd l
-        | None ->
-            Block.last_allowed_fork_level head_metadata
+        | Some l -> snd l
+        | None -> Block.last_allowed_fork_level head_metadata
       in
       Assert.is_true
         ~msg:
@@ -95,36 +84,29 @@ let check_invariants ?(expected_checkpoint = None) ?(expected_savepoint = None)
       >>= fun savepoint_b_opt ->
       Block.read_block_metadata chain_store (fst savepoint)
       >>=? fun savepoint_metadata_opt ->
-      ( match (savepoint_b_opt, savepoint_metadata_opt) with
-      | (Some _, Some _) ->
-          Lwt.return_unit
+      (match (savepoint_b_opt, savepoint_metadata_opt) with
+      | (Some _, Some _) -> Lwt.return_unit
       | (Some _, None) ->
-          Assert.fail_msg
-            "check_invariant: could not find savepoint's metadata"
-      | _ ->
-          Assert.fail_msg "check_invariant: could not find savepoint block" )
+          Assert.fail_msg "check_invariant: could not find savepoint's metadata"
+      | _ -> Assert.fail_msg "check_invariant: could not find savepoint block")
       >>= fun () ->
-      Block.read_block_opt chain_store (fst caboose)
-      >>= fun caboose_b_opt ->
+      Block.read_block_opt chain_store (fst caboose) >>= fun caboose_b_opt ->
       Block.read_block_metadata chain_store (fst caboose)
       >>=? fun caboose_metadata_opt ->
       match (caboose_b_opt, caboose_metadata_opt) with
-      | (Some _, (Some _ | None)) ->
-          return_unit
+      | (Some _, (Some _ | None)) -> return_unit
       | (None, _) ->
           Format.eprintf "caboose lvl : %ld@." (snd caboose) ;
           Assert.fail_msg "check_invariant: could not find the caboose block")
     (fun exn ->
-      Store.make_pp_chain_store chain_store
-      >>= fun pp ->
+      Store.make_pp_chain_store chain_store >>= fun pp ->
       Format.printf "DEBUG CHAIN STORE: %a@." pp () ;
       Lwt.fail exn)
 
 let dummy_patch_context ctxt =
   let open Tezos_context in
   let open Tezos_protocol_alpha in
-  Context.add ctxt ["version"] (Bytes.of_string "genesis")
-  >>= fun ctxt ->
+  Context.add ctxt ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
   let open Tezos_protocol_alpha_parameters in
   let proto_params =
     let json =
@@ -133,8 +115,7 @@ let dummy_patch_context ctxt =
     in
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
-  Context.add ctxt ["protocol_parameters"] proto_params
-  >>= fun ctxt ->
+  Context.add ctxt ["protocol_parameters"] proto_params >>= fun ctxt ->
   let ctxt = Tezos_shell_context.Shell_context.wrap_disk_context ctxt in
   Protocol.Main.init
     ctxt
@@ -149,8 +130,7 @@ let dummy_patch_context ctxt =
       context = Context_hash.zero;
     }
   >>= fun res ->
-  Lwt.return (Protocol.Environment.wrap_tzresult res)
-  >>=? fun {context; _} ->
+  Lwt.return (Protocol.Environment.wrap_tzresult res) >>=? fun {context; _} ->
   return (Tezos_shell_context.Shell_context.unwrap_disk_context context)
 
 let wrap_store_init ?(patch_context = dummy_patch_context)
@@ -162,8 +142,8 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
     else
       let base_dir = Filename.temp_file prefix_dir "" in
       Format.printf "temp dir: %s@." base_dir ;
-      Lwt_unix.unlink base_dir
-      >>= fun () -> Lwt_unix.mkdir base_dir 0o700 >>= fun () -> f base_dir
+      Lwt_unix.unlink base_dir >>= fun () ->
+      Lwt_unix.mkdir base_dir 0o700 >>= fun () -> f base_dir
   in
   run (fun base_dir ->
       let store_dir = base_dir // "store" in
@@ -178,18 +158,14 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
       >>=? fun store ->
       protect
         ~on_error:(fun err ->
-          Store.make_pp_store store
-          >>= fun pp_store ->
+          Store.make_pp_store store >>= fun pp_store ->
           Format.eprintf "@[<v>DEBUG:@ %a@]@." pp_store () ;
           Store.close_store store >>= fun () -> Lwt.return (Error err))
         (fun () ->
-          k (store_dir, context_dir) store
-          >>=? fun () ->
+          k (store_dir, context_dir) store >>=? fun () ->
           Format.printf "Invariants check before closing@." ;
-          check_invariants (Store.main_chain_store store)
-          >>=? fun () ->
-          Store.close_store store
-          >>= fun () ->
+          check_invariants (Store.main_chain_store store) >>=? fun () ->
+          Store.close_store store >>= fun () ->
           Store.init
             ~history_mode
             ~store_dir
@@ -206,8 +182,7 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
   | Error err ->
       Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
       Lwt.fail Alcotest.Test_error
-  | Ok r ->
-      Lwt.return r
+  | Ok r -> Lwt.return r
 
 let wrap_test ?history_mode ?(speed = `Quick) ?patch_context ?keep_dir (name, f)
     =
@@ -224,8 +199,8 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
     if not keep_dir then Lwt_utils_unix.with_tempdir prefix_dir f
     else
       let base_dir = Filename.temp_file prefix_dir "" in
-      Lwt_unix.unlink base_dir
-      >>= fun () -> Lwt_unix.mkdir base_dir 0o700 >>= fun () -> f base_dir
+      Lwt_unix.unlink base_dir >>= fun () ->
+      Lwt_unix.mkdir base_dir 0o700 >>= fun () -> f base_dir
   in
   run (fun base_dir ->
       let store_dir = base_dir // "store" in
@@ -249,8 +224,7 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
   | Error err ->
       Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
       Lwt.fail Alcotest.Test_error
-  | Ok () ->
-      Lwt.return_unit
+  | Ok () -> Lwt.return_unit
 
 let wrap_simple_store_init_test ?history_mode ?(speed = `Quick) ?patch_context
     ?keep_dir (name, f) =
@@ -294,10 +268,8 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
   in
   let last_allowed_fork_level =
     match min_lafl with
-    | Some min_lafl ->
-        Compare.Int32.max min_lafl last_allowed_fork_level
-    | None ->
-        last_allowed_fork_level
+    | Some min_lafl -> Compare.Int32.max min_lafl last_allowed_fork_level
+    | None -> last_allowed_fork_level
   in
   let metadata =
     Some
@@ -364,16 +336,14 @@ let store_raw_block chain_store (raw_block : Block_repr.t) =
     ~operations:(Block_repr.operations raw_block)
     validation_result
   >>= function
-  | Ok (Some block) ->
-      return block
+  | Ok (Some block) -> return block
   | Ok None ->
       Alcotest.failf
         "store_raw_block: could not store block %a (%ld)"
         Block_hash.pp
         (Block_repr.hash raw_block)
         (Block_repr.level raw_block)
-  | Error _ as err ->
-      Lwt.return err
+  | Error _ as err -> Lwt.return err
 
 let set_block_predecessor blk pred_hash =
   let open Block_repr in
@@ -391,8 +361,8 @@ let set_block_predecessor blk pred_hash =
       };
   }
 
-let make_raw_block_list ?min_lafl ?constants ?max_operations_ttl
-    ?(kind = `Full) (pred_hash, pred_level) n =
+let make_raw_block_list ?min_lafl ?constants ?max_operations_ttl ?(kind = `Full)
+    (pred_hash, pred_level) n =
   List.fold_left
     (fun ((pred_hash, pred_level), acc) _ ->
       let raw_block =
@@ -403,8 +373,7 @@ let make_raw_block_list ?min_lafl ?constants ?max_operations_ttl
           (pred_hash, pred_level)
       in
       if kind = `Pruned then prune_block raw_block ;
-      ( (Block_repr.hash raw_block, Block_repr.level raw_block),
-        raw_block :: acc ))
+      ((Block_repr.hash raw_block, Block_repr.level raw_block), raw_block :: acc))
     ((pred_hash, pred_level), [])
     (1 -- n)
   |> snd
@@ -412,18 +381,15 @@ let make_raw_block_list ?min_lafl ?constants ?max_operations_ttl
   let blk = List.hd l |> WithExceptions.Option.get ~loc:__LOC__ in
   Lwt.return (List.rev l, blk)
 
-let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root
-    ?(kind = `Full) ?(should_set_head = false) ?(should_commit = false)
-    chain_store n =
-  ( match root with
-  | Some (bh, bl) ->
-      Lwt.return (bh, bl)
+let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
+    ?(should_set_head = false) ?(should_commit = false) chain_store n =
+  (match root with
+  | Some (bh, bl) -> Lwt.return (bh, bl)
   | None ->
-      Store.Chain.current_head chain_store
-      >>= fun block -> Lwt.return (Store.Block.descriptor block) )
+      Store.Chain.current_head chain_store >>= fun block ->
+      Lwt.return (Store.Block.descriptor block))
   >>= fun root ->
-  Store.Block.read_block chain_store (fst root)
-  >>=? fun root_b ->
+  Store.Block.read_block chain_store (fst root) >>=? fun root_b ->
   Tezos_context.Context.checkout
     (Store.context_index (Store.Chain.global_store chain_store))
     (Store.Block.context_hash root_b)
@@ -432,51 +398,49 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root
   >>= fun (blocks, _last) ->
   List.fold_left_es
     (fun (ctxt_opt, last_opt, blocks) b ->
-      ( if should_commit then
-        let open Tezos_context in
-        let ctxt = WithExceptions.Option.get ~loc:__LOC__ ctxt_opt in
-        Tezos_context.Context.add
-          ctxt
-          ["level"]
-          (Bytes.of_string (Format.asprintf "%ld" (Block_repr.level b)))
-        >>= fun ctxt ->
-        Context.commit ~time:Time.Protocol.epoch ctxt
-        >>= fun ctxt_hash ->
-        let predecessor =
-          Option.value ~default:(Block_repr.predecessor b) last_opt
-        in
-        let shell =
-          {
-            b.contents.header.Block_header.shell with
-            context = ctxt_hash;
-            predecessor;
-          }
-        in
-        let header =
-          {Block_header.shell; protocol_data = b.contents.header.protocol_data}
-        in
-        let hash = Block_header.hash header in
-        return
-          ( Some ctxt,
-            Some hash,
-            {
-              Block_repr.hash;
-              contents =
-                {
-                  header;
-                  operations = b.contents.operations;
-                  block_metadata_hash = None;
-                  operations_metadata_hashes = None;
-                };
-              metadata = b.metadata;
-            } )
-      else return (ctxt_opt, last_opt, b) )
+      (if should_commit then
+       let open Tezos_context in
+       let ctxt = WithExceptions.Option.get ~loc:__LOC__ ctxt_opt in
+       Tezos_context.Context.add
+         ctxt
+         ["level"]
+         (Bytes.of_string (Format.asprintf "%ld" (Block_repr.level b)))
+       >>= fun ctxt ->
+       Context.commit ~time:Time.Protocol.epoch ctxt >>= fun ctxt_hash ->
+       let predecessor =
+         Option.value ~default:(Block_repr.predecessor b) last_opt
+       in
+       let shell =
+         {
+           b.contents.header.Block_header.shell with
+           context = ctxt_hash;
+           predecessor;
+         }
+       in
+       let header =
+         {Block_header.shell; protocol_data = b.contents.header.protocol_data}
+       in
+       let hash = Block_header.hash header in
+       return
+         ( Some ctxt,
+           Some hash,
+           {
+             Block_repr.hash;
+             contents =
+               {
+                 header;
+                 operations = b.contents.operations;
+                 block_metadata_hash = None;
+                 operations_metadata_hashes = None;
+               };
+             metadata = b.metadata;
+           } )
+      else return (ctxt_opt, last_opt, b))
       >>=? fun (ctxt, last_opt, b) ->
-      store_raw_block chain_store b
-      >>=? fun b ->
-      ( if should_set_head then
-        Store.Chain.set_head chain_store b >>=? fun _ -> return_unit
-      else return_unit )
+      store_raw_block chain_store b >>=? fun b ->
+      (if should_set_head then
+       Store.Chain.set_head chain_store b >>=? fun _ -> return_unit
+      else return_unit)
       >>=? fun () -> return (ctxt, last_opt, b :: blocks))
     (ctxt_opt, None, [])
     blocks
@@ -499,8 +463,7 @@ let assert_presence_in_store ?(with_metadata = false) chain_store blocks =
   Lwt_list.iter_s
     (fun b ->
       let hash = Store.Block.hash b in
-      Store.Block.read_block_opt chain_store hash
-      >>= function
+      Store.Block.read_block_opt chain_store hash >>= function
       | None ->
           Format.eprintf "Block %a not present in store@." pp_block b ;
           Lwt.fail Alcotest.Test_error
@@ -511,17 +474,17 @@ let assert_presence_in_store ?(with_metadata = false) chain_store blocks =
             ~msg:"assert_presence: different header"
             b_header
             b'_header ;
-          ( if with_metadata then (
-            Store.Block.get_block_metadata_opt chain_store b
-            >>= fun b_metadata ->
-            Store.Block.get_block_metadata_opt chain_store b'
-            >>= fun b'_metadata ->
-            Assert.equal_metadata
-              b_metadata
-              b'_metadata
-              ~msg:"assert_presence: different metadata" ;
-            Lwt.return_unit )
-          else Lwt.return_unit )
+          (if with_metadata then (
+           Store.Block.get_block_metadata_opt chain_store b
+           >>= fun b_metadata ->
+           Store.Block.get_block_metadata_opt chain_store b'
+           >>= fun b'_metadata ->
+           Assert.equal_metadata
+             b_metadata
+             b'_metadata
+             ~msg:"assert_presence: different metadata" ;
+           Lwt.return_unit)
+          else Lwt.return_unit)
           >>= fun () -> Lwt.return_unit)
     blocks
   >>= fun () -> return_unit
@@ -529,19 +492,13 @@ let assert_presence_in_store ?(with_metadata = false) chain_store blocks =
 let assert_absence_in_store chain_store blocks =
   Lwt_list.iter_s
     (fun b ->
-      Store.Block.(read_block_opt chain_store (hash b))
-      >>= function
-      | None ->
-          Lwt.return_unit
+      Store.Block.(read_block_opt chain_store (hash b)) >>= function
+      | None -> Lwt.return_unit
       | Some b' ->
-          Store.Chain.current_head chain_store
-          >>= fun current_head ->
-          Store.Chain.checkpoint chain_store
-          >>= fun checkpoint ->
-          Store.Chain.savepoint chain_store
-          >>= fun savepoint ->
-          Store.Chain.caboose chain_store
-          >>= fun caboose ->
+          Store.Chain.current_head chain_store >>= fun current_head ->
+          Store.Chain.checkpoint chain_store >>= fun checkpoint ->
+          Store.Chain.savepoint chain_store >>= fun savepoint ->
+          Store.Chain.caboose chain_store >>= fun caboose ->
           Format.printf
             "head %ld - savepoint %ld - checkpoint %ld - caboose %ld@."
             (Store.Block.level current_head)
@@ -564,8 +521,8 @@ let assert_absence_in_store chain_store blocks =
   >>= fun () -> return_unit
 
 let set_head_by_level chain_store lvl =
-  Store.Block.read_block_by_level chain_store lvl
-  >>=? fun head -> Store.Chain.set_head chain_store head
+  Store.Block.read_block_by_level chain_store lvl >>=? fun head ->
+  Store.Chain.set_head chain_store head
 
 module Example_tree = struct
   (**********************************************************
@@ -589,10 +546,8 @@ module Example_tree = struct
       match
         List.combine ~when_different_lengths:(Failure "combine_exn") l1 l2
       with
-      | Ok x ->
-          x
-      | Error _ ->
-          assert false
+      | Ok x -> x
+      | Error _ -> assert false
     in
     let chain_store = Store.main_chain_store store in
     let main_chain = List.map (fun i -> Format.sprintf "A%d" i) (1 -- 8) in
@@ -602,9 +557,7 @@ module Example_tree = struct
       (fun b -> Store.Block.read_block_opt chain_store (Store.Block.hash b))
       blocks
     >>= fun main_blocks ->
-    let a2 =
-      List.nth main_blocks 2 |> WithExceptions.Option.get ~loc:__LOC__
-    in
+    let a2 = List.nth main_blocks 2 |> WithExceptions.Option.get ~loc:__LOC__ in
     let main_blocks = combine_exn main_chain main_blocks in
     let branch_chain = List.map (fun i -> Format.sprintf "B%d" i) (1 -- 8) in
     append_blocks
@@ -619,18 +572,19 @@ module Example_tree = struct
     >>= fun branch_blocks ->
     let branch_blocks = combine_exn branch_chain branch_blocks in
     let vtbl = Nametbl.create 17 in
-    Store.Chain.genesis_block chain_store
-    >>= fun genesis ->
+    Store.Chain.genesis_block chain_store >>= fun genesis ->
     Nametbl.add vtbl "Genesis" genesis ;
     List.iter (fun (k, b) -> Nametbl.add vtbl k b) (main_blocks @ branch_blocks) ;
-    assert_presence_in_store chain_store (blocks @ branch)
-    >>=? fun () -> return vtbl
+    assert_presence_in_store chain_store (blocks @ branch) >>=? fun () ->
+    return vtbl
 
   let rev_lookup block_hash tbl =
     Nametbl.fold
-      (fun k b -> function None ->
+      (fun k b -> function
+        | None ->
             if Block_hash.equal block_hash (Store.Block.hash b) then Some k
-            else None | x -> x)
+            else None
+        | x -> x)
       tbl
       None
     |> WithExceptions.Option.to_exn ~none:Not_found

@@ -50,16 +50,14 @@ type state = {
 
 let worker_loop state () =
   let rec inner sleep time_at_entry =
-    sleep
-    >>= fun () ->
+    sleep >>= fun () ->
     let sleep = Lwt_unix.sleep state.refresh_interval in
     let now = Mtime_clock.elapsed () in
     let elapsed = int_of_float Mtime.Span.(to_ms now -. to_ms time_at_entry) in
     Inttbl.iter
       (fun _ c ->
         c.average <-
-          (c.alpha * c.current / elapsed)
-          + ((1000 - c.alpha) * c.average / 1000) ;
+          (c.alpha * c.current / elapsed) + ((1000 - c.alpha) * c.average / 1000) ;
         c.current <- 0)
       state.counters ;
     List.iter (fun f -> f ()) state.update_hook ;

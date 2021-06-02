@@ -165,9 +165,7 @@ module type S = sig
 
   (** [filter_es] is [filter] where the predicate returns a promise of a [result]. *)
   val filter_es :
-    ('a -> (bool, 'e) result Lwt.t) ->
-    'a option ->
-    ('a option, 'e) result Lwt.t
+    ('a -> (bool, 'e) result Lwt.t) -> 'a option -> ('a option, 'e) result Lwt.t
 
   (** [filter_map_es] is [filter_map] where the function returns a promise of a [result]. *)
   val filter_map_es :

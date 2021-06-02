@@ -83,10 +83,8 @@ let may_inject (cctxt : #Protocol_client_context.full) location ~delegate level
     (fun (delegate', _) -> String.compare delegate delegate' = 0)
     highwatermark
   |> function
-  | None ->
-      return_true
-  | Some (_, past_level) ->
-      return Raw_level.(past_level < level)
+  | None -> return_true
+  | Some (_, past_level) -> return Raw_level.(past_level < level)
 
 let may_inject_block = may_inject
 
@@ -95,25 +93,22 @@ let may_inject_endorsement = may_inject
 let record (cctxt : #Protocol_client_context.full) location ~delegate level =
   let filename = Client_baking_files.filename location in
   let delegate = Signature.Public_key_hash.to_short_b58check delegate in
-  load_highwatermarks cctxt filename
-  >>=? fun highwatermarks ->
+  load_highwatermarks cctxt filename >>=? fun highwatermarks ->
   let level =
     match List.assoc_opt ~equal:String.equal delegate highwatermarks with
-    | None ->
-        level
-    | Some lower_prev_level when level >= lower_prev_level ->
-        level
-    | Some higher_prev_level ->
-        higher_prev_level
+    | None -> level
+    | Some lower_prev_level when level >= lower_prev_level -> level
+    | Some higher_prev_level -> higher_prev_level
     (* should only happen in `forced` mode *)
   in
   save_highwatermarks
     cctxt
     filename
-    ( (delegate, level)
-    :: List.filter
-         (fun (delegate', _) -> String.compare delegate delegate' <> 0)
-         highwatermarks )
+    ((delegate, level)
+     ::
+     List.filter
+       (fun (delegate', _) -> String.compare delegate delegate' <> 0)
+       highwatermarks)
 
 let record_block = record
 

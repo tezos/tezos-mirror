@@ -89,19 +89,23 @@ let load_embedded_cmis cmis = List.iter load_embedded_cmi cmis
 
 let tezos_protocol_env =
   let open Embedded_cmis in
-  [ ("CamlinternalFormatBasics", camlinternalFormatBasics_cmi);
+  [
+    ("CamlinternalFormatBasics", camlinternalFormatBasics_cmi);
     ("Tezos_protocol_environment_sigs", tezos_protocol_environment_sigs_cmi);
     ( "Tezos_protocol_environment_sigs__V0",
       tezos_protocol_environment_sigs__V0_cmi );
     ( "Tezos_protocol_environment_sigs__V1",
       tezos_protocol_environment_sigs__V1_cmi );
     ( "Tezos_protocol_environment_sigs__V2",
-      tezos_protocol_environment_sigs__V2_cmi ) ]
+      tezos_protocol_environment_sigs__V2_cmi );
+  ]
 
 let register_env =
   let open Embedded_cmis in
-  [ ( "tezos_protocol_registerer__Registerer",
-      tezos_protocol_registerer__Registerer_cmi ) ]
+  [
+    ( "tezos_protocol_registerer__Registerer",
+      tezos_protocol_registerer__Registerer_cmi );
+  ]
 
 (** Helpers *)
 
@@ -152,7 +156,8 @@ let main {compile_ml; pack_objects; link_shared} =
   and hash_only = ref false
   and check_protocol_hash = ref true in
   let args_spec =
-    [ ("-o", Arg.String (fun s -> output_file := Some s), "");
+    [
+      ("-o", Arg.String (fun s -> output_file := Some s), "");
       ( "-hash-only",
         Arg.Set hash_only,
         " Only display the hash of the protocol and don't compile" );
@@ -173,7 +178,8 @@ let main {compile_ml; pack_objects; link_shared} =
           (fun () ->
             Format.printf "%s\n" Tezos_version.Bin_version.version_string ;
             Stdlib.exit 0),
-        " Display version information" ) ]
+        " Display version information" );
+    ]
   in
   let usage_msg =
     Printf.sprintf "Usage: %s [options] <srcdir>\nOptions are:" Sys.argv.(0)
@@ -181,18 +187,14 @@ let main {compile_ml; pack_objects; link_shared} =
   Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
   let source_dir =
     match !anonymous with
-    | [protocol_dir] ->
-        protocol_dir
+    | [protocol_dir] -> protocol_dir
     | _ ->
         Arg.usage args_spec usage_msg ;
         Stdlib.exit 1
   in
   let (announced_hash, protocol) =
-    match
-      Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir)
-    with
-    | Ok (hash, proto) ->
-        (hash, proto)
+    match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir) with
+    | Ok (hash, proto) -> (hash, proto)
     | Error err ->
         Format.eprintf "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err ;
         exit 2
@@ -200,11 +202,10 @@ let main {compile_ml; pack_objects; link_shared} =
   let real_hash = Protocol.hash protocol in
   if !hash_only then (
     Format.printf "%a@." Protocol_hash.pp real_hash ;
-    exit 0 ) ;
+    exit 0) ;
   let hash =
     match announced_hash with
-    | None ->
-        real_hash
+    | None -> real_hash
     | Some hash
       when !check_protocol_hash && not (Protocol_hash.equal real_hash hash) ->
         Format.eprintf
@@ -216,8 +217,7 @@ let main {compile_ml; pack_objects; link_shared} =
           Protocol_hash.pp
           real_hash ;
         exit 2
-    | Some hash ->
-        hash
+    | Some hash -> hash
   in
   let build_dir =
     match !build_dir with
@@ -225,19 +225,15 @@ let main {compile_ml; pack_objects; link_shared} =
         let dir = mktemp_dir () in
         at_exit (fun () -> Lwt_main.run (Lwt_utils_unix.remove_dir dir)) ;
         dir
-    | Some dir ->
-        dir
+    | Some dir -> dir
   in
   let output =
     match !output_file with
-    | Some output ->
-        output
-    | None ->
-        Format.asprintf "proto_%a" Protocol_hash.pp hash
+    | Some output -> output
+    | None -> Format.asprintf "proto_%a" Protocol_hash.pp hash
   in
   Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 build_dir) ;
-  Lwt_main.run
-    (Lwt_utils_unix.create_dir ~perm:0o755 (Filename.dirname output)) ;
+  Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 (Filename.dirname output)) ;
   (* Generate the 'functor' *)
   let functor_file = build_dir // "functor.ml" in
   let version = Protocol.module_name_of_env_version protocol.expected_env in
@@ -278,13 +274,13 @@ let main {compile_ml; pack_objects; link_shared} =
         register_file
         (Printf.sprintf
            "module Name = struct let name = %S end\n\
-           \ let () = Tezos_protocol_registerer__Registerer.register \
-            Name.name (%s (module %s.Make))"
+           \ let () = Tezos_protocol_registerer__Registerer.register Name.name \
+            (%s (module %s.Make))"
            (Protocol_hash.to_b58check hash)
            (Protocol.module_name_of_env_version protocol.expected_env)
            functor_unit) ;
       let register_object = compile_ml ~for_pack register_file in
-      [register_object] )
+      [register_object])
   in
   let resulting_object =
     pack_objects output (packed_protocol_object :: register_objects)
@@ -292,7 +288,7 @@ let main {compile_ml; pack_objects; link_shared} =
   (* Create the final [cmxs] *)
   if not !static then (
     Clflags.link_everything := true ;
-    link_shared (output ^ ".cmxs") [resulting_object] ) ;
+    link_shared (output ^ ".cmxs") [resulting_object]) ;
   if !output_dep then (
     let dsrc = Digest.file functor_file in
     let dimpl = Digest.file resulting_object in
@@ -302,5 +298,5 @@ let main {compile_ml; pack_objects; link_shared} =
     Format.printf "module Toto = struct include %s end ;; \n" for_pack ;
     Format.printf "let src_digest = %S ;;\n" (Digest.to_hex dsrc) ;
     Format.printf "let impl_digest = %S ;;\n" (Digest.to_hex dimpl) ;
-    Format.printf "let intf_digest = %S ;;\n" (Digest.to_hex dintf) ) ;
+    Format.printf "let intf_digest = %S ;;\n" (Digest.to_hex dintf)) ;
   Format.printf "Success: %a.@." Protocol_hash.pp hash

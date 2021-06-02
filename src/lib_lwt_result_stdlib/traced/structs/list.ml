@@ -62,8 +62,7 @@ module Make (Monad : Traced_sigs.Monad.S) :
   let exists_ep f l = rev_map_ep f l >|=? exists Fun.id
 
   let partition_ep f l =
-    rev_map_ep (fun x -> f x >|=? fun b -> (b, x)) l
-    >|=? fun bxs ->
+    rev_map_ep (fun x -> f x >|=? fun b -> (b, x)) l >|=? fun bxs ->
     fold_left
       (fun (trues, falses) (b, x) ->
         if b then (x :: trues, falses) else (trues, x :: falses))

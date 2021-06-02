@@ -102,11 +102,13 @@ let contents_encoding =
 let metadata_encoding : metadata Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun { message;
+    (fun {
+           message;
            max_operations_ttl;
            last_allowed_fork_level;
            block_metadata;
-           operations_metadata } ->
+           operations_metadata;
+         } ->
       ( message,
         max_operations_ttl,
         last_allowed_fork_level,
@@ -174,8 +176,7 @@ let timestamp blk = blk.contents.header.Block_header.shell.timestamp
 let validation_passes blk =
   blk.contents.header.Block_header.shell.validation_passes
 
-let operations_hash blk =
-  blk.contents.header.Block_header.shell.operations_hash
+let operations_hash blk = blk.contents.header.Block_header.shell.operations_hash
 
 let fitness blk = blk.contents.header.Block_header.shell.fitness
 
@@ -202,13 +203,11 @@ let check_block_consistency ?genesis_hash ?pred_block block =
   let block_hash = hash block in
   let result_hash = Block_header.hash block_header in
   fail_unless
-    ( Block_hash.equal block_hash result_hash
+    (Block_hash.equal block_hash result_hash
     ||
     match genesis_hash with
-    | Some genesis_hash ->
-        Block_hash.equal block_hash genesis_hash
-    | None ->
-        false )
+    | Some genesis_hash -> Block_hash.equal block_hash genesis_hash
+    | None -> false)
     (Inconsistent_block_hash
        {
          level = level block;
@@ -216,20 +215,19 @@ let check_block_consistency ?genesis_hash ?pred_block block =
          computed_hash = result_hash;
        })
   >>=? fun () ->
-  ( match pred_block with
-  | None ->
-      return_unit
+  (match pred_block with
+  | None -> return_unit
   | Some pred_block ->
       fail_unless
-        ( Block_hash.equal (hash pred_block) (predecessor block)
-        && Compare.Int32.(level block = Int32.succ (level pred_block)) )
+        (Block_hash.equal (hash pred_block) (predecessor block)
+        && Compare.Int32.(level block = Int32.succ (level pred_block)))
         (Inconsistent_block_predecessor
            {
              block_hash;
              level = level block;
              expected_hash = hash pred_block;
              computed_hash = predecessor block;
-           }) )
+           }))
   >>=? fun () ->
   let computed_operations_hash =
     Operation_list_list_hash.compute
@@ -249,8 +247,7 @@ let check_block_consistency ?genesis_hash ?pred_block block =
 let read_next_block_exn fd =
   (* Read length *)
   let length_bytes = Bytes.create 4 in
-  Lwt_utils_unix.read_bytes ~pos:0 ~len:4 fd length_bytes
-  >>= fun () ->
+  Lwt_utils_unix.read_bytes ~pos:0 ~len:4 fd length_bytes >>= fun () ->
   let block_length_int32 = Bytes.get_int32_be length_bytes 0 in
   let block_length = Int32.to_int block_length_int32 in
   let block_bytes = Bytes.extend length_bytes 0 block_length in

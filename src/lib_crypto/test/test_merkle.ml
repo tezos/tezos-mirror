@@ -35,20 +35,15 @@ open Utils.Infix
 type tree = Empty | Leaf of int | Node of tree * tree
 
 let rec pp_tree fmt = function
-  | Empty ->
-      Format.pp_print_string fmt "Empty"
-  | Leaf n ->
-      Format.fprintf fmt "Leaf %d" n
-  | Node (t1, t2) ->
-      Format.fprintf fmt "Node (%a) (%a)" pp_tree t1 pp_tree t2
+  | Empty -> Format.pp_print_string fmt "Empty"
+  | Leaf n -> Format.fprintf fmt "Leaf %d" n
+  | Node (t1, t2) -> Format.fprintf fmt "Node (%a) (%a)" pp_tree t1 pp_tree t2
 
 let testable_tree = Alcotest.testable pp_tree ( = )
 
 let rec list_of_tree = function
-  | Empty ->
-      ([], 0)
-  | Leaf x ->
-      ([x], 1)
+  | Empty -> ([], 0)
+  | Leaf x -> ([x], 1)
   | Node (x, y) ->
       let (x, sx) = list_of_tree x and (y, sy) = list_of_tree y in
       assert (sx = sy) ;
@@ -74,14 +69,10 @@ end)
 *)
 let rec compare_list xs ys =
   match (xs, ys) with
-  | ([], []) ->
-      true
-  | ([x], y :: ys) when x = y ->
-      ys = [] || compare_list xs ys
-  | (x :: xs, y :: ys) when x = y ->
-      compare_list xs ys
-  | (_, _) ->
-      false
+  | ([], []) -> true
+  | ([x], y :: ys) when x = y -> ys = [] || compare_list xs ys
+  | (x :: xs, y :: ys) when x = y -> compare_list xs ys
+  | (_, _) -> false
 
 let check_size i =
   let l = 0 -- i in
@@ -106,15 +97,15 @@ let test_compute _ = List.iter check_size (0 -- 99)
 let test_compute_examples _ =
   let examples =
     (* description, input list, computed tree *)
-    [ ("empty", [], Empty);
+    [
+      ("empty", [], Empty);
       ("leaft", [1], Leaf 1);
       ("padded", [1; 2; 3], Node (Node (Leaf 1, Leaf 2), Node (Leaf 3, Leaf 3)));
-      ( "full",
-        [1; 2; 3; 3],
-        Node (Node (Leaf 1, Leaf 2), Node (Leaf 3, Leaf 3)) );
+      ("full", [1; 2; 3; 3], Node (Node (Leaf 1, Leaf 2), Node (Leaf 3, Leaf 3)));
       ( "full 2",
         [1; 2; 3; 4],
-        Node (Node (Leaf 1, Leaf 2), Node (Leaf 3, Leaf 4)) ) ]
+        Node (Node (Leaf 1, Leaf 2), Node (Leaf 3, Leaf 4)) );
+    ]
   in
   List.iter
     (fun (desc, list, tree) ->
@@ -135,12 +126,9 @@ let check_path i =
 let rec pp_path fmt =
   let open Merkle in
   function
-  | Left (p, r) ->
-      Format.fprintf fmt "Left (%a, %a)" pp_path p pp_tree r
-  | Right (l, p) ->
-      Format.fprintf fmt "Right (%a, %a)" pp_tree l pp_path p
-  | Op ->
-      Format.pp_print_string fmt "Op"
+  | Left (p, r) -> Format.fprintf fmt "Left (%a, %a)" pp_path p pp_tree r
+  | Right (l, p) -> Format.fprintf fmt "Right (%a, %a)" pp_tree l pp_path p
+  | Op -> Format.pp_print_string fmt "Op"
 
 let testable_path = Alcotest.testable pp_path ( = )
 
@@ -170,9 +158,11 @@ let test_path_examples _ =
   Alcotest.check Alcotest.int "recompute tree: index" 2 idx
 
 let tests =
-  [ ("compute", `Quick, test_compute);
+  [
+    ("compute", `Quick, test_compute);
     ("compute_examples", `Quick, test_compute_examples);
     ("path", `Quick, test_path);
-    ("path_examples", `Quick, test_path_examples) ]
+    ("path_examples", `Quick, test_path_examples);
+  ]
 
 let () = Alcotest.run "tezos-crypto" [("merkle", tests)]

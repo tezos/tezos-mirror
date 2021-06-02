@@ -15,7 +15,7 @@ module type S = sig
 end
 
 let logger ~protocol_name : (module S) =
-  ( module struct
+  (module struct
     include Internal_event.Simple
 
     let section = [protocol_name; "proxy_rpc"]
@@ -67,4 +67,4 @@ let logger ~protocol_name : (module S) =
         ~level:Internal_event.Debug
         ~msg:"received tree of size {size}"
         ("size", Data_encoding.int64)
-  end )
+  end)

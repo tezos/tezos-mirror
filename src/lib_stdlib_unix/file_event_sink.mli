@@ -95,7 +95,8 @@ module Query : sig
     ?time_query:Time_constraint.t ->
     Uri.t ->
     init:'a ->
-    f:('a ->
+    f:
+      ('a ->
       time_stamp:float ->
       Internal_event.Generic.event ->
       'a tzresult Lwt.t) ->

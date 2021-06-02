@@ -31,10 +31,8 @@ let of_int64 = Z.of_int64
 
 let of_string x =
   match Time_repr.of_notation x with
-  | None -> (
-    try Some (Z.of_string x) with _ -> None )
-  | Some time ->
-      Some (of_int64 (Time_repr.to_seconds time))
+  | None -> ( try Some (Z.of_string x) with _ -> None)
+  | Some time -> Some (of_int64 (Time_repr.to_seconds time))
 
 let to_notation x =
   try

@@ -33,10 +33,8 @@ let srcdir =
 
 let (hash, sources) =
   match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir srcdir) with
-  | Ok (None, proto) ->
-      (Protocol.hash proto, proto)
-  | Ok (Some hash, proto) ->
-      (hash, proto)
+  | Ok (None, proto) -> (Protocol.hash proto, proto)
+  | Ok (Some hash, proto) -> (hash, proto)
   | Error err ->
       Format.kasprintf
         Stdlib.failwith

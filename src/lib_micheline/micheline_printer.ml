@@ -40,20 +40,13 @@ let print_string ppf text =
   Format.fprintf ppf "\"" ;
   String.iter
     (function
-      | '"' ->
-          Format.fprintf ppf "\\\""
-      | '\n' ->
-          Format.fprintf ppf "\\n"
-      | '\r' ->
-          Format.fprintf ppf "\\r"
-      | '\b' ->
-          Format.fprintf ppf "\\b"
-      | '\t' ->
-          Format.fprintf ppf "\\t"
-      | '\\' ->
-          Format.fprintf ppf "\\\\"
-      | c ->
-          Format.fprintf ppf "%c" c)
+      | '"' -> Format.fprintf ppf "\\\""
+      | '\n' -> Format.fprintf ppf "\\n"
+      | '\r' -> Format.fprintf ppf "\\r"
+      | '\b' -> Format.fprintf ppf "\\b"
+      | '\t' -> Format.fprintf ppf "\\t"
+      | '\\' -> Format.fprintf ppf "\\\\"
+      | c -> Format.fprintf ppf "%c" c)
     text ;
   Format.fprintf ppf "\""
 
@@ -62,16 +55,13 @@ let print_annotations =
 
 let preformat root =
   let preformat_loc = function
-    | {comment = None} ->
-        (false, 0)
+    | {comment = None} -> (false, 0)
     | {comment = Some text} ->
         (String.contains text '\n', String.length text + 1)
   in
   let preformat_annots = function
-    | [] ->
-        0
-    | annots ->
-        String.length (String.concat " " annots) + 2
+    | [] -> 0
+    | annots -> String.length (String.concat " " annots) + 2
   in
   let rec preformat_expr = function
     | Int (loc, value) ->
@@ -115,10 +105,8 @@ let rec print_expr_unwrapped ppf = function
   | Prim ((ml, s, {comment}), name, args, annot) ->
       let name =
         match annot with
-        | [] ->
-            name
-        | annots ->
-            Format.asprintf "%s @[<h>%a@]" name print_annotations annots
+        | [] -> name
+        | annots -> Format.asprintf "%s @[<h>%a@]" name print_annotations annots
       in
       if (not ml) && s < 80 then (
         if args = [] then Format.fprintf ppf "%s" name
@@ -130,10 +118,8 @@ let rec print_expr_unwrapped ppf = function
             (Format.pp_print_list ~pp_sep:Format.pp_print_space print_expr)
             args ;
         match comment with
-        | None ->
-            ()
-        | Some text ->
-            Format.fprintf ppf "@ /* %s */" text )
+        | None -> ()
+        | Some text -> Format.fprintf ppf "@ /* %s */" text)
       else (
         if args = [] then Format.fprintf ppf "%s" name
         else if String.length name <= 4 then
@@ -151,46 +137,37 @@ let rec print_expr_unwrapped ppf = function
             (Format.pp_print_list print_expr)
             args ;
         match comment with
-        | None ->
-            ()
-        | Some comment ->
-            Format.fprintf ppf "@ %a" print_comment comment )
+        | None -> ()
+        | Some comment -> Format.fprintf ppf "@ %a" print_comment comment)
   | Int ((_, _, {comment}), value) -> (
-    match comment with
-    | None ->
-        Format.fprintf ppf "%s" (Z.to_string value)
-    | Some comment ->
-        Format.fprintf ppf "%s@ %a" (Z.to_string value) print_comment comment )
+      match comment with
+      | None -> Format.fprintf ppf "%s" (Z.to_string value)
+      | Some comment ->
+          Format.fprintf ppf "%s@ %a" (Z.to_string value) print_comment comment)
   | String ((_, _, {comment}), value) -> (
-    match comment with
-    | None ->
-        print_string ppf value
-    | Some comment ->
-        Format.fprintf ppf "%a@ %a" print_string value print_comment comment )
+      match comment with
+      | None -> print_string ppf value
+      | Some comment ->
+          Format.fprintf ppf "%a@ %a" print_string value print_comment comment)
   | Bytes ((_, _, {comment}), value) -> (
-    match comment with
-    | None ->
-        Format.fprintf ppf "0x%a" Hex.pp (Hex.of_bytes value)
-    | Some comment ->
-        Format.fprintf
-          ppf
-          "0x%a@ %a"
-          Hex.pp
-          (Hex.of_bytes value)
-          print_comment
-          comment )
-  | Seq ((_, _, {comment = None}), []) ->
-      Format.fprintf ppf "{}"
+      match comment with
+      | None -> Format.fprintf ppf "0x%a" Hex.pp (Hex.of_bytes value)
+      | Some comment ->
+          Format.fprintf
+            ppf
+            "0x%a@ %a"
+            Hex.pp
+            (Hex.of_bytes value)
+            print_comment
+            comment)
+  | Seq ((_, _, {comment = None}), []) -> Format.fprintf ppf "{}"
   | Seq ((ml, s, {comment}), items) ->
       if (not ml) && s < 80 then Format.fprintf ppf "{ @[<h 0>"
       else Format.fprintf ppf "{ @[<v 0>" ;
-      ( match (comment, items) with
-      | (None, _) ->
-          ()
-      | (Some comment, []) ->
-          Format.fprintf ppf "%a" print_comment comment
-      | (Some comment, _) ->
-          Format.fprintf ppf "%a@ " print_comment comment ) ;
+      (match (comment, items) with
+      | (None, _) -> ()
+      | (Some comment, []) -> Format.fprintf ppf "%a" print_comment comment
+      | (Some comment, _) -> Format.fprintf ppf "%a@ " print_comment comment) ;
       Format.pp_print_list
         ~pp_sep:(fun ppf () -> Format.fprintf ppf " ;@ ")
         print_expr_unwrapped
@@ -201,8 +178,7 @@ let rec print_expr_unwrapped ppf = function
 and print_expr ppf = function
   | (Prim (_, _, _ :: _, _) | Prim (_, _, [], _ :: _)) as expr ->
       Format.fprintf ppf "(%a)" print_expr_unwrapped expr
-  | expr ->
-      print_expr_unwrapped ppf expr
+  | expr -> print_expr_unwrapped ppf expr
 
 let with_unbounded_formatter ppf f x =
   let buf = Buffer.create 10000 in

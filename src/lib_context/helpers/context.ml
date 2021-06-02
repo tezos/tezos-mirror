@@ -56,18 +56,14 @@ module Make_tree (Store : DB) = struct
 
   let to_value t =
     match Store.Tree.destruct t with
-    | `Contents (c, _) ->
-        Store.Tree.Contents.force_exn c >|= Option.some
-    | `Node _ ->
-        Lwt.return_none
+    | `Contents (c, _) -> Store.Tree.Contents.force_exn c >|= Option.some
+    | `Node _ -> Lwt.return_none
 
   let of_value _ v = Store.Tree.add Store.Tree.empty [] v
 
   let fold ?depth t k ~init ~f =
-    find_tree t k
-    >>= function
-    | None ->
-        Lwt.return init
+    find_tree t k >>= function
+    | None -> Lwt.return init
     | Some t ->
         Store.Tree.fold
           ?depth
@@ -86,37 +82,30 @@ module Make_tree (Store : DB) = struct
 
   let rec raw_of_concrete : type a. (raw -> a) -> concrete -> a =
    fun k -> function
-    | `Tree l ->
-        raw_of_node (fun l -> k (`Tree (TzString.Map.of_seq l))) l
-    | `Contents (v, _) ->
-        k (`Value v)
+    | `Tree l -> raw_of_node (fun l -> k (`Tree (TzString.Map.of_seq l))) l
+    | `Contents (v, _) -> k (`Value v)
 
   and raw_of_node :
       type a. ((string * raw) Seq.t -> a) -> (string * concrete) list -> a =
    fun k -> function
-    | [] ->
-        k Seq.empty
+    | [] -> k Seq.empty
     | (n, v) :: t ->
         raw_of_concrete
-          (fun v ->
-            raw_of_node (fun t -> k (fun () -> Seq.Cons ((n, v), t))) t)
+          (fun v -> raw_of_node (fun t -> k (fun () -> Seq.Cons ((n, v), t))) t)
           v
 
   let to_raw t = Store.Tree.to_concrete t >|= raw_of_concrete (fun t -> t)
 
   let rec concrete_of_raw : type a. (concrete -> a) -> raw -> a =
    fun k -> function
-    | `Tree l ->
-        concrete_of_node (fun l -> k (`Tree l)) (TzString.Map.to_seq l)
-    | `Value v ->
-        k (`Contents (v, ()))
+    | `Tree l -> concrete_of_node (fun l -> k (`Tree l)) (TzString.Map.to_seq l)
+    | `Value v -> k (`Contents (v, ()))
 
   and concrete_of_node :
       type a. ((string * concrete) list -> a) -> (string * raw) Seq.t -> a =
    fun k seq ->
     match seq () with
-    | Nil ->
-        k []
+    | Nil -> k []
     | Cons ((n, v), t) ->
         concrete_of_raw
           (fun v -> concrete_of_node (fun t -> k ((n, v) :: t)) t)
@@ -134,7 +123,8 @@ module Make_tree (Store : DB) = struct
             (list (tup2 string encoding))
         in
         union
-          [ case
+          [
+            case
               ~title:"tree"
               (Tag 0)
               map_encoding
@@ -145,7 +135,8 @@ module Make_tree (Store : DB) = struct
               (Tag 1)
               bytes
               (function `Value v -> Some v | `Tree _ -> None)
-              (fun v -> `Value v) ])
+              (fun v -> `Value v);
+          ])
 
   type repo = Store.repo
 
@@ -154,9 +145,7 @@ module Make_tree (Store : DB) = struct
   let shallow repo kinded_hash =
     Store.Tree.shallow
       repo
-      ( match kinded_hash with
-      | `Node hash ->
-          `Node (Hash.of_context_hash hash)
-      | `Contents hash ->
-          `Contents (Hash.of_context_hash hash, ()) )
+      (match kinded_hash with
+      | `Node hash -> `Node (Hash.of_context_hash hash)
+      | `Contents hash -> `Contents (Hash.of_context_hash hash, ()))
 end

@@ -110,8 +110,7 @@ let load_protocol proto protocol_root =
       // Protocol_hash.to_short_b58check proto
       // Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp proto
     in
-    Events.(emit dynload_protocol proto)
-    >|= fun () ->
+    Events.(emit dynload_protocol proto) >|= fun () ->
     try
       Dynlink.loadfile_private cmxs_file ;
       ok_unit
@@ -135,22 +134,22 @@ let handshake input output =
     Data_encoding.Variable.bytes
     External_validation.magic
   >>= fun () ->
-  External_validation.recv input Data_encoding.Variable.bytes
-  >>= fun magic ->
+  External_validation.recv input Data_encoding.Variable.bytes >>= fun magic ->
   fail_when
     (not (Bytes.equal magic External_validation.magic))
     (inconsistent_handshake "bad magic")
 
 let init input =
-  Events.(emit initialization_request ())
-  >>= fun () ->
+  Events.(emit initialization_request ()) >>= fun () ->
   External_validation.recv input External_validation.parameters_encoding
-  >>= fun { context_root;
+  >>= fun {
+            context_root;
             protocol_root;
             sandbox_parameters;
             genesis;
             user_activated_upgrades;
-            user_activated_protocol_overrides } ->
+            user_activated_protocol_overrides;
+          } ->
   let sandbox_param =
     Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
   in
@@ -166,8 +165,7 @@ let init input =
       user_activated_protocol_overrides )
 
 let run input output =
-  handshake input output
-  >>=? fun () ->
+  handshake input output >>=? fun () ->
   init input
   >>= fun ( context_index,
             protocol_root,
@@ -187,8 +185,7 @@ let run input output =
         init >>= loop
     | External_validation.Commit_genesis {chain_id} ->
         let commit_genesis : unit Lwt.t =
-          Events.(emit commit_genesis_request genesis.block)
-          >>= fun () ->
+          Events.(emit commit_genesis_request genesis.block) >>= fun () ->
           Error_monad.protect (fun () ->
               Context.commit_genesis
                 context_index
@@ -212,57 +209,51 @@ let run input output =
         in
         restore_context_integrity >>= loop
     | External_validation.Validate
-        { chain_id;
+        {
+          chain_id;
           block_header;
           predecessor_block_header;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
           operations;
-          max_operations_ttl } ->
+          max_operations_ttl;
+        } ->
         let validate : unit Lwt.t =
-          Events.(emit validation_request block_header)
-          >>= fun () ->
-          Error_monad.protect (fun () ->
-              let pred_context_hash = predecessor_block_header.shell.context in
-              Context.checkout context_index pred_context_hash
-              >>= function
-              | Some context ->
-                  return context
-              | None ->
-                  fail
-                    (Block_validator_errors.Failed_to_checkout_context
-                       pred_context_hash))
-          >>=? (fun predecessor_context ->
-                 Context.get_protocol predecessor_context
-                 >>= fun protocol_hash ->
-                 load_protocol protocol_hash protocol_root
-                 >>=? fun () ->
-                 let env =
-                   {
-                     Block_validation.chain_id;
-                     user_activated_upgrades;
-                     user_activated_protocol_overrides;
-                     max_operations_ttl;
-                     predecessor_block_header;
-                     predecessor_block_metadata_hash;
-                     predecessor_ops_metadata_hash;
-                     predecessor_context;
-                   }
-                 in
-                 Block_validation.apply env block_header operations
-                 >>= function
-                 | Error
-                     [Block_validator_errors.Unavailable_protocol {protocol; _}]
-                   as err -> (
-                     (* If `next_protocol` is missing, try to load it *)
-                     load_protocol protocol protocol_root
-                     >>= function
-                     | Error _ ->
-                         Lwt.return err
-                     | Ok () ->
-                         Block_validation.apply env block_header operations )
-                 | result ->
-                     Lwt.return result)
+          Events.(emit validation_request block_header) >>= fun () ->
+          ( Error_monad.protect (fun () ->
+                let pred_context_hash =
+                  predecessor_block_header.shell.context
+                in
+                Context.checkout context_index pred_context_hash >>= function
+                | Some context -> return context
+                | None ->
+                    fail
+                      (Block_validator_errors.Failed_to_checkout_context
+                         pred_context_hash))
+          >>=? fun predecessor_context ->
+            Context.get_protocol predecessor_context >>= fun protocol_hash ->
+            load_protocol protocol_hash protocol_root >>=? fun () ->
+            let env =
+              {
+                Block_validation.chain_id;
+                user_activated_upgrades;
+                user_activated_protocol_overrides;
+                max_operations_ttl;
+                predecessor_block_header;
+                predecessor_block_metadata_hash;
+                predecessor_ops_metadata_hash;
+                predecessor_context;
+              }
+            in
+            Block_validation.apply env block_header operations >>= function
+            | Error [Block_validator_errors.Unavailable_protocol {protocol; _}]
+              as err -> (
+                (* If `next_protocol` is missing, try to load it *)
+                load_protocol protocol protocol_root
+                >>= function
+                | Error _ -> Lwt.return err
+                | Ok () -> Block_validation.apply env block_header operations)
+            | result -> Lwt.return result )
           >>= fun res ->
           External_validation.send
             output
@@ -272,21 +263,15 @@ let run input output =
         validate >>= loop
     | External_validation.Fork_test_chain {context_hash; forked_header} ->
         let fork_test_chain : unit Lwt.t =
-          Events.(emit fork_test_chain_request forked_header)
-          >>= fun () ->
-          Context.checkout context_index context_hash
-          >>= function
+          Events.(emit fork_test_chain_request forked_header) >>= fun () ->
+          Context.checkout context_index context_hash >>= function
           | Some ctxt ->
-              Block_validation.init_test_chain ctxt forked_header
-              >>= (function
-                    | Error
-                        [Block_validator_errors.Missing_test_protocol protocol]
-                      ->
-                        load_protocol protocol protocol_root
-                        >>=? fun () ->
-                        Block_validation.init_test_chain ctxt forked_header
-                    | result ->
-                        Lwt.return result)
+              (Block_validation.init_test_chain ctxt forked_header >>= function
+               | Error [Block_validator_errors.Missing_test_protocol protocol]
+                 ->
+                   load_protocol protocol protocol_root >>=? fun () ->
+                   Block_validation.init_test_chain ctxt forked_header
+               | result -> Lwt.return result)
               >>= fun result ->
               External_validation.send
                 output
@@ -308,10 +293,9 @@ let run input output =
 
 let main ?socket_dir () =
   let canceler = Lwt_canceler.create () in
-  ( match socket_dir with
+  (match socket_dir with
   | Some socket_dir ->
-      Internal_event_unix.init ()
-      >>= fun () ->
+      Internal_event_unix.init () >>= fun () ->
       let pid = Unix.getpid () in
       let socket_path = External_validation.socket_path ~socket_dir ~pid in
       External_validation.create_socket_connect ~canceler ~socket_path
@@ -319,19 +303,14 @@ let main ?socket_dir () =
       let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
       let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
       Lwt.return (socket_in, socket_out)
-  | None ->
-      Lwt.return (Lwt_io.stdin, Lwt_io.stdout) )
+  | None -> Lwt.return (Lwt_io.stdin, Lwt_io.stdout))
   >>= fun (in_channel, out_channel) ->
-  Events.(emit initialized ())
-  >>= fun () ->
+  Events.(emit initialized ()) >>= fun () ->
   Lwt.catch
     (fun () ->
-      run in_channel out_channel
-      >>=? fun () ->
-      Lwt_canceler.cancel canceler
-      >>= function
-      | Ok () | Error [] ->
-          return_unit
+      run in_channel out_channel >>=? fun () ->
+      Lwt_canceler.cancel canceler >>= function
+      | Ok () | Error [] -> return_unit
       | Error (exc :: excs) ->
           let texc = TzTrace.make (Error_monad.Exn exc) in
           let texcs =
@@ -341,8 +320,7 @@ let main ?socket_dir () =
           Lwt.return (Error t))
     (fun e -> Lwt.return (error_exn e))
   >>= function
-  | Ok () ->
-      Events.(emit terminated ()) >>= fun () -> return_unit
+  | Ok () -> Events.(emit terminated ()) >>= fun () -> return_unit
   | Error _ as errs ->
       External_validation.send
         out_channel

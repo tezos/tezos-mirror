@@ -47,7 +47,8 @@ type t = {
 let bootstrap_account_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Public_key_known"
         (tup2 Signature.Public_key.encoding Tez_repr.encoding)
@@ -56,10 +57,9 @@ let bootstrap_account_encoding =
               assert (
                 Signature.Public_key_hash.equal
                   (Signature.Public_key.hash public_key)
-                  public_key_hash ) ;
+                  public_key_hash) ;
               Some (public_key, amount)
-          | {public_key = None} ->
-              None)
+          | {public_key = None} -> None)
         (fun (public_key, amount) ->
           {
             public_key = Some public_key;
@@ -73,10 +73,10 @@ let bootstrap_account_encoding =
         (function
           | {public_key_hash; public_key = None; amount} ->
               Some (public_key_hash, amount)
-          | {public_key = Some _} ->
-              None)
+          | {public_key = Some _} -> None)
         (fun (public_key_hash, amount) ->
-          {public_key = None; public_key_hash; amount}) ]
+          {public_key = None; public_key_hash; amount});
+    ]
 
 let bootstrap_contract_encoding =
   let open Data_encoding in
@@ -91,12 +91,14 @@ let bootstrap_contract_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun { bootstrap_accounts;
+    (fun {
+           bootstrap_accounts;
            bootstrap_contracts;
            commitments;
            constants;
            security_deposit_ramp_up_cycles;
-           no_reward_cycles } ->
+           no_reward_cycles;
+         } ->
       ( ( bootstrap_accounts,
           bootstrap_contracts,
           commitments,

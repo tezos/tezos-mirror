@@ -299,9 +299,7 @@ module Sapling : sig
 
   (* Used by both Commitments and Ciphertexts *)
   module Commitments_size :
-    Single_data_storage
-      with type t := Raw_context.t * id
-       and type value = int64
+    Single_data_storage with type t := Raw_context.t * id and type value = int64
 
   module Memo_size :
     Single_data_storage with type t := Raw_context.t * id and type value = int
@@ -323,9 +321,7 @@ module Sapling : sig
   val ciphertexts_init : Raw_context.t -> id -> Raw_context.t Lwt.t
 
   module Nullifiers_size :
-    Single_data_storage
-      with type t := Raw_context.t * id
-       and type value = int64
+    Single_data_storage with type t := Raw_context.t * id and type value = int64
 
   module Nullifiers_ordered :
     Non_iterable_indexed_data_storage
@@ -347,9 +343,7 @@ module Sapling : sig
        and type value = Sapling.Hash.t
 
   module Roots_pos :
-    Single_data_storage
-      with type t := Raw_context.t * id
-       and type value = int32
+    Single_data_storage with type t := Raw_context.t * id and type value = int32
 
   module Roots_level :
     Single_data_storage
@@ -505,9 +499,9 @@ module Pending_migration : sig
 
   val remove :
     Raw_context.t ->
-    ( Raw_context.t
+    (Raw_context.t
     * Receipt_repr.balance_updates
-    * Migration_repr.origination_result list )
+    * Migration_repr.origination_result list)
     tzresult
     Lwt.t
 end

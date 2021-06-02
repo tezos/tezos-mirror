@@ -54,7 +54,9 @@ module TieredSeq : TIER with type t = int Seq.t = struct
 
   open Monad
 
-  let iter f s = iter f s ; unit_es
+  let iter f s =
+    iter f s ;
+    unit_es
 
   let iter_s f s = iter_s f s >>= fun () -> unit_es
 
@@ -74,8 +76,8 @@ module TestIter (Tier : TIER) = struct
       (fun (Fun (_, fn), init, input) ->
         eq_es
           (let acc = ref init in
-           TieredSeq.iter (IterOf.fn acc fn) (List.to_seq input)
-           >>=? fun () -> Monad.return !acc)
+           TieredSeq.iter (IterOf.fn acc fn) (List.to_seq input) >>=? fun () ->
+           Monad.return !acc)
           (let acc = ref init in
            Tier.iter (IterOf.fn acc fn) (Tier.of_seq @@ List.to_seq input)
            >>=? fun () -> Monad.return !acc))
@@ -206,14 +208,18 @@ let wrap (name, (module Tier : TIER)) =
 let () =
   let name = "Test_fuzzing_seq_tiered" in
   let tests =
-    [ ("TestedSeq_s", (module TieredSeq_s : TIER));
+    [
+      ("TestedSeq_s", (module TieredSeq_s : TIER));
       ("TestedSeq_e", (module TieredSeq_e : TIER));
-      ("TestedSeq_es", (module TieredSeq_es : TIER)) ]
+      ("TestedSeq_es", (module TieredSeq_es : TIER));
+    ]
   in
   let tests = List.map wrap tests in
   let tests =
     tests
-    @ [ ("iter_p", Lib_test.Qcheck_helpers.qcheck_wrap [iter_p]);
-        ("iter_ep", Lib_test.Qcheck_helpers.qcheck_wrap [iter_ep]) ]
+    @ [
+        ("iter_p", Lib_test.Qcheck_helpers.qcheck_wrap [iter_p]);
+        ("iter_ep", Lib_test.Qcheck_helpers.qcheck_wrap [iter_ep]);
+      ]
   in
   Alcotest.run name tests

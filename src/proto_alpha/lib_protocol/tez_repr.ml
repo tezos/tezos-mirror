@@ -57,8 +57,7 @@ let of_string s =
         let len = String.length hd in
         Compare.Int.(
           len <= 3 && len > 0 && List.for_all (fun s -> String.length s = 3) tl)
-    | [] ->
-        false
+    | [] -> false
   in
   let integers s = triplets (String.split_on_char ',' s) in
   let decimals s =
@@ -85,8 +84,7 @@ let of_string s =
   | [left] ->
       if (not (String.contains s ',')) || integers left then parse left ""
       else None
-  | _ ->
-      None
+  | _ -> None
 
 let pp ppf amount =
   let mult_int = 1_000_000L in
@@ -98,8 +96,7 @@ let pp ppf amount =
   let right ppf amount =
     let triplet ppf v =
       if Compare.Int.(v mod 10 > 0) then Format.fprintf ppf "%03d" v
-      else if Compare.Int.(v mod 100 > 0) then
-        Format.fprintf ppf "%02d" (v / 10)
+      else if Compare.Int.(v mod 100 > 0) then Format.fprintf ppf "%02d" (v / 10)
       else Format.fprintf ppf "%d" (v / 100)
     in
     let (hi, lo) = (amount / 1000, amount mod 1000) in
@@ -134,10 +131,8 @@ let ( /? ) t d =
 
 let mul_exn t m =
   match t *? Int64.(of_int m) with
-  | Ok v ->
-      v
-  | Error _ ->
-      invalid_arg "mul_exn"
+  | Ok v -> v
+  | Error _ -> invalid_arg "mul_exn"
 
 let of_mutez t = if t < 0L then None else Some t
 

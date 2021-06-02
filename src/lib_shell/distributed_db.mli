@@ -206,8 +206,7 @@ module Operation : sig
 end
 
 (** Inject a new operation in the local index (memory only). *)
-val inject_operation :
-  chain_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
+val inject_operation : chain_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
 
 (** {2 Protocol index} *)
 
@@ -224,5 +223,4 @@ module Protocol : sig
 end
 
 (** Store on disk protocol sources. *)
-val commit_protocol :
-  db -> Protocol_hash.t -> Protocol.t -> bool tzresult Lwt.t
+val commit_protocol : db -> Protocol_hash.t -> Protocol.t -> bool tzresult Lwt.t

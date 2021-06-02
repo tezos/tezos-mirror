@@ -39,11 +39,13 @@ let gen_unsaturated =
 let gen_t =
   let open Crowbar in
   choose
-    [ const saturated;
+    [
+      const saturated;
       gen_unsaturated;
       gen_unsaturated;
       gen_unsaturated;
-      gen_unsaturated ]
+      gen_unsaturated;
+    ]
 
 (* Test.
  * Tests that [f] commutes.

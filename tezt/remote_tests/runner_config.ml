@@ -33,10 +33,8 @@
 let runner_json =
   let path =
     match Sys.getenv_opt "TEZT_RUNNER_CONFIG" with
-    | None ->
-        "runner_config.json"
-    | Some location ->
-        location
+    | None -> "runner_config.json"
+    | Some location -> location
   in
   JSON.parse_file path
 

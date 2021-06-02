@@ -39,31 +39,23 @@ end) =
 struct
   let of_bytes_exn s =
     match H.of_bytes_opt s with
-    | None ->
-        Format.kasprintf invalid_arg "of_bytes_exn (%s)" H.name
-    | Some pk ->
-        pk
+    | None -> Format.kasprintf invalid_arg "of_bytes_exn (%s)" H.name
+    | Some pk -> pk
 
   let of_bytes s =
     match H.of_bytes_opt s with
-    | None ->
-        generic_error "of_bytes (%s)" H.name
-    | Some pk ->
-        Ok pk
+    | None -> generic_error "of_bytes (%s)" H.name
+    | Some pk -> Ok pk
 
   let of_string_exn s =
     match H.of_string_opt s with
-    | None ->
-        Format.kasprintf invalid_arg "of_string_exn (%s)" H.name
-    | Some pk ->
-        pk
+    | None -> Format.kasprintf invalid_arg "of_string_exn (%s)" H.name
+    | Some pk -> pk
 
   let of_string s =
     match H.of_string_opt s with
-    | None ->
-        generic_error "of_string (%s)" H.name
-    | Some pk ->
-        Ok pk
+    | None -> generic_error "of_string (%s)" H.name
+    | Some pk -> Ok pk
 
   let to_hex s = Hex.of_string (H.to_string s)
 
@@ -71,17 +63,13 @@ struct
 
   let of_hex_exn s =
     match H.of_string_opt (Hex.to_string s) with
-    | Some x ->
-        x
-    | None ->
-        Format.kasprintf invalid_arg "of_hex_exn (%s)" H.name
+    | Some x -> x
+    | None -> Format.kasprintf invalid_arg "of_hex_exn (%s)" H.name
 
   let of_hex s =
     match of_hex_opt s with
-    | None ->
-        generic_error "of_hex (%s)" H.name
-    | Some pk ->
-        ok pk
+    | None -> generic_error "of_hex (%s)" H.name
+    | Some pk -> ok pk
 end
 
 module MakeB58 (H : sig
@@ -96,15 +84,12 @@ struct
 
   let of_b58check_exn s =
     match of_b58check_opt s with
-    | Some x ->
-        x
-    | None ->
-        Format.kasprintf Stdlib.failwith "Unexpected data (%s)" H.name
+    | Some x -> x
+    | None -> Format.kasprintf Stdlib.failwith "Unexpected data (%s)" H.name
 
   let of_b58check s =
     match of_b58check_opt s with
-    | Some x ->
-        Ok x
+    | Some x -> Ok x
     | None ->
         generic_error
           "Failed to read a b58check_encoding data (%s): %S"
@@ -149,11 +134,11 @@ struct
     splitted
       ~binary:(obj1 (req H.name H.raw_encoding))
       ~json:
-        ( def H.name ~title:(H.title ^ " (Base58Check-encoded)")
+        (def H.name ~title:(H.title ^ " (Base58Check-encoded)")
         @@ conv
              H.to_b58check
              (Data_encoding.Json.wrap_error H.of_b58check_exn)
-             string )
+             string)
 
   let of_b58check = H.of_b58check
 
@@ -169,17 +154,16 @@ struct
                  "failed to decode Base58Check-encoded data (%s): %S"
                  H.name
                  s)
-        | Some v ->
-            Ok v)
+        | Some v -> Ok v)
       ~construct:H.to_b58check
       ()
 end
 
-module Weak_FIFO_Cache_Maker : Ringo.MAP_MAKER = ( val Ringo.map_maker
-                                                         ~replacement:FIFO
-                                                         ~overflow:Weak
-                                                         ~accounting:Sloppy
-                                                     : Ringo.MAP_MAKER )
+module Weak_FIFO_Cache_Maker : Ringo.MAP_MAKER = (val Ringo.map_maker
+                                                        ~replacement:FIFO
+                                                        ~overflow:Weak
+                                                        ~accounting:Sloppy
+                                                    : Ringo.MAP_MAKER)
 
 module MakeIterator (H : sig
   type t
@@ -210,13 +194,13 @@ struct
       let n = Random.int (cardinal s) in
       try
         ignore
-          ( fold
-              (fun x i ->
-                if i = n then raise (Found x) ;
-                i + 1)
-              s
-              0
-            : int ) ;
+          (fold
+             (fun x i ->
+               if i = n then raise (Found x) ;
+               i + 1)
+             s
+             0
+            : int) ;
         assert false
       with Found x -> x
 

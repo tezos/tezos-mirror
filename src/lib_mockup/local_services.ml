@@ -72,13 +72,12 @@ end
 
 module Make (E : MENV) = struct
   (* We need to construct a dummy p2p to build the associated
-   rpc directory. *)
+     rpc directory. *)
   let init_fake_p2p =
     let open Tezos_p2p in
     let peer_meta_config =
       {
-        P2p_params.peer_meta_encoding =
-          Tezos_p2p_services.Peer_metadata.encoding;
+        P2p_params.peer_meta_encoding = Tezos_p2p_services.Peer_metadata.encoding;
         peer_meta_initial = Tezos_p2p_services.Peer_metadata.empty;
         score = (fun _ -> 0.0);
       }
@@ -86,8 +85,7 @@ module Make (E : MENV) = struct
     let message_config : unit P2p_params.message_config =
       {
         encoding = [];
-        chain_name =
-          Distributed_db_version.Name.of_string "TEZOS_CLIENT_MOCKUP";
+        chain_name = Distributed_db_version.Name.of_string "TEZOS_CLIENT_MOCKUP";
         (* The following cannot be empty. *)
         distributed_db_versions = Distributed_db_version.[zero; one];
       }
@@ -139,12 +137,9 @@ module Make (E : MENV) = struct
   let check_chain (chain : Block_services.chain) =
     let chain_chain_id =
       match chain with
-      | `Main ->
-          Chain_id.hash_string ["main"]
-      | `Test ->
-          Chain_id.hash_string ["test"]
-      | `Hash cid ->
-          cid
+      | `Main -> Chain_id.hash_string ["main"]
+      | `Test -> Chain_id.hash_string ["test"]
+      | `Hash cid -> cid
     in
     unless (Chain_id.equal E.chain_id chain_chain_id) (fun () ->
         let msg =
@@ -165,8 +160,7 @@ module Make (E : MENV) = struct
                     "test (%a)"
                     Chain_id.pp
                     (Chain_id.hash_string ["test"])
-              | `Hash chain_id ->
-                  Chain_id.pp ppf chain_id)
+              | `Hash chain_id -> Chain_id.pp ppf chain_id)
             chain
             Chain_id.pp
             E.chain_id
@@ -184,8 +178,7 @@ module Make (E : MENV) = struct
       ~predecessor_level:header.level
       ~predecessor_fitness:header.fitness
       ~predecessor
-      ~timestamp:
-        (Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
+      ~timestamp:(Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
 
   let op_data_encoding = E.Protocol.operation_data_encoding
 
@@ -208,12 +201,9 @@ module Make (E : MENV) = struct
         match List.length l with
         (* This should not happend as the lone call to this function is
            protected by a "unless"*)
-        | 0 ->
-            Format.pp_print_string ppf "nothing"
-        | 1 ->
-            Format.pp_print_string ppf "1 operation"
-        | n ->
-            Format.fprintf ppf "%d operations" n
+        | 0 -> Format.pp_print_string ppf "nothing"
+        | 1 -> Format.pp_print_string ppf "1 operation"
+        | n -> Format.fprintf ppf "%d operations" n
       in
       S.declare_1
         ~section
@@ -240,19 +230,18 @@ module Make (E : MENV) = struct
     let file = (File_accessor.get ~dirname:E.base_dir :> string)
 
     let unsafe_read () =
-      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file
-      >>=? fun json -> return @@ Data_encoding.Json.destruct ops_encoding json
+      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file >>=? fun json ->
+      return @@ Data_encoding.Json.destruct ops_encoding json
 
     let read () =
-      File_accessor.exists ~dirname:E.base_dir
-      >>= function true -> unsafe_read () | false -> return []
+      File_accessor.exists ~dirname:E.base_dir >>= function
+      | true -> unsafe_read ()
+      | false -> return []
 
     let write ~mode operations =
-      ( match mode with
-      | Append ->
-          read () >>=? fun ops -> return (ops @ operations)
-      | Zero_truncate ->
-          return operations )
+      (match mode with
+      | Append -> read () >>=? fun ops -> return (ops @ operations)
+      | Zero_truncate -> return operations)
       >>=? fun ops ->
       let json = Data_encoding.Json.construct ops_encoding ops in
       Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file file json
@@ -267,18 +256,14 @@ module Make (E : MENV) = struct
     Directory.register
       Directory.empty
       (* /chains/<chain_id>/mempool/pending_operations *)
-      ( E.Block_services.S.Mempool.pending_operations
-      @@ Block_services.mempool_path Block_services.chain_path )
+      (E.Block_services.S.Mempool.pending_operations
+      @@ Block_services.mempool_path Block_services.chain_path)
       (fun ((), chain) () () ->
-        check_chain chain
-        >>= function
-        | Error errs ->
-            RPC_answer.fail errs
+        check_chain chain >>= function
+        | Error errs -> RPC_answer.fail errs
         | Ok () -> (
-            Mempool.read ()
-            >>= function
-            | Error errs ->
-                RPC_answer.fail errs
+            Mempool.read () >>= function
+            | Error errs -> RPC_answer.fail errs
             | Ok pooled_operations -> (
                 List.map_es
                   (fun (shell_header, operation_data) ->
@@ -293,18 +278,15 @@ module Make (E : MENV) = struct
                         op_data_encoding
                         operation_data
                     with
-                    | Error _ ->
-                        failwith "mockup pending_operations"
+                    | Error _ -> failwith "mockup pending_operations"
                     | Ok proto ->
                         let operation_hash =
-                          Operation.hash
-                            {Operation.shell = shell_header; proto}
+                          Operation.hash {Operation.shell = shell_header; proto}
                         in
                         return (operation_hash, op))
                   pooled_operations
                 >>= function
-                | Error _ ->
-                    RPC_answer.fail [Cannot_parse_op]
+                | Error _ -> RPC_answer.fail [Cannot_parse_op]
                 | Ok applied ->
                     Lwt.return
                       (`Ok
@@ -314,11 +296,12 @@ module Make (E : MENV) = struct
                           branch_refused = Operation_hash.Map.empty;
                           branch_delayed = Operation_hash.Map.empty;
                           unprocessed = Operation_hash.Map.empty;
-                        }) ) ))
+                        }))))
 
   let with_chain chain k =
-    check_chain chain
-    >>= function Error errs -> RPC_answer.fail errs | Ok () -> k ()
+    check_chain chain >>= function
+    | Error errs -> RPC_answer.fail errs
+    | Ok () -> k ()
 
   let shell_header () =
     Directory.prefix
@@ -367,8 +350,7 @@ module Make (E : MENV) = struct
         E.Protocol.operation_data_encoding
         op.protocol_data
     with
-    | Error _ ->
-        failwith "mockup preapply_block"
+    | Error _ -> failwith "mockup preapply_block"
     | Ok proto ->
         let op_t = {Operation.shell = op.shell; proto} in
         let hash = Operation.hash op_t in
@@ -389,54 +371,48 @@ module Make (E : MENV) = struct
          E.Block_services.S.Helpers.Preapply.block
          (fun (((), chain), _block) o {operations; protocol_data = _} ->
            with_chain chain (fun () ->
-               begin_construction ()
-               >>=? (fun validation_state ->
-                      List.fold_left_es
-                        (List.fold_left_es simulate_operation)
-                        (validation_state, [])
-                        operations
-                      >>=? fun (validation_state, preapply_results) ->
-                      E.Protocol.finalize_block validation_state
-                      >>=? fun (validation_result, _metadata) ->
-                      (* Similar to lib_shell.Prevalidation.preapply *)
-                      let operations_hash =
-                        let open Preapply_result in
-                        Operation_list_list_hash.compute
-                        @@ List.map
-                             (fun x ->
-                               Operation_list_hash.compute
-                               @@ List.map fst x.applied)
-                             preapply_results
-                      in
-                      let shell_header =
-                        {
-                          E.rpc_context.block_header with
-                          level = Int32.succ E.rpc_context.block_header.level;
-                          (* proto_level should be unchanged in mockup mode
-                             since we cannot switch protocols *)
-                          predecessor = E.rpc_context.block_hash;
-                          timestamp =
-                            (* The timestamp exists if --minimal-timestamp has
-                               been given on the command line *)
-                            ( match o#timestamp with
-                            | None ->
-                                Time.System.to_protocol
-                                  (Tezos_stdlib_unix.Systime_os.now ())
-                            | Some t ->
-                                t );
-                          operations_hash;
-                          validation_passes = List.length preapply_results;
-                          fitness = validation_result.fitness;
-                          context =
-                            Context_hash.zero (* TODO: is that correct ? *);
-                        }
-                      in
-                      return (shell_header, preapply_results))
+               ( begin_construction () >>=? fun validation_state ->
+                 List.fold_left_es
+                   (List.fold_left_es simulate_operation)
+                   (validation_state, [])
+                   operations
+                 >>=? fun (validation_state, preapply_results) ->
+                 E.Protocol.finalize_block validation_state
+                 >>=? fun (validation_result, _metadata) ->
+                 (* Similar to lib_shell.Prevalidation.preapply *)
+                 let operations_hash =
+                   let open Preapply_result in
+                   Operation_list_list_hash.compute
+                   @@ List.map
+                        (fun x ->
+                          Operation_list_hash.compute @@ List.map fst x.applied)
+                        preapply_results
+                 in
+                 let shell_header =
+                   {
+                     E.rpc_context.block_header with
+                     level = Int32.succ E.rpc_context.block_header.level;
+                     (* proto_level should be unchanged in mockup mode
+                        since we cannot switch protocols *)
+                     predecessor = E.rpc_context.block_hash;
+                     timestamp =
+                       (* The timestamp exists if --minimal-timestamp has
+                          been given on the command line *)
+                       (match o#timestamp with
+                       | None ->
+                           Time.System.to_protocol
+                             (Tezos_stdlib_unix.Systime_os.now ())
+                       | Some t -> t);
+                     operations_hash;
+                     validation_passes = List.length preapply_results;
+                     fitness = validation_result.fitness;
+                     context = Context_hash.zero (* TODO: is that correct ? *);
+                   }
+                 in
+                 return (shell_header, preapply_results) )
                >>= function
-               | Error errs ->
-                   RPC_answer.fail errs
-               | Ok v ->
-                   RPC_answer.return v))
+               | Error errs -> RPC_answer.fail errs
+               | Ok v -> RPC_answer.return v))
 
   let preapply () =
     Directory.prefix
@@ -451,24 +427,21 @@ module Make (E : MENV) = struct
          E.Block_services.S.Helpers.Preapply.operations
          (fun ((_, chain), _block) () op_list ->
            with_chain chain (fun () ->
-               begin_construction ()
-               >>=? (fun state ->
-                      List.fold_left_es
-                        (fun (state, acc) op ->
-                          E.Protocol.apply_operation state op
-                          >>=? fun (state, result) ->
-                          return (state, (op.protocol_data, result) :: acc))
-                        (state, [])
-                        op_list
-                      >>=? fun (state, acc) ->
-                      E.Protocol.finalize_block state
-                      >>=? fun _ -> return (List.rev acc))
+               ( begin_construction () >>=? fun state ->
+                 List.fold_left_es
+                   (fun (state, acc) op ->
+                     E.Protocol.apply_operation state op
+                     >>=? fun (state, result) ->
+                     return (state, (op.protocol_data, result) :: acc))
+                   (state, [])
+                   op_list
+                 >>=? fun (state, acc) ->
+                 E.Protocol.finalize_block state >>=? fun _ ->
+                 return (List.rev acc) )
                >>= fun outcome ->
                match outcome with
-               | Ok result ->
-                   RPC_answer.return result
-               | Error errs ->
-                   RPC_answer.fail errs)))
+               | Ok result -> RPC_answer.return result
+               | Error errs -> RPC_answer.fail errs)))
 
   let equal_op (a_shell_header, a_operation_data)
       (b_shell_header, b_operation_data) =
@@ -476,24 +449,22 @@ module Make (E : MENV) = struct
       a_shell_header.Operation.branch
       b_shell_header.Operation.branch
     && (* FIXME: the protocol should export equality/comparison functions for its
-       abstract types such as operation_data.
+          abstract types such as operation_data.
 
 
-       WARNING: the following expression causes an exception to be raised,
-       complaining about functional values
-       Stdlib.( = ) a_operation_data b_operation_data
+          WARNING: the following expression causes an exception to be raised,
+          complaining about functional values
+          Stdlib.( = ) a_operation_data b_operation_data
        *)
-       Stdlib.compare a_operation_data b_operation_data = 0
+    Stdlib.compare a_operation_data b_operation_data = 0
 
   let need_operation shell_header operation_data =
-    Mempool.read ()
-    >>=? fun mempool_operations ->
+    Mempool.read () >>=? fun mempool_operations ->
     let op = (shell_header, operation_data) in
     if List.mem ~equal:equal_op op mempool_operations then return_false
     else
       let operations = op :: mempool_operations in
-      begin_construction ()
-      >>=? fun validation_state ->
+      begin_construction () >>=? fun validation_state ->
       List.fold_left_es
         (fun rstate (shell, protocol_data) ->
           simulate_operation rstate E.Protocol.{shell; protocol_data})
@@ -504,78 +475,58 @@ module Make (E : MENV) = struct
 
   let inject_operation_with_mempool operation_bytes =
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
-    | Error _ ->
-        RPC_answer.fail [Cannot_parse_op]
+    | Error _ -> RPC_answer.fail [Cannot_parse_op]
     | Ok ({Operation.shell = shell_header; proto} as op) -> (
         let operation_hash = Operation.hash op in
         let proto_op_opt =
-          Data_encoding.Binary.of_bytes
-            E.Protocol.operation_data_encoding
-            proto
+          Data_encoding.Binary.of_bytes E.Protocol.operation_data_encoding proto
         in
         match proto_op_opt with
-        | Error _ ->
-            RPC_answer.fail [Cannot_parse_op]
+        | Error _ -> RPC_answer.fail [Cannot_parse_op]
         | Ok operation_data -> (
-            need_operation shell_header operation_data
-            >>=? (function
-                   | true ->
-                       Mempool.append [(shell_header, operation_data)]
-                   | false ->
-                       L.(S.emit warn_mempool_mem) ()
-                       >>= fun _ ->
-                       Trashpool.append [(shell_header, operation_data)])
+            (need_operation shell_header operation_data >>=? function
+             | true -> Mempool.append [(shell_header, operation_data)]
+             | false ->
+                 L.(S.emit warn_mempool_mem) () >>= fun _ ->
+                 Trashpool.append [(shell_header, operation_data)])
             >>= function
-            | Ok _ ->
-                RPC_answer.return operation_hash
+            | Ok _ -> RPC_answer.return operation_hash
             | Error errs -> (
-                Trashpool.append [(shell_header, operation_data)]
-                >>= function
-                | Ok _ ->
-                    RPC_answer.fail errs
-                | Error errs2 ->
-                    RPC_answer.fail (errs @ errs2) ) ) )
+                Trashpool.append [(shell_header, operation_data)] >>= function
+                | Ok _ -> RPC_answer.fail errs
+                | Error errs2 -> RPC_answer.fail (errs @ errs2))))
 
   let inject_operation_without_mempool
       (write_context_callback :
         Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t)
       operation_bytes =
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
-    | Error _ ->
-        RPC_answer.fail [Cannot_parse_op]
+    | Error _ -> RPC_answer.fail [Cannot_parse_op]
     | Ok ({Operation.shell = shell_header; proto} as op) -> (
         let operation_hash = Operation.hash op in
         let proto_op_opt =
-          Data_encoding.Binary.of_bytes
-            E.Protocol.operation_data_encoding
-            proto
+          Data_encoding.Binary.of_bytes E.Protocol.operation_data_encoding proto
         in
         match proto_op_opt with
-        | Error _ ->
-            RPC_answer.fail [Cannot_parse_op]
+        | Error _ -> RPC_answer.fail [Cannot_parse_op]
         | Ok operation_data -> (
             let op =
               {E.Protocol.shell = shell_header; protocol_data = operation_data}
             in
-            begin_construction ()
-            >>=? (fun state ->
-                   E.Protocol.apply_operation state op
-                   >>=? fun (state, receipt) ->
-                   E.Protocol.finalize_block state
-                   >>=? fun (validation_result, _block_header_metadata) ->
-                   return (validation_result, receipt))
+            ( begin_construction () >>=? fun state ->
+              E.Protocol.apply_operation state op >>=? fun (state, receipt) ->
+              E.Protocol.finalize_block state
+              >>=? fun (validation_result, _block_header_metadata) ->
+              return (validation_result, receipt) )
             >>= fun result ->
             match result with
             | Ok ({context; _}, _receipt) ->
                 let rpc_context = {E.rpc_context with context} in
                 Lwt.bind (write_context_callback rpc_context) (fun result ->
                     match result with
-                    | Ok () ->
-                        RPC_answer.return operation_hash
-                    | Error errs ->
-                        RPC_answer.fail errs)
-            | Error errs ->
-                RPC_answer.fail errs ) )
+                    | Ok () -> RPC_answer.return operation_hash
+                    | Error errs -> RPC_answer.fail errs)
+            | Error errs -> RPC_answer.fail errs))
 
   (* [inject_block] is a feature that assumes that the mockup is on-disk and
    * uses a mempool. *)
@@ -604,18 +555,12 @@ module Make (E : MENV) = struct
         (List.fold_left_es (fun (validation_state, _results) op ->
              incr i ;
              match
-               Data_encoding.Binary.of_bytes
-                 op_data_encoding
-                 op.Operation.proto
+               Data_encoding.Binary.of_bytes op_data_encoding op.Operation.proto
              with
-             | Error _ ->
-                 failwith "Cannot parse"
+             | Error _ -> failwith "Cannot parse"
              | Ok operation_data ->
                  let op =
-                   {
-                     E.Protocol.shell = op.shell;
-                     protocol_data = operation_data;
-                   }
+                   {E.Protocol.shell = op.shell; protocol_data = operation_data}
                  in
                  E.Protocol.apply_operation validation_state op
                  >>=? fun (validation_state, _receipt) ->
@@ -634,70 +579,60 @@ module Make (E : MENV) = struct
         (* assert (Files.Mempool.exists ~dirname:E.base_dir) ; *)
         let block_hash = Block_hash.hash_bytes [bytes] in
         match Block_header.of_bytes bytes with
-        | None ->
-            RPC_answer.fail [Cannot_parse_op]
+        | None -> RPC_answer.fail [Cannot_parse_op]
         | Some block_header -> (
-            reconstruct operations block_header
-            >>=? (fun ({context; _}, _) ->
-                   let rpc_context =
-                     Tezos_protocol_environment.
-                       {
-                         context;
-                         block_hash;
-                         block_header =
-                           (* block_header.shell has been carefully constructed in
-                            * preapply_block. *)
-                           block_header.shell;
-                       }
-                   in
-                   write_context_callback rpc_context
-                   >>=? fun () ->
-                   Mempool.read ()
-                   >>=? fun mempool_operations ->
-                   List.fold_left_es
-                     (fun map ((shell_header, operation_data) as v) ->
-                       match
-                         Data_encoding.Binary.to_bytes
-                           op_data_encoding
-                           operation_data
-                       with
-                       | Error _ ->
-                           failwith
-                             "mockup inject block: byte encoding operation \
-                              failed"
-                       | Ok proto ->
-                           let h =
-                             Operation.hash
-                               {Operation.shell = shell_header; proto}
-                           in
-                           return @@ Operation_hash.Map.add h v map)
-                     Operation_hash.Map.empty
-                     mempool_operations
-                   >>=? fun mempool_map ->
-                   let refused_map =
-                     List.fold_left
-                       (List.fold_left (fun mempool op ->
-                            Operation_hash.Map.remove
-                              (Operation.hash op)
-                              mempool))
-                       mempool_map
-                       operations
-                   in
-                   unless (Operation_hash.Map.is_empty refused_map) (fun () ->
-                       let refused_ops =
-                         Operation_hash.Map.fold
-                           (fun _k v l -> v :: l)
-                           refused_map
-                           []
-                       in
-                       L.(S.emit warn_trashpool_append) refused_ops
-                       >>= fun () -> Trashpool.append refused_ops)
-                   >>=? fun () -> Mempool.write ~mode:Zero_truncate [])
+            ( reconstruct operations block_header >>=? fun ({context; _}, _) ->
+              let rpc_context =
+                Tezos_protocol_environment.
+                  {
+                    context;
+                    block_hash;
+                    block_header =
+                      (* block_header.shell has been carefully constructed in
+                       * preapply_block. *)
+                      block_header.shell;
+                  }
+              in
+              write_context_callback rpc_context >>=? fun () ->
+              Mempool.read () >>=? fun mempool_operations ->
+              List.fold_left_es
+                (fun map ((shell_header, operation_data) as v) ->
+                  match
+                    Data_encoding.Binary.to_bytes
+                      op_data_encoding
+                      operation_data
+                  with
+                  | Error _ ->
+                      failwith
+                        "mockup inject block: byte encoding operation failed"
+                  | Ok proto ->
+                      let h =
+                        Operation.hash {Operation.shell = shell_header; proto}
+                      in
+                      return @@ Operation_hash.Map.add h v map)
+                Operation_hash.Map.empty
+                mempool_operations
+              >>=? fun mempool_map ->
+              let refused_map =
+                List.fold_left
+                  (List.fold_left (fun mempool op ->
+                       Operation_hash.Map.remove (Operation.hash op) mempool))
+                  mempool_map
+                  operations
+              in
+              unless (Operation_hash.Map.is_empty refused_map) (fun () ->
+                  let refused_ops =
+                    Operation_hash.Map.fold
+                      (fun _k v l -> v :: l)
+                      refused_map
+                      []
+                  in
+                  L.(S.emit warn_trashpool_append) refused_ops >>= fun () ->
+                  Trashpool.append refused_ops)
+              >>=? fun () -> Mempool.write ~mode:Zero_truncate [] )
             >>= function
-            | Error errs ->
-                RPC_answer.fail errs
-            | Ok () ->
-                RPC_answer.return block_hash ))
+            | Error errs -> RPC_answer.fail errs
+            | Ok () -> RPC_answer.return block_hash))
 
   let inject_operation (mem_only : bool)
       (write_context_callback :
@@ -705,21 +640,19 @@ module Make (E : MENV) = struct
     Directory.register
       Directory.empty
       (* /injection/operation, vanilla client implementation is in
-      injection_directory.ml *)
+         injection_directory.ml *)
       Tezos_shell_services.Injection_services.S.operation
       (fun _q _contents operation_bytes ->
         if mem_only then RPC_answer.fail [Injection_not_possible]
         else
           (* Looking at the implementations of the two inject_operation_*
-           functions it looks like there is code to share (proto_op_opt,
-           operation_data), but it's not that easy to do;
-           because types of concerned variables depend on E,
-           which cannot cross functions boundaries without putting all that in
-           MOCKUP *)
-          Files.Mempool.exists ~dirname:E.base_dir
-          >>= function
-          | true ->
-              inject_operation_with_mempool operation_bytes
+             functions it looks like there is code to share (proto_op_opt,
+             operation_data), but it's not that easy to do;
+             because types of concerned variables depend on E,
+             which cannot cross functions boundaries without putting all that in
+             MOCKUP *)
+          Files.Mempool.exists ~dirname:E.base_dir >>= function
+          | true -> inject_operation_with_mempool operation_bytes
           | false ->
               inject_operation_without_mempool
                 write_context_callback

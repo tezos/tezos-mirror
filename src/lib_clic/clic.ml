@@ -39,19 +39,16 @@ let compose_parameters {converter = c1; autocomplete = a1'}
       (fun ctx s ->
         c1 ctx s >>= function Ok r -> return r | Error _ -> c2 ctx s);
     autocomplete =
-      ( match a1' with
-      | None ->
-          a2'
+      (match a1' with
+      | None -> a2'
       | Some a1 -> (
-        match a2' with
-        | None ->
-            a1'
-        | Some a2 ->
-            Some
-              (fun ctx ->
-                a1 ctx
-                >>=? fun r1 ->
-                a2 ctx >>=? fun r2 -> return (List.concat [r1; r2])) ) );
+          match a2' with
+          | None -> a1'
+          | Some a2 ->
+              Some
+                (fun ctx ->
+                  a1 ctx >>=? fun r1 ->
+                  a2 ctx >>=? fun r2 -> return (List.concat [r1; r2]))));
   }
 
 let map_parameter ~f {converter; autocomplete} =
@@ -131,8 +128,7 @@ type error += Command_not_found : string list * 'ctx command list -> error
 
 type error += Unknown_option : string * 'ctx command option -> error
 
-type error +=
-  | Option_expected_argument : string * 'ctx command option -> error
+type error += Option_expected_argument : string * 'ctx command option -> error
 
 type error += Bad_option_argument : string * 'ctx command option -> error
 
@@ -153,8 +149,7 @@ let print_desc ppf doc =
     with _ -> (doc, None)
   in
   match long with
-  | None ->
-      Format.fprintf ppf "%s" short
+  | None -> Format.fprintf ppf "%s" short
   | Some doc ->
       Format.fprintf
         ppf
@@ -164,10 +159,8 @@ let print_desc ppf doc =
         doc
 
 let print_label ppf = function
-  | {long; short = None} ->
-      Format.fprintf ppf "--%s" long
-  | {long; short = Some short} ->
-      Format.fprintf ppf "-%c --%s" short long
+  | {long; short = None} -> Format.fprintf ppf "--%s" long
+  | {long; short = Some short} -> Format.fprintf ppf "-%c --%s" short long
 
 let print_options_detailed (type ctx) =
   let help_option : type a. Format.formatter -> (a, ctx) arg -> unit =
@@ -192,25 +185,20 @@ let print_options_detailed (type ctx) =
           (doc ^ "\nDefaults to `" ^ default ^ "`.")
     | Switch {label; doc} ->
         Format.fprintf ppf "@{<opt>%a@}: %a" print_label label print_desc doc
-    | Constant _ ->
-        ()
+    | Constant _ -> ()
   in
   let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
    fun ppf -> function
-    | NoArgs ->
-        ()
-    | AddArg (arg, NoArgs) ->
-        Format.fprintf ppf "%a" help_option arg
+    | NoArgs -> ()
+    | AddArg (arg, NoArgs) -> Format.fprintf ppf "%a" help_option arg
     | AddArg (arg, rest) ->
         Format.fprintf ppf "%a@,%a" help_option arg help rest
   in
   help
 
 let has_args : type a ctx. (a, ctx) args -> bool = function
-  | NoArgs ->
-      false
-  | AddArg (_, _) ->
-      true
+  | NoArgs -> false
+  | AddArg (_, _) -> true
 
 let print_options_brief (type ctx) =
   let help_option : type a. Format.formatter -> (a, ctx) arg -> unit =
@@ -219,17 +207,13 @@ let print_options_brief (type ctx) =
         Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
     | Arg {label; placeholder; _} ->
         Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
-    | Switch {label; _} ->
-        Format.fprintf ppf "[@{<opt>%a@}]" print_label label
-    | Constant _ ->
-        ()
+    | Switch {label; _} -> Format.fprintf ppf "[@{<opt>%a@}]" print_label label
+    | Constant _ -> ()
   in
   let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
    fun ppf -> function
-    | NoArgs ->
-        ()
-    | AddArg (arg, NoArgs) ->
-        Format.fprintf ppf "%a" help_option arg
+    | NoArgs -> ()
+    | AddArg (arg, NoArgs) -> Format.fprintf ppf "%a" help_option arg
     | AddArg (arg, rest) ->
         Format.fprintf ppf "%a@ %a" help_option arg help rest
   in
@@ -237,20 +221,17 @@ let print_options_brief (type ctx) =
 
 let print_highlight highlight_strings formatter str =
   let rec print_string = function
-    | [] ->
-        Format.fprintf formatter "%s" str
+    | [] -> Format.fprintf formatter "%s" str
     | regex :: tl -> (
-      match Re.Str.full_split regex str with
-      | [] | [Re.Str.Text _] ->
-          print_string tl
-      | list ->
-          List.iter
-            (function
-              | Re.Str.Text text ->
-                  Format.fprintf formatter "%s" text
-              | Re.Str.Delim delimiter ->
-                  Format.fprintf formatter "@{<hilight>%s@}" delimiter)
-            list )
+        match Re.Str.full_split regex str with
+        | [] | [Re.Str.Text _] -> print_string tl
+        | list ->
+            List.iter
+              (function
+                | Re.Str.Text text -> Format.fprintf formatter "%s" text
+                | Re.Str.Delim delimiter ->
+                    Format.fprintf formatter "@{<hilight>%s@}" delimiter)
+              list)
   in
   print_string (List.map Re.Str.regexp_string highlight_strings)
 
@@ -260,8 +241,7 @@ let print_commandline ppf (highlights, options, args) =
   in
   let rec print : type a ctx. Format.formatter -> (a, ctx) params -> unit =
    fun ppf -> function
-    | Stop ->
-        Format.fprintf ppf "%a" print_options_brief options
+    | Stop -> Format.fprintf ppf "%a" print_options_brief options
     | Seq (n, _, _) when not (has_args options) ->
         Format.fprintf ppf "[@{<arg>%s@}...]" n
     | Seq (n, _, _) ->
@@ -291,40 +271,30 @@ let print_commandline ppf (highlights, options, args) =
           next
     | Param (n, _, _, Stop) when not (has_args options) ->
         Format.fprintf ppf "@{<arg>%s@}" n
-    | Param (n, _, _, next) ->
-        Format.fprintf ppf "@{<arg>%s@} %a" n print next
+    | Param (n, _, _, next) -> Format.fprintf ppf "@{<arg>%s@} %a" n print next
   in
   Format.fprintf ppf "@{<commandline>%a@}" print args
 
 let rec print_params_detailed :
-    type a b ctx. (b, ctx) args -> Format.formatter -> (a, ctx) params -> unit
-    =
+    type a b ctx. (b, ctx) args -> Format.formatter -> (a, ctx) params -> unit =
  fun spec ppf -> function
-  | Stop ->
-      print_options_detailed ppf spec
+  | Stop -> print_options_detailed ppf spec
   | Seq (n, desc, _) -> (
       Format.fprintf ppf "@{<arg>%s@}: %a" n print_desc (trim desc) ;
       match spec with
-      | NoArgs ->
-          ()
-      | _ ->
-          Format.fprintf ppf "@,%a" print_options_detailed spec )
+      | NoArgs -> ()
+      | _ -> Format.fprintf ppf "@,%a" print_options_detailed spec)
   | NonTerminalSeq (n, desc, _, _, next) -> (
       Format.fprintf ppf "@{<arg>%s@}: %a" n print_desc (trim desc) ;
       match spec with
-      | NoArgs ->
-          ()
-      | _ ->
-          Format.fprintf ppf "@,%a" (print_params_detailed spec) next )
-  | Prefix (_, next) ->
-      print_params_detailed spec ppf next
+      | NoArgs -> ()
+      | _ -> Format.fprintf ppf "@,%a" (print_params_detailed spec) next)
+  | Prefix (_, next) -> print_params_detailed spec ppf next
   | Param (n, desc, _, Stop) -> (
       Format.fprintf ppf "@{<arg>%s@}: %a" n print_desc (trim desc) ;
       match spec with
-      | NoArgs ->
-          ()
-      | _ ->
-          Format.fprintf ppf "@,%a" print_options_detailed spec )
+      | NoArgs -> ()
+      | _ -> Format.fprintf ppf "@,%a" print_options_detailed spec)
   | Param (n, desc, _, next) ->
       Format.fprintf
         ppf
@@ -339,16 +309,11 @@ let contains_params_args :
     type arg ctx. (arg, ctx) params -> (_, ctx) args -> bool =
  fun params args ->
   let rec help : (arg, ctx) params -> bool = function
-    | Stop ->
-        has_args args
-    | Seq (_, _, _) ->
-        true
-    | NonTerminalSeq (_, _, _, _, _) ->
-        true
-    | Prefix (_, next) ->
-        help next
-    | Param (_, _, _, _) ->
-        true
+    | Stop -> has_args args
+    | Seq (_, _, _) -> true
+    | NonTerminalSeq (_, _, _, _, _) -> true
+    | Prefix (_, next) -> help next
+    | Param (_, _, _, _) -> true
   in
   help params
 
@@ -393,30 +358,26 @@ let group_commands commands =
     List.fold_left
       (fun (grouped, ungrouped) (Ex (Command {group; _}) as command) ->
         match group with
-        | None ->
-            (grouped, command :: ungrouped)
+        | None -> (grouped, command :: ungrouped)
         | Some group -> (
-          match
-            List.find_opt (fun ({name; _}, _) -> group.name = name) grouped
-          with
-          | None ->
-              ((group, ref [command]) :: grouped, ungrouped)
-          | Some ({title; _}, r) ->
-              if title <> group.title then
-                invalid_arg "Clic.usage: duplicate group name" ;
-              r := command :: !r ;
-              (grouped, ungrouped) ))
+            match
+              List.find_opt (fun ({name; _}, _) -> group.name = name) grouped
+            with
+            | None -> ((group, ref [command]) :: grouped, ungrouped)
+            | Some ({title; _}, r) ->
+                if title <> group.title then
+                  invalid_arg "Clic.usage: duplicate group name" ;
+                r := command :: !r ;
+                (grouped, ungrouped)))
       ([], [])
       commands
   in
   List.map
     (fun (g, c) -> (g, List.rev !c))
-    ( match ungrouped with
-    | [] ->
-        grouped
+    (match ungrouped with
+    | [] -> grouped
     | l ->
-        grouped @ [({name = "misc"; title = "Miscellaneous commands"}, ref l)]
-    )
+        grouped @ [({name = "misc"; title = "Miscellaneous commands"}, ref l)])
 
 let print_group print_command ppf ({title; _}, commands) =
   Format.fprintf
@@ -440,372 +401,290 @@ let setup_formatter ppf format verbosity =
       Format.pp_get_formatter_stag_functions ppf (),
       Format.pp_get_print_tags ppf () )
   in
-  ( Format.pp_print_flush ppf () ;
-    Format.pp_set_formatter_out_functions
-      ppf
-      {
-        out_string =
-          (fun s b a ->
-            if s = "\000\000\000" then skip := true
-            else if s = "\255\255\255" then skip := false
-            else if not !skip then orig_out_functions.out_string s b a);
-        out_spaces =
-          (fun n -> if not !skip then orig_out_functions.out_spaces n);
-        out_newline =
-          (fun () -> if not !skip then orig_out_functions.out_newline ());
-        out_flush =
-          (fun () -> if not !skip then orig_out_functions.out_flush ());
-        out_indent = orig_out_functions.out_indent;
-      } ;
-    let levels = ref [] in
-    let setup_level (level, op) =
-      if op level verbosity then Format.fprintf ppf "@<0>%s" "\255\255\255"
-      else Format.fprintf ppf "@<0>%s" "\000\000\000"
-    in
-    let push_level level =
-      levels := level :: !levels ;
-      setup_level level
-    in
-    let pop_level () =
-      match !levels with
-      | _ :: level :: rest ->
-          levels := level :: rest ;
-          setup_level level
-      | [_] | [] ->
-          Stdlib.failwith "Clic: unclosed verbosity tag"
-    in
-    push_level (Terse, ( <= )) ;
-    let push_level_tag = function
-      | Format.String_tag tag ->
-          let push op = function
-            | "full" ->
-                push_level (Full, op)
-            | "details" ->
-                push_level (Details, op)
-            | "short" ->
-                push_level (Short, op)
-            | "terse" ->
-                push_level (Terse, op)
-            | tag ->
-                Stdlib.failwith
-                  ("Clic: invalid semantic string tag <" ^ tag ^ ">")
-          in
-          if String.length tag > 0 && tag.[0] = '=' then
-            push ( = ) (String.sub tag 1 (String.length tag - 1))
-          else if String.length tag > 0 && tag.[0] = '-' then
-            push ( > ) (String.sub tag 1 (String.length tag - 1))
-          else push ( <= ) tag
-      | _stag ->
-          Stdlib.failwith "Clic: invalid semantic tag"
-    in
-    let pop_level_tag = function
-      | Format.String_tag "full"
-      | Format.String_tag "details"
-      | Format.String_tag "short"
-      | Format.String_tag "terse"
-      | Format.String_tag "-full"
-      | Format.String_tag "-details"
-      | Format.String_tag "-short"
-      | Format.String_tag "-terse"
-      | Format.String_tag "=full"
-      | Format.String_tag "=details"
-      | Format.String_tag "=short"
-      | Format.String_tag "=terse" ->
-          pop_level ()
-      | Format.String_tag tag ->
-          Stdlib.failwith ("Clic: invalid semantic string tag <" ^ tag ^ ">")
-      | _stag ->
-          Stdlib.failwith "Clic: invalid semantic tag"
-    in
-    match format with
-    | Ansi ->
-        let color_num = function
-          | `Auto ->
-              None
-          | `Black ->
-              Some 0
-          | `Red ->
-              Some 1
-          | `Green ->
-              Some 2
-          | `Yellow ->
-              Some 3
-          | `Blue ->
-              Some 4
-          | `Magenta ->
-              Some 5
-          | `Cyan ->
-              Some 6
-          | `White ->
-              Some 7
-        in
-        let ansi_format ppf (fg, bg, b, u) =
-          Format.fprintf ppf "@<0>%s" "\027[0m" ;
-          match
-            ( match color_num fg with
-            | Some n ->
-                [string_of_int (30 + n)]
-            | None ->
-                [] )
-            @ ( match color_num bg with
-              | Some n ->
-                  [string_of_int (40 + n)]
-              | None ->
-                  [] )
-            @ (if b then ["1"] else [])
-            @ if u then ["4"] else []
-          with
-          | [] ->
-              ()
-          | l ->
-              Format.fprintf ppf "@<0>%s" ("\027[" ^ String.concat ";" l ^ "m")
-        in
-        let ansi_stack = ref [(`Auto, `Auto, false, false)] in
-        let push_ansi_format (fg, bg, b, u) =
-          let format =
-            match !ansi_stack with
-            | (pfg, pbg, pb, pu) :: _ ->
-                ( Option.value ~default:pfg fg,
-                  Option.value ~default:pbg bg,
-                  pb || b,
-                  pu || u )
-            | [] ->
-                assert false
-          in
-          ansi_stack := format :: !ansi_stack ;
-          Format.fprintf ppf "@<0>%a" ansi_format format
-        in
-        let pop_ansi_format () =
-          Format.fprintf ppf "@<0>%s" "\027[0m" ;
-          match !ansi_stack with
-          | _ :: format :: rest ->
-              ansi_stack := format :: rest ;
-              Format.fprintf ppf "@<0>%a" ansi_format format
-          | [_] | [] ->
-              Stdlib.failwith "Clic: unclosed ansi format"
-        in
-        Format.pp_set_formatter_stag_functions
-          ppf
-          {
-            mark_open_stag = (fun _ -> "");
-            mark_close_stag = (fun _ -> "");
-            print_open_stag =
-              (function
-              | Format.String_tag "title" ->
-                  push_ansi_format (None, None, true, true)
-              | Format.String_tag "commandline" ->
-                  Format.fprintf ppf "@[<hov 4>"
-              | Format.String_tag "commanddoc" ->
-                  Format.fprintf ppf "  @[<v 0>"
-              | Format.String_tag "opt" ->
-                  push_ansi_format (Some `Green, None, false, false)
-              | Format.String_tag "arg" ->
-                  push_ansi_format (Some `Yellow, None, false, false) ;
-                  Format.fprintf ppf "<"
-              | Format.String_tag "kwd" ->
-                  push_ansi_format (None, None, false, true)
-              | Format.String_tag "error" ->
-                  push_ansi_format (Some `Red, None, true, true)
-              | Format.String_tag "warning" ->
-                  push_ansi_format (Some `Yellow, None, true, true)
-              | Format.String_tag "hilight" ->
-                  push_ansi_format (Some `White, Some `Yellow, true, true)
-              | Format.String_tag "list" ->
-                  Format.fprintf ppf "  @[<v 0>"
-              | Format.String_tag "command" ->
-                  Format.fprintf ppf "@[<v 0>"
-              | Format.String_tag "document" ->
-                  Format.fprintf ppf "@[<v 0>"
-              | other ->
-                  push_level_tag other);
-            print_close_stag =
-              (function
-              | Format.String_tag "title" ->
-                  Format.fprintf ppf ":" ; pop_ansi_format ()
-              | Format.String_tag "commandline" ->
-                  Format.fprintf ppf "@]"
-              | Format.String_tag "commanddoc" ->
-                  Format.fprintf ppf "@]"
-              | Format.String_tag "opt" ->
-                  pop_ansi_format ()
-              | Format.String_tag "arg" ->
-                  Format.fprintf ppf ">" ; pop_ansi_format ()
-              | Format.String_tag "kwd" ->
-                  pop_ansi_format ()
-              | Format.String_tag "error" ->
-                  pop_ansi_format ()
-              | Format.String_tag "warning" ->
-                  pop_ansi_format ()
-              | Format.String_tag "hilight" ->
-                  pop_ansi_format ()
-              | Format.String_tag "command" | Format.String_tag "list" ->
-                  Format.fprintf ppf "@]"
-              | Format.String_tag "document" ->
-                  Format.fprintf ppf "@]"
-              | other ->
-                  pop_level_tag other);
-          } ;
-        Format.pp_set_print_tags ppf true
-    | Plain ->
-        Format.pp_set_formatter_stag_functions
-          ppf
-          {
-            mark_open_stag = (fun _ -> "");
-            mark_close_stag = (fun _ -> "");
-            print_open_stag =
-              (function
-              | Format.String_tag "title" ->
-                  ()
-              | Format.String_tag "commandline" ->
-                  Format.fprintf ppf "@[<hov 4>"
-              | Format.String_tag "commanddoc" ->
-                  Format.fprintf ppf "  @[<v 0>"
-              | Format.String_tag "opt" ->
-                  ()
-              | Format.String_tag "arg" ->
-                  Format.fprintf ppf "<"
-              | Format.String_tag "kwd" ->
-                  ()
-              | Format.String_tag "hilight" ->
-                  ()
-              | Format.String_tag "error" ->
-                  ()
-              | Format.String_tag "warning" ->
-                  ()
-              | Format.String_tag "list" ->
-                  Format.fprintf ppf "  @[<v 0>"
-              | Format.String_tag "command" ->
-                  Format.fprintf ppf "@[<v 0>"
-              | Format.String_tag "document" ->
-                  Format.fprintf ppf "@[<v 0>"
-              | other ->
-                  push_level_tag other);
-            print_close_stag =
-              (function
-              | Format.String_tag "title" ->
-                  Format.fprintf ppf ":"
-              | Format.String_tag "commandline" ->
-                  Format.fprintf ppf "@]"
-              | Format.String_tag "commanddoc" ->
-                  Format.fprintf ppf "@]"
-              | Format.String_tag "opt" ->
-                  ()
-              | Format.String_tag "arg" ->
-                  Format.fprintf ppf ">"
-              | Format.String_tag "kwd" ->
-                  ()
-              | Format.String_tag "error" ->
-                  ()
-              | Format.String_tag "warning" ->
-                  ()
-              | Format.String_tag "hilight" ->
-                  ()
-              | Format.String_tag "command" | Format.String_tag "list" ->
-                  Format.fprintf ppf "@]"
-              | Format.String_tag "document" ->
-                  Format.fprintf ppf "@]"
-              | other ->
-                  pop_level_tag other);
-          } ;
-        Format.pp_set_print_tags ppf true
-    | Html ->
-        Format.pp_set_formatter_stag_functions
-          ppf
-          {
-            mark_open_stag = (fun _ -> "");
-            mark_close_stag = (fun _ -> "");
-            print_open_stag =
-              (function
-              | Format.String_tag "title" ->
-                  Format.fprintf ppf "\003h3\004"
-              | Format.String_tag "commandline" ->
-                  Format.fprintf ppf "\003div class='cmdline'\004@[<h>"
-              | Format.String_tag "commanddoc" ->
-                  Format.fprintf ppf "\003div class='cmddoc'\004"
-              | Format.String_tag "opt" ->
-                  Format.fprintf ppf "\003span class='opt'\004"
-              | Format.String_tag "arg" ->
-                  Format.fprintf ppf "\003span class='arg'\004"
-              | Format.String_tag "kwd" ->
-                  Format.fprintf ppf "\003span class='kwd'\004"
-              | Format.String_tag "hilight" ->
-                  ()
-              | Format.String_tag "error" ->
-                  ()
-              | Format.String_tag "warning" ->
-                  ()
-              | Format.String_tag "list" ->
-                  Format.fprintf ppf "\003ul\004@\n"
-              | Format.String_tag "command" ->
-                  Format.fprintf ppf "\003li\004@\n"
-              | Format.String_tag "document" ->
-                  Format.fprintf
-                    ppf
-                    "@[<v 0>\003style\004.cmdline { font-family: monospace \
-                     }.cmddoc { white-space: pre-wrap ; font-family: \
-                     monospace; line-height: 170%%; margin: 0 0 20px 0 \
-                     }.cmdline { background: #343131; padding: 2px 8px; \
-                     border-radius:10px; color: white; margin: 5px; \
-                     }.cmdline+.cmddoc { margin: -5px 5px 0 20px; padding: \
-                     5px }.opt,.arg { background: #343131; font-weight: \
-                     bold;  padding: 2px 4px; border-radius:5px; }.kwd { \
-                     font-weight: bold; } .opt { color:#CF0; background: \
-                     #460; } .arg { color: #CEF; background: #369; \
-                     }\003/style\004@\n"
-              | other ->
-                  push_level_tag other);
-            print_close_stag =
-              (function
-              | Format.String_tag "title" ->
-                  Format.fprintf ppf "\003/h3\004@\n"
-              | Format.String_tag "commandline" ->
-                  Format.fprintf ppf "@]\003/div\004@\n"
-              | Format.String_tag "commanddoc" ->
-                  Format.fprintf ppf "\003/div\004@\n"
-              | Format.String_tag "opt"
-              | Format.String_tag "arg"
-              | Format.String_tag "kwd" ->
-                  Format.fprintf ppf "\003/span\004"
-              | Format.String_tag "error"
-              | Format.String_tag "warning"
-              | Format.String_tag "hilight" ->
-                  ()
-              | Format.String_tag "list" ->
-                  Format.fprintf ppf "\003/ul\004@\n"
-              | Format.String_tag "command" ->
-                  Format.fprintf ppf "\003/li\004@\n"
-              | Format.String_tag "document" ->
-                  Format.fprintf ppf "@]"
-              | other ->
-                  pop_level_tag other);
-          } ;
-        let orig_out_functions =
-          Format.pp_get_formatter_out_functions ppf ()
-        in
-        Format.pp_set_formatter_out_functions
-          ppf
-          {
-            orig_out_functions with
-            out_string =
-              (fun s i j ->
-                let buf = Buffer.create (j - i) in
-                for n = i to j - 1 do
-                  match s.[n] with
-                  | '\003' ->
-                      Buffer.add_char buf '<'
-                  | '\004' ->
-                      Buffer.add_char buf '>'
-                  | '>' ->
-                      Buffer.add_string buf "&gt;"
-                  | '<' ->
-                      Buffer.add_string buf "&lt;"
-                  | c ->
-                      Buffer.add_char buf c
-                done ;
-                let s' = Buffer.contents buf in
-                orig_out_functions.out_string s' 0 (String.length s'));
-          } ;
-        Format.pp_set_print_tags ppf true ) ;
+  (Format.pp_print_flush ppf () ;
+   Format.pp_set_formatter_out_functions
+     ppf
+     {
+       out_string =
+         (fun s b a ->
+           if s = "\000\000\000" then skip := true
+           else if s = "\255\255\255" then skip := false
+           else if not !skip then orig_out_functions.out_string s b a);
+       out_spaces = (fun n -> if not !skip then orig_out_functions.out_spaces n);
+       out_newline =
+         (fun () -> if not !skip then orig_out_functions.out_newline ());
+       out_flush = (fun () -> if not !skip then orig_out_functions.out_flush ());
+       out_indent = orig_out_functions.out_indent;
+     } ;
+   let levels = ref [] in
+   let setup_level (level, op) =
+     if op level verbosity then Format.fprintf ppf "@<0>%s" "\255\255\255"
+     else Format.fprintf ppf "@<0>%s" "\000\000\000"
+   in
+   let push_level level =
+     levels := level :: !levels ;
+     setup_level level
+   in
+   let pop_level () =
+     match !levels with
+     | _ :: level :: rest ->
+         levels := level :: rest ;
+         setup_level level
+     | [_] | [] -> Stdlib.failwith "Clic: unclosed verbosity tag"
+   in
+   push_level (Terse, ( <= )) ;
+   let push_level_tag = function
+     | Format.String_tag tag ->
+         let push op = function
+           | "full" -> push_level (Full, op)
+           | "details" -> push_level (Details, op)
+           | "short" -> push_level (Short, op)
+           | "terse" -> push_level (Terse, op)
+           | tag ->
+               Stdlib.failwith
+                 ("Clic: invalid semantic string tag <" ^ tag ^ ">")
+         in
+         if String.length tag > 0 && tag.[0] = '=' then
+           push ( = ) (String.sub tag 1 (String.length tag - 1))
+         else if String.length tag > 0 && tag.[0] = '-' then
+           push ( > ) (String.sub tag 1 (String.length tag - 1))
+         else push ( <= ) tag
+     | _stag -> Stdlib.failwith "Clic: invalid semantic tag"
+   in
+   let pop_level_tag = function
+     | Format.String_tag "full"
+     | Format.String_tag "details"
+     | Format.String_tag "short"
+     | Format.String_tag "terse"
+     | Format.String_tag "-full"
+     | Format.String_tag "-details"
+     | Format.String_tag "-short"
+     | Format.String_tag "-terse"
+     | Format.String_tag "=full"
+     | Format.String_tag "=details"
+     | Format.String_tag "=short"
+     | Format.String_tag "=terse" ->
+         pop_level ()
+     | Format.String_tag tag ->
+         Stdlib.failwith ("Clic: invalid semantic string tag <" ^ tag ^ ">")
+     | _stag -> Stdlib.failwith "Clic: invalid semantic tag"
+   in
+   match format with
+   | Ansi ->
+       let color_num = function
+         | `Auto -> None
+         | `Black -> Some 0
+         | `Red -> Some 1
+         | `Green -> Some 2
+         | `Yellow -> Some 3
+         | `Blue -> Some 4
+         | `Magenta -> Some 5
+         | `Cyan -> Some 6
+         | `White -> Some 7
+       in
+       let ansi_format ppf (fg, bg, b, u) =
+         Format.fprintf ppf "@<0>%s" "\027[0m" ;
+         match
+           (match color_num fg with
+           | Some n -> [string_of_int (30 + n)]
+           | None -> [])
+           @ (match color_num bg with
+             | Some n -> [string_of_int (40 + n)]
+             | None -> [])
+           @ (if b then ["1"] else [])
+           @ if u then ["4"] else []
+         with
+         | [] -> ()
+         | l -> Format.fprintf ppf "@<0>%s" ("\027[" ^ String.concat ";" l ^ "m")
+       in
+       let ansi_stack = ref [(`Auto, `Auto, false, false)] in
+       let push_ansi_format (fg, bg, b, u) =
+         let format =
+           match !ansi_stack with
+           | (pfg, pbg, pb, pu) :: _ ->
+               ( Option.value ~default:pfg fg,
+                 Option.value ~default:pbg bg,
+                 pb || b,
+                 pu || u )
+           | [] -> assert false
+         in
+         ansi_stack := format :: !ansi_stack ;
+         Format.fprintf ppf "@<0>%a" ansi_format format
+       in
+       let pop_ansi_format () =
+         Format.fprintf ppf "@<0>%s" "\027[0m" ;
+         match !ansi_stack with
+         | _ :: format :: rest ->
+             ansi_stack := format :: rest ;
+             Format.fprintf ppf "@<0>%a" ansi_format format
+         | [_] | [] -> Stdlib.failwith "Clic: unclosed ansi format"
+       in
+       Format.pp_set_formatter_stag_functions
+         ppf
+         {
+           mark_open_stag = (fun _ -> "");
+           mark_close_stag = (fun _ -> "");
+           print_open_stag =
+             (function
+             | Format.String_tag "title" ->
+                 push_ansi_format (None, None, true, true)
+             | Format.String_tag "commandline" -> Format.fprintf ppf "@[<hov 4>"
+             | Format.String_tag "commanddoc" -> Format.fprintf ppf "  @[<v 0>"
+             | Format.String_tag "opt" ->
+                 push_ansi_format (Some `Green, None, false, false)
+             | Format.String_tag "arg" ->
+                 push_ansi_format (Some `Yellow, None, false, false) ;
+                 Format.fprintf ppf "<"
+             | Format.String_tag "kwd" ->
+                 push_ansi_format (None, None, false, true)
+             | Format.String_tag "error" ->
+                 push_ansi_format (Some `Red, None, true, true)
+             | Format.String_tag "warning" ->
+                 push_ansi_format (Some `Yellow, None, true, true)
+             | Format.String_tag "hilight" ->
+                 push_ansi_format (Some `White, Some `Yellow, true, true)
+             | Format.String_tag "list" -> Format.fprintf ppf "  @[<v 0>"
+             | Format.String_tag "command" -> Format.fprintf ppf "@[<v 0>"
+             | Format.String_tag "document" -> Format.fprintf ppf "@[<v 0>"
+             | other -> push_level_tag other);
+           print_close_stag =
+             (function
+             | Format.String_tag "title" ->
+                 Format.fprintf ppf ":" ;
+                 pop_ansi_format ()
+             | Format.String_tag "commandline" -> Format.fprintf ppf "@]"
+             | Format.String_tag "commanddoc" -> Format.fprintf ppf "@]"
+             | Format.String_tag "opt" -> pop_ansi_format ()
+             | Format.String_tag "arg" ->
+                 Format.fprintf ppf ">" ;
+                 pop_ansi_format ()
+             | Format.String_tag "kwd" -> pop_ansi_format ()
+             | Format.String_tag "error" -> pop_ansi_format ()
+             | Format.String_tag "warning" -> pop_ansi_format ()
+             | Format.String_tag "hilight" -> pop_ansi_format ()
+             | Format.String_tag "command" | Format.String_tag "list" ->
+                 Format.fprintf ppf "@]"
+             | Format.String_tag "document" -> Format.fprintf ppf "@]"
+             | other -> pop_level_tag other);
+         } ;
+       Format.pp_set_print_tags ppf true
+   | Plain ->
+       Format.pp_set_formatter_stag_functions
+         ppf
+         {
+           mark_open_stag = (fun _ -> "");
+           mark_close_stag = (fun _ -> "");
+           print_open_stag =
+             (function
+             | Format.String_tag "title" -> ()
+             | Format.String_tag "commandline" -> Format.fprintf ppf "@[<hov 4>"
+             | Format.String_tag "commanddoc" -> Format.fprintf ppf "  @[<v 0>"
+             | Format.String_tag "opt" -> ()
+             | Format.String_tag "arg" -> Format.fprintf ppf "<"
+             | Format.String_tag "kwd" -> ()
+             | Format.String_tag "hilight" -> ()
+             | Format.String_tag "error" -> ()
+             | Format.String_tag "warning" -> ()
+             | Format.String_tag "list" -> Format.fprintf ppf "  @[<v 0>"
+             | Format.String_tag "command" -> Format.fprintf ppf "@[<v 0>"
+             | Format.String_tag "document" -> Format.fprintf ppf "@[<v 0>"
+             | other -> push_level_tag other);
+           print_close_stag =
+             (function
+             | Format.String_tag "title" -> Format.fprintf ppf ":"
+             | Format.String_tag "commandline" -> Format.fprintf ppf "@]"
+             | Format.String_tag "commanddoc" -> Format.fprintf ppf "@]"
+             | Format.String_tag "opt" -> ()
+             | Format.String_tag "arg" -> Format.fprintf ppf ">"
+             | Format.String_tag "kwd" -> ()
+             | Format.String_tag "error" -> ()
+             | Format.String_tag "warning" -> ()
+             | Format.String_tag "hilight" -> ()
+             | Format.String_tag "command" | Format.String_tag "list" ->
+                 Format.fprintf ppf "@]"
+             | Format.String_tag "document" -> Format.fprintf ppf "@]"
+             | other -> pop_level_tag other);
+         } ;
+       Format.pp_set_print_tags ppf true
+   | Html ->
+       Format.pp_set_formatter_stag_functions
+         ppf
+         {
+           mark_open_stag = (fun _ -> "");
+           mark_close_stag = (fun _ -> "");
+           print_open_stag =
+             (function
+             | Format.String_tag "title" -> Format.fprintf ppf "\003h3\004"
+             | Format.String_tag "commandline" ->
+                 Format.fprintf ppf "\003div class='cmdline'\004@[<h>"
+             | Format.String_tag "commanddoc" ->
+                 Format.fprintf ppf "\003div class='cmddoc'\004"
+             | Format.String_tag "opt" ->
+                 Format.fprintf ppf "\003span class='opt'\004"
+             | Format.String_tag "arg" ->
+                 Format.fprintf ppf "\003span class='arg'\004"
+             | Format.String_tag "kwd" ->
+                 Format.fprintf ppf "\003span class='kwd'\004"
+             | Format.String_tag "hilight" -> ()
+             | Format.String_tag "error" -> ()
+             | Format.String_tag "warning" -> ()
+             | Format.String_tag "list" -> Format.fprintf ppf "\003ul\004@\n"
+             | Format.String_tag "command" -> Format.fprintf ppf "\003li\004@\n"
+             | Format.String_tag "document" ->
+                 Format.fprintf
+                   ppf
+                   "@[<v 0>\003style\004.cmdline { font-family: monospace \
+                    }.cmddoc { white-space: pre-wrap ; font-family: monospace; \
+                    line-height: 170%%; margin: 0 0 20px 0 }.cmdline { \
+                    background: #343131; padding: 2px 8px; border-radius:10px; \
+                    color: white; margin: 5px; }.cmdline+.cmddoc { margin: \
+                    -5px 5px 0 20px; padding: 5px }.opt,.arg { background: \
+                    #343131; font-weight: bold;  padding: 2px 4px; \
+                    border-radius:5px; }.kwd { font-weight: bold; } .opt { \
+                    color:#CF0; background: #460; } .arg { color: #CEF; \
+                    background: #369; }\003/style\004@\n"
+             | other -> push_level_tag other);
+           print_close_stag =
+             (function
+             | Format.String_tag "title" -> Format.fprintf ppf "\003/h3\004@\n"
+             | Format.String_tag "commandline" ->
+                 Format.fprintf ppf "@]\003/div\004@\n"
+             | Format.String_tag "commanddoc" ->
+                 Format.fprintf ppf "\003/div\004@\n"
+             | Format.String_tag "opt"
+             | Format.String_tag "arg"
+             | Format.String_tag "kwd" ->
+                 Format.fprintf ppf "\003/span\004"
+             | Format.String_tag "error"
+             | Format.String_tag "warning"
+             | Format.String_tag "hilight" ->
+                 ()
+             | Format.String_tag "list" -> Format.fprintf ppf "\003/ul\004@\n"
+             | Format.String_tag "command" ->
+                 Format.fprintf ppf "\003/li\004@\n"
+             | Format.String_tag "document" -> Format.fprintf ppf "@]"
+             | other -> pop_level_tag other);
+         } ;
+       let orig_out_functions = Format.pp_get_formatter_out_functions ppf () in
+       Format.pp_set_formatter_out_functions
+         ppf
+         {
+           orig_out_functions with
+           out_string =
+             (fun s i j ->
+               let buf = Buffer.create (j - i) in
+               for n = i to j - 1 do
+                 match s.[n] with
+                 | '\003' -> Buffer.add_char buf '<'
+                 | '\004' -> Buffer.add_char buf '>'
+                 | '>' -> Buffer.add_string buf "&gt;"
+                 | '<' -> Buffer.add_string buf "&lt;"
+                 | c -> Buffer.add_char buf c
+               done ;
+               let s' = Buffer.contents buf in
+               orig_out_functions.out_string s' 0 (String.length s'));
+         } ;
+       Format.pp_set_print_tags ppf true) ;
   orig_state
 
 let restore_formatter ppf (out_functions, tag_functions, tags) =
@@ -876,44 +755,34 @@ let parse_arg :
  fun ?command spec args_dict ctx ->
   match spec with
   | Arg {label = {long; short = _}; kind = {converter; _}; _} -> (
-    match TzString.Map.find_opt long args_dict with
-    | None | Some [] ->
-        return_none
-    | Some [s] ->
-        trace (Bad_option_argument ("--" ^ long, command)) (converter ctx s)
-        >|=? fun x -> Some x
-    | Some (_ :: _) ->
-        fail (Multiple_occurrences ("--" ^ long, command)) )
+      match TzString.Map.find_opt long args_dict with
+      | None | Some [] -> return_none
+      | Some [s] ->
+          trace (Bad_option_argument ("--" ^ long, command)) (converter ctx s)
+          >|=? fun x -> Some x
+      | Some (_ :: _) -> fail (Multiple_occurrences ("--" ^ long, command)))
   | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (
-      converter ctx default
-      >>= fun default ->
-      ( match default with
-      | Ok x ->
-          return x
+      converter ctx default >>= fun default ->
+      (match default with
+      | Ok x -> return x
       | Error _ ->
           invalid_arg
             (Format.sprintf
                "Value provided as default for '%s' could not be parsed by \
                 converter function."
-               long) )
+               long))
       >>=? fun default ->
       match TzString.Map.find_opt long args_dict with
-      | None | Some [] ->
-          return default
+      | None | Some [] -> return default
       | Some [s] ->
           trace (Bad_option_argument (long, command)) (converter ctx s)
-      | Some (_ :: _) ->
-          fail (Multiple_occurrences (long, command)) )
+      | Some (_ :: _) -> fail (Multiple_occurrences (long, command)))
   | Switch {label = {long; short = _}; _} -> (
-    match TzString.Map.find_opt long args_dict with
-    | None | Some [] ->
-        return_false
-    | Some [_] ->
-        return_true
-    | Some (_ :: _) ->
-        fail (Multiple_occurrences (long, command)) )
-  | Constant c ->
-      return c
+      match TzString.Map.find_opt long args_dict with
+      | None | Some [] -> return_false
+      | Some [_] -> return_true
+      | Some (_ :: _) -> fail (Multiple_occurrences (long, command)))
+  | Constant c -> return c
 
 (* Argument parsing *)
 let rec parse_args :
@@ -925,11 +794,9 @@ let rec parse_args :
     a tzresult Lwt.t =
  fun ?command spec args_dict ctx ->
   match spec with
-  | NoArgs ->
-      return_unit
+  | NoArgs -> return_unit
   | AddArg (arg, rest) ->
-      parse_arg ?command arg args_dict ctx
-      >>=? fun arg ->
+      parse_arg ?command arg args_dict ctx >>=? fun arg ->
       parse_args ?command rest args_dict ctx >|=? fun rest -> (arg, rest)
 
 let empty_args_dict = TzString.Map.empty
@@ -941,68 +808,51 @@ let rec make_arities_dict :
     (int * string) TzString.Map.t =
  fun args acc ->
   match args with
-  | NoArgs ->
-      acc
+  | NoArgs -> acc
   | AddArg (arg, rest) -> (
       let recur {long; short} num =
-        ( match short with
-        | None ->
-            acc
-        | Some c ->
-            TzString.Map.add ("-" ^ String.make 1 c) (num, long) acc )
+        (match short with
+        | None -> acc
+        | Some c -> TzString.Map.add ("-" ^ String.make 1 c) (num, long) acc)
         |> TzString.Map.add ("-" ^ long) (num, long)
         |> TzString.Map.add ("--" ^ long) (num, long)
         |> make_arities_dict rest
       in
       match arg with
-      | Arg {label; _} ->
-          recur label 1
-      | DefArg {label; _} ->
-          recur label 1
-      | Switch {label; _} ->
-          recur label 0
-      | Constant _c ->
-          make_arities_dict rest acc )
+      | Arg {label; _} -> recur label 1
+      | DefArg {label; _} -> recur label 1
+      | Switch {label; _} -> recur label 0
+      | Constant _c -> make_arities_dict rest acc)
 
 type error += Version : error
 
 type error += Help : 'a command option -> error
 
 let check_help_flag ?command = function
-  | ("-h" | "--help") :: _ ->
-      fail (Help command)
-  | _ ->
-      return_unit
+  | ("-h" | "--help") :: _ -> fail (Help command)
+  | _ -> return_unit
 
 let check_version_flag = function
   (* No "-v", it is taken by man output verbosity *)
-  | "--version" :: _ ->
-      fail Version
-  | _ ->
-      return_unit
+  | "--version" :: _ -> fail Version
+  | _ -> return_unit
 
 let add_occurrence long value acc =
   match TzString.Map.find_opt long acc with
-  | Some v ->
-      TzString.Map.add long v acc
-  | None ->
-      TzString.Map.add long [value] acc
+  | Some v -> TzString.Map.add long v acc
+  | None -> TzString.Map.add long [value] acc
 
 let make_args_dict_consume ?command spec args =
   let rec make_args_dict completing arities acc args =
-    check_help_flag ?command args
-    >>=? fun () ->
-    check_version_flag args
-    >>=? fun () ->
+    check_help_flag ?command args >>=? fun () ->
+    check_version_flag args >>=? fun () ->
     match args with
-    | [] ->
-        return (acc, [])
+    | [] -> return (acc, [])
     | arg :: tl ->
         if String.length arg > 0 && arg.[0] = '-' then
           if TzString.Map.mem arg arities then
             let (arity, long) = TzString.Map.find arg arities in
-            check_help_flag ?command tl
-            >>=? fun () ->
+            check_help_flag ?command tl >>=? fun () ->
             match (arity, tl) with
             | (0, tl') ->
                 make_args_dict
@@ -1016,10 +866,8 @@ let make_args_dict_consume ?command spec args =
                   arities
                   (add_occurrence long value acc)
                   tl'
-            | (1, []) when completing ->
-                return (acc, [])
-            | (1, []) ->
-                fail (Option_expected_argument (arg, None))
+            | (1, []) when completing -> return (acc, [])
+            | (1, []) -> fail (Option_expected_argument (arg, None))
             | (_, _) ->
                 raise
                   (Failure
@@ -1036,16 +884,13 @@ let make_args_dict_consume ?command spec args =
 
 let make_args_dict_filter ?command spec args =
   let rec make_args_dict arities (dict, other_args) args =
-    check_help_flag ?command args
-    >>=? fun () ->
+    check_help_flag ?command args >>=? fun () ->
     match args with
-    | [] ->
-        return (dict, other_args)
+    | [] -> return (dict, other_args)
     | arg :: tl ->
         if TzString.Map.mem arg arities then
           let (arity, long) = TzString.Map.find arg arities in
-          check_help_flag ?command tl
-          >>=? fun () ->
+          check_help_flag ?command tl >>=? fun () ->
           match (arity, tl) with
           | (0, tl) ->
               make_args_dict
@@ -1057,8 +902,7 @@ let make_args_dict_filter ?command spec args =
                 arities
                 (add_occurrence long value dict, other_args)
                 tl'
-          | (1, []) ->
-              fail (Option_expected_argument (arg, command))
+          | (1, []) -> fail (Option_expected_argument (arg, command))
           | (_, _) ->
               raise
                 (Failure
@@ -1123,8 +967,8 @@ let args7 spec1 spec2 spec3 spec4 spec5 spec6 spec7 =
     {
       spec =
         spec1
-        >> ( spec2
-           >> (spec3 >> (spec4 >> (spec5 >> (spec6 >> (spec7 >> NoArgs))))) );
+        >> (spec2
+           >> (spec3 >> (spec4 >> (spec5 >> (spec6 >> (spec7 >> NoArgs))))));
       converter =
         (fun (arg1, (arg2, (arg3, (arg4, (arg5, (spec6, (spec7, ()))))))) ->
           (arg1, arg2, arg3, arg4, arg5, spec6, spec7));
@@ -1135,10 +979,10 @@ let args8 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 =
     {
       spec =
         spec1
-        >> ( spec2
-           >> ( spec3
-              >> (spec4 >> (spec5 >> (spec6 >> (spec7 >> (spec8 >> NoArgs)))))
-              ) );
+        >> (spec2
+           >> (spec3
+              >> (spec4 >> (spec5 >> (spec6 >> (spec7 >> (spec8 >> NoArgs))))))
+           );
       converter =
         (fun ( arg1,
                (arg2, (arg3, (arg4, (arg5, (spec6, (spec7, (spec8, ()))))))) ) ->
@@ -1150,12 +994,11 @@ let args9 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 =
     {
       spec =
         spec1
-        >> ( spec2
-           >> ( spec3
-              >> ( spec4
-                 >> ( spec5
-                    >> (spec6 >> (spec7 >> (spec8 >> (spec9 >> NoArgs)))) ) )
-              ) );
+        >> (spec2
+           >> (spec3
+              >> (spec4
+                 >> (spec5 >> (spec6 >> (spec7 >> (spec8 >> (spec9 >> NoArgs)))))
+                 )));
       converter =
         (fun ( arg1,
                ( arg2,
@@ -1169,47 +1012,44 @@ let args10 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 =
     {
       spec =
         spec1
-        >> ( spec2
-           >> ( spec3
-              >> ( spec4
-                 >> ( spec5
-                    >> ( spec6
-                       >> (spec7 >> (spec8 >> (spec9 >> (spec10 >> NoArgs))))
-                       ) ) ) ) );
+        >> (spec2
+           >> (spec3
+              >> (spec4
+                 >> (spec5
+                    >> (spec6
+                       >> (spec7 >> (spec8 >> (spec9 >> (spec10 >> NoArgs))))))
+                 )));
       converter =
         (fun ( arg1,
                ( arg2,
                  ( arg3,
                    ( arg4,
-                     (arg5, (spec6, (spec7, (spec8, (spec9, (spec10, ()))))))
-                   ) ) ) ) ->
+                     (arg5, (spec6, (spec7, (spec8, (spec9, (spec10, ())))))) )
+                 ) ) ) ->
           (arg1, arg2, arg3, arg4, arg5, spec6, spec7, spec8, spec9, spec10));
     }
 
-let args11 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
-    =
+let args11 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11 =
   Argument
     {
       spec =
         spec1
-        >> ( spec2
-           >> ( spec3
-              >> ( spec4
-                 >> ( spec5
-                    >> ( spec6
-                       >> ( spec7
-                          >> ( spec8
-                             >> (spec9 >> (spec10 >> (spec11 >> NoArgs))) ) )
-                       ) ) ) ) );
+        >> (spec2
+           >> (spec3
+              >> (spec4
+                 >> (spec5
+                    >> (spec6
+                       >> (spec7
+                          >> (spec8 >> (spec9 >> (spec10 >> (spec11 >> NoArgs))))
+                          ))))));
       converter =
         (fun ( arg1,
                ( arg2,
                  ( arg3,
                    ( arg4,
                      ( arg5,
-                       ( spec6,
-                         (spec7, (spec8, (spec9, (spec10, (spec11, ()))))) ) )
-                   ) ) ) ) ->
+                       (spec6, (spec7, (spec8, (spec9, (spec10, (spec11, ()))))))
+                     ) ) ) ) ) ->
           ( arg1,
             arg2,
             arg3,
@@ -1229,16 +1069,16 @@ let args12 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
     {
       spec =
         spec1
-        >> ( spec2
-           >> ( spec3
-              >> ( spec4
-                 >> ( spec5
-                    >> ( spec6
-                       >> ( spec7
-                          >> ( spec8
-                             >> ( spec9
-                                >> (spec10 >> (spec11 >> (spec12 >> NoArgs)))
-                                ) ) ) ) ) ) ) );
+        >> (spec2
+           >> (spec3
+              >> (spec4
+                 >> (spec5
+                    >> (spec6
+                       >> (spec7
+                          >> (spec8
+                             >> (spec9
+                                >> (spec10 >> (spec11 >> (spec12 >> NoArgs)))))
+                          ))))));
       converter =
         (fun ( arg1,
                ( arg2,
@@ -1247,8 +1087,8 @@ let args12 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
                      ( arg5,
                        ( spec6,
                          ( spec7,
-                           (spec8, (spec9, (spec10, (spec11, (spec12, ())))))
-                         ) ) ) ) ) ) ) ->
+                           (spec8, (spec9, (spec10, (spec11, (spec12, ()))))) )
+                       ) ) ) ) ) ) ->
           ( arg1,
             arg2,
             arg3,
@@ -1269,17 +1109,17 @@ let args13 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
     {
       spec =
         spec1
-        >> ( spec2
-           >> ( spec3
-              >> ( spec4
-                 >> ( spec5
-                    >> ( spec6
-                       >> ( spec7
-                          >> ( spec8
-                             >> ( spec9
-                                >> ( spec10
+        >> (spec2
+           >> (spec3
+              >> (spec4
+                 >> (spec5
+                    >> (spec6
+                       >> (spec7
+                          >> (spec8
+                             >> (spec9
+                                >> (spec10
                                    >> (spec11 >> (spec12 >> (spec13 >> NoArgs)))
-                                   ) ) ) ) ) ) ) ) );
+                                   )))))))));
       converter =
         (fun ( arg1,
                ( arg2,
@@ -1312,19 +1152,19 @@ let args14 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
     {
       spec =
         spec1
-        >> ( spec2
-           >> ( spec3
-              >> ( spec4
-                 >> ( spec5
-                    >> ( spec6
-                       >> ( spec7
-                          >> ( spec8
-                             >> ( spec9
-                                >> ( spec10
-                                   >> ( spec11
-                                      >> ( spec12
-                                         >> (spec13 >> (spec14 >> NoArgs)) ) )
-                                   ) ) ) ) ) ) ) ) );
+        >> (spec2
+           >> (spec3
+              >> (spec4
+                 >> (spec5
+                    >> (spec6
+                       >> (spec7
+                          >> (spec8
+                             >> (spec9
+                                >> (spec10
+                                   >> (spec11
+                                      >> (spec12
+                                         >> (spec13 >> (spec14 >> NoArgs)))))))
+                          ))))));
       converter =
         (fun ( arg1,
                ( arg2,
@@ -1336,8 +1176,8 @@ let args14 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
                            ( spec8,
                              ( spec9,
                                ( spec10,
-                                 (spec11, (spec12, (spec13, (spec14, ())))) )
-                             ) ) ) ) ) ) ) ) ) ->
+                                 (spec11, (spec12, (spec13, (spec14, ())))) ) )
+                           ) ) ) ) ) ) ) ) ->
           ( arg1,
             arg2,
             arg3,
@@ -1360,20 +1200,20 @@ let args15 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
     {
       spec =
         spec1
-        >> ( spec2
-           >> ( spec3
-              >> ( spec4
-                 >> ( spec5
-                    >> ( spec6
-                       >> ( spec7
-                          >> ( spec8
-                             >> ( spec9
-                                >> ( spec10
-                                   >> ( spec11
-                                      >> ( spec12
-                                         >> ( spec13
-                                            >> (spec14 >> (spec15 >> NoArgs))
-                                            ) ) ) ) ) ) ) ) ) ) ) );
+        >> (spec2
+           >> (spec3
+              >> (spec4
+                 >> (spec5
+                    >> (spec6
+                       >> (spec7
+                          >> (spec8
+                             >> (spec9
+                                >> (spec10
+                                   >> (spec11
+                                      >> (spec12
+                                         >> (spec13
+                                            >> (spec14 >> (spec15 >> NoArgs))))
+                                      ))))))))));
       converter =
         (fun ( arg1,
                ( arg2,
@@ -1386,8 +1226,8 @@ let args15 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
                              ( spec9,
                                ( spec10,
                                  ( spec11,
-                                   (spec12, (spec13, (spec14, (spec15, ()))))
-                                 ) ) ) ) ) ) ) ) ) ) ) ->
+                                   (spec12, (spec13, (spec14, (spec15, ())))) )
+                               ) ) ) ) ) ) ) ) ) ) ->
           ( arg1,
             arg2,
             arg3,
@@ -1411,21 +1251,21 @@ let args16 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
     {
       spec =
         spec1
-        >> ( spec2
-           >> ( spec3
-              >> ( spec4
-                 >> ( spec5
-                    >> ( spec6
-                       >> ( spec7
-                          >> ( spec8
-                             >> ( spec9
-                                >> ( spec10
-                                   >> ( spec11
-                                      >> ( spec12
-                                         >> ( spec13
-                                            >> ( spec14
+        >> (spec2
+           >> (spec3
+              >> (spec4
+                 >> (spec5
+                    >> (spec6
+                       >> (spec7
+                          >> (spec8
+                             >> (spec9
+                                >> (spec10
+                                   >> (spec11
+                                      >> (spec12
+                                         >> (spec13
+                                            >> (spec14
                                                >> (spec15 >> (spec16 >> NoArgs))
-                                               ) ) ) ) ) ) ) ) ) ) ) ) );
+                                               )))))))))))));
       converter =
         (fun ( arg1,
                ( arg2,
@@ -1465,23 +1305,23 @@ let args17 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
     {
       spec =
         spec1
-        >> ( spec2
-           >> ( spec3
-              >> ( spec4
-                 >> ( spec5
-                    >> ( spec6
-                       >> ( spec7
-                          >> ( spec8
-                             >> ( spec9
-                                >> ( spec10
-                                   >> ( spec11
-                                      >> ( spec12
-                                         >> ( spec13
-                                            >> ( spec14
-                                               >> ( spec15
-                                                  >> ( spec16
-                                                     >> (spec17 >> NoArgs) ) )
-                                               ) ) ) ) ) ) ) ) ) ) ) ) );
+        >> (spec2
+           >> (spec3
+              >> (spec4
+                 >> (spec5
+                    >> (spec6
+                       >> (spec7
+                          >> (spec8
+                             >> (spec9
+                                >> (spec10
+                                   >> (spec11
+                                      >> (spec12
+                                         >> (spec13
+                                            >> (spec14
+                                               >> (spec15
+                                                  >> (spec16
+                                                    >> (spec17 >> NoArgs)))))))
+                                   )))))))));
       converter =
         (fun ( arg1,
                ( arg2,
@@ -1496,9 +1336,8 @@ let args17 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
                                  ( spec11,
                                    ( spec12,
                                      ( spec13,
-                                       ( spec14,
-                                         (spec15, (spec16, (spec17, ()))) ) )
-                                   ) ) ) ) ) ) ) ) ) ) ) ) ->
+                                       (spec14, (spec15, (spec16, (spec17, ()))))
+                                     ) ) ) ) ) ) ) ) ) ) ) ) ) ->
           ( arg1,
             arg2,
             arg3,
@@ -1523,19 +1362,15 @@ let param ~name ~desc kind next = Param (name, desc, kind, next)
 
 let seq_of_param param =
   match param Stop with
-  | Param (n, desc, parameter, Stop) ->
-      Seq (n, desc, parameter)
-  | _ ->
-      invalid_arg "Clic.seq_of_param"
+  | Param (n, desc, parameter, Stop) -> Seq (n, desc, parameter)
+  | _ -> invalid_arg "Clic.seq_of_param"
 
 let non_terminal_seq ~suffix param next =
   match (suffix, param Stop) with
-  | ([], _) ->
-      invalid_arg "Clic.non_terminal_seq: empty suffix"
+  | ([], _) -> invalid_arg "Clic.non_terminal_seq: empty suffix"
   | (_, Param (n, desc, parameter, Stop)) ->
       NonTerminalSeq (n, desc, parameter, suffix, next)
-  | _ ->
-      invalid_arg "Clic.non_terminal_seq"
+  | _ -> invalid_arg "Clic.non_terminal_seq"
 
 let prefix keyword next = Prefix (keyword, next)
 
@@ -1566,25 +1401,18 @@ let string_contains ~needle ~haystack =
 let rec search_params_prefix : type a arg. string -> (a, arg) params -> bool =
  fun prefix -> function
   | Prefix (keyword, next) -> (
-    match string_contains ~needle:prefix ~haystack:keyword with
-    | None ->
-        search_params_prefix prefix next
-    | Some _ ->
-        true )
-  | Param (_, _, _, next) ->
-      search_params_prefix prefix next
-  | Stop ->
-      false
-  | Seq _ ->
-      false
+      match string_contains ~needle:prefix ~haystack:keyword with
+      | None -> search_params_prefix prefix next
+      | Some _ -> true)
+  | Param (_, _, _, next) -> search_params_prefix prefix next
+  | Stop -> false
+  | Seq _ -> false
   | NonTerminalSeq (_, _, _, suffix, next) ->
       List.exists
         (fun keyword ->
           match string_contains ~needle:prefix ~haystack:keyword with
-          | None ->
-              false
-          | Some _ ->
-              true)
+          | None -> false
+          | Some _ -> true)
         suffix
       || search_params_prefix prefix next
 
@@ -1593,40 +1421,36 @@ let search_command keyword (Command {params; _}) =
 
 (* Command execution *)
 let exec (type ctx)
-    ( Command
-        { options = Argument {converter; spec = options_spec};
-          params = spec;
-          handler;
-          conv;
-          _ } as command ) (ctx : ctx) params args_dict =
+    (Command
+       {
+         options = Argument {converter; spec = options_spec};
+         params = spec;
+         handler;
+         conv;
+         _;
+       } as command) (ctx : ctx) params args_dict =
   let rec exec :
       type ctx a.
-      int -> ctx -> (a, ctx) params -> a -> string list -> unit tzresult Lwt.t
-      =
+      int -> ctx -> (a, ctx) params -> a -> string list -> unit tzresult Lwt.t =
    fun i ctx spec cb params ->
     match (spec, params) with
-    | (Stop, _) ->
-        cb ctx
+    | (Stop, _) -> cb ctx
     | (Seq (_, _, {converter; _}), seq) ->
         let rec do_seq i acc = function
-          | [] ->
-              return (List.rev acc)
+          | [] -> return (List.rev acc)
           | p :: rest ->
               Lwt.catch
                 (fun () -> converter ctx p)
                 (function
-                  | Failure msg ->
-                      Error_monad.failwith "%s" msg
-                  | exn ->
-                      fail (Exn exn))
+                  | Failure msg -> Error_monad.failwith "%s" msg
+                  | exn -> fail (Exn exn))
               |> trace (Bad_argument (i, p))
               >>=? fun v -> do_seq (succ i) (v :: acc) rest
         in
         do_seq i [] seq >>=? fun parsed -> cb parsed ctx
     | (NonTerminalSeq (_, _, {converter; _}, suffix, next), seq) ->
         let rec do_seq i acc = function
-          | [] ->
-              return (List.rev acc, [])
+          | [] -> return (List.rev acc, [])
           | p :: rest as params ->
               (* try to match suffix first *)
               let rec match_suffix = function
@@ -1635,8 +1459,7 @@ let exec (type ctx)
                 | (params, []) ->
                     (* all of the suffix parts have been matched *)
                     (params, true)
-                | (_, _) ->
-                    (params, false)
+                | (_, _) -> (params, false)
               in
               let (unmatched_rest, matched) = match_suffix (params, suffix) in
               if matched then return (List.rev acc, unmatched_rest)
@@ -1644,36 +1467,29 @@ let exec (type ctx)
                 (* if suffix is not match, try to continue with the sequence *)
                 Lwt.catch
                   (fun () ->
-                    converter ctx p
-                    >>=? fun v -> do_seq (succ i) (v :: acc) rest)
+                    converter ctx p >>=? fun v ->
+                    do_seq (succ i) (v :: acc) rest)
                   (function
                     | err -> (
-                      match err with
-                      | Failure msg ->
-                          Error_monad.failwith "%s" msg
-                      | exn ->
-                          fail (Exn exn) ))
+                        match err with
+                        | Failure msg -> Error_monad.failwith "%s" msg
+                        | exn -> fail (Exn exn)))
         in
-        do_seq i [] seq
-        >>=? fun (parsed, rest) -> exec (succ i) ctx next (cb parsed) rest
-    | (Prefix (n, next), p :: rest) when n = p ->
-        exec (succ i) ctx next cb rest
+        do_seq i [] seq >>=? fun (parsed, rest) ->
+        exec (succ i) ctx next (cb parsed) rest
+    | (Prefix (n, next), p :: rest) when n = p -> exec (succ i) ctx next cb rest
     | (Param (_, _, {converter; _}, next), p :: rest) ->
         Lwt.catch
           (fun () -> converter ctx p)
           (function
-            | Failure msg ->
-                Error_monad.failwith "%s" msg
-            | exn ->
-                fail (Exn exn))
+            | Failure msg -> Error_monad.failwith "%s" msg
+            | exn -> fail (Exn exn))
         |> trace (Bad_argument (i, p))
         >>=? fun v -> exec (succ i) ctx next (cb v) rest
-    | _ ->
-        raise (Failure "cli_entries internal error: exec no case matched")
+    | _ -> raise (Failure "cli_entries internal error: exec no case matched")
   in
   let ctx = conv ctx in
-  parse_args ~command options_spec args_dict ctx
-  >>=? fun parsed_options ->
+  parse_args ~command options_spec args_dict ctx >>=? fun parsed_options ->
   exec 1 ctx spec (handler (converter parsed_options)) params
 
 [@@@ocaml.warning "-30"]
@@ -1712,10 +1528,8 @@ and 'ctx tree =
 let has_options : type ctx. ctx command -> bool =
  fun (Command {options = Argument {spec; _}; _}) ->
   let args_help : type a ctx. (a, ctx) args -> bool = function
-    | NoArgs ->
-        false
-    | AddArg (_, _) ->
-        true
+    | NoArgs -> false
+    | AddArg (_, _) -> true
   in
   args_help spec
 
@@ -1727,18 +1541,15 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
     let insert_tree t c = insert_tree conv t c in
     let rec suffix_to_params suffix next =
       match suffix with
-      | suffix :: suffixes ->
-          Prefix (suffix, suffix_to_params suffixes next)
-      | [] ->
-          next
+      | suffix :: suffixes -> Prefix (suffix, suffix_to_params suffixes next)
+      | [] -> next
     in
     let suffix_to_tree suffix next =
       insert_tree TEmpty (suffix_to_params suffix next)
     in
     let conv_autocomplete = Option.map (fun a c -> a (conv c)) in
     match (t, c) with
-    | (TEmpty, Stop) ->
-        TStop command
+    | (TEmpty, Stop) -> TStop command
     | (TEmpty, Seq (_, _, {autocomplete; _})) ->
         TSeq (command, conv_autocomplete autocomplete)
     | (TEmpty, Param (_, _, {autocomplete; _}, next)) ->
@@ -1753,8 +1564,7 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
     | (TStop cmd, Param (_, _, {autocomplete; _}, next)) ->
         let autocomplete = conv_autocomplete autocomplete in
         if not (has_options cmd) then
-          TParam
-            {tree = insert_tree TEmpty next; stop = Some cmd; autocomplete}
+          TParam {tree = insert_tree TEmpty next; stop = Some cmd; autocomplete}
         else raise (Failure "Command cannot have both prefix and options")
     | (TStop cmd, Prefix (n, next)) ->
         TPrefix {stop = Some cmd; prefix = [(n, insert_tree TEmpty next)]}
@@ -1768,12 +1578,9 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
         TParam {t with tree = insert_tree t.tree next}
     | (TPrefix ({prefix; _} as l), Prefix (n, next)) ->
         let rec insert_prefix = function
-          | [] ->
-              [(n, insert_tree TEmpty next)]
-          | (n', t) :: rest when n = n' ->
-              (n, insert_tree t next) :: rest
-          | item :: rest ->
-              item :: insert_prefix rest
+          | [] -> [(n, insert_tree TEmpty next)]
+          | (n', t) :: rest when n = n' -> (n, insert_tree t next) :: rest
+          | item :: rest -> item :: insert_prefix rest
         in
         TPrefix {l with prefix = insert_prefix prefix}
     | (TPrefix ({stop = None; _} as l), Stop) ->
@@ -1809,10 +1616,8 @@ let make_dispatch_tree commands =
 
 let rec gather_commands ?(acc = []) tree =
   match tree with
-  | TEmpty ->
-      acc
-  | TSeq (c, _) | TStop c ->
-      c :: acc
+  | TEmpty -> acc
+  | TSeq (c, _) | TStop c -> c :: acc
   | TPrefix {stop; prefix} ->
       gather_assoc
         ~acc:(match stop with None -> acc | Some c -> c :: acc)
@@ -1828,32 +1633,26 @@ and gather_assoc ?(acc = []) trees =
 let find_command tree initial_arguments =
   let rec traverse tree arguments acc =
     match (tree, arguments) with
-    | ( ( TStop _
-        | TSeq _
+    | ( ( TStop _ | TSeq _
         | TNonTerminalSeq {stop = Some _; _}
         | TPrefix {stop = Some _; _}
         | TParam {stop = Some _; _} ),
         ("-h" | "--help") :: _ ) -> (
-      match gather_commands tree with
-      | [] ->
-          assert false
-      | [command] ->
-          fail (Help (Some command))
-      | more ->
-          fail (Unterminated_command (initial_arguments, more)) )
-    | (TStop c, []) ->
-        return (c, empty_args_dict, initial_arguments)
+        match gather_commands tree with
+        | [] -> assert false
+        | [command] -> fail (Help (Some command))
+        | more -> fail (Unterminated_command (initial_arguments, more)))
+    | (TStop c, []) -> return (c, empty_args_dict, initial_arguments)
     | (TStop (Command {options = Argument {spec; _}; _} as command), remaining)
       -> (
         make_args_dict_filter ~command spec remaining
         >>=? fun (args_dict, unparsed) ->
         match unparsed with
-        | [] ->
-            return (command, args_dict, initial_arguments)
+        | [] -> return (command, args_dict, initial_arguments)
         | hd :: _ ->
             if String.length hd > 0 && hd.[0] = '-' then
               fail (Unknown_option (hd, Some command))
-            else fail (Extra_arguments (unparsed, command)) )
+            else fail (Extra_arguments (unparsed, command)))
     | ( TSeq ((Command {options = Argument {spec; _}; _} as command), _),
         remaining ) ->
         if
@@ -1878,8 +1677,7 @@ let find_command tree initial_arguments =
           | (_, []) ->
               (* all of the suffix parts have been matched *)
               true
-          | (_, _) ->
-              false
+          | (_, _) -> false
         in
         let matched = match_suffix [] (remaining, suffix) in
         if matched then
@@ -1893,32 +1691,25 @@ let find_command tree initial_arguments =
     | (TPrefix {stop = None; prefix}, ([] | ("-h" | "--help") :: _)) ->
         fail (Unterminated_command (initial_arguments, gather_assoc prefix))
     | (TPrefix {prefix; _}, hd_arg :: tl) -> (
-      match List.assoc ~equal:String.equal hd_arg prefix with
-      | None ->
-          fail (Command_not_found (List.rev acc, gather_assoc prefix))
-      | Some tree' ->
-          traverse tree' tl (hd_arg :: acc) )
+        match List.assoc ~equal:String.equal hd_arg prefix with
+        | None -> fail (Command_not_found (List.rev acc, gather_assoc prefix))
+        | Some tree' -> traverse tree' tl (hd_arg :: acc))
     | (TParam {stop = None; _}, ([] | ("-h" | "--help") :: _)) ->
         fail (Unterminated_command (initial_arguments, gather_commands tree))
     | (TParam {stop = Some c; _}, []) ->
         return (c, empty_args_dict, initial_arguments)
     | (TParam {tree; _}, parameter :: arguments') ->
         traverse tree arguments' (parameter :: acc)
-    | (TEmpty, _) ->
-        fail (Command_not_found (List.rev acc, []))
+    | (TEmpty, _) -> fail (Command_not_found (List.rev acc, []))
   in
   traverse tree initial_arguments []
 
 let get_arg_label (type a) (arg : (a, _) arg) =
   match arg with
-  | Arg {label; _} ->
-      label
-  | DefArg {label; _} ->
-      label
-  | Switch {label; _} ->
-      label
-  | Constant _ ->
-      assert false
+  | Arg {label; _} -> label
+  | DefArg {label; _} -> label
+  | Switch {label; _} -> label
+  | Constant _ -> assert false
 
 let get_arg : type a ctx. (a, ctx) arg -> string list =
  fun arg ->
@@ -1927,42 +1718,31 @@ let get_arg : type a ctx. (a, ctx) arg -> string list =
   :: (match short with None -> [] | Some c -> ["-" ^ String.make 1 c])
 
 let rec list_args : type arg ctx. (arg, ctx) args -> string list = function
-  | NoArgs ->
-      []
-  | AddArg (Constant _, args) ->
-      list_args args
-  | AddArg (arg, args) ->
-      get_arg arg @ list_args args
+  | NoArgs -> []
+  | AddArg (Constant _, args) -> list_args args
+  | AddArg (arg, args) -> get_arg arg @ list_args args
 
 let complete_func autocomplete cctxt =
   match autocomplete with
-  | None ->
-      return_nil
-  | Some autocomplete ->
-      autocomplete cctxt
+  | None -> return_nil
+  | Some autocomplete -> autocomplete cctxt
 
 let list_command_args (Command {options = Argument {spec; _}; _}) =
   list_args spec
 
-let complete_arg :
-    type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t =
+let complete_arg : type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t
+    =
  fun ctx -> function
-  | Arg {kind = {autocomplete; _}; _} ->
-      complete_func autocomplete ctx
-  | DefArg {kind = {autocomplete; _}; _} ->
-      complete_func autocomplete ctx
-  | Switch _ ->
-      return_nil
-  | Constant _ ->
-      return_nil
+  | Arg {kind = {autocomplete; _}; _} -> complete_func autocomplete ctx
+  | DefArg {kind = {autocomplete; _}; _} -> complete_func autocomplete ctx
+  | Switch _ -> return_nil
+  | Constant _ -> return_nil
 
 let rec remaining_spec :
     type a ctx. TzString.Set.t -> (a, ctx) args -> string list =
  fun seen -> function
-  | NoArgs ->
-      []
-  | AddArg (Constant _, rest) ->
-      remaining_spec seen rest
+  | NoArgs -> []
+  | AddArg (Constant _, rest) -> remaining_spec seen rest
   | AddArg (arg, rest) ->
       let {long; _} = get_arg_label arg in
       if TzString.Set.mem long seen then remaining_spec seen rest
@@ -1973,10 +1753,8 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   let rec complete_spec :
       type a. string -> (a, ctx) args -> string list tzresult Lwt.t =
    fun name -> function
-    | NoArgs ->
-        return_nil
-    | AddArg (Constant _, rest) ->
-        complete_spec name rest
+    | NoArgs -> return_nil
+    | AddArg (Constant _, rest) -> complete_spec name rest
     | AddArg (arg, rest) ->
         if (get_arg_label arg).long = name then complete_arg ctx arg
         else complete_spec name rest
@@ -1984,26 +1762,21 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   let rec help args ind seen =
     match args with
     | _ when ind = 0 ->
-        continuation args 0
-        >|=? fun cont_args -> cont_args @ remaining_spec seen args_spec
-    | [] ->
-        Stdlib.failwith "cli_entries internal autocomplete error"
+        continuation args 0 >|=? fun cont_args ->
+        cont_args @ remaining_spec seen args_spec
+    | [] -> Stdlib.failwith "cli_entries internal autocomplete error"
     | arg :: tl ->
         if TzString.Map.mem arg arities then
           let (arity, long) = TzString.Map.find arg arities in
           let seen = TzString.Set.add long seen in
           match (arity, tl) with
           | (0, args) when ind = 0 ->
-              continuation args 0
-              >|=? fun cont_args -> remaining_spec seen args_spec @ cont_args
-          | (0, args) ->
-              help args (ind - 1) seen
-          | (1, _) when ind = 1 ->
-              complete_spec arg args_spec
-          | (1, _ :: tl) ->
-              help tl (ind - 2) seen
-          | _ ->
-              Stdlib.failwith "cli_entries internal error, invalid arity"
+              continuation args 0 >|=? fun cont_args ->
+              remaining_spec seen args_spec @ cont_args
+          | (0, args) -> help args (ind - 1) seen
+          | (1, _) when ind = 1 -> complete_spec arg args_spec
+          | (1, _ :: tl) -> help tl (ind - 2) seen
+          | _ -> Stdlib.failwith "cli_entries internal error, invalid arity"
         else continuation args ind
   in
   help args ind TzString.Set.empty
@@ -2011,33 +1784,26 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
 let complete_next_tree cctxt = function
   | TPrefix {stop; prefix} ->
       return
-        ( ( match stop with
-          | None ->
-              []
-          | Some command ->
-              list_command_args command )
-        @ List.map fst prefix )
+        ((match stop with
+         | None -> []
+         | Some command -> list_command_args command)
+        @ List.map fst prefix)
   | TSeq (command, autocomplete) ->
-      complete_func autocomplete cctxt
-      >|=? fun completions -> completions @ list_command_args command
+      complete_func autocomplete cctxt >|=? fun completions ->
+      completions @ list_command_args command
   | TNonTerminalSeq {autocomplete; suffix; _} ->
-      complete_func autocomplete cctxt
-      >|=? fun completions ->
+      complete_func autocomplete cctxt >|=? fun completions ->
       completions @ [WithExceptions.Option.get ~loc:__LOC__ @@ List.hd suffix]
-  | TParam {autocomplete; _} ->
-      complete_func autocomplete cctxt
-  | TStop command ->
-      return (list_command_args command)
-  | TEmpty ->
-      return_nil
+  | TParam {autocomplete; _} -> complete_func autocomplete cctxt
+  | TStop command -> return (list_command_args command)
+  | TEmpty -> return_nil
 
 let complete_tree cctxt tree index args =
   let rec help tree args ind =
     if ind = 0 then complete_next_tree cctxt tree
     else
       match (tree, args) with
-      | (TSeq _, _) ->
-          complete_next_tree cctxt tree
+      | (TSeq _, _) -> complete_next_tree cctxt tree
       | ((TNonTerminalSeq {tree; suffix; _} as this_tree), _ :: _tl) -> (
           let rec args_starting_from_suffix ind matched_args = function
             | ((s :: s_rest as suffix), a :: a_rest) ->
@@ -2060,22 +1826,16 @@ let complete_tree cctxt tree index args =
             (* Partial or full suffix match found *)
               when List.length unmatched_suffix < List.length suffix ->
                 Some (matched_args @ args, ind)
-            | _ ->
-                None
+            | _ -> None
           in
           match args_starting_from_suffix ind [] (suffix, args) with
-          | Some (args, ind) ->
-              help tree args ind
-          | _ ->
-              complete_next_tree cctxt this_tree )
+          | Some (args, ind) -> help tree args ind
+          | _ -> complete_next_tree cctxt this_tree)
       | (TPrefix {prefix; _}, hd :: tl) -> (
-        match List.assoc ~equal:String.equal hd prefix with
-        | None ->
-            return_nil
-        | Some p ->
-            help p tl (ind - 1) )
-      | (TParam {tree; _}, _ :: tl) ->
-          help tree tl (ind - 1)
+          match List.assoc ~equal:String.equal hd prefix with
+          | None -> return_nil
+          | Some p -> help p tl (ind - 1))
+      | (TParam {tree; _}, _ :: tl) -> help tree tl (ind - 1)
       | (TStop (Command {options = Argument {spec; _}; conv; _}), args) ->
           complete_options (fun _ _ -> return_nil) args spec ind (conv cctxt)
       | ((TParam _ | TPrefix _ | TNonTerminalSeq _), []) | (TEmpty, _) ->
@@ -2087,22 +1847,19 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
     cctxt =
   let tree = make_dispatch_tree commands in
   let rec ind n = function
-    | [] ->
-        None
+    | [] -> None
     | hd :: tl ->
         if hd = prev_arg then
           Some (Option.value ~default:(n + 1) (ind (n + 1) tl))
         else ind (n + 1) tl
   in
-  ( if prev_arg = script then
-    complete_next_tree cctxt tree
-    >|=? fun command_completions ->
-    let (Argument {spec; _}) = global_options in
-    list_args spec @ command_completions
+  (if prev_arg = script then
+   complete_next_tree cctxt tree >|=? fun command_completions ->
+   let (Argument {spec; _}) = global_options in
+   list_args spec @ command_completions
   else
     match ind 0 args with
-    | None ->
-        return_nil
+    | None -> return_nil
     | Some index ->
         let (Argument {spec; _}) = global_options in
         complete_options
@@ -2110,7 +1867,7 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
           args
           spec
           index
-          cctxt )
+          cctxt)
   >|=? fun completions ->
   List.filter
     (fun completion ->
@@ -2119,34 +1876,25 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
 
 let parse_global_options global_options ctx args =
   let (Argument {spec; converter}) = global_options in
-  make_args_dict_consume spec args
-  >>=? fun (dict, remaining) ->
-  parse_args spec dict ctx
-  >>=? fun nested -> return (converter nested, remaining)
+  make_args_dict_consume spec args >>=? fun (dict, remaining) ->
+  parse_args spec dict ctx >>=? fun nested ->
+  return (converter nested, remaining)
 
 let dispatch commands ctx args =
   let tree = make_dispatch_tree commands in
   match args with
   | []
     when match tree with
-         | TPrefix {stop; _} ->
-             stop = None
-         | TParam {stop; _} ->
-             stop = None
-         | TStop _ ->
-             false
-         | TSeq (_, _) ->
-             false
-         | TNonTerminalSeq {stop; _} ->
-             stop = None
-         | TEmpty ->
-             true ->
+         | TPrefix {stop; _} -> stop = None
+         | TParam {stop; _} -> stop = None
+         | TStop _ -> false
+         | TSeq (_, _) -> false
+         | TNonTerminalSeq {stop; _} -> stop = None
+         | TEmpty -> true ->
       fail (Help None)
-  | [("-h" | "--help")] ->
-      fail (Help None)
+  | [("-h" | "--help")] -> fail (Help None)
   | _ ->
-      find_command tree args
-      >>=? fun (command, args_dict, filtered_args) ->
+      find_command tree args >>=? fun (command, args_dict, filtered_args) ->
       exec command ctx filtered_args args_dict
 
 type error += No_manual_entry of string list
@@ -2156,8 +1904,9 @@ let manual_group = {name = "man"; title = "Access the documentation"}
 let add_manual ~executable_name ~global_options format ppf commands =
   let rec with_manual =
     lazy
-      ( commands
-      @ [ command
+      (commands
+      @ [
+          command
             ~group:manual_group
             ~desc:
               "Print documentation of commands.\n\
@@ -2180,41 +1929,28 @@ let add_manual ~executable_name ~global_options format ppf commands =
                      ~autocomplete:(fun _ -> return ["0"; "1"; "2"; "3"])
                      (fun _ arg ->
                        match arg with
-                       | "0" ->
-                           return Terse
-                       | "1" ->
-                           return Short
-                       | "2" ->
-                           return Details
-                       | "3" ->
-                           return Full
-                       | _ ->
-                           failwith "Level of details out of range")))
+                       | "0" -> return Terse
+                       | "1" -> return Short
+                       | "2" -> return Details
+                       | "3" -> return Full
+                       | _ -> failwith "Level of details out of range")))
                (default_arg
                   ~doc:"the manual's output format"
                   ~placeholder:"plain|colors|html"
                   ~long:"format"
                   ~default:
-                    ( match format with
-                    | Ansi ->
-                        "colors"
-                    | Plain ->
-                        "plain"
-                    | Html ->
-                        "html" )
+                    (match format with
+                    | Ansi -> "colors"
+                    | Plain -> "plain"
+                    | Html -> "html")
                   (parameter
-                     ~autocomplete:(fun _ ->
-                       return ["colors"; "plain"; "html"])
+                     ~autocomplete:(fun _ -> return ["colors"; "plain"; "html"])
                      (fun _ arg ->
                        match arg with
-                       | "colors" ->
-                           return Ansi
-                       | "plain" ->
-                           return Plain
-                       | "html" ->
-                           return Html
-                       | _ ->
-                           failwith "Unknown manual format"))))
+                       | "colors" -> return Ansi
+                       | "plain" -> return Plain
+                       | "html" -> return Html
+                       | _ -> failwith "Unknown manual format"))))
             (prefix
                "man"
                (seq_of_param
@@ -2234,16 +1970,12 @@ let add_manual ~executable_name ~global_options format ppf commands =
               in
               let verbosity =
                 match verbosity with
-                | Some verbosity ->
-                    verbosity
-                | None when List.length commands <= 3 ->
-                    Full
-                | None ->
-                    Short
+                | Some verbosity -> verbosity
+                | None when List.length commands <= 3 -> Full
+                | None -> Short
               in
               match commands with
-              | [] ->
-                  fail (No_manual_entry keywords)
+              | [] -> fail (No_manual_entry keywords)
               | _ ->
                   let state = setup_formatter ppf format verbosity in
                   let commands = List.map (fun c -> Ex c) commands in
@@ -2254,7 +1986,8 @@ let add_manual ~executable_name ~global_options format ppf commands =
                     ~highlights:keywords
                     commands ;
                   restore_formatter ppf state ;
-                  return_unit) ] )
+                  return_unit);
+        ])
   in
   Lazy.force with_manual
 
@@ -2282,10 +2015,7 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
           arg ;
         Some (Option.fold ~some:(fun command -> [Ex command]) ~none:[] command)
     | No_manual_entry [keyword] ->
-        Format.fprintf
-          ppf
-          "No manual entry that match @{<hilight>%s@}."
-          keyword ;
+        Format.fprintf ppf "No manual entry that match @{<hilight>%s@}." keyword ;
         Some []
     | No_manual_entry (keyword :: keywords) ->
         Format.fprintf
@@ -2335,31 +2065,27 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
           commands ;
         Some (List.map (fun c -> Ex c) commands)
     | err ->
-        default ppf err ; None
+        default ppf err ;
+        None
   in
   let rec pp acc errs =
     let return command =
       match (command, acc) with
-      | (None, _) ->
-          acc
-      | (Some command, Some commands) ->
-          Some (command @ commands)
-      | (Some command, None) ->
-          Some command
+      | (None, _) -> acc
+      | (Some command, Some commands) -> Some (command @ commands)
+      | (Some command, None) -> Some command
     in
     match errs with
-    | [] ->
-        None
-    | [last] ->
-        return (pp_one last)
+    | [] -> None
+    | [last] -> return (pp_one last)
     | err :: errs ->
         let acc = return (pp_one err) in
-        Format.fprintf ppf "@," ; pp acc errs
+        Format.fprintf ppf "@," ;
+        pp acc errs
   in
   Format.fprintf ppf "@[<v 2>@{<error>@{<title>Error@}@}@," ;
   match pp None errs with
-  | None ->
-      Format.fprintf ppf "@]@\n"
+  | None -> Format.fprintf ppf "@]@\n"
   | Some commands ->
       Format.fprintf
         ppf

@@ -90,20 +90,13 @@ end)
       let open Peer_metadata in
       let (req : requests_kind) =
         match msg with
-        | Get_current_branch _ ->
-            Branch
-        | Get_current_head _ ->
-            Head
-        | Get_block_headers _ ->
-            Block_header
-        | Get_operations _ ->
-            Operations
-        | Get_protocols _ ->
-            Protocols
-        | Get_operations_for_blocks _ ->
-            Operations_for_block
-        | _ ->
-            Other
+        | Get_current_branch _ -> Branch
+        | Get_current_head _ -> Head
+        | Get_block_headers _ -> Block_header
+        | Get_operations _ -> Operations
+        | Get_protocols _ -> Protocols
+        | Get_operations_for_blocks _ -> Operations_for_block
+        | _ -> Other
       in
       let meta = P2p.get_peer_metadata state.p2p gid in
       Peer_metadata.incr meta @@ Scheduled_request req ;
@@ -126,8 +119,8 @@ end)
     Table.create ?random_table ?global_input request_param disk
 
   let shutdown t =
-    Requester_event.(emit shutting_down_requester) ()
-    >>= fun () -> Table.shutdown t
+    Requester_event.(emit shutting_down_requester) () >>= fun () ->
+    Table.shutdown t
 end
 
 module Fake_operation_storage = struct
@@ -169,12 +162,12 @@ module Block_header_storage = struct
   let known = Store.Block.is_known_valid
 
   let read chain_store h =
-    Store.Block.read_block chain_store h
-    >>=? fun b -> return (Store.Block.header b)
+    Store.Block.read_block chain_store h >>=? fun b ->
+    return (Store.Block.header b)
 
   let read_opt chain_store h =
-    Store.Block.read_block_opt chain_store h
-    >>= fun b -> Lwt.return (Option.map Store.Block.header b)
+    Store.Block.read_block_opt chain_store h >>= fun b ->
+    Lwt.return (Option.map Store.Block.header b)
 end
 
 module Raw_block_header =
@@ -212,8 +205,7 @@ module Operations_storage = struct
   let known chain_store (h, _) = Store.Block.is_known_valid chain_store h
 
   let read chain_store (h, i) =
-    Store.Block.read_block chain_store h
-    >>=? fun b ->
+    Store.Block.read_block chain_store h >>=? fun b ->
     let ops =
       List.nth (Store.Block.operations b) i
       |> WithExceptions.Option.to_exn ~none:Not_found
@@ -221,59 +213,53 @@ module Operations_storage = struct
     return ops
 
   let read_opt chain_store (h, i) =
-    Store.Block.read_block_opt chain_store h
-    >>= function
-    | None ->
-        Lwt.return_none
-    | Some b ->
-        Lwt.return (List.nth (Store.Block.operations b) i)
+    Store.Block.read_block_opt chain_store h >>= function
+    | None -> Lwt.return_none
+    | Some b -> Lwt.return (List.nth (Store.Block.operations b) i)
 end
 
 module Raw_operations = struct
-  include Make_raw
-            (struct
-              type t = Block_hash.t * int
+  include
+    Make_raw
+      (struct
+        type t = Block_hash.t * int
 
-              let name = "operations"
+        let name = "operations"
 
-              let pp ppf (h, n) = Format.fprintf ppf "%a:%d" Block_hash.pp h n
+        let pp ppf (h, n) = Format.fprintf ppf "%a:%d" Block_hash.pp h n
 
-              let encoding =
-                let open Data_encoding in
-                obj2 (req "block" Block_hash.encoding) (req "index" uint16)
-            end)
-            (Operations_storage)
-            (Operations_table)
-            (struct
-              type param = unit
+        let encoding =
+          let open Data_encoding in
+          obj2 (req "block" Block_hash.encoding) (req "index" uint16)
+      end)
+      (Operations_storage)
+      (Operations_table)
+      (struct
+        type param = unit
 
-              let max_length = 10
+        let max_length = 10
 
-              let initial_delay = Time.System.Span.of_seconds_exn 1.
+        let initial_delay = Time.System.Span.of_seconds_exn 1.
 
-              let forge () keys = Message.Get_operations_for_blocks keys
-            end)
-            (struct
-              type param = Operation_list_list_hash.t
+        let forge () keys = Message.Get_operations_for_blocks keys
+      end)
+      (struct
+        type param = Operation_list_list_hash.t
 
-              type notified_value =
-                Operation.t list * Operation_list_list_hash.path
+        type notified_value = Operation.t list * Operation_list_list_hash.path
 
-              let precheck (_block, expected_ofs) expected_hash (ops, path) =
-                let (received_hash, received_ofs) =
-                  Operation_list_list_hash.check_path
-                    path
-                    (Operation_list_hash.compute (List.map Operation.hash ops))
-                in
-                if
-                  received_ofs = expected_ofs
-                  && Operation_list_list_hash.compare
-                       expected_hash
-                       received_hash
-                     = 0
-                then Some ops
-                else None
-            end)
+        let precheck (_block, expected_ofs) expected_hash (ops, path) =
+          let (received_hash, received_ofs) =
+            Operation_list_list_hash.check_path
+              path
+              (Operation_list_hash.compute (List.map Operation.hash ops))
+          in
+          if
+            received_ofs = expected_ofs
+            && Operation_list_list_hash.compare expected_hash received_hash = 0
+          then Some ops
+          else None
+      end)
 
   let clear_all table hash n =
     List.iter (fun i -> clear_or_cancel table (hash, i)) (0 -- (n - 1))
@@ -289,9 +275,9 @@ module Protocol_storage = struct
   let read_opt store ph = Store.Protocol.read store ph
 
   let read store ph =
-    read_opt store ph
-    >>= function
-    | None -> Lwt.return (Error_monad.error_exn Not_found) | Some p -> return p
+    read_opt store ph >>= function
+    | None -> Lwt.return (Error_monad.error_exn Not_found)
+    | Some p -> return p
 end
 
 module Raw_protocol =

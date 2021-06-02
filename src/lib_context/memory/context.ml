@@ -65,12 +65,9 @@ let fold ?depth t key ~init ~f = Tree.fold ?depth t (data_key key) ~init ~f
 let current_protocol_key = ["protocol"]
 
 let get_protocol t =
-  Tree.find t current_protocol_key
-  >>= function
-  | None ->
-      assert false
-  | Some data ->
-      Lwt.return (Protocol_hash.of_bytes_exn data)
+  Tree.find t current_protocol_key >>= function
+  | None -> assert false
+  | Some data -> Lwt.return (Protocol_hash.of_bytes_exn data)
 
 let add_protocol t key =
   let key = Protocol_hash.to_bytes key in
@@ -83,7 +80,8 @@ let concrete_encoding : Store.Tree.concrete Data_encoding.t =
   mu "memory_context" (fun encoding ->
       let map_encoding = list (tup2 string encoding) in
       union
-        [ case
+        [
+          case
             ~title:"tree"
             (Tag 0)
             map_encoding
@@ -94,7 +92,8 @@ let concrete_encoding : Store.Tree.concrete Data_encoding.t =
             (Tag 1)
             bytes
             (function `Contents (v, _) -> Some v | `Tree _ -> None)
-            (fun v -> `Contents (v, ())) ])
+            (fun v -> `Contents (v, ()));
+        ])
 
 let encoding : t Data_encoding.t =
   Data_encoding.conv

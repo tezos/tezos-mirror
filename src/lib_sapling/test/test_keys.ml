@@ -40,44 +40,39 @@ let test_vectors_zip32 () =
   List.iter
     (fun v ->
       let open Vk in
-      ( match v.xsk with
+      (match v.xsk with
       | Some xsk ->
           let xfvk = of_sk xsk in
           assert (xfvk = v.xfvk)
-      | None ->
-          () ) ;
+      | None -> ()) ;
       let j0 = default_index in
       let j1 = index_succ j0 in
       let j2 = index_succ j1 in
       let jmax = R.to_diversifier_index (Bytes.make 11 '\xff') in
       let (res_j0, address0) = new_address v.xfvk j0 in
-      ( match v.d0 with
+      (match v.d0 with
       | Some d ->
           assert (res_j0 = j0) ;
           assert (address0.diversifier = d)
-      | None ->
-          () ) ;
+      | None -> ()) ;
       let (res_j1, address1) = new_address v.xfvk j1 in
-      ( match v.d1 with
+      (match v.d1 with
       | Some d ->
           assert (res_j1 = j1) ;
           assert (address1.diversifier = d)
-      | None ->
-          assert (res_j1 <> j1) ) ;
+      | None -> assert (res_j1 <> j1)) ;
       let (res_j2, address2) = new_address v.xfvk j2 in
-      ( match v.d2 with
+      (match v.d2 with
       | Some d ->
           assert (res_j2 = j2) ;
           assert (address2.diversifier = d)
-      | None ->
-          assert (res_j2 <> j2) ) ;
+      | None -> assert (res_j2 <> j2)) ;
       match v.dmax with
       | Some d ->
           let (res_jmax, address_max) = new_address v.xfvk jmax in
           assert (res_jmax = jmax) ;
           assert (address_max.diversifier = d)
-      | None ->
-          ())
+      | None -> ())
     vectors_zip32
 
 let test_zip32 () =
@@ -104,8 +99,10 @@ let test_zip32 () =
   ()
 
 let tests =
-  [ ("keys", `Quick, test_keys);
+  [
+    ("keys", `Quick, test_keys);
     ("vectors_zip32", `Quick, test_vectors_zip32);
-    ("zip32", `Quick, test_zip32) ]
+    ("zip32", `Quick, test_zip32);
+  ]
 
 let () = Alcotest.run "sapling" [("keys", tests)]

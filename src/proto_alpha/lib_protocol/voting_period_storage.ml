@@ -91,15 +91,12 @@ let get_current = Storage.Vote.Current_period.get
 let init = Storage.Vote.Current_period.init
 
 let init_first_period ctxt ~start_position =
-  init ctxt @@ Voting_period_repr.root ~start_position
-  >>=? fun ctxt ->
+  init ctxt @@ Voting_period_repr.root ~start_position >>=? fun ctxt ->
   Storage.Vote.Pred_period_kind.init ctxt Voting_period_repr.Proposal
 
 let common ctxt =
-  get_current ctxt
-  >>=? fun current_period ->
-  Storage.Vote.Pred_period_kind.update ctxt current_period.kind
-  >|=? fun ctxt ->
+  get_current ctxt >>=? fun current_period ->
+  Storage.Vote.Pred_period_kind.update ctxt current_period.kind >|=? fun ctxt ->
   let start_position =
     (* because we are preparing the voting period for the next block we need to
        use the next level. *)
@@ -108,20 +105,17 @@ let common ctxt =
   (ctxt, current_period, start_position)
 
 let reset ctxt =
-  common ctxt
-  >>=? fun (ctxt, current_period, start_position) ->
+  common ctxt >>=? fun (ctxt, current_period, start_position) ->
   Voting_period_repr.reset current_period ~start_position |> set_current ctxt
 
 let succ ctxt =
-  common ctxt
-  >>=? fun (ctxt, current_period, start_position) ->
+  common ctxt >>=? fun (ctxt, current_period, start_position) ->
   Voting_period_repr.succ current_period ~start_position |> set_current ctxt
 
 let get_current_kind ctxt = get_current ctxt >|=? fun {kind; _} -> kind
 
 let get_current_info ctxt =
-  get_current ctxt
-  >|=? fun voting_period ->
+  get_current ctxt >|=? fun voting_period ->
   let blocks_per_voting_period =
     Constants_storage.blocks_per_voting_period ctxt
   in
@@ -136,8 +130,7 @@ let get_current_info ctxt =
   Voting_period_repr.{voting_period; position; remaining}
 
 let get_current_remaining ctxt =
-  get_current ctxt
-  >|=? fun voting_period ->
+  get_current ctxt >|=? fun voting_period ->
   let blocks_per_voting_period =
     Constants_storage.blocks_per_voting_period ctxt
   in
@@ -147,8 +140,8 @@ let get_current_remaining ctxt =
     blocks_per_voting_period
 
 let is_last_block ctxt =
-  get_current_remaining ctxt
-  >|=? fun remaining -> Compare.Int32.(remaining = 0l)
+  get_current_remaining ctxt >|=? fun remaining ->
+  Compare.Int32.(remaining = 0l)
 
 let get_rpc_current_info ctxt =
   get_current_info ctxt
@@ -158,8 +151,7 @@ let get_rpc_current_info ctxt =
     let blocks_per_voting_period =
       Constants_storage.blocks_per_voting_period ctxt
     in
-    Storage.Vote.Pred_period_kind.get ctxt
-    >|=? fun pred_kind ->
+    Storage.Vote.Pred_period_kind.get ctxt >|=? fun pred_kind ->
     let voting_period : Voting_period_repr.t =
       {
         index = Int32.pred voting_period.index;
@@ -179,8 +171,7 @@ let get_rpc_current_info ctxt =
   else return voting_period_info
 
 let get_rpc_succ_info ctxt =
-  get_current ctxt
-  >|=? fun voting_period ->
+  get_current ctxt >|=? fun voting_period ->
   let blocks_per_voting_period =
     Constants_storage.blocks_per_voting_period ctxt
   in

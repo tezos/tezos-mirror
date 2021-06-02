@@ -39,10 +39,11 @@ let encoding =
     "test_chain_status"
     ~description:
       "The status of the test chain: not_running (there is no test chain at \
-       the moment), forking (the test chain is being setup), running (the \
-       test chain is running)."
+       the moment), forking (the test chain is being setup), running (the test \
+       chain is running)."
   @@ union
-       [ case
+       [
+         case
            (Tag 0)
            ~title:"Not_running"
            (obj1 (req "status" (constant "not_running")))
@@ -56,10 +57,8 @@ let encoding =
               (req "protocol" Protocol_hash.encoding)
               (req "expiration" Time.Protocol.encoding))
            (function
-             | Forking {protocol; expiration} ->
-                 Some ((), protocol, expiration)
-             | _ ->
-                 None)
+             | Forking {protocol; expiration} -> Some ((), protocol, expiration)
+             | _ -> None)
            (fun ((), protocol, expiration) -> Forking {protocol; expiration});
          case
            (Tag 2)
@@ -73,14 +72,13 @@ let encoding =
            (function
              | Running {chain_id; genesis; protocol; expiration} ->
                  Some ((), chain_id, genesis, protocol, expiration)
-             | _ ->
-                 None)
+             | _ -> None)
            (fun ((), chain_id, genesis, protocol, expiration) ->
-             Running {chain_id; genesis; protocol; expiration}) ]
+             Running {chain_id; genesis; protocol; expiration});
+       ]
 
 let pp ppf = function
-  | Not_running ->
-      Format.fprintf ppf "@[<v 2>Not running@]"
+  | Not_running -> Format.fprintf ppf "@[<v 2>Not running@]"
   | Forking {protocol; expiration} ->
       Format.fprintf
         ppf

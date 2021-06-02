@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let group =
-  {Clic.name = "protocols"; title = "Commands for managing protocols"}
+let group = {Clic.name = "protocols"; title = "Commands for managing protocols"}
 
 let proto_param ~name ~desc t =
   Clic.param
@@ -40,33 +39,32 @@ let commands () =
     else failwith "%s is not a directory" dn
   in
   let check_dir_parameter = parameter check_dir in
-  [ command
+  [
+    command
       ~group
       ~desc:"List protocols known by the node."
       no_options
       (prefixes ["list"; "protocols"] stop)
       (fun () (cctxt : #Client_context.full) ->
-        Shell_services.Protocol.list cctxt
-        >>=? fun protos ->
+        Shell_services.Protocol.list cctxt >>=? fun protos ->
         List.iter_s (fun ph -> cctxt#message "%a" Protocol_hash.pp ph) protos
         >>= fun () -> return_unit);
     command
       ~group
       ~desc:"Inject a new protocol into the node."
       no_options
-      ( prefixes ["inject"; "protocol"]
+      (prefixes ["inject"; "protocol"]
       @@ param
            ~name:"dir"
            ~desc:"directory containing the sources of a protocol"
            check_dir_parameter
-      @@ stop )
+      @@ stop)
       (fun () dirname (cctxt : #Client_context.full) ->
         Lwt.catch
           (fun () ->
             Tezos_base_unix.Protocol_files.read_dir dirname
             >>=? fun (_hash, proto) ->
-            Shell_services.Injection.protocol cctxt proto
-            >>= function
+            Shell_services.Injection.protocol cctxt proto >>= function
             | Ok hash ->
                 cctxt#message
                   "Injected protocol %a successfully"
@@ -91,12 +89,11 @@ let commands () =
       ~group
       ~desc:"Dump a protocol from the node's record of protocol."
       no_options
-      ( prefixes ["dump"; "protocol"]
+      (prefixes ["dump"; "protocol"]
       @@ proto_param ~name:"protocol hash" ~desc:""
-      @@ stop )
+      @@ stop)
       (fun () ph (cctxt : #Client_context.full) ->
-        Shell_services.Protocol.contents cctxt ph
-        >>=? fun proto ->
+        Shell_services.Protocol.contents cctxt ph >>=? fun proto ->
         Tezos_base_unix.Protocol_files.write_dir
           (Protocol_hash.to_short_b58check ph)
           ~hash:ph
@@ -108,12 +105,11 @@ let commands () =
       ~group
       ~desc:"Show the environment version used by a protocol."
       no_options
-      ( prefixes ["protocol"; "environment"]
+      (prefixes ["protocol"; "environment"]
       @@ proto_param ~name:"protocol hash" ~desc:""
-      @@ stop )
+      @@ stop)
       (fun () protocol_hash (cctxt : #Client_context.full) ->
-        Shell_services.Protocol.environment cctxt protocol_hash
-        >>=? fun env ->
+        Shell_services.Protocol.environment cctxt protocol_hash >>=? fun env ->
         cctxt#message
           "Protocol %a uses environment %s"
           Protocol_hash.pp
@@ -124,12 +120,11 @@ let commands () =
       ~group
       ~desc:"Fetch a protocol from the network."
       no_options
-      ( prefixes ["fetch"; "protocol"]
+      (prefixes ["fetch"; "protocol"]
       @@ proto_param ~name:"protocol hash" ~desc:""
-      @@ stop )
+      @@ stop)
       (fun () hash (cctxt : #Client_context.full) ->
-        Shell_services.Protocol.fetch cctxt hash
-        >>= function
+        Shell_services.Protocol.fetch cctxt hash >>= function
         | Ok () ->
             cctxt#message
               "Protocol %a successfully fetched."
@@ -141,4 +136,5 @@ let commands () =
               "Error while fetching protocol: %a"
               Error_monad.pp_print_error
               err
-            >>= fun () -> return_unit) ]
+            >>= fun () -> return_unit);
+  ]

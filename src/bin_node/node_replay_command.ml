@@ -34,8 +34,10 @@ module Event = struct
       ~name:"block_validation_start"
       ~msg:"replaying block {alias}{hash} ({level})"
       ~level:Notice
-      ~pp1:(fun fmt -> function None -> () | Some alias ->
-            Format.fprintf fmt "%s: " alias)
+      ~pp1:
+        (fun fmt -> function
+          | None -> ()
+          | Some alias -> Format.fprintf fmt "%s: " alias)
       ("alias", Data_encoding.(option string))
       ~pp2:Block_hash.pp
       ("hash", Block_hash.encoding)
@@ -142,8 +144,8 @@ let () =
       Format.fprintf
         ppf
         "Replay of a block below the savepoint was requested, this operation \
-         requires data that have been purged (or were never there if the \
-         state has been imported from a snapshot).")
+         requires data that have been purged (or were never there if the state \
+         has been imported from a snapshot).")
     `Permanent
     Data_encoding.empty
     (function Cannot_replay_below_savepoint -> Some () | _ -> None)
@@ -156,22 +158,21 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
   let genesis = config.blockchain_network.genesis in
   let (validator_env : Block_validator_process.validator_environment) =
     {
-      user_activated_upgrades =
-        config.blockchain_network.user_activated_upgrades;
+      user_activated_upgrades = config.blockchain_network.user_activated_upgrades;
       user_activated_protocol_overrides =
         config.blockchain_network.user_activated_protocol_overrides;
     }
   in
-  ( if singleprocess then
-    Store.init
-      ~store_dir:store_root
-      ~context_dir:context_root
-      ~allow_testchains:false
-      genesis
-    >>=? fun store ->
-    let main_chain_store = Store.main_chain_store store in
-    Block_validator_process.init validator_env (Internal main_chain_store)
-    >>=? fun validator_process -> return (validator_process, store)
+  (if singleprocess then
+   Store.init
+     ~store_dir:store_root
+     ~context_dir:context_root
+     ~allow_testchains:false
+     genesis
+   >>=? fun store ->
+   let main_chain_store = Store.main_chain_store store in
+   Block_validator_process.init validator_env (Internal main_chain_store)
+   >>=? fun validator_process -> return (validator_process, store)
   else
     Block_validator_process.init
       validator_env
@@ -194,7 +195,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
       ~allow_testchains:false
       ~commit_genesis
       genesis
-    >>=? fun store -> return (validator_process, store) )
+    >>=? fun store -> return (validator_process, store))
   >>=? fun (validator_process, store) ->
   let main_chain_store = Store.main_chain_store store in
   Lwt.finalize
@@ -205,21 +206,19 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
             match block with
             | `Head _ | `Genesis | `Alias _ ->
                 Some (Block_services.to_string block)
-            | _ ->
-                None
+            | _ -> None
           in
           protect
             ~on_error:(fun _ -> fail Block_not_found)
             (fun () ->
-              Block_directory.get_block main_chain_store block
-              >>= function
-              | None -> fail Block_not_found | Some block -> return block)
+              Block_directory.get_block main_chain_store block >>= function
+              | None -> fail Block_not_found
+              | Some block -> return block)
           >>=? fun block ->
           let predecessor_hash = Store.Block.predecessor block in
           Store.Block.read_block_opt main_chain_store predecessor_hash
           >>= function
-          | None ->
-              fail Cannot_replay_orphan
+          | None -> fail Cannot_replay_orphan
           | Some predecessor ->
               Store.Chain.savepoint main_chain_store
               >>= fun (_, savepoint_level) ->
@@ -251,100 +250,96 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                 let now = Systime_os.now () in
                 Event.(emit block_validation_end) (Ptime.diff now start_time)
                 >>= fun () ->
-                ( if
-                  not
-                    (Context_hash.equal
-                       expected_context_hash
-                       result.validation_store.context_hash)
+                (if
+                 not
+                   (Context_hash.equal
+                      expected_context_hash
+                      result.validation_store.context_hash)
                 then
-                  Event.(emit inconsistent_context_hash)
-                    ( expected_context_hash,
-                      result.validation_store.context_hash )
-                else Lwt.return_unit )
+                 Event.(emit inconsistent_context_hash)
+                   (expected_context_hash, result.validation_store.context_hash)
+                else Lwt.return_unit)
                 >>= fun () ->
-                ( if
-                  not
-                    (Bytes.equal expected_block_receipt result.block_metadata)
+                (if
+                 not (Bytes.equal expected_block_receipt result.block_metadata)
                 then
-                  Store.Block.protocol_hash main_chain_store block
-                  >>=? fun protocol ->
-                  Registered_protocol.get_result protocol
-                  >>=? fun (module Proto) ->
-                  let exp =
-                    Data_encoding.Binary.of_bytes_exn
-                      Proto.block_header_metadata_encoding
-                      expected_block_receipt
-                  in
-                  let got =
-                    Data_encoding.Binary.of_bytes_exn
-                      Proto.block_header_metadata_encoding
-                      result.block_metadata
-                  in
-                  let exp =
-                    Data_encoding.Json.construct
-                      Proto.block_header_metadata_encoding
-                      exp
-                  in
-                  let got =
-                    Data_encoding.Json.construct
-                      Proto.block_header_metadata_encoding
-                      got
-                  in
-                  Event.(emit inconsistent_block_receipt) (exp, got)
-                  >>= fun () -> return_unit
-                else return_unit )
+                 Store.Block.protocol_hash main_chain_store block
+                 >>=? fun protocol ->
+                 Registered_protocol.get_result protocol
+                 >>=? fun (module Proto) ->
+                 let exp =
+                   Data_encoding.Binary.of_bytes_exn
+                     Proto.block_header_metadata_encoding
+                     expected_block_receipt
+                 in
+                 let got =
+                   Data_encoding.Binary.of_bytes_exn
+                     Proto.block_header_metadata_encoding
+                     result.block_metadata
+                 in
+                 let exp =
+                   Data_encoding.Json.construct
+                     Proto.block_header_metadata_encoding
+                     exp
+                 in
+                 let got =
+                   Data_encoding.Json.construct
+                     Proto.block_header_metadata_encoding
+                     got
+                 in
+                 Event.(emit inconsistent_block_receipt) (exp, got)
+                 >>= fun () -> return_unit
+                else return_unit)
                 >>=? fun () ->
                 let rec check_receipts i j exp got =
                   match (exp, got) with
-                  | ([], []) ->
-                      return_unit
-                  | ([], _ :: _) | (_ :: _, []) ->
-                      assert false
+                  | ([], []) -> return_unit
+                  | ([], _ :: _) | (_ :: _, []) -> assert false
                   | ([] :: exps, [] :: gots) ->
                       check_receipts (succ i) 0 exps gots
                   | ((_ :: _) :: _, [] :: _) | ([] :: _, (_ :: _) :: _) ->
                       assert false
                   | ((exp :: exps) :: expss, (got :: gots) :: gotss) ->
-                      ( if not (Bytes.equal exp got) then
-                        Store.Block.protocol_hash main_chain_store block
-                        >>=? fun protocol ->
-                        Registered_protocol.get_result protocol
-                        >>=? fun (module Proto) ->
-                        let exp =
-                          Data_encoding.Binary.of_bytes_exn
-                            Proto.operation_receipt_encoding
-                            exp
-                        in
-                        let got =
-                          Data_encoding.Binary.of_bytes_exn
-                            Proto.operation_receipt_encoding
-                            got
-                        in
-                        let op =
-                          operations
-                          |> (fun l -> List.nth_opt l i)
-                          |> Option.value_f ~default:(fun () -> assert false)
-                          |> (fun l -> List.nth_opt l j)
-                          |> Option.value_f ~default:(fun () -> assert false)
-                          |> fun {proto; _} ->
-                          Data_encoding.Binary.of_bytes_exn
-                            Proto.operation_data_encoding
-                            proto
-                        in
-                        let exp =
-                          Data_encoding.Json.construct
-                            Proto.operation_data_and_receipt_encoding
-                            (op, exp)
-                        in
-                        let got =
-                          Data_encoding.Json.construct
-                            Proto.operation_data_and_receipt_encoding
-                            (op, got)
-                        in
-                        Event.(emit inconsistent_operation_receipt)
-                          ((i, j), exp, got)
-                        >>= fun () -> return_unit
-                      else return_unit )
+                      (if not (Bytes.equal exp got) then
+                       Store.Block.protocol_hash main_chain_store block
+                       >>=? fun protocol ->
+                       Registered_protocol.get_result protocol
+                       >>=? fun (module Proto) ->
+                       let exp =
+                         Data_encoding.Binary.of_bytes_exn
+                           Proto.operation_receipt_encoding
+                           exp
+                       in
+                       let got =
+                         Data_encoding.Binary.of_bytes_exn
+                           Proto.operation_receipt_encoding
+                           got
+                       in
+                       let op =
+                         operations
+                         |> (fun l -> List.nth_opt l i)
+                         |> Option.value_f ~default:(fun () -> assert false)
+                         |> (fun l -> List.nth_opt l j)
+                         |> Option.value_f ~default:(fun () -> assert false)
+                         |> fun {proto; _} ->
+                         Data_encoding.Binary.of_bytes_exn
+                           Proto.operation_data_encoding
+                           proto
+                       in
+                       let exp =
+                         Data_encoding.Json.construct
+                           Proto.operation_data_and_receipt_encoding
+                           (op, exp)
+                       in
+                       let got =
+                         Data_encoding.Json.construct
+                           Proto.operation_data_and_receipt_encoding
+                           (op, got)
+                       in
+                       Event.(emit inconsistent_operation_receipt)
+                         ((i, j), exp, got)
+                       >>= fun () -> return_unit
+                      else return_unit)
                       >>=? fun () ->
                       check_receipts i (succ j) (exps :: expss) (gots :: gotss)
                 in
@@ -355,18 +350,15 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                   result.ops_metadata)
         blocks)
     (fun () ->
-      Block_validator_process.close validator_process
-      >>= fun () -> Store.close_store store)
+      Block_validator_process.close validator_process >>= fun () ->
+      Store.close_store store)
 
 let run ?verbosity ~singleprocess (config : Node_config_file.t) block =
-  Node_data_version.ensure_data_dir config.data_dir
-  >>=? fun () ->
-  Lwt_lock_file.is_locked (Node_data_version.lock_file config.data_dir)
-  >>=? (function
-         | true ->
-             failwith "Data directory is locked by another process"
-         | false ->
-             return_unit)
+  Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
+  (Lwt_lock_file.is_locked (Node_data_version.lock_file config.data_dir)
+   >>=? function
+   | true -> failwith "Data directory is locked by another process"
+   | false -> return_unit)
   >>=? fun () ->
   Lwt_lock_file.create
     ~unlink_on_exit:true
@@ -375,10 +367,8 @@ let run ?verbosity ~singleprocess (config : Node_config_file.t) block =
   (* Main loop *)
   let log_cfg =
     match verbosity with
-    | None ->
-        config.log
-    | Some default_level ->
-        {config.log with default_level}
+    | None -> config.log
+    | Some default_level -> {config.log with default_level}
   in
   Internal_event_unix.init
     ~lwt_log_sink:log_cfg
@@ -388,13 +378,11 @@ let run ?verbosity ~singleprocess (config : Node_config_file.t) block =
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit
-    @@ ( protect (fun () -> replay ~singleprocess config block)
-       >>= fun res -> Internal_event_unix.close () >>= fun () -> Lwt.return res
-       ))
+    @@ ( protect (fun () -> replay ~singleprocess config block) >>= fun res ->
+         Internal_event_unix.close () >>= fun () -> Lwt.return res ))
 
 let check_data_dir dir =
-  Lwt_unix.file_exists dir
-  >>= fun dir_exists ->
+  Lwt_unix.file_exists dir >>= fun dir_exists ->
   fail_unless
     dir_exists
     (Node_data_version.Invalid_data_dir
@@ -409,18 +397,14 @@ let process verbosity singleprocess block args =
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
   in
   let run =
-    Node_shared_arg.read_data_dir args
-    >>=? fun data_dir ->
-    check_data_dir data_dir
-    >>=? fun () ->
-    Node_shared_arg.read_and_patch_config_file args
-    >>=? fun config -> run ?verbosity ~singleprocess config block
+    Node_shared_arg.read_data_dir args >>=? fun data_dir ->
+    check_data_dir data_dir >>=? fun () ->
+    Node_shared_arg.read_and_patch_config_file args >>=? fun config ->
+    run ?verbosity ~singleprocess config block
   in
   match Lwt_main.run run with
-  | Ok () ->
-      `Ok ()
-  | Error err ->
-      `Error (false, Format.asprintf "%a" pp_print_error err)
+  | Ok () -> `Ok ()
+  | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
 
 module Term = struct
   let verbosity =
@@ -445,10 +429,8 @@ module Term = struct
       Arg.conv
         ( (fun s ->
             match Tezos_shell_services.Block_services.parse_block s with
-            | Ok r ->
-                Ok r
-            | Error _ ->
-                Error (`Msg "cannot decode block argument")),
+            | Ok r -> Ok r
+            | Error _ -> Error (`Msg "cannot decode block argument")),
           fun ppf b ->
             Format.fprintf
               ppf
@@ -478,8 +460,8 @@ module Term = struct
   let term =
     Cmdliner.Term.(
       ret
-        ( const process $ verbosity $ singleprocess $ block
-        $ Node_shared_arg.Term.args ))
+        (const process $ verbosity $ singleprocess $ block
+       $ Node_shared_arg.Term.args))
 end
 
 module Manpage = struct
@@ -495,24 +477,28 @@ module Manpage = struct
         " "
         (TzString.Set.elements (Internal_event.get_registered_sections ()))
     in
-    [ `S "DEBUG";
+    [
+      `S "DEBUG";
       `P
-        ( "The environment variable $(b,TEZOS_LOG) is used to fine-tune what \
-           is going to be logged. The syntax is \
-           $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is \
-           one of $(i," ^ log_sections
-        ^ ") and level is one of $(i,fatal), $(i,error), $(i,warn), \
-           $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
-           wildcard in sections, i.e. $(b, client* -> debug). The rules are \
-           matched left to right, therefore the leftmost rule is highest \
-           priority ." ) ]
+        ("The environment variable $(b,TEZOS_LOG) is used to fine-tune what is \
+          going to be logged. The syntax is \
+          $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is \
+          one of $(i," ^ log_sections
+       ^ ") and level is one of $(i,fatal), $(i,error), $(i,warn), \
+          $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
+          wildcard in sections, i.e. $(b, client* -> debug). The rules are \
+          matched left to right, therefore the leftmost rule is highest \
+          priority .");
+    ]
 
   let examples =
-    [ `S "EXAMPLE";
+    [
+      `S "EXAMPLE";
       `I
         ( "$(b,Replay the last three blocks)",
           "$(mname) replay head-2 head-1 head" );
-      `I ("$(b,Replay block at level twelve)", "$(mname) replay 12") ]
+      `I ("$(b,Replay block at level twelve)", "$(mname) replay 12");
+    ]
 
   let man =
     description @ Node_shared_arg.Manpage.args @ debug @ examples

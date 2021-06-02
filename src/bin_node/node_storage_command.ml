@@ -58,75 +58,64 @@ module Term = struct
   let ensure_context_dir context_dir =
     Lwt.catch
       (fun () ->
-        Lwt_unix.file_exists context_dir
-        >>= function
+        Lwt_unix.file_exists context_dir >>= function
         | false ->
             fail
               (Node_data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
         | true -> (
             let pack = context_dir // "store.pack" in
-            Lwt_unix.file_exists pack
-            >>= function
+            Lwt_unix.file_exists pack >>= function
             | false ->
                 fail
                   (Node_data_version.Invalid_data_dir
                      {data_dir = context_dir; msg = None})
-            | true ->
-                return_unit ))
+            | true -> return_unit))
       (function
         | Unix.Unix_error _ ->
             fail
               (Node_data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
-        | exc ->
-            raise exc)
+        | exc -> raise exc)
 
   let root config_file data_dir =
-    read_config_file config_file
-    >>=? fun cfg ->
+    read_config_file config_file >>=? fun cfg ->
     let data_dir = Option.value ~default:cfg.data_dir data_dir in
     let context_dir = Node_data_version.context_dir data_dir in
     ensure_context_dir context_dir >>=? fun () -> return context_dir
 
   let integrity_check config_file data_dir auto_repair =
-    root config_file data_dir
-    >>=? fun root ->
-    Context.Checks.Pack.Integrity_check.run ~root ~auto_repair
-    >>= fun () -> return_unit
+    root config_file data_dir >>=? fun root ->
+    Context.Checks.Pack.Integrity_check.run ~root ~auto_repair >>= fun () ->
+    return_unit
 
   let stat_index config_file data_dir =
-    root config_file data_dir
-    >>=? fun root ->
+    root config_file data_dir >>=? fun root ->
     Context.Checks.Index.Stat.run ~root ;
     return_unit
 
   let stat_pack config_file data_dir =
-    root config_file data_dir
-    >>=? fun root ->
+    root config_file data_dir >>=? fun root ->
     Context.Checks.Pack.Stat.run ~root >>= fun () -> return_unit
 
   let index_dir_exists context_dir output =
     let index_dir = Option.value output ~default:(context_dir // "index") in
-    Lwt_unix.file_exists index_dir
-    >>= function
-    | false -> return_unit | true -> fail (Existing_index_dir index_dir)
+    Lwt_unix.file_exists index_dir >>= function
+    | false -> return_unit
+    | true -> fail (Existing_index_dir index_dir)
 
   let reconstruct_index config_file data_dir output =
-    root config_file data_dir
-    >>=? fun root ->
-    index_dir_exists root output
-    >>=? fun () ->
+    root config_file data_dir >>=? fun root ->
+    index_dir_exists root output >>=? fun () ->
     Context.Checks.Pack.Reconstruct_index.run ~root ~output ;
     return_unit
 
   let to_context_hash chain_store (hash : Block_hash.t) =
-    Store.Block.read_block chain_store hash
-    >>=? fun block -> return (Store.Block.context_hash block)
+    Store.Block.read_block chain_store hash >>=? fun block ->
+    return (Store.Block.context_hash block)
 
   let current_head config_file data_dir block =
-    read_config_file config_file
-    >>=? fun cfg ->
+    read_config_file config_file >>=? fun cfg ->
     let ({genesis; _} : Node_config_file.blockchain_network) =
       cfg.blockchain_network
     in
@@ -137,26 +126,21 @@ module Term = struct
     >>=? fun store ->
     let genesis = cfg.blockchain_network.genesis in
     let chain_id = Chain_id.of_block_hash genesis.block in
-    Store.get_chain_store store chain_id
-    >>=? fun chain_store ->
+    Store.get_chain_store store chain_id >>=? fun chain_store ->
     let to_context_hash = to_context_hash chain_store in
-    ( match block with
-    | Some block ->
-        Lwt.return (Block_hash.of_b58check block)
+    (match block with
+    | Some block -> Lwt.return (Block_hash.of_b58check block)
     | None ->
-        Store.Chain.current_head chain_store
-        >>= fun head -> return (Store.Block.hash head) )
+        Store.Chain.current_head chain_store >>= fun head ->
+        return (Store.Block.hash head))
     >>=? fun block_hash ->
-    to_context_hash block_hash
-    >>=? fun context_hash ->
-    Store.close_store store
-    >>= fun () -> return (Context_hash.to_b58check context_hash)
+    to_context_hash block_hash >>=? fun context_hash ->
+    Store.close_store store >>= fun () ->
+    return (Context_hash.to_b58check context_hash)
 
   let integrity_check_inodes config_file data_dir block =
-    root config_file data_dir
-    >>=? fun root ->
-    current_head config_file data_dir block
-    >>=? fun head ->
+    root config_file data_dir >>=? fun root ->
+    current_head config_file data_dir block >>=? fun head ->
     Context.Checks.Pack.Integrity_check_inodes.run ~root ~heads:(Some [head])
     >>= fun () -> return_unit
 
@@ -164,53 +148,36 @@ module Term = struct
       =
     let run =
       match subcommand with
-      | Stat_index ->
-          stat_index config_file data_dir
-      | Stat_pack ->
-          stat_pack config_file data_dir
-      | Integrity_check ->
-          integrity_check config_file data_dir auto_repair
-      | Reconstruct_index ->
-          reconstruct_index config_file data_dir dest
+      | Stat_index -> stat_index config_file data_dir
+      | Stat_pack -> stat_pack config_file data_dir
+      | Integrity_check -> integrity_check config_file data_dir auto_repair
+      | Reconstruct_index -> reconstruct_index config_file data_dir dest
       | Integrity_check_inodes ->
           integrity_check_inodes config_file data_dir head
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
-    | Ok () ->
-        `Ok ()
-    | Error err ->
-        `Error (false, Format.asprintf "%a" pp_print_error err)
+    | Ok () -> `Ok ()
+    | Error err -> `Error (false, Format.asprintf "%a" pp_print_error err)
 
   let subcommand_arg =
     let parser = function
-      | "stat-index" ->
-          `Ok Stat_index
-      | "stat-pack" ->
-          `Ok Stat_pack
-      | "integrity-check" ->
-          `Ok Integrity_check
-      | "reconstruct-index" ->
-          `Ok Reconstruct_index
-      | "integrity-check-inodes" ->
-          `Ok Integrity_check_inodes
-      | s ->
-          `Error ("invalid argument: " ^ s)
+      | "stat-index" -> `Ok Stat_index
+      | "stat-pack" -> `Ok Stat_pack
+      | "integrity-check" -> `Ok Integrity_check
+      | "reconstruct-index" -> `Ok Reconstruct_index
+      | "integrity-check-inodes" -> `Ok Integrity_check_inodes
+      | s -> `Error ("invalid argument: " ^ s)
     and printer ppf = function
-      | Stat_index ->
-          Format.fprintf ppf "stat-index"
-      | Stat_pack ->
-          Format.fprintf ppf "stat-pack"
-      | Integrity_check ->
-          Format.fprintf ppf "integrity-check"
-      | Reconstruct_index ->
-          Format.fprintf ppf "reconstruct-index"
-      | Integrity_check_inodes ->
-          Format.fprintf ppf "integrity-check-inodes"
+      | Stat_index -> Format.fprintf ppf "stat-index"
+      | Stat_pack -> Format.fprintf ppf "stat-pack"
+      | Integrity_check -> Format.fprintf ppf "integrity-check"
+      | Reconstruct_index -> Format.fprintf ppf "reconstruct-index"
+      | Integrity_check_inodes -> Format.fprintf ppf "integrity-check-inodes"
     in
     let open Cmdliner.Arg in
     let doc =
-      "Operation to perform. Possible values: $(b,stat-index), \
-       $(b,stat-pack), $(b,integrity-check), $(b,reconstruct-index), \
+      "Operation to perform. Possible values: $(b,stat-index), $(b,stat-pack), \
+       $(b,integrity-check), $(b,reconstruct-index), \
        $(b,integrity-check-inodes)."
     in
     required
@@ -246,8 +213,8 @@ module Term = struct
   let term =
     Term.(
       ret
-        ( const dispatch_subcommand $ subcommand_arg $ config_file $ data_dir
-        $ auto_repair $ dest $ head ))
+        (const dispatch_subcommand $ subcommand_arg $ config_file $ data_dir
+       $ auto_repair $ dest $ head))
 end
 
 module Manpage = struct
@@ -256,7 +223,8 @@ module Manpage = struct
      the storage layer."
 
   let commands =
-    [ `S Cmdliner.Manpage.s_commands;
+    [
+      `S Cmdliner.Manpage.s_commands;
       `P "The following subcommands are available:";
       `P
         "$(b,integrity-check) search the store for integrity faults and \
@@ -265,12 +233,13 @@ module Manpage = struct
       `P "$(b,stat-pack) print high-level statistics about the pack file.";
       `P "$(b,reconstruct-index) reconstruct index from pack file.";
       `P
-        "$(b,integrity-check-inodes) search the store for corrupted inodes. \
-         If no block hash is provided (through the $(b,--head) argument) then \
-         the current head is chosen as the default context to start with.";
+        "$(b,integrity-check-inodes) search the store for corrupted inodes. If \
+         no block hash is provided (through the $(b,--head) argument) then the \
+         current head is chosen as the default context to start with.";
       `P
         "$(b,WARNING): this API is experimental and may change in future \
-         versions." ]
+         versions.";
+    ]
 
   let man = commands @ Node_shared_arg.Manpage.bugs
 

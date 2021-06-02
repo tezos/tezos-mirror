@@ -29,8 +29,11 @@ class type ['pr] gen_simple =
   object
     method call_service :
       'm 'p 'q 'i 'o.
-      (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
-      'q -> 'i -> 'o tzresult Lwt.t
+      (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+      'p ->
+      'q ->
+      'i ->
+      'o tzresult Lwt.t
   end
 
 class type ['pr] gen_streamed =
@@ -38,7 +41,11 @@ class type ['pr] gen_streamed =
     method call_streamed_service :
       'm 'p 'q 'i 'o.
       (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-      on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
+      on_chunk:('o -> unit) ->
+      on_close:(unit -> unit) ->
+      'p ->
+      'q ->
+      'i ->
       (unit -> unit) tzresult Lwt.t
   end
 
@@ -118,24 +125,24 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
   object
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t -> 'p ->
-          'q -> 'i -> 'o tzresult Lwt.t =
+          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+          'p ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
       fun s p q i ->
-        RPC_directory.transparent_lookup dir s p q i
-        >>= function
-        | `Ok v | `OkChunk v ->
-            return v
+        RPC_directory.transparent_lookup dir s p q i >>= function
+        | `Ok v | `OkChunk v -> return v
         | `OkStream {next; shutdown} -> (
-            next ()
-            >>= function
+            next () >>= function
             | Some v ->
-                shutdown () ; return v
+                shutdown () ;
+                return v
             | None ->
-                shutdown () ; not_found s p q )
-        | `Gone None ->
-            gone s p q
-        | `Not_found None ->
-            not_found s p q
+                shutdown () ;
+                not_found s p q)
+        | `Gone None -> gone s p q
+        | `Not_found None -> not_found s p q
         | `Unauthorized (Some err)
         | `Forbidden (Some err)
         | `Gone (Some err)
@@ -154,19 +161,23 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
           (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-          on_chunk:('o -> unit) -> on_close:(unit -> unit) -> 'p -> 'q -> 'i ->
+          on_chunk:('o -> unit) ->
+          on_close:(unit -> unit) ->
+          'p ->
+          'q ->
+          'i ->
           (unit -> unit) tzresult Lwt.t =
       fun s ~on_chunk ~on_close p q i ->
-        RPC_directory.transparent_lookup dir s p q i
-        >>= function
+        RPC_directory.transparent_lookup dir s p q i >>= function
         | `OkStream {next; shutdown} ->
             let rec loop () =
-              next ()
-              >>= function
+              next () >>= function
               | None ->
-                  on_close () ; Lwt.return_unit
+                  on_close () ;
+                  Lwt.return_unit
               | Some v ->
-                  on_chunk v ; loop ()
+                  on_chunk v ;
+                  loop ()
             in
             let _ = loop () in
             return shutdown
@@ -174,10 +185,8 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
             on_chunk v ;
             on_close () ;
             return (fun () -> ())
-        | `Gone None ->
-            gone s p q
-        | `Not_found None ->
-            not_found s p q
+        | `Gone None -> gone s p q
+        | `Not_found None -> not_found s p q
         | `Unauthorized (Some err)
         | `Forbidden (Some err)
         | `Gone (Some err)
@@ -207,8 +216,8 @@ type stopper = unit -> unit
 let make_streamed_call s (ctxt : #streamed) p q i =
   let (stream, push) = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
-  ctxt#call_streamed_service s ~on_chunk ~on_close p q i
-  >>=? fun close -> return (stream, close)
+  ctxt#call_streamed_service s ~on_chunk ~on_close p q i >>=? fun close ->
+  return (stream, close)
 
 let () =
   let open Data_encoding in

@@ -51,8 +51,7 @@ open Pyplot
    of the workload, there are [n+1] columns. *)
 type raw_row = {workload : (string * float) list; qty : float}
 
-let convert_workload_data : (Sparse_vec.String.t * float) list -> raw_row list
-    =
+let convert_workload_data : (Sparse_vec.String.t * float) list -> raw_row list =
  fun workload_data ->
   List.map
     (fun (vec, qty) -> {workload = Sparse_vec.String.to_list vec; qty})
@@ -60,14 +59,10 @@ let convert_workload_data : (Sparse_vec.String.t * float) list -> raw_row list
 
 let style i =
   match i with
-  | 0 ->
-      Plot.(Blue, Dot)
-  | 1 ->
-      Plot.(Red, Square)
-  | 2 ->
-      Plot.(Green, Triangle)
-  | _ ->
-      Stdlib.failwith "Display.style: style overflow"
+  | 0 -> Plot.(Blue, Dot)
+  | 1 -> Plot.(Red, Square)
+  | 2 -> Plot.(Green, Triangle)
+  | _ -> Stdlib.failwith "Display.style: style overflow"
 
 let scatterplot_2d title (name, input) outputs =
   let data =
@@ -123,8 +118,7 @@ let plot_scatter title input_columns outputs =
             | [((dim1, _) as col1); ((dim2, _) as col2)] ->
                 let title = Format.asprintf "%s\n(%s, %s)" title dim1 dim2 in
                 scatterplot_3d title col1 col2 outputs
-            | _ ->
-                assert false)
+            | _ -> assert false)
           subsets
       in
       Ok plots
@@ -161,8 +155,7 @@ let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
         (fun i {workload; qty} ->
           assert (List.length workload = input_dims) ;
           List.iteri
-            (fun input_dim (_, size) ->
-              Matrix.set columns.(input_dim) i 0 size)
+            (fun input_dim (_, size) -> Matrix.set columns.(input_dim) i 0 size)
             workload ;
           Matrix.set timings i 0 qty)
         samples ;
@@ -170,7 +163,7 @@ let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
       let named_columns =
         List.combine ~when_different_lengths:() vars columns
         |> (* [columns = Array.to_list (Array.init (List.length vars))] *)
-           WithExceptions.Result.get_ok ~loc:__LOC__
+        WithExceptions.Result.get_ok ~loc:__LOC__
       in
       Ok (named_columns, timings)
 
@@ -188,8 +181,7 @@ let column_is_constant (m : Matrix.t) =
 (* Prune the dimensions of the input matrix which are constant. *)
 let prune_problem problem : (Free_variable.t * Matrix.t) list * Matrix.t =
   match problem with
-  | Inference.Degenerate _ ->
-      assert false
+  | Inference.Degenerate _ -> assert false
   | Inference.Non_degenerate {input; output; nmap; _} ->
       let (_, cols) = Matrix.shape input in
       let named_columns =
@@ -198,12 +190,10 @@ let prune_problem problem : (Free_variable.t * Matrix.t) list * Matrix.t =
             let col = Matrix.column input c in
             (name, col))
         |> (* column count cannot be negative *)
-           WithExceptions.Result.get_ok ~loc:__LOC__
+        WithExceptions.Result.get_ok ~loc:__LOC__
       in
       let columns =
-        List.filter
-          (fun (_, col) -> not (column_is_constant col))
-          named_columns
+        List.filter (fun (_, col) -> not (column_is_constant col)) named_columns
       in
       (columns, output)
 
@@ -216,19 +206,15 @@ let rec plot_stacked :
     unit Plot.t =
  fun row col plots ->
   match plots with
-  | [] ->
-      Plot.return ()
+  | [] -> Plot.return ()
   | `Dim2 ax :: tl ->
-      Plot.(
-        subplot_2d ~row ~col ax >>= fun () -> plot_stacked (row + 1) col tl)
+      Plot.(subplot_2d ~row ~col ax >>= fun () -> plot_stacked (row + 1) col tl)
   | `Dim3 ax :: tl ->
-      Plot.(
-        subplot_3d ~row ~col ax >>= fun () -> plot_stacked (row + 1) col tl)
+      Plot.(subplot_3d ~row ~col ax >>= fun () -> plot_stacked (row + 1) col tl)
 
 let validator (problem : Inference.problem) (solution : Inference.solution) =
   match problem with
-  | Inference.Degenerate _ ->
-      Error "Display.validator: degenerate plot"
+  | Inference.Degenerate _ -> Error "Display.validator: degenerate plot"
   | Inference.Non_degenerate {input; _} ->
       let {Inference.weights; _} = solution in
       let predicted = Matrix.numpy_mul input weights in
@@ -247,10 +233,8 @@ let validator (problem : Inference.problem) (solution : Inference.solution) =
 
 let empirical (workload_data : (Sparse_vec.String.t * float) list) :
     (int * (col:int -> unit Plot.t), string) result =
-  empirical_data workload_data
-  >>? fun (columns, timings) ->
-  plot_scatter "Empirical" columns [timings]
-  >>? fun plots ->
+  empirical_data workload_data >>? fun (columns, timings) ->
+  plot_scatter "Empirical" columns [timings] >>? fun plots ->
   let nrows = List.length plots in
   Ok (nrows, fun ~col -> plot_stacked 0 col plots)
 
@@ -274,8 +258,7 @@ let validator_empirical workload_data (problem : Inference.problem)
   in
   let predicted =
     match problem with
-    | Inference.Degenerate {predicted; _} ->
-        predicted
+    | Inference.Degenerate {predicted; _} -> predicted
     | Inference.Non_degenerate {lines; _} ->
         let predicted_list =
           List.map
@@ -288,8 +271,7 @@ let validator_empirical workload_data (problem : Inference.problem)
         Matrix.init ~lines:(Array.length array) ~cols:1 ~f:(fun l _ ->
             array.(l))
   in
-  Result.bind (empirical_data workload_data)
-  @@ fun (columns, timings) ->
+  Result.bind (empirical_data workload_data) @@ fun (columns, timings) ->
   Result.bind (plot_scatter "Validation (raw)" columns [timings; predicted])
   @@ fun plots ->
   let nrows = List.length plots in
@@ -318,7 +300,8 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target =
     let max_rows = ref 0 in
     let with_col f =
       let col = !current_col in
-      incr current_col ; f col
+      incr current_col ;
+      f col
     in
     let empirical =
       Result.fold
@@ -349,40 +332,35 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target =
     else
       let plot =
         let open Plot in
-        empirical >>= fun () -> validator >>= fun () -> validator_emp
+        empirical >>= fun () ->
+        validator >>= fun () -> validator_emp
       in
       Some (!max_rows, !current_col, plot)
   in
   match main_plot_opt with
-  | None ->
-      false
+  | None -> false
   | Some (nrows, ncols, plot) ->
       Plot.run
         ~nrows
         ~ncols
         (let open Plot in
-        plot
-        >>= fun () ->
-        suptitle ~title:Bench.name ~fontsize:None
-        >>= fun () ->
+        plot >>= fun () ->
+        suptitle ~title:Bench.name ~fontsize:None >>= fun () ->
         match plot_target with
         | Save {file} -> (
-          match file with
-          | None ->
-              savefig ~filename:(filename "collected") ~dpi:3000 ~quality:95
-          | Some filename ->
-              savefig ~filename ~dpi:3000 ~quality:95 )
-        | Show ->
-            Plot.(show () >>= fun () -> return ())
+            match file with
+            | None ->
+                savefig ~filename:(filename "collected") ~dpi:3000 ~quality:95
+            | Some filename -> savefig ~filename ~dpi:3000 ~quality:95)
+        | Show -> Plot.(show () >>= fun () -> return ())
         | ShowAndSave {file} -> (
-          match file with
-          | None ->
-              Plot.(
-                show ()
-                >>= fun () ->
-                savefig ~filename:(filename "collected") ~dpi:3000 ~quality:95)
-          | Some filename ->
-              Plot.(
-                show () >>= fun () -> savefig ~filename ~dpi:3000 ~quality:95)
-          )) ;
+            match file with
+            | None ->
+                Plot.(
+                  show () >>= fun () ->
+                  savefig ~filename:(filename "collected") ~dpi:3000 ~quality:95)
+            | Some filename ->
+                Plot.(
+                  show () >>= fun () -> savefig ~filename ~dpi:3000 ~quality:95)
+            )) ;
       true

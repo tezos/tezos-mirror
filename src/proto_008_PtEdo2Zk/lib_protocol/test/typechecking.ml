@@ -7,19 +7,16 @@ exception Expression_from_string
 
 let expression_from_string str : Script.expr tzresult Lwt.t =
   let (ast, errs) = Michelson_v1_parser.parse_expression ~check:false str in
-  ( match errs with
-  | [] ->
-      ()
+  (match errs with
+  | [] -> ()
   | lst ->
       Format.printf "expr_from_string: %a\n" Error_monad.pp_print_error lst ;
-      raise Expression_from_string ) ;
+      raise Expression_from_string) ;
   return ast.expanded
 
 let ( >>=?? ) x y =
-  x
-  >>= function
-  | Ok s ->
-      y s
+  x >>= function
+  | Ok s -> y s
   | Error errs ->
       Lwt.return
       @@ Error (List.map (fun x -> Environment.Ecoproto_error x) errs)
@@ -27,24 +24,19 @@ let ( >>=?? ) x y =
 let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_error x
 
 let test_context () =
-  Context.init 3
-  >>=? fun (b, _cs) ->
-  Incremental.begin_construction b
-  >>=? fun v -> return (Incremental.alpha_ctxt v)
+  Context.init 3 >>=? fun (b, _cs) ->
+  Incremental.begin_construction b >>=? fun v ->
+  return (Incremental.alpha_ctxt v)
 
 let test_context_with_nat_nat_big_map () =
-  Context.init 3
-  >>=? fun (b, contracts) ->
+  Context.init 3 >>=? fun (b, contracts) ->
   let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Op.origination (B b) source ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
-  Block.bake ~operation b
-  >>=? fun b ->
-  Incremental.begin_construction b
-  >>=? fun v ->
+  Block.bake ~operation b >>=? fun b ->
+  Incremental.begin_construction b >>=? fun v ->
   let ctxt = Incremental.alpha_ctxt v in
-  wrap_error_lwt @@ Big_map.fresh ~temporary:false ctxt
-  >>=? fun (ctxt, id) ->
+  wrap_error_lwt @@ Big_map.fresh ~temporary:false ctxt >>=? fun (ctxt, id) ->
   let nat_ty = Script_typed_ir.Nat_t None in
   wrap_error_lwt @@ Lwt.return @@ Script_ir_translator.unparse_ty ctxt nat_ty
   >>=? fun (nat_ty_node, ctxt) ->
@@ -52,10 +44,12 @@ let test_context_with_nat_nat_big_map () =
   let alloc = Big_map.{key_type = nat_ty_expr; value_type = nat_ty_expr} in
   let init = Lazy_storage.Alloc alloc in
   let diffs =
-    [ Lazy_storage.make
+    [
+      Lazy_storage.make
         Lazy_storage.Kind.Big_map
         id
-        (Update {init; updates = []}) ]
+        (Update {init; updates = []});
+    ]
   in
   wrap_error_lwt
   @@ Contract.update_script_storage ctxt originated nat_ty_expr (Some diffs)
@@ -77,12 +71,9 @@ let default_step_constants =
    and parameter and returns the result. *)
 let run_script ctx ?(step_constants = default_step_constants) contract
     ?(entrypoint = "default") ~storage ~parameter () =
-  expression_from_string contract
-  >>=? fun contract_expr ->
-  expression_from_string storage
-  >>=? fun storage_expr ->
-  expression_from_string parameter
-  >>=? fun parameter_expr ->
+  expression_from_string contract >>=? fun contract_expr ->
+  expression_from_string storage >>=? fun storage_expr ->
+  expression_from_string parameter >>=? fun parameter_expr ->
   let script =
     Script.{code = lazy_expr contract_expr; storage = lazy_expr storage_expr}
   in
@@ -99,19 +90,17 @@ let run_script ctx ?(step_constants = default_step_constants) contract
 let read_file filename =
   let ch = open_in filename in
   let s = really_input_string ch (in_channel_length ch) in
-  close_in ch ; s
+  close_in ch ;
+  s
 
 (* Check that the custom stack overflow exception is triggered when it should be *)
 let test_typecheck_stack_overflow () =
-  test_context ()
-  >>=? fun ctxt ->
+  test_context () >>=? fun ctxt ->
   let storage = "Unit" in
   let parameter = "Unit" in
   let script = read_file "./contracts/big_interpreter_stack.tz" in
-  run_script ctxt script ~storage ~parameter ()
-  >>= function
-  | Ok _ ->
-      Alcotest.fail "expected an error"
+  run_script ctxt script ~storage ~parameter () >>= function
+  | Ok _ -> Alcotest.fail "expected an error"
   | Error lst
     when List.mem
            ~equal:( = )
@@ -123,8 +112,7 @@ let test_typecheck_stack_overflow () =
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_error errs
 
 let test_unparse_stack_overflow () =
-  test_context ()
-  >>=? fun ctxt ->
+  test_context () >>=? fun ctxt ->
   (* Meme *)
   let enorme_et_seq n =
     let rec aux n acc = aux (n - 1) @@ Micheline.Seq (0, [acc]) in
@@ -132,16 +120,14 @@ let test_unparse_stack_overflow () =
   in
   Script_ir_translator.(unparse_code ctxt Readable (enorme_et_seq 10_001))
   >>= function
-  | Ok _ ->
-      Alcotest.fail "expected an error"
+  | Ok _ -> Alcotest.fail "expected an error"
   | Error lst
     when List.mem
            ~equal:( = )
            Script_tc_errors.Unparsing_too_many_recursive_calls
            lst ->
       return ()
-  | Error _ ->
-      Alcotest.failf "Unexpected error: %s" __LOC__
+  | Error _ -> Alcotest.failf "Unexpected error: %s" __LOC__
 
 let location = function
   | Prim (loc, _, _, _)
@@ -167,8 +153,8 @@ let test_parse_ty ctxt node expected =
         ~allow_ticket
         node
     >>? fun (Script_ir_translator.Ex_ty actual, ctxt) ->
-    Script_ir_translator.ty_eq ctxt (location node) actual expected
-    >|? fun (_, ctxt) -> ctxt )
+      Script_ir_translator.ty_eq ctxt (location node) actual expected
+      >|? fun (_, ctxt) -> ctxt )
 
 let test_parse_comb_type () =
   let open Script in
@@ -183,11 +169,9 @@ let test_parse_comb_type () =
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
   let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
-  test_context ()
-  >>=? fun ctxt ->
+  test_context () >>=? fun ctxt ->
   (* pair nat nat *)
-  test_parse_ty ctxt pair_nat_nat_prim pair_nat_nat_ty
-  >>?= fun ctxt ->
+  test_parse_ty ctxt pair_nat_nat_prim pair_nat_nat_ty >>?= fun ctxt ->
   (* pair (pair nat nat) nat *)
   test_parse_ty
     ctxt
@@ -255,10 +239,9 @@ let test_parse_comb_type () =
 
 let test_unparse_ty loc ctxt expected ty =
   Environment.wrap_error
-    ( Script_ir_translator.unparse_ty ctxt ty
-    >>? fun (actual, ctxt) ->
-    if actual = expected then ok ctxt
-    else Alcotest.failf "Unexpected error: %s" loc )
+    ( Script_ir_translator.unparse_ty ctxt ty >>? fun (actual, ctxt) ->
+      if actual = expected then ok ctxt
+      else Alcotest.failf "Unexpected error: %s" loc )
 
 let test_unparse_comb_type () =
   let open Script in
@@ -273,8 +256,7 @@ let test_unparse_comb_type () =
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
   let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
-  test_context ()
-  >>=? fun ctxt ->
+  test_context () >>=? fun ctxt ->
   (* pair nat nat *)
   test_unparse_ty __LOC__ ctxt pair_nat_nat_prim pair_nat_nat_ty
   >>?= fun ctxt ->
@@ -375,8 +357,8 @@ let test_unparse_comparable_ty loc ctxt expected ty =
   Environment.wrap_error
     ( Script_ir_translator.unparse_ty ctxt (Set_t (ty, None))
     >>? fun (actual, ctxt) ->
-    if actual = Prim (-1, T_set, [expected], []) then ok ctxt
-    else Alcotest.failf "Unexpected error: %s" loc )
+      if actual = Prim (-1, T_set, [expected], []) then ok ctxt
+      else Alcotest.failf "Unexpected error: %s" loc )
 
 let test_unparse_comb_comparable_type () =
   let open Script in
@@ -391,8 +373,7 @@ let test_unparse_comb_comparable_type () =
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
   let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
-  test_context ()
-  >>=? fun ctxt ->
+  test_context () >>=? fun ctxt ->
   (* pair nat nat *)
   test_unparse_comparable_ty __LOC__ ctxt pair_nat_nat_prim pair_nat_nat_ty
   >>?= fun ctxt ->
@@ -430,9 +411,7 @@ let test_unparse_comb_comparable_type () =
     ctxt
     (pair_prim2 nat_prim_a nat_prim_b)
     (Pair_key
-       ( (nat_ty, Some (Field_annot "a")),
-         (nat_ty, Some (Field_annot "b")),
-         None ))
+       ((nat_ty, Some (Field_annot "a")), (nat_ty, Some (Field_annot "b")), None))
   >>?= fun ctxt ->
   (* pair (nat %a) (nat %b) (nat %c) *)
   test_unparse_comparable_ty
@@ -466,8 +445,7 @@ let test_unparse_comb_comparable_type () =
     (pair_prim2 nat_prim (Prim (-1, T_pair, [nat_prim; nat_prim], [":b"])))
     (Pair_key
        ( (nat_ty, None),
-         ( Pair_key ((nat_ty, None), (nat_ty, None), Some (Type_annot "b")),
-           None ),
+         (Pair_key ((nat_ty, None), (nat_ty, None), Some (Type_annot "b")), None),
          None ))
   >>?= fun _ -> return_unit
 
@@ -477,23 +455,21 @@ let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
   wrap_error_lwt
     ( Script_ir_translator.parse_data ctxt ~legacy ~allow_forged ty node
     >>=? fun (actual, ctxt) ->
-    if equal actual expected then return ctxt
-    else Alcotest.failf "Unexpected error: %s" loc )
+      if equal actual expected then return ctxt
+      else Alcotest.failf "Unexpected error: %s" loc )
 
 let test_parse_data_fails loc ctxt ty node =
   let legacy = false in
   let allow_forged = false in
   wrap_error_lwt
-    ( Script_ir_translator.parse_data ctxt ~legacy ~allow_forged ty node
-    >>= function
-    | Ok _ ->
-        Alcotest.failf "Unexpected typechecking success: %s" loc
-    | Error
-        (Tezos_raw_protocol_008_PtEdo2Zk.Script_tc_errors.Invalid_constant _
-        :: _) ->
-        return_unit
-    | Error _ as res ->
-        Lwt.return res )
+    (Script_ir_translator.parse_data ctxt ~legacy ~allow_forged ty node
+     >>= function
+     | Ok _ -> Alcotest.failf "Unexpected typechecking success: %s" loc
+     | Error
+         (Tezos_raw_protocol_008_PtEdo2Zk.Script_tc_errors.Invalid_constant _
+         :: _) ->
+         return_unit
+     | Error _ as res -> Lwt.return res)
 
 let test_parse_comb_data () =
   let open Script in
@@ -508,8 +484,7 @@ let test_parse_comb_data () =
   let pair_z_z_prim = pair_prim2 z_prim z_prim in
   let list_nat_ty = List_t (nat_ty, None) in
   let big_map_nat_nat_ty = Big_map_t (Nat_key None, nat_ty, None) in
-  test_context_with_nat_nat_big_map ()
-  >>=? fun (ctxt, big_map_id) ->
+  test_context_with_nat_nat_big_map () >>=? fun (ctxt, big_map_id) ->
   (* Pair 0 0 *)
   test_parse_data __LOC__ ctxt (pair_ty nat_ty nat_ty) pair_z_z_prim (z, z)
   >>=? fun ctxt ->
@@ -570,7 +545,7 @@ let test_parse_comb_data () =
   (* check Pair 0 (Pair 0 {}) against pair nat (big_map nat nat)
      so that the following test fails for the good reason and not because
      the big map doesn't exist
-   *)
+  *)
   let id_z = Big_map.Id.unparse_to_z big_map_id in
   let id_prim = Int (-1, id_z) in
   let module M = struct
@@ -630,13 +605,13 @@ let test_unparse_data loc ctxt ty x ~expected_readable ~expected_optimized =
   wrap_error_lwt
     ( Script_ir_translator.unparse_data ctxt Script_ir_translator.Readable ty x
     >>=? fun (actual_readable, ctxt) ->
-    ( if actual_readable = expected_readable then return ctxt
-    else Alcotest.failf "Error in readable unparsing: %s" loc )
-    >>=? fun ctxt ->
-    Script_ir_translator.unparse_data ctxt Script_ir_translator.Optimized ty x
-    >>=? fun (actual_optimized, ctxt) ->
-    if actual_optimized = expected_optimized then return ctxt
-    else Alcotest.failf "Error in optimized unparsing: %s" loc )
+      (if actual_readable = expected_readable then return ctxt
+      else Alcotest.failf "Error in readable unparsing: %s" loc)
+      >>=? fun ctxt ->
+      Script_ir_translator.unparse_data ctxt Script_ir_translator.Optimized ty x
+      >>=? fun (actual_optimized, ctxt) ->
+      if actual_optimized = expected_optimized then return ctxt
+      else Alcotest.failf "Error in optimized unparsing: %s" loc )
 
 let test_unparse_comb_data () =
   let open Script in
@@ -649,8 +624,7 @@ let test_unparse_comb_data () =
   let pair_nat_nat_ty = pair_ty nat_ty nat_ty in
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_z_z_prim = pair_prim2 z_prim z_prim in
-  test_context ()
-  >>=? fun ctxt ->
+  test_context () >>=? fun ctxt ->
   (* Pair 0 0 *)
   test_unparse_data
     __LOC__
@@ -699,13 +673,11 @@ let rec gen_combs leaf arity =
   else
     gen_combs leaf (arity - 1)
     |> List.map (fun smaller ->
-           ( match smaller with
+           (match smaller with
            | Prim (loc, Script.D_Pair, vs, []) ->
                Prim (loc, Script.D_Pair, leaf :: vs, [])
-           | Seq (loc, vs) ->
-               Seq (loc, leaf :: vs)
-           | _ ->
-               assert false )
+           | Seq (loc, vs) -> Seq (loc, leaf :: vs)
+           | _ -> assert false)
            :: gen_pairs leaf smaller)
     |> List.flatten
 
@@ -729,50 +701,47 @@ let test_optimal_comb () =
           ty
           v
       >>=? fun (unparsed, ctxt) ->
-      let (unparsed_canonical, unparsed_size) = size_of_micheline unparsed in
-      List.iter_es (fun other_repr ->
-          let (other_repr_canonical, other_repr_size) =
-            size_of_micheline other_repr
-          in
-          if other_repr_size < unparsed_size then
-            Alcotest.failf
-              "At %s, for comb of arity %d, representation %a (size %d bytes) \
-               is shorter than representation %a (size %d bytes) returned by \
-               unparse_data in Optimized mode"
-              loc
-              arity
-              Michelson_v1_printer.print_expr
-              other_repr_canonical
-              other_repr_size
-              Michelson_v1_printer.print_expr
-              unparsed_canonical
-              unparsed_size
-          else return_unit)
-      @@ gen_combs leaf_mich arity
-      >>=? fun () -> return ctxt )
+        let (unparsed_canonical, unparsed_size) = size_of_micheline unparsed in
+        List.iter_es (fun other_repr ->
+            let (other_repr_canonical, other_repr_size) =
+              size_of_micheline other_repr
+            in
+            if other_repr_size < unparsed_size then
+              Alcotest.failf
+                "At %s, for comb of arity %d, representation %a (size %d \
+                 bytes) is shorter than representation %a (size %d bytes) \
+                 returned by unparse_data in Optimized mode"
+                loc
+                arity
+                Michelson_v1_printer.print_expr
+                other_repr_canonical
+                other_repr_size
+                Michelson_v1_printer.print_expr
+                unparsed_canonical
+                unparsed_size
+            else return_unit)
+        @@ gen_combs leaf_mich arity
+        >>=? fun () -> return ctxt )
   in
   let pair_ty ty1 ty2 = Pair_t ((ty1, None, None), (ty2, None, None), None) in
-  test_context ()
-  >>=? fun ctxt ->
+  test_context () >>=? fun ctxt ->
   let comb2_ty = pair_ty leaf_ty leaf_ty in
   let comb2_v = (leaf_v, leaf_v) in
-  check_optimal_comb __LOC__ ctxt comb2_ty comb2_v 2
-  >>=? fun ctxt ->
+  check_optimal_comb __LOC__ ctxt comb2_ty comb2_v 2 >>=? fun ctxt ->
   let comb3_ty = pair_ty leaf_ty comb2_ty in
   let comb3_v = (leaf_v, comb2_v) in
-  check_optimal_comb __LOC__ ctxt comb3_ty comb3_v 3
-  >>=? fun ctxt ->
+  check_optimal_comb __LOC__ ctxt comb3_ty comb3_v 3 >>=? fun ctxt ->
   let comb4_ty = pair_ty leaf_ty comb3_ty in
   let comb4_v = (leaf_v, comb3_v) in
-  check_optimal_comb __LOC__ ctxt comb4_ty comb4_v 4
-  >>=? fun ctxt ->
+  check_optimal_comb __LOC__ ctxt comb4_ty comb4_v 4 >>=? fun ctxt ->
   let comb5_ty = pair_ty leaf_ty comb4_ty in
   let comb5_v = (leaf_v, comb4_v) in
-  check_optimal_comb __LOC__ ctxt comb5_ty comb5_v 5
-  >>=? fun _ctxt -> return_unit
+  check_optimal_comb __LOC__ ctxt comb5_ty comb5_v 5 >>=? fun _ctxt ->
+  return_unit
 
 let tests =
-  [ Test_services.tztest
+  [
+    Test_services.tztest
       "test typecheck stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
@@ -797,4 +766,5 @@ let tests =
     Test_services.tztest
       "test optimal comb data unparsing"
       `Quick
-      test_optimal_comb ]
+      test_optimal_comb;
+  ]

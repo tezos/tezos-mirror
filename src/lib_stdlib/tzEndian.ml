@@ -57,8 +57,7 @@ let set_uint16 = Bytes.set_uint16_be
 
 let get_uint16 = Bytes.get_uint16_be
 
-let get_uint16_string s off =
-  Bytes.get_uint16_be (Bytes.unsafe_of_string s) off
+let get_uint16_string s off = Bytes.get_uint16_be (Bytes.unsafe_of_string s) off
 
 let get_double buff i = Int64.float_of_bits (Bytes.get_int64_be buff i)
 

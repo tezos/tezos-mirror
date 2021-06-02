@@ -33,7 +33,8 @@ let display_progress ?(refresh_rate = (1, 1)) msgf =
     if index mod rate == 0 then
       msgf
         (Format.kasprintf (fun msg ->
-             hide_progress_line msg ; Format.eprintf "%s%!" msg))
+             hide_progress_line msg ;
+             Format.eprintf "%s%!" msg))
 
 let display_progress_end () =
   if Unix.isatty Unix.stderr then Format.eprintf "@."

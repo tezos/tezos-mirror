@@ -69,7 +69,8 @@ type workloads_stats = {
 let determinizer_option_encoding : determinizer_option Data_encoding.t =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         ~title:"percentile"
         (Tag 0)
         Benchmark_helpers.int_encoding
@@ -80,12 +81,14 @@ let determinizer_option_encoding : determinizer_option Data_encoding.t =
         (Tag 1)
         unit
         (function Percentile _ -> None | Mean -> Some ())
-        (fun () -> Mean) ]
+        (fun () -> Mean);
+    ]
 
 let flush_cache_encoding : [`Cache_megabytes of int | `Dont] Data_encoding.t =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         ~title:"cache_megabytes"
         (Tag 0)
         Benchmark_helpers.int_encoding
@@ -96,7 +99,8 @@ let flush_cache_encoding : [`Cache_megabytes of int | `Dont] Data_encoding.t =
         (Tag 1)
         unit
         (function `Cache_megabytes _ -> None | `Dont -> Some ())
-        (fun () -> `Dont) ]
+        (fun () -> `Dont);
+    ]
 
 let heap_size_encoding : [`words of int] Data_encoding.t =
   let open Data_encoding in
@@ -110,7 +114,8 @@ let options_encoding =
   let open Data_encoding in
   def "benchmark_options_encoding"
   @@ conv
-       (fun { flush_cache;
+       (fun {
+              flush_cache;
               stabilize_gc;
               seed;
               nsamples;
@@ -118,7 +123,8 @@ let options_encoding =
               cpu_affinity;
               bench_number;
               minor_heap_size;
-              config_dir } ->
+              config_dir;
+            } ->
          ( flush_cache,
            stabilize_gc,
            seed,
@@ -249,33 +255,25 @@ let pp_options fmtr (options : options) =
   let open Printf in
   let flush_cache =
     match options.flush_cache with
-    | `Cache_megabytes i ->
-        sprintf "true, cache size = %d" i
-    | `Dont ->
-        "false"
+    | `Cache_megabytes i -> sprintf "true, cache size = %d" i
+    | `Dont -> "false"
   in
   let stabilize_gc = string_of_bool options.stabilize_gc in
   let seed =
     match options.seed with
-    | None ->
-        "self-init"
-    | Some seed ->
-        string_of_int seed
+    | None -> "self-init"
+    | Some seed -> string_of_int seed
   in
   let nsamples = string_of_int options.nsamples in
   let determinizer =
     match options.determinizer with
-    | Percentile i ->
-        sprintf "percentile %d" i
-    | Mean ->
-        "mean"
+    | Percentile i -> sprintf "percentile %d" i
+    | Mean -> "mean"
   in
   let cpu_affinity =
     match options.cpu_affinity with
-    | None ->
-        "none"
-    | Some cpu_id ->
-        string_of_int cpu_id
+    | None -> "none"
+    | Some cpu_id -> string_of_int cpu_id
   in
   let config_dir = Option.value options.config_dir ~default:"None" in
   let bench_number = string_of_int options.bench_number in
@@ -337,8 +335,7 @@ let save :
           Data_encoding.Binary.pp_write_error
           err ;
         exit 1
-    | Ok res ->
-        res
+    | Ok res -> res
   in
   let serialized_workload = {bench_name = Bench.name; measurement_bytes} in
   let bytes =
@@ -353,8 +350,7 @@ let save :
           Data_encoding.Binary.pp_write_error
           err ;
         exit 1
-    | Ok res ->
-        res
+    | Ok res -> res
   in
   Lwt_main.run
     ( Tezos_stdlib_unix.Lwt_utils_unix.create_file
@@ -372,35 +368,31 @@ let load : filename:string -> packed_measurement =
     exit 1
   in
   Lwt_main.run
-  @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename
-     >>= fun str ->
-     Format.eprintf "Measure.load: loaded %s\n" filename ;
-     let bytes = Bytes.unsafe_of_string str in
-     match
-       Data_encoding.Binary.of_bytes serialized_workload_encoding bytes
-     with
-     | Ok {bench_name; measurement_bytes} -> (
-       match Registration.find_benchmark bench_name with
-       | None ->
-           Format.eprintf
-             "Measure.load: workload file requires unregistered benchmark %s, \
-              aborting@."
-             bench_name ;
-           exit 1
-       | Some bench -> (
-         match Benchmark.ex_unpack bench with
-         | Ex ((module Bench) as bench) -> (
-           match
-             Data_encoding.Binary.of_bytes
-               (measurement_encoding Bench.workload_encoding)
-               measurement_bytes
-           with
-           | Error err ->
-               cant_load err
-           | Ok m ->
-               Lwt.return (Measurement (bench, m)) ) ) )
-     | Error err ->
-         cant_load err )
+  @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename >>= fun str ->
+       Format.eprintf "Measure.load: loaded %s\n" filename ;
+       let bytes = Bytes.unsafe_of_string str in
+       match
+         Data_encoding.Binary.of_bytes serialized_workload_encoding bytes
+       with
+       | Ok {bench_name; measurement_bytes} -> (
+           match Registration.find_benchmark bench_name with
+           | None ->
+               Format.eprintf
+                 "Measure.load: workload file requires unregistered benchmark \
+                  %s, aborting@."
+                 bench_name ;
+               exit 1
+           | Some bench -> (
+               match Benchmark.ex_unpack bench with
+               | Ex ((module Bench) as bench) -> (
+                   match
+                     Data_encoding.Binary.of_bytes
+                       (measurement_encoding Bench.workload_encoding)
+                       measurement_bytes
+                   with
+                   | Error err -> cant_load err
+                   | Ok m -> Lwt.return (Measurement (bench, m)))))
+       | Error err -> cant_load err )
 
 let to_csv :
     type c t.
@@ -494,7 +486,7 @@ let cull_outliers :
         let cond = lower_bound <= qty && qty <= upper_bound in
         if not cond then (
           incr outlier_count ;
-          Format.eprintf "outlier detected: %f@." qty ) ;
+          Format.eprintf "outlier detected: %f@." qty) ;
         cond)
       workload_data
   in
@@ -513,8 +505,7 @@ module Stubs = Benchmark_utils.Stubs
 let reset_memory ~stabilize_gc ~flush_cache =
   if stabilize_gc then Stubs.stabilize_gc () ;
   match flush_cache with
-  | `Dont ->
-      ()
+  | `Dont -> ()
   | `Cache_megabytes mb ->
       Stubs.Cache.flush_cache Int64.(mul 1048576L (of_int mb))
 
@@ -538,27 +529,21 @@ let determinizer_from_options options =
   | Percentile i ->
       let perc = float_of_int i *. 0.01 in
       fun dist -> Stats.(quantile (module Structures.Float) dist perc)
-  | Mean ->
-      fun dist -> Stats.(mean (module Structures.Float) dist)
+  | Mean -> fun dist -> Stats.(mean (module Structures.Float) dist)
 
 let seed_init_from_options (options : options) =
   match options.seed with
-  | None ->
-      Random.State.make_self_init ()
-  | Some seed ->
-      Random.State.make [|seed|]
+  | None -> Random.State.make_self_init ()
+  | Some seed -> Random.State.make [|seed|]
 
 let gc_init_from_options (options : options) =
   match options.minor_heap_size with
-  | `words words ->
-      Gc.set {(Gc.get ()) with minor_heap_size = words}
+  | `words words -> Gc.set {(Gc.get ()) with minor_heap_size = words}
 
 let cpu_affinity_from_options (options : options) =
   match options.cpu_affinity with
-  | None ->
-      ()
-  | Some cpu_id ->
-      Stubs.Affinity.set cpu_id
+  | None -> ()
+  | Some cpu_id -> Stubs.Affinity.set cpu_id
 
 let set_gc_increment () =
   let stats = Gc.stat () in
@@ -572,9 +557,7 @@ let parse_config (type c t) ((module Bench) : (c, t) Benchmark.poly)
     (options : options) =
   match options.config_dir with
   | None ->
-      Format.eprintf
-        "Using default configuration for benchmark %s@."
-        Bench.name ;
+      Format.eprintf "Using default configuration for benchmark %s@." Bench.name ;
       let json =
         Data_encoding.Json.construct Bench.config_encoding Bench.default_config
       in
@@ -677,8 +660,7 @@ let perform_benchmark (type c t) (options : options)
 (* ------------------------------------------------------------------------- *)
 (* Helpers for creating basic probes *)
 
-let make_timing_probe (type t) (module O : Compare.COMPARABLE with type t = t)
-    =
+let make_timing_probe (type t) (module O : Compare.COMPARABLE with type t = t) =
   let table = Stdlib.Hashtbl.create 41 in
   let module Set = Set.Make (O) in
   {
@@ -688,7 +670,6 @@ let make_timing_probe (type t) (module O : Compare.COMPARABLE with type t = t)
         Stdlib.Hashtbl.add table aspect (float_of_int dt) ;
         r);
     aspects =
-      (fun () ->
-        Stdlib.Hashtbl.to_seq_keys table |> Set.of_seq |> Set.elements);
+      (fun () -> Stdlib.Hashtbl.to_seq_keys table |> Set.of_seq |> Set.elements);
     get = (fun aspect -> Stdlib.Hashtbl.find_all table aspect);
   }

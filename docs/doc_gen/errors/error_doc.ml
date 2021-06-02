@@ -40,11 +40,13 @@ let default_section_title = "Miscellaneous"
    bottom of the document. Unprefixed ids or unreferenced prefixes
    will default to `Miscellaneous` *)
 let section_titles =
-  [ (["proto.alpha"], "Protocol Alpha");
+  [
+    (["proto.alpha"], "Protocol Alpha");
     (["distributed_db"; "node"; "raw_store"; "validator"; "worker"], "Shell");
     (["micheline"; "michelson"], "Michelson parsing/macros");
     (["rpc_client"], "Client");
-    (["cli"; "utils"; default_section_id], default_section_title) ]
+    (["cli"; "utils"; default_section_id], default_section_title);
+  ]
 
 let pp_rst_title ~char ppf title =
   let sub = String.map (fun _ -> char) title in
@@ -58,16 +60,15 @@ let pp_rst_h2 = pp_rst_title ~char:'*'
  * let pp_rst_h4 = pp_rst_title ~char:'`' *)
 
 let string_of_err_category = function
-  | `Branch ->
-      "branch"
-  | `Temporary ->
-      "temporary"
-  | `Permanent ->
-      "permanent"
+  | `Branch -> "branch"
+  | `Temporary -> "temporary"
+  | `Permanent -> "permanent"
 
 let make_counter () =
   let i = ref 1 in
-  fun () -> incr i ; !i
+  fun () ->
+    incr i ;
+    !i
 
 let count = make_counter ()
 
@@ -75,8 +76,7 @@ let unique_label () =
   let label = sprintf "ref%d" (count ()) in
   label
 
-let pp_print_html_tab_button fmt ?(default = false) ~shortlabel ~content idref
-    =
+let pp_print_html_tab_button fmt ?(default = false) ~shortlabel ~content idref =
   fprintf
     fmt
     "<button class=\"tablinks%s\" onclick=\"showTab(this, '%s', \
@@ -126,6 +126,7 @@ let pp_print_html_tabs fmt {Error_monad.id; category; description; schema; _} =
     idref ;
   fprintf fmt "%s@ " description_content ;
   fprintf fmt "</div>@]" ;
+
   (* Print schema *)
 
   (* Hack: negative offset in order to reduce the <pre>'s content left-margin *)
@@ -163,12 +164,9 @@ module ErrorPartition = struct
     let compare s s' =
       let idx s =
         let rec loop acc = function
-          | [] ->
-              assert false
-          | h :: _ when h = s ->
-              acc
-          | _ :: t ->
-              loop (acc + 1) t
+          | [] -> assert false
+          | h :: _ when h = s -> acc
+          | _ :: t -> loop (acc + 1) t
         in
         loop 0 titles
       in
@@ -197,8 +195,7 @@ let pp_error_map ppf (map : ErrorSet.t ErrorPartition.t) : unit =
     (fun section_title set ->
       fprintf ppf "%a" pp_rst_h2 section_title ;
       ErrorSet.iter
-        (fun error_repr ->
-          fprintf ppf "@[%a@]@\n@\n" pp_info_to_rst error_repr)
+        (fun error_repr -> fprintf ppf "@[%a@]@\n@\n" pp_info_to_rst error_repr)
         set)
     map
 
@@ -209,8 +206,8 @@ let script =
    elt.parentNode.children;for (i = 0; i < tablinks.length; i++) \
    {tablinks[i].className = tablinks[i].className.replace(' active', \
    '');}document.getElementById(tab).style.display = 'block';elt.className += \
-   ' active';}document.addEventListener('DOMContentLoaded', function(){var a \
-   = document.getElementsByClassName('defaultOpen');for (i = 0; i < a.length; \
+   ' active';}document.addEventListener('DOMContentLoaded', function(){var a = \
+   document.getElementsByClassName('defaultOpen');for (i = 0; i < a.length; \
    i++) { a[i].click() }})</script>"
 
 let style =
@@ -236,8 +233,8 @@ let () =
   print_script ppf ;
   fprintf
     ppf
-    "This document references possible errors that can come from RPC calls. \
-     It is generated from the OCaml source code (master branch).@\n\
+    "This document references possible errors that can come from RPC calls. It \
+     is generated from the OCaml source code (master branch).@\n\
      @\n" ;
   (* Body *)
   let map =

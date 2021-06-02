@@ -27,11 +27,12 @@
 (* This is the genesis protocol: initialise the state *)
 val prepare_first_block :
   Context.t ->
-  typecheck:(Raw_context.t ->
-            Script_repr.t ->
-            ((Script_repr.t * Lazy_storage_diff.diffs option) * Raw_context.t)
-            Error_monad.tzresult
-            Lwt.t) ->
+  typecheck:
+    (Raw_context.t ->
+    Script_repr.t ->
+    ((Script_repr.t * Lazy_storage_diff.diffs option) * Raw_context.t)
+    Error_monad.tzresult
+    Lwt.t) ->
   level:int32 ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
@@ -43,8 +44,8 @@ val prepare :
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
-  ( Raw_context.t
+  (Raw_context.t
   * Receipt_repr.balance_updates
-  * Migration_repr.origination_result list )
+  * Migration_repr.origination_result list)
   Error_monad.tzresult
   Lwt.t

@@ -106,27 +106,20 @@ let source_list_encoding =
 let parse_strategy s =
   match String.split ~limit:1 ':' s with
   | ["fixed"; parameter] -> (
-    match int_of_string parameter with
-    | exception _ ->
-        Error "invalid integer literal"
-    | mutez when mutez <= 0 ->
-        Error "negative amount"
-    | mutez -> (
-      match Tez.of_mutez (Int64.of_int mutez) with
-      | None ->
-          Error "invalid mutez"
-      | Some mutez ->
-          Ok (Fixed_amount {mutez}) ) )
+      match int_of_string parameter with
+      | exception _ -> Error "invalid integer literal"
+      | mutez when mutez <= 0 -> Error "negative amount"
+      | mutez -> (
+          match Tez.of_mutez (Int64.of_int mutez) with
+          | None -> Error "invalid mutez"
+          | Some mutez -> Ok (Fixed_amount {mutez})))
   | ["evaporation"; parameter] -> (
-    match float_of_string parameter with
-    | exception _ ->
-        Error "invalid float literal"
-    | fraction when fraction < 0.0 || fraction > 1.0 ->
-        Error "invalid evaporation rate"
-    | fraction ->
-        Ok (Evaporation {fraction}) )
-  | _ ->
-      Error "invalid argument"
+      match float_of_string parameter with
+      | exception _ -> Error "invalid float literal"
+      | fraction when fraction < 0.0 || fraction > 1.0 ->
+          Error "invalid evaporation rate"
+      | fraction -> Ok (Evaporation {fraction}))
+  | _ -> Error "invalid argument"
 
 let sample_from_pool state rng_state =
   let idx = Random.State.int rng_state state.pool_size in
@@ -168,8 +161,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full)
     in
     let amount =
       match parameters.strategy with
-      | Fixed_amount {mutez} ->
-          mutez
+      | Fixed_amount {mutez} -> mutez
       | Evaporation {fraction} ->
           let mutez = Int64.to_float (Tez.to_mutez tez) in
           let max_fraction = Int64.of_float (mutez *. fraction) in
@@ -180,8 +172,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full)
           Tez.of_mutez_exn amount
     in
     let fee = parameters.fee_mutez in
-    return
-      {src; dst = dest.pkh; fee; amount; counter = None; fresh_dst = fresh}
+    return {src; dst = dest.pkh; fee; amount; counter = None; fresh_dst = fresh}
 
 let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
     contents =
@@ -223,8 +214,7 @@ let manager_op_of_transfer parameters
     Transaction {amount; parameters; entrypoint; destination}
   in
   match counter with
-  | None ->
-      assert false
+  | None -> assert false
   | Some counter ->
       Manager_operation
         {source; fee; counter; operation; gas_limit; storage_limit}
@@ -235,8 +225,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
     chain block transfer =
   Alpha_services.Contract.counter cctxt (chain, block) transfer.src.pkh
   >>=? fun pcounter ->
-  Shell_services.Blocks.hash cctxt ~chain ~block ()
-  >>=? fun branch ->
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun branch ->
   let freshest_counter =
     match
       Signature.Public_key_hash.Table.find state.counters transfer.src.pkh
@@ -283,25 +272,25 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
         state.counters
         transfer.src.pkh
         (branch, transf_counter) ;
-      ( if !verbose then
-        cctxt#message
-          "injecting reveal+transfer from %a (counters=%a,%a) to %a"
-          Signature.Public_key_hash.pp
-          transfer.src.pkh
-          Z.pp_print
-          reveal_counter
-          Z.pp_print
-          transf_counter
-          Signature.Public_key_hash.pp
-          transfer.dst
-      else Lwt.return_unit )
+      (if !verbose then
+       cctxt#message
+         "injecting reveal+transfer from %a (counters=%a,%a) to %a"
+         Signature.Public_key_hash.pp
+         transfer.src.pkh
+         Z.pp_print
+         reveal_counter
+         Z.pp_print
+         transf_counter
+         Signature.Public_key_hash.pp
+         transfer.dst
+      else Lwt.return_unit)
       >>= fun () ->
       (* NB: regardless of our best efforts to keep track of counters, injection can fail with
          "counter in the future" if a block switch happens in between the moment we
          get the branch and the moment we inject, and the new block does not include
          all the operations we injected. *)
-      inject_contents cctxt chain branch transfer.src.sk list
-      >>= function Error _ | Ok _ -> return_unit )
+      inject_contents cctxt chain branch transfer.src.sk list >>= function
+      | Error _ | Ok _ -> return_unit)
   | Some _ -> (
       let transf_counter = Z.succ freshest_counter in
       let manager_op =
@@ -315,20 +304,20 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
         state.counters
         transfer.src.pkh
         (branch, transf_counter) ;
-      ( if !verbose then
-        cctxt#message
-          "injecting transfer from %a (counter=%a) to %a"
-          Signature.Public_key_hash.pp
-          transfer.src.pkh
-          Z.pp_print
-          transf_counter
-          Signature.Public_key_hash.pp
-          transfer.dst
-      else Lwt.return_unit )
+      (if !verbose then
+       cctxt#message
+         "injecting transfer from %a (counter=%a) to %a"
+         Signature.Public_key_hash.pp
+         transfer.src.pkh
+         Z.pp_print
+         transf_counter
+         Signature.Public_key_hash.pp
+         transfer.dst
+      else Lwt.return_unit)
       >>= fun () ->
       (* See comment above. *)
-      inject_contents cctxt chain branch transfer.src.sk list
-      >>= function Error _ | Ok _ -> return_unit )
+      inject_contents cctxt chain branch transfer.src.sk list >>= function
+      | Error _ | Ok _ -> return_unit)
 
 let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
     state save_pool_callback =
@@ -336,29 +325,26 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
   let dt = 1. /. parameters.tps in
   let terminated () =
     match parameters.total_transfers with
-    | None ->
-        false
-    | Some bound ->
-        bound <= !injected
+    | None -> false
+    | Some bound -> bound <= !injected
   in
   let rng_state = Random.State.make [|parameters.seed|] in
   let rec loop () =
     if terminated () then save_pool_callback () >|= ok
     else
       let start = Mtime_clock.elapsed () in
-      sample_transfer cctxt parameters state rng_state
-      >>=? fun transfer ->
+      sample_transfer cctxt parameters state rng_state >>=? fun transfer ->
       inject_transfer cctxt parameters state cctxt#chain cctxt#block transfer
       >>=? fun () ->
       incr injected ;
       let stop = Mtime_clock.elapsed () in
       let elapsed = Mtime.Span.(to_s stop -. to_s start) in
       let remaining = dt -. elapsed in
-      ( if remaining <= 0.0 then
-        cctxt#warning
-          "warning: tps target could not be reached, consider using a lower \
-           value for --tps"
-      else Lwt_unix.sleep remaining )
+      (if remaining <= 0.0 then
+       cctxt#warning
+         "warning: tps target could not be reached, consider using a lower \
+          value for --tps"
+      else Lwt_unix.sleep remaining)
       >>= loop
   in
   loop ()
@@ -371,25 +357,23 @@ type pool_source =
   | From_file of {path : string; json : Ezjsonm.value}
 
 let json_of_pool_source = function
-  | From_string {json} | From_file {json; _} ->
-      json
+  | From_string {json} | From_file {json; _} -> json
 
 let json_file_or_text_parameter =
   Clic.parameter (fun _ p ->
       match String.split ~limit:1 ':' p with
-      | ["text"; text] ->
-          return (From_string {json = Ezjsonm.from_string text})
+      | ["text"; text] -> return (From_string {json = Ezjsonm.from_string text})
       | ["file"; path] ->
-          Lwt_utils_unix.Json.read_file path
-          >|=? fun json -> From_file {path; json}
+          Lwt_utils_unix.Json.read_file path >|=? fun json ->
+          From_file {path; json}
       | _ -> (
           if Sys.file_exists p then
-            Lwt_utils_unix.Json.read_file p
-            >|=? fun json -> From_file {path = p; json}
+            Lwt_utils_unix.Json.read_file p >|=? fun json ->
+            From_file {path = p; json}
           else
             try return (From_string {json = Ezjsonm.from_string p})
             with Ezjsonm.Parse_error _ ->
-              failwith "Neither an existing file nor valid JSON: '%s'" p ))
+              failwith "Neither an existing file nor valid JSON: '%s'" p))
 
 let seed_arg =
   let open Clic in
@@ -402,8 +386,7 @@ let seed_arg =
          | exception _ ->
              cctxt#error
                "While parsing --seed: could not convert argument to int"
-         | i ->
-             return i))
+         | i -> return i))
 
 let tps_arg =
   let open Clic in
@@ -418,8 +401,7 @@ let tps_arg =
                "While parsing --tps: could not convert argument to float"
          | f when f < 0.0 ->
              cctxt#error "While parsing --tps: negative argument"
-         | f ->
-             return f))
+         | f -> return f))
 
 let fresh_probability_arg =
   let open Clic in
@@ -435,8 +417,7 @@ let fresh_probability_arg =
                 to float"
          | f when f < 0.0 || f > 1.0 ->
              cctxt#error "While parsing --fresh-probability: invalid argument"
-         | f ->
-             return f))
+         | f -> return f))
 
 let strategy_arg =
   let open Clic in
@@ -446,10 +427,8 @@ let strategy_arg =
     ~doc:"wealth redistribution strategy"
     (parameter (fun (cctxt : Protocol_client_context.full) s ->
          match parse_strategy s with
-         | Error msg ->
-             cctxt#error "While parsing --strategy: %s" msg
-         | Ok strategy ->
-             return strategy))
+         | Error msg -> cctxt#error "While parsing --strategy: %s" msg
+         | Ok strategy -> return strategy))
 
 let gas_limit_arg =
   let open Clic in
@@ -507,8 +486,7 @@ let transfers_arg =
              cctxt#error "While parsing --transfers: invalid integer literal"
          | i when i <= 0 ->
              cctxt#error "While parsing --transfers: negative integer"
-         | i ->
-             return i))
+         | i -> return i))
 
 let verbose_arg =
   Clic.switch
@@ -522,24 +500,20 @@ let save_pool_callback (cctxt : Protocol_client_context.full) pool_source state
     =
   let json = Data_encoding.Json.construct source_list_encoding state.pool in
   let catch_write_error = function
-    | Error _ ->
-        cctxt#message "could not write back json file"
-    | Ok () ->
-        Lwt.return_unit
+    | Error _ -> cctxt#message "could not write back json file"
+    | Ok () -> Lwt.return_unit
   in
   match pool_source with
   | From_string _ ->
       (* If the initial pool was given directly as json, save pool to
          a temp file. *)
       let path = Filename.temp_file "client-stresstest-pool" "json" in
-      cctxt#message "writing back address pool in file %s" path
-      >>= fun () ->
+      cctxt#message "writing back address pool in file %s" path >>= fun () ->
       Lwt_utils_unix.Json.write_file path json >>= catch_write_error
   | From_file {path; _} ->
       (* If the pool specification was a json file, save pool to
          the same file. *)
-      cctxt#message "writing back address pool in file %s" path
-      >>= fun () ->
+      cctxt#message "writing back address pool in file %s" path >>= fun () ->
       Lwt_utils_unix.Json.write_file path json >>= catch_write_error
 
 let generate_random_transactions =
@@ -557,16 +531,16 @@ let generate_random_transactions =
        storage_limit_arg
        transfers_arg
        verbose_arg)
-    ( prefixes ["stresstest"; "transfer"; "using"]
+    (prefixes ["stresstest"; "transfer"; "using"]
     @@ param
          ~name:"sources.json"
          ~desc:
            "List of accounts from which to perform transfers in JSON format. \
             The input JSON must be an array of objects of the form \
-            '[{\"pkh\":pkh;\"pk\":pk;\"sk\":sk}; ...]' with the pkh, pk and \
-            sk encoded in B58 form."
+            '[{\"pkh\":pkh;\"pk\":pk;\"sk\":sk}; ...]' with the pkh, pk and sk \
+            encoded in B58 form."
          json_file_or_text_parameter
-    @@ stop )
+    @@ stop)
     (fun ( seed,
            tps,
            freshp,
@@ -601,8 +575,7 @@ let generate_random_transactions =
           source_list_encoding
           (json_of_pool_source sources_json)
       with
-      | exception _ ->
-          cctxt#error "Could not decode list of sources"
+      | exception _ -> cctxt#error "Could not decode list of sources"
       | sources ->
           let counters = Signature.Public_key_hash.Table.create 1023 in
           let state =
@@ -618,7 +591,5 @@ let generate_random_transactions =
 
 let commands network () =
   match network with
-  | Some `Mainnet ->
-      []
-  | Some `Testnet | None ->
-      [generate_random_transactions]
+  | Some `Mainnet -> []
+  | Some `Testnet | None -> [generate_random_transactions]

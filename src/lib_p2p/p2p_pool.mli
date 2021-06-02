@@ -266,14 +266,13 @@ module Points : sig
     ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t
 
   val info :
-    ('msg, 'peer, 'conn) t ->
-    P2p_point.Id.t ->
-    ('msg, 'peer, 'conn) info option
+    ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> ('msg, 'peer, 'conn) info option
 
   val fold_known :
     ('msg, 'peer, 'conn) t ->
     init:'a ->
-    f:(P2p_point.Id.t ->
+    f:
+      (P2p_point.Id.t ->
       ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t ->
       'a ->
       'a) ->

@@ -29,11 +29,13 @@ type bootstrap_secret = {name : string; sk_uri : Client_keys.sk_uri}
 
 let default_bootstrap_accounts =
   let unencrypted_keys =
-    [ "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
+    [
+      "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
       "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo";
       "edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ";
       "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
-      "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm" ]
+      "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm";
+    ]
   in
   let basename = "bootstrap" in
   List.mapi_es
@@ -46,19 +48,16 @@ let default_bootstrap_accounts =
 
 let add_bootstrap_secret cctxt {name; sk_uri} =
   let force = false in
-  Client_keys.neuterize sk_uri
-  >>=? fun pk_uri ->
-  Client_keys.Public_key.find_opt cctxt name
-  >>=? (function
-         | None ->
-             return_unit
-         | Some (pk_uri_found, _) ->
-             fail_unless
-               (pk_uri = pk_uri_found || force)
-               (failure
-                  "public and secret keys '%s' don't correspond, please don't \
-                   use --force"
-                  name))
+  Client_keys.neuterize sk_uri >>=? fun pk_uri ->
+  (Client_keys.Public_key.find_opt cctxt name >>=? function
+   | None -> return_unit
+   | Some (pk_uri_found, _) ->
+       fail_unless
+         (pk_uri = pk_uri_found || force)
+         (failure
+            "public and secret keys '%s' don't correspond, please don't use \
+             --force"
+            name))
   >>=? fun () ->
   Client_keys.import_secret_key ~io:(cctxt :> Client_context.io_wallet) pk_uri
   >>=? fun (pkh, public_key) ->
@@ -80,18 +79,16 @@ let bootstrap_secrets_encoding = Data_encoding.list bootstrap_secret_encoding
 
 let populate (cctxt : #Tezos_client_base.Client_context.io_wallet)
     bootstrap_accounts_file =
-  ( match bootstrap_accounts_file with
-  | None ->
-      default_bootstrap_accounts
+  (match bootstrap_accounts_file with
+  | None -> default_bootstrap_accounts
   | Some accounts_file -> (
       Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file accounts_file
       >>=? fun json ->
       match Data_encoding.Json.destruct bootstrap_secrets_encoding json with
-      | accounts ->
-          return accounts
+      | accounts -> return accounts
       | exception e ->
           failwith
             "cannot read definitions of bootstrap accounts in %s because: %s"
             accounts_file
-            (Printexc.to_string e) ) )
+            (Printexc.to_string e)))
   >>=? List.iter_es (add_bootstrap_secret cctxt)

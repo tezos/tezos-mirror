@@ -126,30 +126,25 @@ module Alias (Entity : Entity) = struct
     wallet#write Entity.name entries wallet_encoding
 
   let autocomplete wallet =
-    load wallet
-    >>= function
-    | Error _ -> return_nil | Ok list -> return (List.map fst list)
+    load wallet >>= function
+    | Error _ -> return_nil
+    | Ok list -> return (List.map fst list)
 
   let find_opt (wallet : #wallet) name =
     load wallet >|=? fun list -> List.assoc ~equal:String.equal name list
 
   let find (wallet : #wallet) name =
-    load wallet
-    >>=? fun list ->
+    load wallet >>=? fun list ->
     match List.assoc ~equal:String.equal name list with
-    | Some v ->
-        return v
-    | None ->
-        failwith "no %s alias named %s" Entity.name name
+    | Some v -> return v
+    | None -> failwith "no %s alias named %s" Entity.name name
 
   let rev_find (wallet : #wallet) v =
-    load wallet
-    >|=? fun list ->
+    load wallet >|=? fun list ->
     Option.map fst @@ List.find (fun (_, v') -> Entity.(v = v')) list
 
   let rev_find_all (wallet : #wallet) v =
-    load wallet
-    >>=? fun list ->
+    load wallet >>=? fun list ->
     return
       (List.filter_map
          (fun (n, v') -> if Entity.(v = v') then Some n else None)
@@ -160,15 +155,14 @@ module Alias (Entity : Entity) = struct
 
   let add ~force (wallet : #wallet) name value =
     let keep = ref false in
-    load wallet
-    >>=? fun list ->
-    ( if force then return_unit
+    load wallet >>=? fun list ->
+    (if force then return_unit
     else
       List.iter_es
         (fun (n, v) ->
           if Compare.String.(n = name) && Entity.(v = value) then (
             keep := true ;
-            return_unit )
+            return_unit)
           else if Compare.String.(n = name) && Entity.(v <> value) then
             failwith
               "another %s is already aliased as %s, use --force to update"
@@ -181,22 +175,19 @@ module Alias (Entity : Entity) = struct
               Entity.name
               n
           else return_unit)
-        list )
+        list)
     >>=? fun () ->
     let list = List.filter (fun (n, _) -> not (String.equal n name)) list in
     let list = (name, value) :: list in
-    if !keep then return_unit
-    else wallet#write Entity.name list wallet_encoding
+    if !keep then return_unit else wallet#write Entity.name list wallet_encoding
 
   let del (wallet : #wallet) name =
-    load wallet
-    >>=? fun list ->
+    load wallet >>=? fun list ->
     let list = List.filter (fun (n, _) -> not (String.equal n name)) list in
     wallet#write Entity.name list wallet_encoding
 
   let update (wallet : #wallet) name value =
-    load wallet
-    >>=? fun list ->
+    load wallet >>=? fun list ->
     let list =
       List.map
         (fun (n, v) -> (n, if String.equal n name then value else v))
@@ -217,15 +208,13 @@ module Alias (Entity : Entity) = struct
   type fresh_param = Fresh of string
 
   let of_fresh (wallet : #wallet) force (Fresh s) =
-    load wallet
-    >>=? fun list ->
-    ( if force then return_unit
+    load wallet >>=? fun list ->
+    (if force then return_unit
     else
       List.iter_es
         (fun (n, v) ->
           if String.equal n s then
-            Entity.to_source v
-            >>=? fun value ->
+            Entity.to_source v >>=? fun value ->
             failwith
               "@[<v 2>The %s alias %s already exists.@,\
                The current value is %s.@,\
@@ -234,50 +223,37 @@ module Alias (Entity : Entity) = struct
               n
               value
           else return_unit)
-        list )
+        list)
     >>=? fun () -> return s
 
   let fresh_alias_param ?(name = "new")
       ?(desc = "new " ^ Entity.name ^ " alias") next =
-    param
-      ~name
-      ~desc
-      (parameter (fun (_ : < .. >) s -> return @@ Fresh s))
-      next
+    param ~name ~desc (parameter (fun (_ : < .. >) s -> return @@ Fresh s)) next
 
   let parse_source_string cctxt s =
     match String.split ~limit:1 ':' s with
-    | ["alias"; alias] ->
-        find cctxt alias
-    | ["text"; text] ->
-        of_source text
-    | ["file"; path] ->
-        cctxt#read_file path >>=? of_source
+    | ["alias"; alias] -> find cctxt alias
+    | ["text"; text] -> of_source text
+    | ["file"; path] -> cctxt#read_file path >>=? of_source
     | _ -> (
-        find cctxt s
-        >>= function
-        | Ok v ->
-            return v
+        find cctxt s >>= function
+        | Ok v -> return v
         | Error a_errs -> (
-            cctxt#read_file s >>=? of_source
-            >>= function
-            | Ok v ->
-                return v
+            cctxt#read_file s >>=? of_source >>= function
+            | Ok v -> return v
             | Error r_errs -> (
-                of_source s
-                >>= function
-                | Ok v ->
-                    return v
+                of_source s >>= function
+                | Ok v -> return v
                 | Error s_errs ->
                     let all_errs = List.flatten [a_errs; r_errs; s_errs] in
-                    Lwt.return_error all_errs ) ) )
+                    Lwt.return_error all_errs)))
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
     let desc =
       Format.asprintf
         "%s\n\
-         Can be a %s name, a file or a raw %s literal. If the parameter is \
-         not the name of an existing %s, the client will look for a file \
+         Can be a %s name, a file or a raw %s literal. If the parameter is not \
+         the name of an existing %s, the client will look for a file \
          containing a %s, and if it does not exist, the argument will be read \
          as a raw %s.\n\
          Use 'alias:name', 'file:path' or 'text:literal' to disable autodetect."
@@ -295,8 +271,8 @@ module Alias (Entity : Entity) = struct
     let doc =
       Format.asprintf
         "%s\n\
-         Can be a %s name, a file or a raw %s literal. If the parameter is \
-         not the name of an existing %s, the client will look for a file \
+         Can be a %s name, a file or a raw %s literal. If the parameter is not \
+         the name of an existing %s, the client will look for a file \
          containing a %s, and if it does not exist, the argument will be read \
          as a raw %s.\n\
          Use 'alias:name', 'file:path' or 'text:literal' to disable autodetect."
@@ -317,6 +293,7 @@ module Alias (Entity : Entity) = struct
       ()
 
   let name (wallet : #wallet) d =
-    rev_find wallet d
-    >>=? function None -> Entity.to_source d | Some name -> return name
+    rev_find wallet d >>=? function
+    | None -> Entity.to_source d
+    | Some name -> return name
 end

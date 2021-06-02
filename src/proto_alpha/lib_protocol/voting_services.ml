@@ -60,8 +60,8 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the voting period (index, kind, starting position) and \
-         related information (position, remaining) of the next block.Useful \
-         to craft operations that will be valid in the next block."
+         related information (position, remaining) of the next block.Useful to \
+         craft operations that will be valid in the next block."
       ~query:RPC_query.empty
       ~output:Voting_period.info_encoding
       RPC_path.(path / "successor_period")

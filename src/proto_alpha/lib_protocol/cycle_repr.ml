@@ -68,8 +68,7 @@ let diff = Int32.sub
 let to_int32 i = i
 
 let of_int32_exn l =
-  if Compare.Int32.(l >= 0l) then l
-  else invalid_arg "Level_repr.Cycle.of_int32"
+  if Compare.Int32.(l >= 0l) then l else invalid_arg "Level_repr.Cycle.of_int32"
 
 module Index = struct
   type t = cycle

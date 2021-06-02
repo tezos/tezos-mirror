@@ -76,8 +76,8 @@ module Block_info = struct
     current_offset := limit + ((list_size - 1) * Block_hash.size) ;
     while !current_offset >= limit do
       predecessors :=
-        ( Bytes.sub bytes !current_offset Block_hash.size
-        |> Block_hash.of_bytes_exn )
+        (Bytes.sub bytes !current_offset Block_hash.size
+        |> Block_hash.of_bytes_exn)
         :: !predecessors ;
       current_offset := !current_offset - Block_hash.size
     done ;

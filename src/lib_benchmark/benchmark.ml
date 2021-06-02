@@ -59,8 +59,7 @@ module type S = sig
   val models : (string * workload Model.t) list
 
   (** Benchmark generator *)
-  include
-    Generator.S with type config := config and type workload := workload
+  include Generator.S with type config := config and type workload := workload
 end
 
 type t = (module S)

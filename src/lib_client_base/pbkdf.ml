@@ -35,8 +35,7 @@ module Make (H : Hacl.Hash.S) : S = struct
     let r = dk_len - ((l - 1) * h_len) in
     let block i =
       let rec f u xor = function
-        | 0 ->
-            xor
+        | 0 -> xor
         | j ->
             let u = H.HMAC.digest ~key:password ~msg:u in
             f u (xorbuf xor u) (j - 1)
@@ -47,10 +46,8 @@ module Make (H : Hacl.Hash.S) : S = struct
       f u_1 u_1 (count - 1)
     in
     let rec loop blocks = function
-      | 0 ->
-          blocks
-      | i ->
-          loop (block i :: blocks) (i - 1)
+      | 0 -> blocks
+      | i -> loop (block i :: blocks) (i - 1)
     in
     Bytes.concat Bytes.empty (loop [Bytes.sub (block l) 0 r] (l - 1))
 end

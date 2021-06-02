@@ -29,15 +29,17 @@ let genesis =
 let genesis_parameters =
   ( "sandbox_parameter",
     `O
-      [ ( "genesis_pubkey",
-          `String "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2" ) ]
-  )
+      [
+        ( "genesis_pubkey",
+          `String "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2" );
+      ] )
 
 let default_genesis_accounts =
   let open Tezos_protocol_alpha.Protocol in
   let open Alpha_context in
   let initial_accounts =
-    [ ( "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+    [
+      ( "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
         "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
         "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh" );
       ( "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
@@ -51,7 +53,8 @@ let default_genesis_accounts =
         "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3" );
       ( "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
         "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n",
-        "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm" ) ]
+        "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm" );
+    ]
   in
   let default_amount = Tez.of_mutez_exn 4_000_000_000_000L in
   let open Alpha_utils.Account in
@@ -69,14 +72,13 @@ let default_genesis_accounts =
 (* Inlined from Tezos_shell.Patch_context to avoid cyclic dependencies *)
 let patch_context ctxt =
   let key_json = Some genesis_parameters in
-  ( match key_json with
-  | None ->
-      Lwt.return ctxt
+  (match key_json with
+  | None -> Lwt.return ctxt
   | Some (key, json) ->
       Tezos_context.Context.add
         ctxt
         [key]
-        (Data_encoding.Binary.to_bytes_exn Data_encoding.json json) )
+        (Data_encoding.Binary.to_bytes_exn Data_encoding.json json))
   >>= fun ctxt ->
   Tezos_protocol_updater.Registered_protocol.get_result genesis.protocol
   >>=? fun proto ->
@@ -110,8 +112,7 @@ let make_legacy_store ?(user_activated_upgrades = [])
   in
   let proc_reader =
     let rec loop () =
-      External_validation.recv proc#stdout Data_encoding.string
-      >>= fun l ->
+      External_validation.recv proc#stdout Data_encoding.string >>= fun l ->
       Format.printf "[Legacy store builder] %s@." l ;
       loop ()
     in
@@ -121,8 +122,7 @@ let make_legacy_store ?(user_activated_upgrades = [])
         | End_of_file ->
             Format.printf "[Legacy store builder] Terminating@.@." ;
             Lwt.return_unit
-        | exn ->
-            Lwt.fail exn)
+        | exn -> Lwt.fail exn)
   in
   Lwt.async (fun () -> proc_reader) ;
   (* Initialize the legacy state *)
@@ -180,10 +180,8 @@ let make_legacy_store ?(user_activated_upgrades = [])
     External_validation.request_encoding
     Terminate
   >>= fun () ->
-  Lwt.join [proc_reader]
-  >>= fun () ->
-  proc#status
-  >>= fun status ->
+  Lwt.join [proc_reader] >>= fun () ->
+  proc#status >>= fun status ->
   Assert.is_true ~msg:"legacy builder exited" (status = Unix.(WEXITED 0)) ;
   Lwt.return_unit
 
@@ -195,7 +193,8 @@ let fitness_from_int64 fitness =
   (* definitions taken from src/proto_alpha/lib_protocol/src/fitness_repr.ml *)
   let int64_to_bytes i =
     let b = Bytes.create 8 in
-    TzEndian.set_int64 b 0 i ; b
+    TzEndian.set_int64 b 0 i ;
+    b
   in
   [Bytes.of_string version_number; int64_to_bytes fitness]
 
@@ -230,24 +229,24 @@ let make_activation_block genesis_block =
   in
   let operations_hash = Operation_list_list_hash.compute [] in
   let shell_header =
-    ( {
-        (Alpha_utils.Forge.make_shell
-           ~level:(Int32.succ (Store.Block.level genesis_block))
-           ~predecessor:(Store.Block.hash genesis_block)
-           ~timestamp:
-             (Time.Protocol.add (Store.Block.timestamp genesis_block) 60L)
-           ~fitness
-           ~operations_hash
-           ~proto_level:1)
-        with
-        validation_passes = 0;
-      }
-      : Block_header.shell_header )
+    ({
+       (Alpha_utils.Forge.make_shell
+          ~level:(Int32.succ (Store.Block.level genesis_block))
+          ~predecessor:(Store.Block.hash genesis_block)
+          ~timestamp:
+            (Time.Protocol.add (Store.Block.timestamp genesis_block) 60L)
+          ~fitness
+          ~operations_hash
+          ~proto_level:1)
+       with
+       validation_passes = 0;
+     }
+      : Block_header.shell_header)
   in
   let block_header = make_block_header shell_header command in
   ( block_header,
-    ( {command; signature = Signature.zero}
-      : Tezos_protocol_genesis.Protocol.block_header_data ) )
+    ({command; signature = Signature.zero}
+      : Tezos_protocol_genesis.Protocol.block_header_data) )
 
 let init_store ~base_dir ~patch_context ~history_mode k =
   let new_store_dir = base_dir // "new_store" in
@@ -266,15 +265,13 @@ let build_new_store nb_blocks ~base_dir ~patch_context ~history_mode =
   let k (_store_dir, _context_dir) store =
     let chain_store = Store.main_chain_store store in
     let genesis = Store.Chain.genesis chain_store in
-    Store.Chain.genesis_block chain_store
-    >>= fun genesis_block ->
+    Store.Chain.genesis_block chain_store >>= fun genesis_block ->
     let chain_id = Store.Chain.chain_id chain_store in
     (* Make the activation block with "dummy" context_hash and protocol_data *)
     let (activation_block, protocol_data) =
       make_activation_block genesis_block
     in
-    Store.Block.context chain_store genesis_block
-    >>=? fun genesis_ctxt ->
+    Store.Block.context chain_store genesis_block >>=? fun genesis_ctxt ->
     (* Craft a block in order to get a right context_hash *)
     Tezos_protocol_genesis.Protocol.begin_construction
       ~chain_id
@@ -290,8 +287,7 @@ let build_new_store nb_blocks ~base_dir ~patch_context ~history_mode =
     >>= fun res ->
     Lwt.return (Tezos_protocol_environment_genesis.Environment.wrap_error res)
     >>=? fun vs ->
-    Tezos_protocol_genesis.Protocol.finalize_block vs
-    >>= fun res ->
+    Tezos_protocol_genesis.Protocol.finalize_block vs >>= fun res ->
     Lwt.return (Tezos_protocol_environment_genesis.Environment.wrap_error res)
     >>=? fun ({context; _}, _meta) ->
     Tezos_protocol_alpha.Protocol.Main.init context activation_block.shell
@@ -342,22 +338,21 @@ let build_new_store nb_blocks ~base_dir ~patch_context ~history_mode =
         user_activated_protocol_overrides = [];
       }
     in
-    Block_validation.apply apply_environment activation_block []
-    >>=? fun bv ->
-    Store.Block.store_block
-      chain_store
-      ~block_header:activation_block
-      ~operations:[]
-      bv
-    >>=? (function Some b -> return b | None -> assert false)
+    Block_validation.apply apply_environment activation_block [] >>=? fun bv ->
+    (Store.Block.store_block
+       chain_store
+       ~block_header:activation_block
+       ~operations:[]
+       bv
+     >>=? function
+     | Some b -> return b
+     | None -> assert false)
     >>=? fun block ->
     Lwt.finalize
       (fun () ->
         match nb_blocks with
-        | `Cycle n ->
-            Alpha_utils.bake_until_n_cycle_end chain_store n block
-        | `Blocks n ->
-            Alpha_utils.bake_n chain_store n block)
+        | `Cycle n -> Alpha_utils.bake_until_n_cycle_end chain_store n block
+        | `Blocks n -> Alpha_utils.bake_n chain_store n block)
       (fun () ->
         let bs = Store.Unsafe.get_block_store chain_store in
         Block_store.await_merging bs >>= fun _ -> Lwt.return_unit)
@@ -422,14 +417,12 @@ let wrap_test_legacy ?(keep_dir = false) test : string Alcotest_lwt.test_case =
           Lwt.catch
             (fun () -> f base_dir)
             (fun exn ->
-              Lwt_utils_unix.remove_dir base_dir
-              >>= fun () -> Lwt.return (Error_monad.error_exn exn)))
+              Lwt_utils_unix.remove_dir base_dir >>= fun () ->
+              Lwt.return (Error_monad.error_exn exn)))
     else
       let base_dir = Filename.temp_file prefix_dir "" in
-      Lwt_unix.unlink base_dir
-      >>= fun () ->
-      Lwt_unix.mkdir base_dir 0o700
-      >>= fun () ->
+      Lwt_unix.unlink base_dir >>= fun () ->
+      Lwt_unix.mkdir base_dir 0o700 >>= fun () ->
       Format.printf "@\nPersisting dir %s for test.@." base_dir ;
       f base_dir
   in
@@ -446,20 +439,17 @@ let wrap_test_legacy ?(keep_dir = false) test : string Alcotest_lwt.test_case =
           (fun () ->
             protect
               ~on_error:(fun err ->
-                Store.make_pp_store store
-                >>= fun pp_store ->
+                Store.make_pp_store store >>= fun pp_store ->
                 Format.eprintf "@[<v>DEBUG:@ %a@]@." pp_store () ;
                 Lwt.return (Error err))
               (fun () -> test store (legacy_store_dir, legacy_state) blocks))
           (fun () ->
-            Legacy_state.close legacy_state
-            >>= fun () -> Store.close_store store))
+            Legacy_state.close legacy_state >>= fun () ->
+            Store.close_store store))
   in
   Alcotest_lwt.test_case name speed (fun x exe ->
-      test x exe
-      >>= function
-      | Ok () ->
-          Lwt.return_unit
+      test x exe >>= function
+      | Ok () -> Lwt.return_unit
       | Error errs ->
           Format.printf
             "@\nError while running test:@\n%a@."

@@ -41,8 +41,7 @@ let pp ppf = function
       Format.fprintf ppf "accepted %a" P2p_connection.Id.pp current_point
   | Running {current_point; _} ->
       Format.fprintf ppf "running %a" P2p_connection.Id.pp current_point
-  | Disconnected ->
-      Format.fprintf ppf "disconnected"
+  | Disconnected -> Format.fprintf ppf "disconnected"
 
 module Info = struct
   type ('conn, 'peer_meta, 'conn_meta) t = {
@@ -87,7 +86,8 @@ module Info = struct
   let encoding peer_metadata_encoding =
     let open Data_encoding in
     conv
-      (fun { peer_id;
+      (fun {
+             peer_id;
              trusted;
              peer_metadata;
              events;
@@ -96,7 +96,8 @@ module Info = struct
              last_rejected_connection;
              last_established_connection;
              last_disconnection;
-             _ } ->
+             _;
+           } ->
         ( peer_id,
           created,
           trusted,
@@ -193,8 +194,8 @@ module Info = struct
     let load path peer_metadata_encoding =
       let enc = Data_encoding.list (encoding peer_metadata_encoding) in
       if path <> "/dev/null" && Sys.file_exists path then
-        Lwt_utils_unix.Json.read_file path
-        >>=? fun json -> return (Data_encoding.Json.destruct enc json)
+        Lwt_utils_unix.Json.read_file path >>=? fun json ->
+        return (Data_encoding.Json.destruct enc json)
       else return_nil
 
     let save path peer_metadata_encoding peers =
@@ -223,22 +224,17 @@ let is_disconnected {Info.state; _} =
 let set_accepted ~timestamp peer_info current_point cancel =
   assert (
     match peer_info.Info.state with
-    | Accepted _ | Running _ ->
-        false
-    | Disconnected ->
-        true ) ;
+    | Accepted _ | Running _ -> false
+    | Disconnected -> true) ;
   peer_info.state <- Accepted {current_point; cancel} ;
   Info.log peer_info ~timestamp current_point Accepting_request
 
 let set_running ~timestamp peer_info point data conn_metadata =
   assert (
     match peer_info.Info.state with
-    | Disconnected ->
-        true (* request to unknown peer_id. *)
-    | Running _ ->
-        false
-    | Accepted {current_point; _} ->
-        P2p_connection.Id.equal point current_point ) ;
+    | Disconnected -> true (* request to unknown peer_id. *)
+    | Running _ -> false
+    | Accepted {current_point; _} -> P2p_connection.Id.equal point current_point) ;
   peer_info.state <- Running {data; conn_metadata; current_point = point} ;
   peer_info.last_established_connection <- Some (point, timestamp) ;
   Info.log peer_info ~timestamp point Connection_established
@@ -253,8 +249,7 @@ let set_disconnected ~timestamp ?(requested = false) peer_info =
         peer_info.last_disconnection <- Some (current_point, timestamp) ;
         ( current_point,
           if requested then Disconnection else External_disconnection )
-    | Disconnected ->
-        assert false
+    | Disconnected -> assert false
   in
   peer_info.state <- Disconnected ;
   Info.log peer_info ~timestamp current_point event

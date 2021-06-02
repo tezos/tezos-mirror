@@ -44,36 +44,26 @@ let equal ?(eq = ( = )) ?(prn = default_printer) ?(msg = "") x y =
 let equal_operation ?msg op1 op2 =
   let eq op1 op2 =
     match (op1, op2) with
-    | (None, None) ->
-        true
-    | (Some op1, Some op2) ->
-        Operation.equal op1 op2
-    | _ ->
-        false
+    | (None, None) -> true
+    | (Some op1, Some op2) -> Operation.equal op1 op2
+    | _ -> false
   in
   let prn = function
-    | None ->
-        "none"
-    | Some op ->
-        Operation_hash.to_b58check (Operation.hash op)
+    | None -> "none"
+    | Some op -> Operation_hash.to_b58check (Operation.hash op)
   in
   equal ?msg ~prn ~eq op1 op2
 
 let equal_block ?msg st1 st2 =
   let eq st1 st2 =
     match (st1, st2) with
-    | (None, None) ->
-        true
-    | (Some st1, Some st2) ->
-        Block_header.equal st1 st2
-    | _ ->
-        false
+    | (None, None) -> true
+    | (Some st1, Some st2) -> Block_header.equal st1 st2
+    | _ -> false
   in
   let prn = function
-    | None ->
-        "none"
-    | Some st ->
-        Block_hash.to_b58check (Block_header.hash st)
+    | None -> "none"
+    | Some st -> Block_hash.to_b58check (Block_header.hash st)
   in
   equal ?msg ~prn ~eq st1 st2
 
@@ -97,26 +87,21 @@ let make_equal_list eq prn ?(msg = "") x y =
           msg
           (List.length x)
           (List.length y)
-    | ([], []) ->
-        ()
+    | ([], []) -> ()
   in
   iter 0 x y
 
-let equal_string_list ?msg l1 l2 =
-  make_equal_list ?msg ( = ) (fun x -> x) l1 l2
+let equal_string_list ?msg l1 l2 = make_equal_list ?msg ( = ) (fun x -> x) l1 l2
 
 let equal_string_list_list ?msg l1 l2 =
   let pr_persist l =
-    let res =
-      String.concat ";" (List.map (fun s -> Printf.sprintf "%S" s) l)
-    in
+    let res = String.concat ";" (List.map (fun s -> Printf.sprintf "%S" s) l) in
     Printf.sprintf "[%s]" res
   in
   make_equal_list ?msg ( = ) pr_persist l1 l2
 
 let equal_block_set ?msg set1 set2 =
-  let b1 = Block_hash.Set.elements set1
-  and b2 = Block_hash.Set.elements set2 in
+  let b1 = Block_hash.Set.elements set1 and b2 = Block_hash.Set.elements set2 in
   make_equal_list
     ?msg
     (fun h1 h2 -> Block_hash.equal h1 h2)
@@ -125,8 +110,7 @@ let equal_block_set ?msg set1 set2 =
     b2
 
 let equal_block_map ?msg ~eq map1 map2 =
-  let b1 = Block_hash.Map.bindings map1
-  and b2 = Block_hash.Map.bindings map2 in
+  let b1 = Block_hash.Map.bindings map1 and b2 = Block_hash.Map.bindings map2 in
   make_equal_list
     ?msg
     (fun (h1, b1) (h2, b2) -> Block_hash.equal h1 h2 && eq b1 b2)
@@ -145,16 +129,13 @@ let is_true ?(msg = "") x = if not x then fail "true" "false" msg
 let equal_checkpoint ?msg cp1 cp2 =
   let eq cp1 cp2 =
     match (cp1, cp2) with
-    | (None, None) ->
-        true
+    | (None, None) -> true
     | (Some (x, bh1), Some (y, bh2)) ->
         Int32.equal x y && Block_hash.equal bh1 bh2
-    | _ ->
-        false
+    | _ -> false
   in
   let prn = function
-    | None ->
-        "none"
+    | None -> "none"
     | Some (_x, bh) ->
         (*let s = Printf.sprintf "%s" x in*)
         Block_hash.to_b58check bh

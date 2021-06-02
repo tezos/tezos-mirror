@@ -29,16 +29,10 @@ module type EXTENDED = sig
   include S
 
   val pp :
-    (Format.formatter -> 'err -> unit) ->
-    Format.formatter ->
-    'err trace ->
-    unit
+    (Format.formatter -> 'err -> unit) -> Format.formatter -> 'err trace -> unit
 
   val pp_top :
-    (Format.formatter -> 'err -> unit) ->
-    Format.formatter ->
-    'err trace ->
-    unit
+    (Format.formatter -> 'err -> unit) -> Format.formatter -> 'err trace -> unit
 
   val fold : ('a -> 'error -> 'a) -> 'a -> 'error trace -> 'a
 

@@ -47,8 +47,7 @@ let empty =
 let project : Context.t -> t =
  fun (Context.Context t) ->
   match t.kind with
-  | Context ->
-      t.ctxt
+  | Context -> t.ctxt
   | _ ->
       Environment_context.err_implementation_mismatch
         ~expected:impl_name

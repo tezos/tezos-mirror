@@ -26,8 +26,7 @@
 (* Tests that test Tezt itself. *)
 
 let () =
-  Test.register ~__FILE__ ~title:"Check.(=)" ~tags:["check"; "eq"]
-  @@ fun () ->
+  Test.register ~__FILE__ ~title:"Check.(=)" ~tags:["check"; "eq"] @@ fun () ->
   let error_msg = "expected %L = %R" in
   Check.((() = ()) unit) ~error_msg ;
   Check.((true = true) bool) ~error_msg ;
@@ -75,8 +74,7 @@ let () =
   unit
 
 let () =
-  Test.register ~__FILE__ ~title:"Check.(<)" ~tags:["check"; "lt"]
-  @@ fun () ->
+  Test.register ~__FILE__ ~title:"Check.(<)" ~tags:["check"; "lt"] @@ fun () ->
   let error_msg = "expected %L < %R" in
   Check.((false < true) bool) ~error_msg ;
   Check.(('a' < 'z') char) ~error_msg ;
@@ -95,8 +93,7 @@ let () =
   unit
 
 let () =
-  Test.register ~__FILE__ ~title:"Check.(<=)" ~tags:["check"; "le"]
-  @@ fun () ->
+  Test.register ~__FILE__ ~title:"Check.(<=)" ~tags:["check"; "le"] @@ fun () ->
   let error_msg = "expected %L <= %R" in
   Check.((false <= true) bool) ~error_msg ;
   Check.((false <= false) bool) ~error_msg ;
@@ -125,8 +122,7 @@ let () =
   unit
 
 let () =
-  Test.register ~__FILE__ ~title:"Check.(>)" ~tags:["check"; "gt"]
-  @@ fun () ->
+  Test.register ~__FILE__ ~title:"Check.(>)" ~tags:["check"; "gt"] @@ fun () ->
   let error_msg = "expected %L > %R" in
   Check.((true > false) bool) ~error_msg ;
   Check.(('z' > 'a') char) ~error_msg ;
@@ -145,8 +141,7 @@ let () =
   unit
 
 let () =
-  Test.register ~__FILE__ ~title:"Check.(>=)" ~tags:["check"; "ge"]
-  @@ fun () ->
+  Test.register ~__FILE__ ~title:"Check.(>=)" ~tags:["check"; "ge"] @@ fun () ->
   let error_msg = "expected %L >= %R" in
   Check.((true >= false) bool) ~error_msg ;
   Check.((false >= false) bool) ~error_msg ;

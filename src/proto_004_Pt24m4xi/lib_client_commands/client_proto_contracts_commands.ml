@@ -35,16 +35,17 @@ let group =
 
 let commands () =
   let open Clic in
-  [ command
+  [
+    command
       ~group
       ~desc:"Add a contract to the wallet."
       (args1 (RawContractAlias.force_switch ()))
-      ( prefixes ["remember"; "contract"]
+      (prefixes ["remember"; "contract"]
       @@ RawContractAlias.fresh_alias_param @@ RawContractAlias.source_param
-      @@ stop )
+      @@ stop)
       (fun force name hash cctxt ->
-        RawContractAlias.of_fresh cctxt force name
-        >>=? fun name -> RawContractAlias.add ~force cctxt name hash);
+        RawContractAlias.of_fresh cctxt force name >>=? fun name ->
+        RawContractAlias.add ~force cctxt name hash);
     command
       ~group
       ~desc:"Remove a contract from the wallet."
@@ -57,8 +58,7 @@ let commands () =
       no_options
       (fixed ["list"; "known"; "contracts"])
       (fun () (cctxt : Alpha_client_context.full) ->
-        list_contracts cctxt
-        >>=? fun contracts ->
+        list_contracts cctxt >>=? fun contracts ->
         List.iter_es
           (fun (prefix, alias, contract) ->
             cctxt#message
@@ -80,8 +80,8 @@ let commands () =
       ~group
       ~desc:"Display a contract from the wallet."
       no_options
-      ( prefixes ["show"; "known"; "contract"]
-      @@ RawContractAlias.alias_param @@ stop )
+      (prefixes ["show"; "known"; "contract"]
+      @@ RawContractAlias.alias_param @@ stop)
       (fun () (_, contract) (cctxt : Alpha_client_context.full) ->
-        cctxt#message "%a\n%!" Contract.pp contract >>= fun () -> return_unit)
+        cctxt#message "%a\n%!" Contract.pp contract >>= fun () -> return_unit);
   ]

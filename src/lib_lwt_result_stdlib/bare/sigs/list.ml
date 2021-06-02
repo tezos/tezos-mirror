@@ -435,8 +435,7 @@ module type S = sig
   (** {4 Traversal variants} *)
   val iter : ('a -> unit) -> 'a list -> unit
 
-  val iter_e :
-    ('a -> (unit, 'trace) result) -> 'a list -> (unit, 'trace) result
+  val iter_e : ('a -> (unit, 'trace) result) -> 'a list -> (unit, 'trace) result
 
   val iter_s : ('a -> unit Lwt.t) -> 'a list -> unit Lwt.t
 
@@ -473,8 +472,7 @@ module type S = sig
 
   val map : ('a -> 'b) -> 'a list -> 'b list
 
-  val map_e :
-    ('a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
+  val map_e : ('a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
 
   val map_s : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
 

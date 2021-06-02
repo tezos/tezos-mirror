@@ -25,17 +25,18 @@
 (*****************************************************************************)
 
 module Public_key_hash = struct
-  include Blake2B.Make
-            (Base58)
-            (struct
-              let name = "P256.Public_key_hash"
+  include
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "P256.Public_key_hash"
 
-              let title = "A P256 public key hash"
+        let title = "A P256 public key hash"
 
-              let b58check_prefix = Base58.Prefix.p256_public_key_hash
+        let b58check_prefix = Base58.Prefix.p256_public_key_hash
 
-              let size = Some 20
-            end)
+        let size = Some 20
+      end)
 
   module Logging = struct
     let tag = Tag.def ~doc:title name pp
@@ -317,11 +318,10 @@ let generate_key ?seed () =
              seedlen)
       else
         match sk_of_bytes (Bytes.sub seed 0 Secret_key.size) with
-        | None ->
-            invalid_arg "P256.generate_key: invalid seed"
+        | None -> invalid_arg "P256.generate_key: invalid seed"
         | Some sk ->
             let pk = neuterize sk in
-            (Public_key.hash pk, pk, sk) )
+            (Public_key.hash pk, pk, sk))
 
 let deterministic_nonce sk msg =
   let key = Secret_key.to_bytes sk in

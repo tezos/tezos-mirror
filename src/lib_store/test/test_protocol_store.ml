@@ -27,10 +27,12 @@ open Test_utils
 
 let test_protocol_store _ store =
   let protocols_to_register =
-    [ ( Tezos_embedded_protocol_alpha.Registerer.Registered.hash,
+    [
+      ( Tezos_embedded_protocol_alpha.Registerer.Registered.hash,
         Tezos_embedded_protocol_alpha.Registerer.Source.sources );
       ( Tezos_embedded_protocol_genesis.Registerer.Registered.hash,
-        Tezos_embedded_protocol_genesis.Registerer.Source.sources ) ]
+        Tezos_embedded_protocol_genesis.Registerer.Source.sources );
+    ]
   in
   let non_stored_protocol_hash =
     Tezos_embedded_protocol_demo_noops.Registerer.Registered.hash
@@ -42,21 +44,20 @@ let test_protocol_store _ store =
   assert (
     List.for_all
       (fun (h, _p) -> Store.Protocol.mem store h)
-      protocols_to_register ) ;
+      protocols_to_register) ;
   assert (not (Store.Protocol.mem store non_stored_protocol_hash)) ;
   Lwt_list.iter_s
     (fun (h, p) ->
-      Store.Protocol.read store h
-      >>= function
-      | None ->
-          Lwt.fail Alcotest.Test_error
+      Store.Protocol.read store h >>= function
+      | None -> Lwt.fail Alcotest.Test_error
       | Some p' ->
           Alcotest.check (module Protocol) "protocol equality" p p' ;
           Lwt.return_unit)
     protocols_to_register
   >>= fun () ->
-  Store.Protocol.read store non_stored_protocol_hash
-  >>= function None -> return_unit | Some _ -> Lwt.fail Alcotest.Test_error
+  Store.Protocol.read store non_stored_protocol_hash >>= function
+  | None -> return_unit
+  | Some _ -> Lwt.fail Alcotest.Test_error
 
 let tests =
   let test_cases =

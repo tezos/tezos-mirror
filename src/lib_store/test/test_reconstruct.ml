@@ -28,8 +28,7 @@ open Test_utils
 
 let check_flags descr store expected_head =
   let chain_store = Store.main_chain_store store in
-  Store.Chain.current_head chain_store
-  >>= fun current_head ->
+  Store.Chain.current_head chain_store >>= fun current_head ->
   Assert.equal_block
     ~msg:("head consistency: " ^ descr)
     (Store.Block.header expected_head)
@@ -39,21 +38,17 @@ let check_flags descr store expected_head =
     ~msg:("history mode consistency: " ^ descr)
     history_mode
     History_mode.Archive ;
-  Store.Chain.checkpoint chain_store
-  >>= fun checkpoint ->
-  Store.Block.get_block_metadata chain_store expected_head
-  >>=? fun metadata ->
+  Store.Chain.checkpoint chain_store >>= fun checkpoint ->
+  Store.Block.get_block_metadata chain_store expected_head >>=? fun metadata ->
   let expected_checkpoint = Store.Block.last_allowed_fork_level metadata in
   Assert.equal
     ~prn:(Format.sprintf "%ld")
     ~msg:("checkpoint consistency: " ^ descr)
     expected_checkpoint
     (snd checkpoint) ;
-  Store.Chain.savepoint chain_store
-  >>= fun savepoint ->
+  Store.Chain.savepoint chain_store >>= fun savepoint ->
   Assert.equal ~msg:("savepoint consistency: " ^ descr) 0l (snd savepoint) ;
-  Store.Chain.caboose chain_store
-  >>= fun caboose ->
+  Store.Chain.caboose chain_store >>= fun caboose ->
   Assert.equal
     ~msg:("caboose consistency: " ^ descr)
     (snd savepoint)
@@ -64,14 +59,11 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
     ~nb_blocks_to_bake ~patch_context =
   let chain_store = Store.main_chain_store store in
   let genesis = Store.Chain.genesis chain_store in
-  Store.Chain.genesis_block chain_store
-  >>= fun genesis_block ->
+  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
   Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
   >>=? fun (baked_blocks, last) ->
-  Store.Chain.savepoint chain_store
-  >>= fun savepoint ->
-  Store.close_store store
-  >>= fun () ->
+  Store.Chain.savepoint chain_store >>= fun savepoint ->
+  Store.close_store store >>= fun () ->
   Error_monad.protect
     (fun () ->
       Reconstruction.reconstruct
@@ -83,16 +75,14 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
         ~user_activated_protocol_overrides:[]
       >>=? fun () -> return_false)
     ~on_error:(function
-      | [Reconstruction.(Reconstruction_failure Nothing_to_reconstruct)] as e
-        ->
+      | [Reconstruction.(Reconstruction_failure Nothing_to_reconstruct)] as e ->
           if Compare.Int32.(snd savepoint = 0l) then
             (* It is expected as nothing was pruned *)
             return_true
           else (
             Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error e ;
             Alcotest.fail
-              "Should not fail to reconstruct (nothing_to_reconstruct raised)."
-            )
+              "Should not fail to reconstruct (nothing_to_reconstruct raised).")
       | [Reconstruction.(Cannot_reconstruct History_mode.Archive)]
       | [Reconstruction.(Cannot_reconstruct (History_mode.Rolling _))] ->
           (* In both Archive and Rolling _ modes, the reconstruction should fail *)
@@ -111,30 +101,29 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
       genesis
     >>=? fun store' ->
     let chain_store' = Store.main_chain_store store' in
-    check_flags descr store' last
-    >>=? fun () ->
+    check_flags descr store' last >>=? fun () ->
     assert_presence_in_store ~with_metadata:true chain_store' baked_blocks
-    >>=? fun () -> Store.close_store store' >>= fun () -> return_unit
+    >>=? fun () ->
+    Store.close_store store' >>= fun () -> return_unit
 
 let make_tests_bootstrapped speed patch_context =
   let history_modes =
     match speed with
     | `Slow ->
         History_mode.
-          [ Full {offset = 0};
+          [
+            Full {offset = 0};
             Full {offset = 3};
             Full {offset = default_offset};
             Archive;
-            Rolling {offset = default_offset} ]
-    | `Quick ->
-        History_mode.[Full {offset = 0}; Full {offset = default_offset}]
+            Rolling {offset = default_offset};
+          ]
+    | `Quick -> History_mode.[Full {offset = 0}; Full {offset = default_offset}]
   in
   let nb_blocks_to_bake =
     match speed with
-    | `Slow ->
-        1 -- 100
-    | `Quick ->
-        [0; 3; 8; 21; 42; 57; 89; 92; 101]
+    | `Slow -> 1 -- 100
+    | `Quick -> [0; 3; 8; 21; 42; 57; 89; 92; 101]
   in
   let permutations = List.(product nb_blocks_to_bake history_modes) in
   List.map
@@ -163,21 +152,15 @@ let make_tests_bootstrapped speed patch_context =
 let test_from_snapshot ~descr:_ (store_dir, context_dir) store
     ~nb_blocks_to_bake ~patch_context =
   let chain_store = Store.main_chain_store store in
-  Store.Chain.genesis_block chain_store
-  >>= fun genesis_block ->
+  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
   Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
   >>=? fun (baked_blocks, last) ->
-  Store.Block.get_block_metadata_opt chain_store last
-  >>= (function
-        | Some m ->
-            Lwt.return (Store.Block.last_allowed_fork_level m)
-        | None ->
-            assert false)
+  (Store.Block.get_block_metadata_opt chain_store last >>= function
+   | Some m -> Lwt.return (Store.Block.last_allowed_fork_level m)
+   | None -> assert false)
   >>= fun lafl ->
-  Store.Chain.savepoint chain_store
-  >>= fun savepoint ->
-  Store.close_store store
-  >>= fun () ->
+  Store.Chain.savepoint chain_store >>= fun savepoint ->
+  Store.close_store store >>= fun () ->
   let open Filename.Infix in
   let dir = store_dir // "imported_store" in
   let dst_store_dir = dir // "store" in
@@ -218,21 +201,18 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
         ~user_activated_protocol_overrides:[]
       >>=? fun () -> return_false)
     ~on_error:(function
-      | [Reconstruction.(Reconstruction_failure Nothing_to_reconstruct)] as e
-        ->
+      | [Reconstruction.(Reconstruction_failure Nothing_to_reconstruct)] as e ->
           if Compare.Int32.(lafl = 0l) || snd savepoint = 0l then
             (* It is expected as nothing was pruned *)
             return_true
           else (
             Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error e ;
             Alcotest.fail
-              "Should not fail to reconstruct (nothing_to_reconstruct raised)."
-            )
+              "Should not fail to reconstruct (nothing_to_reconstruct raised).")
       | [Reconstruction.(Cannot_reconstruct History_mode.Archive)] ->
           (* In Archive, the reconstruction should fail *)
           return_true
-      | Snapshots.[Invalid_export_block {reason = `Genesis; _}] ->
-          return_true
+      | Snapshots.[Invalid_export_block {reason = `Genesis; _}] -> return_true
       | err ->
           Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_error err ;
           Alcotest.fail "Should not fail")
@@ -247,26 +227,26 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
     >>=? fun store' ->
     let chain_store' = Store.main_chain_store store' in
     assert_presence_in_store ~with_metadata:true chain_store' baked_blocks
-    >>=? fun () -> Store.close_store store' >>= fun () -> return_unit
+    >>=? fun () ->
+    Store.close_store store' >>= fun () -> return_unit
 
 let make_tests_snapshoted speed patch_context =
   let history_modes =
     match speed with
     | `Slow ->
         History_mode.
-          [ Full {offset = 0};
+          [
+            Full {offset = 0};
             Full {offset = 3};
             Full {offset = default_offset};
-            Archive ]
-    | `Quick ->
-        History_mode.[Full {offset = 0}; Full {offset = default_offset}]
+            Archive;
+          ]
+    | `Quick -> History_mode.[Full {offset = 0}; Full {offset = default_offset}]
   in
   let nb_blocks_to_bake =
     match speed with
-    | `Slow ->
-        0 -- 100
-    | `Quick ->
-        [0; 3; 8; 21; 42; 57; 89; 92; 101]
+    | `Slow -> 0 -- 100
+    | `Quick -> [0; 3; 8; 21; 42; 57; 89; 92; 101]
   in
   let permutations = List.(product nb_blocks_to_bake history_modes) in
   List.map

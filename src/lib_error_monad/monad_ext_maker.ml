@@ -47,7 +47,8 @@ end)
     let a_encoding = obj1 (req "result" a_encoding) in
     union
       ~tag_size:`Uint8
-      [ case
+      [
+        case
           (Tag 0)
           a_encoding
           ~title:"Ok"
@@ -58,7 +59,8 @@ end)
           trace_encoding
           ~title:"Error"
           (function Error x -> Some x | _ -> None)
-          (function x -> Error x) ]
+          (function x -> Error x);
+      ]
 
   let pp_print_error = Trace.pp_print Error.pp
 

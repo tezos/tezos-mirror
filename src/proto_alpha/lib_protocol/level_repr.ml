@@ -69,22 +69,22 @@ let encoding =
        (req
           "level_position"
           ~description:
-            "The level of the block relative to the block that starts \
-             protocol alpha. This is specific to the protocol alpha. Other \
-             protocols might or might not include a similar notion."
+            "The level of the block relative to the block that starts protocol \
+             alpha. This is specific to the protocol alpha. Other protocols \
+             might or might not include a similar notion."
           int32)
        (req
           "cycle"
           ~description:
             "The current cycle's number. Note that cycles are a \
-             protocol-specific notion. As a result, the cycle number starts \
-             at 0 with the first block of protocol alpha."
+             protocol-specific notion. As a result, the cycle number starts at \
+             0 with the first block of protocol alpha."
           Cycle_repr.encoding)
        (req
           "cycle_position"
           ~description:
-            "The current level of the block relative to the first block of \
-             the current cycle."
+            "The current level of the block relative to the first block of the \
+             current cycle."
           int32)
        (req
           "expected_commitment"
@@ -126,22 +126,22 @@ let () =
 
 let create_cycle_eras cycle_eras =
   match cycle_eras with
-  | [] ->
-      error Invalid_cycle_eras
+  | [] -> error Invalid_cycle_eras
   | newest_era :: older_eras ->
       let rec aux {first_level; first_cycle; _} older_eras =
         match older_eras with
-        | ( { first_level = first_level_of_previous_era;
-              first_cycle = first_cycle_of_previous_era;
-              _ } as previous_era )
+        | ({
+             first_level = first_level_of_previous_era;
+             first_cycle = first_cycle_of_previous_era;
+             _;
+           } as previous_era)
           :: even_older_eras ->
             if
               Raw_level_repr.(first_level > first_level_of_previous_era)
               && Cycle_repr.(first_cycle > first_cycle_of_previous_era)
             then aux previous_era even_older_eras
             else error Invalid_cycle_eras
-        | [] ->
-            ok ()
+        | [] -> ok ()
       in
       aux newest_era older_eras >>? fun () -> ok cycle_eras
 
@@ -181,10 +181,8 @@ let cycle_eras_encoding =
     (fun eras -> eras)
     (fun eras ->
       match create_cycle_eras eras with
-      | Ok res ->
-          res
-      | Error _ ->
-          raise Invalid_cycle_eras_exn)
+      | Ok res -> res
+      | Error _ -> raise Invalid_cycle_eras_exn)
     (Data_encoding.list cycle_era_encoding)
 
 let current_era cycle_eras = List.hd cycle_eras
@@ -203,10 +201,8 @@ let root_level cycle_eras =
 let era_of_level ~cycle_eras level =
   let rec aux = function
     | ({first_level; _} as era) :: previous_eras ->
-        if Raw_level_repr.(level >= first_level) then era
-        else aux previous_eras
-    | [] ->
-        assert false
+        if Raw_level_repr.(level >= first_level) then era else aux previous_eras
+    | [] -> assert false
   in
   aux cycle_eras
 
@@ -215,8 +211,7 @@ let era_of_cycle ~cycle_eras cycle =
   let rec aux = function
     | ({first_cycle; _} as era) :: previous_eras ->
         if Cycle_repr.(cycle >= first_cycle) then era else aux previous_eras
-    | [] ->
-        assert false
+    | [] -> assert false
   in
   aux cycle_eras
 
@@ -245,10 +240,8 @@ let level_from_raw_with_era era ~first_level_in_alpha_family level =
 let level_from_raw ~cycle_eras level =
   let first_level_in_alpha_family =
     match List.rev cycle_eras with
-    | [] ->
-        assert false
-    | {first_level; _} :: _ ->
-        first_level
+    | [] -> assert false
+    | {first_level; _} :: _ -> first_level
   in
   let era = era_of_level ~cycle_eras level in
   level_from_raw_with_era era ~first_level_in_alpha_family level
@@ -256,20 +249,16 @@ let level_from_raw ~cycle_eras level =
 let from_raw ~cycle_eras ?offset l =
   let l =
     match offset with
-    | None ->
-        l
-    | Some o ->
-        Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o))
+    | None -> l
+    | Some o -> Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o))
   in
   level_from_raw ~cycle_eras l
 
 let first_level_in_cycle ~cycle_eras cycle =
   let first_level_in_alpha_family =
     match List.rev cycle_eras with
-    | [] ->
-        assert false
-    | {first_level; _} :: _ ->
-        first_level
+    | [] -> assert false
+    | {first_level; _} :: _ -> first_level
   in
   let era = era_of_cycle ~cycle_eras cycle in
   let cycle_position = Cycle_repr.diff cycle era.first_cycle in

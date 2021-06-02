@@ -31,13 +31,13 @@ let numbits x =
   (let y = (!x lsr 16) lsr 16 in
    if y <> 0 then (
      n := !n + 32 ;
-     x := y )) ;
+     x := y)) ;
   (let y = !x lsr 16 in
    if y <> 0 then (
      n := !n + 16 ;
-     x := y )) ;
+     x := y)) ;
   (let y = !x lsr 8 in
    if y <> 0 then (
      n := !n + 8 ;
-     x := y )) ;
+     x := y)) ;
   !n + Char.code numbits_table.[!x]

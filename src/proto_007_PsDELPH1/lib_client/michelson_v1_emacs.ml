@@ -29,26 +29,20 @@ open Micheline
 
 let print_expr ppf expr =
   let print_annot ppf = function
-    | [] ->
-        ()
-    | annots ->
-        Format.fprintf ppf " %s" (String.concat " " annots)
+    | [] -> ()
+    | annots -> Format.fprintf ppf " %s" (String.concat " " annots)
   in
   let rec print_expr ppf = function
-    | Int (_, value) ->
-        Format.fprintf ppf "%s" (Z.to_string value)
-    | String (_, value) ->
-        Micheline_printer.print_string ppf value
-    | Bytes (_, value) ->
-        Format.fprintf ppf "0x%a" Hex.pp (Hex.of_bytes value)
+    | Int (_, value) -> Format.fprintf ppf "%s" (Z.to_string value)
+    | String (_, value) -> Micheline_printer.print_string ppf value
+    | Bytes (_, value) -> Format.fprintf ppf "0x%a" Hex.pp (Hex.of_bytes value)
     | Seq (_, items) ->
         Format.fprintf
           ppf
           "(seq %a)"
           (Format.pp_print_list ~pp_sep:Format.pp_print_space print_expr)
           items
-    | Prim (_, name, [], []) ->
-        Format.fprintf ppf "%s" name
+    | Prim (_, name, [], []) -> Format.fprintf ppf "%s" name
     | Prim (_, name, items, annot) ->
         Format.fprintf
           ppf
@@ -93,10 +87,9 @@ let print_type_map ppf (parsed, type_map) =
      List.assoc ~equal:Int.equal loc parsed.Michelson_v1_parser.expansion_table
      >?? fun ({start = {point = s; _}; stop = {point = e; _}}, locs) ->
      let locs = List.sort Stdlib.compare locs in
-     List.hd locs
-     >?? fun hd_loc ->
-     List.assoc ~equal:Int.equal hd_loc type_map
-     >?? fun (bef, aft) -> Some (s, e, bef, aft))
+     List.hd locs >?? fun hd_loc ->
+     List.assoc ~equal:Int.equal hd_loc type_map >?? fun (bef, aft) ->
+     Some (s, e, bef, aft))
     |> Option.iter (fun (s, e, bef, aft) ->
            Format.fprintf
              ppf
@@ -112,8 +105,7 @@ let print_type_map ppf (parsed, type_map) =
 
 let first_error_location errs =
   let rec find = function
-    | [] ->
-        0
+    | [] -> 0
     | ( Inconsistent_type_annotations (loc, _, _)
       | Unexpected_annotation loc
       | Ill_formed_type (_, _, loc)
@@ -134,16 +126,16 @@ let first_error_location errs =
       | Michelson_v1_primitives.Invalid_primitive_name (_, loc) )
       :: _ ->
         loc
-    | _ :: rest ->
-        find rest
+    | _ :: rest -> find rest
   in
   find errs
 
 let report_errors ppf (parsed, errs) =
   let (eco, out) =
     List.fold_left
-      (fun (eco, out) -> function Environment.Ecoproto_error err ->
-            (err :: eco, out) | err -> (eco, err :: out))
+      (fun (eco, out) -> function
+        | Environment.Ecoproto_error err -> (err :: eco, out)
+        | err -> (eco, err :: out))
       ([], [])
       errs
   in
@@ -161,8 +153,8 @@ let report_errors ppf (parsed, errs) =
                parsed.Michelson_v1_parser.unexpansion_table
         in
         fst
-          ( WithExceptions.Option.get ~loc:__LOC__
-          @@ List.assoc ~equal:Int.equal oloc parsed.expansion_table )
+          (WithExceptions.Option.get ~loc:__LOC__
+          @@ List.assoc ~equal:Int.equal oloc parsed.expansion_table)
       in
       match errs with
       | top :: errs ->
@@ -180,8 +172,7 @@ let report_errors ppf (parsed, errs) =
                     = parsed.Michelson_v1_parser.unexpanded
                   then find_location loc
                   else find_location 0
-              | _ ->
-                  find_location 0 )
+              | _ -> find_location 0 )
           in
           let message =
             Format.asprintf
@@ -194,8 +185,7 @@ let report_errors ppf (parsed, errs) =
           in
           let {start = {point = s; _}; stop = {point = e; _}} = loc in
           Format.fprintf ppf "(%d %d %S)" (s + 1) (e + 1) message
-      | [] ->
-          ())
+      | [] -> ())
     eco
     (Format.pp_print_list (fun ppf err ->
          let find_location loc =
@@ -207,8 +197,8 @@ let report_errors ppf (parsed, errs) =
                   parsed.Michelson_v1_parser.unexpansion_table
            in
            fst
-             ( WithExceptions.Option.get ~loc:__LOC__
-             @@ List.assoc ~equal:Int.equal oloc parsed.expansion_table )
+             (WithExceptions.Option.get ~loc:__LOC__
+             @@ List.assoc ~equal:Int.equal oloc parsed.expansion_table)
          in
          let loc =
            match err with
@@ -225,10 +215,8 @@ let report_errors ppf (parsed, errs) =
            | Unexpected {loc; _}
            | Extra {loc; _} ->
                loc
-           | Misaligned node ->
-               location node
-           | _ ->
-               find_location 0
+           | Misaligned node -> location node
+           | _ -> find_location 0
          in
          let message =
            Format.asprintf

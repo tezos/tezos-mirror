@@ -77,7 +77,8 @@ type token_value =
 let token_value_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"String"
         (obj1 (req "string" string))
@@ -100,12 +101,9 @@ let token_value_encoding =
         ~title:"Comment"
         (obj2 (req "comment" string) (dft "end_of_line" bool false))
         (function
-          | Comment s ->
-              Some (s, false)
-          | Eol_comment s ->
-              Some (s, true)
-          | _ ->
-              None)
+          | Comment s -> Some (s, false)
+          | Eol_comment s -> Some (s, true)
+          | _ -> None)
         (function (s, false) -> Comment s | (s, true) -> Eol_comment s);
       case
         (Tag 4)
@@ -114,11 +112,13 @@ let token_value_encoding =
            (req
               "punctuation"
               (string_enum
-                 [ ("(", Open_paren);
+                 [
+                   ("(", Open_paren);
                    (")", Close_paren);
                    ("{", Open_brace);
                    ("}", Close_brace);
-                   (";", Semi) ])))
+                   (";", Semi);
+                 ])))
         (fun t -> Some t)
         (fun t -> t);
       case
@@ -132,7 +132,8 @@ let token_value_encoding =
         ~title:"Ident"
         (obj1 (req "ident" string))
         (function Ident s -> Some s | _ -> None)
-        (fun s -> Ident s) ]
+        (fun s -> Ident s);
+    ]
 
 type token = {token : token_value; loc : location}
 
@@ -177,13 +178,11 @@ let tokenize source =
     | [] -> (
         let loc = here () in
         match Uutf.decode decoder with
-        | `Await ->
-            assert false
+        | `Await -> assert false
         | `Malformed s ->
             errors := Invalid_utf8_sequence (loc, s) :: !errors ;
             next ()
-        | (`Uchar _ | `End) as other ->
-            (other, loc) )
+        | (`Uchar _ | `End) as other -> (other, loc))
   in
   let back charloc = stack := charloc :: !stack in
   let uchar_to_char c =
@@ -191,94 +190,75 @@ let tokenize source =
   in
   let allowed_ident_char c =
     match uchar_to_char c with
-    | Some ('a' .. 'z' | 'A' .. 'Z' | '_' | '0' .. '9') ->
-        true
-    | Some _ | None ->
-        false
+    | Some ('a' .. 'z' | 'A' .. 'Z' | '_' | '0' .. '9') -> true
+    | Some _ | None -> false
   in
   let allowed_annot_char c =
     match uchar_to_char c with
     | Some ('a' .. 'z' | 'A' .. 'Z' | '_' | '.' | '%' | '@' | '0' .. '9') ->
         true
-    | Some _ | None ->
-        false
+    | Some _ | None -> false
   in
   let rec skip acc =
     match next () with
-    | (`End, _) ->
-        List.rev acc
+    | (`End, _) -> List.rev acc
     | (`Uchar c, start) -> (
-      match uchar_to_char c with
-      | Some ('a' .. 'z' | 'A' .. 'Z') ->
-          ident acc start (fun s _ -> Ident s)
-      | Some ('@' | ':' | '$' | '&' | '%' | '!' | '?') ->
-          annot acc start (fun str stop ->
-              if String.length str > max_annot_length then
-                errors := Annotation_length {start; stop} :: !errors ;
-              Annot str)
-      | Some '-' -> (
-        match next () with
-        | (`End, stop) ->
-            errors := Unterminated_integer {start; stop} :: !errors ;
-            List.rev acc
-        | (`Uchar c, stop) as first -> (
-          match uchar_to_char c with
-          | Some '0' ->
-              base acc start
-          | Some '1' .. '9' ->
-              integer acc start
-          | Some _ | None ->
-              errors := Unterminated_integer {start; stop} :: !errors ;
-              back first ;
-              skip acc ) )
-      | Some '0' ->
-          base acc start
-      | Some '1' .. '9' ->
-          integer acc start
-      | Some (' ' | '\n') ->
-          skip acc
-      | Some ';' ->
-          skip (tok start (here ()) Semi :: acc)
-      | Some '{' ->
-          skip (tok start (here ()) Open_brace :: acc)
-      | Some '}' ->
-          skip (tok start (here ()) Close_brace :: acc)
-      | Some '(' ->
-          skip (tok start (here ()) Open_paren :: acc)
-      | Some ')' ->
-          skip (tok start (here ()) Close_paren :: acc)
-      | Some '"' ->
-          string acc [] start
-      | Some '#' ->
-          eol_comment acc start
-      | Some '/' -> (
-        match next () with
-        | (`Uchar c, _) when Uchar.equal c (Uchar.of_char '*') ->
-            comment acc start 0
-        | ((`Uchar _ | `End), _) as charloc ->
-            errors := Unexpected_character (start, "/") :: !errors ;
-            back charloc ;
-            skip acc )
-      | Some _ | None ->
-          let byte = Uutf.decoder_byte_count decoder in
-          let s = String.sub source start.byte (byte - start.byte) in
-          errors := Unexpected_character (start, s) :: !errors ;
-          skip acc )
+        match uchar_to_char c with
+        | Some ('a' .. 'z' | 'A' .. 'Z') -> ident acc start (fun s _ -> Ident s)
+        | Some ('@' | ':' | '$' | '&' | '%' | '!' | '?') ->
+            annot acc start (fun str stop ->
+                if String.length str > max_annot_length then
+                  errors := Annotation_length {start; stop} :: !errors ;
+                Annot str)
+        | Some '-' -> (
+            match next () with
+            | (`End, stop) ->
+                errors := Unterminated_integer {start; stop} :: !errors ;
+                List.rev acc
+            | (`Uchar c, stop) as first -> (
+                match uchar_to_char c with
+                | Some '0' -> base acc start
+                | Some '1' .. '9' -> integer acc start
+                | Some _ | None ->
+                    errors := Unterminated_integer {start; stop} :: !errors ;
+                    back first ;
+                    skip acc))
+        | Some '0' -> base acc start
+        | Some '1' .. '9' -> integer acc start
+        | Some (' ' | '\n') -> skip acc
+        | Some ';' -> skip (tok start (here ()) Semi :: acc)
+        | Some '{' -> skip (tok start (here ()) Open_brace :: acc)
+        | Some '}' -> skip (tok start (here ()) Close_brace :: acc)
+        | Some '(' -> skip (tok start (here ()) Open_paren :: acc)
+        | Some ')' -> skip (tok start (here ()) Close_paren :: acc)
+        | Some '"' -> string acc [] start
+        | Some '#' -> eol_comment acc start
+        | Some '/' -> (
+            match next () with
+            | (`Uchar c, _) when Uchar.equal c (Uchar.of_char '*') ->
+                comment acc start 0
+            | ((`Uchar _ | `End), _) as charloc ->
+                errors := Unexpected_character (start, "/") :: !errors ;
+                back charloc ;
+                skip acc)
+        | Some _ | None ->
+            let byte = Uutf.decoder_byte_count decoder in
+            let s = String.sub source start.byte (byte - start.byte) in
+            errors := Unexpected_character (start, s) :: !errors ;
+            skip acc)
   and base acc start =
     match next () with
     | (`Uchar c, stop) as charloc -> (
-      match uchar_to_char c with
-      | Some '0' .. '9' ->
-          integer acc start
-      | Some 'x' ->
-          bytes acc start
-      | Some ('a' .. 'w' | 'y' | 'z' | 'A' .. 'Z') ->
-          errors := Missing_break_after_number stop :: !errors ;
-          back charloc ;
-          skip (tok start stop (Int "0") :: acc)
-      | Some _ | None ->
-          back charloc ;
-          skip (tok start stop (Int "0") :: acc) )
+        match uchar_to_char c with
+        | Some '0' .. '9' -> integer acc start
+        | Some 'x' -> bytes acc start
+        | Some ('a' .. 'w' | 'y' | 'z' | 'A' .. 'Z') ->
+            errors := Missing_break_after_number stop :: !errors ;
+            back charloc ;
+            skip (tok start stop (Int "0") :: acc)
+        | Some _ | None ->
+            back charloc ;
+            skip (tok start stop (Int "0") :: acc))
     | (_, stop) as other ->
         back other ;
         skip (tok start stop (Int "0") :: acc)
@@ -295,13 +275,11 @@ let tokenize source =
           skip (tok stop :: acc)
         in
         match Uchar.to_char c with
-        | '0' .. '9' ->
-            integer acc start
-        | 'a' .. 'z' | 'A' .. 'Z' ->
-            missing_break ()
+        | '0' .. '9' -> integer acc start
+        | 'a' .. 'z' | 'A' .. 'Z' -> missing_break ()
         | _ ->
             back charloc ;
-            skip (tok stop :: acc) )
+            skip (tok stop :: acc))
     | (`End, stop) as other ->
         back other ;
         skip (tok stop :: acc)
@@ -318,13 +296,11 @@ let tokenize source =
           skip (tok stop :: acc)
         in
         match Uchar.to_char c with
-        | '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' ->
-            bytes acc start
-        | 'g' .. 'z' | 'G' .. 'Z' ->
-            missing_break ()
+        | '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' -> bytes acc start
+        | 'g' .. 'z' | 'G' .. 'Z' -> missing_break ()
         | _ ->
             back charloc ;
-            skip (tok stop :: acc) )
+            skip (tok stop :: acc))
     | (`End, stop) as other ->
         back other ;
         skip (tok stop :: acc)
@@ -337,40 +313,33 @@ let tokenize source =
         errors := Unterminated_string {start; stop} :: !errors ;
         skip (tok () :: acc)
     | (`Uchar c, stop) -> (
-      match uchar_to_char c with
-      | Some '"' ->
-          skip (tok () :: acc)
-      | Some ('\n' | '\r') ->
-          errors := Unterminated_string {start; stop} :: !errors ;
-          skip (tok () :: acc)
-      | Some '\\' -> (
-        match next () with
-        | (`End, stop) ->
+        match uchar_to_char c with
+        | Some '"' -> skip (tok () :: acc)
+        | Some ('\n' | '\r') ->
             errors := Unterminated_string {start; stop} :: !errors ;
             skip (tok () :: acc)
-        | (`Uchar c, loc) -> (
-          match uchar_to_char c with
-          | Some '"' ->
-              string acc ("\"" :: sacc) start
-          | Some 'r' ->
-              string acc ("\r" :: sacc) start
-          | Some 'n' ->
-              string acc ("\n" :: sacc) start
-          | Some 't' ->
-              string acc ("\t" :: sacc) start
-          | Some 'b' ->
-              string acc ("\b" :: sacc) start
-          | Some '\\' ->
-              string acc ("\\" :: sacc) start
-          | Some _ | None ->
-              let byte = Uutf.decoder_byte_count decoder in
-              let s = String.sub source loc.byte (byte - loc.byte) in
-              errors := Undefined_escape_sequence (loc, s) :: !errors ;
-              string acc sacc start ) )
-      | Some _ | None ->
-          let byte = Uutf.decoder_byte_count decoder in
-          let s = String.sub source stop.byte (byte - stop.byte) in
-          string acc (s :: sacc) start )
+        | Some '\\' -> (
+            match next () with
+            | (`End, stop) ->
+                errors := Unterminated_string {start; stop} :: !errors ;
+                skip (tok () :: acc)
+            | (`Uchar c, loc) -> (
+                match uchar_to_char c with
+                | Some '"' -> string acc ("\"" :: sacc) start
+                | Some 'r' -> string acc ("\r" :: sacc) start
+                | Some 'n' -> string acc ("\n" :: sacc) start
+                | Some 't' -> string acc ("\t" :: sacc) start
+                | Some 'b' -> string acc ("\b" :: sacc) start
+                | Some '\\' -> string acc ("\\" :: sacc) start
+                | Some _ | None ->
+                    let byte = Uutf.decoder_byte_count decoder in
+                    let s = String.sub source loc.byte (byte - loc.byte) in
+                    errors := Undefined_escape_sequence (loc, s) :: !errors ;
+                    string acc sacc start))
+        | Some _ | None ->
+            let byte = Uutf.decoder_byte_count decoder in
+            let s = String.sub source stop.byte (byte - stop.byte) in
+            string acc (s :: sacc) start)
   and generic_ident allow_char acc start (ret : string -> point -> token_value)
       =
     let tok stop =
@@ -382,7 +351,7 @@ let tokenize source =
         if allow_char c then generic_ident allow_char acc start ret
         else (
           back charloc ;
-          skip (tok stop :: acc) )
+          skip (tok stop :: acc))
     | (_, stop) as other ->
         back other ;
         skip (tok stop :: acc)
@@ -395,27 +364,28 @@ let tokenize source =
         let text = String.sub source start.byte (stop.byte - start.byte) in
         skip (tok start stop (Comment text) :: acc)
     | (`Uchar c, _) -> (
-      match uchar_to_char c with
-      | Some '*' -> (
-        match next () with
-        | (`Uchar c, _) when Uchar.equal c (Uchar.of_char '/') ->
-            if lvl = 0 then
-              let stop = here () in
-              let text =
-                String.sub source start.byte (stop.byte - start.byte)
-              in
-              skip (tok start stop (Comment text) :: acc)
-            else comment acc start (lvl - 1)
-        | other ->
-            back other ; comment acc start lvl )
-      | Some '/' -> (
-        match next () with
-        | (`Uchar c, _) when Uchar.equal c (Uchar.of_char '*') ->
-            comment acc start (lvl + 1)
-        | other ->
-            back other ; comment acc start lvl )
-      | Some _ | None ->
-          comment acc start lvl )
+        match uchar_to_char c with
+        | Some '*' -> (
+            match next () with
+            | (`Uchar c, _) when Uchar.equal c (Uchar.of_char '/') ->
+                if lvl = 0 then
+                  let stop = here () in
+                  let text =
+                    String.sub source start.byte (stop.byte - start.byte)
+                  in
+                  skip (tok start stop (Comment text) :: acc)
+                else comment acc start (lvl - 1)
+            | other ->
+                back other ;
+                comment acc start lvl)
+        | Some '/' -> (
+            match next () with
+            | (`Uchar c, _) when Uchar.equal c (Uchar.of_char '*') ->
+                comment acc start (lvl + 1)
+            | other ->
+                back other ;
+                comment acc start lvl)
+        | Some _ | None -> comment acc start lvl)
   and eol_comment acc start =
     let tok stop =
       let text = String.sub source start.byte (stop.byte - start.byte) in
@@ -423,11 +393,9 @@ let tokenize source =
     in
     match next () with
     | (`Uchar c, stop) -> (
-      match uchar_to_char c with
-      | Some '\n' ->
-          skip (tok stop :: acc)
-      | Some _ | None ->
-          eol_comment acc start )
+        match uchar_to_char c with
+        | Some '\n' -> skip (tok stop :: acc)
+        | Some _ | None -> eol_comment acc start)
     | (_, stop) as other ->
         back other ;
         skip (tok stop :: acc)
@@ -445,8 +413,7 @@ let node_encoding =
 
 (* Beginning of a sequence of consecutive primitives *)
 let min_point : node list -> point = function
-  | [] ->
-      point_zero
+  | [] -> point_zero
   | Int ({start; _}, _) :: _
   | String ({start; _}, _) :: _
   | Bytes ({start; _}, _) :: _
@@ -456,10 +423,8 @@ let min_point : node list -> point = function
 
 (* End of a sequence of consecutive primitives *)
 let rec max_point : node list -> point = function
-  | [] ->
-      point_zero
-  | _ :: (_ :: _ as rest) ->
-      max_point rest
+  | [] -> point_zero
+  | _ :: (_ :: _ as rest) -> max_point rest
   | [Int ({stop; _}, _)]
   | [String ({stop; _}, _)]
   | [Bytes ({stop; _}, _)]
@@ -492,20 +457,13 @@ let pop_mode = function [] -> assert false | _ :: rest -> rest
    state, injecting the current reduction (insert the just parsed item
    of a sequence or argument of a primitive application). *)
 let fill_mode result = function
-  | [] ->
-      assert false
-  | Expression _ :: _ :: _ ->
-      assert false
-  | [Expression (Some _)] ->
-      assert false
-  | Toplevel _ :: _ :: _ ->
-      assert false
-  | [Expression None] ->
-      [Expression (Some result)]
-  | [Toplevel exprs] ->
-      [Toplevel (result :: exprs)]
-  | Sequence (token, exprs) :: rest ->
-      Sequence (token, result :: exprs) :: rest
+  | [] -> assert false
+  | Expression _ :: _ :: _ -> assert false
+  | [Expression (Some _)] -> assert false
+  | Toplevel _ :: _ :: _ -> assert false
+  | [Expression None] -> [Expression (Some result)]
+  | [Toplevel exprs] -> [Toplevel (result :: exprs)]
+  | Sequence (token, exprs) :: rest -> Sequence (token, result :: exprs) :: rest
   | Wrapped (token, name, exprs, annot) :: rest ->
       Wrapped (token, name, result :: exprs, annot) :: rest
   | Unwrapped (start, name, exprs, annot) :: rest ->
@@ -525,8 +483,7 @@ let rec annots = function
   | {token = Annot annot; _} :: rest ->
       let (annots, rest) = annots rest in
       (annot :: annots, rest)
-  | rest ->
-      ([], rest)
+  | rest -> ([], rest)
 
 let rec parse ?(check = true) errors tokens stack =
   (* Two steps:
@@ -545,8 +502,7 @@ let rec parse ?(check = true) errors tokens stack =
   | (Expression _ :: _ :: _, _) ->
       assert false
   (* Return *)
-  | (Expression (Some result) :: _, []) ->
-      ([result], List.rev errors)
+  | (Expression (Some result) :: _, []) -> ([result], List.rev errors)
   | (Expression (Some _) :: _, token :: rem) ->
       let errors = Unexpected token :: errors in
       parse ~check errors rem (* skip *) stack
@@ -594,21 +550,17 @@ let rec parse ?(check = true) errors tokens stack =
       parse ~check errors (* skip *) (valid :: rem) stack
   | ( (Wrapped _ | Unwrapped _) :: _,
       {token = Open_paren; _}
-      :: ( {token = Int _ | String _ | Bytes _ | Annot _ | Close_paren; _} as
-         token )
+      :: ({token = Int _ | String _ | Bytes _ | Annot _ | Close_paren; _} as
+         token)
          :: rem )
   | ( (Expression None | Sequence _ | Toplevel _) :: _,
       {token = Int _ | String _ | Bytes _; _}
-      :: ( { token =
-               ( Ident _
-               | Int _
-               | String _
-               | Bytes _
-               | Annot _
-               | Close_paren
-               | Open_paren
-               | Open_brace );
-             _ } as token )
+      :: ({
+            token =
+              ( Ident _ | Int _ | String _ | Bytes _ | Annot _ | Close_paren
+              | Open_paren | Open_brace );
+            _;
+          } as token)
          :: rem )
   | ( Unwrapped (_, _, _, _) :: Toplevel _ :: _,
       ({token = Close_brace; _} as token) :: rem )
@@ -674,8 +626,7 @@ let rec parse ?(check = true) errors tokens stack =
         else (errors, contents)
       in
       let bytes =
-        Hex.to_bytes
-          (`Hex (String.sub contents 2 (String.length contents - 2)))
+        Hex.to_bytes (`Hex (String.sub contents 2 (String.length contents - 2)))
       in
       let expr : node = Bytes (loc, bytes) in
       let errors =
@@ -714,8 +665,7 @@ let rec parse ?(check = true) errors tokens stack =
       let mode = Wrapped (token, name, [], annots) in
       parse ~check errors rest (push_mode mode stack)
   | ( (Wrapped _ | Unwrapped _) :: _,
-      ({token = Open_paren; _} as token) :: {token = Ident name; _} :: rest )
-    ->
+      ({token = Open_paren; _} as token) :: {token = Ident name; _} :: rest ) ->
       let mode = Wrapped (token, name, [], []) in
       parse ~check errors rest (push_mode mode stack)
   | ((Wrapped _ | Unwrapped _) :: _, {token = Ident name; loc} :: rest) ->
@@ -744,8 +694,7 @@ and do_check ?(toplevel = false) errors = function
            require all items to be aligned, but we relax the rule to
            allow consecutive items to be written on the same line. *)
         let rec in_line_or_aligned prev_start_line errors = function
-          | [] ->
-              errors
+          | [] -> errors
           | expr :: rest ->
               let {column; line = start_line; _} = min_point [expr] in
               let {line = stop_line; _} = max_point [expr] in
@@ -757,8 +706,7 @@ and do_check ?(toplevel = false) errors = function
               in_line_or_aligned start_line errors rest
         in
         in_line_or_aligned first_line errors rest
-  | Prim (_, _, [], _) | String _ | Int _ | Bytes _ ->
-      errors
+  | Prim (_, _, [], _) | String _ | Int _ | Bytes _ -> errors
 
 let parse_expression ?check tokens =
   let result =
@@ -771,14 +719,9 @@ let parse_expression ?check tokens =
     | ({token = Open_paren; _} as token) :: {token = Ident name; _} :: rest ->
         let mode = Wrapped (token, name, [], []) in
         parse ?check [] rest [mode; Expression None]
-    | _ ->
-        parse ?check [] tokens [Expression None]
+    | _ -> parse ?check [] tokens [Expression None]
   in
-  match result with
-  | ([single], errors) ->
-      (single, errors)
-  | _ ->
-      assert false
+  match result with ([single], errors) -> (single, errors) | _ -> assert false
 
 let parse_toplevel ?check tokens = parse ?check [] tokens [Toplevel []]
 
@@ -786,24 +729,15 @@ let print_point ppf {line; column; _} =
   Format.fprintf ppf "At line %d character %d" line column
 
 let print_token_kind ppf = function
-  | Open_paren | Close_paren ->
-      Format.fprintf ppf "parenthesis"
-  | Open_brace | Close_brace ->
-      Format.fprintf ppf "curly brace"
-  | String _ ->
-      Format.fprintf ppf "string constant"
-  | Bytes _ ->
-      Format.fprintf ppf "bytes constant"
-  | Int _ ->
-      Format.fprintf ppf "integer constant"
-  | Ident _ ->
-      Format.fprintf ppf "identifier"
-  | Annot _ ->
-      Format.fprintf ppf "annotation"
-  | Comment _ | Eol_comment _ ->
-      Format.fprintf ppf "comment"
-  | Semi ->
-      Format.fprintf ppf "semi colon"
+  | Open_paren | Close_paren -> Format.fprintf ppf "parenthesis"
+  | Open_brace | Close_brace -> Format.fprintf ppf "curly brace"
+  | String _ -> Format.fprintf ppf "string constant"
+  | Bytes _ -> Format.fprintf ppf "bytes constant"
+  | Int _ -> Format.fprintf ppf "integer constant"
+  | Ident _ -> Format.fprintf ppf "identifier"
+  | Annot _ -> Format.fprintf ppf "annotation"
+  | Comment _ | Eol_comment _ -> Format.fprintf ppf "comment"
+  | Semi -> Format.fprintf ppf "semi colon"
 
 let print_location ppf loc =
   if loc.start.line = loc.stop.line then
@@ -961,8 +895,8 @@ let () =
     ~id:"micheline.parse_error.unclosed_token"
     ~title:"Micheline parser error: unclosed token"
     ~description:
-      "While parsing a piece of Micheline source, a parenthesis or a brace \
-       was unclosed."
+      "While parsing a piece of Micheline source, a parenthesis or a brace was \
+       unclosed."
     ~pp:(fun ppf (loc, token) ->
       Format.fprintf
         ppf
@@ -972,9 +906,7 @@ let () =
         print_token_kind
         token)
     Data_encoding.(
-      obj2
-        (req "location" location_encoding)
-        (req "token" token_value_encoding))
+      obj2 (req "location" location_encoding) (req "token" token_value_encoding))
     (function Unclosed {loc; token} -> Some (loc, token) | _ -> None)
     (fun (loc, token) -> Unclosed {loc; token}) ;
   register_error_kind
@@ -993,9 +925,7 @@ let () =
         print_token_kind
         token)
     Data_encoding.(
-      obj2
-        (req "location" location_encoding)
-        (req "token" token_value_encoding))
+      obj2 (req "location" location_encoding) (req "token" token_value_encoding))
     (function Unexpected {loc; token} -> Some (loc, token) | _ -> None)
     (fun (loc, token) -> Unexpected {loc; token}) ;
   register_error_kind
@@ -1014,9 +944,7 @@ let () =
         print_token_kind
         token)
     Data_encoding.(
-      obj2
-        (req "location" location_encoding)
-        (req "token" token_value_encoding))
+      obj2 (req "location" location_encoding) (req "token" token_value_encoding))
     (function Extra {loc; token} -> Some (loc, token) | _ -> None)
     (fun (loc, token) -> Extra {loc; token}) ;
   register_error_kind

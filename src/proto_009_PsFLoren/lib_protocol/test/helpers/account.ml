@@ -49,10 +49,8 @@ let activator_account = new_account ()
 
 let find pkh =
   match Signature.Public_key_hash.Table.find known_accounts pkh with
-  | Some k ->
-      return k
-  | None ->
-      failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
+  | Some k -> return k
+  | None -> failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
 
 let find_alternate pkh =
   let exception Found of t in
@@ -72,10 +70,8 @@ let generate_accounts ?(initial_balances = []) n : (t * Tez.t) list =
   let default_amount = Tez.of_mutez_exn 4_000_000_000_000L in
   let amount i =
     match List.nth_opt initial_balances i with
-    | None ->
-        default_amount
-    | Some a ->
-        Tez.of_mutez_exn a
+    | None -> default_amount
+    | Some a -> Tez.of_mutez_exn a
   in
   List.map
     (fun i ->
@@ -96,6 +92,5 @@ let new_commitment ?seed () =
   let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
   let bpkh = Blinded_public_key_hash.of_ed25519_pkh commitment_secret pkh in
   Lwt.return
-    ( (Environment.wrap_tzresult @@ Tez.(one *? 4_000L))
-    >|? fun amount ->
-    (unactivated_account, {blinded_public_key_hash = bpkh; amount}) )
+    ( (Environment.wrap_tzresult @@ Tez.(one *? 4_000L)) >|? fun amount ->
+      (unactivated_account, {blinded_public_key_hash = bpkh; amount}) )

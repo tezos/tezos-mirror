@@ -31,30 +31,24 @@ let group = {name = "encoding"; title = "Commands to handle encodings"}
 let id_parameter =
   parameter (fun (cctxt : #Client_context.printer) id ->
       match Data_encoding.Registration.find id with
-      | Some record ->
-          return record
-      | None ->
-          cctxt#error "Unknown encoding id: %s" id)
+      | Some record -> return record
+      | None -> cctxt#error "Unknown encoding id: %s" id)
 
 let json_parameter =
   parameter (fun (cctxt : #Client_context.printer) file_or_data ->
-      Lwt_unix.file_exists file_or_data
-      >>= (function
-            | true ->
-                Tezos_stdlib_unix.Lwt_utils_unix.read_file file_or_data
-            | false ->
-                Lwt.return file_or_data)
+      (Lwt_unix.file_exists file_or_data >>= function
+       | true -> Tezos_stdlib_unix.Lwt_utils_unix.read_file file_or_data
+       | false -> Lwt.return file_or_data)
       >>= fun data ->
       match Json.from_string data with
-      | Ok json ->
-          return json
-      | Error err ->
-          cctxt#error "%s" err)
+      | Ok json -> return json
+      | Error err -> cctxt#error "%s" err)
 
 let bytes_parameter = parameter (fun _ hex -> return (Hex.to_bytes (`Hex hex)))
 
 let commands () =
-  [ command
+  [
+    command
       ~group
       ~desc:"List the registered encoding in Tezos."
       no_options
@@ -84,12 +78,12 @@ let commands () =
     command
       ~group
       ~desc:"Dump a json description of all registered encodings."
-      ( args1
+      (args1
       @@ switch
            ~doc:
              "Output json descriptions without extraneous whitespace characters"
            ~long:"compact"
-           () )
+           ())
       (fixed ["dump"; "encodings"])
       (fun minify (cctxt : #Client_context.printer) ->
         cctxt#message
@@ -97,10 +91,11 @@ let commands () =
           (Json.to_string
              ~minify
              (`A
-               ( Registration.list ()
+               (Registration.list ()
                |> List.map (fun (id, enc) ->
                       `O
-                        [ ("id", `String id);
+                        [
+                          ("id", `String id);
                           ( "json",
                             Json.construct
                               Json.schema_encoding
@@ -108,7 +103,8 @@ let commands () =
                           ( "binary",
                             Json.construct
                               Binary_schema.encoding
-                              (Registration.binary_schema enc) ) ]) )))
+                              (Registration.binary_schema enc) );
+                        ]))))
         >>= fun () -> return_unit);
     (* JSON -> Binary *)
     command
@@ -117,11 +113,11 @@ let commands () =
         "Encode the given JSON data into binary using the provided encoding \
          identifier."
       no_options
-      ( prefix "encode"
+      (prefix "encode"
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
       @@ prefix "from"
       @@ param ~name:"json" ~desc:"JSON file or data" json_parameter
-      @@ stop )
+      @@ stop)
       (fun () registered_encoding json (cctxt : #Client_context.printer) ->
         match
           Data_encoding.Registration.bytes_of_json registered_encoding json
@@ -133,8 +129,8 @@ let commands () =
               "Impossible to the JSON convert to binary.@,\
                This error should not happen."
         | Some bytes ->
-            cctxt#message "%a" Hex.pp (Hex.of_bytes bytes)
-            >>= fun () -> return_unit);
+            cctxt#message "%a" Hex.pp (Hex.of_bytes bytes) >>= fun () ->
+            return_unit);
     (* Binary -> JSON *)
     command
       ~group
@@ -142,17 +138,16 @@ let commands () =
         "Decode the binary encoded data into JSON using the provided encoding \
          identifier."
       no_options
-      ( prefix "decode"
+      (prefix "decode"
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
       @@ prefix "from"
       @@ param ~name:"hex" ~desc:"Binary encoded data" bytes_parameter
-      @@ stop )
+      @@ stop)
       (fun () registered_encoding bytes (cctxt : #Client_context.printer) ->
         match
           Data_encoding.Registration.json_of_bytes registered_encoding bytes
         with
-        | None ->
-            cctxt#error "Cannot parse the binary with the given encoding"
+        | None -> cctxt#error "Cannot parse the binary with the given encoding"
         | Some bytes ->
             cctxt#message "%a" Json.pp bytes >>= fun () -> return_unit);
     command
@@ -161,11 +156,11 @@ let commands () =
         "Display the binary encoded data using the provided encoding \
          identifier."
       no_options
-      ( prefix "display"
+      (prefix "display"
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
       @@ prefixes ["from"; "binary"]
       @@ param ~name:"hex" ~desc:"Binary encoded data" bytes_parameter
-      @@ stop )
+      @@ stop)
       (fun () registered_encoding bytes (cctxt : #Client_context.printer) ->
         let pp_bytes fmt bytes =
           Data_encoding.Registration.binary_pretty_printer
@@ -179,11 +174,11 @@ let commands () =
       ~desc:
         "Display the JSON encoded data using the provided encoding identifier."
       no_options
-      ( prefix "display"
+      (prefix "display"
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
       @@ prefixes ["from"; "json"]
       @@ param ~name:"json" ~desc:"JSON file or data" json_parameter
-      @@ stop )
+      @@ stop)
       (fun () registered_encoding json (cctxt : #Client_context.printer) ->
         let pp_json fmt json =
           Data_encoding.Registration.json_pretty_printer
@@ -198,28 +193,29 @@ let commands () =
         "Describe the binary schema associated to the provided encoding \
          identifier."
       no_options
-      ( prefix "describe"
+      (prefix "describe"
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
       @@ prefixes ["binary"; "schema"]
-      @@ stop )
+      @@ stop)
       (fun () registered_encoding (cctxt : #Client_context.printer) ->
         let schema =
           Data_encoding.Registration.binary_schema registered_encoding
         in
-        cctxt#message "%a" Data_encoding.Binary_schema.pp schema
-        >>= fun () -> return_unit);
+        cctxt#message "%a" Data_encoding.Binary_schema.pp schema >>= fun () ->
+        return_unit);
     command
       ~group
       ~desc:
         "Describe the JSON schema associated to the provided encoding \
          identifier."
       no_options
-      ( prefix "describe"
+      (prefix "describe"
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
       @@ prefixes ["json"; "schema"]
-      @@ stop )
+      @@ stop)
       (fun () registered_encoding cctxt ->
         let schema =
           Data_encoding.Registration.json_schema registered_encoding
         in
-        cctxt#message "%a" Json_schema.pp schema >>= fun () -> return_unit) ]
+        cctxt#message "%a" Json_schema.pp schema >>= fun () -> return_unit);
+  ]

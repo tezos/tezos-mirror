@@ -23,17 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Blake2B.Make
-          (Base58)
-          (struct
-            let name = "block_hash"
+include
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "block_hash"
 
-            let title = "A block identifier"
+      let title = "A block identifier"
 
-            let b58check_prefix = Base58.Prefix.block_hash
+      let b58check_prefix = Base58.Prefix.block_hash
 
-            let size = None
-          end)
+      let size = None
+    end)
 
 module Logging = struct
   let tag = Tag.def ~doc:"Block Hash" "block_hash" pp_short

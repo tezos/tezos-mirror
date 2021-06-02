@@ -173,10 +173,10 @@ val parse_constr_annot :
   ?if_special_first:field_annot option ->
   ?if_special_second:field_annot option ->
   string list ->
-  ( var_annot option
+  (var_annot option
   * type_annot option
   * field_annot option
-  * field_annot option )
+  * field_annot option)
   tzresult
 
 val parse_two_var_annot :
@@ -199,10 +199,10 @@ val parse_unpair_annot :
   pair_annot:var_annot option ->
   value_annot_car:var_annot option ->
   value_annot_cdr:var_annot option ->
-  ( var_annot option
+  (var_annot option
   * var_annot option
   * field_annot option
-  * field_annot option )
+  * field_annot option)
   tzresult
 
 val parse_entrypoint_annot :

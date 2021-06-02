@@ -70,8 +70,7 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     priority
     0
   >>=? fun real_timestamp ->
-  Account.find delegate
-  >>=? fun delegate ->
+  Account.find delegate >>=? fun delegate ->
   let timestamp = Option.value ~default:real_timestamp timestamp in
   let contents = Block.Forge.contents ~priority ?seed_nonce_hash () in
   let protocol_data = {Block_header.contents; signature = Signature.zero} in
@@ -102,8 +101,7 @@ let begin_construction ?(priority = 0) ?timestamp ?seed_nonce_hash
     ~protocol_data
     ()
   >|= fun state ->
-  Environment.wrap_error state
-  >|? fun state ->
+  Environment.wrap_error state >|? fun state ->
   {predecessor; state; rev_operations = []; rev_tickets = []; header; delegate}
 
 let detect_script_failure :
@@ -118,17 +116,13 @@ let detect_script_failure :
       let detect_script_failure (type kind)
           (result : kind manager_operation_result) =
         match result with
-        | Applied _ ->
-            Ok ()
-        | Skipped _ ->
-            assert false
+        | Applied _ -> Ok ()
+        | Skipped _ -> assert false
         | Backtracked (_, None) ->
             (* there must be another error for this to happen *)
             Ok ()
-        | Backtracked (_, Some errs) ->
-            Environment.wrap_error (Error errs)
-        | Failed (_, errs) ->
-            Environment.wrap_error (Error errs)
+        | Backtracked (_, Some errs) -> Environment.wrap_error (Error errs)
+        | Failed (_, errs) -> Environment.wrap_error (Error errs)
       in
       List.fold_left
         (fun acc (Internal_operation_result (_, r)) ->
@@ -139,40 +133,30 @@ let detect_script_failure :
     function
     | Single_result (Manager_operation_result _ as res) ->
         detect_script_failure_single res
-    | Single_result _ ->
-        Ok ()
+    | Single_result _ -> Ok ()
     | Cons_result (res, rest) ->
-        detect_script_failure_single res
-        >>? fun () -> detect_script_failure rest
+        detect_script_failure_single res >>? fun () ->
+        detect_script_failure rest
   in
   fun {contents} -> detect_script_failure contents
 
 let add_operation ?expect_apply_failure ?expect_failure st op =
   let open Apply_results in
-  apply_operation st.state op
-  >|= Environment.wrap_error
-  >>= fun result ->
+  apply_operation st.state op >|= Environment.wrap_error >>= fun result ->
   match (expect_apply_failure, result) with
-  | (Some _, Ok _) ->
-      failwith "Error expected while adding operation"
-  | (Some f, Error err) ->
-      f err >|=? fun () -> st
+  | (Some _, Ok _) -> failwith "Error expected while adding operation"
+  | (Some f, Error err) -> f err >|=? fun () -> st
   | (None, result) -> (
-      result
-      >>?= fun result ->
+      result >>?= fun result ->
       match result with
       | (state, (Operation_metadata result as metadata)) ->
-          detect_script_failure result
-          |> fun result ->
-          ( match expect_failure with
-          | None ->
-              Lwt.return result
+          detect_script_failure result |> fun result ->
+          (match expect_failure with
+          | None -> Lwt.return result
           | Some f -> (
-            match result with
-            | Ok _ ->
-                failwith "Error expected while adding operation"
-            | Error e ->
-                f e ) )
+              match result with
+              | Ok _ -> failwith "Error expected while adding operation"
+              | Error e -> f e))
           >|=? fun () ->
           {
             st with
@@ -187,13 +171,11 @@ let add_operation ?expect_apply_failure ?expect_failure st op =
               state;
               rev_operations = op :: st.rev_operations;
               rev_tickets = metadata :: st.rev_tickets;
-            } )
+            })
 
 let finalize_block st =
-  finalize_block st.state
-  >|= fun x ->
-  Environment.wrap_error x
-  >|? fun (result, _) ->
+  finalize_block st.state >|= fun x ->
+  Environment.wrap_error x >|? fun (result, _) ->
   let operations = List.rev st.rev_operations in
   let operations_hash =
     Operation_list_list_hash.compute

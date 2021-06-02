@@ -308,10 +308,8 @@ module Protocol_constants_overrides = struct
 
   let field_pp ppf (O {name; override_value; pp; _}) =
     match override_value with
-    | None ->
-        ()
-    | Some value ->
-        Format.fprintf ppf "@[<h>%s: %a@]" name pp value
+    | None -> ()
+    | Some value -> Format.fprintf ppf "@[<h>%s: %a@]" name pp value
 
   let apply_overrides (cctxt : Tezos_client_base.Client_context.full) (o : t)
       (c : Protocol.Constants_repr.parametric) :
@@ -320,7 +318,8 @@ module Protocol_constants_overrides = struct
     let pp_print_int32 ppf i = fprintf ppf "%li" i in
     let pp_print_int64 ppf i = fprintf ppf "%Li" i in
     let fields : field list =
-      [ O
+      [
+        O
           {
             name = "preserved_cycles";
             override_value = o.preserved_cycles;
@@ -482,100 +481,99 @@ module Protocol_constants_overrides = struct
             name = "timestamp";
             override_value = o.timestamp;
             pp = Time.Protocol.pp_hum;
-          } ]
+          };
+      ]
     in
     let fields_with_override =
       fields
       |> List.filter (fun (O {override_value; _}) ->
              Option.is_some override_value)
     in
-    ( if fields_with_override <> [] then
-      cctxt#message
-        "@[<v>mockup client uses protocol overrides:@,%a@]@?"
-        (pp_print_list field_pp)
-        fields_with_override
-    else Lwt.return_unit )
+    (if fields_with_override <> [] then
+     cctxt#message
+       "@[<v>mockup client uses protocol overrides:@,%a@]@?"
+       (pp_print_list field_pp)
+       fields_with_override
+    else Lwt.return_unit)
     >>= fun () ->
     return
-      ( {
-          preserved_cycles =
-            Option.value ~default:c.preserved_cycles o.preserved_cycles;
-          blocks_per_cycle =
-            Option.value ~default:c.blocks_per_cycle o.blocks_per_cycle;
-          blocks_per_commitment =
-            Option.value
-              ~default:c.blocks_per_commitment
-              o.blocks_per_commitment;
-          blocks_per_roll_snapshot =
-            Option.value
-              ~default:c.blocks_per_roll_snapshot
-              o.blocks_per_roll_snapshot;
-          blocks_per_voting_period =
-            Option.value
-              ~default:c.blocks_per_voting_period
-              o.blocks_per_voting_period;
-          time_between_blocks =
-            Option.value ~default:c.time_between_blocks o.time_between_blocks;
-          endorsers_per_block =
-            Option.value ~default:c.endorsers_per_block o.endorsers_per_block;
-          hard_gas_limit_per_operation =
-            Option.value
-              ~default:c.hard_gas_limit_per_operation
-              o.hard_gas_limit_per_operation;
-          hard_gas_limit_per_block =
-            Option.value
-              ~default:c.hard_gas_limit_per_block
-              o.hard_gas_limit_per_block;
-          proof_of_work_threshold =
-            Option.value
-              ~default:c.proof_of_work_threshold
-              o.proof_of_work_threshold;
-          tokens_per_roll =
-            Option.value ~default:c.tokens_per_roll o.tokens_per_roll;
-          michelson_maximum_type_size =
-            Option.value
-              ~default:c.michelson_maximum_type_size
-              o.michelson_maximum_type_size;
-          seed_nonce_revelation_tip =
-            Option.value
-              ~default:c.seed_nonce_revelation_tip
-              o.seed_nonce_revelation_tip;
-          origination_size =
-            Option.value ~default:c.origination_size o.origination_size;
-          block_security_deposit =
-            Option.value
-              ~default:c.block_security_deposit
-              o.block_security_deposit;
-          endorsement_security_deposit =
-            Option.value
-              ~default:c.endorsement_security_deposit
-              o.endorsement_security_deposit;
-          baking_reward_per_endorsement =
-            Option.value
-              ~default:c.baking_reward_per_endorsement
-              o.baking_reward_per_endorsement;
-          endorsement_reward =
-            Option.value ~default:c.endorsement_reward o.endorsement_reward;
-          cost_per_byte = Option.value ~default:c.cost_per_byte o.cost_per_byte;
-          hard_storage_limit_per_operation =
-            Option.value
-              ~default:c.hard_storage_limit_per_operation
-              o.hard_storage_limit_per_operation;
-          test_chain_duration =
-            Option.value ~default:c.test_chain_duration o.test_chain_duration;
-          quorum_min = Option.value ~default:c.quorum_min o.quorum_min;
-          quorum_max = Option.value ~default:c.quorum_max o.quorum_max;
-          min_proposal_quorum =
-            Option.value ~default:c.min_proposal_quorum o.min_proposal_quorum;
-          initial_endorsers =
-            Option.value ~default:c.initial_endorsers o.initial_endorsers;
-          delay_per_missing_endorsement =
-            Option.value
-              ~default:c.delay_per_missing_endorsement
-              o.delay_per_missing_endorsement
-            (* Notice that the chain_id and the timestamp are not used here as they are not protocol constants... *);
-        }
-        : Protocol.Constants_repr.parametric )
+      ({
+         preserved_cycles =
+           Option.value ~default:c.preserved_cycles o.preserved_cycles;
+         blocks_per_cycle =
+           Option.value ~default:c.blocks_per_cycle o.blocks_per_cycle;
+         blocks_per_commitment =
+           Option.value ~default:c.blocks_per_commitment o.blocks_per_commitment;
+         blocks_per_roll_snapshot =
+           Option.value
+             ~default:c.blocks_per_roll_snapshot
+             o.blocks_per_roll_snapshot;
+         blocks_per_voting_period =
+           Option.value
+             ~default:c.blocks_per_voting_period
+             o.blocks_per_voting_period;
+         time_between_blocks =
+           Option.value ~default:c.time_between_blocks o.time_between_blocks;
+         endorsers_per_block =
+           Option.value ~default:c.endorsers_per_block o.endorsers_per_block;
+         hard_gas_limit_per_operation =
+           Option.value
+             ~default:c.hard_gas_limit_per_operation
+             o.hard_gas_limit_per_operation;
+         hard_gas_limit_per_block =
+           Option.value
+             ~default:c.hard_gas_limit_per_block
+             o.hard_gas_limit_per_block;
+         proof_of_work_threshold =
+           Option.value
+             ~default:c.proof_of_work_threshold
+             o.proof_of_work_threshold;
+         tokens_per_roll =
+           Option.value ~default:c.tokens_per_roll o.tokens_per_roll;
+         michelson_maximum_type_size =
+           Option.value
+             ~default:c.michelson_maximum_type_size
+             o.michelson_maximum_type_size;
+         seed_nonce_revelation_tip =
+           Option.value
+             ~default:c.seed_nonce_revelation_tip
+             o.seed_nonce_revelation_tip;
+         origination_size =
+           Option.value ~default:c.origination_size o.origination_size;
+         block_security_deposit =
+           Option.value
+             ~default:c.block_security_deposit
+             o.block_security_deposit;
+         endorsement_security_deposit =
+           Option.value
+             ~default:c.endorsement_security_deposit
+             o.endorsement_security_deposit;
+         baking_reward_per_endorsement =
+           Option.value
+             ~default:c.baking_reward_per_endorsement
+             o.baking_reward_per_endorsement;
+         endorsement_reward =
+           Option.value ~default:c.endorsement_reward o.endorsement_reward;
+         cost_per_byte = Option.value ~default:c.cost_per_byte o.cost_per_byte;
+         hard_storage_limit_per_operation =
+           Option.value
+             ~default:c.hard_storage_limit_per_operation
+             o.hard_storage_limit_per_operation;
+         test_chain_duration =
+           Option.value ~default:c.test_chain_duration o.test_chain_duration;
+         quorum_min = Option.value ~default:c.quorum_min o.quorum_min;
+         quorum_max = Option.value ~default:c.quorum_max o.quorum_max;
+         min_proposal_quorum =
+           Option.value ~default:c.min_proposal_quorum o.min_proposal_quorum;
+         initial_endorsers =
+           Option.value ~default:c.initial_endorsers o.initial_endorsers;
+         delay_per_missing_endorsement =
+           Option.value
+             ~default:c.delay_per_missing_endorsement
+             o.delay_per_missing_endorsement
+           (* Notice that the chain_id and the timestamp are not used here as they are not protocol constants... *);
+       }
+        : Protocol.Constants_repr.parametric)
 end
 
 module Parsed_account = struct
@@ -609,10 +607,8 @@ module Parsed_account = struct
          (req "amount" Protocol.Tez_repr.encoding))
 
   let to_bootstrap_account repr =
-    Tezos_client_base.Client_keys.neuterize repr.sk_uri
-    >>=? fun pk_uri ->
-    Tezos_client_base.Client_keys.public_key pk_uri
-    >>=? fun public_key ->
+    Tezos_client_base.Client_keys.neuterize repr.sk_uri >>=? fun pk_uri ->
+    Tezos_client_base.Client_keys.public_key pk_uri >>=? fun public_key ->
     let public_key_hash = Signature.Public_key.hash public_key in
     return
       Protocol.Parameters_repr.
@@ -624,8 +620,7 @@ module Parsed_account = struct
     let wallet = (cctxt :> Client_context.wallet) in
     let parsed_account_reprs = ref [] in
     let errors = ref [] in
-    Client_keys.list_keys wallet
-    >>=? fun all_keys ->
+    Client_keys.list_keys wallet >>=? fun all_keys ->
     List.iter_s
       (function
         | (name, pkh, _pk_opt, Some sk_uri) -> (
@@ -651,12 +646,11 @@ module Parsed_account = struct
                 | Some amount ->
                     parsed_account_reprs :=
                       {name; sk_uri; amount} :: !parsed_account_reprs ;
-                    Lwt.return_unit )
+                    Lwt.return_unit)
             | Error err ->
                 errors := err :: !errors ;
-                Lwt.return_unit )
-        | _ ->
-            Lwt.return_unit)
+                Lwt.return_unit)
+        | _ -> Lwt.return_unit)
       all_keys
     >>= fun () ->
     match !errors with
@@ -667,8 +661,7 @@ module Parsed_account = struct
             !parsed_account_reprs
         in
         return @@ Data_encoding.Json.to_string json
-    | errs ->
-        Lwt.return_error @@ List.concat errs
+    | errs -> Lwt.return_error @@ List.concat errs
 end
 
 module Bootstrap_account = struct
@@ -750,8 +743,9 @@ let lib_parameters_json_encoding =
     conv
       (function
         | {public_key; amount; _} -> (
-          match public_key with None -> assert false | Some pk -> (pk, amount)
-          ))
+            match public_key with
+            | None -> assert false
+            | Some pk -> (pk, amount)))
       (fun (pk, amount) ->
         {
           public_key = Some pk;
@@ -814,11 +808,10 @@ let initial_context (header : Block_header.shell_header)
   in
   Tezos_protocol_environment.Context.(
     let empty = Memory_context.empty in
-    add empty ["version"] (Bytes.of_string "genesis")
-    >>= fun ctxt -> add ctxt ["protocol_parameters"] proto_params)
+    add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
+    add ctxt ["protocol_parameters"] proto_params)
   >>= fun ctxt ->
-  Protocol.Main.init ctxt header
-  >|= Protocol.Environment.wrap_error
+  Protocol.Main.init ctxt header >|= Protocol.Environment.wrap_error
   >>=? fun {context; _} -> return context
 
 let mem_init :
@@ -834,24 +827,22 @@ let mem_init :
   in
   (* Need to read this Json file before since timestamp modification may be in
      there *)
-  ( match constants_overrides_json with
-  | None ->
-      return Protocol_constants_overrides.no_overrides
+  (match constants_overrides_json with
+  | None -> return Protocol_constants_overrides.no_overrides
   | Some json -> (
-    match Data_encoding.Json.destruct lib_parameters_json_encoding json with
-    | (_, x) ->
-        return x
-    | exception error ->
-        failwith
-          "cannot read protocol constants overrides: %a"
-          (Data_encoding.Json.print_error ?print_unknown:None)
-          error ) )
+      match Data_encoding.Json.destruct lib_parameters_json_encoding json with
+      | (_, x) -> return x
+      | exception error ->
+          failwith
+            "cannot read protocol constants overrides: %a"
+            (Data_encoding.Json.print_error ?print_unknown:None)
+            error))
   >>=? fun protocol_overrides ->
   let default = parameters.initial_timestamp in
   let timestamp = Option.value ~default protocol_overrides.timestamp in
-  ( if not @@ Time.Protocol.equal default timestamp then
-    cctxt#message "@[<h>initial_timestamp: %a@]" Time.Protocol.pp_hum timestamp
-  else Lwt.return_unit )
+  (if not @@ Time.Protocol.equal default timestamp then
+   cctxt#message "@[<h>initial_timestamp: %a@]" Time.Protocol.pp_hum timestamp
+  else Lwt.return_unit)
   >>= fun () ->
   let shell_header =
     Forge.make_shell
@@ -866,33 +857,32 @@ let mem_init :
     protocol_overrides
     parameters.constants
   >>=? fun protocol_custom ->
-  ( match bootstrap_accounts_json with
-  | None ->
-      return None
+  (match bootstrap_accounts_json with
+  | None -> return None
   | Some json -> (
-    match
-      Data_encoding.Json.destruct
-        (Data_encoding.list Parsed_account.encoding)
-        json
-    with
-    | accounts ->
-        cctxt#message "@[<h>mockup client uses custom bootstrap accounts:@]"
-        >>= fun () ->
-        let open Format in
-        cctxt#message
-          "@[%a@]"
-          (pp_print_list
-             ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
-             Parsed_account.pp)
-          accounts
-        >>= fun () ->
-        List.map_es Parsed_account.to_bootstrap_account accounts
-        >>=? fun bootstrap_accounts -> return (Some bootstrap_accounts)
-    | exception error ->
-        failwith
-          "cannot read definitions of bootstrap accounts: %a"
-          (Data_encoding.Json.print_error ?print_unknown:None)
-          error ) )
+      match
+        Data_encoding.Json.destruct
+          (Data_encoding.list Parsed_account.encoding)
+          json
+      with
+      | accounts ->
+          cctxt#message "@[<h>mockup client uses custom bootstrap accounts:@]"
+          >>= fun () ->
+          let open Format in
+          cctxt#message
+            "@[%a@]"
+            (pp_print_list
+               ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+               Parsed_account.pp)
+            accounts
+          >>= fun () ->
+          List.map_es Parsed_account.to_bootstrap_account accounts
+          >>=? fun bootstrap_accounts -> return (Some bootstrap_accounts)
+      | exception error ->
+          failwith
+            "cannot read definitions of bootstrap accounts: %a"
+            (Data_encoding.Json.print_error ?print_unknown:None)
+            error))
   >>=? fun bootstrap_accounts_custom ->
   initial_context
     shell_header
@@ -921,8 +911,7 @@ let migrate :
   let Tezos_protocol_environment.{block_hash; context; block_header} =
     rpc_context
   in
-  Protocol.Main.init context block_header
-  >|= Protocol.Environment.wrap_error
+  Protocol.Main.init context block_header >|= Protocol.Environment.wrap_error
   >>=? fun {context; _} ->
   let rpc_context =
     Tezos_protocol_environment.{block_hash; block_header; context}

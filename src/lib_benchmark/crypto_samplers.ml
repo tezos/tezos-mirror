@@ -59,14 +59,16 @@ module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S = struct
         Base_samplers.uniform_bytes ~nbytes:minimal_seed_length state
       in
       let triple = Signature.generate_key ?algo ~seed () in
-      Queue.add triple key_pool ; triple )
+      Queue.add triple key_pool ;
+      triple)
     else
       match Queue.take_opt key_pool with
       | None ->
           (* Queue.length >= Arg.size >= 1 *)
           assert false
       | Some triple ->
-          Queue.add triple key_pool ; triple
+          Queue.add triple key_pool ;
+          triple
 
   let pk state =
     let (_, pk, _) = get_next state in

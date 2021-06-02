@@ -112,9 +112,7 @@ let () =
     ~title:"Rejected socket connection"
     ~description:"Rejected peer connection: rejected socket connection."
     ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Rejected peer connection: rejected socket connection.")
+      Format.fprintf ppf "Rejected peer connection: rejected socket connection.")
     Data_encoding.empty
     (function Rejected_socket_connection -> Some () | _ -> None)
     (fun () -> Rejected_socket_connection) ;
@@ -135,10 +133,8 @@ let () =
         motive
         (fun ppf alt_points ->
           match alt_points with
-          | None ->
-              Format.pp_print_string ppf "no"
-          | Some l ->
-              Format.pp_print_int ppf @@ List.length l)
+          | None -> Format.pp_print_string ppf "no"
+          | Some l -> Format.pp_print_int ppf @@ List.length l)
         alt_points)
     Data_encoding.(
       obj2
@@ -147,8 +143,7 @@ let () =
     (function
       | Rejected_by_nack {motive; alternative_points} ->
           Some (motive, alternative_points)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (motive, alternative_points) ->
       Rejected_by_nack {motive; alternative_points}) ;
   (* Rejected socket connection, no common network protocol *)
@@ -160,9 +155,7 @@ let () =
       "Rejected peer connection: rejected socket connection as we have no \
        common network protocol with the peer."
     ~pp:(fun ppf _lst ->
-      Format.fprintf
-        ppf
-        "Rejected peer connection: no common network protocol.")
+      Format.fprintf ppf "Rejected peer connection: no common network protocol.")
     Data_encoding.(obj1 (req "announced_version" Network_version.encoding))
     (function
       | Rejected_no_common_protocol {announced} -> Some announced | _ -> None)
@@ -237,13 +230,10 @@ let () =
         min
         max
         value)
-    Data_encoding.(
-      obj3 (req "value" int31) (req "min" int31) (req "max" int31))
+    Data_encoding.(obj3 (req "value" int31) (req "min" int31) (req "max" int31))
     (function
-      | Invalid_chunks_size {value; min; max} ->
-          Some (value, min, max)
-      | _ ->
-          None)
+      | Invalid_chunks_size {value; min; max} -> Some (value, min, max)
+      | _ -> None)
     (fun (value, min, max) -> Invalid_chunks_size {value; min; max})
 
 (***************************** p2p pool ***********************************)
@@ -279,8 +269,7 @@ let () =
     `Permanent
     ~id:"node.p2p_pool.pending_connection"
     ~title:"Pending connection"
-    ~description:
-      "Fail to connect with a peer: a connection is already pending."
+    ~description:"Fail to connect with a peer: a connection is already pending."
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
@@ -418,7 +407,6 @@ let () =
     (function
       | Identity_check_failure {point; expected_peer_id; received_peer_id} ->
           Some (point, expected_peer_id, received_peer_id)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (point, expected_peer_id, received_peer_id) ->
       Identity_check_failure {point; expected_peer_id; received_peer_id})

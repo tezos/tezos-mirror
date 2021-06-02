@@ -38,18 +38,12 @@ module Make
 
   let rec of_seqe seq () =
     match seq () with
-    | Ok Seq_e.Nil ->
-        nil_es
-    | Ok (Seq_e.Cons (item, seq)) ->
-        Monad.return (Cons (item, of_seqe seq))
-    | Error _ as e ->
-        Lwt.return e
+    | Ok Seq_e.Nil -> nil_es
+    | Ok (Seq_e.Cons (item, seq)) -> Monad.return (Cons (item, of_seqe seq))
+    | Error _ as e -> Lwt.return e
 
   let rec of_seqs seq () =
-    Lwt.bind (seq ())
-    @@ function
-    | Seq_s.Nil ->
-        nil_es
-    | Seq_s.Cons (e, seq) ->
-        Monad.return (Cons (e, of_seqs seq))
+    Lwt.bind (seq ()) @@ function
+    | Seq_s.Nil -> nil_es
+    | Seq_s.Cons (e, seq) -> Monad.return (Cons (e, of_seqs seq))
 end

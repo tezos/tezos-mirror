@@ -82,40 +82,28 @@ module Make (Trace : Sig.TRACE) :
   let both_p = Lwt.both
 
   let rec join_e_errors trace_acc = function
-    | Ok _ :: ts ->
-        join_e_errors trace_acc ts
-    | Error trace :: ts ->
-        join_e_errors (Trace.conp trace_acc trace) ts
-    | [] ->
-        Error trace_acc
+    | Ok _ :: ts -> join_e_errors trace_acc ts
+    | Error trace :: ts -> join_e_errors (Trace.conp trace_acc trace) ts
+    | [] -> Error trace_acc
 
   let rec join_e = function
-    | [] ->
-        ok_unit
-    | Ok () :: ts ->
-        join_e ts
-    | Error trace :: ts ->
-        join_e_errors trace ts
+    | [] -> ok_unit
+    | Ok () :: ts -> join_e ts
+    | Error trace :: ts -> join_e_errors trace ts
 
   let all_e ts =
     let rec aux acc = function
-      | [] ->
-          Ok (List.rev acc)
-      | Ok v :: ts ->
-          aux (v :: acc) ts
-      | Error trace :: ts ->
-          join_e_errors trace ts
+      | [] -> Ok (List.rev acc)
+      | Ok v :: ts -> aux (v :: acc) ts
+      | Error trace :: ts -> join_e_errors trace ts
     in
     aux [] ts
 
   let both_e a b =
     match (a, b) with
-    | (Ok a, Ok b) ->
-        Ok (a, b)
-    | (Error err, Ok _) | (Ok _, Error err) ->
-        Error err
-    | (Error erra, Error errb) ->
-        Error (Trace.conp erra errb)
+    | (Ok a, Ok b) -> Ok (a, b)
+    | (Error err, Ok _) | (Ok _, Error err) -> Error err
+    | (Error erra, Error errb) -> Error (Trace.conp erra errb)
 
   let join_ep ts = all_p ts >|= join_e
 
@@ -125,32 +113,23 @@ module Make (Trace : Sig.TRACE) :
 
   let record_trace err result =
     match result with
-    | Ok _ as res ->
-        res
-    | Error trace ->
-        Error (Trace.cons err trace)
+    | Ok _ as res -> res
+    | Error trace -> Error (Trace.cons err trace)
 
   let trace err f =
-    f
-    >>= function
-    | Error trace ->
-        Lwt.return_error (Trace.cons err trace)
-    | ok ->
-        Lwt.return ok
+    f >>= function
+    | Error trace -> Lwt.return_error (Trace.cons err trace)
+    | ok -> Lwt.return ok
 
   let record_trace_eval mk_err = function
-    | Error trace ->
-        mk_err () >>? fun err -> Error (Trace.cons err trace)
-    | ok ->
-        ok
+    | Error trace -> mk_err () >>? fun err -> Error (Trace.cons err trace)
+    | ok -> ok
 
   let trace_eval mk_err f =
-    f
-    >>= function
+    f >>= function
     | Error trace ->
         mk_err () >>=? fun err -> Lwt.return_error (Trace.cons err trace)
-    | ok ->
-        Lwt.return ok
+    | ok -> Lwt.return ok
 
   let error_unless cond exn = if cond then ok_unit else error exn
 
@@ -166,10 +145,9 @@ module Make (Trace : Sig.TRACE) :
 
   let dont_wait exc_handler err_handler f =
     Lwt_utils.dont_wait exc_handler (fun () ->
-        f ()
-        >>= function
-        | Ok () ->
-            Lwt.return_unit
+        f () >>= function
+        | Ok () -> Lwt.return_unit
         | Error trace ->
-            err_handler trace ; Lwt.return_unit)
+            err_handler trace ;
+            Lwt.return_unit)
 end

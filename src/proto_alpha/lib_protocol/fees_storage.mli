@@ -42,9 +42,7 @@ val record_paid_storage_space :
     For use only in subsidies. 
     Will fail if storage_space_to_pay has been initialized.*)
 val record_paid_storage_space_subsidy :
-  Raw_context.t ->
-  Contract_repr.t ->
-  (Raw_context.t * Z.t * Z.t) tzresult Lwt.t
+  Raw_context.t -> Contract_repr.t -> (Raw_context.t * Z.t * Z.t) tzresult Lwt.t
 
 val check_storage_limit : Raw_context.t -> storage_limit:Z.t -> unit tzresult
 

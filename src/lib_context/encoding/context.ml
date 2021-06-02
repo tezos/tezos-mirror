@@ -48,8 +48,7 @@ end = struct
 
   let of_string x =
     match Context_hash.of_b58check x with
-    | Ok x ->
-        Ok (of_context_hash x)
+    | Ok x -> Ok (of_context_hash x)
     | Error err ->
         Error
           (`Msg
@@ -61,8 +60,8 @@ end = struct
   let short_hash_string = Irmin.Type.(unstage (short_hash string))
 
   let short_hash_staged =
-    Irmin.Type.stage
-    @@ fun ?seed t -> short_hash_string ?seed (H.to_raw_string t)
+    Irmin.Type.stage @@ fun ?seed t ->
+    short_hash_string ?seed (H.to_raw_string t)
 
   let t : t Irmin.Type.t =
     Irmin.Type.map

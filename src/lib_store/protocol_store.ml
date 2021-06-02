@@ -44,10 +44,8 @@ let raw_store store protocol_hash bytes =
       [Unix.O_CREAT; O_WRONLY; O_CLOEXEC]
       0o644
     >>= fun fd ->
-    Lwt_utils_unix.write_bytes fd bytes
-    >>= fun () ->
-    Lwt_utils_unix.safe_close fd
-    >>= fun _ ->
+    Lwt_utils_unix.write_bytes fd bytes >>= fun () ->
+    Lwt_utils_unix.safe_close fd >>= fun _ ->
     store.protocols <- Protocol_hash.Set.add protocol_hash store.protocols ;
     Lwt.return_some protocol_hash
 
@@ -68,26 +66,19 @@ let read store protocol_hash =
 let init store_dir =
   let protocol_store_dir = Naming.protocol_store_dir store_dir in
   let protocol_store_dir_path = Naming.dir_path protocol_store_dir in
-  Lwt_unix.file_exists protocol_store_dir_path
-  >>= fun file_exists ->
-  ( if not file_exists then Lwt_utils_unix.create_dir protocol_store_dir_path
-  else Lwt.return_unit )
+  Lwt_unix.file_exists protocol_store_dir_path >>= fun file_exists ->
+  (if not file_exists then Lwt_utils_unix.create_dir protocol_store_dir_path
+  else Lwt.return_unit)
   >>= fun () ->
-  Lwt_unix.opendir protocol_store_dir_path
-  >>= fun dir ->
+  Lwt_unix.opendir protocol_store_dir_path >>= fun dir ->
   let rec loop set =
     Lwt.catch
       (fun () ->
-        Lwt_unix.readdir dir
-        >>= fun file ->
+        Lwt_unix.readdir dir >>= fun file ->
         match Protocol_hash.of_b58check_opt file with
-        | Some protocol_hash ->
-            loop (Protocol_hash.Set.add protocol_hash set)
-        | None ->
-            loop set)
+        | Some protocol_hash -> loop (Protocol_hash.Set.add protocol_hash set)
+        | None -> loop set)
       (function End_of_file -> Lwt.return set | _ -> loop set)
   in
-  loop Protocol_hash.Set.empty
-  >>= fun protocols ->
-  Lwt_unix.closedir dir
-  >>= fun () -> Lwt.return {protocol_store_dir; protocols}
+  loop Protocol_hash.Set.empty >>= fun protocols ->
+  Lwt_unix.closedir dir >>= fun () -> Lwt.return {protocol_store_dir; protocols}

@@ -65,10 +65,8 @@ let () =
         head_level)
     Data_encoding.(obj2 (req "head_level" int32) (req "given_level" int32))
     (function
-      | Bad_level {head_level; given_level} ->
-          Some (head_level, given_level)
-      | _ ->
-          None)
+      | Bad_level {head_level; given_level} -> Some (head_level, given_level)
+      | _ -> None)
     (fun (head_level, given_level) -> Bad_level {head_level; given_level}) ;
   register_error_kind
     `Permanent
@@ -105,10 +103,8 @@ let () =
        (Data_encoding.req "previous_mode" History_mode.encoding)
        (Data_encoding.req "next_mode" History_mode.encoding))
     (function
-      | Cannot_switch_history_mode x ->
-          Some (x.previous_mode, x.next_mode)
-      | _ ->
-          None)
+      | Cannot_switch_history_mode x -> Some (x.previous_mode, x.next_mode)
+      | _ -> None)
     (fun (previous_mode, next_mode) ->
       Cannot_switch_history_mode {previous_mode; next_mode}) ;
   register_error_kind
@@ -132,8 +128,7 @@ let () =
     (function
       | Invalid_head_switch {checkpoint_level; given_head} ->
           Some (checkpoint_level, given_head)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (checkpoint_level, given_head) ->
       Invalid_head_switch {checkpoint_level; given_head}) ;
   register_error_kind
@@ -154,10 +149,8 @@ let () =
         (req "expected_operation_hashes" Operation_list_list_hash.encoding)
         (req "received_operation_hashes" Operation_list_list_hash.encoding))
     (function
-      | Inconsistent_operations_hash {expected; got} ->
-          Some (expected, got)
-      | _ ->
-          None)
+      | Inconsistent_operations_hash {expected; got} -> Some (expected, got)
+      | _ -> None)
     (fun (expected, got) -> Inconsistent_operations_hash {expected; got})
 
 type cemented_store_inconsistency =
@@ -181,15 +174,14 @@ type cemented_store_inconsistency =
 let cemented_store_inconsistency_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Missing cycle"
         (obj2 (req "low_cycle" string) (req "high_cycle" string))
         (function
-          | Missing_cycle {low_cycle; high_cycle} ->
-              Some (low_cycle, high_cycle)
-          | _ ->
-              None)
+          | Missing_cycle {low_cycle; high_cycle} -> Some (low_cycle, high_cycle)
+          | _ -> None)
         (fun (low_cycle, high_cycle) -> Missing_cycle {low_cycle; high_cycle});
       case
         (Tag 1)
@@ -198,8 +190,7 @@ let cemented_store_inconsistency_encoding =
         (function
           | Inconsistent_cycle_start {expected_cycle_start; cycle_start} ->
               Some (expected_cycle_start, cycle_start)
-          | _ ->
-              None)
+          | _ -> None)
         (fun (expected_cycle_start, cycle_start) ->
           Inconsistent_cycle_start {expected_cycle_start; cycle_start});
       case
@@ -219,8 +210,7 @@ let cemented_store_inconsistency_encoding =
         (function
           | Unexpected_level {block_hash; expected; got} ->
               Some (block_hash, expected, got)
-          | _ ->
-              None)
+          | _ -> None)
         (fun (block_hash, expected, got) ->
           Unexpected_level {block_hash; expected; got});
       case
@@ -239,11 +229,11 @@ let cemented_store_inconsistency_encoding =
           | Inconsistent_highest_cemented_level
               {highest_cemented_level; cementing_highwatermark} ->
               Some (highest_cemented_level, cementing_highwatermark)
-          | _ ->
-              None)
+          | _ -> None)
         (fun (highest_cemented_level, cementing_highwatermark) ->
           Inconsistent_highest_cemented_level
-            {highest_cemented_level; cementing_highwatermark}) ]
+            {highest_cemented_level; cementing_highwatermark});
+    ]
 
 type store_block_error =
   | Invalid_block
@@ -264,15 +254,15 @@ type store_block_error =
 let store_block_error_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Invalid operations length"
         (obj2 (req "validation_passes" int31) (req "operations" int31))
         (function
           | Invalid_operations_length {validation_passes; operations} ->
               Some (validation_passes, operations)
-          | _ ->
-              None)
+          | _ -> None)
         (fun (validation_passes, operations) ->
           Invalid_operations_length {validation_passes; operations});
       case
@@ -283,8 +273,7 @@ let store_block_error_encoding =
           | Invalid_operations_data_length {validation_passes; operations_data}
             ->
               Some (validation_passes, operations_data)
-          | _ ->
-              None)
+          | _ -> None)
         (fun (validation_passes, operations_data) ->
           Invalid_operations_data_length {validation_passes; operations_data});
       case
@@ -297,11 +286,11 @@ let store_block_error_encoding =
           | Inconsistent_operations_lengths
               {operations_lengths; operations_data_lengths} ->
               Some (operations_lengths, operations_data_lengths)
-          | _ ->
-              None)
+          | _ -> None)
         (fun (operations_lengths, operations_data_lengths) ->
           Inconsistent_operations_lengths
-            {operations_lengths; operations_data_lengths}) ]
+            {operations_lengths; operations_data_lengths});
+    ]
 
 type error +=
   | Cannot_write_in_readonly
@@ -414,8 +403,8 @@ let () =
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "Cannot update the floating store: failed to retrieve enough blocks \
-         to cement.")
+        "Cannot update the floating store: failed to retrieve enough blocks to \
+         cement.")
     Data_encoding.empty
     (function Cannot_update_floating_store -> Some () | _ -> None)
     (fun () -> Cannot_update_floating_store) ;
@@ -467,10 +456,7 @@ let () =
     ~title:"Cannot merge store"
     ~description:"Cannot merge the store."
     ~pp:(fun ppf status ->
-      Format.fprintf
-        ppf
-        "Cannot merge the store, unexpected status: %s."
-        status)
+      Format.fprintf ppf "Cannot merge the store, unexpected status: %s." status)
     Data_encoding.(obj1 (req "status" string))
     (function Cannot_merge_store {status} -> Some status | _ -> None)
     (fun status -> Cannot_merge_store {status}) ;
@@ -498,11 +484,9 @@ let () =
       Format.fprintf
         ppf
         "Failed to cement the blocks metadata: %s."
-        ( match reason with
-        | `Empty ->
-            "the given list of blocks is empty"
-        | `Not_cemented ->
-            "the given blocks ar not cemented" ))
+        (match reason with
+        | `Empty -> "the given list of blocks is empty"
+        | `Not_cemented -> "the given blocks ar not cemented"))
     Data_encoding.(
       obj1
         (req
@@ -519,12 +503,11 @@ let () =
       Format.fprintf
         ppf
         "Failed to merge the store: %s."
-        ( match reason with
-        | `Empty ->
-            "no valid cycles were found"
+        (match reason with
+        | `Empty -> "no valid cycles were found"
         | `Higher_cemented ->
             "the highest cemented block has a higher level than the given \
-             blocks" ))
+             blocks"))
     Data_encoding.(
       obj1
         (req
@@ -541,8 +524,8 @@ let () =
     ~pp:(fun ppf path ->
       Format.fprintf
         ppf
-        "Error while merging the store: the temporary cemented file %s \
-         already exists."
+        "Error while merging the store: the temporary cemented file %s already \
+         exists."
         path)
     Data_encoding.(obj1 (req "path" string))
     (function Temporary_cemented_file_exists path -> Some path | _ -> None)
@@ -560,10 +543,8 @@ let () =
         trace)
     Data_encoding.(obj2 (req "path" string) (req "trace" string))
     (function
-      | Inconsistent_cemented_file (path, trace) ->
-          Some (path, trace)
-      | _ ->
-          None)
+      | Inconsistent_cemented_file (path, trace) -> Some (path, trace)
+      | _ -> None)
     (fun (path, trace) -> Inconsistent_cemented_file (path, trace)) ;
   Error_monad.register_error_kind
     `Temporary
@@ -574,7 +555,7 @@ let () =
       Format.fprintf
         ppf
         "The store is in an unexpected and inconsistent state: %s."
-        ( match csi with
+        (match csi with
         | Missing_cycle {low_cycle; high_cycle} ->
             Format.sprintf
               "missing cycle between %s and %s"
@@ -608,7 +589,7 @@ let () =
               "the most recent cemented block (%ld) is not the previous \
                cemented highwatermark (%ld)"
               highest_cemented_level
-              cementing_highwatermark ))
+              cementing_highwatermark))
     Data_encoding.(
       obj1
         (req "inconsistent_cemented_file" cemented_store_inconsistency_encoding))
@@ -652,8 +633,7 @@ let () =
     (function
       | Inconsistent_block_hash {level; expected_hash; computed_hash} ->
           Some (level, expected_hash, computed_hash)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (level, expected_hash, computed_hash) ->
       Inconsistent_block_hash {level; expected_hash; computed_hash}) ;
   Error_monad.register_error_kind
@@ -664,8 +644,8 @@ let () =
     ~pp:(fun ppf (block_hash, level, expected_hash, computed_hash) ->
       Format.fprintf
         ppf
-        "Inconsistent block: inconsistent predecessor found for block %a \
-         (%ld) - expected: %a vs got: %a."
+        "Inconsistent block: inconsistent predecessor found for block %a (%ld) \
+         - expected: %a vs got: %a."
         Block_hash.pp
         block_hash
         level
@@ -683,8 +663,7 @@ let () =
       | Inconsistent_block_predecessor
           {block_hash; level; expected_hash; computed_hash} ->
           Some (block_hash, level, expected_hash, computed_hash)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (block_hash, level, expected_hash, computed_hash) ->
       Inconsistent_block_predecessor
         {block_hash; level; expected_hash; computed_hash}) ;
@@ -713,16 +692,14 @@ let () =
         "Failed to store block %a: %s."
         Block_hash.pp
         hash
-        ( match err with
-        | Invalid_block ->
-            "the block is marked as invalid"
+        (match err with
+        | Invalid_block -> "the block is marked as invalid"
         | Invalid_operations_length {validation_passes; operations} ->
             Format.sprintf
               "invalid operations length %d (%d was expected)"
               operations
               validation_passes
-        | Invalid_operations_data_length {validation_passes; operations_data}
-          ->
+        | Invalid_operations_data_length {validation_passes; operations_data} ->
             Format.sprintf
               "invalid operation_data length %d (%d was expected)"
               validation_passes
@@ -739,7 +716,7 @@ let () =
               "block's last allowed fork level (%ld) is below the genesis \
                level (%ld)"
               last_allowed_fork_level
-              genesis_level ))
+              genesis_level))
     Data_encoding.(
       obj2
         (req "hash" Block_hash.encoding)
@@ -807,14 +784,13 @@ let () =
     ~pp:(fun ppf (given_target_hash, given_target_level) ->
       Format.fprintf
         ppf
-        "Failed to set the given target %a (%ld): it is either invalid, or \
-         not a predecessor of the checkpoint."
+        "Failed to set the given target %a (%ld): it is either invalid, or not \
+         a predecessor of the checkpoint."
         Block_hash.pp
         given_target_hash
         given_target_level)
     Data_encoding.(obj1 (req "given_target" (tup2 Block_hash.encoding int32)))
-    (function
-      | Cannot_set_target given_target -> Some given_target | _ -> None)
+    (function Cannot_set_target given_target -> Some given_target | _ -> None)
     (fun given_target -> Cannot_set_target given_target) ;
   Error_monad.register_error_kind
     `Temporary
@@ -947,10 +923,8 @@ let () =
         (req "protocol_hash" Protocol_hash.encoding)
         (req "history_mode" History_mode.encoding))
     (function
-      | Missing_activation_block_legacy (bl, ph, hm) ->
-          Some (bl, ph, hm)
-      | _ ->
-          None)
+      | Missing_activation_block_legacy (bl, ph, hm) -> Some (bl, ph, hm)
+      | _ -> None)
     (fun (bl, ph, hm) -> Missing_activation_block_legacy (bl, ph, hm)) ;
   Error_monad.register_error_kind
     `Temporary
@@ -994,8 +968,7 @@ let () =
     ~id:"store.bad_head_invariant"
     ~title:"Bad head invariant"
     ~description:"Bad invariant during Store.set_head"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Bad invariant during Store.set_head")
+    ~pp:(fun ppf () -> Format.fprintf ppf "Bad invariant during Store.set_head")
     Data_encoding.empty
     (function Bad_head_invariant -> Some () | _ -> None)
     (fun () -> Bad_head_invariant)
@@ -1039,10 +1012,8 @@ let () =
         block_name)
     Data_encoding.(obj1 (req "missing_block_metadata" string))
     (function
-      | Unexpected_missing_block_metadata {block_name} ->
-          Some block_name
-      | _ ->
-          None)
+      | Unexpected_missing_block_metadata {block_name} -> Some block_name
+      | _ -> None)
     (fun block_name -> Unexpected_missing_block_metadata {block_name}) ;
   register_error_kind
     `Permanent
@@ -1060,10 +1031,7 @@ let () =
     Data_encoding.(
       obj2 (req "expected" Block_hash.encoding) (req "got" Block_hash.encoding))
     (function
-      | Inconsistent_genesis {expected; got} ->
-          Some (expected, got)
-      | _ ->
-          None)
+      | Inconsistent_genesis {expected; got} -> Some (expected, got) | _ -> None)
     (fun (expected, got) -> Inconsistent_genesis {expected; got}) ;
   register_error_kind
     `Permanent
@@ -1086,8 +1054,7 @@ let () =
       | Inconsistent_cementing_highwatermark
           {highest_cemented_level; cementing_highwatermark} ->
           Some (highest_cemented_level, cementing_highwatermark)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (highest_cemented_level, cementing_highwatermark) ->
       Inconsistent_cementing_highwatermark
         {highest_cemented_level; cementing_highwatermark}) ;

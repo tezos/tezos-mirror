@@ -37,15 +37,11 @@ let unopt_map ~f ~default = function None -> default | Some x -> f x
 let unopt_exn err = function Some x -> x | _ -> raise err
 
 let unopt_assert ~loc:(name, line, pos, _) = function
-  | Some v ->
-      v
-  | None ->
-      raise (Assert_failure (name, line, pos))
+  | Some v -> v
+  | None -> raise (Assert_failure (name, line, pos))
 
 let first_some a b = match a with Some _ -> a | None -> b
 
 let pp ?(default = "None") pp fmt = function
-  | Some value ->
-      pp fmt value
-  | None ->
-      Format.pp_print_text fmt default
+  | Some value -> pp fmt value
+  | None -> Format.pp_print_text fmt default

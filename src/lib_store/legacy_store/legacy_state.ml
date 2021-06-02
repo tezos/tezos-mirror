@@ -122,8 +122,7 @@ let () =
         "@[Cannot find block contents %a@]"
         Block_hash.pp
         block_hash)
-    Data_encoding.(
-      obj1 (req "block_contents_not_found" @@ Block_hash.encoding))
+    Data_encoding.(obj1 (req "block_contents_not_found" @@ Block_hash.encoding))
     (function
       | Block_contents_not_found block_hash -> Some block_hash | _ -> None)
     (fun block_hash -> Block_contents_not_found block_hash)
@@ -135,26 +134,21 @@ let () =
 
 module Header = struct
   let read (store, hash) =
-    Legacy_store.Block.Contents.read (store, hash)
-    >>= function
-    | Ok {header; _} ->
-        return header
+    Legacy_store.Block.Contents.read (store, hash) >>= function
+    | Ok {header; _} -> return header
     | Error _ ->
         Legacy_store.Block.Pruned_contents.read (store, hash)
         >>=? fun {header} -> return header
 
   let read_opt (store, hash) =
-    read (store, hash)
-    >>= function
-    | Ok header -> Lwt.return_some header | Error _ -> Lwt.return_none
+    read (store, hash) >>= function
+    | Ok header -> Lwt.return_some header
+    | Error _ -> Lwt.return_none
 
   let known (store, hash) =
-    Legacy_store.Block.Pruned_contents.known (store, hash)
-    >>= function
-    | true ->
-        Lwt.return_true
-    | false ->
-        Legacy_store.Block.Contents.known (store, hash)
+    Legacy_store.Block.Pruned_contents.known (store, hash) >>= function
+    | true -> Lwt.return_true
+    | false -> Legacy_store.Block.Contents.known (store, hash)
 end
 
 let read_chain_data {chain_data; _} f =
@@ -162,8 +156,7 @@ let read_chain_data {chain_data; _} f =
 
 let update_chain_data {chain_data; _} f =
   Shared.use chain_data (fun state ->
-      f state.chain_data_store state.data
-      >>= fun (data, res) ->
+      f state.chain_data_store state.data >>= fun (data, res) ->
       Option.iter (fun data -> state.data <- data) data ;
       Lwt.return res)
 
@@ -196,21 +189,19 @@ let store_predecessors (store : Legacy_store.Block.store) (b : Block_hash.t) :
     else
       Legacy_store.Block.Predecessors.read_opt (store, pred) (dist - 1)
       >>= function
-      | None ->
-          Lwt.return_unit (* we reached the last known block *)
+      | None -> Lwt.return_unit (* we reached the last known block *)
       | Some p ->
-          Legacy_store.Block.Predecessors.store (store, b) dist p
-          >>= fun () -> loop p (dist + 1)
+          Legacy_store.Block.Predecessors.store (store, b) dist p >>= fun () ->
+          loop p (dist + 1)
   in
   (* the first predecessor is fetched from the header *)
-  Header.read_opt (store, b)
-  >|= WithExceptions.Option.get ~loc:__LOC__
+  Header.read_opt (store, b) >|= WithExceptions.Option.get ~loc:__LOC__
   >>= fun header ->
   let pred = header.shell.predecessor in
   if Block_hash.equal b pred then Lwt.return_unit (* genesis *)
   else
-    Legacy_store.Block.Predecessors.store (store, b) 0 pred
-    >>= fun () -> loop pred 1
+    Legacy_store.Block.Predecessors.store (store, b) 0 pred >>= fun () ->
+    loop pred 1
 
 (**
    [predecessor_n_raw s b d] returns the hash of the block at distance [d] from [b].
@@ -261,8 +252,7 @@ let predecessor_n_raw store block_hash distance =
         in
         Legacy_store.Block.Predecessors.read_opt (store, block_hash) power
         >>= function
-        | None ->
-            Lwt.return_none (* reached genesis *)
+        | None -> Lwt.return_none (* reached genesis *)
         | Some pred ->
             if rest = 0 then Lwt.return_some pred
               (* landed on the requested predecessor *)
@@ -274,14 +264,12 @@ let predecessor_n_raw store block_hash distance =
 let predecessor_n block_store block_hash distance =
   Lwt.catch
     (fun () ->
-      predecessor_n_raw block_store block_hash distance
-      >>= function
-      | None ->
-          Lwt.return_none
+      predecessor_n_raw block_store block_hash distance >>= function
+      | None -> Lwt.return_none
       | Some predecessor -> (
-          Header.known (block_store, predecessor)
-          >>= function
-          | false -> Lwt.return_none | true -> Lwt.return_some predecessor ))
+          Header.known (block_store, predecessor) >>= function
+          | false -> Lwt.return_none
+          | true -> Lwt.return_some predecessor))
     (fun _exn -> Lwt.return_none)
 
 type t = global_state
@@ -368,8 +356,8 @@ let locked_valid_heads_for_checkpoint block_store data checkpoint =
 let tag_invalid_heads block_store chain_store heads level =
   let rec tag_invalid_head (hash, header) =
     if header.Block_header.shell.level <= level then
-      Legacy_store.Chain_data.Known_heads.store chain_store hash
-      >>= fun () -> Lwt.return_some (hash, header)
+      Legacy_store.Chain_data.Known_heads.store chain_store hash >>= fun () ->
+      Lwt.return_some (hash, header)
     else
       let errors = [Validation_errors.Checkpoint_error (hash, None)] in
       Legacy_store.Block.Invalid_block.store
@@ -377,22 +365,17 @@ let tag_invalid_heads block_store chain_store heads level =
         hash
         {level = header.shell.level; errors}
       >>= fun () ->
-      Legacy_store.Block.Contents.remove (block_store, hash)
-      >>= fun () ->
+      Legacy_store.Block.Contents.remove (block_store, hash) >>= fun () ->
       Legacy_store.Block.Operation_hashes.remove_all (block_store, hash)
       >>= fun () ->
       Legacy_store.Block.Operations_metadata.remove_all (block_store, hash)
       >>= fun () ->
-      Legacy_store.Block.Operations.remove_all (block_store, hash)
-      >>= fun () ->
+      Legacy_store.Block.Operations.remove_all (block_store, hash) >>= fun () ->
       Legacy_store.Block.Predecessors.remove_all (block_store, hash)
       >>= fun () ->
-      Header.read_opt (block_store, header.shell.predecessor)
-      >>= function
-      | None ->
-          Lwt.return_none
-      | Some header ->
-          tag_invalid_head (Block_header.hash header, header)
+      Header.read_opt (block_store, header.shell.predecessor) >>= function
+      | None -> Lwt.return_none
+      | Some header -> tag_invalid_head (Block_header.hash header, header)
   in
   List.iter_p
     (fun (hash, _header) ->
@@ -402,36 +385,27 @@ let tag_invalid_heads block_store chain_store heads level =
 
 let prune_block store block_hash =
   let st = (store, block_hash) in
-  Legacy_store.Block.Contents.remove st
-  >>= fun () ->
-  Legacy_store.Block.Invalid_block.remove store block_hash
-  >>= fun () -> Legacy_store.Block.Operations_metadata.remove_all st
+  Legacy_store.Block.Contents.remove st >>= fun () ->
+  Legacy_store.Block.Invalid_block.remove store block_hash >>= fun () ->
+  Legacy_store.Block.Operations_metadata.remove_all st
 
 let store_header_and_prune_block store block_hash =
   let st = (store, block_hash) in
-  Legacy_store.Block.Contents.read_opt st
-  >>= (function
-        | Some {header; _} ->
-            Legacy_store.Block.Pruned_contents.store st {header}
-        | None -> (
-            Legacy_store.Block.Pruned_contents.known st
-            >>= function
-            | true ->
-                Lwt.return_unit
-            | false ->
-                Events.(emit missing_pruned_contents) block_hash ))
+  (Legacy_store.Block.Contents.read_opt st >>= function
+   | Some {header; _} -> Legacy_store.Block.Pruned_contents.store st {header}
+   | None -> (
+       Legacy_store.Block.Pruned_contents.known st >>= function
+       | true -> Lwt.return_unit
+       | false -> Events.(emit missing_pruned_contents) block_hash))
   >>= fun () -> prune_block store block_hash
 
 let delete_block store block_hash =
-  prune_block store block_hash
-  >>= fun () ->
+  prune_block store block_hash >>= fun () ->
   let st = (store, block_hash) in
-  Legacy_store.Block.Pruned_contents.remove st
-  >>= fun () ->
-  Legacy_store.Block.Operations.remove_all st
-  >>= fun () ->
-  Legacy_store.Block.Operation_hashes.remove_all st
-  >>= fun () -> Legacy_store.Block.Predecessors.remove_all st
+  Legacy_store.Block.Pruned_contents.remove st >>= fun () ->
+  Legacy_store.Block.Operations.remove_all st >>= fun () ->
+  Legacy_store.Block.Operation_hashes.remove_all st >>= fun () ->
+  Legacy_store.Block.Predecessors.remove_all st
 
 (* Remove all blocks that are not in the chain. *)
 let cut_alternate_heads block_store chain_store heads =
@@ -442,16 +416,15 @@ let cut_alternate_heads block_store chain_store heads =
     else
       Header.read_opt (block_store, header.Block_header.shell.predecessor)
       >>= function
-      | None ->
-          delete_block block_store hash >>= fun () -> Lwt.return_unit
+      | None -> delete_block block_store hash >>= fun () -> Lwt.return_unit
       | Some header ->
-          delete_block block_store hash
-          >>= fun () -> cut_alternate_head (Block_header.hash header) header
+          delete_block block_store hash >>= fun () ->
+          cut_alternate_head (Block_header.hash header) header
   in
   List.iter_p
     (fun (hash, header) ->
-      Legacy_store.Chain_data.Known_heads.remove chain_store hash
-      >>= fun () -> cut_alternate_head hash header)
+      Legacy_store.Chain_data.Known_heads.remove chain_store hash >>= fun () ->
+      cut_alternate_head hash header)
     heads
 
 module Chain = struct
@@ -482,10 +455,8 @@ module Chain = struct
         let chain_store = Legacy_store.Chain.get global_store chain_id in
         Legacy_store.Chain.Protocol_info.read_opt chain_store protocol_level
         >>= function
-        | None ->
-            Stdlib.failwith "State.Chain.get_level_index_protocol"
-        | Some (p, _) ->
-            Lwt.return p)
+        | None -> Stdlib.failwith "State.Chain.get_level_index_protocol"
+        | Some (p, _) -> Lwt.return p)
 
   let update_level_indexed_protocol_store chain_state chain_id protocol_level
       protocol_hash block_header =
@@ -494,13 +465,10 @@ module Chain = struct
         Header.read_opt
           (block_store, block_header.Block_header.shell.predecessor)
         >>= function
-        | None ->
-            Lwt.return_none (* should not happen *)
-        | Some header ->
-            Lwt.return_some header)
+        | None -> Lwt.return_none (* should not happen *)
+        | Some header -> Lwt.return_some header)
     >>= function
-    | None ->
-        Lwt.return_unit
+    | None -> Lwt.return_unit
     | Some pred_header ->
         if pred_header.shell.proto_level <> block_header.shell.proto_level then
           Shared.use global_state.global_data (fun global_data ->
@@ -563,8 +531,7 @@ module Chain = struct
     let proto_level = genesis_header.shell.proto_level in
     Legacy_store.Chain.Genesis_hash.store chain_store genesis.block
     >>= fun () ->
-    Legacy_store.Chain.Genesis_time.store chain_store genesis.time
-    >>= fun () ->
+    Legacy_store.Chain.Genesis_time.store chain_store genesis.time >>= fun () ->
     Legacy_store.Chain.Genesis_protocol.store chain_store genesis.protocol
     >>= fun () ->
     Legacy_store.Chain_data.Current_head.store chain_data_store genesis.block
@@ -575,22 +542,19 @@ module Chain = struct
     >>= fun () ->
     Legacy_store.Chain_data.Save_point.store chain_data_store save_point
     >>= fun () ->
-    Legacy_store.Chain_data.Caboose.store chain_data_store caboose
-    >>= fun () ->
+    Legacy_store.Chain_data.Caboose.store chain_data_store caboose >>= fun () ->
     Legacy_store.Chain.Protocol_info.store
       chain_store
       proto_level
       (genesis.protocol, genesis_header.shell.level)
     >>= fun () ->
-    ( match expiration with
-    | None ->
-        Lwt.return_unit
-    | Some time ->
-        Legacy_store.Chain.Expiration.store chain_store time )
+    (match expiration with
+    | None -> Lwt.return_unit
+    | Some time -> Legacy_store.Chain.Expiration.store chain_store time)
     >>= fun () ->
-    ( if allow_forked_chain then
-      Legacy_store.Chain.Allow_forked_chain.store data.global_store chain_id
-    else Lwt.return_unit )
+    (if allow_forked_chain then
+     Legacy_store.Chain.Allow_forked_chain.store data.global_store chain_id
+    else Lwt.return_unit)
     >>= fun () ->
     allocate
       ~genesis
@@ -617,8 +581,7 @@ module Chain = struct
         if Chain_id.Table.mem data.chains chain_id then
           Stdlib.failwith "State.Chain.create"
         else
-          commit_genesis ~chain_id
-          >>=? fun commit ->
+          commit_genesis ~chain_id >>=? fun commit ->
           Locked_block.store_genesis block_store genesis commit
           >>= fun genesis_header ->
           locked_create
@@ -630,7 +593,7 @@ module Chain = struct
             genesis_header
           >>= fun chain ->
           (* in case this is a forked chain creation,
-           delete its header from the temporary table*)
+             delete its header from the temporary table*)
           Legacy_store.Forking_block_hash.remove
             data.global_store
             (Context.compute_testchain_chain_id genesis.block)
@@ -640,18 +603,13 @@ module Chain = struct
     let chain_store = Legacy_store.Chain.get data.global_store chain_id in
     let block_store = Legacy_store.Block.get chain_store
     and chain_data_store = Legacy_store.Chain_data.get chain_store in
-    Legacy_store.Chain.Genesis_hash.read chain_store
-    >>=? fun genesis_hash ->
-    Legacy_store.Chain.Genesis_time.read chain_store
-    >>=? fun time ->
-    Legacy_store.Chain.Genesis_protocol.read chain_store
-    >>=? fun protocol ->
-    Legacy_store.Chain.Expiration.read_opt chain_store
-    >>= fun expiration ->
+    Legacy_store.Chain.Genesis_hash.read chain_store >>=? fun genesis_hash ->
+    Legacy_store.Chain.Genesis_time.read chain_store >>=? fun time ->
+    Legacy_store.Chain.Genesis_protocol.read chain_store >>=? fun protocol ->
+    Legacy_store.Chain.Expiration.read_opt chain_store >>= fun expiration ->
     Legacy_store.Chain.Allow_forked_chain.known data.global_store chain_id
     >>= fun allow_forked_chain ->
-    Header.read (block_store, genesis_hash)
-    >>=? fun genesis_header ->
+    Header.read (block_store, genesis_hash) >>=? fun genesis_header ->
     let genesis = {Genesis.time; protocol; block = genesis_hash} in
     Legacy_store.Chain_data.Current_head.read chain_data_store
     >>=? fun current_head ->
@@ -659,8 +617,7 @@ module Chain = struct
     >>=? fun checkpoint ->
     Legacy_store.Chain_data.Save_point.read chain_data_store
     >>=? fun save_point ->
-    Legacy_store.Chain_data.Caboose.read chain_data_store
-    >>=? fun caboose ->
+    Legacy_store.Chain_data.Caboose.read chain_data_store >>=? fun caboose ->
     try
       allocate
         ~genesis
@@ -680,12 +637,10 @@ module Chain = struct
     with Not_found -> fail Bad_data_dir
 
   let locked_read_all global_state data =
-    Legacy_store.Chain.list data.global_store
-    >>= fun ids ->
+    Legacy_store.Chain.list data.global_store >>= fun ids ->
     List.iter_ep
       (fun id ->
-        locked_read global_state data id
-        >>=? fun chain ->
+        locked_read global_state data id >>=? fun chain ->
         Chain_id.Table.add data.chains id chain ;
         return_unit)
       ids
@@ -701,8 +656,9 @@ module Chain = struct
     get_opt state id >|= WithExceptions.Option.to_exn ~none:Not_found
 
   let get state id =
-    get_opt state id
-    >|= function Some v -> Ok v | None -> error (Unknown_chain id)
+    get_opt state id >|= function
+    | Some v -> Ok v
+    | None -> error (Unknown_chain id)
 
   let all state =
     Shared.use state.global_data (fun {chains; _} ->
@@ -735,13 +691,13 @@ module Chain = struct
   let purge_loop_full ?(chunk_size = 4000) global_store store ~genesis_hash
       block_hash caboose_level =
     let do_prune blocks =
-      Legacy_store.with_atomic_rw global_store
-      @@ fun () -> List.iter_s (store_header_and_prune_block store) blocks
+      Legacy_store.with_atomic_rw global_store @@ fun () ->
+      List.iter_s (store_header_and_prune_block store) blocks
     in
     let rec loop block_hash (n_blocks, blocks) =
-      ( if n_blocks >= chunk_size then
-        do_prune blocks >>= fun () -> Lwt.return (0, [])
-      else Lwt.return (n_blocks, blocks) )
+      (if n_blocks >= chunk_size then
+       do_prune blocks >>= fun () -> Lwt.return (0, [])
+      else Lwt.return (n_blocks, blocks))
       >>= fun (n_blocks, blocks) ->
       Header.read_opt (store, block_hash)
       >|= WithExceptions.Option.get ~loc:__LOC__
@@ -777,38 +733,30 @@ module Chain = struct
 
   let purge_loop_rolling global_store store ~genesis_hash block_hash limit =
     let do_delete blocks =
-      Legacy_store.with_atomic_rw global_store
-      @@ fun () -> List.iter_s (delete_block store) blocks
+      Legacy_store.with_atomic_rw global_store @@ fun () ->
+      List.iter_s (delete_block store) blocks
     in
     let rec prune_loop block_hash limit =
       if Block_hash.equal genesis_hash block_hash then Lwt.return block_hash
       else if limit = 1 then
-        Header.read_opt (store, block_hash)
-        >>= function
-        | None ->
-            assert false (* Should not happen. *)
+        Header.read_opt (store, block_hash) >>= function
+        | None -> assert false (* Should not happen. *)
         | Some header ->
-            store_header_and_prune_block store block_hash
-            >>= fun () ->
-            delete_loop header.shell.predecessor (0, [])
-            >>= fun () -> Lwt.return block_hash
+            store_header_and_prune_block store block_hash >>= fun () ->
+            delete_loop header.shell.predecessor (0, []) >>= fun () ->
+            Lwt.return block_hash
       else
-        Header.read_opt (store, block_hash)
-        >>= function
-        | None ->
-            assert false (* Should not happen. *)
+        Header.read_opt (store, block_hash) >>= function
+        | None -> assert false (* Should not happen. *)
         | Some header ->
-            store_header_and_prune_block store block_hash
-            >>= fun () -> prune_loop header.shell.predecessor (limit - 1)
+            store_header_and_prune_block store block_hash >>= fun () ->
+            prune_loop header.shell.predecessor (limit - 1)
     and delete_loop block_hash (n_blocks, blocks) =
-      ( if n_blocks >= 4000 then
-        do_delete blocks >>= fun () -> Lwt.return (0, [])
-      else Lwt.return (n_blocks, blocks) )
+      (if n_blocks >= 4000 then do_delete blocks >>= fun () -> Lwt.return (0, [])
+      else Lwt.return (n_blocks, blocks))
       >>= fun (n_blocks, blocks) ->
-      Header.read_opt (store, block_hash)
-      >>= function
-      | None ->
-          do_delete blocks
+      Header.read_opt (store, block_hash) >>= function
+      | None -> do_delete blocks
       | Some header ->
           if Block_hash.equal genesis_hash block_hash then do_delete blocks
           else
@@ -820,19 +768,16 @@ module Chain = struct
     >|= WithExceptions.Option.get ~loc:__LOC__
     >>= fun header ->
     if limit = 0 then
-      delete_loop header.shell.predecessor (0, [])
-      >>= fun () -> Lwt.return block_hash
+      delete_loop header.shell.predecessor (0, []) >>= fun () ->
+      Lwt.return block_hash
     else prune_loop header.shell.predecessor limit
 
   let purge_rolling chain_state ((lvl, hash) as checkpoint) =
     Shared.use chain_state.global_state.global_data (fun global_data ->
         Shared.use chain_state.block_store (fun store ->
-            Legacy_store.Block.Contents.read_opt (store, hash)
-            >>= (function
-                  | None ->
-                      fail (Block_contents_not_found hash)
-                  | Some contents ->
-                      return contents)
+            (Legacy_store.Block.Contents.read_opt (store, hash) >>= function
+             | None -> fail (Block_contents_not_found hash)
+             | Some contents -> return contents)
             >>=? fun contents ->
             let max_op_ttl = contents.max_operations_ttl in
             let limit = max_op_ttl in
@@ -878,33 +823,33 @@ module Chain = struct
                 else Lwt.return_unit)
             >>= fun () ->
             (* Remove outdated heads and tag invalid branches. *)
-            locked_valid_heads_for_checkpoint store data checkpoint
-            >>= (fun (valid_heads, invalid_heads) ->
-                  tag_invalid_heads
-                    store
-                    data.chain_data_store
-                    invalid_heads
-                    checkpoint.shell.level
-                  >>= fun outdated_invalid_heads ->
-                  if head_header.shell.level < checkpoint.shell.level then
-                    Lwt.return_unit
-                  else
-                    let outdated_valid_heads =
-                      List.filter
-                        (fun (hash, {Block_header.shell; _}) ->
-                          shell.level <= checkpoint.shell.level
-                          && not (Block_hash.equal hash head_hash))
-                        valid_heads
-                    in
-                    cut_alternate_heads
-                      store
-                      data.chain_data_store
-                      outdated_valid_heads
-                    >>= fun () ->
-                    cut_alternate_heads
-                      store
-                      data.chain_data_store
-                      outdated_invalid_heads)
+            ( locked_valid_heads_for_checkpoint store data checkpoint
+            >>= fun (valid_heads, invalid_heads) ->
+              tag_invalid_heads
+                store
+                data.chain_data_store
+                invalid_heads
+                checkpoint.shell.level
+              >>= fun outdated_invalid_heads ->
+              if head_header.shell.level < checkpoint.shell.level then
+                Lwt.return_unit
+              else
+                let outdated_valid_heads =
+                  List.filter
+                    (fun (hash, {Block_header.shell; _}) ->
+                      shell.level <= checkpoint.shell.level
+                      && not (Block_hash.equal hash head_hash))
+                    valid_heads
+                in
+                cut_alternate_heads
+                  store
+                  data.chain_data_store
+                  outdated_valid_heads
+                >>= fun () ->
+                cut_alternate_heads
+                  store
+                  data.chain_data_store
+                  outdated_invalid_heads )
             >>= fun () ->
             (* Legacy_store the new checkpoint. *)
             Legacy_store.Chain_data.Checkpoint.store
@@ -916,15 +861,13 @@ module Chain = struct
             Lwt.return_unit))
 
   let set_checkpoint_then_purge_full chain_state checkpoint =
-    set_checkpoint chain_state checkpoint
-    >>= fun () ->
+    set_checkpoint chain_state checkpoint >>= fun () ->
     let lvl = checkpoint.shell.level in
     let hash = Block_header.hash checkpoint in
     purge_full chain_state (lvl, hash)
 
   let set_checkpoint_then_purge_rolling chain_state checkpoint =
-    set_checkpoint chain_state checkpoint
-    >>= fun () ->
+    set_checkpoint chain_state checkpoint >>= fun () ->
     let lvl = checkpoint.shell.level in
     let hash = Block_header.hash checkpoint in
     purge_rolling chain_state (lvl, hash)
@@ -934,8 +877,7 @@ module Chain = struct
         Locked_block.acceptable chain_data header)
 
   let destroy state chain =
-    Events.(emit destroy_state (id chain))
-    >>= fun () ->
+    Events.(emit destroy_state (id chain)) >>= fun () ->
     Shared.use state.global_data (fun {global_store; chains; _} ->
         Chain_id.Table.remove chains (id chain) ;
         Legacy_store.Chain.destroy global_store (id chain))
@@ -966,18 +908,15 @@ module Block = struct
 
   let read_contents block =
     Shared.use block.chain_state.block_store (fun store ->
-        Legacy_store.Block.Contents.read_opt (store, block.hash)
-        >>= function
-        | None ->
-            fail (Block_contents_not_found block.hash)
-        | Some contents ->
-            return contents)
+        Legacy_store.Block.Contents.read_opt (store, block.hash) >>= function
+        | None -> fail (Block_contents_not_found block.hash)
+        | Some contents -> return contents)
 
   let read_contents_opt block =
     Shared.use block.chain_state.block_store (fun store ->
-        Legacy_store.Block.Contents.read_opt (store, block.hash)
-        >>= function
-        | None -> Lwt.return_none | Some contents -> Lwt.return_some contents)
+        Legacy_store.Block.Contents.read_opt (store, block.hash) >>= function
+        | None -> Lwt.return_none
+        | Some contents -> Lwt.return_some contents)
 
   let header_of_hash chain_state hash =
     Shared.use chain_state.block_store (fun store ->
@@ -1002,18 +941,17 @@ module Block = struct
   let message b = read_contents b >>=? fun {message; _} -> return message
 
   let max_operations_ttl b =
-    read_contents b
-    >>=? fun {max_operations_ttl; _} -> return max_operations_ttl
+    read_contents b >>=? fun {max_operations_ttl; _} ->
+    return max_operations_ttl
 
   let last_allowed_fork_level b =
-    read_contents b
-    >>=? fun {last_allowed_fork_level; _} -> return last_allowed_fork_level
+    read_contents b >>=? fun {last_allowed_fork_level; _} ->
+    return last_allowed_fork_level
 
   let is_genesis b = Block_hash.equal b.hash b.chain_state.genesis.block
 
   let known_valid chain_state hash =
-    Shared.use chain_state.block_store (fun store ->
-        Header.known (store, hash))
+    Shared.use chain_state.block_store (fun store -> Header.known (store, hash))
 
   let known_invalid chain_state hash =
     Shared.use chain_state.block_store (fun store ->
@@ -1033,8 +971,7 @@ module Block = struct
 
   let unmark_invalid chain_state block =
     Shared.use chain_state.block_store (fun store ->
-        Legacy_store.Block.Invalid_block.known store block
-        >>= fun mem ->
+        Legacy_store.Block.Invalid_block.known store block >>= fun mem ->
         if mem then
           Legacy_store.Block.Invalid_block.remove store block >>= return
         else fail (Block_not_invalid block))
@@ -1050,37 +987,32 @@ module Block = struct
 
   let read_predecessor chain_state ~pred hash =
     Shared.use chain_state.block_store (fun store ->
-        predecessor_n store hash pred
-        >>= fun hash_opt ->
+        predecessor_n store hash pred >>= fun hash_opt ->
         let new_hash_opt =
           match hash_opt with
-          | Some _ as hash_opt ->
-              hash_opt
+          | Some _ as hash_opt -> hash_opt
           | None ->
               if Block_hash.equal hash chain_state.genesis.block then
                 Some chain_state.genesis.block
               else None
         in
         match new_hash_opt with
-        | None ->
-            Lwt.fail Not_found
+        | None -> Lwt.fail Not_found
         | Some hash -> (
-            Header.read_opt (store, hash)
-            >>= fun header ->
+            Header.read_opt (store, hash) >>= fun header ->
             match header with
-            | Some header ->
-                Lwt.return_some {chain_state; hash; header}
-            | None ->
-                Lwt.return_none ))
+            | Some header -> Lwt.return_some {chain_state; hash; header}
+            | None -> Lwt.return_none))
 
   let read chain_state hash =
     Shared.use chain_state.block_store (fun store ->
-        Header.read (store, hash)
-        >>=? fun header -> return {chain_state; hash; header})
+        Header.read (store, hash) >>=? fun header ->
+        return {chain_state; hash; header})
 
   let read_opt chain_state hash =
-    read chain_state hash
-    >>= function Error _ -> Lwt.return_none | Ok v -> Lwt.return_some v
+    read chain_state hash >>= function
+    | Error _ -> Lwt.return_none
+    | Ok v -> Lwt.return_some v
 
   let predecessor {chain_state; header; hash; _} =
     if Block_hash.equal hash header.shell.predecessor then Lwt.return_none
@@ -1109,49 +1041,45 @@ module Block = struct
     let inconsistent_failure =
       failure "State.Block.store: inconsistent operations and operations_data"
     in
-    List.for_all2
-      ~when_different_lengths:inconsistent_failure
-      (fun l1 l2 -> List.length l1 = List.length l2)
-      operations
-      operations_metadata
-    |> (function Ok _ as ok -> ok | Error err -> error err)
+    (List.for_all2
+       ~when_different_lengths:inconsistent_failure
+       (fun l1 l2 -> List.length l1 = List.length l2)
+       operations
+       operations_metadata
+     |> function
+     | Ok _ as ok -> ok
+     | Error err -> error err)
     >>?= fun all_have_equal_lengths ->
-    error_unless all_have_equal_lengths inconsistent_failure
-    >>?= fun () ->
+    error_unless all_have_equal_lengths inconsistent_failure >>?= fun () ->
     (* let's the validator check the consistency... of fitness, level, ... *)
     Shared.use chain_state.block_store (fun store ->
         Legacy_store.Block.Invalid_block.known store hash
         >>= fun known_invalid ->
-        fail_when known_invalid (failure "Known invalid")
-        >>=? fun () ->
-        Legacy_store.Block.Contents.known (store, hash)
-        >>= fun known ->
+        fail_when known_invalid (failure "Known invalid") >>=? fun () ->
+        Legacy_store.Block.Contents.known (store, hash) >>= fun known ->
         if known then return_none
         else
           (* safety check: never ever commit a block that is not compatible
-           with the current checkpoint.  *)
+             with the current checkpoint. *)
           let predecessor = block_header.shell.predecessor in
-          Header.known (store, predecessor)
-          >>= (fun valid_predecessor ->
-                if not valid_predecessor then Lwt.return_false
-                else
-                  Shared.use chain_state.chain_data (fun chain_data ->
-                      Locked_block.acceptable chain_data block_header))
+          ( Header.known (store, predecessor) >>= fun valid_predecessor ->
+            if not valid_predecessor then Lwt.return_false
+            else
+              Shared.use chain_state.chain_data (fun chain_data ->
+                  Locked_block.acceptable chain_data block_header) )
           >>= fun acceptable_block ->
           fail_unless acceptable_block (Checkpoint_error (hash, None))
           >>=? fun () ->
           let commit = context_hash in
-          Header.read (store, predecessor)
-          >>=? fun pred_block ->
+          Header.read (store, predecessor) >>=? fun pred_block ->
           Chain.get_level_indexed_protocol chain_state pred_block
           >>= fun protocol ->
-          ( match Registered_protocol.get protocol with
-          | Some (module Proto) ->
-              return Proto.environment_version
+          (match Registered_protocol.get protocol with
+          | Some (module Proto) -> return Proto.environment_version
           | None ->
               fail
                 (Block_validator_errors.Unavailable_protocol
-                   {block = predecessor; protocol}) )
+                   {block = predecessor; protocol}))
           >>=? fun env ->
           let contents =
             {
@@ -1163,8 +1091,7 @@ module Block = struct
               metadata = block_header_metadata;
             }
           in
-          Legacy_store.Block.Contents.store (store, hash) contents
-          >>= fun () ->
+          Legacy_store.Block.Contents.store (store, hash) contents >>= fun () ->
           List.iteri_p
             (fun i ops ->
               Legacy_store.Block.Operation_hashes.store
@@ -1183,20 +1110,18 @@ module Block = struct
               Legacy_store.Block.Operations_metadata.store (store, hash) i ops)
             operations_metadata
           >>= fun () ->
-          ( match block_metadata_hash with
+          (match block_metadata_hash with
           | Some block_metadata_hash ->
               Legacy_store.Block.Block_metadata_hash.store
                 (store, hash)
                 block_metadata_hash
               >|= ok
           | None -> (
-            match env with
-            | V1 | V2 | V3 ->
-                fail @@ Missing_block_metadata_hash predecessor
-            | V0 ->
-                return_unit ) )
+              match env with
+              | V1 | V2 | V3 -> fail @@ Missing_block_metadata_hash predecessor
+              | V0 -> return_unit))
           >>=? fun () ->
-          ( match ops_metadata_hashes with
+          (match ops_metadata_hashes with
           | Some ops_metadata_hashes ->
               Lwt_list.iteri_s
                 (fun i hashes ->
@@ -1207,31 +1132,28 @@ module Block = struct
                 ops_metadata_hashes
               >|= ok
           | None -> (
-            match env with
-            | V1 when pred_block.shell.validation_passes > 0 ->
-                fail @@ Missing_operation_metadata_hashes predecessor
-            | _ ->
-                return_unit ) )
+              match env with
+              | V1 when pred_block.shell.validation_passes > 0 ->
+                  fail @@ Missing_operation_metadata_hashes predecessor
+              | _ -> return_unit))
           >>=? fun () ->
           (* Legacy_store predecessors *)
-          store_predecessors store hash
-          >>= fun () ->
+          store_predecessors store hash >>= fun () ->
           (* Update the chain state. *)
           Shared.use chain_state.chain_data (fun chain_data ->
               let store = chain_data.chain_data_store in
               let predecessor = block_header.shell.predecessor in
               Legacy_store.Chain_data.Known_heads.remove store predecessor
-              >>= fun () ->
-              Legacy_store.Chain_data.Known_heads.store store hash)
+              >>= fun () -> Legacy_store.Chain_data.Known_heads.store store hash)
           >>= fun () ->
-          ( if forking_testchain then
-            Shared.use chain_state.global_state.global_data (fun global_data ->
-                let genesis = Context.compute_testchain_genesis hash in
-                Legacy_store.Forking_block_hash.store
-                  global_data.global_store
-                  (Context.compute_testchain_chain_id genesis)
-                  hash)
-          else Lwt.return_unit )
+          (if forking_testchain then
+           Shared.use chain_state.global_state.global_data (fun global_data ->
+               let genesis = Context.compute_testchain_genesis hash in
+               Legacy_store.Forking_block_hash.store
+                 global_data.global_store
+                 (Context.compute_testchain_chain_id genesis)
+                 hash)
+          else Lwt.return_unit)
           >>= fun () ->
           let block = {chain_state; hash; header = block_header} in
           Lwt_watcher.notify chain_state.block_watcher block ;
@@ -1243,10 +1165,8 @@ module Block = struct
     let header = block.header in
     protect (fun () ->
         Shared.use block.chain_state.block_store (fun store ->
-            Legacy_store.Block.Contents.remove (store, hash)
-            >>= fun () ->
-            Legacy_store.Block.Operations.remove_all (store, hash)
-            >>= fun () ->
+            Legacy_store.Block.Contents.remove (store, hash) >>= fun () ->
+            Legacy_store.Block.Operations.remove_all (store, hash) >>= fun () ->
             Legacy_store.Block.Operations_metadata.remove_all (store, hash)
             >>= fun () ->
             Legacy_store.Block.Operation_hashes.remove_all (store, hash)
@@ -1260,24 +1180,18 @@ module Block = struct
                 >>= fun () ->
                 Legacy_store.Chain_data.In_main_branch.remove (store, hash)
                 >>= fun () ->
-                Legacy_store.Chain_data.Current_head.read_opt store
-                >>= function
+                Legacy_store.Chain_data.Current_head.read_opt store >>= function
                 | Some block_hash when block_hash = hash ->
-                    Legacy_store.Chain_data.Current_head.store
-                      store
-                      predecessor
-                | Some _ | None ->
-                    Lwt.return_unit)
+                    Legacy_store.Chain_data.Current_head.store store predecessor
+                | Some _ | None -> Lwt.return_unit)
             >>= fun () -> return_unit))
 
   let store_invalid chain_state block_header errors =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     Shared.use chain_state.block_store (fun store ->
-        Header.known (store, hash)
-        >>= fun known_valid ->
-        fail_when known_valid (failure "Known valid")
-        >>=? fun () ->
+        Header.known (store, hash) >>= fun known_valid ->
+        fail_when known_valid (failure "Known valid") >>=? fun () ->
         Legacy_store.Block.Invalid_block.known store hash
         >>= fun known_invalid ->
         if known_invalid then return_false
@@ -1370,8 +1284,7 @@ module Block = struct
         else
           Legacy_store.Block.Operations_metadata_hashes.known (store, hash) 0
           >>= function
-          | false ->
-              Lwt.return_none
+          | false -> Lwt.return_none
           | true ->
               List.map_p
                 (fun i ->
@@ -1411,12 +1324,9 @@ module Block = struct
         Context.checkout context_index commit)
 
   let context block =
-    context_opt block
-    >>= function
-    | Some context ->
-        return context
-    | None ->
-        fail (Block_contents_not_found block.hash)
+    context_opt block >>= function
+    | Some context -> return context
+    | None -> fail (Block_contents_not_found block.hash)
 
   let context_exists {chain_state; hash; _} =
     Shared.use chain_state.block_store (fun block_store ->
@@ -1427,18 +1337,15 @@ module Block = struct
         Context.exists context_index commit)
 
   let protocol_hash ({chain_state; _} as block) =
-    Chain.save_point chain_state
-    >>= fun (save_point_level, _) ->
+    Chain.save_point chain_state >>= fun (save_point_level, _) ->
     if Compare.Int32.(level block < save_point_level) then
       Chain.get_level_indexed_protocol chain_state block.header >>= return
     else
-      context block
-      >>=? fun context ->
+      context block >>=? fun context ->
       protect (fun () -> Context.get_protocol context >>= return)
 
   let protocol_hash_exn ({chain_state; _} as block) =
-    Chain.save_point chain_state
-    >>= fun (save_point_level, _) ->
+    Chain.save_point chain_state >>= fun (save_point_level, _) ->
     if Compare.Int32.(level block < save_point_level) then
       Chain.get_level_indexed_protocol chain_state block.header
     else context_exn block >>= fun context -> Context.get_protocol context
@@ -1446,10 +1353,8 @@ module Block = struct
   let protocol_level block = block.header.shell.proto_level
 
   let test_chain block =
-    context_exn block
-    >>= fun context ->
-    Context.get_test_chain context
-    >>= fun status ->
+    context_exn block >>= fun context ->
+    Context.get_test_chain context >>= fun status ->
     let lookup_testchain genesis =
       let chain_id = Context.compute_testchain_chain_id genesis in
       (* otherwise, look in the temporary table *)
@@ -1459,40 +1364,31 @@ module Block = struct
             chain_id)
       >>= function
       | Some forking_block_hash ->
-          read_opt block.chain_state forking_block_hash
-          >>= fun forking_block -> Lwt.return (status, forking_block)
-      | None ->
-          Lwt.return (status, None)
+          read_opt block.chain_state forking_block_hash >>= fun forking_block ->
+          Lwt.return (status, forking_block)
+      | None -> Lwt.return (status, None)
     in
     match status with
-    | Running {genesis; _} ->
-        lookup_testchain genesis
-    | Forking _ ->
-        Lwt.return (status, Some block)
-    | Not_running ->
-        Lwt.return (status, None)
+    | Running {genesis; _} -> lookup_testchain genesis
+    | Forking _ -> Lwt.return (status, Some block)
+    | Not_running -> Lwt.return (status, None)
 
   let known chain_state hash =
     Shared.use chain_state.block_store (fun store ->
-        Header.known (store, hash)
-        >>= fun known ->
+        Header.known (store, hash) >>= fun known ->
         if known then Lwt.return_true
         else Legacy_store.Block.Invalid_block.known store hash)
 
   let block_validity chain_state block : Block_locator.validity Lwt.t =
-    known chain_state block
-    >>= function
+    known chain_state block >>= function
     | false ->
         if Block_hash.equal block (Chain.faked_genesis_hash chain_state) then
           Lwt.return Block_locator.Known_valid
         else Lwt.return Block_locator.Unknown
     | true -> (
-        known_invalid chain_state block
-        >>= function
-        | true ->
-            Lwt.return Block_locator.Known_invalid
-        | false ->
-            Lwt.return Block_locator.Known_valid )
+        known_invalid chain_state block >>= function
+        | true -> Lwt.return Block_locator.Known_invalid
+        | false -> Lwt.return Block_locator.Known_valid)
 
   let known_ancestor chain_state locator =
     Shared.use chain_state.global_state.global_data (fun {global_store; _} ->
@@ -1501,49 +1397,37 @@ module Block = struct
     >>= fun history_mode ->
     Block_locator.unknown_prefix ~is_known:(block_validity chain_state) locator
     >>= function
-    | (Known_valid, prefix_locator) ->
-        Lwt.return_some prefix_locator
-    | (Known_invalid, _) ->
-        Lwt.return_none
+    | (Known_valid, prefix_locator) -> Lwt.return_some prefix_locator
+    | (Known_invalid, _) -> Lwt.return_none
     | (Unknown, _) -> (
-      match history_mode with
-      | Archive ->
-          Lwt.return_none
-      | Rolling | Full ->
-          Lwt.return_some locator )
+        match history_mode with
+        | Archive -> Lwt.return_none
+        | Rolling | Full -> Lwt.return_some locator)
 
   (* Hypothesis : genesis' predecessor is itself. *)
   let get_rpc_directory ({chain_state; _} as block) =
-    read_opt chain_state block.header.shell.predecessor
-    >>= function
-    | None ->
-        Lwt.return_none (* assert false *)
-    | Some pred when equal pred block ->
-        Lwt.return_none (* genesis *)
+    read_opt chain_state block.header.shell.predecessor >>= function
+    | None -> Lwt.return_none (* assert false *)
+    | Some pred when equal pred block -> Lwt.return_none (* genesis *)
     | Some pred -> (
-        protocol_hash_exn pred
-        >>= fun protocol ->
+        protocol_hash_exn pred >>= fun protocol ->
         match
           Protocol_hash.Table.find chain_state.block_rpc_directories protocol
         with
-        | None ->
-            Lwt.return_none
+        | None -> Lwt.return_none
         | Some map ->
-            protocol_hash_exn block
-            >>= fun next_protocol ->
-            Lwt.return (Protocol_hash.Map.find next_protocol map) )
+            protocol_hash_exn block >>= fun next_protocol ->
+            Lwt.return (Protocol_hash.Map.find next_protocol map))
 
   let set_rpc_directory ({chain_state; _} as block) dir =
     read_opt chain_state block.header.shell.predecessor
     >|= WithExceptions.Option.get ~loc:__LOC__
     >>= fun pred ->
-    protocol_hash_exn block
-    >>= fun next_protocol ->
-    Chain.save_point chain_state
-    >>= fun (save_point_level, _) ->
-    ( if Compare.Int32.(level pred < save_point_level) then
-      Chain.get_level_indexed_protocol chain_state (header pred)
-    else protocol_hash_exn pred )
+    protocol_hash_exn block >>= fun next_protocol ->
+    Chain.save_point chain_state >>= fun (save_point_level, _) ->
+    (if Compare.Int32.(level pred < save_point_level) then
+     Chain.get_level_indexed_protocol chain_state (header pred)
+    else protocol_hash_exn pred)
     >>= fun protocol ->
     let map =
       Option.value
@@ -1560,8 +1444,7 @@ module Block = struct
     Shared.use chain_state.block_store (fun block_store ->
         Header.read_opt (block_store, header.Block_header.shell.predecessor)
         >>= function
-        | None ->
-            Lwt.return_none (* caboose *)
+        | None -> Lwt.return_none (* caboose *)
         | Some pred when Block_header.equal pred header ->
             Lwt.return_none (* genesis *)
         | Some pred -> (
@@ -1572,19 +1455,17 @@ module Block = struct
                 chain_state.header_rpc_directories
                 protocol
             with
-            | None ->
-                Lwt.return_none
+            | None -> Lwt.return_none
             | Some map ->
                 Chain.get_level_indexed_protocol chain_state pred
                 >>= fun next_protocol ->
-                Lwt.return (Protocol_hash.Map.find next_protocol map) ))
+                Lwt.return (Protocol_hash.Map.find next_protocol map)))
 
   let set_header_rpc_directory chain_state header dir =
     Shared.use chain_state.block_store (fun block_store ->
         Header.read_opt (block_store, header.Block_header.shell.predecessor)
         >>= function
-        | None ->
-            assert false
+        | None -> assert false
         | Some pred ->
             Chain.get_level_indexed_protocol chain_state header
             >>= fun next_protocol ->
@@ -1612,18 +1493,18 @@ let read_block {global_data; _} hash =
       Chain_id.Table.fold_s
         (fun _chain_id chain_state acc ->
           match acc with
-          | Some _ ->
-              Lwt.return acc
+          | Some _ -> Lwt.return acc
           | None -> (
-              Block.read_opt chain_state hash
-              >>= function
-              | None -> Lwt.return acc | Some block -> Lwt.return_some block ))
+              Block.read_opt chain_state hash >>= function
+              | None -> Lwt.return acc
+              | Some block -> Lwt.return_some block))
         chains
         None)
 
 let read_block_exn t hash =
-  read_block t hash
-  >>= function None -> Lwt.fail Not_found | Some b -> Lwt.return b
+  read_block t hash >>= function
+  | None -> Lwt.fail Not_found
+  | Some b -> Lwt.return b
 
 let update_testchain block ~testchain_state =
   update_chain_data block.chain_state (fun _ chain_data ->
@@ -1666,8 +1547,8 @@ let fork_testchain block chain_id genesis_hash genesis_header protocol
         genesis_header.shell.proto_level
         (protocol, genesis_header.shell.level)
       >>= fun () ->
-      update_testchain block ~testchain_state
-      >>= fun () -> return testchain_state)
+      update_testchain block ~testchain_state >>= fun () ->
+      return testchain_state)
 
 let best_known_head_for_checkpoint chain_state checkpoint =
   Shared.use chain_state.block_store (fun store ->
@@ -1692,9 +1573,9 @@ let best_known_head_for_checkpoint chain_state checkpoint =
                 predecessor_n
                   store
                   hash
-                  ( 1
-                  + ( Int32.to_int
-                    @@ Int32.sub header.shell.level checkpoint.shell.level ) )
+                  (1
+                  + (Int32.to_int
+                    @@ Int32.sub header.shell.level checkpoint.shell.level))
                 >|= WithExceptions.Option.get ~loc:__LOC__
                 >>= fun pred ->
                 Header.read_opt (store, pred)
@@ -1716,8 +1597,7 @@ let best_known_head_for_checkpoint chain_state checkpoint =
             in
             Block_hash.Set.fold_s
               (fun head best ->
-                find_valid_predecessor head
-                >|= fun pred ->
+                find_valid_predecessor head >|= fun pred ->
                 if
                   Fitness.(
                     pred.header.shell.fitness > best.header.shell.fitness)
@@ -1753,8 +1633,7 @@ module Protocol = struct
     let bytes = Protocol.to_bytes p in
     let hash = Protocol.hash_raw bytes in
     Shared.use global_state.protocol_store (fun store ->
-        Legacy_store.Protocol.Contents.known store hash
-        >>= fun known ->
+        Legacy_store.Protocol.Contents.known store hash >>= fun known ->
         if known then Lwt.return_none
         else
           Legacy_store.Protocol.RawContents.store (store, hash) bytes
@@ -1764,12 +1643,11 @@ module Protocol = struct
 
   let remove global_state hash =
     Shared.use global_state.protocol_store (fun store ->
-        Legacy_store.Protocol.Contents.known store hash
-        >>= fun known ->
+        Legacy_store.Protocol.Contents.known store hash >>= fun known ->
         if known then Lwt.return_false
         else
-          Legacy_store.Protocol.Contents.remove store hash
-          >>= fun () -> Lwt.return_true)
+          Legacy_store.Protocol.Contents.remove store hash >>= fun () ->
+          Lwt.return_true)
 
   let list global_state =
     Shared.use global_state.protocol_store (fun store ->
@@ -1795,10 +1673,8 @@ module Current_mempool = struct
 end
 
 let may_create_chain ~commit_genesis state chain_id genesis =
-  Chain.get state chain_id
-  >>= function
-  | Ok chain ->
-      return chain
+  Chain.get state chain_id >>= function
+  | Ok chain -> return chain
   | Error _ ->
       Chain.create
         ~commit_genesis
@@ -1830,38 +1706,29 @@ let compute_locator_from_hash chain_state ?(max_size = max_locator_size)
   Shared.use chain_state.block_store (fun block_store ->
       read_chain_data chain_state (fun _ chain_data ->
           match min_level with
-          | None ->
-              Lwt.return chain_data.caboose
+          | None -> Lwt.return chain_data.caboose
           | Some level -> (
               let head_level = head_header.Block_header.shell.level in
               let distance = Int32.sub head_level level in
               predecessor_n block_store head_hash (Int32.to_int distance)
               >>= function
-              | None ->
-                  Lwt.return chain_data.caboose
-              | Some hash ->
-                  Lwt.return (level, hash) ))
+              | None -> Lwt.return chain_data.caboose
+              | Some hash -> Lwt.return (level, hash)))
       >>= fun (_lvl, caboose) ->
       let get_predecessor =
         match min_level with
-        | None ->
-            predecessor_n block_store
+        | None -> predecessor_n block_store
         | Some min_level -> (
             fun block_hash distance ->
-              predecessor_n block_store block_hash distance
-              >>= function
-              | None ->
-                  Lwt.return_none
+              predecessor_n block_store block_hash distance >>= function
+              | None -> Lwt.return_none
               | Some pred_hash -> (
-                  Header.read_opt (block_store, pred_hash)
-                  >>= function
-                  | None ->
-                      Lwt.return_none
+                  Header.read_opt (block_store, pred_hash) >>= function
+                  | None -> Lwt.return_none
                   | Some pred_header
                     when Compare.Int32.(pred_header.shell.level < min_level) ->
                       Lwt.return_none
-                  | Some _ ->
-                      Lwt.return_some pred_hash ) )
+                  | Some _ -> Lwt.return_some pred_hash))
       in
       Block_locator.compute
         ~get_predecessor
@@ -1875,19 +1742,15 @@ let compute_locator chain ?max_size head seed =
   compute_locator_from_hash chain ?max_size (head.hash, Block.header head) seed
 
 let compute_protocol_locator chain_state ?max_size ~proto_level seed =
-  Chain.store chain_state
-  >>= fun global_store ->
+  Chain.store chain_state >>= fun global_store ->
   let chain_store = Legacy_store.Chain.get global_store chain_state.chain_id in
   read_chain_data chain_state (fun _chain_store chain_data ->
       Legacy_store.Chain.Protocol_info.read_opt chain_store proto_level
       >>= function
-      | None ->
-          Lwt.return_none
+      | None -> Lwt.return_none
       | Some (_protocol_hash, block_activation_level) -> (
           (* proto level's lower bound found, now retrieving the upper bound *)
-          let head_proto_level =
-            Block.protocol_level chain_data.current_head
-          in
+          let head_proto_level = Block.protocol_level chain_data.current_head in
           if Compare.Int.(proto_level = head_proto_level) then
             Lwt.return_some
               ( block_activation_level,
@@ -1899,8 +1762,7 @@ let compute_protocol_locator chain_state ?max_size ~proto_level seed =
               chain_store
               (succ proto_level)
             >>= function
-            | None ->
-                Lwt.return_none
+            | None -> Lwt.return_none
             | Some (_, next_activation_level) -> (
                 let last_level_in_protocol =
                   Int32.(pred next_activation_level)
@@ -1917,21 +1779,17 @@ let compute_protocol_locator chain_state ?max_size ~proto_level seed =
                       (Block.hash chain_data.current_head)
                       (Int32.to_int delta))
                 >>= function
-                | None ->
-                    Lwt.return_none
+                | None -> Lwt.return_none
                 | Some pred_hash ->
                     Shared.use chain_state.block_store (fun block_store ->
-                        Header.read_opt (block_store, pred_hash)
-                        >>= function
-                        | None ->
-                            Lwt.return_none
+                        Header.read_opt (block_store, pred_hash) >>= function
+                        | None -> Lwt.return_none
                         | Some pred_header ->
                             Lwt.return_some
                               (block_activation_level, (pred_hash, pred_header)))
-                ) ))
+                )))
   >>= function
-  | None ->
-      Lwt.return_none
+  | None -> Lwt.return_none
   | Some (block_activation_level, upper_block) ->
       compute_locator_from_hash
         chain_state
@@ -1967,17 +1825,15 @@ let () =
     (function
       | Incorrect_legacy_history_mode_switch x ->
           Some (x.previous_mode, x.next_mode)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (previous_mode, next_mode) ->
       Incorrect_legacy_history_mode_switch {previous_mode; next_mode})
 
 let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
     ~store_root ~context_root ?history_mode ?(readonly = false)
     (genesis : Genesis.t) =
-  Legacy_store.init ~mapsize:store_mapsize store_root
-  >>=? fun global_store ->
-  ( match commit_genesis with
+  Legacy_store.init ~mapsize:store_mapsize store_root >>=? fun global_store ->
+  (match commit_genesis with
   | Some commit_genesis ->
       Context.init ~readonly:true ?patch_context context_root
       >>= fun context_index -> Lwt.return (context_index, commit_genesis)
@@ -1991,34 +1847,29 @@ let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
           ~time:genesis.time
           ~protocol:genesis.protocol
       in
-      Lwt.return (context_index, commit_genesis) )
+      Lwt.return (context_index, commit_genesis))
   >>= fun (context_index, commit_genesis) ->
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
-  read global_store context_index chain_id
-  >>=? fun state ->
+  read global_store context_index chain_id >>=? fun state ->
   may_create_chain ~commit_genesis state chain_id genesis
   >>=? fun main_chain_state ->
-  Legacy_store.Configuration.History_mode.read_opt global_store
-  >>= (function
-        | None ->
-            let mode =
-              Option.value ~default:History_mode.Legacy.Full history_mode
-            in
-            Legacy_store.Configuration.History_mode.store global_store mode
-            >>= fun () -> return mode
-        | Some previous_history_mode -> (
-          match history_mode with
-          | None ->
-              return previous_history_mode
-          | Some history_mode ->
-              if history_mode <> previous_history_mode then
-                fail
-                  (Incorrect_legacy_history_mode_switch
-                     {
-                       previous_mode = previous_history_mode;
-                       next_mode = history_mode;
-                     })
-              else return history_mode ))
+  (Legacy_store.Configuration.History_mode.read_opt global_store >>= function
+   | None ->
+       let mode = Option.value ~default:History_mode.Legacy.Full history_mode in
+       Legacy_store.Configuration.History_mode.store global_store mode
+       >>= fun () -> return mode
+   | Some previous_history_mode -> (
+       match history_mode with
+       | None -> return previous_history_mode
+       | Some history_mode ->
+           if history_mode <> previous_history_mode then
+             fail
+               (Incorrect_legacy_history_mode_switch
+                  {
+                    previous_mode = previous_history_mode;
+                    next_mode = history_mode;
+                  })
+           else return history_mode))
   >>=? fun history_mode ->
   return (state, main_chain_state, context_index, history_mode)
 

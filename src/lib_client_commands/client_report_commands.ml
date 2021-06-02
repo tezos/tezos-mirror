@@ -47,23 +47,21 @@ let commands () =
       ~short:'o'
       ~placeholder:"path"
       ~default:"-"
-      (parameter (fun _ ->
-         function
-         | "-" ->
-             return Format.std_formatter
+      (parameter (fun _ -> function
+         | "-" -> return Format.std_formatter
          | file ->
              let ppf = Format.formatter_of_out_channel (open_out file) in
              ignore Clic.(setup_formatter ppf Plain Full) ;
              return ppf))
   in
-  [ command
+  [
+    command
       ~group
       ~desc:"The last heads that have been considered by the node."
       (args1 output_arg)
       (fixed ["list"; "heads"])
       (fun ppf cctxt ->
-        Shell_services.Blocks.list cctxt ()
-        >>=? fun heads ->
+        Shell_services.Blocks.list cctxt () >>=? fun heads ->
         Format.fprintf
           ppf
           "@[<v>%a@]@."
@@ -76,8 +74,7 @@ let commands () =
       (args1 output_arg)
       (fixed ["list"; "rejected"; "blocks"])
       (fun ppf cctxt ->
-        Shell_services.Invalid_blocks.list cctxt ()
-        >>=? function
+        Shell_services.Invalid_blocks.list cctxt () >>=? function
         | [] ->
             Format.fprintf ppf "No invalid blocks.@." ;
             return_unit
@@ -87,4 +84,5 @@ let commands () =
               "@[<v>%a@]@."
               (Format.pp_print_list print_invalid_blocks)
               invalid ;
-            return_unit) ]
+            return_unit);
+  ]

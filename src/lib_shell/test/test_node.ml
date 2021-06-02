@@ -113,10 +113,8 @@ let wrap f _switch () =
 (** Start tests *)
 
 let ( >>=?? ) m f =
-  m
-  >>= function
-  | Ok v ->
-      f v
+  m >>= function
+  | Ok v -> f v
   | Error error ->
       Format.printf "Error:\n   %a\n" pp_print_error error ;
       Format.print_flush () ;
@@ -230,11 +228,13 @@ let node_store_known_protocol_events _sandbox_parameters config _switch () =
   Node.shutdown n
 
 let tests =
-  [ Alcotest_lwt.test_case
+  [
+    Alcotest_lwt.test_case
       "node_sandbox_initialization_events"
       `Quick
       (wrap node_sandbox_initialization_events);
     Alcotest_lwt.test_case
       "node_initialization_events"
       `Quick
-      (wrap node_initialization_events) ]
+      (wrap node_initialization_events);
+  ]

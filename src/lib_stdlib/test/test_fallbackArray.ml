@@ -36,9 +36,11 @@ open FallbackArray
 let for_some_idx s f = List.iter f [0; s - 1; s / 2; 1; s / 3; s - 2]
 
 let samples =
-  [ (0, "fallback", "foo");
+  [
+    (0, "fallback", "foo");
     (100, "fallback", "bar");
-    (1024 * 1024, "fallback", "baz") ]
+    (1024 * 1024, "fallback", "baz");
+  ]
 
 let on_samples f () = List.iter f samples
 
@@ -47,15 +49,13 @@ let check_make_and_fallback (s, d, _) =
   if not (fallback (make s d) = d) then fail "fallback (make s d) = d"
 
 let check_fresh_accesses (s, d, _) =
-  for_some_idx s
-  @@ fun i ->
+  for_some_idx s @@ fun i ->
   let a = make s d in
   if not (get a i = d) then
     fail "initially, for all i >= 0 && i < s, get (make s d) i = d"
 
 let check_get_set (s, d, v) =
-  for_some_idx s
-  @@ fun i ->
+  for_some_idx s @@ fun i ->
   let a = make s d in
   set a i v ;
   if not (i >= s || i < 0 || get a i = v) then
@@ -103,17 +103,19 @@ let check_fold (s, _, _) =
   iter a (fun x -> r := !r + x) ;
   if not (!r = r') then
     fail
-      "fold a init f should accumulate all applications of f over all \
-       elements of a."
+      "fold a init f should accumulate all applications of f over all elements \
+       of a."
 
 let tests =
-  [ ("make_fallback", `Quick, on_samples check_make_and_fallback);
+  [
+    ("make_fallback", `Quick, on_samples check_make_and_fallback);
     ("fresh_accesses", `Quick, on_samples check_fresh_accesses);
     ("get_set", `Quick, on_samples check_get_set);
     ("out_of_bounds", `Quick, on_samples check_out_of_bounds);
     ("immutable_fallback", `Quick, on_samples check_cannot_override_fallback);
     ("iter", `Quick, on_samples check_iter);
     ("map", `Quick, on_samples check_map);
-    ("fold", `Quick, on_samples check_fold) ]
+    ("fold", `Quick, on_samples check_fold);
+  ]
 
 let () = Alcotest.run "stdlib" [("FallbackArray", tests)]

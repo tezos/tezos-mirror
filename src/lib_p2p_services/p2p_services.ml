@@ -197,13 +197,13 @@ module Points = struct
         ~output:P2p_point.Info.encoding
         ~description:
           "Change the connectivity state of a given `IP:addr`. With `{acl : \
-           ban}`: blacklist the given address and remove it from the \
-           whitelist if present. With `{acl: open}`: removes an address from \
-           the blacklist and whitelist. With `{acl: trust}`: trust a given \
-           address permanently and remove it from the blacklist if present. \
-           With `{peer_id: <id>}` set the peerId of the point. Connections \
-           from this address can still be closed on authentication if the \
-           peer is greylisted. "
+           ban}`: blacklist the given address and remove it from the whitelist \
+           if present. With `{acl: open}`: removes an address from the \
+           blacklist and whitelist. With `{acl: trust}`: trust a given address \
+           permanently and remove it from the blacklist if present. With \
+           `{peer_id: <id>}` set the peerId of the point. Connections from \
+           this address can still be closed on authentication if the peer is \
+           greylisted. "
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg)
 
     let events =
@@ -250,8 +250,7 @@ module Points = struct
         ~description:
           "DEPRECATED: Remove an address from the blacklist. Use PATCH \
            `/network/point/:peerid` instead."
-        RPC_path.(
-          root / "network" / "points" /: P2p_point.Id.rpc_arg / "unban")
+        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "unban")
 
     let trust =
       RPC_service.get_service
@@ -262,8 +261,7 @@ module Points = struct
            the blacklist if present. Connections from this address can still \
            be closed on authentication if the peer is greylisted. Use \
            PATCH`/network/point/<point_id>` instead."
-        RPC_path.(
-          root / "network" / "points" /: P2p_point.Id.rpc_arg / "trust")
+        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "trust")
 
     let untrust =
       RPC_service.get_service
@@ -416,8 +414,7 @@ module Peers = struct
         ~description:
           "DEPRECATED: Remove a given peer from the whitelist. Use PATCH \
            `network/peers/<peer_id>` instead."
-        RPC_path.(
-          root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "untrust")
+        RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "untrust")
 
     let banned =
       RPC_service.get_service
@@ -473,8 +470,8 @@ module ACL = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.empty
         ~description:
-          "Clear all greylists tables. This will unban all addresses and \
-           peers automatically greylisted by the system."
+          "Clear all greylists tables. This will unban all addresses and peers \
+           automatically greylisted by the system."
         RPC_path.(root / "network" / "greylist")
 
     let get_greylisted_peers =
@@ -505,8 +502,8 @@ module ACL = struct
           \           If the field \"not_reliable_since\" Contains a date, \
            this means that the greylist has been overflowed and it is no more \
            possible to obtain the exact list of greylisted IPs. Since the \
-           greylist of IP addresses has been design to work whatever his \
-           size, there is no security issue related to this overflow.\n\
+           greylist of IP addresses has been design to work whatever his size, \
+           there is no security issue related to this overflow.\n\
           \          Reinitialize the ACL structure by calling \"delete \
            /network/greylist\" to get back this list reliable."
         RPC_path.(root / "network" / "greylist" / "ips")
@@ -514,8 +511,7 @@ module ACL = struct
 
   let clear ctxt = make_call S.clear_delete ctxt () ()
 
-  let get_greylisted_peers ctxt =
-    make_call S.get_greylisted_peers ctxt () () ()
+  let get_greylisted_peers ctxt = make_call S.get_greylisted_peers ctxt () () ()
 
   let get_greylisted_ips ctxt = make_call S.get_greylisted_ips ctxt () () ()
 end

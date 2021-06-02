@@ -41,10 +41,7 @@ let zero_bytes = Bytes.make Nonce_hash.size '\000'
 
 let state_hash_encoding =
   let open Data_encoding in
-  conv
-    State_hash.to_bytes
-    State_hash.of_bytes_exn
-    (Fixed.bytes Nonce_hash.size)
+  conv State_hash.to_bytes State_hash.of_bytes_exn (Fixed.bytes Nonce_hash.size)
 
 let seed_encoding =
   let open Data_encoding in
@@ -62,11 +59,12 @@ let xor_higher_bits i b =
   let higher = TzEndian.get_int32 b 0 in
   let r = Int32.logxor higher i in
   let res = Bytes.copy b in
-  TzEndian.set_int32 res 0 r ; res
+  TzEndian.set_int32 res 0 r ;
+  res
 
 let sequence (T state) n =
-  State_hash.to_bytes state |> xor_higher_bits n
-  |> fun b -> S (State_hash.hash_bytes [b])
+  State_hash.to_bytes state |> xor_higher_bits n |> fun b ->
+  S (State_hash.hash_bytes [b])
 
 let take (S state) =
   let b = State_hash.to_bytes state in

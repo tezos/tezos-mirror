@@ -57,7 +57,8 @@ let raw_context_arb =
     fix
       (fun self current_depth_factor ->
         frequency
-          [ (max_depth_factor, map (fun b -> Key b) bytes_gen);
+          [
+            (max_depth_factor, map (fun b -> Key b) bytes_gen);
             (max_depth_factor, pure Cut);
             ( current_depth_factor,
               map
@@ -65,14 +66,14 @@ let raw_context_arb =
                 (MapArb.gen_of_size
                    (0 -- 10)
                    string
-                   (self (current_depth_factor / 2))) ) ])
+                   (self (current_depth_factor / 2))) );
+          ])
       max_depth_factor
   in
   let rec shrink =
     let open Iter in
     function
-    | Cut ->
-        empty
+    | Cut -> empty
     | Key bigger_bytes ->
         shrink Cut
         <+> ( of_option_shrink bytes_shrink_opt bigger_bytes
@@ -104,7 +105,8 @@ let merkle_node_arb =
     fix
       (fun self current_depth_factor ->
         frequency
-          [ ( max_depth_factor,
+          [
+            ( max_depth_factor,
               map
                 (fun (kind, hash) -> Hash (kind, hash))
                 (pair (oneofl [Contents; Node]) irmin_hash_gen) );
@@ -116,18 +118,19 @@ let merkle_node_arb =
                 (MapArb.gen_of_size
                    (0 -- 10)
                    string
-                   (self (current_depth_factor / 2))) ) ])
+                   (self (current_depth_factor / 2))) );
+          ])
       max_depth_factor
   in
   let first_irmin_hash =
-    List.hd Light_lib.irmin_hashes
-    |> function None -> assert false | Some hash -> hash
+    List.hd Light_lib.irmin_hashes |> function
+    | None -> assert false
+    | Some hash -> hash
   in
   let rec shrink =
     let open Iter in
     function
-    | Hash _ ->
-        empty
+    | Hash _ -> empty
     | Data bigger_raw_context ->
         shrink (Hash (Contents, first_irmin_hash))
         <+> ( of_option_shrink raw_context_shrink_opt bigger_raw_context
@@ -157,8 +160,9 @@ let irmin_tree_arb =
   map
     ~rev:(fun tree ->
       Store.Tree.fold tree [] ~init:[] ~f:(fun path sub_tree acc ->
-          Store.Tree.to_value sub_tree
-          >|= function None -> acc | Some bytes -> (path, bytes) :: acc)
+          Store.Tree.to_value sub_tree >|= function
+          | None -> acc
+          | Some bytes -> (path, bytes) :: acc)
       |> Lwt_main.run)
     (fun entries ->
       List.fold_left_s
@@ -193,8 +197,7 @@ let test_merkle_tree_to_irmin_tree_preserves_simple_tree =
      before calling [merkle_tree_to_simple_tree] (that doesn't go through
      Irmin APIs, and hence doesn't remove empty subtrees internally). *)
   let of_merkle_tree =
-    Light_lib.merkle_tree_to_simple_tree
-    @@ Light_lib.merkle_tree_rm_empty mtree
+    Light_lib.merkle_tree_to_simple_tree @@ Light_lib.merkle_tree_rm_empty mtree
   in
   Light_lib.check_simple_tree_eq of_irmin_tree of_merkle_tree
 
@@ -203,10 +206,8 @@ let filter_none : 'a option list -> 'a list = List.filter_map Fun.id
 let rec remove_data_in_node =
   let open Tezos_shell_services.Block_services in
   function
-  | Hash _ as x ->
-      Some x
-  | Data _ ->
-      None
+  | Hash _ as x -> Some x
+  | Data _ -> None
   | Continue mtree ->
       let mtree' = remove_data_in_tree mtree in
       if TzString.Map.is_empty mtree' then None else Some (Continue mtree')
@@ -241,10 +242,8 @@ let test_contains_merkle_tree =
     Lwt_main.run @@ Merkle.contains_merkle_tree irmin_tree mtree
   in
   match contains_res with
-  | Ok _ ->
-      true
-  | Error msg ->
-      QCheck.Test.fail_report msg
+  | Ok _ -> true
+  | Error msg -> QCheck.Test.fail_report msg
 
 (** Test that unioning an empty irmin tree and a merkle tree should yield
     the same irmin tree as if it was built directly from the merkle tree *)
@@ -295,18 +294,14 @@ let test_union_translation =
 let rec union_merkle_node n1 n2 =
   let open Tezos_shell_services.Block_services in
   match (n1, n2) with
-  | (Hash h1, Hash h2) when h1 = h2 ->
-      Some n1
+  | (Hash h1, Hash h2) when h1 = h2 -> Some n1
   | (Data raw_context1, Data raw_context2) when raw_context1 = raw_context2 ->
       Some n1
   | (Continue mtree1, Continue mtree2) -> (
-    match union_merkle_tree mtree1 mtree2 with
-    | None ->
-        None
-    | Some u ->
-        Some (Continue u) )
-  | _ ->
-      None
+      match union_merkle_tree mtree1 mtree2 with
+      | None -> None
+      | Some u -> Some (Continue u))
+  | _ -> None
 
 and union_merkle_tree t1 t2 =
   let conflict = ref false in
@@ -381,8 +376,7 @@ let test_union_commutation =
                t1
           |> get_ok
         in
-        Lwt_main.run
-        @@ Merkle.union_irmin_tree_merkle_tree repo intermediate t2
+        Lwt_main.run @@ Merkle.union_irmin_tree_merkle_tree repo intermediate t2
         |> get_ok
       in
       let union_12 = union2 mtree1 mtree2 in
@@ -417,23 +411,19 @@ let test_shape_ignores_key =
   QCheck.assume @@ not (is_continue node1 && is_continue node2) ;
   let rec deep_add current_key value mtree =
     match current_key with
-    | [last_fragment] ->
-        TzString.Map.add last_fragment value mtree
+    | [last_fragment] -> TzString.Map.add last_fragment value mtree
     | hd_key :: tl_key ->
         TzString.Map.update
           hd_key
           (fun mnode_opt ->
             let subtree =
               match mnode_opt with
-              | Some (Continue subtree) ->
-                  subtree
-              | _ ->
-                  TzString.Map.empty
+              | Some (Continue subtree) -> subtree
+              | _ -> TzString.Map.empty
             in
             Some (Continue (deep_add tl_key value subtree)))
           mtree
-    | [] ->
-        mtree
+    | [] -> mtree
   in
   let tree1 = deep_add key node1 tree in
   let tree2 = deep_add key node2 tree in
@@ -453,10 +443,8 @@ module HashStability = struct
     let hash = Store.Tree.hash tree in
     let data =
       match Store.Tree.kind tree with
-      | `Value ->
-          `Contents hash
-      | `Tree ->
-          `Node hash
+      | `Value -> `Contents hash
+      | `Tree -> `Node hash
     in
     Store.Tree.shallow repo data
 
@@ -469,8 +457,7 @@ module HashStability = struct
       Lwt.return @@ make_tree_shallow repo tree
     else
       (* Maybe shallow some sub-trees *)
-      Store.Tree.list tree []
-      >>= fun dir ->
+      Store.Tree.list tree [] >>= fun dir ->
       Lwt_list.fold_left_s
         (fun wip_tree (key, sub_tree) ->
           make_partial_shallow_tree repo sub_tree
@@ -550,10 +537,8 @@ module AddTree = struct
           Store.Tree.find_tree tree' key |> Lwt_main.run
         in
         match tree_opt_set_at_key with
-        | None ->
-            check_tree_eq (Store.Tree.empty Store.empty) added
-        | Some tree_set_at_key ->
-            check_tree_eq added tree_set_at_key)
+        | None -> check_tree_eq (Store.Tree.empty Store.empty) added
+        | Some tree_set_at_key -> check_tree_eq added tree_set_at_key)
 end
 
 module Consensus = struct
@@ -564,7 +549,10 @@ module Consensus = struct
       method call_service
           : 'm 'p 'q 'i 'o.
             (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
-            'p -> 'q -> 'i -> 'o tzresult Lwt.t =
+            'p ->
+            'q ->
+            'i ->
+            'o tzresult Lwt.t =
         assert false
     end
 
@@ -579,12 +567,9 @@ module Consensus = struct
 
   let mk_rogue_hash str =
     let rec go = function
-      | [] ->
-          Error ()
-      | h :: _ when h <> str ->
-          Ok h
-      | _ :: rest ->
-          go rest
+      | [] -> Error ()
+      | h :: _ when h <> str -> Ok h
+      | _ :: rest -> go rest
     in
     go Light_lib.irmin_hashes
 
@@ -617,10 +602,8 @@ module Consensus = struct
   let rec mk_rogue_raw_context raw_context (rand : Random.State.t) =
     let open Tezos_shell_services.Block_services in
     match raw_context with
-    | Cut ->
-        Error ()
-    | Key v ->
-        Ok (Key (mk_rogue_bytes v))
+    | Cut -> Error ()
+    | Key v -> Ok (Key (mk_rogue_bytes v))
     | Dir dir ->
         let keys = List.map fst @@ TzString.Map.bindings dir in
         let key_changed = ref false in
@@ -632,15 +615,13 @@ module Consensus = struct
               @@ Random.State.int rand 1024
             in
             key_changed := true ;
-            (true, (k', v) :: acc) )
+            (true, (k', v) :: acc))
           else
             (* change value *)
             let sub = mk_rogue_raw_context v rand in
             match sub with
-            | Ok v' ->
-                (true, (k, v') :: acc)
-            | Error _ ->
-                (success, (k, v) :: acc)
+            | Ok v' -> (true, (k, v') :: acc)
+            | Error _ -> (success, (k, v) :: acc)
         in
         let dir_len = List.length keys in
         let (success, dir') =
@@ -665,10 +646,8 @@ module Consensus = struct
   let rec mk_rogue_tree mtree (rand : Random.State.t) =
     let f k v (success, acc) =
       match mk_rogue_node v rand with
-      | Ok v' ->
-          (true, TzString.Map.add k v' acc)
-      | Error _ ->
-          (success, TzString.Map.add k v acc)
+      | Ok v' -> (true, TzString.Map.add k v' acc)
+      | Error _ -> (success, TzString.Map.add k v acc)
     in
     let (success, res) =
       TzString.Map.fold f mtree (false, TzString.Map.empty)
@@ -683,15 +662,13 @@ module Consensus = struct
            tree. *)
         mk_rogue_hash str >>? fun h' -> Ok (Hash (hash_kind, h'))
     | Data raw_context ->
-        mk_rogue_raw_context raw_context rand
-        >>? fun raw_context -> Ok (Data raw_context)
+        mk_rogue_raw_context raw_context rand >>? fun raw_context ->
+        Ok (Data raw_context)
     | Continue dir ->
         let f k v (success, acc) =
           match mk_rogue_node v rand with
-          | Ok v' ->
-              (true, TzString.Map.add k v' acc)
-          | Error _ ->
-              (success, TzString.Map.add k v acc)
+          | Ok v' -> (true, TzString.Map.add k v' acc)
+          | Error _ -> (success, TzString.Map.add k v acc)
         in
         let (success, dir) =
           TzString.Map.fold f dir (false, TzString.Map.empty)
@@ -718,20 +695,18 @@ module Consensus = struct
      that always returns a rogue (illegal) variant of [mtree] when querying [endpoint1],
      [mtree] when querying [endpoint2], and [None] otherwise *)
   let mock_light_rpc mtree endpoints_and_rogueness seed =
-    ( module struct
+    (module struct
       (** Use physical equality on [rpc_context] because they are identical objects. *)
       let merkle_tree (pgi : Tezos_proxy.Proxy.proxy_getter_input) _ _ =
         List.assq pgi.rpc_context endpoints_and_rogueness
         |> Option.map (fun is_rogue ->
                if is_rogue then
                  match mk_rogue_tree mtree seed with
-                 | Ok rogue_mtree ->
-                     rogue_mtree
-                 | _ ->
-                     QCheck.assume_fail ()
+                 | Ok rogue_mtree -> rogue_mtree
+                 | _ -> QCheck.assume_fail ()
                else mtree)
         |> return
-    end : Tezos_proxy.Light_proto.PROTO_RPCS )
+    end : Tezos_proxy.Light_proto.PROTO_RPCS)
 
   let mock_printer () =
     let rev_logs : string list ref = ref [] in
@@ -773,8 +748,7 @@ module Consensus = struct
     let module Consensus = Tezos_proxy.Light_consensus.Make (Light_proto) in
     let printer = mock_printer () in
     let repo = Lwt_main.run Store.Tree.make_repo in
-    Internal.Merkle.merkle_tree_to_irmin_tree repo mtree
-    >|= get_ok
+    Internal.Merkle.merkle_tree_to_irmin_tree repo mtree >|= get_ok
     >>= fun tree ->
     let input : Tezos_proxy.Light_consensus.input =
       {
@@ -794,8 +768,7 @@ module Consensus = struct
           (uri, endpoint))
         endpoints_and_rogueness
     in
-    Consensus.consensus input validating_endpoints
-    >|= get_ok
+    Consensus.consensus input validating_endpoints >|= get_ok
     >>= fun consensus_reached ->
     Lwt.return
     @@ qcheck_eq ~pp:Format.pp_print_bool consensus_expected consensus_reached
@@ -870,19 +843,21 @@ let () =
   Alcotest.run
     ~verbose:true
     "Mode Light"
-    [ ( "Hash stability",
+    [
+      ( "Hash stability",
         qcheck_wrap [HashStability.test_hash_stability; AddTree.test_add_tree]
       );
       ( "Consensus consistency examples",
         (* These tests are kinda superseded by the fuzzing tests
- ([test_consensus_spec]) below. However, I want to keep them for
- documentation purposes, because they provide examples. In addition,
- if tests break in the future, these ones will be easier to
- debug than the most general ones. *)
+           ([test_consensus_spec]) below. However, I want to keep them for
+           documentation purposes, because they provide examples. In addition,
+           if tests break in the future, these ones will be easier to
+           debug than the most general ones. *)
         qcheck_wrap ~rand:(Random.State.make [|348980449|])
         @@ List.map
              add_test_consensus
-             [ (* min_agreement, nb honest nodes, nb rogue nodes, consensus expected *)
+             [
+               (* min_agreement, nb honest nodes, nb rogue nodes, consensus expected *)
                (1.0, 2, 0, true);
                (1.0, 3, 0, true);
                (1.0, 4, 0, true);
@@ -902,15 +877,19 @@ let () =
                (0.6, 4, 1, true);
                (0.6, 5, 1, true);
                (0.5, 2, 2, true);
-               (0.01, 1, 2, true) ] );
+               (0.01, 1, 2, true);
+             ] );
       ("Consensus consistency", qcheck_wrap [test_consensus_spec]);
       ( "Merkle tree to Irmin tree",
         qcheck_wrap
-          [ test_merkle_tree_to_irmin_tree_preserves_simple_tree;
+          [
+            test_merkle_tree_to_irmin_tree_preserves_simple_tree;
             test_contains_merkle_tree;
             test_union_irmin_empty;
             test_union_translation;
             test_union_direct;
             test_union_commutation;
-            test_union_merkle_empty ] );
-      ("Tree shape validation", qcheck_wrap [test_shape_ignores_key]) ]
+            test_union_merkle_empty;
+          ] );
+      ("Tree shape validation", qcheck_wrap [test_shape_ignores_key]);
+    ]

@@ -43,11 +43,7 @@ type block_error =
     }
   | Unexpected_number_of_validation_passes of int (* uint8 *)
   | Too_many_operations of {pass : int; found : int; max : int}
-  | Oversized_operation of {
-      operation : Operation_hash.t;
-      size : int;
-      max : int;
-    }
+  | Oversized_operation of {operation : Operation_hash.t; size : int; max : int}
   | Unallowed_pass of {
       operation : Operation_hash.t;
       pass : int;

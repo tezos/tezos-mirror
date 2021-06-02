@@ -86,6 +86,10 @@ let test_empty_works () =
 let () =
   Alcotest.run
     "stdlib"
-    [ ( "Bounded_heap",
-        [ ("create 0 works", `Quick, test_empty_works);
-          QCheck_alcotest.to_alcotest test_bounded_heap ] ) ]
+    [
+      ( "Bounded_heap",
+        [
+          ("create 0 works", `Quick, test_empty_works);
+          QCheck_alcotest.to_alcotest test_bounded_heap;
+        ] );
+    ]

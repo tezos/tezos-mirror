@@ -40,8 +40,7 @@ let get_big_map_value (rpc : #rpc_context) ~chain ~block id key ~unparsing_mode
     =
   Plugin.RPC.big_map_get_normalized rpc (chain, block) id key ~unparsing_mode
 
-let get_contract_big_map_value (rpc : #rpc_context) ~chain ~block contract key
-    =
+let get_contract_big_map_value (rpc : #rpc_context) ~chain ~block contract key =
   Alpha_services.Contract.contract_big_map_get_opt
     rpc
     (chain, block)
@@ -57,11 +56,10 @@ let parse_expression arg =
        (Michelson_v1_parser.parse_expression arg))
 
 let parse_arg_transfer arg =
-  ( match arg with
+  (match arg with
   | Some arg ->
       parse_expression arg >>=? fun {expanded = arg; _} -> return_some arg
-  | None ->
-      return_none )
+  | None -> return_none)
   >>=? fun parameters ->
   return
     (Option.fold ~some:Script.lazy_expr ~none:Script.unit_parameter parameters)
@@ -79,8 +77,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~source ~src_pk ~src_sk ~destination
     ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
     ?counter ~fee_parameter () =
-  parse_arg_transfer arg
-  >>=? fun parameters ->
+  parse_arg_transfer arg >>=? fun parameters ->
   let contents =
     build_transaction_operation
       ~amount
@@ -111,8 +108,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~fee_parameter
     contents
   >>=? fun (oph, op, result) ->
-  Lwt.return (Injection.originated_contracts result)
-  >>=? fun contracts ->
+  Lwt.return (Injection.originated_contracts result) >>=? fun contracts ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return ((oph, op, result), contracts)
@@ -190,35 +186,24 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
       return (oph, op, result)
 
 let list_contract_labels cctxt ~chain ~block =
-  Alpha_services.Contract.list cctxt (chain, block)
-  >>=? fun contracts ->
+  Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
   List.rev_map_es
     (fun h ->
-      ( match Contract.is_implicit h with
+      (match Contract.is_implicit h with
       | Some m -> (
-          Public_key_hash.rev_find cctxt m
-          >>=? function
-          | None ->
-              return ""
+          Public_key_hash.rev_find cctxt m >>=? function
+          | None -> return ""
           | Some nm -> (
-              RawContractAlias.find_opt cctxt nm
-              >>=? function
-              | None ->
-                  return (" (known as " ^ nm ^ ")")
-              | Some _ ->
-                  return (" (known as key:" ^ nm ^ ")") ) )
+              RawContractAlias.find_opt cctxt nm >>=? function
+              | None -> return (" (known as " ^ nm ^ ")")
+              | Some _ -> return (" (known as key:" ^ nm ^ ")")))
       | None -> (
-          RawContractAlias.rev_find cctxt h
-          >>=? function
-          | None -> return "" | Some nm -> return (" (known as " ^ nm ^ ")") )
-      )
+          RawContractAlias.rev_find cctxt h >>=? function
+          | None -> return ""
+          | Some nm -> return (" (known as " ^ nm ^ ")")))
       >>=? fun nm ->
       let kind =
-        match Contract.is_implicit h with
-        | Some _ ->
-            " (implicit)"
-        | None ->
-            ""
+        match Contract.is_implicit h with Some _ -> " (implicit)" | None -> ""
       in
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
@@ -263,8 +248,7 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     (Some source)
 
 let save_contract ~force cctxt alias_name contract =
-  RawContractAlias.add ~force cctxt alias_name contract
-  >>=? fun () ->
+  RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
   message_added_contract cctxt alias_name >>= fun () -> return_unit
 
 let build_origination_operation ?fee ?gas_limit ?storage_limit ~initial_storage
@@ -323,14 +307,12 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~fee_parameter
     origination
   >>=? fun (oph, op, result) ->
-  ( match Apply_results.pack_contents_list op result with
+  (match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-      return (oph, op, result) )
+      return (oph, op, result))
   >>=? fun res ->
-  Lwt.return (Injection.originated_contracts result)
-  >>=? function
-  | [contract] ->
-      return (res, contract)
+  Lwt.return (Injection.originated_contracts result) >>=? function
+  | [contract] -> return (res, contract)
   | contracts ->
       failwith
         "The origination introduced %d contracts instead of one."
@@ -367,7 +349,8 @@ let activation_key_encoding =
        ~binary:raw_activation_key_encoding
        ~json:
          (union
-            [ case
+            [
+              case
                 ~title:"Activation"
                 Json_only
                 raw_activation_key_encoding
@@ -386,7 +369,8 @@ let activation_key_encoding =
                    (req "password" string)
                    (req "email" string))
                 (fun _ -> None)
-                (fun x -> x) ])
+                (fun x -> x);
+            ])
 
 type batch_transfer_operation = {
   destination : string;
@@ -416,8 +400,7 @@ let batch_transfer_operation_encoding =
 
 let read_key key =
   match Bip39.of_words key.mnemonic with
-  | None ->
-      failwith ""
+  | None -> failwith ""
   | Some t ->
       (* TODO: unicode normalization (NFKD)... *)
       let passphrase =
@@ -445,9 +428,8 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
     ~fee_parameter:Injection.dummy_fee_parameter
     contents
   >>=? fun (oph, op, result) ->
-  ( match confirmations with
-  | None ->
-      return_unit
+  (match confirmations with
+  | None -> return_unit
   | Some _confirmations ->
       Alpha_services.Contract.balance
         cctxt
@@ -462,7 +444,7 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
         Client_proto_args.tez_sym
         Tez.pp
         balance
-      >>= fun () -> return_unit )
+      >>= fun () -> return_unit)
   >>=? fun () ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Activate_account _ as op), result) ->
@@ -470,8 +452,7 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
 
 let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?(encrypted = false) ?force key name =
-  read_key key
-  >>=? fun (pkh, pk, sk) ->
+  read_key key >>=? fun (pkh, pk, sk) ->
   fail_unless
     (Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
     (failure
@@ -482,10 +463,9 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
        Ed25519.Public_key_hash.pp
        key.pkh)
   >>=? fun () ->
-  Tezos_signer_backends.Unencrypted.make_pk pk
-  >>=? fun pk_uri ->
-  ( if encrypted then Tezos_signer_backends.Encrypted.encrypt cctxt sk
-  else Tezos_signer_backends.Unencrypted.make_sk sk )
+  Tezos_signer_backends.Unencrypted.make_pk pk >>=? fun pk_uri ->
+  (if encrypted then Tezos_signer_backends.Encrypted.encrypt cctxt sk
+  else Tezos_signer_backends.Unencrypted.make_sk sk)
   >>=? fun sk_uri ->
   Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name
   >>=? fun () ->
@@ -501,8 +481,7 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 
 let activate_existing_account (cctxt : #full) ~chain ~block ?confirmations
     ?dry_run alias activation_code =
-  Client_keys.alias_keys cctxt alias
-  >>=? function
+  Client_keys.alias_keys cctxt alias >>=? function
   | Some (Ed25519 pkh, _, _) ->
       inject_activate_operation
         cctxt
@@ -513,10 +492,8 @@ let activate_existing_account (cctxt : #full) ~chain ~block ?confirmations
         alias
         pkh
         activation_code
-  | Some _ ->
-      failwith "Only Ed25519 accounts can be activated"
-  | None ->
-      failwith "Unknown account"
+  | Some _ -> failwith "Only Ed25519 accounts can be activated"
+  | None -> failwith "Unknown account"
 
 type period_info = {
   current_period_kind : Voting_period.kind;
@@ -535,12 +512,9 @@ type ballots_info = {
 let get_ballots_info (cctxt : #full) ~chain ~block =
   (* Get the next level, not the current *)
   let cb = (chain, block) in
-  Alpha_services.Voting.ballots cctxt cb
-  >>=? fun ballots ->
-  Alpha_services.Voting.current_quorum cctxt cb
-  >>=? fun current_quorum ->
-  Alpha_services.Voting.listings cctxt cb
-  >>=? fun listings ->
+  Alpha_services.Voting.ballots cctxt cb >>=? fun ballots ->
+  Alpha_services.Voting.current_quorum cctxt cb >>=? fun current_quorum ->
+  Alpha_services.Voting.listings cctxt cb >>=? fun listings ->
   let max_participation =
     List.fold_left (fun acc (_, w) -> Int32.add w acc) 0l listings
   in
@@ -551,13 +525,12 @@ let get_ballots_info (cctxt : #full) ~chain ~block =
 
 let get_period_info ?(successor = false) (cctxt : #full) ~chain ~block =
   let cb = (chain, block) in
-  ( if successor then Alpha_services.Voting.successor_period
-  else Alpha_services.Voting.current_period )
+  (if successor then Alpha_services.Voting.successor_period
+  else Alpha_services.Voting.current_period)
     cctxt
     cb
   >>=? fun voting_period ->
-  Alpha_services.Voting.current_proposal cctxt cb
-  >>=? fun current_proposal ->
+  Alpha_services.Voting.current_proposal cctxt cb >>=? fun current_proposal ->
   return
     {
       current_period_kind = voting_period.voting_period.kind;
@@ -607,19 +580,17 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match (a.receipt, a.protocol_data) with
   | (Some (Apply_results.Operation_metadata omd), Operation_data od) -> (
-    match Apply_results.kind_equal_list od.contents omd.contents with
-    | Some Apply_results.Eq ->
-        Operation_result.pp_operation_result
-          formatter
-          (od.contents, omd.contents)
-    | None ->
-        Stdlib.failwith "Unexpected result." )
+      match Apply_results.kind_equal_list od.contents omd.contents with
+      | Some Apply_results.Eq ->
+          Operation_result.pp_operation_result
+            formatter
+            (od.contents, omd.contents)
+      | None -> Stdlib.failwith "Unexpected result.")
   | (None, _) ->
       Stdlib.failwith
-        "Pruned metadata: the operation receipt was removed accordingly to \
-         the node's history mode."
-  | _ ->
-      Stdlib.failwith "Unexpected result."
+        "Pruned metadata: the operation receipt was removed accordingly to the \
+         node's history mode."
+  | _ -> Stdlib.failwith "Unexpected result."
 
 let get_operation_from_block (cctxt : #full) ~chain predecessors operation_hash
     =
@@ -629,8 +600,7 @@ let get_operation_from_block (cctxt : #full) ~chain predecessors operation_hash
     ~predecessors
     operation_hash
   >>=? function
-  | None ->
-      return_none
+  | None -> return_none
   | Some (block, i, j) ->
       cctxt#message
         "Operation found in block: %a (pass: %d, offset: %d)"
@@ -651,7 +621,5 @@ let display_receipt_for_operation (cctxt : #full) ~chain ?(predecessors = 10)
     operation_hash =
   get_operation_from_block cctxt ~chain predecessors operation_hash
   >>=? function
-  | None ->
-      failwith "Couldn't find operation"
-  | Some op ->
-      cctxt#message "%a" pp_operation op >>= fun () -> return_unit
+  | None -> failwith "Couldn't find operation"
+  | Some op -> cctxt#message "%a" pp_operation op >>= fun () -> return_unit

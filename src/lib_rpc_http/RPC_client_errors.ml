@@ -56,7 +56,8 @@ type error +=
 let rpc_error_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Empty_answer"
         (obj1 (req "kind" (constant "empty_answer")))
@@ -102,8 +103,7 @@ let rpc_error_encoding =
         (function
           | Not_acceptable {proposed; acceptable} ->
               Some ((), proposed, acceptable)
-          | _ ->
-              None)
+          | _ -> None)
         (function
           | ((), proposed, acceptable) -> Not_acceptable {proposed; acceptable});
       case
@@ -117,8 +117,7 @@ let rpc_error_encoding =
         (function
           | Unexpected_status_code {code; content; media_type} ->
               Some ((), Cohttp.Code.code_of_status code, content, media_type)
-          | _ ->
-              None)
+          | _ -> None)
         (function
           | ((), code, content, media_type) ->
               let code = Cohttp.Code.status_of_code code in
@@ -134,8 +133,7 @@ let rpc_error_encoding =
         (function
           | Unexpected_content_type {received; acceptable; body} ->
               Some ((), received, acceptable, body)
-          | _ ->
-              None)
+          | _ -> None)
         (function
           | ((), received, acceptable, body) ->
               Unexpected_content_type {received; acceptable; body});
@@ -150,8 +148,7 @@ let rpc_error_encoding =
         (function
           | Unexpected_content {content; media_type; error} ->
               Some ((), content, media_type, error)
-          | _ ->
-              None)
+          | _ -> None)
         (function
           | ((), content, media_type, error) ->
               Unexpected_content {content; media_type; error});
@@ -166,7 +163,8 @@ let rpc_error_encoding =
         ~title:"Unauthorized URI"
         unit
         (function Unauthorized_uri -> Some () | _ -> None)
-        (function () -> Unauthorized_uri) ]
+        (function () -> Unauthorized_uri);
+    ]
 
 let pp_rpc_error ppf err =
   match err with
@@ -179,8 +177,7 @@ let pp_rpc_error ppf err =
         ppf
         "@[<v 2>Oops! It looks like we forged an invalid HTTP request.@,%s@]"
         msg
-  | Forbidden ->
-      Format.fprintf ppf "@[<v 2>The server forbids access.@]"
+  | Forbidden -> Format.fprintf ppf "@[<v 2>The server forbids access.@]"
   | Method_not_allowed meths ->
       Format.fprintf
         ppf
@@ -238,8 +235,8 @@ let pp_rpc_error ppf err =
   | Unauthorized_host host ->
       Format.fprintf
         ppf
-        "@[<v 2>The server refused connection to host \"%s\", please check \
-         the node settings for CORS allowed origins.@]"
+        "@[<v 2>The server refused connection to host \"%s\", please check the \
+         node settings for CORS allowed origins.@]"
         (Option.value ~default:"" host)
   | Unauthorized_uri ->
       Format.fprintf
@@ -266,8 +263,5 @@ let () =
         (req "uri" RPC_encoding.uri_encoding)
         (req "error" rpc_error_encoding))
     (function
-      | Request_failed {uri; error; meth} ->
-          Some (meth, uri, error)
-      | _ ->
-          None)
+      | Request_failed {uri; error; meth} -> Some (meth, uri, error) | _ -> None)
     (fun (meth, uri, error) -> Request_failed {uri; meth; error})

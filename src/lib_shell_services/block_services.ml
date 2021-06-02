@@ -31,21 +31,15 @@ type chain = [`Main | `Test | `Hash of Chain_id.t]
 let parse_chain s =
   try
     match s with
-    | "main" ->
-        Ok `Main
-    | "test" ->
-        Ok `Test
-    | h ->
-        Ok (`Hash (Chain_id.of_b58check_exn h))
+    | "main" -> Ok `Main
+    | "test" -> Ok `Test
+    | h -> Ok (`Hash (Chain_id.of_b58check_exn h))
   with _ -> Error "Cannot parse chain identifier."
 
 let chain_to_string = function
-  | `Main ->
-      "main"
-  | `Test ->
-      "test"
-  | `Hash h ->
-      Chain_id.to_b58check h
+  | `Main -> "main"
+  | `Test -> "test"
+  | `Hash h -> Chain_id.to_b58check h
 
 let chain_arg =
   let name = "chain_id" in
@@ -74,93 +68,66 @@ let parse_block s =
   in
   let split_on_delim counts =
     match List.fold_left (fun i (v, _) -> i + v) 0 counts with
-    | 0 ->
-        ([s], ' ')
+    | 0 -> ([s], ' ')
     | 1 ->
         let delim =
           WithExceptions.Option.get ~loc:__LOC__
           @@ List.assoc ~equal:Int.equal 1 counts
         in
         (String.split delim s, delim)
-    | _ ->
-        raise Exit
+    | _ -> raise Exit
   in
   try
     match split_on_delim (count_delims s) with
-    | (["genesis"], _) ->
-        Ok `Genesis
-    | (["genesis"; n], '+') ->
-        Ok (`Level (Int32.of_string n))
-    | (["head"], _) ->
-        Ok (`Head 0)
-    | (["head"; n], '~') | (["head"; n], '-') ->
-        Ok (`Head (int_of_string n))
-    | (["checkpoint"], _) ->
-        Ok (`Alias (`Checkpoint, 0))
+    | (["genesis"], _) -> Ok `Genesis
+    | (["genesis"; n], '+') -> Ok (`Level (Int32.of_string n))
+    | (["head"], _) -> Ok (`Head 0)
+    | (["head"; n], '~') | (["head"; n], '-') -> Ok (`Head (int_of_string n))
+    | (["checkpoint"], _) -> Ok (`Alias (`Checkpoint, 0))
     | (["checkpoint"; n], '~') | (["checkpoint"; n], '-') ->
         Ok (`Alias (`Checkpoint, int_of_string n))
-    | (["checkpoint"; n], '+') ->
-        Ok (`Alias (`Checkpoint, -int_of_string n))
-    | (["savepoint"], _) ->
-        Ok (`Alias (`Savepoint, 0))
+    | (["checkpoint"; n], '+') -> Ok (`Alias (`Checkpoint, -int_of_string n))
+    | (["savepoint"], _) -> Ok (`Alias (`Savepoint, 0))
     | (["savepoint"; n], '~') | (["savepoint"; n], '-') ->
         Ok (`Alias (`Savepoint, int_of_string n))
-    | (["savepoint"; n], '+') ->
-        Ok (`Alias (`Savepoint, -int_of_string n))
-    | (["caboose"], _) ->
-        Ok (`Alias (`Caboose, 0))
+    | (["savepoint"; n], '+') -> Ok (`Alias (`Savepoint, -int_of_string n))
+    | (["caboose"], _) -> Ok (`Alias (`Caboose, 0))
     | (["caboose"; n], '~') | (["caboose"; n], '-') ->
         Ok (`Alias (`Caboose, int_of_string n))
-    | (["caboose"; n], '+') ->
-        Ok (`Alias (`Caboose, -int_of_string n))
+    | (["caboose"; n], '+') -> Ok (`Alias (`Caboose, -int_of_string n))
     | ([hol], _) -> (
-      match Block_hash.of_b58check_opt hol with
-      | Some h ->
-          Ok (`Hash (h, 0))
-      | None ->
-          let l = Int32.of_string s in
-          if Compare.Int32.(l < 0l) then raise Exit
-          else if Compare.Int32.(l = 0l) then Ok `Genesis
-          else Ok (`Level (Int32.of_string s)) )
+        match Block_hash.of_b58check_opt hol with
+        | Some h -> Ok (`Hash (h, 0))
+        | None ->
+            let l = Int32.of_string s in
+            if Compare.Int32.(l < 0l) then raise Exit
+            else if Compare.Int32.(l = 0l) then Ok `Genesis
+            else Ok (`Level (Int32.of_string s)))
     | ([h; n], '~') | ([h; n], '-') ->
         Ok (`Hash (Block_hash.of_b58check_exn h, int_of_string n))
     | ([h; n], '+') ->
         Ok (`Hash (Block_hash.of_b58check_exn h, -int_of_string n))
-    | _ ->
-        raise Exit
+    | _ -> raise Exit
   with _ -> Error ("Cannot parse block identifier: " ^ s)
 
 let alias_to_string = function
-  | `Checkpoint ->
-      "checkpoint"
-  | `Savepoint ->
-      "savepoint"
-  | `Caboose ->
-      "caboose"
+  | `Checkpoint -> "checkpoint"
+  | `Savepoint -> "savepoint"
+  | `Caboose -> "caboose"
 
 let to_string = function
-  | `Genesis ->
-      "genesis"
-  | `Alias (a, 0) ->
-      alias_to_string a
-  | `Alias (a, n) when n < 0 ->
-      Printf.sprintf "%s+%d" (alias_to_string a) (-n)
-  | `Alias (a, n) ->
-      Printf.sprintf "%s~%d" (alias_to_string a) n
-  | `Head 0 ->
-      "head"
-  | `Head n when n < 0 ->
-      Printf.sprintf "head+%d" (-n)
-  | `Head n ->
-      Printf.sprintf "head~%d" n
-  | `Hash (h, 0) ->
-      Block_hash.to_b58check h
+  | `Genesis -> "genesis"
+  | `Alias (a, 0) -> alias_to_string a
+  | `Alias (a, n) when n < 0 -> Printf.sprintf "%s+%d" (alias_to_string a) (-n)
+  | `Alias (a, n) -> Printf.sprintf "%s~%d" (alias_to_string a) n
+  | `Head 0 -> "head"
+  | `Head n when n < 0 -> Printf.sprintf "head+%d" (-n)
+  | `Head n -> Printf.sprintf "head~%d" n
+  | `Hash (h, 0) -> Block_hash.to_b58check h
   | `Hash (h, n) when n < 0 ->
       Printf.sprintf "%s+%d" (Block_hash.to_b58check h) (-n)
-  | `Hash (h, n) ->
-      Printf.sprintf "%s~%d" (Block_hash.to_b58check h) n
-  | `Level i ->
-      Printf.sprintf "%d" (Int32.to_int i)
+  | `Hash (h, n) -> Printf.sprintf "%s~%d" (Block_hash.to_b58check h) n
+  | `Level i -> Printf.sprintf "%d" (Int32.to_int i)
 
 let blocks_arg =
   let name = "block_id" in
@@ -201,10 +168,8 @@ let operation_list_quota_encoding =
 type raw_context = Key of Bytes.t | Dir of raw_context TzString.Map.t | Cut
 
 let rec pp_raw_context ppf = function
-  | Cut ->
-      Format.fprintf ppf "..."
-  | Key v ->
-      Hex.pp ppf (Hex.of_bytes v)
+  | Cut -> Format.fprintf ppf "..."
+  | Key v -> Hex.pp ppf (Hex.of_bytes v)
   | Dir l ->
       Format.fprintf
         ppf
@@ -216,7 +181,8 @@ let rec pp_raw_context ppf = function
 let raw_context_encoding =
   mu "raw_context" (fun encoding ->
       union
-        [ case
+        [
+          case
             (Tag 0)
             bytes
             ~title:"Key"
@@ -226,8 +192,7 @@ let raw_context_encoding =
             (Tag 1)
             (assoc encoding)
             ~title:"Dir"
-            (function
-              | Dir map -> Some (TzString.Map.bindings map) | _ -> None)
+            (function Dir map -> Some (TzString.Map.bindings map) | _ -> None)
             (fun bindings ->
               Dir
                 (List.fold_left
@@ -239,7 +204,8 @@ let raw_context_encoding =
             null
             ~title:"Cut"
             (function Cut -> Some () | _ -> None)
-            (fun () -> Cut) ])
+            (fun () -> Cut);
+        ])
 
 type error += Invalid_depth_arg of int
 
@@ -258,10 +224,8 @@ let rec pp_merkle_node ppf = function
   | Hash (k, h) ->
       let k_str = match k with Contents -> "Contents" | Node -> "Node" in
       Format.fprintf ppf "Hash(%s, %s)" k_str h
-  | Data raw_context ->
-      Format.fprintf ppf "Data(%a)" pp_raw_context raw_context
-  | Continue tree ->
-      Format.fprintf ppf "Continue(%a)" pp_merkle_tree tree
+  | Data raw_context -> Format.fprintf ppf "Data(%a)" pp_raw_context raw_context
+  | Continue tree -> Format.fprintf ppf "Continue(%a)" pp_merkle_tree tree
 
 and pp_merkle_tree ppf mtree =
   let pairs = TzString.Map.bindings mtree in
@@ -299,11 +263,10 @@ let merkle_tree_encoding : merkle_tree Data_encoding.t =
                    hash_encoding
                    ( (match kind with Contents -> true | Node -> false),
                      content )
-             | Data raw_context ->
-                 matched data_tag data_encoding raw_context
-             | Continue dir ->
-                 matched continue_tag encoding dir)
-           [ case
+             | Data raw_context -> matched data_tag data_encoding raw_context
+             | Continue dir -> matched continue_tag encoding dir)
+           [
+             case
                (Tag hash_tag)
                ~title:"Hash"
                hash_encoding
@@ -322,7 +285,8 @@ let merkle_tree_encoding : merkle_tree Data_encoding.t =
                continue_encoding
                ~title:"Continue"
                (function Continue dir -> Some dir | _ -> None)
-               (fun dir -> Continue dir) ]))
+               (fun dir -> Continue dir);
+           ]))
 
 let () =
   register_error_kind
@@ -371,10 +335,8 @@ type protocols = {
 
 let raw_protocol_encoding =
   conv
-    (fun {current_protocol; next_protocol} ->
-      (current_protocol, next_protocol))
-    (fun (current_protocol, next_protocol) ->
-      {current_protocol; next_protocol})
+    (fun {current_protocol; next_protocol} -> (current_protocol, next_protocol))
+    (fun (current_protocol, next_protocol) -> {current_protocol; next_protocol})
     (obj2
        (req "protocol" Protocol_hash.encoding)
        (req "next_protocol" Protocol_hash.encoding))
@@ -432,12 +394,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   let block_metadata_encoding =
     def "block_header_metadata"
     @@ conv
-         (fun { protocol_data;
+         (fun {
+                protocol_data;
                 test_chain_status;
                 max_operations_ttl;
                 max_operation_data_length;
                 max_block_header_length;
-                operation_list_quota } ->
+                operation_list_quota;
+              } ->
            ( ( (),
                (),
                test_chain_status,
@@ -479,8 +443,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     let open Data_encoding in
     def "next_operation"
     @@ conv
-         (fun Next_proto.{shell; protocol_data} ->
-           ((), (shell, protocol_data)))
+         (fun Next_proto.{shell; protocol_data} -> ((), (shell, protocol_data)))
          (fun ((), (shell, protocol_data)) -> {shell; protocol_data})
          (merge_objs
             (obj1 (req "protocol" (constant next_protocol_hash)))
@@ -500,24 +463,23 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     let open Data_encoding in
     union
       ~tag_size:`Uint8
-      [ case
+      [
+        case
           ~title:"Operation with metadata"
           (Tag 0)
           Proto.operation_data_and_receipt_encoding
           (function
-            | (operation_data, Some receipt) ->
-                Some (operation_data, receipt)
-            | _ ->
-                None)
+            | (operation_data, Some receipt) -> Some (operation_data, receipt)
+            | _ -> None)
           (function
             | (operation_data, receipt) -> (operation_data, Some receipt));
         case
           ~title:"Operation without metadata"
           (Tag 1)
           Proto.operation_data_encoding
-          (function
-            | (operation_data, None) -> Some operation_data | _ -> None)
-          (fun operation_data -> (operation_data, None)) ]
+          (function (operation_data, None) -> Some operation_data | _ -> None)
+          (fun operation_data -> (operation_data, None));
+      ]
 
   let operation_encoding =
     def "operation"
@@ -693,8 +655,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       let operation_hashes =
         RPC_service.get_service
-          ~description:
-            "The hashes of all the operations included in the block."
+          ~description:"The hashes of all the operations included in the block."
           ~query:RPC_query.empty
           ~output:(list (list Operation_hash.encoding))
           path
@@ -753,8 +714,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         RPC_service.get_service
           ~description:
             "The hash of then `m-th` operation metadata in the `n-th` \
-             validation pass of the block. This is only set on blocks \
-             starting from environment V1."
+             validation pass of the block. This is only set on blocks starting \
+             from environment V1."
           ~query:RPC_query.empty
           ~output:Operation_metadata_hash.encoding
           RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
@@ -820,9 +781,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         let block =
           RPC_service.post_service
             ~description:
-              "Simulate the validation of a block that would contain the \
-               given operations and return the resulting fitness and context \
-               hash."
+              "Simulate the validation of a block that would contain the given \
+               operations and return the resulting fitness and context hash."
             ~query:block_query
             ~input:block_param_encoding
             ~output:block_result_encoding
@@ -1050,8 +1010,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       RPC_service.get_service
         ~description:
           "List the ancestors of the given block which, if referred to as the \
-           branch in an operation header, are recent enough for that \
-           operation to be included in the current block."
+           branch in an operation header, are recent enough for that operation \
+           to be included in the current block."
         ~query:RPC_query.empty
         ~output:Block_hash.Set.encoding
         RPC_path.(live_blocks_path open_root)
@@ -1244,10 +1204,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     type t = S.Mempool.t = {
       applied : (Operation_hash.t * Next_proto.operation) list;
       refused : (Next_proto.operation * error list) Operation_hash.Map.t;
-      branch_refused :
-        (Next_proto.operation * error list) Operation_hash.Map.t;
-      branch_delayed :
-        (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_delayed : (Next_proto.operation * error list) Operation_hash.Map.t;
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
@@ -1256,8 +1214,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       RPC_context.make_call1 s ctxt chain () ()
 
     let monitor_operations ctxt ?(chain = `Main) ?(applied = true)
-        ?(branch_delayed = true) ?(branch_refused = false) ?(refused = false)
-        () =
+        ?(branch_delayed = true) ?(branch_refused = false) ?(refused = false) ()
+        =
       let s = S.Mempool.monitor_operations (mempool_path chain_path) in
       RPC_context.make_streamed_call
         s
@@ -1319,14 +1277,11 @@ module Empty = Make (Fake_protocol) (Fake_protocol)
 
 let () =
   Printexc.register_printer (function
-      | ( Json_schema.Cannot_parse _
-        | Json_schema.Dangling_reference _
-        | Json_schema.Bad_reference _
-        | Json_schema.Unexpected _
+      | ( Json_schema.Cannot_parse _ | Json_schema.Dangling_reference _
+        | Json_schema.Bad_reference _ | Json_schema.Unexpected _
         | Json_schema.Duplicate_definition _ ) as exn ->
           Some
             (Format.asprintf "%a" (fun ppf -> Json_schema.print_error ppf) exn)
-      | _ ->
-          None)
+      | _ -> None)
 
 let protocols = Empty.protocols

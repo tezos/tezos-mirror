@@ -118,8 +118,7 @@ let unlock_and_prove_with_secret secret ~(time : Z.t)
 
 let locked_value_to_symmetric_key_with_secret secret ~(time : Z.t)
     (locked_value : locked_value) : symmetric_key =
-  unlocked_value_to_symmetric_key
-    (unlock_with_secret secret ~time locked_value)
+  unlocked_value_to_symmetric_key (unlock_with_secret secret ~time locked_value)
 
 (* Gives the value that was time_locked from the time_lock, the public modulus
    and the time. Works in linear time in [time] *)
@@ -131,8 +130,8 @@ let unlock_and_prove_without_secret public ~time locked_value =
   let pi = prove_without_secret public ~time locked_value unlocked_value in
   (unlocked_value, pi)
 
-let locked_value_to_symmetric_key_with_proof (public : rsa_public)
-    ~(time : Z.t) locked_value unlocked_value proof =
+let locked_value_to_symmetric_key_with_proof (public : rsa_public) ~(time : Z.t)
+    locked_value unlocked_value proof =
   if verify_time_lock public ~time locked_value unlocked_value proof then
     Some (unlocked_value_to_symmetric_key unlocked_value)
   else None
@@ -187,14 +186,14 @@ let chest_encoding =
        (fun chest ->
          (chest.locked_value, chest.time, chest.rsa_public, chest.ciphertext))
        (fun (locked_value, time, rsa_public, ciphertext) ->
-         ( try
-             assert (Z.(locked_value >= zero)) ;
-             assert (Z.(time >= zero)) ;
-             assert (Z.(rsa_public >= zero))
-           with _ ->
-             failwith
-               "A negative value was provided in timelock chest encoding when \
-                a positive value was expected" ) ;
+         (try
+            assert (Z.(locked_value >= zero)) ;
+            assert (Z.(time >= zero)) ;
+            assert (Z.(rsa_public >= zero))
+          with _ ->
+            failwith
+              "A negative value was provided in timelock chest encoding when a \
+               positive value was expected") ;
          {locked_value; time; rsa_public; ciphertext})
        (obj4
           (req "locked_value" n)
@@ -214,15 +213,12 @@ let open_chest chest chest_key =
       chest_key.proof
   in
   match sym_key_opt with
-  | None ->
-      Bogus_opening
+  | None -> Bogus_opening
   | Some sym_key -> (
       let plaintext_opt = decrypt sym_key chest.ciphertext in
       match plaintext_opt with
-      | None ->
-          Bogus_cipher
-      | Some plaintext ->
-          Correct plaintext )
+      | None -> Bogus_cipher
+      | Some plaintext -> Correct plaintext)
 
 let create_chest_and_chest_key ~payload ~time =
   let (rsa_public, rsa_secret) = gen_rsa_keys () in

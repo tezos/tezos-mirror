@@ -35,20 +35,16 @@ let succ c (l : Level_repr.t) = from_raw c (Raw_level_repr.succ l.level)
 
 let pred c (l : Level_repr.t) =
   match Raw_level_repr.pred l.Level_repr.level with
-  | None ->
-      None
-  | Some l ->
-      Some (from_raw c l)
+  | None -> None
+  | Some l -> Some (from_raw c l)
 
 let current ctxt = Raw_context.current_level ctxt
 
 let previous ctxt =
   let l = current ctxt in
   match pred ctxt l with
-  | None ->
-      assert false (* We never validate the Genesis... *)
-  | Some p ->
-      p
+  | None -> assert false (* We never validate the Genesis... *)
+  | Some p -> p
 
 let first_level_in_cycle ctxt cycle =
   let cycle_eras = Raw_context.cycle_eras ctxt in
@@ -56,10 +52,8 @@ let first_level_in_cycle ctxt cycle =
 
 let last_level_in_cycle ctxt c =
   match pred ctxt (first_level_in_cycle ctxt (Cycle_repr.succ c)) with
-  | None ->
-      assert false
-  | Some x ->
-      x
+  | None -> assert false
+  | Some x -> x
 
 let levels_in_cycle ctxt cycle =
   let first = first_level_in_cycle ctxt cycle in
@@ -91,10 +85,8 @@ let last_allowed_fork_level c =
   let level = Raw_context.current_level c in
   let preserved_cycles = Constants_storage.preserved_cycles c in
   match Cycle_repr.sub level.cycle preserved_cycles with
-  | None ->
-      Raw_level_repr.root
-  | Some cycle ->
-      (first_level_in_cycle c cycle).level
+  | None -> Raw_level_repr.root
+  | Some cycle -> (first_level_in_cycle c cycle).level
 
 let last_of_a_cycle ctxt level =
   let cycle_eras = Raw_context.cycle_eras ctxt in

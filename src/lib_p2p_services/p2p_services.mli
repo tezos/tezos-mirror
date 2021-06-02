@@ -218,8 +218,8 @@ module Peers : sig
         unit,
         < filters : P2p_peer.Filter.t list >,
         unit,
-        ( P2p_peer.Id.t
-        * (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t )
+        (P2p_peer.Id.t
+        * (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t)
         list )
       RPC_service.t
 

@@ -136,23 +136,19 @@ struct
 
   let find_or_make t k make =
     match T.find_opt t k with
-    | Some a ->
-        a
+    | Some a -> a
     | None ->
         let p = Lwt.apply make () in
-        ( match Lwt.state p with
-        | Return (Ok _) ->
-            T.add t k p
-        | Return (Error _) ->
-            ()
-        | Fail _ ->
-            ()
+        (match Lwt.state p with
+        | Return (Ok _) -> T.add t k p
+        | Return (Error _) -> ()
+        | Fail _ -> ()
         | Sleep ->
             T.add t k p ;
             Lwt.on_any
               p
               (function Ok _ -> () | Error _ -> T.remove t k)
-              (fun _ -> T.remove t k) ) ;
+              (fun _ -> T.remove t k)) ;
         p
 
   let find t k = T.find_opt t k
@@ -192,10 +188,8 @@ struct
     T.fold
       (fun k p acc ->
         match Lwt.state p with
-        | Lwt.Return (Ok v) ->
-            f k v acc
-        | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep ->
-            acc)
+        | Lwt.Return (Ok v) -> f k v acc
+        | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> acc)
       t
       init
 

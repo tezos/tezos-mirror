@@ -44,8 +44,7 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
   let dir =
     RPC_directory.register0 dir Signer_services.authorized_keys (fun () () ->
         if require_auth then
-          Handler.Authorized_key.load cctxt
-          >>=? fun keys ->
+          Handler.Authorized_key.load cctxt >>=? fun keys ->
           return_some
             (keys |> List.split |> snd |> List.map Signature.Public_key.hash)
         else return_none)
@@ -54,8 +53,7 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
     (fun () ->
       List.map
         (fun host ->
-          Events.(emit listening) host
-          >>= fun () ->
+          Events.(emit listening) host >>= fun () ->
           RPC_server.launch
             ~host:(Ipaddr.V6.to_string host)
             mode
@@ -67,8 +65,7 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
           failwith "Port already in use."
-      | exn ->
-          Lwt.return (error_exn exn))
+      | exn -> Lwt.return (error_exn exn))
 
 let run_https (cctxt : #Client_context.wallet) ~host ~port ~cert ~key
     ?magic_bytes ~check_high_watermark ~require_auth =
@@ -77,12 +74,10 @@ let run_https (cctxt : #Client_context.wallet) ~host ~port ~cert ~key
     ~node:host
     ~service:(string_of_int port)
   >>= function
-  | [] ->
-      failwith "Cannot resolve listening address: %S" host
+  | [] -> failwith "Cannot resolve listening address: %S" host
   | points ->
       let hosts = fst (List.split points) in
-      Events.(emit accepting_requests) ("HTTPS", port)
-      >>= fun () ->
+      Events.(emit accepting_requests) ("HTTPS", port) >>= fun () ->
       let mode : Conduit_lwt_unix.server =
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
       in
@@ -101,12 +96,10 @@ let run_http (cctxt : #Client_context.wallet) ~host ~port ?magic_bytes
     ~node:host
     ~service:(string_of_int port)
   >>= function
-  | [] ->
-      failwith "Cannot resolve listening address: %S" host
+  | [] -> failwith "Cannot resolve listening address: %S" host
   | points ->
       let hosts = fst (List.split points) in
-      Events.(emit accepting_requests) ("HTTP", port)
-      >>= fun () ->
+      Events.(emit accepting_requests) ("HTTP", port) >>= fun () ->
       let mode : Conduit_lwt_unix.server = `TCP (`Port port) in
       run
         (cctxt : #Client_context.wallet)

@@ -31,17 +31,14 @@ module Store = Tezos_context_memory.Context
 module StringMap = TzString.Map
 
 let rec raw_context_to_irmin_tree
-    (raw : Tezos_shell_services.Block_services.raw_context) : Store.tree Lwt.t
-    =
+    (raw : Tezos_shell_services.Block_services.raw_context) : Store.tree Lwt.t =
   match raw with
-  | Key (bytes : Bytes.t) ->
-      Lwt.return (Store.Tree.of_raw (`Value bytes))
-  | Cut ->
-      Lwt.return (Store.Tree.empty Store.empty)
+  | Key (bytes : Bytes.t) -> Lwt.return (Store.Tree.of_raw (`Value bytes))
+  | Cut -> Lwt.return (Store.Tree.empty Store.empty)
   | Dir pairs ->
       let process_recursively tree (key, sub_raw_context) =
-        raw_context_to_irmin_tree sub_raw_context
-        >>= fun sub_tree -> Store.Tree.add_tree tree [key] sub_tree
+        raw_context_to_irmin_tree sub_raw_context >>= fun sub_tree ->
+        Store.Tree.add_tree tree [key] sub_tree
       in
       List.fold_left_s
         process_recursively
@@ -64,27 +61,21 @@ module Merkle = struct
     let open Tezos_shell_services.Block_services in
     match mnode with
     | Hash (kind, s) ->
-        string_to_hash s
-        >>?= fun hash_str ->
+        string_to_hash s >>?= fun hash_str ->
         let irmin_hash =
           match kind with
-          | Contents ->
-              `Contents hash_str
-          | Node ->
-              `Node hash_str
+          | Contents -> `Contents hash_str
+          | Node -> `Node hash_str
         in
         return @@ Store.Tree.shallow repo irmin_hash
-    | Data raw_context ->
-        raw_context_to_irmin_tree raw_context >|= ok
-    | Continue subtree ->
-        merkle_tree_to_irmin_tree repo subtree
+    | Data raw_context -> raw_context_to_irmin_tree raw_context >|= ok
+    | Continue subtree -> merkle_tree_to_irmin_tree repo subtree
 
-  and merkle_tree_to_irmin_tree repo mtree : (Store.tree, string) result Lwt.t
-      =
+  and merkle_tree_to_irmin_tree repo mtree : (Store.tree, string) result Lwt.t =
     List.fold_left_es
       (fun built_tree (key, mnode) ->
-        merkle_node_to_irmin_tree repo mnode
-        >>=? fun subtree -> Store.Tree.add_tree built_tree [key] subtree >|= ok)
+        merkle_node_to_irmin_tree repo mnode >>=? fun subtree ->
+        Store.Tree.add_tree built_tree [key] subtree >|= ok)
       (Store.Tree.empty Store.empty)
       (StringMap.bindings mtree)
 
@@ -100,8 +91,7 @@ module Merkle = struct
       where [result_tree] is the union of [tree] and [mtree]. *)
   let rec union_irmin_tree_merkle_node repo reversed_key tree = function
     | Tezos_shell_services.Block_services.Hash (_, mnode_hash_str) ->
-        string_to_hash mnode_hash_str
-        >>?= fun mnode_hash ->
+        string_to_hash mnode_hash_str >>?= fun mnode_hash ->
         let tree_hash = Store.Tree.hash tree in
         if Context_hash.equal tree_hash mnode_hash then
           (* The point of the 'Hash' case is to do a check: no addition
@@ -124,8 +114,7 @@ module Merkle = struct
            and cannot be implemented externally in an efficient manner. *)
         (* Check the incoming data ([raw_context]) agrees with
                  the data in place ([tree]) *)
-        raw_context_to_irmin_tree raw_context
-        >>= fun tree_in_merkle ->
+        raw_context_to_irmin_tree raw_context >>= fun tree_in_merkle ->
         let hash_in_merkle = Store.Tree.hash tree_in_merkle in
         let tree_hash = Store.Tree.hash tree in
         if Context_hash.equal hash_in_merkle tree_hash then
@@ -149,14 +138,12 @@ module Merkle = struct
     let change = ref false in
     List.fold_left_es
       (fun built_tree (subkey, mnode) ->
-        Store.Tree.find_tree built_tree [subkey]
-        >>= fun subtree_opt ->
+        Store.Tree.find_tree built_tree [subkey] >>= fun subtree_opt ->
         match subtree_opt with
         | None ->
             (* Integrating new data *)
             change := true ;
-            merkle_node_to_irmin_tree repo mnode
-            >>=? fun subtree ->
+            merkle_node_to_irmin_tree repo mnode >>=? fun subtree ->
             Store.Tree.add_tree built_tree [subkey] subtree >>= Lwt.return_ok
         | Some subtree -> (
             (* Unioning existing data *)
@@ -167,24 +154,22 @@ module Merkle = struct
               mnode
             >>=? fun subtree'_opt ->
             match subtree'_opt with
-            | None ->
-                Lwt.return_ok built_tree (* no change (hashes agree) *)
+            | None -> Lwt.return_ok built_tree (* no change (hashes agree) *)
             | Some subtree' ->
                 change := true ;
                 (* This call to [Store.Tree.remove] should NOT
                    be necessary. Is there a bug in add_tree? *)
-                Store.Tree.remove built_tree [subkey]
-                >>= fun build_tree' ->
+                Store.Tree.remove built_tree [subkey] >>= fun build_tree' ->
                 Store.Tree.add_tree build_tree' [subkey] subtree'
-                >>= Lwt.return_ok ))
+                >>= Lwt.return_ok))
       tree
       (StringMap.bindings mtree)
     >>=? fun res ->
     if !change then lwt_return_ok_some res else lwt_return_ok_none
 
   let union_irmin_tree_merkle_tree repo tree mtree =
-    union_irmin_tree_merkle_tree repo [] tree mtree
-    >>=? fun tree_opt -> Option.value ~default:tree tree_opt |> Lwt.return_ok
+    union_irmin_tree_merkle_tree repo [] tree mtree >>=? fun tree_opt ->
+    Option.value ~default:tree tree_opt |> Lwt.return_ok
 
   let sequence_result_unit (results : (unit, 'b) result list) :
       (unit, 'b) result =
@@ -198,24 +183,20 @@ module Merkle = struct
     let open Tezos_shell_services.Block_services in
     let apply_or_fail_at k f =
       (* Applies [f] on the tree mapped by [k] if present, otherwise fail *)
-      Store.Tree.find_tree tree [k]
-      >>= function
+      Store.Tree.find_tree tree [k] >>= function
       | None ->
           Lwt.return_error
           @@ Format.sprintf
                "Key %s, which is in Merkle tree, cannot be found in in-memory \
                 tree"
                k
-      | Some subtree ->
-          f subtree
+      | Some subtree -> f subtree
     in
     match mnode with
     | Hash (_, mnode_hash_str) ->
-        apply_or_fail_at key
-        @@ fun subtree ->
+        apply_or_fail_at key @@ fun subtree ->
         let subtree_hash = Store.Tree.hash subtree in
-        string_to_hash mnode_hash_str
-        >>?= fun mnode_hash ->
+        string_to_hash mnode_hash_str >>?= fun mnode_hash ->
         if Context_hash.equal subtree_hash mnode_hash then Lwt.return_ok ()
         else
           Lwt.return_error
@@ -231,8 +212,8 @@ module Merkle = struct
            is in the in-memory tree, this is unexpected: only inclusion of \
            hashes should be checked."
     | Continue submtree ->
-        apply_or_fail_at key
-        @@ fun subtree -> contains_merkle_tree subtree submtree
+        apply_or_fail_at key @@ fun subtree ->
+        contains_merkle_tree subtree submtree
 
   and contains_merkle_tree tree mtree =
     StringMap.bindings mtree
@@ -248,22 +229,24 @@ module Merkle = struct
       (right : Tezos_shell_services.Block_services.merkle_node) =
     let open Tezos_shell_services.Block_services in
     match (left, right, path_to_ignore) with
-    | (Hash _, Hash _, _) | (Data _, Data _, _) ->
-        None
+    | (Hash _, Hash _, _) | (Data _, Data _, _) -> None
     | (Continue left_tree, Continue right_tree, _) -> (
-        trees_shape_match path_to_ignore left_tree right_tree
-        |> function [] -> None | errors -> Some errors )
+        trees_shape_match path_to_ignore left_tree right_tree |> function
+        | [] -> None
+        | errors -> Some errors)
     | (_, _, ThisPath _) ->
         (* Shapes are different but this is the path to ignore. *)
         None
     | _ ->
         Some
-          [ Format.asprintf
+          [
+            Format.asprintf
               "@[<v 2>Nodes have different shapes.@,Left:@,%a@,Right:@,%a@]"
               pp_merkle_node
               left
               pp_merkle_node
-              right ]
+              right;
+          ]
 
   and trees_shape_match path_to_ignore
       (left : Tezos_shell_services.Block_services.merkle_tree)
@@ -291,6 +274,7 @@ module Merkle = struct
   let trees_shape_match key_path
       (left : Tezos_shell_services.Block_services.merkle_tree)
       (right : Tezos_shell_services.Block_services.merkle_tree) =
-    trees_shape_match (ThisPath key_path) left right
-    |> function [] -> Ok () | errors -> Error errors
+    trees_shape_match (ThisPath key_path) left right |> function
+    | [] -> Ok ()
+    | errors -> Error errors
 end

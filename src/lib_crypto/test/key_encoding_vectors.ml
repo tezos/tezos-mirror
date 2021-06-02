@@ -15,7 +15,8 @@
  * and taken as a reference (commit 41fc1bbc7c2a8039f00b00bbca210382f99d6e5c) *)
 
 let ed25519_pkhs =
-  [ ( "811d97c377168a8bb2111c1651d23d9116b92f4c",
+  [
+    ( "811d97c377168a8bb2111c1651d23d9116b92f4c",
       "tz1XQjK1b3P72kMcHsoPhnAg3dvX1n8Ainty" );
     ( "fc7050887854931103e675d0dd35cc7fcd95dcb2",
       "tz1ieoXDPfYKyo8HuUqSWWuqWAwrjNvpFcHq" );
@@ -214,10 +215,12 @@ let ed25519_pkhs =
     ( "244a09dd0a33aecd1d4775d59e06b0231b609625",
       "tz1NwuiK4jehMmWAKPBXwawaoMnbyVjMSsZL" );
     ( "225389960f1174d9bd485e1cd47b95b77c0e186f",
-      "tz1NmXjvbiPBGidN4BgpbJYUArj1EpPxXPHR" ) ]
+      "tz1NmXjvbiPBGidN4BgpbJYUArj1EpPxXPHR" );
+  ]
 
 let p256_pkhs =
-  [ ( "48480adaec07ecafbe1de0b2bb68688238740184",
+  [
+    ( "48480adaec07ecafbe1de0b2bb68688238740184",
       "tz3SvEa4tSowHC5iQ8Aw6DVKAAGqBPdyK1MH" );
     ( "6a13d9dc31dd5cc4d7d085e12f51c663c57c1a4b",
       "tz3Vzw2GYxZQwAfg9ipjNmgAuxgBn3kpDrak" );
@@ -416,10 +419,12 @@ let p256_pkhs =
     ( "31616d2df22ae37c3da96d6fbbbcd3d7b825d1d7",
       "tz3Qq9SNZJKfGkemWzUXZuFDq2gZitzeyiUH" );
     ( "8b887528358b645ba3d23da421e1998cc801514a",
-      "tz3Z3q1a1X1UGunPyEqtvUqxqSPB978Qcey2" ) ]
+      "tz3Z3q1a1X1UGunPyEqtvUqxqSPB978Qcey2" );
+  ]
 
 let ed25519_key_encodings =
-  [ ( "98b94d2fa3f98746d3c8b2d1cdde21e43d95b260d8665503a47f5d33da3586d4",
+  [
+    ( "98b94d2fa3f98746d3c8b2d1cdde21e43d95b260d8665503a47f5d33da3586d4",
       "tz1SodoUsWVe1Yey9eMFbqRUtNpBWfir5NRr",
       "edpkufnz668CdgnVC4X5KRvJoXCMgicr29Tjmr5vxGzvMdipwkTZmM",
       "edsk3qAQSJaDBSYN2PCMdv7BuJoBKeRyDFq5uPAwDfFRAhQdwHxPMN" );
@@ -818,10 +823,12 @@ let ed25519_key_encodings =
     ( "bc7a105c854a6f9573c13fc2877e9fffc81cf69e025573156a27a511b2156c50",
       "tz1MzAE1u9ec6vS8tZUTWf4SKb6FGJFeeEqL",
       "edpkv7m7eiwC6bupfrpmZn4Rmr7hJxPRH7qBzMQQmeRw4UcJ4yYA8M",
-      "edsk46ufd8thGcd7nCoxM9gtipDmYbCtfx8S539QwHwGNH1EXfTYci" ) ]
+      "edsk46ufd8thGcd7nCoxM9gtipDmYbCtfx8S539QwHwGNH1EXfTYci" );
+  ]
 
 let p256_key_encodings =
-  [ ( "2bc87e75c79225a15e9ae381069c8de363ddecd9229ce177b51967d94b688d2e",
+  [
+    ( "2bc87e75c79225a15e9ae381069c8de363ddecd9229ce177b51967d94b688d2e",
       "tz3ZxowXGSjiVq227GQcwKdz87rKhq62rY4t",
       "p2pk66Y3178eHvgWFA4CDsgGPhbkWtwrYCVUKJnsAi41eGP7MbHKv24",
       "p2sk2g5Btw8MK7fnhQg9d7DaE8QYX8A89BLWaqWTQcHuATYY3ABjD9" );
@@ -1220,4 +1227,5 @@ let p256_key_encodings =
     ( "b6e8019d9dd40825f685db97f29b46e85e330a13d01832cfa0ceefee12a424f8",
       "tz3aayX9P1ivdBBoBeSnyJsSwbEmVZho5MnL",
       "p2pk64rsendmKUT8pJx66zHgUR25HHVtFsWXKgkzTgnZRu8fLdsaiXr",
-      "p2sk3jLuEb9yEceuC3Jh7nHNZkgeACwR3qkR8RWQhqpj8RZoVj9Jcq" ) ]
+      "p2sk3jLuEb9yEceuC3Jh7nHNZkgeACwR3qkR8RWQhqpj8RZoVj9Jcq" );
+  ]

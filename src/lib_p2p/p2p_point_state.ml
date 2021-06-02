@@ -35,14 +35,12 @@ type 'data t =
 type 'data state = 'data t
 
 let pp ppf = function
-  | Requested _ ->
-      Format.fprintf ppf "requested"
+  | Requested _ -> Format.fprintf ppf "requested"
   | Accepted {current_peer_id; _} ->
       Format.fprintf ppf "accepted %a" P2p_peer.Id.pp current_peer_id
   | Running {current_peer_id; _} ->
       Format.fprintf ppf "running %a" P2p_peer.Id.pp current_peer_id
-  | Disconnected ->
-      Format.fprintf ppf "disconnected"
+  | Disconnected -> Format.fprintf ppf "disconnected"
 
 module Info = struct
   type reconnection_config = {
@@ -123,9 +121,9 @@ module Info = struct
             ~description:
               "The maximum amount by which the reconnection is extended. This \
                limits the rate of the exponential back-off, which eventually \
-               becomes linear when it reaches this limit. This limit is set \
-               to avoid reaching the End-of-Time when repeatedly reconnection \
-               a peer."
+               becomes linear when it reaches this limit. This limit is set to \
+               avoid reaching the End-of-Time when repeatedly reconnection a \
+               peer."
             Time.System.Span.encoding
             default_reconnection_config.increase_cap))
 
@@ -170,10 +168,8 @@ module Info = struct
   let can_reconnect ~now {reconnection_info; _} =
     (* TODO : use Option.map_default when will be available *)
     match reconnection_info with
-    | None ->
-        false
-    | Some gr ->
-        Time.System.compare now gr.end_time <= 0
+    | None -> false
+    | Some gr -> Time.System.compare now gr.end_time <= 0
 
   let reconnection_time {reconnection_info; _} =
     (* TODO : use Option.map_default when will be available *)
@@ -188,8 +184,8 @@ module Info = struct
     Option.merge
       Time.System.max
       s.last_failed_connection
-      ( Option.map snd
-      @@ Time.System.recent s.last_rejected_connection s.last_disconnection )
+      (Option.map snd
+      @@ Time.System.recent s.last_rejected_connection s.last_disconnection)
 
   let log {events; watchers; _} ~timestamp kind =
     let event = Time.System.stamp ~time:timestamp kind in
@@ -208,20 +204,15 @@ let get {Info.state; _} = state
 
 let is_disconnected {Info.state; _} =
   match state with
-  | Disconnected ->
-      true
-  | Requested _ | Accepted _ | Running _ ->
-      false
+  | Disconnected -> true
+  | Requested _ | Accepted _ | Running _ -> false
 
 let set_requested ~timestamp point_info cancel =
   assert (
     match point_info.Info.state with
-    | Requested _ ->
-        true
-    | Accepted _ | Running _ ->
-        false
-    | Disconnected ->
-        true ) ;
+    | Requested _ -> true
+    | Accepted _ | Running _ -> false
+    | Disconnected -> true) ;
   point_info.state <- Requested {cancel} ;
   Info.log point_info ~timestamp Outgoing_request
 
@@ -229,10 +220,8 @@ let set_accepted ~timestamp point_info current_peer_id cancel =
   (* log_notice "SET_ACCEPTED %a@." P2p_point.pp point_info.point ; *)
   assert (
     match point_info.Info.state with
-    | Accepted _ | Running _ ->
-        false
-    | Requested _ | Disconnected ->
-        true ) ;
+    | Accepted _ | Running _ -> false
+    | Requested _ | Disconnected -> true) ;
   point_info.state <- Accepted {current_peer_id; cancel} ;
   Info.log point_info ~timestamp (Accepting_request current_peer_id)
 
@@ -242,14 +231,10 @@ let set_private point_info known_private =
 let set_running ~timestamp point_info peer_id data =
   assert (
     match point_info.Info.state with
-    | Disconnected ->
-        true (* request to unknown peer_id. *)
-    | Running _ ->
-        false
-    | Accepted {current_peer_id; _} ->
-        P2p_peer.Id.equal peer_id current_peer_id
-    | Requested _ ->
-        true ) ;
+    | Disconnected -> true (* request to unknown peer_id. *)
+    | Running _ -> false
+    | Accepted {current_peer_id; _} -> P2p_peer.Id.equal peer_id current_peer_id
+    | Requested _ -> true) ;
   point_info.state <- Running {data; current_peer_id = peer_id} ;
   point_info.last_established_connection <- Some (peer_id, timestamp) ;
   Info.log point_info ~timestamp (Connection_established peer_id)
@@ -260,10 +245,8 @@ let maxed_time_add t s =
 let set_reconnection_delay reconnection_config timestamp point_info =
   let disconnection_delay =
     match point_info.Info.reconnection_info with
-    | None ->
-        reconnection_config.Info.initial_delay
-    | Some gr ->
-        gr.delay
+    | None -> reconnection_config.Info.initial_delay
+    | Some gr -> gr.delay
   in
   let end_time = maxed_time_add timestamp disconnection_delay in
   let delay =
@@ -299,8 +282,7 @@ let set_disconnected ~timestamp ?(requested = false) reconnection_config
         point_info.last_disconnection <- Some (current_peer_id, timestamp) ;
         if requested then Disconnection current_peer_id
         else External_disconnection current_peer_id
-    | Disconnected ->
-        assert false
+    | Disconnected -> assert false
   in
   point_info.state <- Disconnected ;
   Info.log point_info ~timestamp event

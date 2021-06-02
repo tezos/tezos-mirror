@@ -80,10 +80,7 @@ type error +=
     }
 
 type error +=
-  | Outdated_double_baking_evidence of {
-      level : Raw_level.t;
-      last : Raw_level.t;
-    }
+  | Outdated_double_baking_evidence of {level : Raw_level.t; last : Raw_level.t}
 
 type error += Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
 
@@ -96,9 +93,9 @@ type error += (* `Permanent *) Failing_noop_error
 val begin_partial_construction :
   t ->
   escape_vote:bool ->
-  ( t
+  (t
   * packed_successful_manager_operation_result list
-  * Liquidity_baking.escape_ema )
+  * Liquidity_baking.escape_ema)
   tzresult
   Lwt.t
 
@@ -106,11 +103,11 @@ val begin_full_construction :
   t ->
   Time.t ->
   Block_header.contents ->
-  ( t
+  (t
   * Block_header.contents
   * public_key
   * packed_successful_manager_operation_result list
-  * Liquidity_baking.escape_ema )
+  * Liquidity_baking.escape_ema)
   tzresult
   Lwt.t
 
@@ -119,10 +116,10 @@ val begin_application :
   Chain_id.t ->
   Block_header.t ->
   Time.t ->
-  ( t
+  (t
   * public_key
   * packed_successful_manager_operation_result list
-  * Liquidity_baking.escape_ema )
+  * Liquidity_baking.escape_ema)
   tzresult
   Lwt.t
 

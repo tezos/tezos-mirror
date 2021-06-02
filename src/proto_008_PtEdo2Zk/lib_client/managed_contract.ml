@@ -31,8 +31,7 @@ let return_single_manager_result (oph, op, result) =
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
-  | _ ->
-      assert false
+  | _ -> assert false
 
 let get_contract_manager (cctxt : #full) contract =
   let open Micheline in
@@ -43,50 +42,47 @@ let get_contract_manager (cctxt : #full) contract =
     ~block:cctxt#block
     contract
   >>=? function
-  | None ->
-      cctxt#error "This is not a smart contract."
+  | None -> cctxt#error "This is not a smart contract."
   | Some storage -> (
-    match root storage with
-    | Prim (_, D_Pair, Bytes (_, bytes) :: _, _) | Bytes (_, bytes) -> (
-      match
-        Data_encoding.Binary.of_bytes_opt
-          Signature.Public_key_hash.encoding
-          bytes
-      with
-      | Some k ->
-          return k
-      | None ->
+      match root storage with
+      | Prim (_, D_Pair, Bytes (_, bytes) :: _, _) | Bytes (_, bytes) -> (
+          match
+            Data_encoding.Binary.of_bytes_opt
+              Signature.Public_key_hash.encoding
+              bytes
+          with
+          | Some k -> return k
+          | None ->
+              cctxt#error
+                "Cannot find a manager key in contracts storage (decoding \
+                 bytes failed).\n\
+                 Transfer from scripted contract are currently only supported \
+                 for \"manager\" contract.")
+      | Prim (_, D_Pair, String (_, value) :: _, _) | String (_, value) -> (
+          match Signature.Public_key_hash.of_b58check_opt value with
+          | Some k -> return k
+          | None ->
+              cctxt#error
+                "Cannot find a manager key in contracts storage (\"%s\" is not \
+                 a valid key).\n\
+                 Transfer from scripted contract are currently only supported \
+                 for \"manager\" contract."
+                value)
+      | _raw_storage ->
           cctxt#error
-            "Cannot find a manager key in contracts storage (decoding bytes \
-             failed).\n\
-             Transfer from scripted contract are currently only supported for \
-             \"manager\" contract." )
-    | Prim (_, D_Pair, String (_, value) :: _, _) | String (_, value) -> (
-      match Signature.Public_key_hash.of_b58check_opt value with
-      | Some k ->
-          return k
-      | None ->
-          cctxt#error
-            "Cannot find a manager key in contracts storage (\"%s\" is not a \
-             valid key).\n\
+            "Cannot find a manager key in contracts storage (wrong storage \
+             format : @[%a@]).\n\
              Transfer from scripted contract are currently only supported for \
              \"manager\" contract."
-            value )
-    | _raw_storage ->
-        cctxt#error
-          "Cannot find a manager key in contracts storage (wrong storage \
-           format : @[%a@]).\n\
-           Transfer from scripted contract are currently only supported for \
-           \"manager\" contract."
-          Michelson_v1_printer.print_expr
-          storage )
+            Michelson_v1_printer.print_expr
+            storage)
 
 let parse code =
   Lwt.return
     ( Micheline_parser.no_parsing_error
-      @@ Michelson_v1_parser.parse_expression code
+    @@ Michelson_v1_parser.parse_expression code
     >>? fun exp ->
-    Error_monad.ok @@ Script.lazy_expr Michelson_v1_parser.(exp.expanded) )
+      Error_monad.ok @@ Script.lazy_expr Michelson_v1_parser.(exp.expanded) )
 
 let build_lambda_for_set_delegate ~delegate =
   match delegate with
@@ -96,58 +92,52 @@ let build_lambda_for_set_delegate ~delegate =
         "{ DROP ; NIL operation ; PUSH key_hash 0x%s ; SOME ; SET_DELEGATE ; \
          CONS }"
         delegate
-  | None ->
-      "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
+  | None -> "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
 
 let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
     contract (* the KT1 to delegate *)
     (delegate : Signature.public_key_hash option) =
   let entrypoint = "do" in
-  Michelson_v1_entrypoints.contract_entrypoint_type
-    cctxt
-    ~chain
-    ~block
-    ~contract
-    ~entrypoint
-  >>=? (function
-         | Some _ ->
-             (* their is a "do" entrypoint (we could check its type here)*)
-             parse @@ build_lambda_for_set_delegate ~delegate
-             >>=? fun param -> return (param, entrypoint)
-         | None -> (
-             (*  their is no "do" entrypoint trying "set/remove_delegate" *)
-             let entrypoint =
-               match delegate with
-               | Some _ ->
-                   "set_delegate"
-               | None ->
-                   "remove_delegate"
-             in
-             Michelson_v1_entrypoints.contract_entrypoint_type
-               cctxt
-               ~chain
-               ~block
-               ~contract
-               ~entrypoint
-             >>=? function
-             | Some _ ->
-                 (*  their is a "set/remove_delegate" entrypoint *)
-                 let delegate_data =
-                   match delegate with
-                   | Some delegate ->
-                       let (`Hex delegate) =
-                         Signature.Public_key_hash.to_hex delegate
-                       in
-                       "0x" ^ delegate
-                   | None ->
-                       "Unit"
+  (Michelson_v1_entrypoints.contract_entrypoint_type
+     cctxt
+     ~chain
+     ~block
+     ~contract
+     ~entrypoint
+   >>=? function
+   | Some _ ->
+       (* their is a "do" entrypoint (we could check its type here)*)
+       parse @@ build_lambda_for_set_delegate ~delegate >>=? fun param ->
+       return (param, entrypoint)
+   | None -> (
+       (*  their is no "do" entrypoint trying "set/remove_delegate" *)
+       let entrypoint =
+         match delegate with
+         | Some _ -> "set_delegate"
+         | None -> "remove_delegate"
+       in
+       Michelson_v1_entrypoints.contract_entrypoint_type
+         cctxt
+         ~chain
+         ~block
+         ~contract
+         ~entrypoint
+       >>=? function
+       | Some _ ->
+           (*  their is a "set/remove_delegate" entrypoint *)
+           let delegate_data =
+             match delegate with
+             | Some delegate ->
+                 let (`Hex delegate) =
+                   Signature.Public_key_hash.to_hex delegate
                  in
-                 parse delegate_data
-                 >>=? fun param -> return (param, entrypoint)
-             | None ->
-                 cctxt#error
-                   "Cannot find a %%do or %%set_delegate entrypoint in \
-                    contract@." ))
+                 "0x" ^ delegate
+             | None -> "Unit"
+           in
+           parse delegate_data >>=? fun param -> return (param, entrypoint)
+       | None ->
+           cctxt#error
+             "Cannot find a %%do or %%set_delegate entrypoint in contract@."))
   >>=? fun (parameters, entrypoint) ->
   return
     (Client_proto_context.build_transaction_operation
@@ -230,7 +220,7 @@ let build_lambda_for_transfer_to_originated ~destination ~entrypoint ~amount
 let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
     ~destination ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit
     ?storage_limit () =
-  ( match Alpha_context.Contract.is_implicit destination with
+  (match Alpha_context.Contract.is_implicit destination with
   | Some destination when entrypoint = "default" ->
       return @@ build_lambda_for_transfer_to_implicit ~destination ~amount
   | Some _ ->
@@ -241,29 +231,27 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
         Contract.pp
         destination
   | None ->
-      Michelson_v1_entrypoints.contract_entrypoint_type
-        cctxt
-        ~chain
-        ~block
-        ~contract:destination
-        ~entrypoint
-      >>=? (function
-             | None ->
-                 cctxt#error
-                   "Contract %a has no entrypoint named %s"
-                   Contract.pp
-                   destination
-                   entrypoint
-             | Some parameter_type ->
-                 return parameter_type)
+      (Michelson_v1_entrypoints.contract_entrypoint_type
+         cctxt
+         ~chain
+         ~block
+         ~contract:destination
+         ~entrypoint
+       >>=? function
+       | None ->
+           cctxt#error
+             "Contract %a has no entrypoint named %s"
+             Contract.pp
+             destination
+             entrypoint
+       | Some parameter_type -> return parameter_type)
       >>=? fun parameter_type ->
-      ( match arg with
+      (match arg with
       | Some arg ->
           Lwt.return @@ Micheline_parser.no_parsing_error
           @@ Michelson_v1_parser.parse_expression arg
           >>=? fun {expanded = arg; _} -> return_some arg
-      | None ->
-          return_none )
+      | None -> return_none)
       >>=? fun parameter ->
       let parameter = Option.value ~default:d_unit parameter in
       return
@@ -272,10 +260,9 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
            ~entrypoint
            ~amount
            ~parameter_type
-           ~parameter )
+           ~parameter)
   >>=? fun lambda ->
-  parse lambda
-  >>=? fun parameters ->
+  parse lambda >>=? fun parameters ->
   let entrypoint = "do" in
   return
     (Client_proto_context.build_transaction_operation
@@ -327,7 +314,6 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~fee_parameter
     operation
   >>=? fun (oph, op, result) ->
-  Lwt.return (Injection.originated_contracts result)
-  >>=? fun contracts ->
-  return_single_manager_result (oph, op, result)
-  >>=? fun res -> return (res, contracts)
+  Lwt.return (Injection.originated_contracts result) >>=? fun contracts ->
+  return_single_manager_result (oph, op, result) >>=? fun res ->
+  return (res, contracts)

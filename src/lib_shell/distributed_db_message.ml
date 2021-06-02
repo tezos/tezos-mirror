@@ -177,7 +177,8 @@ let encoding =
   let case ?max_length ~tag ~title encoding unwrap wrap =
     P2p_params.Encoding {tag; title; encoding; wrap; unwrap; max_length}
   in
-  [ case
+  [
+    case
       ~tag:0x10
       ~title:"Get_current_branch"
       (obj1 (req "get_current_branch" Chain_id.encoding))
@@ -190,10 +191,8 @@ let encoding =
          (req "chain_id" Chain_id.encoding)
          (req "current_branch" Bounded_encoding.block_locator))
       (function
-        | Current_branch (chain_id, locator) ->
-            Some (chain_id, locator)
-        | _ ->
-            None)
+        | Current_branch (chain_id, locator) -> Some (chain_id, locator)
+        | _ -> None)
       (fun (chain_id, locator) -> Current_branch (chain_id, locator));
     case
       ~tag:0x12
@@ -217,10 +216,8 @@ let encoding =
             (dynamic_size Bounded_encoding.block_header))
          (req "current_mempool" Bounded_encoding.mempool))
       (function
-        | Current_head (chain_id, bh, mempool) ->
-            Some (chain_id, bh, mempool)
-        | _ ->
-            None)
+        | Current_head (chain_id, bh, mempool) -> Some (chain_id, bh, mempool)
+        | _ -> None)
       (fun (chain_id, bh, mempool) -> Current_head (chain_id, bh, mempool));
     case
       ~tag:0x20
@@ -286,8 +283,7 @@ let encoding =
       (function
         | Operations_for_block (block, ofs, ops, path) ->
             Some ((block, ofs), (path, ops))
-        | _ ->
-            None)
+        | _ -> None)
       (fun ((block, ofs), (path, ops)) ->
         Operations_for_block (block, ofs, ops, path));
     case
@@ -316,10 +312,8 @@ let encoding =
             "get_protocol_branch"
             (obj2 (req "chain" Chain_id.encoding) (req "proto_level" uint8))))
       (function
-        | Get_protocol_branch (chain, protocol) ->
-            Some (chain, protocol)
-        | _ ->
-            None)
+        | Get_protocol_branch (chain, protocol) -> Some (chain, protocol)
+        | _ -> None)
       (fun (chain, protocol) -> Get_protocol_branch (chain, protocol));
     case
       ~tag:0x81
@@ -334,8 +328,7 @@ let encoding =
       (function
         | Protocol_branch (chain, proto_level, locator) ->
             Some (chain, proto_level, locator)
-        | _ ->
-            None)
+        | _ -> None)
       (fun (chain, proto_level, locator) ->
         Protocol_branch (chain, proto_level, locator));
     case
@@ -346,10 +339,8 @@ let encoding =
             "get_predecessor_header"
             (obj2 (req "block" Block_hash.encoding) (req "offset" int32))))
       (function
-        | Get_predecessor_header (block, offset) ->
-            Some (block, offset)
-        | _ ->
-            None)
+        | Get_predecessor_header (block, offset) -> Some (block, offset)
+        | _ -> None)
       (fun (block, offset) -> Get_predecessor_header (block, offset));
     case
       ~tag:0x91
@@ -364,9 +355,8 @@ let encoding =
       (function
         | Predecessor_header (hash, offset, header) ->
             Some (hash, offset, header)
-        | _ ->
-            None)
-      (fun (hash, offset, header) -> Predecessor_header (hash, offset, header))
+        | _ -> None)
+      (fun (hash, offset, header) -> Predecessor_header (hash, offset, header));
   ]
 
 let distributed_db_versions = Distributed_db_version.[zero; one]

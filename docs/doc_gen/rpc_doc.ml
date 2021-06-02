@@ -27,7 +27,8 @@ let protocols =
   (* version, title that appears in the doc, an optional path to an introduction, protocol hash *)
   (* the optional introduction is inserted between the title "RPCs index"
      and the generated directory description *)
-  [ ( "alpha",
+  [
+    ( "alpha",
       "Alpha",
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
@@ -39,13 +40,12 @@ let protocols =
     ( "",
       "009 Florence",
       Some "/include/rpc_introduction.rst.inc",
-      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" ) ]
+      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i" );
+  ]
 
 let pp_name ppf = function
-  | [] | [""] ->
-      Format.pp_print_string ppf "/"
-  | prefix ->
-      Format.pp_print_string ppf (String.concat "/" prefix)
+  | [] | [""] -> Format.pp_print_string ppf "/"
+  | prefix -> Format.pp_print_string ppf (String.concat "/" prefix)
 
 let ref_of_service (prefix, meth) =
   Format.asprintf
@@ -60,10 +60,8 @@ module Index = struct
   let rec pp prefix ppf dir =
     let open Resto.Description in
     match dir with
-    | Empty ->
-        Format.fprintf ppf "Empty"
-    | Static {services; subdirs = None} ->
-        pp_services prefix ppf services
+    | Empty -> Format.fprintf ppf "Empty"
+    | Static {services; subdirs = None} -> pp_services prefix ppf services
     | Static {services; subdirs = Some (Suffixes map)} ->
         Format.fprintf
           ppf
@@ -83,15 +81,13 @@ module Index = struct
           services
           (pp_suffixes prefix)
           (name, dir)
-    | Dynamic _ ->
-        Format.fprintf ppf "* %a (<dyn>)" pp_name prefix
+    | Dynamic _ -> Format.fprintf ppf "* %a (<dyn>)" pp_name prefix
 
   and pp_suffixes prefix ppf (name, dir) = pp (prefix @ [name]) ppf dir
 
   and pp_services prefix ppf services =
     match Resto.MethMap.bindings services with
-    | [] ->
-        Format.fprintf ppf "* %a" pp_name prefix
+    | [] -> Format.fprintf ppf "* %a" pp_name prefix
     | _ :: _ as services ->
         Format.fprintf
           ppf
@@ -121,13 +117,11 @@ module Description = struct
       let open RPC_description in
       function
       | {name; kind; _} -> (
-        match kind with
-        | Single arg | Optional arg ->
-            Format.fprintf ppf "[%s=%a]" name pp_arg arg
-        | Flag ->
-            Format.fprintf ppf "[%s]" name
-        | Multi arg ->
-            Format.fprintf ppf "(%s=%a)\\*" name pp_arg arg )
+          match kind with
+          | Single arg | Optional arg ->
+              Format.fprintf ppf "[%s=%a]" name pp_arg arg
+          | Flag -> Format.fprintf ppf "[%s]" name
+          | Multi arg -> Format.fprintf ppf "(%s=%a)\\*" name pp_arg arg)
 
     let pp_title ppf query =
       Format.fprintf
@@ -147,7 +141,7 @@ module Description = struct
       let open RPC_description in
       function
       | {name; description; kind} -> (
-          ( match kind with
+          (match kind with
           | Single arg | Optional arg | Multi arg ->
               Format.fprintf
                 ppf
@@ -155,18 +149,14 @@ module Description = struct
                 name
                 pp_html_arg
                 arg
-          | Flag ->
-              Format.fprintf ppf "<span class=\"query\">%s</span>" name ) ;
+          | Flag -> Format.fprintf ppf "<span class=\"query\">%s</span>" name) ;
           match description with
-          | None ->
-              ()
-          | Some descr ->
-              Format.fprintf ppf " : %s" descr )
+          | None -> ()
+          | Some descr -> Format.fprintf ppf " : %s" descr)
 
     let pp ppf query =
       match query with
-      | [] ->
-          ()
+      | [] -> ()
       | _ :: _ as query ->
           Format.fprintf
             ppf
@@ -305,10 +295,8 @@ module Description = struct
   let rec pp prefix ppf dir =
     let open Resto.Description in
     match dir with
-    | Empty ->
-        ()
-    | Static {services; subdirs = None} ->
-        pp_services prefix ppf services
+    | Empty -> ()
+    | Static {services; subdirs = None} -> pp_services prefix ppf services
     | Static {services; subdirs = Some (Suffixes map)} ->
         pp_services prefix ppf services ;
         Format.pp_print_list
@@ -319,8 +307,7 @@ module Description = struct
         let name = Format.asprintf "<%s>" arg.name in
         pp_services prefix ppf services ;
         pp_suffixes prefix ppf (name, dir)
-    | Dynamic _ ->
-        ()
+    | Dynamic _ -> ()
 
   and pp_suffixes prefix ppf (name, dir) = pp (prefix @ [name]) ppf dir
 
@@ -384,8 +371,7 @@ let main node =
                  this repository *)
               Format.eprintf "Hash not found: %a" Protocol_hash.pp hash ;
               assert false
-          | Some proto ->
-              proto
+          | Some proto -> proto
         in
         ( version,
           "Protocol " ^ name,
@@ -410,8 +396,7 @@ let main node =
            version = required_version)
          dirs
   in
-  RPC_directory.describe_directory ~recurse:true ~arg:() dir
-  >>= fun dir ->
+  RPC_directory.describe_directory ~recurse:true ~arg:() dir >>= fun dir ->
   let ppf = Format.std_formatter in
   pp_document ppf [(name, intro, path, dir)] required_version ;
   return ()

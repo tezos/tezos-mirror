@@ -27,7 +27,8 @@ let () =
   let socket_dir = ref None in
   let args =
     Arg.
-      [ ( "--socket-dir",
+      [
+        ( "--socket-dir",
           String
             (fun s ->
               if not (Sys.file_exists s && Sys.is_directory s) then
@@ -46,7 +47,8 @@ let () =
             (fun () ->
               Format.printf "%s\n" Tezos_version.Bin_version.version_string ;
               Stdlib.exit 0),
-          " Display version information" ) ]
+          " Display version information" );
+      ]
   in
   let usage_msg =
     Format.sprintf "tezos-validator [--version] [--socket-dir <dir>]"
@@ -58,10 +60,8 @@ let () =
   let main_promise = Validator.main ?socket_dir:!socket_dir () in
   Stdlib.exit
     (Lwt_main.run
-       ( Lwt_exit.wrap_and_exit main_promise
-       >>= function
-       | Ok () ->
-           Lwt_exit.exit_and_wait 0
-       | Error err ->
-           Format.eprintf "%a\n%!" pp_print_error err ;
-           Lwt_exit.exit_and_wait 1 ))
+       (Lwt_exit.wrap_and_exit main_promise >>= function
+        | Ok () -> Lwt_exit.exit_and_wait 0
+        | Error err ->
+            Format.eprintf "%a\n%!" pp_print_error err ;
+            Lwt_exit.exit_and_wait 1))

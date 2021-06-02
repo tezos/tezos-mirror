@@ -51,10 +51,8 @@ let expand_all source ast errors =
     in
     let grouped =
       let rec group = function
-        | (acc, []) ->
-            acc
-        | ([], (u, e) :: r) ->
-            group ([(e, [u])], r)
+        | (acc, []) -> acc
+        | ([], (u, e) :: r) -> group ([(e, [u])], r)
         | (((pe, us) :: racc as acc), (u, e) :: r) ->
             if e = pe then group ((e, u :: us) :: racc, r)
             else group ((e, [u]) :: acc, r)
@@ -70,10 +68,8 @@ let expand_all source ast errors =
         (List.sort Stdlib.compare loc_table)
         (List.sort Stdlib.compare grouped)
     with
-    | Ok v ->
-        v
-    | Error () ->
-        invalid_arg "Michelson_v1_parser.expand_all"
+    | Ok v -> v
+    | Error () -> invalid_arg "Michelson_v1_parser.expand_all"
   in
   match
     Environment.wrap_error (Michelson_v1_primitives.prims_of_strings expanded)
@@ -102,9 +98,7 @@ let parse_toplevel ?check source =
 
 let parse_expression ?check source =
   let (tokens, lexing_errors) = Micheline_parser.tokenize source in
-  let (ast, parsing_errors) =
-    Micheline_parser.parse_expression ?check tokens
-  in
+  let (ast, parsing_errors) = Micheline_parser.parse_expression ?check tokens in
   expand_all source ast (lexing_errors @ parsing_errors)
 
 let expand_all ~source ~original = expand_all source original []

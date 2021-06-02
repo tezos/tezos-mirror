@@ -28,8 +28,7 @@ let generate () =
       let hash = Alpha_context.Nonce.hash nonce in
       Table.add known_nonces hash nonce ;
       (hash, nonce)
-  | Error _ ->
-      assert false
+  | Error _ -> assert false
 
 let forget_all () = Table.clear known_nonces
 

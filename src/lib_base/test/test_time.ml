@@ -51,10 +51,12 @@ module Protocol = struct
         (int64_range min_rfc3339_seconds max_rfc3339_seconds)
     in
     QCheck.frequency
-      [ (97, within_rfc3339);
+      [
+        (97, within_rfc3339);
         (1, QCheck.always max_rfc3339);
         (1, QCheck.always min_rfc3339);
-        (1, QCheck.always epoch) ]
+        (1, QCheck.always epoch);
+      ]
 
   let pp fmt t = Format.fprintf fmt "%Lx" (to_seconds t)
 
@@ -104,19 +106,18 @@ module Protocol = struct
       ~name:"Protocol.[to|of]_notation roundtrip in RFC3339 range"
       rfc3339_compatible_t_arb
       (fun t ->
-        to_notation t |> of_notation
-        |> function
-        | None ->
-            QCheck.Test.fail_report "Failed to roundtrip notation"
-        | Some actual ->
-            qcheck_eq' ~pp ~eq:equal ~expected:t ~actual ())
+        to_notation t |> of_notation |> function
+        | None -> QCheck.Test.fail_report "Failed to roundtrip notation"
+        | Some actual -> qcheck_eq' ~pp ~eq:equal ~expected:t ~actual ())
 
   let tests =
-    [ add_diff_roundtrip;
+    [
+      add_diff_roundtrip;
       diff_add_roundtrip;
       encoding_binary_roundtrip;
       encoding_json_roundtrip;
-      encoding_to_notation_roundtrip ]
+      encoding_to_notation_roundtrip;
+    ]
 end
 
 module System = struct
@@ -126,14 +127,13 @@ module System = struct
   let t_ymdhms_arb : t QCheck.arbitrary =
     let open QCheck in
     let rev t =
-      Option.get t |> Ptime.to_date_time
-      |> fun (date, (time, _)) -> (date, time)
+      Option.get t |> Ptime.to_date_time |> fun (date, (time, _)) -> (date, time)
     in
     of_option_arb
-      ( pair
-          (triple (0 -- 9999) (1 -- 12) (1 -- 31))
-          (triple (0 -- 23) (0 -- 59) (0 -- 60))
-      |> map ~rev (fun (date, time) -> Ptime.of_date_time (date, (time, 0))) )
+      (pair
+         (triple (0 -- 9999) (1 -- 12) (1 -- 31))
+         (triple (0 -- 23) (0 -- 59) (0 -- 60))
+      |> map ~rev (fun (date, time) -> Ptime.of_date_time (date, (time, 0))))
     |> set_print (Format.asprintf "%a" pp_hum)
 
   let (min_day, min_ps) = Ptime.min |> Ptime.to_span |> Ptime.Span.to_d_ps
@@ -165,8 +165,7 @@ module System = struct
       t_arb
       (fun t ->
         match to_protocol t |> of_protocol_opt with
-        | None ->
-            QCheck.Test.fail_report "Failed roundtrip"
+        | None -> QCheck.Test.fail_report "Failed roundtrip"
         | Some actual ->
             let delta = Ptime.Span.abs @@ Ptime.diff t actual in
             is_small delta)
@@ -239,16 +238,20 @@ module System = struct
         is_small delta)
 
   let tests =
-    [ to_protocol_of_protocol_roundtrip;
+    [
+      to_protocol_of_protocol_roundtrip;
       of_protocol_to_protocol_roundtrip_or_outside_rfc3339;
       rfc_encoding_binary_roundtrip;
       rfc_encoding_json_roundtrip;
       encoding_binary_roundtrip;
-      encoding_json_roundtrip ]
+      encoding_json_roundtrip;
+    ]
 end
 
 let () =
   Alcotest.run
     "Time"
-    [ ("Protocol", qcheck_wrap Protocol.tests);
-      ("System", qcheck_wrap System.tests) ]
+    [
+      ("Protocol", qcheck_wrap Protocol.tests);
+      ("System", qcheck_wrap System.tests);
+    ]

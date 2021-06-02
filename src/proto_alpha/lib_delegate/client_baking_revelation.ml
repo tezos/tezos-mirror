@@ -27,11 +27,9 @@ module Events = Delegate_events.Revelation
 
 let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
     ~block ?async nonces =
-  Shell_services.Blocks.hash cctxt ~chain ~block ()
-  >>=? fun hash ->
+  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   match nonces with
-  | [] ->
-      Events.(emit no_nonce_reveal) hash >>= fun () -> return_unit
+  | [] -> Events.(emit no_nonce_reveal) hash >>= fun () -> return_unit
   | _ ->
       List.iter_es
         (fun (level, nonce) ->

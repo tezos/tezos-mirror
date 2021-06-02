@@ -45,16 +45,14 @@ module Test_raw_level_repr = struct
     let encoding = Raw_level_repr.encoding in
     let bytes = Bytes.make 4 '0' in
     Bytes.set_int32_ne bytes 0 0l ;
-    Data_encoding.Binary.of_bytes encoding bytes
-    |> (function
-         | Ok x ->
-             Lwt.return (Ok x)
-         | Error e ->
-             failwith
-               "Data_encoding.Binary.read shouldn't have failed with \
-                Raw_level_repr.encoding: %a"
-               Data_encoding.Binary.pp_read_error
-               e)
+    (Data_encoding.Binary.of_bytes encoding bytes |> function
+     | Ok x -> Lwt.return (Ok x)
+     | Error e ->
+         failwith
+           "Data_encoding.Binary.read shouldn't have failed with \
+            Raw_level_repr.encoding: %a"
+           Data_encoding.Binary.pp_read_error
+           e)
     >>=? fun v ->
     Assert.equal_int ~loc:__LOC__ (Int32.to_int (Raw_level_repr.to_int32 v)) 0
 
@@ -64,19 +62,15 @@ module Test_raw_level_repr = struct
   (** int32 interop tests *)
   let test_int32_interop () =
     let int32v = 100l in
-    Lwt.return (Raw_level_repr.of_int32 int32v)
-    >|= Environment.wrap_tzresult
+    Lwt.return (Raw_level_repr.of_int32 int32v) >|= Environment.wrap_tzresult
     >>=? fun raw_level ->
     Assert.equal_int32 ~loc:__LOC__ (Raw_level_repr.to_int32 raw_level) int32v
     >>=? fun () ->
     let int32v = -1l in
-    Lwt.return (Raw_level_repr.of_int32 int32v)
-    >|= Environment.wrap_tzresult
+    Lwt.return (Raw_level_repr.of_int32 int32v) >|= Environment.wrap_tzresult
     >>= function
-    | Ok _ ->
-        failwith "Negative int32s should not be coerced into raw_level"
-    | Error _ ->
-        return_unit
+    | Ok _ -> failwith "Negative int32s should not be coerced into raw_level"
+    | Error _ -> return_unit
 
   (** Asserting [root]'s runtime value. Expected to be [0l] *)
   let test_root () =
@@ -101,7 +95,7 @@ module Test_raw_level_repr = struct
 
   (** Asserting [pred] which is expected to return predecessor levels *)
   let test_pred () =
-    ( match Raw_level_repr.pred (Raw_level_repr.of_int32_exn 1l) with
+    (match Raw_level_repr.pred (Raw_level_repr.of_int32_exn 1l) with
     | Some previous_raw_level ->
         Assert.equal_int32
           ~loc:__LOC__
@@ -110,16 +104,14 @@ module Test_raw_level_repr = struct
     | None ->
         failwith
           "Raw_level_repr.pred should have successfully returned 0l as the \
-           predecessor of 1l" )
+           predecessor of 1l")
     >>=? fun () ->
-    Raw_level_repr.pred Raw_level_repr.root
-    |> function
+    Raw_level_repr.pred Raw_level_repr.root |> function
     | Some _ ->
         failwith
           "Raw_level_repr.pred should have returned None when asked for \
            predecessor of [root]"
-    | None ->
-        return_unit
+    | None -> return_unit
 
   let test_skip_succ () =
     let int32_limit = 0x7FFFFFFFl in
@@ -136,7 +128,8 @@ module Test_raw_level_repr = struct
 end
 
 let tests =
-  [ tztest
+  [
+    tztest
       "Raw_level_repr.encoding: checks if encoding is int32 as expected"
       `Quick
       Test_raw_level_repr.test_encoding;
@@ -155,10 +148,13 @@ let tests =
     tztest
       "Raw_level_repr: int32 interop"
       `Quick
-      Test_raw_level_repr.test_int32_interop ]
+      Test_raw_level_repr.test_int32_interop;
+  ]
 
 let skipped_tests =
-  [ tztest
+  [
+    tztest
       "Raw_level_repr.succ: overflow"
       `Quick
-      Test_raw_level_repr.test_skip_succ ]
+      Test_raw_level_repr.test_skip_succ;
+  ]

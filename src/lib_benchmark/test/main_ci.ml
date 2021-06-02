@@ -26,7 +26,9 @@
 let () =
   Alcotest_lwt.run
     "tezos-benchmark"
-    [ ("sparse_vec", Test_sparse_vec.tests);
+    [
+      ("sparse_vec", Test_sparse_vec.tests);
       ("costlang", Test_costlang.tests);
-      ("probing", Test_probe.tests) ]
+      ("probing", Test_probe.tests);
+    ]
   |> Lwt_main.run

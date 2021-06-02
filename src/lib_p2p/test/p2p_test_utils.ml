@@ -51,33 +51,34 @@ type 'a timeout_t = {time : float; msg : 'a -> string}
      point. *)
 let wait_pred ?timeout ~pred ~arg () =
   let rec inner_wait_pred () =
-    Lwt.pause ()
-    >>= fun () -> if not (pred arg) then inner_wait_pred () else return_unit
+    Lwt.pause () >>= fun () ->
+    if not (pred arg) then inner_wait_pred () else return_unit
   in
   match timeout with
-  | None ->
-      inner_wait_pred ()
+  | None -> inner_wait_pred ()
   | Some timeout ->
       Lwt.pick
-        [ ( Lwt_unix.sleep timeout.time
-          >>= fun () -> Error_monad.fail (Timeout_exceed (timeout.msg arg)) );
-          inner_wait_pred () ]
+        [
+          ( Lwt_unix.sleep timeout.time >>= fun () ->
+            Error_monad.fail (Timeout_exceed (timeout.msg arg)) );
+          inner_wait_pred ();
+        ]
 
 let wait_pred_s ?timeout ~pred ~arg () =
   let rec inner_wait_pred () =
-    Lwt.pause ()
-    >>= fun () ->
-    pred arg
-    >>= fun cond -> if not cond then inner_wait_pred () else return_unit
+    Lwt.pause () >>= fun () ->
+    pred arg >>= fun cond ->
+    if not cond then inner_wait_pred () else return_unit
   in
   match timeout with
-  | None ->
-      inner_wait_pred ()
+  | None -> inner_wait_pred ()
   | Some timeout ->
       Lwt.pick
-        [ ( Lwt_unix.sleep timeout.time
-          >>= fun () -> Error_monad.fail (Timeout_exceed (timeout.msg arg)) );
-          inner_wait_pred () ]
+        [
+          ( Lwt_unix.sleep timeout.time >>= fun () ->
+            Error_monad.fail (Timeout_exceed (timeout.msg arg)) );
+          inner_wait_pred ();
+        ]
 
 let wait_conns ?timeout ~pool n =
   let timeout =
@@ -148,56 +149,46 @@ let rec listen ?port addr =
       | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
         when port = None ->
           listen addr
-      | exn ->
-          Lwt.fail exn)
+      | exn -> Lwt.fail exn)
 
 let rec sync_nodes nodes =
-  List.iter_ep (fun p -> Process.receive p) nodes
-  >>=? fun () ->
-  List.iter_ep (fun p -> Process.send p ()) nodes
-  >>=? fun () -> sync_nodes nodes
+  List.iter_ep (fun p -> Process.receive p) nodes >>=? fun () ->
+  List.iter_ep (fun p -> Process.send p ()) nodes >>=? fun () ->
+  sync_nodes nodes
 
 let sync_nodes nodes =
-  sync_nodes nodes
-  >>= function
-  | Ok () | Error (Exn End_of_file :: _) ->
-      return_unit
-  | Error _ as err ->
-      Lwt.return err
+  sync_nodes nodes >>= function
+  | Ok () | Error (Exn End_of_file :: _) -> return_unit
+  | Error _ as err -> Lwt.return err
 
 let run_nodes client server =
-  listen !addr
-  >>= fun (main_socket, port) ->
+  listen !addr >>= fun (main_socket, port) ->
   Process.detach ~prefix:"server: " (fun channel ->
       let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-      server channel sched main_socket
-      >>=? fun () -> P2p_io_scheduler.shutdown sched >>= fun () -> return_unit)
+      server channel sched main_socket >>=? fun () ->
+      P2p_io_scheduler.shutdown sched >>= fun () -> return_unit)
   >>=? fun server_node ->
   Process.detach ~prefix:"client: " (fun channel ->
-      Lwt_utils_unix.safe_close main_socket
-      >>= (function
-            | Error trace ->
-                Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
-                Lwt.return_unit
-            | Ok () ->
-                Lwt.return_unit)
+      (Lwt_utils_unix.safe_close main_socket >>= function
+       | Error trace ->
+           Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
+           Lwt.return_unit
+       | Ok () -> Lwt.return_unit)
       >>= fun () ->
       let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
-      client channel sched !addr port
-      >>=? fun () -> P2p_io_scheduler.shutdown sched >>= fun () -> return_unit)
+      client channel sched !addr port >>=? fun () ->
+      P2p_io_scheduler.shutdown sched >>= fun () -> return_unit)
   >>=? fun client_node ->
   let nodes = [server_node; client_node] in
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes
 
 let raw_accept sched main_socket =
-  P2p_fd.accept main_socket
-  >>= fun (fd, sockaddr) ->
+  P2p_fd.accept main_socket >>= fun (fd, sockaddr) ->
   let fd = P2p_io_scheduler.register sched fd in
   let point =
     match sockaddr with
-    | Lwt_unix.ADDR_UNIX _ ->
-        assert false
+    | Lwt_unix.ADDR_UNIX _ -> assert false
     | Lwt_unix.ADDR_INET (addr, port) ->
         (Ipaddr_unix.V6.of_inet_addr_exn addr, port)
   in
@@ -208,10 +199,8 @@ let raw_accept sched main_socket =
    [proof_of_work_target].  *)
 let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
     main_socket =
-  raw_accept sched main_socket
-  >>= fun (fd, point) ->
-  id
-  >>= fun id1 ->
+  raw_accept sched main_socket >>= fun (fd, point) ->
+  id >>= fun id1 ->
   P2p_socket.authenticate
     ~canceler
     ~proof_of_work_target
@@ -223,11 +212,9 @@ let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
     conn_meta_config
 
 let raw_connect sched addr port =
-  P2p_fd.socket PF_INET6 SOCK_STREAM 0
-  >>= fun fd ->
+  P2p_fd.socket PF_INET6 SOCK_STREAM 0 >>= fun fd ->
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
-  P2p_fd.connect fd uaddr
-  >>= fun () ->
+  P2p_fd.connect fd uaddr >>= fun () ->
   let fd = P2p_io_scheduler.register sched fd in
   Lwt.return fd
 
@@ -235,8 +222,7 @@ let raw_connect sched addr port =
    and performs [P2p_socket.authenticate] with the given
    [proof_of_work_target]. *)
 let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
-  raw_connect sched addr port
-  >>= fun fd ->
+  raw_connect sched addr port >>= fun fd ->
   P2p_socket.authenticate
     ~canceler
     ~proof_of_work_target
@@ -248,5 +234,5 @@ let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
     conn_meta_config
 
 let sync ch =
-  Process.Channel.push ch ()
-  >>=? fun () -> Process.Channel.pop ch >>=? fun () -> return_unit
+  Process.Channel.push ch () >>=? fun () ->
+  Process.Channel.pop ch >>=? fun () -> return_unit

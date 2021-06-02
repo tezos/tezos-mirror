@@ -170,9 +170,7 @@ val floating_blocks_file : [`Floating_dir] directory -> [`Floating_blocks] file
 val snapshot_dir : ?snapshot_path:string -> unit -> [`Snapshot_dir] directory
 
 val snapshot_file :
-  snapshot_filename:string ->
-  [`Snapshot_dir] directory ->
-  [`Snapshot_file] file
+  snapshot_filename:string -> [`Snapshot_dir] directory -> [`Snapshot_file] file
 
 val snapshot_tmp_dir :
   [`Snapshot_dir] directory -> [`Snapshot_tmp_dir] directory

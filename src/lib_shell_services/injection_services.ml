@@ -59,10 +59,10 @@ module S = struct
          Returns the ID of the block. By default, the RPC will wait for the \
          block to be validated before answering. If ?async is true, the \
          function returns immediately. Otherwise, the block will be validated \
-         before the result is returned. If ?force is true, it will be \
-         injected even on non strictly increasing fitness. An optional ?chain \
-         parameter can be used to specify whether to inject on the test chain \
-         or the main chain."
+         before the result is returned. If ?force is true, it will be injected \
+         even on non strictly increasing fitness. An optional ?chain parameter \
+         can be used to specify whether to inject on the test chain or the \
+         main chain."
       ~query:block_query
       ~input:block_param
       ~output:Block_hash.encoding
@@ -88,11 +88,11 @@ module S = struct
          a contextual RPCs from the latest block and signed by the client. By \
          default, the RPC will wait for the operation to be (pre-)validated \
          before answering. See RPCs under /blocks/prevalidation for more \
-         details on the prevalidation context. If ?async is true, the \
-         function returns immediately. Otherwise, the operation will be \
-         validated before the result is returned. An optional ?chain \
-         parameter can be used to specify whether to inject on the test chain \
-         or the main chain."
+         details on the prevalidation context. If ?async is true, the function \
+         returns immediately. Otherwise, the operation will be validated \
+         before the result is returned. An optional ?chain parameter can be \
+         used to specify whether to inject on the test chain or the main \
+         chain."
       ~query:operation_query
       ~input:bytes
       ~output:Operation_hash.encoding

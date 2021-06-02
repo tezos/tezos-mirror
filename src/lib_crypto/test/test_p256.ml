@@ -34,12 +34,14 @@ let test_b58check_invalid input =
 let test_b58check_invalids () =
   List.iter
     test_b58check_invalid
-    [ "ThisIsGarbageNotACheck";
+    [
+      "ThisIsGarbageNotACheck";
       "\x00";
       String.make 1000 '\x00';
       String.make 2048 'a';
       String.init 2048 (fun _ -> Char.chr (Random.int 256));
-      "" ]
+      "";
+    ]
 
 let of_hex hex = Cstruct.(to_bytes (of_hex hex))
 
@@ -73,9 +75,11 @@ let test_key_encodings () =
   List.iter test_encoded_key Key_encoding_vectors.p256_key_encodings
 
 let tests =
-  [ ("b58check.roundtrip", `Quick, test_b58check_roundtrips);
+  [
+    ("b58check.roundtrip", `Quick, test_b58check_roundtrips);
     ("b58check.invalid", `Slow, test_b58check_invalids);
     ("b58 pkh encodings", `Slow, test_pkh_encodings);
-    ("b58 key encodings", `Slow, test_key_encodings) ]
+    ("b58 key encodings", `Slow, test_key_encodings);
+  ]
 
 let () = Alcotest.run "tezos-crypto" [("p256", tests)]

@@ -56,13 +56,10 @@ let wait_for_denunciation accuser =
 let wait_for_denunciation_injection node client oph_promise =
   let filter json =
     match
-      JSON.(
-        json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
+      JSON.(json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
     with
-    | Some s when s = "inject" ->
-        Some s
-    | Some _ | None ->
-        None
+    | Some s when s = "inject" -> Some s
+    | Some _ | None -> None
   in
   let* _ = Node.wait_for node "node_prevalidator.v0" filter in
   let* oph = oph_promise in
@@ -76,9 +73,7 @@ let double_bake =
     ~tags:["remote"; "runner"; "bake"; "accuser"]
   @@ fun protocol ->
   let* node_1 = Node.init ~runner ~path [Bootstrap_threshold 0; Private_mode]
-  and* node_2 =
-    Node.init ~runner ~path [Bootstrap_threshold 0; Private_mode]
-  in
+  and* node_2 = Node.init ~runner ~path [Bootstrap_threshold 0; Private_mode] in
   let* client_1 = Client.init ~node:node_1 ()
   and* client_2 = Client.init ~node:node_2 () in
   let* () = Client.Admin.trust_address client_1 ~node:node_1 ~peer:node_2
@@ -104,9 +99,7 @@ let double_bake =
   let* _ = Node.wait_for_level node_2 (common_ancestor + 3) in
   let* () = Node.run node_1 [Bootstrap_threshold 0] in
   let* () = Node.wait_for_ready node_1 in
-  let* node_3 =
-    Node.init ~runner ~path [Bootstrap_threshold 0; Private_mode]
-  in
+  let* node_3 = Node.init ~runner ~path [Bootstrap_threshold 0; Private_mode] in
   let* client_3 = Client.init ~node:node_3 () in
   let* accuser_3 = Accuser.init ~protocol node_3 in
   let denunciation = wait_for_denunciation accuser_3 in

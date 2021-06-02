@@ -48,25 +48,20 @@ include Compare.Make (struct
   let compare f1 f2 =
     let rec compare_rec f1 f2 =
       match (f1, f2) with
-      | ([], []) ->
-          0
+      | ([], []) -> 0
       | (i1 :: f1, i2 :: f2) ->
           let i = compare_bytes i1 i2 in
           if i = 0 then compare_rec f1 f2 else i
-      | (_, _) ->
-          assert false
+      | (_, _) -> assert false
     in
     let len = compare (List.length f1) (List.length f2) in
     if len = 0 then compare_rec f1 f2 else len
 end)
 
 let rec pp fmt = function
-  | [] ->
-      ()
-  | [f] ->
-      Format.fprintf fmt "%a" Hex.pp (Hex.of_bytes f)
-  | f1 :: f ->
-      Format.fprintf fmt "%a::%a" Hex.pp (Hex.of_bytes f1) pp f
+  | [] -> ()
+  | [f] -> Format.fprintf fmt "%a" Hex.pp (Hex.of_bytes f)
+  | f1 :: f -> Format.fprintf fmt "%a::%a" Hex.pp (Hex.of_bytes f1) pp f
 
 let encoding =
   let open Data_encoding in
@@ -74,10 +69,10 @@ let encoding =
     "fitness"
     ~title:"Block fitness"
     ~description:
-      "The fitness, or score, of a block, that allow the Tezos to decide \
-       which chain is the best. A fitness value is a list of byte sequences. \
-       They are compared as follows: shortest lists are smaller; lists of the \
-       same length are compared according to the lexicographical order."
+      "The fitness, or score, of a block, that allow the Tezos to decide which \
+       chain is the best. A fitness value is a list of byte sequences. They \
+       are compared as follows: shortest lists are smaller; lists of the same \
+       length are compared according to the lexicographical order."
   @@ splitted ~json:(list bytes) ~binary:(list (def "fitness.elem" bytes))
 
 let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v

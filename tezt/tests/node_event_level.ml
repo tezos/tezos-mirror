@@ -54,13 +54,10 @@
 let wait_for_request_kind (request_kind : string) node =
   let filter json =
     match
-      JSON.(
-        json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
+      JSON.(json |=> 1 |-> "event" |-> "request" |-> "request" |> as_string_opt)
     with
-    | Some s when String.equal s request_kind ->
-        Some ()
-    | Some _ | None ->
-        None
+    | Some s when String.equal s request_kind -> Some ()
+    | Some _ | None -> None
   in
   Node.wait_for node "node_prevalidator.v0" filter
 
@@ -112,8 +109,7 @@ let bake_wait_log ?level node client =
       let* _ = Node.wait_for_level node lvl in
       Log.info "Node at level %d." lvl ;
       unit
-  | _ ->
-      unit
+  | _ -> unit
 
 (* Get the hash of an operation from the json representing the operation. *)
 let get_hash op = JSON.(op |-> "hash" |> as_string)
@@ -128,8 +124,7 @@ let get_applied_operation_hash_list client =
 (* Assert that [json] represents an empty list. *)
 let check_json_is_empty_list ?(fail_msg = "") json =
   match JSON.(json |> as_list_opt) with
-  | Some [] ->
-      ()
+  | Some [] -> ()
   | _ ->
       let msg =
         if String.equal fail_msg "" then
@@ -162,8 +157,7 @@ let test_debug_level_misc =
     ~title:"event level debug"
     ~tags:["node"; "event"]
   @@ fun protocol ->
-  Log.info
-    "Step 1: Start a node with event_level:debug, activate the protocol." ;
+  Log.info "Step 1: Start a node with event_level:debug, activate the protocol." ;
   let* node_1 = Node.init ~event_level:"debug" [Synchronisation_threshold 0] in
   let* client_1 = Client.init ~node:node_1 () in
   let* () = Client.activate_protocol ~protocol client_1 in
@@ -185,10 +179,8 @@ let test_debug_level_misc =
   Log.info "RPC.get_mempool_pending_operations done." ;
   let oph1 =
     match applied_ophs with
-    | [x] ->
-        x
-    | _ ->
-        Test.fail "Expected exactly one applied operation in mempool."
+    | [x] -> x
+    | _ -> Test.fail "Expected exactly one applied operation in mempool."
   in
   Log.info "Hash of injected operation: %s" oph1 ;
   Log.info "2b) operations in block should be empty." ;
@@ -206,41 +198,36 @@ let test_debug_level_misc =
   Log.info "3a) pending_operations should be empty." ;
   let* applied_ophs = get_applied_operation_hash_list client_1 in
   Log.info "RPC.get_mempool_pending_operations done." ;
-  ( match applied_ophs with
-  | [] ->
-      ()
-  | _ ->
-      Test.fail "List of applied operations in mempool should be empty." ) ;
+  (match applied_ophs with
+  | [] -> ()
+  | _ -> Test.fail "List of applied operations in mempool should be empty.") ;
   Log.info
     "3b) operations in block should contain the previously pending operation." ;
   let* ops = RPC.get_operations client_1 in
   Log.info "RPC.get_operations done." ;
-  ( match JSON.(ops |> as_list_opt) with
+  (match JSON.(ops |> as_list_opt) with
   | Some [x1; x2; x3; x4] -> (
       List.iter check_json_is_empty_list [x1; x2; x3] ;
       match JSON.(x4 |> as_list_opt) with
       | Some [x] -> (
-        match JSON.(x |-> "hash" |> as_string_opt) with
-        | Some s when String.equal s oph1 ->
-            ()
-        | _ ->
-            Test.fail
-              "Fourth list returned by RPC.operations should contain only the \
-               previously applied operation." )
+          match JSON.(x |-> "hash" |> as_string_opt) with
+          | Some s when String.equal s oph1 -> ()
+          | _ ->
+              Test.fail
+                "Fourth list returned by RPC.operations should contain only \
+                 the previously applied operation.")
       | _ ->
           Test.fail
-            "Fourth list returned by RPC.operations should contain exactly \
-             one operation." )
-  | _ ->
-      Test.fail "RPC.operations should return a list of length 4." ) ;
+            "Fourth list returned by RPC.operations should contain exactly one \
+             operation.")
+  | _ -> Test.fail "RPC.operations should return a list of length 4.") ;
   unit
 
 (* Wait for an event of name "set_head.v0".
    Note: this event has level "info", so the node needs to have event
    level set to either "debug" or "info" for such an event to exist.
 *)
-let wait_for_set_head node =
-  Node.wait_for node "set_head.v0" (fun _ -> Some ())
+let wait_for_set_head node = Node.wait_for node "set_head.v0" (fun _ -> Some ())
 
 (* Event handler that ensures there is no "set_head.v0" event (this event has
    level "info", so should not happen for nodes of event level "notice").
@@ -248,8 +235,8 @@ let wait_for_set_head node =
 let check_no_set_head event =
   if String.equal Node.(event.name) "set_head.v0" then
     Test.fail
-      "Witnessed a set_head event (of level info), which should not happen \
-       for a node configured with event level notice."
+      "Witnessed a set_head event (of level info), which should not happen for \
+       a node configured with event level notice."
 
 (* Assert that [incoming_level] is possible for events received from a
    node initialized with [config_level].
@@ -257,22 +244,16 @@ let check_no_set_head event =
 let check_event_level ~config_level ~incoming_level =
   let to_int level =
     match String.lowercase_ascii level with
-    | "debug" ->
-        0
-    | "info" ->
-        1
-    | "notice" ->
-        2
-    | "warning" ->
-        3
-    | "error" ->
-        4
-    | "fatal" ->
-        5
+    | "debug" -> 0
+    | "info" -> 1
+    | "notice" -> 2
+    | "warning" -> 3
+    | "error" -> 4
+    | "fatal" -> 5
     | _ ->
         Test.fail
-          "Unexpected event level: %s (should be debug, info, notice, \
-           warning, error, or fatal)."
+          "Unexpected event level: %s (should be debug, info, notice, warning, \
+           error, or fatal)."
           level
   in
   let config_int = to_int config_level
@@ -293,10 +274,8 @@ let check_event_level ~config_level ~incoming_level =
 let check_level_of_all_events node config_level =
   let handler event =
     match JSON.(Node.(event.value) |=> 1 |-> "level" |> as_string_opt) with
-    | Some incoming_level ->
-        check_event_level ~config_level ~incoming_level
-    | None ->
-        ()
+    | Some incoming_level -> check_event_level ~config_level ~incoming_level
+    | None -> ()
   in
   Node.on_event node handler
 
@@ -349,8 +328,8 @@ let test_event_levels =
   let () = check_level_of_all_events node_2 node_2_event_level in
   let () = check_level_of_all_events node_3 node_3_event_level in
   Log.info
-    "Step 3: Connect the nodes and activate the protocol. Nodes 1 and 2 \
-     should send a set_head event (of level info), but node 3 should not." ;
+    "Step 3: Connect the nodes and activate the protocol. Nodes 1 and 2 should \
+     send a set_head event (of level info), but node 3 should not." ;
   let* () = Client.Admin.connect_address client_1 ~peer:node_2
   and* () = Client.Admin.connect_address client_2 ~peer:node_3 in
   let wait1a = wait_for_set_head node_1 in
@@ -367,8 +346,8 @@ let test_event_levels =
   and* _ = Node.wait_for_level node_3 level in
   Log.info "All nodes at level %d." level ;
   Log.info
-    "Step 4: inject a transfer operation from node 1, and witness an \
-     injection event from this node." ;
+    "Step 4: inject a transfer operation from node 1, and witness an injection \
+     event from this node." ;
   let* () =
     transfer_and_wait_for_injection
       node_1

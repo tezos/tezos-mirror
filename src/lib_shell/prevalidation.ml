@@ -115,10 +115,8 @@ struct
             Proto.operation_data_encoding
             raw.Operation.proto
         with
-        | None ->
-            error Parse_error
-        | Some protocol_data ->
-            ok {hash; raw; protocol_data}
+        | None -> error Parse_error
+        | Some protocol_data -> ok {hash; raw; protocol_data}
       with _ -> error Parse_error
 
   let compare op1 op2 =
@@ -130,16 +128,19 @@ struct
       ~live_operations ~timestamp () =
     (* The prevalidation module receives input from the system byt handles
        protocol values. It translates timestamps here. *)
-    let { Block_header.shell =
-            { fitness = predecessor_fitness;
-              timestamp = predecessor_timestamp;
-              level = predecessor_level;
-              _ };
-          _ } =
+    let {
+      Block_header.shell =
+        {
+          fitness = predecessor_fitness;
+          timestamp = predecessor_timestamp;
+          level = predecessor_level;
+          _;
+        };
+      _;
+    } =
       Store.Block.header predecessor
     in
-    Store.Block.context chain_store predecessor
-    >>=? fun predecessor_context ->
+    Store.Block.context chain_store predecessor >>=? fun predecessor_context ->
     let predecessor_header = Store.Block.header predecessor in
     let predecessor_hash = Store.Block.hash predecessor in
     Block_validation.update_testchain_status
@@ -147,19 +148,16 @@ struct
       predecessor_header
       timestamp
     >>= fun predecessor_context ->
-    ( match protocol_data with
-    | None ->
-        return_none
+    (match protocol_data with
+    | None -> return_none
     | Some protocol_data -> (
-      match
-        Data_encoding.Binary.of_bytes_opt
-          Proto.block_header_data_encoding
-          protocol_data
-      with
-      | None ->
-          failwith "Invalid block header"
-      | Some protocol_data ->
-          return_some protocol_data ) )
+        match
+          Data_encoding.Binary.of_bytes_opt
+            Proto.block_header_data_encoding
+            protocol_data
+        with
+        | None -> failwith "Invalid block header"
+        | Some protocol_data -> return_some protocol_data))
     >>=? fun protocol_data ->
     let predecessor_context =
       Shell_context.wrap_disk_context predecessor_context
@@ -207,16 +205,12 @@ struct
             Applied (pv, receipt)
           with exn ->
             Refused
-              [Validation_errors.Cannot_serialize_operation_metadata; Exn exn]
-          )
+              [Validation_errors.Cannot_serialize_operation_metadata; Exn exn])
       | Error errors -> (
-        match classify_errors errors with
-        | `Branch ->
-            Branch_refused errors
-        | `Permanent ->
-            Refused errors
-        | `Temporary ->
-            Branch_delayed errors )
+          match classify_errors errors with
+          | `Branch -> Branch_refused errors
+          | `Permanent -> Refused errors
+          | `Temporary -> Branch_delayed errors)
 
   type status = {
     applied_operations : (operation * Proto.operation_receipt) list;
@@ -225,8 +219,7 @@ struct
   }
 
   let status pv =
-    Proto.finalize_block pv.state
-    >>=? fun (block_result, block_metadata) ->
+    Proto.finalize_block pv.state >>=? fun (block_result, block_metadata) ->
     return {block_metadata; block_result; applied_operations = pv.applied}
 
   let validation_state {state; _} = state
@@ -234,28 +227,20 @@ struct
   let pp_result ppf =
     let open Format in
     function
-    | Applied _ ->
-        pp_print_string ppf "applied"
-    | Branch_delayed err ->
-        fprintf ppf "branch delayed (%a)" pp_print_error err
-    | Branch_refused err ->
-        fprintf ppf "branch refused (%a)" pp_print_error err
-    | Refused err ->
-        fprintf ppf "refused (%a)" pp_print_error err
-    | Duplicate ->
-        pp_print_string ppf "duplicate"
-    | Outdated ->
-        pp_print_string ppf "outdated"
+    | Applied _ -> pp_print_string ppf "applied"
+    | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_error err
+    | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_error err
+    | Refused err -> fprintf ppf "refused (%a)" pp_print_error err
+    | Duplicate -> pp_print_string ppf "duplicate"
+    | Outdated -> pp_print_string ppf "outdated"
 end
 
 let preapply chain_store ~user_activated_upgrades
     ~user_activated_protocol_overrides ~predecessor ~timestamp ~protocol_data
     operations =
-  Store.Block.context chain_store predecessor
-  >>=? fun predecessor_context ->
-  Context.get_protocol predecessor_context
-  >>= fun protocol ->
-  ( match Registered_protocol.get protocol with
+  Store.Block.context chain_store predecessor >>=? fun predecessor_context ->
+  Context.get_protocol predecessor_context >>= fun protocol ->
+  (match Registered_protocol.get protocol with
   | None ->
       (* FIXME. *)
       (* This should not happen: it should be handled in the validator. *)
@@ -263,14 +248,12 @@ let preapply chain_store ~user_activated_upgrades
         "Prevalidation: missing protocol '%a' for the current block."
         Protocol_hash.pp_short
         protocol
-  | Some protocol ->
-      return protocol )
+  | Some protocol -> return protocol)
   >>=? fun (module Proto) ->
   let module Prevalidation = Make (Proto) in
   let apply_operation_with_preapply_result preapp t op =
     let open Preapply_result in
-    Prevalidation.apply_operation t op
-    >>= function
+    Prevalidation.apply_operation t op >>= function
     | Applied (t, _) ->
         let applied = (op.hash, op.raw) :: preapp.applied in
         Lwt.return ({preapp with applied}, t)
@@ -289,8 +272,7 @@ let preapply chain_store ~user_activated_upgrades
           Operation_hash.Map.add op.hash (op.raw, errors) preapp.refused
         in
         Lwt.return ({preapp with refused}, t)
-    | Duplicate | Outdated ->
-        Lwt.return (preapp, t)
+    | Duplicate | Outdated -> Lwt.return (preapp, t)
   in
   Store.Chain.compute_live_blocks chain_store ~block:predecessor
   >>=? fun (live_blocks, live_operations) ->
@@ -304,9 +286,7 @@ let preapply chain_store ~user_activated_upgrades
     ()
   >>=? fun validation_state ->
   List.fold_left_s
-    (fun ( acc_validation_passes,
-           acc_validation_result_rev,
-           acc_validation_state )
+    (fun (acc_validation_passes, acc_validation_result_rev, acc_validation_state)
          operations ->
       List.fold_left_s
         (fun (acc_validation_result, acc_validation_state) op ->
@@ -345,8 +325,7 @@ let preapply chain_store ~user_activated_upgrades
            Operation_list_hash.compute (List.map fst r.Preapply_result.applied))
          validation_result_list_rev)
   in
-  Prevalidation.status validation_state
-  >>=? fun {block_result; _} ->
+  Prevalidation.status validation_state >>=? fun {block_result; _} ->
   let pred_shell_header = Store.Block.shell_header predecessor in
   let level = Int32.succ pred_shell_header.level in
   Block_validation.may_patch_protocol
@@ -355,11 +334,9 @@ let preapply chain_store ~user_activated_upgrades
     ~level
     block_result
   >>= fun {fitness; context; message; _} ->
-  Store.Block.protocol_hash chain_store predecessor
-  >>=? fun pred_protocol ->
+  Store.Block.protocol_hash chain_store predecessor >>=? fun pred_protocol ->
   let context = Shell_context.unwrap_disk_context context in
-  Context.get_protocol context
-  >>= fun protocol ->
+  Context.get_protocol context >>= fun protocol ->
   let proto_level =
     if Protocol_hash.equal protocol pred_protocol then
       pred_shell_header.proto_level
@@ -378,7 +355,7 @@ let preapply chain_store ~user_activated_upgrades
       context = Context_hash.zero (* place holder *);
     }
   in
-  ( if Protocol_hash.equal protocol pred_protocol then return (context, message)
+  (if Protocol_hash.equal protocol pred_protocol then return (context, message)
   else
     match Registered_protocol.get protocol with
     | None ->
@@ -387,46 +364,42 @@ let preapply chain_store ~user_activated_upgrades
              {block = pred_block_hash; protocol})
     | Some (module NewProto) ->
         let context = Shell_context.wrap_disk_context context in
-        NewProto.init context shell_header
-        >>=? fun {context; message; _} ->
+        NewProto.init context shell_header >>=? fun {context; message; _} ->
         let context = Shell_context.unwrap_disk_context context in
-        return (context, message) )
+        return (context, message))
   >>=? fun (context, message) ->
-  ( match Registered_protocol.get pred_protocol with
-  | None ->
-      fail
-        (Block_validator_errors.Unavailable_protocol
-           {block = pred_block_hash; protocol = pred_protocol})
-  | Some (module Proto) ->
-      return Proto.environment_version )
-  >>=? (function
-         | Protocol.V0 ->
-             return context
-         | Protocol.V1 | Protocol.V2 | Protocol.V3 -> (
-             (* Block and operation metadata hashes may not be set on
-                the testchain genesis block and activation block, even
-                when they are using environment V1, they contain no
-                operations. *)
-             let is_from_genesis =
-               (Store.Block.header predecessor).shell.validation_passes = 0
-             in
-             ( match Store.Block.all_operations_metadata_hash predecessor with
-             | None ->
-                 if is_from_genesis then return context
-                 else fail @@ Missing_operation_metadata_hashes pred_block_hash
-             | Some hash ->
-                 Context.add_predecessor_ops_metadata_hash context hash >|= ok
-             )
-             >>=? fun context ->
-             match Store.Block.block_metadata_hash predecessor with
-             | None ->
-                 if is_from_genesis then return context
-                 else fail @@ Missing_operation_metadata_hashes pred_block_hash
-             | Some predecessor_block_metadata_hash ->
-                 Context.add_predecessor_block_metadata_hash
-                   context
-                   predecessor_block_metadata_hash
-                 >|= ok ))
+  ((match Registered_protocol.get pred_protocol with
+   | None ->
+       fail
+         (Block_validator_errors.Unavailable_protocol
+            {block = pred_block_hash; protocol = pred_protocol})
+   | Some (module Proto) -> return Proto.environment_version)
+   >>=? function
+   | Protocol.V0 -> return context
+   | Protocol.V1 | Protocol.V2 | Protocol.V3 -> (
+       (* Block and operation metadata hashes may not be set on
+          the testchain genesis block and activation block, even
+          when they are using environment V1, they contain no
+          operations. *)
+       let is_from_genesis =
+         (Store.Block.header predecessor).shell.validation_passes = 0
+       in
+       (match Store.Block.all_operations_metadata_hash predecessor with
+       | None ->
+           if is_from_genesis then return context
+           else fail @@ Missing_operation_metadata_hashes pred_block_hash
+       | Some hash ->
+           Context.add_predecessor_ops_metadata_hash context hash >|= ok)
+       >>=? fun context ->
+       match Store.Block.block_metadata_hash predecessor with
+       | None ->
+           if is_from_genesis then return context
+           else fail @@ Missing_operation_metadata_hashes pred_block_hash
+       | Some predecessor_block_metadata_hash ->
+           Context.add_predecessor_block_metadata_hash
+             context
+             predecessor_block_metadata_hash
+           >|= ok))
   >>=? fun context ->
   let context = Context.hash ?message ~time:timestamp context in
   return ({shell_header with context}, validation_result_list)

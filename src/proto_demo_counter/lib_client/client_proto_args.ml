@@ -30,10 +30,8 @@ let msg_parameter _param = Clic.parameter (fun _ s -> return s)
 let amount_parameter param =
   Clic.parameter (fun _ s ->
       match Int32.of_string_opt s with
-      | Some amount ->
-          return amount
-      | None ->
-          fail (Bad_amount_param (param, s)))
+      | Some amount -> return amount
+      | None -> fail (Bad_amount_param (param, s)))
 
 let amount_param ~name ~desc next =
   Clic.param ~name ~desc (amount_parameter name) next
@@ -55,8 +53,6 @@ let () =
         literal)
     Data_encoding.(obj2 (req "parameter" string) (req "literal" string))
     (function
-      | Bad_amount_param (parameter, literal) ->
-          Some (parameter, literal)
-      | _ ->
-          None)
+      | Bad_amount_param (parameter, literal) -> Some (parameter, literal)
+      | _ -> None)
     (fun (parameter, literal) -> Bad_amount_param (parameter, literal))

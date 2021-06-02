@@ -43,11 +43,7 @@ type block_error =
     }
   | Unexpected_number_of_validation_passes of int (* uint8 *)
   | Too_many_operations of {pass : int; found : int; max : int}
-  | Oversized_operation of {
-      operation : Operation_hash.t;
-      size : int;
-      max : int;
-    }
+  | Oversized_operation of {operation : Operation_hash.t; size : int; max : int}
   | Unallowed_pass of {
       operation : Operation_hash.t;
       pass : int;
@@ -59,17 +55,15 @@ type block_error =
 let block_error_encoding error_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Cannot_parse_operation"
         (obj2
            (req "error" (constant "cannot_parse_operation"))
            (req "operation" Operation_hash.encoding))
         (function
-          | Cannot_parse_operation operation ->
-              Some ((), operation)
-          | _ ->
-              None)
+          | Cannot_parse_operation operation -> Some ((), operation) | _ -> None)
         (fun ((), operation) -> Cannot_parse_operation operation);
       case
         (Tag 1)
@@ -79,10 +73,8 @@ let block_error_encoding error_encoding =
            (req "expected" Fitness.encoding)
            (req "found" Fitness.encoding))
         (function
-          | Invalid_fitness {expected; found} ->
-              Some ((), expected, found)
-          | _ ->
-              None)
+          | Invalid_fitness {expected; found} -> Some ((), expected, found)
+          | _ -> None)
         (fun ((), expected, found) -> Invalid_fitness {expected; found});
       case
         (Tag 2)
@@ -104,10 +96,8 @@ let block_error_encoding error_encoding =
            (req "expected" int32)
            (req "found" int32))
         (function
-          | Invalid_level {expected; found} ->
-              Some ((), expected, found)
-          | _ ->
-              None)
+          | Invalid_level {expected; found} -> Some ((), expected, found)
+          | _ -> None)
         (fun ((), expected, found) -> Invalid_level {expected; found});
       case
         (Tag 5)
@@ -117,10 +107,8 @@ let block_error_encoding error_encoding =
            (req "expected" uint8)
            (req "found" uint8))
         (function
-          | Invalid_proto_level {expected; found} ->
-              Some ((), expected, found)
-          | _ ->
-              None)
+          | Invalid_proto_level {expected; found} -> Some ((), expected, found)
+          | _ -> None)
         (fun ((), expected, found) -> Invalid_proto_level {expected; found});
       case
         (Tag 6)
@@ -141,8 +129,7 @@ let block_error_encoding error_encoding =
         (function
           | Outdated_operation {operation; originating_block} ->
               Some ((), operation, originating_block)
-          | _ ->
-              None)
+          | _ -> None)
         (fun ((), operation, originating_block) ->
           Outdated_operation {operation; originating_block});
       case
@@ -156,8 +143,7 @@ let block_error_encoding error_encoding =
         (function
           | Expired_chain {chain_id; expiration; timestamp} ->
               Some ((), chain_id, expiration, timestamp)
-          | _ ->
-              None)
+          | _ -> None)
         (fun ((), chain_id, expiration, timestamp) ->
           Expired_chain {chain_id; expiration; timestamp});
       case
@@ -167,10 +153,7 @@ let block_error_encoding error_encoding =
            (req "error" (constant "unexpected_number_of_passes"))
            (req "found" uint8))
         (function
-          | Unexpected_number_of_validation_passes n ->
-              Some ((), n)
-          | _ ->
-              None)
+          | Unexpected_number_of_validation_passes n -> Some ((), n) | _ -> None)
         (fun ((), n) -> Unexpected_number_of_validation_passes n);
       case
         (Tag 10)
@@ -181,10 +164,8 @@ let block_error_encoding error_encoding =
            (req "found" uint16)
            (req "max" uint16))
         (function
-          | Too_many_operations {pass; found; max} ->
-              Some ((), pass, found, max)
-          | _ ->
-              None)
+          | Too_many_operations {pass; found; max} -> Some ((), pass, found, max)
+          | _ -> None)
         (fun ((), pass, found, max) -> Too_many_operations {pass; found; max});
       case
         (Tag 11)
@@ -197,8 +178,7 @@ let block_error_encoding error_encoding =
         (function
           | Oversized_operation {operation; size; max} ->
               Some ((), operation, size, max)
-          | _ ->
-              None)
+          | _ -> None)
         (fun ((), operation, size, max) ->
           Oversized_operation {operation; size; max});
       case
@@ -212,8 +192,7 @@ let block_error_encoding error_encoding =
         (function
           | Unallowed_pass {operation; pass; allowed_pass} ->
               Some ((), operation, pass, allowed_pass)
-          | _ ->
-              None)
+          | _ -> None)
         (fun ((), operation, pass, allowed_pass) ->
           Unallowed_pass {operation; pass; allowed_pass});
       case
@@ -230,7 +209,8 @@ let block_error_encoding error_encoding =
            (req "trace" (list error_encoding)))
         (function
           | Economic_protocol_error trace -> Some ((), trace) | _ -> None)
-        (fun ((), trace) -> Economic_protocol_error trace) ]
+        (fun ((), trace) -> Economic_protocol_error trace);
+    ]
 
 let pp_block_error ppf = function
   | Cannot_parse_operation oph ->
@@ -247,10 +227,8 @@ let pp_block_error ppf = function
         expected
         Fitness.pp
         found
-  | Non_increasing_timestamp ->
-      Format.fprintf ppf "Non increasing timestamp"
-  | Non_increasing_fitness ->
-      Format.fprintf ppf "Non increasing fitness"
+  | Non_increasing_timestamp -> Format.fprintf ppf "Non increasing timestamp"
+  | Non_increasing_fitness -> Format.fprintf ppf "Non increasing fitness"
   | Invalid_level {expected; found} ->
       Format.fprintf
         ppf
@@ -335,7 +313,8 @@ type validation_process_error =
 let validation_process_error_encoding =
   let open Data_encoding in
   union
-    [ case
+    [
+      case
         (Tag 0)
         ~title:"Missing_handshake"
         (obj1 (req "constant" (constant "missing_handshake")))
@@ -370,15 +349,15 @@ let validation_process_error_encoding =
         ~title:"Cannot_run_external_validator"
         (obj1 (req "msg" string))
         (function Cannot_run_external_validator msg -> Some msg | _ -> None)
-        (fun msg -> Cannot_run_external_validator msg) ]
+        (fun msg -> Cannot_run_external_validator msg);
+    ]
 
 let pp_validation_process_error ppf = function
   | Missing_handshake ->
       Format.fprintf
         ppf
         "Missing handshake while initializing validation process."
-  | Protocol_dynlink_failure msg ->
-      Format.fprintf ppf "%s" msg
+  | Protocol_dynlink_failure msg -> Format.fprintf ppf "%s" msg
   | Inconsistent_handshake msg ->
       Format.fprintf ppf "Inconsistent handshake: %s." msg
   | Socket_path_too_long path ->
@@ -432,8 +411,7 @@ let () =
         merge_objs
           (obj1 (req "invalid_block" Block_hash.encoding))
           (block_error_encoding error_encoding)))
-    (function
-      | Invalid_block {block; error} -> Some (block, error) | _ -> None)
+    (function Invalid_block {block; error} -> Some (block, error) | _ -> None)
     (fun (block, error) -> Invalid_block {block; error}) ;
   Error_monad.register_error_kind
     `Temporary
@@ -453,10 +431,8 @@ let () =
         (req "block" Block_hash.encoding)
         (req "missing_protocol" Protocol_hash.encoding))
     (function
-      | Unavailable_protocol {block; protocol} ->
-          Some (block, protocol)
-      | _ ->
-          None)
+      | Unavailable_protocol {block; protocol} -> Some (block, protocol)
+      | _ -> None)
     (fun (block, protocol) -> Unavailable_protocol {block; protocol}) ;
   Error_monad.register_error_kind
     `Temporary
@@ -483,8 +459,7 @@ let () =
     (function
       | Inconsistent_operations_hash {block; expected; found} ->
           Some (block, expected, found)
-      | _ ->
-          None)
+      | _ -> None)
     (fun (block, expected, found) ->
       Inconsistent_operations_hash {block; expected; found}) ;
   Error_monad.register_error_kind

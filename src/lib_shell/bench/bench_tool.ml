@@ -68,31 +68,28 @@ let parse_param_file name =
   if not (Sys.file_exists name) then
     failwith "Parameters : Inexistent JSON file"
   else
-    Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file name
-    >>=? fun json ->
+    Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file name >>=? fun json ->
     match Data_encoding.Json.destruct Parameters.encoding json with
     | exception exn ->
         failwith "Parameters : Invalid JSON file - %a" Error_monad.pp_exn exn
-    | param ->
-        return param
+    | param -> return param
 
 let read_args () =
   let parse_param name =
     parse_param_file name
     >>= (function
-          | Ok p ->
-              Lwt.return p
+          | Ok p -> Lwt.return p
           | Error errs ->
               Format.printf
-                "Parameters parsing error : %a ==> using default parameters\n\
-                 %!"
+                "Parameters parsing error : %a ==> using default parameters\n%!"
                 Error_monad.pp_print_error
                 errs ;
               Lwt.return default_args.params)
     |> Lwt_main.run
   in
   let specific =
-    [ ( "--length",
+    [
+      ( "--length",
         Arg.Int (fun n -> args.length <- n),
         "Length of the chain (nb of blocks)" );
       ("--seed", Arg.Int (fun n -> args.seed <- n), "Used seed (default 0)");
@@ -107,7 +104,8 @@ let read_args () =
       ( "--parameters",
         Arg.String (fun s -> args.params <- parse_param s),
         "JSON protocol parameters file" );
-      ("--debug", Arg.Set debug, "Print more info") ]
+      ("--debug", Arg.Set debug, "Print more info");
+    ]
   in
   let usage =
     "Usage: [--length n] [--seed n] [--accounts n] [--parameters json_file]"
@@ -153,8 +151,7 @@ type gen_state = {
 }
 
 let get_n_endorsements ctxt n =
-  Context.get_endorsers ctxt
-  >>=? fun endorsing_rights ->
+  Context.get_endorsers ctxt >>=? fun endorsing_rights ->
   let endorsing_rights = List.sub endorsing_rights n in
   List.map_es
     (fun {Delegate_services.Endorsing_rights.delegate; level; _} ->
@@ -186,11 +183,9 @@ let generate_random_activation ({remaining_activations; _} as gen_state) inc =
   regenerate_transfers := true ;
   let open Account in
   match remaining_activations with
-  | [] ->
-      assert false
+  | [] -> assert false
   | (({pkh; _} as account), _) :: l ->
-      if_debug (fun () ->
-          Format.printf "[DEBUG] Generating an activation.\n%!") ;
+      if_debug (fun () -> Format.printf "[DEBUG] Generating an activation.\n%!") ;
       gen_state.remaining_activations <- l ;
       add_account account ;
       Op.activation inc pkh Account.commitment_secret
@@ -199,15 +194,13 @@ exception No_transfer_left
 
 let rec generate_random_transfer ({remaining_transfers; _} as gen_state) ctxt =
   match remaining_transfers with
-  | [] ->
-      raise No_transfer_left
+  | [] -> raise No_transfer_left
   | (a1, a2) :: remaining_transfers ->
       gen_state.remaining_transfers <- remaining_transfers ;
       let open Account in
       let c1 = Alpha_context.Contract.implicit_contract a1.pkh in
       let c2 = Alpha_context.Contract.implicit_contract a2.pkh in
-      Context.Contract.balance ctxt c1
-      >>=? fun b1 ->
+      Context.Contract.balance ctxt c1 >>=? fun b1 ->
       if Tez.(b1 < Tez.one) then generate_random_transfer gen_state ctxt
       else Op.transaction ctxt c1 c2 Tez.one
 
@@ -216,8 +209,7 @@ let generate_random_operation (inc : Incremental.t) gen_state =
   match rnd with
   | x when x < 2 && gen_state.remaining_activations <> [] ->
       generate_random_activation gen_state (I inc)
-  | _ ->
-      generate_random_transfer gen_state (I inc)
+  | _ -> generate_random_transfer gen_state (I inc)
 
 (* Build a random block *)
 let step gen_state blk : Block.t tzresult Lwt.t =
@@ -234,26 +226,22 @@ let step gen_state blk : Block.t tzresult Lwt.t =
     (* TODO : make possible transfer computations efficient.. *)
     gen_state.possible_transfers <-
       List.product l l |> List.filter (fun (a, b) -> a <> b) ;
-    regenerate_transfers := false ) ;
+    regenerate_transfers := false) ;
   gen_state.remaining_transfers <- TzList.shuffle gen_state.possible_transfers ;
   let nb_operations =
     min nb_operations_per_block (List.length gen_state.remaining_transfers)
   in
   (* Nonce *)
-  Plugin.RPC.current_level ~offset:1l Block.rpc_ctxt blk
-  >|=? (function
-         | {expected_commitment = true; cycle; level; _} ->
-             if_debug (fun () ->
-                 Format.printf "[DEBUG] Committing a nonce\n%!") ;
-             let (hash, nonce) = Helpers_Nonce.generate () in
-             gen_state.nonce_to_reveal <-
-               (cycle, level, nonce) :: gen_state.nonce_to_reveal ;
-             Some hash
-         | _ ->
-             None)
+  (Plugin.RPC.current_level ~offset:1l Block.rpc_ctxt blk >|=? function
+   | {expected_commitment = true; cycle; level; _} ->
+       if_debug (fun () -> Format.printf "[DEBUG] Committing a nonce\n%!") ;
+       let (hash, nonce) = Helpers_Nonce.generate () in
+       gen_state.nonce_to_reveal <-
+         (cycle, level, nonce) :: gen_state.nonce_to_reveal ;
+       Some hash
+   | _ -> None)
   >>=? fun seed_nonce_hash ->
-  Incremental.begin_construction ~priority ?seed_nonce_hash blk
-  >>=? fun inc ->
+  Incremental.begin_construction ~priority ?seed_nonce_hash blk >>=? fun inc ->
   let open Cycle in
   if_debug (fun () ->
       Format.printf
@@ -264,44 +252,37 @@ let step gen_state blk : Block.t tzresult Lwt.t =
     (fun inc _ ->
       Lwt.catch
         (fun () ->
-          generate_random_operation inc gen_state
-          >>=? fun op -> Incremental.add_operation inc op)
+          generate_random_operation inc gen_state >>=? fun op ->
+          Incremental.add_operation inc op)
         (function No_transfer_left -> return inc | exc -> Lwt.fail exc))
     inc
     (1 -- nb_operations)
   >>=? fun inc ->
   (* Endorsements *)
-  generate_and_add_random_endorsements inc
-  >>=? fun inc ->
+  generate_and_add_random_endorsements inc >>=? fun inc ->
   (* Revelations *)
   (* TODO debug cycle *)
-  Plugin.RPC.current_level ~offset:1l Incremental.rpc_ctxt inc
-  >|=? (function
-         | {cycle; level; _} -> (
-             if_debug (fun () ->
-                 Format.printf "[DEBUG] Current cycle : %a\n%!" Cycle.pp cycle) ;
-             if_debug (fun () ->
-                 Format.printf
-                   "[DEBUG] Current level : %a\n%!"
-                   Raw_level.pp
-                   level) ;
-             match gen_state.nonce_to_reveal with
-             | (pred_cycle, _, _) :: _ as l when succ pred_cycle = cycle ->
-                 if_debug (fun () ->
-                     Format.printf
-                       "[DEBUG] Seed nonce revelation : %d nonces to reveal.\n\
-                        %!"
-                     @@ List.length l) ;
-                 gen_state.nonce_to_reveal <- [] ;
-                 (* List.fold_left_es (fun inc (_, level, nonce) -> *)
-                 (* Op.seed_nonce_revelation inc level nonce >>=? fun op ->
-                  * Incremental.add_operation inc op *)
-                 (* return *)
-                 inc
-             (* TODO reactivate the seeds *)
-             (* ) inc l *)
-             | _ ->
-                 inc ))
+  (Plugin.RPC.current_level ~offset:1l Incremental.rpc_ctxt inc >|=? function
+   | {cycle; level; _} -> (
+       if_debug (fun () ->
+           Format.printf "[DEBUG] Current cycle : %a\n%!" Cycle.pp cycle) ;
+       if_debug (fun () ->
+           Format.printf "[DEBUG] Current level : %a\n%!" Raw_level.pp level) ;
+       match gen_state.nonce_to_reveal with
+       | (pred_cycle, _, _) :: _ as l when succ pred_cycle = cycle ->
+           if_debug (fun () ->
+               Format.printf
+                 "[DEBUG] Seed nonce revelation : %d nonces to reveal.\n%!"
+               @@ List.length l) ;
+           gen_state.nonce_to_reveal <- [] ;
+           (* List.fold_left_es (fun inc (_, level, nonce) -> *)
+           (* Op.seed_nonce_revelation inc level nonce >>=? fun op ->
+            * Incremental.add_operation inc op *)
+           (* return *)
+           inc
+       (* TODO reactivate the seeds *)
+       (* ) inc l *)
+       | _ -> inc))
   >>=? fun inc ->
   (* (\* Shuffle the operations a bit (why not) *\)
    * let operations = endorsements @ operations |> TzList.shuffle in *)
@@ -344,24 +325,24 @@ let init () =
     let l = List.map fst initial_accounts in
     List.product l l |> List.filter (fun (a, b) -> a <> b)
   in
-  ( match args.nb_commitments with
-  | x when x < 0 ->
-      return ([], parameters)
+  (match args.nb_commitments with
+  | x when x < 0 -> return ([], parameters)
   | x ->
       List.map_es
         (fun _ -> Account.new_commitment ~seed:(new_seed ()) ())
         (1 -- x)
       >>=? fun commitments ->
       return
-        (commitments, {parameters with commitments = List.map snd commitments})
-  )
+        (commitments, {parameters with commitments = List.map snd commitments}))
   >>=? fun ( remaining_activations,
-             { bootstrap_accounts = _;
+             {
+               bootstrap_accounts = _;
                commitments;
                constants;
                security_deposit_ramp_up_cycles;
                no_reward_cycles;
-               _ } ) ->
+               _;
+             } ) ->
   let gen_state =
     {
       possible_transfers;
@@ -386,8 +367,7 @@ let init () =
       no_reward_cycles;
     }
   in
-  Block.genesis_with_parameters parameters
-  >>=? fun genesis ->
+  Block.genesis_with_parameters parameters >>=? fun genesis ->
   if_debug_s (fun () ->
       List.iter_es
         (let open Account in
@@ -395,8 +375,7 @@ let init () =
           let contract = Alpha_context.Contract.implicit_contract acc.pkh in
           Context.Contract.manager (B genesis) contract
           >>=? fun {pkh = pkh'; _} ->
-          Context.Contract.balance (B genesis) contract
-          >>=? fun balance ->
+          Context.Contract.balance (B genesis) contract >>=? fun balance ->
           return
           @@ Format.printf
                "[DEBUG] %a's manager is %a with a balance of %a\n%!"
@@ -430,8 +409,7 @@ let init () =
     args.nb_commitments
     args.accounts ;
   let rec loop gen_state blk = function
-    | 0 ->
-        return (gen_state, blk)
+    | 0 -> return (gen_state, blk)
     | n ->
         print_block blk ;
         step gen_state blk >>=? fun blk' -> loop gen_state blk' (n - 1)
@@ -439,10 +417,13 @@ let init () =
   return (loop gen_state genesis args.length)
 
 let () =
-  Lwt_main.run (read_args () ; init ())
+  Lwt_main.run
+    (read_args () ;
+     init ())
   |> function
   | Ok _head ->
-      Format.printf "Success.@." ; exit 0
+      Format.printf "Success.@." ;
+      exit 0
   | Error err ->
       Format.eprintf "%a@." pp_print_error err ;
       exit 1

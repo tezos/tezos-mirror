@@ -26,45 +26,33 @@
 
 let default_tcp_host =
   match Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST" with
-  | None ->
-      "localhost"
-  | Some host ->
-      host
+  | None -> "localhost"
+  | Some host -> host
 
 let default_tcp_port =
   match Sys.getenv_opt "TEZOS_SIGNER_TCP_PORT" with
-  | None ->
-      "7732"
-  | Some port ->
-      port
+  | None -> "7732"
+  | Some port -> port
 
 let default_https_host =
   match Sys.getenv_opt "TEZOS_SIGNER_HTTPS_HOST" with
-  | None ->
-      "localhost"
-  | Some host ->
-      host
+  | None -> "localhost"
+  | Some host -> host
 
 let default_https_port =
   match Sys.getenv_opt "TEZOS_SIGNER_HTTPS_PORT" with
-  | None ->
-      "443"
-  | Some port ->
-      port
+  | None -> "443"
+  | Some port -> port
 
 let default_http_host =
   match Sys.getenv_opt "TEZOS_SIGNER_HTTP_HOST" with
-  | None ->
-      "localhost"
-  | Some host ->
-      host
+  | None -> "localhost"
+  | Some host -> host
 
 let default_http_port =
   match Sys.getenv_opt "TEZOS_SIGNER_HTTP_PORT" with
-  | None ->
-      "6732"
-  | Some port ->
-      port
+  | None -> "6732"
+  | Some port -> port
 
 open Clic
 
@@ -110,8 +98,7 @@ let pidfile_arg =
     (parameter (fun _ s -> return s))
 
 let may_setup_pidfile = function
-  | None ->
-      return_unit
+  | None -> return_unit
   | Some pidfile ->
       trace (failure "Failed to create the pidfile: %s" pidfile)
       @@ Lwt_lock_file.create ~unlink_on_exit:true pidfile
@@ -119,7 +106,8 @@ let may_setup_pidfile = function
 let commands base_dir require_auth : Client_context.full command list =
   Tezos_signer_backends_unix.Ledger.commands ()
   @ Client_keys_commands.commands None
-  @ [ command
+  @ [
+      command
         ~group
         ~desc:"Launch a signer daemon over a TCP socket."
         (args6
@@ -156,10 +144,8 @@ let commands base_dir require_auth : Client_context.full command list =
         (prefixes ["launch"; "socket"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, host, port, timeout)
              cctxt ->
-          may_setup_pidfile pidfile
-          >>=? fun () ->
-          Tezos_signer_backends.Encrypted.decrypt_all cctxt
-          >>=? fun () ->
+          may_setup_pidfile pidfile >>=? fun () ->
+          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
           Socket_daemon.run
             cctxt
             (Tcp (host, port, [AI_SOCKTYPE SOCK_STREAM]))
@@ -184,10 +170,8 @@ let commands base_dir require_auth : Client_context.full command list =
               (parameter (fun _ s -> return s))))
         (prefixes ["launch"; "local"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, path) cctxt ->
-          may_setup_pidfile pidfile
-          >>=? fun () ->
-          Tezos_signer_backends.Encrypted.decrypt_all cctxt
-          >>=? fun () ->
+          may_setup_pidfile pidfile >>=? fun () ->
+          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
           Socket_daemon.run
             cctxt
             (Unix path)
@@ -220,10 +204,8 @@ let commands base_dir require_auth : Client_context.full command list =
                    with Failure _ -> failwith "Invalid port %s" x))))
         (prefixes ["launch"; "http"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, host, port) cctxt ->
-          may_setup_pidfile pidfile
-          >>=? fun () ->
-          Tezos_signer_backends.Encrypted.decrypt_all cctxt
-          >>=? fun () ->
+          may_setup_pidfile pidfile >>=? fun () ->
+          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
           Http_daemon.run_http
             cctxt
             ~host
@@ -254,7 +236,7 @@ let commands base_dir require_auth : Client_context.full command list =
               (parameter (fun _ x ->
                    try return (int_of_string x)
                    with Failure _ -> failwith "Invalid port %s" x))))
-        ( prefixes ["launch"; "https"; "signer"]
+        (prefixes ["launch"; "https"; "signer"]
         @@ param
              ~name:"cert"
              ~desc:"path to the TLS certificate"
@@ -269,15 +251,13 @@ let commands base_dir require_auth : Client_context.full command list =
                   if not (Sys.file_exists s) then
                     failwith "No such TLS key file %s" s
                   else return s))
-        @@ stop )
+        @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, host, port)
              cert
              key
              cctxt ->
-          may_setup_pidfile pidfile
-          >>=? fun () ->
-          Tezos_signer_backends.Encrypted.decrypt_all cctxt
-          >>=? fun () ->
+          may_setup_pidfile pidfile >>=? fun () ->
+          Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
           Http_daemon.run_https
             cctxt
             ~host
@@ -297,23 +277,22 @@ let commands base_dir require_auth : Client_context.full command list =
               ~long:"name"
               ~placeholder:"name"
               (parameter (fun _ s -> return s))))
-        ( prefixes ["add"; "authorized"; "key"]
+        (prefixes ["add"; "authorized"; "key"]
         @@ param
              ~name:"pk"
              ~desc:"full public key (Base58 encoded)"
              (parameter (fun _ s ->
                   Lwt.return (Signature.Public_key.of_b58check s)))
-        @@ stop )
+        @@ stop)
         (fun name key cctxt ->
           let pkh = Signature.Public_key.hash key in
           let name =
             match name with
-            | Some name ->
-                name
-            | None ->
-                Signature.Public_key_hash.to_b58check pkh
+            | Some name -> name
+            | None -> Signature.Public_key_hash.to_b58check pkh
           in
-          Handler.Authorized_key.add ~force:false cctxt name key) ]
+          Handler.Authorized_key.add ~force:false cctxt name key);
+    ]
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
@@ -328,9 +307,9 @@ let base_dir_arg () =
     ~short:'d'
     ~placeholder:"path"
     ~doc:
-      ( "signer data directory\n\
-         The directory where the Tezos client will store all its data.\n\
-         By default: '" ^ default_base_dir ^ "'." )
+      ("signer data directory\n\
+        The directory where the Tezos client will store all its data.\n\
+        By default: '" ^ default_base_dir ^ "'.")
     (string_parameter ())
 
 let require_auth_arg () =
@@ -383,5 +362,4 @@ module C = struct
   let logger = Some (RPC_client_unix.full_logger Format.err_formatter)
 end
 
-let () =
-  Client_main_run.run (module C) ~select_commands:(fun _ _ -> return_nil)
+let () = Client_main_run.run (module C) ~select_commands:(fun _ _ -> return_nil)

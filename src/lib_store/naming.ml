@@ -66,11 +66,7 @@ let chain_dir dir chain_id =
   mk_dir dir (Format.asprintf "chain_%a" Chain_id.pp_short chain_id)
 
 let chain_config_file dir =
-  make_encoded_file
-    ~json:true
-    dir
-    ~filename:"config.json"
-    chain_config_encoding
+  make_encoded_file ~json:true dir ~filename:"config.json" chain_config_encoding
 
 let lock_file dir = mk_file dir "lock"
 
@@ -156,16 +152,11 @@ type floating_kind = RO | RW | RW_TMP | RO_TMP | Restore of floating_kind
 
 let floating_blocks_dir dir kind =
   let rec loop = function
-    | RO ->
-        "ro_floating"
-    | RW ->
-        "rw_floating"
-    | RO_TMP ->
-        "ro_tmp_floating"
-    | RW_TMP ->
-        "rw_tmp_floating"
-    | Restore kind ->
-        "restore_" ^ loop kind
+    | RO -> "ro_floating"
+    | RW -> "rw_floating"
+    | RO_TMP -> "ro_tmp_floating"
+    | RW_TMP -> "rw_tmp_floating"
+    | Restore kind -> "restore_" ^ loop kind
   in
   mk_dir dir (loop kind)
 

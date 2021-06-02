@@ -92,8 +92,9 @@ let () =
   in
   List.iter
     f
-    [ (Ed25519, "Ed25519");
-      (Secp256k1, "Secp256k1")
+    [
+      (Ed25519, "Ed25519");
+      (Secp256k1, "Secp256k1");
       (* TODO uncomment this once signature.ml moved to hacl for p256 *)
       (* ; (P256, "P256") *)
-     ]
+    ]

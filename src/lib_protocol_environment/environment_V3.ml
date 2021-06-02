@@ -78,8 +78,7 @@ module type V3 = sig
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
             ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
-       and type 'a Error_monad.shell_tzresult =
-            ('a, Error_monad.tztrace) result
+       and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
        and type Timelock.chest = Timelock.chest
        and type Timelock.chest_key = Timelock.chest_key
        and type Timelock.opening_result = Timelock.opening_result
@@ -127,8 +126,7 @@ struct
         Printf.eprintf
           "FAILURE: Environment V3 does not support 32-bit architectures\n%!" ;
         Stdlib.exit 1
-    | 64 ->
-        ()
+    | 64 -> ()
     | n ->
         Printf.eprintf
           "FAILURE: Unknown, unsupported architecture (%d bits)\n%!"
@@ -571,13 +569,9 @@ struct
           include Tezos_error_monad.Sig.CORE with type error := unwrapped
 
           include Tezos_error_monad.Sig.EXT with type error := unwrapped
-        end )
+        end)
 
-    let unwrap = function
-      | Ecoproto_error ecoerror ->
-          Some ecoerror
-      | _ ->
-          None
+    let unwrap = function Ecoproto_error ecoerror -> Some ecoerror | _ -> None
 
     let wrap ecoerror = Ecoproto_error ecoerror
   end
@@ -592,8 +586,9 @@ struct
     include Error_core
     module Local_monad = Tezos_error_monad.Monad_maker.Make (TzTrace)
     include Local_monad
-    include Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
-              (Local_monad)
+    include
+      Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
+        (Local_monad)
     include Error_monad_traversors
 
     let make_trace_encoding e = TzTrace.encoding e
@@ -667,16 +662,11 @@ struct
 
     let gen_register dir service handler =
       gen_register dir service (fun p q i ->
-          handler p q i
-          >>= function
-          | `Ok o ->
-              RPC_answer.return_chunked o
-          | `OkStream s ->
-              RPC_answer.return_stream s
-          | `Created s ->
-              Lwt.return (`Created s)
-          | `No_content ->
-              Lwt.return `No_content
+          handler p q i >>= function
+          | `Ok o -> RPC_answer.return_chunked o
+          | `OkStream s -> RPC_answer.return_stream s
+          | `Created s -> Lwt.return (`Created s)
+          | `No_content -> Lwt.return `No_content
           | `Unauthorized e ->
               let e = Option.map (List.map (fun e -> Ecoproto_error e)) e in
               Lwt.return (`Unauthorized e)
@@ -695,20 +685,16 @@ struct
 
     let register dir service handler =
       gen_register dir service (fun p q i ->
-          handler p q i
-          >>= function
-          | Ok o -> RPC_answer.return o | Error e -> RPC_answer.fail e)
+          handler p q i >>= function
+          | Ok o -> RPC_answer.return o
+          | Error e -> RPC_answer.fail e)
 
     let opt_register dir service handler =
       gen_register dir service (fun p q i ->
-          handler p q i
-          >>= function
-          | Ok (Some o) ->
-              RPC_answer.return o
-          | Ok None ->
-              RPC_answer.not_found
-          | Error e ->
-              RPC_answer.fail e)
+          handler p q i >>= function
+          | Ok (Some o) -> RPC_answer.return o
+          | Ok None -> RPC_answer.not_found
+          | Error e -> RPC_answer.fail e)
 
     let lwt_register dir service handler =
       gen_register dir service (fun p q i ->
@@ -736,8 +722,7 @@ struct
 
     let opt_register3 root s f = opt_register root s (curry (S (S (S Z))) f)
 
-    let opt_register4 root s f =
-      opt_register root s (curry (S (S (S (S Z)))) f)
+    let opt_register4 root s f = opt_register root s (curry (S (S (S (S Z)))) f)
 
     let opt_register5 root s f =
       opt_register root s (curry (S (S (S (S (S Z))))) f)
@@ -750,8 +735,7 @@ struct
 
     let gen_register3 root s f = gen_register root s (curry (S (S (S Z))) f)
 
-    let gen_register4 root s f =
-      gen_register root s (curry (S (S (S (S Z)))) f)
+    let gen_register4 root s f = gen_register root s (curry (S (S (S (S Z)))) f)
 
     let gen_register5 root s f =
       gen_register root s (curry (S (S (S (S (S Z))))) f)
@@ -764,8 +748,7 @@ struct
 
     let lwt_register3 root s f = lwt_register root s (curry (S (S (S Z))) f)
 
-    let lwt_register4 root s f =
-      lwt_register root s (curry (S (S (S (S Z)))) f)
+    let lwt_register4 root s f = lwt_register root s (curry (S (S (S (S Z)))) f)
 
     let lwt_register5 root s f =
       lwt_register root s (curry (S (S (S (S (S Z))))) f)
@@ -779,12 +762,19 @@ struct
         method call_proto_service0 :
           'm 'q 'i 'o.
           (([< RPC_service.meth] as 'm), t, t, 'q, 'i, 'o) RPC_service.t ->
-          'pr -> 'q -> 'i -> 'o Error_monad.shell_tzresult Lwt.t
+          'pr ->
+          'q ->
+          'i ->
+          'o Error_monad.shell_tzresult Lwt.t
 
         method call_proto_service1 :
           'm 'a 'q 'i 'o.
           (([< RPC_service.meth] as 'm), t, t * 'a, 'q, 'i, 'o) RPC_service.t ->
-          'pr -> 'a -> 'q -> 'i -> 'o Error_monad.shell_tzresult Lwt.t
+          'pr ->
+          'a ->
+          'q ->
+          'i ->
+          'o Error_monad.shell_tzresult Lwt.t
 
         method call_proto_service2 :
           'm 'a 'b 'q 'i 'o.
@@ -794,7 +784,12 @@ struct
             'q,
             'i,
             'o )
-          RPC_service.t -> 'pr -> 'a -> 'b -> 'q -> 'i ->
+          RPC_service.t ->
+          'pr ->
+          'a ->
+          'b ->
+          'q ->
+          'i ->
           'o Error_monad.shell_tzresult Lwt.t
 
         method call_proto_service3 :
@@ -805,7 +800,13 @@ struct
             'q,
             'i,
             'o )
-          RPC_service.t -> 'pr -> 'a -> 'b -> 'c -> 'q -> 'i ->
+          RPC_service.t ->
+          'pr ->
+          'a ->
+          'b ->
+          'c ->
+          'q ->
+          'i ->
           'o Error_monad.shell_tzresult Lwt.t
       end
 
@@ -826,44 +827,28 @@ struct
     let make_call3 = (make_call3 : _ -> _ simple -> _ :> _ -> _ #simple -> _)
 
     let make_opt_call0 s ctxt block q i =
-      make_call0 s ctxt block q i
-      >>= function
-      | Error [RPC_context.Not_found _] ->
-          Lwt.return_ok None
-      | Error _ as v ->
-          Lwt.return v
-      | Ok v ->
-          Lwt.return_ok (Some v)
+      make_call0 s ctxt block q i >>= function
+      | Error [RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error _ as v -> Lwt.return v
+      | Ok v -> Lwt.return_ok (Some v)
 
     let make_opt_call1 s ctxt block a1 q i =
-      make_call1 s ctxt block a1 q i
-      >>= function
-      | Error [RPC_context.Not_found _] ->
-          Lwt.return_ok None
-      | Error _ as v ->
-          Lwt.return v
-      | Ok v ->
-          Lwt.return_ok (Some v)
+      make_call1 s ctxt block a1 q i >>= function
+      | Error [RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error _ as v -> Lwt.return v
+      | Ok v -> Lwt.return_ok (Some v)
 
     let make_opt_call2 s ctxt block a1 a2 q i =
-      make_call2 s ctxt block a1 a2 q i
-      >>= function
-      | Error [RPC_context.Not_found _] ->
-          Lwt.return_ok None
-      | Error _ as v ->
-          Lwt.return v
-      | Ok v ->
-          Lwt.return_ok (Some v)
+      make_call2 s ctxt block a1 a2 q i >>= function
+      | Error [RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error _ as v -> Lwt.return v
+      | Ok v -> Lwt.return_ok (Some v)
 
     let make_opt_call3 s ctxt block a1 a2 a3 q i =
-      make_call3 s ctxt block a1 a2 a3 q i
-      >>= function
-      | Error [RPC_context.Not_found _] ->
-          Lwt.return_ok None
-      | Error _ as v ->
-          Lwt.return v
-      | Ok v ->
-          Lwt.return_ok (Some v)
+      make_call3 s ctxt block a1 a2 a3 q i >>= function
+      | Error [RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error _ as v -> Lwt.return v
+      | Ok v -> Lwt.return_ok (Some v)
   end
 
   module Sapling = Tezos_sapling.Core.Validator
@@ -957,9 +942,9 @@ struct
         raw_block
       >|= wrap_tzresult
 
-    let begin_construction ~chain_id ~predecessor_context
-        ~predecessor_timestamp ~predecessor_level ~predecessor_fitness
-        ~predecessor ~timestamp ?protocol_data () =
+    let begin_construction ~chain_id ~predecessor_context ~predecessor_timestamp
+        ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp
+        ?protocol_data () =
       begin_construction
         ~chain_id
         ~predecessor_context
@@ -994,7 +979,11 @@ struct
               'q,
               'i,
               'o )
-            RPC_service.t -> 'chain * 'block -> 'q -> 'i -> 'o tzresult Lwt.t =
+            RPC_service.t ->
+            'chain * 'block ->
+            'q ->
+            'i ->
+            'o tzresult Lwt.t =
         fun s (chain, block) q i ->
           let s = RPC_service.subst0 s in
           let s = RPC_service.prefix prefix s in
@@ -1008,7 +997,11 @@ struct
               'q,
               'i,
               'o )
-            RPC_service.t -> 'chain * 'block -> 'a -> 'q -> 'i ->
+            RPC_service.t ->
+            'chain * 'block ->
+            'a ->
+            'q ->
+            'i ->
             'o tzresult Lwt.t =
         fun s (chain, block) a1 q i ->
           let s = RPC_service.subst1 s in
@@ -1023,7 +1016,12 @@ struct
               'q,
               'i,
               'o )
-            RPC_service.t -> 'chain * 'block -> 'a -> 'b -> 'q -> 'i ->
+            RPC_service.t ->
+            'chain * 'block ->
+            'a ->
+            'b ->
+            'q ->
+            'i ->
             'o tzresult Lwt.t =
         fun s (chain, block) a1 a2 q i ->
           let s = RPC_service.subst2 s in
@@ -1038,7 +1036,13 @@ struct
               'q,
               'i,
               'o )
-            RPC_service.t -> 'chain * 'block -> 'a -> 'b -> 'c -> 'q -> 'i ->
+            RPC_service.t ->
+            'chain * 'block ->
+            'a ->
+            'b ->
+            'c ->
+            'q ->
+            'i ->
             'o tzresult Lwt.t =
         fun s (chain, block) a1 a2 a3 q i ->
           let s = RPC_service.subst3 s in
@@ -1058,7 +1062,11 @@ struct
               'q,
               'i,
               'o )
-            RPC_service.t -> 'block -> 'q -> 'i -> 'o tzresult Lwt.t =
+            RPC_service.t ->
+            'block ->
+            'q ->
+            'i ->
+            'o tzresult Lwt.t =
         fun s block q i ->
           let rpc_context = conv block in
           lookup#call_service s rpc_context q i
@@ -1071,7 +1079,12 @@ struct
               'q,
               'i,
               'o )
-            RPC_service.t -> 'block -> 'a -> 'q -> 'i -> 'o tzresult Lwt.t =
+            RPC_service.t ->
+            'block ->
+            'a ->
+            'q ->
+            'i ->
+            'o tzresult Lwt.t =
         fun s block a1 q i ->
           let rpc_context = conv block in
           lookup#call_service s (rpc_context, a1) q i
@@ -1084,7 +1097,12 @@ struct
               'q,
               'i,
               'o )
-            RPC_service.t -> 'block -> 'a -> 'b -> 'q -> 'i ->
+            RPC_service.t ->
+            'block ->
+            'a ->
+            'b ->
+            'q ->
+            'i ->
             'o tzresult Lwt.t =
         fun s block a1 a2 q i ->
           let rpc_context = conv block in
@@ -1098,7 +1116,13 @@ struct
               'q,
               'i,
               'o )
-            RPC_service.t -> 'block -> 'a -> 'b -> 'c -> 'q -> 'i ->
+            RPC_service.t ->
+            'block ->
+            'a ->
+            'b ->
+            'c ->
+            'q ->
+            'i ->
             'o tzresult Lwt.t =
         fun s block a1 a2 a3 q i ->
           let rpc_context = conv block in

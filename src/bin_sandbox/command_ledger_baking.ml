@@ -6,12 +6,9 @@ let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
 let ledger_prompt_notice state ~ef ?(button = `Checkmark) () =
   let button_str =
     match button with
-    | `Checkmark ->
-        "✔"
-    | `X ->
-        "❌"
-    | `Both ->
-        "❌ and ✔ at the same time"
+    | `Checkmark -> "✔"
+    | `X -> "❌"
+    | `Both -> "❌ and ✔ at the same time"
   in
   Console.say
     state
@@ -21,12 +18,13 @@ let ledger_prompt_notice state ~ef ?(button = `Checkmark) () =
         (list [ef; wf "Press %s on the ledger." button_str]))
 
 let assert_failure state msg f () =
-  Console.say state EF.(wf "Asserting %s" msg)
-  >>= fun () ->
+  Console.say state EF.(wf "Asserting %s" msg) >>= fun () ->
   Asynchronous_result.bind_on_error
     (f () >>= fun _ -> return `Worked)
     ~f:(fun ~result:_ _ -> return `Didn'tWork)
-  >>= function `Worked -> failf "%s" msg | `Didn'tWork -> return ()
+  >>= function
+  | `Worked -> failf "%s" msg
+  | `Didn'tWork -> return ()
 
 let failf fmt = ksprintf (fun s -> fail (`Scenario_error s)) fmt
 
@@ -41,11 +39,11 @@ let assert_eq to_string ~expected ~actual =
       (to_string actual)
 
 let rec ask state ef =
-  Console.say state EF.(list [ef; wf " (y/n)?"])
-  >>= fun () ->
-  System_error.catch Lwt_io.read_char Lwt_io.stdin
-  >>= function
-  | 'y' | 'Y' -> return true | 'n' | 'N' -> return false | _ -> ask state ef
+  Console.say state EF.(list [ef; wf " (y/n)?"]) >>= fun () ->
+  System_error.catch Lwt_io.read_char Lwt_io.stdin >>= function
+  | 'y' | 'Y' -> return true
+  | 'n' | 'N' -> return false
+  | _ -> ask state ef
 
 let ask_assert state ef () = ask state ef >>= fun b -> assert_ b
 
@@ -57,25 +55,25 @@ let with_ledger_prompt state message expectation ~f =
     ~ef:
       EF.(
         list
-          [ message;
+          [
+            message;
             wf "\n\n";
             wf
-              ( match expectation with
-              | `Succeeds ->
-                  ">> ACCEPT THIS <<"
-              | `Fails ->
-                  ">> REJECT THIS <<" ) ])
+              (match expectation with
+              | `Succeeds -> ">> ACCEPT THIS <<"
+              | `Fails -> ">> REJECT THIS <<");
+          ])
   >>= fun () ->
   match expectation with
   | `Succeeds ->
       f () >>= fun _ -> Console.say state EF.(wf "> Got response: ACCEPTED")
   | `Fails ->
-      assert_failure state "expected failure" f ()
-      >>= fun () -> Console.say state EF.(wf "> Got response: REJECTED")
+      assert_failure state "expected failure" f () >>= fun () ->
+      Console.say state EF.(wf "> Got response: REJECTED")
 
 let with_ledger_test_reject_and_succeed state ef f =
-  with_ledger_prompt state ef `Fails ~f
-  >>= fun () -> with_ledger_prompt state ef `Succeeds ~f
+  with_ledger_prompt state ef `Fails ~f >>= fun () ->
+  with_ledger_prompt state ef `Succeeds ~f
 
 let assert_hwms state ~client ~uri ~main ~test =
   Console.say
@@ -84,41 +82,40 @@ let assert_hwms state ~client ~uri ~main ~test =
   >>= fun () ->
   Tezos_client.Ledger.get_hwm state ~client ~uri
   >>= fun {main = main_actual; test = test_actual; _} ->
-  assert_eq Int.to_string ~actual:main_actual ~expected:main
-  >>= fun () -> assert_eq Int.to_string ~actual:test_actual ~expected:test
+  assert_eq Int.to_string ~actual:main_actual ~expected:main >>= fun () ->
+  assert_eq Int.to_string ~actual:test_actual ~expected:test
 
 let get_chain_id_string state ~client =
-  Tezos_client.rpc state ~client `Get ~path:"/chains/main/chain_id"
-  >>= function
-  | `String x ->
-      return x
-  | _ ->
-      failf "Failed to parse chain_id JSON from node"
+  Tezos_client.rpc state ~client `Get ~path:"/chains/main/chain_id" >>= function
+  | `String x -> return x
+  | _ -> failf "Failed to parse chain_id JSON from node"
 
 let get_chain_id state ~client =
-  get_chain_id_string state ~client
-  >>= fun chain_id_string ->
+  get_chain_id_string state ~client >>= fun chain_id_string ->
   return (Tezos_crypto.Chain_id.of_b58check_exn chain_id_string)
 
 let get_head_block_hash state ~client () =
   Tezos_client.rpc state ~client `Get ~path:"/chains/main/blocks/head/hash"
   >>= function
-  | `String x ->
-      return x
-  | _ ->
-      failf "Failed to parse block hash JSON from node"
+  | `String x -> return x
+  | _ -> failf "Failed to parse block hash JSON from node"
 
 let forge_endorsement state ~client ~chain_id ~level () =
-  get_head_block_hash state ~client ()
-  >>= fun branch ->
+  get_head_block_hash state ~client () >>= fun branch ->
   let json =
     `O
-      [ ("branch", `String branch);
+      [
+        ("branch", `String branch);
         ( "contents",
           `A
-            [ `O
-                [ ("kind", `String "endorsement");
-                  ("level", `Float (Float.of_int level)) ] ] ) ]
+            [
+              `O
+                [
+                  ("kind", `String "endorsement");
+                  ("level", `Float (Float.of_int level));
+                ];
+            ] );
+      ]
   in
   Tezos_client.rpc
     state
@@ -129,29 +126,33 @@ let forge_endorsement state ~client ~chain_id ~level () =
   | `String operation_bytes ->
       let endorsement_magic_byte = "02" in
       return
-        ( endorsement_magic_byte
+        (endorsement_magic_byte
         ^ (chain_id |> Tezos_crypto.Chain_id.to_hex |> Hex.show)
-        ^ operation_bytes )
-  | _ ->
-      failf "Failed to forge operation or parse result"
+        ^ operation_bytes)
+  | _ -> failf "Failed to forge operation or parse result"
 
 let forge_delegation state ~client ~src ~dest ?(fee = 0.00126) () =
-  get_head_block_hash state ~client ()
-  >>= fun branch ->
+  get_head_block_hash state ~client () >>= fun branch ->
   let json =
     `O
-      [ ("branch", `String branch);
+      [
+        ("branch", `String branch);
         ( "contents",
           `A
-            [ `O
-                [ ("kind", `String "delegation");
+            [
+              `O
+                [
+                  ("kind", `String "delegation");
                   ("source", `String src);
                   ( "fee",
                     `String (Int.to_string (Int.of_float (fee *. 1000000.))) );
                   ("counter", `String (Int.to_string 30713));
                   ("gas_limit", `String (Int.to_string 10100));
                   ("delegate", `String dest);
-                  ("storage_limit", `String (Int.to_string 277)) ] ] ) ]
+                  ("storage_limit", `String (Int.to_string 277));
+                ];
+            ] );
+      ]
   in
   Tezos_client.rpc
     state
@@ -162,8 +163,7 @@ let forge_delegation state ~client ~src ~dest ?(fee = 0.00126) () =
   | `String operation_bytes ->
       let magic_byte = "03" in
       return (magic_byte ^ operation_bytes)
-  | _ ->
-      failf "Failed to forge operation or parse result"
+  | _ -> failf "Failed to forge operation or parse result"
 
 let sign state ~client ~bytes () =
   Tezos_client.successful_client_cmd
@@ -188,12 +188,12 @@ let originate_account_from state ~client ~account =
       "# No push-drops"
   in
   let tmp = Caml.Filename.temp_file "little-id-script" ".tz" in
-  System.write_file state tmp ~content:(id_script "unit")
-  >>= fun () ->
+  System.write_file state tmp ~content:(id_script "unit") >>= fun () ->
   Tezos_client.successful_client_cmd
     state
     ~client
-    [ "originate";
+    [
+      "originate";
       "contract";
       orig_account_name;
       "transferring";
@@ -205,12 +205,12 @@ let originate_account_from state ~client ~account =
       "--init";
       "Unit";
       "--burn-cap";
-      Float.to_string 0.300 ]
+      Float.to_string 0.300;
+    ]
   >>= fun _ -> return orig_account_name
 
 let setup_baking_ledger state uri ~client ~protocol =
-  Console.say state EF.(wf "Setting up the ledger device %S" uri)
-  >>= fun () ->
+  Console.say state EF.(wf "Setting up the ledger device %S" uri) >>= fun () ->
   let key_name = "ledgered" in
   let baker = Tezos_client.Keyed.make client ~key_name ~secret_key:uri in
   let assert_baking_key x () =
@@ -226,8 +226,7 @@ let setup_baking_ledger state uri ~client ~protocol =
   (* TODO: The following assertion doesn't confirm anything if the ledger was already not authorized to bake. *)
   >>= assert_baking_key None
   >>= fun () ->
-  Tezos_client.Ledger.show_ledger state ~client ~uri
-  >>= fun account ->
+  Tezos_client.Ledger.show_ledger state ~client ~uri >>= fun account ->
   with_ledger_test_reject_and_succeed
     state
     EF.(
@@ -237,8 +236,7 @@ let setup_baking_ledger state uri ~client ~protocol =
         uri
         client.Tezos_client.id
         (Tezos_protocol.Account.pubkey_hash account))
-    (fun () ->
-      Tezos_client.Keyed.initialize state baker >>= fun _ -> return ())
+    (fun () -> Tezos_client.Keyed.initialize state baker >>= fun _ -> return ())
   >>= assert_failure state "baking before setup should fail" (fun () ->
           Tezos_client.Keyed.bake state baker "Baked by ledger")
   >>= assert_failure state "endorsing before setup should fail" (fun () ->
@@ -251,9 +249,11 @@ let setup_baking_ledger state uri ~client ~protocol =
         (fst (List.last_exn protocol.Tezos_protocol.bootstrap_accounts))
     in
     let cases =
-      [ (ledger_pkh, other_pkh, "ledger to another account");
+      [
+        (ledger_pkh, other_pkh, "ledger to another account");
         (other_pkh, ledger_pkh, "another account to ledger");
-        (other_pkh, other_pkh, "another account to another account") ]
+        (other_pkh, other_pkh, "another account to another account");
+      ]
     in
     List_sequential.iter cases ~f:(fun (src, dest, msg) ->
         forge_delegation state ~client ~src ~dest ()
@@ -268,25 +268,26 @@ let setup_baking_ledger state uri ~client ~protocol =
           (sign state ~client:baker ~bytes:forged_delegation_bytes)
           ())
   in
-  test_invalid_delegations ()
-  >>= fun () ->
-  get_chain_id_string state ~client
-  >>= fun cid ->
+  test_invalid_delegations () >>= fun () ->
+  get_chain_id_string state ~client >>= fun cid ->
   with_ledger_test_reject_and_succeed
     state
     EF.(
       list
-        [ wf "Setting up %S for baking" uri;
+        [
+          wf "Setting up %S for baking" uri;
           wf "Setup Baking?";
           wf "Address: %S\n" (Tezos_protocol.Account.pubkey_hash account);
           wf "Chain: %S" cid;
           wf "Main Chain HWM: 0";
-          wf "Test Chain HWM: 0" ])
+          wf "Test Chain HWM: 0";
+        ])
     (fun () ->
       Tezos_client.successful_client_cmd
         state
         ~client
-        [ "setup";
+        [
+          "setup";
           "ledger";
           "to";
           "bake";
@@ -295,15 +296,15 @@ let setup_baking_ledger state uri ~client ~protocol =
           "--main-hwm";
           "0";
           "--test-hwm";
-          "0" ])
+          "0";
+        ])
   >>= assert_baking_key (Some uri)
   >>= test_invalid_delegations
   >>= fun () -> return (baker, account)
 
 let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
     ~uri ~enable_deterministic_nonce_tests () =
-  Helpers.clear_root state
-  >>= fun () ->
+  Helpers.clear_root state >>= fun () ->
   Interactive_test.Pauser.generic
     state
     EF.[af "Ready to start"; af "Root path deleted."]
@@ -351,11 +352,13 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
     state
     ~client:(client 0)
     Tezos_protocol.Account.
-      [ "import";
+      [
+        "import";
         "secret";
         "key";
         name other_baker_account;
-        private_key other_baker_account ]
+        private_key other_baker_account;
+      ]
   >>= fun _ ->
   Tezos_client.successful_client_cmd
     state
@@ -373,45 +376,40 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
       ~f:(fun () ->
         Tezos_client.Ledger.set_hwm state ~client:(client 0) ~uri ~level)
   in
-  get_chain_id state ~client:(client 0)
-  >>= fun chain_id ->
+  get_chain_id state ~client:(client 0) >>= fun chain_id ->
   setup_baking_ledger state uri ~client:(client 0) ~protocol
   >>= fun (baker, ledger_account) ->
   Interactive_test.Pauser.add_commands
     state
     Interactive_test.Commands.
-      [ arbitrary_command_on_all_clients
+      [
+        arbitrary_command_on_all_clients
           state
           ~command_names:["baker"]
           ~make_admin
-          ~clients:[baker.Tezos_client.Keyed.client] ] ;
+          ~clients:[baker.Tezos_client.Keyed.client];
+      ] ;
   let bake () = Tezos_client.Keyed.bake state baker "Baked by ledger" in
   let endorse () =
     Tezos_client.Keyed.endorse state baker "Endorsed by ledger"
   in
-  get_chain_id_string state ~client:(client 0)
-  >>= fun cid ->
+  get_chain_id_string state ~client:(client 0) >>= fun cid ->
   let ask_hwm ~main ~test () =
     assert_hwms_ ~main ~test ()
     >>= ask_assert
           state
           EF.(wf "Is 'Chain' = %S and 'Last Block Level' = %d" cid main)
   in
-  ( if enable_deterministic_nonce_tests then
-    (* Test determinism of nonces *)
-    Tezos_client.Keyed.generate_nonce state baker "this"
-    >>= fun thisNonce1 ->
-    Tezos_client.Keyed.generate_nonce state baker "that"
-    >>= fun thatNonce1 ->
-    Tezos_client.Keyed.generate_nonce state baker "this"
-    >>= fun thisNonce2 ->
-    Tezos_client.Keyed.generate_nonce state baker "that"
-    >>= fun thatNonce2 ->
-    assert_eq (fun x -> x) ~expected:thisNonce1 ~actual:thisNonce2
-    >>= fun () ->
-    assert_eq (fun x -> x) ~expected:thatNonce1 ~actual:thatNonce2
-    >>= fun () -> assert_ Poly.(thisNonce1 <> thatNonce1)
-  else return () )
+  (if enable_deterministic_nonce_tests then
+   (* Test determinism of nonces *)
+   Tezos_client.Keyed.generate_nonce state baker "this" >>= fun thisNonce1 ->
+   Tezos_client.Keyed.generate_nonce state baker "that" >>= fun thatNonce1 ->
+   Tezos_client.Keyed.generate_nonce state baker "this" >>= fun thisNonce2 ->
+   Tezos_client.Keyed.generate_nonce state baker "that" >>= fun thatNonce2 ->
+   assert_eq (fun x -> x) ~expected:thisNonce1 ~actual:thisNonce2 >>= fun () ->
+   assert_eq (fun x -> x) ~expected:thatNonce1 ~actual:thatNonce2 >>= fun () ->
+   assert_ Poly.(thisNonce1 <> thatNonce1)
+  else return ())
   >>= fun () ->
   assert_failure
     state
@@ -435,9 +433,9 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
     state
     EF.(
       list
-        [ wf "Register as delegate?";
-          wf "Address %s" ledger_pkh;
-          wf "Fee %f" fee ])
+        [
+          wf "Register as delegate?"; wf "Address %s" ledger_pkh; wf "Fee %f" fee;
+        ])
     (sign state ~client:baker ~bytes:forged_delegation_bytes)
   >>= bake >>= ask_hwm ~main:3 ~test:0
   >>= fun () ->
@@ -490,15 +488,10 @@ let run state ~protocol ~node_exec ~client_exec ~admin_exec ~size ~base_port
   (* Only the test HWM has changed *)
   >>= assert_hwms_ ~main:6 ~test:5
   >>= fun () ->
-  Loop.n_times 5 (fun _ -> bake ())
-  >>= ask_hwm ~main:11 ~test:5
-  >>= fun () ->
+  Loop.n_times 5 (fun _ -> bake ()) >>= ask_hwm ~main:11 ~test:5 >>= fun () ->
   Tezos_client.Ledger.deauthorize_baking state ~client:(client 0) ~uri
   >>= assert_failure state "baking after deauthorization should fail" bake
-  >>= assert_failure
-        state
-        "endorsing after deauthorization should fail"
-        endorse
+  >>= assert_failure state "endorsing after deauthorization should fail" endorse
 
 let cmd () =
   let open Cmdliner in
@@ -513,16 +506,17 @@ let cmd () =
   let docs = Manpage_builder.section_test_scenario base_state in
   let term =
     const
-      (fun uri
-           node_exec
-           client_exec
-           admin_exec
-           size
-           (`Base_port base_port)
-           no_deterministic_nonce_tests
-           protocol
-           state
-           ->
+      (fun
+        uri
+        node_exec
+        client_exec
+        admin_exec
+        size
+        (`Base_port base_port)
+        no_deterministic_nonce_tests
+        protocol
+        state
+      ->
         Test_command_line.Run_command.or_hard_fail
           state
           ~pp_error

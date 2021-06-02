@@ -43,7 +43,7 @@ let chain_n_block_to_string chain block =
 let get_core (module Light_proto : Light_proto.PROTO_RPCS)
     (printer : Tezos_client_base.Client_context.printer)
     ({endpoints; min_agreement} : Light.sources) =
-  ( module struct
+  (module struct
     type irmin = {repo : Store.Tree.repo; root : Store.tree}
 
     (** Do not access directly, use [get_irmin] instead *)
@@ -52,20 +52,17 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
     let get_irmin () : irmin Lwt.t =
       match !irmin_ref with
       | None ->
-          Store.Tree.make_repo
-          >>= fun repo ->
+          Store.Tree.make_repo >>= fun repo ->
           let root = Store.Tree.empty Store.empty in
           let irmin = {repo; root} in
           irmin_ref := Some irmin ;
           Lwt.return irmin
-      | Some res ->
-          Lwt.return res
+      | Some res -> Lwt.return res
 
     let rec get_first_merkle_tree chain block key leaf_kind tried_endpoints_rev
         remaining_endpoints =
       match remaining_endpoints with
-      | [] ->
-          Lwt.return_none
+      | [] -> Lwt.return_none
       | ((uri, rpc_context) as hd_endpoint) :: tl_remaining_endpoints -> (
           Light_proto.merkle_tree
             Proxy.{rpc_context; chain; block}
@@ -111,7 +108,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
                 key
                 leaf_kind
                 (hd_endpoint :: tried_endpoints_rev)
-                tl_remaining_endpoints )
+                tl_remaining_endpoints)
 
     (** Returns the Merkle tree of the first successful call to an endpoint
         in [endpoints], together with the other [endpoints] so that the caller
@@ -125,27 +122,26 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
       get_first_merkle_tree chain block key leaf_kind [] endpoints
 
     let get key =
-      Logger.(emit api_get @@ key_to_string key)
-      >>= fun () ->
+      Logger.(emit api_get @@ key_to_string key) >>= fun () ->
       get_irmin () >>= fun {root; _} -> Store.Tree.find_tree root key
 
-    let light_failwith (pgi : Proxy.proxy_getter_input)
-        ?(warn_symbolic = false) msg =
+    let light_failwith (pgi : Proxy.proxy_getter_input) ?(warn_symbolic = false)
+        msg =
       let symbolic_block = Light.hash_of_block pgi.block |> Option.is_none in
       let full_msg =
         Format.sprintf
           "Light mode (%s): %s%s"
           (chain_n_block_to_string pgi.chain pgi.block)
           msg
-          ( if warn_symbolic && symbolic_block then
-            Format.sprintf
-              ". Because requested block is symbolic: %s (it has no hash), it \
-               could be that the different endpoints are mapping this \
-               symbolic identifier to different concrete blocks. If you are \
-               using the 'head' identifier (or 'head~1', etc.) in a RPC path, \
-               replace it with a concrete hash."
-            @@ Block_services.to_string pgi.block
-          else "" )
+          (if warn_symbolic && symbolic_block then
+           Format.sprintf
+             ". Because requested block is symbolic: %s (it has no hash), it \
+              could be that the different endpoints are mapping this symbolic \
+              identifier to different concrete blocks. If you are using the \
+              'head' identifier (or 'head~1', etc.) in a RPC path, replace it \
+              with a concrete hash."
+           @@ Block_services.to_string pgi.block
+          else "")
       in
       Logger.(emit failing full_msg) >>= fun () -> failwith "%s" full_msg
 
@@ -155,8 +151,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
       let ( >>>=? ) v f =
         v >>= function Error msg -> light_failwith pgi msg | Ok x -> f x
       in
-      Logger.(emit api_do_rpc @@ key_to_string key)
-      >>= fun () ->
+      Logger.(emit api_do_rpc @@ key_to_string key) >>= fun () ->
       get_first_merkle_tree chain block key Block_services.Raw_context
       >>= fun mtree_and_i_opt ->
       let nb_endpoints = List.length endpoints in
@@ -168,10 +163,8 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
                nb_endpoints
                (key_to_string key)
       | Some (mtree, validating_endpoints) -> (
-          get_irmin ()
-          >>= fun {root; repo} ->
-          Merkle.union_irmin_tree_merkle_tree repo root mtree
-          >>>=? fun root' ->
+          get_irmin () >>= fun {root; repo} ->
+          Merkle.union_irmin_tree_merkle_tree repo root mtree >>>=? fun root' ->
           Logger.(
             emit
               staged_data
@@ -180,13 +173,12 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
           let input : Light_consensus.input =
             {printer; min_agreement; chain; block; key; mtree; tree = root'}
           in
-          Consensus.consensus input validating_endpoints
-          >>>=? function
+          Consensus.consensus input validating_endpoints >>>=? function
           | false ->
               light_failwith pgi ~warn_symbolic:true
               @@ Format.sprintf "Consensus cannot be reached for key: %s"
               @@ key_to_string key
           | true ->
               irmin_ref := Some {repo; root = root'} ;
-              return_unit )
-  end : Proxy.CORE )
+              return_unit)
+  end : Proxy.CORE)

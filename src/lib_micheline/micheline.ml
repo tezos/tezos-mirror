@@ -48,28 +48,18 @@ let canonical_location_encoding =
   @@ int31
 
 let location = function
-  | Int (loc, _) ->
-      loc
-  | String (loc, _) ->
-      loc
-  | Bytes (loc, _) ->
-      loc
-  | Seq (loc, _) ->
-      loc
-  | Prim (loc, _, _, _) ->
-      loc
+  | Int (loc, _) -> loc
+  | String (loc, _) -> loc
+  | Bytes (loc, _) -> loc
+  | Seq (loc, _) -> loc
+  | Prim (loc, _, _, _) -> loc
 
 let annotations = function
-  | Int (_, _) ->
-      []
-  | String (_, _) ->
-      []
-  | Bytes (_, _) ->
-      []
-  | Seq (_, _) ->
-      []
-  | Prim (_, _, _, annots) ->
-      annots
+  | Int (_, _) -> []
+  | String (_, _) -> []
+  | Bytes (_, _) -> []
+  | Seq (_, _) -> []
+  | Prim (_, _, _, annots) -> annots
 
 let root (Canonical expr) = expr
 
@@ -87,17 +77,16 @@ and ('l, 'p, 'la, 'pa) list_cont =
 let strip_locations (type a b) (root : (a, b) node) : b canonical =
   let id =
     let id = ref (-1) in
-    fun () -> incr id ; !id
+    fun () ->
+      incr id ;
+      !id
   in
   let rec strip_locations l k =
     let id = id () in
     match l with
-    | Int (_, v) ->
-        (apply [@tailcall]) k (Int (id, v))
-    | String (_, v) ->
-        (apply [@tailcall]) k (String (id, v))
-    | Bytes (_, v) ->
-        (apply [@tailcall]) k (Bytes (id, v))
+    | Int (_, v) -> (apply [@tailcall]) k (Int (id, v))
+    | String (_, v) -> (apply [@tailcall]) k (String (id, v))
+    | Bytes (_, v) -> (apply [@tailcall]) k (Bytes (id, v))
     | Seq (_, seq) ->
         (strip_locations_list [@tailcall]) seq [] (Seq_cont (id, k))
     | Prim (_, name, seq, annots) ->
@@ -107,20 +96,16 @@ let strip_locations (type a b) (root : (a, b) node) : b canonical =
           (Prim_cont (id, name, annots, k))
   and strip_locations_list ls acc k =
     match ls with
-    | [] ->
-        (apply_list [@tailcall]) k (List.rev acc)
-    | x :: tl ->
-        (strip_locations [@tailcall]) x (List_cont (tl, acc, k))
+    | [] -> (apply_list [@tailcall]) k (List.rev acc)
+    | x :: tl -> (strip_locations [@tailcall]) x (List_cont (tl, acc, k))
   and apply k node =
     match k with
     | List_cont (tl, acc, k) ->
         (strip_locations_list [@tailcall]) tl (node :: acc) k
-    | Return ->
-        node
+    | Return -> node
   and apply_list k node_list =
     match k with
-    | Seq_cont (id, k) ->
-        (apply [@tailcall]) k (Seq (id, node_list))
+    | Seq_cont (id, k) -> (apply [@tailcall]) k (Seq (id, node_list))
     | Prim_cont (id, name, annots, k) ->
         (apply [@tailcall]) k (Prim (id, name, node_list, annots))
   in
@@ -131,7 +116,9 @@ let extract_locations :
  fun root ->
   let id =
     let id = ref (-1) in
-    fun () -> incr id ; !id
+    fun () ->
+      incr id ;
+      !id
   in
   let loc_table = ref [] in
   let rec strip_locations l k =
@@ -157,20 +144,16 @@ let extract_locations :
           (Prim_cont (id, name, annots, k))
   and strip_locations_list ls acc k =
     match ls with
-    | [] ->
-        (apply_list [@tailcall]) k (List.rev acc)
-    | x :: tl ->
-        (strip_locations [@tailcall]) x (List_cont (tl, acc, k))
+    | [] -> (apply_list [@tailcall]) k (List.rev acc)
+    | x :: tl -> (strip_locations [@tailcall]) x (List_cont (tl, acc, k))
   and apply k node =
     match k with
     | List_cont (tl, acc, k) ->
         (strip_locations_list [@tailcall]) tl (node :: acc) k
-    | Return ->
-        node
+    | Return -> node
   and apply_list k node_list =
     match k with
-    | Seq_cont (id, k) ->
-        (apply [@tailcall]) k (Seq (id, node_list))
+    | Seq_cont (id, k) -> (apply [@tailcall]) k (Seq (id, node_list))
     | Prim_cont (id, name, annots, k) ->
         (apply [@tailcall]) k (Prim (id, name, node_list, annots))
   in
@@ -182,12 +165,9 @@ let inject_locations :
  fun lookup (Canonical root) ->
   let rec inject_locations l k =
     match l with
-    | Int (loc, v) ->
-        (apply [@tailcall]) k (Int (lookup loc, v))
-    | String (loc, v) ->
-        (apply [@tailcall]) k (String (lookup loc, v))
-    | Bytes (loc, v) ->
-        (apply [@tailcall]) k (Bytes (lookup loc, v))
+    | Int (loc, v) -> (apply [@tailcall]) k (Int (lookup loc, v))
+    | String (loc, v) -> (apply [@tailcall]) k (String (lookup loc, v))
+    | Bytes (loc, v) -> (apply [@tailcall]) k (Bytes (lookup loc, v))
     | Seq (loc, seq) ->
         (inject_locations_list [@tailcall]) seq [] (Seq_cont (lookup loc, k))
     | Prim (loc, name, seq, annots) ->
@@ -197,20 +177,16 @@ let inject_locations :
           (Prim_cont (lookup loc, name, annots, k))
   and inject_locations_list ls acc k =
     match ls with
-    | [] ->
-        (apply_list [@tailcall]) k (List.rev acc)
-    | x :: tl ->
-        (inject_locations [@tailcall]) x (List_cont (tl, acc, k))
+    | [] -> (apply_list [@tailcall]) k (List.rev acc)
+    | x :: tl -> (inject_locations [@tailcall]) x (List_cont (tl, acc, k))
   and apply k node =
     match k with
     | List_cont (tl, acc, k) ->
         (inject_locations_list [@tailcall]) tl (node :: acc) k
-    | Return ->
-        node
+    | Return -> node
   and apply_list k node_list =
     match k with
-    | Seq_cont (id, k) ->
-        (apply [@tailcall]) k (Seq (id, node_list))
+    | Seq_cont (id, k) -> (apply [@tailcall]) k (Seq (id, node_list))
     | Prim_cont (id, name, annots, k) ->
         (apply [@tailcall]) k (Prim (id, name, node_list, annots))
   in
@@ -220,45 +196,35 @@ let map : type a b. (a -> b) -> a canonical -> b canonical =
  fun f (Canonical expr) ->
   let rec map_node l k =
     match l with
-    | (Int _ | String _ | Bytes _) as node ->
-        (apply [@tailcall]) k node
-    | Seq (loc, seq) ->
-        (map_list [@tailcall]) seq [] (Seq_cont (loc, k))
+    | (Int _ | String _ | Bytes _) as node -> (apply [@tailcall]) k node
+    | Seq (loc, seq) -> (map_list [@tailcall]) seq [] (Seq_cont (loc, k))
     | Prim (loc, name, seq, annots) ->
         (map_list [@tailcall]) seq [] (Prim_cont (loc, f name, annots, k))
   and map_list ls acc k =
     match ls with
-    | [] ->
-        (apply_list [@tailcall]) k (List.rev acc)
-    | x :: tl ->
-        (map_node [@tailcall]) x (List_cont (tl, acc, k))
+    | [] -> (apply_list [@tailcall]) k (List.rev acc)
+    | x :: tl -> (map_node [@tailcall]) x (List_cont (tl, acc, k))
   and apply k node =
     match k with
-    | List_cont (tl, acc, k) ->
-        (map_list [@tailcall]) tl (node :: acc) k
-    | Return ->
-        node
+    | List_cont (tl, acc, k) -> (map_list [@tailcall]) tl (node :: acc) k
+    | Return -> node
   and apply_list k node_list =
     match k with
-    | Seq_cont (id, k) ->
-        (apply [@tailcall]) k (Seq (id, node_list))
+    | Seq_cont (id, k) -> (apply [@tailcall]) k (Seq (id, node_list))
     | Prim_cont (id, name, annots, k) ->
         (apply [@tailcall]) k (Prim (id, name, node_list, annots))
   in
   Canonical (map_node expr Return)
 
 let map_node :
-    type la lb pa pb.
-    (la -> lb) -> (pa -> pb) -> (la, pa) node -> (lb, pb) node =
+    type la lb pa pb. (la -> lb) -> (pa -> pb) -> (la, pa) node -> (lb, pb) node
+    =
  fun fl fp node ->
   let rec map_node fl fp node k =
     match node with
-    | Int (loc, v) ->
-        (apply [@tailcall]) fl fp k (Int (fl loc, v))
-    | String (loc, v) ->
-        (apply [@tailcall]) fl fp k (String (fl loc, v))
-    | Bytes (loc, v) ->
-        (apply [@tailcall]) fl fp k (Bytes (fl loc, v))
+    | Int (loc, v) -> (apply [@tailcall]) fl fp k (Int (fl loc, v))
+    | String (loc, v) -> (apply [@tailcall]) fl fp k (String (fl loc, v))
+    | Bytes (loc, v) -> (apply [@tailcall]) fl fp k (Bytes (fl loc, v))
     | Seq (loc, seq) ->
         (map_node_list [@tailcall]) fl fp seq [] (Seq_cont (fl loc, k))
     | Prim (loc, name, seq, annots) ->
@@ -270,20 +236,16 @@ let map_node :
           (Prim_cont (fl loc, fp name, annots, k))
   and map_node_list fl fp ls acc k =
     match ls with
-    | [] ->
-        (apply_list [@tailcall]) fl fp k (List.rev acc)
-    | x :: tl ->
-        (map_node [@tailcall]) fl fp x (List_cont (tl, acc, k))
+    | [] -> (apply_list [@tailcall]) fl fp k (List.rev acc)
+    | x :: tl -> (map_node [@tailcall]) fl fp x (List_cont (tl, acc, k))
   and apply fl fp k node =
     match k with
     | List_cont (tl, acc, k) ->
         (map_node_list [@tailcall]) fl fp tl (node :: acc) k
-    | Return ->
-        node
+    | Return -> node
   and apply_list fl fp k node_list =
     match k with
-    | Seq_cont (id, k) ->
-        (apply [@tailcall]) fl fp k (Seq (id, node_list))
+    | Seq_cont (id, k) -> (apply [@tailcall]) fl fp k (Seq (id, node_list))
     | Prim_cont (id, name, annots, k) ->
         (apply [@tailcall]) fl fp k (Prim (id, name, node_list, annots))
   in
@@ -367,15 +329,18 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
           ~json:
             (union
                ~tag_size:`Uint8
-               [ int_encoding Json_only;
+               [
+                 int_encoding Json_only;
                  string_encoding Json_only;
                  bytes_encoding Json_only;
                  seq_encoding Json_only expr_encoding;
-                 application_encoding Json_only expr_encoding ])
+                 application_encoding Json_only expr_encoding;
+               ])
           ~binary:
             (union
                ~tag_size:`Uint8
-               [ int_encoding (Tag 0);
+               [
+                 int_encoding (Tag 0);
                  string_encoding (Tag 1);
                  seq_encoding (Tag 2) expr_encoding;
                  (* No args, no annot *)
@@ -412,10 +377,8 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
                       (req "arg" expr_encoding)
                       (req "annots" annots_encoding))
                    (function
-                     | Prim (_, prim, [arg], annots) ->
-                         Some (prim, arg, annots)
-                     | _ ->
-                         None)
+                     | Prim (_, prim, [arg], annots) -> Some (prim, arg, annots)
+                     | _ -> None)
                    (fun (prim, arg, annots) -> Prim (0, prim, [arg], annots));
                  (* Two args, no annot *)
                  case
@@ -428,8 +391,7 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
                    (function
                      | Prim (_, prim, [arg1; arg2], []) ->
                          Some (prim, arg1, arg2)
-                     | _ ->
-                         None)
+                     | _ -> None)
                    (fun (prim, arg1, arg2) -> Prim (0, prim, [arg1; arg2], []));
                  (* Two args, with annots *)
                  case
@@ -443,13 +405,13 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
                    (function
                      | Prim (_, prim, [arg1; arg2], annots) ->
                          Some (prim, arg1, arg2, annots)
-                     | _ ->
-                         None)
+                     | _ -> None)
                    (fun (prim, arg1, arg2, annots) ->
                      Prim (0, prim, [arg1; arg2], annots));
                  (* General case *)
                  application_encoding (Tag 9) expr_encoding;
-                 bytes_encoding (Tag 10) ]))
+                 bytes_encoding (Tag 10);
+               ]))
   in
   conv
     (function Canonical node -> node)
@@ -494,24 +456,22 @@ let erased_encoding ~variant default_location prim_encoding =
 *)
 
 let%test_module "semantics_preservation" =
-  ( module struct
+  (module struct
     module Original = struct
       let strip_locations root =
         let id =
           let id = ref (-1) in
-          fun () -> incr id ; !id
+          fun () ->
+            incr id ;
+            !id
         in
         let rec strip_locations l =
           let id = id () in
           match l with
-          | Int (_, v) ->
-              Int (id, v)
-          | String (_, v) ->
-              String (id, v)
-          | Bytes (_, v) ->
-              Bytes (id, v)
-          | Seq (_, seq) ->
-              Seq (id, List.map strip_locations seq)
+          | Int (_, v) -> Int (id, v)
+          | String (_, v) -> String (id, v)
+          | Bytes (_, v) -> Bytes (id, v)
+          | Seq (_, seq) -> Seq (id, List.map strip_locations seq)
           | Prim (_, name, seq, annots) ->
               Prim (id, name, List.map strip_locations seq, annots)
         in
@@ -520,7 +480,9 @@ let%test_module "semantics_preservation" =
       let extract_locations root =
         let id =
           let id = ref (-1) in
-          fun () -> incr id ; !id
+          fun () ->
+            incr id ;
+            !id
         in
         let loc_table = ref [] in
         let rec strip_locations l =
@@ -548,14 +510,10 @@ let%test_module "semantics_preservation" =
       let inject_locations lookup (Canonical root) =
         let rec inject_locations l =
           match l with
-          | Int (loc, v) ->
-              Int (lookup loc, v)
-          | String (loc, v) ->
-              String (lookup loc, v)
-          | Bytes (loc, v) ->
-              Bytes (lookup loc, v)
-          | Seq (loc, seq) ->
-              Seq (lookup loc, List.map inject_locations seq)
+          | Int (loc, v) -> Int (lookup loc, v)
+          | String (loc, v) -> String (lookup loc, v)
+          | Bytes (loc, v) -> Bytes (lookup loc, v)
+          | Seq (loc, seq) -> Seq (lookup loc, List.map inject_locations seq)
           | Prim (loc, name, seq, annots) ->
               Prim (lookup loc, name, List.map inject_locations seq, annots)
         in
@@ -563,31 +521,25 @@ let%test_module "semantics_preservation" =
 
       let map f (Canonical expr) =
         let rec map_node f = function
-          | (Int _ | String _ | Bytes _) as node ->
-              node
-          | Seq (loc, seq) ->
-              Seq (loc, List.map (map_node f) seq)
+          | (Int _ | String _ | Bytes _) as node -> node
+          | Seq (loc, seq) -> Seq (loc, List.map (map_node f) seq)
           | Prim (loc, name, seq, annots) ->
               Prim (loc, f name, List.map (map_node f) seq, annots)
         in
         Canonical (map_node f expr)
 
       let rec map_node fl fp = function
-        | Int (loc, v) ->
-            Int (fl loc, v)
-        | String (loc, v) ->
-            String (fl loc, v)
-        | Bytes (loc, v) ->
-            Bytes (fl loc, v)
-        | Seq (loc, seq) ->
-            Seq (fl loc, List.map (map_node fl fp) seq)
+        | Int (loc, v) -> Int (fl loc, v)
+        | String (loc, v) -> String (fl loc, v)
+        | Bytes (loc, v) -> Bytes (fl loc, v)
+        | Seq (loc, seq) -> Seq (fl loc, List.map (map_node fl fp) seq)
         | Prim (loc, name, seq, annots) ->
             Prim (fl loc, fp name, List.map (map_node fl fp) seq, annots)
     end
 
     module Sampler = struct
       (* Sampler copied from [micheline_benchmarks.ml] - lib-micheline cannot depend
-       on lib-shell-benchmarks. *)
+         on lib-shell-benchmarks. *)
 
       type 'a sampler = Random.State.t -> 'a
 
@@ -618,12 +570,9 @@ let%test_module "semantics_preservation" =
       let sample (w : width_function) rng_state =
         let rec sample depth rng_state k =
           match sample_kind rng_state with
-          | Int_node ->
-              k (Int (0, sample_z rng_state))
-          | String_node ->
-              k (String (0, sample_string rng_state))
-          | Bytes_node ->
-              k (Bytes (0, sample_bytes rng_state))
+          | Int_node -> k (Int (0, sample_z rng_state))
+          | String_node -> k (String (0, sample_string rng_state))
+          | Bytes_node -> k (Bytes (0, sample_bytes rng_state))
           | Seq_node ->
               let width = w ~depth rng_state in
               sample_list
@@ -705,4 +654,4 @@ let%test_module "semantics_preservation" =
         1_000
         (Original.map_node (fun _i -> ()) (fun _i -> ()))
         (map_node (fun _i -> ()) (fun _i -> ()))
-  end )
+  end)

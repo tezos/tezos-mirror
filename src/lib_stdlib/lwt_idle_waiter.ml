@@ -45,8 +45,7 @@ let create () =
 let rec may_run_idle_tasks w =
   if w.running_tasks = 0 && not w.running_idle then
     match w.pending_idle with
-    | [] ->
-        ()
+    | [] -> ()
     | pending_idle ->
         w.running_idle <- true ;
         w.prevent_tasks <- false ;
@@ -55,8 +54,7 @@ let rec may_run_idle_tasks w =
            thread? *)
         Lwt.async (fun () ->
             let pending_idle = List.rev pending_idle in
-            Lwt_list.iter_s (fun f -> f ()) pending_idle
-            >>= fun () ->
+            Lwt_list.iter_s (fun f -> f ()) pending_idle >>= fun () ->
             w.running_idle <- false ;
             let pending_tasks = List.rev w.pending_tasks in
             w.pending_tasks <- [] ;
@@ -72,23 +70,20 @@ let wrap_error f =
 let unwrap_error = function Ok r -> Lwt.return r | Error exn -> Lwt.fail exn
 
 let wakeup_error u = function
-  | Ok r ->
-      Lwt.wakeup u r
-  | Error exn ->
-      Lwt.wakeup_exn u exn
+  | Ok r -> Lwt.wakeup u r
+  | Error exn -> Lwt.wakeup_exn u exn
 
 let rec task w f =
   if w.running_idle || w.prevent_tasks then (
     let (t, u) = Lwt.task () in
     w.pending_tasks <- u :: w.pending_tasks ;
-    t >>= fun () -> task w f )
+    t >>= fun () -> task w f)
   else (
     w.running_tasks <- w.running_tasks + 1 ;
-    wrap_error f
-    >>= fun res ->
+    wrap_error f >>= fun res ->
     w.running_tasks <- w.running_tasks - 1 ;
     may_run_idle_tasks w ;
-    unwrap_error res )
+    unwrap_error res)
 
 let when_idle w f =
   let (t, u) = Lwt.task () in
@@ -96,7 +91,10 @@ let when_idle w f =
   Lwt.on_cancel t (fun () -> canceled := true) ;
   let f () =
     if !canceled then Lwt.return_unit
-    else wrap_error f >>= fun res -> wakeup_error u res ; Lwt.return_unit
+    else
+      wrap_error f >>= fun res ->
+      wakeup_error u res ;
+      Lwt.return_unit
   in
   w.pending_idle <- f :: w.pending_idle ;
   may_run_idle_tasks w ;

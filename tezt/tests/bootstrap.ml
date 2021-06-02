@@ -70,7 +70,7 @@ let bootstrapped_event =
     if name = "node_chain_validator.v0" && filter value then
       if not !fulfilled then (
         fulfilled := true ;
-        Lwt.wakeup resolver () )
+        Lwt.wakeup resolver ())
 
 (* This test replicates part of the flextesa test "command_node_synchronization".
    It checks the synchronization of two nodes depending on their history mode.
@@ -107,13 +107,15 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
     ~__FILE__
     ~title:(Format.sprintf "node synchronization (%s / %s)" hmode1s hmode2s)
     ~tags:
-      [ "bootstrap";
+      [
+        "bootstrap";
         "node";
         "sync";
         "activate";
         "bake";
         "primary_" ^ hmode1s;
-        "secondary_" ^ hmode2s ]
+        "secondary_" ^ hmode2s;
+      ]
   @@ fun protocol ->
   (* Initialize nodes and client. *)
   let* node_1 =
@@ -169,8 +171,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
             caboose
             bakes_before_kill ;
         return ()
-    | _ ->
-        return ()
+    | _ -> return ()
   in
   (* Check whether the nodes are still connected. *)
   if hmode1 <> Rolling then
