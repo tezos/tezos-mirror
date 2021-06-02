@@ -1,5 +1,5 @@
 opam-version: "2.0"
-name: "tezos-snoop-rewriting"
+name: "tezos-micheline-rewriting"
 version: "1.0"
 authors: [ "Tezos devteam" ]
 maintainer: "contact@tezos.com"
