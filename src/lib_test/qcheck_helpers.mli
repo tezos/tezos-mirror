@@ -84,15 +84,17 @@ val of_option_gen : 'a option QCheck.Gen.t -> 'a QCheck.Gen.t
 *)
 val of_option_arb : 'a option QCheck.arbitrary -> 'a QCheck.arbitrary
 
-(** [uint16] generates an unsigned int16 arbitrary
-
-    - Generation of values is delegated to {!int_range} *)
+(** [uint16] is an arbitrary of unsigned [int16] arbitrary *)
 val uint16 : int QCheck.arbitrary
 
-(** [int16] generates a signed int16 arbitrary
-
-    - Generation of values is delegated to {!int_range} *)
+(** [int16] is an arbitrary of signed int16 arbitrary *)
 val int16 : int QCheck.arbitrary
+
+(** [uint8] is an arbitrary of unsigned [int8] values *)
+val uint8 : int QCheck.arbitrary
+
+(** [int8] is an arbitrary of signed int8 values  *)
+val int8 : int QCheck.arbitrary
 
 (** [of_option_shrink shrink_opt] returns a shrinker from an optional one.
     This is typically useful when extracting a shrinker from an [arbitrary]

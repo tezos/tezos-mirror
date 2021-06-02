@@ -88,6 +88,10 @@ let uint16 = QCheck.(0 -- 65535)
 
 let int16 = QCheck.(-32768 -- 32767)
 
+let uint8 = QCheck.(0 -- 255)
+
+let int8 = QCheck.(-128 -- 127)
+
 let bytes_arb = QCheck.(map ~rev:Bytes.to_string Bytes.of_string string)
 
 let of_option_shrink shrink_opt x yield =
