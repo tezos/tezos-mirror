@@ -4,8 +4,8 @@ Micheline
 =========
 
 Micheline is a data format comparable to JSON, XML, S-expressions, and
-YAML. Its main purpose is to serve as the concrete syntax for :ref:`the
-Michelson language <Michelson>`.
+YAML. Its main purpose is to serve as the concrete syntax for :doc:`the
+Michelson language <../active/michelson>`.
 
 Syntax
 ------
@@ -308,6 +308,3 @@ languages:
   https://smart-contracts-micheline-michelson-translator-for-tezos.scalac.io
   developed as part of Cryptonomic hackathon and documented here:
   https://scalac.io/we-hakked-tezos-and-created-a-micheline-michelson-translator/
-
-
-

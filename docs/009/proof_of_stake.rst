@@ -1,6 +1,3 @@
-.. _proof-of-stake:
-.. _proof-of-stake_009:
-
 Proof-of-stake in Tezos
 =======================
 

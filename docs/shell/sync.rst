@@ -88,8 +88,8 @@ though it is many blocks away from the chain's head.
 
 A good value for ``latency`` is ``2`` to ``5`` times the time between
 blocks, plus a small delta for network delays. At time of writing,
-because of the baking priority system (see :ref:`Proof of stake in
-Tezos<proof-of-stake>`) the time between two consecutive blocks is
+because of the baking priority system (see :doc:`Proof of stake in
+Tezos <../active/proof_of_stake>`) the time between two consecutive blocks is
 close to ``60`` seconds when the chain is healthy.
 
 A shorter ``latency`` might give false negatives: delays from a few

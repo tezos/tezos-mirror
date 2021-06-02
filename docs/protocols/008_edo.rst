@@ -173,8 +173,8 @@ Sapling
 ~~~~~~~
 
 Integration of the Sapling protocol into the Michelson language.
-More information can be found in the :ref:`Sapling documentation page
-<sapling_dev>`.
+More information can be found in the :doc:`Sapling documentation page
+<../active/sapling>`.
 
 Bls12-381
 ~~~~~~~~~

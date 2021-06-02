@@ -225,7 +225,7 @@ needs to contain not only the action to perform but also:
   meant for another multisig contract,
 - the chain identifier of the current chain to avoid replaying
   signatures between the test chain forked during the testing period
-  of :ref:`the voting procedure <voting>` and the main chain,
+  of :doc:`the voting procedure <../active/voting>` and the main chain,
 - an always-increasing anti-replay counter to avoid replaying past
   transactions on the same multisig contract.
 

@@ -1,5 +1,3 @@
-.. _cli_commands_010:
-
 **********************
 Command Line Interface
 **********************
@@ -14,7 +12,7 @@ using the following shell commands.
    tezos-admin-client man -verbosity 3
 
 The rest of this page documents the protocol-dependent tools.
-The protocol-independent tools are documented :ref:`here <cli_commands_shell>`.
+The protocol-independent tools are documented :doc:`here <../shell/cli-commands>`.
 
 
 .. _client_manual_010:
@@ -23,7 +21,7 @@ Client manual
 =============
 
 .. raw:: html
-         :file: tezos-client-010.html
+         :file: tezos-client.html
 
 
 .. _baker_manual_010:
@@ -32,7 +30,7 @@ Baker manual
 ============
 
 .. raw:: html
-         :file: tezos-baker-010.html
+         :file: tezos-baker.html
 
 
 .. _endorser_manual_010:
@@ -41,7 +39,7 @@ Endorser manual
 ===============
 
 .. raw:: html
-         :file: tezos-endorser-010.html
+         :file: tezos-endorser.html
 
 
 .. _accuser_manual_010:
@@ -50,4 +48,4 @@ Accuser manual
 ==============
 
 .. raw:: html
-         :file: tezos-accuser-010.html
+         :file: tezos-accuser.html
