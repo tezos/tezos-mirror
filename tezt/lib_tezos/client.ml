@@ -57,6 +57,13 @@ let fresh_name () =
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
+let address ?(hostname = false) ?from peer =
+  match from with
+  | None ->
+      Runner.address ~hostname (Node.runner peer)
+  | Some node ->
+      Runner.address ~hostname ?from:(Node.runner node) (Node.runner peer)
+
 let create_with_mode ?(path = Constant.tezos_client)
     ?(admin_path = Constant.tezos_admin_client) ?name
     ?(color = Log.Color.FG.blue) ?base_dir mode =
@@ -95,7 +102,11 @@ let endpoint_arg ?node client =
   | (Light _, Some node)
   | (Proxy _, Some node)
   | (Proxy node, None) ->
-      ["--endpoint"; "http://localhost:" ^ string_of_int (Node.rpc_port node)]
+      [ "--endpoint";
+        "http://"
+        ^ address ~hostname:true node
+        ^ ":"
+        ^ string_of_int (Node.rpc_port node) ]
 
 let mode_arg client =
   match client.mode with
@@ -216,7 +227,9 @@ module Admin = struct
       ?node
       client
       ( endpoint_arg ?node client @ mode_arg client
-      @ ["trust"; "address"; "127.0.0.1:" ^ string_of_int (Node.net_port peer)]
+      @ [ "trust";
+          "address";
+          address ?from:node peer ^ ":" ^ string_of_int (Node.net_port peer) ]
       )
 
   let trust_address ?node ~peer client =
@@ -226,7 +239,9 @@ module Admin = struct
     spawn_command
       ?node
       client
-      ["connect"; "address"; "127.0.0.1:" ^ string_of_int (Node.net_port peer)]
+      [ "connect";
+        "address";
+        address ?from:node peer ^ ":" ^ string_of_int (Node.net_port peer) ]
 
   let connect_address ?node ~peer client =
     spawn_connect_address ?node ~peer client |> Process.check

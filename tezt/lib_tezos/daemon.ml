@@ -141,7 +141,7 @@ module Make (X : PARAMETERS) = struct
     next_name := 1 ;
     next_color := 0
 
-  let create ~path ?name ?color ?event_pipe persistent_state =
+  let create ~path ?runner ?name ?color ?event_pipe persistent_state =
     let name = match name with None -> fresh_name () | Some name -> name in
     let color =
       match color with None -> get_next_color () | Some color -> color
@@ -149,7 +149,7 @@ module Make (X : PARAMETERS) = struct
     let event_pipe =
       match event_pipe with
       | None ->
-          Temp.file (name ^ "-event-pipe")
+          Temp.file ?runner (name ^ "-event-pipe")
       | Some file ->
           file
     in
@@ -215,22 +215,43 @@ module Make (X : PARAMETERS) = struct
             in
             loop [] events )
 
-  let run ?(on_terminate = fun _ -> unit) ?event_level daemon session_state
-      arguments =
+  let run ?runner ?(on_terminate = fun _ -> unit) ?event_level daemon
+      session_state arguments =
     ( match daemon.status with
     | Not_running ->
         ()
     | Running _ ->
         Test.fail "daemon %s is already running" daemon.name ) ;
     (* Create the named pipe where the daemon will send its internal events in JSON. *)
-    if Sys.file_exists daemon.event_pipe then Sys.remove daemon.event_pipe ;
-    Unix.mkfifo daemon.event_pipe 0o640 ;
+    if Runner.Sys.file_exists ?runner daemon.event_pipe then
+      Runner.Sys.remove ?runner daemon.event_pipe ;
+    Runner.Sys.mkfifo ?runner ~perms:0o640 daemon.event_pipe ;
     (* Note: in the CI, it seems that if the daemon tries to open the
        FIFO for writing before we opened it for reading, the
        [Lwt.openfile] call (of the daemon, for writing) blocks
        forever. So we need to make sure that we open the file before we
        spawn the daemon. *)
-    let* event_input = Lwt_io.(open_file ~mode:input) daemon.event_pipe in
+    let event_process =
+      match runner with
+      | None ->
+          None
+      | Some runner ->
+          let cmd = "cat" in
+          let arguments = [daemon.event_pipe] in
+          let name = Filename.basename daemon.event_pipe in
+          let process =
+            Process.spawn ~name ~runner ~log_output:false cmd arguments
+          in
+          Some process
+    in
+    (* The input is either the local pipe or the remote pipe. *)
+    let* event_input =
+      match event_process with
+      | None ->
+          Lwt_io.(open_file ~mode:input) daemon.event_pipe
+      | Some process ->
+          Lwt.return @@ Process.stdout process
+    in
     let env =
       let level_str =
         match event_level with
@@ -245,6 +266,7 @@ module Make (X : PARAMETERS) = struct
     in
     let process =
       Process.spawn
+        ?runner
         ~name:daemon.name
         ~color:daemon.color
         ~env
@@ -265,8 +287,12 @@ module Make (X : PARAMETERS) = struct
             event_loop ()
         | None -> (
           match daemon.status with
-          | Not_running ->
-              Lwt_io.close event_input
+          | Not_running -> (
+            match event_process with
+            | None ->
+                Lwt_io.close event_input
+            | Some process ->
+                Lwt.return @@ Process.kill process )
           | Running _ ->
               (* It can take a little while before the pipe is opened by the daemon,
                  and before that, reading from it yields end of file for some reason. *)

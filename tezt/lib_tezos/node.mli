@@ -93,8 +93,12 @@ type t
     should run with. It is passed to the first run of [tezos-node config init].
     It is also passed to all runs of [tezos-node run] that occur before
     [tezos-node config init]. If [Expected_pow] is given, it is also used as
-    the default value for {!identity_generate}. *)
+    the default value for {!identity_generate}.
+
+    If [runner] is specified, the node will be spawned on this
+    runner using SSH. *)
 val create :
+  ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
@@ -129,9 +133,15 @@ val add_peer : t -> t -> unit
     where [<PORT>] is the P2P port and [<ID>] is the identity of [peer]. *)
 val add_peer_with_id : t -> t -> unit Lwt.t
 
-(** [point_and_id node] ["127.0.0.1:<PORT>#<ID>"] where [<PORT>] is the P2P
-    port  and [<ID>] is the identity of [node]. *)
-val point_and_id : t -> string Lwt.t
+(** Get the P2P point and id for a node.
+
+    Return ["<ADDRESS>:<PORT>#<ID>"] where [<PORT>] is the P2P
+    port and [<ID>] is the identity of the node.
+
+    [<ADDRESS>] is obtained using [Runner.address runner] with [?from]
+    being the runner of [from] and [runner] is the runner of the node.
+    In other words it is the address where [from] can contact [node]. *)
+val point_and_id : ?from:t -> t -> string Lwt.t
 
 (** Get the name of a node. *)
 val name : t -> string
@@ -147,6 +157,11 @@ val rpc_port : t -> int
 
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
+
+(** Get the runner associated to a node.
+
+    Return [None] if the node runs on the local machine. *)
+val runner : t -> Runner.t option
 
 (** Wait until a node terminates and check its status.
 
@@ -302,6 +317,7 @@ val log_events : t -> unit
     If you do not wish the arguments to be stored in the configuration file
     (which will affect future runs too), do not use [init]. *)
 val init :
+  ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->

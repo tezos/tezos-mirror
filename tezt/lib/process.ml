@@ -106,6 +106,9 @@ type hooks = {
   on_spawn : string -> string list -> unit;
 }
 
+(* Information which is specific to processes that run on remote runners. *)
+type remote = {runner : Runner.t; pid : int Lwt.t}
+
 type t = {
   id : int;
   name : string;
@@ -117,7 +120,47 @@ type t = {
   stdout : echo;
   stderr : echo;
   hooks : hooks option;
+  remote : remote option;
 }
+
+type failed_info = {
+  name : string;
+  command : string;
+  arguments : string list;
+  status : Unix.process_status option;
+  expect_failure : bool;
+  reason : String.t option;
+}
+
+exception Failed of failed_info
+
+let () =
+  Printexc.register_printer
+  @@ function
+  | Failed {name; command; arguments; status; expect_failure; reason} ->
+      let reason =
+        Option.value
+          ~default:
+            ( match status with
+            | Some (WEXITED code) ->
+                Printf.sprintf "exited with code %d" code
+            | Some (WSIGNALED code) ->
+                Printf.sprintf "was killed by signal %d" code
+            | Some (WSTOPPED code) ->
+                Printf.sprintf "was killed by signal %d" code
+            | None ->
+                Printf.sprintf "exited" )
+          reason
+      in
+      Some
+        (Printf.sprintf
+           "%s%s %s (full command: %s)"
+           name
+           (if expect_failure then " was expected to fail," else "")
+           reason
+           (String.concat " " (List.map Log.quote_shell (command :: arguments))))
+  | _ ->
+      None
 
 let get_unique_name =
   let name_counts = ref String_map.empty in
@@ -246,21 +289,65 @@ let to_key_equal_value (kv_map : string String_map.t) : string array =
   |> Seq.map (fun (name, value) -> name ^ "=" ^ value)
   |> Array.of_seq
 
-let spawn_with_stdin ?(log_status_on_exit = true) ?(log_output = true) ?name
-    ?(color = Log.Color.FG.cyan) ?(env = String_map.empty) ?hooks command
+let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
+    ?name ?(color = Log.Color.FG.cyan) ?(env = String_map.empty) ?hooks command
     arguments =
   let name = Option.value ~default:(get_unique_name command) name in
   Option.iter (fun hooks -> hooks.on_spawn command arguments) hooks ;
   Log.command ~color:Log.Color.bold ~prefix:name command arguments ;
-  let current_env = parse_current_environment () in
-  let merged_env =
-    (* Merge [current_env] and [env], choosing [env] on common keys: *)
-    String_map.union (fun _ _ new_val -> Some new_val) current_env env
+  let lwt_command =
+    match runner with
+    | None ->
+        (command, Array.of_list (command :: arguments))
+    | Some runner ->
+        let local_env = String_map.bindings env in
+        let (ssh, ssh_args) =
+          Runner.wrap_with_ssh_pid
+            runner
+            {local_env; name = command; arguments}
+        in
+        (ssh, Array.of_list (ssh :: ssh_args))
   in
   let lwt_process =
-    Lwt_process.open_process_full
-      ~env:(to_key_equal_value merged_env)
-      (command, Array.of_list (command :: arguments))
+    match runner with
+    | None ->
+        let env =
+          (* Merge [current_env] and [env], choosing [env] on common keys: *)
+          String_map.union
+            (fun _ _ new_val -> Some new_val)
+            (parse_current_environment ())
+            env
+          |> to_key_equal_value
+        in
+        Lwt_process.open_process_full ~env lwt_command
+    | Some _runner ->
+        Lwt_process.open_process_full lwt_command
+  in
+  let remote =
+    let open Lwt.Infix in
+    match runner with
+    | None ->
+        None
+    | Some runner ->
+        let pid =
+          Lwt_io.read_line lwt_process#stdout
+          >|= fun pid ->
+          match int_of_string_opt pid with
+          | Some pid ->
+              pid
+          | None ->
+              raise
+                (Failed
+                   {
+                     name;
+                     command;
+                     arguments;
+                     status = None;
+                     expect_failure = false;
+                     reason = Some "unable to read remote process PID";
+                   })
+        in
+        Some {runner; pid}
   in
   let process =
     {
@@ -274,16 +361,18 @@ let spawn_with_stdin ?(log_status_on_exit = true) ?(log_output = true) ?name
       stdout = create_echo ();
       stderr = create_echo ();
       hooks;
+      remote;
     }
   in
   live_processes := ID_map.add process.id process !live_processes ;
   Background.register (handle_process ~log_output process) ;
   (process, (process.lwt_process)#stdin)
 
-let spawn ?log_status_on_exit ?log_output ?name ?color ?env ?hooks command
-    arguments =
+let spawn ?runner ?log_status_on_exit ?log_output ?name ?color ?env ?hooks
+    command arguments =
   let (process, stdin) =
     spawn_with_stdin
+      ?runner
       ?log_status_on_exit
       ?log_output
       ?name
@@ -296,50 +385,37 @@ let spawn ?log_status_on_exit ?log_output ?name ?color ?env ?hooks command
   Background.register (Lwt_io.close stdin) ;
   process
 
-let terminate process =
+(* Propagate the signal in case of remote runner. *)
+let kill_remote_if_needed process =
+  match process.remote with
+  | None ->
+      ()
+  | Some {pid; runner} ->
+      let open Lwt in
+      let open Infix in
+      Background.register
+        ( pid
+        >|= (fun pid ->
+              let command = "kill" in
+              let arguments = ["-9"; "-P"; string_of_int pid] in
+              let shell =
+                Runner.Shell.(
+                  redirect_stderr (cmd [] command arguments) "/dev/null")
+              in
+              Runner.wrap_with_ssh runner shell)
+        >>= fun (ssh, ssh_args) ->
+        let cmd = (ssh, Array.of_list (ssh :: ssh_args)) in
+        Lwt_process.exec cmd >>= fun _ -> Lwt.return_unit )
+
+let terminate (process : t) =
   Log.debug "Send SIGTERM to %s." process.name ;
+  kill_remote_if_needed process ;
   (process.lwt_process)#kill Sys.sigterm
 
-let kill process =
+let kill (process : t) =
   Log.debug "Send SIGKILL to %s." process.name ;
+  kill_remote_if_needed process ;
   (process.lwt_process)#terminate
-
-type failed_info = {
-  name : string;
-  command : string;
-  arguments : string list;
-  status : Unix.process_status;
-  expect_failure : bool;
-  reason : String.t option;
-}
-
-exception Failed of failed_info
-
-let () =
-  Printexc.register_printer
-  @@ function
-  | Failed {name; command; arguments; status; expect_failure; reason} ->
-      let reason =
-        Option.value
-          ~default:
-            ( match status with
-            | WEXITED code ->
-                Printf.sprintf "exited with code %d" code
-            | WSIGNALED code ->
-                Printf.sprintf "was killed by signal %d" code
-            | WSTOPPED code ->
-                Printf.sprintf "was killed by signal %d" code )
-          reason
-      in
-      Some
-        (Printf.sprintf
-           "%s%s %s (full command: %s)"
-           name
-           (if expect_failure then " was expected to fail," else "")
-           reason
-           (String.concat " " (List.map Log.quote_shell (command :: arguments))))
-  | _ ->
-      None
 
 let check ?(expect_failure = false) process =
   let* status = wait process in
@@ -354,7 +430,7 @@ let check ?(expect_failure = false) process =
              name = process.name;
              command = process.command;
              arguments = process.arguments;
-             status;
+             status = Some status;
              expect_failure;
              reason = None;
            })
@@ -416,7 +492,7 @@ let check_error ?exit_code ?msg process =
       name = process.name;
       command = process.command;
       arguments = process.arguments;
-      status;
+      status = Some status;
       expect_failure = true;
       reason = None;
     }

@@ -75,6 +75,7 @@ module Parameters = struct
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
     mutable pending_identity : string option Lwt.u list;
+    runner : Runner.t option;
   }
 
   type session_state = {
@@ -117,6 +118,8 @@ let rpc_port node = node.persistent_state.rpc_port
 
 let data_dir node = node.persistent_state.data_dir
 
+let runner node = node.persistent_state.runner
+
 let next_port = ref Cli.options.starting_port
 
 let fresh_port () =
@@ -128,7 +131,11 @@ let () =
   @@ fun () -> next_port := Cli.options.starting_port
 
 let spawn_command node =
-  Process.spawn ~name:node.name ~color:node.color node.path
+  Process.spawn
+    ?runner:node.persistent_state.runner
+    ~name:node.name
+    ~color:node.color
+    node.path
 
 let spawn_identity_generate ?expected_pow node =
   spawn_command
@@ -163,16 +170,21 @@ let spawn_config_init node arguments =
       arguments
     else Network "sandbox" :: arguments
   in
+  let (net_addr, rpc_addr) =
+    match node.persistent_state.runner with
+    | None ->
+        ("127.0.0.1:", node.persistent_state.rpc_host ^ ":")
+    | Some _ ->
+        (* FIXME spawn an ssh tunnel in case of remote host *)
+        ("0.0.0.0:", "0.0.0.0:")
+  in
   spawn_command
     node
     ( "config" :: "init" :: "--data-dir" :: node.persistent_state.data_dir
     :: "--net-addr"
-    :: ("127.0.0.1:" ^ string_of_int node.persistent_state.net_port)
+    :: (net_addr ^ string_of_int node.persistent_state.net_port)
     :: "--rpc-addr"
-    :: Format.sprintf
-         "%s:%d"
-         node.persistent_state.rpc_host
-         node.persistent_state.rpc_port
+    :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
     :: make_arguments arguments )
 
 let config_init node arguments =
@@ -305,11 +317,11 @@ let wait_for_identity node =
         resolver :: node.persistent_state.pending_identity ;
       check_event node "read_identity.v0" promise
 
-let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
-    ?net_port ?(rpc_host = "localhost") ?rpc_port arguments =
+let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
+    ?event_pipe ?net_port ?(rpc_host = "localhost") ?rpc_port arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
-    match data_dir with None -> Temp.dir name | Some dir -> dir
+    match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
   let net_port =
     match net_port with None -> fresh_port () | Some port -> port
@@ -329,6 +341,7 @@ let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
   in
   let node =
     create
+      ?runner
       ~path
       ~name
       ?color
@@ -340,6 +353,7 @@ let create ?(path = Constant.tezos_node) ?name ?color ?data_dir ?event_pipe
         rpc_port;
         arguments;
         default_expected_pow;
+        runner;
         pending_ready = [];
         pending_level = [];
         pending_identity = [];
@@ -353,14 +367,24 @@ let add_argument node argument =
     argument :: node.persistent_state.arguments
 
 let add_peer node peer =
-  add_argument node (Peer ("127.0.0.1:" ^ string_of_int (net_port peer)))
+  let address =
+    Runner.address
+      ?from:node.persistent_state.runner
+      peer.persistent_state.runner
+    ^ ":"
+  in
+  add_argument node (Peer (address ^ string_of_int (net_port peer)))
 
-let point_and_id node =
+let point_and_id ?from node =
+  let from =
+    match from with None -> None | Some peer -> peer.persistent_state.runner
+  in
+  let address = Runner.address ?from node.persistent_state.runner ^ ":" in
   let* id = wait_for_identity node in
-  Lwt.return ("127.0.0.1:" ^ string_of_int (net_port node) ^ "#" ^ id)
+  Lwt.return (address ^ string_of_int (net_port node) ^ "#" ^ id)
 
 let add_peer_with_id node peer =
-  let* peer = point_and_id peer in
+  let* peer = point_and_id ~from:node peer in
   add_argument node (Peer peer) ;
   Lwt.return_unit
 
@@ -405,16 +429,18 @@ let run ?(on_terminate = fun _ -> ()) ?event_level node arguments =
     unit
   in
   run
+    ?runner:node.persistent_state.runner
     ?event_level
     node
     {ready = false; level = Unknown; identity = Unknown}
     arguments
     ~on_terminate
 
-let init ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_host ?rpc_port
-    ?event_level arguments =
+let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_host
+    ?rpc_port ?event_level arguments =
   let node =
     create
+      ?runner
       ?path
       ?name
       ?color

@@ -25,18 +25,56 @@
 
 open Base
 
-(* [parents] contains the list of parent directories that were created.
+(* Private type to represent a file system. It's used by [clean_up].
+
+   [parents] contains the list of parent directories that were created.
    [cleanup] will delete them only if they are empty.
-   If [a/b] and [a/b/c] needed to be created, then [a/b] is after [a/b/c] in this list. *)
-let parents = ref []
+   If [a/b] and [a/b/c] needed to be created, then [a/b] is after [a/b/c] in
+   this list, i.e. descendants come before parents. *)
+type file_system = {
+  parents : string list;
+  dirs : string list;
+  files : string list;
+}
 
-let dirs = ref []
+(* Associate one runner with its remote file system. *)
+module Runner_map = Map.Make (struct
+  type t = Runner.t option
 
-let files = ref []
+  let compare = Option.compare compare
+end)
+
+let filesystems = ref Runner_map.empty
+
+let get_fs ?runner () =
+  let fs = Runner_map.find_opt runner !filesystems in
+  match fs with None -> {parents = []; dirs = []; files = []} | Some fs -> fs
 
 let next_name = ref 0
 
 let base_main_dir = "tezt-" ^ string_of_int (Unix.getpid ())
+
+(* [add_file], [add_dir] and [add_parent] select the file system to use.*)
+let add_file ?runner file =
+  let fs = get_fs ?runner () in
+  let old_files = fs.files in
+  filesystems :=
+    Runner_map.add runner {fs with files = file :: old_files} !filesystems
+
+let add_dir ?runner dir =
+  let fs = get_fs ?runner () in
+  let old_dirs = fs.dirs in
+  filesystems :=
+    Runner_map.add runner {fs with dirs = dir :: old_dirs} !filesystems
+
+let add_parent ?runner parent =
+  let fs = get_fs ?runner () in
+  let old_parents = fs.parents in
+  filesystems :=
+    Runner_map.add
+      runner
+      {fs with parents = parent :: old_parents}
+      !filesystems
 
 let fresh_main_dir () =
   let index = !next_name in
@@ -47,15 +85,15 @@ let main_dir_ref = ref @@ fresh_main_dir ()
 
 let main_dir () = !main_dir_ref
 
-let file_aux ?(perms = 0o755) base_name =
+let file_aux ?runner ?(perms = 0o755) base_name =
   let filename = main_dir () // base_name in
   let rec create_parent filename =
     let parent = Filename.dirname filename in
     if String.length parent < String.length filename then (
       create_parent parent ;
-      if not (Sys.file_exists parent) then (
-        Unix.mkdir parent perms ;
-        parents := parent :: !parents ) )
+      if not (Runner.Sys.file_exists ?runner parent) then (
+        Runner.Sys.mkdir ?runner ~perms parent ;
+        add_parent ?runner parent ) )
   in
   create_parent filename ; filename
 
@@ -69,18 +107,17 @@ let check_allowed fname arg =
       arg ;
     exit 1 )
 
-let file ?perms base_name =
+let file ?runner ?perms base_name =
   check_allowed "file" base_name ;
-  let filename = file_aux ?perms base_name in
-  files := filename :: !files ;
-  filename
+  let filename = file_aux ?runner ?perms base_name in
+  add_file ?runner filename ; filename
 
-let dir ?(perms = 0o755) base_name =
+let dir ?runner ?(perms = 0o755) base_name =
   check_allowed "dir" base_name ;
-  let filename = file_aux ~perms base_name in
-  if not (Sys.file_exists filename) then (
-    Unix.mkdir filename perms ;
-    dirs := filename :: !dirs ) ;
+  let filename = file_aux ?runner ~perms base_name in
+  if not (Runner.Sys.file_exists ?runner filename) then (
+    Runner.Sys.mkdir ?runner ~perms filename ;
+    add_dir ?runner filename ) ;
   filename
 
 let rec remove_recursively filename =
@@ -121,27 +158,41 @@ let start () =
 
 let stop () = allowed := false
 
+let clean_up_aux (runner : Runner.t option) runner_fs =
+  List.iter
+    (fun filename ->
+      if Runner.Sys.file_exists ?runner filename then
+        Runner.Sys.remove ?runner filename)
+    runner_fs.files ;
+  List.iter
+    (fun dirname ->
+      if
+        Runner.Sys.file_exists ?runner dirname
+        && Runner.Sys.is_directory ?runner dirname
+      then
+        match runner with
+        | None ->
+            remove_recursively dirname
+        | Some runner ->
+            Runner.Sys.rm_rf runner dirname)
+    runner_fs.dirs ;
+  List.iter
+    (fun dirname ->
+      match Runner.Sys.readdir ?runner dirname with
+      | [||] ->
+          Runner.Sys.rmdir ?runner dirname
+      | _ ->
+          let dirtype =
+            if Option.is_some runner then "Remote directory" else "Directory"
+          in
+          Log.warn "%s directory is not empty %s" dirtype dirname)
+    runner_fs.parents
+
 let clean_up () =
   stop () ;
-  List.iter
-    (fun filename -> if Sys.file_exists filename then Sys.remove filename)
-    !files ;
-  files := [] ;
-  List.iter
-    (fun dirname ->
-      if Sys.file_exists dirname && Sys.is_directory dirname then
-        remove_recursively dirname)
-    !dirs ;
-  dirs := [] ;
-  List.iter
-    (fun dirname ->
-      match Sys.readdir dirname with
-      | [||] ->
-          Unix.rmdir dirname
-      | _ ->
-          Log.warn "Directory is not empty: %s" dirname)
-    !parents ;
-  parents := []
+  let filesystems_to_clean = !filesystems in
+  filesystems := Runner_map.empty ;
+  Runner_map.iter clean_up_aux filesystems_to_clean
 
 let check () =
   let tmp_dir = Filename.get_temp_dir_name () in
@@ -159,3 +210,6 @@ let check () =
       Array.iter check_file contents
 
 let () = check ()
+
+(* FIXME: Add a remote check to verify the existence of a tezt
+   repository on the remote machine. *)

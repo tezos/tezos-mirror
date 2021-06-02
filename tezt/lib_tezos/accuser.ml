@@ -25,8 +25,9 @@
 
 module Parameters = struct
   type persistent_state = {
+    runner : Runner.t option;
     base_dir : string;
-    node_rpc_port : int;
+    node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -42,7 +43,7 @@ end
 open Parameters
 include Daemon.Make (Parameters)
 
-let node_rpc_port accuser = accuser.persistent_state.node_rpc_port
+let node_rpc_port accuser = Node.rpc_port accuser.persistent_state.node
 
 let trigger_ready accuser value =
   let pending = accuser.persistent_state.pending_ready in
@@ -65,8 +66,7 @@ let handle_raw_stdout accuser line =
   | _ ->
       ()
 
-let create ~protocol ?name ?color ?event_pipe ?base_dir node =
-  let node_rpc_port = Node.rpc_port node in
+let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
@@ -77,7 +77,8 @@ let create ~protocol ?name ?color ?event_pipe ?base_dir node =
       ?name:(Some name)
       ?color
       ?event_pipe
-      {base_dir; node_rpc_port; pending_ready = []}
+      ?runner
+      {runner; base_dir; node; pending_ready = []}
   in
   on_stdout accuser (handle_raw_stdout accuser) ;
   accuser
@@ -88,10 +89,13 @@ let run accuser =
       ()
   | Running _ ->
       Test.fail "accuser %s is already running" accuser.name ) ;
+  let runner = accuser.persistent_state.runner in
+  let node_runner = Node.runner accuser.persistent_state.node in
+  let node_rpc_port = node_rpc_port accuser in
+  let address = "http://" ^ Runner.address ?from:runner node_runner ^ ":" in
   let arguments =
     [ "-E";
-      "http://localhost:"
-      ^ string_of_int accuser.persistent_state.node_rpc_port;
+      address ^ string_of_int node_rpc_port;
       "--base-dir";
       accuser.persistent_state.base_dir;
       "run" ]
@@ -100,7 +104,7 @@ let run accuser =
     (* Cancel all [Ready] event listeners. *)
     trigger_ready accuser None ; unit
   in
-  run accuser {ready = false} arguments ~on_terminate
+  run accuser {ready = false} arguments ~on_terminate ?runner
 
 let check_event ?where accuser name promise =
   let* result = promise in
@@ -121,9 +125,11 @@ let wait_for_ready accuser =
         resolver :: accuser.persistent_state.pending_ready ;
       check_event accuser "Accuser started." promise
 
-let init ~protocol ?name ?color ?event_pipe ?base_dir node =
+let init ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
   let* () = Node.wait_for_ready node in
-  let accuser = create ~protocol ?name ?color ?event_pipe ?base_dir node in
+  let accuser =
+    create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node
+  in
   let* () = run accuser in
   return accuser
 
