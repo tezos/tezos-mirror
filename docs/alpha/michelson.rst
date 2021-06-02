@@ -486,13 +486,14 @@ Core data types and notations
    sorted.
 
 -  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
-   ``(k)`` of values of type ``(t)``. These maps should be used if one
-   intends to store large amounts of data in a map. They have higher
-   gas costs than standard maps as data is lazily deserialized. A
-   ``big_map`` cannot appear inside another ``big_map``. See the
-   section on :ref:`operations on big maps <OperationsOnBigMaps_alpha>`
-   for a description of the syntax of values of type ``big_map (k)
-   (t)`` and available operations.
+   ``(k)`` of values of type ``(t)``.
+   These maps should be used if you intend to store large amounts of data in a map.
+   Using ``big_map`` can reduce gas costs significantly compared to standard maps, as data is lazily deserialized.
+   Note however that individual operations on ``big_map`` have higher gas costs than those over standard maps.
+   A ``big_map`` also has a lower storage cost than a standard map of the same size, when large keys are used, since only the hash of each key is stored in a ``big_map``.
+
+   A ``big_map`` cannot appear inside another ``big_map``.
+   See the section on :ref:`operations on big maps <OperationsOnBigMaps_alpha>` for a description of the syntax of values of type ``big_map (k) (t)`` and available operations.
 
 Core instructions
 -----------------

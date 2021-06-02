@@ -6,7 +6,7 @@ Proof-of-stake in Tezos
 
 This document provides an in-depth description of the Tezos
 proof-of-stake algorithm as implemented in the current protocol
-(namely `PsCARTHA` on `mainnet`).
+on `mainnet`.
 
 Brief Overview
 --------------
@@ -342,8 +342,7 @@ the amount of staked tokens is 720,000,000 ꜩ, then roughly 8.74% of
 this amount is stored in security deposits. This percentage also gives
 an indication of the minimal amount of tokens a delegate should own in
 order to not miss out on creating a block or an endorsement.  Please
-refer to `this section
-<https://tezos.gitlab.io/introduction/howtorun.html#deposits-and-over-delegation>`_
+refer to :ref:`this section <over_delegation>`
 of the documentation for a discussion on (over-)delegation.
 
 Inflation

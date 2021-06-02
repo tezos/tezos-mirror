@@ -219,6 +219,8 @@ Putting together all the above instructions, you may want to run a node as follo
     # Run the node:
     tezos-node run --data-dir ~/.tezos-node-<test-net> --rpc-addr 127.0.0.1
 
+.. _howtouse_tezos_client:
+
 Client
 ------
 

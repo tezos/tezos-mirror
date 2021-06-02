@@ -48,11 +48,11 @@ module type MOCKUP = sig
 
   val protocol_constants_encoding : protocol_constants Data_encoding.t
 
-  (** The content equivalent to the default value of {[--protocol-constants]} *)
+  (** The content equivalent to the default value of [--protocol-constants] *)
   val default_protocol_constants :
     Tezos_client_base.Client_context.full -> protocol_constants tzresult Lwt.t
 
-  (** The content equivalent to the default value of {[--bootstrap-acounts]} *)
+  (** The content equivalent to the default value of [--bootstrap-accounts] *)
   val default_bootstrap_accounts :
     Tezos_client_base.Client_context.full -> string tzresult Lwt.t
 

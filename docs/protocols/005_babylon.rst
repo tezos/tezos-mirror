@@ -19,8 +19,8 @@ Gitlab branch.
 Developers are particularly encouraged to carefully read this page and
 to monitor it for updates.
 
-More documentation concerning Emmy+ and Michelson is available `here
-<https://tezos.gitlab.io/>`_.
+More documentation concerning Emmy+ and Michelson is available :doc:`here
+<../index>`.
 
 .. contents:: Summary of changes
 

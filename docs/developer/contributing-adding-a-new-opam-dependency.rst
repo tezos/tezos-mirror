@@ -28,7 +28,7 @@ between those two components must happen in a specific order.
 
 The rest of this document explains the process from the point-of-view of
 a developer (you). The instructions below assume you have already
-`set up your work environment <http://tezos.gitlab.io/introduction/howtoget.html#setting-up-the-development-environment-from-scratch>`__
+:ref:`set up your work environment <build_from_sources>`
 but that you installed *development* dependencies
 (``make build-dev-deps`` instead of ``make build-deps``).
 

@@ -289,7 +289,7 @@ module type Validator = sig
      This function must be called before any of the proving and verification
      functions requiring a context.
      Usually you should not need to call this function directly as it is done
-     by the fist call to `with_{proving,verification}_ctx`.
+     by the fist call to `with_\{proving,verification\}_ctx`.
      However you can call this function in order to:
      - pay its cost upfront and have more predictable latency later
      - make sure that the parameters are present in the system and avoid a

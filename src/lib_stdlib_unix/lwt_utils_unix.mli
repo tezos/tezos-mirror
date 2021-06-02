@@ -86,7 +86,7 @@ val create_dir : ?perm:int -> string -> unit Lwt.t
 (** [copy_dir ?perm src dst] copies the content of directory [src] in
     a fresh directory [dst] created with [perm] (0o755 by default).
 
-    @raise [Unix_error (ENOTDIR, _, _)] if the given file is not a
+    @raise Unix_error(ENOTDIR,_,_) if the given file is not a
     directory. *)
 val copy_dir : ?perm:int -> string -> string -> unit Lwt.t
 

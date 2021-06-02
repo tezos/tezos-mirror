@@ -81,6 +81,8 @@ using this identity.
 Otherwise, you need to ask the faucet for more accounts and
 delegate them to the first.
 
+.. _over_delegation:
+
 Deposits and over-delegation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -236,7 +238,7 @@ If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
 
 To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and endorsing slots assigned to it, using a block explorer in the :ref:`Tezos community <tezos_community>`.
-Alternatively, you may use the `baking rights RPC <https://tezos.gitlab.io/alpha/rpc.html#get-block-id-helpers-baking-rights>`_) and the `endorsing rights RPC <https://tezos.gitlab.io/alpha/rpc.html#get-block-id-helpers-endorsing-rights>`_,  able to return a list of baking/endorsing slots for a given delegate.
+Alternatively, you may use the :ref:`baking rights RPC <GET_..--block_id--helpers--baking_rights>`) and the :ref:`endorsing rights RPC <GET_..--block_id--helpers--endorsing_rights>`, able to return a list of baking/endorsing slots for a given delegate.
 
 .. _baker_run:
 
