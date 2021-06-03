@@ -51,8 +51,9 @@ let sigint =
 exception Failed of string
 
 let () =
-  Printexc.register_printer
-  @@ function Failed message -> Some message | _ -> None
+  Printexc.register_printer @@ function
+  | Failed message -> Some message
+  | _ -> None
 
 let fail x = Printf.ksprintf (fun message -> raise (Failed message)) x
 
@@ -101,8 +102,10 @@ end = struct
 
   let encode {total_time; count} =
     `O
-      [ ("total_time", `String (Int64.to_string total_time));
-        ("count", `String (string_of_int count)) ]
+      [
+        ("total_time", `String (Int64.to_string total_time));
+        ("count", `String (string_of_int count));
+      ]
 
   let decode (json : JSON.t) =
     {
@@ -139,14 +142,12 @@ let really_run ~progress_state ~iteration test =
   let handle_background_exception exn =
     let message = Printexc.to_string exn in
     Log.error "%s" message ;
-    ( match test.result with
-    | Some _ ->
-        ()
-    | None ->
-        test.result <- Some (Log.Failed message) ) ;
+    (match test.result with
+    | Some _ -> ()
+    | None -> test.result <- Some (Log.Failed message)) ;
     if not !already_woke_up_fail_promise then (
       already_woke_up_fail_promise := true ;
-      Lwt.wakeup_later fail_awakener () )
+      Lwt.wakeup_later fail_awakener ())
   in
   Background.start handle_background_exception ;
   (* It may happen that the promise of the function resolves successfully
@@ -158,21 +159,20 @@ let really_run ~progress_state ~iteration test =
      - the error message in [Failed] is the first error that was encountered. *)
   let set_test_result new_result =
     match test.result with
-    | None ->
-        test.result <- Some new_result
+    | None -> test.result <- Some new_result
     | Some old_result -> (
-      match (old_result, new_result) with
-      | (Successful, _) | (Failed _, Aborted) ->
-          test.result <- Some new_result
-      | (Failed _, (Successful | Failed _)) | (Aborted, _) ->
-          () )
+        match (old_result, new_result) with
+        | (Successful, _) | (Failed _, Aborted) ->
+            test.result <- Some new_result
+        | (Failed _, (Successful | Failed _)) | (Aborted, _) -> ())
   in
   (* Run the test until it succeeds, fails, or we receive SIGINT. *)
   let main_temporary_directory = Temp.start () in
   let* () =
     let run_test () =
       let* () = test.body () in
-      set_test_result Successful ; unit
+      set_test_result Successful ;
+      unit
     in
     let handle_exception = function
       | Lwt.Canceled ->
@@ -193,38 +193,39 @@ let really_run ~progress_state ~iteration test =
     in
     let global_timeout =
       match Cli.options.global_timeout with
-      | None ->
-          []
+      | None -> []
       | Some delay ->
           let local_starting_time = Unix.gettimeofday () in
           let remaining_delay =
             max 0. (delay -. local_starting_time +. global_starting_time)
           in
-          [ let* () = Lwt_unix.sleep remaining_delay in
-            fail
-              "the set of tests took more than specified global timeout (%gs) \
-               to run"
-              delay ]
+          [
+            (let* () = Lwt_unix.sleep remaining_delay in
+             fail
+               "the set of tests took more than specified global timeout (%gs) \
+                to run"
+               delay);
+          ]
     in
     let test_timeout =
       match Cli.options.test_timeout with
-      | None ->
-          []
+      | None -> []
       | Some delay ->
-          [ let* () = Lwt_unix.sleep delay in
-            fail "test took more than specified timeout (%gs) to run" delay ]
+          [
+            (let* () = Lwt_unix.sleep delay in
+             fail "test took more than specified timeout (%gs) to run" delay);
+          ]
     in
     Lwt.catch
       (fun () ->
         Lwt.pick
-          ( (run_test () :: handle_sigint () :: fail_promise :: global_timeout)
-          @ test_timeout ))
+          (run_test () :: handle_sigint () :: fail_promise :: global_timeout
+          @ test_timeout))
       handle_exception
   in
   (* Terminate all remaining processes. *)
   let* () =
-    Lwt.catch Process.clean_up
-    @@ fun exn ->
+    Lwt.catch Process.clean_up @@ fun exn ->
     Log.warn "Failed to clean up processes: %s" (Printexc.to_string exn) ;
     unit
   in
@@ -233,12 +234,18 @@ let really_run ~progress_state ~iteration test =
     try
       match Cli.options.temporary_file_mode with
       | Delete ->
-          Temp.clean_up () ; false
+          Temp.clean_up () ;
+          false
       | Delete_if_successful ->
-          if test.result = Some Successful then (Temp.clean_up () ; false)
-          else (Temp.stop () ; true)
+          if test.result = Some Successful then (
+            Temp.clean_up () ;
+            false)
+          else (
+            Temp.stop () ;
+            true)
       | Keep ->
-          Temp.stop () ; true
+          Temp.stop () ;
+          true
     with exn ->
       Log.warn "Failed to clean up: %s" (Printexc.to_string exn) ;
       true
@@ -256,8 +263,7 @@ let really_run ~progress_state ~iteration test =
            But if it does happen we assume that it failed and that we failed to
            maintain this invariant. *)
         Log.Failed "unknown error"
-    | Some result ->
-        result
+    | Some result -> result
   in
   let has_failed =
     match test_result with Successful -> false | Failed _ | Aborted -> true
@@ -266,45 +272,38 @@ let really_run ~progress_state ~iteration test =
   (* Display test result. *)
   Log.test_result ~progress_state ~iteration test_result test.title ;
   match test_result with
-  | Successful ->
-      return true
+  | Successful -> return true
   | Failed _ ->
       Log.report
         "Try again with: %s --verbose --test %s"
         Sys.argv.(0)
         (Log.quote_shell test.title) ;
       return false
-  | Aborted ->
-      exit 2
+  | Aborted -> exit 2
 
 let test_should_be_run ~file ~title ~tags =
   List.for_all (fun tag -> List.mem tag tags) Cli.options.tags_to_run
   && (not
         (List.exists (fun tag -> List.mem tag tags) Cli.options.tags_not_to_run))
-  && ( match Cli.options.tests_to_run with
-     | [] ->
-         true
-     | titles ->
-         List.mem title titles )
+  && (match Cli.options.tests_to_run with
+     | [] -> true
+     | titles -> List.mem title titles)
   && (not (List.mem title Cli.options.tests_not_to_run))
   &&
   match Cli.options.files_to_run with
-  | [] ->
-      true
-  | files ->
-      List.mem file files
+  | [] -> true
+  | files -> List.mem file files
 
 let tag_rex = rex "^[a-z0-9_]{1,32}$"
 
 let check_tags tags =
   match List.filter (fun tag -> tag =~! tag_rex) tags with
-  | [] ->
-      ()
+  | [] -> ()
   | invalid_tags ->
       List.iter (Printf.eprintf "Invalid tag: %S\n") invalid_tags ;
       Printf.eprintf
-        "Tags may only use lowercase letters, digits and underscores, and \
-         must be at most 32 character long.\n" ;
+        "Tags may only use lowercase letters, digits and underscores, and must \
+         be at most 32 character long.\n" ;
       exit 1
 
 let known_files = ref String_set.empty
@@ -351,16 +350,15 @@ let map_registered_list f =
 let list_tests format =
   match format with
   | `Tsv ->
-      iter_registered
-      @@ fun {file; title; tags; _} ->
+      iter_registered @@ fun {file; title; tags; _} ->
       Printf.printf "%s\t%s\t%s\n%!" file title (String.concat " " tags)
   | `Ascii_art ->
       let file_header = "FILE" in
       let title_header = "TITLE" in
       let tags_header = "TAGS" in
       let list =
-        map_registered_list
-        @@ fun {file; title; tags; _} -> (file, title, String.concat ", " tags)
+        map_registered_list @@ fun {file; title; tags; _} ->
+        (file, title, String.concat ", " tags)
       in
       (* Compute the size of each column. *)
       let (file_size, title_size, tags_size) =
@@ -437,8 +435,7 @@ let display_time_summary () =
     fold_registered 0. @@ fun acc test -> acc +. test_time test
   in
   let tests_by_file =
-    fold_registered String_map.empty
-    @@ fun acc test ->
+    fold_registered String_map.empty @@ fun acc test ->
     String_map.add
       test.file
       (test :: (String_map.find_opt test.file acc |> Option.value ~default:[]))
@@ -478,11 +475,13 @@ module Record = struct
 
   let encode_test {file; title; tags; successful_runs; failed_runs} : JSON.u =
     `O
-      [ ("file", `String file);
+      [
+        ("file", `String file);
         ("title", `String title);
         ("tags", `A (List.map (fun tag -> `String tag) tags));
         ("successful_runs", Summed_durations.encode successful_runs);
-        ("failed_runs", Summed_durations.encode failed_runs) ]
+        ("failed_runs", Summed_durations.encode failed_runs);
+      ]
 
   let decode_test (json : JSON.t) : test =
     {
@@ -505,8 +504,8 @@ module Record = struct
     (* Write to file using Marshal.
        This is not very robust but enough for the purposes of this file. *)
     try
-      with_open_out filename
-      @@ fun file -> output_string file (JSON.encode_u (encode record))
+      with_open_out filename @@ fun file ->
+      output_string file (JSON.encode_u (encode record))
     with Sys_error error -> Log.warn "Failed to write record: %s" error
 
   let input_file filename : t =
@@ -518,7 +517,8 @@ module Record = struct
   (* Get the record for the current run. *)
   let current () =
     map_registered_list
-    @@ fun { id = _;
+    @@ fun {
+             id = _;
              file;
              title;
              tags;
@@ -527,7 +527,8 @@ module Record = struct
              session_failed_runs;
              past_records_successful_runs = _;
              past_records_failed_runs = _;
-             result = _ } ->
+             result = _;
+           } ->
     {
       file;
       title;
@@ -575,7 +576,7 @@ let knapsack (type a) bag_count (items : (int64 * a) list) :
         let (bag_weight, _) = bags.(i) in
         if bag_weight < !best_weight then (
           best_index := i ;
-          best_weight := bag_weight )
+          best_weight := bag_weight)
       done ;
       !best_index
     in
@@ -625,18 +626,18 @@ let suggest_jobs () =
   (* Jobs are allocated, now display them. *)
   let display_job ~negate (total_job_time, job_tests) =
     print_endline
-      ( String.concat
-          " "
-          (List.map
-             (fun test ->
-               Printf.sprintf
-                 "%s %s"
-                 (if negate then "--not-test" else "--test")
-                 (Log.quote_shell (test : test).title))
-             job_tests)
+      (String.concat
+         " "
+         (List.map
+            (fun test ->
+              Printf.sprintf
+                "%s %s"
+                (if negate then "--not-test" else "--test")
+                (Log.quote_shell (test : test).title))
+            job_tests)
       ^ " # "
       ^ Int64.to_string (Int64.div total_job_time 1_000_000L)
-      ^ "s" )
+      ^ "s")
   in
   let all_other_tests = ref [] in
   for i = 0 to job_count - 2 do
@@ -654,18 +655,21 @@ let suggest_jobs () =
 
 let output_junit filename =
   let test_time = total_test_display_time ~past_records:false ~session:true in
-  with_open_out filename
-  @@ fun ch ->
+  with_open_out filename @@ fun ch ->
   let echo x =
-    Printf.ksprintf (fun s -> output_string ch s ; output_char ch '\n') x
+    Printf.ksprintf
+      (fun s ->
+        output_string ch s ;
+        output_char ch '\n')
+      x
   in
   let (count, fail_count, skipped_count, total_time) =
     fold_registered (0, 0, 0, 0.)
     @@ fun (count, fail_count, skipped_count, total_time) test ->
     ( count + 1,
       (fail_count + match test.result with Some (Failed _) -> 1 | _ -> 0),
-      ( skipped_count
-      + match test.result with None | Some Aborted -> 1 | _ -> 0 ),
+      (skipped_count
+      + match test.result with None | Some Aborted -> 1 | _ -> 0),
       total_time +. test_time test )
   in
   echo {|<?xml version="1.0" encoding="UTF-8" ?>|} ;
@@ -681,56 +685,49 @@ let output_junit filename =
     fail_count
     skipped_count
     total_time ;
-  ( iter_registered
-  @@ fun test ->
-  match test.result with
-  | None | Some Aborted ->
-      (* Skipped test, do not output. *)
-      ()
-  | Some (Successful | Failed _) ->
-      let replace_entities s =
-        let buffer = Buffer.create (String.length s * 2) in
-        for i = 0 to String.length s - 1 do
-          match s.[i] with
-          | '"' ->
-              Buffer.add_string buffer "&quot;"
-          | '&' ->
-              Buffer.add_string buffer "&amp;"
-          | '\'' ->
-              Buffer.add_string buffer "&apos;"
-          | '<' ->
-              Buffer.add_string buffer "&lt;"
-          | '>' ->
-              Buffer.add_string buffer "&gt;"
-          | c ->
-              Buffer.add_char buffer c
-        done ;
-        Buffer.contents buffer
-      in
-      let title = replace_entities test.title in
-      echo
-        {|    <testcase id="%s" name="%s: %s" time="%f">|}
-        title
-        (replace_entities test.file)
-        title
-        (test_time test) ;
-      ( match test.result with
-      | None | Some Successful | Some Aborted ->
-          ()
-      | Some (Failed message) ->
-          echo
-            {|      <failure message="test failed" type="ERROR">%s</failure>|}
-            (replace_entities message) ) ;
-      echo "    </testcase>" ) ;
-  echo "  </testsuite>" ; echo "</testsuites>" ; ()
+  ( iter_registered @@ fun test ->
+    match test.result with
+    | None | Some Aborted ->
+        (* Skipped test, do not output. *)
+        ()
+    | Some (Successful | Failed _) ->
+        let replace_entities s =
+          let buffer = Buffer.create (String.length s * 2) in
+          for i = 0 to String.length s - 1 do
+            match s.[i] with
+            | '"' -> Buffer.add_string buffer "&quot;"
+            | '&' -> Buffer.add_string buffer "&amp;"
+            | '\'' -> Buffer.add_string buffer "&apos;"
+            | '<' -> Buffer.add_string buffer "&lt;"
+            | '>' -> Buffer.add_string buffer "&gt;"
+            | c -> Buffer.add_char buffer c
+          done ;
+          Buffer.contents buffer
+        in
+        let title = replace_entities test.title in
+        echo
+          {|    <testcase id="%s" name="%s: %s" time="%f">|}
+          title
+          (replace_entities test.file)
+          title
+          (test_time test) ;
+        (match test.result with
+        | None | Some Successful | Some Aborted -> ()
+        | Some (Failed message) ->
+            echo
+              {|      <failure message="test failed" type="ERROR">%s</failure>|}
+              (replace_entities message)) ;
+        echo "    </testcase>" ) ;
+  echo "  </testsuite>" ;
+  echo "</testsuites>" ;
+  ()
 
 let next_id = ref 0
 
 let register ~__FILE__ ~title ~tags body =
   let file = Filename.basename __FILE__ in
-  ( match String_map.find_opt title !registered with
-  | None ->
-      ()
+  (match String_map.find_opt title !registered with
+  | None -> ()
   | Some {file = other_file; tags = other_tags; _} ->
       Printf.eprintf "Error: there are several tests with title: %S\n" title ;
       Printf.eprintf
@@ -741,7 +738,7 @@ let register ~__FILE__ ~title ~tags body =
         "- also seen in: %s with tags: %s\n%!"
         file
         (String.concat ", " tags) ;
-      exit 1 ) ;
+      exit 1) ;
   check_tags tags ;
   register_file file ;
   register_title title ;
@@ -779,17 +776,17 @@ let run () =
       "No test found for filters: %s\n%!"
       (String.concat
          " "
-         ( List.map
-             (fun x -> "--file " ^ Log.quote_shell x)
-             Cli.options.files_to_run
+         (List.map
+            (fun x -> "--file " ^ Log.quote_shell x)
+            Cli.options.files_to_run
          @ List.map
              (fun x -> "--test " ^ Log.quote_shell x)
              Cli.options.tests_to_run
          @ Cli.options.tags_to_run
-         @ List.map (sf "/%s") Cli.options.tags_not_to_run )) ;
+         @ List.map (sf "/%s") Cli.options.tags_not_to_run)) ;
     if Cli.options.list = None then
       prerr_endline
-        "You can use --list to get the list of tests and their tags." ) ;
+        "You can use --list to get the list of tests and their tags.") ;
   (* Read records. *)
   List.iter
     Record.(fun filename -> use (input_file filename))
@@ -798,10 +795,8 @@ let run () =
   select_job () ;
   (* Actually run the tests (or list them). *)
   match (Cli.options.list, Cli.options.suggest_jobs) with
-  | (Some format, false) ->
-      list_tests format
-  | (None, true) ->
-      suggest_jobs ()
+  | (Some format, false) -> list_tests format
+  | (None, true) -> suggest_jobs ()
   | (Some _, true) ->
       prerr_endline
         "Cannot use both --list and --suggest-jobs at the same time."
@@ -810,8 +805,7 @@ let run () =
       let a_test_failed = ref false in
       let rec run iteration =
         match Cli.options.loop_mode with
-        | Count n when n < iteration ->
-            ()
+        | Count n when n < iteration -> ()
         | _ ->
             let progress_state =
               Progress.create ~total:(String_map.cardinal !registered)
@@ -829,7 +823,7 @@ let run () =
                   Summed_durations.(
                     test.session_failed_runs + single_seconds time) ;
                 a_test_failed := true ;
-                if not Cli.options.keep_going then raise Stop )
+                if not Cli.options.keep_going then raise Stop)
             in
             iter_registered run_and_measure_time ;
             run (iteration + 1)

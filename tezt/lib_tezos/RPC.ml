@@ -68,8 +68,8 @@ let get_mempool_pending_operations ?node ?hooks ?(chain = "main") client =
   let path = ["chains"; chain; "mempool"; "pending_operations"] in
   Client.rpc ?node ?hooks GET path client
 
-let preapply_block ?node ?hooks ?(chain = "main") ?(block = "head") ~data
-    client =
+let preapply_block ?node ?hooks ?(chain = "main") ?(block = "head") ~data client
+    =
   let path =
     ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "block"]
   in
@@ -87,15 +87,15 @@ let get_constants ?node ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in
   Client.rpc ?node ?hooks GET path client
 
-let get_constants_errors ?node ?hooks ?(chain = "main") ?(block = "head")
-    client =
+let get_constants_errors ?node ?hooks ?(chain = "main") ?(block = "head") client
+    =
   let path =
     ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
   in
   Client.rpc ?node ?hooks GET path client
 
-let get_baking_rights ?node ?hooks ?(chain = "main") ?(block = "head")
-    ?delegate client =
+let get_baking_rights ?node ?hooks ?(chain = "main") ?(block = "head") ?delegate
+    client =
   let path = ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"] in
   let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
   Client.rpc ?node ?hooks ?query_string GET path client
@@ -114,8 +114,8 @@ let get_endorsing_rights ?node ?hooks ?(chain = "main") ?(block = "head")
   let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
   Client.rpc ?node ?hooks ?query_string GET path client
 
-let get_levels_in_current_cycle ?node ?hooks ?(chain = "main")
-    ?(block = "head") client =
+let get_levels_in_current_cycle ?node ?hooks ?(chain = "main") ?(block = "head")
+    client =
   let path =
     ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
   in
@@ -129,14 +129,16 @@ module Big_maps = struct
     in
     Client.rpc ?node ?hooks GET path client
 
-  let spawn_get_all ?node ?hooks ?(chain = "main") ?(block = "head")
-      ~big_map_id ?offset ?length client =
+  let spawn_get_all ?node ?hooks ?(chain = "main") ?(block = "head") ~big_map_id
+      ?offset ?length client =
     let path =
       ["chains"; chain; "blocks"; block; "context"; "big_maps"; big_map_id]
     in
     let query_string =
-      [ Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
-        Option.map (fun length -> ("length", Int.to_string length)) length ]
+      [
+        Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
+        Option.map (fun length -> ("length", Int.to_string length)) length;
+      ]
       |> List.filter_map Fun.id
     in
     Client.spawn_rpc ?node ?hooks ~query_string GET path client
@@ -147,15 +149,17 @@ module Big_maps = struct
       ["chains"; chain; "blocks"; block; "context"; "big_maps"; big_map_id]
     in
     let query_string =
-      [ Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
-        Option.map (fun length -> ("length", Int.to_string length)) length ]
+      [
+        Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
+        Option.map (fun length -> ("length", Int.to_string length)) length;
+      ]
       |> List.filter_map Fun.id
     in
     Client.rpc ?node ?hooks ~query_string GET path client
 end
 
-let post_forge_operations ?node ?hooks ?(chain = "main") ?(block = "head")
-    ~data client =
+let post_forge_operations ?node ?hooks ?(chain = "main") ?(block = "head") ~data
+    client =
   let path =
     ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
   in
@@ -184,22 +188,23 @@ module Contracts = struct
     in
     Client.spawn_rpc ?node ?hooks GET path client
 
-  let get ?node ?hooks ?(chain = "main") ?(block = "head") ~contract_id client
-      =
+  let get ?node ?hooks ?(chain = "main") ?(block = "head") ~contract_id client =
     let path =
       ["chains"; chain; "blocks"; block; "context"; "contracts"; contract_id]
     in
     Client.rpc ?node ?hooks GET path client
 
   let sub_path ~chain ~block ~contract_id field =
-    [ "chains";
+    [
+      "chains";
       chain;
       "blocks";
       block;
       "context";
       "contracts";
       contract_id;
-      field ]
+      field;
+    ]
 
   let spawn_get_sub ?node ?hooks ~chain ~block ~contract_id field client =
     let path = sub_path ~chain ~block ~contract_id field in
@@ -239,8 +244,8 @@ module Contracts = struct
       ~contract_id client =
     spawn_get_sub ?node ?hooks ~chain ~block ~contract_id "delegate" client
 
-  let get_delegate ?node ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
+  let get_delegate ?node ?hooks ?(chain = "main") ?(block = "head") ~contract_id
+      client =
     get_sub ?node ?hooks ~chain ~block ~contract_id "delegate" client
 
   let spawn_get_entrypoints ?node ?hooks ?(chain = "main") ?(block = "head")
@@ -313,8 +318,7 @@ module Delegates = struct
       client =
     spawn_get_sub ?node ?hooks ~chain ~block ~pkh "balance" client
 
-  let get_balance ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh client
-      =
+  let get_balance ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh client =
     get_sub ?node ?hooks ~chain ~block ~pkh "balance" client
 
   let spawn_get_deactivated ?node ?hooks ?(chain = "main") ?(block = "head")
@@ -372,8 +376,8 @@ module Delegates = struct
       client =
     get_sub ?node ?hooks ~chain ~block ~pkh "grace_period" client
 
-  let spawn_get_staking_balance ?node ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
+  let spawn_get_staking_balance ?node ?hooks ?(chain = "main") ?(block = "head")
+      ~pkh client =
     spawn_get_sub ?node ?hooks ~chain ~block ~pkh "staking_balance" client
 
   let get_staking_balance ?node ?hooks ?(chain = "main") ?(block = "head") ~pkh
@@ -411,8 +415,8 @@ module Votes = struct
     let path = sub_path ~chain ~block "current_proposal" in
     Client.rpc ?node ?hooks GET path client
 
-  let get_current_quorum ?node ?hooks ?(chain = "main") ?(block = "head")
-      client =
+  let get_current_quorum ?node ?hooks ?(chain = "main") ?(block = "head") client
+      =
     let path = sub_path ~chain ~block "current_quorum" in
     Client.rpc ?node ?hooks GET path client
 
@@ -424,8 +428,8 @@ module Votes = struct
     let path = sub_path ~chain ~block "proposals" in
     Client.rpc ?node ?hooks GET path client
 
-  let get_current_period ?node ?hooks ?(chain = "main") ?(block = "head")
-      client =
+  let get_current_period ?node ?hooks ?(chain = "main") ?(block = "head") client
+      =
     let path = sub_path ~chain ~block "current_period" in
     Client.rpc ?node ?hooks GET path client
 

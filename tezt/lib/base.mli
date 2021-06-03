@@ -36,10 +36,10 @@ val sf : ('a, unit, string) format -> 'a
 (** {2 Concurrency Monad} *)
 
 (** Same as [Lwt.bind]. *)
-val (let*) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+val ( let* ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 
 (** Same as [Lwt.both]. *)
-val (and*) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+val ( and* ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 
 (** Same as [Lwt.return]. *)
 val return : 'a -> 'a Lwt.t
@@ -93,12 +93,17 @@ val ( =~** ) : string -> rex -> (string * string) option
     occurrence of [rex] with [by]. If [all = false], then only the first
     occurrence of [rex] is replaced. *)
 val replace_string :
-  ?pos:int ->    (* Default: 0 *)
+  ?pos:int ->
+  (* Default: 0 *)
   ?len:int ->
-  ?all:bool ->   (* Default: true. Otherwise only replace first occurrence *)
-  rex ->         (* matched groups *)
-  by:string ->   (* replacement string *)
-  string ->      (* string to replace in *)
+  ?all:bool ->
+  (* Default: true. Otherwise only replace first occurrence *)
+  rex ->
+  (* matched groups *)
+  by:string ->
+  (* replacement string *)
+  string ->
+  (* string to replace in *)
   string
 
 (** {2 Promises} *)
@@ -110,7 +115,7 @@ val repeat : int -> (unit -> unit Lwt.t) -> unit Lwt.t
 
 (** Open file, use function to write output then close the output. In case of
    error while writing, the channel is closed before raising the exception *)
-val with_open_out : string -> (out_channel -> unit) ->unit
+val with_open_out : string -> (out_channel -> unit) -> unit
 
 (** Open file, use function to read input then close the input. In case of
    error while reading, the channel is closed before raising the exception **)
@@ -122,4 +127,5 @@ val read_file : string -> string Lwt.t
 (** {2 Common structures} *)
 
 module String_map : Map.S with type key = string
+
 module String_set : Set.S with type elt = string

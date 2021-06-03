@@ -144,12 +144,10 @@ val convert : ('a -> 'b) -> 'b typ -> 'a typ
 (** Make a custom type from a pretty-printer and an equality function.
 
     The result is not comparable. *)
-val equalable :
-  (Format.formatter -> 'a -> unit) -> ('a -> 'a -> bool) -> 'a typ
+val equalable : (Format.formatter -> 'a -> unit) -> ('a -> 'a -> bool) -> 'a typ
 
 (** Make a custom type from a pretty-printer and a comparison function. *)
-val comparable :
-  (Format.formatter -> 'a -> unit) -> ('a -> 'a -> int) -> 'a typ
+val comparable : (Format.formatter -> 'a -> unit) -> ('a -> 'a -> int) -> 'a typ
 
 module type EQUALABLE = sig
   type t

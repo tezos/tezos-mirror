@@ -36,15 +36,13 @@ let state = ref Not_started
 
 let register p =
   match !state with
-  | Not_started ->
-      invalid_arg "Background.register: not started"
+  | Not_started -> invalid_arg "Background.register: not started"
   | Started started_state ->
       let p =
         Lwt.catch
           (fun () -> p)
           (function
-            | Lwt.Canceled ->
-                unit
+            | Lwt.Canceled -> unit
             | exn ->
                 started_state.exception_handler exn ;
                 unit)
@@ -53,20 +51,16 @@ let register p =
 
 let start exception_handler =
   match !state with
-  | Not_started ->
-      state := Started {exception_handler; pending = []}
-  | Started _ ->
-      invalid_arg "Background.start: already started"
+  | Not_started -> state := Started {exception_handler; pending = []}
+  | Started _ -> invalid_arg "Background.start: already started"
 
 let stop () =
   match !state with
-  | Not_started ->
-      unit
+  | Not_started -> unit
   | Started started_state ->
       let rec loop () =
         match started_state.pending with
-        | [] ->
-            unit
+        | [] -> unit
         | list ->
             started_state.pending <- [] ;
             (* Note that when registered promises are rejected, their wrapper

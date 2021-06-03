@@ -27,10 +27,12 @@ let hooks =
   (* Replace variables that may change between different runs by constants. *)
   let replace_variables string =
     let replacements =
-      [ ("tz[123]\\w{33}", "[PUBLIC_KEY_HASH]");
+      [
+        ("tz[123]\\w{33}", "[PUBLIC_KEY_HASH]");
         ("edpk\\w{50}", "[PUBLIC_KEY]");
         ("KT1\\w{33}", "[CONTRACT_HASH]");
-        ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]") ]
+        ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
+      ]
     in
     List.fold_left
       (fun string (replace, by) ->
@@ -49,8 +51,7 @@ let hooks =
             (* scrub client global options *)
             | "--base-dir" | "-d" | "--endpoint" | "-E" | "--sources" ->
                 (acc, true)
-            | _ ->
-                (acc @ [replace_variables arg], false))
+            | _ -> (acc @ [replace_variables arg], false))
         ([], (* scrub_next *) false)
         arguments
     in

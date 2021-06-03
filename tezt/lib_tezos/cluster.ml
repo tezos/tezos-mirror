@@ -39,30 +39,27 @@ let create ?path ?name count arguments =
 let connect a b = List.iter (fun a -> List.iter (Node.add_peer a) b) a
 
 let rec clique_gen connect = function
-  | [] ->
-      ()
+  | [] -> ()
   | head :: tail ->
       List.iter (connect head) tail ;
       clique_gen connect tail
 
 let ring_gen connect nodes =
   match nodes with
-  | [] ->
-      ()
+  | [] -> ()
   | first :: _ ->
       let rec loop = function
         | [] ->
             (* We checked that the list was not empty already. *)
             assert false
-        | [last] ->
-            connect last first
+        | [last] -> connect last first
         | a :: (b :: _ as tail) ->
-            connect a b ; loop tail
+            connect a b ;
+            loop tail
       in
       loop nodes
 
-let star_gen connect center other_nodes =
-  List.iter (connect center) other_nodes
+let star_gen connect center other_nodes = List.iter (connect center) other_nodes
 
 let clique = clique_gen Node.add_peer
 

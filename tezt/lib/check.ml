@@ -65,8 +65,7 @@ let pp_print_quoted_string fmt string =
 let string = C {pp = pp_print_quoted_string; compare = String.compare}
 
 let pp_option pp_item fmt = function
-  | None ->
-      Format.pp_print_string fmt "None"
+  | None -> Format.pp_print_string fmt "None"
   | Some item ->
       Format.pp_print_string fmt "Some " ;
       pp_item fmt item
@@ -88,28 +87,22 @@ let pp_list ?(left = "[") ?(right = "]") pp_item fmt list =
     in
     Format.pp_print_list ~pp_sep pp_item fmt list ;
     Format.pp_print_char fmt ' ' ;
-    Format.pp_close_box fmt () ) ;
+    Format.pp_close_box fmt ()) ;
   Format.pp_print_string fmt right
 
 (* Note: available as List.equal in OCaml 4.12. *)
 let rec equal_lists eq_items a b =
   match (a, b) with
-  | ([], []) ->
-      true
-  | ([], _ :: _) | (_ :: _, []) ->
-      false
-  | (hda :: tla, hdb :: tlb) ->
-      eq_items hda hdb && equal_lists eq_items tla tlb
+  | ([], []) -> true
+  | ([], _ :: _) | (_ :: _, []) -> false
+  | (hda :: tla, hdb :: tlb) -> eq_items hda hdb && equal_lists eq_items tla tlb
 
 (* Note: available as List.compare in OCaml 4.12. *)
 let rec compare_lists cmp_items a b =
   match (a, b) with
-  | ([], []) ->
-      0
-  | ([], _ :: _) ->
-      -1
-  | (_ :: _, []) ->
-      1
+  | ([], []) -> 0
+  | ([], _ :: _) -> -1
+  | (_ :: _, []) -> 1
   | (hda :: tla, hdb :: tlb) ->
       let c = cmp_items hda hdb in
       if c = 0 then compare_lists cmp_items tla tlb else c
@@ -167,10 +160,8 @@ type _ tuple_item = Item : 'b typ * ('a -> 'b) -> 'a tuple_item
 let get_pp = function E {pp; _} | C {pp; _} -> pp
 
 let get_equal = function
-  | E {equal; _} ->
-      equal
-  | C {compare; _} ->
-      fun a b -> compare a b = 0
+  | E {equal; _} -> equal
+  | C {compare; _} -> fun a b -> compare a b = 0
 
 let tuple (type a) (items : a tuple_item list) : a typ =
   let pp fmt value =
@@ -180,7 +171,7 @@ let tuple (type a) (items : a tuple_item list) : a typ =
       (fun i (Item (item_type, get_item)) ->
         if i > 0 then (
           Format.pp_print_char fmt ',' ;
-          Format.pp_print_space fmt () ) ;
+          Format.pp_print_space fmt ()) ;
         get_pp item_type fmt (get_item value))
       items ;
     Format.pp_print_string fmt ")" ;
@@ -194,15 +185,13 @@ let tuple (type a) (items : a tuple_item list) : a typ =
   if comparable then
     let compare a b =
       let rec loop = function
-        | [] ->
-            0
+        | [] -> 0
         | Item (item_type, get_item) :: tail -> (
-          match item_type with
-          | E _ ->
-              assert false (* [comparable] was [true] *)
-          | C {compare; _} ->
-              let c = compare (get_item a) (get_item b) in
-              if c = 0 then loop tail else c )
+            match item_type with
+            | E _ -> assert false (* [comparable] was [true] *)
+            | C {compare; _} ->
+                let c = compare (get_item a) (get_item b) in
+                if c = 0 then loop tail else c)
       in
       loop items
     in
@@ -210,8 +199,7 @@ let tuple (type a) (items : a tuple_item list) : a typ =
   else
     let equal a b =
       let rec loop = function
-        | [] ->
-            true
+        | [] -> true
         | Item (item_type, get_item) :: tail ->
             get_equal item_type (get_item a) (get_item b) && loop tail
       in
@@ -223,16 +211,20 @@ let tuple2 a b = tuple [Item (a, fst); Item (b, snd)]
 
 let tuple3 a b c =
   tuple
-    [ Item (a, fun (x, _, _) -> x);
+    [
+      Item (a, fun (x, _, _) -> x);
       Item (b, fun (_, x, _) -> x);
-      Item (c, fun (_, _, x) -> x) ]
+      Item (c, fun (_, _, x) -> x);
+    ]
 
 let tuple4 a b c d =
   tuple
-    [ Item (a, fun (x, _, _, _) -> x);
+    [
+      Item (a, fun (x, _, _, _) -> x);
       Item (b, fun (_, x, _, _) -> x);
       Item (c, fun (_, _, x, _) -> x);
-      Item (d, fun (_, _, _, x) -> x) ]
+      Item (d, fun (_, _, _, x) -> x);
+    ]
 
 let convert encode = function
   | E {pp; equal} ->
@@ -280,12 +272,9 @@ let fail error_msg pp_a a pp_b b =
           (* Should not happen: groups always contain at least group 0
              denoting the whole match. *)
           ""
-      | "%L" ->
-          Format.asprintf "%a" pp_a a
-      | "%R" ->
-          Format.asprintf "%a" pp_b b
-      | s ->
-          s
+      | "%L" -> Format.asprintf "%a" pp_a a
+      | "%R" -> Format.asprintf "%a" pp_b b
+      | s -> s
     in
     Re.replace (Re.compile (Re.Perl.re "%[LR]")) ~f:substitution error_msg
   in
