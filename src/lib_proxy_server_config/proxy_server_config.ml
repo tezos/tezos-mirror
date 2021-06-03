@@ -78,21 +78,17 @@ let sym_block_caching_time_error sym_block_caching_time =
         (Format.sprintf
            {|--sym-block-caching-time argument and sym_block_caching_time field must be strictly positive, but found %d|}
            sym_block_caching_time)
-  | _ ->
-      None
+  | _ -> None
 
 type 'a destructed = Valid of 'a | Invalid of string | CannotDeserialize
 
 let destruct_config json =
   match Data_encoding.Json.destruct encoding json with
   | cfg -> (
-    match sym_block_caching_time_error cfg.sym_block_caching_time with
-    | Some err ->
-        Invalid err
-    | _ ->
-        Valid cfg )
-  | exception _ ->
-      CannotDeserialize
+      match sym_block_caching_time_error cfg.sym_block_caching_time with
+      | Some err -> Invalid err
+      | _ -> Valid cfg)
+  | exception _ -> CannotDeserialize
 
 let union_right_bias (t1 : t) (t2 : t) =
   {
@@ -124,19 +120,16 @@ let address_and_port_for_runtime rpc_addr =
          looked_for
   in
   match (Uri.host rpc_addr, Uri.port rpc_addr) with
-  | (None, _) ->
-      wrong_rpc_addr "Hostname"
-  | (_, None) ->
-      wrong_rpc_addr "Port"
+  | (None, _) -> wrong_rpc_addr "Hostname"
+  | (_, None) -> wrong_rpc_addr "Port"
   | (Some rpc_server_address, Some rpc_server_port) -> (
-    match P2p_addr.of_string_opt rpc_server_address with
-    | Some rpc_server_address ->
-        Ok (rpc_server_address, rpc_server_port)
-    | None ->
-        error
-        @@ Format.asprintf
-             {|Cannot convert hostname of "--rpc-addr" argument or "rpc_addr" field to P2p_addr: %s|}
-             rpc_server_address )
+      match P2p_addr.of_string_opt rpc_server_address with
+      | Some rpc_server_address -> Ok (rpc_server_address, rpc_server_port)
+      | None ->
+          error
+          @@ Format.asprintf
+               {|Cannot convert hostname of "--rpc-addr" argument or "rpc_addr" field to P2p_addr: %s|}
+               rpc_server_address)
 
 (** Given the value of the [--rpc-tls] argument (or the [rpc_tls] CONFIG field),
     return the paths to the certificate and the key for use by TLS *)
@@ -152,8 +145,7 @@ let tls_for_runtime =
              {|Value of "--rpc-tls" argument or "rpc_tls" field cannot be parsed: %s doesn't match regexp %s|}
              rpc_tls
              regexp_str
-    | Some group ->
-        ok (Re.Group.get group 1, Re.Group.get group 2)
+    | Some group -> ok (Re.Group.get group 1, Re.Group.get group 2)
 
 (** Helper to lift a validation function [f : 'a -> ('b * _) result] over
     an optional value. *)
@@ -181,13 +173,11 @@ let to_runtime ({endpoint; rpc_addr; rpc_tls; sym_block_caching_time} : t) :
   | (_, None, _) ->
       Error
         {|RPC address not specified: pass argument --rpc-addr or specify "rpc_addr" field in CONFIG file|}
-  | (_, _, Some err) ->
-      Error err
+  | (_, _, Some err) -> Error err
   | (Some endpoint, Some rpc_addr, None) ->
       address_and_port_for_runtime rpc_addr
       >>? fun (rpc_server_address, rpc_server_port) ->
-      Option.map tls_for_runtime rpc_tls
-      |> opt_res_to_res_opt
+      Option.map tls_for_runtime rpc_tls |> opt_res_to_res_opt
       >>? fun rpc_server_tls ->
       Ok
         {

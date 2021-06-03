@@ -48,18 +48,15 @@ let () =
         addrlist)
     Data_encoding.(obj1 (req "addrlist" (list P2p_point.Id.encoding)))
     (function
-      | Proxy_server_RPC_Port_already_in_use addrlist ->
-          Some addrlist
-      | _ ->
-          None)
+      | Proxy_server_RPC_Port_already_in_use addrlist -> Some addrlist
+      | _ -> None)
     (fun addrlist -> Proxy_server_RPC_Port_already_in_use addrlist)
 
 let launch_rpc_server dir {address; port; tls_cert_and_key} =
   let host = Ipaddr.V6.to_string address in
   let mode =
     match tls_cert_and_key with
-    | None ->
-        `TCP (`Port port)
+    | None -> `TCP (`Port port)
     | Some (cert, key) ->
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
   in
@@ -74,26 +71,23 @@ let launch_rpc_server dir {address; port; tls_cert_and_key} =
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
           fail (Proxy_server_RPC_Port_already_in_use [(address, port)])
-      | exn ->
-          Lwt.return (error_exn exn))
+      | exn -> Lwt.return (error_exn exn))
 
 let run dir ({address; port; _} as args) =
   let log_cfg = Lwt_log_sink_unix.create_cfg () in
-  Internal_event_unix.init ~lwt_log_sink:log_cfg ()
-  >>= fun () ->
+  Internal_event_unix.init ~lwt_log_sink:log_cfg () >>= fun () ->
   let node_downer =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         Events.(emit shutting_down_proxy_server) ())
   in
-  launch_rpc_server dir args
-  >>=? fun rpc ->
+  launch_rpc_server dir args >>=? fun rpc ->
   let rpc_downer =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       ~after:[node_downer]
       (fun _ ->
-        Events.(emit shutting_down_rpc_server) ()
-        >>= fun () -> Tezos_rpc_http_server.RPC_server.shutdown rpc)
+        Events.(emit shutting_down_rpc_server) () >>= fun () ->
+        Tezos_rpc_http_server.RPC_server.shutdown rpc)
   in
   Events.(emit starting_rpc_server) (P2p_addr.to_string address, port)
   >>= fun () ->

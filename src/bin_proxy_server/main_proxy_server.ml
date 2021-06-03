@@ -31,8 +31,8 @@ let name = "tezos-proxy-server"
 let config : string option Term.t =
   let doc =
     "The configuration file. Fields (see corresponding options): endpoint \
-     (string), rpc_addr (string), rpc_tls (string), and \
-     sym_block_caching_time (int)."
+     (string), rpc_addr (string), rpc_tls (string), and sym_block_caching_time \
+     (int)."
   in
   let docv = "CONFIG" in
   Arg.(value & opt (some string) None & info ["c"; "config"] ~docv ~doc)
@@ -70,12 +70,10 @@ let sym_block_caching_time : int option Term.t =
      this value)."
   in
   let docv = "SYM_BLOCK_CACHING_TIME" in
-  Arg.(
-    value & opt (some int) None & info ["sym-block-caching-time"] ~docv ~doc)
+  Arg.(value & opt (some int) None & info ["sym-block-caching-time"] ~docv ~doc)
 
 let load_config_from_file (config_file : string) =
-  Lwt_utils_unix.Json.read_file config_file
-  >>=? fun json ->
+  Lwt_utils_unix.Json.read_file config_file >>=? fun json ->
   let open Proxy_server_config in
   match destruct_config json with
   | CannotDeserialize ->
@@ -84,10 +82,8 @@ let load_config_from_file (config_file : string) =
          like this one :%s"
         config_file
         example_config
-  | Invalid msg ->
-      failwith "%s" msg
-  | Valid config_from_file ->
-      return config_from_file
+  | Invalid msg -> failwith "%s" msg
+  | Valid config_from_file -> return config_from_file
 
 (** [get_runtime] unions the arguments coming from the config file
     and the command line, and translates the result to
@@ -104,27 +100,25 @@ let get_runtime config_from_file config_args =
         Proxy_server_config.union_right_bias config_from_file config_args
   in
   match to_runtime config with
-  | Error msg ->
-      failwith "%s" msg
-  | Ok runtime ->
-      return runtime
+  | Error msg -> failwith "%s" msg
+  | Ok runtime -> return runtime
 
 let main_promise (config_file : string option)
     (config_args : Proxy_server_config.t) (log_requests : bool) :
     int tzresult Lwt.t =
-  ( match config_file with
-  | None ->
-      return_none
-  | Some config_file ->
-      load_config_from_file config_file >>=? return_some )
+  (match config_file with
+  | None -> return_none
+  | Some config_file -> load_config_from_file config_file >>=? return_some)
   >>=? fun (config_from_file : Proxy_server_config.t option) ->
   let open Proxy_server_config in
   get_runtime config_from_file config_args
-  >>=? fun { endpoint;
+  >>=? fun {
+             endpoint;
              rpc_server_address;
              rpc_server_port;
              rpc_server_tls;
-             sym_block_caching_time } ->
+             sym_block_caching_time;
+           } ->
   let open Tezos_rpc_http in
   let open Tezos_rpc_http_client_unix in
   let logger =
@@ -176,28 +170,29 @@ let main (config_file : string option) (log_requests : bool)
       ~sym_block_caching_time
   in
   Lwt_main.run
-    ( Lwt_exit.wrap_and_error
-      @@ main_promise config_file config_args log_requests
-    >>= function
-    | Ok (Ok _) ->
-        Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
-    | Ok (Error err) ->
-        Lwt_exit.exit_and_wait 2
-        >|= fun _ -> `Error (false, Format.asprintf "%a" pp_print_error err)
-    | Error exit_status ->
-        Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)) )
+    (Lwt_exit.wrap_and_error
+     @@ main_promise config_file config_args log_requests
+     >>= function
+     | Ok (Ok _) -> Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
+     | Ok (Error err) ->
+         Lwt_exit.exit_and_wait 2 >|= fun _ ->
+         `Error (false, Format.asprintf "%a" pp_print_error err)
+     | Error exit_status ->
+         Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)))
 
 let term : unit Term.t =
   Term.(
     ret
-      ( const main $ config $ log_requests $ endpoint $ rpc_addr $ rpc_tls
-      $ sym_block_caching_time ))
+      (const main $ config $ log_requests $ endpoint $ rpc_addr $ rpc_tls
+     $ sym_block_caching_time))
 
 let info =
   let doc = "Launches a server that is a readonly frontend to a Tezos node" in
   let man =
-    [ `S Manpage.s_bugs;
-      `P "Report issues to https://gitlab.com/tezos/tezos/-/issues" ]
+    [
+      `S Manpage.s_bugs;
+      `P "Report issues to https://gitlab.com/tezos/tezos/-/issues";
+    ]
   in
   let version = Tezos_version.Bin_version.version_string in
   Term.info name ~version ~doc ~exits:Term.default_exits ~man

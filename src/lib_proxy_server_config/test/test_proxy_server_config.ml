@@ -93,8 +93,7 @@ module UnionRightBias = struct
         (opt sym_block_caching_time_gen))
 
   let reflexive =
-    QCheck.Test.make ~name:"[union_right_bias t t] = t" arb
-    @@ fun expected ->
+    QCheck.Test.make ~name:"[union_right_bias t t] = t" arb @@ fun expected ->
     Qcheck_helpers.qcheck_eq'
       ~pp:Proxy_server_config.pp
       ~expected
@@ -140,10 +139,12 @@ module UnionRightBias = struct
   type field = Field : 'a option -> field
 
   let fields (t : Proxy_server_config.t) =
-    [ Field t.endpoint;
+    [
+      Field t.endpoint;
       Field t.rpc_addr;
       Field t.rpc_tls;
-      Field t.sym_block_caching_time ]
+      Field t.sym_block_caching_time;
+    ]
 
   let common_some t1 t2 =
     let combination = Stdlib.List.combine (fields t1) (fields t2) in
@@ -181,16 +182,12 @@ let test_example () =
     Data_encoding.Json.from_string Proxy_server_config.example_config
   in
   match json with
-  | Error msg ->
-      fail (Some msg)
+  | Error msg -> fail (Some msg)
   | Ok json -> (
-    match Proxy_server_config.destruct_config json with
-    | Proxy_server_config.Valid _ ->
-        ()
-    | Proxy_server_config.Invalid msg ->
-        fail (Some msg)
-    | Proxy_server_config.CannotDeserialize ->
-        fail None )
+      match Proxy_server_config.destruct_config json with
+      | Proxy_server_config.Valid _ -> ()
+      | Proxy_server_config.Invalid msg -> fail (Some msg)
+      | Proxy_server_config.CannotDeserialize -> fail None)
 
 (** This generator is such that [Proxy_server_config.to_runtime]
     succeeds on generated values (if optional argument are left
@@ -216,8 +213,7 @@ let test_good_arb_to_runtime_ok =
     (good_proxy_server_config_arb ())
   @@ fun config ->
   match Proxy_server_config.to_runtime config with
-  | Ok _ ->
-      true
+  | Ok _ -> true
   | Error msg ->
       QCheck.Test.fail_reportf
         "Expected [to_runtime] to succeed, but it failed as follows: %s."
@@ -284,25 +280,30 @@ let test_wrong_sym_block_caching_time =
   match Proxy_server_config.to_runtime config with
   | Ok _ ->
       QCheck.Test.fail_report "Expected [to_runtime] to fail, but it succeeded"
-  | Error _ ->
-      true
+  | Error _ -> true
 
 let () =
   Alcotest.run
     ~verbose:true
     "Proxy_server_config"
-    [ ( "union_right_bias",
+    [
+      ( "union_right_bias",
         Qcheck_helpers.qcheck_wrap
           UnionRightBias.
             [reflexive; right_bias; associative; disjoint_commutative] );
       ( "example",
-        [ Alcotest.test_case
+        [
+          Alcotest.test_case
             "[example_config] is successfully parsed and validated"
             `Quick
-            test_example ] );
+            test_example;
+        ] );
       ( "to_runtime",
         Qcheck_helpers.qcheck_wrap
-          [ test_good_arb_to_runtime_ok;
+          [
+            test_good_arb_to_runtime_ok;
             test_wrong_sym_block_caching_time;
             test_union_preserves_to_runtime_ok;
-            test_to_runtime_err_implies_union_to_runtime_err ] ) ]
+            test_to_runtime_err_implies_union_to_runtime_err;
+          ] );
+    ]
