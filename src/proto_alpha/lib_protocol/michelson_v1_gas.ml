@@ -1638,10 +1638,9 @@ module Cost_of = struct
     (* Reasonable estimate. *)
     let contract = Gas.(S.safe_int 2 *@ public_key_readable)
 
-    (* Assuming unflattened storage: /contracts/hash1/.../hash6/key/balance,
-       balance stored on 64 bits *)
+    (* Balance stored at /contracts/index/hash/balance, on 64 bits *)
     let contract_exists =
-      Gas.cost_of_repr @@ Storage_costs.read_access ~path_length:9 ~read_bytes:8
+      Gas.cost_of_repr @@ Storage_costs.read_access ~path_length:4 ~read_bytes:8
 
     (* Constructing proof arguments consists in a decreasing loop in the result
        monad, allocating at each step. We charge a reasonable overapproximation. *)
