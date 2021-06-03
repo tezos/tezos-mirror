@@ -80,6 +80,19 @@ stages:
       when: never
     - when: on_success
 
+# Same as .rules_template__development, but for manual jobs.
+.rules_template__development_manual:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: never
+    - when: manual
+
 # Rules for all the jobs that are run only for the master branch and the like
 # (tags, releases, etc.)
 .rules_template__master_and_releases:

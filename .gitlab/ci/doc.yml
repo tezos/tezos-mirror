@@ -1,5 +1,9 @@
 ---
 
+# Warning: the documentation:linkcheck job must have at least the same
+# restrictions in the rules as documentation:build, otherwise the CI
+# may complain that documentation:linkcheck depends on documentation:build
+# which does not exist.
 documentation:build:
   extends:
     - .default_settings_template
@@ -18,9 +22,8 @@ documentation:linkcheck:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development_manual
   stage: manual
-  rules:
-    - when: manual
   needs:
     - job: documentation:build
       artifacts: true
