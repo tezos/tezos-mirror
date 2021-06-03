@@ -39,16 +39,16 @@ type error = {raw : raw option; origin : string; message : string}
 
 let show_error {raw; origin; message} =
   match raw with
-  | None ->
-      Printf.sprintf "%s: %s" origin message
+  | None -> Printf.sprintf "%s: %s" origin message
   | Some {raw_origin; raw_string} ->
       Printf.sprintf "%s = %s\n%s: %s" raw_origin raw_string origin message
 
 exception Error of error
 
 let () =
-  Printexc.register_printer
-  @@ function Error error -> Some (show_error error) | _ -> None
+  Printexc.register_printer @@ function
+  | Error error -> Some (show_error error)
+  | _ -> None
 
 type u = Ezjsonm.value
 
@@ -77,8 +77,7 @@ let encode_u = Ezjsonm.value_to_string ~minify:false
 
 let encode {node; _} = Ezjsonm.value_to_string ~minify:false node
 
-let annotate ~origin node =
-  {origin = Origin {name = origin; json = node}; node}
+let annotate ~origin node = {origin = Origin {name = origin; json = node}; node}
 
 let unannotate {node; _} = node
 
@@ -87,10 +86,8 @@ let fail_string origin message =
     | Origin {name; json} ->
         let origin =
           match fields with
-          | [] ->
-              name
-          | _ :: _ ->
-              name ^ ", at " ^ String.concat "" fields
+          | [] -> name
+          | _ :: _ -> name ^ ", at " ^ String.concat "" fields
         in
         raise
           (Error
@@ -106,8 +103,7 @@ let fail_string origin message =
           message
           (("[" ^ string_of_int index ^ "]") :: fields)
           origin
-    | Error {origin; message} ->
-        gather_origin message [] origin
+    | Error {origin; message} -> gather_origin message [] origin
   in
   gather_origin message [] origin
 
@@ -149,53 +145,42 @@ let parse ~origin raw =
 
 let parse_opt ~origin raw =
   match Ezjsonm.from_string raw with
-  | exception Ezjsonm.Parse_error _ ->
-      None
-  | node ->
-      Some {origin = Origin {name = origin; json = node}; node}
+  | exception Ezjsonm.Parse_error _ -> None
+  | node -> Some {origin = Origin {name = origin; json = node}; node}
 
 let null_because_error origin message =
   let origin =
     match origin with
-    | Error _ ->
-        origin
-    | Origin _ | Field _ | Item _ ->
-        Error {origin; message}
+    | Error _ -> origin
+    | Origin _ | Field _ | Item _ -> Error {origin; message}
   in
   {origin; node = `Null}
 
 let get name {origin; node} =
   match node with
   | `O fields -> (
-    match List.assoc_opt name fields with
-    | None ->
-        null_because_error origin ("missing field: " ^ name)
-    | Some node ->
-        {origin = Field {origin; name}; node} )
-  | _ ->
-      null_because_error origin "not an object"
+      match List.assoc_opt name fields with
+      | None -> null_because_error origin ("missing field: " ^ name)
+      | Some node -> {origin = Field {origin; name}; node})
+  | _ -> null_because_error origin "not an object"
 
 let ( |-> ) json name = get name json
 
 let geti index {origin; node} =
   match node with
   | `A items -> (
-    match List.nth_opt items index with
-    | None ->
-        null_because_error origin ("missing item: " ^ string_of_int index)
-    | Some node ->
-        {origin = Item {origin; index}; node} )
-  | _ ->
-      null_because_error origin "not an array"
+      match List.nth_opt items index with
+      | None ->
+          null_because_error origin ("missing item: " ^ string_of_int index)
+      | Some node -> {origin = Item {origin; index}; node})
+  | _ -> null_because_error origin "not an array"
 
 let ( |=> ) json index = geti index json
 
 let check as_opt error_message json =
   match as_opt json with
-  | None ->
-      fail json.origin error_message
-  | Some value ->
-      value
+  | None -> fail json.origin error_message
+  | Some value -> value
 
 let test as_opt json = match as_opt json with None -> false | Some _ -> true
 
@@ -209,12 +194,9 @@ let is_bool = test as_bool_opt
 
 let as_int_opt json =
   match json.node with
-  | `Float f ->
-      if Float.is_integer f then Some (Float.to_int f) else None
-  | `String s ->
-      int_of_string_opt s
-  | _ ->
-      None
+  | `Float f -> if Float.is_integer f then Some (Float.to_int f) else None
+  | `String s -> int_of_string_opt s
+  | _ -> None
 
 let as_int = check as_int_opt "expected an integer"
 
@@ -222,12 +204,9 @@ let is_int = test as_int_opt
 
 let as_int64_opt json =
   match json.node with
-  | `Float f ->
-      if Float.is_integer f then Some (Int64.of_float f) else None
-  | `String s ->
-      Int64.of_string_opt s
-  | _ ->
-      None
+  | `Float f -> if Float.is_integer f then Some (Int64.of_float f) else None
+  | `String s -> Int64.of_string_opt s
+  | _ -> None
 
 let as_int64 = check as_int64_opt "expected a 64-bit integer"
 
@@ -235,12 +214,9 @@ let is_int64 = test as_int64_opt
 
 let as_float_opt json =
   match json.node with
-  | `Float f ->
-      Some f
-  | `String s ->
-      float_of_string_opt s
-  | _ ->
-      None
+  | `Float f -> Some f
+  | `String s -> float_of_string_opt s
+  | _ -> None
 
 let as_float = check as_float_opt "expected a number"
 
@@ -254,16 +230,14 @@ let is_string = test as_string_opt
 
 let as_list_opt json =
   match json.node with
-  | `Null ->
-      Some []
+  | `Null -> Some []
   | `A l ->
       Some
         (List.mapi
            (fun index node ->
              {origin = Item {origin = json.origin; index}; node})
            l)
-  | _ ->
-      None
+  | _ -> None
 
 let as_list = check as_list_opt "expected an array"
 
@@ -271,28 +245,23 @@ let is_list = test as_list_opt
 
 let as_object_opt json =
   match json.node with
-  | `Null ->
-      Some []
+  | `Null -> Some []
   | `O l ->
       Some
         (List.map
            (fun (name, node) ->
              (name, {origin = Field {origin = json.origin; name}; node}))
            l)
-  | _ ->
-      None
+  | _ -> None
 
 let as_object = check as_object_opt "expected an object"
 
 let is_object = test as_object_opt
 
 let rec assoc_put_or_replace ~key ~value = function
-  | [] ->
-      [(key, value)]
-  | (k, _) :: assoc when k = key ->
-      (key, value) :: assoc
-  | (k, v) :: assoc ->
-      (k, v) :: assoc_put_or_replace ~key ~value assoc
+  | [] -> [(key, value)]
+  | (k, _) :: assoc when k = key -> (key, value) :: assoc
+  | (k, v) :: assoc -> (k, v) :: assoc_put_or_replace ~key ~value assoc
 
 let put (key, value) json =
   let new_fields =

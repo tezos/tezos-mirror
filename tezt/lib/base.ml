@@ -27,9 +27,9 @@ let ( // ) = Filename.concat
 
 let sf = Printf.sprintf
 
-let (let*) = Lwt.bind
+let ( let* ) = Lwt.bind
 
-let (and*) = Lwt.both
+let ( and* ) = Lwt.both
 
 let return = Lwt.return
 
@@ -46,18 +46,13 @@ let range a b =
   range a b
 
 let rec list_find_map f = function
-  | [] ->
-      None
-  | head :: tail ->
-      match f head with
-        | None ->
-            list_find_map f tail
-        | Some _ as x ->
-            x
+  | [] -> None
+  | head :: tail -> (
+      match f head with None -> list_find_map f tail | Some _ as x -> x)
 
 type rex = string * Re.re
 
-let rex r = r, Re.compile (Re.Perl.re r)
+let rex r = (r, Re.compile (Re.Perl.re r))
 
 let show_rex = fst
 
@@ -67,17 +62,13 @@ let ( =~! ) s (_, r) = not (Re.execp r s)
 
 let ( =~* ) s (_, r) =
   match Re.exec_opt r s with
-  | None ->
-      None
-  | Some group ->
-      Some (Re.Group.get group 1)
+  | None -> None
+  | Some group -> Some (Re.Group.get group 1)
 
 let ( =~** ) s (_, r) =
   match Re.exec_opt r s with
-  | None ->
-      None
-  | Some group ->
-      Some (Re.Group.get group 1, Re.Group.get group 2)
+  | None -> None
+  | Some group -> Some (Re.Group.get group 1, Re.Group.get group 2)
 
 let replace_string ?pos ?len ?all (_, r) ~by s =
   Re.replace_string ?pos ?len ?all r ~by s
@@ -90,13 +81,22 @@ let rec repeat n f =
 
 let with_open_out file write_f =
   let chan = open_out file in
-  try (write_f chan; close_out chan;)
-  with x -> close_out chan; raise x
+  try
+    write_f chan ;
+    close_out chan
+  with x ->
+    close_out chan ;
+    raise x
 
 let with_open_in file read_f =
   let chan = open_in file in
-  try (let value = read_f chan in close_in chan; value)
-  with x -> close_in chan; raise x
+  try
+    let value = read_f chan in
+    close_in chan ;
+    value
+  with x ->
+    close_in chan ;
+    raise x
 
 let read_file filename =
   let* ic = Lwt_io.open_file ~mode:Lwt_io.Input filename in

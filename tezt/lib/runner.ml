@@ -47,12 +47,9 @@ let create ?ssh_alias ?ssh_user ?ssh_port ?ssh_id ~address () =
 
 let address ?(hostname = false) ?from runner =
   match (from, runner) with
-  | (None, None) ->
-      if hostname then "localhost" else "127.0.0.1"
-  | (None, Some host) ->
-      host.address
-  | (Some _peer, None) ->
-      get_local_public_ip ()
+  | (None, None) -> if hostname then "localhost" else "127.0.0.1"
+  | (None, Some host) -> host.address
+  | (Some _peer, None) -> get_local_public_ip ()
   | (Some peer, Some host) ->
       if peer.address = host.address then "127.0.0.1" else host.address
 
@@ -98,8 +95,7 @@ module Shell = struct
       | `top ->
           (* No need for parentheses in the toplevel context. *)
           s
-      | `operator ->
-          "(" ^ s ^ ")"
+      | `operator -> "(" ^ s ^ ")"
     in
     let in_operator = to_string ~context:`operator in
     match shell with
@@ -108,8 +104,7 @@ module Shell = struct
         string_of_cmd cmd
     | Seq (cmd1, cmd2) ->
         with_parentheses @@ in_operator cmd1 ^ " && " ^ in_operator cmd2
-    | Echo_pid ->
-        "echo $$"
+    | Echo_pid -> "echo $$"
     | Redirect_stdout (cmd, file) ->
         with_parentheses @@ in_operator cmd ^ " > " ^ Log.quote_shell file
     | Redirect_stderr (cmd, file) ->
@@ -131,17 +126,13 @@ end
 let wrap_with_ssh runner shell =
   let cmd = Shell.to_string shell in
   let ssh_args =
-    ( match runner.ssh_alias with
-    | None ->
-        [runner.address]
-    | Some alias ->
-        [alias] )
+    (match runner.ssh_alias with
+    | None -> [runner.address]
+    | Some alias -> [alias])
     @ (match runner.ssh_user with None -> [] | Some user -> ["-l"; user])
-    @ ( match runner.ssh_port with
-      | None ->
-          []
-      | Some port ->
-          ["-p"; string_of_int port] )
+    @ (match runner.ssh_port with
+      | None -> []
+      | Some port -> ["-p"; string_of_int port])
     @ match runner.ssh_id with None -> [] | Some id -> ["-h"; id]
   in
   ("ssh", ssh_args @ [cmd])
@@ -165,26 +156,22 @@ module Sys = struct
   let show_error {address; command; exit_code; stderr} =
     let address_msg =
       match address with
-      | None ->
-          "on localhost"
-      | Some address ->
-          "on " ^ address
+      | None -> "on localhost"
+      | Some address -> "on " ^ address
     in
     let exit_msg =
       match exit_code with
-      | Unix.WEXITED code ->
-          "exited with code " ^ string_of_int code
-      | Unix.WSIGNALED signal ->
-          "was killed by signal " ^ string_of_int signal
-      | Unix.WSTOPPED signal ->
-          "was stopped by signal " ^ string_of_int signal
+      | Unix.WEXITED code -> "exited with code " ^ string_of_int code
+      | Unix.WSIGNALED signal -> "was killed by signal " ^ string_of_int signal
+      | Unix.WSTOPPED signal -> "was stopped by signal " ^ string_of_int signal
     in
     let stderr_msg = if stderr = "" then "" else " (" ^ stderr ^ ")" in
     command ^ " " ^ exit_msg ^ stderr_msg ^ " " ^ address_msg ^ "."
 
   let () =
-    Printexc.register_printer
-    @@ function Remote_error error -> Some (show_error error) | _ -> None
+    Printexc.register_printer @@ function
+    | Remote_error error -> Some (show_error error)
+    | _ -> None
 
   (* WARNING: synchronous method so it can block. *)
   let run_unix_with_ssh runner shell =
@@ -193,16 +180,13 @@ module Sys = struct
     let ssh_env = ssh_env () in
     Unix.open_process_full unix_cmd ssh_env
 
-  let get_stderr (_, _, stderr) =
-    try input_line stderr with End_of_file -> ""
+  let get_stderr (_, _, stderr) = try input_line stderr with End_of_file -> ""
 
-  let get_stdout (stdout, _, _) =
-    try input_line stdout with End_of_file -> ""
+  let get_stdout (stdout, _, _) = try input_line stdout with End_of_file -> ""
 
   let file_exists ?runner file =
     match runner with
-    | None ->
-        Sys.file_exists file
+    | None -> Sys.file_exists file
     | Some runner -> (
         let command = "test" in
         let arguments = ["-e"; file] in
@@ -212,8 +196,7 @@ module Sys = struct
         let stderr = get_stderr process in
         let status = Unix.close_process_full process in
         match status with
-        | Unix.WEXITED 0 ->
-            stdout <> "false"
+        | Unix.WEXITED 0 -> stdout <> "false"
         | error ->
             let error =
               {
@@ -223,12 +206,11 @@ module Sys = struct
                 stderr;
               }
             in
-            raise (Remote_error error) )
+            raise (Remote_error error))
 
   let is_directory ?runner path =
     match runner with
-    | None ->
-        Sys.is_directory path
+    | None -> Sys.is_directory path
     | Some runner -> (
         let command = "test" in
         let arguments = ["-d"; path] in
@@ -238,8 +220,7 @@ module Sys = struct
         let stderr = get_stderr process in
         let status = Unix.close_process_full process in
         match status with
-        | Unix.WEXITED 0 ->
-            stdout <> "false"
+        | Unix.WEXITED 0 -> stdout <> "false"
         | error ->
             let error =
               {
@@ -249,12 +230,11 @@ module Sys = struct
                 stderr;
               }
             in
-            raise (Remote_error error) )
+            raise (Remote_error error))
 
   let mkdir ?runner ?(perms = 0o755) dir =
     match runner with
-    | None ->
-        Unix.mkdir dir perms
+    | None -> Unix.mkdir dir perms
     | Some runner -> (
         let command = "mkdir" in
         let arguments = ["-m"; Format.sprintf "%o" perms; dir] in
@@ -263,8 +243,7 @@ module Sys = struct
         let stderr = get_stderr process in
         let status = Unix.close_process_full process in
         match status with
-        | Unix.WEXITED 0 ->
-            ()
+        | Unix.WEXITED 0 -> ()
         | error ->
             let error =
               {
@@ -274,12 +253,11 @@ module Sys = struct
                 stderr;
               }
             in
-            raise (Remote_error error) )
+            raise (Remote_error error))
 
   let readdir ?runner dir =
     match runner with
-    | None ->
-        Sys.readdir dir
+    | None -> Sys.readdir dir
     | Some runner -> (
         let command = "ls" in
         let arguments = ["-1"; dir] in
@@ -295,8 +273,7 @@ module Sys = struct
         let stderr = get_stderr process in
         let status = Unix.close_process_full process in
         match status with
-        | Unix.WEXITED 0 ->
-            files
+        | Unix.WEXITED 0 -> files
         | error ->
             let error =
               {
@@ -306,12 +283,11 @@ module Sys = struct
                 stderr;
               }
             in
-            raise (Remote_error error) )
+            raise (Remote_error error))
 
   let remove ?runner file =
     match runner with
-    | None ->
-        Sys.remove file
+    | None -> Sys.remove file
     | Some runner -> (
         let command = "rm" in
         let arguments = [file] in
@@ -320,8 +296,7 @@ module Sys = struct
         let stderr = get_stderr process in
         let status = Unix.close_process_full process in
         match status with
-        | Unix.WEXITED 0 ->
-            ()
+        | Unix.WEXITED 0 -> ()
         | error ->
             let error =
               {
@@ -331,7 +306,7 @@ module Sys = struct
                 stderr;
               }
             in
-            raise (Remote_error error) )
+            raise (Remote_error error))
 
   let rm_rf runner file =
     let command = "rm" in
@@ -341,8 +316,7 @@ module Sys = struct
     let stderr = get_stderr process in
     let status = Unix.close_process_full process in
     match status with
-    | Unix.WEXITED 0 ->
-        ()
+    | Unix.WEXITED 0 -> ()
     | error ->
         let error =
           {command; address = Some runner.address; exit_code = error; stderr}
@@ -351,8 +325,7 @@ module Sys = struct
 
   let rmdir ?runner dir =
     match runner with
-    | None ->
-        Unix.rmdir dir
+    | None -> Unix.rmdir dir
     | Some runner -> (
         let command = "rmdir" in
         let arguments = [dir] in
@@ -361,8 +334,7 @@ module Sys = struct
         let stderr = get_stderr process in
         let status = Unix.close_process_full process in
         match status with
-        | Unix.WEXITED 0 ->
-            ()
+        | Unix.WEXITED 0 -> ()
         | error ->
             let error =
               {
@@ -372,12 +344,11 @@ module Sys = struct
                 stderr;
               }
             in
-            raise (Remote_error error) )
+            raise (Remote_error error))
 
   let mkfifo ?runner ?(perms = 755) pipe =
     match runner with
-    | None ->
-        Unix.mkfifo pipe perms
+    | None -> Unix.mkfifo pipe perms
     | Some runner -> (
         let command = "mkfifo" in
         let arguments = ["-m"; Format.sprintf "%o" perms; pipe] in
@@ -386,8 +357,7 @@ module Sys = struct
         let stderr = get_stderr process in
         let status = Unix.close_process_full process in
         match status with
-        | Unix.WEXITED 0 ->
-            ()
+        | Unix.WEXITED 0 -> ()
         | error ->
             let error =
               {
@@ -397,5 +367,5 @@ module Sys = struct
                 stderr;
               }
             in
-            raise (Remote_error error) )
+            raise (Remote_error error))
 end

@@ -35,51 +35,36 @@ let name = function Alpha -> "Alpha" | Edo -> "Edo" | Florence -> "Florence"
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
-  | Alpha ->
-      "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Edo ->
-      "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
-  | Florence ->
-      "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i"
+  | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+  | Edo -> "PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA"
+  | Florence -> "PsFLorenaUUuikDWvMDr6fGBRG8kt3e3D3fHoXK1j1BFRxeSH4i"
 
 let default_constants = Constants_sandbox
 
 let parameter_file ?(constants = default_constants) protocol =
   let name =
     match constants with
-    | Constants_sandbox ->
-        "sandbox"
-    | Constants_mainnet ->
-        "mainnet"
-    | Constants_test ->
-        "test"
+    | Constants_sandbox -> "sandbox"
+    | Constants_mainnet -> "mainnet"
+    | Constants_test -> "test"
   in
   let directory =
     match protocol with
-    | Alpha ->
-        "proto_alpha"
-    | Edo ->
-        "proto_008_PtEdo2Zk"
-    | Florence ->
-        "proto_009_PsFLoren"
+    | Alpha -> "proto_alpha"
+    | Edo -> "proto_008_PtEdo2Zk"
+    | Florence -> "proto_009_PsFLoren"
   in
   sf "src/%s/parameters/%s-parameters.json" directory name
 
 let accuser = function
-  | Alpha ->
-      "./tezos-accuser-alpha"
-  | Edo ->
-      "./tezos-accuser-008-PtEdo2Zk"
-  | Florence ->
-      "./tezos-accuser-009-PsFLoren"
+  | Alpha -> "./tezos-accuser-alpha"
+  | Edo -> "./tezos-accuser-008-PtEdo2Zk"
+  | Florence -> "./tezos-accuser-009-PsFLoren"
 
 let daemon_name = function
-  | Alpha ->
-      "alpha"
-  | Edo ->
-      "008-PtEdo2Zk"
-  | Florence ->
-      "009-PsFLoren"
+  | Alpha -> "alpha"
+  | Edo -> "008-PtEdo2Zk"
+  | Florence -> "009-PsFLoren"
 
 let encoding_prefix = daemon_name
 
@@ -103,26 +88,18 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
   let* overriden_parameters_out =
     Lwt_io.open_file ~mode:Output overriden_parameters
   in
-  let* () =
-    Lwt_io.write overriden_parameters_out @@ JSON.encode_u parameters
-  in
+  let* () = Lwt_io.write overriden_parameters_out @@ JSON.encode_u parameters in
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Edo ->
-      Some Florence
-  | Florence ->
-      Some Alpha
-  | Alpha ->
-      None
+  | Edo -> Some Florence
+  | Florence -> Some Alpha
+  | Alpha -> None
 
 let previous_protocol = function
-  | Alpha ->
-      Some Florence
-  | Florence ->
-      Some Edo
-  | Edo ->
-      None
+  | Alpha -> Some Florence
+  | Florence -> Some Edo
+  | Edo -> None
 
 let all = [Alpha; Edo; Florence]
 

@@ -33,31 +33,33 @@
 let channel =
   (* The use of a pattern with all fields ensures that we will update this if we
      add new commands that should log to stderr. *)
-  let { Cli.color = _;
-        log_level = _;
-        log_file = _;
-        log_buffer_size = _;
-        commands = _;
-        temporary_file_mode = _;
-        keep_going = _;
-        files_to_run = _;
-        tests_to_run = _;
-        tests_not_to_run = _;
-        tags_to_run = _;
-        tags_not_to_run = _;
-        list;
-        global_timeout = _;
-        test_timeout = _;
-        reset_regressions = _;
-        loop_mode = _;
-        time = _;
-        starting_port = _;
-        record = _;
-        from_records = _;
-        job = _;
-        job_count = _;
-        suggest_jobs;
-        junit = _ } =
+  let {
+    Cli.color = _;
+    log_level = _;
+    log_file = _;
+    log_buffer_size = _;
+    commands = _;
+    temporary_file_mode = _;
+    keep_going = _;
+    files_to_run = _;
+    tests_to_run = _;
+    tests_not_to_run = _;
+    tags_to_run = _;
+    tags_not_to_run = _;
+    list;
+    global_timeout = _;
+    test_timeout = _;
+    reset_regressions = _;
+    loop_mode = _;
+    time = _;
+    starting_port = _;
+    record = _;
+    from_records = _;
+    job = _;
+    job_count = _;
+    suggest_jobs;
+    junit = _;
+  } =
     Cli.options
   in
   if
@@ -80,17 +82,9 @@ let quote_shell s =
     | 'a' .. 'z'
     | 'A' .. 'Z'
     | '0' .. '9'
-    | '-'
-    | '_'
-    | '.'
-    | '+'
-    | '/'
-    | ':'
-    | '@'
-    | '%' ->
+    | '-' | '_' | '.' | '+' | '/' | ':' | '@' | '%' ->
         ()
-    | _ ->
-        needs_quotes := true
+    | _ -> needs_quotes := true
   in
   String.iter categorize s ;
   if not !needs_quotes then s
@@ -174,7 +168,7 @@ module Log_buffer = struct
       if !next >= capacity then next := 0 ;
       buffer.(!next) <- line ;
       incr next ;
-      used := min capacity (!used + 1) )
+      used := min capacity (!used + 1))
 
   (* Note: don't call [push] in [f]. *)
   let iter f =
@@ -208,12 +202,12 @@ let log_line_to ~use_colors
       output "[" ;
       if use_colors then Option.iter output prefix_color ;
       output prefix ;
-      ( if use_colors then
-        match prefix_color with
-        | None ->
-            ()
-        | Some _ ->
-            output Color.reset ; Option.iter output color ) ;
+      (if use_colors then
+       match prefix_color with
+       | None -> ()
+       | Some _ ->
+           output Color.reset ;
+           Option.iter output color) ;
       output "] ")
     prefix ;
   Option.iter output progress ;
@@ -224,8 +218,7 @@ let log_line_to ~use_colors
 let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color
     ?progress_msg message =
   match String.split_on_char '\n' message with
-  | [] | [""] ->
-      ()
+  | [] | [""] -> ()
   | lines ->
       let log_line message =
         let line =
@@ -238,22 +231,19 @@ let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color
         in
         Option.iter (log_line_to ~use_colors:false line) log_file ;
         match (Cli.options.log_level, level) with
-        | (_, Quiet) ->
-            invalid_arg "Log.log_string: level cannot be Quiet"
+        | (_, Quiet) -> invalid_arg "Log.log_string: level cannot be Quiet"
         | (Error, Error)
         | (Warn, (Error | Warn))
         | (Report, (Error | Warn | Report))
         | (Info, (Error | Warn | Report | Info))
         | (Debug, (Error | Warn | Report | Info | Debug)) ->
-            ( if level = Error then
-              Log_buffer.iter
-              @@ fun line ->
-              log_line_to ~use_colors:Cli.options.color line channel ) ;
+            (if level = Error then
+             Log_buffer.iter @@ fun line ->
+             log_line_to ~use_colors:Cli.options.color line channel) ;
             Log_buffer.reset () ;
             log_line_to ~use_colors:Cli.options.color line channel ;
             flush channel
-        | ((Quiet | Error | Warn | Report | Info), _) ->
-            Log_buffer.push line
+        | ((Quiet | Error | Warn | Report | Info), _) -> Log_buffer.push line
       in
       List.iter log_line lines
 
@@ -275,12 +265,9 @@ type test_result = Successful | Failed of string | Aborted
 let test_result ~progress_state ~iteration test_result test_name =
   let (prefix, prefix_color) =
     match test_result with
-    | Successful ->
-        ("SUCCESS", Color.(FG.green ++ bold))
-    | Failed _ ->
-        ("FAILURE", Color.(FG.red ++ bold))
-    | Aborted ->
-        ("ABORTED", Color.(FG.red ++ bold))
+    | Successful -> ("SUCCESS", Color.(FG.green ++ bold))
+    | Failed _ -> ("FAILURE", Color.(FG.red ++ bold))
+    | Aborted -> ("ABORTED", Color.(FG.red ++ bold))
   in
   let message =
     if Cli.options.loop_mode <> Count 1 then

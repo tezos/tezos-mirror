@@ -284,8 +284,7 @@ val wait_for_identity : t -> string Lwt.t
     For instance, you can define a promise with
     [let x_event = wait_for node "x" (fun x -> Some x)]
     and bind it later with [let* x = x_event]. *)
-val wait_for :
-  ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)
 type event = {name : string; value : JSON.t}

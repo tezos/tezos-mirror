@@ -46,12 +46,12 @@ let wake_up_echo echo =
 let push_to_echo echo string =
   if String.length string > 0 then (
     Queue.push string echo.queue ;
-    wake_up_echo echo )
+    wake_up_echo echo)
 
 let close_echo echo =
   if not echo.closed then (
     echo.closed <- true ;
-    wake_up_echo echo )
+    wake_up_echo echo)
 
 let create_echo () =
   let echo =
@@ -77,16 +77,11 @@ let create_echo () =
             bytes
             ofs
             str_len ;
-          return str_len )
+          return str_len)
         else (
-          Lwt_bytes.blit_from_bytes
-            (Bytes.unsafe_of_string str)
-            0
-            bytes
-            ofs
-            len ;
+          Lwt_bytes.blit_from_bytes (Bytes.unsafe_of_string str) 0 bytes ofs len ;
           push_to_echo echo (String.sub str len (str_len - len)) ;
-          return len )
+          return len)
   in
   let lwt_channel = Lwt_io.(make ~mode:input) read in
   echo.lwt_channel <- Some lwt_channel ;
@@ -98,13 +93,9 @@ let get_echo_lwt_channel echo =
       (* Impossible: [lwt_channel] is filled by [Some ...] immediately after the [echo]
          is created by [create_echo]. *)
       assert false
-  | Some lwt_channel ->
-      lwt_channel
+  | Some lwt_channel -> lwt_channel
 
-type hooks = {
-  on_log : string -> unit;
-  on_spawn : string -> string list -> unit;
-}
+type hooks = {on_log : string -> unit; on_spawn : string -> string list -> unit}
 
 (* Information which is specific to processes that run on remote runners. *)
 type remote = {runner : Runner.t; pid : int Lwt.t}
@@ -135,21 +126,18 @@ type failed_info = {
 exception Failed of failed_info
 
 let () =
-  Printexc.register_printer
-  @@ function
+  Printexc.register_printer @@ function
   | Failed {name; command; arguments; status; expect_failure; reason} ->
       let reason =
         Option.value
           ~default:
-            ( match status with
-            | Some (WEXITED code) ->
-                Printf.sprintf "exited with code %d" code
+            (match status with
+            | Some (WEXITED code) -> Printf.sprintf "exited with code %d" code
             | Some (WSIGNALED code) ->
                 Printf.sprintf "was killed by signal %d" code
             | Some (WSTOPPED code) ->
                 Printf.sprintf "was killed by signal %d" code
-            | None ->
-                Printf.sprintf "exited" )
+            | None -> Printf.sprintf "exited")
           reason
       in
       Some
@@ -159,18 +147,13 @@ let () =
            (if expect_failure then " was expected to fail," else "")
            reason
            (String.concat " " (List.map Log.quote_shell (command :: arguments))))
-  | _ ->
-      None
+  | _ -> None
 
 let get_unique_name =
   let name_counts = ref String_map.empty in
   fun name ->
     let index =
-      match String_map.find_opt name !name_counts with
-      | None ->
-          0
-      | Some i ->
-          i
+      match String_map.find_opt name !name_counts with None -> 0 | Some i -> i
     in
     name_counts := String_map.add name (index + 1) !name_counts ;
     name ^ "#" ^ string_of_int index
@@ -179,7 +162,8 @@ let fresh_id =
   let next = ref 0 in
   fun () ->
     let id = !next in
-    incr next ; id
+    incr next ;
+    id
 
 module ID_map = Map.Make (Int)
 
@@ -217,15 +201,14 @@ let show_signal code =
   else string_of_int code
 
 let wait process =
-  let* status = (process.lwt_process)#status in
+  let* status = process.lwt_process#status in
   (* If we already removed [process] from [!live_processes], we already logged
      the exit status. *)
   if ID_map.mem process.id !live_processes then (
     live_processes := ID_map.remove process.id !live_processes ;
     if process.log_status_on_exit then
       match status with
-      | WEXITED code ->
-          Log.debug "%s exited with code %d." process.name code
+      | WEXITED code -> Log.debug "%s exited with code %d." process.name code
       | WSIGNALED code ->
           Log.debug
             "%s was killed by signal %s."
@@ -235,7 +218,7 @@ let wait process =
           Log.debug
             "%s was stopped by signal %s."
             process.name
-            (show_signal code) ) ;
+            (show_signal code)) ;
   return status
 
 (* Read process outputs and log them.
@@ -245,23 +228,22 @@ let handle_process ~log_output process =
     let* line = Lwt_io.read_line_opt ch in
     match line with
     | None ->
-        close_echo echo ; Lwt_io.close ch
+        close_echo echo ;
+        Lwt_io.close ch
     | Some line ->
         if log_output then (
           Log.debug ~prefix:name ~color:process.color "%s" line ;
-          Option.iter (fun hooks -> hooks.on_log line) process.hooks ) ;
+          Option.iter (fun hooks -> hooks.on_log line) process.hooks) ;
         push_to_echo echo line ;
         (* TODO: here we assume that all lines end with "\n",
-           but it may not always be the case:
-         - there may be lines ending with "\r\n";
-         - the last line may not end with "\n" before the EOF. *)
+             but it may not always be the case:
+           - there may be lines ending with "\r\n";
+           - the last line may not end with "\n" before the EOF. *)
         push_to_echo echo "\n" ;
         handle_output name ch echo
   in
-  let* () =
-    handle_output process.name (process.lwt_process)#stdout process.stdout
-  and* () =
-    handle_output process.name (process.lwt_process)#stderr process.stderr
+  let* () = handle_output process.name process.lwt_process#stdout process.stdout
+  and* () = handle_output process.name process.lwt_process#stderr process.stderr
   and* _ = wait process in
   unit
 
@@ -297,14 +279,11 @@ let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
   Log.command ~color:Log.Color.bold ~prefix:name command arguments ;
   let lwt_command =
     match runner with
-    | None ->
-        (command, Array.of_list (command :: arguments))
+    | None -> (command, Array.of_list (command :: arguments))
     | Some runner ->
         let local_env = String_map.bindings env in
         let (ssh, ssh_args) =
-          Runner.wrap_with_ssh_pid
-            runner
-            {local_env; name = command; arguments}
+          Runner.wrap_with_ssh_pid runner {local_env; name = command; arguments}
         in
         (ssh, Array.of_list (ssh :: ssh_args))
   in
@@ -320,21 +299,17 @@ let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
           |> to_key_equal_value
         in
         Lwt_process.open_process_full ~env lwt_command
-    | Some _runner ->
-        Lwt_process.open_process_full lwt_command
+    | Some _runner -> Lwt_process.open_process_full lwt_command
   in
   let remote =
     let open Lwt.Infix in
     match runner with
-    | None ->
-        None
+    | None -> None
     | Some runner ->
         let pid =
-          Lwt_io.read_line lwt_process#stdout
-          >|= fun pid ->
+          Lwt_io.read_line lwt_process#stdout >|= fun pid ->
           match int_of_string_opt pid with
-          | Some pid ->
-              pid
+          | Some pid -> pid
           | None ->
               raise
                 (Failed
@@ -366,7 +341,7 @@ let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
   in
   live_processes := ID_map.add process.id process !live_processes ;
   Background.register (handle_process ~log_output process) ;
-  (process, (process.lwt_process)#stdin)
+  (process, process.lwt_process#stdin)
 
 let spawn ?runner ?log_status_on_exit ?log_output ?name ?color ?env ?hooks
     command arguments =
@@ -388,34 +363,32 @@ let spawn ?runner ?log_status_on_exit ?log_output ?name ?color ?env ?hooks
 (* Propagate the signal in case of remote runner. *)
 let kill_remote_if_needed process =
   match process.remote with
-  | None ->
-      ()
+  | None -> ()
   | Some {pid; runner} ->
       let open Lwt in
       let open Infix in
       Background.register
-        ( pid
-        >|= (fun pid ->
-              let command = "kill" in
-              let arguments = ["-9"; "-P"; string_of_int pid] in
-              let shell =
-                Runner.Shell.(
-                  redirect_stderr (cmd [] command arguments) "/dev/null")
-              in
-              Runner.wrap_with_ssh runner shell)
+        ( ( pid >|= fun pid ->
+            let command = "kill" in
+            let arguments = ["-9"; "-P"; string_of_int pid] in
+            let shell =
+              Runner.Shell.(
+                redirect_stderr (cmd [] command arguments) "/dev/null")
+            in
+            Runner.wrap_with_ssh runner shell )
         >>= fun (ssh, ssh_args) ->
-        let cmd = (ssh, Array.of_list (ssh :: ssh_args)) in
-        Lwt_process.exec cmd >>= fun _ -> Lwt.return_unit )
+          let cmd = (ssh, Array.of_list (ssh :: ssh_args)) in
+          Lwt_process.exec cmd >>= fun _ -> Lwt.return_unit )
 
 let terminate (process : t) =
   Log.debug "Send SIGTERM to %s." process.name ;
   kill_remote_if_needed process ;
-  (process.lwt_process)#kill Sys.sigterm
+  process.lwt_process#kill Sys.sigterm
 
 let kill (process : t) =
   Log.debug "Send SIGKILL to %s." process.name ;
   kill_remote_if_needed process ;
-  (process.lwt_process)#terminate
+  process.lwt_process#terminate
 
 let check ?(expect_failure = false) process =
   let* status = wait process in
@@ -472,16 +445,12 @@ let check_and_read_stderr = check_and_read ~channel_getter:stderr
 
 let run_and_read_stdout ?log_status_on_exit ?name ?color ?env ?expect_failure
     command arguments =
-  let process =
-    spawn ?log_status_on_exit ?name ?color ?env command arguments
-  in
+  let process = spawn ?log_status_on_exit ?name ?color ?env command arguments in
   check_and_read_stdout ?expect_failure process
 
 let run_and_read_stderr ?log_status_on_exit ?name ?color ?env ?expect_failure
     command arguments =
-  let process =
-    spawn ?log_status_on_exit ?name ?color ?env command arguments
-  in
+  let process = spawn ?log_status_on_exit ?name ?color ?env command arguments in
   check_and_read_stdout ?expect_failure process
 
 let check_error ?exit_code ?msg process =
@@ -524,5 +493,4 @@ let check_error ?exit_code ?msg process =
                  }))
         msg ;
       unit
-  | _ ->
-      raise (Failed error)
+  | _ -> raise (Failed error)

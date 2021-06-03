@@ -89,20 +89,13 @@ let options =
   let suggest_jobs = ref false in
   let junit = ref None in
   let set_log_level = function
-    | "quiet" ->
-        log_level := Quiet
-    | "error" ->
-        log_level := Error
-    | "warn" ->
-        log_level := Warn
-    | "report" ->
-        log_level := Report
-    | "info" ->
-        log_level := Info
-    | "debug" ->
-        log_level := Debug
-    | level ->
-        raise (Arg.Bad (Printf.sprintf "invalid log level: %S" level))
+    | "quiet" -> log_level := Quiet
+    | "error" -> log_level := Error
+    | "warn" -> log_level := Warn
+    | "report" -> log_level := Report
+    | "info" -> log_level := Info
+    | "debug" -> log_level := Debug
+    | level -> raise (Arg.Bad (Printf.sprintf "invalid log level: %S" level))
   in
   let set_job_count value =
     if value < 1 then raise (Arg.Bad "--job-count must be positive") ;
@@ -122,10 +115,8 @@ let options =
     | Some (index, count) ->
         let int s =
           match int_of_string_opt s with
-          | None ->
-              raise (Arg.Bad ("value too large: " ^ s))
-          | Some i ->
-              i
+          | None -> raise (Arg.Bad ("value too large: " ^ s))
+          | Some i -> i
         in
         let index = int index in
         let count = int count in
@@ -137,7 +128,8 @@ let options =
   in
   let spec =
     Arg.align
-      [ ("--color", Arg.Set color, " Use colors in output.");
+      [
+        ("--color", Arg.Set color, " Use colors in output.");
         ("--no-color", Arg.Clear color, " Do not use colors in output.");
         ( "--log-level",
           Arg.String set_log_level,
@@ -166,8 +158,8 @@ let options =
         ("-i", Arg.Unit (fun () -> log_level := Info), " Same as --info.");
         ( "--commands",
           Arg.Unit (fun () -> commands := true),
-          " Output commands which are run, in a way that is easily \
-           copy-pasted for manual reproductibility." );
+          " Output commands which are run, in a way that is easily copy-pasted \
+           for manual reproductibility." );
         ("-c", Arg.Unit (fun () -> commands := true), " Same as --commands.");
         ( "--delete-temp",
           Arg.Unit (fun () -> temporary_file_mode := Delete),
@@ -179,8 +171,7 @@ let options =
         );
         ( "--keep-temp",
           Arg.Unit (fun () -> temporary_file_mode := Keep),
-          " Do not delete temporary files and directories that were created."
-        );
+          " Do not delete temporary files and directories that were created." );
         ( "--keep-going",
           Arg.Set keep_going,
           " If a test fails, continue with the remaining tests instead of \
@@ -240,23 +231,23 @@ let options =
            and --loop-count, only the last one is taken into account." );
         ( "--time",
           Arg.Set time,
-          " Print a summary of the total time taken by each test. Ignored if \
-           a test failed. Includes the time read from records: to display a \
+          " Print a summary of the total time taken by each test. Ignored if a \
+           test failed. Includes the time read from records: to display a \
            record, you can use --time --loop-count 0 --from-record <FILE>." );
         ( "--starting-port",
           Arg.Set_int starting_port,
           " If tests need to open ports, they may start from this number." );
         ( "--record",
           Arg.String (fun file -> record := Some file),
-          "<FILE> Record test results to FILE. This file can then be used \
-           with --from-record. If you use --loop or --loop-count, times are \
+          "<FILE> Record test results to FILE. This file can then be used with \
+           --from-record. If you use --loop or --loop-count, times are \
            averaged for each test." );
         ( "--from-record",
           Arg.String (fun file -> from_records := file :: !from_records),
           "<FILE> Start from a file recorded with --record. Can be specified \
            multiple times. When using --time, test durations include tests \
-           found in record files. When using --record, the new record which \
-           is output does NOT include the input records. When using --junit, \
+           found in record files. When using --record, the new record which is \
+           output does NOT include the input records. When using --junit, \
            reports do NOT include input records." );
         ( "--job",
           Arg.String set_job,
@@ -285,16 +276,17 @@ let options =
            suggest a partition of the tests that would result in --job-count \
            sets of roughly the same total duration. Output each job as a list \
            of flags that can be passed to Tezt, followed by a shell comment \
-           that denotes the expected duration of the job. A similar result \
-           can be obtained with --list --job, except that the last job \
-           suggested by --suggest-jobs uses --not-test to express \"all tests \
-           that are not already in other jobs\", meaning that the last job \
-           acts as a catch-all for unknown tests." );
+           that denotes the expected duration of the job. A similar result can \
+           be obtained with --list --job, except that the last job suggested \
+           by --suggest-jobs uses --not-test to express \"all tests that are \
+           not already in other jobs\", meaning that the last job acts as a \
+           catch-all for unknown tests." );
         ( "--junit",
           Arg.String (fun path -> junit := Some path),
           "<FILE> Store test results in FILE using JUnit XML format. Time \
            information for each test is the sum of all runs of this test for \
-           the current session." ) ]
+           the current session." );
+      ]
   in
   let usage =
     (* This was formatted by ocamlformat. Sorry for all the slashes. *)
@@ -313,10 +305,10 @@ let options =
        is what is printed after [SUCCESS] (or [FAILURE] or [ABORTED]) in the \
        reports. Use --test (respectively --not-test) to select (respectively \
        unselect) a test by its title on the command-line.\n\n\
-      \  The file in which a test is implemented is specified by the \
-       ~__FILE__ argument of Test.run. In other words, it is the name of the \
-       file in which the test is defined, without directories. Use --file to \
-       select a test by its filename on the command-line.\n\n\
+      \  The file in which a test is implemented is specified by the ~__FILE__ \
+       argument of Test.run. In other words, it is the name of the file in \
+       which the test is defined, without directories. Use --file to select a \
+       test by its filename on the command-line.\n\n\
       \  For instance:\n\n\
       \    " ^ Sys.argv.(0)
     ^ " node bake /rpc --file bootstrap.ml --file sync.ml\n\n\

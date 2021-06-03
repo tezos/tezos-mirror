@@ -51,20 +51,16 @@ let trigger_ready accuser value =
   List.iter (fun pending -> Lwt.wakeup_later pending value) pending
 
 let set_ready accuser =
-  ( match accuser.status with
-  | Not_running ->
-      ()
-  | Running status ->
-      status.session_state.ready <- true ) ;
+  (match accuser.status with
+  | Not_running -> ()
+  | Running status -> status.session_state.ready <- true) ;
   trigger_ready accuser (Some ())
 
 let handle_raw_stdout accuser line =
   match line with
   (* The accuser is ready when it communicates with a bootstrapped node. *)
-  | "Accuser started." ->
-      set_ready accuser
-  | _ ->
-      ()
+  | "Accuser started." -> set_ready accuser
+  | _ -> ()
 
 let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
   let name = match name with None -> fresh_name () | Some name -> name in
@@ -84,25 +80,26 @@ let create ~protocol ?name ?color ?event_pipe ?base_dir ?runner node =
   accuser
 
 let run accuser =
-  ( match accuser.status with
-  | Not_running ->
-      ()
-  | Running _ ->
-      Test.fail "accuser %s is already running" accuser.name ) ;
+  (match accuser.status with
+  | Not_running -> ()
+  | Running _ -> Test.fail "accuser %s is already running" accuser.name) ;
   let runner = accuser.persistent_state.runner in
   let node_runner = Node.runner accuser.persistent_state.node in
   let node_rpc_port = node_rpc_port accuser in
   let address = "http://" ^ Runner.address ?from:runner node_runner ^ ":" in
   let arguments =
-    [ "-E";
+    [
+      "-E";
       address ^ string_of_int node_rpc_port;
       "--base-dir";
       accuser.persistent_state.base_dir;
-      "run" ]
+      "run";
+    ]
   in
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
-    trigger_ready accuser None ; unit
+    trigger_ready accuser None ;
+    unit
   in
   run accuser {ready = false} arguments ~on_terminate ?runner
 
@@ -112,13 +109,11 @@ let check_event ?where accuser name promise =
   | None ->
       raise
         (Terminated_before_event {daemon = accuser.name; event = name; where})
-  | Some x ->
-      return x
+  | Some x -> return x
 
 let wait_for_ready accuser =
   match accuser.status with
-  | Running {session_state = {ready = true; _}; _} ->
-      unit
+  | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       let (promise, resolver) = Lwt.task () in
       accuser.persistent_state.pending_ready <-

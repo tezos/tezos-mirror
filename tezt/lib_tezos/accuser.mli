@@ -120,8 +120,7 @@ val wait_for_ready : t -> unit Lwt.t
     For instance, you can define a promise with
     [let x_event = wait_for accuser "x" (fun x -> Some x)]
     and bind it later with [let* x = x_event]. *)
-val wait_for :
-  ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Add a callback to be called whenever the accuser emits an event.
 

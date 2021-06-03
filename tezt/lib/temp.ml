@@ -71,10 +71,7 @@ let add_parent ?runner parent =
   let fs = get_fs ?runner () in
   let old_parents = fs.parents in
   filesystems :=
-    Runner_map.add
-      runner
-      {fs with parents = parent :: old_parents}
-      !filesystems
+    Runner_map.add runner {fs with parents = parent :: old_parents} !filesystems
 
 let fresh_main_dir () =
   let index = !next_name in
@@ -93,9 +90,10 @@ let file_aux ?runner ?(perms = 0o755) base_name =
       create_parent parent ;
       if not (Runner.Sys.file_exists ?runner parent) then (
         Runner.Sys.mkdir ?runner ~perms parent ;
-        add_parent ?runner parent ) )
+        add_parent ?runner parent))
   in
-  create_parent filename ; filename
+  create_parent filename ;
+  filename
 
 let allowed = ref false
 
@@ -105,19 +103,20 @@ let check_allowed fname arg =
       "Error: Temp.%s %S: not allowed outside of Test.run\n%!"
       fname
       arg ;
-    exit 1 )
+    exit 1)
 
 let file ?runner ?perms base_name =
   check_allowed "file" base_name ;
   let filename = file_aux ?runner ?perms base_name in
-  add_file ?runner filename ; filename
+  add_file ?runner filename ;
+  filename
 
 let dir ?runner ?(perms = 0o755) base_name =
   check_allowed "dir" base_name ;
   let filename = file_aux ?runner ~perms base_name in
   if not (Runner.Sys.file_exists ?runner filename) then (
     Runner.Sys.mkdir ?runner ~perms filename ;
-    add_dir ?runner filename ) ;
+    add_dir ?runner filename) ;
   filename
 
 let rec remove_recursively filename =
@@ -128,27 +127,26 @@ let rec remove_recursively filename =
         filename
         (Unix.error_message error)
   | S_REG | S_LNK | S_FIFO | S_SOCK -> (
-    (* It is particularly important to not recursively delete symbolic links
-       to directories but to remove the links instead. *)
-    try Sys.remove filename
-    with Sys_error error -> Log.warn "Failed to remove %s: %s" filename error )
+      (* It is particularly important to not recursively delete symbolic links
+         to directories but to remove the links instead. *)
+      try Sys.remove filename
+      with Sys_error error ->
+        Log.warn "Failed to remove %s: %s" filename error)
   | S_DIR -> (
-    match Sys.readdir filename with
-    | exception Sys_error error ->
-        Log.warn "Failed to read %s: %s" filename error
-    | contents -> (
-        let contents = Array.map (Filename.concat filename) contents in
-        Array.iter remove_recursively contents ;
-        try Unix.rmdir filename
-        with Unix.Unix_error (error, _, _) ->
-          Log.warn
-            "Failed to remove directory %s: %s"
-            filename
-            (Unix.error_message error) ) )
-  | S_CHR ->
-      Log.warn "Will not remove character device: %s" filename
-  | S_BLK ->
-      Log.warn "Will not remove block device: %s" filename
+      match Sys.readdir filename with
+      | exception Sys_error error ->
+          Log.warn "Failed to read %s: %s" filename error
+      | contents -> (
+          let contents = Array.map (Filename.concat filename) contents in
+          Array.iter remove_recursively contents ;
+          try Unix.rmdir filename
+          with Unix.Unix_error (error, _, _) ->
+            Log.warn
+              "Failed to remove directory %s: %s"
+              filename
+              (Unix.error_message error)))
+  | S_CHR -> Log.warn "Will not remove character device: %s" filename
+  | S_BLK -> Log.warn "Will not remove block device: %s" filename
 
 let start () =
   if !allowed then invalid_arg "Temp.start: a test is already running" ;
@@ -171,16 +169,13 @@ let clean_up_aux (runner : Runner.t option) runner_fs =
         && Runner.Sys.is_directory ?runner dirname
       then
         match runner with
-        | None ->
-            remove_recursively dirname
-        | Some runner ->
-            Runner.Sys.rm_rf runner dirname)
+        | None -> remove_recursively dirname
+        | Some runner -> Runner.Sys.rm_rf runner dirname)
     runner_fs.dirs ;
   List.iter
     (fun dirname ->
       match Runner.Sys.readdir ?runner dirname with
-      | [||] ->
-          Runner.Sys.rmdir ?runner dirname
+      | [||] -> Runner.Sys.rmdir ?runner dirname
       | _ ->
           let dirtype =
             if Option.is_some runner then "Remote directory" else "Directory"
@@ -197,8 +192,7 @@ let clean_up () =
 let check () =
   let tmp_dir = Filename.get_temp_dir_name () in
   match Sys.readdir tmp_dir with
-  | exception Sys_error _ ->
-      ()
+  | exception Sys_error _ -> ()
   | contents ->
       let tezt_rex = rex "^tezt-[0-9]+$" in
       let check_file filename =

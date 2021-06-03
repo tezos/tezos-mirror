@@ -59,8 +59,7 @@ let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
 let address ?(hostname = false) ?from peer =
   match from with
-  | None ->
-      Runner.address ~hostname (Node.runner peer)
+  | None -> Runner.address ~hostname (Node.runner peer)
   | Some node ->
       Runner.address ~hostname ?from:(Node.runner node) (Node.runner peer)
 
@@ -83,10 +82,8 @@ let base_dir_arg client = ["--base-dir"; client.base_dir]
    Do not call it from a client in Mockup or Client (nominal) mode. *)
 let sources_file client =
   match client.mode with
-  | Mockup | Client _ | Proxy _ ->
-      assert false
-  | Light _ ->
-      client.base_dir // "sources.json"
+  | Mockup | Client _ | Proxy _ -> assert false
+  | Light _ -> client.base_dir // "sources.json"
 
 (* [?node] can be used to override the default node stored in the client.
    Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.
@@ -94,33 +91,30 @@ let sources_file client =
 *)
 let endpoint_arg ?node client =
   match (client.mode, node) with
-  | (Mockup, _) | (Client None, None) | (Light (_, []), _) ->
-      []
+  | (Mockup, _) | (Client None, None) | (Light (_, []), _) -> []
   | (Client _, Some node)
   | (Client (Some node), None)
   | (Light (_, node :: _), None)
   | (Light _, Some node)
   | (Proxy _, Some node)
   | (Proxy node, None) ->
-      [ "--endpoint";
+      [
+        "--endpoint";
         "http://"
         ^ address ~hostname:true node
         ^ ":"
-        ^ string_of_int (Node.rpc_port node) ]
+        ^ string_of_int (Node.rpc_port node);
+      ]
 
 let mode_arg client =
   match client.mode with
-  | Client _ ->
-      []
-  | Mockup ->
-      ["--mode"; "mockup"]
-  | Light _ ->
-      ["--mode"; "light"; "--sources"; sources_file client]
-  | Proxy _ ->
-      ["--mode"; "proxy"]
+  | Client _ -> []
+  | Mockup -> ["--mode"; "mockup"]
+  | Light _ -> ["--mode"; "light"; "--sources"; sources_file client]
+  | Proxy _ -> ["--mode"; "proxy"]
 
-let spawn_command ?(env = String_map.empty) ?node ?hooks ?(admin = false)
-    client command =
+let spawn_command ?(env = String_map.empty) ?node ?hooks ?(admin = false) client
+    command =
   let env =
     (* Set disclaimer to "Y" if unspecified, otherwise use given value *)
     String_map.update
@@ -134,8 +128,7 @@ let spawn_command ?(env = String_map.empty) ?node ?hooks ?(admin = false)
     ~env
     ?hooks
     (if admin then client.admin_path else client.path)
-  @@ endpoint_arg ?node client @ mode_arg client @ base_dir_arg client
-  @ command
+  @@ endpoint_arg ?node client @ mode_arg client @ base_dir_arg client @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -146,22 +139,20 @@ let url_encode str =
     | c ->
         Buffer.add_char buffer '%' ;
         let (c1, c2) = Hex.of_char c in
-        Buffer.add_char buffer c1 ; Buffer.add_char buffer c2
+        Buffer.add_char buffer c1 ;
+        Buffer.add_char buffer c2
   done ;
   let result = Buffer.contents buffer in
-  Buffer.reset buffer ; result
+  Buffer.reset buffer ;
+  result
 
 type meth = GET | PUT | POST | PATCH
 
 let string_of_meth = function
-  | GET ->
-      "get"
-  | PUT ->
-      "put"
-  | POST ->
-      "post"
-  | PATCH ->
-      "patch"
+  | GET -> "get"
+  | PUT -> "put"
+  | POST -> "post"
+  | PATCH -> "patch"
 
 type path = string list
 
@@ -170,8 +161,7 @@ let string_of_path path = "/" ^ String.concat "/" (List.map url_encode path)
 type query_string = (string * string) list
 
 let string_of_query_string = function
-  | [] ->
-      ""
+  | [] -> ""
   | qs ->
       let qs' = List.map (fun (k, v) -> (url_encode k, url_encode v)) qs in
       "?" ^ String.concat "&" @@ List.map (fun (k, v) -> k ^ "=" ^ v) qs'
@@ -216,8 +206,7 @@ let spawn_shell_header ?node ?(chain = "main") ?(block = "head") client =
   spawn_rpc ?node GET path client
 
 let shell_header ?node ?chain ?block client =
-  spawn_shell_header ?node ?chain ?block client
-  |> Process.check_and_read_stdout
+  spawn_shell_header ?node ?chain ?block client |> Process.check_and_read_stdout
 
 module Admin = struct
   let spawn_command = spawn_command ~admin:true
@@ -226,11 +215,12 @@ module Admin = struct
     spawn_command
       ?node
       client
-      ( endpoint_arg ?node client @ mode_arg client
-      @ [ "trust";
+      (endpoint_arg ?node client @ mode_arg client
+      @ [
+          "trust";
           "address";
-          address ?from:node peer ^ ":" ^ string_of_int (Node.net_port peer) ]
-      )
+          address ?from:node peer ^ ":" ^ string_of_int (Node.net_port peer);
+        ])
 
   let trust_address ?node ~peer client =
     spawn_trust_address ?node ~peer client |> Process.check
@@ -239,9 +229,11 @@ module Admin = struct
     spawn_command
       ?node
       client
-      [ "connect";
+      [
+        "connect";
         "address";
-        address ?from:node peer ^ ":" ^ string_of_int (Node.net_port peer) ]
+        address ?from:node peer ^ ":" ^ string_of_int (Node.net_port peer);
+      ]
 
   let connect_address ?node ~peer client =
     spawn_connect_address ?node ~peer client |> Process.check
@@ -264,8 +256,7 @@ let spawn_activate_protocol ?node ~protocol ?(fitness = 1)
     ?(timestamp_delay = 3600. *. 24. *. 365.) ?parameter_file client =
   let timestamp =
     match timestamp with
-    | Some timestamp ->
-        timestamp
+    | Some timestamp -> timestamp
     | None ->
         let tm = Unix.gmtime (Unix.time () -. timestamp_delay) in
         Printf.sprintf
@@ -280,7 +271,8 @@ let spawn_activate_protocol ?node ~protocol ?(fitness = 1)
   spawn_command
     ?node
     client
-    [ "activate";
+    [
+      "activate";
       "protocol";
       Protocol.hash protocol;
       "with";
@@ -293,7 +285,8 @@ let spawn_activate_protocol ?node ~protocol ?(fitness = 1)
       "parameters";
       Option.value parameter_file ~default:(Protocol.parameter_file protocol);
       "--timestamp";
-      timestamp ]
+      timestamp;
+    ]
 
 let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
     ?parameter_file client =
@@ -321,10 +314,10 @@ let spawn_bake_for ?node ?protocol ?(key = Constant.bootstrap1.alias)
   spawn_command
     ?node
     client
-    ( Option.fold
-        ~none:[]
-        ~some:(fun p -> ["--protocol"; Protocol.hash p])
-        protocol
+    (Option.fold
+       ~none:[]
+       ~some:(fun p -> ["--protocol"; Protocol.hash p])
+       protocol
     @ ["bake"; "for"; key]
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
     @ Option.fold
@@ -364,8 +357,7 @@ let show_address ?show_secret ~alias client =
       match client_output =~* rex "Hash: ?(\\w*)" with
       | None ->
           Test.fail "Cannot extract key from client_output: %s" client_output
-      | Some hash ->
-          hash
+      | Some hash -> hash
     in
     let public_key = client_output =~* rex "Public key: ?(\\w*)" in
     let secret_key = client_output =~* rex "Secret key: ?(\\w*)" in
@@ -386,7 +378,7 @@ let spawn_transfer ?node ?(wait = "none") ?burn_cap ?fee ?gas_limit
   spawn_command
     ?node
     client
-    ( ["--wait"; wait]
+    (["--wait"; wait]
     @ ["transfer"; Tez.to_string amount; "from"; giver; "to"; receiver]
     @ Option.fold
         ~none:[]
@@ -404,7 +396,7 @@ let spawn_transfer ?node ?(wait = "none") ?burn_cap ?fee ?gas_limit
         ~none:[]
         ~some:(fun s -> ["--storage-limit"; string_of_int s])
         storage_limit
-    @ Option.fold ~none:[] ~some:(fun p -> ["--arg"; p]) arg )
+    @ Option.fold ~none:[] ~some:(fun p -> ["--arg"; p]) arg)
 
 let transfer ?node ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?arg ~amount
     ~giver ~receiver client =
@@ -448,23 +440,19 @@ let get_balance_for ?node ~account client =
     match client_output =~* rex "(\\d+(?:\\.\\d+)?) \u{A729}" with
     | None ->
         Test.fail "Cannot extract balance from client_output: %s" client_output
-    | Some balance ->
-        float_of_string balance
+    | Some balance -> float_of_string balance
   in
   let process = spawn_get_balance_for ?node ~account client in
   let* () = Process.check process
   and* output = Lwt_io.read (Process.stdout process) in
   return @@ extract_balance output
 
-let spawn_create_mockup ?(sync_mode = Synchronous) ?constants ~protocol client
-    =
+let spawn_create_mockup ?(sync_mode = Synchronous) ?constants ~protocol client =
   let cmd =
     let common = ["--protocol"; Protocol.hash protocol; "create"; "mockup"] in
-    ( match sync_mode with
-    | Synchronous ->
-        common
-    | Asynchronous ->
-        common @ ["--asynchronous"] )
+    (match sync_mode with
+    | Synchronous -> common
+    | Asynchronous -> common @ ["--asynchronous"])
     @ Option.fold
         ~none:[]
         ~some:(fun constants ->
@@ -490,17 +478,14 @@ type ballot = Nay | Pass | Yay
 let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ?(wait = "none")
     ~proto_hash vote client =
   let string_of_vote = function
-    | Yay ->
-        "yay"
-    | Nay ->
-        "nay"
-    | Pass ->
-        "pass"
+    | Yay -> "yay"
+    | Nay -> "nay"
+    | Pass -> "pass"
   in
   spawn_command
     client
-    ( ["--wait"; wait]
-    @ ["submit"; "ballot"; "for"; key; proto_hash; string_of_vote vote] )
+    (["--wait"; wait]
+    @ ["submit"; "ballot"; "for"; key; proto_hash; string_of_vote vote])
 
 let submit_ballot ?key ?wait ~proto_hash vote client =
   spawn_submit_ballot ?key ?wait ~proto_hash vote client |> Process.check
@@ -510,8 +495,9 @@ let spawn_originate_contract ?node ?(wait = "none") ?init ?burn_cap ~alias
   spawn_command
     ?node
     client
-    ( ["--wait"; wait]
-    @ [ "originate";
+    (["--wait"; wait]
+    @ [
+        "originate";
         "contract";
         alias;
         "transferring";
@@ -519,12 +505,13 @@ let spawn_originate_contract ?node ?(wait = "none") ?init ?burn_cap ~alias
         "from";
         src;
         "running";
-        prg ]
+        prg;
+      ]
     @ Option.fold ~none:[] ~some:(fun init -> ["--init"; init]) init
     @ Option.fold
         ~none:[]
         ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
-        burn_cap )
+        burn_cap)
 
 let originate_contract ?node ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
     client =
@@ -546,8 +533,7 @@ let originate_contract ?node ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
       Test.fail
         "Cannot extract contract hash from client_output: %s"
         client_output
-  | Some hash ->
-      return hash
+  | Some hash -> return hash
 
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
@@ -567,8 +553,7 @@ let hash_data ?expect_failure ?hooks ~data ~typ client =
           typ
           line ;
         None
-    | Some _ as x ->
-        x
+    | Some _ as x -> x
   in
   (* Filtering avoids the last line (after the trailing \n).
      We don't want to produce a warning about an empty line. *)
@@ -578,12 +563,9 @@ let hash_data ?expect_failure ?hooks ~data ~typ client =
 
 let spawn_normalize_data ?mode ?(legacy = false) ~data ~typ client =
   let mode_to_string = function
-    | Readable ->
-        "Readable"
-    | Optimized ->
-        "Optimized"
-    | Optimized_legacy ->
-        "Optimized_legacy"
+    | Readable -> "Readable"
+    | Optimized -> "Optimized"
+    | Optimized_legacy -> "Optimized_legacy"
   in
   let mode_cmd =
     Option.map mode_to_string mode
@@ -634,7 +616,8 @@ let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ?constants
   in
   let* () = create_mockup ?sync_mode ?constants ~protocol client in
   (* We want, however, to return a mockup client; hence the following: *)
-  set_mode Mockup client ; return client
+  set_mode Mockup client ;
+  return client
 
 let init_light ?path ?admin_path ?name ?color ?base_dir ?nodes
     ?(min_agreement = 0.66) () =
@@ -650,8 +633,7 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?nodes
           "When initializing a light client and specifying the nodes, there \
            should be 2 or more nodes but found %d nodes"
           (Option.value nodes ~default:[] |> List.length)
-    | Some nodes ->
-        return nodes
+    | Some nodes -> return nodes
   in
   let client =
     create_with_mode
@@ -663,12 +645,13 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?nodes
       (Light (min_agreement, nodes))
   in
   (* Create a services.json file in the base directory with correctly
-    JSONified data *)
+     JSONified data *)
   let* () =
     Lwt_io.with_file ~mode:Lwt_io.Output (sources_file client) (fun oc ->
         let obj =
           `O
-            [ ("min_agreement", `Float min_agreement);
+            [
+              ("min_agreement", `Float min_agreement);
               ( "uris",
                 `A
                   (List.map
@@ -677,7 +660,8 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?nodes
                          (Printf.sprintf
                             "http://localhost:%d"
                             (Node.rpc_port node)))
-                     nodes) ) ]
+                     nodes) );
+            ]
         in
         Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
   in
