@@ -38,11 +38,11 @@ manuals: main
 	@../tezos-baker-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-baker.html
 	@../tezos-endorser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-endorser.html
 	@../tezos-accuser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-accuser.html
-    # ACTIVE (Florence) protocol
-	@../tezos-client -protocol $(ACTIVE_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ACTIVE/tezos-client.html
-	@../tezos-baker-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ACTIVE/tezos-baker.html
-	@../tezos-endorser-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ACTIVE/tezos-endorser.html
-	@../tezos-accuser-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ACTIVE/tezos-accuser.html
+    # active (Florence) protocol
+	@../tezos-client -protocol $(ACTIVE_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-client.html
+	@../tezos-baker-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-baker.html
+	@../tezos-endorser-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-endorser.html
+	@../tezos-accuser-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-accuser.html
     # generic
 	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
