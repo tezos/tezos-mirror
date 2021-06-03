@@ -49,6 +49,24 @@ let extract_qcheck_tzresult : unit tzresult Lwt.t -> bool =
   | Ok () -> true
   | Error err -> QCheck.Test.fail_reportf "@\n%a@." pp_print_error err
 
+let rec run_and_check check scenarios env state =
+  match scenarios with
+  | step :: rst ->
+      let state' = SymbolicMachine.step step env state in
+      assert (check state state') ;
+      run_and_check check rst env state'
+  | [] -> state
+
+let one_balance_decreases c env state state' =
+  let xtz = SymbolicMachine.get_xtz_balance c state in
+  let tzbtc = SymbolicMachine.get_tzbtc_balance c env state in
+  let lqt = SymbolicMachine.get_liquidity_balance c env state in
+  let xtz' = SymbolicMachine.get_xtz_balance c state' in
+  let tzbtc' = SymbolicMachine.get_tzbtc_balance c env state' in
+  let lqt' = SymbolicMachine.get_liquidity_balance c env state' in
+  xtz' < xtz || tzbtc' < tzbtc || lqt' < lqt
+  || (xtz' = xtz && tzbtc' = tzbtc && lqt' = lqt)
+
 let tests =
   [
     QCheck.Test.make
@@ -60,6 +78,19 @@ let tests =
           ( ValidationMachine.build specs >>=? fun (state, env) ->
             ValidationMachine.run scenario env state >>=? fun _ -> return_unit
           ));
+    QCheck.Test.make
+      ~count:100
+      ~name:"arbitrary adversary scenarios"
+      (Liquidity_baking_generator.arb_adversary_scenario
+         1_000_000
+         1_000_000
+         100)
+      (fun (specs, attacker, scenario) ->
+        let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
+        let _ =
+          run_and_check (one_balance_decreases attacker env) scenario env state
+        in
+        true);
   ]
 
 let _ =

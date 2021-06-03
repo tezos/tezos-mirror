@@ -285,6 +285,35 @@ let arb_scenario :
       QCheck.Iter.pair (QCheck.Iter.return specs) (shrink_list_spine_tail steps))
     (gen_scenario total_tzbtc total_liquidity size)
 
+let gen_adversary_scenario :
+    tzbtc ->
+    liquidity ->
+    int ->
+    (specs * contract_id * contract_id step list) QCheck.Gen.t =
+ fun total_tzbtc total_liquidity size ->
+  let* specs = gen_specs total_tzbtc total_liquidity in
+  let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
+  let* c = oneofl env.implicit_accounts in
+  let* scenario = gen_steps ~source:c ~destination:c env state size in
+  return (specs, c, scenario)
+
+let arb_adversary_scenario :
+    tzbtc ->
+    liquidity ->
+    int ->
+    (specs * contract_id * contract_id step list) QCheck.arbitrary =
+ fun total_tzbtc total_liquidity size ->
+  QCheck.make
+    ~print:(fun (specs, _, steps) ->
+      Format.asprintf "%a" pp_scenario (specs, steps))
+    ~shrink:(fun (specs, c, steps) ->
+      (* see note (1) *)
+      QCheck.Iter.triple
+        (QCheck.Iter.return specs)
+        (QCheck.Iter.return c)
+        (shrink_list_spine_tail steps))
+    (gen_adversary_scenario total_tzbtc total_liquidity size)
+
 (* -------------------------------------------------------------------------- *)
 
 (* Note (1)
