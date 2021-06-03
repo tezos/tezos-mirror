@@ -46,7 +46,11 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
   | Archive when previous_mode <> Archive ->
       invalid_history_mode_switch ~previous_mode ~target_mode
   | Archive -> return 0l
-  | Full {offset = target_offset} -> (
+  | Full offset -> (
+      let target_offset =
+        (Option.value offset ~default:History_mode.default_additional_cycles)
+          .offset
+      in
       match previous_mode with
       | Archive ->
           (* We can comply to every mode *)
@@ -64,7 +68,13 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
           in
           let preserved_savepoint = min preserved_level expected_savepoint in
           return (max 0l preserved_savepoint)
-      | Full {offset = previous_offset} ->
+      | Full offset ->
+          let previous_offset =
+            (Option.value
+               offset
+               ~default:History_mode.default_additional_cycles)
+              .offset
+          in
           (* We are limited by the previous savepoint available *)
           let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
           let target_offset_window =
@@ -90,7 +100,11 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
           in
           return (max available_savepoint preserved_savepoint)
       | Rolling _ -> invalid_history_mode_switch ~previous_mode ~target_mode)
-  | Rolling {offset = target_offset} -> (
+  | Rolling offset -> (
+      let target_offset =
+        (Option.value offset ~default:History_mode.default_additional_cycles)
+          .offset
+      in
       match previous_mode with
       | Archive ->
           (* We can comply to every mode *)
@@ -103,7 +117,13 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
           in
           let preserved_savepoint = min preserved_level expected_savepoint in
           return (max 0l preserved_savepoint)
-      | Full {offset = previous_offset} ->
+      | Full offset ->
+          let previous_offset =
+            (Option.value
+               offset
+               ~default:History_mode.default_additional_cycles)
+              .offset
+          in
           (* We are limited by the previous savepoint available *)
           let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
           let target_offset_window =
@@ -125,7 +145,13 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
                    (succ (sub head_lafl previous_offset_window))))
           in
           return (max available_savepoint preserved_savepoint)
-      | Rolling {offset = previous_offset} ->
+      | Rolling offset ->
+          let previous_offset =
+            (Option.value
+               offset
+               ~default:History_mode.default_additional_cycles)
+              .offset
+          in
           (* We are limited by the previous savepoint available *)
           let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
           let target_offset_window =
@@ -153,7 +179,11 @@ let expected_caboose chain_store current_head blocks_per_cycle ~previous_mode
   match target_mode with
   | Archive -> return 0l
   | Full _ -> return 0l
-  | Rolling {offset = target_offset} -> (
+  | Rolling offset -> (
+      let target_offset =
+        (Option.value offset ~default:History_mode.default_additional_cycles)
+          .offset
+      in
       match previous_mode with
       | Archive -> return savepoint
       | Full _ ->
@@ -310,24 +340,24 @@ let make_tests speed patch_context =
     | `Slow ->
         [
           Archive;
-          Full {offset = 0};
-          Full {offset = 3};
+          Full (Some {offset = 0});
+          Full (Some {offset = 3});
           default_full;
-          Full {offset = 7};
-          Full {offset = 10};
-          Rolling {offset = 0};
-          Rolling {offset = 3};
+          Full (Some {offset = 7});
+          Full (Some {offset = 10});
+          Rolling (Some {offset = 0});
+          Rolling (Some {offset = 3});
           default_rolling;
-          Rolling {offset = 7};
-          Rolling {offset = 10};
+          Rolling (Some {offset = 7});
+          Rolling (Some {offset = 10});
           default;
         ]
     | `Quick ->
         [
           Archive;
-          Full {offset = 0};
+          Full (Some {offset = 0});
           default_full;
-          Rolling {offset = 0};
+          Rolling (Some {offset = 0});
           default_rolling;
         ]
   in

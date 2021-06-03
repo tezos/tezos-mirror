@@ -214,10 +214,12 @@ module Term = struct
       | ["archive"] | ["Archive"] -> Some Archive
       | ["full"] | ["Full"] -> Some default_full
       | ["full"; n] | ["Full"; n] ->
-          Option.map (fun offset -> Full {offset}) (int_of_string_opt n)
+          Option.map (fun offset -> Full (Some {offset})) (int_of_string_opt n)
       | ["rolling"] | ["Rolling"] -> Some default_rolling
       | ["rolling"; n] | ["Rolling"; n] ->
-          Option.map (fun offset -> Rolling {offset}) (int_of_string_opt n)
+          Option.map
+            (fun offset -> Rolling (Some {offset}))
+            (int_of_string_opt n)
       | ["experimental-rolling"] -> Some default_rolling
       | _ -> None
     in
@@ -298,7 +300,7 @@ module Term = struct
          preserved cycles is %d. The value $(i,experimental-rolling) is \
          deprecated but is equivalent to $(i,rolling) which should be used \
          instead."
-        History_mode.default_offset
+        History_mode.default_additional_cycles.offset
     in
     Arg.(
       value

@@ -578,7 +578,7 @@ let pp_metadata ppf {version; chain_name; history_mode; block_hash; level; _} =
     Block_hash.pp
     block_hash
     level
-    History_mode.pp
+    History_mode.pp_short
     history_mode
     version
 
@@ -1431,8 +1431,10 @@ module Tar_exporter : EXPORTER = struct
     >>= fun tar ->
     (* As the metadata are available after exporting the whole
        snapshot, we reserve a metadata slot as header, by writing a
-       dummy header. It will be overwrite when finalizing the
-       snapshot. *)
+       dummy header which will be overwritten once the archive is
+       finalized. Having the metadata at the beginning of the archive
+       allows to extract it without the need to interpret the complete
+       archive. *)
     let dummy_metadata =
       {
         version = current_version;
@@ -1587,6 +1589,7 @@ module Tar_exporter : EXPORTER = struct
     Onthefly.add_file_and_finalize t.tar ~file:src ~filename:dst
 
   let write_metadata t ~f =
+    (* Overwrite the dummy metadata. *)
     let raw_fd = Onthefly.get_raw_output_fd t.tar in
     Lwt_unix.LargeFile.lseek raw_fd (Int64.of_int Onthefly.header_size) SEEK_SET
     >>= fun _ -> f raw_fd
@@ -2015,13 +2018,13 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                   return (filtered_table, Some floating_blocks))
 
   (* Ensures that the history mode requested to export is compatible
-     with the current storage *)
+     with the current storage. *)
   let check_history_mode chain_store ~rolling =
     match (Store.Chain.history_mode chain_store : History_mode.t) with
     | Archive | Full _ -> return_unit
     | Rolling _ when rolling -> return_unit
     | Rolling _ as stored ->
-        fail (Incompatible_history_mode {stored; requested = Full {offset = 0}})
+        fail (Incompatible_history_mode {stored; requested = Full None})
 
   let export_floating_block_stream snapshot_exporter floating_block_stream =
     let f fd =
@@ -2044,7 +2047,9 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       check_history_mode chain_store ~rolling >>=? fun () ->
       retrieve_export_block chain_store block
       >>=? fun (export_block, pred_block, lowest_block_level_needed) ->
-      let export_mode = History_mode.Rolling {offset = 0} in
+      (* The number of additional cycles to export is fixed as the
+         snasphot content must not rely on the local configuration. *)
+      let export_mode = History_mode.Rolling None in
       Event.(
         emit export_info (export_mode, Store.Block.descriptor export_block))
       >>= fun () ->
@@ -2114,7 +2119,9 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       check_history_mode chain_store ~rolling >>=? fun () ->
       retrieve_export_block chain_store block
       >>=? fun (export_block, pred_block, _lowest_block_level_needed) ->
-      let export_mode = History_mode.Full {offset = 0} in
+      (* The number of additional cycles to export is fixed as the
+         snasphot content must not rely on the local configuration. *)
+      let export_mode = History_mode.Full None in
       Event.(
         emit export_info (export_mode, Store.Block.descriptor export_block))
       >>= fun () ->
@@ -3242,12 +3249,16 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       ({hash = Block_header.hash block_data.block_header; contents; metadata}
         : Block_repr.block)
     in
-    (* Set the history mode with the default offset *)
+    (* Set the history mode with the default additional cycle
+       offset. This is necessary as the snapshot content does not rely
+       on a given offset. If the node was configured to run with the
+       non default number of additional cycles, it will be
+       automatically updated when running the node. *)
     (let open History_mode in
     match snapshot_metadata.history_mode with
     | Archive -> assert false
-    | Rolling _ -> return (Rolling {offset = default_offset})
-    | Full _ -> return (Full {offset = default_offset}))
+    | Rolling _ -> return (Rolling None)
+    | Full _ -> return (Full None))
     >>=? fun history_mode ->
     Animation.display_progress
       ~every:100

@@ -50,17 +50,21 @@
 type additional_cycles = {offset : int}
 
 (** The type for defining an history mode. *)
-type t = Archive | Full of additional_cycles | Rolling of additional_cycles
+type t =
+  | Archive
+  | Full of additional_cycles option
+  | Rolling of additional_cycles option
 
 (** The default value for the number of additional cycles to
    preserve.*)
-val default_offset : int
+val default_additional_cycles : additional_cycles
 
-(** The default full history mode value. Based on [default_offset]. *)
+(** The default full history mode value. Based on
+   [default_additional_cycles]. *)
 val default_full : t
 
 (** The default rolling history mode value. Based on
-   [default_offset]. *)
+   [default_additional_cycles]. *)
 val default_rolling : t
 
 (** The default history mode value. *)

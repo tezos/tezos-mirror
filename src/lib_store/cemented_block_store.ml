@@ -604,9 +604,21 @@ let trigger_gc cemented_store =
   | Some cemented_blocks_files -> (
       function
       | History_mode.Archive -> Lwt.return_unit
-      | Full {offset} ->
+      | Full offset ->
+          let offset =
+            (Option.value
+               offset
+               ~default:History_mode.default_additional_cycles)
+              .offset
+          in
           trigger_full_gc cemented_store cemented_blocks_files offset
-      | Rolling {offset} ->
+      | Rolling offset ->
+          let offset =
+            (Option.value
+               offset
+               ~default:History_mode.default_additional_cycles)
+              .offset
+          in
           trigger_rolling_gc cemented_store cemented_blocks_files offset)
 
 let iter_cemented_file f ({file; _} as cemented_blocks_file) =

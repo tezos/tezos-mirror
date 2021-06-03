@@ -177,7 +177,8 @@ let check_baking_continuity ~test_descr ~exported_chain_store
   let imported_history_mode = Store.Chain.history_mode imported_chain_store in
   let imported_offset =
     match imported_history_mode with
-    | History_mode.Rolling {offset} | Full {offset} -> offset
+    | History_mode.Rolling (Some {offset}) | Full (Some {offset}) -> offset
+    | Rolling None | Full None -> History_mode.default_additional_cycles.offset
     | Archive -> assert false
   in
   Store.Chain.current_head exported_chain_store >>= fun export_store_head ->
@@ -370,16 +371,16 @@ let make_tests speed genesis_parameters =
     | `Slow ->
         [
           Archive;
-          Full {offset = 0};
-          Full {offset = default_offset};
-          Rolling {offset = 0};
-          Rolling {offset = default_offset};
+          Full (Some {offset = 0});
+          Full (Some default_additional_cycles);
+          Rolling (Some {offset = 0});
+          Rolling (Some default_additional_cycles);
         ]
     | `Quick ->
         [
-          Full {offset = default_offset};
-          Rolling {offset = 0};
-          Rolling {offset = default_offset};
+          Full (Some default_additional_cycles);
+          Rolling (Some {offset = 0});
+          Rolling (Some default_additional_cycles);
         ]
   in
   let export_blocks_levels nb_initial_blocks =

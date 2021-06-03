@@ -496,7 +496,10 @@ let infer_caboose block_store savepoint current_head ~target_offset
           preserved_block block_store current_head expected_caboose
       | None -> return savepoint)
   | Rolling r ->
-      if r.offset < target_offset then caboose block_store >>= return
+      let offset =
+        Option.value r ~default:History_mode.default_additional_cycles
+      in
+      if offset.offset < target_offset then caboose block_store >>= return
       else return savepoint
 
 let switch_history_mode block_store ~current_head ~previous_history_mode
@@ -504,14 +507,17 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
   let open History_mode in
   match (previous_history_mode, new_history_mode) with
   | (Full _, Rolling m) | (Rolling _, Rolling m) ->
+      let m =
+        (Option.value m ~default:History_mode.default_additional_cycles).offset
+      in
       (* Both the caboose and savepoint can be updated *)
-      infer_savepoint block_store current_head ~target_offset:m.offset
+      infer_savepoint block_store current_head ~target_offset:m
       >>=? fun new_savepoint ->
       infer_caboose
         block_store
         new_savepoint
         current_head
-        ~target_offset:m.offset
+        ~target_offset:m
         ~new_history_mode
         ~previous_history_mode
       >>=? fun new_caboose ->
@@ -521,8 +527,11 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
       write_savepoint block_store new_savepoint >>=? fun () ->
       write_caboose block_store new_caboose >>=? fun () -> return_unit
   | (Full _, Full m) ->
+      let m =
+        (Option.value m ~default:History_mode.default_additional_cycles).offset
+      in
       (* Only the savepoint can be updated *)
-      infer_savepoint block_store current_head ~target_offset:m.offset
+      infer_savepoint block_store current_head ~target_offset:m
       >>=? fun new_savepoint ->
       Cemented_block_store.trigger_gc
         (cemented_block_store block_store)
@@ -530,14 +539,17 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
       >>= fun () ->
       write_savepoint block_store new_savepoint >>=? fun () -> return_unit
   | (Archive, Full m) | (Archive, Rolling m) ->
+      let m =
+        (Option.value m ~default:History_mode.default_additional_cycles).offset
+      in
       (* Both the caboose and savepoint can be updated *)
-      infer_savepoint block_store current_head ~target_offset:m.offset
+      infer_savepoint block_store current_head ~target_offset:m
       >>=? fun new_savepoint ->
       infer_caboose
         block_store
         new_savepoint
         current_head
-        ~target_offset:m.offset
+        ~target_offset:m
         ~new_history_mode
         ~previous_history_mode
       >>=? fun new_caboose ->
@@ -561,7 +573,11 @@ let compute_new_savepoint block_store history_mode ~min_level_to_preserve
   | History_mode.Archive ->
       (* new_savepoint = savepoint = genesis *)
       return savepoint
-  | Full {offset} | Rolling {offset} -> (
+  | Full offset | Rolling offset -> (
+      let offset =
+        (Option.value offset ~default:History_mode.default_additional_cycles)
+          .offset
+      in
       read_predecessor_block_by_level
         block_store
         ~head:new_head
@@ -634,10 +650,14 @@ let compute_new_caboose block_store history_mode ~new_savepoint
   | History_mode.Archive | Full _ ->
       (* caboose = genesis *)
       return caboose
-  | Rolling {offset} ->
+  | Rolling offset ->
       (* If caboose equals min block to preserve, we leave it
          unchanged. Note: Caboose cannot normally be >
          min_level_to_preserve. *)
+      let offset =
+        (Option.value offset ~default:History_mode.default_additional_cycles)
+          .offset
+      in
       if Compare.Int32.(snd caboose >= min_level_to_preserve) then
         return caboose
       else if
@@ -946,51 +966,62 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
               cement_blocks ~write_metadata:true block_store cycle)
             cycles_interval_to_cement
           >>=? fun () -> return (new_savepoint, new_caboose)
-      | Rolling {offset} when offset > 0 ->
-          (* Only cement <offset> cycles *)
-          let cycles_interval_to_cement =
-            List.remove
-              (List.length cycles_interval_to_cement - offset)
-              cycles_interval_to_cement
+      | Rolling offset ->
+          let offset =
+            (Option.value
+               offset
+               ~default:History_mode.default_additional_cycles)
+              .offset
           in
-          List.iter_es
-            (fun cycle_range ->
-              cycle_reader cycle_range >>=? fun cycle ->
-              cement_blocks ~write_metadata:true block_store cycle)
-            cycles_interval_to_cement
-          >>=? fun () ->
-          (* Clean-up the files that are below the offset *)
-          Cemented_block_store.trigger_gc
-            block_store.cemented_store
-            history_mode
-          >>= fun () -> return (new_savepoint, new_caboose)
-      | Full {offset} when offset > 0 ->
-          (* If the [offset] > 0 then the cemented store's GC should be
-             called to clean-up old cycles. *)
-          List.iter_es
-            (fun cycle_range ->
-              cycle_reader cycle_range >>=? fun cycle ->
-              cement_blocks ~write_metadata:true block_store cycle)
-            cycles_interval_to_cement
-          >>=? fun () ->
-          (* Clean-up the files that are below the offset *)
-          Cemented_block_store.trigger_gc
-            block_store.cemented_store
-            history_mode
-          >>= fun () -> return (new_savepoint, new_caboose)
-      | Full {offset} ->
-          assert (offset = 0) ;
-          List.iter_es
-            (fun cycle_range ->
-              cycle_reader cycle_range >>=? fun cycle ->
-              (* In full 0, we do not store the metadata *)
-              cement_blocks ~write_metadata:false block_store cycle)
-            cycles_interval_to_cement
-          >>=? fun () -> return (new_savepoint, new_caboose)
-      | Rolling {offset} ->
-          assert (offset = 0) ;
-          (* Don't cement any cycles! *)
-          return (new_savepoint, new_caboose))
+          if offset > 0 then
+            (* Only cement <offset> cycles *)
+            let cycles_interval_to_cement =
+              List.remove
+                (List.length cycles_interval_to_cement - offset)
+                cycles_interval_to_cement
+            in
+            List.iter_es
+              (fun cycle_range ->
+                cycle_reader cycle_range >>=? fun cycle ->
+                cement_blocks ~write_metadata:true block_store cycle)
+              cycles_interval_to_cement
+            >>=? fun () ->
+            (* Clean-up the files that are below the offset *)
+            Cemented_block_store.trigger_gc
+              block_store.cemented_store
+              history_mode
+            >>= fun () -> return (new_savepoint, new_caboose)
+          else (* Don't cement any cycles! *)
+            return (new_savepoint, new_caboose)
+      | Full offset ->
+          let offset =
+            (Option.value
+               offset
+               ~default:History_mode.default_additional_cycles)
+              .offset
+          in
+          if offset > 0 then
+            (* If the [offset] > 0 then the cemented store's GC should be
+               called to clean-up old cycles. *)
+            List.iter_es
+              (fun cycle_range ->
+                cycle_reader cycle_range >>=? fun cycle ->
+                cement_blocks ~write_metadata:true block_store cycle)
+              cycles_interval_to_cement
+            >>=? fun () ->
+            (* Clean-up the files that are below the offset *)
+            Cemented_block_store.trigger_gc
+              block_store.cemented_store
+              history_mode
+            >>= fun () -> return (new_savepoint, new_caboose)
+          else
+            List.iter_es
+              (fun cycle_range ->
+                cycle_reader cycle_range >>=? fun cycle ->
+                (* In full 0, we do not store the metadata *)
+                cement_blocks ~write_metadata:false block_store cycle)
+              cycles_interval_to_cement
+            >>=? fun () -> return (new_savepoint, new_caboose))
     (fun exn ->
       Floating_block_store.close new_ro_store >>= fun () -> Lwt.fail exn)
   >>=? fun (new_savepoint, new_caboose) ->
