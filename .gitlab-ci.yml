@@ -103,6 +103,15 @@ stages:
       when: on_success
     - when: never
 
+# Rules for all the jobs that are run only for the latest release branch
+.rules_template__latest_release:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "latest-release" && $CI_PROJECT_NAMESPACE == "tezos"'
+      when: on_success
+    - when: never
+
 # Rules for specific topics: doc, opam, etc.
 .rules_template__development_documentation:
   rules:

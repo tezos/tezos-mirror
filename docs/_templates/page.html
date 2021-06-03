@@ -1,0 +1,14 @@
+{% block header %}
+  {% if version == "master" or version == "local" %}
+    <div id="version-warning" style="padding: .5em; text-align: center; background-color: #FFBABA; color: #6A0E0E;">
+    You're reading the documentation for the <b>master</b> branch.
+    <!--See also the <a href="https://tezos.gitlab.io/stable">latest release doc</a>.-->
+  {% else %}
+    <div id="version-warning" style="padding: .5em; text-align: center; background-color: LightGreen; color: #6A0E0E;">
+    You're reading the documentation for the <b>latest release</b>.
+    See also the <a href="https://tezos.gitlab.io">master branch doc</a>.
+  {% endif %}
+</div>
+{% endblock %}
+
+{% extends "!page.html" %}
