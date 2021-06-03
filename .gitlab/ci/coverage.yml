@@ -1,6 +1,5 @@
-# This job is manual. It can be launched from the gitlab CI interface.
-# It instruments the code with bisect_ppx and runs the full test suite
-# (sequentially).
+# This job is scheduled. It instruments the code with bisect_ppx and
+# runs the full test suite (sequentially).
 
 test_coverage:
   extends:

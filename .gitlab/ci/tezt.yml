@@ -34,6 +34,8 @@ tezt:3:
   variables:
     TEZT_JOB: 3
 
+# Note: if you reactivate this test and if you keep it manual, put it in the "manual" stage.
+#
 #tezt:manual:migration:
 #  extends:
 #    - .test_template
