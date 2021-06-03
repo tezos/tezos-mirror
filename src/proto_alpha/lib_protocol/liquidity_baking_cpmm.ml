@@ -5,7 +5,7 @@ let script_hex : Hex.t =
 let script_bytes : Bytes.t = Hex.to_bytes script_hex
 
 let script_opt : Script_repr.expr option =
-  Data_encoding.Binary.of_bytes Script_repr.expr_encoding script_bytes
+  Data_encoding.Binary.of_bytes_opt Script_repr.expr_encoding script_bytes
 
 let script : Script_repr.expr =
   Option.value_f ~default:(fun () -> assert false) script_opt

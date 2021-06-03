@@ -2321,7 +2321,7 @@ let parse_key ctxt = function
       Gas.consume ctxt Typecheck_costs.public_key_optimized
       >>? fun ctxt ->
       match
-        Data_encoding.Binary.of_bytes Signature.Public_key.encoding bytes
+        Data_encoding.Binary.of_bytes_opt Signature.Public_key.encoding bytes
       with
       | Some k -> ok (k, ctxt)
       | None ->
@@ -2347,7 +2347,9 @@ let parse_key_hash ctxt = function
       Gas.consume ctxt Typecheck_costs.key_hash_optimized
       >>? fun ctxt ->
       match
-        Data_encoding.Binary.of_bytes Signature.Public_key_hash.encoding bytes
+        Data_encoding.Binary.of_bytes_opt
+          Signature.Public_key_hash.encoding
+          bytes
       with
       | Some k -> ok (k, ctxt)
       | None ->
@@ -2368,7 +2370,7 @@ let parse_key_hash ctxt = function
 let parse_signature ctxt = function
   | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.signature_optimized >>? fun ctxt ->
-      match Data_encoding.Binary.of_bytes Signature.encoding bytes with
+      match Data_encoding.Binary.of_bytes_opt Signature.encoding bytes with
       | Some k -> ok (k, ctxt)
       | None ->
           error
@@ -2388,7 +2390,7 @@ let parse_signature ctxt = function
 let parse_chain_id ctxt = function
   | Bytes (loc, bytes) as expr -> (
       Gas.consume ctxt Typecheck_costs.chain_id_optimized >>? fun ctxt ->
-      match Data_encoding.Binary.of_bytes Chain_id.encoding bytes with
+      match Data_encoding.Binary.of_bytes_opt Chain_id.encoding bytes with
       | Some k -> ok (k, ctxt)
       | None ->
           error
@@ -2409,7 +2411,7 @@ let parse_address ctxt = function
   | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
       match
-        Data_encoding.Binary.of_bytes
+        Data_encoding.Binary.of_bytes_opt
           Data_encoding.(tup2 Contract.encoding Variable.string)
           bytes
       with
@@ -2944,7 +2946,7 @@ let rec parse_data :
   (* Sapling *)
   | (Sapling_transaction_t (memo_size, _), Bytes (_, bytes)) -> (
       match
-        Data_encoding.Binary.of_bytes Sapling.transaction_encoding bytes
+        Data_encoding.Binary.of_bytes_opt Sapling.transaction_encoding bytes
       with
       | Some transaction -> (
           match Sapling.transaction_get_memo_size transaction with

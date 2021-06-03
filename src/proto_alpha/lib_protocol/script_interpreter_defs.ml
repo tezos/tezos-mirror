@@ -698,7 +698,7 @@ let unpack ctxt ~ty ~bytes =
     && Compare.Int.(TzEndian.get_uint8 bytes 0 = 0x05)
   then
     let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
-    match Data_encoding.Binary.of_bytes Script.expr_encoding bytes with
+    match Data_encoding.Binary.of_bytes_opt Script.expr_encoding bytes with
     | None ->
         Lwt.return
           ( Gas.consume ctxt (Interp_costs.unpack_failed bytes) >|? fun ctxt ->
