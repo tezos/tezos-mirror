@@ -98,6 +98,8 @@ let tezos_protocol_env =
       tezos_protocol_environment_sigs__V1_cmi );
     ( "Tezos_protocol_environment_sigs__V2",
       tezos_protocol_environment_sigs__V2_cmi );
+    ( "Tezos_protocol_environment_sigs__V3",
+      tezos_protocol_environment_sigs__V3_cmi );
   ]
 
 let register_env =

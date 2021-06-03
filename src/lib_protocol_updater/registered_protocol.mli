@@ -94,3 +94,16 @@ module Register_embedded_V2
      and type P.operation_data = Proto.operation_data
      and type P.operation_receipt = Proto.operation_receipt
      and type P.validation_state = Proto.validation_state
+
+module Register_embedded_V3
+    (Env : Tezos_protocol_environment.V3)
+    (Proto : Env.Updater.PROTOCOL) (Source : sig
+      val hash : Protocol_hash.t option
+
+      val sources : Protocol.t
+    end) :
+  T
+    with type P.block_header_data = Proto.block_header_data
+     and type P.operation_data = Proto.operation_data
+     and type P.operation_receipt = Proto.operation_receipt
+     and type P.validation_state = Proto.validation_state
