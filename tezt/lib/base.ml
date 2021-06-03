@@ -31,6 +31,24 @@ let ( let* ) = Lwt.bind
 
 let ( and* ) = Lwt.both
 
+let ( and*! ) a b =
+  let (main_promise, main_awakener) = Lwt.task () in
+  let already_woke_up = ref false in
+  Lwt.on_failure a (fun exn ->
+      if not !already_woke_up then (
+        already_woke_up := true ;
+        Lwt.wakeup_exn main_awakener exn) ;
+      Lwt.cancel b) ;
+  Lwt.on_failure b (fun exn ->
+      if not !already_woke_up then (
+        already_woke_up := true ;
+        Lwt.wakeup_exn main_awakener exn) ;
+      Lwt.cancel a) ;
+  let both = Lwt.both a b in
+  Lwt.on_success both (fun x -> Lwt.wakeup main_awakener x) ;
+  Lwt.on_cancel main_promise (fun () -> Lwt.cancel both) ;
+  main_promise
+
 let return = Lwt.return
 
 let unit = Lwt.return_unit
