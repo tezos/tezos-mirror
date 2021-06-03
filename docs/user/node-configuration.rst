@@ -201,6 +201,8 @@ The list of the Tezos components that can be logged and the syntax for the loggi
     :start-after: DEBUG
     :end-before: OPTIONS
 
+Additionally, specific logs can be activated for the context part, see the :ref:`storage layer <context_component>` documentation.
+
 Event-based logging
 ~~~~~~~~~~~~~~~~~~~
 
