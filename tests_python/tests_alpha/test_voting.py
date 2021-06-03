@@ -1,19 +1,18 @@
+import copy
 import shutil
-
 import pytest
-
 from client.client import Client
 from tools import constants, paths, utils
-
 from . import protocol
 
 
 @pytest.fixture(scope="class")
 def client(sandbox):
     """One node, 4 blocks per voting period."""
-    parameters = dict(protocol.PARAMETERS)
-    parameters["time_between_blocks"] = ["1", "0"]
+    proto_params = dict(protocol.PARAMETERS)
+    parameters = copy.deepcopy(proto_params)
     parameters["blocks_per_voting_period"] = 4
+    parameters['consensus_threshold'] = 0
     sandbox.add_node(0, params=constants.NODE_PARAMS)
     protocol.activate(sandbox.client(0), parameters, activate_in_the_past=True)
     yield sandbox.client(0)
@@ -77,8 +76,9 @@ class TestManualBaking:
 
     def test_inject_proto1(self, client: Client, tmpdir):
         proto_fp = (
-            f'{paths.TEZOS_HOME}/src/' f'bin_client/test/proto_test_injection'
+            f'{paths.TEZOS_HOME}/src/bin_client/test/proto_test_injection'
         )
+
         for i in range(1, 4):
             proto = f'{tmpdir}/proto{i}'
             shutil.copytree(proto_fp, proto)
@@ -144,9 +144,9 @@ class TestManualBaking:
 
     def test_bake_last_block_of_proposal_period(self, client: Client):
         utils.bake(client)
-        level = client.get_current_level()
         period_info = client.get_current_period()
         metadata = client.get_metadata()
+        level = client.get_current_level()
         level_info = metadata["level_info"]
         meta_period_info = metadata["voting_period_info"]
         expected_commitment = level["expected_commitment"]

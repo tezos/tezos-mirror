@@ -64,7 +64,7 @@ class TestMultiNodeSnapshot:
     def test_bake_batch_1(self, sandbox, session):
         for _ in range(BATCH_1):
             utils.bake(sandbox.client(0))
-            sandbox.client(0).endorse('bootstrap2')
+            sandbox.client(0).run(['endorse', "for", 'bootstrap2', '--force'])
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         session['head_level'] = sandbox.client(0).get_head()['header']['level']
         session['snapshot_level'] = session['head_level']
@@ -256,7 +256,7 @@ class TestMultiNodeSnapshot:
     def test_bake_batch_2(self, sandbox, session):
         for _ in range(BATCH_2):
             utils.bake(sandbox.client(0))
-            sandbox.client(0).endorse('bootstrap2')
+            sandbox.client(0).run(['endorse', 'for', 'bootstrap2', '--force'])
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         session['head_level'] = sandbox.client(0).get_head()['header']['level']
         for i in GROUP2:
@@ -408,7 +408,7 @@ class TestMultiNodeSnapshot:
     def test_bake_batch_3(self, sandbox, session):
         for _ in range(BATCH_3):
             utils.bake(sandbox.client(0))
-            sandbox.client(0).endorse('bootstrap2')
+            sandbox.client(0).run(['endorse', 'for', 'bootstrap2', '--force'])
         session['head_hash'] = sandbox.client(0).get_head()['hash']
         session['head_level'] = sandbox.client(0).get_head()['header']['level']
         session['snapshot_level'] = session['head_level']

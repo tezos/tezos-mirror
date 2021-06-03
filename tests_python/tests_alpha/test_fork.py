@@ -17,7 +17,11 @@ class TestFork:
     def test_init(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
-        protocol.activate(sandbox.client(0))
+        parameters = protocol.get_parameters()
+        parameters['consensus_threshold'] = 0
+        protocol.activate(
+            sandbox.client(0), parameters=parameters, activate_in_the_past=True
+        )
 
     def test_level(self, sandbox: Sandbox):
         level = 1
@@ -35,14 +39,14 @@ class TestFork:
     def test_endorse_node_0(self, sandbox: Sandbox, session: dict):
         """bootstrap1 builds an endorsement for block A"""
         client = sandbox.client(0)
-        client.endorse('bootstrap1')
+        client.run(["endorse", "for", "bootstrap1", "--force"])
         mempool = client.get_mempool()
         endorsement = mempool['applied'][0]
         session['endorsement1'] = endorsement
 
     def test_bake_node_0_again(self, sandbox: Sandbox):
         """Client 0 bakes block A' at level 3, not communicated to 1 and 2"""
-        utils.bake(sandbox.client(0))
+        utils.bake(sandbox.client(0), bake_for='bootstrap1')
 
     def test_first_branch(self, sandbox: Sandbox, session: dict):
         head = sandbox.client(0).get_head()
@@ -59,17 +63,17 @@ class TestFork:
 
     def test_bake_node_2(self, sandbox: Sandbox):
         """Client 2 bakes block B at level 2, not communicated to 0 and 1"""
-        utils.bake(sandbox.client(2))
+        utils.bake(sandbox.client(2), bake_for='bootstrap1')
 
     def test_bake_node_2_again(self, sandbox: Sandbox):
         """Client 2 bakes block B' at level 3, not communicated to 0 and 1"""
-        utils.bake(sandbox.client(2))
+        utils.bake(sandbox.client(2), bake_for='bootstrap1')
 
     def test_second_branch(self, sandbox: Sandbox, session: dict):
         head = sandbox.client(2).get_head()
         session['hash2'] = head['hash']
         assert head['header']['level'] == 3
-        assert not head['operations'][0]
+        assert len(head['operations'][0]) == 1
 
     def test_restart_all(self, sandbox: Sandbox):
         sandbox.node(0).run()
@@ -77,9 +81,8 @@ class TestFork:
         assert sandbox.client(0).check_node_listening()
         assert sandbox.client(1).check_node_listening()
 
-
-#    def test_check_head(self, sandbox: Sandbox, session: dict):
-#        """All nodes are at level 3, head should be hash1"""
-#        for client in sandbox.all_clients():
-#            head = client.get_head()
-#            assert session['hash1'] == head['hash']
+    def test_check_head(self, sandbox: Sandbox, session: dict):
+        """All nodes are at level 3, head should be hash1"""
+        for client in sandbox.all_clients():
+            head = client.get_head()
+            assert session['hash1'] == head['hash']

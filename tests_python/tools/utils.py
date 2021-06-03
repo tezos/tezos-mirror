@@ -420,11 +420,11 @@ def contract_name_of_file(contract_path: str) -> str:
 
 
 def bake(
-    client: Client, bake_for='bootstrap1', bake_args: List[str] = None
+    client: Client,
+    bake_for: str = 'bootstrap1',
+    bake_args: List[str] = None,
 ) -> BakeForResult:
     default_bake_args = [
-        '--max-priority',
-        '1024',
         '--minimal-timestamp',
         '--minimal-fees',
         '0',
@@ -537,6 +537,12 @@ def client_output_converter(pre):
     )
 
     # Scrub receipt
+    # FIXME: Maybe use something more specific like
+    # Injecting block for [CONTRACT_HASH] at [LEVEL], [ROUND],
+    # with [TIMESTAMP], on top of [BLOCK_HASH]
+    # [ROUND] and [TIMESTAMP] needs to be created above
+    pre = re.sub(r"Injecting block .+", "Injecting block ", pre)
+
     pre = re.sub(
         r"Operation hash is '\w+'", "Operation hash is '[OPERATION_HASH]'", pre
     )

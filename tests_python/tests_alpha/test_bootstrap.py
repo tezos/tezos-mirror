@@ -18,6 +18,11 @@ def params(threshold=0, latency=3):
     ]
 
 
+def add_fully_delegated_baker(sandbox: Sandbox, node: int, protocol: str):
+    """Add a baker that has all known bootstrap accounts delegated to it."""
+    sandbox.add_baker(node, [], proto=protocol)
+
+
 @pytest.mark.baker
 @pytest.mark.incremental
 class TestThresholdZero:
@@ -25,7 +30,7 @@ class TestThresholdZero:
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
 
     def test_bootstrap(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -41,7 +46,7 @@ class TestThresholdOne:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
         protocol.activate(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
 
     def test_bootstrap(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -61,7 +66,8 @@ class TestThresholdTwo:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(0), log_levels=LOG_LEVEL)
         protocol.activate(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        time.sleep(3)
+        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
 
     def test_add_nodes(self, sandbox: Sandbox):
         sandbox.add_node(
@@ -74,10 +80,13 @@ class TestThresholdTwo:
             3, params=params(1), log_levels=LOG_LEVEL, config_client=False
         )
 
-    @pytest.mark.timeout(5)
+    # Some lower timeouts (5, 10) make the test fails. 15 seems to be enough
+    # If the test fails again, look at increasing this timeout first.
+    @pytest.mark.timeout(15)
     def test_node_3_bootstrapped(self, sandbox: Sandbox):
         sandbox.client(3).bootstrapped()
 
+    # See comment for previous test
     @pytest.mark.timeout(5)
     def test_node_1_bootstrapped(self, sandbox: Sandbox):
         sandbox.client(1).bootstrapped()
@@ -91,11 +100,11 @@ class TestStuck:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
         protocol.activate(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        add_fully_delegated_baker(sandbox, 0, protocol.DAEMON)
 
     def test_kill_baker(self, sandbox: Sandbox):
         """Bake a few blocks and kill baker"""
-        time.sleep(2)
+        time.sleep(14)
         sandbox.rm_baker(0, proto=protocol.DAEMON)
         time.sleep(5)
 
@@ -134,7 +143,7 @@ class TestSplitView:
             config_client=False,
             log_levels=LOG_LEVEL,
         )
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        add_fully_delegated_baker(sandbox, 0, protocol.DAEMON)
 
     @pytest.mark.timeout(10)
     def test_all_nodes_boostrap(self, sandbox: Sandbox):
@@ -170,10 +179,10 @@ class TestManyNodesBootstrap:
 
     def test_init(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        parameters = dict(protocol.PARAMETERS)
-        parameters["time_between_blocks"] = ["1", "0"]
-        protocol.activate(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap1', proto=protocol.DAEMON)
+        parameters = protocol.get_parameters()
+        protocol.activate(sandbox.client(0), parameters=parameters)
+        time.sleep(3)
+        add_fully_delegated_baker(sandbox, 0, protocol.DAEMON)
         sandbox.add_node(
             1, params=params(), log_levels=LOG_LEVEL, config_client=False
         )

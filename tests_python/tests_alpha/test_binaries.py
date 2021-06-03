@@ -12,7 +12,7 @@ from . import protocol
 
 PROTO_BINARIES = [
     binary + "-" + protocol.DAEMON
-    for binary in ["tezos-baker", "tezos-endorser", "tezos-accuser"]
+    for binary in ["tezos-baker", "tezos-accuser"]
 ]
 
 BINARIES = [

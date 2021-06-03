@@ -23,9 +23,9 @@ class TestManyNodesBootstrap:
         parameters = dict(protocol.PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
         protocol.activate(sandbox.client(0), parameters)
-        sandbox.add_baker(0, 'bootstrap1', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap1'], proto=protocol.DAEMON)
         sandbox.add_node(1, params=constants.NODE_PARAMS)
-        sandbox.add_baker(1, 'bootstrap2', proto=protocol.DAEMON)
+        sandbox.add_baker(1, ['bootstrap2'], proto=protocol.DAEMON)
 
     def test_add_nodes(self, sandbox: Sandbox):
         for i in range(2, NUM_NODES):

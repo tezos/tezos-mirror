@@ -990,7 +990,7 @@ class TestContractOpcodes:
                 'voting_power.tz',
                 '(Pair 0 0)',
                 f'"{PUBLIC_KEY}"',
-                '(Pair 500 2500)',
+                '(Pair 666 3330)',
             ),
             # Test KECCAK
             (

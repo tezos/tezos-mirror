@@ -33,7 +33,7 @@ class TestNonceSeedRevelation:
         node_params = constants.NODE_PARAMS + ['--history-mode', 'archive']
         sandbox.add_node(0, params=node_params)
         protocol.activate(sandbox.client(0), activate_in_the_past=True)
-        sandbox.add_baker(0, 'bootstrap1', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap1'], proto=protocol.DAEMON)
 
     @pytest.mark.timeout(TIMEOUT)
     def test_wait_for_two_cycles(self, sandbox: Sandbox):

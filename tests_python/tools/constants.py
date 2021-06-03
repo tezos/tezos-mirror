@@ -4,13 +4,14 @@ import os.path
 from tools import paths
 
 
-def get_parameters(folder: str) -> dict:
-    """Takes a protocol folder ('proto_alpha', 'proto_005_PsBabyM1'...) and
+def get_parameters(folder: str, network='test') -> dict:
+    """Takes a protocol suffix ('alpha', '005_PsBabyM1'...) and
     retrieve json test parameters for that protocol. Assertion failure
     if parameters can't be found."""
 
     params_file = (
-        f'{paths.TEZOS_HOME}src/{folder}/parameters/' 'test-parameters.json'
+        f'{paths.TEZOS_HOME}/src/{folder}/parameters/'
+        f'{network}-parameters.json'
     )
     assert os.path.isfile(params_file), (
         f'{params_file}'
@@ -256,3 +257,13 @@ A high-number of connections helps triggering the maintenance process
  some spurious deadlocks (e.g. a node not broadcasting its head).
 """
 NODE_PARAMS = ['--connections', '100', '--synchronisation-threshold', '0']
+
+TENDERBAKE_BAKER_LOG_LEVELS = {"alpha.baker.*": "debug"}
+
+TENDERBAKE_NODE_LOG_LEVELS = {
+    "node.chain_validator": "debug",
+    "node.validator.block": "debug",
+    "node_prevalidator": "debug",
+    "validator.block": "debug",
+    "validator.chain": "debug",
+}
