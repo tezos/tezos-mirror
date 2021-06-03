@@ -73,23 +73,20 @@ module Crypto = struct
     P2p_io_scheduler.write ?canceler fd payload
 
   let read_chunk ?canceler fd cryptobox_data =
+    let open P2p_io_scheduler in
     let header_buf = Bytes.create header_length in
-    P2p_io_scheduler.read_full ?canceler ~len:header_length fd header_buf
-    >>=? fun () ->
+    read_full ?canceler fd @@ mk_buffer_safe header_buf >>=? fun () ->
     let encrypted_length = TzEndian.get_uint16 header_buf 0 in
     fail_unless
       (encrypted_length >= tag_length)
       P2p_errors.Invalid_incoming_ciphertext_size
     >>=? fun () ->
     let tag = Bytes.create tag_length in
-    P2p_io_scheduler.read_full ?canceler ~len:tag_length fd tag >>=? fun () ->
+    read_full ?canceler fd @@ mk_buffer_safe tag >>=? fun () ->
+    (* [msg_length] is [>= 0], as guaranteed by the [fail_unless] guard above. *)
     let msg_length = encrypted_length - tag_length in
     let msg = Bytes.create msg_length in
-    (* read_full fails if msg is empty *)
-    (if msg_length > 0 then
-     P2p_io_scheduler.read_full ?canceler ~len:msg_length fd msg
-    else return_unit)
-    >>=? fun () ->
+    read_full ?canceler fd @@ mk_buffer_safe msg >>=? fun () ->
     let remote_nonce = cryptobox_data.remote_nonce in
     cryptobox_data.remote_nonce <- Crypto_box.increment_nonce remote_nonce ;
     match
@@ -168,14 +165,17 @@ module Connection_message = struct
         return buf
 
   let read ~canceler fd =
+    let open P2p_io_scheduler in
     let header_buf = Bytes.create Crypto.header_length in
-    P2p_io_scheduler.read_full ~canceler ~len:Crypto.header_length fd header_buf
-    >>=? fun () ->
+    read_full ~canceler fd @@ mk_buffer_safe header_buf >>=? fun () ->
     let len = TzEndian.get_uint16 header_buf 0 in
     let pos = Crypto.header_length in
     let buf = Bytes.create (pos + len) in
-    TzEndian.set_int16 buf 0 len ;
-    P2p_io_scheduler.read_full ~canceler ~len ~pos fd buf >>=? fun () ->
+    TzEndian.set_uint16 buf 0 len ;
+    (* This call to [mk_buffer] is safe (it can't [Error] out)
+       but we cannot use [mk_buffer_safe], because we need to specify
+       ~len and ~pos. *)
+    mk_buffer ~len ~pos buf >>?= read_full ~canceler fd >>=? fun () ->
     let buf = Bytes.unsafe_to_string buf in
     match Data_encoding.Binary.read encoding buf pos len with
     | Error re -> fail (P2p_errors.Decoding_error re)
