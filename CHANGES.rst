@@ -20,6 +20,8 @@ be documented here either.
 Node
 ----
 
+-  Fixed wrong error message in case of p2p network address binding collision.
+
 Client
 ------
 
