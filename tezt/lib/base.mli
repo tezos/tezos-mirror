@@ -81,7 +81,7 @@ val take : int -> 'a list -> 'a list
 type rex
 
 (** Compile a regular expression using Perl syntax. *)
-val rex : string -> rex
+val rex : ?opts:Re.Perl.opt list -> string -> rex
 
 (** Convert a regular expression to a string using Perl syntax. *)
 val show_rex : rex -> string
