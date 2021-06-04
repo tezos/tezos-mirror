@@ -446,7 +446,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         | Refused errors ->
             handle_refused pv op.raw op.hash errors ;
             Lwt.return (validation_state, mempool)
-        | Duplicate -> Lwt.return (validation_state, mempool)
         | Outdated ->
             Distributed_db.Operation.clear_or_cancel pv.parameters.chain_db oph ;
             Lwt.return (validation_state, mempool))

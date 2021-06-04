@@ -60,7 +60,6 @@ module type T = sig
     | Branch_delayed of error list
     | Branch_refused of error list
     | Refused of error list
-    | Duplicate
     | Outdated
 
   val apply_operation : t -> operation -> result Lwt.t
@@ -100,7 +99,6 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     | Branch_delayed of error list
     | Branch_refused of error list
     | Refused of error list
-    | Duplicate
     | Outdated
 
   let parse (raw : Operation.t) =
@@ -231,7 +229,6 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
     | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_error err
     | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_error err
     | Refused err -> fprintf ppf "refused (%a)" pp_print_error err
-    | Duplicate -> pp_print_string ppf "duplicate"
     | Outdated -> pp_print_string ppf "outdated"
 end
 
@@ -272,7 +269,7 @@ let preapply chain_store ~user_activated_upgrades
           Operation_hash.Map.add op.hash (op.raw, errors) preapp.refused
         in
         Lwt.return ({preapp with refused}, t)
-    | Duplicate | Outdated -> Lwt.return (preapp, t)
+    | Outdated -> Lwt.return (preapp, t)
   in
   Store.Chain.compute_live_blocks chain_store ~block:predecessor
   >>=? fun (live_blocks, live_operations) ->

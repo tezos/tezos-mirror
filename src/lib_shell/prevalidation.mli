@@ -62,7 +62,6 @@ module type T = sig
     | Branch_delayed of error list
     | Branch_refused of error list
     | Refused of error list
-    | Duplicate
     | Outdated
 
   val apply_operation : t -> operation -> result Lwt.t
