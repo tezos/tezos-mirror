@@ -51,7 +51,7 @@ let test_normalize_vanilla =
     ~tags:["normalize"; "data"]
   @@ fun protocol ->
   let* node = Node.init [] in
-  let* client = Client.init ~node () in
+  let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   let* _ = execute_all_modes client in
   Lwt.return_unit

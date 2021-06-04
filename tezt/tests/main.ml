@@ -50,6 +50,7 @@ let () =
   Mockup.register_constant_migration ~migrate_from:Florence ~migrate_to:Alpha ;
   Node_event_level.register ~protocols:[Alpha] ;
   Proxy.register ~protocols:[Protocol.current_mainnet; Alpha] ;
+  Proxy_server_test.register ~protocols:[Alpha] ;
   P2p.register ~protocols:[Alpha] ;
   Protocol_limits.register ~protocols:[Alpha] ;
   (* TODO: the "Baking" test does not have a documentation.

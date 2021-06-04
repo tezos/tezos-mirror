@@ -25,12 +25,17 @@
 
 (** Run Tezos client commands. *)
 
+(** Values that can be passed to the client's [--endpoint] argument *)
+type endpoint =
+  | Node of Node.t  (** A full-fledged node *)
+  | Proxy_server of Proxy_server.t  (** A proxy server *)
+
 (** Mode of the client *)
 type mode =
-  | Client of Node.t option
+  | Client of endpoint option
   | Mockup
-  | Light of float * Node.t list
-  | Proxy of Node.t
+  | Light of float * endpoint list
+  | Proxy of endpoint
 
 (** The synchronization mode of the client.
 
@@ -58,9 +63,9 @@ val base_dir : t -> string
     Default [base_dir] is a temporary directory
     which is always the same for each [name].
 
-    The node argument is used to know which port the client should connect to.
-    This node can be overridden for each command, as a client is not actually tied
-    to a node. Most commands require a node to be specified (either with [create]
+    The endpoint argument is used to know which port the client should connect to.
+    This endpoint can be overridden for each command, as a client is not actually tied
+    to an endpoint. Most commands require an endpoint to be specified (either with [create]
     or with the command itself). *)
 val create :
   ?path:string ->
@@ -68,7 +73,7 @@ val create :
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   unit ->
   t
 
@@ -117,11 +122,12 @@ val rpc_path_query_to_string : ?query_string:query_string -> path -> string
 
     Run [rpc meth path?query_string with data].
     Fail the test if the RPC call failed.
+
     [env] can be used to customize environment variables, e.g.
     [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")] to enable
     logging. *)
 val rpc :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   ?hooks:Process.hooks ->
   ?env:string String_map.t ->
   ?data:JSON.u ->
@@ -133,7 +139,7 @@ val rpc :
 
 (** Same as [rpc], but do not wait for the process to exit. *)
 val spawn_rpc :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   ?hooks:Process.hooks ->
   ?env:string String_map.t ->
   ?data:JSON.u ->
@@ -144,18 +150,18 @@ val spawn_rpc :
   Process.t
 
 (** Run [tezos-client rpc list]. *)
-val rpc_list : ?node:Node.t -> t -> string Lwt.t
+val rpc_list : ?endpoint:endpoint -> t -> string Lwt.t
 
 (** Same as [rpc_list], but do not wait for the process to exit. *)
-val spawn_rpc_list : ?node:Node.t -> t -> Process.t
+val spawn_rpc_list : ?endpoint:endpoint -> t -> Process.t
 
 (** Run [tezos-client rpc /chains/<chain>/blocks/<block>/header/shell]. *)
 val shell_header :
-  ?node:Node.t -> ?chain:string -> ?block:string -> t -> string Lwt.t
+  ?endpoint:endpoint -> ?chain:string -> ?block:string -> t -> string Lwt.t
 
 (** Same as [shell_header], but do not wait for the process to exit. *)
 val spawn_shell_header :
-  ?node:Node.t -> ?chain:string -> ?block:string -> t -> Process.t
+  ?endpoint:endpoint -> ?chain:string -> ?block:string -> t -> Process.t
 
 (** {2 Admin Client Commands} *)
 
@@ -163,34 +169,36 @@ module Admin : sig
   (** Run tezos-admin-client commands. *)
 
   (** Ask a node to trust the address and port of another node. *)
-  val trust_address : ?node:Node.t -> peer:Node.t -> t -> unit Lwt.t
+  val trust_address : ?endpoint:endpoint -> peer:Node.t -> t -> unit Lwt.t
 
   (** Same as [trust_address], but do not wait for the process to exit. *)
-  val spawn_trust_address : ?node:Node.t -> peer:Node.t -> t -> Process.t
+  val spawn_trust_address : ?endpoint:endpoint -> peer:Node.t -> t -> Process.t
 
   (** Connect a node to another peer. *)
-  val connect_address : ?node:Node.t -> peer:Node.t -> t -> unit Lwt.t
+  val connect_address : ?endpoint:endpoint -> peer:Node.t -> t -> unit Lwt.t
 
   (** Same as [connect_address], but do not wait for the process to exit. *)
-  val spawn_connect_address : ?node:Node.t -> peer:Node.t -> t -> Process.t
+  val spawn_connect_address :
+    ?endpoint:endpoint -> peer:Node.t -> t -> Process.t
 
   (** Kick a peer.
 
       [peer] is the identity of the peer to kick.
       You can get it with [Node.wait_for_identity] for instance. *)
-  val kick_peer : ?node:Node.t -> peer:string -> t -> unit Lwt.t
+  val kick_peer : ?endpoint:endpoint -> peer:string -> t -> unit Lwt.t
 
   (** Same as [kick_peer], but do not wait for the process to exit. *)
-  val spawn_kick_peer : ?node:Node.t -> peer:string -> t -> Process.t
+  val spawn_kick_peer : ?endpoint:endpoint -> peer:string -> t -> Process.t
 end
 
 (** {2 Regular Client Commands} *)
 
 (** Run [tezos-client import secret key]. *)
-val import_secret_key : ?node:Node.t -> t -> Constant.key -> unit Lwt.t
+val import_secret_key : ?endpoint:endpoint -> t -> Constant.key -> unit Lwt.t
 
 (** Same as [import_secret_key], but do not wait for the process to exit. *)
-val spawn_import_secret_key : ?node:Node.t -> t -> Constant.key -> Process.t
+val spawn_import_secret_key :
+  ?endpoint:endpoint -> t -> Constant.key -> Process.t
 
 (** Run [tezos-client activate protocol].
 
@@ -199,7 +207,7 @@ val spawn_import_secret_key : ?node:Node.t -> t -> Constant.key -> Process.t
     before their timestamp reach the present (at which point one would have to wait
     between each block so that peers do not reject them for being in the future). *)
 val activate_protocol :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   protocol:Protocol.t ->
   ?fitness:int ->
   ?key:string ->
@@ -211,7 +219,7 @@ val activate_protocol :
 
 (** Same as [activate_protocol], but do not wait for the process to exit. *)
 val spawn_activate_protocol :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   protocol:Protocol.t ->
   ?fitness:int ->
   ?key:string ->
@@ -225,7 +233,7 @@ val spawn_activate_protocol :
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val bake_for :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?key:string ->
   ?minimal_timestamp:bool ->
@@ -237,7 +245,7 @@ val bake_for :
 
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?key:string ->
   ?minimal_timestamp:bool ->
@@ -260,14 +268,14 @@ val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
 (** Run [tezos-client endorse for].
 
     Default [key] is {!Constant.bootstrap2.alias}. *)
-val endorse_for : ?node:Node.t -> ?key:string -> t -> unit Lwt.t
+val endorse_for : ?endpoint:endpoint -> ?key:string -> t -> unit Lwt.t
 
 (** Same as [endorse_for], but do not wait for the process to exit. *)
-val spawn_endorse_for : ?node:Node.t -> ?key:string -> t -> Process.t
+val spawn_endorse_for : ?endpoint:endpoint -> ?key:string -> t -> Process.t
 
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
   ?fee:Tez.t ->
@@ -282,7 +290,7 @@ val transfer :
 
 (** Same as [transfer], but do not wait for the process to exit. *)
 val spawn_transfer :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
   ?fee:Tez.t ->
@@ -297,7 +305,7 @@ val spawn_transfer :
 
 (** Run [tezos-client set delegate for <src> to <delegate>]. *)
 val set_delegate :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   ?wait:string ->
   src:string ->
   delegate:string ->
@@ -306,7 +314,7 @@ val set_delegate :
 
 (** Same as [set_delegate], but do not wait for the process to exit. *)
 val spawn_set_delegate :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   ?wait:string ->
   src:string ->
   delegate:string ->
@@ -315,17 +323,18 @@ val spawn_set_delegate :
 
 (** Run [tezos-client withdraw delegate from <src>]. *)
 val withdraw_delegate :
-  ?node:Node.t -> ?wait:string -> src:string -> t -> unit Lwt.t
+  ?endpoint:endpoint -> ?wait:string -> src:string -> t -> unit Lwt.t
 
 (** Same as [withdraw_delegate], but do not wait for the process to exit. *)
 val spawn_withdraw_delegate :
-  ?node:Node.t -> ?wait:string -> src:string -> t -> Process.t
+  ?endpoint:endpoint -> ?wait:string -> src:string -> t -> Process.t
 
 (** Run [tezos-client get balance for]. *)
-val get_balance_for : ?node:Node.t -> account:string -> t -> float Lwt.t
+val get_balance_for : ?endpoint:endpoint -> account:string -> t -> float Lwt.t
 
 (** Same as [get_balance_for], but do not wait for the process to exit. *)
-val spawn_get_balance_for : ?node:Node.t -> account:string -> t -> Process.t
+val spawn_get_balance_for :
+  ?endpoint:endpoint -> account:string -> t -> Process.t
 
 (** Run [tezos-client create mockup]. *)
 val create_mockup :
@@ -368,7 +377,7 @@ val spawn_submit_ballot :
 (** Run [tezos-client originate contract alias transferring amount from src
     running prg]. Returns the originated contract hash *)
 val originate_contract :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   ?wait:string ->
   ?init:string ->
   ?burn_cap:Tez.t ->
@@ -381,7 +390,7 @@ val originate_contract :
 
 (** Same as [originate_contract], but do not wait for the process to exit. *)
 val spawn_originate_contract :
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
   ?wait:string ->
   ?init:string ->
   ?burn_cap:Tez.t ->
@@ -469,7 +478,27 @@ val init :
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
-  ?node:Node.t ->
+  ?endpoint:endpoint ->
+  unit ->
+  t Lwt.t
+
+(** Set up a client and a node and activate a protocol.
+
+    - Create a client with mode [Client], [Light], or [Proxy]
+    - Import all secret keys listed in {!Constant.all_secret_keys}
+    - Activate the given protocol
+    - Bake (unless [~bake:false] is passed) *)
+val init_activate_bake :
+  ?path:string ->
+  ?admin_path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?base_dir:string ->
+  ?nodes_args:Node.argument list ->
+  ?parameter_file:string ->
+  ?bake:bool ->
+  [`Client | `Light | `Proxy] ->
+  protocol:Protocol.t ->
   unit ->
   t Lwt.t
 
@@ -492,15 +521,18 @@ val init_mockup :
   t Lwt.t
 
 (** Create a client with mode [Light]. In addition to the client, the list
-    of nodes is returned, as it was potentially created by this call; and
-    the light mode needs tight interaction with the nodes. *)
+    of nodes is returned, as it is created by this call; and
+    the light mode needs tight interaction with the nodes. The [nodes_args]
+    argument allows to configure the created nodes, but note
+    that arguments [Node.Connections] and [Node.Synchronisation_threshold]
+    are ignored. *)
 val init_light :
   ?path:string ->
   ?admin_path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?base_dir:string ->
-  ?nodes:Node.t list ->
   ?min_agreement:float ->
+  ?nodes_args:Node.argument list ->
   unit ->
   (t * Node.t list) Lwt.t

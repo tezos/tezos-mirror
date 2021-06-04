@@ -71,6 +71,10 @@ val range : int -> int -> int list
 (** Backport of [List.find_map] from OCaml 4.10. *)
 val list_find_map : ('a -> 'b option) -> 'a list -> 'b option
 
+(** [take n l] returns the first [n] elements of [l] if longer than [n],
+    else [l] itself. *)
+val take : int -> 'a list -> 'a list
+
 (** {2 Regular Expressions} *)
 
 (** Compiled regular expressions. *)

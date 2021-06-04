@@ -70,6 +70,11 @@ let rec list_find_map f = function
 
 type rex = string * Re.re
 
+let rec take n l =
+  if n < 0 then invalid_arg "Tezt.Base.take: argument cannot be negative"
+  else if n = 0 then []
+  else match l with [] -> [] | hd :: rest -> hd :: take (n - 1) rest
+
 let rex r = (r, Re.compile (Re.Perl.re r))
 
 let show_rex = fst

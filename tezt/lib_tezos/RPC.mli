@@ -30,19 +30,18 @@
 (** Call RPC /network/connections if [peer_id] is [None].
     Call RPC /network/connections/[peer_id] otherwise. *)
 val get_connections :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?peer_id:string ->
   Client.t ->
   JSON.t Lwt.t
 
 (** Call RPC /network/greylist/ips *)
-val get_greylist_ips :
-  ?node:Node.t -> ?hooks:Process.hooks -> Client.t -> JSON.t Lwt.t
+val get_greylist_ips : ?hooks:Process.hooks -> Client.t -> JSON.t Lwt.t
 
 (** Call RPC /chain/[chain]/chain_id *)
 val get_chain_id :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   Client.t ->
@@ -50,7 +49,7 @@ val get_chain_id :
 
 (** Call RPC /chain/[chain] *)
 val force_bootstrapped :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?bootstrapped:bool ->
@@ -59,7 +58,7 @@ val force_bootstrapped :
 
 (** Call RPC /chain/[chain]/checkpoint *)
 val get_checkpoint :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   Client.t ->
@@ -67,7 +66,7 @@ val get_checkpoint :
 
 (** Call RPC /injection/operation *)
 val inject_operation :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   data:JSON.u ->
   Client.t ->
@@ -75,7 +74,7 @@ val inject_operation :
 
 (** Call RPC /injection/block *)
 val inject_block :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   data:JSON.u ->
   Client.t ->
@@ -83,7 +82,7 @@ val inject_block :
 
 (** Call RPC /chain/[chain]/blocks/[block]/header/protocol_data *)
 val get_protocol_data :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
@@ -93,7 +92,7 @@ val get_protocol_data :
 
 (** Call RPC /chain/[chain]/blocks/head/hash *)
 val get_branch :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   Client.t ->
@@ -101,7 +100,7 @@ val get_branch :
 
 (** Call RPC /chain/[chain]/blocks/[block]/operations *)
 val get_operations :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
@@ -110,7 +109,7 @@ val get_operations :
 
 (** Call RPC /chains/[chain]/mempool/pending_operations *)
 val get_mempool_pending_operations :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   Client.t ->
@@ -118,7 +117,7 @@ val get_mempool_pending_operations :
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/preapply/block *)
 val preapply_block :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
@@ -128,7 +127,7 @@ val preapply_block :
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/forge/operations *)
 val post_forge_operations :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
@@ -140,7 +139,7 @@ val post_forge_operations :
 
 (** Call RPC /chain/[chain]/blocks/[block]/context/constants *)
 val get_constants :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
@@ -149,7 +148,7 @@ val get_constants :
 
 (** Call RPC /chain/[chain]/blocks/[block]/context/constants/errors *)
 val get_constants_errors :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
@@ -158,7 +157,7 @@ val get_constants_errors :
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/baking_rights *)
 val get_baking_rights :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
@@ -168,7 +167,7 @@ val get_baking_rights :
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/current_level *)
 val get_current_level :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
@@ -178,7 +177,7 @@ val get_current_level :
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/endorsing_rights *)
 val get_endorsing_rights :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
@@ -188,7 +187,7 @@ val get_endorsing_rights :
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/levels_in_current_cycle *)
 val get_levels_in_current_cycle :
-  ?node:Node.t ->
+  ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?block:string ->
@@ -198,7 +197,7 @@ val get_levels_in_current_cycle :
 module Big_maps : sig
   (** Call RPC /chain/[chain]/blocks/[block]/context/big_maps/[id]/[key_hash] *)
   val get :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -209,7 +208,7 @@ module Big_maps : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/big_maps/[big_map_id]?offset=[int]&length=[int] *)
   val get_all :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -221,7 +220,7 @@ module Big_maps : sig
 
   (** Same as {!get_all}, but do not wait for the process to exit. *)
   val spawn_get_all :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -237,7 +236,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts *)
   val get_all :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -246,7 +245,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
   val get_all_delegates :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -255,7 +254,7 @@ module Contracts : sig
 
   (** Same as [get_all], but do not wait for the process to exit. *)
   val spawn_get_all :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -264,7 +263,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id] *)
   val get :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -274,7 +273,7 @@ module Contracts : sig
 
   (** Same as [get], but do not wait for the process to exit. *)
   val spawn_get :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -284,7 +283,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/balance *)
   val get_balance :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -294,7 +293,7 @@ module Contracts : sig
 
   (** Same as [get_balance], but do not wait for the process to exit. *)
   val spawn_get_balance :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -304,7 +303,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/big_map_get *)
   val big_map_get :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -315,7 +314,7 @@ module Contracts : sig
 
   (** Same as [big_map_get], but do not wait for the process to exit. *)
   val spawn_big_map_get :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -326,7 +325,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/counter *)
   val get_counter :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -336,7 +335,7 @@ module Contracts : sig
 
   (** Same as [get_counter], but do not wait for the process to exit. *)
   val spawn_get_counter :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -346,7 +345,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/delegate *)
   val get_delegate :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -356,7 +355,7 @@ module Contracts : sig
 
   (** Same as [get_delegate], but do not wait for the process to exit. *)
   val spawn_get_delegate :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -366,7 +365,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/entrypoints *)
   val get_entrypoints :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -376,7 +375,7 @@ module Contracts : sig
 
   (** Same as [get_entrypoints], but do not wait for the process to exit. *)
   val spawn_get_entrypoints :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -386,7 +385,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/manager_key *)
   val get_manager_key :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -396,7 +395,7 @@ module Contracts : sig
 
   (** Same as [get_manager_key], but do not wait for the process to exit. *)
   val spawn_get_manager_key :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -406,7 +405,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/script *)
   val get_script :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -416,7 +415,7 @@ module Contracts : sig
 
   (** Same as [get_script], but do not wait for the process to exit. *)
   val spawn_get_script :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -426,7 +425,7 @@ module Contracts : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/storage *)
   val get_storage :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -436,7 +435,7 @@ module Contracts : sig
 
   (** Same as [get_storage], but do not wait for the process to exit. *)
   val spawn_get_storage :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -450,7 +449,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
   val get_all :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -459,7 +458,7 @@ module Delegates : sig
 
   (** Same as [get_all], but do not wait for the process to exit. *)
   val spawn_get_all :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -468,7 +467,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh] *)
   val get :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -478,7 +477,7 @@ module Delegates : sig
 
   (** Same as [get], but do not wait for the process to exit. *)
   val spawn_get :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -488,7 +487,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/balance *)
   val get_balance :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -498,7 +497,7 @@ module Delegates : sig
 
   (** Same as [get_balance], but do not wait for the process to exit. *)
   val spawn_get_balance :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -508,7 +507,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/deactivated *)
   val get_deactivated :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -518,7 +517,7 @@ module Delegates : sig
 
   (** Same as [get_deactivated], but do not wait for the process to exit. *)
   val spawn_get_deactivated :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -528,7 +527,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/delegated_balance *)
   val get_delegated_balance :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -538,7 +537,7 @@ module Delegates : sig
 
   (** Same as [get_delegated_balance], but do not wait for the process to exit. *)
   val spawn_get_delegated_balance :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -548,7 +547,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/delegated_contracts *)
   val get_delegated_contracts :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -558,7 +557,7 @@ module Delegates : sig
 
   (** Same as [get_delegated_contracts], but do not wait for the process to exit. *)
   val spawn_get_delegated_contracts :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -568,7 +567,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_balance *)
   val get_frozen_balance :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -578,7 +577,7 @@ module Delegates : sig
 
   (** Same as [get_frozen_balance], but do not wait for the process to exit. *)
   val spawn_get_frozen_balance :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -588,7 +587,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_balance_by_cycle *)
   val get_frozen_balance_by_cycle :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -598,7 +597,7 @@ module Delegates : sig
 
   (** Same as [get_frozen_balance_by_cycle], but do not wait for the process to exit. *)
   val spawn_get_frozen_balance_by_cycle :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -608,7 +607,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/grace_period *)
   val get_grace_period :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -618,7 +617,7 @@ module Delegates : sig
 
   (** Same as [get_grace_period], but do not wait for the process to exit. *)
   val spawn_get_grace_period :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -628,7 +627,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/staking_balance *)
   val get_staking_balance :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -638,7 +637,7 @@ module Delegates : sig
 
   (** Same as [get_staking_balance], but do not wait for the process to exit. *)
   val spawn_get_staking_balance :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -648,7 +647,7 @@ module Delegates : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/voting_power *)
   val get_voting_power :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -658,7 +657,7 @@ module Delegates : sig
 
   (** Same as [get_voting_power], but do not wait for the process to exit. *)
   val spawn_get_voting_power :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -672,7 +671,7 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/ballot_list *)
   val get_ballot_list :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -681,7 +680,7 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/ballots *)
   val get_ballots :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -690,7 +689,7 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period_kind *)
   val get_current_period_kind :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -699,7 +698,7 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/current_proposal *)
   val get_current_proposal :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -708,7 +707,7 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/current_quorum *)
   val get_current_quorum :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -717,7 +716,7 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/listings *)
   val get_listings :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -726,7 +725,7 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/proposals *)
   val get_proposals :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -735,7 +734,7 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period *)
   val get_current_period :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -744,7 +743,7 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/successor_period *)
   val get_successor_period :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
@@ -753,7 +752,7 @@ module Votes : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/votes/total_voting_power *)
   val get_total_voting_power :
-    ?node:Node.t ->
+    ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->

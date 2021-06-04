@@ -65,7 +65,7 @@ module Color : sig
 
     val cyan : t
 
-    val white : t
+    val gray : t
   end
 
   (** Background colors. *)
@@ -84,7 +84,7 @@ module Color : sig
 
     val cyan : t
 
-    val white : t
+    val gray : t
   end
 end
 

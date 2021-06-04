@@ -60,7 +60,7 @@ let check_node_synchronization_state =
       (range 1 n)
   in
   Log.info "%d nodes initialized." (n + 1) ;
-  let* client = Client.init ~node:main_node () in
+  let* client = Client.init ~endpoint:(Node main_node) () in
   let* () =
     Client.activate_protocol
       ~protocol
@@ -97,8 +97,8 @@ let check_node_synchronization_state =
 (* In order to check that the prevalidator is not alive, we cannot
    rely on events because it's indecidable, thus we query a RPC that
    is reachable only if the prevalidator is running. *)
-let check_is_prevalidator_started node =
-  let client = Client.create ~node () in
+let check_is_prevalidator_started endpoint =
+  let client = Client.create ~endpoint () in
   let process =
     Client.spawn_rpc
       GET
@@ -107,8 +107,8 @@ let check_is_prevalidator_started node =
   in
   Process.check ~expect_failure:false process
 
-let check_is_prevalidator_closed node =
-  let client = Client.create ~node () in
+let check_is_prevalidator_closed endpoint =
+  let client = Client.create ~endpoint () in
   let process =
     Client.spawn_rpc
       GET
@@ -142,7 +142,7 @@ let check_prevalidator_start =
   let waiter_sync =
     Lwt_list.iter_p (fun node -> wait_for_sync node) [node1; node2]
   in
-  let* client = Client.init ~node:node1 () in
+  let* client = Client.init ~endpoint:(Node node1) () in
   let* () = Client.activate_protocol ~protocol client ~timestamp_delay:3600. in
   Log.info "Activated protocol." ;
   let* () = Client.bake_for ~minimal_timestamp:false client in
@@ -163,9 +163,9 @@ let check_prevalidator_start =
   Log.info "Waiting for nodes to be synchronized." ;
   let* () = waiter_sync in
   Log.info "Asserting that the prevalidator started for node 2." ;
-  let* () = check_is_prevalidator_started node2 in
+  let* () = check_is_prevalidator_started (Node node2) in
   Log.info "Asserting that the prevalidator did not start for node 3." ;
-  let* () = check_is_prevalidator_closed node3 in
+  let* () = check_is_prevalidator_closed (Node node3) in
   unit
 
 let register ~protocols =

@@ -24,16 +24,16 @@
 (*****************************************************************************)
 
 (* The functions below could be put in the Tezt library. *)
-let get_savepoint ?node client =
-  let* json = RPC.get_checkpoint ?node client in
+let get_savepoint ?endpoint client =
+  let* json = RPC.get_checkpoint ?endpoint client in
   return JSON.(json |-> "savepoint" |> as_int)
 
-let get_caboose ?node client =
-  let* json = RPC.get_checkpoint ?node client in
+let get_caboose ?endpoint client =
+  let* json = RPC.get_checkpoint ?endpoint client in
   return JSON.(json |-> "caboose" |> as_int)
 
-let is_connected ?node client ~peer_id =
-  let* connections = RPC.get_connections ?node client in
+let is_connected ?endpoint client ~peer_id =
+  let* connections = RPC.get_connections ?endpoint client in
   let open JSON in
   return
   @@ List.exists
@@ -121,8 +121,9 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* node_1 =
     Node.init [Synchronisation_threshold 0; Connections 1; History_mode hmode1]
   and* node_2 = Node.init [Connections 1; History_mode hmode2] in
+  let endpoint_1 = Client.(Node node_1) in
   let* node2_identity = Node.wait_for_identity node_2 in
-  let* client = Client.init ~node:node_1 () in
+  let* client = Client.init ~endpoint:endpoint_1 () in
   (* Connect node 1 to node 2 and start baking. *)
   let* () = Client.Admin.connect_address client ~peer:node_2 in
   let* () = Client.activate_protocol ~protocol client in
@@ -156,7 +157,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* () =
     match hmode1 with
     | Full ->
-        let* savepoint = get_savepoint ~node:node_1 client in
+        let* savepoint = get_savepoint ~endpoint:endpoint_1 client in
         if savepoint <= bakes_before_kill then
           Test.fail
             "savepoint level (%d) is lower or equal to the starting level (%d)"
@@ -164,7 +165,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
             bakes_before_kill ;
         return ()
     | Rolling ->
-        let* caboose = get_caboose ~node:node_1 client in
+        let* caboose = get_caboose ~endpoint:endpoint_1 client in
         if caboose <= bakes_before_kill then
           Test.fail
             "caboose level (%d) is lower or equal to the starting level (%d)"
@@ -189,7 +190,7 @@ let check_rpc_force_bootstrapped () =
   @@ fun () ->
   Log.info "Start a node." ;
   let* node = Node.init [Synchronisation_threshold 255] in
-  let* client = Client.init ~node () in
+  let* client = Client.init ~endpoint:(Node node) () in
   let (bootstrapped_promise, bootstrapped_resolver) = Lwt.task () in
   Node.on_event node (bootstrapped_event bootstrapped_resolver) ;
   Log.info "Force the node to be bootstrapped." ;

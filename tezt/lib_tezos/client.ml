@@ -23,11 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type endpoint = Node of Node.t | Proxy_server of Proxy_server.t
+
+let rpc_port = function
+  | Node n -> Node.rpc_port n
+  | Proxy_server ps -> Proxy_server.rpc_port ps
+
 type mode =
-  | Client of Node.t option
+  | Client of endpoint option
   | Mockup
-  | Light of float * Node.t list
-  | Proxy of Node.t
+  | Light of float * endpoint list
+  | Proxy of endpoint
 
 type mockup_sync_mode = Asynchronous | Synchronous
 
@@ -57,11 +63,16 @@ let fresh_name () =
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
+let runner endpoint =
+  match endpoint with
+  | Node node -> Node.runner node
+  | Proxy_server ps -> Proxy_server.runner ps
+
 let address ?(hostname = false) ?from peer =
   match from with
-  | None -> Runner.address ~hostname (Node.runner peer)
-  | Some node ->
-      Runner.address ~hostname ?from:(Node.runner node) (Node.runner peer)
+  | None -> Runner.address ~hostname (runner peer)
+  | Some endpoint ->
+      Runner.address ~hostname ?from:(runner endpoint) (runner peer)
 
 let create_with_mode ?(path = Constant.tezos_client)
     ?(admin_path = Constant.tezos_admin_client) ?name
@@ -72,8 +83,8 @@ let create_with_mode ?(path = Constant.tezos_client)
   in
   {path; admin_path; name; color; base_dir; mode}
 
-let create ?path ?admin_path ?name ?color ?base_dir ?node () =
-  create_with_mode ?path ?admin_path ?name ?color ?base_dir @@ Client node
+let create ?path ?admin_path ?name ?color ?base_dir ?endpoint () =
+  create_with_mode ?path ?admin_path ?name ?color ?base_dir (Client endpoint)
 
 let base_dir_arg client = ["--base-dir"; client.base_dir]
 
@@ -85,25 +96,26 @@ let sources_file client =
   | Mockup | Client _ | Proxy _ -> assert false
   | Light _ -> client.base_dir // "sources.json"
 
-(* [?node] can be used to override the default node stored in the client.
+(* [?endpoint] can be used to override the default node stored in the client.
    Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.
-   Light mode needs a sources file which contains a list of endpoints.
+   Light mode needs a file (specified with [--sources] on the CLI)
+   that contains a list of endpoints.
 *)
-let endpoint_arg ?node client =
-  match (client.mode, node) with
+let endpoint_arg ?(endpoint : endpoint option) client =
+  match (client.mode, endpoint) with
   | (Mockup, _) | (Client None, None) | (Light (_, []), _) -> []
-  | (Client _, Some node)
-  | (Client (Some node), None)
-  | (Light (_, node :: _), None)
-  | (Light _, Some node)
-  | (Proxy _, Some node)
-  | (Proxy node, None) ->
+  | (Client _, Some endpoint)
+  | (Client (Some endpoint), None)
+  | (Light (_, endpoint :: _), None)
+  | (Light _, Some endpoint)
+  | (Proxy _, Some endpoint)
+  | (Proxy endpoint, None) ->
       [
         "--endpoint";
-        "http://"
-        ^ address ~hostname:true node
-        ^ ":"
-        ^ string_of_int (Node.rpc_port node);
+        Printf.sprintf
+          "http://%s:%d"
+          (address ~hostname:true endpoint)
+          (rpc_port endpoint);
       ]
 
 let mode_arg client =
@@ -113,8 +125,8 @@ let mode_arg client =
   | Light _ -> ["--mode"; "light"; "--sources"; sources_file client]
   | Proxy _ -> ["--mode"; "proxy"]
 
-let spawn_command ?(env = String_map.empty) ?node ?hooks ?(admin = false) client
-    command =
+let spawn_command ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false)
+    client command =
   let env =
     (* Set disclaimer to "Y" if unspecified, otherwise use given value *)
     String_map.update
@@ -128,7 +140,8 @@ let spawn_command ?(env = String_map.empty) ?node ?hooks ?(admin = false) client
     ~env
     ?hooks
     (if admin then client.admin_path else client.path)
-  @@ endpoint_arg ?node client @ mode_arg client @ base_dir_arg client @ command
+  @@ endpoint_arg ?endpoint client
+  @ mode_arg client @ base_dir_arg client @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -169,7 +182,7 @@ let string_of_query_string = function
 let rpc_path_query_to_string ?(query_string = []) path =
   string_of_path path ^ string_of_query_string query_string
 
-let spawn_rpc ?node ?hooks ?env ?data ?query_string meth path client =
+let spawn_rpc ?endpoint ?hooks ?env ?data ?query_string meth path client =
   let data =
     Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
   in
@@ -179,79 +192,85 @@ let spawn_rpc ?node ?hooks ?env ?data ?query_string meth path client =
   let path = string_of_path path in
   let full_path = path ^ query_string in
   spawn_command
-    ?node
+    ?endpoint
     ?hooks
     ?env
     client
     (["rpc"; string_of_meth meth; full_path] @ data)
 
-let rpc ?node ?hooks ?env ?data ?query_string meth path client =
+let rpc ?endpoint ?hooks ?env ?data ?query_string meth path client =
   let* output =
-    spawn_rpc ?node ?hooks ?env ?data ?query_string meth path client
+    spawn_rpc ?endpoint ?hooks ?env ?data ?query_string meth path client
     |> Process.check_and_read_stdout
   in
   return (JSON.parse ~origin:(string_of_path path ^ " response") output)
 
-let spawn_rpc_list ?node client =
-  spawn_command
-    ?node
-    client
-    (endpoint_arg ?node client @ mode_arg client @ ["rpc"; "list"])
+let spawn_rpc_list ?endpoint client =
+  spawn_command ?endpoint client ["rpc"; "list"]
 
-let rpc_list ?node client =
-  spawn_rpc_list ?node client |> Process.check_and_read_stdout
+let rpc_list ?endpoint client =
+  spawn_rpc_list ?endpoint client |> Process.check_and_read_stdout
 
-let spawn_shell_header ?node ?(chain = "main") ?(block = "head") client =
+let spawn_shell_header ?endpoint ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "header"; "shell"] in
-  spawn_rpc ?node GET path client
+  spawn_rpc ?endpoint GET path client
 
-let shell_header ?node ?chain ?block client =
-  spawn_shell_header ?node ?chain ?block client |> Process.check_and_read_stdout
+let shell_header ?endpoint ?chain ?block client =
+  spawn_shell_header ?endpoint ?chain ?block client
+  |> Process.check_and_read_stdout
 
 module Admin = struct
   let spawn_command = spawn_command ~admin:true
 
-  let spawn_trust_address ?node ~peer client =
+  let spawn_trust_address ?endpoint ~peer client =
     spawn_command
-      ?node
+      ?endpoint
       client
-      (endpoint_arg ?node client @ mode_arg client
-      @ [
-          "trust";
-          "address";
-          address ?from:node peer ^ ":" ^ string_of_int (Node.net_port peer);
-        ])
+      [
+        "trust";
+        "address";
+        Printf.sprintf
+          "%s:%d"
+          (address ?from:endpoint (Node peer))
+          (Node.net_port peer);
+      ]
 
-  let trust_address ?node ~peer client =
-    spawn_trust_address ?node ~peer client |> Process.check
+  let trust_address ?endpoint ~peer client =
+    spawn_trust_address ?endpoint ~peer client |> Process.check
 
-  let spawn_connect_address ?node ~peer client =
+  let spawn_connect_address ?endpoint ~peer client =
     spawn_command
-      ?node
+      ?endpoint
       client
       [
         "connect";
         "address";
-        address ?from:node peer ^ ":" ^ string_of_int (Node.net_port peer);
+        Printf.sprintf
+          "%s:%d"
+          (address ?from:endpoint (Node peer))
+          (Node.net_port peer);
       ]
 
-  let connect_address ?node ~peer client =
-    spawn_connect_address ?node ~peer client |> Process.check
+  let connect_address ?endpoint ~peer client =
+    spawn_connect_address ?endpoint ~peer client |> Process.check
 
-  let spawn_kick_peer ?node ~peer client =
-    spawn_command ?node client ["kick"; "peer"; peer]
+  let spawn_kick_peer ?endpoint ~peer client =
+    spawn_command ?endpoint client ["kick"; "peer"; peer]
 
-  let kick_peer ?node ~peer client =
-    spawn_kick_peer ?node ~peer client |> Process.check
+  let kick_peer ?endpoint ~peer client =
+    spawn_kick_peer ?endpoint ~peer client |> Process.check
 end
 
-let spawn_import_secret_key ?node client (key : Constant.key) =
-  spawn_command ?node client ["import"; "secret"; "key"; key.alias; key.secret]
+let spawn_import_secret_key ?endpoint client (key : Constant.key) =
+  spawn_command
+    ?endpoint
+    client
+    ["import"; "secret"; "key"; key.alias; key.secret]
 
-let import_secret_key ?node client key =
-  spawn_import_secret_key ?node client key |> Process.check
+let import_secret_key ?endpoint client key =
+  spawn_import_secret_key ?endpoint client key |> Process.check
 
-let spawn_activate_protocol ?node ~protocol ?(fitness = 1)
+let spawn_activate_protocol ?endpoint ~protocol ?(fitness = 1)
     ?(key = Constant.activator.alias) ?timestamp
     ?(timestamp_delay = 3600. *. 24. *. 365.) ?parameter_file client =
   let timestamp =
@@ -269,7 +288,7 @@ let spawn_activate_protocol ?node ~protocol ?(fitness = 1)
           tm.tm_sec
   in
   spawn_command
-    ?node
+    ?endpoint
     client
     [
       "activate";
@@ -288,10 +307,10 @@ let spawn_activate_protocol ?node ~protocol ?(fitness = 1)
       timestamp;
     ]
 
-let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
-    ?parameter_file client =
+let activate_protocol ?endpoint ~protocol ?fitness ?key ?timestamp
+    ?timestamp_delay ?parameter_file client =
   spawn_activate_protocol
-    ?node
+    ?endpoint
     ~protocol
     ?fitness
     ?key
@@ -301,18 +320,16 @@ let activate_protocol ?node ~protocol ?fitness ?key ?timestamp ?timestamp_delay
     client
   |> Process.check
 
-let spawn_endorse_for ?node ?(key = Constant.bootstrap2.alias) client =
-  spawn_command
-    client
-    (endpoint_arg ?node client @ mode_arg client @ ["endorse"; "for"; key])
+let spawn_endorse_for ?endpoint ?(key = Constant.bootstrap2.alias) client =
+  spawn_command ?endpoint client ["endorse"; "for"; key]
 
-let endorse_for ?node ?key client =
-  spawn_endorse_for ?node ?key client |> Process.check
+let endorse_for ?endpoint ?key client =
+  spawn_endorse_for ?endpoint ?key client |> Process.check
 
-let spawn_bake_for ?node ?protocol ?(key = Constant.bootstrap1.alias)
+let spawn_bake_for ?endpoint ?protocol ?(key = Constant.bootstrap1.alias)
     ?(minimal_timestamp = true) ?mempool ?force ?context_path client =
   spawn_command
-    ?node
+    ?endpoint
     client
     (Option.fold
        ~none:[]
@@ -328,10 +345,10 @@ let spawn_bake_for ?node ?protocol ?(key = Constant.bootstrap1.alias)
     @ Option.fold ~none:[] ~some:(fun path -> ["--context"; path]) context_path
     )
 
-let bake_for ?node ?protocol ?key ?minimal_timestamp ?mempool ?force
+let bake_for ?endpoint ?protocol ?key ?minimal_timestamp ?mempool ?force
     ?context_path client =
   spawn_bake_for
-    ?node
+    ?endpoint
     ?key
     ?minimal_timestamp
     ?mempool
@@ -373,10 +390,10 @@ let gen_and_show_keys ~alias client =
   let* () = gen_keys ~alias client in
   show_address ~show_secret:true ~alias client
 
-let spawn_transfer ?node ?(wait = "none") ?burn_cap ?fee ?gas_limit
+let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
     ?storage_limit ?arg ~amount ~giver ~receiver client =
   spawn_command
-    ?node
+    ?endpoint
     client
     (["--wait"; wait]
     @ ["transfer"; Tez.to_string amount; "from"; giver; "to"; receiver]
@@ -398,10 +415,10 @@ let spawn_transfer ?node ?(wait = "none") ?burn_cap ?fee ?gas_limit
         storage_limit
     @ Option.fold ~none:[] ~some:(fun p -> ["--arg"; p]) arg)
 
-let transfer ?node ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?arg ~amount
-    ~giver ~receiver client =
+let transfer ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?arg
+    ~amount ~giver ~receiver client =
   spawn_transfer
-    ?node
+    ?endpoint
     ?wait
     ?burn_cap
     ?fee
@@ -414,38 +431,42 @@ let transfer ?node ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?arg ~amount
     client
   |> Process.check
 
-let spawn_set_delegate ?node ?(wait = "none") ~src ~delegate client =
+let spawn_set_delegate ?endpoint ?(wait = "none") ~src ~delegate client =
   spawn_command
-    ?node
+    ?endpoint
     client
     (["--wait"; wait] @ ["set"; "delegate"; "for"; src; "to"; delegate])
 
-let set_delegate ?node ?wait ~src ~delegate client =
-  spawn_set_delegate ?node ?wait ~src ~delegate client |> Process.check
+let set_delegate ?endpoint ?wait ~src ~delegate client =
+  spawn_set_delegate ?endpoint ?wait ~src ~delegate client |> Process.check
 
-let spawn_withdraw_delegate ?node ?(wait = "none") ~src client =
+let spawn_withdraw_delegate ?endpoint ?(wait = "none") ~src client =
   spawn_command
-    ?node
+    ?endpoint
     client
     (["--wait"; wait] @ ["withdraw"; "delegate"; "for"; src])
 
-let withdraw_delegate ?node ?wait ~src client =
-  spawn_withdraw_delegate ?node ?wait ~src client |> Process.check
+let withdraw_delegate ?endpoint ?wait ~src client =
+  spawn_withdraw_delegate ?endpoint ?wait ~src client |> Process.check
 
-let spawn_get_balance_for ?node ~account client =
-  spawn_command ?node client ["get"; "balance"; "for"; account]
+let spawn_get_balance_for ?endpoint ~account client =
+  spawn_command ?endpoint client ["get"; "balance"; "for"; account]
 
-let get_balance_for ?node ~account client =
-  let extract_balance (client_output : string) : float =
-    match client_output =~* rex "(\\d+(?:\\.\\d+)?) \u{A729}" with
-    | None ->
-        Test.fail "Cannot extract balance from client_output: %s" client_output
-    | Some balance -> float_of_string balance
-  in
-  let process = spawn_get_balance_for ?node ~account client in
-  let* () = Process.check process
-  and* output = Lwt_io.read (Process.stdout process) in
-  return @@ extract_balance output
+let get_balance_for =
+  let re = rex "(\\d+(?:\\.\\d+)?) \u{A729}" in
+  fun ?endpoint ~account client ->
+    let extract_balance (client_output : string) : float =
+      match client_output =~* re with
+      | None ->
+          Test.fail
+            "Cannot extract balance from client_output: %s"
+            client_output
+      | Some balance -> float_of_string balance
+    in
+    let process = spawn_get_balance_for ?endpoint ~account client in
+    let* () = Process.check process
+    and* output = Lwt_io.read (Process.stdout process) in
+    return @@ extract_balance output
 
 let spawn_create_mockup ?(sync_mode = Synchronous) ?constants ~protocol client =
   let cmd =
@@ -490,10 +511,10 @@ let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ?(wait = "none")
 let submit_ballot ?key ?wait ~proto_hash vote client =
   spawn_submit_ballot ?key ?wait ~proto_hash vote client |> Process.check
 
-let spawn_originate_contract ?node ?(wait = "none") ?init ?burn_cap ~alias
+let spawn_originate_contract ?endpoint ?(wait = "none") ?init ?burn_cap ~alias
     ~amount ~src ~prg client =
   spawn_command
-    ?node
+    ?endpoint
     client
     (["--wait"; wait]
     @ [
@@ -513,11 +534,11 @@ let spawn_originate_contract ?node ?(wait = "none") ?init ?burn_cap ~alias
         ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
         burn_cap)
 
-let originate_contract ?node ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
+let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
     client =
   let* client_output =
     spawn_originate_contract
-      ?node
+      ?endpoint
       ?wait
       ?init
       ?burn_cap
@@ -599,8 +620,8 @@ let spawn_migrate_mockup ~next_protocol client =
 let migrate_mockup ~next_protocol client =
   spawn_migrate_mockup ~next_protocol client |> Process.check
 
-let init ?path ?admin_path ?name ?color ?base_dir ?node () =
-  let client = create ?path ?admin_path ?name ?color ?base_dir ?node () in
+let init ?path ?admin_path ?name ?color ?base_dir ?endpoint () =
+  let client = create ?path ?admin_path ?name ?color ?base_dir ?endpoint () in
   let* () =
     Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
   in
@@ -619,21 +640,20 @@ let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ?constants
   set_mode Mockup client ;
   return client
 
-let init_light ?path ?admin_path ?name ?color ?base_dir ?nodes
-    ?(min_agreement = 0.66) () =
+let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
+    ?(nodes_args = []) () =
+  let filter_node_arg = function
+    | Node.Connections _ | Synchronisation_threshold _ -> None
+    | x -> Some x
+  in
+  let nodes_args =
+    List.filter_map filter_node_arg nodes_args
+    @ Node.[Connections 1; Synchronisation_threshold 0]
+  in
   let* nodes =
-    match nodes with
-    | None ->
-        let* node1 =
-          Node.init ~name:"node1" [Connections 1; Synchronisation_threshold 0]
-        and* node2 = Node.init ~name:"node2" [Connections 1] in
-        return [node1; node2]
-    | Some [] | Some [_] ->
-        Test.fail
-          "When initializing a light client and specifying the nodes, there \
-           should be 2 or more nodes but found %d nodes"
-          (Option.value nodes ~default:[] |> List.length)
-    | Some nodes -> return nodes
+    let* node1 = Node.init ~name:"node1" nodes_args
+    and* node2 = Node.init ~name:"node2" nodes_args in
+    return [node1; node2]
   in
   let client =
     create_with_mode
@@ -642,7 +662,7 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?nodes
       ?name
       ?color
       ?base_dir
-      (Light (min_agreement, nodes))
+      (Light (min_agreement, List.map (fun n -> Node n) nodes))
   in
   (* Create a services.json file in the base directory with correctly
      JSONified data *)
@@ -681,3 +701,32 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?nodes
       (List.tl nodes)
   in
   return (client, nodes)
+
+let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
+    ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
+    ?parameter_file ?(bake = true) tag ~protocol () =
+  match tag with
+  | (`Client | `Proxy) as mode ->
+      let* node = Node.init nodes_args in
+      let endpoint = Node node in
+      let mode =
+        match mode with
+        | `Client -> Client (Some endpoint)
+        | `Proxy -> Proxy endpoint
+      in
+      let client =
+        create_with_mode ?path ?admin_path ?name ?color ?base_dir mode
+      in
+      let* () =
+        Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
+      in
+      let* () = activate_protocol ?parameter_file ~protocol client in
+      let* () = if bake then bake_for client else Lwt.return_unit in
+      return client
+  | `Light ->
+      let* (client, _) =
+        init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
+      in
+      let* () = activate_protocol ?parameter_file ~protocol client in
+      let* () = if bake then bake_for client else Lwt.return_unit in
+      return client

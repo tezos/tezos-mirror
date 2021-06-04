@@ -65,7 +65,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
       | [] -> Lwt.return_none
       | ((uri, rpc_context) as hd_endpoint) :: tl_remaining_endpoints -> (
           Light_proto.merkle_tree
-            Proxy.{rpc_context; chain; block}
+            Proxy.{rpc_context; chain; block; mode = Client}
             key
             leaf_kind
           >>= fun raw_context ->

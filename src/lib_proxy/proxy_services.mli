@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,15 +25,24 @@
 
 (** Whether using the light mode or the proxy mode (remember that
     the light mode is a different instance of the proxy mode
-    (see srcs/lib_proxy/README_LIGHT.md for documentation). *)
-type mode = Light of Light.sources | Proxy
+    (see srcs/lib_proxy/README_LIGHT.md for documentation)
+    and whether [tezos-client] or [tezos-proxy-server] is running. *)
+type mode =
+  | Light_client of Light.sources  (** [tezos-client --mode light] is running *)
+  | Proxy_client  (** [tezos-client --mode proxy] is running *)
+  | Proxy_server of int option
+      (** [tezos-proxy-server] is running and the [int option] value
+          is the value of argument [--sym-block-caching-time] *)
 
-(** [build_directory printer rpc_context mode env] returns the directory
-    of RPCs that is served locally by the proxy mode
-    and the light mode. [printer] is used for logging. [rpc_context] is
-    used to perform RPCs to distant endpoints. [mode] specifies whether
-    to use the proxy mode or the light mode. [env] is a protocol-specific
-    module used to create the context passed when executing a RPC. *)
+(** [build_directory printer rpc_context env mode] returns the directory
+    of RPCs that is served locally by the client's light and proxy modes and
+    by the proxy server. Parameters are:
+    
+    - [printer] is used for logging.
+    - [rpc_context] is used to perform RPCs to distant endpoints.
+    - [mode] specifies whether [tezos-client] (light or proxy mode)
+      or [tezos-proxy-server] is running.
+    - [env] is a protocol-specific module used to create the context passed when executing a RPC. *)
 val build_directory :
   Tezos_client_base.Client_context.printer ->
   RPC_context.json ->

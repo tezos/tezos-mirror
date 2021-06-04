@@ -972,6 +972,16 @@ opam:tezos-proxy:
   variables:
     package: tezos-proxy
 
+opam:tezos-proxy-server:
+  extends: .opam_template
+  variables:
+    package: tezos-proxy-server
+
+opam:tezos-proxy-server-config:
+  extends: .opam_template
+  variables:
+    package: tezos-proxy-server-config
+
 opam:tezos-requester:
   extends: .opam_template
   variables:

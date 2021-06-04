@@ -142,6 +142,19 @@ Baker / Endorser / Accuser
 -  Optimized the performance of the baker to reduce the number of RPC
    calls to the node while waiting for endorsements.
 
+Proxy server
+------------
+
+-  Added a new binary: ``tezos-proxy-server``, a read-only frontend to a node.
+   It is designed to lower the load of nodes, by being capable
+   of serving `protocol RPCs <https://tezos.gitlab.io/alpha/rpc.html>`__.
+   An instance of a proxy server is protocol-specific: it automatically picks
+   up the protocol from the backing node when it starts. Proxy servers
+   can be started and destroyed at will, making them easy to deploy.
+
+   Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
+   for further details.
+
 Protocol Compiler And Environment
 ---------------------------------
 

@@ -1,0 +1,8 @@
+parameter (pair string (option nat));
+storage (big_map string nat) ;
+code { UNPAIR ; # let (parameter, storage) = input in stack = [parameter; storage]
+       UNPAIR ; # let (key, value) = parameter in stack = [key; value; storage]
+       UPDATE ; # let updated_storage = Map.update key value storage in stack = [updated_storage]
+       NIL operation ; # let operations = [] in stack = [[]; updated_storage]
+       PAIR # return (operations, updated_map) 
+       };

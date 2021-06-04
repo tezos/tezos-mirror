@@ -46,17 +46,18 @@ let init_light ~protocol =
   let* (client, nodes) = Client.init_light () in
   let node0 = List.nth nodes 0 in
   Log.info "Activating protocol %s" @@ Protocol.tag protocol ;
-  let* () = Client.activate_protocol ~node:node0 ~protocol client in
+  let endpoint = Client.(Node node0) in
+  let* () = Client.activate_protocol ~endpoint ~protocol client in
   (* Set client temporarily to vanilla mode: needed when baking,
      because nodes are temporarily out-of-sync for "HEAD" which the light
      mode doesn't like *)
   let mode_received = Client.get_mode client in
   let is_light_mode = function Client.Light _ -> true | _ -> false in
   assert (is_light_mode mode_received) ;
-  Client.set_mode (Client.Client (Some node0)) client ;
-  let* () = Client.bake_for ~node:node0 ~key:Constant.bootstrap1.alias client in
-  let* () = Client.bake_for ~node:node0 ~key:Constant.bootstrap2.alias client in
-  let* level_json = get_current_level ~node:node0 client in
+  Client.set_mode (Client.Client (Some (Node node0))) client ;
+  let* () = Client.bake_for ~endpoint ~key:Constant.bootstrap1.alias client in
+  let* () = Client.bake_for ~endpoint ~key:Constant.bootstrap2.alias client in
+  let* level_json = get_current_level ~endpoint client in
   let level = JSON.(level_json |-> "level" |> as_int) in
   let* () =
     Lwt_list.iter_s (fun node ->
@@ -222,7 +223,7 @@ let test_compare_light =
     ~tags:(compare_tags alt_mode)
   @@ fun protocol ->
   let* (node, light_client) = init_light ~protocol in
-  let* vanilla = Client.init ~node () in
+  let* vanilla = Client.init ~endpoint:(Node node) () in
   let clients = {vanilla; alternative = light_client} in
   let tz_log =
     [

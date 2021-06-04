@@ -197,7 +197,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
       in
       let get_mode () =
         match (mode, sources) with
-        | (`Mode_proxy, _) -> return Tezos_proxy.Proxy_services.Proxy
+        | (`Mode_proxy, _) -> return Tezos_proxy.Proxy_services.Proxy_client
         | (`Mode_light, None) ->
             failwith
               "--sources MUST be specified when --mode light is specified"
@@ -234,15 +234,15 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
                 rpc_builder
                 sources_config
             in
-            return (Tezos_proxy.Proxy_services.Light sources)
+            return (Tezos_proxy.Proxy_services.Light_client sources)
       in
       Tezos_proxy.Registration.get_registered_proxy
         printer
         rpc_context
         mode
+        ~chain
+        ~block
         protocol
-        chain
-        block
       >>=? fun proxy_env ->
       get_mode () >>=? fun mode ->
       return

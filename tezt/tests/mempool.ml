@@ -224,7 +224,8 @@ let flush_mempool =
   (* Step 1 *)
   (* A Node is started and we activate the protocol and wait the node to be synced *)
   let* node_1 = Node.init [Synchronisation_threshold 0] in
-  let* client_1 = Client.init ~node:node_1 () in
+  let endpoint_1 = Client.(Node node_1) in
+  let* client_1 = Client.init ~endpoint:endpoint_1 () in
   let* () = Client.activate_protocol ~protocol client_1 in
   Log.info "Activated protocol." ;
   let* _ = Node.wait_for_level node_1 1 in

@@ -36,10 +36,10 @@ let matches re s = try Re.Str.search_forward re s 0 >= 0 with _ -> false
 (** Returns: a node and a proxy client *)
 let init ~protocol () =
   let* node = Node.init [Synchronisation_threshold 0] in
-  let* client = Client.init ~node () in
+  let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
-  Client.set_mode (Proxy node) client ;
+  Client.set_mode (Proxy (Node node)) client ;
   let* () = Client.bake_for client in
   Log.info "Baked 1 block: protocol is now %s" (Protocol.name protocol) ;
   Lwt.return (node, client)
@@ -291,10 +291,10 @@ let test_bake =
   Protocol.register_test ~__FILE__ ~title:"(Proxy) Bake" ~tags:["proxy"; "bake"]
   @@ fun protocol ->
   let* node = Node.init [] in
-  let* client = Client.init ~node () in
+  let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
-  Client.set_mode (Proxy node) client ;
+  Client.set_mode (Proxy (Node node)) client ;
   let* () = repeat 10 (fun () -> Client.bake_for client) in
   Log.info "Baked 10 blocks." ;
   let* level = Node.wait_for_level node 11 in
@@ -350,9 +350,22 @@ module Location = struct
 
   type clients = {vanilla : Client.t; alternative : Client.t}
 
-  type alt_mode = Light | Proxy
+  type alt_mode =
+    | Vanilla_proxy_server
+        (** A vanilla client ([--mode client]) but whose [--endpoint] is
+        a [tezos-proxy-server] *)
+    | Light  (** A light client ([--mode light]) *)
+    | Proxy  (** A proxy client ([--mode proxy]) *)
 
-  let alt_mode_to_string = function Light -> "light" | Proxy -> "proxy"
+  (** Whether an alternative client is expected to execute RPCs locally *)
+  let executes_locally = function
+    | Vanilla_proxy_server -> false
+    | Light | Proxy -> true
+
+  let alt_mode_to_string = function
+    | Vanilla_proxy_server -> "vanilla_proxy_server_endpoint"
+    | Light -> "light"
+    | Proxy -> "proxy"
 
   let chain_id = "main"
 
@@ -503,18 +516,24 @@ module Location = struct
           vanilla_out
           alt_out
       else
+        let log_same_answer () =
+          Log.info
+            "%s client, %s: same answer than vanilla client ✓"
+            alt_mode_string
+            (Client.rpc_path_query_to_string ~query_string rpc_path)
+        in
         match
           ( parse_rpc_exec_location vanilla_err ~query_string rpc_path,
             parse_rpc_exec_location alt_err ~query_string rpc_path )
         with
+        (* Unknown matches on the left-hand side: there should be no match
+           in the vanilla output, because the vanilla client doesn't deal
+           with alternative stuff. That is why [Unknown] is matched here. *)
+        | (Unknown, Unknown) when not (executes_locally alt_mode) ->
+            log_same_answer () ;
+            Lwt.return_unit
         | (Unknown, Local) ->
-            (* There should be no match in the vanilla output,
-               because the vanilla client doesn't deal with alternative stuff.
-               That is why [Unknown] is matched here. *)
-            Log.info
-              "%s client, %s: same answer than vanilla client ✓"
-              alt_mode_string
-              (Client.rpc_path_query_to_string ~query_string rpc_path) ;
+            log_same_answer () ;
             Log.info
               "%s client, %s: done locally ✓"
               alt_mode_string
@@ -556,7 +575,7 @@ module Location = struct
       ~tags:(compare_tags alt_mode)
     @@ fun protocol ->
     let* (node, alternative) = init ~protocol () in
-    let* vanilla = Client.init ~node () in
+    let* vanilla = Client.init ~endpoint:(Node node) () in
     let clients = {vanilla; alternative} in
     check_equivalence protocol alt_mode clients
 end

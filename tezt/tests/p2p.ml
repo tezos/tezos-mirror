@@ -67,7 +67,7 @@ module ACL = struct
     in
     let* target = Node.init [] in
     let* node = Node.init [] in
-    let* client = Client.init ~node:target () in
+    let* client = Client.init ~endpoint:(Node target) () in
     let* () =
       Node.send_raw_data
         target
@@ -119,7 +119,7 @@ let check_peer_option =
     ~tags:["p2p"; "cli"; "peer"]
   @@ fun protocol ->
   let* node_1 = Node.init [Synchronisation_threshold 0] in
-  let* client = Client.init ~node:node_1 () in
+  let* client = Client.init ~endpoint:(Node node_1) () in
   let* () = Client.activate_protocol ~protocol client in
   let node_2 = Node.create [] in
   let wait = wait_for_accepted_peer_ids node_2 in
@@ -147,7 +147,7 @@ let test_one_connection =
     ~tags:["p2p"; "cli"; "connections"]
   @@ fun protocol ->
   let* node_1 = Node.init [Synchronisation_threshold 0] in
-  let* client = Client.init ~node:node_1 () in
+  let* client = Client.init ~endpoint:(Node node_1) () in
   let* () = Client.activate_protocol ~protocol client in
   let node_2 = Node.create [Connections nb_connection] in
   let wait = wait_for_accepted_peer_ids node_2 in
@@ -236,7 +236,7 @@ module Maintenance = struct
       max_threshold
       max_connections ;
     let* target_node = Node.init [Connections expected_connections] in
-    let* target_client = Client.init ~node:target_node () in
+    let* target_client = Client.init ~endpoint:(Node target_node) () in
     Log.info "Target created." ;
     let nodes =
       Cluster.create max_connections [Connections (max_connections - 1)]

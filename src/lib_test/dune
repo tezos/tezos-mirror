@@ -1,6 +1,6 @@
 (library
  (name lib_test)
  (public_name tezos-test-helpers)
- (libraries  qcheck-alcotest alcotest alcotest-lwt)
+ (libraries uri qcheck-alcotest alcotest alcotest-lwt)
  (flags
   (:standard -linkall)))

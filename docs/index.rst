@@ -113,6 +113,7 @@ in the :ref:`introduction <howtoget>`.
    user/mockup
    user/proxy
    user/light
+   user/proxy-server
    user/multisig
    user/various
 

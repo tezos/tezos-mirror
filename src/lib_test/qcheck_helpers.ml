@@ -60,6 +60,25 @@ let int64_range a b =
   in
   QCheck.int64 |> QCheck.set_gen int64_range_gen
 
+let endpoint_arb =
+  let open QCheck in
+  let open Gen in
+  let protocol_gen = oneofl ["http"; "https"] in
+  let path_gen =
+    (* Specify the characters to use, to have valid URLs *)
+    list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
+    >|= String.concat "."
+  in
+  let port_arb = 1 -- 32768 >|= fun port -> ":" ^ Int.to_string port in
+  let url_string_gen =
+    triple protocol_gen path_gen (opt port_arb)
+    >|= fun (protocol, path, opt_part) ->
+    String.concat "" [protocol; "://"; path; Option.value ~default:"" opt_part]
+  in
+  let url_gen = url_string_gen >|= Uri.of_string in
+  let print = Uri.to_string in
+  make ~print url_gen
+
 let rec of_option_gen gen random =
   match gen random with None -> of_option_gen gen random | Some a -> a
 

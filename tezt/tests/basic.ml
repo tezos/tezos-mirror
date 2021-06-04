@@ -34,7 +34,7 @@ let check_node_initialization history_mode =
     ~tags:["basic"; "node"; Node.show_history_mode history_mode]
   @@ fun protocol ->
   let* node = Node.init [History_mode history_mode] in
-  let* client = Client.init ~node () in
+  let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
   let* () = repeat 10 (fun () -> Client.bake_for client) in
