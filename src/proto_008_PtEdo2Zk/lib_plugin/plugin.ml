@@ -853,7 +853,7 @@ module RPC = struct
                 >|=? fun (value, _ctxt) -> Micheline.strip_locations value)) ;
     RPC_directory.merge rpc_services !patched_services
 
-  let normalize_data ctxt block ?legacy ~data ~ty ~unparsing_mode =
+  let normalize_data ?legacy ~data ~ty ~unparsing_mode ctxt block =
     RPC_context.make_call0
       normalize_data
       ctxt
@@ -890,9 +890,8 @@ module RPC = struct
       ()
       unparsing_mode
 
-  let run_code_normalized ctxt block ?gas ?(entrypoint = "default") ~script
-      ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~unparsing_mode
-      =
+  let run_code_normalized ?gas ?(entrypoint = "default") ~script ~storage ~input
+      ~amount ~balance ~chain_id ~source ~payer ~unparsing_mode ctxt block =
     RPC_context.make_call0
       run_code_normalized
       ctxt
@@ -910,9 +909,9 @@ module RPC = struct
           entrypoint ),
         unparsing_mode )
 
-  let trace_code_normalized ctxt block ?gas ?(entrypoint = "default") ~script
-      ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~unparsing_mode
-      =
+  let trace_code_normalized ?gas ?(entrypoint = "default") ~script ~storage
+      ~input ~amount ~balance ~chain_id ~source ~payer ~unparsing_mode ctxt
+      block =
     RPC_context.make_call0
       trace_code_normalized
       ctxt

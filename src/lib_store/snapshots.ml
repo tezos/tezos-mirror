@@ -2964,8 +2964,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
 
   let read_snapshot_metadata = Importer.load_snapshot_metadata
 
-  let restore_cemented_blocks snapshot_importer ?(check_consistency = true)
-      ~dst_chain_dir ~genesis_hash =
+  let restore_cemented_blocks ?(check_consistency = true) ~dst_chain_dir
+      ~genesis_hash snapshot_importer =
     Importer.restore_cemented_indexes snapshot_importer >>= fun () ->
     Importer.load_cemented_files snapshot_importer >>=? fun cemented_files ->
     let nb_cemented_files = List.length cemented_files in

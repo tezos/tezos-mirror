@@ -829,9 +829,8 @@ module RPC = struct
       ()
       unparsing_mode
 
-  let run_code_normalized ctxt block ?gas ?(entrypoint = "default") ~script
-      ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~unparsing_mode
-      =
+  let run_code_normalized ?gas ?(entrypoint = "default") ~script ~storage ~input
+      ~amount ~balance ~chain_id ~source ~payer ~unparsing_mode ctxt block =
     RPC_context.make_call0
       run_code_normalized
       ctxt
@@ -849,9 +848,9 @@ module RPC = struct
           entrypoint ),
         unparsing_mode )
 
-  let trace_code_normalized ctxt block ?gas ?(entrypoint = "default") ~script
-      ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~unparsing_mode
-      =
+  let trace_code_normalized ?gas ?(entrypoint = "default") ~script ~storage
+      ~input ~amount ~balance ~chain_id ~source ~payer ~unparsing_mode ctxt
+      block =
     RPC_context.make_call0
       trace_code_normalized
       ctxt

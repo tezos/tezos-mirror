@@ -1123,8 +1123,8 @@ module RPC = struct
                   map
                   [] ) ))
 
-    let run_code ctxt block ?unparsing_mode ?gas ?(entrypoint = "default")
-        ~script ~storage ~input ~amount ~balance ~chain_id ~source ~payer =
+    let run_code ?unparsing_mode ?gas ?(entrypoint = "default") ~script ~storage
+        ~input ~amount ~balance ~chain_id ~source ~payer ctxt block =
       RPC_context.make_call0
         S.run_code
         ctxt
@@ -1142,8 +1142,8 @@ module RPC = struct
             entrypoint ),
           unparsing_mode )
 
-    let trace_code ctxt block ?unparsing_mode ?gas ?(entrypoint = "default")
-        ~script ~storage ~input ~amount ~balance ~chain_id ~source ~payer =
+    let trace_code ?unparsing_mode ?gas ?(entrypoint = "default") ~script
+        ~storage ~input ~amount ~balance ~chain_id ~source ~payer ctxt block =
       RPC_context.make_call0
         S.trace_code
         ctxt
@@ -1161,10 +1161,10 @@ module RPC = struct
             entrypoint ),
           unparsing_mode )
 
-    let typecheck_code ctxt block ?gas ?legacy ~script =
+    let typecheck_code ?gas ?legacy ~script ctxt block =
       RPC_context.make_call0 S.typecheck_code ctxt block () (script, gas, legacy)
 
-    let typecheck_data ctxt block ?gas ?legacy ~data ~ty =
+    let typecheck_data ?gas ?legacy ~data ~ty ctxt block =
       RPC_context.make_call0
         S.typecheck_data
         ctxt
@@ -1172,10 +1172,10 @@ module RPC = struct
         ()
         (data, ty, gas, legacy)
 
-    let pack_data ctxt block ?gas ~data ~ty =
+    let pack_data ?gas ~data ~ty ctxt block =
       RPC_context.make_call0 S.pack_data ctxt block () (data, ty, gas)
 
-    let normalize_data ctxt block ?legacy ~data ~ty ~unparsing_mode =
+    let normalize_data ?legacy ~data ~ty ~unparsing_mode ctxt block =
       RPC_context.make_call0
         S.normalize_data
         ctxt
@@ -1183,7 +1183,7 @@ module RPC = struct
         ()
         (data, ty, unparsing_mode, legacy)
 
-    let normalize_script ctxt block ~script ~unparsing_mode =
+    let normalize_script ~script ~unparsing_mode ctxt block =
       RPC_context.make_call0
         S.normalize_script
         ctxt
@@ -1191,13 +1191,13 @@ module RPC = struct
         ()
         (script, unparsing_mode)
 
-    let normalize_type ctxt block ~ty =
+    let normalize_type ~ty ctxt block =
       RPC_context.make_call0 S.normalize_type ctxt block () ty
 
-    let run_operation ctxt block ~op ~chain_id =
+    let run_operation ~op ~chain_id ctxt block =
       RPC_context.make_call0 S.run_operation ctxt block () (op, chain_id)
 
-    let entrypoint_type ctxt block ~script ~entrypoint =
+    let entrypoint_type ~script ~entrypoint ctxt block =
       RPC_context.make_call0 S.entrypoint_type ctxt block () (script, entrypoint)
 
     let list_entrypoints ctxt block ~script =
