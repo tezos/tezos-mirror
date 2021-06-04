@@ -199,6 +199,74 @@ which is installed with
 (see the header of `./scripts/pre_commit/pre_commit.py` and its `--help`
 for additional options).
 
+Exposing internals
+------------------
+
+Sometimes you want to expose some internal functions, types or sub-modules of a module: usually it is for testing part of the module logic, but it may also be to let some power users access internals (for performance, extra-functionality, or any other reason).
+
+A first question you should ask yourself is: "Is this a hint that my module has too many responsibilities?".
+
+If the answer is yes: consider splitting your module per responsibility and see if you still need to expose internals.
+
+If the answer is no: the guideline is to expose an internal module as part of your API:
+
++ ``Internal_for_tests`` for internal types, functions and sub-modules that are only meant to be accessed by tests
++ ``Internal`` for internal types, functions and sub-modules that are meant to be accessed by production code (but may also be accessed by tests)
+
+Additionally you should add the ``(**/**)`` `Stop special comment <https://ocaml.org/manual/ocamldoc.html#ss:ocamldoc-stop>`_ so that this module is
+not displayed in the public module documentation.
+
+The rationale of ``Internal_for_tests`` is to make it explicit both for developers writing code and for reviewers that this module must not be used in production code.
+
+Example:
+
+.. code-block:: ocaml
+  :emphasize-lines: 6,8-20,35-43
+
+   (* mli *)
+   type t
+
+   val f : t -> u
+
+   (**/**)
+
+   module Internal_for_tests : sig
+     (** The actual representation of [t] *)
+     type t_raw = {bar : string; baz : int}
+
+     (** Access inner fields of a value of type [t] *)
+     val unwrap : t -> t_raw
+
+     (** An internal function that we want to test in isolation *)
+     val g : t -> v
+
+     (** You can also expose internal modules, e.g. the inner cache *)
+     module Mycache : Cache.S
+   end
+
+   (* ml *)
+   module Mycache = Cache.Make ...
+
+   type t = {bar : string; baz : int}
+
+   (* [g] is an internal function, not part of the public API *)
+   let g t = ...
+
+   (* [f] uses internal function [g] *)
+   let f t =
+     let w = g t in
+     ...
+   
+   module Internal_for_tests = struct
+     type t_raw = t = {bar : string; baz : int}
+
+     let unwrap t = t
+
+     let g = g
+
+     module Mycache = Mycache
+   end
+
 Coding conventions
 ------------------
 
