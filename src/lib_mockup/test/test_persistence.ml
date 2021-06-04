@@ -36,7 +36,7 @@ open Tezos_test_services
 open Tezos_mockup_registration
 
 let base_dir_class_testable =
-  Alcotest.(testable Persistence.M.pp_base_dir_class ( = ))
+  Alcotest.(testable Persistence.pp_base_dir_class ( = ))
 
 let check_base_dir s bd1 bd2 = Alcotest.check base_dir_class_testable s bd1 bd2
 
@@ -44,7 +44,7 @@ let check_base_dir s bd1 bd2 = Alcotest.check base_dir_class_testable s bd1 bd2
 let test_classify_does_not_exist =
   Test_services.tztest "Classify a non existing directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun base_dir ->
-          Persistence.M.classify_base_dir
+          Persistence.classify_base_dir
             (Filename.concat base_dir "non_existing_directory")
           >|=? check_base_dir "A non existing directory" Base_dir_does_not_exist))
 
@@ -52,7 +52,7 @@ let test_classify_does_not_exist =
 let test_classify_is_file =
   Test_services.tztest "Classify a file" `Quick (fun () ->
       let tmp_file = Filename.temp_file "" "" in
-      Persistence.M.classify_base_dir tmp_file
+      Persistence.classify_base_dir tmp_file
       >|=? check_base_dir "A file" Base_dir_is_file)
 
 (** [classify_base_dir] a mockup directory *)
@@ -63,7 +63,7 @@ let test_classify_is_mockup =
           and mockup_file_name = Files.Context.get ~dirname in
           Lwt_unix.mkdir mockup_directory 0o700 >>= fun () ->
           let () = close_out (open_out (mockup_file_name :> string)) in
-          Persistence.M.classify_base_dir dirname
+          Persistence.classify_base_dir dirname
           >|=? check_base_dir "A mockup directory" Base_dir_is_mockup))
 
 (** [classify_base_dir] a non empty directory *)
@@ -71,17 +71,17 @@ let test_classify_is_nonempty =
   Test_services.tztest "Classify a non empty directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun temp_dir ->
           let _ = Filename.temp_file ~temp_dir "" "" in
-          Persistence.M.classify_base_dir temp_dir
+          Persistence.classify_base_dir temp_dir
           >|=? check_base_dir "A non empty directory" Base_dir_is_nonempty))
 
 (** [classify_base_dir] an empty directory *)
 let test_classify_is_empty =
   Test_services.tztest "Classify an empty directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun base_dir ->
-          Persistence.M.classify_base_dir base_dir
+          Persistence.classify_base_dir base_dir
           >|=? check_base_dir "An empty directory" Base_dir_is_empty))
 
-module Mock_protocol : Registration_intf.PROTOCOL = struct
+module Mock_protocol : Registration.PROTOCOL = struct
   type validation_state = unit
 
   type block_header_data = unit
@@ -154,7 +154,7 @@ module Mock_protocol : Registration_intf.PROTOCOL = struct
   let hash = Protocol_hash.hash_string [""]
 end
 
-module Mock_mockup : Registration_intf.MOCKUP = struct
+module Mock_mockup : Registration.MOCKUP = struct
   type parameters = unit
 
   type protocol_constants = unit
@@ -185,7 +185,7 @@ module Mock_mockup : Registration_intf.MOCKUP = struct
 end
 
 let mock_mockup_module (protocol_hash' : Protocol_hash.t) :
-    (module Registration_intf.MOCKUP) =
+    (module Registration.MOCKUP) =
   (module struct
     include Mock_mockup
 
@@ -210,8 +210,8 @@ let test_get_registered_mockup_no_env =
     "get_registered_mockup fails when no environment was registered"
     `Quick
     (fun () ->
-      let module Registration = Registration.Internal.Make () in
-      let module Persistence = Persistence.Internal.Make (Registration) in
+      let module Registration = Registration.Internal_for_tests.Make () in
+      let module Persistence = Persistence.Internal_for_tests.Make (Registration) in
       Persistence.get_registered_mockup None (mock_printer ()) >>= function
       | Ok _ -> Alcotest.fail "Should have failed"
       | Error ([_] as errors) ->
@@ -232,8 +232,8 @@ let test_get_registered_mockup_not_found =
     "get_registered_mockup fails if the requested protocol is not found"
     `Quick
     (fun () ->
-      let module Registration = Registration.Internal.Make () in
-      let module Persistence = Persistence.Internal.Make (Registration) in
+      let module Registration = Registration.Internal_for_tests.Make () in
+      let module Persistence = Persistence.Internal_for_tests.Make (Registration) in
       let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
       let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
       let proto_hash_3 = Protocol_hash.hash_string ["mock3"] in
@@ -269,8 +269,8 @@ let test_get_registered_mockup_take_alpha =
     "get_registered_mockup returns Alpha if none is specified"
     `Quick
     (fun () ->
-      let module Registration = Registration.Internal.Make () in
-      let module Persistence = Persistence.Internal.Make (Registration) in
+      let module Registration = Registration.Internal_for_tests.Make () in
+      let module Persistence = Persistence.Internal_for_tests.Make (Registration) in
       let printer = mock_printer () in
       let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
       let proto_hash_alpha =
@@ -301,8 +301,8 @@ let test_get_registered_mockup_take_requested =
     "get_registered_mockup returns the requested protocol"
     `Quick
     (fun () ->
-      let module Registration = Registration.Internal.Make () in
-      let module Persistence = Persistence.Internal.Make (Registration) in
+      let module Registration = Registration.Internal_for_tests.Make () in
+      let module Persistence = Persistence.Internal_for_tests.Make (Registration) in
       let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
       let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
       Registration.register_mockup_environment (mock_mockup_module proto_hash_1) ;

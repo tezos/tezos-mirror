@@ -60,7 +60,7 @@ let create_mockup_command_handler
   >>=? fun constants_overrides_json ->
   load_json_file cctxt bootstrap_accounts_file
   >>=? fun bootstrap_accounts_json ->
-  Tezos_mockup.Persistence.M.create_mockup
+  Tezos_mockup.Persistence.create_mockup
     ~cctxt:(cctxt :> Tezos_client_base.Client_context.full)
     ~protocol_hash:Protocol.hash
     ~constants_overrides_json

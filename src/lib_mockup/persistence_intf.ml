@@ -22,17 +22,18 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
 module type S = sig
   val get_registered_mockup :
     Protocol_hash.t option ->
     #Tezos_client_base.Client_context.printer ->
-    Registration.M.mockup_environment tzresult Lwt.t
+    Registration.mockup_environment tzresult Lwt.t
 
   (** Returns a mockup environment for the default protocol (which is the first
     in the list of registered protocol, cf [Registration] module). *)
   val default_mockup_context :
     Tezos_client_base.Client_context.full ->
-    (Registration.M.mockup_environment * Registration.M.mockup_context) tzresult
+    (Registration.mockup_environment * Registration.mockup_context) tzresult
     Lwt.t
 
   (**  Returns a mockup environment for the specified protocol hash. *)
@@ -41,7 +42,7 @@ module type S = sig
     protocol_hash:Protocol_hash.t ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
-    (Registration.M.mockup_environment * Registration.M.mockup_context) tzresult
+    (Registration.mockup_environment * Registration.mockup_context) tzresult
     Lwt.t
 
   (** Load a mockup environment and initializes a protocol RPC context from
@@ -51,7 +52,7 @@ module type S = sig
     base_dir:string ->
     protocol_hash:Protocol_hash.t option ->
     #Tezos_client_base.Client_context.printer ->
-    (Registration.M.mockup_environment * Registration.M.mockup_context) tzresult
+    (Registration.mockup_environment * Registration.mockup_context) tzresult
     Lwt.t
 
   (** Initializes an on-disk mockup environment in [base_dir] for the specified
@@ -86,4 +87,14 @@ module type S = sig
   (** Test whether base directory is a valid target for loading or creating
     a mockup environment. *)
   val classify_base_dir : string -> base_dir_class tzresult Lwt.t
+end
+
+module type T = sig
+  include S
+
+  module type S = S
+
+  module Internal_for_tests : sig
+    module Make (Registration : Registration.S) : S
+  end
 end

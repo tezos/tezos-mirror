@@ -22,20 +22,23 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Registration_intf
 
-module Internal = struct
-  module Make () = struct
-    include Registration_intf.T
+include Registration_intf
 
-    type mockup_environment = (module MOCKUP)
+module Make () : S = struct
+  include Registration_intf
 
-    let registered : mockup_environment list ref = ref []
+  type mockup_environment = (module MOCKUP)
 
-    let register_mockup_environment m = registered := m :: !registered
+  let registered : mockup_environment list ref = ref []
 
-    let get_registered_environments () = !registered
-  end
+  let register_mockup_environment m = registered := m :: !registered
+
+  let get_registered_environments () = !registered
 end
 
-module M = Internal.Make ()
+include Make ()
+
+module Internal_for_tests = struct
+  module Make = Make
+end
