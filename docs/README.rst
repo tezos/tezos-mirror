@@ -102,8 +102,9 @@ Links
 
 +When introducing cross-references between documentation pages as well as references to external resources, please consider using the most appropriate kind of link:
 
-- When referring to a whole documentation page, you may use a ``:doc:`` role instead of introducing a label at the start of the page.
+- When referring to a whole documentation page, you should use a ``:doc:`` role rather than introducing a label at the start of the page.
   Indeed, labels incur an overhead, especially when pages get duplicated for different protocol versions.
+  In particular, when referring to a page of the currently active protocol, consider using ``active/`` as the directory of that page, instead of a hardcoded protocol number ``NNN/``.
 - When referring to an artifact in the code repository (source file, commit, etc.), you may use an appropriate custom or GitLab role (see `Sphinx extensions`_) instead of a plain HTML link.
   Indeed, specific roles are checked for correctness more effectively and more efficiently than HTML links.
 
@@ -230,6 +231,8 @@ Documenting protocols
 Due to the duplication of the documentation for multiple protocol versions, the following extra guidelines should be observed.
 
 - In principle, protocol-independent pages should only refer to the currently active protocol. Indeed, until newer protocols are adopted, there is no guarantee that their features will be part of Tezos someday.
+  Note that there is a symbolic link called ``active`` within the documentation folder pointing to the currently active protocol directory.
+  Use it whenever appropriate to avoid introducing hardcoded protocol numbers.
 
 - When modifying the pages of a given protocol version, you might have to also modify it for later versions. Otherwise, when newer protocols are adopted, your changes will vanish! In particular, when fixing a problem in the documentation of the current protocol (e.g. adding a term in the glossary), you might have to fix it also for the candidate protocol (if there is one under the voting procedure) and for the Alpha protocol under development (assuming that the features of the candidate protocol will be inherited by or proposed in another form in Alpha).
 
