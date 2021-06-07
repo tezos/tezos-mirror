@@ -96,6 +96,9 @@ val uint8 : int QCheck.arbitrary
 (** [int8] is an arbitrary of signed int8 values  *)
 val int8 : int QCheck.arbitrary
 
+(** [string_fixed n] is an arbitrary of string of length [n]. *)
+val string_fixed : int -> string QCheck.arbitrary
+
 (** [of_option_shrink shrink_opt] returns a shrinker from an optional one.
     This is typically useful when extracting a shrinker from an [arbitrary]
     to compose a bigger shrinker.

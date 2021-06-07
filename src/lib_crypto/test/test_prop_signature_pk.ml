@@ -33,6 +33,7 @@
                   This is currently only relevant for Hacl.P256 since it is
                   the only scheme in which these 2 functions are different.
 *)
+open Lib_test.Qcheck_helpers
 
 module Pk_Properties (Desc : sig
   val name : string
@@ -42,21 +43,24 @@ struct
   (** Checks that [pk_of_bytes_without_validation] and [pk_of_bytes] have
       the same output on valid public keys and always return a Some. *)
   let test_prop_sign_check (sk_bytes : string) =
-    Option.iter
-      (fun sk ->
+    match X.sk_of_bytes @@ Bytes.of_string sk_bytes with
+    | Some sk ->
         let pk = X.neuterize sk in
         let pk_bytes = X.to_bytes pk in
         let pk1 = X.pk_of_bytes_without_validation pk_bytes in
         let pk2 = X.pk_of_bytes pk_bytes in
-        Crowbar.check (pk1 = pk2 && Option.is_some pk1))
-      (X.sk_of_bytes @@ Bytes.of_string sk_bytes)
+        pk1 = pk2 && Option.is_some pk1
+    | None ->
+        QCheck.Test.fail_report
+          "X.sk_of_bytes @@ Bytes.of_string sk_bytes can't return a None."
 
-  let () =
-    let open Crowbar in
-    add_test
+  let test_prop_sign_check =
+    QCheck.Test.make
       ~name:(Desc.name ^ "_pk_of_bytes")
-      [bytes_fixed X.sk_size]
+      (string_fixed X.sk_size)
       test_prop_sign_check
+
+  let tests = [test_prop_sign_check]
 end
 
 module P256_Props =
@@ -65,3 +69,8 @@ module P256_Props =
       let name = "P256"
     end)
     (Hacl.P256)
+
+let () =
+  Alcotest.run
+    "tezos-crypto-signature-pk"
+    [("P256_Pros", qcheck_wrap P256_Props.tests)]

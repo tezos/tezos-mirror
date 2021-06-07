@@ -30,6 +30,7 @@
     Subject:      Property-tests over the interface S.SIGNATURE and its
                   instantiations Ed25519 and Secp256k1.
 *)
+open Lib_test.Qcheck_helpers
 
 module Signature_Properties (Desc : sig
   val name : string
@@ -42,11 +43,15 @@ struct
     let (_, pk, sk) = X.generate_key () in
     let data = Bytes.of_string s in
     let signed = X.sign sk data in
-    Crowbar.check (X.check pk signed data)
+    X.check pk signed data
 
-  let () =
-    let open Crowbar in
-    add_test ~name:(Desc.name ^ "_sign_check") [bytes] test_prop_sign_check
+  let test_prop_sign_check =
+    QCheck.Test.make
+      ~name:(Desc.name ^ "_sign_check")
+      QCheck.string
+      test_prop_sign_check
+
+  let tests = [test_prop_sign_check]
 end
 
 module Ed25519_Props =
@@ -88,13 +93,7 @@ let () =
         end)
         (X)
     in
-    ()
+    (name, qcheck_wrap XProps.tests)
   in
-  List.iter
-    f
-    [
-      (Ed25519, "Ed25519");
-      (Secp256k1, "Secp256k1");
-      (* TODO uncomment this once signature.ml moved to hacl for p256 *)
-      (* ; (P256, "P256") *)
-    ]
+  List.map f [(Ed25519, "Ed25519"); (Secp256k1, "Secp256k1"); (P256, "P256")]
+  |> Alcotest.run "tezos-crypto-prop-signature"

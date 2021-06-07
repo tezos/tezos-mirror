@@ -106,6 +106,8 @@ let uint8 = QCheck.(0 -- 255)
 
 let int8 = QCheck.(-128 -- 127)
 
+let string_fixed n = QCheck.(Gen.pure n |> string_of_size)
+
 let bytes_arb = QCheck.(map ~rev:Bytes.to_string Bytes.of_string string)
 
 let of_option_shrink shrink_opt x yield =
