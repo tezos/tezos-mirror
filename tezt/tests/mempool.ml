@@ -131,22 +131,29 @@ let wait_for_flush node =
   let* _ = Node.wait_for node "node_prevalidator.v0" filter in
   return ()
 
-let operation_json branch sender receiver counter =
+let operation_json ~fee ~gas_limit ~source ~destination ~counter =
   Format.sprintf
-    {|{"branch": %s,
-           "contents": [{
+    {|{
              "kind": "transaction",
              "source": "%s",
-             "fee": "10",
+             "fee": "%d",
              "counter": "%d",
-             "gas_limit": "1040",
+             "gas_limit": "%d",
              "storage_limit": "0",
              "amount": "1000",
-             "destination": "%s"}]}|}
-    branch
-    sender
+             "destination": "%s"}|}
+    source
+    fee
     counter
-    receiver
+    gas_limit
+    destination
+
+let operation_json_branch ~branch operations_json =
+  Format.sprintf
+    {|{"branch": "%s",
+           "contents": [%s]}|}
+    branch
+    operations_json
 
 let sign_operation_bytes (signer : Constant.key) (msg : Bytes.t) =
   let open Tezos_crypto in
@@ -158,36 +165,46 @@ let sign_operation_bytes (signer : Constant.key) (msg : Bytes.t) =
   let sk = Signature.Secret_key.of_b58check_exn b58_secret_key in
   Signature.(sign ~watermark:Generic_operation sk msg)
 
-let counter = ref 0
-
-let forge_and_inject_operation ~branch ~sender ~receiver ~client =
-  incr counter ;
-  let op_json = operation_json branch sender receiver !counter in
+let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
+    ~counter ~signer ~client =
+  let op_json = operation_json ~fee ~gas_limit ~source ~destination ~counter in
+  let op_json_branch = operation_json_branch ~branch op_json in
   let* op_hex =
-    RPC.post_forge_operations ~data:(Ezjsonm.from_string op_json) client
+    RPC.post_forge_operations ~data:(Ezjsonm.from_string op_json_branch) client
   in
   let op_str_hex = JSON.as_string op_hex in
   let signature =
-    sign_operation_bytes Constant.bootstrap1 (Hex.to_bytes (`Hex op_str_hex))
+    sign_operation_bytes signer (Hex.to_bytes (`Hex op_str_hex))
   in
   let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
   let signed_op = op_str_hex ^ signature in
   let* res = RPC.inject_operation ~data:(`String signed_op) client in
   return (Some res)
 
-let forge_and_inject_n_operations ~branch ~sender ~receiver ~client ~node n =
-  let rec loop acc = function
+let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
+    ~counter ~signer ~client ~node n =
+  let rec loop ((oph_list, counter) as acc) = function
     | 0 -> return acc
     | n ->
         let transfer_1 = wait_for_injection node in
         let* oph =
-          forge_and_inject_operation ~branch ~sender ~receiver ~client
+          forge_and_inject_operation
+            ~branch
+            ~fee
+            ~gas_limit
+            ~source
+            ~destination
+            ~counter
+            ~signer
+            ~client
         in
         let* () = transfer_1 in
-        let acc = match oph with None -> acc | Some oph -> oph :: acc in
-        loop acc (pred n)
+        let oph_list =
+          match oph with None -> oph_list | Some oph -> oph :: oph_list
+        in
+        loop (oph_list, counter + 1) (pred n)
   in
-  loop [] n
+  loop ([], counter + 1) n
 
 (* This test tries to manually inject some operations
 
@@ -232,12 +249,12 @@ let flush_mempool =
   Log.info "Node is at level %d." 1 ;
   (* Step 2 *)
   (* Get the counter and the current branch *)
-  let* base_counter =
+  let* counter =
     RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
   in
-  counter := JSON.as_int base_counter ;
+  let counter = JSON.as_int counter in
   let* branch = RPC.get_branch client_1 in
-  let branch_s = JSON.encode branch in
+  let branch = JSON.as_string branch in
   (* Step 3 *)
   (* Forge operation, inject them and check injection *)
   let number_of_transactions =
@@ -246,11 +263,15 @@ let flush_mempool =
     (* TODO: pass a lower limit to the node config init so we may inject less operations *)
     60
   in
-  let* ophs =
+  let* (ophs, _counter) =
     forge_and_inject_n_operations
-      ~branch:branch_s
-      ~sender:Constant.bootstrap1.identity
-      ~receiver:Constant.bootstrap2.identity
+      ~branch
+      ~fee:1000 (* Minimal fees to successfully apply the transfer *)
+      ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap2.identity
+      ~counter
+      ~signer:Constant.bootstrap1
       ~client:client_1
       ~node:node_1
       number_of_transactions
@@ -362,4 +383,125 @@ let flush_mempool =
 (* TODO: add a test than ensure that we cannot have more than 1000
    branch delayed/branch refused/refused *)
 
-let register ~protocols = flush_mempool ~protocols
+let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
+    ~destination ~counter ~signer ~client =
+  let ops_json =
+    String.concat ", "
+    @@ List.map
+         (fun counter ->
+           operation_json ~fee ~gas_limit ~source ~destination ~counter)
+         (range (counter + 1) (counter + n))
+  in
+  let op_json_branch = operation_json_branch ~branch ops_json in
+  let* op_hex =
+    RPC.post_forge_operations ~data:(Ezjsonm.from_string op_json_branch) client
+  in
+  let op_str_hex = JSON.as_string op_hex in
+  let signature =
+    sign_operation_bytes signer (Hex.to_bytes (`Hex op_str_hex))
+  in
+  let* _run =
+    let* chain_id = RPC.get_chain_id client in
+    let op_runnable =
+      Format.asprintf
+        {|{ "operation":
+            {"branch": "%s",
+             "contents": [ %s ],
+             "signature": "%a" },
+            "chain_id": %s }|}
+        branch
+        ops_json
+        Tezos_crypto.Signature.pp
+        signature
+        (JSON.encode chain_id)
+    in
+    RPC.post_run_operation ~data:(Ezjsonm.from_string op_runnable) client
+  in
+  let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
+  let signed_op = op_str_hex ^ signature in
+  let* res = RPC.inject_operation ~data:(`String signed_op) client in
+  return res
+
+let check_batch_operations_are_in_applied_mempool ops oph n =
+  let open JSON in
+  let ops_list = as_list (ops |-> "applied") in
+  let res =
+    List.exists
+      (fun e ->
+        let contents = as_list (e |-> "contents") in
+        let h = as_string (e |-> "hash") in
+        List.length contents = n && h = as_string oph)
+      ops_list
+  in
+  if not res then
+    Test.fail
+      "Batch Operation %s was not found in the mempool or it does not contain \
+       %d operations"
+      (JSON.encode oph)
+      n
+
+(* This test tries to run manually forged operations before injecting them
+
+   Scenario:
+
+   1. Node 1 activates a protocol
+
+   2. Retrieve the counter and the branch for bootstrap1
+
+   3. Forge, run and inject <n> operations in the node
+
+   4. Check that the batch is correctly injected
+ *)
+let run_batched_operation =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Run batched operations before injecting them"
+    ~tags:["forge"; "mempool"; "batch"; "run_operation"]
+  @@ fun protocol ->
+  (* Step 1 *)
+  (* A Node is started and we activate the protocol and wait for the node to be synced *)
+  let* node_1 = Node.init [Synchronisation_threshold 0] in
+  let* client_1 = Client.init ~endpoint:(Node node_1) () in
+  let* () = Client.activate_protocol ~protocol client_1 in
+  Log.info "Activated protocol." ;
+  let* _ = Node.wait_for_level node_1 1 in
+  Log.info "Node is at level %d." 1 ;
+  (* Step 2 *)
+  (* Get the counter and the current branch *)
+  let* counter =
+    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+  in
+  let counter = JSON.as_int counter in
+  let* branch = RPC.get_branch client_1 in
+  let branch = JSON.as_string branch in
+  (* Step 3 *)
+  (* Forge operations, run and inject them *)
+  let number_of_transactions = 3 in
+  let* oph =
+    forge_run_and_inject_n_batched_operation
+      number_of_transactions
+      ~branch
+      ~fee:1000 (* Minimal fees to successfully apply the transfer *)
+      ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
+      ~source:Constant.bootstrap2.identity
+      ~destination:Constant.bootstrap1.identity
+      ~counter
+      ~signer:Constant.bootstrap2
+      ~client:client_1
+  in
+  Log.info "Operations forged, signed, run and injected" ;
+  (* Step 4 *)
+  (* Check that the batch is correctly injected *)
+  let* mempool_after_batch = RPC.get_mempool_pending_operations client_1 in
+  check_batch_operations_are_in_applied_mempool
+    mempool_after_batch
+    oph
+    number_of_transactions ;
+  Log.info
+    "%d operations are applied as a batch in the mempool"
+    number_of_transactions ;
+  unit
+
+let register ~protocols =
+  flush_mempool ~protocols ;
+  run_batched_operation ~protocols
