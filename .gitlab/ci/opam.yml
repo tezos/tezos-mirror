@@ -17,6 +17,21 @@
 ##BEGIN_OPAM##
 # this section is updated using the script scripts/update_opam_test.sh
 
+opam:alcotest-glue:
+  extends: .opam_template
+  variables:
+    package: alcotest-glue
+
+opam:alcotest-glue-js:
+  extends: .opam_template
+  variables:
+    package: alcotest-glue-js
+
+opam:alcotest-glue-unix:
+  extends: .opam_template
+  variables:
+    package: alcotest-glue-unix
+
 opam:benchmark-utils:
   extends: .opam_template
   variables:
