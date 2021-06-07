@@ -141,6 +141,28 @@ typecheck scripts:
 
     $ tezos-client --mode mockup typecheck script ./tests_python/contracts_alpha/mini_scenarios/hardlimit.tz
 
+The script can also be executed:
+
+.. code-block:: shell-session
+
+   $ tezos-client --mode mockup run script <filename> on storage <storage> and input <input>
+
+where ``<storage>`` and ``<input>`` are some :ref:`Michelson expression
+<michelson_type_system>` describing contract's storage and script input
+respectively. A ``--trace-stack`` option can be added in the end to output the
+state of the stack after each step of script's execution.
+
+For example:
+
+.. code-block:: shell-session
+
+  $ tezos-client --mode mockup run script tests_python/contracts_alpha/attic/id.tz on storage '"hello"' and input '"world"'
+  # Ignore warnings about the missing/wrong base directory, they do not apply to "run script"
+  storage
+    "world"
+  [...]
+
+
 Tune mockup parameters
 ======================
 
