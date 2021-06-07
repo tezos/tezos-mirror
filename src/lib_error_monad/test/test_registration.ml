@@ -31,7 +31,7 @@
                   and recursive errors.
 *)
 
-module Make () = struct
+module MakeRecReg () = struct
   open TzCore
 
   (* Shallow parallel errors *)
@@ -163,10 +163,46 @@ end
     well as deep recursion.
 *)
 let test_register_rec () =
-  let module M = Make () in
+  let module M = MakeRecReg () in
   M.main ()
 
-let tests = [Alcotest.test_case "register-rec" `Quick test_register_rec]
+let tests_recursive_reg =
+  [Alcotest.test_case "register-rec" `Quick test_register_rec]
+
+module MakeExtractInfos () = struct
+  open TzCore
+
+  type error += A
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"test.extractinfo"
+      ~title:"test-extractinfo"
+      ~description:"Test Extract Infos"
+      Data_encoding.unit
+      (function A -> Some () | _ -> None)
+      (fun () -> A)
+
+  let () =
+    let infos = find_info_of_error A in
+    assert (infos.id = "test.extractinfo") ;
+    assert (infos.title = "test-extractinfo")
+
+  let main () = ()
+end
+
+let test_extract_infos () =
+  let module M = MakeExtractInfos () in
+  M.main ()
+
+let tests_extract_infos =
+  [Alcotest.test_case "extract-infos" `Quick test_extract_infos]
 
 let () =
-  Alcotest.run "recursive-error-registration" [("recursive-error", tests)]
+  Alcotest.run
+    "error-registration"
+    [
+      ("recursive-error", tests_recursive_reg);
+      ("extract-info", tests_extract_infos);
+    ]
