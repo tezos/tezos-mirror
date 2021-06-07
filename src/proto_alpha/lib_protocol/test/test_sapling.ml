@@ -598,7 +598,7 @@ module Interpreter_tests = struct
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
     transac_and_sync ~memo_size b parameters total src0 dst baker
-    >>=? fun (b, _ctx, _state) ->
+    >>=? fun (b, _state) ->
     (* we shield again on another block, forging with the empty state *)
     let (list_transac, total) =
       shield
@@ -612,10 +612,9 @@ module Interpreter_tests = struct
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
     transac_and_sync ~memo_size b parameters total src0 dst baker
-    >>=? fun (b, ctx, state) ->
+    >>=? fun (b, state) ->
     (* address that will receive an unshield *)
-    Alpha_context.Contract.get_balance ctx src1 >>= wrap
-    >>=? fun balance_before_shield ->
+    Context.Contract.balance (B b) src1 >>=? fun balance_before_shield ->
     let wb = wallet_gen () in
     let list_addr = gen_addr 15 wb.vk in
     let list_forge_input =
@@ -662,9 +661,8 @@ module Interpreter_tests = struct
     in
     (* a transfers to b and unshield some money to src_2 (the pkh) *)
     transac_and_sync ~memo_size b parameters 0 src0 dst baker
-    >>=? fun (b, ctx, state) ->
-    Alpha_context.Contract.get_balance ctx src1 >>= wrap
-    >>=? fun balance_after_shield ->
+    >>=? fun (b, state) ->
+    Context.Contract.balance (B b) src1 >>=? fun balance_after_shield ->
     let diff =
       Int64.sub
         (Test_tez.Tez.to_mutez balance_after_shield)
@@ -710,7 +708,7 @@ module Interpreter_tests = struct
     in
     (* b transfers to a with dummy inputs and outputs *)
     transac_and_sync ~memo_size b parameters 0 src0 dst baker
-    >>=? fun (b, _ctx, _state) ->
+    >>=? fun (b, _state) ->
     (* Here we fail by doing the same transaction again*)
     Incremental.begin_construction b >>=? fun incr ->
     let fee = Test_tez.Tez.of_int 10 in
@@ -818,7 +816,7 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (expression_from_string string_1))
     in
     transac_and_sync ~memo_size block_start parameters_1 15 src dst baker
-    >>=? fun (block_1, _ctx, state) ->
+    >>=? fun (block_1, state) ->
     let intermediary_root = Tezos_sapling.Storage.get_root state in
     let addr =
       snd
@@ -845,7 +843,7 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (expression_from_string string_2))
     in
     transac_and_sync ~memo_size block_1 parameters_2 0 src dst baker
-    >>=? fun (block_1, _ctx, state_1) ->
+    >>=? fun (block_1, state_1) ->
     let final_root = Tezos_sapling.Storage.get_root state_1 in
     Alpha_services.Contract.single_sapling_get_diff
       Block.rpc_ctxt

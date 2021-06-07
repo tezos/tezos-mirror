@@ -325,12 +325,9 @@ module Interpreter_helpers = struct
       ~offset_commitment:0L
       ~offset_nullifier:0L
       ()
-    >>=? fun diff ->
+    >|=? fun diff ->
     let state = client_state_of_diff ~memo_size diff in
-    Incremental.begin_construction ~policy:Block.(By_account baker) block
-    >|=? fun incr ->
-    let ctx = Incremental.alpha_ctxt incr in
-    (block, ctx, state)
+    (block, state)
 
   (* Returns a list of printed shield transactions and their total amount. *)
   let shield ~memo_size sk number_transac vk printer anti_replay =
