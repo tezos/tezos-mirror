@@ -25,6 +25,7 @@ __pycache__
 /tezos-baker-*
 /tezos-endorser-*
 /tezos-accuser-*
+/tezos-proxy-server
 /tezos-signer
 /tezos-sandbox
 /tezos-codec
