@@ -504,13 +504,11 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
     | true -> failwith "Data directory is locked by another process"
   in
   Lwt_main.run
-    (Lwt_exit.wrap_and_error main_promise >>= function
-     | Ok (Ok _) -> Lwt_exit.exit_and_wait 0 >>= fun _ -> Lwt.return (`Ok ())
-     | Ok (Error err) ->
-         Lwt_exit.exit_and_wait 2 >>= fun _ ->
-         Lwt.return (`Error (false, Format.asprintf "%a" pp_print_error err))
-     | Error exit_status ->
-         Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)))
+    (Lwt_exit.wrap_and_exit main_promise >>= function
+     | Ok () -> Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
+     | Error err ->
+         Lwt_exit.exit_and_wait 1 >|= fun _ ->
+         `Error (false, Format.asprintf "%a" pp_print_error err))
 
 module Term = struct
   let verbosity =
