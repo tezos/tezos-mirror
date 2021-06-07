@@ -367,15 +367,18 @@ let test_randomness_commitment_protocol () =
 
 let tests =
   [
-    ("dealer proof", `Quick, test_dealer_proof);
-    ("invalid dealer proof", `Quick, test_invalid_dealer_proof);
-    ("reveal", `Quick, test_share_reveal);
-    ("invalid reveal", `Quick, test_invalid_share_reveal);
-    ("reconstruct", `Quick, test_reconstruct);
-    ("invalid reconstruct", `Quick, test_invalid_reconstruct);
-    ( "randomness commitment protocol",
-      `Quick,
-      test_randomness_commitment_protocol );
+    ( "pvss",
+      [
+        ("dealer proof", `Quick, test_dealer_proof);
+        ("invalid dealer proof", `Quick, test_invalid_dealer_proof);
+        ("reveal", `Quick, test_share_reveal);
+        ("invalid reveal", `Quick, test_invalid_share_reveal);
+        ("reconstruct", `Quick, test_reconstruct);
+        ("invalid reconstruct", `Quick, test_invalid_reconstruct);
+        ( "randomness commitment protocol",
+          `Quick,
+          test_randomness_commitment_protocol );
+      ] );
   ]
 
-let () = Alcotest.run "test-pvss" [("pvss", tests)]
+let tests_lwt = []

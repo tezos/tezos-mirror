@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Alcotest = Alcotest_glue
+
 let test_rt_opt name testable enc dec input =
   try
     let roundtripped = dec (enc input) in

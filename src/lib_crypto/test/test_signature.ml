@@ -70,12 +70,15 @@ let test_of_bytes_without_validation () =
       assert (Some pk = pk2))
     [Ed25519; Secp256k1; P256]
 
-let size =
+let tests =
   [
-    ("size", `Quick, test_size);
-    ( "test_of_bytes_without_validation",
-      `Quick,
-      test_of_bytes_without_validation );
+    ( "signature",
+      [
+        ("size", `Quick, test_size);
+        ( "test_of_bytes_without_validation",
+          `Quick,
+          test_of_bytes_without_validation );
+      ] );
   ]
 
-let () = Alcotest.run "signature" [("size", size)]
+let tests_lwt = []

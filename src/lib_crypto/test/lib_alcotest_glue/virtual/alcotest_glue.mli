@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2018 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,41 +22,69 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Crypto
-    Invocation:   dune build @src/lib_crypto/runtest
-    Subject:      On hash functions with deterministic nonce
-*)
+module type TESTABLE = sig
+  type t
 
-(** Deterministic nonce generation using HMAC-SHA256 *)
+  val pp : t Fmt.t
 
-module Alcotest = Alcotest_glue
+  val equal : t -> t -> bool
+end
 
-let test_hash_matches (module X : S.SIGNATURE) () =
-  let (_, _, sk) = X.generate_key () in
-  let data = Bytes.of_string "ce input sa pun eu aici oare?" in
-  let nonce = X.deterministic_nonce sk data in
-  let nonce_hash = X.deterministic_nonce_hash sk data in
-  let hashed_nonce = Blake2B.hash_bytes [nonce] in
-  if nonce_hash <> Blake2B.to_bytes hashed_nonce then
-    Alcotest.failf
-      "the hash of deterministic_nonce is NOT deterministic_nonce_hash"
+type 'a testable = (module TESTABLE with type t = 'a)
 
-let ed25519 = (module Ed25519 : S.SIGNATURE)
+val testable : 'a Fmt.t -> ('a -> 'a -> bool) -> 'a testable
 
-let p256 = (module P256 : S.SIGNATURE)
+module Source_code_position : sig
+  type here = Lexing.position
 
-let secp256k1 = (module Secp256k1 : S.SIGNATURE)
+  type pos = string * int * int * int
+end
 
-let tests =
-  [
-    ( "deterministic_nonce",
-      [
-        ("hash_matches_ed25519", `Quick, test_hash_matches ed25519);
-        ("hash_matches_p256", `Quick, test_hash_matches p256);
-        ("hash_matches_secp256k1", `Quick, test_hash_matches secp256k1);
-      ] );
-  ]
+type 'a extra_info =
+  ?here:Source_code_position.here -> ?pos:Source_code_position.pos -> 'a
 
-let tests_lwt = []
+type return = unit
+
+type speed_level = [`Quick | `Slow]
+
+type 'a test_case = string * speed_level * ('a -> return)
+
+(*exception Test_error of unit Fmt.t*)
+
+type 'a test = string * 'a test_case list
+
+type 'a with_options =
+  ?and_exit:bool ->
+  ?verbose:bool ->
+  ?compact:bool ->
+  ?tail_errors:[`Unlimited | `Limit of int] ->
+  ?quick_only:bool ->
+  ?show_errors:bool ->
+  ?json:bool ->
+  ?filter:Re.re option * int list option ->
+  ?log_dir:string ->
+  ?bail:bool ->
+  'a
+
+val bool : bool testable
+
+val int : int testable
+
+val string : string testable
+
+val option : 'a testable -> 'a option testable
+
+val bytes : bytes testable
+
+val pp : 'a testable -> 'a Fmt.t
+
+val equal : 'a testable -> 'a -> 'a -> bool
+
+val check : ('a testable -> string -> 'a -> 'a -> unit) extra_info
+
+val fail : (string -> 'a) extra_info
+
+val failf : (('a, Format.formatter, unit, 'b) format4 -> 'a) extra_info
+
+val run :
+  (?argv:string array -> string -> unit test list -> return) with_options

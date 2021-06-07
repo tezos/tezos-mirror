@@ -1,0 +1,10 @@
+(library
+ (name alcotest_glue_js)
+ (public_name alcotest-glue-js)
+ (implements alcotest-glue)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries
+   js_of_ocaml
+   js_of_ocaml-compiler
+   fmt)
+)

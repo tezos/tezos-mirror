@@ -30,6 +30,7 @@
     Subject:      Checking all of the HACL* primitives used in lib_crypto:
                   hashing, HMAC, NaCl, Ed25519, and P-256.
 *)
+module Alcotest = Alcotest_glue
 
 open Hacl
 
@@ -442,14 +443,14 @@ let p256 =
     ("test_vectors", `Quick, test_vectors_p256);
   ]
 
-let () =
-  Alcotest.run
-    "hacl"
-    [
-      ("hash", hash);
-      ("blake2b", blake2b_tests);
-      ("secretbox", secretbox);
-      ("box", box);
-      ("ed25519", ed25519);
-      ("p256", p256);
-    ]
+let tests =
+  [
+    ("hash", hash);
+    ("blake2b", blake2b_tests);
+    ("secretbox", secretbox);
+    ("box", box);
+    ("ed25519", ed25519);
+    ("p256", p256);
+  ]
+
+let tests_lwt = []

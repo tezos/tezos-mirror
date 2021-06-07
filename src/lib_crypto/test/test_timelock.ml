@@ -138,12 +138,17 @@ let test_negative () =
 
 let tests =
   [
-    ("timelock raw scenario short", `Quick, test_raw_scenario (Z.of_int 5));
-    ("timelock raw scenario", `Quick, test_raw_scenario (Z.of_int 1000));
-    ("timelock raw scenario long", `Slow, test_raw_scenario (Z.of_int 100000));
-    ("timelock high level scenario", `Quick, test_high_level_scenario);
-    ("bench", `Slow, bench);
-    ("timelock negative test", `Quick, test_negative);
+    ( "timelock",
+      [
+        ("timelock raw scenario short", `Quick, test_raw_scenario (Z.of_int 5));
+        ("timelock raw scenario", `Quick, test_raw_scenario (Z.of_int 1000));
+        ( "timelock raw scenario long",
+          `Slow,
+          test_raw_scenario (Z.of_int 100000) );
+        ("timelock high level scenario", `Quick, test_high_level_scenario);
+        ("bench", `Slow, bench);
+        ("timelock negative test", `Quick, test_negative);
+      ] );
   ]
 
-let () = Alcotest.run "tezos-crypto" [("timelock", tests)]
+let tests_lwt = []

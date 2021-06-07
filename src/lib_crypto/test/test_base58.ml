@@ -31,6 +31,8 @@
     Subject:      Encoding in Base58
 *)
 
+module Alcotest = Alcotest_glue
+
 let test_roundtrip_safe input =
   Roundtrips.test_rt_opt
     "safe base58"
@@ -94,11 +96,14 @@ let test_safety input =
 (** Safe Base58Check-decoding (provided with error detections) *)
 let test_safetys () = List.iter test_safety inputs
 
-let tests =
+let tests : unit Alcotest.test list =
   [
-    ("safe decoding", `Quick, test_safetys);
-    ("safe encoding/decoding", `Quick, test_roundtrip_safes);
-    ("raw encoding/decoding", `Quick, test_roundtrip_raws);
+    ( "base58",
+      [
+        ("safe decoding", `Quick, test_safetys);
+        ("safe encoding/decoding", `Quick, test_roundtrip_safes);
+        ("raw encoding/decoding", `Quick, test_roundtrip_raws);
+      ] );
   ]
 
-let () = Alcotest.run "tezos-crypto" [("base58", tests)]
+let tests_lwt = []
