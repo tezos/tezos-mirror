@@ -32,12 +32,15 @@
                   SHA512.
 *)
 
+open Lib_test.Qcheck_helpers
+
 module Hash_Properties (Desc : sig
   val name : string
 end)
 (X : Hacl.Hash.S) =
 struct
-  let pp_bytes fmt d = Crowbar.pp_string fmt (Bytes.to_string d)
+  let pp_bytes fmt d =
+    Format.fprintf fmt "\"%s\"" (String.escaped @@ Bytes.to_string d)
 
   (** Verifies equivalence between the hash of [msg_s] obtained through the
       direct and incremental interface of [X].
@@ -46,9 +49,15 @@ struct
     let st = X.init () in
     let msg = Bytes.of_string msg_s in
     X.update st msg ;
-    let d = X.finish st in
-    let d' = X.digest msg in
-    Crowbar.check_eq ~pp:pp_bytes d d'
+    let expected = X.finish st in
+    let actual = X.digest msg in
+    qcheck_eq' ~pp:pp_bytes ~expected ~actual ()
+
+  let test_prop_incremental_one =
+    QCheck.Test.make
+      ~name:(Desc.name ^ "_incremental_one")
+      QCheck.string
+      test_prop_incremental_one
 
   (** Verifies equivalence between the hash of the concatenation of [msg_ss]
       obtained through the direct and incremental interface of [X].
@@ -57,20 +66,17 @@ struct
     let st = X.init () in
     let msgs = List.map Bytes.of_string msg_ss in
     List.iter (X.update st) msgs ;
-    let d = X.finish st in
-    let d' = X.digest (Bytes.concat Bytes.empty msgs) in
-    Crowbar.check_eq ~pp:pp_bytes d d'
+    let expected = X.finish st in
+    let actual = X.digest (Bytes.concat Bytes.empty msgs) in
+    qcheck_eq' ~pp:pp_bytes ~expected ~actual ()
 
-  let () =
-    let open Crowbar in
-    add_test
-      ~name:(Desc.name ^ "_incremental_one")
-      [bytes]
-      test_prop_incremental_one ;
-    add_test
+  let test_prop_incremental_list =
+    QCheck.Test.make
       ~name:(Desc.name ^ "_incremental_list")
-      [list bytes]
+      (QCheck.list QCheck.string)
       test_prop_incremental_list
+
+  let tests = [test_prop_incremental_one; test_prop_incremental_list]
 end
 
 module SHA256_Props =
@@ -86,3 +92,11 @@ module SHA512_Props =
       let name = "SHA512"
     end)
     (Hacl.Hash.SHA512)
+
+let () =
+  Alcotest.run
+    "tezos-crypto-shaX-props"
+    [
+      ("SHA256_Props", qcheck_wrap SHA256_Props.tests);
+      ("SHA512_Props", qcheck_wrap SHA512_Props.tests);
+    ]

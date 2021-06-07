@@ -19,9 +19,9 @@
             zarith
             tezos-hacl-glue-unix
             data-encoding
-            alcotest
             alcotest-lwt
-            crowbar)
+            qcheck-alcotest
+            tezos-test-helpers)
  (package tezos-crypto)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_crypto

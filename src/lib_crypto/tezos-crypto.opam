@@ -21,7 +21,8 @@ depends: [
   "secp256k1-internal"
   "ringo" { = "0.5" }
   "bls12-381-unix" { with-test }
-  "alcotest" { with-test & >= "1.1.0" }
+  "qcheck-alcotest" { with-test }
+  "tezos-test-helpers" { with-test }
   "alcotest-lwt" { with-test & >= "1.1.0" }
 ]
 build: [
