@@ -4,7 +4,8 @@
             tezos-micheline
             tezos-protocol-environment
             alcotest-lwt
-            crowbar
+            qcheck-alcotest
+            tezos-test-helpers
             tezos-009-PsFLoren-test-helpers
             tezos-stdlib-unix
             tezos-client-base
