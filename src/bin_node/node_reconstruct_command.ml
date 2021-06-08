@@ -62,7 +62,7 @@ module Term = struct
       >>=? fun () ->
       let context_root = Node_data_version.context_dir data_dir in
       let store_root = Node_data_version.store_dir data_dir in
-      Store.init ~mapsize:40_960_000_000L store_root
+      Store.init ~mapsize:409_600_000_000L store_root
       >>=? fun store ->
       let genesis = config.blockchain_network.genesis in
       State.init ~context_root ~store_root genesis

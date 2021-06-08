@@ -1947,7 +1947,7 @@ let () =
     (fun (previous_mode, next_mode) ->
       Incorrect_history_mode_switch {previous_mode; next_mode})
 
-let init ?patch_context ?commit_genesis ?(store_mapsize = 40_960_000_000L)
+let init ?patch_context ?commit_genesis ?(store_mapsize = 409_600_000_000L)
     ?(context_mapsize = 409_600_000_000L) ~store_root ~context_root
     ?history_mode ?(readonly = false) (genesis : Genesis.t) =
   Store.init ~mapsize:store_mapsize store_root
