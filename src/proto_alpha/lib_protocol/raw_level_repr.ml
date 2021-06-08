@@ -29,8 +29,6 @@ type raw_level = t
 
 include (Compare.Int32 : Compare.S with type t := t)
 
-let encoding = Data_encoding.int32
-
 let pp ppf level = Format.fprintf ppf "%ld" level
 
 let rpc_arg =
@@ -57,6 +55,12 @@ let to_int32 l = l
 
 let of_int32_exn l =
   if Compare.Int32.(l >= 0l) then l else invalid_arg "Level_repr.of_int32"
+
+let encoding =
+  Data_encoding.conv_with_guard
+    (fun i -> i)
+    (fun i -> try ok (of_int32_exn i) with Invalid_argument s -> Error s)
+    Data_encoding.int32
 
 type error += Unexpected_level of Int32.t (* `Permanent *)
 

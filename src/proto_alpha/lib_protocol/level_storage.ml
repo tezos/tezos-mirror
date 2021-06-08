@@ -25,9 +25,13 @@
 
 open Level_repr
 
-let from_raw c ?offset l =
+let from_raw c l =
   let cycle_eras = Raw_context.cycle_eras c in
-  Level_repr.level_from_raw ~cycle_eras ?offset l
+  Level_repr.from_raw ~cycle_eras l
+
+let from_raw_with_offset c ~offset l : Level_repr.t tzresult =
+  let cycle_eras = Raw_context.cycle_eras c in
+  Level_repr.from_raw_with_offset ~cycle_eras ~offset l
 
 let root c = Raw_context.cycle_eras c |> Level_repr.root_level
 

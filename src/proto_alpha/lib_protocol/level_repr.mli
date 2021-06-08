@@ -91,10 +91,14 @@ val current_era : cycle_eras -> cycle_era
 (** Returns the first level of the oldest era *)
 val root_level : cycle_eras -> level
 
+(** Returns the annotated level corresponding to a raw level *)
+val from_raw : cycle_eras:cycle_eras -> Raw_level_repr.t -> level
+
 (** Returns the annotated level corresponding to a raw level and an
-   offset. A positive offset corresponds to a higher level. *)
-val level_from_raw :
-  cycle_eras:cycle_eras -> ?offset:int32 -> Raw_level_repr.t -> level
+   offset. A positive offset corresponds to a higher level.
+   Fails with [Negative_level_and_offset_sum] if the sum of the raw_level and the offset is negative. *)
+val from_raw_with_offset :
+  cycle_eras:cycle_eras -> offset:int32 -> Raw_level_repr.t -> level tzresult
 
 (** Returns the first level of the given cycle. *)
 val first_level_in_cycle_from_eras :

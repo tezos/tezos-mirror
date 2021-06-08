@@ -970,7 +970,11 @@ module Level : sig
 
   val pred : context -> level -> level option
 
-  val from_raw : context -> ?offset:int32 -> Raw_level.t -> level
+  val from_raw : context -> Raw_level.t -> level
+
+  (** Fails with [Negative_level_and_offset_sum] if the sum of the raw_level and the offset is negative. *)
+  val from_raw_with_offset :
+    context -> offset:int32 -> Raw_level.t -> level tzresult
 
   val diff : level -> level -> int32
 

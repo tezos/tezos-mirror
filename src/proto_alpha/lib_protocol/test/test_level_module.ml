@@ -194,7 +194,7 @@ let test_level_from_raw () =
           Level_repr.create_cycle_eras cycle_eras |> Environment.wrap_tzresult
           >>?= fun cycle_eras ->
           let level_from_raw =
-            Protocol.Level_repr.level_from_raw ~cycle_eras raw_level
+            Protocol.Level_repr.from_raw ~cycle_eras raw_level
           in
           Assert.equal_int
             ~loc:__LOC__

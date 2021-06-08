@@ -653,7 +653,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
   get_constants ctxt >>=? fun constants ->
   get_cycle_eras ctxt >|=? fun cycle_eras ->
   check_cycle_eras cycle_eras constants ;
-  let level = Level_repr.level_from_raw ~cycle_eras level in
+  let level = Level_repr.from_raw ~cycle_eras level in
   {
     remaining_operation_gas = Gas_limit_repr.Arith.zero;
     back =
