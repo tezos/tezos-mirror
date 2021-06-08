@@ -91,8 +91,11 @@ update_all_dot_ocamlformats () {
 }
 
 check_scripts () {
+    # Gather scripts
     scripts=$(find "${source_directories[@]}" tests_python/ scripts/ -name "*.sh" -type f -print)
     exit_code=0
+
+    # Check scripts do not contain the tab character
     tab="$(printf '%b' '\t')"
     for f in $scripts ; do
         if grep -q "$tab" "$f"; then
@@ -100,6 +103,40 @@ check_scripts () {
             exit_code=1
         fi
     done
+
+    # Execute shellcheck
+    ./scripts/shellcheck_version.sh || return 1  # Check shellcheck's version
+
+    shellcheck_skips=""
+    while read -r shellcheck_skip; do
+      shellcheck_skips+=" $shellcheck_skip"
+    done < "src/tooling/shellcheck_skips"
+
+    for script in ${scripts}; do
+        if [[ "${shellcheck_skips}" == *"${script}"* ]]; then
+          # script is skipped, we leave a log however, to incite
+          # devs to enhance the scripts
+          say "$script shellcheck SKIPPED ⚠️"
+        else
+          # script is not skipped, let's shellcheck it
+          if shellcheck "${script}"; then
+            say "$script shellcheck PASSED ✅"
+          else
+            say "$script shellcheck FAILED ❌"
+            exit_code=1
+          fi
+        fi
+    done
+    # Check that shellcheck_skips doesn't contain a deprecated value
+    for shellcheck_skip in ${shellcheck_skips}; do
+        if [[ ! -e "${shellcheck_skip}" ]]; then
+          say "$shellcheck_skip is mentioned in shellcheck_skips, but doesn't exist anymore"
+          say "please delete it from shellcheck_skips"
+          exit_code=1
+        fi
+    done
+    # Done executing shellcheck
+
     exit $exit_code
 }
 
