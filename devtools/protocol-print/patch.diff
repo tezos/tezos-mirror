@@ -1,0 +1,67 @@
+diff --git a/src/lib_protocol_environment/environment_V2.ml b/src/lib_protocol_environment/environment_V2.ml
+index 128916cc1..58dc448fb 100644
+--- a/src/lib_protocol_environment/environment_V2.ml
++++ b/src/lib_protocol_environment/environment_V2.ml
+@@ -612,6 +612,9 @@ struct
+   module RPC_arg = RPC_arg
+   module RPC_path = RPC_path
+   module RPC_query = RPC_query
++  module Hack = struct
++    let print s = Printf.printf "%s\n%!" s
++  end
+   module RPC_service = RPC_service
+ 
+   module RPC_answer = struct
+diff --git a/src/lib_protocol_environment/environment_V3.ml b/src/lib_protocol_environment/environment_V3.ml
+index b0e7ef6ee..ed5a7fbe9 100644
+--- a/src/lib_protocol_environment/environment_V3.ml
++++ b/src/lib_protocol_environment/environment_V3.ml
+@@ -632,6 +632,10 @@ struct
+   module RPC_arg = RPC_arg
+   module RPC_path = RPC_path
+   module RPC_query = RPC_query
++  module Hack = struct
++    let print s = Printf.printf "%s\n%!" s
++  end
++
+   module RPC_service = RPC_service
+ 
+   module RPC_answer = struct
+diff --git a/src/lib_protocol_environment/sigs/v2.dune.inc b/src/lib_protocol_environment/sigs/v2.dune.inc
+index ed403dc47..b02cad4e8 100644
+--- a/src/lib_protocol_environment/sigs/v2.dune.inc
++++ b/src/lib_protocol_environment/sigs/v2.dune.inc
+@@ -66,6 +66,7 @@
+    v2/updater.mli
+    v2/RPC_context.mli
+    v2/equality_witness.mli
++   v2/hack.mli
+  )
+  (action (with-stdout-to %{targets} (chdir %{workspace_root}}
+           (run %{libexec:tezos-protocol-environment-packer:s_packer} "sigs" %{deps})))))
+diff --git a/src/lib_protocol_environment/sigs/v2/hack.mli b/src/lib_protocol_environment/sigs/v2/hack.mli
+new file mode 100644
+index 000000000..d402aee9a
+--- /dev/null
++++ b/src/lib_protocol_environment/sigs/v2/hack.mli
+@@ -0,0 +1 @@
++val print : string -> unit
+diff --git a/src/lib_protocol_environment/sigs/v3.dune.inc b/src/lib_protocol_environment/sigs/v3.dune.inc
+index 9ce877727..b35e0878d 100644
+--- a/src/lib_protocol_environment/sigs/v3.dune.inc
++++ b/src/lib_protocol_environment/sigs/v3.dune.inc
+@@ -66,6 +66,7 @@
+    v3/updater.mli
+    v3/RPC_context.mli
+    v3/equality_witness.mli
++   v3/hack.mli
+  )
+  (action (with-stdout-to %{targets} (chdir %{workspace_root}}
+           (run %{libexec:tezos-protocol-environment-packer:s_packer} "sigs" %{deps})))))
+diff --git a/src/lib_protocol_environment/sigs/v3/hack.mli b/src/lib_protocol_environment/sigs/v3/hack.mli
+new file mode 100644
+index 000000000..d402aee9a
+--- /dev/null
++++ b/src/lib_protocol_environment/sigs/v3/hack.mli
+@@ -0,0 +1 @@
++val print : string -> unit
