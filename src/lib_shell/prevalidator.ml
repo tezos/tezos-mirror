@@ -1599,3 +1599,13 @@ let rpc_directory : t option RPC_directory.t =
               let pv_rpc_dir = Lazy.force pv.rpc_directory in
               Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir)
           ))
+
+module Internal_for_tests = struct
+  module type CLASSIFICATOR = CLASSIFICATOR
+
+  module Classificator : functor
+    (Requester : Requester.REQUESTER with type key = Operation_hash.t)
+    ->
+    CLASSIFICATOR with type input = Requester.t * Prevalidation.Classification.t =
+    Classificator
+end
