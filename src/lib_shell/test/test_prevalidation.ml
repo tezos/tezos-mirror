@@ -130,6 +130,35 @@ let test_db_leak f (nb_ops : int) (_ : unit) =
       (actual_table_size <= max_table_size)
       true)
 
+(** Check that when doing a succession of inject/classify operations,
+ *  the memory table of the requester stays small. In the past, this
+ *  was broken; because of a missing call to remove elements
+ *  from [Classes.in_mempool]. This could be exploited to create
+ *  a memory leak. *)
+let test_in_mempool_leak f (nb_ops : int) (_ : unit) =
+  let requester = init_full_requester () in
+  let max_table_size = 32 in
+  assert (nb_ops >= max_table_size) ;
+  let classes = Classification.mk_empty max_table_size in
+  let handle i =
+    let op = mk_operation i in
+    let oph = Operation.hash op in
+    let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
+    assert injected ;
+    f (requester, classes) op oph []
+  in
+  List.iter handle (1 -- nb_ops) ;
+  let actual_in_mempool_size = Operation_hash.Set.cardinal classes.in_mempool in
+  Alcotest.(
+    check
+      bool
+      (Printf.sprintf
+         "in_mempool size (%d) is less or equal than %d"
+         actual_in_mempool_size
+         max_table_size)
+      (actual_in_mempool_size <= max_table_size)
+      true)
+
 let () =
   let nb_ops = [512; 1024; 2048] in
   let handle_refused_pair = (Classificator.handle_refused, "handle_refused") in
@@ -152,6 +181,9 @@ let () =
   let all_ddb_leak_tests =
     List.map (mk_test_cases ~test:test_db_leak) applier_funs |> List.concat
   in
+  let in_mempool_leak_test =
+    mk_test_cases ~test:test_in_mempool_leak handle_refused_pair
+  in
   Alcotest.run
     "Prevalidation"
     [
@@ -162,5 +194,6 @@ let () =
             `Quick
             test_safe_decode;
         ] );
-      ("Leaks", all_ddb_leak_tests);
+      ("Ddb leaks", all_ddb_leak_tests);
+      ("Mempool Leaks", in_mempool_leak_test);
     ]
