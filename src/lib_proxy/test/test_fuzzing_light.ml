@@ -841,7 +841,6 @@ let test_consensus_spec =
 
 let () =
   Alcotest.run
-    ~verbose:true
     "Mode Light"
     [
       ( "Hash stability",
