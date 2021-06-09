@@ -51,16 +51,20 @@ module Program = Client_aliases.Alias (struct
   let name = "script"
 end)
 
-let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
+let print_errors ?parsed (cctxt : #Client_context.printer) errs ~show_source =
   cctxt#warning
     "%a"
     (Michelson_v1_error_reporter.report_errors
        ~details:false
        ~show_source
-       ~parsed)
+       ?parsed)
     errs
   >>= fun () ->
   cctxt#error "error running script" >>= fun () -> return_unit
+
+let print_view_result (cctxt : #Client_context.printer) = function
+  | Ok expr -> cctxt#message "%a" print_expr expr >>= fun () -> return_unit
+  | Error errs -> print_errors cctxt ~show_source:false errs
 
 let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   function
@@ -107,6 +111,24 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         trace
       >>= fun () -> return_unit
   | Error errs -> print_errors cctxt errs ~show_source ~parsed
+
+let run_view (cctxt : #Protocol_client_context.rpc_context)
+    ~(chain : Chain_services.chain) ~block ~(contract : Contract.t) ~entrypoint
+    ~(input : Michelson_v1_parser.parsed)
+    ~(unparsing_mode : Script_ir_translator.unparsing_mode) ?source ?payer ?gas
+    () =
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  Plugin.RPC.run_view
+    cctxt
+    (chain, block)
+    ?gas
+    ~contract
+    ~entrypoint
+    ~input:input.expanded
+    ~chain_id
+    ~source
+    ~payer
+    ~unparsing_mode
 
 let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block ?(amount = Tez.fifty_cents) ~balance

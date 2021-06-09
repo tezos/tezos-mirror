@@ -1533,3 +1533,26 @@ class Client:
     def sapling_list_keys(self) -> List[str]:
         cmd = ['sapling', 'list', 'keys']
         return self.run(cmd).strip().split("\n")
+
+    def run_view(
+        self,
+        entrypoint: str,
+        contract: str,
+        parameter: str,
+        args: List[str] = None,
+    ) -> client_output.ViewResult:
+        cmd = [
+            'run',
+            'tzip4',
+            'view',
+            entrypoint,
+            'on',
+            'contract',
+            contract,
+            'with',
+            'input',
+            parameter,
+        ]
+        args = args or []
+        cmd += args
+        return client_output.ViewResult(self.run(cmd))

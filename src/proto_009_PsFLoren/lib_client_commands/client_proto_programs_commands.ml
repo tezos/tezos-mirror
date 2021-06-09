@@ -914,4 +914,41 @@ let commands () =
                 expression
         in
         cctxt#message "%s" output >>= fun () -> return_unit);
+    command
+      ~group
+      ~desc:"Ask the node to run a TZIP-4 view."
+      (args4
+         source_arg
+         payer_arg
+         custom_gas_flag
+         (unparsing_mode_arg ~default:"Readable"))
+      (prefixes ["run"; "tzip4"; "view"]
+      @@ param ~name:"entrypoint" ~desc:"the name of the view" string_parameter
+      @@ prefixes ["on"; "contract"]
+      @@ ContractAlias.destination_param
+           ~name:"contract"
+           ~desc:"viewed contract"
+      @@ prefixes ["with"; "input"]
+      @@ param ~name:"input" ~desc:"the input data" data_parameter
+      @@ stop)
+      (fun (source, payer, gas, unparsing_mode)
+           entrypoint
+           (_, contract)
+           input
+           cctxt ->
+        let source = Option.map snd source in
+        let payer = Option.map snd payer in
+        Client_proto_programs.run_view
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ?gas
+          ~contract
+          ~entrypoint
+          ~input
+          ?source
+          ?payer
+          ~unparsing_mode
+          ()
+        >>= fun res -> print_view_result cctxt res);
   ]
