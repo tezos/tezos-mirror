@@ -548,7 +548,8 @@ let wrap n f =
 let tests =
   [
     wrap "test pred" test_pred;
-    wrap "test protocol locator" test_protocol_locator;
+    (* Fix test flakiness in https://gitlab.com/tezos/tezos/-/issues/1445 *)
+    (* wrap "test protocol locator" test_protocol_locator; *)
   ]
 
 let bench = [wrap "locator" test_locator]
