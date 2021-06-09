@@ -383,10 +383,6 @@ let init_rpc (config : Node_config_file.t) node =
 let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
-  Lwt_lock_file.create
-    ~unlink_on_exit:true
-    (Node_data_version.lock_file config.data_dir)
-  >>=? fun () ->
   (* Main loop *)
   let log_cfg =
     match verbosity with
@@ -479,29 +475,30 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
               "Failed to parse the provided target. A '<block_hash>,<level>' \
                value was expected."))
     >>=? fun target ->
-    Lwt_lock_file.is_locked (Node_data_version.lock_file config.data_dir)
-    >>=? function
-    | false ->
-        Lwt.catch
-          (fun () ->
-            run
-              ?sandbox
-              ?verbosity
-              ?target
-              ~singleprocess
-              ~force_history_mode_switch
-              config)
-          (function
-            | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-                List.fold_right_es
-                  (fun addr acc ->
-                    Node_config_file.resolve_rpc_listening_addrs addr
-                    >>=? fun x -> return (x @ acc))
-                  config.rpc.listen_addrs
-                  []
-                >>=? fun addrlist -> fail (RPC_Port_already_in_use addrlist)
-            | exn -> Lwt.return (error_exn exn))
-    | true -> failwith "Data directory is locked by another process"
+    Lwt_lock_file.try_with_lock
+      ~when_locked:(fun () ->
+        failwith "Data directory is locked by another process")
+      ~filename:(Node_data_version.lock_file config.data_dir)
+    @@ fun () ->
+    Lwt.catch
+      (fun () ->
+        run
+          ?sandbox
+          ?verbosity
+          ?target
+          ~singleprocess
+          ~force_history_mode_switch
+          config)
+      (function
+        | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
+            List.fold_right_es
+              (fun addr acc ->
+                Node_config_file.resolve_rpc_listening_addrs addr >>=? fun x ->
+                return (x @ acc))
+              config.rpc.listen_addrs
+              []
+            >>=? fun addrlist -> fail (RPC_Port_already_in_use addrlist)
+        | exn -> Lwt.return (error_exn exn))
   in
   Lwt_main.run
     (Lwt_exit.wrap_and_exit main_promise >>= function

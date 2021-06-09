@@ -87,6 +87,7 @@ type error +=
     }
   | Inconsistent_imported_block of Block_hash.t * Block_hash.t
   | Inconsistent_snapshot_file of string
+  | Invalid_chain_store_export of Chain_id.t * string
 
 let () =
   let open Data_encoding in
@@ -513,7 +514,28 @@ let () =
         filename)
     Data_encoding.(obj1 (req "filename" string))
     (function Inconsistent_snapshot_file s -> Some s | _ -> None)
-    (fun s -> Inconsistent_snapshot_file s)
+    (fun s -> Inconsistent_snapshot_file s) ;
+  register_error_kind
+    `Permanent
+    ~id:"Snapshot.invalid_chain_store_export"
+    ~title:"Invalid chain store export"
+    ~description:"Error while exporting snapshot"
+    ~pp:(fun ppf (chain_id, store_dir) ->
+      Format.fprintf
+        ppf
+        "Failed to export snapshot. Cannot find chain %a from store located at \
+         directory %s."
+        Chain_id.pp_short
+        chain_id
+        store_dir)
+    Data_encoding.(
+      obj2 (req "chain_id" Chain_id.encoding) (req "store_dir" string))
+    (function
+      | Invalid_chain_store_export (chain_id, store_dir) ->
+          Some (chain_id, store_dir)
+      | _ -> None)
+    (fun (chain_id, store_dir) ->
+      Invalid_chain_store_export (chain_id, store_dir))
 
 type metadata = {
   version : int;
@@ -1770,7 +1792,17 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
 
   (* Export the protocol table (info regarding the protocol transitions)
      as well as all the stored protocols *)
-  let export_protocols snapshot_exporter protocol_levels protocol_store_dir =
+  let export_protocols snapshot_exporter export_block all_protocol_levels
+      protocol_store_dir =
+    let export_level = Store.Block.level export_block in
+    (* Filter protocols to only export the protocols with an activation
+       block below the block target. *)
+    let protocol_levels =
+      Protocol_levels.filter
+        (fun _ {Protocol_levels.block = (_, activation_level); _} ->
+          activation_level < export_level)
+        all_protocol_levels
+    in
     Exporter.write_protocols_table snapshot_exporter ~f:(fun fd ->
         let bytes =
           Data_encoding.Binary.to_bytes_exn
@@ -1780,7 +1812,6 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         Lwt_utils_unix.write_bytes ~pos:0 fd bytes)
     >>= fun () ->
     Lwt_unix.opendir (Naming.dir_path protocol_store_dir) >>= fun dir_handle ->
-    (* Only export the protocols relative to the targeted network *)
     let proto_to_export =
       List.map
         (fun (_, {Protocol_levels.protocol; _}) -> protocol)
@@ -2223,8 +2254,18 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         protocol_levels,
         (reading_thread, floating_block_stream) )
 
+  let ensure_valid_export_chain_dir store_path chain_id =
+    let store_dir = Naming.store_dir ~dir_path:store_path in
+    let chain_dir = Naming.chain_dir store_dir chain_id in
+    Lwt_unix.file_exists (Naming.dir_path chain_dir) >>= function
+    | true -> return_unit
+    | false ->
+        fail (Invalid_chain_store_export (chain_id, Naming.dir_path store_dir))
+
   let export ?snapshot_path ?(rolling = false) ~block ~store_dir ~context_dir
       ~chain_name genesis =
+    let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+    ensure_valid_export_chain_dir store_dir chain_id >>=? fun () ->
     init
       ~chain_name
       ~export_mode:
@@ -2286,6 +2327,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         reading_thread >>=? fun () ->
         export_protocols
           snapshot_exporter
+          export_block
           protocol_levels
           (Naming.protocol_store_dir (Naming.store_dir ~dir_path:store_dir))
         >>=? fun () ->

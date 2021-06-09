@@ -355,15 +355,11 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
 
 let run ?verbosity ~singleprocess (config : Node_config_file.t) block =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
-  (Lwt_lock_file.is_locked (Node_data_version.lock_file config.data_dir)
-   >>=? function
-   | true -> failwith "Data directory is locked by another process"
-   | false -> return_unit)
-  >>=? fun () ->
-  Lwt_lock_file.create
-    ~unlink_on_exit:true
-    (Node_data_version.lock_file config.data_dir)
-  >>=? fun () ->
+  Lwt_lock_file.try_with_lock
+    ~when_locked:(fun () ->
+      failwith "Data directory is locked by another process")
+    ~filename:(Node_data_version.lock_file config.data_dir)
+  @@ fun () ->
   (* Main loop *)
   let log_cfg =
     match verbosity with

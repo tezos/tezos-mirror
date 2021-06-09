@@ -25,7 +25,6 @@
 
 open Store_types
 open Store_errors
-open Store_events
 
 module Shared = struct
   type 'a t = {mutable data : 'a; lock : Lwt_idle_waiter.t}
@@ -441,7 +440,8 @@ module Block = struct
         in
         let block = {Block_repr.hash; contents; metadata} in
         Block_store.store_block chain_store.block_store block >>=? fun () ->
-        Event.(emit store_block) (hash, block_header.shell.level) >>= fun () ->
+        Store_events.(emit store_block) (hash, block_header.shell.level)
+        >>= fun () ->
         Lwt_watcher.notify chain_store.block_watcher block ;
         Lwt_watcher.notify
           chain_store.global_store.global_block_watcher
@@ -939,7 +939,9 @@ module Chain = struct
           seed
         >>= Lwt.return_some
 
-  (* Hypothesis: \forall x. x \in current_head \union alternate_heads | new_head is not a predecessor of x *)
+  (* Hypothesis:
+     \forall x. x \in current_head \union alternate_heads | new_head
+     is not a predecessor of x *)
   let locked_update_and_trim_alternate_heads chain_store chain_state
       ~new_checkpoint ~new_head =
     Stored_data.get chain_state.current_head_data >>= fun prev_head_descr ->
@@ -949,8 +951,16 @@ module Chain = struct
     is_ancestor chain_store ~head:new_head_descr ~ancestor:prev_head_descr
     >>= function
     | true ->
-        (* If the new head is a successor of prev_head, do nothing. *)
-        Lwt.return prev_alternate_heads
+        (* If the new head is a successor of prev_head, do nothing
+           particular, just trim alternate heads which are anchored
+           below the checkpoint. *)
+        Lwt_list.filter_s
+          (fun alternate_head ->
+            is_ancestor
+              chain_store
+              ~head:alternate_head
+              ~ancestor:new_checkpoint)
+          prev_alternate_heads
     | false ->
         (* If the new head is not a successor of prev_head. *)
         (* 2 cases:
@@ -966,7 +976,7 @@ module Chain = struct
             | true ->
                 (* If the new head is a successor of a former
                    alternate_head, remove it from the alternate heads,
-                   it will be added updated as the current head *)
+                   it will be updated as the current head *)
                 Lwt.return_false
             | false ->
                 (* Only retain alternate_heads that are successor of the
@@ -1064,7 +1074,7 @@ module Chain = struct
     | _ -> return_unit
 
   let set_head chain_store new_head =
-    Event.(emit set_head) (Block.descriptor new_head) >>= fun () ->
+    Store_events.(emit set_head) (Block.descriptor new_head) >>= fun () ->
     Shared.update_with chain_store.chain_state (fun chain_state ->
         (* The merge cannot finish until we release the lock on the
            chain state so its status cannot change while this
@@ -1075,13 +1085,13 @@ module Chain = struct
         | Merge_failed _ ->
             (* If the merge has failed, notify in the logs but don't
                trigger any merge. *)
-            Event.(emit notify_merge_error ()) >>= fun () ->
+            Store_events.(emit notify_merge_error ()) >>= fun () ->
             (* We mark the merge as on-going to prevent the merge from
                being triggered and to update on-disk values. *)
             return_true
         | Not_running when store_status <> Idle ->
             (* Degenerate case, do the same as the Merge_failed case *)
-            Event.(emit notify_merge_error ()) >>= fun () -> return_true
+            Store_events.(emit notify_merge_error ()) >>= fun () -> return_true
         | Not_running -> return_false
         | Running -> return_true)
         >>=? fun is_merge_ongoing ->
@@ -1262,7 +1272,7 @@ module Chain = struct
               current_head = new_head;
             }
           in
-          Event.(emit set_head) new_head_descr >>= fun () ->
+          Store_events.(emit set_head) new_head_descr >>= fun () ->
           return (Some new_chain_state, Some previous_head))
 
   let known_heads chain_store =
@@ -1377,7 +1387,8 @@ module Chain = struct
                      update it correctly *)
                   Stored_data.write chain_state.target_data (Some new_target)
                   >>=? fun () ->
-                  Event.(emit set_target) new_target >>= fun () -> return_unit)
+                  Store_events.(emit set_target) new_target >>= fun () ->
+                  return_unit)
           | true ->
               trace
                 (Cannot_set_target new_target)
@@ -1878,7 +1889,7 @@ module Chain = struct
                        forked_block_hash
                        forked_chains))
               >>=? fun () ->
-              Event.(emit fork_testchain)
+              Store_events.(emit fork_testchain)
                 ( testchain_id,
                   test_protocol,
                   genesis_hash,
@@ -2062,7 +2073,7 @@ let load_store ?history_mode store_dir ~context_index ~genesis ~chain_id
   protect
     (fun () ->
       Consistency.check_consistency chain_dir genesis >>=? fun () ->
-      Store_events.Event.(emit store_is_consistent ()) >>= fun () -> return_unit)
+      Store_events.(emit store_is_consistent ()) >>= fun () -> return_unit)
     ~on_error:(function
       | err
         when List.exists
@@ -2074,10 +2085,10 @@ let load_store ?history_mode store_dir ~context_index ~genesis ~chain_id
              readonly, we are not allowed to write in it. *)
           Lwt.return_error err
       | err ->
-          Store_events.Event.(emit inconsistent_store err) >>= fun () ->
+          Store_events.(emit inconsistent_store err) >>= fun () ->
           Consistency.fix_consistency chain_dir context_index genesis
           >>=? fun () ->
-          Store_events.Event.(emit store_was_fixed ()) >>= fun () -> return_unit)
+          Store_events.(emit store_was_fixed ()) >>= fun () -> return_unit)
   >>=? fun () ->
   Protocol_store.init store_dir >>= fun protocol_store ->
   let protocol_watcher = Lwt_watcher.create_input () in
@@ -2227,7 +2238,7 @@ let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
             ~new_history_mode
           >>=? fun () ->
           Chain.set_history_mode chain_store new_history_mode >>=? fun () ->
-          Store_events.Event.(
+          Store_events.(
             emit switch_history_mode (previous_history_mode, new_history_mode))
           >>= return)
       (fun () -> unlock chain_store.lockfile >>= fun () -> close_store store)
@@ -2551,6 +2562,7 @@ module Unsafe = struct
     let genesis_block =
       Block_repr.create_genesis_block ~genesis genesis_context_hash
     in
+    let real_genesis_hash = Block_header.hash (Block.header genesis_block) in
     let new_head_descr =
       ( Block_repr.hash new_head_with_metadata,
         Block_repr.level new_head_with_metadata )
@@ -2641,7 +2653,10 @@ module Unsafe = struct
                 (* If we are importing a rolling snapshot then allow the
                    absence of block. *)
                 return_unit
-            | _ -> fail (Missing_activation_block (bh, protocol, history_mode)))
+            | _ ->
+                fail_unless
+                  (Block_hash.equal real_genesis_hash bh)
+                  (Missing_activation_block (bh, protocol, history_mode)))
         | (Some _block, None) -> return_unit
         | (Some block, Some commit_info) ->
             Context.check_protocol_commit_consistency
@@ -2805,9 +2820,13 @@ module Unsafe = struct
                         proto_levels)
                 else return proto_levels
             | _ ->
-                fail
+                fail_unless
+                  Compare.Int32.(transition_level = Block.level genesis_block)
                   (Missing_activation_block_legacy
-                     (transition_level, protocol_hash, history_mode)))
+                     (transition_level, protocol_hash, history_mode))
+                >>=? fun () ->
+                (* genesis commit info was already added *)
+                return proto_levels)
         | (Some block, None) ->
             return
               Protocol_levels.(
@@ -2865,13 +2884,13 @@ module Unsafe = struct
     Stored_data.write_file (Naming.chain_config_file chain_dir) chain_config
     >>=? fun () -> return_unit
 
-  let restore_from_legacy_upgrade store_dir ~genesis ~alternate_heads
-      ~invalid_blocks ~forked_chains =
+  let restore_from_legacy_upgrade store_dir ~genesis ~invalid_blocks
+      ~forked_chains =
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let chain_dir = Naming.chain_dir store_dir chain_id in
-    Stored_data.write_file
-      (Naming.alternate_heads_file chain_dir)
-      alternate_heads
+    (* We don't import branches, only a linear history, thus we don't
+       write any alternate heads *)
+    Stored_data.write_file (Naming.alternate_heads_file chain_dir) []
     >>=? fun () ->
     Stored_data.write_file (Naming.invalid_blocks_file chain_dir) invalid_blocks
     >>=? fun () ->

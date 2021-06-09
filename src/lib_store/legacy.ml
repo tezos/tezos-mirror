@@ -637,22 +637,6 @@ let import_protocols history_mode legacy_store legacy_chain_state store
         ~protocol_level
         (Store.Unsafe.block_of_repr transition_block, protocol_hash)
 
-let import_alternate_heads legacy_chain_store legacy_chain_data =
-  Legacy_store.Chain_data.Checkpoint.read legacy_chain_data
-  >>=? fun checkpoint ->
-  Legacy_store.Chain_data.Known_heads.elements legacy_chain_data
-  >>= fun bindings ->
-  List.fold_left_es
-    (fun acc hash ->
-      Legacy_store.Block.Contents.read (legacy_chain_store, hash)
-      >>=? fun {header; _} ->
-      let level = header.shell.level in
-      (* Ensure that alternate heads are valid *)
-      if level <= checkpoint.shell.level then return acc
-      else return ((hash, level) :: acc))
-    []
-    bindings
-
 let import_invalid_blocks legacy_chain_store =
   Legacy_store.Block.Invalid_block.fold
     legacy_chain_store
@@ -677,14 +661,11 @@ let update_stored_data legacy_chain_store legacy_store new_store ~new_checkpoint
   let legacy_chain_data = Legacy_store.Chain_data.get legacy_chain_store in
   Legacy_store.Chain_data.Current_head.read legacy_chain_data
   >>=? fun legacy_head ->
-  import_alternate_heads legacy_chain_store legacy_chain_data
-  >>=? fun alternate_heads ->
   import_invalid_blocks legacy_chain_store >>= fun invalid_blocks ->
   import_forked_chains legacy_store >>= fun forked_chains ->
   Store.Unsafe.restore_from_legacy_upgrade
     store_dir
     ~genesis
-    ~alternate_heads
     ~invalid_blocks
     ~forked_chains
   >>=? fun () ->

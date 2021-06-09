@@ -97,11 +97,15 @@ let pidfile_arg =
     ~placeholder:"filename"
     (parameter (fun _ s -> return s))
 
-let may_setup_pidfile = function
-  | None -> return_unit
+let may_setup_pidfile pidfile_opt f =
+  match pidfile_opt with
+  | None -> f ()
   | Some pidfile ->
-      trace (failure "Failed to create the pidfile: %s" pidfile)
-      @@ Lwt_lock_file.create ~unlink_on_exit:true pidfile
+      Lwt_lock_file.try_with_lock
+        ~when_locked:(fun () ->
+          failwith "Failed to create the pidfile: %s" pidfile)
+        ~filename:pidfile
+        f
 
 let commands base_dir require_auth : Client_context.full command list =
   Tezos_signer_backends_unix.Ledger.commands ()
@@ -144,7 +148,7 @@ let commands base_dir require_auth : Client_context.full command list =
         (prefixes ["launch"; "socket"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, host, port, timeout)
              cctxt ->
-          may_setup_pidfile pidfile >>=? fun () ->
+          may_setup_pidfile pidfile @@ fun () ->
           Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
           Socket_daemon.run
             cctxt
@@ -170,7 +174,7 @@ let commands base_dir require_auth : Client_context.full command list =
               (parameter (fun _ s -> return s))))
         (prefixes ["launch"; "local"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, path) cctxt ->
-          may_setup_pidfile pidfile >>=? fun () ->
+          may_setup_pidfile pidfile @@ fun () ->
           Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
           Socket_daemon.run
             cctxt
@@ -204,7 +208,7 @@ let commands base_dir require_auth : Client_context.full command list =
                    with Failure _ -> failwith "Invalid port %s" x))))
         (prefixes ["launch"; "http"; "signer"] @@ stop)
         (fun (pidfile, magic_bytes, check_high_watermark, host, port) cctxt ->
-          may_setup_pidfile pidfile >>=? fun () ->
+          may_setup_pidfile pidfile @@ fun () ->
           Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
           Http_daemon.run_http
             cctxt
@@ -256,7 +260,7 @@ let commands base_dir require_auth : Client_context.full command list =
              cert
              key
              cctxt ->
-          may_setup_pidfile pidfile >>=? fun () ->
+          may_setup_pidfile pidfile @@ fun () ->
           Tezos_signer_backends.Encrypted.decrypt_all cctxt >>=? fun () ->
           Http_daemon.run_https
             cctxt
