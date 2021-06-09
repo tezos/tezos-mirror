@@ -170,6 +170,8 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
       | None -> assert false
       | Some b ->
           Store.Chain.set_head chain_store b >>=? fun _pred_head ->
+          let block_store = Store.Unsafe.get_block_store chain_store in
+          Block_store.await_merging block_store >>= fun () ->
           Store.Chain.may_update_protocol_level
             chain_store
             ~protocol_level:proto_level
