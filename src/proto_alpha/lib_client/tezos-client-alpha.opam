@@ -18,6 +18,7 @@ depends: [
   "tezos-protocol-alpha-parameters"
   "tezos-protocol-plugin-alpha"
   "alcotest-lwt" { with-test & >= "1.1.0" }
+  "tezos-base-test-helpers" { with-test }
   "ppx_inline_test"
 ]
 build: [
