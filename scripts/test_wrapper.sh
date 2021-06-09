@@ -9,7 +9,11 @@ echo "Running test \"dune build @$nametest/runtest\" ..."
 
 START=$(date +%s.%N)
 
-dune build "@$nametest/runtest" -f --no-buffer |& tee -a "test_results/$name.log"
+for i in $(seq 10)
+do
+    dune build "@$nametest/runtest" -f --no-buffer |& tee -a "test_results/$name.log"
+done
+
 EXITCODE=$?
 
 END=$(date +%s.%N)
