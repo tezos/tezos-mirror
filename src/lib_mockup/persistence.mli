@@ -22,11 +22,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Persistence_intf
 
-module M : S
-
-module Internal : sig
-  (** Functor extracted for testability (dependency injection). *)
-  module Make (Registration : Registration_intf.S) : S
-end
+(** @inline *)
+include Persistence_intf.T

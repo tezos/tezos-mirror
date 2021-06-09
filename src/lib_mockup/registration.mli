@@ -22,11 +22,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Registration_intf
 
-module M : S
-
-module Internal : sig
-  (** Functor extracted for testability (make new registration modules instead of one global shared state). *)
-  module Make () : S
-end
+(** @inline *)
+include Registration_intf.T

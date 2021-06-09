@@ -29,9 +29,9 @@ let group =
   {Clic.name = "mockup"; title = "Commands for creating mockup environments"}
 
 let list_mockup_command_handler _ _ =
-  let available = Registration.M.get_registered_environments () in
+  let available = Registration.get_registered_environments () in
   List.iter
-    (fun (mockup : (module Registration_intf.MOCKUP)) ->
+    (fun (mockup : (module Registration.MOCKUP)) ->
       let module Mockup = (val mockup) in
       Format.printf "%a@." Protocol_hash.pp Mockup.protocol_hash)
     available ;

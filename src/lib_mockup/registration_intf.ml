@@ -23,10 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module T = struct
-  (** Type of a mockup environment *)
-  type mockup_context = Chain_id.t * Tezos_protocol_environment.rpc_context
-end
+(** Type of a mockup environment *)
+type mockup_context = Chain_id.t * Tezos_protocol_environment.rpc_context
 
 module type PROTOCOL = sig
   val hash : Protocol_hash.t
@@ -71,17 +69,32 @@ module type MOCKUP = sig
     parameters:parameters ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
-    T.mockup_context tzresult Lwt.t
+    mockup_context tzresult Lwt.t
 
-  val migrate : T.mockup_context -> T.mockup_context tzresult Lwt.t
+  val migrate : mockup_context -> mockup_context tzresult Lwt.t
 end
 
 module type S = sig
-  include module type of T
+  module type MOCKUP = MOCKUP
+
+  module type PROTOCOL = PROTOCOL
+
+  type mockup_context = Chain_id.t * Tezos_protocol_environment.rpc_context
 
   type mockup_environment = (module MOCKUP)
 
   val register_mockup_environment : mockup_environment -> unit
 
   val get_registered_environments : unit -> mockup_environment list
+end
+
+module type T = sig
+  include S
+
+  module type S = S
+
+  module Internal_for_tests : sig
+    (** Make new registration modules instead of one global shared state. *)
+    module Make () : S
+  end
 end

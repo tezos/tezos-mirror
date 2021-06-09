@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Persistence.M
+open Persistence
 
 let migrate_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     ~protocol_hash ~next_protocol_hash =
