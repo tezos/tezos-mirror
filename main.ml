@@ -203,6 +203,20 @@ let blocks_loop cctxt =
       >>=? fun ops ->
       let block_level = header.Block_header.shell.Block_header.level in
       let timestamp = header.Block_header.shell.Block_header.timestamp in
+      let _seed_nonce_hash =
+        match
+          Data_encoding.Binary.of_bytes
+            Protocol.block_header_data_encoding
+            header.Block_header.protocol_data
+        with
+        | Ok { contents = { seed_nonce_hash; _ }; signature = _ } ->
+            seed_nonce_hash
+        | Error err ->
+            let () =
+              Format.eprintf "@[%a@]@." Data_encoding.Binary.pp_read_error err
+            in
+            None
+      in
       (*_assert
           (check_level_in_endorsements (Int32.pred block_level) ops)
           __LOC__
