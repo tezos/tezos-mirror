@@ -135,6 +135,16 @@ val post_forge_operations :
   Client.t ->
   JSON.t Lwt.t
 
+(** Call RPC /chain/[chain]/blocks/[block]/helpers/scripts/run_operation *)
+val post_run_operation :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
+
 (** {2 Protocol RPCs} *)
 
 (** Call RPC /chain/[chain]/blocks/[block]/context/constants *)
