@@ -263,8 +263,7 @@ let rec read_password (cctxt : #Client_context.io) =
     cctxt#message "Passwords do not match." >>= fun () -> read_password cctxt
   else return password
 
-let encrypt cctxt sk =
-  read_password cctxt >>=? fun password ->
+let encrypt sk password =
   let payload = Raw.encrypt ~password sk in
   let encoding =
     match sk with
@@ -274,6 +273,9 @@ let encrypt cctxt sk =
   in
   let path = Base58.simple_encode encoding payload in
   Client_keys.make_sk_uri (Uri.make ~scheme ~path ())
+
+let prompt_twice_and_encrypt cctxt sk =
+  read_password cctxt >>=? fun password -> encrypt sk password
 
 module Sapling_raw = struct
   let salt_len = 8

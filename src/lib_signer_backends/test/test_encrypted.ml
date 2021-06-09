@@ -156,7 +156,8 @@ let test_random algo =
     if i >= loops then return_unit
     else
       let (_, _, sk) = Signature.generate_key ~algo () in
-      encrypt ctx sk >>=? fun sk_uri ->
+      Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt ctx sk
+      >>=? fun sk_uri ->
       decrypt decrypt_ctx sk_uri >>=? fun decrypted_sk ->
       Alcotest.check sk_testable "test_encrypt: decrypt" sk decrypted_sk ;
       inner (succ i)
@@ -177,7 +178,7 @@ let test_random _switch () =
 (** For each of the algorithms [Ed25519; Secp256k1; P256], creates a
     dummy context, uses it to decrypt a list of secret key URIs
     [...__sks_encrypted]. It is asserted that the decrypted keys shall
-    match the list [..._sks]. 
+    match the list [..._sks].
 *)
 let test_vectors _switch () =
   test_vectors () >>= function
