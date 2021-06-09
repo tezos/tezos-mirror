@@ -49,7 +49,9 @@
 (rule
  (alias runtest)
  (package tezos-store)
- (deps
-  (alias runtest_store)
-  (alias runtest_store_legacy))
+ ; FIXME, these tests should be replugged!
+ ; See https://gitlab.com/tezos/tezos/-/issues/1448
+ ; (deps
+  ; (alias runtest_store)
+  ; (alias runtest_store_legacy))
  (action (progn)))
