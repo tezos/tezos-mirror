@@ -37,16 +37,7 @@ variables:
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
 stages:
-  - build
-  - sanity_ci
   - test
-  - doc
-  - packaging
-  - build_release
-  - publish_release
-  - test_coverage
-  - publish_coverage
-  - manual
 
 # Basic, specialised, minimal, orthogonal templates
 
@@ -170,15 +161,4 @@ stages:
 # Actual jobs are defined in these included files
 
 include:
-  - .gitlab/ci/build.yml
-  - .gitlab/ci/lints.yml
   - .gitlab/ci/unittest.yml
-  - .gitlab/ci/integration.yml
-  - .gitlab/ci/liquidity-baking-scripts-integrity.yml
-  - .gitlab/ci/coq.yml
-  - .gitlab/ci/tezt.yml
-  - .gitlab/ci/doc.yml
-  - .gitlab/ci/opam.yml
-  - .gitlab/ci/publish.yml
-  - .gitlab/ci/coverage.yml
-  - .gitlab/ci/test-doc-scripts.yml

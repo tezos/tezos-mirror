@@ -35,6 +35,7 @@ let () =
   Lwt_main.run
     ( Internal_event_unix.init () >>= fun () ->
       Alcotest_lwt.run
+        ~verbose:true
         "tezos-store"
         [
           Test_cemented_store.tests;
