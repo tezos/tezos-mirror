@@ -94,13 +94,90 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   (* Number of calls to [tezos-client bake for] once the protocol is activated,
      before we kill [node_2]. *)
   let bakes_before_kill = 9 in
+
   (* Number of calls to [tezos-client bake for] while [node_2] is not
      running. This number is high enough so that it is bigger than the
      Last-Allowed-Fork-Level or the caboose.
 
      Since the caboose depends on [max_op_ttl] which is set to [120]
-     with the consensus algorithm Emmy* we bake [150] blocks. *)
-  let bakes_during_kill = 150 in
+     with the consensus algorithm Emmy* we bake [1 + bakes_before_kill
+     + bakes_during_kill = 153] blocks.
+
+     The rationale behind this number is the following:
+
+     The test depends on two special blocks called [checkpoint] (which
+     in this case is the same as the [last allowed fork level] since
+     no target is not set on the command-line) and [caboose]. The
+     [checkpoint] is the block level (often we refer it as the level
+     directly) for which there is not reorganisation below this
+     point. The [caboose] is the lowest level for which the store
+     knows the [block_header] associated. These values are updated by
+     the shell using information from the economic protocol when a new
+     cycle starts.
+
+     - When the checkpoint is set, its level is [preserved_cycles *
+     blocks_per_cycle] behind the current level of the head
+
+     - When the [caboose] is set, its level is [max(0, checkpoint -
+     max_op_ttl)]. In [Full] and [Archive] mode, the [caboose] value
+     is always [0].
+
+     These values are set when the head changes with level [level = 1
+     mod blocks_per_cycle] (the modulo 1 comes from the activation
+     block).
+
+     In sandbox mode, we have [preserved_cycles = 2] and
+     [blocks_per_cycle = 8].
+
+     Hence, when [node_1] has baked [153] blocks, the checkpoint
+     should be at level [153 - 16 = 137] and the [caboose] in rolling
+     history mode should be at level [137 - 120 = 17] (and [0] for the
+     other history modes).
+
+     When the [node_1] is in rolling mode, we want to ensure that it
+     can't synchronise with [node_2]. Consequently, we want to ensure
+     that the [caboose] of [node_1] is above the level of [node_2]
+     which is [1+bakes_before_kill = 10].
+
+     Since, the [caboose] is updated at every cycle, the values it
+     takes in sandbox mode are [1;9;17; ...]. [17] is the first value
+     for which it prevents the synchronisation with [node_2].
+
+     Consequently, to have a [caboose] at level [17] we need a
+     checkpoint at level [137] and so the head should be, at least, at
+     level [153].
+
+     However, the [caboose] is set asynchronously and checking the
+     level of the node is not enough. We have to ensure that the
+     [caboose] was set too. This should be done when the [store]
+     finishes its merge.
+
+     To ensure that, we need first to catch an event which says which
+     cycle (up to which block) is being merged and then wait for the
+     event which indicates the merge is over.
+
+     This may be flaky if merging a store is way slower than baking
+     blocks since the store does not trigger a merge when there is
+     already one merge in progress. However, we do not observe such
+     behavior for this test and we do not handle that currently. *)
+
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/1337
+
+     To avoid this particular case, we add 16 blocks.
+  *)
+  let bakes_during_kill = 143 + 16 in
+  let last_cycle_being_merged = ref false in
+  let on_starting_merge_event node =
+    Node.on_event node @@ fun Node.{name; value} ->
+    if name = "start_merging_stores.v0" then
+      let level = JSON.(value |> as_int) in
+      if level = bakes_during_kill + 1 + bakes_before_kill - (2 * 8) then
+        last_cycle_being_merged := true
+  in
+  let wait_for_end_merge_event node last_cycle_being_merged =
+    Node.wait_for node "end_merging_stores.v0" @@ fun _json ->
+    if !last_cycle_being_merged then Some () else None
+  in
   let hmode1s = Node.show_history_mode hmode1 in
   let hmode2s = Node.show_history_mode hmode2 in
   Protocol.register_test
@@ -132,15 +209,20 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* _ = Node.wait_for_level node_1 (bakes_before_kill + 1)
   and* _ = Node.wait_for_level node_2 (bakes_before_kill + 1) in
   Log.info "Both nodes are at level %d." (bakes_before_kill + 1) ;
+  let _ = on_starting_merge_event node_1 in
+  let wait_for_last_cycle =
+    wait_for_end_merge_event node_1 last_cycle_being_merged
+  in
   (* Kill node 2 and continue baking without it. *)
   let* () = Node.terminate node_2 in
   let* () = repeat bakes_during_kill (fun () -> Client.bake_for client) in
   (* Restart node 2 and let it catch up. *)
   Log.info "Baked %d times with node_2 down, restart node_2." bakes_during_kill ;
+  let final_level = 1 + bakes_before_kill + bakes_during_kill in
+  let* _ = Node.wait_for_level node_1 final_level
+  and* () = wait_for_last_cycle in
   let* () = Node.run node_2 [Synchronisation_threshold 1; Connections 1] in
   let* _ = Node.wait_for_ready node_2 in
-  let final_level = 1 + bakes_before_kill + bakes_during_kill in
-  let* _ = Node.wait_for_level node_1 final_level in
   (* Register the unknown ancestor event before connecting node 2 to node 1
      to ensure that we don't miss it because of a race condition. *)
   let node_2_catched_up =
@@ -149,7 +231,13 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
       unit
     else
       (* In rolling mode, node 2 cannot catch up. We get an unknown ancestor event instead. *)
-      wait_for_unknown_ancestor node_2
+      Lwt.pick
+        [
+          (let* _ = Node.wait_for_level node_2 (bakes_before_kill + 2) in
+           Test.fail
+             "node_2 is not supposed to progress when node_1 is in rolling mode");
+          wait_for_unknown_ancestor node_2;
+        ]
   in
   let* () = Client.Admin.connect_address client ~peer:node_2 in
   let* () = node_2_catched_up in
