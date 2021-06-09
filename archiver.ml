@@ -165,7 +165,7 @@ let get_file_mutex filename =
   | Some x -> x
 
 let drop_file_mutex filename =
-  files_in_use := List.remove_assoc filename !files_in_use
+  files_in_use := List.filter (fun (name,mutex) -> not (String.equal name filename && Lwt_mutex.is_empty mutex)) !files_in_use
 
 let dump_anomalies path level anomalies =
   let filename =
