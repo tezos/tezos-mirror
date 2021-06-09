@@ -143,9 +143,10 @@ let filename_of_level prefix level =
 let load filename encoding empty =
   Lwt_unix.file_exists filename >>= function
   | false -> return empty
-  | true ->
-      Lwt_utils_unix.Json.read_file filename
-      >|=? Data_encoding.Json.destruct encoding
+  | true -> (
+      Lwt_utils_unix.Json.read_file filename >>=? fun json ->
+      try return (Data_encoding.Json.destruct encoding json)
+      with exn -> Lwt.return (Error_monad.error_exn exn) )
 
 let write filename encoding value =
   Lwt_utils_unix.create_dir (Filename.dirname filename) >>= fun () ->
@@ -173,17 +174,16 @@ let dump_anomalies path level anomalies =
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
       load filename (Data_encoding.list Anomaly.encoding) [] >>=? fun known ->
-      let out =
-        write
-          filename
-          (Data_encoding.list Anomaly.encoding)
-          (List.fold_left
-             (fun x y -> Anomaly.insert_in_ordered_list y x)
-             known
-             anomalies)
-      in
-      let () = drop_file_mutex filename in
-      out)
+      write
+        filename
+        (Data_encoding.list Anomaly.encoding)
+        (List.fold_left
+           (fun x y -> Anomaly.insert_in_ordered_list y x)
+           known
+           anomalies))
+  >|= fun out ->
+  let () = drop_file_mutex filename in
+  out
 
 let extract_anomalies path level infos =
   if infos.unaccurate then return_unit
@@ -260,10 +260,11 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
        let out_infos =
          { blocks = infos.blocks; endorsements; unaccurate = infos.unaccurate }
        in
-       let out = write filename encoding out_infos in
-       let () = drop_file_mutex filename in
-       out >>=? fun () -> extract_anomalies path endorsements_level out_infos)
-   >>= function
+       write filename encoding out_infos >>=? fun () ->
+       extract_anomalies path endorsements_level out_infos)
+   >>= fun out ->
+   let () = drop_file_mutex filename in
+   match out with
    | Ok () -> Lwt.return_unit
    | Error err ->
        Lwt_io.printl
@@ -283,18 +284,16 @@ let dump_included_in_block path block_level block_hash timestamp reception_time
         Block.{ hash = block_hash; reception_time; timestamp; nonce = None }
         :: infos.blocks
       in
-      let out =
-        write
-          filename
-          encoding
-          { blocks;
-            endorsements = infos.endorsements;
-            unaccurate = infos.unaccurate
-          }
-      in
-      let () = drop_file_mutex filename in
-      out)
-  >>= function
+      write
+        filename
+        encoding
+        { blocks;
+          endorsements = infos.endorsements;
+          unaccurate = infos.unaccurate
+        })
+  >>= fun out ->
+  let () = drop_file_mutex filename in
+  match out with
   | Ok () -> Lwt.return_unit
   | Error err ->
       Lwt_io.printl
@@ -310,6 +309,7 @@ let dump_received path ?unaccurate level items =
   let filename = filename_of_level path level in
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
+      Lwt_io.printlf "Locked %s" filename >>= fun () ->
       load filename encoding empty >>=? fun infos ->
       let (updated_known, unknown) =
         List.fold_left
@@ -347,10 +347,11 @@ let dump_received path ?unaccurate level items =
       in
       let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
       let out_infos = { blocks = infos.blocks; endorsements; unaccurate } in
-      let out = write filename encoding out_infos in
-      let () = drop_file_mutex filename in
-      out >>=? fun () -> extract_anomalies path level out_infos)
-  >>= function
+      write filename encoding out_infos >>=? fun () ->
+      extract_anomalies path level out_infos)
+  >>= fun out ->
+  let () = drop_file_mutex filename in
+  match out with
   | Ok () -> Lwt.return_unit
   | Error err ->
       Lwt_io.printl
