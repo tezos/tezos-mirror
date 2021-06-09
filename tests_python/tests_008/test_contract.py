@@ -1,6 +1,5 @@
 import os
 import re
-import json
 import itertools
 import pytest
 
@@ -273,56 +272,6 @@ class TestManager:
             'manager', 'rooted_target', ['--arg', arg, '--entrypoint', 'root']
         )
         utils.bake(client, 'bootstrap5')
-
-    def test_transfer_json_to_entrypoint_with_args(self, client):
-        balance = client.get_mutez_balance('manager')
-        balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        fee = 0.0123
-        fee_mutez = utils.mutez_of_tez(fee)
-        json_obj = [
-            {
-                "destination": "target",
-                "amount": "0",
-                "fee": str(fee),
-                "gas-limit": "65942",
-                "storage-limit": "1024",
-                "arg": 'Pair "hello" 42',
-                "entrypoint": "add_left",
-            }
-        ]
-        json_ops = json.dumps(json_obj, separators=(',', ':'))
-        client.run(client.cmd_batch('manager', json_ops))
-        utils.bake(client, 'bootstrap5')
-        new_balance = client.get_mutez_balance('manager')
-        new_balance_bootstrap = client.get_mutez_balance('bootstrap2')
-        assert balance == new_balance
-        assert balance_bootstrap - fee_mutez == new_balance_bootstrap
-
-    def test_multiple_transfers(self, client):
-        balance = client.get_mutez_balance('manager')
-        balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
-        balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
-        amount_2 = 10.1
-        amount_mutez_2 = utils.mutez_of_tez(amount_2)
-        amount_3 = 11.01
-        amount_mutez_3 = utils.mutez_of_tez(amount_3)
-        json_obj = [
-            {"destination": "bootstrap2", "amount": str(amount_2)},
-            {"destination": "bootstrap3", "amount": str(amount_3)},
-        ]
-        json_ops = json.dumps(json_obj, separators=(',', ':'))
-        client.run(client.cmd_batch('manager', json_ops))
-        utils.bake(client, 'bootstrap5')
-        new_balance = client.get_mutez_balance('manager')
-        new_balance_bootstrap2 = client.get_mutez_balance('bootstrap2')
-        new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
-        fee_mutez = 794 + 698
-        assert balance - amount_mutez_2 - amount_mutez_3 == new_balance
-        assert (
-            balance_bootstrap2 + amount_mutez_2 - fee_mutez
-            == new_balance_bootstrap2
-        )
-        assert balance_bootstrap3 + amount_mutez_3 == new_balance_bootstrap3
 
 
 @pytest.mark.slow
