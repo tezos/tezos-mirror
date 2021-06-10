@@ -1186,8 +1186,8 @@ module RPC = struct
       ()
       unparsing_mode
 
-  let run_view ctxt block ?gas ~contract ~entrypoint ~input ~chain_id ~source
-      ~payer ~unparsing_mode =
+  let run_view ?gas ~contract ~entrypoint ~input ~chain_id ~source ~payer
+      ~unparsing_mode ctxt block =
     RPC_context.make_call0
       run_view
       ctxt
