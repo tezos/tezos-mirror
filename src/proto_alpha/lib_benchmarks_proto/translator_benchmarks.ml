@@ -804,9 +804,7 @@ module Merge_types : Benchmark.S = struct
             let nodes =
               let max_type_size = 9999 in
               let remaining =
-                Script_ir_translator.deduce_type_size
-                  ~remaining:max_type_size
-                  ty
+                Script_type_size.deduce_type_size ~remaining:max_type_size ty
               in
               assert (remaining >= 0) ;
               max_type_size - remaining

@@ -33,11 +33,6 @@ open Script_typed_ir
 module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
 module Unparse_costs = Michelson_v1_gas.Cost_of.Unparsing
 
-type ex_comparable_ty =
-  | Ex_comparable_ty : 'a comparable_ty -> ex_comparable_ty
-
-type ex_ty = Ex_ty : 'a ty -> ex_ty
-
 type ex_stack_ty = Ex_stack_ty : ('a, 's) stack_ty -> ex_stack_ty
 
 (*
@@ -122,124 +117,6 @@ let add_dip ty annot prev =
   | Lambda | Toplevel _ ->
       Dip (Item_t (ty, Item_t (Unit_t None, Bot_t, None), annot), prev)
   | Dip (stack, _) -> Dip (Item_t (ty, stack, annot), prev)
-
-(* ---- Type size accounting ------------------------------------------------*)
-
-(**
-  [deduce_comparable_type_size ~remaining ty] returns [remaining] minus the size of type [ty].
-  It is guaranteed to not grow the stack by more than [remaining] non-tail calls.
-*)
-let rec deduce_comparable_type_size :
-    type t. remaining:int -> t comparable_ty -> int =
- fun ~remaining ty ->
-  if Compare.Int.(remaining < 0) then remaining
-  else
-    match ty with
-    | Unit_key _ | Never_key _ | Int_key _ | Nat_key _ | Signature_key _
-    | String_key _ | Bytes_key _ | Mutez_key _ | Bool_key _ | Key_hash_key _
-    | Key_key _ | Timestamp_key _ | Chain_id_key _ | Address_key _ ->
-        remaining - 1
-    | Pair_key ((t1, _), (t2, _), _) ->
-        let remaining = remaining - 1 in
-        let remaining = deduce_comparable_type_size ~remaining t1 in
-        deduce_comparable_type_size ~remaining t2
-    | Union_key ((t1, _), (t2, _), _) ->
-        let remaining = remaining - 1 in
-        let remaining = deduce_comparable_type_size ~remaining t1 in
-        deduce_comparable_type_size ~remaining t2
-    | Option_key (t, _) ->
-        let remaining = remaining - 1 in
-        deduce_comparable_type_size ~remaining t
-
-(**
-  [deduce_type_size ~remaining ty] returns [remaining] minus the size of type [ty].
-  It is guaranteed to not grow the stack by more than [remaining] non-tail calls.
-*)
-let rec deduce_type_size : type t. remaining:int -> t ty -> int =
- fun ~remaining ty ->
-  match ty with
-  | Unit_t _ | Int_t _ | Nat_t _ | Signature_t _ | Bytes_t _ | String_t _
-  | Mutez_t _ | Key_hash_t _ | Key_t _ | Timestamp_t _ | Address_t _ | Bool_t _
-  | Operation_t _ | Chain_id_t _ | Never_t _ | Bls12_381_g1_t _
-  | Bls12_381_g2_t _ | Bls12_381_fr_t _ | Sapling_transaction_t _
-  | Sapling_state_t _ ->
-      remaining - 1
-  | Pair_t ((l, _, _), (r, _, _), _) ->
-      let remaining = remaining - 1 in
-      let remaining = deduce_type_size ~remaining l in
-      deduce_type_size ~remaining r
-  | Union_t ((l, _), (r, _), _) ->
-      let remaining = remaining - 1 in
-      let remaining = deduce_type_size ~remaining l in
-      deduce_type_size ~remaining r
-  | Lambda_t (arg, ret, _) ->
-      let remaining = remaining - 1 in
-      let remaining = deduce_type_size ~remaining arg in
-      deduce_type_size ~remaining ret
-  | Option_t (t, _) ->
-      let remaining = remaining - 1 in
-      deduce_type_size ~remaining t
-  | List_t (t, _) ->
-      let remaining = remaining - 1 in
-      deduce_type_size ~remaining t
-  | Ticket_t (t, _) ->
-      let remaining = remaining - 1 in
-      deduce_comparable_type_size ~remaining t
-  | Set_t (k, _) ->
-      let remaining = remaining - 1 in
-      deduce_comparable_type_size ~remaining k
-  | Map_t (k, v, _) ->
-      let remaining = remaining - 1 in
-      let remaining = deduce_comparable_type_size ~remaining k in
-      deduce_type_size ~remaining v
-  | Big_map_t (k, v, _) ->
-      let remaining = remaining - 1 in
-      let remaining = deduce_comparable_type_size ~remaining k in
-      deduce_type_size ~remaining v
-  | Contract_t (arg, _) ->
-      let remaining = remaining - 1 in
-      deduce_type_size ~remaining arg
-
-let check_type_size ~loc ~maximum_type_size ty =
-  if Compare.Int.(deduce_type_size ~remaining:maximum_type_size ty >= 0) then
-    ok_unit
-  else error (Type_too_large (loc, maximum_type_size))
-
-let rec check_type_size_of_stack_head :
-    type a s.
-    loc:Script.location ->
-    maximum_type_size:int ->
-    (a, s) stack_ty ->
-    up_to:int ->
-    unit tzresult =
- fun ~loc ~maximum_type_size stack ~up_to ->
-  if Compare.Int.(up_to <= 0) then ok_unit
-  else
-    match stack with
-    | Bot_t -> ok_unit
-    | Item_t (head, tail, _annot) ->
-        check_type_size ~loc ~maximum_type_size head >>? fun () ->
-        (check_type_size_of_stack_head [@tailcall])
-          ~loc
-          ~maximum_type_size
-          tail
-          ~up_to:(up_to - 1)
-
-let check_comparable_type_size ~legacy ctxt ~loc ty =
-  if legacy then ok_unit
-  else
-    let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
-    if
-      Compare.Int.(
-        deduce_comparable_type_size ~remaining:maximum_type_size ty >= 0)
-    then ok_unit
-    else error (Type_too_large (loc, maximum_type_size))
-
-let check_type_size ~legacy ctxt ~loc ty =
-  if legacy then ok_unit
-  else
-    let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
-    check_type_size ~loc ~maximum_type_size ty
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -1420,6 +1297,9 @@ let parse_memo_size (n : (location, _) Micheline.node) :
           @@ Invalid_syntactic_constant (location n, strip_locations n, msg))
   | _ -> error @@ Invalid_kind (location n, [Int_kind], kind n)
 
+type ex_comparable_ty =
+  | Ex_comparable_ty : 'a comparable_ty -> ex_comparable_ty
+
 let rec parse_comparable_ty :
     stack_depth:int ->
     context ->
@@ -1548,6 +1428,8 @@ let rec parse_comparable_ty :
                T_signature;
                T_key;
              ]
+
+type ex_ty = Ex_ty : 'a ty -> ex_ty
 
 let rec parse_packable_ty :
     context ->
@@ -3072,7 +2954,7 @@ and parse_instr :
     match judgement with
     | Typed {loc; aft; _} ->
         let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
-        check_type_size_of_stack_head
+        Script_type_size.check_type_size_of_stack_head
           ~loc
           ~maximum_type_size
           aft
@@ -3263,7 +3145,7 @@ and parse_instr :
       parse_var_annot loc annot >>?= fun annot ->
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
-      check_type_size ~legacy ctxt ~loc t >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ctxt ~loc t >>?= fun () ->
       parse_data
         ?type_logger
         ~stack_depth:(stack_depth + 1)
@@ -4211,10 +4093,10 @@ and parse_instr :
   | (Prim (loc, I_LAMBDA, [arg; ret; code], annot), stack) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy arg
       >>?= fun (Ex_ty arg, ctxt) ->
-      check_type_size ~legacy ctxt ~loc arg >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ctxt ~loc arg >>?= fun () ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ret
       >>?= fun (Ex_ty ret, ctxt) ->
-      check_type_size ~legacy ctxt ~loc ret >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ctxt ~loc ret >>?= fun () ->
       check_kind [Seq_kind] code >>?= fun () ->
       parse_var_annot loc annot >>?= fun annot ->
       parse_returning
@@ -4896,7 +4778,7 @@ and parse_instr :
            ~legacy
            arg_type)
       >>?= fun (Ex_ty arg_type, ctxt) ->
-      check_type_size ~legacy ctxt ~loc arg_type >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ctxt ~loc arg_type >>?= fun () ->
       (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
       >>?= fun () ->
       record_trace
@@ -4907,7 +4789,8 @@ and parse_instr :
            ~legacy
            storage_type)
       >>?= fun (Ex_ty storage_type, ctxt) ->
-      check_type_size ~legacy ctxt ~loc storage_type >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ctxt ~loc storage_type
+      >>?= fun () ->
       let arg_annot =
         default_annot
           (type_to_var_annot (name_of_ty arg_type))
@@ -5677,7 +5560,8 @@ let parse_code :
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
     (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_ty arg_type, ctxt) ->
-  check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type >>?= fun () ->
+  Script_type_size.check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type
+  >>?= fun () ->
   (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
   >>?= fun () ->
   let storage_type_loc = location storage_type in
@@ -5685,7 +5569,12 @@ let parse_code :
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
-  check_type_size ~legacy ctxt ~loc:storage_type_loc storage_type >>?= fun () ->
+  Script_type_size.check_type_size
+    ~legacy
+    ctxt
+    ~loc:storage_type_loc
+    storage_type
+  >>?= fun () ->
   let arg_annot =
     default_annot
       (type_to_var_annot (name_of_ty arg_type))
@@ -5783,7 +5672,8 @@ let typecheck_code :
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
     (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_ty arg_type, ctxt) ->
-  check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type >>?= fun () ->
+  Script_type_size.check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type
+  >>?= fun () ->
   (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
   >>?= fun () ->
   let storage_type_loc = location storage_type in
@@ -5791,7 +5681,12 @@ let typecheck_code :
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
-  check_type_size ~legacy ctxt ~loc:storage_type_loc storage_type >>?= fun () ->
+  Script_type_size.check_type_size
+    ~legacy
+    ctxt
+    ~loc:storage_type_loc
+    storage_type
+  >>?= fun () ->
   let arg_annot =
     default_annot
       (type_to_var_annot (name_of_ty arg_type))

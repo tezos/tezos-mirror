@@ -256,28 +256,6 @@ val unparse_ty :
 val ty_of_comparable_ty :
   'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.ty
 
-(**
-  [deduce_type_size ~remaining ty] returns [remaining] minus the size of type [ty]
-  or any negative value if that result would be negative.
-  It is guaranteed to not grow the stack by more than [remaining] non-tail calls.
-*)
-val deduce_type_size : remaining:int -> 't Script_typed_ir.ty -> int
-
-(**
-  [check_comparable_type_size ~legacy ctxt ~loc ty] checks that the size of type [ty]
-  is not larger than the constant [maximum_type_size] from the context [ctxt].
-  If the check fails, an error [Type_too_large] is returned.
-  If [legacy] is [true], there is no check at all and [ok_unit] is returned directly.
-
-  It is guaranteed to not grow the stack by more than [maximum_type_size] non-tail calls.
-*)
-val check_comparable_type_size :
-  legacy:bool ->
-  context ->
-  loc:Script.location ->
-  't Script_typed_ir.comparable_ty ->
-  unit tzresult
-
 val parse_toplevel :
   legacy:bool ->
   Script.expr ->
