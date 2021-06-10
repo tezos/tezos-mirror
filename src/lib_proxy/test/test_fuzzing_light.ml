@@ -45,50 +45,6 @@ let list1_arb arb =
     list_of_size Gen.(1 -- 100) arb
     |> add_shrink_invariant (fun l -> List.length l > 0))
 
-let raw_context_arb =
-  let open Tezos_shell_services.Block_services in
-  let module MapArb = MakeMapArb (TzString.Map) in
-  let open QCheck in
-  let {gen = bytes_gen; shrink = bytes_shrink_opt; _} = bytes_arb in
-  let gen =
-    let open Gen in
-    (* Factor used to limit the depth of the tree. *)
-    let max_depth_factor = 10 in
-    fix
-      (fun self current_depth_factor ->
-        frequency
-          [
-            (max_depth_factor, map (fun b -> Key b) bytes_gen);
-            (max_depth_factor, pure Cut);
-            ( current_depth_factor,
-              map
-                (fun d -> Dir d)
-                (MapArb.gen_of_size
-                   (0 -- 10)
-                   string
-                   (self (current_depth_factor / 2))) );
-          ])
-      max_depth_factor
-  in
-  let rec shrink =
-    let open Iter in
-    function
-    | Cut -> empty
-    | Key bigger_bytes ->
-        shrink Cut
-        <+> ( of_option_shrink bytes_shrink_opt bigger_bytes
-            >|= fun smaller_bytes -> Key smaller_bytes )
-    | Dir bigger_raw_context_map ->
-        shrink Cut <+> shrink (Key Bytes.empty)
-        <+> ( MapArb.shrink
-                ~key:Shrink.string
-                ~value:shrink
-                bigger_raw_context_map
-            >|= fun smaller_dir -> Dir smaller_dir )
-  in
-  let print = Format.asprintf "%a" pp_raw_context in
-  make ~print ~shrink gen
-
 let irmin_hash_arb = QCheck.oneofl ~print:Fun.id Light_lib.irmin_hashes
 
 let merkle_node_arb =
@@ -97,7 +53,7 @@ let merkle_node_arb =
   let open QCheck in
   let open Gen in
   let {gen = raw_context_gen; shrink = raw_context_shrink_opt; _} =
-    raw_context_arb
+    Light_lib.raw_context_arb
   in
   let {gen = irmin_hash_gen; _} = irmin_hash_arb in
   let gen =
