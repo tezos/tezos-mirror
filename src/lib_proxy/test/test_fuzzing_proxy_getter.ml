@@ -47,7 +47,7 @@ let test_set_leaf_get (tree_path : string list) leaf_data =
        tree_path
        (Tezos_shell_services.Block_services.Key leaf_data)
      >>= function
-     | Ok (Value updated_tree) -> Tree.get updated_tree tree_path
+     | Value updated_tree -> Tree.get updated_tree tree_path
      | _ -> assert false)
     >>= function
     | None -> assert false

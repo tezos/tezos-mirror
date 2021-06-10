@@ -102,11 +102,11 @@ struct
 
   let get = Local.Tree.find_tree
 
-  let set_leaf tree key raw_context : t Proxy.update tzresult Lwt.t =
+  let set_leaf tree key raw_context : t Proxy.update Lwt.t =
     (raw_context_to_tree raw_context >>= function
      | None -> Lwt.return tree
      | Some sub_tree -> Local.Tree.add_tree tree key sub_tree)
-    >|= fun updated_tree -> ok (Proxy.Value updated_tree)
+    >|= fun updated_tree -> Proxy.Value updated_tree
 end
 
 module type REQUESTS_TREE = sig
@@ -169,7 +169,7 @@ module Core
     X.do_rpc pgi key >>=? fun tree ->
     lazy_load_store () >>= fun current_store ->
     (* Update cache with data obtained *)
-    T.set_leaf current_store key tree >>=? fun updated ->
+    T.set_leaf current_store key tree >>= fun updated ->
     (match updated with Mutation -> () | Value cache' -> store := Some cache') ;
     return_unit
 end

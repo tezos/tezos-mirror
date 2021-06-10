@@ -63,7 +63,7 @@ module type TREE = sig
     t ->
     key ->
     Tezos_shell_services.Block_services.raw_context ->
-    t update tzresult Lwt.t
+    t update Lwt.t
 end
 
 (** Module used by implementations of [Proxy_getter.M]. *)
