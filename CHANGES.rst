@@ -205,6 +205,9 @@ Client
    ``unban operation <operation_hash>``, and ``unban all operations``
    that call the corresponding RPCs.
 
+-  Added a ``--legacy`` flag to the ``convert script`` command. This flag permits to use the
+   legacy typechecking mode when the input of the command is typechecked.
+
 Baker / Endorser / Accuser
 --------------------------
 
