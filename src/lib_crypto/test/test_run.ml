@@ -11,7 +11,7 @@ type t = (module T)
 let runtest l =
   let _ =
     Alcotest.run
-      "tesoz-crypto"
+      "tezos-crypto"
       (List.fold_left
          (fun acc (e : t) ->
            let module M : T = (val e) in
@@ -22,7 +22,7 @@ let runtest l =
   let _ =
     Lwt_main.run
     @@ Alcotest_lwt.run
-         "tesoz-crypto-lwt"
+         "tezos-crypto-lwt"
          (List.fold_left
             (fun acc (e : t) ->
               let module M : T = (val e) in
