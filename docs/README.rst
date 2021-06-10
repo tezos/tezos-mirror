@@ -100,7 +100,7 @@ For that, you should build the documentation (by running ``make`` in the ``docs`
 Links
 ~~~~~
 
-+When introducing cross-references between documentation pages as well as references to external resources, please consider using the most appropriate kind of link:
+When introducing cross-references between documentation pages as well as references to external resources, please consider using the most appropriate kind of link:
 
 - When referring to a whole documentation page, you should use a ``:doc:`` role rather than introducing a label at the start of the page.
   Indeed, labels incur an overhead, especially when pages get duplicated for different protocol versions.
@@ -135,8 +135,8 @@ Executable documentation allows one to test those scripts, e.g. in CI (continuou
 Typically, Tezos installation scripts not only have to evolve with the Tezos codebase, but also with various other evolving resources, such as OPAM packages, package managers, Linux distrbutions, and so on.
 By continuously testing such installation scripts, executable documentation allows one to detect problems and fix obsolete instructions as early as possible, avoiding headaches and frustration, for new end users and experienced developers alike.
 
-+Technically, executable documentation can be created by using the Sphinx directive `literalinclude <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-literalinclude>`_, which may include whole scripts or parts of them.
-+For example, the following directive includes a script fragment detailing a step in compiling the Tezos sources::
+Technically, executable documentation can be created by using the Sphinx directive `literalinclude <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-literalinclude>`_, which may include whole scripts or parts of them.
+For example, the following directive includes a script fragment detailing a step in compiling the Tezos sources::
 
   .. literalinclude:: compile-sources.sh
     :language: shell
