@@ -44,7 +44,9 @@ let test_b58check_roundtrip :
     type t. (module B58CHECK with type t = t) -> string -> t -> unit =
  fun m msg input ->
   let module M = (val m) in
-  let testable = Alcotest.testable M.pp ( = ) in
+  let testable =
+    Alcotest.testable M.pp (fun a b -> M.to_b58check a = M.to_b58check b)
+  in
   Roundtrips.test_rt_opt
     ("b58check." ^ msg)
     testable
