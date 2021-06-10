@@ -33,7 +33,7 @@ let pp_ignore fmt _ = Format.pp_print_string fmt ""
 module Revelation = struct
   include Internal_event.Simple
 
-  let section = ["protocol"; "delegate"; "reveal"]
+  let section = [Protocol.name; "delegate"; "reveal"]
 
   let no_nonce_reveal =
     declare_1
@@ -61,7 +61,7 @@ end
 module Nonces = struct
   include Internal_event.Simple
 
-  let section = ["protocol"; "delegate"; "nonces"]
+  let section = [Protocol.name; "delegate"; "nonces"]
 
   let cannot_retrieve_block_header =
     declare_2
@@ -114,7 +114,7 @@ end
 module Denunciator = struct
   include Internal_event.Simple
 
-  let section = ["protocol"; "delegate"; "denunciation"]
+  let section = [Protocol.name; "delegate"; "denunciation"]
 
   let invalid_level_conversion =
     declare_1
@@ -235,7 +235,7 @@ end
 module Baking_scheduling = struct
   include Internal_event.Simple
 
-  let section = ["protocol"; "delegate"; "baking-scheduling"]
+  let section = [Protocol.name; "delegate"; "baking-scheduling"]
 
   let cannot_fetch_event =
     declare_1
@@ -291,7 +291,7 @@ end
 module Baking_forge = struct
   include Internal_event.Simple
 
-  let section = ["protocol"; "delegate"; "baking_forge"]
+  let section = [Protocol.name; "delegate"; "baking_forge"]
 
   let double_bake_near_miss =
     declare_1
@@ -625,7 +625,7 @@ end
 module Endorsement = struct
   include Internal_event.Simple
 
-  let section = ["protocol"; "delegate"; "endorsement"]
+  let section = [Protocol.name; "delegate"; "endorsement"]
 
   let double_endorsement_near_miss =
     declare_1
