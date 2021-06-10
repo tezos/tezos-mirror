@@ -145,13 +145,13 @@ let list (list : 'a Script_typed_ir.boxed_list) : t =
 
 let set (set : 'a Script_typed_ir.set) : t =
   let res =
-    Alpha_context.Script_int.to_int (Script_ir_translator.set_size set)
+    Alpha_context.Script_int.to_int (Script_ir_pervasives.set_size set)
   in
   match res with None -> assert false | Some x -> x
 
 let map (map : ('a, 'b) Script_typed_ir.map) : t =
   let res =
-    Alpha_context.Script_int.to_int (Script_ir_translator.map_size map)
+    Alpha_context.Script_int.to_int (Script_ir_pervasives.map_size map)
   in
   match res with None -> assert false | Some x -> x
 

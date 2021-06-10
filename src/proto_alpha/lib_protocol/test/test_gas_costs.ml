@@ -33,19 +33,20 @@
 *)
 
 open Protocol
-open Script_ir_translator
 module S = Saturation_repr
 
-let dummy_list = list_cons 42 list_empty
+let dummy_list = Script_ir_pervasives.(list_cons 42 list_empty)
 
 let forty_two = Alpha_context.Script_int.of_int 42
 
 let forty_two_n = Alpha_context.Script_int.abs forty_two
 
 let dummy_set =
+  let open Script_ir_pervasives in
   set_update forty_two true (empty_set Script_typed_ir.(Int_key None))
 
 let dummy_map =
+  let open Script_ir_pervasives in
   map_update
     forty_two
     (Some forty_two)
@@ -150,7 +151,7 @@ let all_interpreter_costs =
     ("neq", neq);
     ("compare", compare Script_typed_ir.(Int_key None) forty_two forty_two);
     ( "concat_string_precheck",
-      concat_string_precheck (list_cons "42" list_empty) );
+      concat_string_precheck Script_ir_pervasives.(list_cons "42" list_empty) );
     ("concat_string", concat_string (S.safe_int 42));
     ("concat_bytes", concat_bytes (S.safe_int 42));
     ("exec", exec);

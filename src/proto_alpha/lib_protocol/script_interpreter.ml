@@ -251,7 +251,7 @@ let rec kmap_exit :
     type a b c d e f g h m n o. (a, b, c, d, e, f, g, h, m, n, o) kmap_exit_type
     =
  fun mk g gas (body, xs, ys, yk) ks accu stack ->
-  let ys = map_update yk (Some accu) ys in
+  let ys = Script_ir_pervasives.map_update yk (Some accu) ys in
   let ks = mk (KMap_enter_body (body, xs, ys, ks)) in
   let (accu, stack) = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
@@ -385,7 +385,9 @@ and ilist_iter : type a b c d e f g. (a, b, c, d, e, f, g) ilist_iter_type =
 and iset_iter : type a b c d e f g. (a, b, c, d, e, f, g) iset_iter_type =
  fun log_if_needed g gas (body, k) ks accu stack ->
   let set = accu in
-  let l = List.rev (set_fold (fun e acc -> e :: acc) set []) in
+  let l =
+    List.rev (Script_ir_pervasives.set_fold (fun e acc -> e :: acc) set [])
+  in
   let ks = log_if_needed (KIter (body, l, KCons (k, ks))) in
   let (accu, stack) = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
@@ -395,8 +397,12 @@ and imap_map : type a b c d e f g h i. (a, b, c, d, e, f, g, h, i) imap_map_type
     =
  fun log_if_needed g gas (body, k) ks accu stack ->
   let map = accu in
-  let xs = List.rev (map_fold (fun k v a -> (k, v) :: a) map []) in
-  let ys = empty_map (map_key_ty map) in
+  let xs =
+    List.rev (Script_ir_pervasives.map_fold (fun k v a -> (k, v) :: a) map [])
+  in
+  let ys =
+    Script_ir_pervasives.empty_map (Script_ir_pervasives.map_key_ty map)
+  in
   let ks = log_if_needed (KMap_enter_body (body, xs, ys, KCons (k, ks))) in
   let (accu, stack) = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
@@ -405,7 +411,9 @@ and imap_map : type a b c d e f g h i. (a, b, c, d, e, f, g, h, i) imap_map_type
 and imap_iter : type a b c d e f g h. (a, b, c, d, e, f, g, h) imap_iter_type =
  fun log_if_needed g gas (body, k) ks accu stack ->
   let map = accu in
-  let l = List.rev (map_fold (fun k v a -> (k, v) :: a) map []) in
+  let l =
+    List.rev (Script_ir_pervasives.map_fold (fun k v a -> (k, v) :: a) map [])
+  in
   let ks = log_if_needed (KIter (body, l, KCons (k, ks))) in
   let (accu, stack) = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
@@ -516,11 +524,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       (* lists *)
       | ICons_list (_, k) ->
           let (tl, stack) = stack in
-          let accu = list_cons accu tl in
+          let accu = Script_ir_pervasives.list_cons accu tl in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | INil (_, k) ->
           let stack = (accu, stack) in
-          let accu = list_empty in
+          let accu = Script_ir_pervasives.list_empty in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IIf_cons {branch_if_cons; branch_if_nil; _} -> (
           match accu.elements with
@@ -540,25 +548,26 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (ilist_iter [@ocaml.tailcall]) id g gas (body, k) ks accu stack
       (* sets *)
       | IEmpty_set (_, ty, k) ->
-          let res = empty_set ty in
+          let res = Script_ir_pervasives.empty_set ty in
           let stack = (accu, stack) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | ISet_iter (_, body, k) ->
           (iset_iter [@ocaml.tailcall]) id g gas (body, k) ks accu stack
       | ISet_mem (_, k) ->
           let (set, stack) = stack in
-          let res = set_mem accu set in
+          let res = Script_ir_pervasives.set_mem accu set in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | ISet_update (_, k) ->
           let (presence, (set, stack)) = stack in
-          let res = set_update accu presence set in
+          let res = Script_ir_pervasives.set_update accu presence set in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | ISet_size (_, k) ->
-          let res = set_size accu in
+          let res = Script_ir_pervasives.set_size accu in
           (step [@ocaml.tailcall]) g gas k ks res stack
       (* maps *)
       | IEmpty_map (_, ty, _, k) ->
-          let res = empty_map ty and stack = (accu, stack) in
+          let res = Script_ir_pervasives.empty_map ty
+          and stack = (accu, stack) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMap_map (_, body, k) ->
           (imap_map [@ocaml.tailcall]) id g gas (body, k) ks accu stack
@@ -566,25 +575,25 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (imap_iter [@ocaml.tailcall]) id g gas (body, k) ks accu stack
       | IMap_mem (_, k) ->
           let (map, stack) = stack in
-          let res = map_mem accu map in
+          let res = Script_ir_pervasives.map_mem accu map in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMap_get (_, k) ->
           let (map, stack) = stack in
-          let res = map_get accu map in
+          let res = Script_ir_pervasives.map_get accu map in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMap_update (_, k) ->
           let (v, (map, stack)) = stack in
           let key = accu in
-          let res = map_update key v map in
+          let res = Script_ir_pervasives.map_update key v map in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMap_get_and_update (_, k) ->
           let key = accu in
           let (v, (map, rest)) = stack in
-          let map' = map_update key v map in
-          let v' = map_get key map in
+          let map' = Script_ir_pervasives.map_update key v map in
+          let v' = Script_ir_pervasives.map_get key map in
           (step [@ocaml.tailcall]) g gas k ks v' (map', rest)
       | IMap_size (_, k) ->
-          let res = map_size accu in
+          let res = Script_ir_pervasives.map_size accu in
           (step [@ocaml.tailcall]) g gas k ks res stack
       (* Big map operations *)
       | IEmpty_big_map (_, tk, tv, k) ->
@@ -900,7 +909,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let a = accu in
           let (b, stack) = stack in
           let r =
-            Script_int.of_int @@ Script_ir_translator.compare_comparable ty a b
+            Script_int.of_int @@ Script_ir_pervasives.compare_comparable ty a b
           in
           (step [@ocaml.tailcall]) g gas k ks r stack
       (* comparators *)
@@ -1310,8 +1319,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let result =
             if
               Compare.Int.(
-                compare_address ticket_a.ticketer ticket_b.ticketer = 0
-                && compare_comparable
+                Script_ir_pervasives.compare_address
+                  ticket_a.ticketer
+                  ticket_b.ticketer
+                = 0
+                && Script_ir_pervasives.compare_comparable
                      contents_ty
                      ticket_a.contents
                      ticket_b.contents

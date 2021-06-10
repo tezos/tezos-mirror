@@ -167,181 +167,6 @@ let check_kind kinds expr =
     let loc = location expr in
     error (Invalid_kind (loc, kinds, kind))
 
-(* ---- Lists, Sets and Maps ----------------------------------------------- *)
-
-let list_empty : 'a Script_typed_ir.boxed_list =
-  let open Script_typed_ir in
-  {elements = []; length = 0}
-
-let list_cons :
-    'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list =
- fun elt l ->
-  let open Script_typed_ir in
-  {length = 1 + l.length; elements = elt :: l.elements}
-
-let compare_address (x, ex) (y, ey) =
-  let lres = Contract.compare x y in
-  if Compare.Int.(lres = 0) then Compare.String.compare ex ey else lres
-
-type compare_comparable_cont =
-  | Compare_comparable :
-      'a comparable_ty * 'a * 'a * compare_comparable_cont
-      -> compare_comparable_cont
-  | Compare_comparable_return : compare_comparable_cont
-
-let compare_comparable : type a. a comparable_ty -> a -> a -> int =
-  let rec compare_comparable :
-      type a. a comparable_ty -> compare_comparable_cont -> a -> a -> int =
-   fun kind k x y ->
-    match (kind, x, y) with
-    | (Unit_key _, (), ()) -> (apply [@tailcall]) 0 k
-    | (Never_key _, _, _) -> .
-    | (Signature_key _, x, y) -> (apply [@tailcall]) (Signature.compare x y) k
-    | (String_key _, x, y) -> (apply [@tailcall]) (Script_string.compare x y) k
-    | (Bool_key _, x, y) -> (apply [@tailcall]) (Compare.Bool.compare x y) k
-    | (Mutez_key _, x, y) -> (apply [@tailcall]) (Tez.compare x y) k
-    | (Key_hash_key _, x, y) ->
-        (apply [@tailcall]) (Signature.Public_key_hash.compare x y) k
-    | (Key_key _, x, y) ->
-        (apply [@tailcall]) (Signature.Public_key.compare x y) k
-    | (Int_key _, x, y) -> (apply [@tailcall]) (Script_int.compare x y) k
-    | (Nat_key _, x, y) -> (apply [@tailcall]) (Script_int.compare x y) k
-    | (Timestamp_key _, x, y) ->
-        (apply [@tailcall]) (Script_timestamp.compare x y) k
-    | (Address_key _, x, y) -> (apply [@tailcall]) (compare_address x y) k
-    | (Bytes_key _, x, y) -> (apply [@tailcall]) (Compare.Bytes.compare x y) k
-    | (Chain_id_key _, x, y) -> (apply [@tailcall]) (Chain_id.compare x y) k
-    | (Pair_key ((tl, _), (tr, _), _), (lx, rx), (ly, ry)) ->
-        (compare_comparable [@tailcall])
-          tl
-          (Compare_comparable (tr, rx, ry, k))
-          lx
-          ly
-    | (Union_key ((tl, _), _, _), L x, L y) ->
-        (compare_comparable [@tailcall]) tl k x y
-    | (Union_key _, L _, R _) -> -1
-    | (Union_key _, R _, L _) -> 1
-    | (Union_key (_, (tr, _), _), R x, R y) ->
-        (compare_comparable [@tailcall]) tr k x y
-    | (Option_key _, None, None) -> 0
-    | (Option_key _, None, Some _) -> -1
-    | (Option_key _, Some _, None) -> 1
-    | (Option_key (t, _), Some x, Some y) ->
-        (compare_comparable [@tailcall]) t k x y
-  and apply ret k =
-    match (ret, k) with
-    | (0, Compare_comparable (ty, x, y, k)) ->
-        (compare_comparable [@tailcall]) ty k x y
-    | (0, Compare_comparable_return) -> 0
-    | (ret, _) ->
-        (* ret <> 0, we perform an early exit *)
-        if Compare.Int.(ret > 0) then 1 else -1
-  in
-  fun t -> compare_comparable t Compare_comparable_return
-  [@@coq_axiom_with_reason "non top-level mutually recursive function"]
-
-let empty_set : type a. a comparable_ty -> a set =
- fun ty ->
-  let module OPS = Set.Make (struct
-    type t = a
-
-    let compare = compare_comparable ty
-  end) in
-  (module struct
-    type elt = a
-
-    let elt_ty = ty
-
-    module OPS = OPS
-
-    let boxed = OPS.empty
-
-    let size = 0
-  end)
-
-let set_update : type a. a -> bool -> a set -> a set =
- fun v b (module Box) ->
-  (module struct
-    type elt = a
-
-    let elt_ty = Box.elt_ty
-
-    module OPS = Box.OPS
-
-    let boxed =
-      if b then Box.OPS.add v Box.boxed else Box.OPS.remove v Box.boxed
-
-    let size =
-      let mem = Box.OPS.mem v Box.boxed in
-      if mem then if b then Box.size else Box.size - 1
-      else if b then Box.size + 1
-      else Box.size
-  end)
-
-let set_mem : type elt. elt -> elt set -> bool =
- fun v (module Box) -> Box.OPS.mem v Box.boxed
-
-let set_fold : type elt acc. (elt -> acc -> acc) -> elt set -> acc -> acc =
- fun f (module Box) -> Box.OPS.fold f Box.boxed
-
-let set_size : type elt. elt set -> Script_int.n Script_int.num =
- fun (module Box) -> Script_int.(abs (of_int Box.size))
-
-let map_key_ty : type a b. (a, b) map -> a comparable_ty =
- fun (module Box) -> Box.key_ty
-
-let empty_map : type a b. a comparable_ty -> (a, b) map =
- fun ty ->
-  let module OPS = Map.Make (struct
-    type t = a
-
-    let compare = compare_comparable ty
-  end) in
-  (module struct
-    type key = a
-
-    type value = b
-
-    let key_ty = ty
-
-    module OPS = OPS
-
-    let boxed = (OPS.empty, 0)
-  end)
-
-let map_get : type key value. key -> (key, value) map -> value option =
- fun k (module Box) -> Box.OPS.find k (fst Box.boxed)
-
-let map_update : type a b. a -> b option -> (a, b) map -> (a, b) map =
- fun k v (module Box) ->
-  (module struct
-    type key = a
-
-    type value = b
-
-    let key_ty = Box.key_ty
-
-    module OPS = Box.OPS
-
-    let boxed =
-      let (map, size) = Box.boxed in
-      let contains = Box.OPS.mem k map in
-      match v with
-      | Some v -> (Box.OPS.add k v map, size + if contains then 0 else 1)
-      | None -> (Box.OPS.remove k map, size - if contains then 1 else 0)
-  end)
-
-let map_mem : type key value. key -> (key, value) map -> bool =
- fun k (module Box) -> Box.OPS.mem k (fst Box.boxed)
-
-let map_fold :
-    type key value acc.
-    (key -> value -> acc -> acc) -> (key, value) map -> acc -> acc =
- fun f (module Box) -> Box.OPS.fold f (fst Box.boxed)
-
-let map_size : type key value. (key, value) map -> Script_int.n Script_int.num =
- fun (module Box) -> Script_int.(abs (of_int (snd Box.boxed)))
-
 (* ---- Unparsing (Typed IR -> Untyped expressions) of types -----------------*)
 
 (* This part contains the unparsing that does not depend on parsing
@@ -2526,7 +2351,9 @@ let rec parse_data :
                          value
                          k)
                     >>? fun ctxt ->
-                    let c = compare_comparable key_type value k in
+                    let c =
+                      Script_ir_pervasives.compare_comparable key_type value k
+                    in
                     if Compare.Int.(0 <= c) then
                       if Compare.Int.(0 = c) then
                         error (Duplicate_map_keys (loc, strip_locations expr))
@@ -2539,13 +2366,15 @@ let rec parse_data :
                   ctxt
                   (Michelson_v1_gas.Cost_of.Interpreter.map_update k map)
                 >|? fun ctxt ->
-                (Some k, map_update k (Some (item_wrapper v)) map, ctxt) )
+                ( Some k,
+                  Script_ir_pervasives.map_update k (Some (item_wrapper v)) map,
+                  ctxt ) )
         | Prim (loc, D_Elt, l, _) ->
             fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
         | Prim (loc, name, _, _) ->
             fail @@ Invalid_primitive (loc, [D_Elt], name)
         | Int _ | String _ | Bytes _ | Seq _ -> fail_parse_data ())
-      (None, empty_map key_type, ctxt)
+      (None, Script_ir_pervasives.empty_map key_type, ctxt)
       items
     |> traced
     >|=? fun (_, items, ctxt) -> (items, ctxt)
@@ -2573,7 +2402,12 @@ let rec parse_data :
                          last_key
                          k)
                     >>? fun ctxt ->
-                    let c = compare_comparable key_type last_key k in
+                    let c =
+                      Script_ir_pervasives.compare_comparable
+                        key_type
+                        last_key
+                        k
+                    in
                     if Compare.Int.(0 <= c) then
                       if Compare.Int.(0 = c) then
                         error (Duplicate_map_keys (loc, strip_locations expr))
@@ -2692,9 +2526,9 @@ let rec parse_data :
       @@ List.fold_right_es
            (fun v (rest, ctxt) ->
              non_terminal_recursion ?type_logger ctxt ~legacy t v
-             >|=? fun (v, ctxt) -> (list_cons v rest, ctxt))
+             >|=? fun (v, ctxt) -> (Script_ir_pervasives.list_cons v rest, ctxt))
            items
-           (list_empty, ctxt)
+           (Script_ir_pervasives.list_empty, ctxt)
   | (List_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Tickets *)
@@ -2717,7 +2551,9 @@ let rec parse_data :
                        ctxt
                        (Michelson_v1_gas.Cost_of.Interpreter.compare t value v)
                      >>? fun ctxt ->
-                     let c = compare_comparable t value v in
+                     let c =
+                       Script_ir_pervasives.compare_comparable t value v
+                     in
                      if Compare.Int.(0 <= c) then
                        if Compare.Int.(0 = c) then
                          error
@@ -2731,8 +2567,9 @@ let rec parse_data :
                  Gas.consume
                    ctxt
                    (Michelson_v1_gas.Cost_of.Interpreter.set_update v set)
-                 >|? fun ctxt -> (Some v, set_update v true set, ctxt) ))
-           (None, empty_set t, ctxt)
+                 >|? fun ctxt ->
+                 (Some v, Script_ir_pervasives.set_update v true set, ctxt) ))
+           (None, Script_ir_pervasives.empty_set t, ctxt)
            vs
       >|=? fun (_, set, ctxt) -> (set, ctxt)
   | (Set_t _, expr) ->
@@ -5868,10 +5705,12 @@ let rec unparse_data :
           unparse_comparable_data ctxt mode t item >|=? fun (item, ctxt) ->
           (item :: l, ctxt))
         ([], ctxt)
-        (set_fold (fun e acc -> e :: acc) set [])
+        (Script_ir_pervasives.set_fold (fun e acc -> e :: acc) set [])
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Map_t (kt, vt, _), map) ->
-      let items = map_fold (fun k v acc -> (k, v) :: acc) map [] in
+      let items =
+        Script_ir_pervasives.map_fold (fun k v acc -> (k, v) :: acc) map []
+      in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Big_map_t (_kt, _vt, _), {id = Some id; diff = {size; _}; _})
@@ -5887,7 +5726,9 @@ let rec unparse_data :
            so we don't bother carbonating this sort operation
            precisely. Also, the sort uses a reverse compare because
            [unparse_items] will reverse the result. *)
-        List.sort (fun (a, _) (b, _) -> compare_comparable kt b a) items
+        List.sort
+          (fun (a, _) (b, _) -> Script_ir_pervasives.compare_comparable kt b a)
+          items
       in
       let vt = Option_t (vt, None) in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
@@ -5908,7 +5749,9 @@ let rec unparse_data :
       in
       let items =
         (* See note above. *)
-        List.sort (fun (a, _) (b, _) -> compare_comparable kt b a) items
+        List.sort
+          (fun (a, _) (b, _) -> Script_ir_pervasives.compare_comparable kt b a)
+          items
       in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
@@ -6336,8 +6179,8 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
           (fun (ctxt, l, ids_to_copy, acc) x ->
             aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
             >|=? fun (ctxt, x, ids_to_copy, acc) ->
-            (ctxt, list_cons x l, ids_to_copy, acc))
-          (ctxt, list_empty, ids_to_copy, acc)
+            (ctxt, Script_ir_pervasives.list_cons x l, ids_to_copy, acc))
+          (ctxt, Script_ir_pervasives.list_empty, ids_to_copy, acc)
           l.elements
         >|=? fun (ctxt, l, ids_to_copy, acc) ->
         let reversed = {length = l.length; elements = List.rev l.elements} in
@@ -6433,7 +6276,7 @@ let rec fold_lazy_storage :
         (ok (Fold_lazy_storage.Ok init, ctxt))
         l.elements
   | (Map_f has_lazy_storage, Map_t (_, ty, _), m) ->
-      map_fold
+      Script_ir_pervasives.map_fold
         (fun _
              v
              (acc : (('acc, error) Fold_lazy_storage.result * context) tzresult) ->
