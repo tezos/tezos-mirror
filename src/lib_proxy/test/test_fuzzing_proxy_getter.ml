@@ -26,41 +26,56 @@
 (** Testing
     -------
     Component:    Proxy getter
-    Invocation:   dune build @src/lib_proxy/runtest
+    Invocation:   dune build @src/lib_proxy/runtest_proxy_fuzzing
     Subject:      Fuzzing tests of internals of the client's --mode proxy
 *)
 
 module Local = Tezos_context_memory.Context
 module Proxy_getter = Tezos_proxy.Proxy_getter
+module Tree = Proxy_getter.Internal.Tree
+open Lib_test.Qcheck_helpers
 
-let tree_path_gen = Crowbar.list Crowbar.bytes
+let key_arb =
+  (* Using small_list, otherwise the test takes considerably longer.
+     This test is quite slow already *)
+  QCheck.(small_list string)
 
-let leaf_data_gen = Crowbar.map [Crowbar.bytes] Bytes.of_string
+let tree_arb =
+  let rec mk_tree acc sets =
+    match sets with
+    | [] -> Lwt.return acc
+    | (key, value) :: tl -> (
+        Tree.set_leaf acc key value >>= function
+        | Tezos_proxy.Proxy.Mutation -> (mk_tree [@ocaml.tailcall]) acc tl
+        | Tezos_proxy.Proxy.Value acc' -> (mk_tree [@ocaml.tailcall]) acc' tl)
+  in
+  let mk_tree acc sets = Lwt_main.run @@ mk_tree acc sets in
+  QCheck.(
+    map (mk_tree Tree.empty) (list (pair key_arb Light_lib.raw_context_arb)))
 
 (** [Tree.set_leaf] then [Tree.get] should return the inserted data *)
-let test_set_leaf_get (tree_path : string list) leaf_data =
-  let module Tree = Proxy_getter.Internal.Tree in
-  let expected = leaf_data in
-  let actual_lwt =
-    (Tree.set_leaf
-       Tree.empty
-       tree_path
-       (Tezos_shell_services.Block_services.Key leaf_data)
-     >>= function
-     | Value updated_tree -> Tree.get updated_tree tree_path
-     | _ -> assert false)
-    >>= function
-    | None -> assert false
-    | Some result_tree -> (
-        Local.Tree.to_value result_tree >|= function
-        | None -> assert false
-        | Some bytes -> bytes)
+let test_set_leaf_get =
+  QCheck.Test.make
+    ~name:"Tree.get (Tree.set_leaf t k v) k = v"
+    QCheck.(triple tree_arb key_arb Light_lib.raw_context_arb)
+  @@ fun (tree, key, value) ->
+  let expected =
+    Lwt_main.run @@ Proxy_getter.Internal.raw_context_to_tree value
   in
-  let actual = Lwt_main.run actual_lwt in
-  Crowbar.check_eq expected actual
+  (* We need to make sure that we are actually setting something: *)
+  QCheck.assume @@ Option.is_some expected ;
+  let tree' = Lwt_main.run @@ Tree.set_leaf tree key value in
+  let tree' =
+    match tree' with
+    | Tezos_proxy.Proxy.Mutation -> tree
+    | Tezos_proxy.Proxy.Value tree' -> tree'
+  in
+  let actual = Lwt_main.run @@ Tree.get tree' key in
+  let pp = Format.pp_print_option Local.Tree.pp in
+  let eq = Option.equal Local.Tree.equal in
+  qcheck_eq' ~pp ~eq ~expected ~actual ()
 
 let () =
-  Crowbar.add_test
-    ~name:"[Tree.set_leaf] then [Tree.get] should return the inserted data"
-    [tree_path_gen; leaf_data_gen]
-    test_set_leaf_get
+  Alcotest.run
+    "Proxy Getter"
+    [("Array theory", qcheck_wrap [test_set_leaf_get])]

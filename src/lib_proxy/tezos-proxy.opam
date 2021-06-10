@@ -16,7 +16,6 @@ depends: [
   "tezos-shell-services"
   "tezos-context"
   "alcotest-lwt" { with-test & >= "1.1.0" }
-  "crowbar" { with-test }
   "tezos-test-services" { with-test }
   "tezos-test-helpers" { with-test }
   "qcheck-alcotest" { with-test }

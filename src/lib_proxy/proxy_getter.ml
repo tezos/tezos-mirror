@@ -274,4 +274,6 @@ module MakeProxy (X : Proxy_proto.PROTO_RPC) : M = Make (Core (Tree) (X)) (X)
 
 module Internal = struct
   module Tree = Tree
+
+  let raw_context_to_tree = raw_context_to_tree
 end

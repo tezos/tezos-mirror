@@ -99,4 +99,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M
 (** Exposed for testing purpose only, you should not use it directly *)
 module Internal : sig
   module Tree : Proxy.TREE with type t = Local.tree with type key = Local.key
+
+  val raw_context_to_tree :
+    Tezos_shell_services.Block_services.raw_context -> Local.tree option Lwt.t
 end
