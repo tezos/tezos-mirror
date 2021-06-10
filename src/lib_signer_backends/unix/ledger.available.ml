@@ -640,7 +640,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
        support non-hardened paths, so each node of the path must be hardened."
       Bip32_path.(string_of_path tezos_root)
 
-  let neuterize (sk : sk_uri) = make_pk_uri (sk :> Uri.t)
+  let neuterize (sk : sk_uri) = make_pk_uri (sk :> Uri.t) >>?= return
 
   let pkh_of_pk = Signature.Public_key.hash
 

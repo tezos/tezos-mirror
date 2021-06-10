@@ -85,6 +85,12 @@ module type Alias = sig
     ('a, (#Client_context.wallet as 'b)) Clic.params ->
     (string * t -> 'a, 'b) Clic.params
 
+  val aliases_param :
+    ?name:string ->
+    ?desc:string ->
+    ('a, (#Client_context.wallet as 'b)) Clic.params ->
+    ((string * t) list -> 'a, 'b) Clic.params
+
   val fresh_alias_param :
     ?name:string ->
     ?desc:string ->
@@ -204,6 +210,15 @@ module Alias (Entity : Entity) = struct
   let alias_param ?(name = "name")
       ?(desc = "existing " ^ Entity.name ^ " alias") next =
     param ~name ~desc (alias_parameter ()) next
+
+  let aliases_parameter () =
+    parameter ~autocomplete (fun cctxt s ->
+        String.split ',' s
+        |> List.map_es (fun s -> find cctxt s >>=? fun pkh -> return (s, pkh)))
+
+  let aliases_param ?(name = "name")
+      ?(desc = "existing " ^ Entity.name ^ " aliases") next =
+    param ~name ~desc (aliases_parameter ()) next
 
   type fresh_param = Fresh of string
 

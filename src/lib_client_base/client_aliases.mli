@@ -80,6 +80,12 @@ module type Alias = sig
     ('a, (#Client_context.wallet as 'b)) Clic.params ->
     (string * t -> 'a, 'b) Clic.params
 
+  val aliases_param :
+    ?name:string ->
+    ?desc:string ->
+    ('a, (#Client_context.wallet as 'b)) Clic.params ->
+    ((string * t) list -> 'a, 'b) Clic.params
+
   val fresh_alias_param :
     ?name:string ->
     ?desc:string ->

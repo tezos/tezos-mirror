@@ -41,7 +41,7 @@ let default_bootstrap_accounts =
   List.mapi_es
     (fun i ukey ->
       Client_keys.make_sk_uri @@ Uri.of_string ("unencrypted:" ^ ukey)
-      >>=? fun sk_uri ->
+      >>?= fun sk_uri ->
       let name = basename ^ string_of_int (i + 1) in
       return {name; sk_uri})
     unencrypted_keys
