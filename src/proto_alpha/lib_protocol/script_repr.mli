@@ -23,16 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Defines a Michelson expression representation as a Micheline node with
+    canonical ([int]) location and [Michelson_v1_primitives.prim] as content.
+
+    Types [expr] and [node] both define representation of Michelson
+    expressions and are indeed the same type internally, although this is not
+    visible outside Micheline due to interface abstraction. *)
+
+(** Locations are used by Micheline mostly for error-reporting and pretty-
+    printing expressions. [canonical_location] is simply an [int]. *)
 type location = Micheline.canonical_location
 
+(** Annotations attached to Michelson expressions. *)
 type annot = Micheline.annot
 
+(** Represents a Michelson expression as canonical Micheline. *)
 type expr = Michelson_v1_primitives.prim Micheline.canonical
 
 type error += Lazy_script_decode (* `Permanent *)
 
+(** A record containing either an underlying serialized representation of an
+    expression or a deserialized one, or both. If either is absent, it will be
+    computed on-demand. *)
 type lazy_expr = expr Data_encoding.lazy_t
 
+(** Same as [expr], but used in different contexts, as required by Micheline's
+    abstract interface. *)
 type node = (location, Michelson_v1_primitives.prim) Micheline.node
 
 val location_encoding : location Data_encoding.t
@@ -43,9 +59,12 @@ val lazy_expr_encoding : lazy_expr Data_encoding.t
 
 val lazy_expr : expr -> lazy_expr
 
+(** Type [t] joins the contract's code and storage in a single record. *)
 type t = {code : lazy_expr; storage : lazy_expr}
 
 val encoding : t Data_encoding.encoding
+
+(* Basic gas costs of operations related to processing Michelson: *)
 
 val deserialization_cost_estimated_from_bytes : int -> Gas_limit_repr.cost
 

@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines the protocol representation of a level. Besides the "raw
+    level", which is the shell's notion of the level, this representation also
+    contains additional information, like the cycle the level belongs to. *)
+
 type t = private {
   level : Raw_level_repr.t;
       (** The level of the block relative to genesis. This
@@ -75,7 +79,7 @@ val cycle_eras_encoding : cycle_eras Data_encoding.t
    - the first levels and the first cycles are decreasing, meaning that the
      first era in the list is the current era, and the last era in the list
      is the oldest era
-   Invariants: 
+   Invariants:
    - the first era therefore contains the same constants as in Constants
    - the first level of an era is the first level of a cycle
 *)

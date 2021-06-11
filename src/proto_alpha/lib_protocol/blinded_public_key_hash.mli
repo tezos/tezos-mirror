@@ -23,6 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module handles hashes of implicit contract addresses used for
+    commitments in the origin block.
+
+    This module is needed because for legal reasons, when the blockchain is
+    activated, the btz1 addresses of participants to the fundraising are not
+    listed directly but instead their hashes are listed, together with their
+    balances. Thus, the listed accounts can be activated and credited in the
+    activation block. *)
+
 include S.HASH
 
 type activation_code

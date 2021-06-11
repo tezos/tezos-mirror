@@ -25,7 +25,7 @@
 
 type t
 
-(** A [period] is a non-negative integer. *)
+(** Represents a period of time as a non-negative integer. *)
 type period = t
 
 include Compare.S with type t := t
@@ -36,19 +36,27 @@ val rpc_arg : period RPC_arg.t
 
 val pp : Format.formatter -> period -> unit
 
+(** Returns the number of seconds contained in the period. *)
 val to_seconds : period -> int64
 
-(** [of_second period] fails if period is not positive *)
+(** Converts a number of seconds to a [period].
+
+    [of_second s] fails if [s] is not positive. *)
 val of_seconds : int64 -> period tzresult
 
-(** [of_second period] fails if period is not positive.
+(** Converts a number of seconds to [period].
+
+   [of_second s] fails if [s] is not positive.
     It should only be used at toplevel for constants. *)
 val of_seconds_exn : int64 -> period
 
+(** Safe addition of periods, guarded against overflow. *)
 val add : period -> period -> period tzresult
 
+(** Alias for [add]. *)
 val ( +? ) : period -> period -> period tzresult
 
+(** Safe multiplication by a positive integer. Guarded against overflow. *)
 val mult : int32 -> period -> period tzresult
 
 val zero : period

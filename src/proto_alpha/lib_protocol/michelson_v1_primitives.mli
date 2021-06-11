@@ -33,6 +33,11 @@ type error +=
       Invalid_primitive_name of
       string Micheline.canonical * Micheline.canonical_location
 
+(** Types of nodes in Michelson's AST. They fall into 4 categories:
+    - types (prefixed with [T_]);
+    - constants (prefixed with [D_]);
+    - instructions (prefixed with [I_]);
+    - keywords (prefixed with [K_]). *)
 type prim =
   | K_parameter
   | K_storage

@@ -24,4 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A specialized Blake2B implementation for hashing contract identifiers. *)
+
 include S.HASH

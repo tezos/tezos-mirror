@@ -23,6 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines identifiers for two basic types of contracts. It also
+    specifies how to compute originated contract's hash from origination
+    nonce. *)
+
+(** A contract is simply an account on the blockchain ledger. There are two
+    types of contracts:
+    - implicit contracts represent accounts of users of the blockchain;
+    - originated are special accounts with a Michelson script attached to
+    them. Every time a transaction is sent to an originated account, its
+    associated script is run in order to trigger some action in response.
+
+    An implicit account is identified by the hash of the public key which was
+    used to create it. The owner of the corresponding private key is the
+    holder of the account. An originated contract's hash is derived from its
+    origination nonce (see below). *)
 type t = private
   | Implicit of Signature.Public_key_hash.t
   | Originated of Contract_hash.t
