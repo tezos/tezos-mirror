@@ -580,15 +580,6 @@ module RPC = struct
           ~output:run_code_output_encoding
           RPC_path.(path / "run_code")
 
-      let run_code_normalized =
-        RPC_service.post_service
-          ~description:
-            "Deprecated alias of the .../helpers/scripts/run_code RPC"
-          ~query:RPC_query.empty
-          ~input:run_code_input_encoding
-          ~output:run_code_output_encoding
-          RPC_path.(path / "run_code" / "normalized")
-
       let trace_code =
         RPC_service.post_service
           ~description:
@@ -597,15 +588,6 @@ module RPC = struct
           ~input:trace_code_input_encoding
           ~output:trace_code_output_encoding
           RPC_path.(path / "trace_code")
-
-      let trace_code_normalized =
-        RPC_service.post_service
-          ~description:
-            "Deprecated alias of the .../helpers/scripts/trace_code RPC"
-          ~query:RPC_query.empty
-          ~input:trace_code_input_encoding
-          ~output:trace_code_output_encoding
-          RPC_path.(path / "trace_code" / "normalized")
 
       let run_view =
         RPC_service.post_service
