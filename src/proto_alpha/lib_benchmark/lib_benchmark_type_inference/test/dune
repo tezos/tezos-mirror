@@ -7,4 +7,3 @@
             tezos-error-monad tezos-client-alpha)
  (flags
     (:standard -open Tezos_micheline)))
-
