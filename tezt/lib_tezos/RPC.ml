@@ -172,6 +172,10 @@ module Big_maps = struct
     Client.rpc ?endpoint ?hooks ~query_string GET path client
 end
 
+let get_ddb ?endpoint ?hooks ?(chain = "main") client =
+  let path = ["workers"; "chain_validators"; chain; "ddb"] in
+  Client.rpc ?endpoint ?hooks GET path client
+
 module Contracts = struct
   let spawn_get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client
       =

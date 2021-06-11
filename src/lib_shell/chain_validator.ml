@@ -388,8 +388,10 @@ let may_flush_or_update_prevalidator nv ~prev ~block =
       if Compare.Int.(prev_proto_level < new_proto_level) then
         (* TODO inject in the new prevalidator the operation
            from the previous one. *)
-        let parameters = Prevalidator.parameters old_prevalidator in
-        instantiate_prevalidator nv block parameters >>= fun () ->
+        let Prevalidator.{limits; chain_db} =
+          Prevalidator.parameters old_prevalidator
+        in
+        instantiate_prevalidator nv block (limits, chain_db) >>= fun () ->
         Prevalidator.shutdown old_prevalidator >>= fun () -> return_unit
       else
         Store.Chain.live_blocks nv.parameters.chain_store

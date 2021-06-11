@@ -28,7 +28,7 @@
 open Validation_errors
 
 module type T = sig
-  module Proto : Registered_protocol.T
+  module Proto : Tezos_protocol_environment.PROTOCOL
 
   type t
 
@@ -60,7 +60,6 @@ module type T = sig
     | Branch_delayed of error list
     | Branch_refused of error list
     | Refused of error list
-    | Duplicate
     | Outdated
 
   val apply_operation : t -> operation -> result Lwt.t
@@ -78,8 +77,8 @@ module type T = sig
   val pp_result : Format.formatter -> result -> unit
 end
 
-module Make (Proto : Registered_protocol.T) : T with module Proto = Proto =
-struct
+module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
+  T with module Proto = Proto = struct
   module Proto = Proto
 
   type operation = {
@@ -100,7 +99,6 @@ struct
     | Branch_delayed of error list
     | Branch_refused of error list
     | Refused of error list
-    | Duplicate
     | Outdated
 
   let parse (raw : Operation.t) =
@@ -231,7 +229,6 @@ struct
     | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_error err
     | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_error err
     | Refused err -> fprintf ppf "refused (%a)" pp_print_error err
-    | Duplicate -> pp_print_string ppf "duplicate"
     | Outdated -> pp_print_string ppf "outdated"
 end
 
@@ -272,7 +269,7 @@ let preapply chain_store ~user_activated_upgrades
           Operation_hash.Map.add op.hash (op.raw, errors) preapp.refused
         in
         Lwt.return ({preapp with refused}, t)
-    | Duplicate | Outdated -> Lwt.return (preapp, t)
+    | Outdated -> Lwt.return (preapp, t)
   in
   Store.Chain.compute_live_blocks chain_store ~block:predecessor
   >>=? fun (live_blocks, live_operations) ->

@@ -204,6 +204,14 @@ val get_levels_in_current_cycle :
   Client.t ->
   JSON.t Lwt.t
 
+(** Call RPC /workers/chain_validators/[chain]/ddb *)
+val get_ddb :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  Client.t ->
+  JSON.t Lwt.t
+
 module Big_maps : sig
   (** Call RPC /chain/[chain]/blocks/[block]/context/big_maps/[id]/[key_hash] *)
   val get :

@@ -502,6 +502,181 @@ let run_batched_operation =
     number_of_transactions ;
   unit
 
+let get_endorsement_hash ops =
+  let open JSON in
+  let ops_list = as_list (ops |-> "applied") in
+  match ops_list with
+  | [op] -> op |-> "hash" |> as_string
+  | _ -> Test.fail "Only one operation must be applied"
+
+let check_if_op_is_branch_refused ops oph =
+  let open JSON in
+  let ops_list = as_list (ops |-> "branch_refused") in
+  match ops_list with
+  | [br] -> (
+      match as_list br with
+      | br_oph :: _ ->
+          let br_oph = as_string br_oph in
+          let res = br_oph = oph in
+          if not res then
+            Test.fail "Found %s in branch_refused instead of %s" br_oph oph
+      | [] ->
+          (* Can't happen *)
+          assert false)
+  | _ -> Test.fail "Only one operation must be branch_refused1"
+
+(* This test checks that branch_refused endorsement are still propagated
+
+   Scenario:
+
+   1. 3 Nodes are chained connected and activate a protocol
+
+   2. Disconnect node_1 from node_2 and bake on both node.
+
+   3. Reconnect node_1 and node_2
+
+   4. Endorse on node_1
+
+   5. Check that endorsement is applied on node_1 and refused on node_2 and node_3
+*)
+let endorsement_flushed_branch_refused =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Ensure that branch_refused endorsement are transmited"
+    ~tags:["endorsement"; "mempool"; "branch_refused"]
+  @@ fun protocol ->
+  (* Step 1 *)
+  (* 3 Nodes are started and we activate the protocol and wait the nodes to be synced *)
+  let* node_1 = Node.init [Bootstrap_threshold 0; Private_mode]
+  and* node_2 = Node.init [Bootstrap_threshold 0; Private_mode]
+  and* node_3 = Node.init [Bootstrap_threshold 0; Private_mode] in
+  let* client_1 = Client.init ~endpoint:(Node node_1) ()
+  and* client_2 = Client.init ~endpoint:(Node node_2) ()
+  and* client_3 = Client.init ~endpoint:(Node node_3) () in
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2
+  and* () = Client.Admin.trust_address client_2 ~peer:node_1
+  and* () = Client.Admin.trust_address client_2 ~peer:node_3
+  and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_2
+  and* () = Client.Admin.connect_address client_2 ~peer:node_3 in
+  let* () = Client.activate_protocol ~protocol client_1 in
+  Log.info "Activated protocol." ;
+  let* _ = Node.wait_for_level node_1 1
+  and* _ = Node.wait_for_level node_2 1
+  and* _ = Node.wait_for_level node_3 1 in
+  Log.info "All nodes are at level %d." 1 ;
+  (* Step 2 *)
+  (* Disconnect node_1 and node_2 and bake on both node. This will force different branches *)
+  let* node_2_id = Node.wait_for_identity node_2
+  and* node_1_id = Node.wait_for_identity node_1 in
+  let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id
+  and* () = Client.Admin.kick_peer client_2 ~peer:node_1_id in
+  let bake_waiter_1 = wait_for_flush node_1
+  and bake_waiter_2 = wait_for_flush node_2 in
+  let* () = Client.bake_for client_1
+  and* () = Client.bake_for ~key:Constant.bootstrap3.identity client_2 in
+  let* () = bake_waiter_1 and* () = bake_waiter_2 in
+  (* Step3 *)
+  (* Reconnect node_1 and node_2 *)
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2
+  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
+  (* Step 4 *)
+  (* Endorse on node_1 *)
+  let endorser_waiter = wait_for_injection node_1 in
+  let* () = Client.endorse_for client_1 in
+  let* () = endorser_waiter in
+  Log.info "Endorsement on node_1 done" ;
+  (* Step 5 *)
+  (* Check that endorsement is applied on node_1 and refused on node_2 and node_3 *)
+  let* pending_op_1 = RPC.get_mempool_pending_operations client_1 in
+  let oph = get_endorsement_hash pending_op_1 in
+  Log.info "Endorsement found in node_1 applied mempool" ;
+  let* pending_op_2 = RPC.get_mempool_pending_operations client_2 in
+  let () = check_if_op_is_branch_refused pending_op_2 oph in
+  Log.info "Endorsement found in branch_refused of node_2 mempool" ;
+  (* The only way node_3 gets the endorsement is that node_2 has
+     propagated the operation. *)
+  let* pending_op_3 = RPC.get_mempool_pending_operations client_3 in
+  let () = check_if_op_is_branch_refused pending_op_3 oph in
+  Log.info "Endorsement found in branch_refused of node_3 mempool" ;
+  unit
+
+let check_empty_operation__ddb ddb =
+  let open JSON in
+  let op_db_length = as_int (ddb |-> "operation_db" |-> "table_length") in
+  if op_db_length > 0 then
+    Test.fail
+      "Operation Ddb should be empty, contains : %d elements"
+      op_db_length
+
+(* This test checks that pre-filtered operations are cleaned from the ddb
+
+   Scenario:
+
+   1. 3 Nodes are chained connected and activate a protocol
+
+   2. Get the counter and the current branch
+
+   3. Forge operation, inject it and check injection on node_1
+      This operation is pre-filtered on node_2
+
+   4. Bake 1 block
+
+   5. Get client_2 ddb and check that it contains no operation
+*)
+let forge_pre_filtered_operation =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Forge pre-filtered operation and check mempool"
+    ~tags:["forge"; "mempool"; "pre_filtered"]
+  @@ fun protocol ->
+  (* Step 1 *)
+  (* Two Nodes are started and we activate the protocol and wait the nodes to be synced *)
+  let* node_1 = Node.init [Bootstrap_threshold 0; Private_mode]
+  and* node_2 = Node.init [Bootstrap_threshold 0; Private_mode] in
+  let* client_1 = Client.init ~endpoint:(Node node_1) ()
+  and* client_2 = Client.init ~endpoint:(Node node_2) () in
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2
+  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
+  let* () = Client.activate_protocol ~protocol client_1 in
+  Log.info "Activated protocol." ;
+  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  Log.info "All nodes are at level %d." 1 ;
+  (* Step 2 *)
+  (* Get the counter and the current branch *)
+  let* base_counter =
+    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+  in
+  let counter = JSON.as_int base_counter in
+  let* branch = RPC.get_branch client_1 in
+  (* Step 3 *)
+  (* Forge operation, inject it and check injection *)
+  let* _op =
+    forge_and_inject_operation
+      ~branch:(JSON.as_string branch)
+      ~fee:1
+      ~gas_limit:1040000
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap2.identity
+      ~counter:(counter + 1)
+      ~signer:Constant.bootstrap1
+      ~client:client_1
+  in
+  Log.info "Op forged and injected" ;
+  (* Step 4 *)
+  (* Bake 1 block *)
+  let* () = Client.bake_for client_2 in
+  (* Step 5 *)
+  (* Get client_2 ddb and check that it contains no operation *)
+  let* ddb2 = RPC.get_ddb client_2 in
+  check_empty_operation__ddb ddb2 ;
+  Log.info "Operation Ddb of client_2 does not contain any operation" ;
+  unit
+
 let register ~protocols =
   flush_mempool ~protocols ;
-  run_batched_operation ~protocols
+  run_batched_operation ~protocols ;
+  endorsement_flushed_branch_refused ~protocols ;
+  forge_pre_filtered_operation ~protocols
