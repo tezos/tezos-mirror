@@ -218,7 +218,7 @@ publish:documentation-stable:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__latest_release
+    - .rules_template__latest_release_doc
   stage: doc
   before_script:
     - sudo apk add --no-cache openssh-client rsync
