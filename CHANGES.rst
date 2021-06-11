@@ -20,8 +20,37 @@ be documented here either.
 Node
 ----
 
+Client
+------
+
+Baker / Endorser / Accuser
+--------------------------
+
+Proxy server
+------------
+
+Protocol Compiler And Environment
+---------------------------------
+
+-  Added a new version of the protocol environment (V3).
+
+Codec
+-----
+
+Docker Images
+-------------
+
+Miscellaneous
+-------------
+
+Version 10.0~rc1 (Not Available Yet)
+====================================
+
+Node
+----
+
 -  Replaced the chain storage layer with a more efficient backend in
-   both terms of performance and storage size.
+   terms of both performance and storage size.
 
 -  Added an upgrade procedure to upgrade from the previous store to the
    new one. The procedure is implemented through the
@@ -68,6 +97,11 @@ Node
    for instance, to compute rewards payouts. The default number of extra
    preserved cycles is 5 (``5 + 5`` on mainnet).
 
+-  Updated the semantics of the history mode configuration parameter/option
+   of the node in full and rolling modes. If the number of additional cycles
+   is not explicitly specified, the default value is used. The default
+   number of additional cycles to keep is set to 5.
+
 -  Improved the shutdown procedure for external validator process.
 
 -  Added command ``replay`` which takes a list of block levels, hashes
@@ -88,10 +122,29 @@ Node
 -  Fixed a bug that caused the lack of connection in private network
    with ``--connections`` set to 1.
 
-- Updated the behaviour of the ``TEZOS_STORAGE`` environment variable
-  which aims to display the logs of the Irmin's context backend. It
-  now allows to display ``Info`` logs using the ``v`` value. ``Debug``
-  logs are now available through ``vv``.
+-  Fixed a potential interleaving of distinct events written to a file
+   descriptor sink simultaneously.
+
+-  Introduced Access Control Lists for RPC servers, which allow to
+   restrict access to selected RPC endpoints for different listening
+   addresses.
+
+-  You can now control the verbosity of the logs of the context
+   storage backend using the ``TEZOS_CONTEXT`` environment
+   variable. Set it to ``v`` to display log messages with level "info"
+   or to ``vv`` to also display log messages with level "debug".
+
+-  The ``TEZOS_STORAGE`` variable now has no effect. Use
+   ``TEZOS_CONTEXT`` instead (see previous item).
+
+-  Added an RPC to run `TZIP-4
+   views<https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`__
+   offchain, accessible via ``../<block_id>/helpers/scripts/run_view``.
+
+-  Updated the output of the ``/stats/gc`` RPC entry point: it now also
+   reports the number of full major collections made by the OCaml
+   garbage collector. Because this changes the JSON schema of this
+   existing RPC entry point, it is a breaking change.
 
 Client
 ------
@@ -102,15 +155,28 @@ Client
    considered final with quasi-certainty if there are at least 5 blocks
    built on top of it. See Emmy\* TZIP for more detailed explanations.
 
-- Added ``--mode light`` which makes the client execute some RPCs
-  locally (to lower the load of nodes and to avoid having to trust
-  the nodes). This mode is akin to light clients and SPV clients:
-  it uses Merkle proofs to make the light mode super safe.
+-  Added ``--mode light`` which makes the client execute some RPCs
+   locally (to lower the load of nodes and to avoid having to trust
+   the nodes). This mode is akin to light clients and SPV clients:
+   it uses Merkle proofs to make the light mode super safe.
 
--  Added commands to display the hash of Michelson script from files and
+-  Added commands to display the hash of Michelson scripts from files and
    from addresses.
 
 -  Added support for a new generic version of the multisig contract.
+
+-  Added a new flag, ``--simulation``, which simulates operations instead of preapplying them.
+
+-  ``hash data`` command now supports the optional ``--for-script [TSV|CSV]``.
+
+-  Renamed ``--block`` option of ``sign message`` command to ``--branch``.
+
+-  Commands using an encrypted key now fail after the user fails to give the correct
+   password three times.
+
+-  Added support for FA1.2 standard, allowing to interact with fungible
+   assets contracts using the ``from fa1.2 contract ...`` commands, and
+   support for running the view entrypoints offchain.
 
 Baker / Endorser / Accuser
 --------------------------
@@ -118,17 +184,39 @@ Baker / Endorser / Accuser
 -  Optimized the performance of the baker to reduce the number of RPC
    calls to the node while waiting for endorsements.
 
-Protocol Compiler And Environment
----------------------------------
+Proxy server
+------------
 
-Codec
------
+-  Added a new binary: ``tezos-proxy-server``, a read-only frontend to a node.
+   It is designed to lower the load of nodes, by being capable
+   of serving `protocol RPCs <https://tezos.gitlab.io/alpha/rpc.html>`__.
+   An instance of a proxy server is protocol-specific: it automatically picks
+   up the protocol from the backing node when it starts. Proxy servers
+   can be started and destroyed at will, making them easy to deploy.
 
-Docker Images
--------------
+   Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
+   for further details.
 
-Miscellaneous
--------------
+Version 9.3
+===========
+
+-  Reintroduced the following RPCs in the Granada RPC plugin. These
+   RPCs were already present in the Edo and Florence protocol plugin
+   and are deprecated, they will be removed in the successor protocol
+   of Granada.
+
+   - ``../<block_id>/helpers/scripts/run_code/normalized``
+     (deprecated alias of ``../<block_id>/helpers/scripts/run_code``)
+   - ``../<block_id>/helpers/scripts/trace_code/normalized``
+     (deprecated alias of ``../<block_id>/helpers/scripts/trace_code``)
+
+-  Increased the LMDB store mapsize limit to avoid ``MDB_MAP_FULL`` failures.
+
+-  Fixed a case where the node was unable to fetch an operation because
+   a remote peer did not answer.
+
+-  Fixed various issues with the TLS layer that could in particular
+   cause some valid certificates to be refused from remote nodes.
 
 Version 9.2
 ===========
@@ -137,14 +225,14 @@ Node
 ----
 
 -  Added Granada, a protocol proposal for Mainnet featuring, among others,
-   the Emmy* consensus algorithm, Liquidity Baking, and reduced gas costs.
+   the Emmy* consensus algorithm, Liquidity Baking, and reduced gas consumption.
 
 -  Added the configuration for Granadanet, a test network for Granada,
    as a built-in network alias (``--network granadanet``).
 
 -  Updated the mempool to keep more than 50 non-included operations
-   when receiving a new block. This should result is fewer endorsements
-   being missed in particular.
+   when receiving a new block. In particular, this should result in
+   fewer endorsements being missed.
 
 Docker Images
 -------------
