@@ -43,6 +43,10 @@ module Term = struct
   open Cmdliner
   open Node_shared_arg.Term
 
+  let ( let+ ) t f = Term.(const f $ t)
+
+  let ( and+ ) a b = Term.(const (fun x y -> (x, y)) $ a $ b)
+
   type subcommand =
     | Stat_index
     | Stat_pack
@@ -104,10 +108,10 @@ module Term = struct
     | false -> return_unit
     | true -> fail (Existing_index_dir index_dir)
 
-  let reconstruct_index config_file data_dir output =
+  let reconstruct_index config_file data_dir output index_log_size =
     root config_file data_dir >>=? fun root ->
     index_dir_exists root output >>=? fun () ->
-    Context.Checks.Pack.Reconstruct_index.run ~root ~output () ;
+    Context.Checks.Pack.Reconstruct_index.run ~root ~output ?index_log_size () ;
     return_unit
 
   let to_context_hash chain_store (hash : Block_hash.t) =
@@ -145,13 +149,14 @@ module Term = struct
     >>= fun () -> return_unit
 
   let dispatch_subcommand subcommand config_file data_dir auto_repair dest head
-      =
+      log_size =
     let run =
       match subcommand with
       | Stat_index -> stat_index config_file data_dir
       | Stat_pack -> stat_pack config_file data_dir
       | Integrity_check -> integrity_check config_file data_dir auto_repair
-      | Reconstruct_index -> reconstruct_index config_file data_dir dest
+      | Reconstruct_index ->
+          reconstruct_index config_file data_dir dest log_size
       | Integrity_check_inodes ->
           integrity_check_inodes config_file data_dir head
     in
@@ -201,6 +206,18 @@ module Term = struct
            ~docv:"DEST"
            ["output"; "o"]
 
+  let index_log_size =
+    let open Cmdliner.Arg in
+    value
+    & opt (some int) None
+      @@ info
+           ~doc:
+             "Size of the index write-ahead log; option for reconstruct-index. \
+              Increasing the log size will reduce the total time necessary to \
+              reconstruct the index, at the cost of increased memory usage."
+           ~docv:"ENTRIES"
+           ["index-log-size"]
+
   let head =
     let open Cmdliner.Arg in
     value
@@ -210,11 +227,31 @@ module Term = struct
            ~docv:"HEAD"
            ["head"; "h"]
 
+  let setup_logs =
+    let+ style_renderer = Fmt_cli.style_renderer ()
+    and+ level =
+      let+ vopts =
+        let doc =
+          "Increase verbosity. Repeatable, but more than twice does not bring \
+           more."
+        in
+        Arg.(value & flag_all & info ["v"; "verbose"] ~doc)
+      in
+      match List.length vopts with
+      | 0 -> Some Logs.Error
+      | 1 -> Some Logs.Info
+      | _ -> Some Logs.Debug
+    in
+    Fmt_tty.setup_std_outputs ?style_renderer () ;
+    Logs.set_level level ;
+    Logs.set_reporter (Logs_fmt.reporter ())
+
   let term =
     Term.(
       ret
-        (const dispatch_subcommand $ subcommand_arg $ config_file $ data_dir
-       $ auto_repair $ dest $ head))
+        (const (fun () -> dispatch_subcommand)
+        $ setup_logs $ subcommand_arg $ config_file $ data_dir $ auto_repair
+        $ dest $ head $ index_log_size))
 end
 
 module Manpage = struct
