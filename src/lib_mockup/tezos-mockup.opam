@@ -18,6 +18,9 @@ depends: [
   "tezos-mockup-registration"
   "tezos-mockup-registration" { with-test }
   "tezos-test-services" { with-test }
+  "qcheck-alcotest" { with-test }
+  "alcotest-lwt" { with-test }
+  "tezos-test-helpers" { with-test }
   "resto-cohttp-self-serving-client" { >= "0.6" & < "0.7" }
 ]
 build: [

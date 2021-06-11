@@ -8,7 +8,8 @@
    tezos_mockup_registration
    tezos-client-base
    tezos-test-services
-   crowbar alcotest
+   qcheck-alcotest
+   tezos-test-helpers
    alcotest-lwt)
  (flags
   (:standard -open Tezos_base__TzPervasives)))
