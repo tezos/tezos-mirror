@@ -560,8 +560,8 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
               ~prev_proto_level:(Some block_proto_level)
               ~level:(Int32.succ level)
               acc
-        | Some ppl ->
-            if ppl <> block_proto_level then
+        | Some previous_proto_level ->
+            if Compare.Int.(previous_proto_level <> block_proto_level) then
               Context.checkout context_index (Block_repr.context block)
               >>= function
               | None ->
@@ -584,12 +584,12 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
                    | Error _ -> Lwt.return_none)
                   >>= fun commit_info ->
                   let activation =
-                    ({
-                       block = (Block_repr.hash block, Block_repr.level block);
-                       protocol = protocol_hash;
-                       commit_info;
-                     }
-                      : Store_types.Protocol_levels.activation_block)
+                    {
+                      Protocol_levels.block =
+                        (Block_repr.hash block, Block_repr.level block);
+                      protocol = protocol_hash;
+                      commit_info;
+                    }
                   in
                   aux
                     ~prev_proto_level:(Some block_proto_level)
@@ -626,7 +626,8 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
               (Some block_proto_level)
               (activations @ protocols)
               higher_cycles
-        | Some ppl when ppl <> block_proto_level ->
+        | Some previous_proto_level
+          when Compare.Int.(previous_proto_level <> block_proto_level) ->
             (* At least one protocol transition occurs in this cycle *)
             cycle_search
               (Block_store.cemented_block_store block_store)
@@ -658,42 +659,43 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
   let floating_stores = Block_store.floating_block_stores block_store in
   ( List.map_es
       (Floating_block_store.fold_left_s
-         (fun (pls, prev_protocol_level) block ->
-           match prev_protocol_level with
-           | Some l when Block_repr.proto_level block <> l ->
+         (fun (pls, previous_protocol_level) block ->
+           match previous_protocol_level with
+           | Some previous_proto_level ->
                let new_proto_level = Block_repr.proto_level block in
-               (Context.checkout context_index (Block_repr.context block)
-                >>= function
-                | None ->
-                    (* If the context associated to an activation
-                       block is not available, then we cannot infer
-                       the protocol table. It may be the case after
-                       importing a snapshot. *)
-                    fail
-                      (Corrupted_store
-                         "failed to restore the protocol levels: not enough \
-                          data.")
-                | Some context -> return context)
-               >>=? fun context ->
-               Context.get_protocol context >>= fun protocol_hash ->
-               (Context.retrieve_commit_info
-                  context_index
-                  (Block_repr.header block)
-                >>= function
-                | Ok tup ->
-                    Lwt.return_some (Protocol_levels.commit_info_of_tuple tup)
-                | Error _ -> Lwt.return_none)
-               >>= fun commit_info ->
-               let activation =
-                 ({
-                    block = (Block_repr.hash block, Block_repr.level block);
-                    protocol = protocol_hash;
-                    commit_info;
-                  }
-                   : Store_types.Protocol_levels.activation_block)
-               in
-               return (activation :: pls, Some new_proto_level)
-           | Some _ -> return (pls, prev_protocol_level)
+               if Compare.Int.(new_proto_level <> previous_proto_level) then
+                 (Context.checkout context_index (Block_repr.context block)
+                  >>= function
+                  | None ->
+                      (* If the context associated to an activation
+                         block is not available, then we cannot infer
+                         the protocol table. It may be the case after
+                         importing a snapshot. *)
+                      fail
+                        (Corrupted_store
+                           "failed to restore the protocol levels: not enough \
+                            data.")
+                  | Some context -> return context)
+                 >>=? fun context ->
+                 Context.get_protocol context >>= fun protocol_hash ->
+                 (Context.retrieve_commit_info
+                    context_index
+                    (Block_repr.header block)
+                  >>= function
+                  | Ok tup ->
+                      Lwt.return_some (Protocol_levels.commit_info_of_tuple tup)
+                  | Error _ -> Lwt.return_none)
+                 >>= fun commit_info ->
+                 let activation =
+                   {
+                     Protocol_levels.block =
+                       (Block_repr.hash block, Block_repr.level block);
+                     protocol = protocol_hash;
+                     commit_info;
+                   }
+                 in
+                 return (activation :: pls, Some new_proto_level)
+               else return (pls, previous_protocol_level)
            | None -> return (pls, Some (Block_repr.proto_level block)))
          ([], Some highest_cemented_proto_level))
       floating_stores
@@ -709,12 +711,12 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
    | Error _ -> Lwt.return_none)
   >>= fun genesis_commit_info ->
   let genesis_protocol_level =
-    ({
-       block = (Block_header.hash genesis_header, genesis_header.shell.level);
-       protocol;
-       commit_info = genesis_commit_info;
-     }
-      : Store_types.Protocol_levels.activation_block)
+    {
+      Protocol_levels.block =
+        (Block_header.hash genesis_header, genesis_header.shell.level);
+      protocol;
+      commit_info = genesis_commit_info;
+    }
   in
   let protocol_levels =
     genesis_protocol_level
