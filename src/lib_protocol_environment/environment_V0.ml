@@ -725,7 +725,7 @@ struct
     let del = remove
   end
 
-  module Lift (P : Updater.PROTOCOL) = struct
+  module LiftV0 (P : Updater.PROTOCOL) = struct
     include P
 
     let begin_partial_application ~chain_id ~ancestor_context
@@ -770,6 +770,10 @@ struct
     let finalize_block c = finalize_block c >|= wrap_error
 
     let init c bh = init c bh >|= wrap_error
+  end
+
+  module Lift (P : Updater.PROTOCOL) = struct
+    include Environment_protocol_T.V0toV3 (LiftV0 (P))
 
     let environment_version = Protocol.V0
   end
