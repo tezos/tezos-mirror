@@ -1003,9 +1003,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           on_advertise pv ;
           (* TODO: rebase the advertisement instead *)
           let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
-          Store.Block.read_block chain_store hash >>=? fun block ->
-          on_flush w pv block live_blocks live_operations >>=? fun () ->
-          return (() : r)
+          Store.Block.read_block chain_store hash
+          >>=? fun block : r tzresult Lwt.t ->
+          on_flush w pv block live_blocks live_operations
       | Request.Notify (peer, mempool) ->
           on_notify w pv peer mempool ;
           return_unit
