@@ -4,6 +4,7 @@
 
 (executables
  (names main_proxy_server)
+ (instrumentation (backend bisect_ppx))
  (public_names tezos-proxy-server)
  (package tezos-proxy-server)
  (libraries tezos-base

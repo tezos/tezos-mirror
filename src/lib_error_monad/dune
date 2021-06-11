@@ -1,5 +1,6 @@
 (library
  (name tezos_error_monad)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-error-monad)
  (flags (:standard -open Tezos_stdlib
                    -open Data_encoding

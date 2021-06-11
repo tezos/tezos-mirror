@@ -1,5 +1,6 @@
 (library
  (name tezos_009_PsFLoren_test_helpers)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-009-PsFLoren-test-helpers)
  (libraries alcotest-lwt
             tezos-base

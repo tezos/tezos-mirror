@@ -1,5 +1,6 @@
 (executables
  (names main_snoop)
+ (instrumentation (backend bisect_ppx))
  (public_names tezos-snoop)
  (package tezos-snoop)
  (libraries tezos-base

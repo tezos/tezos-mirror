@@ -286,6 +286,7 @@ include Tezos_raw_protocol_008_PtEdo2Zk.Main
 
 (library
  (name tezos_protocol_environment_008_PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-008-PtEdo2Zk.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -293,6 +294,7 @@ include Tezos_raw_protocol_008_PtEdo2Zk.Main
 
 (library
  (name tezos_raw_protocol_008_PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-008-PtEdo2Zk.raw)
  (libraries tezos_protocol_environment_008_PtEdo2Zk)
  (library_flags (:standard -linkall))
@@ -387,6 +389,7 @@ include Tezos_raw_protocol_008_PtEdo2Zk.Main
 
 (library
  (name tezos_protocol_008_PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-008-PtEdo2Zk)
  (libraries
       tezos-protocol-environment
@@ -399,6 +402,7 @@ include Tezos_raw_protocol_008_PtEdo2Zk.Main
 
 (library
  (name tezos_protocol_008_PtEdo2Zk_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-008-PtEdo2Zk)
  (libraries
       tezos-protocol-environment
@@ -411,6 +415,7 @@ include Tezos_raw_protocol_008_PtEdo2Zk.Main
 
 (library
  (name tezos_embedded_protocol_008_PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-008-PtEdo2Zk)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-008-PtEdo2Zk

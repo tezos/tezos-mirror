@@ -1,5 +1,6 @@
 (executable
  (name main_endorser_008_PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-endorser-008-PtEdo2Zk)
  (libraries tezos-client-base-unix
             tezos-client-commands

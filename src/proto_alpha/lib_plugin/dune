@@ -1,5 +1,6 @@
 (library
  (name tezos_protocol_plugin_alpha)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-alpha)
  (libraries tezos-base
             tezos-protocol-alpha)
@@ -9,6 +10,7 @@
 
 (library
  (name tezos_protocol_plugin_alpha_registerer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-alpha-registerer)
  (libraries tezos-base
             tezos-embedded-protocol-alpha

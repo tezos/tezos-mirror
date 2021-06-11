@@ -1,5 +1,6 @@
 (library
  (name tezos_protocol_plugin_008_PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-008-PtEdo2Zk)
  (libraries tezos-base
             tezos-protocol-008-PtEdo2Zk)
@@ -9,6 +10,7 @@
 
 (library
  (name tezos_protocol_plugin_008_PtEdo2Zk_registerer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-008-PtEdo2Zk-registerer)
  (libraries tezos-base
             tezos-embedded-protocol-008-PtEdo2Zk

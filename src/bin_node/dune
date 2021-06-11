@@ -9,6 +9,7 @@
 
 (executable
  (name main)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-node)
  (package tezos-node)
  (libraries tezos-base

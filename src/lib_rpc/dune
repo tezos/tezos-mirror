@@ -1,5 +1,6 @@
 (library
  (name tezos_rpc)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-rpc)
  (libraries data-encoding
             tezos-error-monad

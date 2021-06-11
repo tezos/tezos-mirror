@@ -1,5 +1,6 @@
 (executable
  (name main_baker_008_PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baker-008-PtEdo2Zk)
  (libraries tezos-client-base-unix
             tezos-client-commands

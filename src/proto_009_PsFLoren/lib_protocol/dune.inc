@@ -295,6 +295,7 @@ include Tezos_raw_protocol_009_PsFLoren.Main
 
 (library
  (name tezos_protocol_environment_009_PsFLoren)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-009-PsFLoren.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -302,6 +303,7 @@ include Tezos_raw_protocol_009_PsFLoren.Main
 
 (library
  (name tezos_raw_protocol_009_PsFLoren)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-009-PsFLoren.raw)
  (libraries tezos_protocol_environment_009_PsFLoren)
  (library_flags (:standard -linkall))
@@ -399,6 +401,7 @@ include Tezos_raw_protocol_009_PsFLoren.Main
 
 (library
  (name tezos_protocol_009_PsFLoren)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-009-PsFLoren)
  (libraries
       tezos-protocol-environment
@@ -411,6 +414,7 @@ include Tezos_raw_protocol_009_PsFLoren.Main
 
 (library
  (name tezos_protocol_009_PsFLoren_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-009-PsFLoren)
  (libraries
       tezos-protocol-environment
@@ -423,6 +427,7 @@ include Tezos_raw_protocol_009_PsFLoren.Main
 
 (library
  (name tezos_embedded_protocol_009_PsFLoren)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-009-PsFLoren)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-009-PsFLoren

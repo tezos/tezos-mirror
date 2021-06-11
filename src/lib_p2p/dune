@@ -1,5 +1,6 @@
 (library
  (name tezos_p2p)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-p2p)
  (libraries lwt-watcher
             lwt-canceler

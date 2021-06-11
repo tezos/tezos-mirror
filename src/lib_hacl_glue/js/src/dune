@@ -1,5 +1,6 @@
 (library
  (name tezos_hacl_glue_js)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-hacl-glue-js)
  (modules hacl)
  (implements tezos-hacl-glue)
@@ -8,6 +9,7 @@
 
 (library
  (name            hacl_star_raw_empty)
+ (instrumentation (backend bisect_ppx))
  (public_name     hacl-star-raw-empty)
  (modules)
  (foreign_stubs

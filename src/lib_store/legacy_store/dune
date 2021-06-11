@@ -1,5 +1,6 @@
 (library
  (name tezos_legacy_store)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-legacy-store)
  (libraries tezos-base
             tezos-shell-services

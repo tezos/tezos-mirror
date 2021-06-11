@@ -1,5 +1,6 @@
 (library
  (name tezos_benchmark_type_inference_alpha)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-benchmark-type-inference-alpha)
  (libraries
   tezos-stdlib

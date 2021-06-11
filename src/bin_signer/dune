@@ -1,5 +1,6 @@
 (executables
  (names main_signer)
+ (instrumentation (backend bisect_ppx))
  (public_names tezos-signer)
  (package tezos-signer)
  (libraries tezos-base

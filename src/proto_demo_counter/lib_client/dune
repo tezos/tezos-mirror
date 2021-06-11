@@ -1,5 +1,6 @@
 (library
  (name tezos_client_demo_counter)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-demo-counter)
  (libraries
             tezos-base

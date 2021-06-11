@@ -6,6 +6,7 @@
 
 (library
  (name tezos_base_unix)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-base.unix)
  (flags (:standard -open Tezos_error_monad
                    -open Tezos_crypto

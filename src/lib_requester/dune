@@ -1,5 +1,6 @@
 (library
  (name tezos_requester)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-requester)
  (libraries tezos-base
             tezos-stdlib-unix

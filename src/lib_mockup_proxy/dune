@@ -1,5 +1,6 @@
 (library
  (name tezos_mockup_proxy)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-mockup-proxy)
  (modules RPC_client)
  (libraries

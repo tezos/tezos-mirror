@@ -82,6 +82,7 @@ include Tezos_raw_protocol_demo_counter.Main
 
 (library
  (name tezos_protocol_environment_demo_counter)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-demo-counter.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -89,6 +90,7 @@ include Tezos_raw_protocol_demo_counter.Main
 
 (library
  (name tezos_raw_protocol_demo_counter)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-demo-counter.raw)
  (libraries tezos_protocol_environment_demo_counter)
  (library_flags (:standard -linkall))
@@ -116,6 +118,7 @@ include Tezos_raw_protocol_demo_counter.Main
 
 (library
  (name tezos_protocol_demo_counter)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-demo-counter)
  (libraries
       tezos-protocol-environment
@@ -128,6 +131,7 @@ include Tezos_raw_protocol_demo_counter.Main
 
 (library
  (name tezos_protocol_demo_counter_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-demo-counter)
  (libraries
       tezos-protocol-environment
@@ -140,6 +144,7 @@ include Tezos_raw_protocol_demo_counter.Main
 
 (library
  (name tezos_embedded_protocol_demo_counter)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-demo-counter)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-demo-counter

@@ -1,5 +1,6 @@
 (library
  (name tezos_alpha_test_helpers)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-alpha-test-helpers)
  (libraries alcotest-lwt
             tezos-base

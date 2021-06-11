@@ -1,3 +1,4 @@
 (library
  (name latex)
+ (instrumentation (backend bisect_ppx))
  (public_name latex))

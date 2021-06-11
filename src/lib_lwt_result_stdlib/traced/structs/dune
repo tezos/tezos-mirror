@@ -1,5 +1,6 @@
 (library
  (name traced_structs)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-lwt-result-stdlib.traced.structs)
  (libraries
    lwt

@@ -1,5 +1,6 @@
 (library
  (name tezos_baking_alpha)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-alpha)
  (libraries tezos-base
             tezos-version
@@ -37,6 +38,7 @@
 
 (library
  (name tezos_baking_alpha_commands)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-alpha-commands)
  (libraries tezos-base
             tezos-protocol-alpha
@@ -60,6 +62,7 @@
 
 (library
  (name tezos_baking_alpha_commands_registration)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-alpha-commands.registration)
  (libraries tezos-base
             tezos-protocol-alpha

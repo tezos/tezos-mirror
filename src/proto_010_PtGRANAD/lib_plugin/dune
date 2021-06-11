@@ -1,5 +1,6 @@
 (library
  (name tezos_protocol_plugin_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-010-PtGRANAD)
  (libraries tezos-base
             tezos-protocol-010-PtGRANAD)
@@ -9,6 +10,7 @@
 
 (library
  (name tezos_protocol_plugin_010_PtGRANAD_registerer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-010-PtGRANAD-registerer)
  (libraries tezos-base
             tezos-embedded-protocol-010-PtGRANAD

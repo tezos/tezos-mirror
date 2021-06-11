@@ -1,5 +1,6 @@
 (library
  (name tezos_client_sapling_009_PsFLoren)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-sapling-009-PsFLoren)
  (libraries tezos-base
             tezos-crypto

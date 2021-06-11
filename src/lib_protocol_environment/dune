@@ -1,5 +1,6 @@
 (library
  (name tezos_protocol_environment)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-environment)
  (libraries tezos-base
             tezos-sapling
@@ -28,6 +29,7 @@
 
 (library
  (name tezos_shell_context)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-shell-context)
  (libraries tezos-base
             tezos-protocol-environment

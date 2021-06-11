@@ -1,5 +1,6 @@
 (library
  (name tezos_crypto)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-crypto)
  (flags (:standard -open Tezos_stdlib
                    -open Data_encoding

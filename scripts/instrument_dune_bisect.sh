@@ -7,8 +7,8 @@ src_dir="$(dirname "$script_dir")"
 . "$script_dir"/version.sh
 
 readonly BISECT_FILE=$src_dir/$COVERAGE_OUTPUT/
-readonly DIRECTIVE_PREFIX="(preprocess (pps bisect_ppx"
-readonly LINE_TO_ADD="$DIRECTIVE_PREFIX -- --bisect-file $BISECT_FILE)) ; Added by $0"
+readonly DIRECTIVE_PREFIX=" (instrumentation (backend bisect_ppx"
+readonly LINE_TO_ADD="$DIRECTIVE_PREFIX))"
 
 usage () {
     cat >&2 <<EOF

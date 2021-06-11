@@ -1,5 +1,6 @@
 (library
  (name tezos_client_sapling_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-sapling-010-PtGRANAD)
  (libraries tezos-base
             tezos-crypto

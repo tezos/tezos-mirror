@@ -1,5 +1,6 @@
 (library
  (name tezos_mockup_registration)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-mockup-registration)
  (modules registration registration_intf mockup_args)
  (libraries
@@ -11,6 +12,7 @@
 
 (library
  (name tezos_mockup)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-mockup)
  (modules files local_services persistence persistence_intf RPC_client migration)
  (libraries
@@ -33,6 +35,7 @@
 
 (library
  (name tezos_mockup_commands)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-mockup-commands)
  (modules mockup_wallet mockup_commands)
  (libraries

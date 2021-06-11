@@ -1,5 +1,6 @@
 (library
  (name tezos_benchmark_examples)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-benchmark-examples)
  (libraries tezos-base
             tezos-stdlib-unix

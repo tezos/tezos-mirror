@@ -1,5 +1,6 @@
 (library
  (name tezos_proxy_server_config)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-proxy-server-config)
  (libraries tezos-base
             tezos-stdlib-unix)

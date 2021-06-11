@@ -1,5 +1,6 @@
 (library
  (name tezos_protocol_plugin_009_PsFLoren)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-009-PsFLoren)
  (libraries tezos-base
             tezos-protocol-009-PsFLoren)
@@ -9,6 +10,7 @@
 
 (library
  (name tezos_protocol_plugin_009_PsFLoren_registerer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-009-PsFLoren-registerer)
  (libraries tezos-base
             tezos-embedded-protocol-009-PsFLoren

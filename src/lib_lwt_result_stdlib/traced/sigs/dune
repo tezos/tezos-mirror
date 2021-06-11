@@ -1,5 +1,6 @@
 (library
  (name traced_sigs)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-lwt-result-stdlib.traced.sigs)
  (libraries
    lwt
