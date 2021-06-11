@@ -501,7 +501,8 @@ let fix_checkpoint chain_dir block_store head =
       >>=? function
       | Some block -> (
           if
-            (* The lowest block with metadata is never higher thant current head. *)
+            (* The lowest block with metadata is never higher than
+               current head. *)
             Block_repr.level block = Block_repr.level head
           then return head
           else
@@ -509,10 +510,18 @@ let fix_checkpoint chain_dir block_store head =
             | Some _metadata -> return block
             | None -> find_lbwm (Int32.succ block_level))
       | None ->
-          fail
-            (Corrupted_store
-               "No block with metadata found. At least the head must have \
-                metadata.")
+          (* If the head was reached and it has no metadata, the store
+             is broken *)
+          if block_level = Block_repr.level head then
+            fail
+              (Corrupted_store
+                 "No block with metadata found. At least the head must have \
+                  metadata")
+          else
+            (* Freshly imported rolling nodes may have deleted blocks
+               at a level higher that the lafl of the current
+               head. Continue. *)
+            find_lbwm (Int32.succ block_level)
     in
     find_lbwm head_lafl >>=? fun lbwm ->
     let checkpoint = (Block_repr.hash lbwm, Block_repr.level lbwm) in
@@ -584,12 +593,13 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
                    | Error _ -> Lwt.return_none)
                   >>= fun commit_info ->
                   let activation =
-                    {
-                      Protocol_levels.block =
-                        (Block_repr.hash block, Block_repr.level block);
-                      protocol = protocol_hash;
-                      commit_info;
-                    }
+                    ( block_proto_level,
+                      {
+                        Protocol_levels.block =
+                          (Block_repr.hash block, Block_repr.level block);
+                        protocol = protocol_hash;
+                        commit_info;
+                      } )
                   in
                   aux
                     ~prev_proto_level:(Some block_proto_level)
@@ -647,7 +657,7 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
   >>=? fun cemented_protocol_levels ->
   (match cemented_protocol_levels with
   | [] -> return 0
-  | {block = (_, block_level); _} :: _ ->
+  | (_, {block = (_, block_level); _}) :: _ ->
       Cemented_block_store.get_cemented_block_by_level
         ~read_metadata:false
         cemented_block_store
@@ -687,12 +697,13 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
                   | Error _ -> Lwt.return_none)
                  >>= fun commit_info ->
                  let activation =
-                   {
-                     Protocol_levels.block =
-                       (Block_repr.hash block, Block_repr.level block);
-                     protocol = protocol_hash;
-                     commit_info;
-                   }
+                   ( new_proto_level,
+                     {
+                       Protocol_levels.block =
+                         (Block_repr.hash block, Block_repr.level block);
+                       protocol = protocol_hash;
+                       commit_info;
+                     } )
                  in
                  return (activation :: pls, Some new_proto_level)
                else return (pls, previous_protocol_level)
@@ -711,12 +722,13 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
    | Error _ -> Lwt.return_none)
   >>= fun genesis_commit_info ->
   let genesis_protocol_level =
-    {
-      Protocol_levels.block =
-        (Block_header.hash genesis_header, genesis_header.shell.level);
-      protocol;
-      commit_info = genesis_commit_info;
-    }
+    ( 0,
+      {
+        Protocol_levels.block =
+          (Block_header.hash genesis_header, genesis_header.shell.level);
+        protocol;
+        commit_info = genesis_commit_info;
+      } )
   in
   let protocol_levels =
     genesis_protocol_level
@@ -732,16 +744,16 @@ let fix_chain_state chain_dir ~head ~cementing_highwatermark ~checkpoint
     ~savepoint ~caboose ~alternate_heads ~forked_chains ~protocol_levels
     ~genesis ~genesis_context =
   (* By setting each stored data, we erase the previous content. *)
-  let rec init_protocol_table proto_level protocol_table = function
+  let rec init_protocol_table protocol_table = function
     | [] -> protocol_table
-    | hd :: tl ->
+    | (proto_level, proto_hash) :: tl ->
         let new_protocol_table =
-          Protocol_levels.add proto_level hd protocol_table
+          Protocol_levels.add proto_level proto_hash protocol_table
         in
-        init_protocol_table (proto_level + 1) new_protocol_table tl
+        init_protocol_table new_protocol_table tl
   in
   let protocol_table =
-    init_protocol_table 0 Protocol_levels.empty protocol_levels
+    init_protocol_table Protocol_levels.empty protocol_levels
   in
   Stored_data.write_file (Naming.protocol_levels_file chain_dir) protocol_table
   >>=? fun () ->
