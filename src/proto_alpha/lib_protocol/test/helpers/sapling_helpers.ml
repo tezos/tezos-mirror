@@ -60,11 +60,10 @@ module Common = struct
   let randomized_byte ?pos v encoding =
     let bytes = Data_encoding.Binary.(to_bytes_exn encoding v) in
     let rec aux () =
-      let b = Random.bits () in
-      let random_pos = Random.int (Bytes.length bytes) in
-      let pos = Option.value ~default:random_pos pos in
-      if b = Bytes.get_int8 bytes pos then aux ()
-      else Bytes.set_int8 bytes pos b
+      let random_char = Random.int 256 |> char_of_int in
+      let pos = Option.value ~default:(Random.int (Bytes.length bytes)) pos in
+      if random_char = Bytes.get bytes pos then aux ()
+      else Bytes.set bytes pos random_char
     in
     aux () ;
     Data_encoding.Binary.(of_bytes_exn encoding bytes)
