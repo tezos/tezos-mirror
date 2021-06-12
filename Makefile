@@ -31,7 +31,7 @@ all: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
-	@dune build \
+	@dune build $(COVERAGE_OPTIONS) \
 		src/bin_node/main.exe \
 		src/bin_validation/main_validator.exe \
 		src/bin_client/main_client.exe \
@@ -119,12 +119,12 @@ build-test: build-sandbox
 
 .PHONY: test-protocol-compile
 test-protocol-compile:
-	@dune build @runtest_compile_protocol
-	@dune build @runtest_out_of_opam
+	@dune build $(COVERAGE_OPTIONS) @runtest_compile_protocol
+	@dune build $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
 .PHONY: test-unit
 test-unit:
-	@dune build @runtest
+	@dune build $(COVERAGE_OPTIONS) @runtest
 
 .PHONY: test-python
 test-python: all
@@ -136,13 +136,13 @@ test-flextesa:
 
 .PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
 test-tezt:
-	@dune exec tezt/tests/main.exe
+	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe
 test-tezt-i:
-	@dune exec tezt/tests/main.exe -- --info
+	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --info
 test-tezt-c:
-	@dune exec tezt/tests/main.exe -- --commands
+	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --commands
 test-tezt-v:
-	@dune exec tezt/tests/main.exe -- --verbose
+	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --verbose
 
 .PHONY: test-code
 test-code: test-protocol-compile test-unit test-flextesa test-python test-tezt
