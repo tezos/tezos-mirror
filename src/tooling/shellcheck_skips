@@ -20,7 +20,6 @@ scripts/install_build_deps.raw.sh
 scripts/install_build_deps.rust.sh
 scripts/install_build_deps.sh
 scripts/install_sapling_parameters.sh
-scripts/instrument_dune_bisect.sh
 scripts/link_protocol.sh
 scripts/opam-check.sh
 scripts/opam-pin.sh

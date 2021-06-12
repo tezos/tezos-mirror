@@ -8,21 +8,8 @@ test_coverage:
     - .rules_template__development_coverage
   stage: test_coverage
   variables:
-    # We exclude from coverage old protocols and code that can't be
-    # instrumented because of current limitations of bisect_ppx.
-    OLD_PROTOCOLS: "src/proto_000_Ps9mPmXa src/proto_001_PtCJ7pwo src/proto_002_PsYLVpVv src/proto_003_PsddFKi3 src/proto_004_Pt24m4xi src/proto_005_PsBABY5H src/proto_005_PsBabyM1 src/proto_006_PsCARTHA  src/proto_007_PsDELPH1"
-    NOT_INSTRUMENTABLE: ""
-    COVERAGE_EXCLUDE: "$OLD_PROTOCOLS $NOT_INSTRUMENTABLE"
     COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
   script:
-    # The next three lines are temporary. They replace bisect_ppx.2.5.0 with
-    # its development version (and hopefully could be removed when
-    # bisect_ppx is upgraded to a version > 2.5.0)
-    # See commit "CI: pin bisect_ppx to dev version to fix coverage"
-    # and `docs/developer/testing.rst`
-    - test $(opam show -f version bisect_ppx) = "2.5.0"
-    - opam repository add default https://opam.ocaml.org --rank=-1
-    - opam pin add bisect_ppx git+https://github.com/aantron/bisect_ppx.git#2fc5b795e603cde966a45343ef1b523234ce93d4 --yes
     - make
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
