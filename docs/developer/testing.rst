@@ -394,25 +394,6 @@ Known issues
 
    In that case, either delete the problematic files or re-launch the tests and re-generate the report.
 
-2. Instrumented code doesn't compile on certain pattern-matching constructs
-   with ``bisect_ppx <= 2.5.0``
-
-   ::
-
-        File "src/proto_008_PtEdoTez/lib_protocol/script_ir_translator.ml", line 1074, characters 13-14:
-        1074 |   | Lambda_t _
-
-        Error: This pattern matches values of type $5 ty
-            but a pattern was expected which matches values of type 'a ty
-            The type constructor $5 would escape its scope
-
-    This issue is solved in the development version of ``bisect_ppx``. It can
-    be obtained with
-
-    ::
-
-        opam pin add bisect_ppx.2.5.0 --dev-repo --yes
-
 Executing tests through the GitLab CI
 -------------------------------------
 
