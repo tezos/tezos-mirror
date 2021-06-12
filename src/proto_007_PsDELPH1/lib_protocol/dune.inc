@@ -271,6 +271,7 @@ include Tezos_raw_protocol_007_PsDELPH1.Main
 
 (library
  (name tezos_protocol_environment_007_PsDELPH1)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-007-PsDELPH1.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -278,6 +279,7 @@ include Tezos_raw_protocol_007_PsDELPH1.Main
 
 (library
  (name tezos_raw_protocol_007_PsDELPH1)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-007-PsDELPH1.raw)
  (libraries tezos_protocol_environment_007_PsDELPH1)
  (library_flags (:standard -linkall))
@@ -367,6 +369,7 @@ include Tezos_raw_protocol_007_PsDELPH1.Main
 
 (library
  (name tezos_protocol_007_PsDELPH1)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-007-PsDELPH1)
  (libraries
       tezos-protocol-environment
@@ -379,6 +382,7 @@ include Tezos_raw_protocol_007_PsDELPH1.Main
 
 (library
  (name tezos_protocol_007_PsDELPH1_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-007-PsDELPH1)
  (libraries
       tezos-protocol-environment
@@ -391,6 +395,7 @@ include Tezos_raw_protocol_007_PsDELPH1.Main
 
 (library
  (name tezos_embedded_protocol_007_PsDELPH1)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-007-PsDELPH1)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-007-PsDELPH1

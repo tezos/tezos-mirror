@@ -262,6 +262,7 @@ include Tezos_raw_protocol_003_PsddFKi3.Main
 
 (library
  (name tezos_protocol_environment_003_PsddFKi3)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-003-PsddFKi3.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -269,6 +270,7 @@ include Tezos_raw_protocol_003_PsddFKi3.Main
 
 (library
  (name tezos_raw_protocol_003_PsddFKi3)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-003-PsddFKi3.raw)
  (libraries tezos_protocol_environment_003_PsddFKi3)
  (library_flags (:standard -linkall))
@@ -355,6 +357,7 @@ include Tezos_raw_protocol_003_PsddFKi3.Main
 
 (library
  (name tezos_protocol_003_PsddFKi3)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-003-PsddFKi3)
  (libraries
       tezos-protocol-environment
@@ -367,6 +370,7 @@ include Tezos_raw_protocol_003_PsddFKi3.Main
 
 (library
  (name tezos_protocol_003_PsddFKi3_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-003-PsddFKi3)
  (libraries
       tezos-protocol-environment
@@ -379,6 +383,7 @@ include Tezos_raw_protocol_003_PsddFKi3.Main
 
 (library
  (name tezos_embedded_protocol_003_PsddFKi3)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-003-PsddFKi3)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-003-PsddFKi3

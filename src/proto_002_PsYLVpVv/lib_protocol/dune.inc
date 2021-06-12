@@ -259,6 +259,7 @@ include Tezos_raw_protocol_002_PsYLVpVv.Main
 
 (library
  (name tezos_protocol_environment_002_PsYLVpVv)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-002-PsYLVpVv.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -266,6 +267,7 @@ include Tezos_raw_protocol_002_PsYLVpVv.Main
 
 (library
  (name tezos_raw_protocol_002_PsYLVpVv)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-002-PsYLVpVv.raw)
  (libraries tezos_protocol_environment_002_PsYLVpVv)
  (library_flags (:standard -linkall))
@@ -351,6 +353,7 @@ include Tezos_raw_protocol_002_PsYLVpVv.Main
 
 (library
  (name tezos_protocol_002_PsYLVpVv)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-002-PsYLVpVv)
  (libraries
       tezos-protocol-environment
@@ -363,6 +366,7 @@ include Tezos_raw_protocol_002_PsYLVpVv.Main
 
 (library
  (name tezos_protocol_002_PsYLVpVv_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-002-PsYLVpVv)
  (libraries
       tezos-protocol-environment
@@ -375,6 +379,7 @@ include Tezos_raw_protocol_002_PsYLVpVv.Main
 
 (library
  (name tezos_embedded_protocol_002_PsYLVpVv)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-002-PsYLVpVv)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-002-PsYLVpVv

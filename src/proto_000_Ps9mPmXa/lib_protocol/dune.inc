@@ -67,6 +67,7 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
 
 (library
  (name tezos_protocol_environment_000_Ps9mPmXa)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-000-Ps9mPmXa.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -74,6 +75,7 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
 
 (library
  (name tezos_raw_protocol_000_Ps9mPmXa)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-000-Ps9mPmXa.raw)
  (libraries tezos_protocol_environment_000_Ps9mPmXa)
  (library_flags (:standard -linkall))
@@ -95,6 +97,7 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
 
 (library
  (name tezos_protocol_000_Ps9mPmXa)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-000-Ps9mPmXa)
  (libraries
       tezos-protocol-environment
@@ -107,6 +110,7 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
 
 (library
  (name tezos_protocol_000_Ps9mPmXa_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-000-Ps9mPmXa)
  (libraries
       tezos-protocol-environment
@@ -119,6 +123,7 @@ include Tezos_raw_protocol_000_Ps9mPmXa.Main
 
 (library
  (name tezos_embedded_protocol_000_Ps9mPmXa)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-000-Ps9mPmXa)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-000-Ps9mPmXa
