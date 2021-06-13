@@ -42,6 +42,7 @@ module type V3 = sig
        and type Operation_list_list_hash.t = Operation_list_list_hash.t
        and type Context.t = Context.t
        and type Context_hash.t = Context_hash.t
+       and type Context_hash.Version.t = Context_hash.Version.t
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
        and type Operation.shell_header = Operation.shell_header

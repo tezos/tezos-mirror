@@ -26,7 +26,7 @@
 include S.HASH
 
 module Version : sig
-  type t = int
+  type t = private int
 
   include Compare.S with type t := t
 
