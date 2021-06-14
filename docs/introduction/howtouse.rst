@@ -676,6 +676,7 @@ The Tezos codec (``tezos-codec``) is a utility that:
 - allows to convert from JSON to binary and vice-versa for all these encodings.
 
 It is meant to be used by developers for tests, for generating documentation when writing libraries that share data with the node, for light scripting, etc.
+For more details on its usage, refer to its :ref:`online manual <codec_manual>` and to :doc:`../developer/encodings`.
 
 Protocol compiler
 ~~~~~~~~~~~~~~~~~

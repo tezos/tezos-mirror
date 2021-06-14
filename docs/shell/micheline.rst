@@ -182,6 +182,7 @@ A mapping between file locations and canonical locations is produced
 during the serialization so that errors reported by tools working on
 the serialized form can be printed in a meaningful way to users.
 
+.. _micheline_json:
 
 Conversion to JSON
 ~~~~~~~~~~~~~~~~~~
@@ -202,6 +203,7 @@ The JSON conversion is very straightforward:
   and the JSON array of annotations. Both ``"args"`` and ``"annots"``
   are optional and default to the empty array.
 
+.. _micheline_bin:
 
 Binary serialization
 ~~~~~~~~~~~~~~~~~~~~
