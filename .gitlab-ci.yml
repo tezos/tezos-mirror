@@ -26,7 +26,7 @@ workflow:
 
 variables:
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
-  build_deps_image_version: 4f2882db0c98232c8c12eaa3ace975ef42dfc12c
+  build_deps_image_version: 3d00720cca573ae9c2ecc9c27d5e45f76e48b30e
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   public_docker_image_name: docker.io/${CI_PROJECT_PATH}-
   GIT_STRATEGY: fetch
