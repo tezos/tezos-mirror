@@ -272,6 +272,7 @@ let finalize_block
       migration_balance_updates;
       liquidity_baking_escape_ema;
       implicit_operations_results;
+      _;
     } =
   match mode with
   | Partial_construction _ ->

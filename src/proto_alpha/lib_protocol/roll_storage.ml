@@ -292,7 +292,7 @@ module Delegate = struct
         (Contract_repr.implicit_contract delegate)
       >|=? function
       | Some last_active_cycle ->
-          let ({Level_repr.cycle = current_cycle} : Level_repr.t) =
+          let ({Level_repr.cycle = current_cycle; _} : Level_repr.t) =
             Raw_context.current_level ctxt
           in
           Cycle_repr.(last_active_cycle < current_cycle)

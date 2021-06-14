@@ -310,16 +310,16 @@ module IdSet = struct
 
   let mem (type i a u) (kind : (i, a, u) kind) (id : i) set =
     match (kind, set) with
-    | (Big_map, {big_map}) -> Big_map.IdSet.mem id big_map
-    | (Sapling_state, {sapling_state}) ->
+    | (Big_map, {big_map; _}) -> Big_map.IdSet.mem id big_map
+    | (Sapling_state, {sapling_state; _}) ->
         Sapling_state.IdSet.mem id sapling_state
 
   let add (type i a u) (kind : (i, a, u) kind) (id : i) set =
     match (kind, set) with
-    | (Big_map, {big_map}) ->
+    | (Big_map, {big_map; _}) ->
         let big_map = Big_map.IdSet.add id big_map in
         {set with big_map}
-    | (Sapling_state, {sapling_state}) ->
+    | (Sapling_state, {sapling_state; _}) ->
         let sapling_state = Sapling_state.IdSet.add id sapling_state in
         {set with sapling_state}
 
@@ -333,8 +333,8 @@ module IdSet = struct
   let fold (type i a u) (kind : (i, a, u) kind) (f : i -> 'acc -> 'acc) set
       (acc : 'acc) =
     match (kind, set) with
-    | (Big_map, {big_map}) -> Big_map.IdSet.fold f big_map acc
-    | (Sapling_state, {sapling_state}) ->
+    | (Big_map, {big_map; _}) -> Big_map.IdSet.fold f big_map acc
+    | (Sapling_state, {sapling_state; _}) ->
         Sapling_state.IdSet.fold f sapling_state acc
 
   let fold_all f set acc =

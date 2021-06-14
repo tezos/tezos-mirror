@@ -437,7 +437,7 @@ let add {id; diff; memo_size} cm_cipher_list =
     memo_size;
   }
 
-let root_mem ctx {id} tested_root =
+let root_mem ctx {id; _} tested_root =
   match id with
   | Some id -> Roots.mem ctx id tested_root
   | None ->
@@ -446,7 +446,7 @@ let root_mem ctx {id} tested_root =
           Sapling.Hash.compare tested_root Commitments.default_root = 0)
 
 (* to avoid a double spend we need to check the disk AND the diff *)
-let nullifiers_mem ctx {id; diff} nf =
+let nullifiers_mem ctx {id; diff; _} nf =
   let exists_in_diff =
     List.exists
       (fun v -> Compare.Int.(Sapling.Nullifier.compare nf v = 0))

@@ -34,12 +34,12 @@ type t = {
 include Compare.Make (struct
   type nonrec t = t
 
-  let compare {level = l1} {level = l2} = Raw_level_repr.compare l1 l2
+  let compare {level = l1; _} {level = l2; _} = Raw_level_repr.compare l1 l2
 end)
 
 type level = t
 
-let pp ppf {level} = Raw_level_repr.pp ppf level
+let pp ppf {level; _} = Raw_level_repr.pp ppf level
 
 let pp_full ppf l =
   Format.fprintf

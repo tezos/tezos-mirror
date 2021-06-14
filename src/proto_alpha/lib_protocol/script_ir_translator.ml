@@ -5039,8 +5039,12 @@ and parse_instr :
             | Lambda -> error (Self_in_lambda loc)
             | Dip (_, prev) -> get_toplevel_type prev
             | Toplevel
-                {param_type; root_name; legacy_create_contract_literal = false}
-              ->
+                {
+                  param_type;
+                  root_name;
+                  legacy_create_contract_literal = false;
+                  _;
+                } ->
                 find_entrypoint param_type ~root_name entrypoint
                 >>? fun (_, Ex_ty param_type) ->
                 let instr =
@@ -5058,6 +5062,7 @@ and parse_instr :
                   param_type;
                   root_name = _;
                   legacy_create_contract_literal = true;
+                  _;
                 } ->
                 let instr =
                   {
@@ -5980,7 +5985,7 @@ let rec unparse_data :
       let items = map_fold (fun k v acc -> (k, v) :: acc) map [] in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
-  | (Big_map_t (_kt, _vt, _), {id = Some id; diff = {size}; _})
+  | (Big_map_t (_kt, _vt, _), {id = Some id; diff = {size; _}; _})
     when Compare.Int.( = ) size 0 ->
       return (Micheline.Int (-1, Big_map.Id.unparse_to_z id), ctxt)
   | (Big_map_t (kt, vt, _), {id = Some id; diff = {map; _}; _}) ->
@@ -6181,7 +6186,7 @@ let big_map_mem ctxt key {id; diff; key_type; _} =
   | (Some (_, None), _) -> return (false, ctxt)
   | (Some (_, Some _), _) -> return (true, ctxt)
 
-let big_map_get_by_hash ctxt key {id; diff; value_type} =
+let big_map_get_by_hash ctxt key {id; diff; value_type; _} =
   match (Big_map_overlay.find_opt key diff.map, id) with
   | (Some (_, x), _) -> return (x, ctxt)
   | (None, None) -> return (None, ctxt)
@@ -6502,15 +6507,17 @@ let rec fold_lazy_storage :
  fun ~f ~init ctxt ty x ~has_lazy_storage ->
   Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
   match (has_lazy_storage, ty, x) with
-  | (_, Big_map_t (_, _, _), {id = Some id}) ->
+  | (_, Big_map_t (_, _, _), {id = Some id; _}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
       ok (f.f Big_map id (Fold_lazy_storage.Ok init), ctxt)
-  | (_, Sapling_state_t _, {id = Some id}) ->
+  | (_, Sapling_state_t _, {id = Some id; _}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
       ok (f.f Sapling_state id (Fold_lazy_storage.Ok init), ctxt)
   | (False_f, _, _) -> ok (Fold_lazy_storage.Ok init, ctxt)
-  | (_, Big_map_t (_, _, _), {id = None}) -> ok (Fold_lazy_storage.Ok init, ctxt)
-  | (_, Sapling_state_t _, {id = None}) -> ok (Fold_lazy_storage.Ok init, ctxt)
+  | (_, Big_map_t (_, _, _), {id = None; _}) ->
+      ok (Fold_lazy_storage.Ok init, ctxt)
+  | (_, Sapling_state_t _, {id = None; _}) ->
+      ok (Fold_lazy_storage.Ok init, ctxt)
   | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) -> (
       fold_lazy_storage ~f ~init ctxt tyl xl ~has_lazy_storage:hl
       >>? fun (init, ctxt) ->

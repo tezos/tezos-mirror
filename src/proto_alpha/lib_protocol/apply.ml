@@ -808,7 +808,9 @@ let apply_manager_contents (type kind) ctxt mode chain_id
     * kind manager_operation_result
     * packed_internal_operation_result list)
     Lwt.t =
-  let (Manager_operation {source; operation; gas_limit; storage_limit}) = op in
+  let (Manager_operation {source; operation; gas_limit; storage_limit; _}) =
+    op
+  in
   (* We do not expose the internal scaling to the users. Instead, we multiply
        the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
@@ -865,7 +867,7 @@ let rec mark_skipped :
     kind Kind.manager contents_list ->
     kind Kind.manager contents_result_list =
  fun ~baker level -> function
-  | Single (Manager_operation {source; fee; operation}) ->
+  | Single (Manager_operation {source; fee; operation; _}) ->
       let source = Contract.implicit_contract source in
       Single_result
         (Manager_operation_result
@@ -879,7 +881,7 @@ let rec mark_skipped :
              operation_result = skipped_operation_result operation;
              internal_operation_results = [];
            })
-  | Cons (Manager_operation {source; fee; operation}, rest) ->
+  | Cons (Manager_operation {source; fee; operation; _}, rest) ->
       let source = Contract.implicit_contract source in
       Cons_result
         ( Manager_operation_result
@@ -1079,7 +1081,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           endorsement =
             {
               shell = {branch};
-              protocol_data = {contents = Single (Endorsement {level})};
+              protocol_data = {contents = Single (Endorsement {level}); _};
             } as unslotted;
           slot;
         }) ->
