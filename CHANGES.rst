@@ -112,6 +112,16 @@ Node
   views<https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`__
   offchain, accessible via ``../<block_id>/helpers/scripts/run_view``.
 
+-  Reintroduced the following RPCs in the Granada RPC plugin. These
+   RPCs were already present in the Edo and Florence protocol plugin
+   and are deprecated, they will be removed in the successor protocol
+   of Granada.
+
+   - ``../<block_id>/helpers/scripts/run_code/normalized``
+     (deprecated alias of ``../<block_id>/helpers/scripts/run_code``)
+   - ``../<block_id>/helpers/scripts/trace_code/normalized``
+     (deprecated alias of ``../<block_id>/helpers/scripts/trace_code``)
+
 Client
 ------
 

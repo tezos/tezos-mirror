@@ -1002,11 +1002,7 @@ module RPC = struct
             unparse_ty ctxt ty >|? fun (ty_node, _) ->
             Micheline.strip_locations ty_node )
       in
-      Registration.register0
-        S.run_code
-        (fun
-          ctxt
-          ()
+      let run_code_registration ctxt ()
           ( ( code,
               storage,
               parameter,
@@ -1017,49 +1013,45 @@ module RPC = struct
               payer,
               gas,
               entrypoint ),
-            unparsing_mode )
-        ->
-          let unparsing_mode = Option.value ~default:Readable unparsing_mode in
-          let storage = Script.lazy_expr storage in
-          let code = Script.lazy_expr code in
-          originate_dummy_contract ctxt {storage; code} balance
-          >>=? fun (ctxt, dummy_contract) ->
-          let (source, payer) =
-            match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (dummy_contract, dummy_contract)
-          in
-          let gas =
-            match gas with
-            | Some gas -> gas
-            | None -> Constants.hard_gas_limit_per_operation ctxt
-          in
-          let ctxt = Gas.set_limit ctxt gas in
-          let step_constants =
-            let open Script_interpreter in
-            {source; payer; self = dummy_contract; amount; chain_id}
-          in
-          Script_interpreter.execute
-            ctxt
-            unparsing_mode
-            step_constants
-            ~script:{storage; code}
-            ~entrypoint
-            ~parameter
-            ~internal:true
-          >|=? fun {
-                     Script_interpreter.storage;
-                     operations;
-                     lazy_storage_diff;
-                     _;
-                   } -> (storage, operations, lazy_storage_diff)) ;
-      Registration.register0
-        S.trace_code
-        (fun
+            unparsing_mode ) =
+        let unparsing_mode =
+          Option.value ~default:Script_ir_translator.Readable unparsing_mode
+        in
+        let storage = Script.lazy_expr storage in
+        let code = Script.lazy_expr code in
+        originate_dummy_contract ctxt {storage; code} balance
+        >>=? fun (ctxt, dummy_contract) ->
+        let (source, payer) =
+          match (source, payer) with
+          | (Some source, Some payer) -> (source, payer)
+          | (Some source, None) -> (source, source)
+          | (None, Some payer) -> (payer, payer)
+          | (None, None) -> (dummy_contract, dummy_contract)
+        in
+        let gas =
+          match gas with
+          | Some gas -> gas
+          | None -> Constants.hard_gas_limit_per_operation ctxt
+        in
+        let ctxt = Gas.set_limit ctxt gas in
+        let step_constants =
+          let open Script_interpreter in
+          {source; payer; self = dummy_contract; amount; chain_id}
+        in
+        Script_interpreter.execute
           ctxt
-          ()
+          unparsing_mode
+          step_constants
+          ~script:{storage; code}
+          ~entrypoint
+          ~parameter
+          ~internal:true
+        >|=? fun {Script_interpreter.storage; operations; lazy_storage_diff; _}
+          -> (storage, operations, lazy_storage_diff)
+      in
+      Registration.register0 S.run_code run_code_registration ;
+      Registration.register0 S.run_code_normalized run_code_registration ;
+      let trace_code_registration ctxt ()
           ( ( code,
               storage,
               parameter,
@@ -1070,47 +1062,46 @@ module RPC = struct
               payer,
               gas,
               entrypoint ),
-            unparsing_mode )
-        ->
-          let unparsing_mode = Option.value ~default:Readable unparsing_mode in
-          let storage = Script.lazy_expr storage in
-          let code = Script.lazy_expr code in
-          originate_dummy_contract ctxt {storage; code} balance
-          >>=? fun (ctxt, dummy_contract) ->
-          let (source, payer) =
-            match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (dummy_contract, dummy_contract)
-          in
-          let gas =
-            match gas with
-            | Some gas -> gas
-            | None -> Constants.hard_gas_limit_per_operation ctxt
-          in
-          let ctxt = Gas.set_limit ctxt gas in
-          let step_constants =
-            let open Script_interpreter in
-            {source; payer; self = dummy_contract; amount; chain_id}
-          in
-          let module Unparsing_mode = struct
-            let unparsing_mode = unparsing_mode
-          end in
-          let module Interp = Traced_interpreter (Unparsing_mode) in
-          Interp.execute
-            ctxt
-            step_constants
-            ~script:{storage; code}
-            ~entrypoint
-            ~parameter
-          >|=? fun ( {
-                       Script_interpreter.storage;
-                       operations;
-                       lazy_storage_diff;
-                       _;
-                     },
-                     trace ) -> (storage, operations, trace, lazy_storage_diff)) ;
+            unparsing_mode ) =
+        let unparsing_mode =
+          Option.value ~default:Script_ir_translator.Readable unparsing_mode
+        in
+        let storage = Script.lazy_expr storage in
+        let code = Script.lazy_expr code in
+        originate_dummy_contract ctxt {storage; code} balance
+        >>=? fun (ctxt, dummy_contract) ->
+        let (source, payer) =
+          match (source, payer) with
+          | (Some source, Some payer) -> (source, payer)
+          | (Some source, None) -> (source, source)
+          | (None, Some payer) -> (payer, payer)
+          | (None, None) -> (dummy_contract, dummy_contract)
+        in
+        let gas =
+          match gas with
+          | Some gas -> gas
+          | None -> Constants.hard_gas_limit_per_operation ctxt
+        in
+        let ctxt = Gas.set_limit ctxt gas in
+        let step_constants =
+          let open Script_interpreter in
+          {source; payer; self = dummy_contract; amount; chain_id}
+        in
+        let module Unparsing_mode = struct
+          let unparsing_mode = unparsing_mode
+        end in
+        let module Interp = Traced_interpreter (Unparsing_mode) in
+        Interp.execute
+          ctxt
+          step_constants
+          ~script:{storage; code}
+          ~entrypoint
+          ~parameter
+        >|=? fun ( {Script_interpreter.storage; operations; lazy_storage_diff; _},
+                   trace ) -> (storage, operations, trace, lazy_storage_diff)
+      in
+      Registration.register0 S.trace_code trace_code_registration ;
+      Registration.register0 S.trace_code_normalized trace_code_registration ;
       Registration.register0
         S.run_view
         (fun
