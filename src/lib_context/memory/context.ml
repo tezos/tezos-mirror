@@ -105,8 +105,6 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   and t = context
 
-  module type S = Tezos_context_sigs.Context.S
-
   type tree = Store.tree
 
   type key = string list

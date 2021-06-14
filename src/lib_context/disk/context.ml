@@ -218,8 +218,6 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let index {index; _} = index
 
-  module type S = Tezos_context_sigs.Context.S
-
   (*-- Version Access and Update -----------------------------------------------*)
 
   let current_protocol_key = ["protocol"]
