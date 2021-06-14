@@ -537,9 +537,9 @@ A baker is more likely to include an operation with lower gas and
 storage limits because it takes fewer resources to execute so it is in
 the best interest of the user to pick limits that are as close as
 possible to the actual use. In this case, you may have to specify some
-fees as the baker is expecting some for the resource
+fees (using option ``--fee``) as the baker is expecting some for the resource
 usage. Otherwise, you can force a low fee operation using the
-`--force-low-fee`, with the risk that no baker will include it.
+``--force-low-fee``, with the risk that no baker will include it.
 
 More test contracts can be found in directory
 :src:`tests_python/contracts_alpha/`.
