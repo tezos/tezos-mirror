@@ -75,16 +75,20 @@ Some ad-hoc reference kinds are supported.
 - ``:opam:`package``` or ``:opam:`text<package>``` points to the
   package page on ``opam.ocaml.org``, version number is supported
   (``package.version``)
-- ``:gl:`<special gitlab reference>``` or ``:opam:`text<special gitlab
-  reference>``` expands and links `GitLab special reference
+- ``:gl:`[special gitlab reference]``` or ``:gl:`text <[special gitlab
+  reference]>``` expands and links `GitLab special references
   <https://docs.gitlab.com/ce/user/markdown.html#special-gitlab-references>`_,
-  like for merge requests `tezos/tezos!123`, issues `tezos/tezos#999`
-  and commits `28309c81`. The default project and namespace is
-  `tezos/tezos`. In other words, `tezos/tezos#999`, `tezos#999` and
-  `#999` all refer to the same thing. Currently supports usernames,
+  like for
+  merge requests :gl:`tezos/tezos!123` (``:gl:`tezos/tezos!123```),
+  issues :gl:`tezos/tezos#999` (``:gl:`tezos/tezos#999```)
+  and
+  commits :gl:`28309c81` (``:gl:`28309c81```).
+  The default project and namespace is
+  ``tezos/tezos``. In other words, ``tezos/tezos#999``, ``tezos#999`` and
+  ``#999`` all refer to the same thing. Currently supports usernames,
   projects, issues, merge requests, snippets, milestone ids, commits
-  and commit ranges. This is implemented in
-  `docs/_extensions/gitlab_custom_role.py`.
+  and commit ranges. The implementation of this role is in
+  :src:`docs/_extensions/gitlab_custom_role.py`.
 
 Style guidelines
 ----------------
