@@ -704,8 +704,8 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         generate_list ety rng_state
       in
       List.fold_left
-        (fun set x -> Script_ir_pervasives.set_update x true set)
-        (Script_ir_pervasives.empty_set elt_ty)
+        (fun set x -> Script_set.update x true set)
+        (Script_set.empty elt_ty)
         elements
 
     and generate_map :
@@ -721,8 +721,8 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
       let keys = List.init size (fun _ -> value kty rng_state) in
       let elts = List.init size (fun _ -> value elt_ty rng_state) in
       List.fold_left2
-        (fun map key elt -> Script_ir_pervasives.map_update key (Some elt) map)
-        (Script_ir_pervasives.empty_map key_ty)
+        (fun map key elt -> Script_map.update key (Some elt) map)
+        (Script_map.empty key_ty)
         keys
         elts
 
@@ -741,7 +741,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
               (* Cannot have big maps under big maps *)
               let opt_elt_ty = Option_t (elt_ty, None) in
               let map = generate_map key_ty opt_elt_ty rng_state in
-              Script_ir_pervasives.map_fold
+              Script_map.fold
                 (fun k v acc ->
                   acc >>=? fun (bm, ctxt_acc) ->
                   Script_ir_translator.big_map_update ctxt_acc k v bm)

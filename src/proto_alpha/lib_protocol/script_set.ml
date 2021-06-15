@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Tocqueville Group, Inc. <contact@tezos.com>            *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,51 +24,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module contains basic operations on Michelson compound types: lists,
-    sets, maps and big_maps. They are mainly used by the interpreter to execute
-    scripts. *)
-
 open Alpha_context
+open Script_typed_ir
 
-val list_empty : 'a Script_typed_ir.boxed_list
+let empty : type a. a comparable_ty -> a set =
+ fun ty ->
+  let module OPS = Set.Make (struct
+    type t = a
 
-val list_cons :
-  'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
+    let compare = Script_comparable.compare_comparable ty
+  end) in
+  (module struct
+    type elt = a
 
-val empty_set : 'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.set
+    let elt_ty = ty
 
-val set_fold :
-  ('elt -> 'acc -> 'acc) -> 'elt Script_typed_ir.set -> 'acc -> 'acc
+    module OPS = OPS
 
-val set_update : 'a -> bool -> 'a Script_typed_ir.set -> 'a Script_typed_ir.set
+    let boxed = OPS.empty
 
-val set_mem : 'elt -> 'elt Script_typed_ir.set -> bool
+    let size = 0
+  end)
 
-val set_size : 'elt Script_typed_ir.set -> Script_int.n Script_int.num
+let update : type a. a -> bool -> a set -> a set =
+ fun v b (module Box) ->
+  (module struct
+    type elt = a
 
-val empty_map : 'a Script_typed_ir.comparable_ty -> ('a, 'b) Script_typed_ir.map
+    let elt_ty = Box.elt_ty
 
-val map_fold :
-  ('key -> 'value -> 'acc -> 'acc) ->
-  ('key, 'value) Script_typed_ir.map ->
-  'acc ->
-  'acc
+    module OPS = Box.OPS
 
-val map_update :
-  'a ->
-  'b option ->
-  ('a, 'b) Script_typed_ir.map ->
-  ('a, 'b) Script_typed_ir.map
+    let boxed =
+      if b then Box.OPS.add v Box.boxed else Box.OPS.remove v Box.boxed
 
-val map_mem : 'key -> ('key, 'value) Script_typed_ir.map -> bool
+    let size =
+      let mem = Box.OPS.mem v Box.boxed in
+      if mem then if b then Box.size else Box.size - 1
+      else if b then Box.size + 1
+      else Box.size
+  end)
 
-val map_get : 'key -> ('key, 'value) Script_typed_ir.map -> 'value option
+let mem : type elt. elt -> elt set -> bool =
+ fun v (module Box) -> Box.OPS.mem v Box.boxed
 
-val map_key_ty :
-  ('a, 'b) Script_typed_ir.map -> 'a Script_typed_ir.comparable_ty
+let fold : type elt acc. (elt -> acc -> acc) -> elt set -> acc -> acc =
+ fun f (module Box) -> Box.OPS.fold f Box.boxed
 
-val map_size : ('a, 'b) Script_typed_ir.map -> Script_int.n Script_int.num
-
-val compare_comparable : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> int
-
-val compare_address : Script_typed_ir.address -> Script_typed_ir.address -> int
+let size : type elt. elt set -> Script_int.n Script_int.num =
+ fun (module Box) -> Script_int.(abs (of_int Box.size))

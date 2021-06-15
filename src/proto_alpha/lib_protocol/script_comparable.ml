@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Tocqueville Group, Inc. <contact@tezos.com>            *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,15 +26,6 @@
 
 open Alpha_context
 open Script_typed_ir
-
-let list_empty : 'a Script_typed_ir.boxed_list =
-  let open Script_typed_ir in
-  {elements = []; length = 0}
-
-let list_cons :
-    'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list =
- fun elt l ->
-  {length = 1 + l.length; elements = elt :: l.elements}
 
 let compare_address (x, ex) (y, ey) =
   let lres = Contract.compare x y in
@@ -95,106 +87,3 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
   in
   fun t -> compare_comparable t Compare_comparable_return
   [@@coq_axiom_with_reason "non top-level mutually recursive function"]
-
-let empty_set : type a. a comparable_ty -> a set =
- fun ty ->
-  let module OPS = Set.Make (struct
-    type t = a
-
-    let compare = compare_comparable ty
-  end) in
-  (module struct
-    type elt = a
-
-    let elt_ty = ty
-
-    module OPS = OPS
-
-    let boxed = OPS.empty
-
-    let size = 0
-  end)
-
-let set_update : type a. a -> bool -> a set -> a set =
- fun v b (module Box) ->
-  (module struct
-    type elt = a
-
-    let elt_ty = Box.elt_ty
-
-    module OPS = Box.OPS
-
-    let boxed =
-      if b then Box.OPS.add v Box.boxed else Box.OPS.remove v Box.boxed
-
-    let size =
-      let mem = Box.OPS.mem v Box.boxed in
-      if mem then if b then Box.size else Box.size - 1
-      else if b then Box.size + 1
-      else Box.size
-  end)
-
-let set_mem : type elt. elt -> elt set -> bool =
- fun v (module Box) -> Box.OPS.mem v Box.boxed
-
-let set_fold : type elt acc. (elt -> acc -> acc) -> elt set -> acc -> acc =
- fun f (module Box) -> Box.OPS.fold f Box.boxed
-
-let set_size : type elt. elt set -> Script_int.n Script_int.num =
- fun (module Box) -> Script_int.(abs (of_int Box.size))
-
-let map_key_ty : type a b. (a, b) map -> a comparable_ty =
- fun (module Box) -> Box.key_ty
-
-let empty_map : type a b. a comparable_ty -> (a, b) map =
- fun ty ->
-  let module OPS = Map.Make (struct
-    type t = a
-
-    let compare = compare_comparable ty
-  end) in
-  (module struct
-    type key = a
-
-    type value = b
-
-    let key_ty = ty
-
-    module OPS = OPS
-
-    let boxed = (OPS.empty, 0)
-  end)
-
-let map_get : type key value. key -> (key, value) map -> value option =
- fun k (module Box) -> Box.OPS.find k (fst Box.boxed)
-
-let map_update : type a b. a -> b option -> (a, b) map -> (a, b) map =
- fun k v (module Box) ->
-  (module struct
-    type key = a
-
-    type value = b
-
-    let key_ty = Box.key_ty
-
-    module OPS = Box.OPS
-
-    let boxed =
-      let (map, size) = Box.boxed in
-      let contains = Box.OPS.mem k map in
-      match v with
-      | Some v -> (Box.OPS.add k v map, size + if contains then 0 else 1)
-      | None -> (Box.OPS.remove k map, size - if contains then 1 else 0)
-  end)
-
-let map_mem : type key value. key -> (key, value) map -> bool =
- fun k (module Box) -> Box.OPS.mem k (fst Box.boxed)
-
-let map_fold :
-    type key value acc.
-    (key -> value -> acc -> acc) -> (key, value) map -> acc -> acc =
- fun f (module Box) -> Box.OPS.fold f (fst Box.boxed)
-
-let map_size : type key value. (key, value) map -> Script_int.n Script_int.num =
- fun (module Box) -> Script_int.(abs (of_int (snd Box.boxed)))
-

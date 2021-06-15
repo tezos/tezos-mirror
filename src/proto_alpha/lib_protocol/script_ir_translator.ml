@@ -2352,7 +2352,7 @@ let rec parse_data :
                          k)
                     >>? fun ctxt ->
                     let c =
-                      Script_ir_pervasives.compare_comparable key_type value k
+                      Script_comparable.compare_comparable key_type value k
                     in
                     if Compare.Int.(0 <= c) then
                       if Compare.Int.(0 = c) then
@@ -2366,15 +2366,14 @@ let rec parse_data :
                   ctxt
                   (Michelson_v1_gas.Cost_of.Interpreter.map_update k map)
                 >|? fun ctxt ->
-                ( Some k,
-                  Script_ir_pervasives.map_update k (Some (item_wrapper v)) map,
-                  ctxt ) )
+                (Some k, Script_map.update k (Some (item_wrapper v)) map, ctxt)
+              )
         | Prim (loc, D_Elt, l, _) ->
             fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
         | Prim (loc, name, _, _) ->
             fail @@ Invalid_primitive (loc, [D_Elt], name)
         | Int _ | String _ | Bytes _ | Seq _ -> fail_parse_data ())
-      (None, Script_ir_pervasives.empty_map key_type, ctxt)
+      (None, Script_map.empty key_type, ctxt)
       items
     |> traced
     >|=? fun (_, items, ctxt) -> (items, ctxt)
@@ -2403,10 +2402,7 @@ let rec parse_data :
                          k)
                     >>? fun ctxt ->
                     let c =
-                      Script_ir_pervasives.compare_comparable
-                        key_type
-                        last_key
-                        k
+                      Script_comparable.compare_comparable key_type last_key k
                     in
                     if Compare.Int.(0 <= c) then
                       if Compare.Int.(0 = c) then
@@ -2526,9 +2522,9 @@ let rec parse_data :
       @@ List.fold_right_es
            (fun v (rest, ctxt) ->
              non_terminal_recursion ?type_logger ctxt ~legacy t v
-             >|=? fun (v, ctxt) -> (Script_ir_pervasives.list_cons v rest, ctxt))
+             >|=? fun (v, ctxt) -> (Script_list.cons v rest, ctxt))
            items
-           (Script_ir_pervasives.list_empty, ctxt)
+           (Script_list.empty, ctxt)
   | (List_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Tickets *)
@@ -2551,9 +2547,7 @@ let rec parse_data :
                        ctxt
                        (Michelson_v1_gas.Cost_of.Interpreter.compare t value v)
                      >>? fun ctxt ->
-                     let c =
-                       Script_ir_pervasives.compare_comparable t value v
-                     in
+                     let c = Script_comparable.compare_comparable t value v in
                      if Compare.Int.(0 <= c) then
                        if Compare.Int.(0 = c) then
                          error
@@ -2567,9 +2561,8 @@ let rec parse_data :
                  Gas.consume
                    ctxt
                    (Michelson_v1_gas.Cost_of.Interpreter.set_update v set)
-                 >|? fun ctxt ->
-                 (Some v, Script_ir_pervasives.set_update v true set, ctxt) ))
-           (None, Script_ir_pervasives.empty_set t, ctxt)
+                 >|? fun ctxt -> (Some v, Script_set.update v true set, ctxt) ))
+           (None, Script_set.empty t, ctxt)
            vs
       >|=? fun (_, set, ctxt) -> (set, ctxt)
   | (Set_t _, expr) ->
@@ -5705,12 +5698,10 @@ let rec unparse_data :
           unparse_comparable_data ctxt mode t item >|=? fun (item, ctxt) ->
           (item :: l, ctxt))
         ([], ctxt)
-        (Script_ir_pervasives.set_fold (fun e acc -> e :: acc) set [])
+        (Script_set.fold (fun e acc -> e :: acc) set [])
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Map_t (kt, vt, _), map) ->
-      let items =
-        Script_ir_pervasives.map_fold (fun k v acc -> (k, v) :: acc) map []
-      in
+      let items = Script_map.fold (fun k v acc -> (k, v) :: acc) map [] in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Big_map_t (_kt, _vt, _), {id = Some id; diff = {size; _}; _})
@@ -5727,7 +5718,7 @@ let rec unparse_data :
            precisely. Also, the sort uses a reverse compare because
            [unparse_items] will reverse the result. *)
         List.sort
-          (fun (a, _) (b, _) -> Script_ir_pervasives.compare_comparable kt b a)
+          (fun (a, _) (b, _) -> Script_comparable.compare_comparable kt b a)
           items
       in
       let vt = Option_t (vt, None) in
@@ -5750,7 +5741,7 @@ let rec unparse_data :
       let items =
         (* See note above. *)
         List.sort
-          (fun (a, _) (b, _) -> Script_ir_pervasives.compare_comparable kt b a)
+          (fun (a, _) (b, _) -> Script_comparable.compare_comparable kt b a)
           items
       in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
@@ -6179,8 +6170,8 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
           (fun (ctxt, l, ids_to_copy, acc) x ->
             aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
             >|=? fun (ctxt, x, ids_to_copy, acc) ->
-            (ctxt, Script_ir_pervasives.list_cons x l, ids_to_copy, acc))
-          (ctxt, Script_ir_pervasives.list_empty, ids_to_copy, acc)
+            (ctxt, Script_list.cons x l, ids_to_copy, acc))
+          (ctxt, Script_list.empty, ids_to_copy, acc)
           l.elements
         >|=? fun (ctxt, l, ids_to_copy, acc) ->
         let reversed = {length = l.length; elements = List.rev l.elements} in
@@ -6276,7 +6267,7 @@ let rec fold_lazy_storage :
         (ok (Fold_lazy_storage.Ok init, ctxt))
         l.elements
   | (Map_f has_lazy_storage, Map_t (_, ty, _), m) ->
-      Script_ir_pervasives.map_fold
+      Script_map.fold
         (fun _
              v
              (acc : (('acc, error) Fold_lazy_storage.result * context) tzresult) ->

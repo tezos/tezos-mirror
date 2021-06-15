@@ -98,7 +98,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_type_size.mli script_type_size.ml
-   script_ir_pervasives.mli script_ir_pervasives.ml
+   script_list.mli script_list.ml
+   script_comparable.mli script_comparable.ml
+   script_set.mli script_set.ml
+   script_map.mli script_map.ml
    script_ir_translator.mli script_ir_translator.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter_defs.ml
@@ -193,7 +196,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_type_size.mli script_type_size.ml
-   script_ir_pervasives.mli script_ir_pervasives.ml
+   script_list.mli script_list.ml
+   script_comparable.mli script_comparable.ml
+   script_set.mli script_set.ml
+   script_map.mli script_map.ml
    script_ir_translator.mli script_ir_translator.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter_defs.ml
@@ -288,7 +294,10 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_type_size.mli script_type_size.ml
-   script_ir_pervasives.mli script_ir_pervasives.ml
+   script_list.mli script_list.ml
+   script_comparable.mli script_comparable.ml
+   script_set.mli script_set.ml
+   script_map.mli script_map.ml
    script_ir_translator.mli script_ir_translator.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter_defs.ml
@@ -405,7 +414,10 @@ include Tezos_raw_protocol_alpha.Main
    Michelson_v1_gas
    Script_ir_annot
    Script_type_size
-   Script_ir_pervasives
+   Script_list
+   Script_comparable
+   Script_set
+   Script_map
    Script_ir_translator
    Script_tc_errors_registration
    Script_interpreter_defs
@@ -539,7 +551,10 @@ include Tezos_raw_protocol_alpha.Main
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_ir_annot.mli script_ir_annot.ml
    script_type_size.mli script_type_size.ml
-   script_ir_pervasives.mli script_ir_pervasives.ml
+   script_list.mli script_list.ml
+   script_comparable.mli script_comparable.ml
+   script_set.mli script_set.ml
+   script_map.mli script_map.ml
    script_ir_translator.mli script_ir_translator.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
    script_interpreter_defs.ml
