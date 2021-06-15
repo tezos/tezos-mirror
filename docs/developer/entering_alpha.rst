@@ -78,7 +78,7 @@ enforced.
 
 Hashes and storage description layer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This layer is implemented by module ``storage_description.ml`` and modules named ``*_hash`.
+This layer is implemented by module ``storage_description.ml`` and modules named ``*_hash``.
 It contains mainly Blake2b hash implementations specialized
 for various basic types of the protocol.
 

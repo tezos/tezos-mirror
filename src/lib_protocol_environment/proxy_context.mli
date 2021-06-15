@@ -31,7 +31,7 @@
 
     Whereas [Memory_context] is a regular recursive map, [Proxy_context]
     obtains values by delegating to endpoints when receiving requests.
-    Hence, after right after having created an [empty] value with an instance
+    Hence, right after having created an [empty] value with an instance
     of [M.ProxyDelegate], this value is as filled as the distant endpoint
     it delegates to. *)
 

@@ -4,7 +4,7 @@ Michelson: the language of Smart Contracts in Tezos
 ===================================================
 
 This specification gives a detailed formal semantics of the Michelson
-language, and a short explanation of how smart contracts are executed
+language and a short explanation of how smart contracts are executed
 and interact in the blockchain.
 
 The language is stack-based, with high level data types and primitives,
@@ -13,7 +13,7 @@ several language families. Vigilant readers will notice direct
 references to Forth, Scheme, ML and Cat.
 
 A Michelson program is a series of instructions that are run in
-sequence: each instruction receives as input the stack resulting of the
+sequence: each instruction receives as input the stack resulting from the
 previous instruction, and rewrites it for the next one. The stack
 contains both immediate values and heap allocated structures. All values
 are immutable and garbage collected.
@@ -55,7 +55,7 @@ Intra-transaction semantics
 
 Alongside their tokens, smart contracts keep a piece of storage. Both
 are ruled by a specific logic specified by a Michelson program. A
-transaction to smart contract will provide an input value and in
+transaction to a smart contract will provide an input value and in
 option some tokens, and in return, the smart contract can modify its
 storage and transfer its tokens.
 
@@ -71,7 +71,7 @@ not be caught by the type system (e.g. gas exhaustion).
 A bit of polymorphism can be used at contract level, with a
 lightweight system of named entrypoints: instead of an input value,
 the contract can be called with an entrypoint name and an argument,
-and these two component are transformed automatically in a simple and
+and these two components are transformed automatically in a simple and
 deterministic way to an input value. This feature is available both
 for users and from Michelson code. See the dedicated section.
 
@@ -161,7 +161,8 @@ In any case, when a failure happens, either total success or total
 failure is guaranteed. If a transaction (internal or external) fails,
 then the whole sequence fails and all the effects up to the failure
 are reverted. These transactions can still be included in blocks, and
-the transaction fees given to the implicit account who baked the block.
+the transaction fees are given to the implicit account who baked the
+block.
 
 Language semantics
 ------------------
@@ -193,8 +194,8 @@ The left hand side of the ``=>`` sign is used for selecting the rule.
 Given a program and an initial stack, one (and only one) rule can be
 selected using the following process. First, the toplevel structure of
 the program must match the syntax pattern. This is quite simple since
-there is only a few non trivial patterns to deal with instruction
-sequences, and the rest is made of trivial pattern that match one
+there are only a few non-trivial patterns to deal with instruction
+sequences, and the rest is made of trivial patterns that match one
 specific instruction. Then, the initial stack must match the initial
 stack pattern. Finally, some rules add extra conditions over the values
 in the stack that follow the ``iff`` keyword. Sometimes, several rules
@@ -221,7 +222,7 @@ form.
 
     where (intermediate program) / (intermediate stack)  =>  (partial result)
 
-This means that this rules applies in case interpreting the intermediate
+This means that this rule applies in case interpreting the intermediate
 state on the left gives the pattern on the right.
 
 The left hand sign of the ``=>`` sign is constructed from elements of
