@@ -53,6 +53,9 @@ _`Baking`/_`Endorsing rights`
     For each block_ height, there are several accounts that are allowed to
     endorse. There can be multiple endorsements per block_.
 
+_`Constants`
+    Protocols are parameterized by several parameters called protocol constants, which may vary from one protocol to another or from one network to another.
+
 _`Contract`
     See account_.
 

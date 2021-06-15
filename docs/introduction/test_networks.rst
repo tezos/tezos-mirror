@@ -7,7 +7,7 @@ Test Networks
 
 Mainnet is the main Tezos network, but is not appropriate for testing.
 Other networks are available to this end. Test networks usually run
-with different constants to speed up the chain.
+with different :ref:`constants <protocol_constants>` to speed up the chain.
 
 There is one test network for the current protocol, and one test
 network for the protocol which is being proposed for voting. The

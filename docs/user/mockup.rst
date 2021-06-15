@@ -167,7 +167,7 @@ Tune mockup parameters
 ======================
 
 To keep it simple, the mockup mode - like the sandboxed mode - uses
-default values. Such values are visible as follows (we recall
+default values for the :ref:`protocol constants <protocol_constants>`. Such values are visible as follows (we recall
 that ``mockup-client`` is an alias for ``tezos-client``, see previous
 section):
 

@@ -588,8 +588,12 @@ For example the ``get timestamp`` command above is a shortcut for::
 
 The client tries to simplify common tasks as much as possible, however
 if you want to query the node for more specific information you'll
-have to resort to RPCs. For example to check the value of important
-constants in Tezos, which may differ between Mainnet and other
+have to resort to RPCs.
+
+.. _get_protocol_constants:
+
+For example to check the value of important
+:ref:`constants <protocol_constants>` in Tezos, which may differ between Mainnet and other
 :ref:`test networks<test-networks>`, you can use::
 
    tezos-client rpc get /chains/main/blocks/head/context/constants | jq
