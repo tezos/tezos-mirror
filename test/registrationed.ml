@@ -47,7 +47,7 @@ let find_test () =
             Alcotest.failf
               "Descriptions do not match (expected %s) (got %s)"
               description
-              rd )
+              rd)
 
 let tests =
   [("register-test", `Quick, register_test); ("find-test", `Quick, find_test)]

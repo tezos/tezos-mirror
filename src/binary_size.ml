@@ -66,7 +66,7 @@ let signed_range_to_size min max : [> signed_integer] =
 
 (* max should be centered at zero *)
 let unsigned_range_to_size max : [> unsigned_integer] =
-  assert (max >= 0);
+  assert (max >= 0) ;
   if max <= 255 then `Uint8 else if max <= 65535 then `Uint16 else `Uint30
 
 let integer_to_size = function

@@ -53,7 +53,7 @@ let (tree_encoding, forest_encoding) =
   let open Data_encoding in
   let mu_tree forest_enc =
     mu "tree" @@ fun tree_enc ->
-    incr tree_points;
+    incr tree_points ;
     union
       [
         case
@@ -72,7 +72,7 @@ let (tree_encoding, forest_encoding) =
   in
   let mu_forest =
     mu "forest" @@ fun forest_enc ->
-    incr forest_points;
+    incr forest_points ;
     union
       [
         case
@@ -98,10 +98,10 @@ let forest_points_done = !forest_points
 let points () =
   (* [mu_tree] is called twice, each call creates one [Mu] node, each
       instantiation of [Mu] can call the fixpointing function at most twice. *)
-  assert (tree_points_done <= 4);
+  assert (tree_points_done <= 4) ;
   (* [mu_forest] is evaluated once, the evaluation creates one [Mu] node, each
       instantiation of [Mu] can call the fixpointing function at most twice. *)
-  assert (tree_points_done <= 2);
+  assert (tree_points_done <= 2) ;
   ()
 
 let tiny_test () =
@@ -118,8 +118,8 @@ let tiny_test () =
     Binary.to_bytes_exn forest_encoding (Children (Node (Leaf, Empty), Empty))
   in
   (* Calls to encoding do not invalidate the memoisation: points are the same *)
-  assert (!tree_points = tree_points_done);
-  assert (!forest_points = forest_points_done);
+  assert (!tree_points = tree_points_done) ;
+  assert (!forest_points = forest_points_done) ;
   ()
 
 let flip_flop () =
@@ -134,8 +134,8 @@ let flip_flop () =
   let (_ : bytes) = Binary.to_bytes_exn tree_encoding flip in
   let (_ : bytes) = Binary.to_bytes_exn tree_encoding flop in
   (* Calls to encoding do not invalidate the memoisation: points are the same *)
-  assert (!tree_points = tree_points_done);
-  assert (!forest_points = forest_points_done);
+  assert (!tree_points = tree_points_done) ;
+  assert (!forest_points = forest_points_done) ;
   ()
 
 let big_test () =
@@ -159,8 +159,8 @@ let big_test () =
   let t = Node (t, f) in
   let (_ : bytes) = Binary.to_bytes_exn tree_encoding t in
   (* Calls to encoding do not invalidate the memoisation: points are the same *)
-  assert (!tree_points = tree_points_done);
-  assert (!forest_points = forest_points_done);
+  assert (!tree_points = tree_points_done) ;
+  assert (!forest_points = forest_points_done) ;
   ()
 
 let tests =

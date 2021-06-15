@@ -25,15 +25,15 @@
 
 (* Facilities to decode streams of binary data *)
 
-type buffer = {buffer: Bytes.t; ofs: int; len: int}
+type buffer = {buffer : Bytes.t; ofs : int; len : int}
 
 type t = {
-  current: buffer;
+  current : buffer;
   (* buffer queue (classical double list implementation) *)
-  pending: Bytes.t list;
-  pending_rev: Bytes.t list;
+  pending : Bytes.t list;
+  pending_rev : Bytes.t list;
   (* number unread bytes in 'current + pending + pending_rev' *)
-  unread: int;
+  unread : int;
 }
 
 let is_empty {unread; _} = unread = 0
@@ -57,12 +57,12 @@ let push buffer stream =
 exception Need_more_data
 
 let split buffer len =
-  assert (len <= buffer.len);
+  assert (len <= buffer.len) ;
   ( {buffer with len},
     {buffer with ofs = buffer.ofs + len; len = buffer.len - len} )
 
 let read stream len =
-  if len > stream.unread then raise Need_more_data;
+  if len > stream.unread then raise Need_more_data ;
   if len <= stream.current.len then
     let (res, current) = split stream.current len in
     (res, {stream with current; unread = stream.unread - len})
@@ -73,14 +73,14 @@ let read stream len =
       stream.current.ofs
       res.buffer
       0
-      stream.current.len;
+      stream.current.len ;
     let rec loop ofs pending_rev = function
       | [] -> loop ofs [] (List.rev pending_rev)
       | buffer :: pending ->
           let current = {buffer; ofs = 0; len = Bytes.length buffer} in
           let to_read = len - ofs in
           if to_read <= current.len then (
-            Bytes.blit current.buffer 0 res.buffer ofs to_read;
+            Bytes.blit current.buffer 0 res.buffer ofs to_read ;
             ( res,
               {
                 current =
@@ -88,9 +88,9 @@ let read stream len =
                 pending;
                 pending_rev;
                 unread = stream.unread - len;
-              } ) )
+              } ))
           else (
-            Bytes.blit current.buffer 0 res.buffer ofs current.len;
-            loop (ofs + current.len) pending_rev pending )
+            Bytes.blit current.buffer 0 res.buffer ofs current.len ;
+            loop (ofs + current.len) pending_rev pending)
     in
     loop stream.current.len stream.pending_rev stream.pending

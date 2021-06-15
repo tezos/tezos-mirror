@@ -27,16 +27,16 @@ open Binary_error_types
 
 let raise e = raise (Read_error e)
 
-type slice = {name: string; value: string; pretty_printed: string}
+type slice = {name : string; value : string; pretty_printed : string}
 
 (* state management *)
 
 type slicer_state = {
-  buffer: string;
-  mutable offset: int;
-  mutable remaining_bytes: int;
-  mutable allowed_bytes: int option;
-  mutable slices: slice list;
+  buffer : string;
+  mutable offset : int;
+  mutable remaining_bytes : int;
+  mutable allowed_bytes : int option;
+  mutable slices : slice list;
 }
 
 let make_slicer_state buffer ~offset ~length =
@@ -58,17 +58,17 @@ let check_allowed_bytes state size =
   | None -> None
 
 let check_remaining_bytes state size =
-  if state.remaining_bytes < size then raise Not_enough_data;
+  if state.remaining_bytes < size then raise Not_enough_data ;
   state.remaining_bytes - size
 
 let read_atom ?(pp = fun _ -> "") size conv name state =
   let offset = state.offset in
-  state.remaining_bytes <- check_remaining_bytes state size;
-  state.allowed_bytes <- check_allowed_bytes state size;
-  state.offset <- state.offset + size;
+  state.remaining_bytes <- check_remaining_bytes state size ;
+  state.allowed_bytes <- check_allowed_bytes state size ;
+  state.offset <- state.offset + size ;
   let value = String.sub state.buffer offset size in
   let result = conv state.buffer offset in
-  state.slices <- {name; value; pretty_printed = pp result} :: state.slices;
+  state.slices <- {name; value; pretty_printed = pp result} :: state.slices ;
   result
 
 (** Reader for all the atomic types. *)
@@ -76,9 +76,9 @@ module Atom = struct
   let read_byte state =
     let size = Binary_size.int8 in
     let offset = state.offset in
-    state.remaining_bytes <- check_remaining_bytes state size;
-    state.allowed_bytes <- check_allowed_bytes state size;
-    state.offset <- state.offset + size;
+    state.remaining_bytes <- check_remaining_bytes state size ;
+    state.allowed_bytes <- check_allowed_bytes state size ;
+    state.offset <- state.offset + size ;
     TzEndian.get_int8_string state.buffer offset
 
   let uint8 =
@@ -114,7 +114,7 @@ module Atom = struct
   let uint30 =
     read_atom ~pp:string_of_int Binary_size.uint30 @@ fun buffer ofs ->
     let v = Int32.to_int (TzEndian.get_int32_string buffer ofs) in
-    if v < 0 then raise (Invalid_int {min = 0; v; max = (1 lsl 30) - 1});
+    if v < 0 then raise (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
     v
 
   let int31 =
@@ -142,13 +142,13 @@ module Atom = struct
     let ranged = read_int name state in
     let ranged = if minimum > 0 then ranged + minimum else ranged in
     if not (minimum <= ranged && ranged <= maximum) then
-      raise (Invalid_int {min = minimum; v = ranged; max = maximum});
+      raise (Invalid_int {min = minimum; v = ranged; max = maximum}) ;
     ranged
 
   let ranged_float ~minimum ~maximum name state =
     let ranged = float name state in
     if not (minimum <= ranged && ranged <= maximum) then
-      raise (Invalid_float {min = minimum; v = ranged; max = maximum});
+      raise (Invalid_float {min = minimum; v = ranged; max = maximum}) ;
     ranged
 
   let rec read_z res value bit_in_value name state initial_offset =
@@ -158,21 +158,21 @@ module Atom = struct
     let (bit_in_value, value) =
       if bit_in_value < 8 then (bit_in_value, value)
       else (
-        Buffer.add_char res (Char.unsafe_chr (value land 0xFF));
-        (bit_in_value - 8, value lsr 8) )
+        Buffer.add_char res (Char.unsafe_chr (value land 0xFF)) ;
+        (bit_in_value - 8, value lsr 8))
     in
     if byte land 0x80 = 0x80 then
       read_z res value bit_in_value name state initial_offset
     else (
-      if bit_in_value > 0 then Buffer.add_char res (Char.unsafe_chr value);
-      if byte = 0x00 then raise Trailing_zero;
+      if bit_in_value > 0 then Buffer.add_char res (Char.unsafe_chr value) ;
+      if byte = 0x00 then raise Trailing_zero ;
       let result = Z.of_bits (Buffer.contents res) in
       let pretty_printed = Z.to_string result in
       let value =
         String.sub state.buffer initial_offset (state.offset - initial_offset)
       in
-      state.slices <- {name; value; pretty_printed} :: state.slices;
-      result )
+      state.slices <- {name; value; pretty_printed} :: state.slices ;
+      result)
 
   let n name state =
     let initial_offset = state.offset in
@@ -187,7 +187,7 @@ module Atom = struct
       let value =
         String.sub state.buffer initial_offset (state.offset - initial_offset)
       in
-      state.slices <- {name; value; pretty_printed} :: state.slices;
+      state.slices <- {name; value; pretty_printed} :: state.slices ;
       result
 
   let z name state =
@@ -213,7 +213,7 @@ module Atom = struct
       | `Uint30 -> uint30
     in
     let index = read_index name state in
-    if index >= Array.length arr then raise No_case_matched;
+    if index >= Array.length arr then raise No_case_matched ;
     arr.(index)
 
   let fixed_length_bytes length =
@@ -259,7 +259,7 @@ let rec read_rec :
       Atom.fixed_length_string state.remaining_bytes !!"string" state
   | Padded (e, n) ->
       let v = read_rec e ?name state in
-      ignore (Atom.fixed_length_string n "padding" state : string);
+      ignore (Atom.fixed_length_string n "padding" state : string) ;
       v
   | RangedInt {minimum; maximum} ->
       Atom.ranged_int ~minimum ~maximum !!"ranged int" state
@@ -282,8 +282,8 @@ let rec read_rec :
       if state.remaining_bytes = 0 then None
       else Some (read_rec e ~name:!!name state)
   | Objs {kind = `Fixed sz; left; right} ->
-      ignore (check_remaining_bytes state sz : int);
-      ignore (check_allowed_bytes state sz : int option);
+      ignore (check_remaining_bytes state sz : int) ;
+      ignore (check_allowed_bytes state sz : int option) ;
       let left = read_rec left ?name state in
       let right = read_rec right ?name state in
       (left, right)
@@ -295,8 +295,8 @@ let rec read_rec :
       read_variable_pair left right ?name state
   | Tup e -> read_rec e ?name state
   | Tups {kind = `Fixed sz; left; right} ->
-      ignore (check_remaining_bytes state sz : int);
-      ignore (check_allowed_bytes state sz : int option);
+      ignore (check_remaining_bytes state sz : int) ;
+      ignore (check_allowed_bytes state sz : int option) ;
       let left = read_rec left ?name state in
       let right = read_rec right ?name state in
       (left, right)
@@ -318,8 +318,8 @@ let rec read_rec :
                     let {value; pretty_printed; _} = List.hd state.slices in
                     state.slices <-
                       {name = title ^ " tag"; value; pretty_printed}
-                      :: List.tl state.slices;
-                    true )
+                      :: List.tl state.slices ;
+                    true)
                   else false)
             cases
         with Not_found -> raise (Unexpected_tag ctag)
@@ -328,11 +328,11 @@ let rec read_rec :
   | Dynamic_size {kind; encoding = e} ->
       let sz = Atom.int kind "dynamic length" state in
       let remaining = check_remaining_bytes state sz in
-      state.remaining_bytes <- sz;
-      ignore (check_allowed_bytes state sz : int option);
+      state.remaining_bytes <- sz ;
+      ignore (check_allowed_bytes state sz : int option) ;
       let v = read_rec e ?name state in
-      if state.remaining_bytes <> 0 then raise Extra_bytes;
-      state.remaining_bytes <- remaining;
+      if state.remaining_bytes <> 0 then raise Extra_bytes ;
+      state.remaining_bytes <- remaining ;
       v
   | Check_size {limit; encoding = e} ->
       let old_allowed_bytes = state.allowed_bytes in
@@ -341,7 +341,7 @@ let rec read_rec :
         | None -> limit
         | Some current_limit -> min current_limit limit
       in
-      state.allowed_bytes <- Some limit;
+      state.allowed_bytes <- Some limit ;
       let v = read_rec e ?name state in
       let allowed_bytes =
         match old_allowed_bytes with
@@ -355,7 +355,7 @@ let rec read_rec :
             let read = limit - remaining in
             Some (old_limit - read)
       in
-      state.allowed_bytes <- allowed_bytes;
+      state.allowed_bytes <- allowed_bytes ;
       v
   | Describe {encoding = e; id; _} -> read_rec e ~name:!!id state
   | Splitted {encoding = e; _} -> read_rec e ?name state
@@ -376,13 +376,13 @@ and read_variable_pair :
       let right = read_rec e2 ?name state in
       (left, right)
   | (`Variable, `Fixed n) ->
-      if n > state.remaining_bytes then raise Not_enough_data;
-      state.remaining_bytes <- state.remaining_bytes - n;
+      if n > state.remaining_bytes then raise Not_enough_data ;
+      state.remaining_bytes <- state.remaining_bytes - n ;
       let left = read_rec e1 ?name state in
-      assert (state.remaining_bytes = 0);
-      state.remaining_bytes <- n;
+      assert (state.remaining_bytes = 0) ;
+      state.remaining_bytes <- n ;
       let right = read_rec e2 ?name state in
-      assert (state.remaining_bytes = 0);
+      assert (state.remaining_bytes = 0) ;
       (left, right)
   | _ -> assert false
 
@@ -425,7 +425,7 @@ let slice_string_exn encoding buffer =
     }
   in
   let _ = read_rec encoding state in
-  if state.offset <> len then raise Extra_bytes;
+  if state.offset <> len then raise Extra_bytes ;
   List.rev state.slices
 
 let slice_string encoding buffer =

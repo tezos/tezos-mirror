@@ -139,8 +139,8 @@ let all_ranged_int minimum maximum =
     splitted
       ~json:(ranged_int (minimum - 1) (maximum + 1))
       ~binary:
-        ( if signed then ranged_int (minimum - 1) (maximum + 1)
-        else ranged_int minimum (maximum + 1) )
+        (if signed then ranged_int (minimum - 1) (maximum + 1)
+        else ranged_int minimum (maximum + 1))
   in
   let name = Format.asprintf "ranged_int.%d" minimum in
   all ~expected:invalid_int (name ^ ".max") write_encoding encoding (maximum + 1)

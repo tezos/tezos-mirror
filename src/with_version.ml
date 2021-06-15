@@ -39,9 +39,9 @@ let make_encoding ~name l =
 type _ t =
   | Version_0 : 'v0 encoding -> 'v0 t
   | Version_S : {
-      previous: 'vn t;
-      encoding: 'vnp1 encoding;
-      upgrade: 'vn -> 'vnp1;
+      previous : 'vn t;
+      encoding : 'vnp1 encoding;
+      upgrade : 'vn -> 'vnp1;
     }
       -> 'vnp1 t
 

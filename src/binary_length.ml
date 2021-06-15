@@ -70,7 +70,7 @@ let rec length : type x. x Encoding.t -> x -> int =
       length left v1 + length right v2
   | Mu {kind = `Dynamic; fix; _} -> length (fix e) value
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) -> (
-      match value with None -> 1 | Some value -> 1 + length e value )
+      match value with None -> 1 | Some value -> 1 + length e value)
   (* Variable *)
   | Ignore -> 0
   | Bytes `Variable -> Bytes.length value
@@ -88,12 +88,12 @@ let rec length : type x. x Encoding.t -> x -> int =
       let (v1, v2) = value in
       length left v1 + length right v2
   | Obj (Opt {kind = `Variable; encoding = e; _}) -> (
-      match value with None -> 0 | Some value -> length e value )
+      match value with None -> 0 | Some value -> length e value)
   | Mu {kind = `Variable; fix; _} -> length (fix e) value
   (* Variable or Dynamic we don't care for those constructors *)
   | Union {kind = `Dynamic | `Variable; tag_size; match_case; _} ->
       let (Matched (tag, e, value)) = match_case value in
-      assert (tag <= Binary_size.max_int tag_size);
+      assert (tag <= Binary_size.max_int tag_size) ;
       Binary_size.tag_size tag_size + length e value
   (* Recursive*)
   | Obj (Req {encoding = e; _}) -> length e value
@@ -107,7 +107,7 @@ let rec length : type x. x Encoding.t -> x -> int =
       Binary_size.integer_to_size kind + length
   | Check_size {limit; encoding = e} ->
       let length = length e value in
-      if length > limit then raise (Write_error Size_limit_exceeded);
+      if length > limit then raise (Write_error Size_limit_exceeded) ;
       length
   | Delayed f -> length (f ()) value
 
@@ -138,8 +138,8 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | Z -> None
   | RangedInt {minimum; maximum} ->
       Some
-        ( Binary_size.integer_to_size
-        @@ Binary_size.range_to_size ~minimum ~maximum )
+        (Binary_size.integer_to_size
+        @@ Binary_size.range_to_size ~minimum ~maximum)
   | Float -> Some Binary_size.float
   | RangedFloat _ -> Some Binary_size.float
   | Bytes (`Fixed n) -> Some n

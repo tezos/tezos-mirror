@@ -45,7 +45,7 @@ let list_result =
   ]
 
 (* record *)
-type record = {p: int; q: string; b: bool; f: float}
+type record = {p : int; q : string; b : bool; f : float}
 
 let record_enc =
   let open Data_encoding in
@@ -64,7 +64,7 @@ let record_result =
 (* f *)
 
 (* union *)
-type union = A of {arg1: int; arg2: bool} | B
+type union = A of {arg1 : int; arg2 : bool} | B
 
 let union_enc =
   let open Data_encoding in
@@ -194,12 +194,12 @@ let qualified_example = 5
 let qualified_result = ["5"]
 
 let () =
-  Data_encoding.Registration.register list_enc;
-  Data_encoding.Registration.register record_enc;
-  Data_encoding.Registration.register union_enc;
-  Data_encoding.Registration.register option_enc;
-  Data_encoding.Registration.register parameter_enc;
-  Data_encoding.Registration.register recursive_enc;
+  Data_encoding.Registration.register list_enc ;
+  Data_encoding.Registration.register record_enc ;
+  Data_encoding.Registration.register union_enc ;
+  Data_encoding.Registration.register option_enc ;
+  Data_encoding.Registration.register parameter_enc ;
+  Data_encoding.Registration.register recursive_enc ;
   Data_encoding.Registration.register qualified_enc
 
 let bin_list = Data_encoding.Binary.to_string_exn list_enc list_example
@@ -244,7 +244,7 @@ let slice_test id result expected () =
       match Data_encoding.Registration.slice r result with
       | Error e ->
           Alcotest.failf "Error %a" Data_encoding.Binary.pp_read_error e
-      | Ok l -> check_sliced_fields_result l expected )
+      | Ok l -> check_sliced_fields_result l expected)
 
 let tests =
   [

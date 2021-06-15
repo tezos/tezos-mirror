@@ -15,7 +15,7 @@ depends: [
   "json-data-encoding-bson" { = "0.9.1" }
   "alcotest" { with-test }
   "crowbar" { >= "0.2" & with-test }
-  "ocamlformat" { = "0.15.0" & dev }
+  "ocamlformat" { = "0.18.0" & dev }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

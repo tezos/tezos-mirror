@@ -34,9 +34,9 @@ type json =
 type schema = Json_schema.schema
 
 type pair_builder = {
-  build:
-    'a 'b. Encoding.Kind.t -> 'a Encoding.t -> 'b Encoding.t ->
-    ('a * 'b) Encoding.t;
+  build :
+    'a 'b.
+    Encoding.Kind.t -> 'a Encoding.t -> 'b Encoding.t -> ('a * 'b) Encoding.t;
 }
 
 exception Parse_error of string
@@ -62,13 +62,13 @@ let n_encoding =
     ~description:"Decimal representation of a positive big number"
   @@ conv
        (fun z ->
-         if Z.sign z < 0 then invalid_arg "negative natural";
+         if Z.sign z < 0 then invalid_arg "negative natural" ;
          Z.to_string z)
        (fun s ->
          let n = Z.of_string s in
          if Z.sign n < 0 then
            raise
-             (Json_encoding.Cannot_destruct ([], Failure "negative natural"));
+             (Json_encoding.Cannot_destruct ([], Failure "negative natural")) ;
          n)
        string
 
@@ -171,7 +171,7 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
                  match_case;
                  cases = List.map lift cases;
                }
-      | e -> make @@ Conv {proj; inj; encoding = e; schema} )
+      | e -> make @@ Conv {proj; inj; encoding = e; schema})
   | Objs {kind; left; right} ->
       lift_union_in_pair
         {build = (fun kind left right -> make @@ Objs {kind; left; right})}
@@ -287,7 +287,7 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
                ( [],
                  Unexpected
                    ( Format.asprintf "string (len %d)" found,
-                     Format.asprintf "string (len %d)" expected ) ));
+                     Format.asprintf "string (len %d)" expected ) )) ;
         s
       in
       conv check check raw_string_encoding
@@ -302,7 +302,7 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
                ( [],
                  Unexpected
                    ( Format.asprintf "string (len %d)" found,
-                     Format.asprintf "string (len %d)" expected ) ));
+                     Format.asprintf "string (len %d)" expected ) )) ;
         s
       in
       conv check check bytes_jsont
@@ -347,7 +347,7 @@ and get_json : type a. a Encoding.t -> a Json_encoding.encoding =
   match e.json_encoding with
   | None ->
       let json_encoding = json (lift_union e).encoding in
-      e.json_encoding <- Some json_encoding;
+      e.json_encoding <- Some json_encoding ;
       json_encoding
   | Some json_encoding -> json_encoding
 

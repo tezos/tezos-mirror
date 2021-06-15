@@ -39,12 +39,12 @@ let test_too_big_fails i =
   | _ -> ()
 
 let test_32_is_not_31 () =
-  test_too_big_fails Int32.max_int;
-  test_too_big_fails Int32.(sub max_int 1l);
-  test_too_big_fails Int32.(sub max_int 3124l);
-  test_too_big_fails Int32.min_int;
-  test_too_big_fails Int32.(add min_int 1l);
-  test_too_big_fails Int32.(add min_int 3124l);
+  test_too_big_fails Int32.max_int ;
+  test_too_big_fails Int32.(sub max_int 1l) ;
+  test_too_big_fails Int32.(sub max_int 3124l) ;
+  test_too_big_fails Int32.min_int ;
+  test_too_big_fails Int32.(add min_int 1l) ;
+  test_too_big_fails Int32.(add min_int 3124l) ;
   ()
 
 let test_small_enough_succeeds i =
@@ -56,10 +56,10 @@ let test_small_enough_succeeds i =
   assert (encodable = decoded)
 
 let test_31_is_31 () =
-  test_small_enough_succeeds 0;
-  test_small_enough_succeeds 0x23f4;
-  test_small_enough_succeeds Int32.(to_int (div max_int 2l));
-  test_small_enough_succeeds Int32.(to_int (div min_int 2l));
+  test_small_enough_succeeds 0 ;
+  test_small_enough_succeeds 0x23f4 ;
+  test_small_enough_succeeds Int32.(to_int (div max_int 2l)) ;
+  test_small_enough_succeeds Int32.(to_int (div min_int 2l)) ;
   ()
 
 let test_small_enough_is_compatible i =
@@ -71,10 +71,10 @@ let test_small_enough_is_compatible i =
   assert (encodable = Int32.of_int decoded)
 
 let test_small_32_is_31 () =
-  test_small_enough_is_compatible 0l;
-  test_small_enough_is_compatible 0x23f4l;
-  test_small_enough_is_compatible Int32.(div max_int 2l);
-  test_small_enough_is_compatible Int32.(div min_int 2l);
+  test_small_enough_is_compatible 0l ;
+  test_small_enough_is_compatible 0x23f4l ;
+  test_small_enough_is_compatible Int32.(div max_int 2l) ;
+  test_small_enough_is_compatible Int32.(div min_int 2l) ;
   ()
 
 let tests =
