@@ -96,7 +96,8 @@ type error +=
   | Cannot_write_metadata of string
   | Cannot_read of {
       kind :
-        [ `Metadata
+        [ `Version
+        | `Metadata
         | `Block_data
         | `Context
         | `Protocol_table
@@ -126,16 +127,6 @@ type error +=
 (** Current version of snapshots *)
 val current_version : int
 
-(** The type of the snapshot [metadata]. *)
-type metadata
-
-type snapshot_metadata =
-  | Current_metadata of metadata
-  | Legacy_metadata of {
-      version : string;
-      legacy_history_mode : History_mode.Legacy.t;
-    }
-
 type snapshot_format = Tar | Raw
 
 val pp_snapshot_format : Format.formatter -> snapshot_format -> unit
@@ -144,16 +135,19 @@ val snapshot_format_encoding : snapshot_format Data_encoding.t
 
 type snapshot_kind = Current of snapshot_format | Legacy | Invalid
 
-(** Encoding of a snapshot's {!metadata} *)
-val metadata_encoding : metadata Data_encoding.t
+type snapshot_header
 
-(** Pretty-printer of a snapshot's {!metadata} *)
-val pp_metadata : Format.formatter -> metadata -> unit
+(** [version snapshot_header] returns the version of a given
+    [snapshot_header] as an integer value. *)
+val version : snapshot_header -> int
 
-(** [read_snapshot_metadata ~snapshot_path] reads [snapshot_file]'s
-    metadata. *)
-val read_snapshot_metadata :
-  snapshot_path:string -> snapshot_metadata tzresult Lwt.t
+(** Pretty-printer of a snapshot's {!header} *)
+val pp_snapshot_header : Format.formatter -> snapshot_header -> unit
+
+(** [read_snapshot_header ~snapshot_path] reads [snapshot_file]'s
+   header. *)
+val read_snapshot_header :
+  snapshot_path:string -> snapshot_header tzresult Lwt.t
 
 (** [export ?snapshot_path snapshot_format ?rolling ~block ~store_dir
    ~context_dir ~chain_name genesis] reads from the [store_dir] and

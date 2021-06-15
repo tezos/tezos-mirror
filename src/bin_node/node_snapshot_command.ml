@@ -252,22 +252,15 @@ module Term = struct
               ~user_activated_protocol_overrides:
                 node_config.blockchain_network.user_activated_protocol_overrides
           else return_unit
-      | Info -> (
+      | Info ->
           check_snapshot_path snapshot_path >>=? fun snapshot_path ->
-          Snapshots.read_snapshot_metadata ~snapshot_path >>=? function
-          | Snapshots.Current_metadata metadata ->
-              Format.printf
-                "@[<v 2>Snapshot information:@ %a@]@."
-                Snapshots.pp_metadata
-                metadata ;
-              return_unit
-          | Legacy_metadata {version; legacy_history_mode} ->
-              Format.printf
-                "@[<v 2>Snapshot version %s in %a@ @]@."
-                version
-                History_mode.Legacy.pp
-                legacy_history_mode ;
-              return_unit)
+          Snapshots.read_snapshot_header ~snapshot_path
+          >>=? fun snapshot_header ->
+          Format.printf
+            "@[<v 2>Snapshot information:@ %a@]@."
+            Snapshots.pp_snapshot_header
+            snapshot_header ;
+          return_unit
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () -> `Ok ()

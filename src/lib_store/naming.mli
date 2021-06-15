@@ -194,6 +194,10 @@ val snapshot_metadata_file :
   [< `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
   [`Snapshot_metadata] file
 
+val snapshot_version_file :
+  [< `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
+  [`Snapshot_version] file
+
 val snapshot_protocol_levels_file :
   [< `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
   ( [`Snapshot_protocol_levels],

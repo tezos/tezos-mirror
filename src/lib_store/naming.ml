@@ -184,6 +184,8 @@ let snapshot_floating_blocks_file dir = mk_file dir "floating_blocks"
 
 let snapshot_metadata_file dir = mk_file dir "metadata.json"
 
+let snapshot_version_file dir = mk_file dir "snapshot_version.json"
+
 let snapshot_protocol_levels_file dir =
   make_encoded_file dir ~filename:"protocol_levels" Protocol_levels.encoding
 
