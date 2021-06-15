@@ -75,16 +75,20 @@ Some ad-hoc reference kinds are supported.
 - ``:opam:`package``` or ``:opam:`text<package>``` points to the
   package page on ``opam.ocaml.org``, version number is supported
   (``package.version``)
-- ``:gl:`<special gitlab reference>``` or ``:opam:`text<special gitlab
-  reference>``` expands and links `GitLab special reference
+- ``:gl:`[special gitlab reference]``` or ``:gl:`text <[special gitlab
+  reference]>``` expands and links `GitLab special references
   <https://docs.gitlab.com/ce/user/markdown.html#special-gitlab-references>`_,
-  like for merge requests `tezos/tezos!123`, issues `tezos/tezos#999`
-  and commits `28309c81`. The default project and namespace is
-  `tezos/tezos`. In other words, `tezos/tezos#999`, `tezos#999` and
-  `#999` all refer to the same thing. Currently supports usernames,
+  like for
+  merge requests :gl:`tezos/tezos!123` (``:gl:`tezos/tezos!123```),
+  issues :gl:`tezos/tezos#999` (``:gl:`tezos/tezos#999```)
+  and
+  commits :gl:`28309c81` (``:gl:`28309c81```).
+  The default project and namespace is
+  ``tezos/tezos``. In other words, ``tezos/tezos#999``, ``tezos#999`` and
+  ``#999`` all refer to the same thing. Currently supports usernames,
   projects, issues, merge requests, snippets, milestone ids, commits
-  and commit ranges. This is implemented in
-  `docs/_extensions/gitlab_custom_role.py`.
+  and commit ranges. The implementation of this role is in
+  :src:`docs/_extensions/gitlab_custom_role.py`.
 
 Style guidelines
 ----------------
@@ -100,10 +104,11 @@ For that, you should build the documentation (by running ``make`` in the ``docs`
 Links
 ~~~~~
 
-+When introducing cross-references between documentation pages as well as references to external resources, please consider using the most appropriate kind of link:
+When introducing cross-references between documentation pages as well as references to external resources, please consider using the most appropriate kind of link:
 
-- When referring to a whole documentation page, you may use a ``:doc:`` role instead of introducing a label at the start of the page.
+- When referring to a whole documentation page, you should use a ``:doc:`` role rather than introducing a label at the start of the page.
   Indeed, labels incur an overhead, especially when pages get duplicated for different protocol versions.
+  In particular, when referring to a page of the currently active protocol, consider using ``active/`` as the directory of that page, instead of a hardcoded protocol number ``NNN/``.
 - When referring to an artifact in the code repository (source file, commit, etc.), you may use an appropriate custom or GitLab role (see `Sphinx extensions`_) instead of a plain HTML link.
   Indeed, specific roles are checked for correctness more effectively and more efficiently than HTML links.
 
@@ -134,8 +139,8 @@ Executable documentation allows one to test those scripts, e.g. in CI (continuou
 Typically, Tezos installation scripts not only have to evolve with the Tezos codebase, but also with various other evolving resources, such as OPAM packages, package managers, Linux distrbutions, and so on.
 By continuously testing such installation scripts, executable documentation allows one to detect problems and fix obsolete instructions as early as possible, avoiding headaches and frustration, for new end users and experienced developers alike.
 
-+Technically, executable documentation can be created by using the Sphinx directive `literalinclude <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-literalinclude>`_, which may include whole scripts or parts of them.
-+For example, the following directive includes a script fragment detailing a step in compiling the Tezos sources::
+Technically, executable documentation can be created by using the Sphinx directive `literalinclude <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-literalinclude>`_, which may include whole scripts or parts of them.
+For example, the following directive includes a script fragment detailing a step in compiling the Tezos sources::
 
   .. literalinclude:: compile-sources.sh
     :language: shell
@@ -230,6 +235,8 @@ Documenting protocols
 Due to the duplication of the documentation for multiple protocol versions, the following extra guidelines should be observed.
 
 - In principle, protocol-independent pages should only refer to the currently active protocol. Indeed, until newer protocols are adopted, there is no guarantee that their features will be part of Tezos someday.
+  Note that there is a symbolic link called ``active`` within the documentation folder pointing to the currently active protocol directory.
+  Use it whenever appropriate to avoid introducing hardcoded protocol numbers.
 
 - When modifying the pages of a given protocol version, you might have to also modify it for later versions. Otherwise, when newer protocols are adopted, your changes will vanish! In particular, when fixing a problem in the documentation of the current protocol (e.g. adding a term in the glossary), you might have to fix it also for the candidate protocol (if there is one under the voting procedure) and for the Alpha protocol under development (assuming that the features of the candidate protocol will be inherited by or proposed in another form in Alpha).
 

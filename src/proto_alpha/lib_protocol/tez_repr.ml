@@ -183,7 +183,7 @@ let () =
         pp
         opb
         id)
-    ~description:("An subtraction of two " ^ id ^ " amounts underflowed")
+    ~description:("A subtraction of two " ^ id ^ " amounts underflowed")
     (obj1 (req "amounts" (tup2 encoding encoding)))
     (function Subtraction_underflow (a, b) -> Some (a, b) | _ -> None)
     (fun (a, b) -> Subtraction_underflow (a, b)) ;

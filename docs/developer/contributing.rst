@@ -28,8 +28,8 @@ while Z was expected*).
 Going further
 ~~~~~~~~~~~~~
 
-+You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository.
-This kind of small contribution can be done without creating a merge request, by directly pushing commits to the ``typo-train`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
+You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository.
+This kind of small contributions can be done without creating a merge request, by directly pushing commits to the ``typo-doc`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
 Of course, all these commits will be reviewed before being integrated.
 
 To directly contribute to the *codebase*, expertise in a few areas is necessary.
