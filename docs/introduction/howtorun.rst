@@ -1,14 +1,15 @@
 .. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
 
-.. _howtorun:
-
 How to run Tezos
 ================
 
 In this section, we discuss how to take part in the protocol that runs
 the network.
-There are two main ways to participate in the consensus, delegating
+There are two main ways to participate in the consensus: delegating
 your coins and running a delegate.
+The main advantage of delegating your coins is simplicity.
+The second way allows to participate more actively in the protocol, by baking blocks and voting, but is more demanding; however, the extra effort is compensated by more rewards in tez.
+
 To learn more about the protocol refer to :doc:`this page <../active/proof_of_stake>`.
 
 
@@ -94,10 +95,12 @@ deposits for all the blocks it can potentially bake/endorse during
 ``preserved_cycles``.
 The current deposits are *512ꜩ* for baked block and *64ꜩ* for
 endorsement.
-Note that being delegated coins doesn't mean that a delegate can spend
+Note that delegating coins doesn't mean that a delegate can spend
 them, they only add up to its rolls count while all the deposits must
 come from the delegate's account.
-
+In turn, delegators can freely spend their own funds in spite of the active delegation (they are not locked, like in other PoS algorithms).
+Technically, delegation is a link between a delegator account and a delegate account, meaning that *all* the funds of the former are delegated to the latter, until the delegation is withdrawn.
+When a delegator spends their tokens, the delegated balance of their delegate decreases; when they receive tokens the delegated balance of their delegate increases.
 If a delegate runs out of funds to deposit it won't be able to bake or
 endorse. Other than being a missed opportunity for them, this has also
 negative consequences on the network.
@@ -107,9 +110,11 @@ reduce the fitness of the chain, making it more susceptible to forks.
 Running out of funds can happen if a delegate is *over-delegated*,
 that is if the amount of rolls it was delegate is disproportionate
 with respect to its available funds.
-It is the responsibility of every delegator to make sure a delegate is
-not already over-delegated (a delegate cannot refuse a delegation) and
-each delegate should plan carefully its deposits.
+
+It is in the interest of every delegator to make sure a delegate is
+not already over-delegated, because a delegate cannot refuse a delegation.
+Indeed, over-delegation translates in missed baking and endorsing slots, as explained above, and hence in missed rewards. On the other hand,
+each delegate should plan carefully its deposits, as explained next, by buying more tez if needed.
 
 .. _expected_rights:
 
@@ -125,8 +130,8 @@ The number of active rolls can be computed with two RPCs. First, we
 list all the active delegates with ``delegates?active``. Then, we sum
 all their ``stacking_balance``. Finally, we simply divide by the size of a
 roll, 8kꜩ.
-At the time of writing, on Betanet the number of active rolls is ~30k
-so for each block, we know that the chance that we get selected for
+For example, if the number of active rolls is ~30k then,
+for each block, we know that the chance that we get selected for
 baking is ``1/30k`` while for endorsing is 32 times that.
 Given that every draw is with replacement, the distribution that
 describes our chances of being selected is the binomial with
@@ -149,7 +154,7 @@ confidence that we can put to 95%.
 There a simple `Python
 script <https://gitlab.com/paracetamolo/utils/blob/master/estimated-rights.py>`_
 that does the computation for us and returns the deposits and rewards,
-expected and maximum, for a cycle and `preserved_cycles`.
+expected and maximum, for a cycle and ``preserved_cycles``.
 
 ::
 
@@ -238,7 +243,7 @@ If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
 
 To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and endorsing slots assigned to it, using a block explorer in the :ref:`Tezos community <tezos_community>`.
-Alternatively, you may use the :ref:`baking rights RPC <GET_..--block_id--helpers--baking_rights>`) and the :ref:`endorsing rights RPC <GET_..--block_id--helpers--endorsing_rights>`, able to return a list of baking/endorsing slots for a given delegate.
+Alternatively, you may use the :ref:`baking rights RPC <GET_..--block_id--helpers--baking_rights>`) and the :ref:`endorsing rights RPC <GET_..--block_id--helpers--endorsing_rights>`, able to return a list of baking/endorsing slots for a given delegate (see :ref:`example <DelegateRegistration>`).
 
 .. _baker_run:
 
@@ -246,10 +251,10 @@ Baker
 ~~~~~
 
 The baker is a daemon that, once connected to an account, computes the
-baking rights for that account, collects transactions from the mempool
-and bakes a block.
-Note that the baker is the only program that needs direct access to
-the node data directory for performance reasons.
+baking rights for that account, selects transactions from the mempool
+and bakes blocks.
+Note that the baker needs direct access to
+the node data directory for performance reasons (to avoid RPC calls to the node).
 
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
