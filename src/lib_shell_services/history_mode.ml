@@ -179,7 +179,7 @@ let pp ppf = function
         pp_additional_cycles
         default_additional_cycles
   | Full (Some additional_cycles) ->
-      Format.fprintf ppf "Fulll mode%a" pp_additional_cycles additional_cycles
+      Format.fprintf ppf "Full mode%a" pp_additional_cycles additional_cycles
   | Rolling (Some additional_cycles) ->
       Format.fprintf ppf "Rolling mode%a" pp_additional_cycles additional_cycles
 
