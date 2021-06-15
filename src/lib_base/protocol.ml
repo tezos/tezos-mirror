@@ -33,6 +33,8 @@ and component = {
 
 and env_version = V0 | V1 | V2 | V3
 
+let compare_version = Stdlib.compare
+
 include Compare.Make (struct
   type nonrec t = t
 

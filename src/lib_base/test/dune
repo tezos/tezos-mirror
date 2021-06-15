@@ -2,6 +2,7 @@
  (names
    test_time
    test_p2p_addr
+   test_protocol
  )
  (libraries
    tezos-base
@@ -20,6 +21,7 @@
  (deps
    test_time.exe
    test_p2p_addr.exe
+   test_protocol.exe
  )
  (action (progn)))
 
@@ -29,6 +31,9 @@
 (rule
  (alias runtest_p2p_addr)
  (action (run %{exe:test_p2p_addr.exe})))
+(rule
+ (alias runtest_protocol)
+ (action (run %{exe:test_protocol.exe})))
 
 (rule
  (alias runtest)
@@ -36,6 +41,7 @@
  (deps
    (alias runtest_time)
    (alias runtest_p2p_addr)
+   (alias runtest_protocol)
  )
  (action (progn)))
 
