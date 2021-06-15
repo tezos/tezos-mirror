@@ -2578,27 +2578,12 @@ module Raw_importer : IMPORTER = struct
         dst_chain_dir;
       }
 
-  let load_snapshot_version t =
-    let version_file =
-      Naming.(snapshot_version_file t.snapshot_dir |> file_path)
-    in
-    let read_config json =
-      Data_encoding.Json.destruct Version.version_encoding json
-    in
-    Lwt_utils_unix.Json.read_file version_file >>=? fun json ->
-    return (read_config json)
-
-  let load_snapshot_metadata t =
-    let metadata_file =
-      Naming.(snapshot_metadata_file t.snapshot_dir |> file_path)
-    in
-    let read_config json = Data_encoding.Json.destruct metadata_encoding json in
-    Lwt_utils_unix.Json.read_file metadata_file >>=? fun json ->
-    return (read_config json)
-
   let load_snapshot_header t =
-    load_snapshot_version t >>=? fun version ->
-    load_snapshot_metadata t >>=? fun metadata -> return (version, metadata)
+    let (module Loader) =
+      (module Make_snapshot_loader (Raw_loader) : Snapshot_loader)
+    in
+    Loader.load_snapshot_header
+      ~snapshot_path:Naming.(t.snapshot_dir |> dir_path)
 
   let load_block_data t =
     let file = Naming.(snapshot_block_data_file t.snapshot_dir |> file_path) in
@@ -2844,35 +2829,12 @@ module Tar_importer : IMPORTER = struct
         files;
       }
 
-  let load_snapshot_version t =
-    let filename = Naming.(snapshot_version_file t.snapshot_tar |> file_path) in
-    (Onthefly.find_file t.tar ~filename >>= function
-     | Some file ->
-         Onthefly.load_file t.tar file >>= fun bytes ->
-         Lwt.return
-           (Data_encoding.Binary.of_bytes_opt Version.version_encoding bytes)
-     | None -> Lwt.return_none)
-    >>= function
-    | Some version -> return version
-    | None -> fail (Cannot_read {kind = `Version; path = filename})
-
-  let load_snapshot_metadata t =
-    let filename =
-      Naming.(snapshot_metadata_file t.snapshot_tar |> file_path)
-    in
-    (Onthefly.load_from_filename t.tar ~filename >>= function
-     | Some bytes -> (
-         match Data_encoding.Binary.of_bytes_opt metadata_encoding bytes with
-         | Some metadata -> return_some metadata
-         | None -> return_none)
-     | None -> return_none)
-    >>=? function
-    | Some metadata -> return metadata
-    | None -> fail (Cannot_read {kind = `Metadata; path = filename})
-
   let load_snapshot_header t =
-    load_snapshot_version t >>=? fun version ->
-    load_snapshot_metadata t >>=? fun metadata -> return (version, metadata)
+    let (module Loader) =
+      (module Make_snapshot_loader (Tar_loader) : Snapshot_loader)
+    in
+    Loader.load_snapshot_header
+      ~snapshot_path:Naming.(t.snapshot_file |> file_path)
 
   let load_block_data t =
     let filename =
