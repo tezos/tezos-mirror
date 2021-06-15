@@ -49,7 +49,7 @@ module Documented_example = struct
 
   (** The first version has a [(string * string) list] field. *)
   module V0 = struct
-    type t = {message: string; attachment: (string * string) list}
+    type t = {message : string; attachment : (string * string) list}
 
     (** This is the "naked" (i.e. non-versioned) encoding of version-0: *)
     let encoding =
@@ -70,15 +70,15 @@ module Documented_example = struct
 
     let pp ppf {message; attachment} =
       let open Format in
-      fprintf ppf "%s:@ %s@ [" name message;
-      pp_open_box ppf 2;
+      fprintf ppf "%s:@ %s@ [" name message ;
+      pp_open_box ppf 2 ;
       pp_print_list
         ~pp_sep:(fun fmt () -> fprintf fmt ";@ ")
         (fun fmt (k, v) -> fprintf fmt "%s: %S" k v)
         ppf
-        attachment;
-      pp_close_box ppf ();
-      fprintf ppf "]";
+        attachment ;
+      pp_close_box ppf () ;
+      fprintf ppf "]" ;
       ()
   end
 
@@ -86,7 +86,7 @@ module Documented_example = struct
       Json and not just a key-value list: *)
   module V1 = struct
     (** Version 1 is very similar to {!Internal_event.Debug_event}: *)
-    type t = {message: string; attachment: Data_encoding.Json.t}
+    type t = {message : string; attachment : Data_encoding.Json.t}
 
     let make ?(attach = `Null) message () = {message; attachment = attach}
 
@@ -157,7 +157,7 @@ module Documented_example = struct
         Data_encoding.Json.pp
         json_v0
         Data_encoding.Json.pp
-        expected_json_v0;
+        expected_json_v0 ;
     (* Up to here we only used the {!First_version} module. Now the
        same process with {!Second_version}: *)
     let v1_thing : Second_version.t =
@@ -186,7 +186,7 @@ module Documented_example = struct
         Data_encoding.Json.pp
         json_v1
         Data_encoding.Json.pp
-        expected_json_v1;
+        expected_json_v1 ;
     (* Now the {b interesting part}, we decode ("destruct") the JSON from
        {!First_version} with {!Second_version}: *)
     let v0_decoded_later : Second_version.t =
@@ -202,7 +202,7 @@ module Documented_example = struct
         Second_version.pp
         v0_decoded_later
         Second_version.pp
-        expected_v1;
+        expected_v1 ;
     ()
 end
 
@@ -221,7 +221,7 @@ let test_n_encapsulated_versions () =
   let json_0 = Json.construct versioned_0 value_0 in
   Helpers.no_exception (fun () ->
       let result = Json.destruct versioned_0 json_0 in
-      if result <> value_0 then Alcotest.failf "value-0");
+      if result <> value_0 then Alcotest.failf "value-0") ;
   let module Ex = struct
     type v0 = string * string
 
@@ -238,25 +238,25 @@ let test_n_encapsulated_versions () =
     let json_example_n = Json.construct encoding example_n in
     Helpers.no_exception (fun () ->
         let result = Json.destruct encoding json_example_n in
-        if result <> example_n then Alcotest.failf "value-%d" index);
+        if result <> example_n then Alcotest.failf "value-%d" index) ;
     let json_example_p =
       Json.construct With_version.(encoding ~name versioned) example
     in
     Helpers.no_exception (fun () ->
         let result = Json.destruct encoding json_example_p in
         if result <> upgrade example then
-          Alcotest.failf "value-%d-previous-encoding" index);
+          Alcotest.failf "value-%d-previous-encoding" index) ;
     let next_upgrade x = upgrade (from_v0 x) in
     Helpers.no_exception (fun () ->
         let result = Json.destruct encoding json_0 in
         if result <> next_upgrade value_0 then
-          Alcotest.failf "value-%d-from-v0-encoding" index);
-    Format.eprintf "json_example_%d:@ %a\n%!" index Json.pp json_example_n;
+          Alcotest.failf "value-%d-from-v0-encoding" index) ;
+    Format.eprintf "json_example_%d:@ %a\n%!" index Json.pp json_example_n ;
     Format.eprintf
       "json_example_%d-from-v0:@ %a\n%!"
       index
       Json.pp
-      (Json.construct encoding (next_upgrade value_0));
+      (Json.construct encoding (next_upgrade value_0)) ;
     Ex.Hide (version_n, versioned_n, example_n, next_upgrade)
   in
   let (Ex.Hide _) =

@@ -986,10 +986,10 @@ module Binary : sig
     | Extra_bytes  (** Decoding requires fewer bytes than were provided. *)
     | No_case_matched  (** Unknown case in a {!string_enum}. *)
     | Unexpected_tag of int  (** Unknown case in a {!union} or {!matching}. *)
-    | Invalid_int of {min: int; v: int; max: int}
+    | Invalid_int of {min : int; v : int; max : int}
         (** An integer is out of range. E.g., an integer is beyond a
             user-provided range. *)
-    | Invalid_float of {min: float; v: float; max: float}
+    | Invalid_float of {min : float; v : float; max : float}
         (** A float is out of range. *)
     | Trailing_zero
         (** An arbitrary-precision number (N or Z) leads to a null byte. *)
@@ -1022,10 +1022,10 @@ module Binary : sig
   type write_error =
     | Size_limit_exceeded
     | No_case_matched
-    | Invalid_int of {min: int; v: int; max: int}
-    | Invalid_float of {min: float; v: float; max: float}
-    | Invalid_bytes_length of {expected: int; found: int}
-    | Invalid_string_length of {expected: int; found: int}
+    | Invalid_int of {min : int; v : int; max : int}
+    | Invalid_float of {min : float; v : float; max : float}
+    | Invalid_bytes_length of {expected : int; found : int}
+    | Invalid_string_length of {expected : int; found : int}
     | Invalid_natural
     | List_too_long
     | Array_too_long
@@ -1105,7 +1105,7 @@ module Binary : sig
 
   (** Return type for the function [read_stream]. *)
   type 'ret status =
-    | Success of {result: 'ret; size: int; stream: Binary_stream.t}
+    | Success of {result : 'ret; size : int; stream : Binary_stream.t}
         (** Fully decoded value, together with the total amount of bytes reads,
         and the remaining unread stream. *)
     | Await of (Bytes.t -> 'ret status)  (** Partially decoded value.*)
@@ -1195,7 +1195,7 @@ module Binary : sig
   module Slicer : sig
     (** A [slice] is a part of a binary representation of some data. The
       concatenation of multiple slice represents the whole data. *)
-    type slice = {name: string; value: string; pretty_printed: string}
+    type slice = {name : string; value : string; pretty_printed : string}
 
     type slicer_state
 

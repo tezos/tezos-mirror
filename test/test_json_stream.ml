@@ -106,7 +106,7 @@ let jsonm_lexeme_seq =
 let () =
   let open Crowbar in
   add_test ~name:"gen" [jsonm_lexeme_seq] (fun j ->
-      ignore j;
+      ignore j ;
       check true)
 
 let () =
@@ -186,7 +186,7 @@ let () =
       in
       let s =
         let b = Buffer.create 8 in
-        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s;
+        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s ;
         Buffer.contents b
       in
       match Data_encoding.Json.from_string s with
@@ -206,7 +206,7 @@ let () =
       in
       let s =
         let b = Buffer.create 8 in
-        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s;
+        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s ;
         Buffer.contents b
       in
       match Data_encoding.Json.from_string s with
@@ -226,7 +226,7 @@ let () =
       in
       let s =
         let b = Buffer.create 128 in
-        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s;
+        Seq.iter (fun (s, o, l) -> Buffer.add_subbytes b s o l) s ;
         Buffer.contents b
       in
       match Data_encoding.Json.from_string s with

@@ -31,9 +31,9 @@ open Data_encoding
 let test_generator ?(iterations = 50) ty encoding generator =
   for _ = 0 to iterations - 1 do
     let value = generator () in
-    Success.json ty encoding value ();
-    Success.bson ty encoding value ();
-    Success.binary ty encoding value ();
+    Success.json ty encoding value () ;
+    Success.bson ty encoding value () ;
+    Success.binary ty encoding value () ;
     Success.stream ty encoding value ()
   done
 

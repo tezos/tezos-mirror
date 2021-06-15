@@ -48,7 +48,7 @@ let full_legacy_result : type a b. a full -> b full -> (a, b) result full =
  fun fulla fullb ->
   let module Fulla = (val fulla) in
   let module Fullb = (val fullb) in
-  ( module struct
+  (module struct
     type t = (Fulla.t, Fullb.t) result
 
     let ty = Result (Fulla.ty, Fullb.ty)
@@ -62,7 +62,7 @@ let full_legacy_result : type a b. a full -> b full -> (a, b) result full =
     let gen = Crowbar.result Fulla.gen Fullb.gen
 
     let encoding = legacy_result Fulla.encoding Fullb.encoding
-  end )
+  end)
 
 let trip_binary pp code_ding decode_ding v =
   let bin =
@@ -97,15 +97,15 @@ let test_binary_compat_legacy_res (fulla_and_v : full_and_v)
       let module Fullr = (val fullr) in
       let fullleg = full_legacy_result fulla fullb in
       let module Fullleg = (val fullleg) in
-      trip_binary Fullr.pp Fullr.encoding Fullleg.encoding (Ok a);
-      trip_binary Fullr.pp Fullleg.encoding Fullr.encoding (Ok a);
-      trip_binary Fullr.pp Fullr.encoding Fullleg.encoding (Error b);
-      trip_binary Fullr.pp Fullleg.encoding Fullr.encoding (Error b);
+      trip_binary Fullr.pp Fullr.encoding Fullleg.encoding (Ok a) ;
+      trip_binary Fullr.pp Fullleg.encoding Fullr.encoding (Ok a) ;
+      trip_binary Fullr.pp Fullr.encoding Fullleg.encoding (Error b) ;
+      trip_binary Fullr.pp Fullleg.encoding Fullr.encoding (Error b) ;
       ()
 
 let () =
   Crowbar.add_test
     ~name:"binary compat legacy"
     [gen; gen]
-    test_binary_compat_legacy_res;
+    test_binary_compat_legacy_res ;
   ()

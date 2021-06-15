@@ -31,7 +31,7 @@ let () =
   (* test Stdlib.String.sub *)
   let ful = String.make 1 '0' in
   let sub = String.sub ful 0 1 in
-  tamper_with ful;
+  tamper_with ful ;
   assert (not (String.equal ful sub))
 
 let () =
@@ -40,7 +40,7 @@ let () =
   let ful = String.make 1 '0' in
   let bin = Data_encoding.Binary.to_string_exn enc ful in
   let nib = Data_encoding.Binary.of_string_exn enc bin in
-  tamper_with bin;
+  tamper_with bin ;
   assert (String.equal ful nib)
 
 let () =
@@ -53,11 +53,11 @@ let () =
     @@ Data_encoding.Binary.make_writer_state buf ~offset:0 ~allowed_bytes:1
   in
   let wri = Data_encoding.Binary.write_exn enc ful sta in
-  assert (wri = 1);
+  assert (wri = 1) ;
   let buf = Bytes.unsafe_to_string buf in
   let (red, nib) = Data_encoding.Binary.read_exn enc buf 0 1 in
-  assert (red = 1);
-  tamper_with buf;
+  assert (red = 1) ;
+  tamper_with buf ;
   assert (String.equal ful nib)
 
 let () =
@@ -66,5 +66,5 @@ let () =
   let ful = Bytes.make 1 '0' in
   let bin = Data_encoding.Binary.to_bytes_exn enc ful in
   let nib = Data_encoding.Binary.of_bytes_exn enc bin in
-  Bytes.set bin 0 'X';
+  Bytes.set bin 0 'X' ;
   assert (Bytes.equal ful nib)

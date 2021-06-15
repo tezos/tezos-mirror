@@ -28,7 +28,7 @@ type t = int
 let none = -1
 
 let some i =
-  assert (i >= 0);
+  assert (i >= 0) ;
   i
 
 let is_none t = t = none
@@ -38,5 +38,5 @@ let is_some t = t <> none
 let fold ~none:default ~some t = if t = none then default else some t
 
 let get t =
-  assert (is_some t);
+  assert (is_some t) ;
   t

@@ -27,7 +27,7 @@
     use the corresponding module intended for use: {!Data_encoding.Binary}. *)
 
 type 'ret status =
-  | Success of {result: 'ret; size: int; stream: Binary_stream.t}
+  | Success of {result : 'ret; size : int; stream : Binary_stream.t}
   | Await of (Bytes.t -> 'ret status)
   | Error of Binary_error_types.read_error
 

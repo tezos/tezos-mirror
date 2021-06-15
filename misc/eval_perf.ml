@@ -26,12 +26,12 @@
 let default_num_iterations = 1000
 
 let bench ?(num_iterations = default_num_iterations) name thunk =
-  Gc.full_major ();
-  Gc.compact ();
+  Gc.full_major () ;
+  Gc.compact () ;
   let start_time = Sys.time () in
   for _i = 0 to num_iterations - 1 do
     thunk ()
-  done;
+  done ;
   let end_time = Sys.time () in
   Format.printf
     "Benchmark: %s took %f for %d iterations.@."
@@ -54,11 +54,11 @@ let bench_all ?(num_iterations = default_num_iterations) name encoding value =
     ("writing " ^ name ^ " json")
     (fun () ->
       ignore @@ Data_encoding.Json.to_string
-      @@ Data_encoding.Json.construct encoding value);
+      @@ Data_encoding.Json.construct encoding value) ;
   bench
     ~num_iterations
     ("writing " ^ name ^ " binary")
-    (fun () -> ignore @@ Data_encoding.Binary.to_bytes_exn encoding value);
+    (fun () -> ignore @@ Data_encoding.Binary.to_bytes_exn encoding value) ;
   let encoded_json =
     Data_encoding.Json.to_string @@ Data_encoding.Json.construct encoding value
   in
@@ -69,20 +69,20 @@ let bench_all ?(num_iterations = default_num_iterations) name encoding value =
       ignore
         (Data_encoding.Json.destruct
            encoding
-           (Ezjsonm.from_string encoded_json)));
+           (Ezjsonm.from_string encoded_json))) ;
   let encoded_binary = Data_encoding.Binary.to_bytes_exn encoding value in
   bench
     ~num_iterations
     ("reading " ^ name ^ " binary")
-    (fun () -> ignore @@ Data_encoding.Binary.of_bytes encoding encoded_binary);
+    (fun () -> ignore @@ Data_encoding.Binary.of_bytes encoding encoded_binary) ;
   bench
     ~num_iterations
     ("reading " ^ name ^ " streamed binary (one chunk)")
-    (fun () -> read_stream encoding [encoded_binary]);
+    (fun () -> read_stream encoding [encoded_binary]) ;
   bench
     ~num_iterations
     ("reading " ^ name ^ " streamed binary (small chunks)")
-    (fun () -> read_stream encoding (Helpers.cut 1 encoded_binary));
+    (fun () -> read_stream encoding (Helpers.cut 1 encoded_binary)) ;
   ()
 
 type t = A of string | B of bool | I of int | F of float | R of t * t
@@ -128,20 +128,20 @@ let () =
   bench_all
     "10000_element_int_list"
     Data_encoding.(list int31)
-    (Array.to_list (Array.make 10000 0));
+    (Array.to_list (Array.make 10000 0)) ;
   bench_all
     "option_element_int_list"
     Data_encoding.(list (option int31))
-    (Array.to_list (Array.make 10000 (Some 0)));
+    (Array.to_list (Array.make 10000 (Some 0))) ;
   let encoding = Data_encoding.(list (result (option int31) string)) in
   let value = Array.to_list (Array.make 10000 (Error "hello")) in
-  bench_all "option_result_element_list" encoding value;
+  bench_all "option_result_element_list" encoding value ;
   let encoding = Data_encoding.(list cases_encoding) in
   let value =
     Array.to_list (Array.make 1000 (R (R (A "asdf", B true), F 1.0)))
   in
   bench "binary_encoding" (fun () ->
-      ignore @@ Data_encoding.Binary.to_bytes encoding value);
+      ignore @@ Data_encoding.Binary.to_bytes encoding value) ;
   bench_all
     "binary_encoding_large_list"
     Data_encoding.(list cases_encoding)

@@ -57,19 +57,19 @@ let non_empty_int8s = NonEmptyList.encoding
 let non_empty_list_roundtrip x xs =
   let data = NonEmptyList.cons x xs in
   let s = Data_encoding.Binary.to_string non_empty_int8s data in
-  assert (Result.is_ok s);
+  assert (Result.is_ok s) ;
   let s = Result.get_ok s in
   let d = Data_encoding.Binary.of_string non_empty_int8s s in
-  assert (Result.is_ok d);
-  assert (Result.get_ok d = data);
+  assert (Result.is_ok d) ;
+  assert (Result.get_ok d = data) ;
   ()
 
 let non_empty_list_roundtrip () =
-  non_empty_list_roundtrip 0 [];
-  non_empty_list_roundtrip 0 [1];
-  non_empty_list_roundtrip 0 [0; 0];
-  non_empty_list_roundtrip 4 [0; 0];
-  non_empty_list_roundtrip 10 [9; 8; 4; 3; 1; 0; 0; 0; 0; 0];
+  non_empty_list_roundtrip 0 [] ;
+  non_empty_list_roundtrip 0 [1] ;
+  non_empty_list_roundtrip 0 [0; 0] ;
+  non_empty_list_roundtrip 4 [0; 0] ;
+  non_empty_list_roundtrip 10 [9; 8; 4; 3; 1; 0; 0; 0; 0; 0] ;
   ()
 
 (* Checking that we can decode encoded lists when they are not empty *)
@@ -77,20 +77,20 @@ let non_empty_list_is_a_list_that_is_not_empty xs =
   let data = xs in
   (* encode with list *)
   let s = Data_encoding.Binary.to_string int8s data in
-  assert (Result.is_ok s);
+  assert (Result.is_ok s) ;
   let s = Result.get_ok s in
   (* decode with non-empty-list *)
   let d = Data_encoding.Binary.of_string non_empty_int8s s in
-  assert (Result.is_ok d);
+  assert (Result.is_ok d) ;
   let d = Result.get_ok d in
-  assert ((d : NonEmptyList.t :> int list) = data);
+  assert ((d : NonEmptyList.t :> int list) = data) ;
   ()
 
 let non_empty_list_is_a_list_that_is_not_empty () =
-  non_empty_list_is_a_list_that_is_not_empty [0];
-  non_empty_list_is_a_list_that_is_not_empty [1];
-  non_empty_list_is_a_list_that_is_not_empty [1; 2; 3; 4; 5];
-  non_empty_list_is_a_list_that_is_not_empty [0; 1; 2; 4; 8];
+  non_empty_list_is_a_list_that_is_not_empty [0] ;
+  non_empty_list_is_a_list_that_is_not_empty [1] ;
+  non_empty_list_is_a_list_that_is_not_empty [1; 2; 3; 4; 5] ;
+  non_empty_list_is_a_list_that_is_not_empty [0; 1; 2; 4; 8] ;
   ()
 
 (* Checking that we cannot decode encoded lists when they are empty *)
@@ -98,16 +98,16 @@ let non_empty_list_is_not_an_empty_list () =
   let data = [] in
   (* encode with list *)
   let s = Data_encoding.Binary.to_string int8s data in
-  assert (Result.is_ok s);
+  assert (Result.is_ok s) ;
   let s = Result.get_ok s in
   (* decode with non-empty-list *)
   let d = Data_encoding.Binary.of_string non_empty_int8s s in
-  assert (Result.is_error d);
+  assert (Result.is_error d) ;
   let d = Result.get_error d in
   assert (
     match d with
     | Data_encoding.Binary.User_invariant_guard _ -> true
-    | _ -> false );
+    | _ -> false) ;
   ()
 
 let tests =

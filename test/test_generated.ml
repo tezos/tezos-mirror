@@ -164,7 +164,7 @@ let roundtrip_binary_write pp ding v slack =
         Data_encoding.Binary.pp_write_error
         we
   in
-  Crowbar.check_eq written size;
+  Crowbar.check_eq written size ;
   let (read, vv) =
     try
       Data_encoding.Binary.read_exn ding (Bytes.unsafe_to_string buffer) 0 size
@@ -177,7 +177,7 @@ let roundtrip_binary_write pp ding v slack =
         Data_encoding.Binary.pp_read_error
         re
   in
-  Crowbar.check_eq read size;
+  Crowbar.check_eq read size ;
   Crowbar.check_eq ~pp v vv
 
 (* Setting up the actual tests *)
@@ -210,17 +210,17 @@ let () =
   add_test
     ~name:"binary roundtrips (write/read)"
     [gen; uint8]
-    test_full_and_v_binary_write;
+    test_full_and_v_binary_write ;
   add_test
     ~name:"binary roundtrips (to_/of_bytes)"
     [gen]
-    test_full_and_v_binary_to_bytes;
+    test_full_and_v_binary_to_bytes ;
   add_test
     ~name:"binary roundtrips (to_/of_string)"
     [gen]
-    test_full_and_v_binary_to_string;
+    test_full_and_v_binary_to_string ;
   add_test
     ~name:"json roundtrips (construct/destruct)"
     [gen]
-    test_full_and_v_json;
+    test_full_and_v_json ;
   ()

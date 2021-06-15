@@ -46,12 +46,12 @@ module Encoding = struct
           (let open Json_encoding in
           conv
             (fun s ->
-              if String.length s > length then invalid_arg "oversized string";
+              if String.length s > length then invalid_arg "oversized string" ;
               s)
             (fun s ->
               if String.length s > length then
                 raise
-                  (Cannot_destruct ([], Invalid_argument "oversized string"));
+                  (Cannot_destruct ([], Invalid_argument "oversized string")) ;
               s)
             string)
 
@@ -65,19 +65,19 @@ module Encoding = struct
           (let open Json_encoding in
           conv
             (fun s ->
-              if Bytes.length s > length then invalid_arg "oversized string";
+              if Bytes.length s > length then invalid_arg "oversized string" ;
               s)
             (fun s ->
               if Bytes.length s > length then
                 raise
-                  (Cannot_destruct ([], Invalid_argument "oversized string"));
+                  (Cannot_destruct ([], Invalid_argument "oversized string")) ;
               s)
             Json.bytes_jsont)
   end
 
   type 'a lazy_state = Value of 'a | Bytes of Bytes.t | Both of Bytes.t * 'a
 
-  type 'a lazy_t = {mutable state: 'a lazy_state; encoding: 'a t}
+  type 'a lazy_t = {mutable state : 'a lazy_state; encoding : 'a t}
 
   let force_decode le =
     match le.state with
@@ -86,9 +86,9 @@ module Encoding = struct
     | Bytes bytes -> (
         match Binary_reader.of_bytes_opt le.encoding bytes with
         | Some expr ->
-            le.state <- Both (bytes, expr);
+            le.state <- Both (bytes, expr) ;
             Some expr
-        | None -> None )
+        | None -> None)
 
   let force_bytes le =
     match le.state with
@@ -96,7 +96,7 @@ module Encoding = struct
     | Both (bytes, _) -> bytes
     | Value value ->
         let bytes = Binary_writer.to_bytes_exn le.encoding value in
-        le.state <- Both (bytes, value);
+        le.state <- Both (bytes, value) ;
         bytes
 
   let lazy_encoding encoding =

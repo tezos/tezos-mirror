@@ -69,7 +69,7 @@ module Kind = struct
     | k :: ks -> (
         match List.fold_left merge k ks with
         | `Fixed n -> `Fixed (n + Binary_size.tag_size sz)
-        | k -> k )
+        | k -> k)
 end
 
 type case_tag = Tag of int | Json_only
@@ -102,8 +102,8 @@ type 'a desc =
   | Int64 : Int64.t desc
   | N : Z.t desc
   | Z : Z.t desc
-  | RangedInt : {minimum: int; maximum: int} -> int desc
-  | RangedFloat : {minimum: float; maximum: float} -> float desc
+  | RangedInt : {minimum : int; maximum : int} -> int desc
+  | RangedFloat : {minimum : float; maximum : float} -> float desc
   | Float : float desc
   | Bytes : Kind.length -> Bytes.t desc
   | String : Kind.length -> string desc
@@ -112,95 +112,95 @@ type 'a desc =
   | Array : int option * 'a t -> 'a array desc
   | List : int option * 'a t -> 'a list desc
   | Obj : 'a field -> 'a desc
-  | Objs : {kind: Kind.t; left: 'a t; right: 'b t} -> ('a * 'b) desc
+  | Objs : {kind : Kind.t; left : 'a t; right : 'b t} -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
-  | Tups : {kind: Kind.t; left: 'a t; right: 'b t} -> ('a * 'b) desc
+  | Tups : {kind : Kind.t; left : 'a t; right : 'b t} -> ('a * 'b) desc
   | Union : {
-      kind: Kind.t;
-      tag_size: Binary_size.tag_size;
-      tagged_cases: 'a case array;
-      match_case: 'a -> match_result;
-      cases: 'a case list;
+      kind : Kind.t;
+      tag_size : Binary_size.tag_size;
+      tagged_cases : 'a case array;
+      match_case : 'a -> match_result;
+      cases : 'a case list;
     }
       -> 'a desc
   | Mu : {
-      kind: Kind.enum;
-      name: string;
-      title: string option;
-      description: string option;
-      fix: 'a t -> 'a t;
+      kind : Kind.enum;
+      name : string;
+      title : string option;
+      description : string option;
+      fix : 'a t -> 'a t;
     }
       -> 'a desc
   | Conv : {
-      proj: 'a -> 'b;
-      inj: 'b -> 'a;
-      encoding: 'b t;
-      schema: Json_schema.schema option;
+      proj : 'a -> 'b;
+      inj : 'b -> 'a;
+      encoding : 'b t;
+      schema : Json_schema.schema option;
     }
       -> 'a desc
   | Describe : {
-      id: string;
-      title: string option;
-      description: string option;
-      encoding: 'a t;
+      id : string;
+      title : string option;
+      description : string option;
+      encoding : 'a t;
     }
       -> 'a desc
   | Splitted : {
-      encoding: 'a t;
-      json_encoding: 'a Json_encoding.encoding;
-      is_obj: bool;
-      is_tup: bool;
+      encoding : 'a t;
+      json_encoding : 'a Json_encoding.encoding;
+      is_obj : bool;
+      is_tup : bool;
     }
       -> 'a desc
   | Dynamic_size : {
-      kind: Binary_size.unsigned_integer;
-      encoding: 'a t;
+      kind : Binary_size.unsigned_integer;
+      encoding : 'a t;
     }
       -> 'a desc
-  | Check_size : {limit: int; encoding: 'a t} -> 'a desc
+  | Check_size : {limit : int; encoding : 'a t} -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
   | Req : {
-      name: string;
-      encoding: 'a t;
-      title: string option;
-      description: string option;
+      name : string;
+      encoding : 'a t;
+      title : string option;
+      description : string option;
     }
       -> 'a field
   | Opt : {
-      name: string;
-      kind: Kind.enum;
-      encoding: 'a t;
-      title: string option;
-      description: string option;
+      name : string;
+      kind : Kind.enum;
+      encoding : 'a t;
+      title : string option;
+      description : string option;
     }
       -> 'a option field
   | Dft : {
-      name: string;
-      encoding: 'a t;
-      default: 'a;
-      title: string option;
-      description: string option;
+      name : string;
+      encoding : 'a t;
+      default : 'a;
+      title : string option;
+      description : string option;
     }
       -> 'a field
 
 and 'a case =
   | Case : {
-      title: string;
-      description: string option;
-      encoding: 'a t;
-      proj: 't -> 'a option;
-      inj: 'a -> 't;
-      tag: case_tag_internal;
+      title : string;
+      description : string option;
+      encoding : 'a t;
+      proj : 't -> 'a option;
+      inj : 'a -> 't;
+      tag : case_tag_internal;
     }
       -> 't case
 
 and match_result = Matched : int * 'b t * 'b -> match_result
 
 and 'a t = {
-  encoding: 'a desc;
-  mutable json_encoding: 'a Json_encoding.encoding option;
+  encoding : 'a desc;
+  mutable json_encoding : 'a Json_encoding.encoding option;
 }
 
 type 'a encoding = 'a t
@@ -234,7 +234,7 @@ and classify_desc : type a. a desc -> Kind.t =
   | Padded ({encoding; _}, n) -> (
       match classify_desc encoding with
       | `Fixed m -> `Fixed (n + m)
-      | _ -> assert false (* by construction (see [Fixed.padded]) *) )
+      | _ -> assert false (* by construction (see [Fixed.padded]) *))
   | String_enum (_, cases) ->
       `Fixed Binary_size.(integer_to_size @@ enum_size cases)
   | Obj (Opt {kind; _}) -> (kind :> Kind.t)
@@ -263,18 +263,18 @@ module Fixed = struct
   let string n =
     if n <= 0 then
       invalid_arg
-        "Cannot create a string encoding of negative or null fixed length.";
+        "Cannot create a string encoding of negative or null fixed length." ;
     make @@ String (`Fixed n)
 
   let bytes n =
     if n <= 0 then
       invalid_arg
-        "Cannot create a byte encoding of negative or null fixed length.";
+        "Cannot create a byte encoding of negative or null fixed length." ;
     make @@ Bytes (`Fixed n)
 
   let add_padding e n =
     if n <= 0 then
-      invalid_arg "Cannot create a padding of negative or null fixed length.";
+      invalid_arg "Cannot create a padding of negative or null fixed length." ;
     match classify e with
     | `Fixed _ -> make @@ Padded (e, n)
     | _ -> invalid_arg "Cannot pad non-fixed size encoding"
@@ -359,8 +359,8 @@ module Variable = struct
     else ()
 
   let array ?max_length e =
-    check_not_variable "an array" e;
-    check_not_zeroable "an array" e;
+    check_not_variable "an array" e ;
+    check_not_zeroable "an array" e ;
     let encoding = make @@ Array (max_length, e) in
     match (classify e, max_length) with
     | (`Fixed n, Some max_length) ->
@@ -369,8 +369,8 @@ module Variable = struct
     | (_, _) -> encoding
 
   let list ?max_length e =
-    check_not_variable "a list" e;
-    check_not_zeroable "a list" e;
+    check_not_variable "a list" e ;
+    check_not_zeroable "a list" e ;
     let encoding = make @@ List (max_length, e) in
     match (classify e, max_length) with
     | (`Fixed n, Some max_length) ->
@@ -410,7 +410,7 @@ let int32 = make @@ Int32
 let ranged_int minimum maximum =
   let minimum = min minimum maximum and maximum = max minimum maximum in
   if minimum < -(1 lsl 30) || (1 lsl 30) - 1 < maximum then
-    invalid_arg "Data_encoding.ranged_int";
+    invalid_arg "Data_encoding.ranged_int" ;
   make @@ RangedInt {minimum; maximum}
 
 let ranged_float minimum maximum =
@@ -442,7 +442,7 @@ let string_enum = function
   | _ :: _ as cases ->
       let arr = Array.of_list (List.map snd cases) in
       let tbl = Hashtbl.create (Array.length arr) in
-      List.iteri (fun ind (str, a) -> Hashtbl.add tbl a (str, ind)) cases;
+      List.iteri (fun ind (str, a) -> Hashtbl.add tbl a (str, ind)) cases ;
       make @@ String_enum (tbl, arr)
 
 let conv proj inj ?schema encoding = make @@ Conv {proj; inj; encoding; schema}
@@ -697,14 +697,14 @@ let valid_tag tag_size t =
       max_tag
 
 let matching ?(tag_size = `Uint8) match_case cases =
-  if cases = [] then invalid_arg "Data_encoding.union: empty list of cases.";
+  if cases = [] then invalid_arg "Data_encoding.union: empty list of cases." ;
   let tagged_cases_list =
     List.filter
       (fun (Case {tag; _}) ->
         is_tag tag
         &&
-        ( valid_tag tag_size (get_tag tag);
-          true ))
+        (valid_tag tag_size (get_tag tag) ;
+         true))
       cases
   in
   (* In [tagged_cases_list] all tags are [some] so [get] cannot fail *)
@@ -719,9 +719,9 @@ let matching ?(tag_size = `Uint8) match_case cases =
     (fun (Case {tag; _} as case) ->
       let tag = Uint_option.get tag in
       if not (is_undefined_case tagged_cases.(tag)) then
-        Format.kasprintf invalid_arg "The tag %d appears twice in an union." tag;
+        Format.kasprintf invalid_arg "The tag %d appears twice in an union." tag ;
       tagged_cases.(tag) <- case)
-    tagged_cases_list;
+    tagged_cases_list ;
   let classify_case (Case {encoding; _}) = classify encoding in
   let kinds = List.map classify_case cases in
   let kind = Kind.merge_list tag_size kinds in
@@ -759,8 +759,8 @@ let case ~title ?description tag encoding proj inj =
   Case {title; description; encoding; proj; inj; tag}
 
 let matched ?(tag_size : [`Uint8 | `Uint16] = `Uint8) tag encoding v =
-  if tag < 0 then raise (Invalid_argument "Data_encoding.matched: negative tag");
-  valid_tag tag_size tag;
+  if tag < 0 then raise (Invalid_argument "Data_encoding.matched: negative tag") ;
+  valid_tag tag_size tag ;
   Matched (tag, encoding, v)
 
 let rec is_nullable : type t. t encoding -> bool =
@@ -805,7 +805,7 @@ let rec is_nullable : type t. t encoding -> bool =
 
 let option ty =
   if is_nullable ty then
-    invalid_arg "Data_encoding.option: cannot nest nullable encodings";
+    invalid_arg "Data_encoding.option: cannot nest nullable encodings" ;
   (* TODO add a special construct `Option` in the GADT *)
   union
     ~tag_size:`Uint8
@@ -837,7 +837,7 @@ let mu name ?title ?description fix =
     | Some (e0, e') when e == e0 -> e'
     | _ ->
         let e' = fix_f e in
-        self := Some (e, e');
+        self := Some (e, e') ;
         e'
   in
   (* Attempt to determine kind. Note that this can results in memoisation
@@ -857,7 +857,7 @@ let mu name ?title ?description fix =
         make @@ Mu {kind = `Variable; name; title; description; fix}
       in
       let fixed_precursor = fix precursor in
-      ignore (classify fixed_precursor);
+      ignore (classify fixed_precursor) ;
       fixed_precursor
 
 let result ok_enc error_enc =

@@ -56,23 +56,23 @@ and layout =
 and fields = field_descr list
 
 and toplevel_encoding =
-  | Obj of {fields: fields}
+  | Obj of {fields : fields}
   | Cases of {
-      kind: Kind.t;
-      tag_size: Binary_size.tag_size;
-      cases: (int * string option * fields) list;
+      kind : Kind.t;
+      tag_size : Binary_size.tag_size;
+      cases : (int * string option * fields) list;
     }
-  | Int_enum of {size: Binary_size.integer; cases: (int * string) list}
+  | Int_enum of {size : Binary_size.integer; cases : (int * string) list}
 
-and description = {title: string; description: string option}
+and description = {title : string; description : string option}
 
 type t = {
-  toplevel: toplevel_encoding;
-  fields: (description * toplevel_encoding) list;
+  toplevel : toplevel_encoding;
+  fields : (description * toplevel_encoding) list;
 }
 
 module Printer_ast = struct
-  type table = {headers: string list; body: string list list}
+  type table = {headers : string list; body : string list list}
 
   type t =
     | Table of table
@@ -88,7 +88,7 @@ module Printer_ast = struct
     Format.fprintf
       ppf
       "%s"
-      ( match int with
+      (match int with
       | `Int16 -> "signed 16-bit integer"
       | `Int31 -> "signed 31-bit integer"
       | `Uint30 -> "unsigned 30-bit integer"
@@ -96,7 +96,7 @@ module Printer_ast = struct
       | `Int64 -> "signed 64-bit integer"
       | `Int8 -> "signed 8-bit integer"
       | `Uint16 -> "unsigned 16-bit integer"
-      | `Uint8 -> "unsigned 8-bit integer" )
+      | `Uint8 -> "unsigned 8-bit integer")
 
   let rec pp_layout ppf = function
     | Zero_width -> ()
@@ -138,13 +138,13 @@ module Printer_ast = struct
           (size :> integer_extended)
           reference
     | Seq (data, len) -> (
-        Format.fprintf ppf "sequence of ";
-        ( match len with
+        Format.fprintf ppf "sequence of " ;
+        (match len with
         | None -> ()
-        | Some len -> Format.fprintf ppf "at most %d " len );
+        | Some len -> Format.fprintf ppf "at most %d " len) ;
         match data with
         | Ref reference -> Format.fprintf ppf "$%s" reference
-        | _ -> pp_layout ppf data )
+        | _ -> pp_layout ppf data)
 
   let pp_tag_size ppf tag =
     Format.fprintf ppf "%s"
@@ -155,7 +155,7 @@ module Printer_ast = struct
     let string_of_layout = Format.asprintf "%a" pp_layout in
     let anon_num () =
       let value = !reference in
-      reference := value + 1;
+      reference := value + 1 ;
       string_of_int value
     in
     let is_zero_size_kind = function `Fixed 0 -> true | _ -> false in
@@ -240,9 +240,9 @@ module Printer_ast = struct
                 (fun (tag, name, fields) ->
                   ( {
                       title =
-                        ( match name with
+                        (match name with
                         | Some name -> Format.asprintf "%s (tag %d)" name tag
-                        | None -> Format.asprintf "Tag %d" tag );
+                        | None -> Format.asprintf "Tag %d" tag);
                       description = None;
                     },
                     {
@@ -271,7 +271,7 @@ module Printer = struct
   let rec pad char ppf = function
     | 0 -> ()
     | n ->
-        Format.pp_print_char ppf char;
+        Format.pp_print_char ppf char ;
         pad char ppf (n - 1)
 
   let pp_title level ppf title =
@@ -500,13 +500,13 @@ module Encoding = struct
   let kind_t_encoding =
     def "schema.kind"
     @@ union
-         ( case
-             ~title:"Fixed"
-             (Tag 2)
-             (obj2 (req "size" int31) (req "kind" (constant "Float")))
-             (function `Fixed n -> Some (n, ()) | _ -> None)
-             (fun (n, _) -> `Fixed n)
-         :: kind_enum_cases () )
+         (case
+            ~title:"Fixed"
+            (Tag 2)
+            (obj2 (req "size" int31) (req "kind" (constant "Float")))
+            (function `Fixed n -> Some (n, ()) | _ -> None)
+            (fun (n, _) -> `Fixed n)
+          :: kind_enum_cases ())
 
   let unsigned_integer_encoding =
     string_enum [("Uint30", `Uint30); ("Uint16", `Uint16); ("Uint8", `Uint8)]
@@ -582,7 +582,7 @@ module Encoding = struct
              (req
                 "cases"
                 (list
-                   ( def "union case"
+                   (def "union case"
                    @@ conv
                         (fun (tag, name, fields) -> (tag, fields, name))
                         (fun (tag, fields, name) -> (tag, name, fields))
@@ -591,7 +591,7 @@ module Encoding = struct
                         (req
                            "fields"
                            (list (dynamic_size field_descr_encoding)))
-                        (opt "name" string) ))))
+                        (opt "name" string)))))
           (function
             | Cases {kind; tag_size; cases} -> Some (tag_size, kind, cases)
             | _ -> None)

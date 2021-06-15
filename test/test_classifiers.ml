@@ -42,8 +42,8 @@ let () =
   let expect =
     Data_encoding__Binary_size.uint30 (* dynamic size *)
     + 10 (* max number of elements in the list *)
-      * ( Data_encoding__Binary_size.uint8 (* tag *)
-        + max Data_encoding__Binary_size.int64 10 (* fixed-string size *) )
+      * (Data_encoding__Binary_size.uint8 (* tag *)
+        + max Data_encoding__Binary_size.int64 10 (* fixed-string size *))
   in
   match Binary.maximum_length ding with
   | None -> assert false
@@ -70,7 +70,7 @@ let has_no_max_is_dyn_or_var ding =
       match Data_encoding.classify ding with
       | `Variable | `Dynamic -> ()
       | `Fixed _ ->
-          Crowbar.fail "Encoding without a maximum length has a fixed length" )
+          Crowbar.fail "Encoding without a maximum length has a fixed length")
 
 let () =
   Crowbar.add_test

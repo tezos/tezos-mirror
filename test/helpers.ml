@@ -41,7 +41,7 @@ let cut ?(copy = false) sz bytes =
     in
     let rec split_full_blocks curr_upper_limit acc =
       let start = curr_upper_limit - sz in
-      assert (start >= 0);
+      assert (start >= 0) ;
       (* copy the block [ start, curr_upper_limit [ of size sz *)
       let acc = may_copy (Bytes.sub bytes start sz) :: acc in
       if start = 0 then acc else split_full_blocks start acc

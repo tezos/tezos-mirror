@@ -25,7 +25,7 @@
 
 open Data_encoding
 
-type record = {a: int; b: bool; c: Z.t option; d: float}
+type record = {a : int; b : bool; c : Z.t option; d : float}
 
 let default_record = {a = 32; b = true; c = Some Z.one; d = 12.34}
 
@@ -47,7 +47,7 @@ let record_to_string {a; b; c; d} =
   let c = match c with None -> "none" | Some c -> Z.to_string c in
   Format.asprintf "(%d, %B, %s, %f)" a b c d
 
-type variable_record = {p: int; q: Bytes.t}
+type variable_record = {p : int; q : Bytes.t}
 
 let default_variable_record = {p = 23; q = Bytes.of_string "wwwxxyyzzz"}
 
@@ -63,7 +63,7 @@ let variable_record_tup_enc =
 let variable_record_to_string {p; q} =
   Format.asprintf "(%d, %a)" p Hex.pp (Hex.of_bytes q)
 
-type variable_left_record = {x: int; y: Bytes.t; z: int}
+type variable_left_record = {x : int; y : Bytes.t; z : int}
 
 let default_variable_left_record = {x = 98; y = Bytes.of_string "765"; z = 4321}
 

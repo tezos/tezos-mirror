@@ -32,10 +32,10 @@ exception Local_read_error of read_error
 let raise_read_error e = raise (Local_read_error e)
 
 type state = {
-  buffer: string;
-  mutable offset: int;
-  mutable remaining_bytes: int;
-  mutable allowed_bytes: int option;
+  buffer : string;
+  mutable offset : int;
+  mutable remaining_bytes : int;
+  mutable allowed_bytes : int option;
 }
 
 let check_allowed_bytes state size =
@@ -45,14 +45,14 @@ let check_allowed_bytes state size =
   | None -> None
 
 let check_remaining_bytes state size =
-  if state.remaining_bytes < size then raise_read_error Not_enough_data;
+  if state.remaining_bytes < size then raise_read_error Not_enough_data ;
   state.remaining_bytes - size
 
 let read_atom size conv state =
   let offset = state.offset in
-  state.remaining_bytes <- check_remaining_bytes state size;
-  state.allowed_bytes <- check_allowed_bytes state size;
-  state.offset <- state.offset + size;
+  state.remaining_bytes <- check_remaining_bytes state size ;
+  state.allowed_bytes <- check_allowed_bytes state size ;
+  state.offset <- state.offset + size ;
   conv state.buffer offset
 
 (** Reader for all the atomic types. *)
@@ -77,7 +77,7 @@ module Atom = struct
     read_atom Binary_size.uint30 @@ fun buffer ofs ->
     let v = Int32.to_int (TzEndian.get_int32_string buffer ofs) in
     if v < 0 then
-      raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1});
+      raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
     v
 
   let int31 =
@@ -86,7 +86,7 @@ module Atom = struct
     let r = Int32.to_int r32 in
     if not (-0x4000_0000l <= r32 && r32 <= 0x3fff_ffffl) then
       raise_read_error
-        (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff});
+        (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff}) ;
     r
 
   let int = function
@@ -110,14 +110,14 @@ module Atom = struct
     let ranged = read_int state in
     let ranged = if minimum > 0 then ranged + minimum else ranged in
     if not (minimum <= ranged && ranged <= maximum) then
-      raise_read_error (Invalid_int {min = minimum; v = ranged; max = maximum});
+      raise_read_error (Invalid_int {min = minimum; v = ranged; max = maximum}) ;
     ranged
 
   let ranged_float ~minimum ~maximum state =
     let ranged = float state in
     if not (minimum <= ranged && ranged <= maximum) then
       raise_read_error
-        (Invalid_float {min = minimum; v = ranged; max = maximum});
+        (Invalid_float {min = minimum; v = ranged; max = maximum}) ;
     ranged
 
   let rec read_z res value bit_in_value state =
@@ -127,14 +127,14 @@ module Atom = struct
     let (bit_in_value, value) =
       if bit_in_value < 8 then (bit_in_value, value)
       else (
-        Buffer.add_char res (Char.unsafe_chr (value land 0xFF));
-        (bit_in_value - 8, value lsr 8) )
+        Buffer.add_char res (Char.unsafe_chr (value land 0xFF)) ;
+        (bit_in_value - 8, value lsr 8))
     in
     if byte land 0x80 = 0x80 then read_z res value bit_in_value state
     else (
-      if bit_in_value > 0 then Buffer.add_char res (Char.unsafe_chr value);
-      if byte = 0x00 then raise_read_error Trailing_zero;
-      Z.of_bits (Buffer.contents res) )
+      if bit_in_value > 0 then Buffer.add_char res (Char.unsafe_chr value) ;
+      if byte = 0x00 then raise_read_error Trailing_zero ;
+      Z.of_bits (Buffer.contents res))
 
   let n state =
     let first = uint8 state in
@@ -162,7 +162,7 @@ module Atom = struct
       | `Uint30 -> uint30
     in
     let index = read_index state in
-    if index >= Array.length arr then raise_read_error No_case_matched;
+    if index >= Array.length arr then raise_read_error No_case_matched ;
     arr.(index)
 
   let fixed_length_bytes length =
@@ -201,7 +201,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | String `Variable -> Atom.fixed_length_string state.remaining_bytes state
   | Padded (e, n) ->
       let v = read_rec e state in
-      ignore (Atom.fixed_length_string n state : string);
+      ignore (Atom.fixed_length_string n state : string) ;
       v
   | RangedInt {minimum; maximum} -> Atom.ranged_int ~minimum ~maximum state
   | RangedFloat {minimum; maximum} -> Atom.ranged_float ~minimum ~maximum state
@@ -221,8 +221,8 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Obj (Opt {kind = `Variable; encoding = e; _}) ->
       if state.remaining_bytes = 0 then None else Some (read_rec e state)
   | Objs {kind = `Fixed sz; left; right} ->
-      ignore (check_remaining_bytes state sz : int);
-      ignore (check_allowed_bytes state sz : int option);
+      ignore (check_remaining_bytes state sz : int) ;
+      ignore (check_allowed_bytes state sz : int option) ;
       let left = read_rec left state in
       let right = read_rec right state in
       (left, right)
@@ -233,8 +233,8 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Objs {kind = `Variable; left; right} -> read_variable_pair left right state
   | Tup e -> read_rec e state
   | Tups {kind = `Fixed sz; left; right} ->
-      ignore (check_remaining_bytes state sz : int);
-      ignore (check_allowed_bytes state sz : int option);
+      ignore (check_remaining_bytes state sz : int) ;
+      ignore (check_allowed_bytes state sz : int option) ;
       let left = read_rec left state in
       let right = read_rec right state in
       (left, right)
@@ -249,7 +249,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Union {tag_size; tagged_cases; _} ->
       let ctag = Atom.tag tag_size state in
       if ctag >= Array.length tagged_cases then
-        raise_read_error (Unexpected_tag ctag);
+        raise_read_error (Unexpected_tag ctag) ;
       let (Case {inj; encoding; _} as case) = tagged_cases.(ctag) in
       if is_undefined_case case then raise_read_error (Unexpected_tag ctag)
       else
@@ -258,11 +258,11 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Dynamic_size {kind; encoding = e} ->
       let sz = Atom.int kind state in
       let remaining = check_remaining_bytes state sz in
-      state.remaining_bytes <- sz;
-      ignore (check_allowed_bytes state sz : int option);
+      state.remaining_bytes <- sz ;
+      ignore (check_allowed_bytes state sz : int option) ;
       let v = read_rec e state in
-      if state.remaining_bytes <> 0 then raise_read_error Extra_bytes;
-      state.remaining_bytes <- remaining;
+      if state.remaining_bytes <> 0 then raise_read_error Extra_bytes ;
+      state.remaining_bytes <- remaining ;
       v
   | Check_size {limit; encoding = e} ->
       let old_allowed_bytes = state.allowed_bytes in
@@ -271,7 +271,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
         | None -> limit
         | Some current_limit -> min current_limit limit
       in
-      state.allowed_bytes <- Some limit;
+      state.allowed_bytes <- Some limit ;
       let v = read_rec e state in
       let allowed_bytes =
         match old_allowed_bytes with
@@ -285,7 +285,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
             let read = limit - remaining in
             Some (old_limit - read)
       in
-      state.allowed_bytes <- allowed_bytes;
+      state.allowed_bytes <- allowed_bytes ;
       v
   | Describe {encoding = e; _} -> read_rec e state
   | Splitted {encoding = e; _} -> read_rec e state
@@ -306,13 +306,13 @@ and read_variable_pair :
       let right = read_rec e2 state in
       (left, right)
   | (`Variable, `Fixed n) ->
-      if n > state.remaining_bytes then raise_read_error Not_enough_data;
-      state.remaining_bytes <- state.remaining_bytes - n;
+      if n > state.remaining_bytes then raise_read_error Not_enough_data ;
+      state.remaining_bytes <- state.remaining_bytes - n ;
       let left = read_rec e1 state in
-      assert (state.remaining_bytes = 0);
-      state.remaining_bytes <- n;
+      assert (state.remaining_bytes = 0) ;
+      state.remaining_bytes <- n ;
       let right = read_rec e2 state in
-      assert (state.remaining_bytes = 0);
+      assert (state.remaining_bytes = 0) ;
       (left, right)
   | _ -> assert false
 
@@ -362,7 +362,7 @@ let of_string_exn encoding buffer =
   in
   wrap_reader (fun () ->
       let v = read_rec encoding state in
-      if state.offset <> len then raise_read_error Extra_bytes;
+      if state.offset <> len then raise_read_error Extra_bytes ;
       v)
 
 let of_string encoding buffer =

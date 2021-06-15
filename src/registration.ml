@@ -27,9 +27,9 @@ type id = string
 
 type t =
   | Record : {
-      encoding: 'a Encoding.t;
-      description: string option;
-      pp: (Format.formatter -> 'a -> unit) option;
+      encoding : 'a Encoding.t;
+      description : string option;
+      pp : (Format.formatter -> 'a -> unit) option;
     }
       -> t
 

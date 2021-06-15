@@ -25,7 +25,7 @@
 
 type t
 
-type buffer = {buffer: Bytes.t; ofs: int; len: int}
+type buffer = {buffer : Bytes.t; ofs : int; len : int}
 
 exception Need_more_data
 

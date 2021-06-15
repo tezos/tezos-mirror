@@ -36,10 +36,10 @@ let raise error = Stdlib.raise (Write_error error)
 
 (** Imperative state of the binary writer. *)
 type writer_state = {
-  mutable buffer: Bytes.t;  (** The buffer where to write. *)
-  mutable offset: int;
+  mutable buffer : Bytes.t;  (** The buffer where to write. *)
+  mutable offset : int;
       (** The offset of the next byte to be written in [buffer]. *)
-  mutable allowed_bytes: Uint_option.t;
+  mutable allowed_bytes : Uint_option.t;
       (** Maximum number of bytes that are allowed to be write in [buffer]
       (after [offset]) before to fail (unless it is [unlimited_bytes]). *)
 }
@@ -57,8 +57,8 @@ let limited_bytes = Uint_option.is_some
 let check_allowed_bytes state size =
   if limited_bytes state.allowed_bytes then (
     let allowed_bytes = Uint_option.get state.allowed_bytes in
-    if allowed_bytes < size then raise Size_limit_exceeded;
-    state.allowed_bytes <- Uint_option.(some (allowed_bytes - size)) )
+    if allowed_bytes < size then raise Size_limit_exceeded ;
+    state.allowed_bytes <- Uint_option.(some (allowed_bytes - size)))
 
 (** [may_resize state size] will first ensure there is enough
     space in [state.buffer] for writing [size] bytes (starting at
@@ -71,12 +71,12 @@ let check_allowed_bytes state size =
     @raise [Binary_error.Write_error Size_limit_exceeded] when there is
            not enough allowed bytes to write [size] bytes. *)
 let may_resize state size =
-  check_allowed_bytes state size;
+  check_allowed_bytes state size ;
   let buffer_len = Bytes.length state.buffer in
   if buffer_len - state.offset < size then (
     let new_buffer = Bytes.create (max (2 * buffer_len) (buffer_len + size)) in
-    Bytes.blit state.buffer 0 new_buffer 0 state.offset;
-    state.buffer <- new_buffer );
+    Bytes.blit state.buffer 0 new_buffer 0 state.offset ;
+    state.buffer <- new_buffer) ;
   state.offset <- state.offset + size
 
 (** Writer for all the atomic types. *)
@@ -94,9 +94,9 @@ module Atom = struct
     | `Int8 | `Uint8 -> TzEndian.set_int8 buffer ofs v
 
   let int kind state v =
-    check_int_range (Binary_size.min_int kind) v (Binary_size.max_int kind);
+    check_int_range (Binary_size.min_int kind) v (Binary_size.max_int kind) ;
     let ofs = state.offset in
-    may_resize state (Binary_size.integer_to_size kind);
+    may_resize state (Binary_size.integer_to_size kind) ;
     set_int kind state.buffer ofs v
 
   let int8 = int `Int8
@@ -115,16 +115,16 @@ module Atom = struct
 
   let int32 state v =
     let ofs = state.offset in
-    may_resize state Binary_size.int32;
+    may_resize state Binary_size.int32 ;
     TzEndian.set_int32 state.buffer ofs v
 
   let int64 state v =
     let ofs = state.offset in
-    may_resize state Binary_size.int64;
+    may_resize state Binary_size.int64 ;
     TzEndian.set_int64 state.buffer ofs v
 
   let ranged_int ~minimum ~maximum state v =
-    check_int_range minimum v maximum;
+    check_int_range minimum v maximum ;
     let v = if minimum >= 0 then v - minimum else v in
     match Binary_size.range_to_size ~minimum ~maximum with
     | `Uint8 -> uint8 state v
@@ -135,14 +135,14 @@ module Atom = struct
     | `Int31 -> int31 state v
 
   let n state v =
-    if Z.sign v < 0 then raise Invalid_natural;
+    if Z.sign v < 0 then raise Invalid_natural ;
     if Z.equal v Z.zero then uint8 state 0x00
     else
       let bits = Z.numbits v in
       let get_chunk pos len = Z.to_int (Z.extract v pos len) in
       let length = Binary_length.n_length v in
       let offset = state.offset in
-      may_resize state length;
+      may_resize state length ;
       for i = 0 to length - 1 do
         let pos = i * 7 in
         let chunk_len = if i = length - 1 then bits - pos else 7 in
@@ -161,13 +161,13 @@ module Atom = struct
       let get_chunk pos len = Z.to_int (Z.extract v pos len) in
       let length = Binary_length.z_length v in
       let offset = state.offset in
-      may_resize state length;
+      may_resize state length ;
       TzEndian.set_int8
         state.buffer
         offset
-        ( (if sign then 0x40 else 0x00)
+        ((if sign then 0x40 else 0x00)
         lor (if bits > 6 then 0x80 else 0x00)
-        lor get_chunk 0 6 );
+        lor get_chunk 0 6) ;
       for i = 1 to length - 1 do
         let pos = 6 + ((i - 1) * 7) in
         let chunk_len = if i = length - 1 then bits - pos else 7 in
@@ -179,11 +179,11 @@ module Atom = struct
 
   let float state v =
     let ofs = state.offset in
-    may_resize state Binary_size.float;
+    may_resize state Binary_size.float ;
     TzEndian.set_double state.buffer ofs v
 
   let ranged_float ~minimum ~maximum state v =
-    check_float_range minimum v maximum;
+    check_float_range minimum v maximum ;
     float state v
 
   let string_enum tbl arr state v =
@@ -197,16 +197,16 @@ module Atom = struct
 
   let fixed_kind_bytes length state s =
     if Bytes.length s <> length then
-      raise (Invalid_bytes_length {expected = length; found = Bytes.length s});
+      raise (Invalid_bytes_length {expected = length; found = Bytes.length s}) ;
     let ofs = state.offset in
-    may_resize state length;
+    may_resize state length ;
     Bytes.blit s 0 state.buffer ofs length
 
   let fixed_kind_string length state s =
     if String.length s <> length then
-      raise (Invalid_string_length {expected = length; found = String.length s});
+      raise (Invalid_string_length {expected = length; found = String.length s}) ;
     let ofs = state.offset in
-    may_resize state length;
+    may_resize state length ;
     Bytes.blit_string s 0 state.buffer ofs length
 
   let tag = function `Uint8 -> uint8 | `Uint16 -> uint16
@@ -241,7 +241,7 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       let length = String.length value in
       Atom.fixed_kind_string length state value
   | Padded (e, n) ->
-      write_rec e state value;
+      write_rec e state value ;
       Atom.fixed_kind_string n state (String.make n '\000')
   | RangedInt {minimum; maximum} ->
       Atom.ranged_int ~minimum ~maximum state value
@@ -259,32 +259,32 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       match value with
       | None -> Atom.bool state false
       | Some value ->
-          Atom.bool state true;
-          write_rec e state value )
+          Atom.bool state true ;
+          write_rec e state value)
   | Obj (Opt {kind = `Variable; encoding = e; _}) -> (
-      match value with None -> () | Some value -> write_rec e state value )
+      match value with None -> () | Some value -> write_rec e state value)
   | Obj (Dft {encoding = e; _}) -> write_rec e state value
   | Objs {left; right; _} ->
       let (v1, v2) = value in
-      write_rec left state v1;
+      write_rec left state v1 ;
       write_rec right state v2
   | Tup e -> write_rec e state value
   | Tups {left; right; _} ->
       let (v1, v2) = value in
-      write_rec left state v1;
+      write_rec left state v1 ;
       write_rec right state v2
   | Conv {encoding = e; proj; _} ->
       let value = wrap_user_function proj value in
       write_rec e state value
   | Union {tag_size; match_case; _} ->
       let (Matched (tag, e, value)) = wrap_user_function match_case value in
-      Atom.tag tag_size state tag;
+      Atom.tag tag_size state tag ;
       write_rec e state value
   | Dynamic_size {kind; encoding = e} ->
       let initial_offset = state.offset in
       (* place holder for [size] *)
-      Atom.int kind state 0;
-      write_with_limit (Binary_size.max_int kind) e state value;
+      Atom.int kind state 0 ;
+      write_with_limit (Binary_size.max_int kind) e state value ;
       (* patch the written [size] *)
       Atom.set_int
         kind
@@ -313,8 +313,8 @@ and write_with_limit : type a. int -> a Encoding.t -> writer_state -> a -> unit
       let old_limit = Uint_option.get state.allowed_bytes in
       min old_limit limit
   in
-  state.allowed_bytes <- Uint_option.some limit;
-  write_rec e state value;
+  state.allowed_bytes <- Uint_option.some limit ;
+  write_rec e state value ;
   (* restore the previous limit (minus the read bytes) *)
   if unlimited_bytes old_limit then state.allowed_bytes <- Uint_option.none
   else
@@ -327,7 +327,7 @@ and write_with_limit : type a. int -> a Encoding.t -> writer_state -> a -> unit
 (** Various entry points *)
 
 let write_exn e v state =
-  write_rec e state v;
+  write_rec e state v ;
   state.offset
 
 let write e v state =
@@ -347,7 +347,7 @@ let to_bytes_exn ?(buffer_size = 128) e v =
           allowed_bytes = Uint_option.some n;
         }
       in
-      write_rec e state v;
+      write_rec e state v ;
       state.buffer
   | `Dynamic | `Variable ->
       (* Preallocate a minimal buffer and let's not hardcode a
@@ -359,7 +359,7 @@ let to_bytes_exn ?(buffer_size = 128) e v =
           allowed_bytes = Uint_option.none;
         }
       in
-      write_rec e state v;
+      write_rec e state v ;
       Bytes.sub state.buffer 0 state.offset
 
 let to_bytes_opt ?buffer_size e v =
@@ -369,7 +369,7 @@ let to_bytes_opt ?buffer_size e v =
         Stdlib.raise
           (Invalid_argument
              "Data_encoding.Binary_writer.to_bytes_opt: negative length"))
-    buffer_size;
+    buffer_size ;
   try Some (to_bytes_exn ?buffer_size e v) with Write_error _ -> None
 
 let to_bytes ?buffer_size e v =
@@ -379,7 +379,7 @@ let to_bytes ?buffer_size e v =
         Stdlib.raise
           (Invalid_argument
              "Data_encoding.Binary_writer.to_bytes: negative length"))
-    buffer_size;
+    buffer_size ;
   try Ok (to_bytes_exn ?buffer_size e v) with Write_error err -> Error err
 
 let to_bytes_exn ?buffer_size e v =
@@ -389,7 +389,7 @@ let to_bytes_exn ?buffer_size e v =
         Stdlib.raise
           (Invalid_argument
              "Data_encoding.Binary_writer.to_bytes: negative length"))
-    buffer_size;
+    buffer_size ;
   to_bytes_exn ?buffer_size e v
 
 let to_string_opt ?buffer_size e v =

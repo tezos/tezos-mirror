@@ -33,15 +33,15 @@ let raise_read_error e = raise (Local_read_error e)
 
 (** Persistent state of the binary reader. *)
 type state = {
-  stream: Binary_stream.t;  (** All the remaining data to be read. *)
-  remaining_bytes: int option;
+  stream : Binary_stream.t;  (** All the remaining data to be read. *)
+  remaining_bytes : int option;
       (** Total number of bytes that should be from 'stream' (None =
       unlimited). Reading less bytes should raise [Extra_bytes] and
       trying to read more bytes should raise [Not_enough_data]. *)
-  allowed_bytes: int option;
+  allowed_bytes : int option;
       (** Maximum number of bytes that are allowed to be read from 'stream'
       before to fail (None = unlimited). *)
-  total_read: int;
+  total_read : int;
       (** Total number of bytes that has been read from [stream] since the
       beginning. *)
 }
@@ -49,7 +49,7 @@ type state = {
 (** Return type for the function [read_rec]. See [Data_encoding] for its
     description. *)
 type 'ret status =
-  | Success of {result: 'ret; size: int; stream: Binary_stream.t}
+  | Success of {result : 'ret; size : int; stream : Binary_stream.t}
   | Await of (Bytes.t -> 'ret status)
   | Error of read_error
 
@@ -124,7 +124,7 @@ module Atom = struct
     read_atom r Binary_size.uint30 @@ fun buffer ofs ->
     let v = Int32.to_int (TzEndian.get_int32 buffer ofs) in
     if v < 0 then
-      raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1});
+      raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
     v
 
   let int31 r =
@@ -133,7 +133,7 @@ module Atom = struct
     let r = Int32.to_int r32 in
     if not (-0x4000_0000l <= r32 && r32 <= 0x3fff_ffffl) then
       raise_read_error
-        (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff});
+        (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff}) ;
     r
 
   let int = function
@@ -177,14 +177,14 @@ module Atom = struct
     let (bit_in_value, value) =
       if bit_in_value < 8 then (bit_in_value, value)
       else (
-        Buffer.add_char res (Char.unsafe_chr (value land 0xFF));
-        (bit_in_value - 8, value lsr 8) )
+        Buffer.add_char res (Char.unsafe_chr (value land 0xFF)) ;
+        (bit_in_value - 8, value lsr 8))
     in
     if byte land 0x80 = 0x80 then read_z res value bit_in_value state k
     else (
-      if bit_in_value > 0 then Buffer.add_char res (Char.unsafe_chr value);
-      if byte = 0x00 then raise_read_error Trailing_zero;
-      k (Z.of_bits (Buffer.contents res), state) )
+      if bit_in_value > 0 then Buffer.add_char res (Char.unsafe_chr value) ;
+      if byte = 0x00 then raise_read_error Trailing_zero ;
+      k (Z.of_bits (Buffer.contents res), state))
 
   let n resume state k =
     uint8 resume state @@ fun (first, state) ->
@@ -247,7 +247,7 @@ let rec read_rec :
     with Local_read_error err -> Error err
   in
   let open Encoding in
-  assert (Encoding.classify e <> `Variable || state.remaining_bytes <> None);
+  assert (Encoding.classify e <> `Variable || state.remaining_bytes <> None) ;
   match e.encoding with
   | Null -> k ((), state)
   | Empty -> k ((), state)
@@ -298,8 +298,8 @@ let rec read_rec :
       if size = 0 then k (None, state)
       else read_rec whole e state @@ fun (v, state) -> k (Some v, state)
   | Objs {kind = `Fixed sz; left; right} ->
-      ignore (check_remaining_bytes state sz : int option);
-      ignore (check_allowed_bytes state sz : int option);
+      ignore (check_remaining_bytes state sz : int option) ;
+      ignore (check_allowed_bytes state sz : int option) ;
       read_rec false left state @@ fun (left, state) ->
       read_rec whole right state @@ fun (right, state) ->
       k ((left, right), state)
@@ -311,8 +311,8 @@ let rec read_rec :
       read_variable_pair left right state k
   | Tup e -> read_rec whole e state k
   | Tups {kind = `Fixed sz; left; right} ->
-      ignore (check_remaining_bytes state sz : int option);
-      ignore (check_allowed_bytes state sz : int option);
+      ignore (check_remaining_bytes state sz : int option) ;
+      ignore (check_allowed_bytes state sz : int option) ;
       read_rec false left state @@ fun (left, state) ->
       read_rec whole right state @@ fun (right, state) ->
       k ((left, right), state)
@@ -334,12 +334,12 @@ let rec read_rec :
       with
       | None -> Error (Unexpected_tag ctag)
       | Some (Case {encoding; inj; _}) ->
-          read_rec whole encoding state @@ fun (v, state) -> k (inj v, state) )
+          read_rec whole encoding state @@ fun (v, state) -> k (inj v, state))
   | Dynamic_size {kind; encoding = e} ->
       Atom.int kind resume state @@ fun (sz, state) ->
       let remaining = check_remaining_bytes state sz in
       let state = {state with remaining_bytes = Some sz} in
-      ignore (check_allowed_bytes state sz : int option);
+      ignore (check_allowed_bytes state sz : int option) ;
       read_rec true e state @@ fun (v, state) ->
       if state.remaining_bytes <> Some 0 then Error Extra_bytes
       else k (v, {state with remaining_bytes = remaining})
@@ -350,10 +350,10 @@ let rec read_rec :
         | None -> limit
         | Some current_limit -> min current_limit limit
       in
-      ( match state.remaining_bytes with
+      (match state.remaining_bytes with
       | Some remaining when whole && limit < remaining ->
           raise_read_error Size_limit_exceeded
-      | _ -> () );
+      | _ -> ()) ;
       let state = {state with allowed_bytes = Some limit} in
       read_rec whole e state @@ fun (v, state) ->
       let allowed_bytes =
@@ -404,10 +404,10 @@ and read_variable_pair :
       else
         let state = {state with remaining_bytes = Some (size - n)} in
         read_rec true e1 state @@ fun (left, state) ->
-        assert (state.remaining_bytes = Some 0);
+        assert (state.remaining_bytes = Some 0) ;
         let state = {state with remaining_bytes = Some n} in
         read_rec true e2 state @@ fun (right, state) ->
-        assert (state.remaining_bytes = Some 0);
+        assert (state.remaining_bytes = Some 0) ;
         k ((left, right), state)
   | _ -> assert false
 

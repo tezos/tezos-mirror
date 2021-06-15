@@ -26,7 +26,7 @@
 (** This is for use *within* the data encoding library only. Instead, you should
     use the corresponding module intended for use: {!Data_encoding.Encoding}. *)
 
-type slice = {name: string; value: string; pretty_printed: string}
+type slice = {name : string; value : string; pretty_printed : string}
 
 type slicer_state
 
