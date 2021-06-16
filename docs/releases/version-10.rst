@@ -1,7 +1,7 @@
 .. _version-10:
 
-Version 10~rc1
-==============
+Version 10.0~rc1
+================
 
 **This release candidate changes the storage backend and requires specific care when updating.**
 
@@ -13,6 +13,10 @@ node in full mode requires around 6GB of disk space, compared to more
 than 22GB before that. In archive mode, it drops from 56GB to 9GB. It
 also reduces by a factor of more than 2 the time needed to export and
 import snapshots.
+
+This version also notably introduces an Access Control List (ACL) feature for RPCs,
+a new *light* mode for the client, and a new executable ``tezos-proxy-server``.
+See full `Changelog`_ for more details.
 
 Update Instructions
 -------------------
