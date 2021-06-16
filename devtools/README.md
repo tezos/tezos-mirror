@@ -4,4 +4,5 @@ This is a place designed to development only tools, it may include, patches, sug
 
 ## Tools
 
-- utop-fix: allows utop to be used globally in Tezos
+- protocol-print: This allows printing inside the protocol files for debugging purposes.
+- utop-fix (deprecated by [tztop](../src/tooling/tztop/README.md)): allows utop to be used globally in Tezos

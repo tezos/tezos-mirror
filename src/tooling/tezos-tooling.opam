@@ -10,8 +10,11 @@ depends: [
   "dune" { >= "2.0" }
   "ocamlformat" { = "0.18.0" }
   "bisect_ppx" { >= "2.3" }
+  "tezos-base"
+  "tezos-protocol-compiler"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
+depopts: [ "utop" { >= "2.8" } ]
 synopsis: "Tezos: tooling for the project"

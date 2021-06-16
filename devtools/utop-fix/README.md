@@ -1,4 +1,8 @@
-# utop-fix
+# [Deprecated] utop-fix
+
+## Deprecation note
+
+Superseded by [tztop](../../src/tooling/tztop/README.md)
 
 ## Why a patch
 
