@@ -31,24 +31,39 @@
     information. This snapshot may also be shared by third parties to
     facilitate the bootstrap process.
 
-    A snapshot of a block [B] is composed of:
-    - The metadata of the snapshot;
-    - A single context containing every key that the block [B-1] needs (see below);
-    - The set of blocks and their operations from the genesis block up
-      to [B] -- it might contain less blocks if the snapshot is
-      created from a store using a [Rolling] history mode of if it is
-      created as a [Rolling] snapshot. Block's metadata are not
-      exported ;
-    - The set of necessary Tezos protocols.
+    A snapshot of a block [B] is composed of :
+    - The snapshot format version (see [version]), as a file;
+    - The metadata of the snapshot (see [metadata]), as a file;
+    - Some data to ensure snapshot consistency at import (see
+      [block_data]), as a file;
+    - A single context containing every key that the block [B-1] needs
+      (see below), as a file;
+    - The set of (cemented and floating) blocks and their operations
+      from the genesis block up to [B] -- it might contain less blocks
+      if the snapshot is created from a store using a [Rolling]
+      history mode of if it is created as a [Rolling]
+      snapshot. Block's metadata are not exported. The cemented blocks
+      are exported as a directory containing cycles as files, as well
+      as some indexing data. The floating blocks are stored as a
+      single file ;
+    - The set of necessary Tezos protocols, as a directory containing
+      the protocols as single files.
 
-    Exporting a snapshot will generate such a file (or a directory, if
-    the snapshot is not compressed). Importing a snapshot will
-    initialize a fresh store with the data contained in the
-    snapshot. As snapshots may be shared between users, checks are
-    made to ensure that no malicious data is loaded. For instance, we
-    export the context of block [B-1] to make sure that the
-    application of the block [B], given its predecessor's context, is
-    valid.
+    There are two kinds of snapshot formats that can be exported:
+    - [Raw] is a directory containing the aforementioned data as
+    independent files;
+    - [Tar] is a tar archive containing all the data as a single
+    archive file. To achieve better performances while loading the
+    snapshot's information (version and metadata), we store first the
+    version and then the metadata, to avoid seeking through the whole
+    file.
+
+    Importing a snapshot will initialize a fresh store with the data
+    contained in the snapshot. As snapshots may be shared between
+    users, checks are made to ensure that no malicious data is
+    loaded. For instance, we export the context of block [B-1] to make
+    sure that the application of the block [B], given its
+    predecessor's context, is valid.
 
     Depending on the history mode, a snapshot might contain less
     blocks. In full, all blocks are present and importing such a
@@ -60,7 +75,7 @@
 
     Snapshots may be created concurrently with a running node. It
     might impact the node for a few seconds to retrieve the necessary
-    consistent information to producethe snapshot.
+    consistent information to produce the snapshot.
 *)
 
 open Store_types
