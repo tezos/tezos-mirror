@@ -427,12 +427,10 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to hash a Michelson script with `BLAKE2B`."
-      no_options
+      (args1 enforce_indentation_flag)
       (prefixes ["hash"; "script"] @@ file_or_literal_param () @@ stop)
-      (fun () expr_string (cctxt : Protocol_client_context.full) ->
-        let program =
-          Michelson_v1_parser.parse_toplevel ~check:false expr_string
-        in
+      (fun check expr_string (cctxt : Protocol_client_context.full) ->
+        let program = Michelson_v1_parser.parse_toplevel ~check expr_string in
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
         let code = program.expanded in
@@ -739,11 +737,11 @@ let commands () =
       ~desc:
         "Conversion of Michelson script from Micheline, JSON or binary to \
          Micheline, JSON, binary or OCaml"
-      (args2 zero_loc_switch legacy_switch)
+      (args3 zero_loc_switch legacy_switch enforce_indentation_flag)
       (prefixes ["convert"; "script"]
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
-      (fun (zero_loc, legacy)
+      (fun (zero_loc, legacy, check)
            expr_string
            from_format
            to_format
@@ -751,7 +749,7 @@ let commands () =
         (match from_format with
         | `Michelson ->
             let program =
-              Michelson_v1_parser.parse_toplevel ~check:false expr_string
+              Michelson_v1_parser.parse_toplevel ~check expr_string
             in
             Lwt.return @@ Micheline_parser.no_parsing_error program
             >>=? fun program ->
