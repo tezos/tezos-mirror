@@ -274,6 +274,9 @@ module Real = struct
   let find_connection {pool; _} peer_id =
     P2p_pool.Connection.find_by_peer_id pool peer_id
 
+  let find_connection_by_point {pool; _} point =
+    P2p_pool.Connection.find_by_point pool point
+
   let disconnect ?wait conn = P2p_conn.disconnect ?wait conn
 
   let connection_info _net conn = P2p_conn.info conn
@@ -292,6 +295,9 @@ module Real = struct
 
   let get_peer_metadata {pool; _} conn =
     P2p_pool.Peers.get_peer_metadata pool conn
+
+  let connect ?timeout net point =
+    P2p_connect_handler.connect ?timeout net.connect_handler point
 
   let recv _net conn =
     P2p_conn.read conn >>=? fun msg ->
@@ -399,6 +405,8 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   connections : unit -> ('msg, 'peer_meta, 'conn_meta) connection list;
   find_connection :
     P2p_peer.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection option;
+  find_connection_by_point :
+    P2p_point.Id.t -> ('msg, 'peer_meta, 'conn_meta) connection option;
   disconnect :
     ?wait:bool -> ('msg, 'peer_meta, 'conn_meta) connection -> unit Lwt.t;
   connection_info :
@@ -412,6 +420,10 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   global_stat : unit -> P2p_stat.t;
   get_peer_metadata : P2p_peer.Id.t -> 'peer_meta;
   set_peer_metadata : P2p_peer.Id.t -> 'peer_meta -> unit;
+  connect :
+    ?timeout:Ptime.span ->
+    P2p_point.Id.t ->
+    ('msg, 'peer_meta, 'conn_meta) connection tzresult Lwt.t;
   recv : ('msg, 'peer_meta, 'conn_meta) connection -> 'msg tzresult Lwt.t;
   recv_any : unit -> (('msg, 'peer_meta, 'conn_meta) connection * 'msg) Lwt.t;
   send :
@@ -482,6 +494,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       shutdown = Real.shutdown net;
       connections = Real.connections net;
       find_connection = Real.find_connection net;
+      find_connection_by_point = Real.find_connection_by_point net;
       disconnect = Real.disconnect;
       connection_info = Real.connection_info net;
       connection_local_metadata = Real.connection_local_metadata net;
@@ -490,6 +503,7 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       global_stat = Real.global_stat net;
       get_peer_metadata = Real.get_peer_metadata net;
       set_peer_metadata = Real.set_peer_metadata net;
+      connect = (fun ?timeout -> Real.connect ?timeout net);
       recv = Real.recv net;
       recv_any = Real.recv_any net;
       send = Real.send net;
@@ -524,6 +538,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     shutdown = Lwt.return;
     connections = (fun () -> []);
     find_connection = (fun _ -> None);
+    find_connection_by_point = (fun _ -> None);
     disconnect = (fun ?wait:_ _ -> Lwt.return_unit);
     connection_info =
       (fun _ -> Fake.connection_info announced_version faked_metadata);
@@ -533,6 +548,7 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     global_stat = (fun () -> Fake.empty_stat);
     get_peer_metadata = (fun _ -> peer_cfg.P2p_params.peer_meta_initial ());
     set_peer_metadata = (fun _ _ -> ());
+    connect = (fun ?timeout:_ _ -> fail P2p_errors.Connection_refused);
     recv = (fun _ -> Lwt_utils.never_ending ());
     recv_any = (fun () -> Lwt_utils.never_ending ());
     send = (fun _ _ -> fail P2p_errors.Connection_closed);
@@ -561,6 +577,8 @@ let disconnect net = net.disconnect
 
 let find_connection net = net.find_connection
 
+let find_connection_by_point net = net.find_connection_by_point
+
 let connection_info net = net.connection_info
 
 let connection_local_metadata net = net.connection_local_metadata
@@ -574,6 +592,8 @@ let global_stat net = net.global_stat ()
 let get_peer_metadata net = net.get_peer_metadata
 
 let set_peer_metadata net = net.set_peer_metadata
+
+let connect net = net.connect
 
 let recv net = net.recv
 
