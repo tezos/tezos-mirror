@@ -7,6 +7,7 @@ test_coverage:
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development_coverage
   stage: test_coverage
+  needs: []
   parallel:
     matrix:
       # Set up tests suites to run. Note that each of these make will
