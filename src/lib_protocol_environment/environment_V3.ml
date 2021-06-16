@@ -588,6 +588,38 @@ struct
     let pp_trace = pp_print_error
 
     type 'err trace = 'err TzTrace.trace
+
+    (* Shadowing catch to prevent catching system exceptions *)
+    type error += Exn of exn
+
+    let () =
+      register_error_kind
+        `Temporary
+        ~id:"failure"
+        ~title:"Exception"
+        ~description:"Exception safely wrapped in an error"
+        ~pp:(fun ppf s ->
+          Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s)
+        Data_encoding.(obj1 (req "msg" string))
+        (function
+          | Exn (Failure msg) -> Some msg
+          | Exn exn -> Some (Printexc.to_string exn)
+          | _ -> None)
+        (fun msg -> Exn (Failure msg))
+
+    let error_of_exn e = TzTrace.make @@ Exn e
+
+    let catch ?(catch_only = fun _ -> true) f =
+      match f () with
+      | v -> Ok v
+      | exception ((Stack_overflow | Out_of_memory | Unix.Unix_error _) as e) ->
+          raise e
+      | exception e -> if catch_only e then Error (error_of_exn e) else raise e
+
+    let catch_s ?(catch_only = fun _ -> true) f =
+      Lwt.try_bind f return (function
+          | (Stack_overflow | Out_of_memory | Unix.Unix_error _) as e -> raise e
+          | e -> if catch_only e then fail (Exn e) else raise e)
   end
 
   let () =
