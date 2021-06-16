@@ -23,17 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module is the location where the proxy tweaks the behavior of a
-    vanilla client. A regular mockup client uses a [Memory_context] in
-    place of this implementation. Compared to [Memory_context], this
-    instance features a [M.ProxyDelegate]
-    which under the hood relies on [Proxy_getter].
+(** This module is the location where the proxy tweaks the behavior of a vanilla
+    client. A regular mockup client uses a [Memory_context] in place of this
+    implementation. Compared to [Memory_context], this instance features a
+    [M.ProxyDelegate] which under the hood relies on [Proxy_getter].
 
-    Whereas [Memory_context] is a regular recursive map, [Proxy_context]
-    obtains values by delegating to endpoints when receiving requests.
-    Hence, right after having created an [empty] value with an instance
-    of [M.ProxyDelegate], this value is as filled as the distant endpoint
-    it delegates to. *)
+    Whereas [Memory_context] is a regular recursive map, [Proxy_context] obtains
+    values by delegating to endpoints when receiving requests. Hence, right
+    after having created an [empty] value with an instance of [M.ProxyDelegate],
+    this value is as filled as the distant endpoint it delegates to. *)
 
 open Tezos_protocol_environment
 
