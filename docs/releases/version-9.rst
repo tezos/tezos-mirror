@@ -1,6 +1,6 @@
 .. _version-9:
 
-Version 9.2
+Version 9.3
 ===========
 
 Version 9.0 contains a new version (V2) of the protocol environment,
@@ -23,23 +23,28 @@ reduced gas consumption. Version 9.2 also improves how the mempool
 chooses which operations to keep. This should result in fewer
 endorsements being missed.
 
+Version 9.3 fixes some cases where ``MDB_MAP_FULL`` errors could occur
+and reintroduces more ``/normalized`` RPCs which were still missing
+from version 9.1.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v9.2
+  git checkout v9.3
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v9.2`` Docker images of Tezos.
+If you are using Docker instead, use the ``v9.3`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 9.3 <../CHANGES.html#version-9-3>`_
 - `Version 9.2 <../CHANGES.html#version-9-2>`_
 - `Version 9.1 <../CHANGES.html#version-9-1>`_
 - `Version 9.0 <../CHANGES.html#version-9-0>`_
