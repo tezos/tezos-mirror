@@ -156,6 +156,7 @@ struct
   module Buffer = Buffer
   module Format = Format
   module Option = Tezos_error_monad.TzLwtreslib.Option
+  module FallbackArray = FallbackArray
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest
