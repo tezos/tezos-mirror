@@ -1,290 +1,869 @@
-(**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
-(*                                                                        *)
-(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
-(*     en Automatique.                                                    *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
-(** List operations.
+(** {1 List}
 
-   Some functions are flagged as not tail-recursive.  A tail-recursive
-   function uses constant stack space, while a non-tail-recursive function
-   uses stack space proportional to the length of its list argument, which
-   can be a problem with very long lists.  When the function takes several
-   list arguments, an approximate formula giving stack usage (in some
-   unspecified constant unit) is shown in parentheses.
+    A replacement for {!Stdlib.List} which:
+    - replaces the exception-raising functions by exception-safe variants,
+    - provides Lwt-, result- and Lwt-result-aware traversors.
 
-   The above considerations can usually be ignored if your lists are not
-   longer than about 10000 elements.
+    [List] is intended to shadow both {!Stdlib.List} and {!Lwt_list}. *)
+
+(** {2 Basics}
+
+    Checkout {!Lwtreslib} for an introduction to the naming and semantic
+    convention of Lwtreslib. In a nutshell:
+    - Stdlib functions that raise exceptions are replaced by safe variants
+      (typically returning [option]).
+    - The [_e] suffix is for result-aware traversors ("e" stands for "error"),
+      [_s] and [_p] are for Lwt-aware, and [_es] and [_ep] are for
+      Lwt-result-aware.
+    - [_e], [_s], and [_es] traversors are {i fail-early}: they stop traversal
+      as soon as a failure ([Error] or [Fail]) occurs; [_p] and [_ep]
+      traversors are {i best-effort}: they only resolve once all of the
+      intermediate promises have, even if a failure occurs. *)
+
+(** {2 Double-traversal and combine}
+
+    Note that double-list traversors ([iter2], [map2], etc., and also [combine])
+    take an additional [when_different_lengths] parameter. This is to control
+    the error that is returned when the two lists passed as arguments have
+    different lengths.
+
+    This mechanism is a replacement for {!Stdlib.List.iter2} (etc.) raising
+    [Invalid_argument].
+
+    Note that, as per the fail-early behaviour mentioned above, [_e], [_s], and
+    [_es] traversors will have already processed the common-prefix before the
+    error is returned.
+
+    Because the best-effort behaviour of [_p] and [_ep] is unsatisfying for this
+    failure case, double parallel traversors are omitted from this library.
+    (Specifically, it is not obvious whether nor how the
+    [when_different_lengths] error should be composed with the other errors.)
+
+    To obtain a different behaviour for sequential traversors, or to process
+    two lists in parallel, you can use {!combine} or any of the alternatives
+    that handles the error differently: {!combine_drop},
+    {!combine_with_leftovers}. Finally, the {!rev_combine} is provided to allow
+    to avoid multiple-reversing.
+
+    {3 Special considerations}
+
+    Because they traverse the list from right-to-left, the {!fold_right2}
+    function and all its variants fail with [when_different_lengths] before any
+    of the processing starts. Whilst this is still within the fail-early
+    behaviour, it may be surprising enough that it requires mentioning here.
+
+    Because they may return early, {!for_all2} and {!exists2} and all their
+    variants may return [Ok _] even though the arguments have different lengths.
 *)
 
-type 'a t = 'a list = [] | (::) of 'a * 'a list (**)
-(** An alias for the type of lists. *)
+(** {3 Trivial values} *)
+
+type 'a t = 'a Stdlib.List.t = [] | ( :: ) of 'a * 'a list
+
+(** in-monad, preallocated nil *)
+
+(** [nil] is [[]] *)
+val nil : 'a list
+
+(** [nil_e] is [Ok []] *)
+val nil_e : ('a list, 'trace) result
+
+(** [nil_s] is [Lwt.return_nil] *)
+val nil_s : 'a list Lwt.t
+
+(** [nil_es] is [Lwt.return (Ok [])] *)
+val nil_es : ('a list, 'trace) result Lwt.t
+
+(** {3 Safe wrappers}
+
+    Shadowing unsafe functions to avoid all exceptions. *)
+
+(** {4 Safe lookups, scans, retrievals}
+
+    Return option rather than raise [Not_found], [Failure _], or
+    [Invalid_argument _] *)
+
+(** [hd xs] is the head (first element) of the list or [None] if the list is
+    empty. *)
+val hd : 'a list -> 'a option
+
+(** [tl xs] is the tail of the list (the whole list except the first element)
+    or [None] if the list is empty. *)
+val tl : 'a list -> 'a list option
+
+(** [nth xs n] is the [n]th element of the list or [None] if the list has
+    fewer than [n] elements.
+
+    [nth xs 0 = hd xs] *)
+val nth : 'a list -> int -> 'a option
+
+(** [nth_opt] is an alias for [nth] provided for backwards compatibility. *)
+val nth_opt : 'a list -> int -> 'a option
+
+(** [last x xs] is the last element of the list [xs] or [x] if [xs] is empty.
+
+    The primary intended use for [last] is after destructing a list:
+    [match l with | None -> … | Some x :: xs -> last x xs]
+    but it can also be used for a default value:
+    [last default_value_if_empty xs]. *)
+val last : 'a -> 'a list -> 'a
+
+(** [last_opt xs] is the last element of the list [xs] or [None] if the list
+    [xs] is empty. *)
+val last_opt : 'a list -> 'a option
+
+(** [find predicate xs] is the first element [x] of the list [xs] such that
+    [predicate x] is [true] or [None] if the list [xs] has no such element. *)
+val find : ('a -> bool) -> 'a list -> 'a option
+
+(** [find_opt] is an alias for [find] provided for backwards compatibility. *)
+val find_opt : ('a -> bool) -> 'a list -> 'a option
+
+(** [mem ~equal a l] is [true] iff there is an element [e] of [l] such that
+    [equal a e]. *)
+val mem : equal:('a -> 'a -> bool) -> 'a -> 'a list -> bool
+
+(** [assoc ~equal k kvs] is [Some v] such that [(k', v)] is the first pair in
+    the list such that [equal k' k] or [None] if the list contains no such
+    pair. *)
+val assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
+
+(** [assoc_opt] is an alias for [assoc] provided for backwards compatibility. *)
+val assoc_opt : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
+
+(** [assq k kvs] is the same as [assoc ~equal:Stdlib.( == ) k kvs]: it uses
+    the physical equality. *)
+val assq : 'a -> ('a * 'b) list -> 'b option
+
+(** [assq_opt] is an alias for [assq] provided for backwards compatibility. *)
+val assq_opt : 'a -> ('a * 'b) list -> 'b option
+
+(** [mem_assoc ~equal k l] is equivalent to
+    [Option.is_some @@ assoc ~equal k l]. *)
+val mem_assoc : equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> bool
+
+(** [mem_assq k l] is [mem_assoc ~equal:Stdlib.( == ) k l]. *)
+val mem_assq : 'a -> ('a * 'b) list -> bool
+
+(** [remove_assoc ~equal k l] is [l] without the first element [(k', _)] such
+    that [equal k k']. *)
+val remove_assoc :
+  equal:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> ('a * 'b) list
+
+(** [remove_assoq k l] is [remove_assoc ~equal:Stdlib.( == ) k l]. *)
+val remove_assq : 'a -> ('a * 'b) list -> ('a * 'b) list
+
+(** {4 Initialisation} *)
+
+(** [init ~when_negative_length n f] is [Error when_negative_length] if [n] is
+    strictly negative and [Ok (Stdlib.List.init n f)] otherwise. *)
+val init :
+  when_negative_length:'trace ->
+  int ->
+  (int -> 'a) ->
+  ('a list, 'trace) result
+
+(** {4 Basic traversal} *)
 
 val length : 'a list -> int
-(** Return the length (number of elements) of the given list. *)
-
-val compare_lengths : 'a list -> 'b list -> int
-(** Compare the lengths of two lists. [compare_lengths l1 l2] is
-   equivalent to [compare (length l1) (length l2)], except that
-   the computation stops after itering on the shortest list.
-   @since 4.05.0
- *)
-
-val compare_length_with : 'a list -> int -> int
-(** Compare the length of a list to an integer. [compare_length_with l n] is
-   equivalent to [compare (length l) n], except that
-   the computation stops after at most [n] iterations on the list.
-   @since 4.05.0
-*)
-
-val cons : 'a -> 'a list -> 'a list
-(** [cons x xs] is [x :: xs]
-    @since 4.03.0
-*)
-
-val hd : 'a list -> 'a
-(** Return the first element of the given list. Raise
-   [Failure "hd"] if the list is empty. *)
-
-val tl : 'a list -> 'a list
-(** Return the given list without its first element. Raise
-    [Failure "tl"] if the list is empty. *)
-
-val nth_opt: 'a list -> int -> 'a option
-(** Return the [n]-th element of the given list.
-    The first element (head of the list) is at position 0.
-    Return [None] if the list is too short.
-    Raise [Invalid_argument "List.nth"] if [n] is negative.
-    @since 4.05
-*)
 
 val rev : 'a list -> 'a list
-(** List reversal. *)
-
-val init : int -> (int -> 'a) -> 'a list
-(** [List.init len f] is [[f 0; f 1; ...; f (len-1)]], evaluated left to right.
-
-    @raise Invalid_argument if len < 0.
-    @since 4.06.0
-*)
-
-val append : 'a list -> 'a list -> 'a list
-(** Concatenate two lists.  Same as the infix operator [@].
-   Not tail-recursive (length of the first argument).  *)
-
-val rev_append : 'a list -> 'a list -> 'a list
-(** [List.rev_append l1 l2] reverses [l1] and concatenates it to [l2].
-   This is equivalent to {!List.rev}[ l1 @ l2], but [rev_append] is
-   tail-recursive and more efficient. *)
 
 val concat : 'a list list -> 'a list
-(** Concatenate a list of lists.  The elements of the argument are all
-   concatenated together (in the same order) to give the result.
-   Not tail-recursive
-   (length of the argument + length of the longest sub-list). *)
+
+val append : 'a list -> 'a list -> 'a list
+
+val rev_append : 'a list -> 'a list -> 'a list
 
 val flatten : 'a list list -> 'a list
-(** An alias for [concat]. *)
 
+(** {4 Double-list traversals}
 
-(** {1 Iterators} *)
-
-
-val iter : ('a -> unit) -> 'a list -> unit
-(** [List.iter f [a1; ...; an]] applies function [f] in turn to
-   [a1; ...; an]. It is equivalent to
-   [begin f a1; f a2; ...; f an; () end]. *)
-
-val iteri : (int -> 'a -> unit) -> 'a list -> unit
-(** Same as {!List.iter}, but the function is applied to the index of
-   the element as first argument (counting from 0), and the element
-   itself as second argument.
-   @since 4.00.0
+    These safe-wrappers take an explicit value to handle the case of lists of
+    unequal length.
 *)
 
-val map : ('a -> 'b) -> 'a list -> 'b list
-(** [List.map f [a1; ...; an]] applies function [f] to [a1, ..., an],
-   and builds the list [[f a1; ...; f an]]
-   with the results returned by [f].  Not tail-recursive. *)
+(** [combine ~when_different_lengths l1 l2] is either
+    - [Error when_different_lengths] if [List.length l1 <> List.length l2]
+    - a list of pairs of elements from [l1] and [l2]
 
-val mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
-(** Same as {!List.map}, but the function is applied to the index of
-   the element as first argument (counting from 0), and the element
-   itself as second argument.  Not tail-recursive.
-   @since 4.00.0
-*)
+    E.g., [combine ~when_different_lengths [] [] = Ok []]
 
-val rev_map : ('a -> 'b) -> 'a list -> 'b list
-(** [List.rev_map f l] gives the same result as
-   {!List.rev}[ (]{!List.map}[ f l)], but is tail-recursive and
-   more efficient. *)
+    E.g., [combine ~when_different_lengths [1; 2] ['a'; 'b'] = Ok [(1,'a'); (2, 'b')]]
 
-val filter_map : ('a -> 'b option) -> 'a list -> 'b list
-(** [filter_map f l] applies [f] to every element of [l], filters
-    out the [None] elements and returns the list of the arguments of
-    the [Some] elements.
-    @since 4.08.0
-*)
+    E.g., [combine ~when_different_lengths:() [1] [] = Error ()]
 
-val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
-(** [List.fold_left f a [b1; ...; bn]] is
-   [f (... (f (f a b1) b2) ...) bn]. *)
+    Note: [combine ~when_different_lengths l1 l2] is equivalent to
+    [try Ok (Stdlib.List.combine l1 l2)
+     with Invalid_argument _ -> when_different_lengths]
 
-val fold_right : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
-(** [List.fold_right f [a1; ...; an] b] is
-   [f a1 (f a2 (... (f an b) ...))].  Not tail-recursive. *)
+    The same equivalence almost holds for the other double traversors below.
+    The notable difference is if the functions passed as argument to the
+    traversors raise the [Invalid_argument _] exception. *)
+val combine :
+  when_different_lengths:'trace ->
+  'a list ->
+  'b list ->
+  (('a * 'b) list, 'trace) result
 
-
-(** {1 Iterators on two lists} *)
-
-
-val iter2 : ('a -> 'b -> unit) -> 'a list -> 'b list -> unit
-(** [List.iter2 f [a1; ...; an] [b1; ...; bn]] calls in turn
-   [f a1 b1; ...; f an bn].
-   Raise [Invalid_argument] if the two lists are determined
-   to have different lengths. *)
-
-val map2 : ('a -> 'b -> 'c) -> 'a list -> 'b list -> 'c list
-(** [List.map2 f [a1; ...; an] [b1; ...; bn]] is
-   [[f a1 b1; ...; f an bn]].
-   Raise [Invalid_argument] if the two lists are determined
-   to have different lengths.  Not tail-recursive. *)
-
-val rev_map2 : ('a -> 'b -> 'c) -> 'a list -> 'b list -> 'c list
-(** [List.rev_map2 f l1 l2] gives the same result as
-   {!List.rev}[ (]{!List.map2}[ f l1 l2)], but is tail-recursive and
-   more efficient. *)
-
-val fold_left2 : ('a -> 'b -> 'c -> 'a) -> 'a -> 'b list -> 'c list -> 'a
-(** [List.fold_left2 f a [b1; ...; bn] [c1; ...; cn]] is
-   [f (... (f (f a b1 c1) b2 c2) ...) bn cn].
-   Raise [Invalid_argument] if the two lists are determined
-   to have different lengths. *)
-
-val fold_right2 : ('a -> 'b -> 'c -> 'c) -> 'a list -> 'b list -> 'c -> 'c
-(** [List.fold_right2 f [a1; ...; an] [b1; ...; bn] c] is
-   [f a1 b1 (f a2 b2 (... (f an bn c) ...))].
-   Raise [Invalid_argument] if the two lists are determined
-   to have different lengths.  Not tail-recursive. *)
-
-
-(** {1 List scanning} *)
-
-
-val for_all : ('a -> bool) -> 'a list -> bool
-(** [for_all p [a1; ...; an]] checks if all elements of the list
-   satisfy the predicate [p]. That is, it returns
-   [(p a1) && (p a2) && ... && (p an)]. *)
-
-val exists : ('a -> bool) -> 'a list -> bool
-(** [exists p [a1; ...; an]] checks if at least one element of
-   the list satisfies the predicate [p]. That is, it returns
-   [(p a1) || (p a2) || ... || (p an)]. *)
-
-val for_all2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
-(** Same as {!List.for_all}, but for a two-argument predicate.
-   Raise [Invalid_argument] if the two lists are determined
-   to have different lengths. *)
-
-val exists2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
-(** Same as {!List.exists}, but for a two-argument predicate.
-   Raise [Invalid_argument] if the two lists are determined
-   to have different lengths. *)
-
-
-(** {1 List searching} *)
-
-
-val find_opt: ('a -> bool) -> 'a list -> 'a option
-(** [find_opt p l] returns the first element of the list [l] that
-    satisfies the predicate [p], or [None] if there is no value that
-    satisfies [p] in the list [l].
-    @since 4.05 *)
-
-val filter : ('a -> bool) -> 'a list -> 'a list
-(** [filter p l] returns all the elements of the list [l]
-   that satisfy the predicate [p].  The order of the elements
-   in the input list is preserved.  *)
-
-val find_all : ('a -> bool) -> 'a list -> 'a list
-(** [find_all] is another name for {!List.filter}. *)
-
-val partition : ('a -> bool) -> 'a list -> 'a list * 'a list
-(** [partition p l] returns a pair of lists [(l1, l2)], where
-   [l1] is the list of all the elements of [l] that
-   satisfy the predicate [p], and [l2] is the list of all the
-   elements of [l] that do not satisfy [p].
-   The order of the elements in the input list is preserved. *)
-
-
-(** {1 Lists of pairs} *)
-
+(** [rev_combine ~when_different_lengths xs ys] is
+    [rev (combine ~when_different_lengths xs ys)] but more efficient. *)
+val rev_combine :
+  when_different_lengths:'trace ->
+  'a list ->
+  'b list ->
+  (('a * 'b) list, 'trace) result
 
 val split : ('a * 'b) list -> 'a list * 'b list
-(** Transform a list of pairs into a pair of lists:
-   [split [(a1,b1); ...; (an,bn)]] is [([a1; ...; an], [b1; ...; bn])].
-   Not tail-recursive.
-*)
 
-val combine : 'a list -> 'b list -> ('a * 'b) list
-(** Transform a pair of lists into a list of pairs:
-   [combine [a1; ...; an] [b1; ...; bn]] is
-   [[(a1,b1); ...; (an,bn)]].
-   Raise [Invalid_argument] if the two lists
-   have different lengths.  Not tail-recursive. *)
+val iter2 :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> unit) ->
+  'a list ->
+  'b list ->
+  (unit, 'trace) result
 
+val map2 :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result
 
-(** {1 Sorting} *)
+val rev_map2 :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result
 
+val fold_left2 :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c -> 'a) ->
+  'a ->
+  'b list ->
+  'c list ->
+  ('a, 'trace) result
+
+(** This function is not tail-recursive *)
+val fold_right2 :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c -> 'c) ->
+  'a list ->
+  'b list ->
+  'c ->
+  ('c, 'trace) result
+
+val for_all2 :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> bool) ->
+  'a list ->
+  'b list ->
+  (bool, 'trace) result
+
+val exists2 :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> bool) ->
+  'a list ->
+  'b list ->
+  (bool, 'trace) result
+
+(** {3 Monad-aware variants}
+
+    The functions below are strict extensions of the standard {!Stdlib.List}
+    module. It is for result-, lwt- and lwt-result-aware variants. The meaning
+    of the suffix is as described above, in {!Lwtreslib}, and in {!Sigs.Seq}. *)
+
+(** {4 Initialisation variants}
+
+    Note that for asynchronous variants ([_s], [_es], [_p], and [_ep]), if the
+    length parameter is negative, then the promise is returned already
+    fulfilled with [Error when_different_lengths]. *)
+
+val init_e :
+  when_negative_length:'trace ->
+  int ->
+  (int -> ('a, 'trace) result) ->
+  ('a list, 'trace) result
+
+val init_s :
+  when_negative_length:'trace ->
+  int ->
+  (int -> 'a Lwt.t) ->
+  ('a list, 'trace) result Lwt.t
+
+val init_es :
+  when_negative_length:'trace ->
+  int ->
+  (int -> ('a, 'trace) result Lwt.t) ->
+  ('a list, 'trace) result Lwt.t
+
+val init_p :
+  when_negative_length:'trace ->
+  int ->
+  (int -> 'a Lwt.t) ->
+  ('a list, 'trace) result Lwt.t
+
+(** {4 Query variants} *)
+
+val find_e :
+  ('a -> (bool, 'trace) result) -> 'a list -> ('a option, 'trace) result
+
+val find_s : ('a -> bool Lwt.t) -> 'a list -> 'a option Lwt.t
+
+val find_es :
+  ('a -> (bool, 'trace) result Lwt.t) ->
+  'a list ->
+  ('a option, 'trace) result Lwt.t
+
+val filter : ('a -> bool) -> 'a list -> 'a list
+
+(** [rev_filter f l] is [rev (filter f l)] but more efficient. *)
+val rev_filter : ('a -> bool) -> 'a list -> 'a list
+
+val rev_filter_some : 'a option list -> 'a list
+
+val filter_some : 'a option list -> 'a list
+
+val rev_filter_ok : ('a, 'b) result list -> 'a list
+
+val filter_ok : ('a, 'b) result list -> 'a list
+
+val rev_filter_error : ('a, 'b) result list -> 'b list
+
+val filter_error : ('a, 'b) result list -> 'b list
+
+val rev_filter_e :
+  ('a -> (bool, 'trace) result) -> 'a list -> ('a list, 'trace) result
+
+val filter_e :
+  ('a -> (bool, 'trace) result) -> 'a list -> ('a list, 'trace) result
+
+val rev_filter_s : ('a -> bool Lwt.t) -> 'a list -> 'a list Lwt.t
+
+val filter_s : ('a -> bool Lwt.t) -> 'a list -> 'a list Lwt.t
+
+val rev_filter_es :
+  ('a -> (bool, 'trace) result Lwt.t) ->
+  'a list ->
+  ('a list, 'trace) result Lwt.t
+
+val filter_es :
+  ('a -> (bool, 'trace) result Lwt.t) ->
+  'a list ->
+  ('a list, 'trace) result Lwt.t
+
+val filter_p : ('a -> bool Lwt.t) -> 'a list -> 'a list Lwt.t
+
+val rev_partition : ('a -> bool) -> 'a list -> 'a list * 'a list
+
+val partition : ('a -> bool) -> 'a list -> 'a list * 'a list
+
+val rev_partition_result : ('a, 'b) result list -> 'a list * 'b list
+
+val partition_result : ('a, 'b) result list -> 'a list * 'b list
+
+val rev_partition_e :
+  ('a -> (bool, 'trace) result) ->
+  'a list ->
+  ('a list * 'a list, 'trace) result
+
+val partition_e :
+  ('a -> (bool, 'trace) result) ->
+  'a list ->
+  ('a list * 'a list, 'trace) result
+
+val rev_partition_s :
+  ('a -> bool Lwt.t) -> 'a list -> ('a list * 'a list) Lwt.t
+
+val partition_s : ('a -> bool Lwt.t) -> 'a list -> ('a list * 'a list) Lwt.t
+
+val rev_partition_es :
+  ('a -> (bool, 'trace) result Lwt.t) ->
+  'a list ->
+  ('a list * 'a list, 'trace) result Lwt.t
+
+val partition_es :
+  ('a -> (bool, 'trace) result Lwt.t) ->
+  'a list ->
+  ('a list * 'a list, 'trace) result Lwt.t
+
+val partition_p : ('a -> bool Lwt.t) -> 'a list -> ('a list * 'a list) Lwt.t
+
+(** {4 Traversal variants} *)
+val iter : ('a -> unit) -> 'a list -> unit
+
+val iter_e : ('a -> (unit, 'trace) result) -> 'a list -> (unit, 'trace) result
+
+val iter_s : ('a -> unit Lwt.t) -> 'a list -> unit Lwt.t
+
+val iter_es :
+  ('a -> (unit, 'trace) result Lwt.t) ->
+  'a list ->
+  (unit, 'trace) result Lwt.t
+
+val iter_p : ('a -> unit Lwt.t) -> 'a list -> unit Lwt.t
+
+val iteri : (int -> 'a -> unit) -> 'a list -> unit
+
+val iteri_e :
+  (int -> 'a -> (unit, 'trace) result) -> 'a list -> (unit, 'trace) result
+
+val iteri_s : (int -> 'a -> unit Lwt.t) -> 'a list -> unit Lwt.t
+
+val iteri_es :
+  (int -> 'a -> (unit, 'trace) result Lwt.t) ->
+  'a list ->
+  (unit, 'trace) result Lwt.t
+
+val iteri_p : (int -> 'a -> unit Lwt.t) -> 'a list -> unit Lwt.t
+
+val map : ('a -> 'b) -> 'a list -> 'b list
+
+val map_e : ('a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
+
+val map_s : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val map_es :
+  ('a -> ('b, 'trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'trace) result Lwt.t
+
+val map_p : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
+
+val mapi_e :
+  (int -> 'a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
+
+val mapi_s : (int -> 'a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val mapi_es :
+  (int -> 'a -> ('b, 'trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'trace) result Lwt.t
+
+val mapi_p : (int -> 'a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val rev_map : ('a -> 'b) -> 'a list -> 'b list
+
+val rev_mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
+
+val rev_map_e :
+  ('a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
+
+val rev_map_s : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val rev_map_es :
+  ('a -> ('b, 'trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'trace) result Lwt.t
+
+val rev_map_p : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val rev_mapi_e :
+  (int -> 'a -> ('b, 'trace) result) -> 'a list -> ('b list, 'trace) result
+
+val rev_mapi_s : (int -> 'a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val rev_mapi_es :
+  (int -> 'a -> ('b, 'trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'trace) result Lwt.t
+
+val rev_mapi_p : (int -> 'a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val rev_filter_map : ('a -> 'b option) -> 'a list -> 'b list
+
+val rev_filter_map_e :
+  ('a -> ('b option, 'trace) result) -> 'a list -> ('b list, 'trace) result
+
+val filter_map_e :
+  ('a -> ('b option, 'trace) result) -> 'a list -> ('b list, 'trace) result
+
+val rev_filter_map_s : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val filter_map : ('a -> 'b option) -> 'a list -> 'b list
+
+val filter_map_s : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val rev_filter_map_es :
+  ('a -> ('b option, 'trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'trace) result Lwt.t
+
+val filter_map_es :
+  ('a -> ('b option, 'trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'trace) result Lwt.t
+
+val filter_map_p : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
+
+val fold_left_e :
+  ('a -> 'b -> ('a, 'trace) result) -> 'a -> 'b list -> ('a, 'trace) result
+
+val fold_left_s : ('a -> 'b -> 'a Lwt.t) -> 'a -> 'b list -> 'a Lwt.t
+
+val fold_left_es :
+  ('a -> 'b -> ('a, 'trace) result Lwt.t) ->
+  'a ->
+  'b list ->
+  ('a, 'trace) result Lwt.t
+
+(** This function is not tail-recursive *)
+val fold_right : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
+
+(** This function is not tail-recursive *)
+val fold_right_e :
+  ('a -> 'b -> ('b, 'trace) result) -> 'a list -> 'b -> ('b, 'trace) result
+
+(** This function is not tail-recursive *)
+val fold_right_s : ('a -> 'b -> 'b Lwt.t) -> 'a list -> 'b -> 'b Lwt.t
+
+(** This function is not tail-recursive *)
+val fold_right_es :
+  ('a -> 'b -> ('b, 'trace) result Lwt.t) ->
+  'a list ->
+  'b ->
+  ('b, 'trace) result Lwt.t
+
+(** {4 Double-traversal variants}
+
+    As mentioned above, there are no [_p] and [_ep] double-traversors. Use
+    {!combine} (and variants) to circumvent this. *)
+
+val iter2_e :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> (unit, 'trace) result) ->
+  'a list ->
+  'b list ->
+  (unit, 'trace) result
+
+val iter2_s :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> unit Lwt.t) ->
+  'a list ->
+  'b list ->
+  (unit, 'trace) result Lwt.t
+
+val iter2_es :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> (unit, 'trace) result Lwt.t) ->
+  'a list ->
+  'b list ->
+  (unit, 'trace) result Lwt.t
+
+val map2_e :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> ('c, 'trace) result) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result
+
+val map2_s :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c Lwt.t) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result Lwt.t
+
+val map2_es :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> ('c, 'trace) result Lwt.t) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result Lwt.t
+
+val rev_map2_e :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> ('c, 'trace) result) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result
+
+val rev_map2_s :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c Lwt.t) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result Lwt.t
+
+val rev_map2_es :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> ('c, 'trace) result Lwt.t) ->
+  'a list ->
+  'b list ->
+  ('c list, 'trace) result Lwt.t
+
+val fold_left2_e :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c -> ('a, 'trace) result) ->
+  'a ->
+  'b list ->
+  'c list ->
+  ('a, 'trace) result
+
+val fold_left2_s :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c -> 'a Lwt.t) ->
+  'a ->
+  'b list ->
+  'c list ->
+  ('a, 'trace) result Lwt.t
+
+val fold_left2_es :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c -> ('a, 'trace) result Lwt.t) ->
+  'a ->
+  'b list ->
+  'c list ->
+  ('a, 'trace) result Lwt.t
+
+(** This function is not tail-recursive *)
+val fold_right2_e :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c -> ('c, 'trace) result) ->
+  'a list ->
+  'b list ->
+  'c ->
+  ('c, 'trace) result
+
+(** This function is not tail-recursive *)
+val fold_right2_s :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c -> 'c Lwt.t) ->
+  'a list ->
+  'b list ->
+  'c ->
+  ('c, 'trace) result Lwt.t
+
+(** This function is not tail-recursive *)
+val fold_right2_es :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> 'c -> ('c, 'trace) result Lwt.t) ->
+  'a list ->
+  'b list ->
+  'c ->
+  ('c, 'trace) result Lwt.t
+
+(** {4 Scanning variants} *)
+
+val for_all : ('a -> bool) -> 'a list -> bool
+
+val for_all_e :
+  ('a -> (bool, 'trace) result) -> 'a list -> (bool, 'trace) result
+
+val for_all_s : ('a -> bool Lwt.t) -> 'a list -> bool Lwt.t
+
+val for_all_es :
+  ('a -> (bool, 'trace) result Lwt.t) ->
+  'a list ->
+  (bool, 'trace) result Lwt.t
+
+val for_all_p : ('a -> bool Lwt.t) -> 'a list -> bool Lwt.t
+
+val exists : ('a -> bool) -> 'a list -> bool
+
+val exists_e :
+  ('a -> (bool, 'trace) result) -> 'a list -> (bool, 'trace) result
+
+val exists_s : ('a -> bool Lwt.t) -> 'a list -> bool Lwt.t
+
+val exists_es :
+  ('a -> (bool, 'trace) result Lwt.t) ->
+  'a list ->
+  (bool, 'trace) result Lwt.t
+
+val exists_p : ('a -> bool Lwt.t) -> 'a list -> bool Lwt.t
+
+(** {4 Double-scanning variants}
+
+    As mentioned above, there are no [_p] and [_ep] double-scanners. Use
+    {!combine} (and variants) to circumvent this. *)
+
+val for_all2_e :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> (bool, 'trace) result) ->
+  'a list ->
+  'b list ->
+  (bool, 'trace) result
+
+val for_all2_s :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> bool Lwt.t) ->
+  'a list ->
+  'b list ->
+  (bool, 'trace) result Lwt.t
+
+val for_all2_es :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> (bool, 'trace) result Lwt.t) ->
+  'a list ->
+  'b list ->
+  (bool, 'trace) result Lwt.t
+
+val exists2_e :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> (bool, 'trace) result) ->
+  'a list ->
+  'b list ->
+  (bool, 'trace) result
+
+val exists2_s :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> bool Lwt.t) ->
+  'a list ->
+  'b list ->
+  (bool, 'trace) result Lwt.t
+
+val exists2_es :
+  when_different_lengths:'trace ->
+  ('a -> 'b -> (bool, 'trace) result Lwt.t) ->
+  'a list ->
+  'b list ->
+  (bool, 'trace) result Lwt.t
+
+(** {3 Combine variants}
+
+    These are primarily intended to be used for preprocessing before applying
+    a traversor to the resulting list of pairs. They give alternatives to the
+    [when_different_lengths] mechanism of the immediate double-traversors
+    above.
+
+    In case the semantic of, say, [map2_es] was unsatisfying, one can use
+    [map_es] on a [combine]-preprocessed pair of lists. The different variants
+    of [combine] give different approaches to different-length handling. *)
+
+(** [combine_drop ll lr] is a list [l] of pairs of elements taken from the
+    common-length prefix of [ll] and [lr]. The suffix of whichever list is
+    longer (if any) is dropped.
+
+    More formally [nth l n] is:
+    - [None] if [n >= min (length ll) (length lr)]
+    - [Some (Option.get @@ nth ll n, Option.get @@ nth lr n)] otherwise
+    *)
+val combine_drop : 'a list -> 'b list -> ('a * 'b) list
+
+(** [combine_with_leftovers ll lr] is a tuple [(combined, leftover)]
+    where [combined] is [combine_drop ll lr]
+    and [leftover] is either [`Left lsuffix] or [`Right rsuffix] depending on
+    which of [ll] or [lr] is longer. [leftover] is [None] if the two lists
+    have the same length. *)
+val combine_with_leftovers :
+  'a list ->
+  'b list ->
+  ('a * 'b) list * [`Left of 'a list | `Right of 'b list] option
+
+(** {3 compare / equal} *)
+
+val compare : ('a -> 'a -> int) -> 'a list -> 'a list -> int
+
+val compare_lengths : 'a list -> 'a list -> int
+
+val compare_length_with : 'a list -> int -> int
+
+val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
+
+(** {3 Sorting} *)
 
 val sort : ('a -> 'a -> int) -> 'a list -> 'a list
-(** Sort a list in increasing order according to a comparison
-   function.  The comparison function must return 0 if its arguments
-   compare as equal, a positive integer if the first is greater,
-   and a negative integer if the first is smaller (see Array.sort for
-   a complete specification).  For example,
-   {!Stdlib.compare} is a suitable comparison function.
-   The resulting list is sorted in increasing order.
-   [List.sort] is guaranteed to run in constant heap space
-   (in addition to the size of the result list) and logarithmic
-   stack space.
-
-   The current implementation uses Merge Sort. It runs in constant
-   heap space and logarithmic stack space.
-*)
 
 val stable_sort : ('a -> 'a -> int) -> 'a list -> 'a list
-(** Same as {!List.sort}, but the sorting algorithm is guaranteed to
-   be stable (i.e. elements that compare equal are kept in their
-   original order) .
-
-   The current implementation uses Merge Sort. It runs in constant
-   heap space and logarithmic stack space.
-*)
 
 val fast_sort : ('a -> 'a -> int) -> 'a list -> 'a list
-(** Same as {!List.sort} or {!List.stable_sort}, whichever is faster
-    on typical input. *)
 
 val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
-(** Same as {!List.sort}, but also remove duplicates.
-    @since 4.02.0 *)
 
-val merge : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
-(** Merge two lists:
-    Assuming that [l1] and [l2] are sorted according to the
-    comparison function [cmp], [merge cmp l1 l2] will return a
-    sorted list containing all the elements of [l1] and [l2].
-    If several elements compare equal, the elements of [l1] will be
-    before the elements of [l2].
-    Not tail-recursive (sum of the lengths of the arguments).
-*)
+(** {3 conversion} *)
+
+val to_seq : 'a t -> 'a Stdlib.Seq.t
+
+val of_seq : 'a Stdlib.Seq.t -> 'a list
+
+val init_ep :
+  when_negative_length:'error ->
+  int ->
+  (int -> ('a, 'error Error_monad.trace) result Lwt.t) ->
+  ('a list, 'error Error_monad.trace) result Lwt.t
+
+val filter_ep :
+  ('a -> (bool, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  ('a list, 'error Error_monad.trace) result Lwt.t
+
+val partition_ep :
+  ('a -> (bool, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  ('a list * 'a list, 'error Error_monad.trace) result Lwt.t
+
+val iter_ep :
+  ('a -> (unit, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  (unit, 'error Error_monad.trace) result Lwt.t
+
+val iteri_ep :
+  (int -> 'a -> (unit, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  (unit, 'error Error_monad.trace) result Lwt.t
+
+val map_ep :
+  ('a -> ('b, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'error Error_monad.trace) result Lwt.t
+
+val mapi_ep :
+  (int -> 'a -> ('b, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'error Error_monad.trace) result Lwt.t
+
+val rev_map_ep :
+  ('a -> ('b, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'error Error_monad.trace) result Lwt.t
+
+val rev_mapi_ep :
+  (int -> 'a -> ('b, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'error Error_monad.trace) result Lwt.t
+
+val filter_map_ep :
+  ('a -> ('b option, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'error Error_monad.trace) result Lwt.t
+
+val for_all_ep :
+  ('a -> (bool, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  (bool, 'error Error_monad.trace) result Lwt.t
+
+val exists_ep :
+  ('a -> (bool, 'error Error_monad.trace) result Lwt.t) ->
+  'a list ->
+  (bool, 'error Error_monad.trace) result Lwt.t
