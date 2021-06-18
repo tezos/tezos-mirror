@@ -1286,6 +1286,226 @@ class Client:
         cmd += args
         return self.run(cmd)
 
+    def fa12_check(self, fa_name: str) -> client_output.FA12CheckResult:
+        cmd = ['check', 'contract', fa_name, 'implements', 'fa1.2']
+        try:
+            output = self.run(cmd)
+            return client_output.FA12CheckResult(output)
+        except subprocess.CalledProcessError as exc:
+            return client_output.FA12CheckResult(exc.stderr)
+
+    def fa12_transfer(
+        self,
+        contract_name: str,
+        amount: int,
+        src: str,
+        dst: str,
+        args: List[str],
+    ) -> str:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'transfer',
+            str(amount),
+            'from',
+            src,
+            'to',
+            dst,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_transfer_as(
+        self,
+        contract_name: str,
+        amount: int,
+        src: str,
+        dst: str,
+        as_: str,
+        args: List[str],
+    ) -> str:
+        args = ['--as', as_] + args
+        return self.fa12_transfer(contract_name, amount, src, dst, args)
+
+    def fa12_approve(
+        self,
+        contract_name: str,
+        amount: int,
+        src: str,
+        dst: str,
+        args: List[str],
+    ) -> str:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'as',
+            src,
+            'approve',
+            str(amount),
+            'from',
+            dst,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_get_balance_offchain(
+        self, contract_name: str, src: str, args: List[str]
+    ) -> client_output.FA12ViewResult:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'balance',
+            'for',
+            src,
+        ] + args
+        return client_output.FA12ViewResult(self.run(cmd))
+
+    def fa12_get_allowance_offchain(
+        self,
+        contract_name: str,
+        src: str,
+        dst: str,
+        args: List[str],
+    ) -> client_output.FA12ViewResult:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'allowance',
+            'on',
+            src,
+            'as',
+            dst,
+        ] + args
+        return client_output.FA12ViewResult(self.run(cmd))
+
+    def fa12_get_total_supply_offchain(
+        self, contract_name: str, args: List[str]
+    ) -> client_output.FA12ViewResult:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'total',
+            'supply',
+        ] + args
+        return client_output.FA12ViewResult(self.run(cmd))
+
+    def fa12_get_balance_callback(
+        self, contract_name: str, src: str, callback: str, args: List[str]
+    ) -> str:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'balance',
+            'for',
+            src,
+            'callback',
+            'on',
+            callback,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_get_allowance_callback(
+        self,
+        contract_name: str,
+        src: str,
+        dst: str,
+        callback: str,
+        args: List[str],
+    ) -> str:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'allowance',
+            'on',
+            src,
+            'as',
+            dst,
+            'callback',
+            'on',
+            callback,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_get_total_supply_callback(
+        self, contract_name: str, src: str, callback: str, args: List[str]
+    ) -> str:
+        cmd = [
+            'from',
+            'fa1.2',
+            'contract',
+            contract_name,
+            'get',
+            'total',
+            'supply',
+            'as',
+            src,
+            'callback',
+            'on',
+            callback,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_deploy_viewer(
+        self, viewer_name: str, typ: str, src: str, args: List[str]
+    ) -> str:
+        cmd = [
+            'deploy',
+            'viewer',
+            'contract',
+            viewer_name,
+            'of',
+            'type',
+            typ,
+            'from',
+            src,
+        ] + args
+        return self.run(cmd)
+
+    def fa12_mk_batch_transfer(self, dst: str, token: str, amount: int):
+        json_obj = [
+            {"destination": dst, "amount": str(amount), "token_contract": token}
+        ]
+        return json_obj
+
+    def fa12_multiple_tokens_transfers(
+        self, src: str, ops: str, args: List[str]
+    ) -> str:
+        cmd = [
+            'multiple',
+            'fa1.2',
+            'transfers',
+            'from',
+            src,
+            'using',
+            ops,
+        ] + args
+        res = self.run(cmd)
+        return res
+
+    def fa12_multiple_tokens_transfers_as(
+        self, src: str, as_: str, ops: str, args: List[str]
+    ) -> str:
+        args = ['--as', as_] + args
+        res = self.fa12_multiple_tokens_transfers(src, ops, args)
+        return res
+
     def check_node_listening(
         self, timeout: float = 1, attempts: int = 20
     ) -> bool:

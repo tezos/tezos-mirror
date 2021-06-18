@@ -138,6 +138,11 @@ let bytes_of_prefixed_string s =
 
 let bytes_parameter = parameter (fun _ s -> bytes_of_prefixed_string s)
 
+let data_parameter =
+  parameter (fun _ data ->
+      Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
+      @@ Michelson_v1_parser.parse_expression data)
+
 let init_arg =
   default_arg
     ~long:"init"
@@ -271,6 +276,14 @@ let default_gas_limit_arg =
     ~doc:
       "Set the default gas limit for each transaction instead of letting the \
        client decide based on a simulation"
+    gas_limit_kind
+
+let run_gas_limit_arg =
+  arg
+    ~long:"gas"
+    ~short:'G'
+    ~doc:"Initial quantity of gas for typechecking and execution"
+    ~placeholder:"gas"
     gas_limit_kind
 
 let storage_limit_kind =

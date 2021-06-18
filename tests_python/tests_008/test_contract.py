@@ -7,42 +7,13 @@ import pytest
 from client.client import Client
 from tools import utils
 from tools.constants import IDENTITIES
+from tools.utils import originate
 from .contract_paths import (
     CONTRACT_PATH,
     ILLTYPED_CONTRACT_PATH,
     all_contracts,
     all_legacy_contracts,
 )
-
-
-def file_basename(path):
-    return os.path.splitext(os.path.basename(path))[0]
-
-
-# Generic piece of code to originate a contract
-def originate(
-    client,
-    session,
-    contract,
-    init_storage,
-    amount,
-    contract_name=None,
-    sender='bootstrap1',
-    baker='bootstrap5',
-):
-    if contract_name is None:
-        contract_name = file_basename(contract)
-    args = ['--init', init_storage, '--burn-cap', '10.0']
-    origination = client.originate(
-        contract_name, amount, sender, contract, args
-    )
-    session['contract'] = origination.contract
-    print(origination.contract)
-    utils.bake(client, baker)
-    assert utils.check_block_contains_operations(
-        client, [origination.operation_hash]
-    )
-    return origination
 
 
 @pytest.mark.contract
