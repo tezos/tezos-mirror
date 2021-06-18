@@ -1212,9 +1212,9 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           (Block_hash.equal block pred_block)
           (Wrong_endorsement_predecessor (pred_block, block))
         >>?= fun () ->
-        let current_level = (Level.current ctxt).level in
+        let current_level = Level.current ctxt in
         error_unless
-          Raw_level.(succ level = current_level)
+          Raw_level.(succ level = current_level.level)
           Invalid_endorsement_level
         >>?= fun () ->
         Baking.check_endorsement_slots_at_current_level ctxt ~slot delegate
@@ -1229,7 +1229,6 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
           Global.get_block_priority ctxt >>=? fun block_priority ->
           Baking.endorsing_reward ctxt ~block_priority gap >>?= fun reward ->
           Delegate.freeze_rewards ctxt delegate reward >|=? fun ctxt ->
-          let level = Level.from_raw ctxt level in
           ( ctxt,
             Single_result
               (Endorsement_with_slot_result
@@ -1241,10 +1240,10 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
                             ( Contract (Contract.implicit_contract delegate),
                               Debited deposit,
                               Block_application );
-                            ( Deposits (delegate, level.cycle),
+                            ( Deposits (delegate, current_level.cycle),
                               Credited deposit,
                               Block_application );
-                            ( Rewards (delegate, level.cycle),
+                            ( Rewards (delegate, current_level.cycle),
                               Credited reward,
                               Block_application );
                           ];
@@ -1264,7 +1263,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
             Single_result
               (Seed_nonce_revelation_result
                  [
-                   ( Rewards (baker, level.cycle),
+                   ( Rewards (baker, (Level.current ctxt).cycle),
                      Credited seed_nonce_revelation_tip,
                      Block_application );
                  ]) ) )

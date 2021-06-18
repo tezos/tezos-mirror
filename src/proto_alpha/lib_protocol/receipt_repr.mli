@@ -40,7 +40,10 @@ type update_origin =
   | Protocol_migration  (** Update from a protocol migration *)
   | Subsidy  (** Update from an inflationary subsidy  *)
 
-(** A list of balance updates. Duplicates may happen. *)
+(** A list of balance updates. Duplicates may happen.
+    For example, an entry of the form [(Rewards (b,c), Credited am, ...)]
+    indicates that the balance of frozen rewards has been increased by [am]
+    for baker [b] and cycle [c]. *)
 type balance_updates = (balance * balance_update * update_origin) list
 
 val balance_updates_encoding : balance_updates Data_encoding.t
