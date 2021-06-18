@@ -8,8 +8,7 @@
   tezos-micheline
   tezos-protocol-alpha
   tezos-micheline-rewriting
-  hashcons
-  )
+  hashcons)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_error_monad
                    -open Tezos_micheline
