@@ -1217,11 +1217,7 @@ end
 module type EXPORTER = sig
   type t
 
-  val init :
-    chain_name:Distributed_db_version.Name.t ->
-    export_mode:History_mode.t ->
-    string option ->
-    t tzresult Lwt.t
+  val init : string option -> t tzresult Lwt.t
 
   val write_block_data :
     t ->
@@ -1253,7 +1249,7 @@ module type EXPORTER = sig
 
   val copy_protocol : t -> src:string -> dst_ph:Protocol_hash.t -> unit Lwt.t
 
-  val write_metadata : t -> f:(Lwt_unix.file_descr -> 'a Lwt.t) -> 'a Lwt.t
+  val write_metadata : t -> metadata -> unit tzresult Lwt.t
 
   val cleaner : ?to_clean:string list -> t -> unit Lwt.t
 
@@ -1268,7 +1264,7 @@ module Raw_exporter : EXPORTER = struct
     snapshot_protocol_dir : [`Protocol_dir] Naming.directory;
   }
 
-  let init ~chain_name:_ ~export_mode:_ snapshot_dir =
+  let init snapshot_dir =
     (* Creates the requested export folder and its hierarchy *)
     let snapshot_tmp_dir =
       let tmp_dir = Naming.snapshot_dir ?snapshot_path:snapshot_dir () in
@@ -1409,12 +1405,14 @@ module Raw_exporter : EXPORTER = struct
     in
     Lwt_utils_unix.copy_file ~src ~dst
 
-  let write_metadata t ~f =
+  let write_metadata t metadata =
     let metadata_file =
       Naming.(snapshot_metadata_file t.snapshot_tmp_dir |> file_path)
     in
-    Lwt_unix.openfile metadata_file Unix.[O_CREAT; O_TRUNC; O_WRONLY] 0o444
-    >>= fun fd -> Lwt.finalize (fun () -> f fd) (fun () -> Lwt_unix.close fd)
+    let metadata_json =
+      Data_encoding.Json.(construct metadata_encoding metadata)
+    in
+    Lwt_utils_unix.Json.write_file metadata_file metadata_json
 
   let cleaner ?to_clean t =
     Event.(emit cleaning_after_failure ()) >>= fun () ->
@@ -1431,13 +1429,7 @@ module Raw_exporter : EXPORTER = struct
       | Some path -> path
       | None -> default_snapshot_filename metadata
     in
-    let metadata_string =
-      Data_encoding.Json.to_string
-        (Data_encoding.Json.construct metadata_encoding metadata)
-    in
-    write_metadata t ~f:(fun fd ->
-        Lwt_utils_unix.write_string fd metadata_string)
-    >>= fun () ->
+    write_metadata t metadata >>=? fun () ->
     protect
       ~on_error:(fun errors ->
         cleaner ~to_clean:[Naming.dir_path t.snapshot_tmp_dir] t >>= fun () ->
@@ -1459,7 +1451,7 @@ module Tar_exporter : EXPORTER = struct
     tar : Onthefly.o;
   }
 
-  let init ~chain_name ~export_mode snapshot_file =
+  let init snapshot_file =
     (* Creates the requested export folder and its hierarchy *)
     let snapshot_tmp_dir =
       let tmp_dir = Naming.snapshot_dir ?snapshot_path:snapshot_file () in
@@ -1477,37 +1469,17 @@ module Tar_exporter : EXPORTER = struct
     let snapshot_tar_file = Naming.snapshot_tmp_tar_file snapshot_tmp_dir in
     Onthefly.open_out ~file:(snapshot_tar_file |> Naming.file_path)
     >>= fun tar ->
-    let version_bytes =
-      Data_encoding.Binary.to_bytes_exn Version.version_encoding current_version
+    let version_file =
+      Naming.snapshot_version_file snapshot_tmp_dir |> Naming.file_path
     in
-    Onthefly.add_raw_and_finalize
+    let version_json =
+      Data_encoding.Json.construct Version.version_encoding current_version
+    in
+    Lwt_utils_unix.Json.write_file version_file version_json >>=? fun () ->
+    Onthefly.add_file_and_finalize
       tar
-      ~f:(fun fd -> Lwt_utils_unix.write_bytes fd version_bytes)
-      ~filename:Naming.(snapshot_version_file snapshot_tar |> file_path)
-    >>= fun () ->
-    (* As the metadata are available after exporting the whole
-       snapshot, we reserve a metadata slot as header, by writing a
-       dummy header which will be overwritten once the archive is
-       finalized. Having the metadata at the beginning of the archive
-       allows to extract it without the need to interpret the complete
-       archive. *)
-    let dummy_metadata =
-      {
-        chain_name;
-        history_mode = export_mode;
-        block_hash = Block_hash.zero;
-        level = 0l;
-        timestamp = Time.Protocol.epoch;
-        context_elements = 0;
-      }
-    in
-    let dummy_bytes =
-      Data_encoding.Binary.to_bytes_exn metadata_encoding dummy_metadata
-    in
-    Onthefly.add_raw_and_finalize
-      tar
-      ~f:(fun fd -> Lwt_utils_unix.write_bytes fd dummy_bytes)
-      ~filename:Naming.(snapshot_metadata_file snapshot_tar |> file_path)
+      ~file:version_file
+      ~filename:(Filename.basename version_file)
     >>= fun () ->
     return
       {
@@ -1535,7 +1507,6 @@ module Tar_exporter : EXPORTER = struct
     let bytes =
       Data_encoding.Binary.to_bytes_exn block_data_encoding block_data
     in
-    (* TODO: Block_data as binary *)
     Onthefly.add_raw_and_finalize
       t.tar
       ~f:(fun fd -> Lwt_utils_unix.write_bytes fd bytes)
@@ -1643,21 +1614,19 @@ module Tar_exporter : EXPORTER = struct
     in
     Onthefly.add_file_and_finalize t.tar ~file:src ~filename:dst
 
-  let write_metadata t ~f =
-    (* Overwrite the dummy metadata. *)
-    let raw_fd = Onthefly.get_raw_output_fd t.tar in
-    (* The stride corresponds to the size of the shift due to the
-       snasphot's version encoded as an int plus the size of two tar
-       headers (version and metadata). As tar archives are made of
-       data blocks which contains at least 512 (potentially padded
-       with zeros), the version data size is 512 (a 4 bytes int + 508
-       zero bytes).*)
-    let tar_minimum_block_length = 512L in
-    let stride =
-      Int64.(
-        add tar_minimum_block_length (mul 2L (of_int Onthefly.header_size)))
+  let write_metadata t metadata =
+    let metadata_json =
+      Data_encoding.Json.(construct metadata_encoding metadata)
     in
-    Lwt_unix.LargeFile.lseek raw_fd stride SEEK_SET >>= fun _ -> f raw_fd
+    let metadata_file =
+      Naming.snapshot_metadata_file t.snapshot_tmp_dir |> Naming.file_path
+    in
+    Lwt_utils_unix.Json.write_file metadata_file metadata_json >>=? fun () ->
+    Onthefly.add_file_and_finalize
+      t.tar
+      ~file:metadata_file
+      ~filename:(Filename.basename metadata_file)
+    >>= fun () -> return_unit
 
   let cleaner ?to_clean t =
     let paths =
@@ -1673,11 +1642,7 @@ module Tar_exporter : EXPORTER = struct
       | Some path -> path
       | None -> default_snapshot_filename metadata
     in
-    let metadata_bytes =
-      Data_encoding.Binary.to_bytes_exn metadata_encoding metadata
-    in
-    write_metadata t ~f:(fun fd -> Lwt_utils_unix.write_bytes fd metadata_bytes)
-    >>= fun () ->
+    write_metadata t metadata >>=? fun () ->
     Onthefly.close_out t.tar >>= fun () ->
     protect
       ~on_error:(fun errors ->
@@ -2309,15 +2274,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       ~chain_name genesis =
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     ensure_valid_export_chain_dir store_dir chain_id >>=? fun () ->
-    init
-      ~chain_name
-      ~export_mode:
-        ((function
-           | true -> History_mode.default_rolling
-           | false -> History_mode.default_full)
-           rolling)
-      snapshot_path
-    >>=? fun snapshot_exporter ->
+    init snapshot_path >>=? fun snapshot_exporter ->
     protect
       ~on_error:(fun errors ->
         Exporter.cleaner snapshot_exporter >>= fun () ->
@@ -2457,10 +2414,13 @@ module Tar_loader : LOADER = struct
   let load_snapshot_version t =
     let filename = Naming.(snapshot_version_file t.snapshot_tar |> file_path) in
     (Onthefly.find_file t.tar ~filename >>= function
-     | Some file ->
+     | Some file -> (
          Onthefly.load_file t.tar file >>= fun bytes ->
-         Lwt.return
-           (Data_encoding.Binary.of_bytes_opt Version.version_encoding bytes)
+         match Data_encoding.Json.from_string (Bytes.to_string bytes) with
+         | Ok json ->
+             Lwt.return_some
+               (Data_encoding.Json.destruct Version.version_encoding json)
+         | Error _ -> Lwt.return_none)
      | None -> Lwt.return_none)
     >>= function
     | Some version -> return version
@@ -2471,9 +2431,13 @@ module Tar_loader : LOADER = struct
       Naming.(snapshot_metadata_file t.snapshot_tar |> file_path)
     in
     (Onthefly.find_file t.tar ~filename >>= function
-     | Some file ->
+     | Some file -> (
          Onthefly.load_file t.tar file >>= fun bytes ->
-         Lwt.return (Data_encoding.Binary.of_bytes_opt metadata_encoding bytes)
+         match Data_encoding.Json.from_string (Bytes.to_string bytes) with
+         | Ok json ->
+             Lwt.return_some
+               (Data_encoding.Json.destruct metadata_encoding json)
+         | Error _ -> Lwt.return_none)
      | None -> Lwt.return_none)
     >>= function
     | Some metadata -> return metadata
