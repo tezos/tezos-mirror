@@ -47,23 +47,23 @@ endif
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/mainnet-parameters.json) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/sandbox-parameters.json) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/test-parameters.json)
-	@cp _build/default/src/bin_node/main.exe tezos-node
-	@cp _build/default/src/bin_validation/main_validator.exe tezos-validator
-	@cp _build/default/src/bin_client/main_client.exe tezos-client
-	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
-	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
-	@cp _build/default/src/bin_codec/codec.exe tezos-codec
-	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
-	@cp _build/default/src/bin_snoop/main_snoop.exe tezos-snoop
-	@cp _build/default/src/bin_proxy_server/main_proxy_server.exe tezos-proxy-server
+	@cp -f _build/default/src/bin_node/main.exe tezos-node
+	@cp -f _build/default/src/bin_validation/main_validator.exe tezos-validator
+	@cp -f _build/default/src/bin_client/main_client.exe tezos-client
+	@cp -f _build/default/src/bin_client/main_admin.exe tezos-admin-client
+	@cp -f _build/default/src/bin_signer/main_signer.exe tezos-signer
+	@cp -f _build/default/src/bin_codec/codec.exe tezos-codec
+	@cp -f _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
+	@cp -f _build/default/src/bin_snoop/main_snoop.exe tezos-snoop
+	@cp -f _build/default/src/bin_proxy_server/main_proxy_server.exe tezos-proxy-server
 	@for p in $(active_protocol_directories) ; do \
-	   cp _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
-	   cp _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
-	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
+	   cp -f _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
+	   cp -f _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
+	   cp -f _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
 	   mkdir -p src/proto_$$p/parameters ; \
-	   cp _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
-	   cp _build/default/src/proto_$$p/lib_parameters/test-parameters.json src/proto_$$p/parameters/test-parameters.json ; \
-	   cp _build/default/src/proto_$$p/lib_parameters/mainnet-parameters.json src/proto_$$p/parameters/mainnet-parameters.json ; \
+	   cp -f _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
+	   cp -f _build/default/src/proto_$$p/lib_parameters/test-parameters.json src/proto_$$p/parameters/test-parameters.json ; \
+	   cp -f _build/default/src/proto_$$p/lib_parameters/mainnet-parameters.json src/proto_$$p/parameters/mainnet-parameters.json ; \
 	 done
 ifeq ($(MERLIN_INSTALLED),0) # only build tooling support if merlin is installed
 	@dune build @check
@@ -111,7 +111,7 @@ coverage-report-summary:
 .PHONY: build-sandbox
 build-sandbox:
 	@dune build src/bin_sandbox/main.exe
-	@cp _build/default/src/bin_sandbox/main.exe tezos-sandbox
+	@cp -f _build/default/src/bin_sandbox/main.exe tezos-sandbox
 
 .PHONY: build-test
 build-test: build-sandbox
