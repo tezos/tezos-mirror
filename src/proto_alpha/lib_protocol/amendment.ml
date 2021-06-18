@@ -219,33 +219,28 @@ let () =
     (function Empty_proposal -> Some () | _ -> None)
     (fun () -> Empty_proposal)
 
-(* @return [true] if [List.length l] > [n] w/o computing length *)
-let rec longer_than l n =
-  if Compare.Int.(n < 0) then assert false
-  else
-    match l with
-    | [] -> false
-    | _ :: rest ->
-        if Compare.Int.(n = 0) then true else (* n > 0 *)
-                                           longer_than rest (n - 1)
-
 let record_proposals ctxt delegate proposals =
   (match proposals with [] -> error Empty_proposal | _ :: _ -> ok_unit)
   >>?= fun () ->
   Voting_period.get_current_kind ctxt >>=? function
   | Proposal ->
       Vote.in_listings ctxt delegate >>= fun in_listings ->
-      if in_listings then
+      if in_listings then (
         Vote.recorded_proposal_count_for_delegate ctxt delegate
         >>=? fun count ->
+        assert (Compare.Int.(Constants.max_proposals_per_delegate >= count)) ;
         error_when
-          (longer_than proposals (Constants.max_proposals_per_delegate - count))
+          Compare.Int.(
+            List.compare_length_with
+              proposals
+              (Constants.max_proposals_per_delegate - count)
+            > 0)
           Too_many_proposals
         >>?= fun () ->
         List.fold_left_es
           (fun ctxt proposal -> Vote.record_proposal ctxt proposal delegate)
           ctxt
-          proposals
+          proposals)
       else fail Unauthorized_proposal
   | Exploration | Cooldown | Promotion | Adoption -> fail Unexpected_proposal
 

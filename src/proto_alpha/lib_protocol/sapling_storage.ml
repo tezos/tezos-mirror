@@ -261,7 +261,7 @@ module Nullifiers = struct
      Not tail-recursive so we put a hard limit on the size of the
      list of nullifiers. *)
   let add ctx id nfs =
-    assert (Compare.Int.(List.length nfs <= 1000)) ;
+    assert (Compare.Int.(List.compare_length_with nfs 1000 <= 0)) ;
     size ctx id >>=? fun nf_start_pos ->
     List.fold_right_es
       (fun nf (ctx, pos, acc_size) ->
