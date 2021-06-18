@@ -63,6 +63,7 @@ type argument =
   | Connections of int  (** [--connections] *)
   | Private_mode  (** [--private-mode] *)
   | Peer of string  (** [--peer] *)
+  | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
 
 (** Tezos node states. *)
 type t
