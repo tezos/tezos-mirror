@@ -281,18 +281,19 @@ let freeze_fees ctxt delegate amount =
   Roll_storage.Delegate.add_amount ctxt delegate amount >>=? fun ctxt ->
   credit_frozen_fees ctxt delegate cycle amount
 
-let burn_fees ctxt delegate cycle amount =
+let burn_fees ctxt delegate cycle prescribed_amount =
   let contract = Contract_repr.implicit_contract delegate in
   get_frozen_fees ctxt contract cycle >>=? fun old_amount ->
-  (match Tez_repr.(old_amount -? amount) with
+  (match Tez_repr.(old_amount -? prescribed_amount) with
   | Ok new_amount ->
-      Roll_storage.Delegate.remove_amount ctxt delegate amount >|=? fun ctxt ->
-      (new_amount, ctxt)
+      Roll_storage.Delegate.remove_amount ctxt delegate prescribed_amount
+      >|=? fun ctxt -> (new_amount, prescribed_amount, ctxt)
   | Error _ ->
       Roll_storage.Delegate.remove_amount ctxt delegate old_amount
-      >|=? fun ctxt -> (Tez_repr.zero, ctxt))
-  >>=? fun (new_amount, ctxt) ->
-  Storage.Contract.Frozen_fees.add (ctxt, contract) cycle new_amount >|= ok
+      >|=? fun ctxt -> (Tez_repr.zero, old_amount, ctxt))
+  >>=? fun (new_amount, burned_amount, ctxt) ->
+  Storage.Contract.Frozen_fees.add (ctxt, contract) cycle new_amount
+  >|= fun ctxt -> ok (ctxt, burned_amount)
 
 let get_frozen_rewards ctxt contract cycle =
   Storage.Contract.Frozen_rewards.find (ctxt, contract) cycle
@@ -310,15 +311,16 @@ let freeze_rewards ctxt delegate amount =
   let ({Level_repr.cycle; _} : Level_repr.t) = Level_storage.current ctxt in
   credit_frozen_rewards ctxt delegate cycle amount
 
-let burn_rewards ctxt delegate cycle amount =
+let burn_rewards ctxt delegate cycle prescribed_amount =
   let contract = Contract_repr.implicit_contract delegate in
   get_frozen_rewards ctxt contract cycle >>=? fun old_amount ->
-  let new_amount =
-    match Tez_repr.(old_amount -? amount) with
-    | Error _ -> Tez_repr.zero
-    | Ok new_amount -> new_amount
+  let (new_amount, burned_amount) =
+    match Tez_repr.(old_amount -? prescribed_amount) with
+    | Error _ -> (Tez_repr.zero, old_amount)
+    | Ok new_amount -> (new_amount, prescribed_amount)
   in
-  Storage.Contract.Frozen_rewards.add (ctxt, contract) cycle new_amount >|= ok
+  Storage.Contract.Frozen_rewards.add (ctxt, contract) cycle new_amount
+  >|= fun ctxt -> ok (ctxt, burned_amount)
 
 let unfreeze ctxt delegate cycle =
   let contract = Contract_repr.implicit_contract delegate in
@@ -353,16 +355,18 @@ let cycle_end ctxt last_cycle unrevealed =
   | Some revealed_cycle ->
       List.fold_left_es
         (fun (ctxt, balance_updates) (u : Nonce_storage.unrevealed) ->
-          burn_fees ctxt u.delegate revealed_cycle u.fees >>=? fun ctxt ->
-          burn_rewards ctxt u.delegate revealed_cycle u.rewards >|=? fun ctxt ->
+          burn_fees ctxt u.delegate revealed_cycle u.fees
+          >>=? fun (ctxt, burned_fees) ->
+          burn_rewards ctxt u.delegate revealed_cycle u.rewards
+          >|=? fun (ctxt, burned_rewards) ->
           let bus =
             Receipt_repr.
               [
                 ( Fees (u.delegate, revealed_cycle),
-                  Debited u.fees,
+                  Debited burned_fees,
                   Block_application );
                 ( Rewards (u.delegate, revealed_cycle),
-                  Debited u.rewards,
+                  Debited burned_rewards,
                   Block_application );
               ]
           in
