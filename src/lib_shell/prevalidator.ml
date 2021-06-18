@@ -656,6 +656,26 @@ module Make
             in
             set_mempool pv.shell our_mempool >>= fun _res -> Lwt_main.yield ())
 
+  (** Mimics [Data_encoding.Json.construct] but accepts argument
+      [?include_default_fields] to pass on to [Json_encoding.construct]. *)
+  let data_encoding_json_construct ?include_default_fields e v =
+    Json_encoding.construct
+      ?include_default_fields
+      (Data_encoding.Json.convert e)
+      v
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1876
+     Remove this function upon the next release of [data-encoding]. *)
+
+  let get_filter w pv =
+    filter_config w pv >>= fun config ->
+    let json =
+      data_encoding_json_construct
+        ~include_default_fields:`Always
+        Filter.Mempool.config_encoding
+        config
+    in
+    return json
+
   let build_rpc_directory w =
     lazy
       (let dir : state RPC_directory.t ref = ref RPC_directory.empty in
@@ -664,19 +684,7 @@ module Make
          RPC_directory.register
            !dir
            (Proto_services.S.Mempool.get_filter RPC_path.open_root)
-           (fun pv () () ->
-             match Protocol_hash.Map.find Proto.hash pv.shell.filter_config with
-             | Some obj -> return obj
-             | None -> (
-                 match Prevalidator_filters.find Proto.hash with
-                 | None -> return (`O [])
-                 | Some (module Filter) ->
-                     let default =
-                       Data_encoding.Json.construct
-                         Filter.Mempool.config_encoding
-                         Filter.Mempool.default_config
-                     in
-                     return default)) ;
+           (fun pv () () -> get_filter w pv.shell) ;
        dir :=
          RPC_directory.register
            !dir
