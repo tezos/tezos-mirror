@@ -158,31 +158,13 @@ let spawn_config_init node arguments =
       arguments
     else Network "sandbox" :: arguments
   in
-  let (net_addr, rpc_addr) =
-    match node.persistent_state.runner with
-    | None -> ("127.0.0.1:", node.persistent_state.rpc_host ^ ":")
-    | Some _ ->
-        (* FIXME spawn an ssh tunnel in case of remote host *)
-        ("0.0.0.0:", "0.0.0.0:")
-  in
   spawn_command
     node
     ("config"
      ::
      "init"
      ::
-     "--data-dir"
-     ::
-     node.persistent_state.data_dir
-     ::
-     "--net-addr"
-     ::
-     (net_addr ^ string_of_int node.persistent_state.net_port)
-     ::
-     "--rpc-addr"
-     ::
-     (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
-     :: make_arguments arguments)
+     "--data-dir" :: node.persistent_state.data_dir :: make_arguments arguments)
 
 let config_init node arguments =
   spawn_config_init node arguments |> Process.check
@@ -389,11 +371,29 @@ let run ?(on_terminate = fun _ -> ()) ?event_level node arguments =
             None)
     | None -> None
   in
+  let (net_addr, rpc_addr) =
+    match node.persistent_state.runner with
+    | None -> ("127.0.0.1:", node.persistent_state.rpc_host ^ ":")
+    | Some _ ->
+        (* FIXME spawn an ssh tunnel in case of remote host *)
+        ("0.0.0.0:", "0.0.0.0:")
+  in
   let arguments = node.persistent_state.arguments @ arguments in
   let arguments =
     "run"
     ::
-    "--data-dir" :: node.persistent_state.data_dir :: make_arguments arguments
+    "--data-dir"
+    ::
+    node.persistent_state.data_dir
+    ::
+    "--net-addr"
+    ::
+    (net_addr ^ string_of_int node.persistent_state.net_port)
+    ::
+    "--rpc-addr"
+    ::
+    (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
+    :: make_arguments arguments
   in
   let on_terminate status =
     on_terminate status ;
