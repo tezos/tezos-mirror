@@ -847,6 +847,10 @@ module type S = sig
 
   val compare : ('a -> 'a -> int) -> 'a list -> 'a list -> int
 
+  val compare_lengths : 'a list -> 'a list -> int
+
+  val compare_length_with : 'a list -> int -> int
+
   val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 
   (** {3 Sorting} *)
