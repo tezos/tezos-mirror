@@ -65,8 +65,8 @@ Upgrade Using the Upgrade Command
 - Compile the new version of the node (see the `Update Instructions`_).
 
 - Run: ``./tezos-node upgrade storage`` This takes between about 40
-  minutes and few hours depending on your hardware. (docker users can
-  refer to `Guide for Docker and mainnet.sh Users`_)
+  minutes and few hours depending on your hardware. (Docker users can
+  refer to `Guide for Docker Users`_.)
 
 - You are now ready to start your upgraded node with: ``./tezos-node run``
 
@@ -117,22 +117,27 @@ instead.
 If you do not specify ``--block`` the snapshot will be less recent and
 thus your node will have to spend some time to catch up.
 
-
-Guide for Docker and ``mainnet.sh`` Users
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Guide for Docker Users
+~~~~~~~~~~~~~~~~~~~~~~
 
 Docker users can run the upgrade procedure using the
-``tezos-upgrade-storage`` entry-point, such as: ``docker run -v
-docker-node:/var/run/tezos/node -it
-registry.gitlab.com/tezos/tezos/debug:amd64-v10.0-rc1
-tezos-upgrade-tezos``
+``tezos-upgrade-storage`` command as follows (replace ``docker-node`` by
+the name of your Docker volume)::
 
-``storage-docker-manager.sh`` users can simply execute the built-in
+    docker run -v docker-node:/var/run/tezos/node -it registry.gitlab.com/tezos/tezos:amd64-v10.0-rc1 tezos-upgrade-tezos
+
+Users who use ``storage-docker-manager.sh`` can simply execute the built-in
 upgrade command, such as (for Mainnet): ``./mainnet.sh node upgrade``
 
 If the upgrade is successful and your node is running well, you can
-now safely remove the former's store backup. To do so run ``docker
-run -v docker-node:/var/run/tezos/node -it --entrypoint /bin/sh
-registry.gitlab.com/nomadic-labs/tezos/debug:amd64-romain-v10-opam``
-and then, remove the backup using: ``rm -rf ~/tezos-context-backup
-~/tezos-store-backup``.
+now safely remove the backup of the previous store version.
+To do so, start a shell using (replace ``docker-node`` by
+the name of your Docker volume)::
+
+    docker run -v docker-node:/var/run/tezos/node -it --entrypoint /bin/sh registry.gitlab.com/tezos/tezos/debug:amd64-v10.0-rc1
+
+Once you have a shell, remove the backup using::
+
+    rm -rf /var/run/tezos/node/data/lmdb_store_to_remove
+
+and close the shell with ``exit`` or Ctrl+D.
