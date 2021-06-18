@@ -446,7 +446,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
     ~protocol_data
     ()
   >>=? fun vstate ->
-  fold_left_s
+  List.fold_left_es
     (fun vstate op ->
       apply_operation vstate op >>=? fun (state, _result) -> return state)
     vstate

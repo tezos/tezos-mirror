@@ -242,7 +242,7 @@ let record_proposals ctxt delegate proposals =
           (longer_than proposals (Constants.max_proposals_per_delegate - count))
           Too_many_proposals
         >>?= fun () ->
-        fold_left_s
+        List.fold_left_es
           (fun ctxt proposal -> Vote.record_proposal ctxt proposal delegate)
           ctxt
           proposals

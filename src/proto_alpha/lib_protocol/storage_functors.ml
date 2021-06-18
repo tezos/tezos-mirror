@@ -778,18 +778,20 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           | Some path -> Lwt.return [path])
       | [] ->
           list t prefix >>= fun prefixes ->
-          Lwt_list.map_s
+          List.map_s
             (function `Key prefix | `Dir prefix -> loop (i + 1) prefix [])
             prefixes
           >|= List.flatten
       | [d] when Compare.Int.(i = I.path_length - 1) ->
           if Compare.Int.(i >= I.path_length) then invalid_arg "IO.resolve" ;
           list t prefix >>= fun prefixes ->
-          Lwt_list.map_s
+          List.map_s
             (function
               | `Key prefix | `Dir prefix -> (
                   match
-                    Misc.remove_prefix ~prefix:d (List.hd (List.rev prefix))
+                    let ( >?? ) = Option.bind in
+                    List.last_opt prefix >?? fun last ->
+                    Misc.remove_prefix ~prefix:d last
                   with
                   | None -> Lwt.return_nil
                   | Some _ -> loop (i + 1) prefix []))
@@ -797,7 +799,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           >|= List.flatten
       | "" :: ds ->
           list t prefix >>= fun prefixes ->
-          Lwt_list.map_s
+          List.map_s
             (function `Key prefix | `Dir prefix -> loop (i + 1) prefix ds)
             prefixes
           >|= List.flatten

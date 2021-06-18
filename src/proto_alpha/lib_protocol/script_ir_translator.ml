@@ -2631,7 +2631,7 @@ let rec parse_data :
   let traced_fail err = Lwt.return @@ traced_no_lwt (error err) in
   let parse_items ?type_logger ctxt expr key_type value_type items item_wrapper
       =
-    fold_left_s
+    List.fold_left_es
       (fun (last_value, map, ctxt) item ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
@@ -2677,7 +2677,7 @@ let rec parse_data :
   in
   let parse_big_map_items (type t) ?type_logger ctxt expr
       (key_type : t comparable_ty) value_type items item_wrapper =
-    fold_left_s
+    List.fold_left_es
       (fun (last_key, {map; size}, ctxt) item ->
         match item with
         | Prim (loc, D_Elt, [k; v], annot) ->
@@ -2814,7 +2814,7 @@ let rec parse_data :
   (* Lists *)
   | (List_t (t, _ty_name), Seq (_loc, items)) ->
       traced
-      @@ fold_right_s
+      @@ List.fold_right_es
            (fun v (rest, ctxt) ->
              non_terminal_recursion ?type_logger ctxt ~legacy t v
              >|=? fun (v, ctxt) -> (list_cons v rest, ctxt))
@@ -2832,7 +2832,7 @@ let rec parse_data :
   (* Sets *)
   | (Set_t (t, _ty_name), (Seq (loc, vs) as expr)) ->
       traced
-      @@ fold_left_s
+      @@ List.fold_left_es
            (fun (last_value, set, ctxt) v ->
              parse_comparable_data ?type_logger ctxt t v >>=? fun (v, ctxt) ->
              Lwt.return
@@ -5959,7 +5959,7 @@ let rec unparse_data :
       let unparse_v ctxt v = non_terminal_recursion ctxt mode t v in
       unparse_option unparse_v ctxt v
   | (List_t (t, _), items) ->
-      fold_left_s
+      List.fold_left_es
         (fun (l, ctxt) element ->
           non_terminal_recursion ctxt mode t element
           >|=? fun (unparsed, ctxt) -> (unparsed :: l, ctxt))
@@ -5975,7 +5975,7 @@ let rec unparse_data :
         t
         (ticketer, (contents, amount))
   | (Set_t (t, _), set) ->
-      fold_left_s
+      List.fold_left_es
         (fun (l, ctxt) item ->
           unparse_comparable_data ctxt mode t item >|=? fun (item, ctxt) ->
           (item :: l, ctxt))
@@ -6067,7 +6067,7 @@ and unparse_items :
     (k * v) list ->
     (Script.node list * context) tzresult Lwt.t =
  fun ctxt ~stack_depth mode kt vt items ->
-  fold_left_s
+  List.fold_left_es
     (fun (l, ctxt) (k, v) ->
       unparse_comparable_data ctxt mode kt k >>=? fun (key, ctxt) ->
       unparse_data ctxt ~stack_depth:(stack_depth + 1) mode vt v
@@ -6106,7 +6106,7 @@ and unparse_code ctxt ~stack_depth mode code =
       >>=? fun (data, ctxt) ->
       return (Prim (loc, I_PUSH, [ty; data], annot), ctxt)
   | Seq (loc, items) ->
-      fold_left_s
+      List.fold_left_es
         (fun (l, ctxt) item ->
           non_terminal_recursion ctxt mode item >|=? fun (item, ctxt) ->
           (item :: l, ctxt))
@@ -6115,7 +6115,7 @@ and unparse_code ctxt ~stack_depth mode code =
       >>=? fun (items, ctxt) ->
       return (Micheline.Seq (loc, List.rev items), ctxt)
   | Prim (loc, prim, items, annot) ->
-      fold_left_s
+      List.fold_left_es
         (fun (l, ctxt) item ->
           non_terminal_recursion ctxt mode item >|=? fun (item, ctxt) ->
           (item :: l, ctxt))
@@ -6271,7 +6271,7 @@ let diff_of_big_map ctxt mode ~temporary ~ids_to_copy
       diff.map
       []
   in
-  fold_left_s
+  List.fold_left_es
     (fun (acc, ctxt) (key_hash, key, value) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>?= fun ctxt ->
       unparse_comparable_data ctxt mode key_type key
@@ -6444,7 +6444,7 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
         aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
         >|=? fun (ctxt, x, ids_to_copy, acc) -> (ctxt, Some x, ids_to_copy, acc)
     | (List_f has_lazy_storage, List_t (ty, _), l) ->
-        fold_left_s
+        List.fold_left_es
           (fun (ctxt, l, ids_to_copy, acc) x ->
             aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
             >|=? fun (ctxt, x, ids_to_copy, acc) ->
@@ -6455,7 +6455,7 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
         let reversed = {length = l.length; elements = List.rev l.elements} in
         (ctxt, reversed, ids_to_copy, acc)
     | (Map_f has_lazy_storage, Map_t (_, ty, _), (module M)) ->
-        fold_left_s
+        List.fold_left_es
           (fun (ctxt, m, ids_to_copy, acc) (k, x) ->
             aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
             >|=? fun (ctxt, x, ids_to_copy, acc) ->

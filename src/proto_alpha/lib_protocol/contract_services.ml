@@ -300,7 +300,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
         parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
         >>?= fun (Ex_ty value_type, ctxt) ->
         Big_map.list_values ?offset ?length ctxt id >>=? fun (ctxt, values) ->
-        Lwt_list.fold_left_s
+        List.fold_left_s
           (fun acc value ->
             acc >>?= fun (ctxt, rev_values) ->
             parse_data

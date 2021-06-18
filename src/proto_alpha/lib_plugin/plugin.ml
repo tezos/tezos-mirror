@@ -774,7 +774,7 @@ module RPC = struct
         in
         let log_control _ = () in
         let get_log () =
-          map_s
+          List.map_es
             (fun (Log (ctxt, loc, stack, stack_ty)) ->
               trace Cannot_serialize_log (unparse_stack ctxt (stack, stack_ty))
               >>=? fun stack -> return (loc, Gas.level ctxt, stack))
@@ -1878,7 +1878,7 @@ module RPC = struct
 
     let register () =
       Registration.register0 S.operations (fun _ctxt () (operations, check) ->
-          map_s
+          List.map_es
             (fun raw ->
               parse_operation raw >>?= fun op ->
               (match check with
@@ -1951,9 +1951,9 @@ module RPC = struct
         match rev_levels with
         | [] -> return_none
         | [level] -> return (Some (level.level, level.level))
-        | last :: (_ :: _ as rest) ->
+        | last :: default_first :: rest ->
             (* The [rev_levels] list is reversed, the last level is the head *)
-            let first = List.hd (List.rev rest) in
+            let first = List.last default_first rest in
             return (Some (first.level, last.level)))
 
   let current_level ctxt ?(offset = 0l) block =

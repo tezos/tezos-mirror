@@ -210,9 +210,8 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
           else error (Unexpected_annotation loc)
       | _ -> error (Unexpected_annotation loc)
   in
-  List.fold_left
+  List.fold_left_e
     (fun acc s ->
-      acc >>? fun acc ->
       if Compare.Int.(String.length s = 0) then
         error (Unexpected_annotation loc)
       else
@@ -231,7 +230,7 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
               s
               acc
         | _ -> error (Unexpected_annotation loc))
-    ok_nil
+    []
     l
   >|? List.rev
 

@@ -582,7 +582,7 @@ let fresh_contract_from_current_nonce c =
 let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
   Raw_context.origination_nonce ctxt_since >>?= fun since ->
   Raw_context.origination_nonce ctxt_until >>?= fun until ->
-  filter_s
+  List.filter_es
     (fun contract -> exists ctxt_until contract)
     (Contract_repr.originated_contracts ~since ~until)
 

@@ -369,7 +369,7 @@ let build_directory : type key. key t -> key RPC_directory.t =
           else if Compare.Int.(i = 0) then return_some []
           else
             list k >>=? fun keys ->
-            map_s
+            List.map_es
               (fun key ->
                 if Compare.Int.(i = 1) then return (key, None)
                 else handler.get (k, key) (i - 1) >|=? fun value -> (key, value))
