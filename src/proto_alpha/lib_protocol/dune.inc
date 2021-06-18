@@ -6,6 +6,15 @@
 ; but the original template in `tezos-protocol-compiler`
 ;
 
+; generated from src/lib_protocol_compiler/dune_protocol.template.v1
+
+; This template is intended for protocols written after the Tezos
+; project start using OCaml 4.12.
+;
+; template.v1 was introduced when we bumped the version of our OCaml
+; dependency to 4.12.  This change to a newer OCaml version introduced
+; new warnings that need to be ignored in the protocols written before
+; the update (see dune_protocol.template.v0).
 
 (rule
  (targets environment.ml)

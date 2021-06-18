@@ -65,7 +65,7 @@ done
 for dune in "${DUNES[@]}"; do
 
     if [ -d "$dune" ]; then
-        DUNE_FILES=$(find "$dune" \( "${PRUNE[@]}" \) -prune -o -type f \( -name "dune" -o -name "*dune.inc" -o -name "dune_protocol.template" \) -print)
+        DUNE_FILES=$(find "$dune" \( "${PRUNE[@]}" \) -prune -o -type f \( -name "dune" -o -name "*dune.inc" -o -name "dune_protocol.template*" \) -print)
     else
         DUNE_FILES=$dune
     fi

@@ -55,7 +55,10 @@ let compile_ml ?for_pack source_file =
   let output_prefix = Filename.chop_extension source_file in
   Clflags.for_package := for_pack ;
   Compenv.(readenv Format.err_formatter (Before_compile source_file)) ;
-  Compile.implementation ~source_file ~output_prefix ;
+  Compile.implementation
+    ~start_from:Clflags.Compiler_pass.Parsing
+    ~source_file
+    ~output_prefix ;
   Clflags.for_package := None ;
   output_prefix ^ ".cmo"
 
