@@ -361,6 +361,7 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
         if Compare.Int.(ret > 0) then 1 else -1
   in
   fun t -> compare_comparable t Compare_comparable_return
+  [@@coq_axiom_with_reason "non top-level mutually recursive function"]
 
 let empty_set : type a. a comparable_ty -> a set =
  fun ty ->

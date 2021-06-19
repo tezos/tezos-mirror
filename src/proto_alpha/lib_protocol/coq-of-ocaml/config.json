@@ -18,6 +18,7 @@
     "The placeholders `_` in types are not handled",
     "No type known for the following variants: `Ge, `Lt, `Eq, `Le, `Gt",
     "No type known for the following variants: `Eq, `Ge, `Gt, `Le, `Lt",
+    "No type known for the following variants: `Eq",
     "Constructor of the variant `Eq unknown",
     "No type known for the following variants: `Tree, `Value",
     "Constructor of the variant `Tree unknown",
@@ -25,7 +26,8 @@
     "Anonymous definition of signatures is not handled",
     "A variable name instead of a pattern was expected",
     "We only support extensible types in patterns at the head",
-    "This kind of signature is not handled"
+    "This kind of signature is not handled",
+    "Tezos_raw_protocol_alpha.Raw_context_intf.T"
   ],
   "escape_value": [
     "a",

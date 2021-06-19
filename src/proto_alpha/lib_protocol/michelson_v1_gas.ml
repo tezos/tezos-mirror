@@ -1339,7 +1339,7 @@ module Cost_of = struct
 
     let compare : type a. a Script_typed_ir.comparable_ty -> a -> a -> cost =
      fun ty x y ->
-      let[@coq_axiom_with_reason "gadt"] rec compare :
+      let rec compare :
           type a.
           a Script_typed_ir.comparable_ty -> a -> a -> cost -> cont -> cost =
        fun ty x y acc k ->
@@ -1394,6 +1394,7 @@ module Cost_of = struct
         | Return -> cost
       in
       compare ty x y Gas.free Return
+     [@@coq_axiom_with_reason "non top-level mutually recursive function"]
 
     let set_mem (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
       let open S_syntax in
