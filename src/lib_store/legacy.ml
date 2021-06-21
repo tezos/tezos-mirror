@@ -222,23 +222,10 @@ let may_update_protocol_table legacy_chain_store chain_store ~prev_block ~block
 let read_i legacy_chain_state block_hash i =
   Legacy_state.Block.read legacy_chain_state block_hash >>=? fun block ->
   let pred = Int32.(to_int (sub block.header.shell.level i)) in
-  Lwt.catch
-    (fun () ->
-      Legacy_state.Block.read_predecessor legacy_chain_state ~pred block_hash
-      >>= function
-      | Some {header; _} -> return header
-      | None -> failwith "Failed to find block at level %ld" i)
-    (function
-      | Not_found -> (
-          (* The block is below the savepoint *)
-          Legacy_state.Block.read_predecessor
-            legacy_chain_state
-            ~pred
-            block_hash
-          >>= function
-          | Some {header; _} -> return header
-          | None -> failwith "Failed to find block at level %ld" i)
-      | _ -> failwith "Failed to find block at level %ld" i)
+  Legacy_state.Block.read_predecessor legacy_chain_state ~pred block_hash
+  >>= function
+  | Some {header; _} -> return header
+  | None -> failwith "Failed to find block at level %ld" i
 
 (* Reads, from the legacy lmdb store, the blocks from [block_hash] to
    [limit] and store them in the floating store. The ~with_metadata
