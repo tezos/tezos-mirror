@@ -68,52 +68,12 @@ module Logger =
 
 type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
 
-(* This type is used to represent a finite set of operations. *)
-type 'a bounded_map = {
-  ring : Operation_hash.t Ringo.Ring.t;
-  mutable map : (Operation.t * error list) Operation_hash.Map.t;
-}
-
-type classification = {
-  refused : [`Refused] bounded_map;
-  branch_refused : [`Branch_refused] bounded_map;
-  branch_delayed : [`Branch_delayed] bounded_map;
-  mutable applied : (Operation_hash.t * Operation.t) list;
-  mutable in_mempool : Operation_hash.Set.t;
-}
-
-(** [mk_empty_bounded_map ring_size] returns a {!bounded_map} whose ring
- *  holds at mosts [ring_size] values. {!Invalid_argument} is raised
- *  if [ring_size] is [0] or less. *)
-let mk_empty_bounded_map ring_size =
-  {ring = Ringo.Ring.create ring_size; map = Operation_hash.Map.empty}
-
-(** [mk_empty ring_size] returns an empty {!classification} whose
- *  rings hold at most [ring_size] values. {!Invalid_argument} is raised
- *  if [ring_size] is [0] or less. *)
-let mk_empty ring_size =
-  {
-    refused = mk_empty_bounded_map ring_size;
-    branch_refused = mk_empty_bounded_map ring_size;
-    branch_delayed = mk_empty_bounded_map ring_size;
-    in_mempool = Operation_hash.Set.empty;
-    applied = [];
-  }
-
-(** [clear classes] resets the state of all fields of [classes],
- *  except for [refused] *)
-let clear (classes : classification) =
-  Ringo.Ring.clear classes.branch_refused.ring ;
-  classes.branch_refused.map <- Operation_hash.Map.empty ;
-  Ringo.Ring.clear classes.branch_delayed.ring ;
-  classes.branch_delayed.map <- Operation_hash.Map.empty ;
-  classes.applied <- [] ;
-  classes.in_mempool <- Operation_hash.Set.empty
+module Classification = Prevalidation.Classification
 
 (** The type needed for the implementation of [Make] below, but
  *  which is independent from the protocol. *)
 type types_state_shell = {
-  classification : classification;
+  classification : Classification.t;
   parameters : parameters;
   mutable predecessor : Store.Block.t;
   mutable timestamp : Time.System.t;
@@ -206,6 +166,7 @@ module Make_notifier (Proto : Tezos_protocol_environment.PROTOCOL) :
         ()
 end
 
+(** How to treat branch_refused, branch_delayed, and refused operations *)
 module type CLASSIFICATION_APPLIER = sig
   type input
 
@@ -219,12 +180,18 @@ module type CLASSIFICATION_APPLIER = sig
     input -> Operation.t -> Operation_hash.t -> error list -> unit
 end
 
+(* For the moment we only use the function [clear_or_cancel] from
+ * [Requester.REQUESTER], so we could take a smaller module as
+ * input. However, in the future, we may want to extend
+ * what [Applier] does and will then use more of [Requester.REQUESTER] *)
 module Classification_applier
     (Requester : Requester.REQUESTER with type key = Operation_hash.t) :
-  CLASSIFICATION_APPLIER with type input = Requester.t * classification = struct
-  type input = Requester.t * classification
+  CLASSIFICATION_APPLIER
+    with type input = Requester.t * Prevalidation.Classification.t = struct
+  type input = Requester.t * Prevalidation.Classification.t
 
-  let handle_branch_refused (requester, classes) op oph errors =
+  let handle_branch_refused
+      (requester, (classes : Prevalidation.Classification.t)) op oph errors =
     Option.iter
       (fun e ->
         classes.branch_refused.map <-
@@ -236,7 +203,8 @@ module Classification_applier
     classes.branch_refused.map <-
       Operation_hash.Map.add oph (op, errors) classes.branch_refused.map
 
-  let handle_branch_delayed (requester, classes) op oph errors =
+  let handle_branch_delayed
+      (requester, (classes : Prevalidation.Classification.t)) op oph errors =
     Option.iter
       (fun e ->
         classes.branch_delayed.map <-
@@ -248,12 +216,13 @@ module Classification_applier
     classes.branch_delayed.map <-
       Operation_hash.Map.add oph (op, errors) classes.branch_delayed.map
 
-  let handle_refused (requester, classes) op oph errors =
+  let handle_refused (requester, (classes : Prevalidation.Classification.t)) op
+      oph errors =
     Option.iter
       (fun e ->
         classes.refused.map <- Operation_hash.Map.remove e classes.refused.map ;
         (* The line below is not necessary but just to be sure *)
-        Requester.clear_or_cancel requester e ;
+        Requester.clear_or_cancel requester oph ;
         classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool)
       (Ringo.Ring.add_and_return_erased classes.refused.ring oph) ;
     classes.refused.map <-
@@ -708,7 +677,7 @@ module Make
 
      Moreover, this function ensures that only each newly classified
      operations are advertised to the remote peers. However, if a peer
-     request our mempool, we advertise all our classified operations and
+     requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
 
   let classify_pending_operations w (pv : state) state =
@@ -1122,7 +1091,7 @@ module Make
       pv.shell.timestamp <- timestamp_system ;
       pv.shell.mempool <- {known_valid = []; pending = Operation_hash.Set.empty} ;
       pv.shell.pending <- pending ;
-      clear pv.shell.classification ;
+      Classification.clear pv.shell.classification ;
       pv.validation_state <- validation_state ;
       pv.operation_stream <- Lwt_watcher.create_input () ;
       return_unit
@@ -1194,7 +1163,9 @@ module Make
           mempool.known_valid
       in
       let parameters = {limits; chain_db} in
-      let classification = mk_empty limits.max_refused_operations in
+      let classification =
+        Classification.mk_empty limits.max_refused_operations
+      in
       let shell =
         {
           classification;
