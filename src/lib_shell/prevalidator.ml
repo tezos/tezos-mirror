@@ -82,6 +82,24 @@ type classification = {
   mutable in_mempool : Operation_hash.Set.t;
 }
 
+(** [mk_empty_bounded_map ring_size] returns a {!bounded_map} whose ring
+ *  holds at mosts [ring_size] values. {!Invalid_argument} is raised
+ *  if [ring_size] is [0] or less. *)
+let mk_empty_bounded_map ring_size =
+  {ring = Ringo.Ring.create ring_size; map = Operation_hash.Map.empty}
+
+(** [mk_empty ring_size] returns an empty {!classification} whose
+ *  rings hold at most [ring_size] values. {!Invalid_argument} is raised
+ *  if [ring_size] is [0] or less. *)
+let mk_empty ring_size =
+  {
+    refused = mk_empty_bounded_map ring_size;
+    branch_refused = mk_empty_bounded_map ring_size;
+    branch_delayed = mk_empty_bounded_map ring_size;
+    in_mempool = Operation_hash.Set.empty;
+    applied = [];
+  }
+
 (** [clear classes] resets the state of all fields of [classes],
  *  except for [refused] *)
 let clear (classes : classification) =
@@ -1176,21 +1194,7 @@ module Make
           mempool.known_valid
       in
       let parameters = {limits; chain_db} in
-      let make_bounded_operation_collections () =
-        {
-          ring = Ringo.Ring.create limits.max_refused_operations;
-          map = Operation_hash.Map.empty;
-        }
-      in
-      let classification =
-        {
-          refused = make_bounded_operation_collections ();
-          branch_refused = make_bounded_operation_collections ();
-          branch_delayed = make_bounded_operation_collections ();
-          in_mempool = Operation_hash.Set.empty;
-          applied = [];
-        }
-      in
+      let classification = mk_empty limits.max_refused_operations in
       let shell =
         {
           classification;
