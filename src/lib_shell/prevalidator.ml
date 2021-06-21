@@ -142,6 +142,38 @@ module type ARG = sig
   val chain_id : Chain_id.t
 end
 
+(** Centralised operation stream for the RPCs *)
+module type NOTIFIER = sig
+  type operation_data
+
+  (** [notify_operation stream kind op] should be called when
+   *  [op] is about to be classified as [kind]. In practice [kind] is one
+   *  of [`Branch_refused], [`Branch_delayed], or [`Refused].
+   *
+   *  [notify_operation] should be called exactly ONCE for a given stream
+   *  and operation. *)
+  val notify_operation :
+    ('kind * Operation.shell_header * operation_data) Lwt_watcher.input ->
+    'kind ->
+    Operation.t ->
+    unit
+end
+
+module Make_notifier (Proto : Tezos_protocol_environment.PROTOCOL) :
+  NOTIFIER with type operation_data = Proto.operation_data = struct
+  type operation_data = Proto.operation_data
+
+  module Prevalidation = Prevalidation.Make (Proto)
+
+  let notify_operation operation_stream result {Operation.shell; proto} =
+    match Prevalidation.parse_unsafe proto with
+    | Ok protocol_data ->
+        Lwt_watcher.notify operation_stream (result, shell, protocol_data)
+    | Error _ ->
+        (* possible enhancement: https://gitlab.com/tezos/tezos/-/issues/1510 *)
+        ()
+end
+
 type t = (module T)
 
 (* General description of the mempool:
@@ -275,7 +307,11 @@ type t = (module T)
    notified several times if it is classified again after a
    [flush]. *)
 
-module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
+module Make
+    (Filter : Prevalidator_filters.FILTER)
+    (Arg : ARG)
+    (Notifier : NOTIFIER with type operation_data = Filter.Proto.operation_data) :
+  T = struct
   module Filter = Filter
   module Proto = Filter.Proto
 
@@ -346,13 +382,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (Prevalidator_worker_state.Request)
       (Types)
       (Logger)
-
-  (** Centralised operation stream for the RPCs *)
-  let notify_operation operation_stream result {Operation.shell; proto} =
-    match Prevalidation.parse_unsafe proto with
-    | Ok protocol_data ->
-        Lwt_watcher.notify operation_stream (result, shell, protocol_data)
-    | Error _ -> ()
 
   open Types
 
@@ -475,7 +504,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (op, receipt)
 
   let handle_branch_refused pv op oph errors =
-    notify_operation pv.operation_stream `Branch_refused op ;
+    Notifier.notify_operation pv.operation_stream `Branch_refused op ;
     Option.iter
       (fun e ->
         pv.shell.branch_refused.map <-
@@ -490,7 +519,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Operation_hash.Map.add oph (op, errors) pv.shell.branch_refused.map
 
   let handle_branch_delayed pv op oph errors =
-    notify_operation pv.operation_stream `Branch_delayed op ;
+    Notifier.notify_operation pv.operation_stream `Branch_delayed op ;
     Option.iter
       (fun e ->
         pv.shell.branch_delayed.map <-
@@ -505,7 +534,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Operation_hash.Map.add oph (op, errors) pv.shell.branch_delayed.map
 
   let handle_refused pv op oph errors =
-    notify_operation pv.operation_stream `Refused op ;
+    Notifier.notify_operation pv.operation_stream `Refused op ;
     Option.iter
       (fun e ->
         pv.shell.refused.map <- Operation_hash.Map.remove e pv.shell.refused.map ;
@@ -519,7 +548,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     pv.shell.in_mempool <- Operation_hash.Set.add oph pv.shell.in_mempool
 
   let handle_applied pv (op : Prevalidation.operation) =
-    notify_operation pv.operation_stream `Applied op.raw ;
+    Notifier.notify_operation pv.operation_stream `Applied op.raw ;
     pv.shell.applied <- (op.hash, op.raw) :: pv.shell.applied ;
     pv.shell.in_mempool <- Operation_hash.Set.add op.hash pv.shell.in_mempool
 
@@ -1173,6 +1202,7 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
     ChainProto_registry.find (chain_id, Filter.Proto.hash) !chain_proto_registry
   with
   | None ->
+      let module Notifier = Make_notifier (Filter.Proto) in
       let module Prevalidator =
         Make
           (Filter)
@@ -1183,6 +1213,7 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
 
             let chain_id = chain_id
           end)
+          (Notifier)
       in
       (* Checking initialization errors before giving a reference to dangerous
        * `worker` value to caller. *)
