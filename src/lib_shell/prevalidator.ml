@@ -201,46 +201,46 @@ module type CLASSIFICATION_APPLIER = sig
     input -> Operation.t -> Operation_hash.t -> error list -> unit
 end
 
-module ShellClassificationApplier :
-  CLASSIFICATION_APPLIER
-    with type input = Distributed_db.chain_db * classification = struct
-  type input = Distributed_db.chain_db * classification
+module Classification_applier
+    (Requester : Requester.REQUESTER with type key = Operation_hash.t) :
+  CLASSIFICATION_APPLIER with type input = Requester.t * classification = struct
+  type input = Requester.t * classification
 
-  let handle_branch_refused (chain_db, classes) op oph errors =
+  let handle_branch_refused (requester, classes) op oph errors =
     Option.iter
       (fun e ->
         classes.branch_refused.map <-
           Operation_hash.Map.remove e classes.branch_refused.map ;
-        Distributed_db.Operation.clear_or_cancel chain_db oph ;
+        Requester.clear_or_cancel requester oph ;
         classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool)
       (Ringo.Ring.add_and_return_erased classes.branch_refused.ring oph) ;
     classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool ;
     classes.branch_refused.map <-
       Operation_hash.Map.add oph (op, errors) classes.branch_refused.map
 
-  let handle_branch_delayed (chain_db, classes) op oph errors =
+  let handle_branch_delayed (requester, classes) op oph errors =
     Option.iter
       (fun e ->
         classes.branch_delayed.map <-
           Operation_hash.Map.remove e classes.branch_delayed.map ;
-        Distributed_db.Operation.clear_or_cancel chain_db oph ;
+        Requester.clear_or_cancel requester oph ;
         classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool)
       (Ringo.Ring.add_and_return_erased classes.branch_delayed.ring oph) ;
     classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool ;
     classes.branch_delayed.map <-
       Operation_hash.Map.add oph (op, errors) classes.branch_delayed.map
 
-  let handle_refused (chain_db, classes) op oph errors =
+  let handle_refused (requester, classes) op oph errors =
     Option.iter
       (fun e ->
         classes.refused.map <- Operation_hash.Map.remove e classes.refused.map ;
         (* The line below is not necessary but just to be sure *)
-        Distributed_db.Operation.clear_or_cancel chain_db e ;
+        Requester.clear_or_cancel requester e ;
         classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool)
       (Ringo.Ring.add_and_return_erased classes.refused.ring oph) ;
     classes.refused.map <-
       Operation_hash.Map.add oph (op, errors) classes.refused.map ;
-    Distributed_db.Operation.clear_or_cancel chain_db oph ;
+    Requester.clear_or_cancel requester oph ;
     classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool
 end
 
@@ -574,24 +574,43 @@ module Make
       ~validation_state_after
       (op, receipt)
 
-  module ProtoClassificationApplier :
+  module Proto_classification_applier :
     CLASSIFICATION_APPLIER with type input = types_state = struct
     type input = types_state
+
+    module Requester :
+      Requester.REQUESTER
+        with type t = Distributed_db.chain_db
+         and type key = Operation_hash.t
+         and type value = Operation.t
+         and type param = unit = struct
+      type t = Distributed_db.chain_db
+
+      type key = Operation_hash.t
+
+      type value = Operation.t
+
+      type param = unit
+
+      include Distributed_db.Operation
+    end
+
+    module Classification_applier = Classification_applier (Requester)
 
     let handle_branch_refused pv op oph errors =
       let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
       Notifier.notify_operation pv.operation_stream `Branch_refused op ;
-      ShellClassificationApplier.handle_branch_refused input op oph errors
+      Classification_applier.handle_branch_refused input op oph errors
 
     let handle_branch_delayed pv op oph errors =
       let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
       Notifier.notify_operation pv.operation_stream `Branch_delayed op ;
-      ShellClassificationApplier.handle_branch_delayed input op oph errors
+      Classification_applier.handle_branch_delayed input op oph errors
 
     let handle_refused pv op oph errors =
       let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
       Notifier.notify_operation pv.operation_stream `Refused op ;
-      ShellClassificationApplier.handle_refused input op oph errors
+      Classification_applier.handle_refused input op oph errors
   end
 
   let handle_applied pv (op : Prevalidation.operation) =
@@ -604,7 +623,7 @@ module Make
   let classify_operation w pv validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        ProtoClassificationApplier.handle_refused pv op oph errors ;
+        Proto_classification_applier.handle_refused pv op oph errors ;
         Lwt.return (validation_state, mempool)
     | Ok op -> (
         Prevalidation.apply_operation validation_state op >>= function
@@ -632,21 +651,21 @@ module Make
                 oph ;
               Lwt.return (validation_state, mempool))
         | Branch_delayed errors ->
-            ProtoClassificationApplier.handle_branch_delayed
+            Proto_classification_applier.handle_branch_delayed
               pv
               op.raw
               op.hash
               errors ;
             Lwt.return (validation_state, mempool)
         | Branch_refused errors ->
-            ProtoClassificationApplier.handle_branch_refused
+            Proto_classification_applier.handle_branch_refused
               pv
               op.raw
               op.hash
               errors ;
             Lwt.return (validation_state, mempool)
         | Refused errors ->
-            ProtoClassificationApplier.handle_refused pv op.raw op.hash errors ;
+            Proto_classification_applier.handle_refused pv op.raw op.hash errors ;
             Lwt.return (validation_state, mempool)
         | Outdated ->
             Distributed_db.Operation.clear_or_cancel
@@ -701,7 +720,7 @@ module Make
            code since [Proto.begin_construction] cannot fail. *)
         Operation_hash.Map.iter
           (fun oph op ->
-            ProtoClassificationApplier.handle_branch_delayed pv op oph err)
+            Proto_classification_applier.handle_branch_delayed pv op oph err)
           pv.shell.pending ;
         pv.shell.pending <- Operation_hash.Map.empty ;
         Lwt.return_unit
@@ -990,7 +1009,7 @@ module Make
         not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
       then (
         let error = [Exn (Failure "Unknown branch operation")] in
-        ProtoClassificationApplier.handle_branch_refused pv op oph error ;
+        Proto_classification_applier.handle_branch_refused pv op oph error ;
         may_propagate_unknown_branch_operation pv.validation_state op
         >>= function
         | true ->
