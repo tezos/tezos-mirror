@@ -264,13 +264,11 @@ end)
 (Disk_table : DISK_TABLE with type key := Hash.t)
 (Memory_table : MEMORY_TABLE with type key := Hash.t)
 (Request : REQUEST with type key := Hash.t)
-(Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) : sig
-  include
-    FULL_REQUESTER
-      with type key = Hash.t
-       and type value = Disk_table.value
-       and type param = Precheck.param
-       and type request_param = Request.param
-       and type notified_value = Precheck.notified_value
-       and type store = Disk_table.store
-end
+(Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) :
+  FULL_REQUESTER
+    with type key = Hash.t
+     and type value = Disk_table.value
+     and type param = Precheck.param
+     and type request_param = Request.param
+     and type notified_value = Precheck.notified_value
+     and type store = Disk_table.store

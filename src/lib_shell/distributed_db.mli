@@ -193,20 +193,16 @@ val commit_invalid_block :
 
 (** {2 Operations index} *)
 
-(** Index of operations (for the mempool). *)
-module Operation : sig
-  type t = Operation.t (* avoid shadowing. *)
-
-  include
-    Requester.REQUESTER
-      with type t := chain_db
-       and type key := Operation_hash.t
-       and type value := Operation.t
-       and type param := unit
-end
-
 (** Inject a new operation in the local index (memory only). *)
 val inject_operation : chain_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
+
+(** Index of operations (for the mempool). *)
+module Operation :
+  Requester.REQUESTER
+    with type t := chain_db
+     and type key := Operation_hash.t
+     and type value := Operation.t
+     and type param := unit
 
 (** {2 Protocol index} *)
 
