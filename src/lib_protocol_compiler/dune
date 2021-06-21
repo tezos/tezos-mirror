@@ -7,7 +7,8 @@
        %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}
        %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V0.cmi}
        %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi}
-       %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V2.cmi})))
+       %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V2.cmi}
+       %{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V3.cmi})))
 
 (library
  (name tezos_protocol_registerer)

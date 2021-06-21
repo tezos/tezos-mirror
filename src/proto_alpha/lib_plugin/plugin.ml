@@ -412,7 +412,9 @@ module RPC = struct
 
   let parse_operation (op : Operation.raw) =
     match
-      Data_encoding.Binary.of_bytes Operation.protocol_data_encoding op.proto
+      Data_encoding.Binary.of_bytes_opt
+        Operation.protocol_data_encoding
+        op.proto
     with
     | Some protocol_data -> ok {shell = op.shell; protocol_data}
     | None -> error Cannot_parse_operation
@@ -1266,7 +1268,7 @@ module RPC = struct
                 in
                 let arg =
                   match
-                    Data_encoding.Binary.of_bytes
+                    Data_encoding.Binary.of_bytes_opt
                       Script.lazy_expr_encoding
                       arg_bytes
                   with
@@ -1285,7 +1287,9 @@ module RPC = struct
                 in
                 let script =
                   match
-                    Data_encoding.Binary.of_bytes Script.encoding script_bytes
+                    Data_encoding.Binary.of_bytes_opt
+                      Script.encoding
+                      script_bytes
                   with
                   | Some script -> script
                   | None -> assert false
@@ -1865,7 +1869,7 @@ module RPC = struct
 
     let parse_protocol_data protocol_data =
       match
-        Data_encoding.Binary.of_bytes
+        Data_encoding.Binary.of_bytes_opt
           Block_header.protocol_data_encoding
           protocol_data
       with

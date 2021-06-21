@@ -211,7 +211,7 @@ module Index = struct
         assert (Compare.String.(String.sub index_key 6 2 = index4)) ;
         assert (Compare.String.(String.sub index_key 8 2 = index5)) ;
         assert (Compare.String.(String.sub index_key 10 2 = index6)) ;
-        Data_encoding.Binary.of_bytes encoding raw_key
+        Data_encoding.Binary.of_bytes_opt encoding raw_key
 
   let rpc_arg = rpc_arg
 

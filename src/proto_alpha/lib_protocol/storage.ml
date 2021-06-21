@@ -686,7 +686,7 @@ module Sapling = struct
 
            let of_string hexstring =
              let b = Hex.to_bytes (`Hex hexstring) in
-             match Data_encoding.Binary.of_bytes encoding b with
+             match Data_encoding.Binary.of_bytes_opt encoding b with
              | None -> Error "Cannot parse sapling nullifier"
              | Some nf -> Ok nf
 

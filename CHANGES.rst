@@ -181,6 +181,8 @@ Proxy server
 Protocol Compiler And Environment
 ---------------------------------
 
+- Export the environment V3 so protocols can be built against it.
+
 Codec
 -----
 

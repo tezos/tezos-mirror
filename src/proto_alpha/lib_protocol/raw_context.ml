@@ -548,7 +548,7 @@ let get_first_level ctxt =
   Context.find ctxt first_level_key >|= function
   | None -> storage_error (Missing_key (first_level_key, Get))
   | Some bytes -> (
-      match Data_encoding.Binary.of_bytes Raw_level_repr.encoding bytes with
+      match Data_encoding.Binary.of_bytes_opt Raw_level_repr.encoding bytes with
       | None -> storage_error (Corrupted_data first_level_key)
       | Some level -> ok level)
 
@@ -557,7 +557,7 @@ let get_cycle_eras ctxt =
   | None -> storage_error (Missing_key (cycle_eras_key, Get))
   | Some bytes -> (
       match
-        Data_encoding.Binary.of_bytes Level_repr.cycle_eras_encoding bytes
+        Data_encoding.Binary.of_bytes_opt Level_repr.cycle_eras_encoding bytes
       with
       | None -> storage_error (Corrupted_data cycle_eras_key)
       | Some cycle_eras -> ok cycle_eras)
@@ -607,7 +607,7 @@ let get_proto_param ctxt =
   Context.find ctxt protocol_param_key >>= function
   | None -> failwith "Missing protocol parameters."
   | Some bytes -> (
-      match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
+      match Data_encoding.Binary.of_bytes_opt Data_encoding.json bytes with
       | None -> fail (Failed_to_parse_parameter bytes)
       | Some json -> (
           Context.remove ctxt protocol_param_key >|= fun ctxt ->
@@ -637,7 +637,9 @@ let get_constants ctxt =
   | None -> failwith "Internal error: cannot read constants in context."
   | Some bytes -> (
       match
-        Data_encoding.Binary.of_bytes Constants_repr.parametric_encoding bytes
+        Data_encoding.Binary.of_bytes_opt
+          Constants_repr.parametric_encoding
+          bytes
       with
       | None -> failwith "Internal error: cannot parse constants in context."
       | Some constants -> ok constants)
@@ -729,7 +731,7 @@ let get_previous_protocol_constants ctxt =
         "Internal error: cannot read previous protocol constants in context."
   | Some bytes -> (
       match
-        Data_encoding.Binary.of_bytes
+        Data_encoding.Binary.of_bytes_opt
           Constants_repr.Proto_previous.parametric_encoding
           bytes
       with
