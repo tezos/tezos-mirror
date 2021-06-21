@@ -348,7 +348,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (Logger)
 
   (** Centralised operation stream for the RPCs *)
-  let notify_operation {operation_stream; _} result {Operation.shell; proto} =
+  let notify_operation operation_stream result {Operation.shell; proto} =
     match Prevalidation.parse_unsafe proto with
     | Ok protocol_data ->
         Lwt_watcher.notify operation_stream (result, shell, protocol_data)
@@ -475,7 +475,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (op, receipt)
 
   let handle_branch_refused pv op oph errors =
-    notify_operation pv `Branch_refused op ;
+    notify_operation pv.operation_stream `Branch_refused op ;
     Option.iter
       (fun e ->
         pv.shell.branch_refused.map <-
@@ -490,7 +490,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Operation_hash.Map.add oph (op, errors) pv.shell.branch_refused.map
 
   let handle_branch_delayed pv op oph errors =
-    notify_operation pv `Branch_delayed op ;
+    notify_operation pv.operation_stream `Branch_delayed op ;
     Option.iter
       (fun e ->
         pv.shell.branch_delayed.map <-
@@ -505,7 +505,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       Operation_hash.Map.add oph (op, errors) pv.shell.branch_delayed.map
 
   let handle_refused pv op oph errors =
-    notify_operation pv `Refused op ;
+    notify_operation pv.operation_stream `Refused op ;
     Option.iter
       (fun e ->
         pv.shell.refused.map <- Operation_hash.Map.remove e pv.shell.refused.map ;
@@ -519,7 +519,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
     pv.shell.in_mempool <- Operation_hash.Set.add oph pv.shell.in_mempool
 
   let handle_applied pv (op : Prevalidation.operation) =
-    notify_operation pv `Applied op.raw ;
+    notify_operation pv.operation_stream `Applied op.raw ;
     pv.shell.applied <- (op.hash, op.raw) :: pv.shell.applied ;
     pv.shell.in_mempool <- Operation_hash.Set.add op.hash pv.shell.in_mempool
 
