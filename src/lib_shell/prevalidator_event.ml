@@ -50,7 +50,7 @@ let invalid_mempool_filter_configuration =
     ~section
     ~name:"invalid_mempool_filter_configuration"
     ~msg:"invalid mempool filter configuration"
-    ~level:Debug
+    ~level:Warning
     ()
 
 let unparsable_operation =
