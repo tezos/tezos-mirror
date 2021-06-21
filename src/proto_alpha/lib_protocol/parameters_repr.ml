@@ -59,7 +59,7 @@ let bootstrap_account_encoding =
                   (Signature.Public_key.hash public_key)
                   public_key_hash) ;
               Some (public_key, amount)
-          | {public_key = None} -> None)
+          | {public_key = None; _} -> None)
         (fun (public_key, amount) ->
           {
             public_key = Some public_key;
@@ -73,7 +73,7 @@ let bootstrap_account_encoding =
         (function
           | {public_key_hash; public_key = None; amount} ->
               Some (public_key_hash, amount)
-          | {public_key = Some _} -> None)
+          | {public_key = Some _; _} -> None)
         (fun (public_key_hash, amount) ->
           {public_key = None; public_key_hash; amount});
     ]

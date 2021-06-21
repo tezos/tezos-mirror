@@ -141,7 +141,7 @@ let freeze_rolls_for_cycle ctxt cycle =
         Storage.Roll.Owner.delete_snapshot ctxt (cycle, index) >>= fun ctxt ->
         Storage.Roll.Last_for_snapshot.remove_existing (ctxt, cycle) index)
     ctxt
-    Misc.(0 --> (max_index - 1))
+    (0 --> (max_index - 1))
 
 (* Roll selection *)
 module Random = struct
@@ -292,7 +292,7 @@ module Delegate = struct
         (Contract_repr.implicit_contract delegate)
       >|=? function
       | Some last_active_cycle ->
-          let ({Level_repr.cycle = current_cycle} : Level_repr.t) =
+          let ({Level_repr.cycle = current_cycle; _} : Level_repr.t) =
             Raw_context.current_level ctxt
           in
           Cycle_repr.(last_active_cycle < current_cycle)
@@ -483,7 +483,7 @@ let update_tokens_per_roll ctxt new_tokens_per_roll =
   (if decrease then Tez_repr.(old_tokens_per_roll -? new_tokens_per_roll)
   else Tez_repr.(new_tokens_per_roll -? old_tokens_per_roll))
   >>?= fun abs_diff ->
-  Storage.Delegates.fold ctxt (Ok ctxt) (fun pkh ctxt_opt ->
+  Storage.Delegates.fold ctxt ~init:(Ok ctxt) ~f:(fun pkh ctxt_opt ->
       ctxt_opt >>?= fun ctxt ->
       count_rolls ctxt pkh >>=? fun rolls ->
       Tez_repr.(abs_diff *? Int64.of_int rolls) >>?= fun amount ->

@@ -487,7 +487,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks (Some accu) stack
       | ICons_none (_, _, k) ->
           (step [@ocaml.tailcall]) g gas k ks None (accu, stack)
-      | IIf_none {branch_if_none; branch_if_some} -> (
+      | IIf_none {branch_if_none; branch_if_some; _} -> (
           match accu with
           | None ->
               let (accu, stack) = stack in
@@ -509,7 +509,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       (* unions *)
       | ICons_left (_, k) -> (step [@ocaml.tailcall]) g gas k ks (L accu) stack
       | ICons_right (_, k) -> (step [@ocaml.tailcall]) g gas k ks (R accu) stack
-      | IIf_left {branch_if_left; branch_if_right} -> (
+      | IIf_left {branch_if_left; branch_if_right; _} -> (
           match accu with
           | L v -> (step [@ocaml.tailcall]) g gas branch_if_left ks v stack
           | R v -> (step [@ocaml.tailcall]) g gas branch_if_right ks v stack)
@@ -522,7 +522,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let stack = (accu, stack) in
           let accu = list_empty in
           (step [@ocaml.tailcall]) g gas k ks accu stack
-      | IIf_cons {branch_if_cons; branch_if_nil} -> (
+      | IIf_cons {branch_if_cons; branch_if_nil; _} -> (
           match accu.elements with
           | [] ->
               let (accu, stack) = stack in
@@ -870,7 +870,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let res = Script_int.lognot x in
           (step [@ocaml.tailcall]) g gas k ks res stack
       (* control *)
-      | IIf {branch_if_true; branch_if_false} ->
+      | IIf {branch_if_true; branch_if_false; _} ->
           let (res, stack) = stack in
           if accu then
             (step [@ocaml.tailcall]) g gas branch_if_true ks res stack
@@ -980,7 +980,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let res = (Unit_t None, (contract, "default")) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | ICreate_contract
-          {storage_type; arg_type; lambda = Lam (_, code); root_name; k} ->
+          {storage_type; arg_type; lambda = Lam (_, code); root_name; k; _} ->
           (* Removed the instruction's arguments manager, spendable and delegatable *)
           let delegate = accu in
           let (credit, (init, stack)) = stack in

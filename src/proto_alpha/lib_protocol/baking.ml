@@ -225,7 +225,7 @@ let earlier_predecessor_timestamp ctxt level =
     Timestamp.(current_timestamp +? delay)
 
 let check_timestamp c ~priority pred_timestamp =
-  minimal_time (Constants.parametric c) priority pred_timestamp
+  minimal_time (Constants.parametric c) ~priority pred_timestamp
   >>? fun minimal_time ->
   let timestamp = Timestamp.current c in
   record_trace

@@ -32,13 +32,13 @@ module Registered : REGISTER
 
 module Ghost : REGISTER
 
-module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
+module Make_subcontext (_ : REGISTER) (C : Raw_context.T) (_ : NAME) :
   Raw_context.T with type t = C.t
 
 module Make_single_data_storage
-    (R : REGISTER)
+    (_ : REGISTER)
     (C : Raw_context.T)
-    (N : NAME)
+    (_ : NAME)
     (V : VALUE) : Single_data_storage with type t = C.t and type value = V.t
 
 module type INDEX = sig

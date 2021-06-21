@@ -48,7 +48,7 @@ let previous ctxt =
 
 let first_level_in_cycle ctxt cycle =
   let cycle_eras = Raw_context.cycle_eras ctxt in
-  Level_repr.first_level_in_cycle cycle_eras cycle
+  Level_repr.first_level_in_cycle ~cycle_eras cycle
 
 let last_level_in_cycle ctxt c =
   match pred ctxt (first_level_in_cycle ctxt (Cycle_repr.succ c)) with
@@ -90,7 +90,7 @@ let last_allowed_fork_level c =
 
 let last_of_a_cycle ctxt level =
   let cycle_eras = Raw_context.cycle_eras ctxt in
-  Level_repr.last_of_cycle cycle_eras level
+  Level_repr.last_of_cycle ~cycle_eras level
 
 let dawn_of_a_new_cycle ctxt =
   let level = current ctxt in

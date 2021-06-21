@@ -111,7 +111,7 @@ end = struct
   let assert_pos pos height =
     assert (Compare.Int64.(pos >= 0L && pos <= pow2 height))
 
-  let default_root = H.uncommitted max_height
+  let default_root = H.uncommitted ~height:max_height
 
   let init = Storage.Sapling.commitments_init
 
@@ -120,7 +120,7 @@ end = struct
     assert_height height ;
     Storage.Sapling.Commitments.find (ctx, id) node >|=? function
     | (ctx, None) ->
-        let hash = H.uncommitted height in
+        let hash = H.uncommitted ~height in
         (ctx, hash)
     | (ctx, Some hash) -> (ctx, hash)
 
@@ -437,7 +437,7 @@ let add {id; diff; memo_size} cm_cipher_list =
     memo_size;
   }
 
-let root_mem ctx {id} tested_root =
+let root_mem ctx {id; _} tested_root =
   match id with
   | Some id -> Roots.mem ctx id tested_root
   | None ->
@@ -446,7 +446,7 @@ let root_mem ctx {id} tested_root =
           Sapling.Hash.compare tested_root Commitments.default_root = 0)
 
 (* to avoid a double spend we need to check the disk AND the diff *)
-let nullifiers_mem ctx {id; diff} nf =
+let nullifiers_mem ctx {id; diff; _} nf =
   let exists_in_diff =
     List.exists
       (fun v -> Compare.Int.(Sapling.Nullifier.compare nf v = 0))

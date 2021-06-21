@@ -120,10 +120,9 @@ let ( +? ) t1 t2 =
   if t < t1 then error (Addition_overflow (t1, t2)) else ok t
 
 let ( *? ) t m =
-  if Compare.Int64.(m < 0L) then error (Negative_multiplicator (t, m))
-  else if Compare.Int64.(m = 0L) then ok 0L
-  else if Compare.Int64.(t > Int64.(div max_int m)) then
-    error (Multiplication_overflow (t, m))
+  if m < 0L then error (Negative_multiplicator (t, m))
+  else if m = 0L then ok 0L
+  else if t > Int64.(div max_int m) then error (Multiplication_overflow (t, m))
   else ok (Int64.mul t m)
 
 let ( /? ) t d =
