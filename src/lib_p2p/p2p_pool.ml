@@ -626,3 +626,56 @@ let list_known_points ~ignore_private ?(size = 50) pool =
     |> sample best other
     |> List.map P2p_point_state.Info.point
     |> Lwt.return
+
+module Internal_for_tests = struct
+  let dumb_config : config =
+    let identity = P2p_identity.generate_with_pow_target_0 () in
+    let trusted_points = [(P2p_point.Id.of_string_exn "0.0.0.0:0", None)] in
+    let peers_file = "/dev/null" in
+    let private_mode = true in
+    let max_known_points = Some (400, 300) in
+    let max_known_peer_ids = Some (400, 300) in
+    let peer_greylist_size = 100 in
+    let ip_greylist_size_in_kilobytes = 1024 in
+    let ip_greylist_cleanup_delay = Time.System.Span.of_seconds_exn 60. in
+    {
+      identity;
+      trusted_points;
+      peers_file;
+      private_mode;
+      max_known_points;
+      max_known_peer_ids;
+      peer_greylist_size;
+      ip_greylist_size_in_kilobytes;
+      ip_greylist_cleanup_delay;
+    }
+
+  let create peer_meta_encoding initial_peer =
+    let triggers = P2p_trigger.create () in
+    let config = dumb_config in
+    let peer_meta_config : 'peer P2p_params.peer_meta_config =
+      {
+        peer_meta_encoding;
+        peer_meta_initial = (fun () -> initial_peer);
+        score = (fun _ -> 0.);
+      }
+    in
+    let watcher = Lwt_watcher.create_input () in
+    let log event = Lwt_watcher.notify watcher event in
+    {
+      config;
+      peer_meta_config;
+      my_id_points = P2p_point.Table.create ~random:true 7;
+      known_peer_ids = P2p_peer.Table.create ~random:true 53;
+      connected_peer_ids = P2p_peer.Table.create ~random:true 53;
+      known_points = P2p_point.Table.create ~random:true 53;
+      connected_points = P2p_point.Table.create ~random:true 53;
+      triggers;
+      acl =
+        P2p_acl.create
+          ~peer_id_size:config.peer_greylist_size
+          ~ip_size:config.ip_greylist_size_in_kilobytes
+          ~ip_cleanup_delay:config.ip_greylist_cleanup_delay;
+      log;
+    }
+end

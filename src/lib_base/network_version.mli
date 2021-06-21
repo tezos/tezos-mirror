@@ -71,3 +71,9 @@ val select :
   p2p_versions:P2p_version.t list ->
   t ->
   t Error_monad.tzresult
+
+(**/**)
+
+module Internal_for_tests : sig
+  val mock : unit -> t
+end

@@ -104,3 +104,12 @@ let select ~chain_name ~distributed_db_versions ~p2p_versions remote =
     >>? fun p2p_version -> ok {chain_name; distributed_db_version; p2p_version}
 
 let () = Data_encoding.Registration.register ~pp encoding
+
+module Internal_for_tests = struct
+  let mock () =
+    {
+      chain_name = Distributed_db_version.Name.of_string "";
+      distributed_db_version = Distributed_db_version.zero;
+      p2p_version = P2p_version.zero;
+    }
+end

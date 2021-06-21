@@ -187,3 +187,9 @@ val close : ?wait:bool -> ('msg, 'meta) t -> unit Lwt.t
 
 (** for testing only *)
 val raw_write_sync : ('msg, 'meta) t -> Bytes.t -> unit tzresult Lwt.t
+
+module Internal_for_tests : sig
+  val mock_authenticated_connection : 'meta -> 'meta authenticated_connection
+
+  val mock : 'meta authenticated_connection -> ('msg, 'meta) t
+end

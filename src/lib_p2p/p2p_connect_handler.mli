@@ -133,3 +133,70 @@ val on_new_connection :
   unit
 
 val destroy : ('msg, 'peer, 'conn) t -> unit Lwt.t
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** Replace dependencies like [P2p_socket.accept]. *)
+  type ('msg, 'peer, 'conn) dependencies = {
+    pool_greylist_peer :
+      ('msg, 'peer, 'conn) P2p_pool.t -> P2p_peer.Id.t -> unit;
+    peer_state_info_trusted :
+      (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t ->
+      bool;
+    point_state_info_trusted :
+      ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t -> bool;
+    fd_connect : P2p_fd.t -> Unix.sockaddr -> unit Lwt.t;
+    socket_authenticate :
+      canceler:Lwt_canceler.t ->
+      proof_of_work_target:Crypto_box.pow_target ->
+      incoming:bool ->
+      P2p_io_scheduler.connection ->
+      P2p_point.Id.t ->
+      ?listening_port:int ->
+      P2p_identity.t ->
+      Network_version.t ->
+      'conn P2p_params.conn_meta_config ->
+      ('conn P2p_connection.Info.t * 'conn P2p_socket.authenticated_connection)
+      tzresult
+      Lwt.t;
+    socket_accept :
+      ?incoming_message_queue_size:int ->
+      ?outgoing_message_queue_size:int ->
+      ?binary_chunks_size:int ->
+      canceler:Lwt_canceler.t ->
+      'conn P2p_socket.authenticated_connection ->
+      'msg P2p_message.t Data_encoding.t ->
+      ('msg P2p_message.t, 'conn) P2p_socket.t tzresult Lwt.t;
+  }
+
+  (** [mock_dependencies conn] creates [dependencies] that do nothing. [conn] is necessary for the default return value of some functions.
+       You can use this function and then override just the functions you need to mock for each test *)
+  val mock_dependencies : 'conn -> ('msg, 'peer, 'conn) dependencies
+
+  (** [dumb_config] provides an arbitrary [config]. Just like for [mock_dependencies], you typically start from [dumb_config] and then
+      only override the fields your test relies one. *)
+  val dumb_config : config
+
+  (** [create conn peer] creates a [P2p_connect_handler.t] value with minimal work.
+      All optional arguments allow overriding individually the parts that need customisation for each test. *)
+  val create :
+    ?config:config ->
+    ?pool:('msg, 'peer, 'conn) P2p_pool.t ->
+    ?log:(P2p_connection.P2p_event.t -> unit) ->
+    ?triggers:P2p_trigger.t ->
+    ?io_sched:P2p_io_scheduler.t ->
+    ?announced_version:Network_version.t ->
+    ?conn_meta_config:'conn P2p_params.conn_meta_config ->
+    ?message_config:'msg P2p_params.message_config ->
+    ?custom_p2p_versions:P2p_version.t list ->
+    ?encoding:'msg P2p_message.t Data_encoding.t ->
+    ?incoming:Lwt_canceler.t P2p_point.Table.t ->
+    ?new_connection_hook:
+      (P2p_peer.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t -> unit) list ->
+    ?answerer:'msg P2p_answerer.t Lazy.t ->
+    ?dependencies:('msg, 'peer, 'conn) dependencies ->
+    'conn ->
+    'peer ->
+    ('msg, 'peer, 'conn) t
+end
