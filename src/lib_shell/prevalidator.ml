@@ -74,22 +74,26 @@ type 'a bounded_map = {
   mutable map : (Operation.t * error list) Operation_hash.Map.t;
 }
 
+type classification = {
+  refused : [`Refused] bounded_map;
+  branch_refused : [`Branch_refused] bounded_map;
+  branch_delayed : [`Branch_delayed] bounded_map;
+  mutable applied : (Operation_hash.t * Operation.t) list;
+  mutable in_mempool : Operation_hash.Set.t;
+}
+
 (** The type needed for the implementation of [Make] below, but
  *  which is independent from the protocol. *)
 type types_state_shell = {
+  classification : classification;
   parameters : parameters;
   mutable predecessor : Store.Block.t;
   mutable timestamp : Time.System.t;
   mutable live_blocks : Block_hash.Set.t;
   mutable live_operations : Operation_hash.Set.t;
-  refused : [`Refused] bounded_map;
-  branch_refused : [`Branch_refused] bounded_map;
-  branch_delayed : [`Branch_delayed] bounded_map;
   mutable fetching : Operation_hash.Set.t;
   mutable pending : Operation.t Operation_hash.Map.t;
   mutable mempool : Mempool.t;
-  mutable in_mempool : Operation_hash.Set.t;
-  mutable applied : (Operation_hash.t * Operation.t) list;
   mutable advertisement : [`Pending of Mempool.t | `None];
   mutable filter_config : Data_encoding.json Protocol_hash.Map.t;
 }
@@ -188,45 +192,46 @@ module type CLASSIFICATION_APPLIER = sig
 end
 
 module ShellClassificationApplier :
-  CLASSIFICATION_APPLIER with type input = types_state_shell = struct
-  type input = types_state_shell
+  CLASSIFICATION_APPLIER
+    with type input = Distributed_db.chain_db * classification = struct
+  type input = Distributed_db.chain_db * classification
 
-  let handle_branch_refused shell op oph errors =
+  let handle_branch_refused (chain_db, classes) op oph errors =
     Option.iter
       (fun e ->
-        shell.branch_refused.map <-
-          Operation_hash.Map.remove e shell.branch_refused.map ;
-        Distributed_db.Operation.clear_or_cancel shell.parameters.chain_db oph ;
-        shell.in_mempool <- Operation_hash.Set.remove e shell.in_mempool)
-      (Ringo.Ring.add_and_return_erased shell.branch_refused.ring oph) ;
-    shell.in_mempool <- Operation_hash.Set.add oph shell.in_mempool ;
-    shell.branch_refused.map <-
-      Operation_hash.Map.add oph (op, errors) shell.branch_refused.map
+        classes.branch_refused.map <-
+          Operation_hash.Map.remove e classes.branch_refused.map ;
+        Distributed_db.Operation.clear_or_cancel chain_db oph ;
+        classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool)
+      (Ringo.Ring.add_and_return_erased classes.branch_refused.ring oph) ;
+    classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool ;
+    classes.branch_refused.map <-
+      Operation_hash.Map.add oph (op, errors) classes.branch_refused.map
 
-  let handle_branch_delayed shell op oph errors =
+  let handle_branch_delayed (chain_db, classes) op oph errors =
     Option.iter
       (fun e ->
-        shell.branch_delayed.map <-
-          Operation_hash.Map.remove e shell.branch_delayed.map ;
-        Distributed_db.Operation.clear_or_cancel shell.parameters.chain_db oph ;
-        shell.in_mempool <- Operation_hash.Set.remove e shell.in_mempool)
-      (Ringo.Ring.add_and_return_erased shell.branch_delayed.ring oph) ;
-    shell.in_mempool <- Operation_hash.Set.add oph shell.in_mempool ;
-    shell.branch_delayed.map <-
-      Operation_hash.Map.add oph (op, errors) shell.branch_delayed.map
+        classes.branch_delayed.map <-
+          Operation_hash.Map.remove e classes.branch_delayed.map ;
+        Distributed_db.Operation.clear_or_cancel chain_db oph ;
+        classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool)
+      (Ringo.Ring.add_and_return_erased classes.branch_delayed.ring oph) ;
+    classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool ;
+    classes.branch_delayed.map <-
+      Operation_hash.Map.add oph (op, errors) classes.branch_delayed.map
 
-  let handle_refused shell op oph errors =
+  let handle_refused (chain_db, classes) op oph errors =
     Option.iter
       (fun e ->
-        shell.refused.map <- Operation_hash.Map.remove e shell.refused.map ;
+        classes.refused.map <- Operation_hash.Map.remove e classes.refused.map ;
         (* The line below is not necessary but just to be sure *)
-        Distributed_db.Operation.clear_or_cancel shell.parameters.chain_db e ;
-        shell.in_mempool <- Operation_hash.Set.remove e shell.in_mempool)
-      (Ringo.Ring.add_and_return_erased shell.refused.ring oph) ;
-    shell.refused.map <-
-      Operation_hash.Map.add oph (op, errors) shell.refused.map ;
-    Distributed_db.Operation.clear_or_cancel shell.parameters.chain_db oph ;
-    shell.in_mempool <- Operation_hash.Set.add oph shell.in_mempool
+        Distributed_db.Operation.clear_or_cancel chain_db e ;
+        classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool)
+      (Ringo.Ring.add_and_return_erased classes.refused.ring oph) ;
+    classes.refused.map <-
+      Operation_hash.Map.add oph (op, errors) classes.refused.map ;
+    Distributed_db.Operation.clear_or_cancel chain_db oph ;
+    classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool
 end
 
 type t = (module T)
@@ -417,11 +422,12 @@ module Make
         timestamp = state.shell.timestamp;
         fetching = state.shell.fetching;
         pending = domain state.shell.pending;
-        applied = List.rev_map (fun (h, _) -> h) state.shell.applied;
+        applied =
+          List.rev_map (fun (h, _) -> h) state.shell.classification.applied;
         delayed =
           Operation_hash.Set.union
-            (domain state.shell.branch_delayed.map)
-            (domain state.shell.branch_refused.map);
+            (domain state.shell.classification.branch_delayed.map)
+            (domain state.shell.classification.branch_refused.map);
       }
   end
 
@@ -488,18 +494,18 @@ module Make
       outdated ;
     Lwt.return new_mempool
 
-  let already_handled pv oph =
-    Operation_hash.Map.mem oph pv.refused.map
-    || Operation_hash.Map.mem oph pv.pending
-    || Operation_hash.Set.mem oph pv.fetching
-    || Operation_hash.Set.mem oph pv.live_operations
-    || Operation_hash.Set.mem oph pv.in_mempool
+  let already_handled shell oph =
+    Operation_hash.Map.mem oph shell.classification.refused.map
+    || Operation_hash.Map.mem oph shell.pending
+    || Operation_hash.Set.mem oph shell.fetching
+    || Operation_hash.Set.mem oph shell.live_operations
+    || Operation_hash.Set.mem oph shell.classification.in_mempool
 
   let validation_result (state : types_state) =
     {
-      Preapply_result.applied = List.rev state.shell.applied;
-      branch_delayed = state.shell.branch_delayed.map;
-      branch_refused = state.shell.branch_refused.map;
+      Preapply_result.applied = List.rev state.shell.classification.applied;
+      branch_delayed = state.shell.classification.branch_delayed.map;
+      branch_refused = state.shell.classification.branch_refused.map;
       refused = Operation_hash.Map.empty;
     }
 
@@ -563,22 +569,27 @@ module Make
     type input = types_state
 
     let handle_branch_refused pv op oph errors =
+      let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
       Notifier.notify_operation pv.operation_stream `Branch_refused op ;
-      ShellClassificationApplier.handle_branch_refused pv.shell op oph errors
+      ShellClassificationApplier.handle_branch_refused input op oph errors
 
     let handle_branch_delayed pv op oph errors =
+      let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
       Notifier.notify_operation pv.operation_stream `Branch_delayed op ;
-      ShellClassificationApplier.handle_branch_delayed pv.shell op oph errors
+      ShellClassificationApplier.handle_branch_delayed input op oph errors
 
     let handle_refused pv op oph errors =
+      let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
       Notifier.notify_operation pv.operation_stream `Refused op ;
-      ShellClassificationApplier.handle_refused pv.shell op oph errors
+      ShellClassificationApplier.handle_refused input op oph errors
   end
 
   let handle_applied pv (op : Prevalidation.operation) =
+    let classification = pv.shell.classification in
     Notifier.notify_operation pv.operation_stream `Applied op.raw ;
-    pv.shell.applied <- (op.hash, op.raw) :: pv.shell.applied ;
-    pv.shell.in_mempool <- Operation_hash.Set.add op.hash pv.shell.in_mempool
+    classification.applied <- (op.hash, op.raw) :: classification.applied ;
+    pv.shell.classification.in_mempool <-
+      Operation_hash.Set.add op.hash pv.shell.classification.in_mempool
 
   let classify_operation w pv validation_state mempool op oph =
     match Prevalidation.parse op with
@@ -708,9 +719,10 @@ module Make
             advertise w pv.shell mempool_to_advertise ;
             let our_mempool =
               {
-                (* Using List.rev_map is ok since the size of pv.applied
+                (* Using List.rev_map is ok since the size of pv.shell.classification.applied
                    cannot be too big. *)
-                Mempool.known_valid = List.rev_map fst pv.shell.applied;
+                Mempool.known_valid =
+                  List.rev_map fst pv.shell.classification.applied;
                 pending = remaining_pendings;
               }
             in
@@ -811,17 +823,19 @@ module Make
                    match map_op op with
                    | Some op -> Some (hash, op)
                    | None -> None)
-                 pv.shell.applied
+                 pv.shell.classification.applied
              in
              let filter f map =
                Operation_hash.Map.fold f map Operation_hash.Map.empty
              in
-             let refused = filter map_op_error pv.shell.refused.map in
+             let refused =
+               filter map_op_error pv.shell.classification.refused.map
+             in
              let branch_refused =
-               filter map_op_error pv.shell.branch_refused.map
+               filter map_op_error pv.shell.classification.branch_refused.map
              in
              let branch_delayed =
-               filter map_op_error pv.shell.branch_delayed.map
+               filter map_op_error pv.shell.classification.branch_delayed.map
              in
              let unprocessed =
                Operation_hash.Map.fold
@@ -853,7 +867,12 @@ module Make
            (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
            (fun
              {
-               shell = {applied; refused; branch_refused; branch_delayed; _};
+               shell =
+                 {
+                   classification =
+                     {applied; refused; branch_refused; branch_delayed; _};
+                   _;
+                 };
                operation_stream;
                _;
              }
@@ -1056,12 +1075,12 @@ module Make
       pv.shell.timestamp <- timestamp_system ;
       pv.shell.mempool <- {known_valid = []; pending = Operation_hash.Set.empty} ;
       pv.shell.pending <- pending ;
-      pv.shell.in_mempool <- Operation_hash.Set.empty ;
-      Ringo.Ring.clear pv.shell.branch_delayed.ring ;
-      pv.shell.branch_delayed.map <- Operation_hash.Map.empty ;
-      Ringo.Ring.clear pv.shell.branch_refused.ring ;
-      pv.shell.branch_refused.map <- Operation_hash.Map.empty ;
-      pv.shell.applied <- [] ;
+      pv.shell.classification.in_mempool <- Operation_hash.Set.empty ;
+      Ringo.Ring.clear pv.shell.classification.branch_delayed.ring ;
+      pv.shell.classification.branch_delayed.map <- Operation_hash.Map.empty ;
+      Ringo.Ring.clear pv.shell.classification.branch_refused.ring ;
+      pv.shell.classification.branch_refused.map <- Operation_hash.Map.empty ;
+      pv.shell.classification.applied <- [] ;
       pv.validation_state <- validation_state ;
       pv.operation_stream <- Lwt_watcher.create_input () ;
       return_unit
@@ -1139,21 +1158,26 @@ module Make
           map = Operation_hash.Map.empty;
         }
       in
+      let classification =
+        {
+          refused = make_bounded_operation_collections ();
+          branch_refused = make_bounded_operation_collections ();
+          branch_delayed = make_bounded_operation_collections ();
+          in_mempool = Operation_hash.Set.empty;
+          applied = [];
+        }
+      in
       let shell =
         {
+          classification;
           parameters;
           predecessor;
           timestamp = timestamp_system;
           live_blocks;
           live_operations;
           mempool = {known_valid = []; pending = Operation_hash.Set.empty};
-          refused = make_bounded_operation_collections ();
           fetching;
           pending = Operation_hash.Map.empty;
-          in_mempool = Operation_hash.Set.empty;
-          applied = [];
-          branch_refused = make_bounded_operation_collections ();
-          branch_delayed = make_bounded_operation_collections ();
           advertisement = `None;
           filter_config =
             Protocol_hash.Map.empty (* TODO: initialize from config file *);
@@ -1288,7 +1312,7 @@ let operations (t : t) =
   let pv = Prevalidator.Worker.state w in
   ( {
       (Prevalidator.validation_result pv) with
-      applied = List.rev pv.shell.applied;
+      applied = List.rev pv.shell.classification.applied;
     },
     pv.shell.pending )
 
