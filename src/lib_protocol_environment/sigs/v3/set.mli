@@ -1,65 +1,131 @@
-(**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
-(*                                                                        *)
-(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
-(*     en Automatique.                                                    *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
-(**************************************************************************)
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
-(** Sets over ordered types.
+(* From Lwtreslib *)
 
-   This module implements the set data structure, given a total ordering
-   function over the set elements. All operations over sets
-   are purely applicative (no side-effects).
-   The implementation uses balanced binary trees, and is therefore
-   reasonably efficient: insertion and membership take time
-   logarithmic in the size of the set, for instance.
+module type S = sig
+  type elt
 
-   The {!Make} functor constructs implementations for any type, given a
-   [compare] function.
-   For instance:
-   {[
-     module IntPairs =
-       struct
-         type t = int * int
-         let compare (x0,y0) (x1,y1) =
-           match Stdlib.compare x0 x1 with
-               0 -> Stdlib.compare y0 y1
-             | c -> c
-       end
+  type t
 
-     module PairsSet = Set.Make(IntPairs)
+  (**/**)
+  module Legacy : Stdlib.Set.S with type elt = elt and type t = t
+  (**/**)
 
-     let m = PairsSet.(empty |> add (2,3) |> add (5,7) |> add (11,13))
-   ]}
+  val empty : t
 
-   This creates a new module [PairsSet], with a new type [PairsSet.t]
-   of sets of [int * int].
-*)
+  val is_empty : t -> bool
 
-module type OrderedType =
-  sig
-    type t
-      (** The type of the set elements. *)
+  val mem : elt -> t -> bool
 
-    val compare : t -> t -> int
-      (** A total ordering function over the set elements.
-          This is a two-argument function [f] such that
-          [f e1 e2] is zero if the elements [e1] and [e2] are equal,
-          [f e1 e2] is strictly negative if [e1] is smaller than [e2],
-          and [f e1 e2] is strictly positive if [e1] is greater than [e2].
-          Example: a suitable ordering function is the generic structural
-          comparison function {!Stdlib.compare}. *)
-  end
-(** Input signature of the functor {!Set.Make}. *)
+  val add : elt -> t -> t
 
-module Make (Ord : OrderedType) : S.SET with type elt = Ord.t
-(** Functor building an implementation of the set structure
-   given a totally ordered type. *)
+  val singleton : elt -> t
+
+  val remove : elt -> t -> t
+
+  val union : t -> t -> t
+
+  val inter : t -> t -> t
+
+  val disjoint : t -> t -> bool
+
+  val diff : t -> t -> t
+
+  val compare : t -> t -> int
+
+  val equal : t -> t -> bool
+
+  val subset : t -> t -> bool
+
+  val iter : (elt -> unit) -> t -> unit
+
+  val iter_e : (elt -> (unit, 'trace) result) -> t -> (unit, 'trace) result
+
+  val iter_s : (elt -> unit Lwt.t) -> t -> unit Lwt.t
+
+  val iter_p : (elt -> unit Lwt.t) -> t -> unit Lwt.t
+
+  val iter_es :
+    (elt -> (unit, 'trace) result Lwt.t) -> t -> (unit, 'trace) result Lwt.t
+
+  val map : (elt -> elt) -> t -> t
+
+  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val fold_e :
+    (elt -> 'a -> ('a, 'trace) result) -> t -> 'a -> ('a, 'trace) result
+
+  val fold_s : (elt -> 'a -> 'a Lwt.t) -> t -> 'a -> 'a Lwt.t
+
+  val fold_es :
+    (elt -> 'a -> ('a, 'trace) result Lwt.t) ->
+    t ->
+    'a ->
+    ('a, 'trace) result Lwt.t
+
+  val for_all : (elt -> bool) -> t -> bool
+
+  val exists : (elt -> bool) -> t -> bool
+
+  val filter : (elt -> bool) -> t -> t
+
+  val partition : (elt -> bool) -> t -> t * t
+
+  val cardinal : t -> int
+
+  val elements : t -> elt list
+
+  val min_elt : t -> elt option
+
+  val max_elt : t -> elt option
+
+  val choose : t -> elt option
+
+  val split : elt -> t -> t * bool * t
+
+  val find : elt -> t -> elt option
+
+  val find_first : (elt -> bool) -> t -> elt option
+
+  val find_last : (elt -> bool) -> t -> elt option
+
+  val of_list : elt list -> t
+
+  val to_seq_from : elt -> t -> elt Stdlib.Seq.t
+
+  val to_seq : t -> elt Stdlib.Seq.t
+
+  val add_seq : elt Stdlib.Seq.t -> t -> t
+
+  val of_seq : elt Stdlib.Seq.t -> t
+
+  val iter_ep :
+    (elt -> (unit, 'error Error_monad.trace) result Lwt.t) ->
+    t ->
+    (unit, 'error Error_monad.trace) result Lwt.t
+end
+
+module Make (Ord : sig type t val compare : t -> t -> int end) : S with type elt = Ord.t

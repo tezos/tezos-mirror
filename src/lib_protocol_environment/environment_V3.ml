@@ -134,14 +134,9 @@ struct
         Stdlib.exit 1
 
   include Stdlib
-
-  (* The modules provided in the [_struct.V3.M] pack are meant specifically to
-     shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
-     versions. Thus we open the module, hiding the incompatible, newer modules.
-  *)
-  open Tezos_protocol_environment_structs.V3.M
   module Pervasives = Stdlib
   module Compare = Compare
+  module Seq = Tezos_error_monad.TzLwtreslib.Seq
   module List = Tezos_error_monad.TzLwtreslib.List
   module Char = Char
   module Bytes = Bytes
@@ -149,8 +144,8 @@ struct
   module String = String
   module Bits = Bits
   module TzEndian = TzEndian
-  module Set = Stdlib.Set
-  module Map = Stdlib.Map
+  module Set = Tezos_error_monad.TzLwtreslib.Set
+  module Map = Tezos_error_monad.TzLwtreslib.Map
   module Int32 = Int32
   module Int64 = Int64
   module Buffer = Buffer
@@ -237,18 +232,16 @@ struct
       val rpc_arg : t RPC_arg.t
     end
 
-    module type SET = S.SET
-
-    module type MAP = S.MAP
-
     module type INDEXES_SET = sig
-      include SET
+      include Set.S
+
+      val random_elt : t -> elt
 
       val encoding : t Data_encoding.t
     end
 
     module type INDEXES_MAP = sig
-      include MAP
+      include Map.S
 
       val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
     end
