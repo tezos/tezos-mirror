@@ -875,19 +875,19 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
        manages to apply the operation on the current validation state
        or if the operation can be applied later on ([branch_delayed]
        classification). *)
-    let may_propagate_unknown_branch_operation pv op =
+    let may_propagate_unknown_branch_operation validation_state op =
       ( Prevalidation.parse op >>?= fun op ->
         let is_alternative_endorsement () =
-          Lwt.return pv.validation_state >>=? fun validation_state ->
+          Lwt.return validation_state >>=? fun validation_state ->
           Prevalidation.apply_operation validation_state op >>= function
           | Applied _ | Branch_delayed _ -> return_true
           | _ -> return_false
         in
         if is_endorsement op then is_alternative_endorsement ()
         else return_false )
-      >>= function
-      | Ok b -> Lwt.return b
-      | Error _ -> Lwt.return_false
+      >|= function
+      | Ok b -> b
+      | Error _ -> false
 
     let on_operation_arrived w (pv : state) oph op =
       if already_handled pv.shell oph then return_unit
@@ -896,7 +896,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       then (
         let error = [Exn (Failure "Unknown branch operation")] in
         handle_branch_refused pv op oph error ;
-        may_propagate_unknown_branch_operation pv op >>= function
+        may_propagate_unknown_branch_operation pv.validation_state op
+        >>= function
         | true ->
             let pending = Operation_hash.Set.singleton oph in
             advertise w pv.shell {Mempool.empty with pending} ;
