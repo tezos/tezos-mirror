@@ -480,7 +480,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (fun e ->
         pv.shell.branch_refused.map <-
           Operation_hash.Map.remove e pv.shell.branch_refused.map ;
-        Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
+        Distributed_db.Operation.clear_or_cancel
+          pv.shell.parameters.chain_db
+          oph ;
         pv.shell.in_mempool <- Operation_hash.Set.remove e pv.shell.in_mempool)
       (Ringo.Ring.add_and_return_erased pv.shell.branch_refused.ring oph) ;
     pv.shell.in_mempool <- Operation_hash.Set.add oph pv.shell.in_mempool ;
@@ -493,7 +495,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       (fun e ->
         pv.shell.branch_delayed.map <-
           Operation_hash.Map.remove e pv.shell.branch_delayed.map ;
-        Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
+        Distributed_db.Operation.clear_or_cancel
+          pv.shell.parameters.chain_db
+          oph ;
         pv.shell.in_mempool <- Operation_hash.Set.remove e pv.shell.in_mempool)
       (Ringo.Ring.add_and_return_erased pv.shell.branch_delayed.ring oph) ;
     pv.shell.in_mempool <- Operation_hash.Set.add oph pv.shell.in_mempool ;
@@ -509,7 +513,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db e ;
         pv.shell.in_mempool <- Operation_hash.Set.remove e pv.shell.in_mempool)
       (Ringo.Ring.add_and_return_erased pv.shell.refused.ring oph) ;
-    pv.shell.refused.map <- Operation_hash.Map.add oph (op, errors) pv.shell.refused.map ;
+    pv.shell.refused.map <-
+      Operation_hash.Map.add oph (op, errors) pv.shell.refused.map ;
     Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
     pv.shell.in_mempool <- Operation_hash.Set.add oph pv.shell.in_mempool
 
@@ -558,7 +563,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             handle_refused pv op.raw op.hash errors ;
             Lwt.return (validation_state, mempool)
         | Outdated ->
-            Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
+            Distributed_db.Operation.clear_or_cancel
+              pv.shell.parameters.chain_db
+              oph ;
             Lwt.return (validation_state, mempool))
 
   (* Classify pending operations into either: [Refused |
@@ -744,8 +751,12 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
                Operation_hash.Map.fold f map Operation_hash.Map.empty
              in
              let refused = filter map_op_error pv.shell.refused.map in
-             let branch_refused = filter map_op_error pv.shell.branch_refused.map in
-             let branch_delayed = filter map_op_error pv.shell.branch_delayed.map in
+             let branch_refused =
+               filter map_op_error pv.shell.branch_refused.map
+             in
+             let branch_delayed =
+               filter map_op_error pv.shell.branch_delayed.map
+             in
              let unprocessed =
                Operation_hash.Map.fold
                  (fun oph op acc ->
@@ -776,11 +787,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
            (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
            (fun
              {
-               shell = { applied;
-               refused;
-               branch_refused;
-               branch_delayed;
-               _ };
+               shell = {applied; refused; branch_refused; branch_delayed; _};
                operation_stream;
                _;
              }
@@ -884,7 +891,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
     let on_operation_arrived w (pv : state) oph op =
       if already_handled pv.shell oph then return_unit
-      else if not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
+      else if
+        not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
       then (
         let error = [Exn (Failure "Unknown branch operation")] in
         handle_branch_refused pv op oph error ;
@@ -894,7 +902,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             advertise w pv.shell {Mempool.empty with pending} ;
             return_unit
         | false ->
-            Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
+            Distributed_db.Operation.clear_or_cancel
+              pv.shell.parameters.chain_db
+              oph ;
             return_unit)
       else
         pre_filter w pv.shell oph op >>= function
@@ -903,7 +913,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
             return_unit
         | false ->
-            Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
+            Distributed_db.Operation.clear_or_cancel
+              pv.shell.parameters.chain_db
+              oph ;
             return_unit
 
     let on_inject _w (pv : state) op =
@@ -917,7 +929,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         | Applied (_, _result) ->
             Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
             >>= fun (_ : bool) ->
-            pv.shell.pending <- Operation_hash.Map.add parsed_op.hash op pv.shell.pending ;
+            pv.shell.pending <-
+              Operation_hash.Map.add parsed_op.hash op pv.shell.pending ;
             return_unit
         | res ->
             failwith
@@ -943,7 +956,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
     let on_flush w pv predecessor live_blocks live_operations =
       Lwt_watcher.shutdown_input pv.operation_stream ;
-      let chain_store = Distributed_db.chain_store pv.shell.parameters.chain_db in
+      let chain_store =
+        Distributed_db.chain_store pv.shell.parameters.chain_db
+      in
       list_pendings
         pv.shell.parameters.chain_db
         ~from_block:pv.shell.predecessor
@@ -1001,7 +1016,9 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       | Request.Flush (hash, live_blocks, live_operations) ->
           on_advertise pv.shell ;
           (* TODO: rebase the advertisement instead *)
-          let chain_store = Distributed_db.chain_store pv.shell.parameters.chain_db in
+          let chain_store =
+            Distributed_db.chain_store pv.shell.parameters.chain_db
+          in
           Store.Block.read_block chain_store hash
           >>=? fun block : r tzresult Lwt.t ->
           on_flush w pv block live_blocks live_operations
@@ -1200,7 +1217,10 @@ let operations (t : t) =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
   let pv = Prevalidator.Worker.state w in
-  ( {(Prevalidator.validation_result pv) with applied = List.rev pv.shell.applied},
+  ( {
+      (Prevalidator.validation_result pv) with
+      applied = List.rev pv.shell.applied;
+    },
     pv.shell.pending )
 
 let pending (t : t) =
