@@ -428,8 +428,6 @@ module Make
           (fun exc ->
             Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
 
-  let filter_config pv = Lwt.return pv.filter_config
-
   (* Each classified operation should be notified exactly ONCE for a
      given stream. Operations which cannot be parsed are not notified. *)
   let handle
@@ -470,7 +468,6 @@ module Make
             protocol_data = parsed_op.protocol_data;
           }
         in
-        filter_config pv >|= fun config ->
         let validation_state_before =
           Option.map
             Prevalidation.validation_state
@@ -479,7 +476,7 @@ module Make
         match
           Filter.Mempool.pre_filter
             ?validation_state_before
-            config
+            pv.filter_config
             op.Filter.Proto.protocol_data
         with
         | (`Branch_delayed _ | `Branch_refused _ | `Refused _) as errs ->
@@ -488,14 +485,13 @@ module Make
               pv.shell
               (`Parsed parsed_op)
               errs ;
-            false
-        | `Undecided -> true)
+            Lwt.return_false
+        | `Undecided -> Lwt.return_true)
 
   let post_filter pv ~validation_state_before ~validation_state_after op receipt
       =
-    filter_config pv >>= fun config ->
     Filter.Mempool.post_filter
-      config
+      pv.filter_config
       ~validation_state_before
       ~validation_state_after
       (op, receipt)
@@ -658,14 +654,10 @@ module Make
      Remove this function upon the next release of [data-encoding]. *)
 
   let get_filter pv =
-    filter_config pv >>= fun config ->
-    let json =
-      data_encoding_json_construct
-        ~include_default_fields:`Always
-        Filter.Mempool.config_encoding
-        config
-    in
-    return json
+    data_encoding_json_construct
+      ~include_default_fields:`Always
+      Filter.Mempool.config_encoding
+      pv.filter_config
 
   let set_filter pv obj =
     try
@@ -686,7 +678,7 @@ module Make
          RPC_directory.register
            !dir
            (Proto_services.S.Mempool.get_filter RPC_path.open_root)
-           (fun pv () () -> get_filter pv) ;
+           (fun pv () () -> return (get_filter pv)) ;
        dir :=
          RPC_directory.register
            !dir
