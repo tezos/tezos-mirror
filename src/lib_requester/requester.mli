@@ -252,7 +252,8 @@ module type PRECHECK = sig
   val precheck : key -> param -> notified_value -> value option
 end
 
-module Make (Hash : sig
+(** An input module of {!Make} *)
+module type HASH = sig
   type t
 
   val name : string
@@ -260,11 +261,16 @@ module Make (Hash : sig
   val encoding : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
-end)
-(Disk_table : DISK_TABLE with type key := Hash.t)
-(Memory_table : MEMORY_TABLE with type key := Hash.t)
-(Request : REQUEST with type key := Hash.t)
-(Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) :
+end
+
+module Make
+    (Hash : HASH)
+    (Disk_table : DISK_TABLE with type key := Hash.t)
+    (Memory_table : MEMORY_TABLE with type key := Hash.t)
+    (Request : REQUEST with type key := Hash.t)
+    (Precheck : PRECHECK
+                  with type key := Hash.t
+                   and type value := Disk_table.value) :
   FULL_REQUESTER
     with type key = Hash.t
      and type value = Disk_table.value

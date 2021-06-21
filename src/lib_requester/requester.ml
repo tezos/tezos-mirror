@@ -170,19 +170,24 @@ module type REQUEST = sig
   val send : param -> P2p_peer.Id.t -> key list -> unit
 end
 
-(** The requester uses a generic scheduler to schedule its requests.
-    The [Memory_table] must be shared between the scheduler and the requester
-    as it used to store both pending requests and found values. *)
-
-module Make_request_scheduler (Hash : sig
+module type HASH = sig
   type t
 
   val name : string
 
   val encoding : t Data_encoding.t
-end)
-(Table : MEMORY_TABLE with type key := Hash.t)
-(Request : REQUEST with type key := Hash.t) : sig
+
+  val pp : Format.formatter -> t -> unit
+end
+
+(** The requester uses a generic scheduler to schedule its requests.
+    The [Memory_table] must be shared between the scheduler and the requester
+    as it used to store both pending requests and found values. *)
+
+module Make_request_scheduler
+    (Hash : HASH)
+    (Table : MEMORY_TABLE with type key := Hash.t)
+    (Request : REQUEST with type key := Hash.t) : sig
   include SCHEDULER with type key := Hash.t and type param := Request.param
 end = struct
   module Events = Requester_event.Make (Hash)
@@ -394,19 +399,14 @@ end = struct
   let pending_requests s = Table.length s.pending
 end
 
-module Make (Hash : sig
-  type t
-
-  val name : string
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end)
-(Disk_table : DISK_TABLE with type key := Hash.t)
-(Memory_table : MEMORY_TABLE with type key := Hash.t)
-(Request : REQUEST with type key := Hash.t)
-(Precheck : PRECHECK with type key := Hash.t and type value := Disk_table.value) :
+module Make
+    (Hash : HASH)
+    (Disk_table : DISK_TABLE with type key := Hash.t)
+    (Memory_table : MEMORY_TABLE with type key := Hash.t)
+    (Request : REQUEST with type key := Hash.t)
+    (Precheck : PRECHECK
+                  with type key := Hash.t
+                   and type value := Disk_table.value) :
   FULL_REQUESTER
     with type key = Hash.t
      and type value = Disk_table.value

@@ -46,29 +46,26 @@ module type EXTENDED_REQUESTER_2 = sig
   val clear_all : t -> Block_hash.t -> int -> unit
 end
 
-module Make_raw (Hash : sig
-  type t
-
-  val name : string
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end)
-(Disk_table : Requester.DISK_TABLE with type key := Hash.t)
-(Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
-(Request_message : sig
+module type REQUEST_MESSAGE = sig
   type param
+
+  type hash
 
   val max_length : int
 
   val initial_delay : Time.System.Span.t
 
-  val forge : param -> Hash.t list -> Message.t
-end)
-(Precheck : Requester.PRECHECK
-              with type key := Hash.t
-               and type value := Disk_table.value) :
+  val forge : param -> hash list -> Message.t
+end
+
+module Make_raw
+    (Hash : Requester.HASH)
+    (Disk_table : Requester.DISK_TABLE with type key := Hash.t)
+    (Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
+    (Request_message : REQUEST_MESSAGE with type hash := Hash.t)
+    (Precheck : Requester.PRECHECK
+                  with type key := Hash.t
+                   and type value := Disk_table.value) :
   EXTENDED_REQUESTER
     with type key = Hash.t
      and type value = Disk_table.value
