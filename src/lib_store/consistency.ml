@@ -531,14 +531,15 @@ let fix_checkpoint chain_dir block_store head =
   set_checkpoint head >>=? fun checkpoint ->
   Store_events.(emit fix_checkpoint checkpoint) >>= fun () -> return checkpoint
 
-(* [fix_protocol_levels context_index block_store genesis_header]
+(* [fix_protocol_levels context_index block_store genesis_header ~head]
    fixes protocol levels table by searching for all the protocol
    levels in the block store (cemented and floating). Fixing this
    table is possible in archive mode only.
    Assumptions:
    - block store is valid and available,
    - current head is valid and available. *)
-let fix_protocol_levels context_index block_store genesis genesis_header =
+let fix_protocol_levels context_index block_store genesis genesis_header ~head
+    ~savepoint =
   (* Search in the cemented store*)
   let cemented_block_store = Block_store.cemented_block_store block_store in
   let cemented_block_files =
@@ -730,11 +731,69 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
         commit_info = genesis_commit_info;
       } )
   in
-  let protocol_levels =
-    genesis_protocol_level
-    :: (List.rev cemented_protocol_levels @ floating_protocol_levels)
+  (* [finalize_protocol_levels] aims to aggregate the protocol levels
+     found in the cemented and floating stores.*)
+  let finalize_protocol_levels genesis_protocol_level cemented_protocol_levels
+      floating_protocol_levels =
+    let all_found =
+      genesis_protocol_level
+      :: (List.rev cemented_protocol_levels @ floating_protocol_levels)
+    in
+    let corrupted_store head_proto_level head_hash =
+      fail
+        (Corrupted_store
+           (Format.asprintf
+              "Failed to find a valid activation block for protocol %d of the \
+               current head (%a)"
+              head_proto_level
+              Block_hash.pp
+              head_hash))
+    in
+    (* Make sure that the protocol of the current head is registered. If
+       not, set it to the savepoint. *)
+    let head_proto_level = Block_repr.proto_level head in
+    let head_hash = Block_repr.hash head in
+    if
+      not
+        (List.mem
+           ~equal:Compare.Int.equal
+           head_proto_level
+           (List.map fst all_found))
+    then
+      (Block_store.read_block
+         ~read_metadata:true
+         block_store
+         (Block_store.Block (fst savepoint, 0))
+       >>=? function
+       | None -> corrupted_store head_proto_level head_hash
+       | Some savepoint -> return savepoint)
+      >>=? fun savepoint ->
+      Context.checkout context_index (Block_repr.context savepoint) >>= function
+      | None -> corrupted_store head_proto_level head_hash
+      | Some context ->
+          Context.get_protocol context >>= fun protocol_hash ->
+          (Context.retrieve_commit_info
+             context_index
+             (Block_repr.header savepoint)
+           >>= function
+           | Ok tup -> return_some (Protocol_levels.commit_info_of_tuple tup)
+           | Error _ -> corrupted_store head_proto_level head_hash)
+          >>=? fun commit_info ->
+          let head_protocol_activation =
+            ( head_proto_level,
+              {
+                Protocol_levels.block = (head_hash, Block_repr.level head);
+                protocol = protocol_hash;
+                commit_info;
+              } )
+          in
+          return (all_found @ [head_protocol_activation])
+    else return all_found
   in
-  return protocol_levels
+  finalize_protocol_levels
+    genesis_protocol_level
+    cemented_protocol_levels
+    floating_protocol_levels
 
 (* [fix_chain_state ~chain_dir ~head ~cementing_highwatermark
    ~checkpoint ~savepoint ~caboose ~alternate_heads ~forked_chains
@@ -881,6 +940,8 @@ let fix_consistency chain_dir context_index genesis =
     block_store
     genesis
     (Block_repr.header genesis_block)
+    ~head
+    ~savepoint
   >>=? fun protocol_levels ->
   fix_chain_state
     chain_dir

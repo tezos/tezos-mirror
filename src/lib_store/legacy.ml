@@ -684,8 +684,8 @@ let update_stored_data legacy_chain_store legacy_store new_store ~new_checkpoint
 let infer_checkpoint legacy_chain_state chain_id =
   (* When upgrading from a full or rolling node, the checkpoint may
      not be set on a "protocol defined checkpoint". We substitute it
-     by using, as a checkpoint, the last allowed fork level of the
-     current head. *)
+     by using, as a checkpoint, the highest block between the
+     savepoint and the last allowed fork level of the current head. *)
   Legacy_state.Chain.store legacy_chain_state >>= fun legacy_store ->
   let legacy_chain_store = Legacy_store.Chain.get legacy_store chain_id in
   let legacy_chain_data = Legacy_store.Chain_data.get legacy_chain_store in
@@ -697,8 +697,14 @@ let infer_checkpoint legacy_chain_state chain_id =
     (Failed_to_upgrade "Nothing to do")
   >>=? fun () ->
   Legacy_state.Block.last_allowed_fork_level head_contents >>=? fun lafl ->
-  read_i legacy_chain_state head_hash lafl >>=? fun lafl_header ->
-  return (lafl_header, lafl)
+  Legacy_store.Chain_data.Save_point.read legacy_chain_data
+  >>=? fun (savepoint_level, savepoint_hash) ->
+  Legacy_state.Block.read legacy_chain_state savepoint_hash
+  >>=? fun savepoint ->
+  if Compare.Int32.(lafl > savepoint_level) then
+    read_i legacy_chain_state head_hash lafl >>=? fun lafl_header ->
+    return (lafl_header, lafl)
+  else return (Legacy_state.Block.header savepoint, savepoint_level)
 
 let upgrade_cleaner data_dir ~upgraded_store =
   Event.(emit restoring_after_failure) data_dir >>= fun () ->
