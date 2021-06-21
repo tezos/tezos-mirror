@@ -1566,11 +1566,10 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
     ~included_endorsements
   >>?= fun reward ->
   add_rewards ctxt reward >>?= fun ctxt ->
-  Signature.Public_key_hash.Map.fold
-    (fun delegate deposit ctxt ->
-      ctxt >>=? fun ctxt -> Delegate.freeze_deposit ctxt delegate deposit)
+  Signature.Public_key_hash.Map.fold_es
+    (fun delegate deposit ctxt -> Delegate.freeze_deposit ctxt delegate deposit)
     (get_deposits ctxt)
-    (return ctxt)
+    ctxt
   >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
   let fees = Alpha_context.get_fees ctxt in
