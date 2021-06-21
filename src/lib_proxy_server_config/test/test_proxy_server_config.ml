@@ -193,7 +193,7 @@ let test_example () =
     succeeds on generated values (if optional argument are left
     to their defaults), as tested in [test_good_arb_to_runtime_ok] below.
     It acts both as:
-    
+
     - a test of the subgenerators (in particular [Qcheck_helpers.endpoint_arb])
     - a specification of [to_runtime]. *)
 let good_proxy_server_config_arb
@@ -284,7 +284,6 @@ let test_wrong_sym_block_caching_time =
 
 let () =
   Alcotest.run
-    ~verbose:true
     "Proxy_server_config"
     [
       ( "union_right_bias",
