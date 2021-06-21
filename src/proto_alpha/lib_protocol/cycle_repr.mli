@@ -51,6 +51,6 @@ val to_int32 : cycle -> int32
 
 val of_int32_exn : int32 -> cycle
 
-module Map : S.MAP with type key = cycle
+module Map : Map.S with type key = cycle
 
 module Index : Storage_description.INDEX with type t = cycle

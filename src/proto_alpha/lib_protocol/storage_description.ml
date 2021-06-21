@@ -102,7 +102,7 @@ let rec register_named_subcontext : type r. r t -> string list -> r t =
       register_named_subcontext subdir names
   | (NamedDir map, name :: names) ->
       let subdir =
-        match StringMap.find_opt name map with
+        match StringMap.find name map with
         | Some subdir -> subdir
         | None ->
             let subdir = {rev_path = name :: desc.rev_path; dir = Empty} in

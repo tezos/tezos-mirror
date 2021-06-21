@@ -1130,7 +1130,7 @@ module Registration_section = struct
       in
       let (module M) = map in
       let (key, _) =
-        M.OPS.choose_opt (fst M.boxed) |> WithExceptions.Option.get ~loc:__LOC__
+        M.OPS.choose (fst M.boxed) |> WithExceptions.Option.get ~loc:__LOC__
       in
       (key, map)
 
@@ -1311,7 +1311,7 @@ module Registration_section = struct
       in
       let (module M) = map in
       let (key, _) =
-        M.OPS.choose_opt (fst M.boxed) |> WithExceptions.Option.get ~loc:__LOC__
+        M.OPS.choose (fst M.boxed) |> WithExceptions.Option.get ~loc:__LOC__
       in
       let big_map =
         raise_if_error

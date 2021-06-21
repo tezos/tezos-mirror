@@ -41,7 +41,7 @@ let get_proposals ctxt =
       Lwt.return
         ( acc >|? fun acc ->
           let previous =
-            match Protocol_hash.Map.find_opt proposal acc with
+            match Protocol_hash.Map.find proposal acc with
             | None -> 0l
             | Some x -> x
           in

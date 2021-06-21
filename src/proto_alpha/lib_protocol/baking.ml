@@ -317,7 +317,7 @@ let endorsement_rights ctxt level =
       Roll.endorsement_rights_owner ctxt level ~slot >|=? fun pk ->
       let pkh = Signature.Public_key.hash pk in
       let right =
-        match Signature.Public_key_hash.Map.find_opt pkh acc with
+        match Signature.Public_key_hash.Map.find pkh acc with
         | None -> (pk, [slot], false)
         | Some (pk, slots, used) -> (pk, slot :: slots, used)
       in
@@ -344,7 +344,7 @@ let[@coq_axiom_with_reason "gadt"] check_endorsement_rights ctxt chain_id ~slot
          return (Alpha_context.allowed_endorsements ctxt)
         else endorsement_rights ctxt (Level.from_raw ctxt level))
         >>=? fun endorsements ->
-        match Signature.Public_key_hash.Map.find_opt pkh endorsements with
+        match Signature.Public_key_hash.Map.find pkh endorsements with
         | None -> fail Unexpected_endorsement (* unexpected *)
         | Some (_pk, (top_slot :: _ as slots), v) ->
             error_unless

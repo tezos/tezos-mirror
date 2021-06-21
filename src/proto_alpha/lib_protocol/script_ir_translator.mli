@@ -351,7 +351,7 @@ val find_entrypoint :
   string ->
   ((Script.node -> Script.node) * ex_ty) tzresult
 
-module Entrypoints_map : S.MAP with type key = string
+module Entrypoints_map : Map.S with type key = string
 
 val list_entrypoints :
   't Script_typed_ir.ty ->

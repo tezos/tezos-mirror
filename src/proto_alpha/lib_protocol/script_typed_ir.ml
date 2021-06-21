@@ -83,7 +83,7 @@ module type Boxed_set = sig
 
   val elt_ty : elt comparable_ty
 
-  module OPS : S.SET with type elt = elt
+  module OPS : Set.S with type elt = elt
 
   val boxed : OPS.t
 
@@ -99,7 +99,7 @@ module type Boxed_map = sig
 
   val key_ty : key comparable_ty
 
-  module OPS : S.MAP with type key = key
+  module OPS : Map.S with type key = key
 
   val boxed : value OPS.t * int
 end

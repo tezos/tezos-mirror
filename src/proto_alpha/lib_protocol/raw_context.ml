@@ -196,9 +196,7 @@ let[@inline] update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids =
   update_back ctxt {ctxt.back with temporary_lazy_storage_ids}
 
 let record_endorsement ctxt k =
-  match
-    Signature.Public_key_hash.Map.find_opt k (allowed_endorsements ctxt)
-  with
+  match Signature.Public_key_hash.Map.find k (allowed_endorsements ctxt) with
   | None -> assert false
   | Some (_, _, true) -> assert false (* right already used *)
   | Some (d, s, false) ->
@@ -286,7 +284,7 @@ let add_rewards ctxt rewards' =
 let add_deposit ctxt delegate deposit =
   let open Signature.Public_key_hash.Map in
   let previous =
-    match find_opt delegate (deposits ctxt) with
+    match find delegate (deposits ctxt) with
     | Some tz -> tz
     | None -> Tez_repr.zero
   in
