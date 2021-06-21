@@ -15,7 +15,7 @@ git apply /dev/patch.diff
 make
 
 # now you can just print in any protocol file by using the command
-Hash.print "Hello World!" 
+Hack.print "Hello World!" 
 
 
 ```
