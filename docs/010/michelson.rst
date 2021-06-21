@@ -2007,7 +2007,7 @@ Special operations
     > COMPARE / x : y : S  =>  1 : S
         iff x > y
 
--  ``LEVEL``: Push the current block level.
+-  ``LEVEL``: Push the level of the current transaction's block.
 
 ::
 
