@@ -305,7 +305,7 @@ module type T = sig
       * Proto.operation_data)
       Lwt_watcher.input;
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
-    mutable filter_config : Filter.Mempool.config Protocol_hash.Map.t;
+    mutable filter_config : Filter.Mempool.config;
   }
 
   module Types : Worker_intf.TYPES with type state = types_state
@@ -374,7 +374,7 @@ module Make
       * Proto.operation_data)
       Lwt_watcher.input;
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
-    mutable filter_config : Filter.Mempool.config Protocol_hash.Map.t;
+    mutable filter_config : Filter.Mempool.config;
   }
 
   module Types = struct
@@ -428,10 +428,7 @@ module Make
           (fun exc ->
             Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
 
-  let filter_config pv =
-    match Protocol_hash.Map.find Proto.hash pv.filter_config with
-    | Some config -> Lwt.return config
-    | None -> Lwt.return Filter.Mempool.default_config
+  let filter_config pv = Lwt.return pv.filter_config
 
   (* Each classified operation should be notified exactly ONCE for a
      given stream. Operations which cannot be parsed are not notified. *)
@@ -675,8 +672,7 @@ module Make
       let config =
         Data_encoding.Json.destruct Filter.Mempool.config_encoding obj
       in
-      pv.filter_config <-
-        Protocol_hash.Map.add Proto.hash config pv.filter_config ;
+      pv.filter_config <- config ;
       return_unit
     with _ ->
       Event.(emit invalid_mempool_filter_configuration) () >>= fun () ->
@@ -1210,7 +1206,7 @@ module Make
           filter_config =
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/1725
                initialize from config file *)
-            Protocol_hash.Map.empty;
+            Filter.Mempool.default_config;
         }
       in
       Seq.iter_s
