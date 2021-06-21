@@ -82,6 +82,16 @@ type classification = {
   mutable in_mempool : Operation_hash.Set.t;
 }
 
+(** [clear classes] resets the state of all fields of [classes],
+ *  except for [refused] *)
+let clear (classes : classification) =
+  Ringo.Ring.clear classes.branch_refused.ring ;
+  classes.branch_refused.map <- Operation_hash.Map.empty ;
+  Ringo.Ring.clear classes.branch_delayed.ring ;
+  classes.branch_delayed.map <- Operation_hash.Map.empty ;
+  classes.applied <- [] ;
+  classes.in_mempool <- Operation_hash.Set.empty
+
 (** The type needed for the implementation of [Make] below, but
  *  which is independent from the protocol. *)
 type types_state_shell = {
@@ -1075,12 +1085,7 @@ module Make
       pv.shell.timestamp <- timestamp_system ;
       pv.shell.mempool <- {known_valid = []; pending = Operation_hash.Set.empty} ;
       pv.shell.pending <- pending ;
-      pv.shell.classification.in_mempool <- Operation_hash.Set.empty ;
-      Ringo.Ring.clear pv.shell.classification.branch_delayed.ring ;
-      pv.shell.classification.branch_delayed.map <- Operation_hash.Map.empty ;
-      Ringo.Ring.clear pv.shell.classification.branch_refused.ring ;
-      pv.shell.classification.branch_refused.map <- Operation_hash.Map.empty ;
-      pv.shell.classification.applied <- [] ;
+      clear pv.shell.classification ;
       pv.validation_state <- validation_state ;
       pv.operation_stream <- Lwt_watcher.create_input () ;
       return_unit
