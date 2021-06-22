@@ -76,16 +76,14 @@ module Test2 = struct
     let exception Test_failed in
     try
       ignore
-        ( time
-        @@ fun () ->
-        ignore @@ Inference.infer program ;
-        raise Test_failed )
+        ( time @@ fun () ->
+          ignore @@ Inference.infer program ;
+          raise Test_failed )
     with
     | Inference.Ill_typed_script error ->
         Format.printf "Error:\n" ;
         Format.printf "%a\n" Inference.pp_inference_error error
-    | Test_failed ->
-        Format.printf "No type error: Test failed!"
+    | Test_failed -> Format.printf "No type error: Test failed!"
 
   let _ = print_newline ()
 end
@@ -95,14 +93,16 @@ module Test3 = struct
 
   let program =
     seq
-      [ dip (seq [swap; dup]);
+      [
+        dip (seq [swap; dup]);
         swap;
         dip cdr;
         loop (seq [dip instr_hole; cdr; loop instr_hole]);
         car;
         car;
         push int_ty (Data.integer 10);
-        compare ]
+        compare;
+      ]
 
   let _ =
     Format.printf "Testing rewriting and type inference\n" ;
@@ -144,8 +144,7 @@ module Test3 = struct
       ignore
         ((let open Inference in
          let open M in
-         M.uf_lift Uf.UF.show
-         >>= fun uf_state ->
+         M.uf_lift Uf.UF.show >>= fun uf_state ->
          Inference.M.repr_lift (fun s -> (Inference.Repr_store.to_string s, s))
          >>= fun repr_state ->
          Printf.printf "uf_state:\n%s\n" uf_state ;
@@ -161,18 +160,15 @@ module Test3 = struct
            subterm ;
          Inference.M.annot_instr_lift (Inference.Annot_instr_sm.get path)
          >>= fun typ ->
-         ( match typ with
-         | None ->
-             assert false
+         (match typ with
+         | None -> assert false
          | Some {bef; aft} ->
-             Inference.instantiate bef
-             >>= fun bef ->
-             Inference.instantiate aft
-             >>= fun aft ->
+             Inference.instantiate bef >>= fun bef ->
+             Inference.instantiate aft >>= fun aft ->
              Format.printf "Type of subterm:\n" ;
              Format.printf "bef: %a@." Type.Stack.pp bef ;
              Format.printf "aft: %a@." Type.Stack.pp aft ;
-             return () )
+             return ())
          >>= fun () -> return ())
            state)
     with Inference.Ill_typed_script error ->
@@ -191,12 +187,14 @@ module Test4 = struct
 
   let program =
     seq
-      [ empty_set;
+      [
+        empty_set;
         push Type.(unopt (unparse_ty bool)) Data.true_;
         push
           Type.(unopt (unparse_ty (pair int int)))
           Data.(pair (integer 0) (integer 0));
-        update_set ]
+        update_set;
+      ]
 
   let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
 
@@ -218,12 +216,14 @@ module Test5 = struct
 
   let program =
     seq
-      [ empty_map;
+      [
+        empty_map;
         push Type.(unopt (unparse_ty (option (set int)))) Data.none;
         push
           Type.(unopt (unparse_ty (pair int int)))
           Data.(pair (integer 0) (integer 0));
-        update_map ]
+        update_map;
+      ]
 
   let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
 
@@ -239,16 +239,20 @@ module Test5 = struct
 
   let program =
     seq
-      [ push
+      [
+        push
           Type.(unopt (unparse_ty (map (pair int int) (set int))))
           Data.(
             map
-              [ map_elt
+              [
+                map_elt
                   (pair (integer 0) (integer 1))
                   (set [integer 42; integer 44]);
                 map_elt
                   (pair (integer 1) (integer 2))
-                  (set [integer 42; integer 48]) ]) ]
+                  (set [integer 42; integer 48]);
+              ]);
+      ]
 
   let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
 
@@ -292,7 +296,8 @@ module Test6 = struct
      expect the type inference to fail *)
   let program =
     seq
-      [ push int_ty (Data.integer 0);
+      [
+        push int_ty (Data.integer 0);
         push int_ty (Data.integer 100);
         swap;
         drop;
@@ -309,7 +314,8 @@ module Test6 = struct
          * abs;
          * drop; *)
         dip (prim I_CONCAT [] []);
-        compare ]
+        compare;
+      ]
 
   let () =
     Format.printf "Testing type inference\n" ;
@@ -333,12 +339,14 @@ module Test7 = struct
 
   let program =
     seq
-      [ push int_ty (Data.integer 42);
+      [
+        push int_ty (Data.integer 42);
         left;
         push string_ty (Data.string "forty-two");
         right;
         pair;
-        left ]
+        left;
+      ]
 
   let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
 
@@ -358,7 +366,8 @@ module Test8 = struct
 
   let program =
     seq
-      [ hole;
+      [
+        hole;
         add_ii;
         push int_ty (Data.big_integer (Z.of_int 100));
         abs;
@@ -381,7 +390,8 @@ module Test8 = struct
         drop;
         compare;
         mul_ii;
-        push_int ]
+        push_int;
+      ]
 
   let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
 
@@ -529,11 +539,13 @@ module Test16 = struct
 
   let program =
     seq
-      [ empty_set;
+      [
+        empty_set;
         push bool_ty Data.true_;
         push_int;
         update_set;
-        iter_set [dup; add_ii; add_ii] ]
+        iter_set [dup; add_ii; add_ii];
+      ]
 
   let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
 
@@ -553,16 +565,22 @@ module Test17 = struct
 
   let program =
     seq
-      [ empty_map;
+      [
+        empty_map;
         push (option_ty (list_ty bool_ty)) Data.(some (list [false_; true_]));
         push_int;
         update_map;
         map_map
-          [ cdr;
+          [
+            cdr;
             map_list
-              [ if_
+              [
+                if_
                   (seq [push bool_ty Data.false_])
-                  (seq [push bool_ty Data.true_]) ] ] ]
+                  (seq [push bool_ty Data.true_]);
+              ];
+          ];
+      ]
 
   let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
 
@@ -582,23 +600,29 @@ module Test18 = struct
 
   let program =
     seq
-      [ empty_map;
+      [
+        empty_map;
         push (option_ty (list_ty bool_ty)) Data.(some (list [false_; true_]));
         push_int;
         update_map;
         map_map
-          [ cdr;
+          [
+            cdr;
             map_list
-              [ if_
+              [
+                if_
                   (seq [push bool_ty Data.false_])
-                  (seq [push bool_ty Data.true_]) ] ];
+                  (seq [push bool_ty Data.true_]);
+              ];
+          ];
         dup;
         dip push_int;
         push_int;
         mem_map;
         if_
           (seq [get_map])
-          (seq [drop; drop; push (option_ty (list_ty bool_ty)) Data.none]) ]
+          (seq [drop; drop; push (option_ty (list_ty bool_ty)) Data.none]);
+      ]
 
   let (timing, (bef, aft)) = time @@ fun () -> Inference.infer program
 
