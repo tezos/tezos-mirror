@@ -611,7 +611,8 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
     aux ~prev_proto_level ~level:cycle_start []
   in
   (* Return the list of protocol activation blocks by iterating
-     through the cemented store.*)
+     through the cemented store. The elements of the returned list are
+     assumed to be consecutive and sorted in descending order.*)
   let rec cemented_search prev_proto_level protocols = function
     | [] -> return protocols
     | cycle :: higher_cycles -> (
@@ -666,8 +667,11 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
       >|=? WithExceptions.Option.get ~loc:__LOC__
       >>=? fun block -> return (Block_repr.proto_level block))
   >>=? fun highest_cemented_proto_level ->
-  (* Search protocol activation in the floating stores *)
   let floating_stores = Block_store.floating_block_stores block_store in
+  (* Search protocol activation in the floating stores by iterating
+     over RO and RW. The elements of the returned list are assumed to
+     be consecutive and sorted in ascending order (as floating_stores
+     = [RO;RW]). *)
   ( List.map_es
       (Floating_block_store.fold_left_s
          (fun (pls, previous_protocol_level) block ->
@@ -708,10 +712,7 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
          ([], highest_cemented_proto_level))
       floating_stores
   >|=? fun v -> List.flatten (List.map fst v) )
-  (* Assumption: Floating protocol levels is ordered asc. as
-     floating_stores = [RO;RW] *)
-  >>=?
-  fun floating_protocol_levels ->
+  >>=? fun floating_protocol_levels ->
   (* Add the genesis protocol *)
   let protocol = genesis.Genesis.protocol in
   (Context.retrieve_commit_info context_index genesis_header >>= function
