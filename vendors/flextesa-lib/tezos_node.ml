@@ -107,6 +107,8 @@ module Config_file = struct
         List.map ~f:RPC_server.Acl.matcher_to_string except
         @ [ "GET /chains/*/blocks/*/helpers/baking_rights"
           ; "GET /chains/*/blocks/*/helpers/endorsing_rights"
+          ; "GET /chains/*/blocks/*/helpers/proposers"
+          ; "GET /chains/*/blocks/*/helpers/validators"
           ; "GET /chains/*/blocks/*/helpers/levels_in_current_cycle"
           ; "POST /chains/*/blocks/*/helpers/forge/operations"
           ; "POST /chains/*/blocks/*/helpers/preapply/*"

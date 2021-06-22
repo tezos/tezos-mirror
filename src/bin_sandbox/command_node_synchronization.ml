@@ -112,16 +112,24 @@ let run state ~node_exec ~client_exec ~primary_history_mode
   | `Rolling _ ->
       let caboose_level = Jqo.(get_int @@ field ~k:"caboose" json) in
       if not (caboose_level > starting_level) then
-        fail
-          (`Scenario_error
-            "Caboose level is lower or equal to the starting level")
+        let msg =
+          sprintf
+            "Caboose level %d is lower or equal to starting level %d"
+            caboose_level
+            starting_level
+        in
+        fail (`Scenario_error msg)
       else return ()
   | `Full _ ->
       let save_point_level = Jqo.(get_int @@ field ~k:"savepoint" json) in
       if not (save_point_level > starting_level) then
-        fail
-          (`Scenario_error
-            "Save point level is lower or equal to the starting level")
+        let msg =
+          sprintf
+            "Save point level %d is lower or equal to starting level %d"
+            save_point_level
+            starting_level
+        in
+        fail (`Scenario_error msg)
       else return ())
   >>= fun () ->
   Helpers.restart_node ~client_exec state secondary_node >>= fun () ->

@@ -17,6 +17,10 @@ all: accusations_simple_double_endorsing \
 	daemons_upgrade_next \
 	daemons_upgrade_alpha
 
+# These are the targets that are actually run in ./.gitlab/ci/integration.yml
+ci: all
+
+
 # The following rules define how to build Tezos binaries if they are
 # missing.
 #
@@ -104,10 +108,17 @@ user_activated_upgrade_next: tezos-sandbox tezos-client tezos-node \
 	  --hard-fork-endorser ./tezos-endorser-${NEXT_PROTO} \
 	  --hard-fork-accuser ./tezos-accuser-${NEXT_PROTO}
 
+# The use --second-endorser ./tezos-baker-${ALPHA_PROTO} is a hack since there
+# is no endorser binary when Alpha is based on Tenderbake Since
+# user_activated_upgrade_* tests do not really use the endorsers but nonetheless
+# check the presence of the file, we can substitute it by another file that we
+# know to exist
+# The same hack is applied for the daemons_upgrade_alpha target
+# below
 .PHONY: user_activated_upgrade_alpha
 user_activated_upgrade_alpha: tezos-sandbox tezos-client tezos-node \
 	tezos-baker-${NEXT_PROTO} tezos-endorser-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO} \
-	tezos-baker-${ALPHA_PROTO} tezos-endorser-${ALPHA_PROTO} tezos-accuser-${ALPHA_PROTO}
+	tezos-baker-${ALPHA_PROTO} tezos-accuser-${ALPHA_PROTO}
 	./tezos-sandbox mini-net \
 	  --root-path ${TMP}/flextesa-hard-fork-alpha/ \
 	  --base-port 14_000 \
@@ -124,7 +135,7 @@ user_activated_upgrade_alpha: tezos-sandbox tezos-client tezos-node \
 	  --tezos-accuser ./tezos-accuser-${NEXT_PROTO} \
 	  --hard-fork 8:${ALPHA_PROTO_HASH} \
 	  --hard-fork-baker ./tezos-baker-${ALPHA_PROTO} \
-	  --hard-fork-endorser ./tezos-endorser-${ALPHA_PROTO} \
+	  --hard-fork-endorser ./tezos-baker-${ALPHA_PROTO} \
 	  --hard-fork-accuser ./tezos-accuser-${ALPHA_PROTO}
 
 .PHONY: daemons_upgrade_next
@@ -154,10 +165,11 @@ daemons_upgrade_next: tezos-sandbox tezos-client tezos-admin-client tezos-node \
 	  --second-endorser ./tezos-endorser-${NEXT_PROTO} \
 	  --second-accuser ./tezos-accuser-${NEXT_PROTO}
 
+# See above the reasoon for --second-endorser ./tezos-baker-${ALPHA_PROTO}
 .PHONY: daemons_upgrade_alpha
 daemons_upgrade_alpha: tezos-sandbox tezos-client tezos-admin-client tezos-node \
 	tezos-baker-${NEXT_PROTO} tezos-endorser-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO} \
-	tezos-baker-${ALPHA_PROTO} tezos-endorser-${ALPHA_PROTO} tezos-accuser-${ALPHA_PROTO}
+	tezos-baker-${ALPHA_PROTO} tezos-accuser-${ALPHA_PROTO}
 	./tezos-sandbox daemons-upgrade \
 	  src/proto_${subst -,_,${ALPHA_PROTO}}/lib_protocol/TEZOS_PROTOCOL \
 	  --root-path ${TMP}/flextesa-daemons-upgrade-alpha/ \
@@ -178,5 +190,5 @@ daemons_upgrade_alpha: tezos-sandbox tezos-client tezos-admin-client tezos-node 
 	  --first-endorser ./tezos-endorser-${NEXT_PROTO} \
 	  --first-accuser ./tezos-accuser-${NEXT_PROTO} \
 	  --second-baker ./tezos-baker-${ALPHA_PROTO} \
-	  --second-endorser ./tezos-endorser-${ALPHA_PROTO} \
+	  --second-endorser ./tezos-baker-${ALPHA_PROTO} \
 	  --second-accuser ./tezos-accuser-${ALPHA_PROTO}
