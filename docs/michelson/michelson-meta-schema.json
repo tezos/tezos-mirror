@@ -1,0 +1,139 @@
+{
+    "$schema": "http://json-schema.org/draft-06/schema#",
+    "$ref": "#/definitions/MichelsonLanguage",
+    "definitions": {
+        "MichelsonLanguage": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "protocols": {
+                    "$ref": "#/definitions/Protocols"
+                },
+                "categories": {
+                    "$ref": "#/definitions/Categories"
+                },
+                "instructions": {
+                    "$ref": "#/definitions/Instructions"
+                },
+                "types": {
+                    "$ref": "#/definitions/Types"
+                }
+            },
+            "required": [
+                "categories",
+                "instructions",
+                "types"
+            ],
+            "title": "MichelsonLanguage"
+        },
+        "Protocols": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "title": "Protocols"
+        },
+        "Categories": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "title": "Categories"
+        },
+        "Instructions": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/definitions/Instruction" },
+            "title": "Instruction"
+        },
+        "Types": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/definitions/Type" },
+            "title": "Types"
+        },
+        "Protocol": {"type": "string"},
+        "Instruction": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties" : {
+                "category": { "type" : "string" },
+                "documentation_short": { "type" : "string" },
+                "documentation": { "type": "string" },
+                "stack_effect": { "type": "string" },
+                "examples": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Example"
+                    }
+                },
+                "proposed-in": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Protocol"
+                    }
+                },
+                "since": { "$ref": "#/definitions/Protocol" }
+            },
+            "required": [
+                "category",
+                "documentation_short",
+                "proposed-in"
+            ]
+        },
+        "Example": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+                "path": {"type": "string"},
+                "ranges": {"type": "string"},
+                "input": {"type": "string"},
+                "initial_storage": {"type": "string"},
+                "final_storage": {"type": "string"},
+                "final_storage_pre": {"type": "string"},
+                "final_storage_post": {"type": "string"},
+                "hide_final_storage": {"type": "boolean"},
+                "client_run_script_params": {"type": "array"}
+            },
+            "required": [
+                "description",
+                "final_storage",
+                "initial_storage",
+                "input",
+                "path"
+            ]
+        },
+        "Type": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "documentation_short": { "type": "string" },
+                "documentation": { "type": "string" },
+                "proposed-in": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Protocol"
+                    }
+                },
+                "since": { "$ref": "#/definitions/Protocol" },
+                "comparable": { "type": "boolean" },
+                "passable": { "type": "boolean" },
+                "packable": { "type": "boolean" },
+                "pushable": { "type": "boolean" },
+                "unpackable": { "type": "boolean" },
+                "storable": { "type": "boolean" },
+                "duplicable": { "type": "boolean" },
+                "big_map_value": { "type": "boolean" },
+                "literal": { "type": "boolean" },
+                "examples": { "type": "array" },
+                "insertions": { "type": "array" }
+            },
+            "required": [
+                "documentation_short",
+                "proposed-in",
+                "comparable",
+                "pushable",
+                "passable",
+                "packable",
+                "storable",
+                "big_map_value"
+            ]
+        }
+    }
+}
