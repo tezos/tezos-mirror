@@ -1,0 +1,55 @@
+# CODEOWNERS
+
+# This file declares which users are qualified to review and approve changes to
+# specific files or paths in this repository. It helps contributors to identify
+# whom to consult for assistance on merge requests.
+
+# To understand the syntax and semantics of this file, see:
+#   https://docs.gitlab.com/ee/user/project/code_owners.html
+#
+# Note that rules defined later in the file take precedence over the rules
+# defined earlier.
+
+
+# ************************************
+# Insert code owner declarations here!
+# ************************************
+
+
+# Merge Team
+#
+# These users are, as members of the Merge Team, permitted to act as authorities on any code.
+#
+# @arvidnl = Arvid Jakobsson
+# @camlspotter = Jun Furuse
+# @igarnier = Ilias Garnier
+# @klakplok = Benjamin Canou
+# @mbouaziz = Mehdi Bouaziz
+# @murbard = Arthur B.
+# @NicVolanschi = Nic Volanschi
+# @paracetamolo = Marco Stronati
+# @pirbo = Pierre Boutillier
+# @pmetzger = Perry E. Metzger
+# @rafoo_ = Raphaël Cauderlier
+# @raphael-proust = Raphaël Proust
+# @romain.nl = Romain
+# @Saroupille = François Thiré
+# @Sir4ur0n = Julien Debon
+# @smelc = Clément Hurlin
+# @smondet = Seb Mondet
+# @sventimir = Sventimir
+# @tomjack = Tom Jack
+# @vbotbol = vbot
+# @yrg = Yann Regis-Gianas
+#
+* @arvidnl @camlspotter @igarnier @klakplok @mbouaziz @murbard @NicVolanschi @paracetamolo @pirbo @pmetzger @rafoo_ @raphael-proust @romain.nl @Saroupille @Sir4ur0n @smelc @smondet @sventimir @tomjack @vbotbol @yrg
+
+# CODEOWNERS Owners
+#
+# These users are authorized to change authorizations.
+#
+# Note that this stanza MUST appear LAST so that it takes precedence over prior rules.
+#
+/CODEOWNERS         @murbard @pmetzger @pirbo @smondet @klakplok @vbotbol @romain.nl
+/docs/CODEOWNERS    @murbard @pmetzger @pirbo @smondet @klakplok @vbotbol @romain.nl
+/.gitlab/CODEOWNERS @murbard @pmetzger @pirbo @smondet @klakplok @vbotbol @romain.nl
