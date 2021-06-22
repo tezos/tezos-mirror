@@ -55,8 +55,7 @@ module Base = struct
 
     let equal (t1 : t) (t2 : t) =
       match (t1, t2) with
-      | (Var_t v1, Var_t v2) ->
-          v1 = v2
+      | (Var_t v1, Var_t v2) -> v1 = v2
       | (Unit_t, Unit_t)
       | (Int_t, Int_t)
       | (Nat_t, Nat_t)
@@ -68,22 +67,17 @@ module Base = struct
       | (Mutez_t, Mutez_t)
       | (Key_t, Key_t) ->
           true
-      | (Option_t ty1, Option_t ty2) ->
-          ty1.tag = ty2.tag
-      | (Pair_t (l1, r1), Pair_t (l2, r2)) ->
-          l1.tag = l2.tag && r1.tag = r2.tag
+      | (Option_t ty1, Option_t ty2) -> ty1.tag = ty2.tag
+      | (Pair_t (l1, r1), Pair_t (l2, r2)) -> l1.tag = l2.tag && r1.tag = r2.tag
       | (Union_t (l1, r1), Union_t (l2, r2)) ->
           l1.tag = l2.tag && r1.tag = r2.tag
-      | (List_t ty1, List_t ty2) ->
-          ty1.tag = ty2.tag
-      | (Set_t ty1, Set_t ty2) ->
-          ty1.tag = ty2.tag
+      | (List_t ty1, List_t ty2) -> ty1.tag = ty2.tag
+      | (Set_t ty1, Set_t ty2) -> ty1.tag = ty2.tag
       | (Map_t (kty1, vty1), Map_t (kty2, vty2)) ->
           kty1.tag = kty2.tag && vty1.tag = vty2.tag
       | (Lambda_t (dom1, range1), Lambda_t (dom2, range2)) ->
           dom1.tag = dom2.tag && range1.tag = range2.tag
-      | _ ->
-          false
+      | _ -> false
 
     let hash (t : t) = Hashtbl.hash t
   end
@@ -94,66 +88,36 @@ module Base = struct
 
   let rec pp fmtr x =
     match x.Hashcons.node with
-    | Unit_t ->
-        Format.pp_print_string fmtr "unit"
-    | Var_t v ->
-        Format.fprintf fmtr "%d" v
-    | Int_t ->
-        Format.pp_print_string fmtr "int"
-    | Nat_t ->
-        Format.pp_print_string fmtr "nat"
-    | Bool_t ->
-        Format.pp_print_string fmtr "bool"
-    | String_t ->
-        Format.pp_print_string fmtr "string"
-    | Bytes_t ->
-        Format.pp_print_string fmtr "bytes"
-    | Key_hash_t ->
-        Format.pp_print_string fmtr "key_hash"
-    | Timestamp_t ->
-        Format.pp_print_string fmtr "timestamp"
-    | Mutez_t ->
-        Format.pp_print_string fmtr "mutez"
-    | Key_t ->
-        Format.pp_print_string fmtr "key"
-    | Option_t ty ->
-        Format.fprintf fmtr "(option %a)" pp ty
-    | List_t ty ->
-        Format.fprintf fmtr "(list %a)" pp ty
-    | Pair_t (lty, rty) ->
-        Format.fprintf fmtr "(pair %a %a)" pp lty pp rty
-    | Union_t (lty, rty) ->
-        Format.fprintf fmtr "(union %a %a)" pp lty pp rty
-    | Set_t ty ->
-        Format.fprintf fmtr "(set %a)" pp ty
-    | Map_t (kty, vty) ->
-        Format.fprintf fmtr "(map %a %a)" pp kty pp vty
+    | Unit_t -> Format.pp_print_string fmtr "unit"
+    | Var_t v -> Format.fprintf fmtr "%d" v
+    | Int_t -> Format.pp_print_string fmtr "int"
+    | Nat_t -> Format.pp_print_string fmtr "nat"
+    | Bool_t -> Format.pp_print_string fmtr "bool"
+    | String_t -> Format.pp_print_string fmtr "string"
+    | Bytes_t -> Format.pp_print_string fmtr "bytes"
+    | Key_hash_t -> Format.pp_print_string fmtr "key_hash"
+    | Timestamp_t -> Format.pp_print_string fmtr "timestamp"
+    | Mutez_t -> Format.pp_print_string fmtr "mutez"
+    | Key_t -> Format.pp_print_string fmtr "key"
+    | Option_t ty -> Format.fprintf fmtr "(option %a)" pp ty
+    | List_t ty -> Format.fprintf fmtr "(list %a)" pp ty
+    | Pair_t (lty, rty) -> Format.fprintf fmtr "(pair %a %a)" pp lty pp rty
+    | Union_t (lty, rty) -> Format.fprintf fmtr "(union %a %a)" pp lty pp rty
+    | Set_t ty -> Format.fprintf fmtr "(set %a)" pp ty
+    | Map_t (kty, vty) -> Format.fprintf fmtr "(map %a %a)" pp kty pp vty
     | Lambda_t (dom, range) ->
         Format.fprintf fmtr "(lambda %a %a)" pp dom pp range
 
   let rec vars x acc =
     match x.Hashcons.node with
-    | Unit_t
-    | Int_t
-    | Nat_t
-    | Bool_t
-    | String_t
-    | Bytes_t
-    | Key_hash_t
-    | Timestamp_t
-    | Mutez_t
-    | Key_t ->
+    | Unit_t | Int_t | Nat_t | Bool_t | String_t | Bytes_t | Key_hash_t
+    | Timestamp_t | Mutez_t | Key_t ->
         acc
-    | Var_t v ->
-        v :: acc
-    | Option_t ty | List_t ty | Set_t ty ->
-        vars ty acc
-    | Pair_t (lty, rty) | Union_t (lty, rty) ->
-        vars lty (vars rty acc)
-    | Map_t (kty, vty) ->
-        vars kty (vars vty acc)
-    | Lambda_t (dom, range) ->
-        vars dom (vars range acc)
+    | Var_t v -> v :: acc
+    | Option_t ty | List_t ty | Set_t ty -> vars ty acc
+    | Pair_t (lty, rty) | Union_t (lty, rty) -> vars lty (vars rty acc)
+    | Map_t (kty, vty) -> vars kty (vars vty acc)
+    | Lambda_t (dom, range) -> vars dom (vars range acc)
 
   let vars x = vars x []
 end
@@ -168,14 +132,10 @@ module Stack = struct
 
     let equal (t1 : t) (t2 : t) =
       match (t1, t2) with
-      | (Empty_t, Empty_t) ->
-          true
-      | (Stack_var_t v1, Stack_var_t v2) ->
-          v1 = v2
-      | (Item_t (h1, tl1), Item_t (h2, tl2)) ->
-          h1 == h2 && tl1 == tl2
-      | _ ->
-          false
+      | (Empty_t, Empty_t) -> true
+      | (Stack_var_t v1, Stack_var_t v2) -> v1 = v2
+      | (Item_t (h1, tl1), Item_t (h2, tl2)) -> h1 == h2 && tl1 == tl2
+      | _ -> false
 
     let hash (t : t) = Hashtbl.hash t
   end
@@ -186,21 +146,15 @@ module Stack = struct
 
   let rec pp fmtr x =
     match x.Hashcons.node with
-    | Empty_t ->
-        Format.pp_print_string fmtr "[]"
-    | Stack_var_t v ->
-        Format.fprintf fmtr "<%d>" v
-    | Item_t (head, tail) ->
-        Format.fprintf fmtr "%a :: %a" Base.pp head pp tail
+    | Empty_t -> Format.pp_print_string fmtr "[]"
+    | Stack_var_t v -> Format.fprintf fmtr "<%d>" v
+    | Item_t (head, tail) -> Format.fprintf fmtr "%a :: %a" Base.pp head pp tail
 
   let rec vars x =
     match x.Hashcons.node with
-    | Empty_t ->
-        None
-    | Stack_var_t v ->
-        Some v
-    | Item_t (_head, tail) ->
-        vars tail
+    | Empty_t -> None
+    | Stack_var_t v -> Some v
+    | Item_t (_head, tail) -> vars tail
 end
 
 let unit = Base.Table.hashcons Base.table Unit_t
