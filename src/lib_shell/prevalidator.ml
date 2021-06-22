@@ -456,8 +456,7 @@ module Make
           (List.fold_left_s (fun mempool op ->
                let h = Operation.hash op in
                Distributed_db.inject_operation chain_db h op
-               >>= fun (_ : bool) ->
-               Lwt.return (Operation_hash.Map.add h op mempool)))
+               >|= fun (_ : bool) -> Operation_hash.Map.add h op mempool))
           mempool
           operations
         >>= fun mempool ->
@@ -1025,8 +1024,8 @@ module Make
       if already_handled pv.shell oph then return_unit
         (* FIXME : is this an error ? *)
       else
-        Lwt.return pv.validation_state >>=? fun validation_state ->
-        Lwt.return (Prevalidation.parse op) >>=? fun parsed_op ->
+        pv.validation_state >>?= fun validation_state ->
+        Prevalidation.parse op >>?= fun parsed_op ->
         Prevalidation.apply_operation validation_state parsed_op >>= function
         | Applied (_, _result) ->
             Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
@@ -1236,12 +1235,12 @@ module Make
   let fitness () =
     let w = Lazy.force worker in
     let pv = Worker.state w in
-    ( Lwt.return pv.validation_state >>=? fun state ->
+    ( pv.validation_state >>?= fun state ->
       Prevalidation.status state >>=? fun status ->
       return status.block_result.fitness )
-    >>= function
-    | Ok fitness -> Lwt.return fitness
-    | Error _ -> Lwt.return (Store.Block.fitness pv.shell.predecessor)
+    >|= function
+    | Ok fitness -> fitness
+    | Error _ -> Store.Block.fitness pv.shell.predecessor
 end
 
 module ChainProto_registry = Map.Make (struct
