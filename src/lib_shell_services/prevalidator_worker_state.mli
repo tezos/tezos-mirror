@@ -52,6 +52,7 @@ module Event : sig
     | Fetching_operation of Operation_hash.t
     | Operation_included of Operation_hash.t
     | Operations_not_flushed of int
+    | Operation_not_fetched of Operation_hash.t
 
   type view = t
 

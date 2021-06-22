@@ -132,6 +132,7 @@ module Event = struct
     | Fetching_operation of Operation_hash.t
     | Operation_included of Operation_hash.t
     | Operations_not_flushed of int
+    | Operation_not_fetched of Operation_hash.t
 
   type view = t
 
@@ -148,7 +149,7 @@ module Event = struct
     | Request (View Advertise, _, _) -> Internal_event.Debug
     | Invalid_mempool_filter_configuration | Unparsable_operation _
     | Processing_n_operations _ | Fetching_operation _ | Operation_included _
-    | Operations_not_flushed _ ->
+    | Operations_not_flushed _ | Operation_not_fetched _ ->
         Internal_event.Debug
 
   let encoding =
@@ -196,7 +197,7 @@ module Event = struct
         case
           (Tag 5)
           ~title:"fetching_operation"
-          Operation_hash.encoding
+          (obj1 (req "fetching_operation" Operation_hash.encoding))
           (function Fetching_operation oph -> Some oph | _ -> None)
           (fun oph -> Fetching_operation oph);
         case
@@ -211,6 +212,12 @@ module Event = struct
           int31
           (function Operations_not_flushed n -> Some n | _ -> None)
           (fun n -> Operations_not_flushed n);
+        case
+          (Tag 8)
+          ~title:"operation_not_fetched"
+          (obj1 (req "operation_not_fetched" Operation_hash.encoding))
+          (function Operation_not_fetched oph -> Some oph | _ -> None)
+          (fun oph -> Operation_not_fetched oph);
       ]
 
   let pp ppf = function
@@ -248,6 +255,8 @@ module Event = struct
           {pushed; treated; completed}
           (Format.pp_print_list Error_monad.pp)
           errors
+    | Operation_not_fetched oph ->
+        Format.fprintf ppf "operation %a was not fetched" Operation_hash.pp oph
 end
 
 module Worker_state = struct
