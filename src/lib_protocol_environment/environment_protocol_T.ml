@@ -77,6 +77,7 @@ module V0toV3
   include E
 
   (* Add backwards compatibility shadowing here *)
+  let relative_position_within_block = compare_operations
 end
 
 (* [module type PROTOCOL] is protocol signature that the shell can use*)

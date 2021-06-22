@@ -350,7 +350,7 @@ let finalize_block
       let ctxt = Alpha_context.finalize ~commit_message ctxt in
       (ctxt, receipt)
 
-let compare_operations op1 op2 =
+let relative_position_within_block op1 op2 =
   let open Alpha_context in
   let (Operation_data op1) = op1.protocol_data in
   let (Operation_data op2) = op2.protocol_data in

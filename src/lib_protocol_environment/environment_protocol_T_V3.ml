@@ -75,7 +75,7 @@ module type T = sig
 
   val acceptable_passes : operation -> int list
 
-  val compare_operations : operation -> operation -> int
+  val relative_position_within_block : operation -> operation -> int
 
   type validation_state
 
