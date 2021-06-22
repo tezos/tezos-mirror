@@ -145,12 +145,7 @@ let add_input diff vk index position sum state =
       (Tezos_sapling.Core.Client.DH.esk_random ())
   in
   let nf =
-    Tezos_sapling.Core.Client.Nullifier.compute
-      address
-      vk
-      ~amount
-      rcm
-      ~position
+    Tezos_sapling.Core.Client.Nullifier.compute address vk ~amount rcm ~position
   in
   let diff =
     Protocol.Sapling_repr.
@@ -178,8 +173,7 @@ let generate_commitments ~vk ~nb_input ~nb_cm ~nb_nf ~diff ~index state =
       add_input diff vk cm_index (Int64.of_int i) sum state
       >>=? fun (diff, {nf; _}, next_index) ->
       (* can we use a nullifier? *)
-      if nb_nf = 0 then
-        (* No. *)
+      if nb_nf = 0 then (* No. *)
         loop (i + 1) next_index nb_nf diff to_forge sum
       else
         (* Yes! Grab it. *)
@@ -251,8 +245,7 @@ let output proving_ctx vk sum =
 let outputs nb_output proving_ctx vk =
   let rec aux output_amount list_outputs nb_output sum =
     match nb_output with
-    | 0 ->
-        (output_amount, list_outputs)
+    | 0 -> (output_amount, list_outputs)
     | nb_output ->
         let (output, amount) = output proving_ctx vk sum in
         assert (
@@ -261,7 +254,7 @@ let outputs nb_output proving_ctx vk =
             (Int64.sub
                Int64.max_int
                Tezos_sapling.Core.Validator.UTXO.max_amount)
-          < 0 ) ;
+          < 0) ;
         aux
           (Int64.add output_amount amount)
           (output :: list_outputs)
@@ -323,16 +316,15 @@ let generate_spending_and_viewing_keys state =
 
 let prepare_seeded_state_internal ~(nb_input : int) ~(nb_nf : int)
     ~(nb_cm : int) (ctxt : Raw_context.t) (state : Random.State.t) :
-    ( Sapling_repr.diff
+    (Sapling_repr.diff
     * forge_info list
     * Tezos_sapling.Core.Client.Spending_key.t
     * Tezos_sapling.Core.Client.Viewing_key.t
     * Raw_context.t
-    * Protocol.Lazy_storage_kind.Sapling_state.Id.t )
+    * Protocol.Lazy_storage_kind.Sapling_state.Id.t)
     tzresult
     Lwt.t =
-  init_fresh_sapling_state ctxt
-  >|= Protocol.Environment.wrap_tzresult
+  init_fresh_sapling_state ctxt >|= Protocol.Environment.wrap_tzresult
   >>=? fun (ctxt, id) ->
   let index_start = Tezos_sapling.Core.Client.Viewing_key.default_index in
   let (sk, vk) = generate_spending_and_viewing_keys state in
@@ -360,8 +352,7 @@ let prepare_seeded_state
     rng_state
   >>=? fun (diff, forge_info, spending_key, viewing_key, raw_ctxt, raw_id) ->
   let id = Protocol.Lazy_storage_kind.Sapling_state.Id.unparse_to_z raw_id in
-  return
-    (diff, forge_info, spending_key, viewing_key, raw_to_alpha raw_ctxt, id)
+  return (diff, forge_info, spending_key, viewing_key, raw_to_alpha raw_ctxt, id)
 
 let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
     ~(anti_replay : string) ~ctxt state =
@@ -384,7 +375,7 @@ let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
                 (Int64.sub
                    Int64.max_int
                    Tezos_sapling.Core.Validator.UTXO.max_amount)
-              < 0 ) ;
+              < 0) ;
             Int64.add sum amount)
           0L
           to_forge
@@ -435,31 +426,29 @@ let save ~filename ~txs =
           Data_encoding.Binary.pp_write_error
           err ;
         exit 1
-    | Ok res ->
-        res
+    | Ok res -> res
   in
   ignore (* TODO handle error *)
-    ( Lwt_main.run
+    (Lwt_main.run
     @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file
          filename
-         (Bytes.unsafe_to_string bytes) )
+         (Bytes.unsafe_to_string bytes))
 
 let load_file filename =
   Lwt_main.run
-  @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename
-     >>= fun str ->
-     Format.eprintf "Sapling_generation.load: loaded %s@." filename ;
-     let bytes = Bytes.unsafe_of_string str in
-     match Data_encoding.Binary.of_bytes sapling_dataset_encoding bytes with
-     | Ok result ->
-         let result = List.map (fun tx -> (filename, tx)) result in
-         Lwt.return result
-     | Error err ->
-         Format.eprintf
-           "Sapling_generation.load: can't load file (%a); exiting"
-           Data_encoding.Binary.pp_read_error
-           err ;
-         exit 1 )
+  @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename >>= fun str ->
+       Format.eprintf "Sapling_generation.load: loaded %s@." filename ;
+       let bytes = Bytes.unsafe_of_string str in
+       match Data_encoding.Binary.of_bytes sapling_dataset_encoding bytes with
+       | Ok result ->
+           let result = List.map (fun tx -> (filename, tx)) result in
+           Lwt.return result
+       | Error err ->
+           Format.eprintf
+             "Sapling_generation.load: can't load file (%a); exiting"
+             Data_encoding.Binary.pp_read_error
+             err ;
+           exit 1 )
 
 let get_all_sapling_data_files directory =
   let is_sapling_data file =
@@ -470,17 +459,17 @@ let get_all_sapling_data_files directory =
   let handle = Unix.opendir directory in
   let rec loop acc =
     match Unix.readdir handle with
-    | file ->
-        if is_sapling_data file then loop (lift file :: acc) else loop acc
+    | file -> if is_sapling_data file then loop (lift file :: acc) else loop acc
     | exception End_of_file ->
-        Unix.closedir handle ; acc
+        Unix.closedir handle ;
+        acc
   in
   loop []
 
 let load ~filename =
   if not (Sys.file_exists filename) then (
     Format.eprintf "Sapling_generation.load: file does not exist@." ;
-    Stdlib.failwith "Sapling_generation.load" )
+    Stdlib.failwith "Sapling_generation.load")
   else if Sys.is_directory filename then
     let () =
       Format.eprintf
@@ -498,11 +487,13 @@ let generate (save_to : string) (tx_count : int)
     (sapling_gen_options : sapling_gen_options) =
   let result =
     Lwt_main.run
-      (let { max_inputs;
-             max_outputs;
-             max_nullifiers;
-             max_additional_commitments;
-             seed } =
+      (let {
+         max_inputs;
+         max_outputs;
+         max_nullifiers;
+         max_additional_commitments;
+         seed;
+       } =
          sapling_gen_options
        in
        let rng_state =
@@ -511,26 +502,22 @@ let generate (save_to : string) (tx_count : int)
          Random.State.make
          @@ Option.fold ~none:shared_seed ~some:(fun seed -> [|seed|]) seed
        in
-       Execution_context.make ~rng_state
-       >>=? fun (ctxt, step_constants) ->
+       Execution_context.make ~rng_state >>=? fun (ctxt, step_constants) ->
        let address = Alpha_context.Contract.to_b58check step_constants.self in
        let chain_id =
          Environment.Chain_id.to_b58check step_constants.chain_id
        in
        let anti_replay = address ^ chain_id in
        let ctxt = alpha_to_raw ctxt in
-       ( match sapling_gen_options.seed with
-       | None ->
-           Random.self_init ()
-       | Some seed ->
-           Random.init seed ) ;
+       (match sapling_gen_options.seed with
+       | None -> Random.self_init ()
+       | Some seed -> Random.init seed) ;
        let seeds =
          Stdlib.List.init tx_count (fun i -> (i, Random.int 0x3FFFFFFF))
        in
        let rec loop seeds acc =
          match seeds with
-         | [] ->
-             return acc
+         | [] -> return acc
          | (i, seed) :: tl ->
              let nb_input = 1 + Random.int max_inputs in
              let nb_output = 1 + Random.int max_outputs in
