@@ -31,25 +31,37 @@ let rec document = {title = "test"; sections = [section]}
 and section = Section ("section 1", contents)
 
 and contents =
-  [ Text
-      [ Text_blob (Normal, "Ceci est un morceau de maths:");
-        Inline_math_blob "3 \\times x + 2" ];
+  [
+    Text
+      [
+        Text_blob (Normal, "Ceci est un morceau de maths:");
+        Inline_math_blob "3 \\times x + 2";
+      ];
     Figure ([], {filename = "lol.png"; size = Some (Width_cm 17)});
-    table ]
+    table;
+  ]
 
 and table =
   let spec = [Vbar; L; Vbar; L; Vbar] in
   let rows =
-    [ Hline;
+    [
+      Hline;
       Row
-        [ [Text_blob (Normal, "Model name:")];
-          [Text_blob (Normal, "timer\\_ir\\_model")] ];
+        [
+          [Text_blob (Normal, "Model name:")];
+          [Text_blob (Normal, "timer\\_ir\\_model")];
+        ];
       Row [[Text_blob (Normal, "Benchmark name:")]; [Text_blob (Normal, "ABS")]];
       Row
-        [ [Text_blob (Normal, "Model:")];
-          [ Inline_math_blob
-              "N\\_Abs\\_int1 \\times size + N\\_Abs\\_int\\_const" ] ];
-      Hline ]
+        [
+          [Text_blob (Normal, "Model:")];
+          [
+            Inline_math_blob
+              "N\\_Abs\\_int1 \\times size + N\\_Abs\\_int\\_const";
+          ];
+        ];
+      Hline;
+    ]
   in
   Table (spec, rows)
 
