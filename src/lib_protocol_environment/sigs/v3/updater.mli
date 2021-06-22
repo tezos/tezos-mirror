@@ -71,14 +71,14 @@ module type PROTOCOL = sig
   (** The maximum size of an operation in bytes. *)
   val max_operation_data_length : int
 
-  (** The number of validation passes (length of the list) and the
-      operation's quota for each pass. *)
+  (** Operations quota for each validation pass. The length of the
+     list denotes the number of validation passes. *)
   val validation_passes : quota list
 
-  (** The version specific type of blocks. *)
+  (** The version-specific type of blocks. *)
   type block_header_data
 
-  (** Encoding for version specific part of block headers.  *)
+  (** Encoding for version-specific part of block headers.  *)
   val block_header_data_encoding : block_header_data Data_encoding.t
 
   (** A fully parsed block header. *)
@@ -88,16 +88,16 @@ module type PROTOCOL = sig
   }
 
   (** Version-specific side information computed by the protocol
-      during the validation of a block. Should not include information
-      about the evaluation of operations which is handled separately by
-      {!operation_metadata}. To be used as an execution trace by tools
-      (client, indexer). Not necessary for validation. *)
+     during the validation of a block. Should not include information
+     about the evaluation of operations which is handled separately by
+     {!operation_metadata}. To be used as an execution trace by tools
+     (client, indexer). Not necessary for validation. *)
   type block_header_metadata
 
   (** Encoding for version-specific block metadata. *)
   val block_header_metadata_encoding : block_header_metadata Data_encoding.t
 
-  (** The version specific type of operations. *)
+  (** The version-specific type of operations. *)
   type operation_data
 
   (** Version-specific side information computed by the protocol
@@ -121,45 +121,61 @@ module type PROTOCOL = sig
   val operation_data_and_receipt_encoding :
     (operation_data * operation_receipt) Data_encoding.t
 
-  (** The Validation passes in which an operation can appear.
-      For instance [[0]] if it only belongs to the first pass.
-      An answer of [[]] means that the operation is ill-formed
-      and cannot be included at all. *)
+  (** [acceptable_passes op] lists the validation passes in which the
+     input operation [op] can appear. For instance, it results in
+     [[0]] if [op] only belongs to the first pass. An answer of [[]]
+     means that the [op] is ill-formed and cannot be included at
+     all in a block. *)
   val acceptable_passes : operation -> int list
 
-  (** {!relative_position_within_block} is intended for use with
-      {!List.sort} (and other sorting/ordering functions) to arrange a set of
-      operations into a sequence, the order of which is valid for the protocol.
+  (** [relative_position_within_block op1 op2] provides a partial and
+     strict order of operations within a block. It is intended to be
+     used as an argument to {!List.sort} (and other sorting/ordering
+     functions) to arrange a set of operations into a sequence, the
+     order of which is valid for the protocol.
 
-      This function does not provide a total ordering on the operations. E.g.,
-      [relative_position_within_block o1 o2 = 0] does NOT imply that [o1] is
-      equal to [o2] in any way.
-      Consequently, it {e MUST NOT} be used as a [compare] component of an
-      {!Stdlib.Map.OrderedType}. *)
+     A negative (respectively, positive) results means that [op1]
+     should appear before (and, respectively, after) [op2] in a
+     block. This function does not provide a total ordering on the
+     operations: a result of [0] entails that the protocol does not
+     impose any preferences to the order in which [op1] and [op2]
+     should be included in a block.
+
+     {b Caveat Emptor!} [relative_position_within_block o1 o2 = 0]
+     does NOT imply that [o1] is equal to [o2] in any way.
+     Consequently, it {e MUST NOT} be used as a [compare] component of
+     an {!Stdlib.Map.OrderedType}, or any such collection which relies
+     on a total comparison function. *)
   val relative_position_within_block : operation -> operation -> int
 
   (** A functional state that is transmitted through the steps of a
-      block validation sequence. It must retain the current state of
-      the store (that can be extracted from the outside using
-      {!current_context}, and whose final value is produced by
-      {!finalize_block}). It can also contain the information that
-      must be remembered during the validation, which must be
-      immutable (as validator or baker implementations are allowed to
-      pause, replay or backtrack during the validation process). *)
+     block validation sequence: it can be created by any of the
+     [begin_x] functions below, and its final value is produced by
+     {!finalize_block}. It must retain the current state of the store
+     -- which can be extracted from the outside using
+     {!current_context} --, and it can also contain additional
+     information that must be remembered during the validation
+     process. Said extra content must however be immutable: validator
+     or baker implementations are allowed to pause, replay or
+     backtrack throughout validation steps. *)
   type validation_state
 
-  (** Access the context at a given validation step. *)
+  (** [current_contexts vs] accesses the context at the given
+     validation state [vs]. It allows for querying the context in
+     between validation steps. *)
   val current_context : validation_state -> Context.t tzresult Lwt.t
 
-  (** Checks that a block is well formed in a given context. This
-      function should run quickly, as its main use is to reject bad
-      blocks from the chain as early as possible. The input context
-      is the one resulting of an ancestor block of same protocol
-      version. This ancestor of the current head is guaranteed to be
-      more recent than `last_allowed_fork_level`.
+  (** [begin_partial_application cid ctxt] checks that a block is
+     well-formed in a given context. This function should run quickly,
+     as its main use is to reject bad blocks from the chain as early
+     as possible. The input [ancestor_context] is expected to result
+     from the application of an ancestor block of the current head
+     with the same economic protocol. Said ancestor block is also
+     required to be more recent (i.e., it has a greater level), than
+     the current head's "last_allowed_fork_level".
 
       The resulting `validation_state` will be used for multi-pass
-      validation. *)
+     validation. *)
   val begin_partial_application :
     chain_id:Chain_id.t ->
     ancestor_context:Context.t ->
@@ -168,12 +184,9 @@ module type PROTOCOL = sig
     block_header ->
     validation_state tzresult Lwt.t
 
-  (** The first step in a block validation sequence. Initializes a
-      validation context for validating a block. Takes as argument the
-      {!Block_header.t} to initialize the context for this block. The
-      function {!precheck_block} may not have been called before
-      [begin_application], so all the check performed by the former
-      must be repeated in the latter. *)
+  (** [begin_application chain_id ... bh] defines the first step in a
+     block validation sequence. It initializes a validation context
+     for validating a block, whose header is [bh]. *)
   val begin_application :
     chain_id:Chain_id.t ->
     predecessor_context:Context.t ->
@@ -182,15 +195,15 @@ module type PROTOCOL = sig
     block_header ->
     validation_state tzresult Lwt.t
 
-  (** Initializes a validation context for constructing a new block
-      (as opposed to validating an existing block). When the
-      [protocol_data] argument is specified, it should contains a
-      'prototype' of a the protocol specific part of a block header,
-      and the function should produce the exact same effect on the
-      context than would produce the validation of a block containing
-      an "equivalent" (but complete) header. For instance, if the
-      block header usually includes a signature, the header provided
-      to {!begin_construction} should includes a faked signature. *)
+  (** [begin_construction] initializes a validation context for
+     constructing a new block (as opposed to validating an existing
+     block). When the [protocol_data] argument is specified, it should
+     contain a 'prototype' of the protocol-specific part of a block
+     header, and the function should produce the exact same effect on
+     the context as the validation of a block containing an
+     "equivalent" (but complete) header. For instance, if the block
+     header usually includes a signature, the header provided to
+     {!begin_construction} should include a faked signature. *)
   val begin_construction :
     chain_id:Chain_id.t ->
     predecessor_context:Context.t ->
@@ -203,33 +216,43 @@ module type PROTOCOL = sig
     unit ->
     validation_state tzresult Lwt.t
 
-  (** Called after {!begin_application} (or {!begin_construction}) and
-      before {!finalize_block}, with each operation in the block. *)
+  (** [apply_operation vs op] applies the input operation [op] on top
+     of the given {!validation_state} [vs]. It must be called after
+     {!begin_application} or {!begin_construction}, and before
+     {!finalize_block}, for each operation in a block. On a successful
+     application, it returns a pair consisting of the resulting
+     [validation_state], and the corresponding [operation_receipt]. *)
   val apply_operation :
     validation_state ->
     operation ->
     (validation_state * operation_receipt) tzresult Lwt.t
 
-  (** The last step in a block validation sequence. It produces the
-      context that will be used as input for the validation of its
-      successor block candidates. *)
+  (** [finalize_block vs] implements the last validation step in a
+     block validation sequence. A successful call produces the context
+     that will be used as input for the validation of its successor
+     block candidates. *)
   val finalize_block :
     validation_state ->
     (validation_result * block_header_metadata) tzresult Lwt.t
 
-  (** The list of remote procedures exported by this implementation *)
+  (** [rpc_services] provides the list of remote procedures exported
+     by this protocol implementation. *)
   val rpc_services : rpc_context RPC_directory.t
 
-  (** Initialize the context (or upgrade the context after a protocol
-      amendment). This function receives the context resulting of the
-      application of a block that triggered the amendment. It also
-      receives the header of the block that triggered the amendment. *)
+  (** [init ctxt hd] initializes the context, or upgrades the context
+     after a protocol amendment. This function receives as arguments
+     the context [ctxt] resulting from the application of the block
+     that triggered the amendment, as well as its header [hd]. This
+     function should fail if the "protocol stitching", i.e., the
+     transition from a valid previous protocol to the one being
+     activated, has not been implemented. *)
   val init :
     Context.t -> Block_header.shell_header -> validation_result tzresult Lwt.t
 end
 
-(** Activates a given protocol version from a given context. This
-    means that the context used for the next block will use this
-    version (this is not an immediate change). The version must have
-    been previously compiled successfully. *)
+(** [activate ctxt ph] activates an economic protocol version, given
+   by its hash [ph], from a given context [ctxt]. This means that the
+   context used for the next block will use the input protocol version
+   (this is not an immediate change). The protocol must have been
+   previously compiled successfully. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
