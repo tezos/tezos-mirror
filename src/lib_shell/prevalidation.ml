@@ -63,6 +63,23 @@ module Classification = struct
     classes.in_mempool <- Operation_hash.Set.empty
 end
 
+module Requester :
+  Requester.REQUESTER
+    with type t = Distributed_db.chain_db
+     and type key = Operation_hash.t
+     and type value = Operation.t
+     and type param = unit = struct
+  type t = Distributed_db.chain_db
+
+  type key = Operation_hash.t
+
+  type value = Operation.t
+
+  type param = unit
+
+  include Distributed_db.Operation
+end
+
 open Validation_errors
 
 module type T = sig

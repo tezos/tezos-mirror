@@ -367,8 +367,12 @@ type t = (module T)
 module Make
     (Filter : Prevalidator_filters.FILTER)
     (Arg : ARG)
-    (Notifier : NOTIFIER with type operation_data = Filter.Proto.operation_data) :
-  T = struct
+    (Notifier : NOTIFIER with type operation_data = Filter.Proto.operation_data)
+    (Requester : Requester.REQUESTER
+                   with type t = Distributed_db.chain_db
+                    and type key = Operation_hash.t
+                    and type value = Operation.t
+                    and type param = unit) : T = struct
   module Filter = Filter
   module Proto = Filter.Proto
 
@@ -563,23 +567,6 @@ module Make
   module Proto_classification_applier :
     CLASSIFICATION_APPLIER with type input = types_state = struct
     type input = types_state
-
-    module Requester :
-      Requester.REQUESTER
-        with type t = Distributed_db.chain_db
-         and type key = Operation_hash.t
-         and type value = Operation.t
-         and type param = unit = struct
-      type t = Distributed_db.chain_db
-
-      type key = Operation_hash.t
-
-      type value = Operation.t
-
-      type param = unit
-
-      include Distributed_db.Operation
-    end
 
     module Classification_applier = Classification_applier (Requester)
 
@@ -1273,6 +1260,7 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
             let chain_id = chain_id
           end)
           (Notifier)
+          (Prevalidation.Requester)
       in
       (* Checking initialization errors before giving a reference to dangerous
        * `worker` value to caller. *)

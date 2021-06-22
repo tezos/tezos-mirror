@@ -55,6 +55,14 @@ module Classification : sig
   val clear : t -> unit
 end
 
+(** The requester used by [Prevalidator], backed by [Distributed_db]. *)
+module Requester :
+  Requester.REQUESTER
+    with type t = Distributed_db.chain_db
+     and type key = Operation_hash.t
+     and type value = Operation.t
+     and type param = unit
+
 module type T = sig
   module Proto : Tezos_protocol_environment.PROTOCOL
 
