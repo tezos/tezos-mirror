@@ -6,6 +6,7 @@ coq:lint:
     # provides this
     - dune build @src/proto_alpha/lib_protocol/check
     - cd src/proto_alpha/lib_protocol
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/1498
     # We ignore some of the files because they create bugs in `coq-of-ocaml`. We
     # should either modify these files or fix `coq-of-ocaml`.
     - for source in *.ml ; do
