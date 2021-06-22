@@ -666,24 +666,40 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
               pv.mempool
             >>= fun _res -> Lwt_main.yield ())
 
-  let fetch_operation w pv ?peer oph =
-    Worker.log_event w (Fetching_operation oph) >>= fun () ->
-    Distributed_db.Operation.fetch
-      ~timeout:pv.parameters.limits.operation_timeout
-      pv.parameters.chain_db
-      ?peer
-      oph
-      ()
-    >>= function
-    | Ok op ->
-        Worker.Queue.push_request_now w (Arrived (oph, op)) ;
-        Lwt.return_unit
-    | Error (Distributed_db.Operation.Canceled _ :: _) ->
-        Worker.log_event w (Operation_included oph) >>= fun () ->
-        Lwt.return_unit
-    | Error _ ->
-        (* should not happen *)
-        Lwt.return_unit
+  (* This function fetches operations through the [distributed_db] and
+     ensures that an operation is fetched at most once by adding
+     operations being fetched into [pv.fetching]. On errors, the
+     operation is simply removed from this set and could be fetched
+     again if it is advertised again by a peer. *)
+  let fetch_operations w (pv : state) ?peer to_fetch =
+    let fetch_operation w pv ?peer oph =
+      Worker.log_event w (Fetching_operation oph) >>= fun () ->
+      Distributed_db.Operation.fetch
+        ~timeout:pv.parameters.limits.operation_timeout
+        pv.parameters.chain_db
+        ?peer
+        oph
+        ()
+      >>= function
+      | Ok op ->
+          Worker.Queue.push_request_now w (Arrived (oph, op)) ;
+          Lwt.return_unit
+      | Error (Distributed_db.Operation.Canceled _ :: _) ->
+          Worker.log_event w (Operation_included oph) >>= fun () ->
+          Lwt.return_unit
+      | Error _ ->
+          (* This may happen if the peer timed out for example. *)
+          Lwt.return_unit
+    in
+    pv.fetching <- Operation_hash.Set.union to_fetch pv.fetching ;
+    Operation_hash.Set.iter
+      (fun oph ->
+        let p = fetch_operation w pv ?peer oph in
+        (* We ensure that when the fetch is over (successfuly or not),
+           we remove the operation from the [pv.fetching] set. *)
+        Lwt.on_termination p (fun () ->
+            pv.fetching <- Operation_hash.Set.remove oph pv.fetching))
+      to_fetch
 
   let rpc_directory =
     lazy
@@ -880,7 +896,6 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       | Error _ -> Lwt.return_false
 
     let on_operation_arrived w (pv : state) oph op =
-      pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
       if already_handled pv oph then return_unit
       else if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks)
       then (
@@ -937,10 +952,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           (fun oph -> not (already_handled pv oph))
           all_ophs
       in
-      pv.fetching <- Operation_hash.Set.union to_fetch pv.fetching ;
-      Operation_hash.Set.iter
-        (fun oph -> Lwt.ignore_result (fetch_operation w pv ~peer oph))
-        to_fetch
+      fetch_operations w pv ~peer to_fetch
 
     let on_flush w pv predecessor live_blocks live_operations =
       Lwt_watcher.shutdown_input pv.operation_stream ;
@@ -1079,9 +1091,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             Protocol_hash.Map.empty (* TODO: initialize from config file *);
         }
       in
-      List.iter
-        (fun oph -> Lwt.ignore_result (fetch_operation w pv oph))
-        mempool.known_valid ;
+      fetch_operations w pv fetching ;
       return pv
 
     let on_error w r st errs =
