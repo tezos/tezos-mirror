@@ -40,7 +40,7 @@ depends: [
   "tezos-protocol-plugin-alpha-registerer"
   "cmdliner"
   "lwt-exit"
-  "tls" { >= "0.10" < "0.11" } # remove the upper bond when the compatibility with hacl-star is restored
+  "tls" { >= "0.13" }
   "cstruct"
 ]
 build: [
