@@ -31,19 +31,20 @@ type validation_result = {
   context : Context.t;
       (** The resulting context, it will be used for the next block. *)
   fitness : Fitness.t;
-      (** The effective fitness of the block (to be compared with
-      the 'announced' one in the block header. *)
+      (** The effective fitness of the block (to be compared with the one
+      'announced' in the block header). *)
   message : string option;
-      (** An optional informative message to be used as in the 'git
-      commit' of the block's context. *)
+      (** An optional informative message, akin to a 'git commit' message,
+      which can be attached to the [context] when it's being commited. *)
   max_operations_ttl : int;
-      (** The "time-to-live" of operation for the next block: any
-      operations whose 'branch' is older than 'ttl' blocks in the
-      past cannot be included in the next block. *)
+      (** The "time-to-live" of operations for the next block: any
+      operation whose 'branch' is older than 'ttl' blocks in the past
+      cannot be included in the next block. *)
   last_allowed_fork_level : Int32.t;
       (** The level of the last block for which the node might consider an
-      alternate branch. The shell should consider as invalid any
-      branch whose fork point is older than the given level *)
+      alternate branch. The shell should consider as invalid any branch
+      whose fork point is older (has a lower level) than the
+      given value. *)
 }
 
 type quota = {
@@ -51,7 +52,7 @@ type quota = {
       (** The maximum size (in bytes) of the serialized list of
       operations. *)
   max_op : int option;
-      (** The maximum number of operation.
+      (** The maximum number of operations in a block.
       [None] means no limit. *)
 }
 
