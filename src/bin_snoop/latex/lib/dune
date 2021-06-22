@@ -1,4 +1,3 @@
 (library
  (name latex)
- (public_name latex)
-)
+ (public_name latex))

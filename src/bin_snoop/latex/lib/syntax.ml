@@ -60,10 +60,8 @@ let spec_width : table_spec -> int =
     spec
 
 let row_width : row -> int option = function
-  | Row texts ->
-      Some (List.length texts)
-  | Hline ->
-      None
+  | Row texts -> Some (List.length texts)
+  | Hline -> None
 
 let rec map_string f (toplevel : t) =
   {
@@ -78,21 +76,16 @@ and map_string_section f (s : section) =
 
 and map_string_section_content f (c : section_content) =
   match c with
-  | Text blobs ->
-      Text (map_text f blobs)
-  | Figure (caption, image) ->
-      Figure (map_text f caption, image)
-  | Table (spec, rows) ->
-      Table (spec, List.map (map_string_row f) rows)
+  | Text blobs -> Text (map_text f blobs)
+  | Figure (caption, image) -> Figure (map_text f caption, image)
+  | Table (spec, rows) -> Table (spec, List.map (map_string_row f) rows)
 
 and map_text f blobs = List.map (map_string_blob f) blobs
 
 and map_string_blob f (b : blob) =
   match b with
-  | Text_blob (style, s) ->
-      Text_blob (style, f s)
-  | Inline_math_blob s ->
-      Inline_math_blob (f s)
+  | Text_blob (style, s) -> Text_blob (style, f s)
+  | Inline_math_blob s -> Inline_math_blob (f s)
 
 and map_string_row f (r : row) =
   match r with Row texts -> Row (List.map (map_text f) texts) | Hline -> r

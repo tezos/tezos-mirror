@@ -90,10 +90,8 @@ and pp_section : Format.formatter -> section -> unit =
 and pp_section_content : Format.formatter -> section_content -> unit =
  fun fmtr section_content ->
   match section_content with
-  | Text text ->
-      pp_text fmtr text
-  | Table table ->
-      pp_table fmtr table
+  | Text text -> pp_text fmtr text
+  | Table table -> pp_table fmtr table
   | Figure (caption, {filename; size}) ->
       Format.fprintf fmtr "\\begin{figure}[H]@." ;
       Format.fprintf
@@ -108,10 +106,8 @@ and pp_section_content : Format.formatter -> section_content -> unit =
 and pp_image_size : Format.formatter -> image_size option -> unit =
  fun fmtr image_size_opt ->
   match image_size_opt with
-  | None ->
-      Format.fprintf fmtr ""
-  | Some (Width_cm i) ->
-      Format.fprintf fmtr "[width=%dcm]" i
+  | None -> Format.fprintf fmtr ""
+  | Some (Width_cm i) -> Format.fprintf fmtr "[width=%dcm]" i
 
 and pp_text : Format.formatter -> text -> unit =
  fun fmtr text ->
@@ -125,15 +121,11 @@ and pp_blob : Format.formatter -> blob -> unit =
  fun fmtr blob ->
   match blob with
   | Text_blob (style, text) -> (
-    match style with
-    | Normal ->
-        Format.fprintf fmtr "%s" text
-    | Emph ->
-        Format.fprintf fmtr "\\textit{%s}" text
-    | Bold ->
-        Format.fprintf fmtr "\\textbf{%s}" text )
-  | Inline_math_blob text ->
-      Format.fprintf fmtr "$%s$" text
+      match style with
+      | Normal -> Format.fprintf fmtr "%s" text
+      | Emph -> Format.fprintf fmtr "\\textit{%s}" text
+      | Bold -> Format.fprintf fmtr "\\textbf{%s}" text)
+  | Inline_math_blob text -> Format.fprintf fmtr "$%s$" text
 
 and pp_table : Format.formatter -> table -> unit =
  fun fmtr table ->
@@ -164,14 +156,10 @@ and pp_table_spec : Format.formatter -> table_spec -> unit =
 and pp_spec : Format.formatter -> spec -> unit =
  fun fmtr spec ->
   match spec with
-  | L ->
-      Format.fprintf fmtr "l"
-  | C ->
-      Format.fprintf fmtr "c"
-  | R ->
-      Format.fprintf fmtr "r"
-  | Vbar ->
-      Format.fprintf fmtr "|"
+  | L -> Format.fprintf fmtr "l"
+  | C -> Format.fprintf fmtr "c"
+  | R -> Format.fprintf fmtr "r"
+  | Vbar -> Format.fprintf fmtr "|"
 
 and pp_row : Format.formatter -> row -> unit =
  fun fmtr row ->
@@ -183,8 +171,7 @@ and pp_row : Format.formatter -> row -> unit =
         fmtr
         texts ;
       Format.fprintf fmtr " \\\\@."
-  | Hline ->
-      Format.fprintf fmtr "\\hline@."
+  | Hline -> Format.fprintf fmtr "\\hline@."
 
 and pp_cell_text : Format.formatter -> text -> unit =
  fun fmtr text ->
@@ -202,14 +189,12 @@ and pp_cell_blob : Format.formatter -> blob -> unit =
         let chunks = String.split_on_char '\n' text in
         let text =
           match chunks with
-          | [] | [_] ->
-              text
+          | [] | [_] -> text
           | _ ->
               let s = String.concat " \\\\ " chunks in
               Format.asprintf "\\pbox{20cm}{%s}" s
         in
         Text_blob (style, text)
-    | Inline_math_blob _ ->
-        blob
+    | Inline_math_blob _ -> blob
   in
   pp_blob fmtr blob
