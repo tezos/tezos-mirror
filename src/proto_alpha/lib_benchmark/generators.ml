@@ -108,8 +108,7 @@ struct
       in
       let holes_deficit =
         (* we want at least 10% of holes, above is ok *)
-        if holes_proportion < 0.5 then
-          (0.5 -. holes_proportion) *. size_deficit
+        if holes_proportion < 0.5 then (0.5 -. holes_proportion) *. size_deficit
         else 0.0
       in
       let depth_deficit =

@@ -64,10 +64,8 @@ module Make_base (P : Michelson_samplers_parameters.S) : Base_S = struct
     match
       Alpha_context.Script_int.is_nat (Alpha_context.Script_int.of_zint i)
     with
-    | None ->
-        assert false
-    | Some n ->
-        n
+    | None -> assert false
+    | Some n -> n
 
   (* We ought to do better *)
   let signature _rng_state = Signature.zero
@@ -79,10 +77,8 @@ module Make_base (P : Michelson_samplers_parameters.S) : Base_S = struct
   let tez rng_state =
     let i = Random.State.int64 rng_state (Int64.of_int max_int) in
     match Protocol.Alpha_context.Tez.of_mutez i with
-    | Some res ->
-        res
-    | None ->
-        assert false
+    | Some res -> res
+    | None -> assert false
 
   let timestamp rng_state =
     let i = Base_samplers.int ~size:P.parameters.int_size rng_state in

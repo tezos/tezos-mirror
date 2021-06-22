@@ -33,12 +33,9 @@ open Sampling_helpers
 
 let rec stack_length (stack : Type.Stack.t) acc =
   match stack.node with
-  | Empty_t ->
-      acc
-  | Stack_var_t _ ->
-      acc + 1
-  | Item_t (_, tl) ->
-      stack_length tl (acc + 1)
+  | Empty_t -> acc
+  | Stack_var_t _ -> acc + 1
+  | Item_t (_, tl) -> stack_length tl (acc + 1)
 
 (* We need to sort and remove duplicate elements
    of sets and maps to make them Michelson-compatible. *)
@@ -59,8 +56,7 @@ let sort_map_elements elements =
             ~prim_compare:Mikhailsky.Mikhailsky_signature.compare
             k1
             k2
-      | _ ->
-          Stdlib.failwith "Autocomp.sort_map_elements: invalid Michelson map")
+      | _ -> Stdlib.failwith "Autocomp.sort_map_elements: invalid Michelson map")
     elements
 
 (* ------------------------------------------------------------------------- *)
@@ -97,62 +93,45 @@ and replace_vars (ty : Type.Base.t) =
   let open Inference.M in
   let node = ty.node in
   match node with
-  | Type.Base.Unit_t
-  | Type.Base.Int_t
-  | Type.Base.Nat_t
-  | Type.Base.Bool_t
-  | Type.Base.String_t
-  | Type.Base.Bytes_t
-  | Type.Base.Key_hash_t
-  | Type.Base.Timestamp_t
-  | Type.Base.Mutez_t
-  | Type.Base.Key_t ->
+  | Type.Base.Unit_t | Type.Base.Int_t | Type.Base.Nat_t | Type.Base.Bool_t
+  | Type.Base.String_t | Type.Base.Bytes_t | Type.Base.Key_hash_t
+  | Type.Base.Timestamp_t | Type.Base.Mutez_t | Type.Base.Key_t ->
       return ty
   | Type.Base.Var_t v -> (
-      get_repr_exn v
-      >>= fun repr ->
+      get_repr_exn v >>= fun repr ->
       match repr with
-      | Inference.Stack_type _ ->
-          assert false
-      | Inference.Base_type {comparable = _; repr = Some _} ->
-          assert false
+      | Inference.Stack_type _ -> assert false
+      | Inference.Base_type {comparable = _; repr = Some _} -> assert false
       | Inference.Base_type {comparable; repr = None} -> (
-        match comparable with
-        | Inference.Comparable ->
-            return default_comparable_type
-        | Inference.Unconstrained | Inference.Not_comparable ->
-            return Type.unit ) )
+          match comparable with
+          | Inference.Comparable -> return default_comparable_type
+          | Inference.Unconstrained | Inference.Not_comparable ->
+              return Type.unit))
   | Type.Base.Option_t ty ->
       replace_vars ty >>= fun ty -> return (Type.option ty)
   | Type.Base.Pair_t (lt, rt) ->
-      replace_vars lt
-      >>= fun lt -> replace_vars rt >>= fun rt -> return (Type.pair lt rt)
+      replace_vars lt >>= fun lt ->
+      replace_vars rt >>= fun rt -> return (Type.pair lt rt)
   | Type.Base.Union_t (lt, rt) ->
-      replace_vars lt
-      >>= fun lt -> replace_vars rt >>= fun rt -> return (Type.union lt rt)
-  | Type.Base.List_t ty ->
-      replace_vars ty >>= fun ty -> return (Type.list ty)
-  | Type.Base.Set_t ty ->
-      replace_vars ty >>= fun ty -> return (Type.set ty)
+      replace_vars lt >>= fun lt ->
+      replace_vars rt >>= fun rt -> return (Type.union lt rt)
+  | Type.Base.List_t ty -> replace_vars ty >>= fun ty -> return (Type.list ty)
+  | Type.Base.Set_t ty -> replace_vars ty >>= fun ty -> return (Type.set ty)
   | Type.Base.Map_t (k, v) ->
-      replace_vars k
-      >>= fun k -> replace_vars v >>= fun v -> return (Type.map k v)
+      replace_vars k >>= fun k ->
+      replace_vars v >>= fun v -> return (Type.map k v)
   | Type.Base.Lambda_t (dom, range) ->
-      replace_vars dom
-      >>= fun dom ->
+      replace_vars dom >>= fun dom ->
       replace_vars range >>= fun range -> return (Type.lambda dom range)
 
 let rec instantiate_and_set_stack (stack_ty : Type.Stack.t) =
   let open Inference.M in
   let node = stack_ty.node in
   match node with
-  | Type.Stack.Empty_t ->
-      return Type.empty
-  | Type.Stack.Stack_var_t _ ->
-      return Type.empty
+  | Type.Stack.Empty_t -> return Type.empty
+  | Type.Stack.Stack_var_t _ -> return Type.empty
   | Type.Stack.Item_t (hd, tl) ->
-      instantiate_and_set hd
-      >>= fun hd ->
+      instantiate_and_set hd >>= fun hd ->
       instantiate_and_set_stack tl >>= fun tl -> return (Type.item hd tl)
 
 (* In the following we perform computations in the composite monad
@@ -187,10 +166,8 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
     let open Type.Base in
     let desc = ty.node in
     match desc with
-    | Var_t _v ->
-        assert false
-    | Unit_t ->
-        return Mikhailsky.Data.unit
+    | Var_t _v -> assert false
+    | Unit_t -> return Mikhailsky.Data.unit
     | Int_t ->
         sample @@ Base_samplers.int ~size:P.sampling_parameters.int_size
         >>= fun i -> return (Mikhailsky.Data.big_integer i)
@@ -198,8 +175,7 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
         sample @@ Base_samplers.nat ~size:P.sampling_parameters.int_size
         >>= fun n -> return (Mikhailsky.Data.big_natural n)
     | Bool_t ->
-        sample Base_samplers.uniform_bool
-        >>= fun b ->
+        sample Base_samplers.uniform_bool >>= fun b ->
         if b then return Mikhailsky.Data.true_
         else return Mikhailsky.Data.false_
     | String_t ->
@@ -211,38 +187,31 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
         sample (Base_samplers.bytes ~size:P.sampling_parameters.bytes_size)
         >>= fun bytes -> return (Mikhailsky.Data.bytes bytes)
     | Key_hash_t ->
-        sample P.Crypto_samplers.pkh
-        >>= fun pkh -> return (Mikhailsky.Data.key_hash pkh)
+        sample P.Crypto_samplers.pkh >>= fun pkh ->
+        return (Mikhailsky.Data.key_hash pkh)
     | Timestamp_t ->
-        sample P.Michelson_base.timestamp
-        >>= fun tstamp -> return (Mikhailsky.Data.timestamp tstamp)
+        sample P.Michelson_base.timestamp >>= fun tstamp ->
+        return (Mikhailsky.Data.timestamp tstamp)
     | Mutez_t ->
-        sample P.Michelson_base.tez
-        >>= fun tz -> return (Mikhailsky.Data.mutez tz)
+        sample P.Michelson_base.tez >>= fun tz ->
+        return (Mikhailsky.Data.mutez tz)
     | Key_t ->
-        sample P.Crypto_samplers.pk
-        >>= fun pk -> return (Mikhailsky.Data.key pk)
+        sample P.Crypto_samplers.pk >>= fun pk ->
+        return (Mikhailsky.Data.key pk)
     | Option_t ty ->
-        sample Base_samplers.uniform_bool
-        >>= fun b ->
+        sample Base_samplers.uniform_bool >>= fun b ->
         if b then return Mikhailsky.Data.none
         else generate_data ty >>= fun res -> return (Mikhailsky.Data.some res)
     | Pair_t (lty, rty) ->
-        generate_data lty
-        >>= fun lv ->
+        generate_data lty >>= fun lv ->
         generate_data rty >>= fun rv -> return (Mikhailsky.Data.pair lv rv)
     | Union_t (lty, rty) ->
-        sample P.Michelson_base.bool
-        >>= fun b ->
-        if b then
-          generate_data lty >>= fun v -> return (Mikhailsky.Data.left v)
+        sample P.Michelson_base.bool >>= fun b ->
+        if b then generate_data lty >>= fun v -> return (Mikhailsky.Data.left v)
         else generate_data rty >>= fun v -> return (Mikhailsky.Data.right v)
-    | List_t _ty ->
-        return (Mikhailsky.Data.list [])
-    | Set_t _ty ->
-        return (Mikhailsky.Data.set [])
-    | Map_t (_kty, _vty) ->
-        return (Mikhailsky.Data.map [])
+    | List_t _ty -> return (Mikhailsky.Data.list [])
+    | Set_t _ty -> return (Mikhailsky.Data.set [])
+    | Map_t (_kty, _vty) -> return (Mikhailsky.Data.map [])
     | Lambda_t (dom, range) ->
         invent_term Type.(item dom empty) Type.(item range empty)
         >>= fun code -> return (Mikhailsky.Data.lambda code)
@@ -250,8 +219,7 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
   and invent_term (bef : Type.Stack.t) (aft : Type.Stack.t) :
       Mikhailsky.node list SM.t =
     let open SM in
-    install_dummy_stack aft []
-    >>= fun code ->
+    install_dummy_stack aft [] >>= fun code ->
     let terms = drop_stack bef code in
     return terms
 
@@ -261,30 +229,27 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
   and install_dummy_stack (stack : Type.Stack.t) (acc : Mikhailsky.node list) =
     let open SM in
     match stack.node with
-    | Empty_t ->
-        return acc
+    | Empty_t -> return acc
     | Stack_var_t _ ->
         let acc = Mikhailsky.(Instructions.push unit_ty Data.unit) :: acc in
         return acc
     | Item_t (hd, tl) ->
-        deterministic @@ instantiate_and_set hd
-        >>= fun hd ->
-        ( match hd.node with
+        deterministic @@ instantiate_and_set hd >>= fun hd ->
+        (match hd.node with
         | Lambda_t (dom, range) ->
             invent_term Type.(item dom empty) Type.(item range empty)
             >>= fun code ->
             let instr = Mikhailsky.(prim I_LAMBDA [seq code] []) in
             return instr
         | _ ->
-            generate_data hd
-            >>= fun term ->
+            generate_data hd >>= fun term ->
             let ty = Mikhailsky.unparse_ty_exn hd in
-            return (Mikhailsky.Instructions.push ty term) )
+            return (Mikhailsky.Instructions.push ty term))
         >>= fun instr -> install_dummy_stack tl (instr :: acc)
 
   (* Autocomplete Mikhailsky data.
-   When encountering a hole, we lookup its type and instantiate
-   some random data of the specified type. *)
+     When encountering a hole, we lookup its type and instantiate
+     some random data of the specified type. *)
   let rec complete_data :
       Mikhailsky.node -> Kernel.Path.t -> Mikhailsky.node SM.t =
     let open SM in
@@ -294,14 +259,12 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
         ->
           return node
       | Micheline.Prim (_, D_Hole, _, _) -> (
-          deterministic @@ Inference.M.get_data_annot path
-          >>= fun ty_opt ->
+          deterministic @@ Inference.M.get_data_annot path >>= fun ty_opt ->
           match ty_opt with
-          | None ->
-              cannot_complete_data node path
+          | None -> cannot_complete_data node path
           | Some ty ->
-              deterministic @@ instantiate_and_set ty
-              >>= fun ty -> generate_data ty )
+              deterministic @@ instantiate_and_set ty >>= fun ty ->
+              generate_data ty)
       | Micheline.Prim (_, A_Set, [Micheline.Seq (_, elements)], _) ->
           complete_data_list (Kernel.Path.at_index 0 path) 0 elements []
           >>= fun elements ->
@@ -313,29 +276,27 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
           let elements = sort_map_elements elements in
           return (Mikhailsky.Data.map elements)
       | Micheline.Prim (_, prim, subterms, _) ->
-          complete_data_list path 0 subterms []
-          >>= fun subterms -> return (Mikhailsky.prim prim subterms [])
+          complete_data_list path 0 subterms [] >>= fun subterms ->
+          return (Mikhailsky.prim prim subterms [])
       | Micheline.Seq (_, subterms) ->
-          complete_data_list path 0 subterms []
-          >>= fun subterms -> return (Mikhailsky.seq subterms)
+          complete_data_list path 0 subterms [] >>= fun subterms ->
+          return (Mikhailsky.seq subterms)
 
   and complete_data_list path i subterms acc =
     let open SM in
     match subterms with
-    | [] ->
-        return (List.rev acc)
+    | [] -> return (List.rev acc)
     | subterm :: tl ->
         let path' = Kernel.Path.at_index i path in
-        complete_data subterm path'
-        >>= fun term -> complete_data_list path (i + 1) tl (term :: acc)
+        complete_data subterm path' >>= fun term ->
+        complete_data_list path (i + 1) tl (term :: acc)
 
   let complete_data typing node rng_state =
     let (root_type_opt, _) =
       Inference.M.get_data_annot Kernel.Path.root typing
     in
     match root_type_opt with
-    | None ->
-        Stdlib.failwith "Autocomp.complete_data: cannot get type of expr"
+    | None -> Stdlib.failwith "Autocomp.complete_data: cannot get type of expr"
     | Some ty ->
         let (_, typing) = Inference.instantiate_base ty typing in
         let (result, _) =
@@ -366,41 +327,34 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
         ->
           return node
       | Micheline.Prim (_, I_Hole, _, _) -> (
-          deterministic @@ Inference.M.get_instr_annot path
-          >>= function
-          | None ->
-              cannot_complete_code node path
+          deterministic @@ Inference.M.get_instr_annot path >>= function
+          | None -> cannot_complete_code node path
           | Some {bef; aft} ->
-              deterministic @@ Inference.instantiate bef
-              >>= fun bef ->
-              deterministic @@ Inference.instantiate aft
-              >>= fun aft ->
-              invent_term bef aft >>= fun code -> return (Mikhailsky.seq code)
-          )
+              deterministic @@ Inference.instantiate bef >>= fun bef ->
+              deterministic @@ Inference.instantiate aft >>= fun aft ->
+              invent_term bef aft >>= fun code -> return (Mikhailsky.seq code))
       | Micheline.Prim (_, prim, subterms, _) ->
-          complete_code_list path 0 subterms []
-          >>= fun subterms -> return (Mikhailsky.prim prim subterms [])
+          complete_code_list path 0 subterms [] >>= fun subterms ->
+          return (Mikhailsky.prim prim subterms [])
       | Micheline.Seq (_, subterms) ->
-          complete_code_list path 0 subterms []
-          >>= fun subterms -> return (Mikhailsky.seq subterms)
+          complete_code_list path 0 subterms [] >>= fun subterms ->
+          return (Mikhailsky.seq subterms)
 
   and complete_code_list path i subterms acc =
     let open SM in
     match subterms with
-    | [] ->
-        return (List.rev acc)
+    | [] -> return (List.rev acc)
     | subterm :: tl ->
         let path' = Kernel.Path.at_index i path in
-        complete_code subterm path'
-        >>= fun term -> complete_code_list path (i + 1) tl (term :: acc)
+        complete_code subterm path' >>= fun term ->
+        complete_code_list path (i + 1) tl (term :: acc)
 
   let complete_code typing node rng_state =
     let (root_type_opt, _) =
       Inference.M.get_instr_annot Kernel.Path.root typing
     in
     match root_type_opt with
-    | None ->
-        Stdlib.failwith "Autocomp.complete_code: cannot get type of expr"
+    | None -> Stdlib.failwith "Autocomp.complete_code: cannot get type of expr"
     | Some {bef; aft} ->
         let (_, typing) = Inference.instantiate bef typing in
         let (_, typing) = Inference.instantiate aft typing in
@@ -411,8 +365,7 @@ module Make (P : Michelson_samplers_base.Full_S) = struct
               Format.eprintf "at path %s@." (Kernel.Path.to_string path) ;
               Format.eprintf "%a@." Mikhailsky.pp subterm ;
               Stdlib.failwith "in autocomp.ml: unrecoverable failure"
-          | _ ->
-              assert false
+          | _ -> assert false
         in
         let ((bef, aft), typing) =
           try Inference.infer_with_state result

@@ -42,8 +42,7 @@ let rec stack_type_to_michelson_type_list
   match node with
   | Type.Stack.Stack_var_t _ ->
       Stdlib.failwith "stack_type_to_michelson_type_list: bug found"
-  | Type.Stack.Empty_t ->
-      []
+  | Type.Stack.Empty_t -> []
   | Type.Stack.Item_t (ty, tl) ->
       base_type_to_michelson_type ty :: stack_type_to_michelson_type_list tl
 
@@ -60,8 +59,7 @@ let michelson_type_to_ex_ty (typ : Protocol.Alpha_context.Script.expr)
     (Micheline.root typ)
   |> Protocol.Environment.wrap_tzresult
   |> function
-  | Ok t ->
-      t
+  | Ok t -> t
   | Error errs ->
       Format.eprintf "%a@." pp_print_error errs ;
       raise (Failure "Test_helpers.michelson_type_to_ex_ty: error")
@@ -75,8 +73,7 @@ let rec michelson_type_list_to_ex_stack_ty
     (stack_ty : Protocol.Alpha_context.Script.expr list) ctxt =
   let open Protocol.Script_ir_translator in
   match stack_ty with
-  | [] ->
-      (Ex_stack_ty Protocol.Script_typed_ir.Bot_t, ctxt)
+  | [] -> (Ex_stack_ty Protocol.Script_typed_ir.Bot_t, ctxt)
   | hd :: tl -> (
       let (ex_ty, ctxt) = michelson_type_to_ex_ty hd ctxt in
       match ex_ty with
@@ -85,8 +82,7 @@ let rec michelson_type_list_to_ex_stack_ty
             michelson_type_list_to_ex_stack_ty tl ctxt
           in
           match ex_stack_ty with
-          | Ex_stack_ty tl ->
-              (Ex_stack_ty (Item_t (ty, tl, None)), ctxt) ) )
+          | Ex_stack_ty tl -> (Ex_stack_ty (Item_t (ty, tl, None)), ctxt)))
 
 module Alpha_test_helpers = Tezos_alpha_test_helpers
 
@@ -96,17 +92,18 @@ let typecheck_by_tezos =
     Context.init
       ~rng_state
       ~initial_balances:
-        [ 4_000_000_000_000L;
+        [
           4_000_000_000_000L;
           4_000_000_000_000L;
           4_000_000_000_000L;
-          4_000_000_000_000L ]
+          4_000_000_000_000L;
+          4_000_000_000_000L;
+        ]
       5
     >>=? fun (block, _accounts) ->
     Incremental.begin_construction
       ~priority:0
-      ~timestamp:
-        (Tezos_base.Time.Protocol.add block.header.shell.timestamp 30L)
+      ~timestamp:(Tezos_base.Time.Protocol.add block.header.shell.timestamp 30L)
       block
     >>=? fun vs ->
     let ctxt = Incremental.alpha_ctxt vs in
@@ -119,16 +116,15 @@ let typecheck_by_tezos =
   fun bef node ->
     Result.get_ok
       (Lwt_main.run
-         ( context_init_memory ~rng_state
-         >>=? fun ctxt ->
-         let stack = stack_type_to_michelson_type_list bef in
-         let (bef, ctxt) = michelson_type_list_to_ex_stack_ty stack ctxt in
-         let (Protocol.Script_ir_translator.Ex_stack_ty bef) = bef in
-         Protocol.Script_ir_translator.parse_instr
-           Protocol.Script_ir_translator.Lambda
-           ctxt
-           ~legacy:false
-           (Micheline.root node)
-           bef
-         >|= Protocol.Environment.wrap_tzresult
-         >>=? fun _ -> return_unit ))
+         ( context_init_memory ~rng_state >>=? fun ctxt ->
+           let stack = stack_type_to_michelson_type_list bef in
+           let (bef, ctxt) = michelson_type_list_to_ex_stack_ty stack ctxt in
+           let (Protocol.Script_ir_translator.Ex_stack_ty bef) = bef in
+           Protocol.Script_ir_translator.parse_instr
+             Protocol.Script_ir_translator.Lambda
+             ctxt
+             ~legacy:false
+             (Micheline.root node)
+             bef
+           >|= Protocol.Environment.wrap_tzresult
+           >>=? fun _ -> return_unit ))

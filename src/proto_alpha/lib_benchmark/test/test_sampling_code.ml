@@ -28,7 +28,7 @@
 let _ =
   if Array.length Sys.argv < 2 then (
     Format.eprintf "Executable expects random seed on input\n%!" ;
-    exit 1 )
+    exit 1)
   else Random.init (int_of_string Sys.argv.(1))
 
 (* ------------------------------------------------------------------------- *)
