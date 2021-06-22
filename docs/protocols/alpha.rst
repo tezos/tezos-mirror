@@ -25,6 +25,12 @@ New Environment Version (V3)
 This protocol requires a different protocol environment than Granada.
 It requires protocol environment V3, compared to V2 for Granada.
 
+Receipts, Balance updates
+-------------------------
+
+- /!\ Breaking change: Rewards balance updates for nonce revelations or endorsements now mention the cycle at which the rewards were granted instead of the cycle of the level carried by the operation.
+  Likewise for deposits balance updates related to endorsement operations, they now mention the cycle at which the funds have been deposited.
+
 Bug fixes
 ---------
 
@@ -44,7 +50,7 @@ Minor changes
 - Gas improvements for typechecking instruction ``CONTRACT`` (MR :gl:`!3241`)
 
 - Other internal refactorings or documentation. (MRs :gl:`!2021` :gl:`!2984`
-  :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075` :gl:`!3266`)
+  :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075` :gl:`!3266` :gl:`!3270`)
 
 - Check order in the validation of endorsements has changed to not
   compute all endorsement slots of a level if the endorsement is
