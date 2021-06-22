@@ -217,6 +217,9 @@ Version 9.3
 -  Fixed a case where the node was unable to fetch an operation because
    a remote peer did not answer.
 
+-  Fixed various issues with the TLS layer that could in particular
+   cause some valid certificates to be refused from remote nodes.
+
 Version 9.2
 ===========
 
