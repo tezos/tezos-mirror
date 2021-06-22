@@ -679,37 +679,33 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
          (fun (pls, previous_protocol_level) block ->
            let new_proto_level = Block_repr.proto_level block in
            if Compare.Int.(new_proto_level <> previous_protocol_level) then
-             (Context.checkout context_index (Block_repr.context block)
-              >>= function
-              | None ->
-                  (* If the context associated to an activation
-                     block is not available, then we cannot infer
-                     the protocol table. It may be the case after
-                     importing a snapshot. *)
-                  fail
-                    (Corrupted_store
-                       "failed to restore the protocol levels: not enough data.")
-              | Some context -> return context)
-             >>=? fun context ->
-             Context.get_protocol context >>= fun protocol_hash ->
-             (Context.retrieve_commit_info
-                context_index
-                (Block_repr.header block)
-              >>= function
-              | Ok tup ->
-                  Lwt.return_some (Protocol_levels.commit_info_of_tuple tup)
-              | Error _ -> Lwt.return_none)
-             >>= fun commit_info ->
-             let activation =
-               ( new_proto_level,
-                 {
-                   Protocol_levels.block =
-                     (Block_repr.hash block, Block_repr.level block);
-                   protocol = protocol_hash;
-                   commit_info;
-                 } )
-             in
-             return (activation :: pls, new_proto_level)
+             Context.checkout context_index (Block_repr.context block)
+             >>= function
+             | None ->
+                 (* We have an incomplete context (full or rolling)
+                    and thus not enough information to get the
+                    activation. We ignore this protocol change. *)
+                 return (pls, new_proto_level)
+             | Some context ->
+                 Context.get_protocol context >>= fun protocol_hash ->
+                 (Context.retrieve_commit_info
+                    context_index
+                    (Block_repr.header block)
+                  >>= function
+                  | Ok tup ->
+                      Lwt.return_some (Protocol_levels.commit_info_of_tuple tup)
+                  | Error _ -> Lwt.return_none)
+                 >>= fun commit_info ->
+                 let activation =
+                   ( new_proto_level,
+                     {
+                       Protocol_levels.block =
+                         (Block_repr.hash block, Block_repr.level block);
+                       protocol = protocol_hash;
+                       commit_info;
+                     } )
+                 in
+                 return (activation :: pls, new_proto_level)
            else return (pls, previous_protocol_level))
          ([], highest_cemented_proto_level))
       floating_stores
