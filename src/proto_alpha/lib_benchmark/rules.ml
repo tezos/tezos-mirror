@@ -60,74 +60,57 @@ let cmp_repr =
 let rec add_fresh_stack_variables vars =
   let open Inference.M in
   match vars with
-  | [] ->
-      return ()
+  | [] -> return ()
   | fresh :: tl ->
-      uf_lift (Uf.UF.add fresh)
-      >>= fun () ->
+      uf_lift (Uf.UF.add fresh) >>= fun () ->
       set_repr fresh stack_repr >>= fun () -> add_fresh_stack_variables tl
 
 let rec add_fresh_data_variables vars =
   let open Inference.M in
   match vars with
-  | [] ->
-      return ()
+  | [] -> return ()
   | fresh :: tl ->
-      uf_lift (Uf.UF.add fresh)
-      >>= fun () ->
+      uf_lift (Uf.UF.add fresh) >>= fun () ->
       set_repr fresh base_repr >>= fun () -> add_fresh_data_variables tl
 
 let rec add_fresh_variables vars plain_repr cmp_repr =
   let open Inference.M in
   match vars with
-  | [] ->
-      return ()
+  | [] -> return ()
   | Plain fresh :: tl ->
-      uf_lift (Uf.UF.add fresh)
-      >>= fun () ->
-      set_repr fresh plain_repr
-      >>= fun () -> add_fresh_variables tl plain_repr cmp_repr
+      uf_lift (Uf.UF.add fresh) >>= fun () ->
+      set_repr fresh plain_repr >>= fun () ->
+      add_fresh_variables tl plain_repr cmp_repr
   | Cmp fresh :: tl ->
-      uf_lift (Uf.UF.add fresh)
-      >>= fun () ->
-      set_repr fresh cmp_repr
-      >>= fun () -> add_fresh_variables tl plain_repr cmp_repr
+      uf_lift (Uf.UF.add fresh) >>= fun () ->
+      set_repr fresh cmp_repr >>= fun () ->
+      add_fresh_variables tl plain_repr cmp_repr
 
 let evaluate_guard_monadic guard path =
   let open Inference.M in
   match guard with
-  | No_cnstrnt ->
-      return ()
+  | No_cnstrnt -> return ()
   | Data_cnstrnt {cnstrnt = base_type_constraint; fresh} -> (
-      add_fresh_data_variables fresh
-      >>= fun () ->
-      get_data_annot path
-      >>= fun res_opt ->
+      add_fresh_data_variables fresh >>= fun () ->
+      get_data_annot path >>= fun res_opt ->
       match res_opt with
-      | None ->
-          assert false
+      | None -> assert false
       | Some type_of_expr ->
-          Inference.unify_base type_of_expr base_type_constraint
-          >>= fun () ->
-          Inference.instantiate_base type_of_expr >>= fun _ -> return () )
+          Inference.unify_base type_of_expr base_type_constraint >>= fun () ->
+          Inference.instantiate_base type_of_expr >>= fun _ -> return ())
   | Instr_cnstrnt {cnstrnt = {bef = pre; aft = post}; fresh; fresh_stack} -> (
       (* Add base fresh type variables *)
       add_fresh_variables fresh base_repr cmp_repr
       >>= fun () ->
-      add_fresh_stack_variables fresh_stack
-      >>= fun () ->
-      get_instr_annot path
-      >>= fun res_opt ->
+      add_fresh_stack_variables fresh_stack >>= fun () ->
+      get_instr_annot path >>= fun res_opt ->
       match res_opt with
-      | None ->
-          assert false
+      | None -> assert false
       | Some {bef; aft} ->
-          Inference.unify pre bef
-          >>= fun () ->
-          Inference.unify post aft
-          >>= fun () ->
-          Inference.instantiate bef
-          >>= fun _bef -> Inference.instantiate aft >>= fun _aft -> return () )
+          Inference.unify pre bef >>= fun () ->
+          Inference.unify post aft >>= fun () ->
+          Inference.instantiate bef >>= fun _bef ->
+          Inference.instantiate aft >>= fun _aft -> return ())
 
 let evaluate_guard typing guard path =
   try
@@ -146,8 +129,7 @@ let matches_with_hash_consing =
   in
   fun pattern term ->
     match pattern with
-    | Root ->
-        [Path.root]
+    | Root -> [Path.root]
     | Pattern patt -> (
         let key = (Kernel.Patt.uid patt, Mikhailsky.tag term) in
         match Hashtbl.find_opt match_table key with
@@ -155,15 +137,12 @@ let matches_with_hash_consing =
             let res = Rewriter.all_matches patt term in
             Hashtbl.add match_table key res ;
             res
-        | Some res ->
-            res )
+        | Some res -> res)
 
 let matches_without_consing pattern term =
   match pattern with
-  | Root ->
-      [Path.root]
-  | Pattern patt ->
-      Rewriter.all_matches patt term
+  | Root -> [Path.root]
+  | Pattern patt -> Rewriter.all_matches patt term
 
 let rewriting (state : State_space.t) (rules : rule_set list) =
   List.fold_left
@@ -209,8 +188,7 @@ module Instruction = struct
     Pattern
       (focus
          (prim_pred
-            (fun prim ->
-              Mikhailsky_prim.kind prim = Mikhailsky_prim.Instr_kind)
+            (fun prim -> Mikhailsky_prim.kind prim = Mikhailsky_prim.Instr_kind)
             list_any))
 
   let replace_any_instr_by_hole =
@@ -246,14 +224,17 @@ module Instruction = struct
     let beta = ~-2 in
     let gamma = ~-3 in
     let delta = ~-4 in
-    [ replacement
+    [
+      replacement
         ~fresh_stack:[alpha]
         ~bef:(item bytes (stack_var alpha))
         ~aft:(item bytes (stack_var alpha))
         ~replacement:
-          [ Context_blind (fun () -> M.Instructions.blake2b);
+          [
+            Context_blind (fun () -> M.Instructions.blake2b);
             Context_blind (fun () -> M.Instructions.sha256);
-            Context_blind (fun () -> M.Instructions.sha512) ]
+            Context_blind (fun () -> M.Instructions.sha512);
+          ]
         ();
       replacement
         ~fresh_stack:[alpha]
@@ -272,8 +253,10 @@ module Instruction = struct
         ~bef:(item int (item int (stack_var alpha)))
         ~aft:(item int (stack_var alpha))
         ~replacement:
-          [ Context_blind (fun () -> M.Instructions.add M.int_ty M.int_ty);
-            Context_blind (fun () -> M.Instructions.mul M.int_ty M.int_ty) ]
+          [
+            Context_blind (fun () -> M.Instructions.add M.int_ty M.int_ty);
+            Context_blind (fun () -> M.Instructions.mul M.int_ty M.int_ty);
+          ]
         ();
       replacement
         ~fresh:[Plain alpha; Plain beta]
@@ -329,9 +312,11 @@ module Instruction = struct
         ~bef:(stack_var alpha)
         ~aft:(item int (stack_var alpha))
         ~replacement:
-          [ (* TODO : push random integer? *)
+          [
+            (* TODO : push random integer? *)
             Context_blind
-              (fun () -> M.Instructions.push M.int_ty (M.Data.integer 100)) ]
+              (fun () -> M.Instructions.push M.int_ty (M.Data.integer 100));
+          ]
         ();
       replacement
         ~fresh:[Plain alpha; Plain beta]
@@ -382,8 +367,10 @@ module Instruction = struct
         ~bef:(stack_var alpha)
         ~aft:(stack_var beta)
         ~replacement:
-          [ Context_blind
-              (fun () -> M.seq [M.Instructions.hole; M.Instructions.hole]) ]
+          [
+            Context_blind
+              (fun () -> M.seq [M.Instructions.hole; M.Instructions.hole]);
+          ]
         ();
       replacement
         ~fresh:[Plain alpha; Plain beta]
@@ -581,11 +568,14 @@ module Instruction = struct
         ~bef:(item bytes (stack_var gamma))
         ~aft:(item (option (var alpha)) (stack_var gamma))
         ~replacement:[Context_blind (fun () -> M.Instructions.unpack)]
-        () ]
+        ();
+    ]
 
   let rules =
-    [ replace_any_instr_by_hole;
-      {rule_patt = match_instr_hole; replacements = instructions} ]
+    [
+      replace_any_instr_by_hole;
+      {rule_patt = match_instr_hole; replacements = instructions};
+    ]
 end
 
 module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
@@ -639,16 +629,10 @@ module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
       (focus
          (prim_pred
             (function
-              | A_Int
-              | A_Nat
-              | A_Mutez
-              | A_Timestamp
-              | A_Key_hash
-              | A_Key
+              | A_Int | A_Nat | A_Mutez | A_Timestamp | A_Key_hash | A_Key
               | D_None ->
                   true
-              | _ ->
-                  false)
+              | _ -> false)
             list_any))
 
   (* Matches an empty list, set or map literal *)
@@ -774,7 +758,8 @@ module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
     {
       rule_patt = match_hole;
       replacements =
-        [ replace_by_singleton_list;
+        [
+          replace_by_singleton_list;
           replace_by_empty_pair;
           replace_by_singleton_set;
           replace_by_singleton_map;
@@ -785,47 +770,56 @@ module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
           replace_by_none;
           replace_by_mutez rng_state;
           replace_by_key_hash rng_state;
-          replace_by_key rng_state ];
+          replace_by_key rng_state;
+        ];
     }
 
   let kill_empty_pair =
     {
       rule_patt = match_empty_pair;
       replacements =
-        [ {
+        [
+          {
             type_constraint = No_cnstrnt;
             replacement = [Context_blind (fun () -> Mikhailsky.Data.hole)];
-          } ];
+          };
+        ];
     }
 
   let kill_int_mutez_timestamp_key_hash_none =
     {
       rule_patt = match_int_mutez_timestamp_key_hash_key_or_none;
       replacements =
-        [ {
+        [
+          {
             type_constraint = No_cnstrnt;
             replacement = [Context_blind (fun () -> Mikhailsky.Data.hole)];
-          } ];
+          };
+        ];
     }
 
   let kill_empty_list_set_or_map =
     {
       rule_patt = match_empty_list_set_or_map;
       replacements =
-        [ {
+        [
+          {
             type_constraint = No_cnstrnt;
             replacement = [Context_blind (fun () -> Mikhailsky.Data.hole)];
-          } ];
+          };
+        ];
     }
 
   let kill_empty_some_left_or_right =
     {
       rule_patt = match_empty_some_left_or_right;
       replacements =
-        [ {
+        [
+          {
             type_constraint = No_cnstrnt;
             replacement = [Context_blind (fun () -> Mikhailsky.Data.hole)];
-          } ];
+          };
+        ];
     }
 
   let modify_set =
@@ -833,26 +827,23 @@ module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
       {
         type_constraint = No_cnstrnt;
         replacement =
-          [ Context_aware
+          [
+            Context_aware
               (fun set ->
                 match set with
-                | Micheline.Prim (_, A_Set, [Micheline.Seq (_, elements)], _)
-                  ->
+                | Micheline.Prim (_, A_Set, [Micheline.Seq (_, elements)], _) ->
                     Mikhailsky.Data.(set (hole :: elements))
-                | _ ->
-                    assert false);
+                | _ -> assert false);
             Context_aware
               (fun set ->
                 match set with
                 | Micheline.Prim (_, A_Set, [Micheline.Seq (_, elements)], _)
                   -> (
-                  match elements with
-                  | [] ->
-                      Mikhailsky.Data.hole
-                  | _ :: tl ->
-                      Mikhailsky.Data.set tl )
-                | _ ->
-                    assert false) ];
+                    match elements with
+                    | [] -> Mikhailsky.Data.hole
+                    | _ :: tl -> Mikhailsky.Data.set tl)
+                | _ -> assert false);
+          ];
       }
     in
     {rule_patt = match_set; replacements = [grow_ungrow_set]}
@@ -862,26 +853,23 @@ module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
       {
         type_constraint = No_cnstrnt;
         replacement =
-          [ Context_aware
+          [
+            Context_aware
               (fun set ->
                 match set with
-                | Micheline.Prim (_, A_Map, [Micheline.Seq (_, elements)], _)
-                  ->
+                | Micheline.Prim (_, A_Map, [Micheline.Seq (_, elements)], _) ->
                     Mikhailsky.Data.(map (map_elt hole hole :: elements))
-                | _ ->
-                    assert false);
+                | _ -> assert false);
             Context_aware
               (fun set ->
                 match set with
                 | Micheline.Prim (_, A_Map, [Micheline.Seq (_, elements)], _)
                   -> (
-                  match elements with
-                  | [] ->
-                      Mikhailsky.Data.hole
-                  | _ :: tl ->
-                      Mikhailsky.Data.map tl )
-                | _ ->
-                    assert false) ];
+                    match elements with
+                    | [] -> Mikhailsky.Data.hole
+                    | _ :: tl -> Mikhailsky.Data.map tl)
+                | _ -> assert false);
+          ];
       }
     in
     {rule_patt = match_map; replacements = [grow_ungrow_map]}
@@ -891,38 +879,37 @@ module Data_rewrite_leaves (P : Michelson_samplers_base.Full_S) = struct
       {
         type_constraint = No_cnstrnt;
         replacement =
-          [ Context_aware
+          [
+            Context_aware
               (fun list ->
                 match list with
                 | Micheline.Prim (_, A_List, [Micheline.Seq (_, terms)], _) ->
                     Mikhailsky.Data.(list (hole :: terms))
-                | _ ->
-                    assert false);
+                | _ -> assert false);
             Context_aware
               (fun list ->
                 match list with
-                | Micheline.Prim (_, A_List, [Micheline.Seq (_, terms)], _)
-                  -> (
-                  match terms with
-                  | [] ->
-                      Mikhailsky.Data.hole
-                  | _ :: tl ->
-                      Mikhailsky.Data.list tl )
-                | _ ->
-                    assert false) ];
+                | Micheline.Prim (_, A_List, [Micheline.Seq (_, terms)], _) -> (
+                    match terms with
+                    | [] -> Mikhailsky.Data.hole
+                    | _ :: tl -> Mikhailsky.Data.list tl)
+                | _ -> assert false);
+          ];
       }
     in
     {rule_patt = match_list; replacements = [grow_ungrow_list]}
 
   let rules rng_state =
-    [ fill_in_hole rng_state;
+    [
+      fill_in_hole rng_state;
       kill_empty_pair;
       kill_empty_list_set_or_map;
       kill_empty_some_left_or_right;
       kill_int_mutez_timestamp_key_hash_none;
       modify_list;
       modify_set;
-      modify_map ]
+      modify_map;
+    ]
 end
 
 module Data (P : Michelson_samplers_base.Full_S) = struct
@@ -932,28 +919,12 @@ module Data (P : Michelson_samplers_base.Full_S) = struct
       (focus
          (prim_pred
             (function
-              | Mikhailsky_prim.D_Elt | D_Hole ->
-                  false
-              | D_False
-              | D_Left
-              | D_None
-              | D_Pair
-              | D_Right
-              | D_Some
-              | D_True
-              | D_Unit
-              | A_Int
-              | A_Nat
-              | A_Set
-              | A_List
-              | A_Map
-              | A_Key_hash
-              | A_Mutez
-              | A_Timestamp
-              | A_Key ->
+              | Mikhailsky_prim.D_Elt | D_Hole -> false
+              | D_False | D_Left | D_None | D_Pair | D_Right | D_Some | D_True
+              | D_Unit | A_Int | A_Nat | A_Set | A_List | A_Map | A_Key_hash
+              | A_Mutez | A_Timestamp | A_Key ->
                   true
-              | _ ->
-                  false)
+              | _ -> false)
             list_any))
 
   let match_list =
@@ -975,9 +946,11 @@ module Data (P : Michelson_samplers_base.Full_S) = struct
 
   let pack_root =
     let replacement =
-      [ Context_aware (fun node -> Mikhailsky.Data.list [node]);
+      [
+        Context_aware (fun node -> Mikhailsky.Data.list [node]);
         Context_aware (fun node -> Mikhailsky.Data.(pair node hole));
-        Context_aware (fun node -> Mikhailsky.Data.(pair hole node)) ]
+        Context_aware (fun node -> Mikhailsky.Data.(pair hole node));
+      ]
     in
     let guarded_replacements = [{type_constraint = No_cnstrnt; replacement}] in
     {rule_patt = Root; replacements = guarded_replacements}
@@ -985,9 +958,11 @@ module Data (P : Michelson_samplers_base.Full_S) = struct
   module Data_rewrite_leaves_rules = Data_rewrite_leaves (P)
 
   let rules rng_state =
-    [ Data_rewrite_leaves_rules.fill_in_hole rng_state;
+    [
+      Data_rewrite_leaves_rules.fill_in_hole rng_state;
       replace_by_hole;
       Data_rewrite_leaves_rules.modify_list;
       Data_rewrite_leaves_rules.modify_map;
-      Data_rewrite_leaves_rules.modify_set ]
+      Data_rewrite_leaves_rules.modify_set;
+    ]
 end

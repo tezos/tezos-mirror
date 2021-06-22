@@ -50,12 +50,9 @@ let rec statistics stats depth (n : Mikhailsky.node) =
   stats.size <- stats.size + 1 ;
   stats.depth <- max depth stats.depth ;
   match n with
-  | Micheline.Int (_, z) ->
-      stats.bytes <- stats.bytes + (Z.numbits z / 8)
-  | Micheline.String (_, s) ->
-      stats.bytes <- stats.bytes + String.length s
-  | Micheline.Bytes (_, b) ->
-      stats.bytes <- stats.bytes + Bytes.length b
+  | Micheline.Int (_, z) -> stats.bytes <- stats.bytes + (Z.numbits z / 8)
+  | Micheline.String (_, s) -> stats.bytes <- stats.bytes + String.length s
+  | Micheline.Bytes (_, b) -> stats.bytes <- stats.bytes + Bytes.length b
   | Micheline.Prim (_, Mikhailsky_prim.I_Hole, _, _)
   | Micheline.Prim (_, Mikhailsky_prim.D_Hole, _, _) ->
       stats.holes <- stats.holes + 1
@@ -64,7 +61,8 @@ let rec statistics stats depth (n : Mikhailsky.node) =
 
 let statistics {term; _} =
   let stats = {size = 0; bytes = 0; holes = 0; depth = 0} in
-  statistics stats 0 term ; stats
+  statistics stats 0 term ;
+  stats
 
 let pp fmtr (state : t) =
   Format.fprintf fmtr "current term:@." ;
