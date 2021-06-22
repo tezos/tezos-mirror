@@ -227,7 +227,7 @@ let fix_head block_store genesis_block =
          blocks were truncated. The head is then chosen as the highest
          cemented block known. *)
       if
-        List.length cemented_block_files <> 0
+        cemented_block_files <> []
         && Block_hash.equal
              (Block_repr.hash genesis_block)
              (Block_repr.hash floating_head)
@@ -330,7 +330,8 @@ let fix_savepoint_and_caboose chain_dir block_store head =
                metadata exists, then the savepoint is the genesis. It
                is the case in archive mode and when the offset window
                includes the genesis. *)
-            if start_level = 0l then return_some 0l else aux (Some file) tl
+            if Compare.Int32.(start_level = 0l) then return_some 0l
+            else aux (Some file) tl
           else
             (* As metadata files are ordered and contiguous, we can
                stop and search for the lowest entry in that metadata
@@ -405,8 +406,9 @@ let fix_savepoint_and_caboose chain_dir block_store head =
       let sp =
         match lowest_floating_with_metadata with
         | Some lowest_floating_with_metadata ->
-            if lowest_floating_with_metadata < cemented_savepoint then
-              lowest_floating_with_metadata
+            if
+              Compare.Int32.(lowest_floating_with_metadata < cemented_savepoint)
+            then lowest_floating_with_metadata
             else cemented_savepoint
         | None -> cemented_savepoint
       in
@@ -503,7 +505,7 @@ let fix_checkpoint chain_dir block_store head =
           if
             (* The lowest block with metadata is never higher than
                current head. *)
-            Block_repr.level block = Block_repr.level head
+            Compare.Int32.(Block_repr.level block = Block_repr.level head)
           then return head
           else
             match Block_repr.metadata block with
@@ -512,7 +514,7 @@ let fix_checkpoint chain_dir block_store head =
       | None ->
           (* If the head was reached and it has no metadata, the store
              is broken *)
-          if block_level = Block_repr.level head then
+          if Compare.Int32.(block_level = Block_repr.level head) then
             fail
               (Corrupted_store
                  "No block with metadata found. At least the head must have \
@@ -553,7 +555,7 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
   let cycle_search cemented_block_store ~prev_proto_level ~cycle_start
       ~cycle_end:limit =
     let rec aux ~prev_proto_level ~level acc =
-      if level > limit then return acc
+      if Compare.Int32.(level > limit) then return acc
       else
         Cemented_block_store.get_cemented_block_by_level
           cemented_block_store
@@ -863,17 +865,20 @@ let fix_chain_config chain_dir block_store genesis caboose savepoint =
   (* If the infered offset equals the default offset value then we
      assume that "default" was the previous value. *)
   let offset =
-    if nb_cycles_metadata = History_mode.default_additional_cycles.offset then
-      None
+    if
+      Compare.Int.(
+        nb_cycles_metadata = History_mode.default_additional_cycles.offset)
+    then None
     else Some {History_mode.offset = nb_cycles_metadata}
   in
   let history_mode =
     (* Caboose is not genesis: we sure are in rolling*)
-    if fst caboose <> genesis.Genesis.block then History_mode.Rolling offset
+    if not (Block_hash.equal (fst caboose) genesis.Genesis.block) then
+      History_mode.Rolling offset
     else if
       (* Caboose is genesis and savepoint is not genesis: we can be in
          both rolling and full. We choose full as the less destructive. *)
-      fst savepoint <> genesis.block
+      not (Block_hash.equal (fst savepoint) genesis.block)
     then Full offset
     else if
       (* Caboose is genesis and savepoint is genesis and there are as
