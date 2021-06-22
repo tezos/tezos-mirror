@@ -93,8 +93,6 @@ module type T = sig
     protocol_data : Proto.operation_data;
   }
 
-  val compare : operation -> operation -> int
-
   val parse : Operation.t -> operation tzresult
 
   val parse_unsafe : bytes -> Proto.operation_data tzresult
@@ -174,11 +172,6 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
       error (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
       parse_unsafe raw.proto >|? fun protocol_data -> {hash; raw; protocol_data}
-
-  let compare op1 op2 =
-    Proto.compare_operations
-      {shell = op1.raw.shell; protocol_data = op1.protocol_data}
-      {shell = op2.raw.shell; protocol_data = op2.protocol_data}
 
   let create chain_store ?protocol_data ~predecessor ~live_blocks
       ~live_operations ~timestamp () =
