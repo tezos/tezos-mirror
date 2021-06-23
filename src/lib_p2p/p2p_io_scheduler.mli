@@ -85,11 +85,6 @@ val mk_buffer : ?pos:int -> ?len:int -> bytes -> (buffer, tztrace) result
     starting at position [0]. *)
 val mk_buffer_safe : bytes -> buffer
 
-(** [read_now conn buffer] blits at most [buffer.len] bytes from
-    [conn]'s read queue and returns the number of bytes written in
-    [buffer.buf] starting at [buffer.pos]. *)
-val read_now : connection -> buffer -> int tzresult option
-
 (** Like [read_now], but waits till [conn] read queue has at least one
     element instead of failing. *)
 val read :

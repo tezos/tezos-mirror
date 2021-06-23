@@ -699,25 +699,7 @@ let read_from conn {pos = offset; len; buf} data =
       Ok read_len
   | Error _ -> error P2p_errors.Connection_closed
 
-(* Read available data if any.
-
-   If data are available in conn.partial_read, take them else try to
-   pop data from the pipe.
-
-   TODO: [read_now] could do a better job by popping data until buf is
-   full or pipe is drained ?  *)
-let read_now conn buffer =
-  match conn.partial_read with
-  | Some msg ->
-      conn.partial_read <- None ;
-      Some (read_from conn buffer (Ok msg))
-  | None -> (
-      try Option.map (read_from conn buffer) (Lwt_pipe.pop_now conn.read_queue)
-      with Lwt_pipe.Closed -> Some (error P2p_errors.Connection_closed))
-
-(* Read available data or wait for it.
-
-   Todo : could do [read_now] and wait for data if result is None *)
+(* Read available data or wait for it. *)
 let read ?canceler conn buffer =
   match conn.partial_read with
   | Some msg ->
