@@ -6,12 +6,11 @@ coq:lint:
     # provides this
     - dune build @src/proto_alpha/lib_protocol/check
     - cd src/proto_alpha/lib_protocol
-    # We ignore `storage.ml` because there is an assert failure
-    # in `coq-of-ocaml`. We should release a fixed version of `coq-of-ocaml`
-    # with a proper error message, or modify `storage.ml` in order to avoid
-    # this bug.
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/1498
+    # We ignore some of the files because they create bugs in `coq-of-ocaml`. We
+    # should either modify these files or fix `coq-of-ocaml`.
     - for source in *.ml ; do
-        if [ $source != "storage.ml" ] ; then
+        if [ $source != "storage.ml" ] && [ $source != "script_interpreter.ml" ] ; then
           coq-of-ocaml -config coq-of-ocaml/config.json $source ;
         fi
       done
