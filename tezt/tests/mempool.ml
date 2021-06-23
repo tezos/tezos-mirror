@@ -73,10 +73,11 @@ let pp_mempool_count fmt
     refused
     unprocessed
 
-(* Matches events which contain an injection request.
+(** Matches events which contain an injection request.
    For example:
 
-     "event": {
+  {[
+    { "event": {
        "request": {
          "request": "inject",
          "operation": {
@@ -92,6 +93,7 @@ let pp_mempool_count fmt
      },
      "level": "notice"
    }
+  ]}
  *)
 let wait_for_injection node =
   let filter json =
@@ -104,10 +106,11 @@ let wait_for_injection node =
   let* _ = Node.wait_for node "node_prevalidator.v0" filter in
   return ()
 
-(* Matches events which contain an flush request.
+(** Matches events which contain an flush request.
    For example:
 
-     "event": {
+  {[
+    { "event": {
        "request": {
          "request": "flush",
          "block": "BLTv3VhCAVzMVxbXhTRqGf6M7oyxeeH2eBzdf9onbD9ULyFgo7d"
@@ -119,7 +122,9 @@ let wait_for_injection node =
        }
      },
      "level": "notice"
- *)
+    }
+  ]}
+*)
 let wait_for_flush node =
   let filter json =
     match
@@ -227,30 +232,30 @@ let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
   in
   loop ([], counter + 1) n
 
-(* This test tries to manually inject some operations
+(** This test tries to manually inject some operations
 
    Scenario:
 
-   1. Node 1 activates a protocol
+   + Node 1 activates a protocol
 
-   2. Retrieve the counter and the branch for bootstrap1
+   + Retrieve the counter and the branch for bootstrap1
 
-   3. Forge and inject <n> operations in the node
+   + Forge and inject <n> operations in the node
 
-   4. Check that the operations are in the mempool
+   + Check that the operations are in the mempool
 
-   5. Bake an empty block
+   + Bake an empty block
 
-   6. Check that we did not lose any operations in the flush
+   + Check that we did not lose any operations in the flush
 
-   7. Inject an endorsement
+   + Inject an endorsement
 
-   8. Check that we have one more operation in the mempool and that
+   + Check that we have one more operation in the mempool and that
       the endorsement is applied
 
-   9. Bake an empty block
+   + Bake an empty block
 
-   8. Check that we did not lose any operations in the flush
+   + Check that we did not lose any operations in the flush
  *)
 
 let flush_mempool =
@@ -461,17 +466,17 @@ let check_batch_operations_are_in_applied_mempool ops oph n =
       (JSON.encode oph)
       n
 
-(* This test tries to run manually forged operations before injecting them
+(** This test tries to run manually forged operations before injecting them
 
    Scenario:
 
-   1. Node 1 activates a protocol
+   + Node 1 activates a protocol
 
-   2. Retrieve the counter and the branch for bootstrap1
+   + Retrieve the counter and the branch for bootstrap1
 
-   3. Forge, run and inject <n> operations in the node
+   + Forge, run and inject <n> operations in the node
 
-   4. Check that the batch is correctly injected
+   + Check that the batch is correctly injected
  *)
 let run_batched_operation =
   Protocol.register_test
@@ -546,19 +551,19 @@ let check_if_op_is_branch_refused ops oph =
           assert false)
   | _ -> Test.fail "Only one operation must be branch_refused1"
 
-(* This test checks that branch_refused endorsement are still propagated
+(** This test checks that branch_refused endorsement are still propagated
 
    Scenario:
 
-   1. 3 Nodes are chained connected and activate a protocol
+   + 3 Nodes are chained connected and activate a protocol
 
-   2. Disconnect node_1 from node_2 and bake on both node.
+   + Disconnect node_1 from node_2 and bake on both node.
 
-   3. Reconnect node_1 and node_2
+   + Reconnect node_1 and node_2
 
-   4. Endorse on node_1
+   + Endorse on node_1
 
-   5. Check that endorsement is applied on node_1 and refused on node_2 and node_3
+   + Check that endorsement is applied on node_1 and refused on node_2 and node_3
 *)
 let endorsement_flushed_branch_refused =
   Protocol.register_test
@@ -631,20 +636,20 @@ let check_empty_operation__ddb ddb =
       "Operation Ddb should be empty, contains : %d elements"
       op_db_length
 
-(* This test checks that pre-filtered operations are cleaned from the ddb
+(** This test checks that pre-filtered operations are cleaned from the ddb
 
    Scenario:
 
-   1. 3 Nodes are chained connected and activate a protocol
+   + 3 Nodes are chained connected and activate a protocol
 
-   2. Get the counter and the current branch
+   + Get the counter and the current branch
 
-   3. Forge operation, inject it and check injection on node_1
-      This operation is pre-filtered on node_2
+   + Forge operation, inject it and check injection on node_1
+     This operation is pre-filtered on node_2
 
-   4. Bake 1 block
+   + Bake 1 block
 
-   5. Get client_2 ddb and check that it contains no operation
+   + Get client_2 ddb and check that it contains no operation
 *)
 let forge_pre_filtered_operation =
   Protocol.register_test
@@ -696,15 +701,17 @@ let forge_pre_filtered_operation =
   Log.info "Operation Ddb of client_2 does not contain any operation" ;
   unit
 
-(* Matches events which contain a failed fetch.
+(** Matches events which contain a failed fetch.
    For example:
 
-     "event": {
-       "operation_not_fetched": "onuvmuCS5NqtJG65BJWqH44bzwiXLw4tVpfNqRQvkgorv5LoejA"
-     },
-     "level": "debug"
-   }
- *)
+  {[
+    {  "event": {
+           "operation_not_fetched": "onuvmuCS5NqtJG65BJWqH44bzwiXLw4tVpfNqRQvkgorv5LoejA"
+       },
+       "level": "debug"
+    }
+  ]}
+*)
 let wait_for_failed_fetch node =
   let filter json =
     match
@@ -734,24 +741,23 @@ let set_config_operations_timeout node timeout =
   in
   Node.Config_file.update node (JSON.put ("shell", updated_shell_config))
 
-(* This test checks that failed fetched operations can be refetched successfully
+(** This test checks that failed fetched operations can be refetched successfully
 
    Scenario:
 
-   1. initialise two nodes and activate the protocol. The second node is initialise with specific configuration
+   + initialise two nodes and activate the protocol. The second node is initialise with specific configuration
 
-   2. Get the counter and the current branch
+   + Get the counter and the current branch
 
-   3. Forge operation and inject it in node_1, checks that the fetch fail in node_2
+   + Forge operation and inject it in node_1, checks that the fetch fail in node_2
 
-   4. Ensure that the injected operation is in node_1 mempool
+   + Ensure that the injected operation is in node_1 mempool
 
-   5. Ensure that the mempool of node_2 is empty
+   + Ensure that the mempool of node_2 is empty
 
-   6. Inject the previous operation in node_2
+   + Inject the previous operation in node_2
 
-   7. Ensure that the operation is injected in node_2 mempool
-
+   + Ensure that the operation is injected in node_2 mempool
 *)
 let refetch_failed_operation =
   Protocol.register_test
