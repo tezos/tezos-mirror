@@ -41,8 +41,7 @@ let group =
 
 let keys_of_implicit_account cctxt source =
   match Protocol.Alpha_context.Contract.is_implicit source with
-  | None ->
-      assert false
+  | None -> assert false
   | Some src ->
       Client_keys.get_key cctxt src >>=? fun (_, pk, sk) -> return (src, pk, sk)
 
@@ -63,30 +62,22 @@ let anti_replay cctxt contract =
   return (address ^ chain_id)
 
 let do_unshield cctxt contract src_name stez dst =
-  anti_replay cctxt contract
-  >>=? fun anti_replay ->
-  Wallet.new_address cctxt src_name None
-  >>=? fun (src, _, backdst) ->
-  Context.Client_state.sync_and_scan cctxt contract
-  >>=? fun contract_state ->
+  anti_replay cctxt contract >>=? fun anti_replay ->
+  Wallet.new_address cctxt src_name None >>=? fun (src, _, backdst) ->
+  Context.Client_state.sync_and_scan cctxt contract >>=? fun contract_state ->
   Lwt.return
   @@ Context.unshield ~src ~dst ~backdst stez contract_state anti_replay
 
 let do_shield cctxt ?message contract utez dst =
-  anti_replay cctxt contract
-  >>=? fun anti_replay ->
-  Context.Client_state.sync_and_scan cctxt contract
-  >>=? fun contract_state ->
+  anti_replay cctxt contract >>=? fun anti_replay ->
+  Context.Client_state.sync_and_scan cctxt contract >>=? fun contract_state ->
   let dst = viewing_key_of_string dst in
   Context.shield cctxt ~dst ?message utez contract_state anti_replay
 
 let do_sapling_transfer cctxt ?message contract src_name amount dst =
-  anti_replay cctxt contract
-  >>=? fun anti_replay ->
-  Wallet.new_address cctxt src_name None
-  >>=? fun (src, _, backdst) ->
-  Context.Client_state.sync_and_scan cctxt contract
-  >>=? fun contract_state ->
+  anti_replay cctxt contract >>=? fun anti_replay ->
+  Wallet.new_address cctxt src_name None >>=? fun (src, _, backdst) ->
+  Context.Client_state.sync_and_scan cctxt contract >>=? fun contract_state ->
   let dst = viewing_key_of_string dst in
   Context.transfer
     cctxt
@@ -118,8 +109,7 @@ let memo_size_arg =
            assert (i >= 0 && i <= 65535) ;
            i
          with
-         | i ->
-             return i
+         | i -> return i
          | exception _ ->
              failwith "invalid memo-size (must be between 0 and 65535)"))
 
@@ -146,7 +136,7 @@ let shield_cmd =
        fee_cap_arg
        burn_cap_arg
        message_arg)
-    ( prefixes ["sapling"; "shield"]
+    (prefixes ["sapling"; "shield"]
     @@ tez_param
          ~name:"qty"
          ~desc:"Amount taken from transparent wallet of source."
@@ -160,7 +150,7 @@ let shield_cmd =
     @@ ContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
-    @@ stop )
+    @@ stop)
     (fun ( fee,
            dry_run,
            verbose_signing,
@@ -180,8 +170,7 @@ let shield_cmd =
          sapling_dst
          (_contract_name, contract_dst)
          cctxt ->
-      keys_of_implicit_account cctxt source
-      >>=? fun (pkh, src_pk, src_sk) ->
+      keys_of_implicit_account cctxt source >>=? fun (pkh, src_pk, src_sk) ->
       let open Context in
       cctxt#warning
         "Shielding %a from %a to %s@ entails a loss of privacy@."
@@ -230,7 +219,8 @@ let shield_cmd =
         cctxt
         errors
       >>= function
-      | None -> return_unit | Some (_res, _contracts) -> return_unit)
+      | None -> return_unit
+      | Some (_res, _contracts) -> return_unit)
 
 let unshield_cmd =
   let open Client_proto_args in
@@ -254,7 +244,7 @@ let unshield_cmd =
        force_low_fee_arg
        fee_cap_arg
        burn_cap_arg)
-    ( prefixes ["sapling"; "unshield"]
+    (prefixes ["sapling"; "unshield"]
     @@ tez_param
          ~name:"qty"
          ~desc:"Amount taken from shielded wallet of source."
@@ -270,7 +260,7 @@ let unshield_cmd =
     @@ ContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
-    @@ stop )
+    @@ stop)
     (fun ( fee,
            dry_run,
            verbose_signing,
@@ -299,10 +289,8 @@ let unshield_cmd =
         Contract.pp
         tz_dst
       >>= fun () ->
-      keys_of_implicit_account cctxt tz_dst
-      >>=? fun (source, src_pk, src_sk) ->
-      do_unshield cctxt contract_dst name stez source
-      >>=? fun sapling_input ->
+      keys_of_implicit_account cctxt tz_dst >>=? fun (source, src_pk, src_sk) ->
+      do_unshield cctxt contract_dst name stez source >>=? fun sapling_input ->
       let arg = Shielded_tez_contract_input.as_arg sapling_input in
       let fee_parameter =
         {
@@ -340,7 +328,8 @@ let unshield_cmd =
         cctxt
         errors
       >>= function
-      | None -> return_unit | Some (_res, _contracts) -> return_unit)
+      | None -> return_unit
+      | Some (_res, _contracts) -> return_unit)
 
 (* Default name for Sapling transaction file *)
 let sapling_transaction_file = "sapling_transaction"
@@ -379,7 +368,7 @@ let forge_shielded_cmd =
        message_arg
        (file_arg sapling_transaction_file)
        json_switch)
-    ( prefixes ["sapling"; "forge"; "transaction"]
+    (prefixes ["sapling"; "forge"; "transaction"]
     @@ tez_param
          ~name:"qty"
          ~desc:"Amount taken from shielded wallet of source."
@@ -393,7 +382,7 @@ let forge_shielded_cmd =
     @@ ContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
-    @@ stop )
+    @@ stop)
     (fun ( _fee,
            _dry_run,
            _verbose_signing,
@@ -420,12 +409,11 @@ let forge_shielded_cmd =
       do_sapling_transfer cctxt ?message contract_dst name stez destination
       >>=? fun transaction ->
       let file = Option.value ~default:sapling_transaction_file file in
-      cctxt#message "Writing transaction to %s@." file
-      >>= fun () ->
-      ( if use_json_format then
-        save_json_to_file
-          (Data_encoding.Json.construct UTXO.transaction_encoding transaction)
-          file
+      cctxt#message "Writing transaction to %s@." file >>= fun () ->
+      (if use_json_format then
+       save_json_to_file
+         (Data_encoding.Json.construct UTXO.transaction_encoding transaction)
+         file
       else
         let bytes =
           Hex.of_bytes
@@ -435,7 +423,7 @@ let forge_shielded_cmd =
         in
         let file = open_out_bin file in
         Printf.fprintf file "0x%s" (Hex.show bytes) ;
-        close_out file ) ;
+        close_out file) ;
       return_unit)
 
 let submit_shielded_cmd =
@@ -460,9 +448,9 @@ let submit_shielded_cmd =
        fee_cap_arg
        burn_cap_arg
        json_switch)
-    ( prefixes ["sapling"; "submit"]
+    (prefixes ["sapling"; "submit"]
     (* TODO: Add a dedicated abstracted Clic element to parse filenames,
-      potentially using Sys.file_exists *)
+       potentially using Sys.file_exists *)
     @@ Clic.string ~name:"file" ~desc:"Filename of the forged transaction."
     @@ prefix "from"
     @@ ContractAlias.destination_param
@@ -472,7 +460,7 @@ let submit_shielded_cmd =
     @@ ContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
-    @@ stop )
+    @@ stop)
     (fun ( fee,
            dry_run,
            verbose_signing,
@@ -497,13 +485,11 @@ let submit_shielded_cmd =
         contract_name
       >>= fun () ->
       let open Context in
-      ( if use_json_format then
-        Lwt_utils_unix.Json.read_file filename
-        >>=? fun json ->
-        return @@ Data_encoding.Json.destruct UTXO.transaction_encoding json
+      (if use_json_format then
+       Lwt_utils_unix.Json.read_file filename >>=? fun json ->
+       return @@ Data_encoding.Json.destruct UTXO.transaction_encoding json
       else
-        Lwt_utils_unix.read_file filename
-        >>= fun hex ->
+        Lwt_utils_unix.read_file filename >>= fun hex ->
         let hex =
           (* remove 0x *)
           String.sub hex 2 (String.length hex - 2)
@@ -511,13 +497,12 @@ let submit_shielded_cmd =
         return
         @@ Data_encoding.Binary.of_bytes_exn
              UTXO.transaction_encoding
-             Hex.(to_bytes (`Hex hex)) )
+             Hex.(to_bytes (`Hex hex)))
       >>=? fun transaction ->
       return Shielded_tez_contract_input.(as_arg (create transaction))
       >>=? fun contract_input ->
       let chain = cctxt#chain and block = cctxt#block in
-      keys_of_implicit_account cctxt source
-      >>=? fun (source, src_pk, src_sk) ->
+      keys_of_implicit_account cctxt source >>=? fun (source, src_pk, src_sk) ->
       let open Protocol.Alpha_context in
       let fee_parameter =
         {
@@ -555,7 +540,8 @@ let submit_shielded_cmd =
         cctxt
         errors
       >>= function
-      | None -> return_unit | Some (_res, _contracts) -> return_unit)
+      | None -> return_unit
+      | Some (_res, _contracts) -> return_unit)
 
 let for_contract_arg =
   Client_proto_contracts.ContractAlias.destination_arg
@@ -574,11 +560,9 @@ let generate_key_cmd =
     ~group
     ~desc:"Generate a new sapling key."
     (args2 (Sapling_key.force_switch ()) (unencrypted_switch ()))
-    ( prefixes ["sapling"; "gen"; "key"]
-    @@ Sapling_key.fresh_alias_param @@ stop )
+    (prefixes ["sapling"; "gen"; "key"] @@ Sapling_key.fresh_alias_param @@ stop)
     (fun (force, unencrypted) name (cctxt : Protocol_client_context.full) ->
-      Sapling_key.of_fresh cctxt force name
-      >>=? fun name ->
+      Sapling_key.of_fresh cctxt force name >>=? fun name ->
       let mnemonic = Wallet.Mnemonic.new_random in
       cctxt#message
         "It is important to save this mnemonic in a secure place:@\n\
@@ -589,15 +573,15 @@ let generate_key_cmd =
         Wallet.Mnemonic.words_pp
         (Bip39.to_words mnemonic)
       >>= fun () ->
-      Wallet.register cctxt ~force ~unencrypted mnemonic name
-      >>=? fun _vk -> return_unit)
+      Wallet.register cctxt ~force ~unencrypted mnemonic name >>=? fun _vk ->
+      return_unit)
 
 let use_key_for_contract_cmd =
   command
     ~group
     ~desc:"Use a sapling key for a contract."
     (args1 memo_size_arg)
-    ( prefixes ["sapling"; "use"; "key"]
+    (prefixes ["sapling"; "use"; "key"]
     @@ Sapling_key.alias_param
          ~name:"sapling-key"
          ~desc:"Sapling key to use for the contract."
@@ -605,13 +589,12 @@ let use_key_for_contract_cmd =
     @@ Client_proto_contracts.ContractAlias.destination_param
          ~name:"contract"
          ~desc:"Contract the key will be used on."
-    @@ stop )
+    @@ stop)
     (fun default_memo_size
          (name, _sapling_uri)
          (_contract_name, contract)
          (cctxt : Protocol_client_context.full) ->
-      Wallet.find_vk cctxt name
-      >>=? fun vk ->
+      Wallet.find_vk cctxt name >>=? fun vk ->
       Context.Client_state.register
         cctxt
         ~default_memo_size
@@ -631,37 +614,31 @@ let import_key_cmd =
           ~placeholder:"mnemonic"
           ~doc:"Mnemonic as an option, only used for testing and debugging."
           Client_proto_args.string_parameter))
-    ( prefixes ["sapling"; "import"; "key"]
-    @@ Sapling_key.fresh_alias_param @@ stop )
+    (prefixes ["sapling"; "import"; "key"]
+    @@ Sapling_key.fresh_alias_param @@ stop)
     (fun (force, unencrypted, mnemonic_opt)
          fresh_name
          (cctxt : Protocol_client_context.full) ->
-      ( match mnemonic_opt with
+      (match mnemonic_opt with
       | None ->
           let rec loop_words (acc : string list) i =
             if i > 23 then return (List.rev acc)
             else
-              cctxt#prompt_password "Enter word %d: " i
-              >>=? fun word_raw ->
+              cctxt#prompt_password "Enter word %d: " i >>=? fun word_raw ->
               let word = Bytes.to_string word_raw in
               match Bip39.index_of_word word with
-              | None ->
-                  loop_words acc i
-              | Some _ ->
-                  loop_words (word :: acc) (succ i)
+              | None -> loop_words acc i
+              | Some _ -> loop_words (word :: acc) (succ i)
           in
           loop_words [] 0
-      | Some mnemonic ->
-          return (String.split_on_char ' ' mnemonic) )
+      | Some mnemonic -> return (String.split_on_char ' ' mnemonic))
       >>=? fun words ->
       match Bip39.of_words words with
-      | None ->
-          failwith "Not a valid mnemonic"
+      | None -> failwith "Not a valid mnemonic"
       | Some mnemonic ->
-          Sapling_key.of_fresh cctxt force fresh_name
-          >>=? fun name ->
-          Wallet.register cctxt ~force ~unencrypted mnemonic name
-          >>=? fun _ -> return_unit)
+          Sapling_key.of_fresh cctxt force fresh_name >>=? fun name ->
+          Wallet.register cctxt ~force ~unencrypted mnemonic name >>=? fun _ ->
+          return_unit)
 
 let commands () =
   let child_index_param =
@@ -677,7 +654,8 @@ let commands () =
       ~placeholder:"idx"
       Client_proto_args.int_parameter
   in
-  [ generate_key_cmd;
+  [
+    generate_key_cmd;
     use_key_for_contract_cmd;
     import_key_cmd;
     command
@@ -688,18 +666,17 @@ let commands () =
          for_contract_arg
          (unencrypted_switch ())
          memo_size_arg)
-      ( prefixes ["sapling"; "derive"; "key"]
+      (prefixes ["sapling"; "derive"; "key"]
       @@ Sapling_key.fresh_alias_param @@ prefix "from"
       @@ Sapling_key.alias_param
       @@ prefixes ["at"; "index"]
-      @@ child_index_param @@ stop )
+      @@ child_index_param @@ stop)
       (fun (force, contract_opt, unencrypted, default_memo_size)
            fresh_name
            (existing_name, _existing_uri)
            child_index
            (cctxt : Protocol_client_context.full) ->
-        Sapling_key.of_fresh cctxt force fresh_name
-        >>=? fun new_name ->
+        Sapling_key.of_fresh cctxt force fresh_name >>=? fun new_name ->
         Wallet.derive
           cctxt
           ~force
@@ -728,11 +705,8 @@ let commands () =
       ~group
       ~desc:"Generate an address for a key referenced by alias."
       (args1 index_arg)
-      ( prefixes ["sapling"; "gen"; "address"]
-      @@ Sapling_key.alias_param @@ stop )
-      (fun index_opt
-           (name, _sapling_uri)
-           (cctxt : Protocol_client_context.full) ->
+      (prefixes ["sapling"; "gen"; "address"] @@ Sapling_key.alias_param @@ stop)
+      (fun index_opt (name, _sapling_uri) (cctxt : Protocol_client_context.full) ->
         Wallet.new_address cctxt name index_opt
         >>=? fun (_, corrected_index, address) ->
         let address_b58 =
@@ -747,16 +721,16 @@ let commands () =
       ~group
       ~desc:"Save a sapling viewing key in a JSON file."
       no_options
-      ( prefixes ["sapling"; "export"; "key"]
+      (prefixes ["sapling"; "export"; "key"]
       @@ Sapling_key.alias_param @@ prefix "in"
       @@ Clic.param
            ~name:"file"
            ~desc:"Filename."
            Client_proto_args.string_parameter
-      @@ stop )
+      @@ stop)
       (fun () (name, _sapling_uri) file (cctxt : Protocol_client_context.full) ->
-        Wallet.export_vk cctxt name
-        >>=? fun vk_json -> return (save_json_to_file vk_json file));
+        Wallet.export_vk cctxt name >>=? fun vk_json ->
+        return (save_json_to_file vk_json file));
     command
       ~group
       ~desc:"Get balance associated with given sapling key and contract"
@@ -766,7 +740,7 @@ let commands () =
             ~short:'v'
             ~long:"verbose"
             ()))
-      ( prefixes ["sapling"; "get"; "balance"; "for"]
+      (prefixes ["sapling"; "get"; "balance"; "for"]
       @@ Sapling_key.alias_param
            ~name:"sapling-key"
            ~desc:"Sapling key we get balance for."
@@ -774,49 +748,45 @@ let commands () =
       @@ Client_proto_contracts.ContractAlias.destination_param
            ~name:"contract"
            ~desc:"Contract we get balance from."
-      @@ stop )
+      @@ stop)
       (fun verbose
            (name, _sapling_uri)
            (_contract_name, contract)
            (cctxt : Protocol_client_context.full) ->
-        Wallet.find_vk cctxt name
-        >>= function
-        | Error _ ->
-            cctxt#error "Account %s not found" name
+        Wallet.find_vk cctxt name >>= function
+        | Error _ -> cctxt#error "Account %s not found" name
         | Ok vk -> (
             Context.Client_state.sync_and_scan cctxt contract
             >>=? fun contract_state ->
-            Context.Contract_state.find_account vk contract_state
-            |> function
-            | None ->
-                cctxt#error "Account %s not found" name
+            Context.Contract_state.find_account vk contract_state |> function
+            | None -> cctxt#error "Account %s not found" name
             | Some account ->
-                ( if verbose then
-                  cctxt#answer
-                    "@[<v 2>Received Sapling transactions for %s@,@[<v>%a@]@]"
-                    name
-                    Context.Account.pp_unspent
-                    account
-                else Lwt.return_unit )
+                (if verbose then
+                 cctxt#answer
+                   "@[<v 2>Received Sapling transactions for %s@,@[<v>%a@]@]"
+                   name
+                   Context.Account.pp_unspent
+                   account
+                else Lwt.return_unit)
                 >>= fun () ->
                 cctxt#answer
                   "Total Sapling funds %a%s"
                   Context.Shielded_tez.pp
                   (Context.Account.balance account)
                   Client_proto_args.tez_sym
-                >>= fun () -> return_unit ));
+                >>= fun () -> return_unit));
     command
       ~group
       ~desc:"List sapling keys."
       no_options
       (fixed ["sapling"; "list"; "keys"])
       (fun () (cctxt : Protocol_client_context.full) ->
-        Sapling_key.load cctxt
-        >>=? fun l ->
+        Sapling_key.load cctxt >>=? fun l ->
         List.iter_es
           (fun (s, _) -> cctxt#message "%s" s >>= fun () -> return_unit)
           (List.sort (fun (s1, _) (s2, _) -> String.compare s1 s2) l));
     shield_cmd;
     unshield_cmd;
     forge_shielded_cmd;
-    submit_shielded_cmd ]
+    submit_shielded_cmd;
+  ]
