@@ -21,12 +21,12 @@
   (name buildtest)
   (deps test_sampling_data.exe test_sampling_code.exe))
 
-(alias
-  (name runtest_micheline_rewriting_data)
+(rule
+  (alias runtest_micheline_rewriting_data)
   (action (run %{exe:test_sampling_data.exe} 1234)))
 
-(alias
-  (name runtest_micheline_rewriting_code)
+(rule
+  (alias runtest_micheline_rewriting_code)
   (action (run %{exe:test_sampling_code.exe} 1234)))
 
 
