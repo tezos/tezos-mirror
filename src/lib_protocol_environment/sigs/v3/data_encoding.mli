@@ -312,9 +312,9 @@ val case :
   ('a -> 't) ->
   't case
 
-type 'a matching_function = 'a -> match_result
+type match_result
 
-and match_result
+type 'a matching_function = 'a -> match_result
 
 (* [tag_size] is not declared in the upstream library, instead, the expanded
    polymorphic-variant type-expression is used as is. We include it in the
