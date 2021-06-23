@@ -168,6 +168,8 @@ val check_correct_field :
 val parse_var_annot :
   int -> ?default:var_annot option -> string list -> var_annot option tzresult
 
+val is_allowed_char : char -> bool
+
 val parse_constr_annot :
   int ->
   ?if_special_first:field_annot option ->

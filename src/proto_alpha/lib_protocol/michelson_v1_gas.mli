@@ -342,6 +342,17 @@ module Cost_of : sig
 
     val contract : Gas.cost
 
+    val view : Gas.cost
+
+    val view_mem :
+      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+
+    val view_get :
+      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+
+    val view_update :
+      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+
     val transfer_tokens : Gas.cost
 
     val implicit_account : Gas.cost

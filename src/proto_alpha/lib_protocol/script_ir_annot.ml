@@ -170,10 +170,13 @@ let string_iter p s i =
   in
   aux i
 
+let is_allowed_char = function
+  | 'a' .. 'z' | 'A' .. 'Z' | '_' | '.' | '%' | '@' | '0' .. '9' -> true
+  | _ -> false
+
 (* Valid annotation characters as defined by the allowed_annot_char function from lib_micheline/micheline_parser *)
-let check_char loc = function
-  | 'a' .. 'z' | 'A' .. 'Z' | '_' | '.' | '%' | '@' | '0' .. '9' -> ok_unit
-  | _ -> error (Unexpected_annotation loc)
+let check_char loc c =
+  if is_allowed_char c then ok_unit else error (Unexpected_annotation loc)
 
 (* This constant is defined in lib_micheline/micheline_parser which is not available in the environment. *)
 let max_annot_length = 255

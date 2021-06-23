@@ -302,6 +302,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IAddress _ -> Interp_costs.address
   | IContract _ -> Interp_costs.contract
   | ITransfer_tokens _ -> Interp_costs.transfer_tokens
+  | IView _ -> Interp_costs.view
   | IImplicit_account _ -> Interp_costs.implicit_account
   | ISet_delegate _ -> Interp_costs.set_delegate
   | IBalance _ -> Interp_costs.balance

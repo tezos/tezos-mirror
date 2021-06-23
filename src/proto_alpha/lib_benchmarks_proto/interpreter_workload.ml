@@ -167,6 +167,7 @@ type instruction_name =
   | N_INow
   | N_IBalance
   | N_ILevel
+  | N_IView
   (* We specialize the check-signature instruction for each crypto scheme. *)
   | N_ICheck_signature_ed25519
   | N_ICheck_signature_secp256k1
@@ -376,6 +377,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IDupN -> "N_IDupN"
   | N_IChainId -> "N_IChainId"
   | N_ILevel -> "N_ILevel"
+  | N_IView -> "N_IView"
   | N_ISelf_address -> "N_ISelf_address"
   | N_INever -> "N_INever"
   | N_IUnpair -> "N_IUnpair"
@@ -598,6 +600,7 @@ let all_instructions =
     N_IDupN;
     N_IChainId;
     N_ILevel;
+    N_IView;
     N_ISelf_address;
     N_INever;
     N_IUnpair;
@@ -1023,6 +1026,8 @@ module Instructions = struct
 
   let level = ir_sized_step N_ILevel nullary
 
+  let view = ir_sized_step N_IView nullary
+
   let self_address = ir_sized_step N_ISelf_address nullary
 
   let never = ir_sized_step N_INever nullary
@@ -1376,6 +1381,7 @@ let extract_ir_sized_step :
   | (IAddress (_, _), _) -> Instructions.address
   | (IContract (_, _, _, _), _) -> Instructions.contract
   | (ITransfer_tokens (_, _), _) -> Instructions.transfer_tokens
+  | (IView (_, _, _), _) -> Instructions.view
   | (IImplicit_account (_, _), _) -> Instructions.implicit_account
   | (ICreate_contract _, _) -> Instructions.create_contract
   | (ISet_delegate (_, _), _) -> Instructions.set_delegate

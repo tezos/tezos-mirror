@@ -248,6 +248,12 @@ module Cost_of = struct
       let v0 = S.safe_int size in
       S.safe_int 20 + (v0 + (v0 lsr 1) + (v0 lsr 3))
 
+    (* model N_IView *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/1608
+       Need to determine a proper constant
+    *)
+    let cost_N_IView = S.safe_int 100000
+
     (* model N_IDrop *)
     let cost_N_IDrop = S.safe_int 10
 
@@ -1149,6 +1155,8 @@ module Cost_of = struct
 
     let dip = atomic_step_cost cost_N_IDip
 
+    let view = atomic_step_cost cost_N_IView
+
     let check_signature (pkey : Signature.public_key) b =
       let cost =
         match pkey with
@@ -1400,6 +1408,24 @@ module Cost_of = struct
       in
       compare ty x y Gas.free Return
      [@@coq_axiom_with_reason "non top-level mutually recursive function"]
+
+    let view_mem (elt : Script_string.t)
+        (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
+      let open S_syntax in
+      let per_elt_cost = compare (String_key None) elt elt in
+      let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
+      let intercept = atomic_step_cost (S.safe_int 80) in
+      Gas.(intercept +@ (log2 size *@ per_elt_cost))
+
+    let view_get = view_mem
+
+    let view_update (elt : Script_string.t)
+        (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
+      let open S_syntax in
+      let per_elt_cost = compare (String_key None) elt elt in
+      let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
+      let intercept = atomic_step_cost (S.safe_int 80) in
+      Gas.(intercept +@ (S.safe_int 2 * log2 size *@ per_elt_cost))
 
     let set_mem (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
       let open S_syntax in

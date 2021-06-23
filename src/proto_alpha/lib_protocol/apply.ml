@@ -652,13 +652,24 @@ let apply_manager_operation_content :
       >>?= fun (_unparsed_storage, ctxt) ->
       Script.force_decode_in_context ctxt script.code
       (* see [note] *)
-      >>?= fun (_unparsed_code, ctxt) ->
+      >>?= fun (unparsed_code, ctxt) ->
       Script_ir_translator.parse_script
         ctxt
         ~legacy:false
         ~allow_forged_in_storage:internal
         script
       >>=? fun (Ex_script parsed_script, ctxt) ->
+      let views_result =
+        Script_ir_translator.typecheck_views
+          ctxt
+          ~legacy:false
+          parsed_script.storage_type
+          parsed_script.views
+      in
+      trace
+        (Script_tc_errors.Ill_typed_contract (unparsed_code, []))
+        views_result
+      >>=? fun ctxt ->
       Script_ir_translator.collect_lazy_storage
         ctxt
         parsed_script.storage_type

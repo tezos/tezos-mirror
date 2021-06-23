@@ -42,6 +42,7 @@ type prim =
   | K_parameter
   | K_storage
   | K_code
+  | K_view
   | D_False
   | D_Elt
   | D_Left
@@ -74,6 +75,7 @@ type prim =
   | I_DIP
   | I_DROP
   | I_DUP
+  | I_VIEW
   | I_EDIV
   | I_EMPTY_BIG_MAP
   | I_EMPTY_MAP

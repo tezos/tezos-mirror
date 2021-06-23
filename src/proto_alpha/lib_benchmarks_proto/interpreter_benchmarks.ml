@@ -2147,6 +2147,21 @@ module Registration_section = struct
         ()
 
     let () =
+      let name =
+        match Protocol.Alpha_context.Script_string.of_string "view" with
+        | Ok s -> s
+        | Error _ -> assert false
+      in
+      simple_benchmark
+        ~name:Interpreter_workload.N_IView
+        ~kinstr:
+          (IView
+             ( kinfo (unit @$ address @$ bot),
+               View_signature {name; input_ty = unit; output_ty = unit},
+               halt (option unit @$ bot) ))
+        ()
+
+    let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ISet_delegate
         ~kinstr:

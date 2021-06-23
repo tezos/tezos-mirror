@@ -985,7 +985,8 @@ module RPC = struct
         let legacy = false in
         let open Script_ir_translator in
         Lwt.return
-          ( ( parse_toplevel ~legacy expr >>? fun (arg_type, _, _, root_name) ->
+          ( ( parse_toplevel ctxt ~legacy expr
+            >>? fun ({arg_type; root_name; _}, ctxt) ->
               parse_parameter_ty ctxt ~legacy arg_type
               >>? fun (Ex_ty arg_type, _) ->
               Script_ir_translator.find_entrypoint
@@ -1382,7 +1383,8 @@ module RPC = struct
           let legacy = false in
           let open Script_ir_translator in
           Lwt.return
-            ( parse_toplevel ~legacy expr >>? fun (arg_type, _, _, root_name) ->
+            ( parse_toplevel ctxt ~legacy expr
+            >>? fun ({arg_type; root_name; _}, ctxt) ->
               parse_parameter_ty ctxt ~legacy arg_type
               >>? fun (Ex_ty arg_type, _) ->
               Script_ir_translator.list_entrypoints ~root_name arg_type ctxt

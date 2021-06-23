@@ -773,52 +773,30 @@ let record_inconsistent_type_annotations ctxt loc ta tb =
       Inconsistent_type_annotations (loc, ta, tb))
 
 module type GAS_MONAD = sig
-  (* This monad combines:
-     - a state monad where the state is the context
-     - two levels of error monad to distinguish gas exhaustion from other errors
-
-     It is useful for backtracking on type checking errors without backtracking
-     the consumed gas.
-  *)
   type 'a t
 
-  (* Alias of ['a t] to avoid confusion when the module is open *)
   type 'a gas_monad = 'a t
 
-  (* monadic return operator of the gas monad *)
   val return : 'a -> 'a t
 
-  (* Binding operator for the gas monad *)
   val ( >>$ ) : 'a t -> ('a -> 'b t) -> 'b t
 
-  (* Mapping operator for the gas monad, [m >|$ f] is equivalent to
-     [m >>$ fun x -> return (f x)] *)
   val ( >|$ ) : 'a t -> ('a -> 'b) -> 'b t
 
-  (* Variant of [( >>$ )] to bind uncarbonated functions *)
   val ( >?$ ) : 'a t -> ('a -> 'b tzresult) -> 'b t
 
-  (* Another variant of [( >>$ )] that lets recover from inner errors *)
   val ( >??$ ) : 'a t -> ('a tzresult -> 'b t) -> 'b t
 
-  (* gas-free embedding of tzresult values. [from_tzresult x] is equivalent to [return () >?$ fun () -> x] *)
   val from_tzresult : 'a tzresult -> 'a t
 
-  (* Open the abstraction barrier to construct an 'a t from a function.
-     This must only be used on functions that can only fail because of gas
-     such as unparse_ty *)
   val unsafe_embed : (context -> ('a * context) tzresult) -> 'a t
 
-  (* Gas consumption *)
   val gas_consume : Gas.cost -> unit t
 
-  (* Escaping the gas monad *)
   val run : context -> 'a t -> ('a tzresult * context) tzresult
 
-  (* re-export of [Error_monad.record_trace_eval] *)
   val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
 
-  (* read the state of the state monad *)
   val get_context : context t
 end
 
@@ -1437,6 +1415,38 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_parame
     ~allow_contract:true
     ~allow_ticket:true
 
+and parse_view_input_ty :
+    context ->
+    stack_depth:int ->
+    legacy:bool ->
+    Script.node ->
+    (ex_ty * context) tzresult =
+ fun ctxt ~stack_depth ~legacy ->
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:false
+    ~allow_operation:false
+    ~allow_contract:true
+    ~allow_ticket:false
+
+and parse_view_output_ty :
+    context ->
+    stack_depth:int ->
+    legacy:bool ->
+    Script.node ->
+    (ex_ty * context) tzresult =
+ fun ctxt ~stack_depth ~legacy ->
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:false
+    ~allow_operation:false
+    ~allow_contract:true
+    ~allow_ticket:false
+
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_normal_storage_ty
     :
     context ->
@@ -1877,16 +1887,30 @@ let check_packable ~legacy loc root =
   in
   check root
 
+type toplevel = {
+  code_field : Script.node;
+  arg_type : Script.node;
+  storage_type : Script.node;
+  views : view SMap.t;
+  root_name : field_annot option;
+}
+
 type ('arg, 'storage) code = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage_type : 'storage ty;
+  views : view SMap.t;
   root_name : field_annot option;
 }
 
 type ex_script = Ex_script : ('a, 'c) script -> ex_script
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
+
+type 'storage ex_view =
+  | Ex_view :
+      ('input * 'storage, 'output) Script_typed_ir.lambda
+      -> 'storage ex_view
 
 type (_, _) dig_proof_argument =
   | Dig_proof_argument :
@@ -2863,6 +2887,85 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       | None -> fail_parse_data ())
   | (Chest_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
+
+and parse_view_returning :
+    type storage.
+    ?type_logger:type_logger ->
+    context ->
+    legacy:bool ->
+    storage ty ->
+    view ->
+    (storage ex_view * context) tzresult Lwt.t =
+ fun ?type_logger ctxt ~legacy storage_type {input_ty; output_ty; view_code} ->
+  let input_ty_loc = location input_ty in
+  record_trace_eval
+    (fun () ->
+      ok
+      @@ Ill_formed_type
+           (Some "arg of view", strip_locations input_ty, input_ty_loc))
+    (parse_view_input_ty ctxt ~stack_depth:0 ~legacy input_ty)
+  >>?= fun (Ex_ty input_ty', ctxt) ->
+  let output_ty_loc = location output_ty in
+  record_trace_eval
+    (fun () ->
+      ok
+      @@ Ill_formed_type
+           (Some "return of view", strip_locations output_ty, output_ty_loc))
+    (parse_view_output_ty ctxt ~stack_depth:0 ~legacy output_ty)
+  >>?= fun (Ex_ty output_ty', ctxt) ->
+  parse_instr
+    ?type_logger
+    ~stack_depth:0
+    Lambda
+    ctxt
+    ~legacy
+    view_code
+    (Item_t
+       ( Pair_t ((input_ty', None, None), (storage_type, None, None), None),
+         Bot_t,
+         None ))
+  >>=? fun (judgement, ctxt) ->
+  Lwt.return
+  @@
+  match judgement with
+  | Failed {descr} ->
+      let cur_view' =
+        Ex_view
+          (Lam
+             (close_descr (descr (Item_t (output_ty', Bot_t, None))), view_code))
+      in
+      ok (cur_view', ctxt)
+  | Typed ({loc; aft; _} as descr) -> (
+      let ill_type_view loc stack_ty =
+        serialize_stack_for_error ctxt stack_ty >>? fun (actual, ctxt) ->
+        let expected_stack = Item_t (output_ty', Bot_t, None) in
+        serialize_stack_for_error ctxt expected_stack
+        >>? fun (expected, _ctxt) ->
+        error (Ill_typed_view {loc; actual; expected})
+      in
+      match aft with
+      | Item_t (ty, Bot_t, _) ->
+          record_trace_eval
+            (fun () -> ill_type_view loc aft)
+            ( ty_eq ~legacy ctxt loc ty output_ty' >|? fun (Eq, ctxt) ->
+              let view' = Ex_view (Lam (close_descr descr, view_code)) in
+              (view', ctxt) )
+      | _ -> ill_type_view loc aft)
+
+and typecheck_views :
+    type storage.
+    ?type_logger:type_logger ->
+    context ->
+    legacy:bool ->
+    storage ty ->
+    view SMap.t ->
+    context tzresult Lwt.t =
+ fun ?type_logger ctxt ~legacy storage_type views ->
+  let aux _name cur_view ctxt =
+    parse_view_returning ?type_logger ctxt ~legacy storage_type cur_view
+    >|=? fun (_parsed_view, ctxt) -> ctxt
+  in
+  SMap.fold_es aux views ctxt
 
 and[@coq_axiom_with_reason "gadt"] parse_returning :
     type arg ret.
@@ -4758,6 +4861,25 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       let stack = Item_t (Option_t (Contract_t (t, None), None), rest, annot) in
       typed ctxt 1 loc instr stack
+  | ( Prim (loc, I_VIEW, [name; output_ty], annot),
+      Item_t (input_ty, Item_t (Address_t _, rest, addr_annot), _) ) ->
+      parse_view_name ctxt name >>?= fun (name, ctxt) ->
+      parse_view_output_ty ctxt ~stack_depth:0 ~legacy output_ty
+      >>?= fun (Ex_ty output_ty, ctxt) ->
+      parse_var_annot
+        loc
+        annot
+        ~default:(gen_access_annot addr_annot default_contract_annot)
+      >>?= fun annot ->
+      let instr =
+        {
+          apply =
+            (fun kinfo k ->
+              IView (kinfo, View_signature {name; input_ty; output_ty}, k));
+        }
+      in
+      let stack = Item_t (Option_t (output_ty, None), rest, annot) in
+      typed ctxt 1 loc instr stack
   | ( Prim (loc, I_TRANSFER_TOKENS, [], annot),
       Item_t (p, Item_t (Mutez_t _, Item_t (Contract_t (cp, _), rest, _), _), _)
     ) ->
@@ -4789,8 +4911,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           _ ) ) ->
       parse_two_var_annot loc annot >>?= fun (op_annot, addr_annot) ->
       let canonical_code = fst @@ Micheline.extract_locations code in
-      parse_toplevel ~legacy canonical_code
-      >>?= fun (arg_type, storage_type, code_field, root_name) ->
+      parse_toplevel ctxt ~legacy canonical_code
+      >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
       record_trace
         (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
         (parse_parameter_ty
@@ -4859,6 +4981,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                       },
                       _ ) as lambda),
                  ctxt ) ->
+      let views_result =
+        typecheck_views ctxt ?type_logger ~legacy storage_type views
+      in
+      trace (Ill_typed_contract (canonical_code, [])) views_result
+      >>=? fun ctxt ->
       ty_eq ~legacy ctxt loc arg arg_type_full >>?= fun (Eq, ctxt) ->
       ty_eq ~legacy ctxt loc ret ret_type_full >>?= fun (Eq, ctxt) ->
       ty_eq ~legacy ctxt loc storage_type ginit >>?= fun (Eq, ctxt) ->
@@ -5210,7 +5337,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       fail (Invalid_arity (loc, name, 1, List.length l))
   | ( Prim
         ( loc,
-          (( I_PUSH | I_IF_NONE | I_IF_LEFT | I_IF_CONS | I_EMPTY_MAP
+          (( I_PUSH | I_VIEW | I_IF_NONE | I_IF_LEFT | I_IF_CONS | I_EMPTY_MAP
            | I_EMPTY_BIG_MAP | I_IF ) as name),
           (([] | [_] | _ :: _ :: _ :: _) as l),
           _ ),
@@ -5293,6 +5420,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
              I_DUP;
              I_DIG;
              I_DUG;
+             I_VIEW;
              I_SWAP;
              I_SOME;
              I_UNIT;
@@ -5411,8 +5539,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
           Lwt.return
             ( Script.force_decode_in_context ctxt code >>? fun (code, ctxt) ->
               (* can only fail because of gas *)
-              parse_toplevel ~legacy:true code
-              >>? fun (arg_type, _, _, root_name) ->
+              parse_toplevel ctxt ~legacy:true code
+              >>? fun ({arg_type; root_name; _}, ctxt) ->
               parse_parameter_ty
                 ctxt
                 ~stack_depth:(stack_depth + 1)
@@ -5436,11 +5564,31 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
               in
               (ctxt, contract) ))
 
+and parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
+  function
+  | String (loc, v) as expr ->
+      (* The limitation of length of string is same as entrypoint *)
+      if Compare.Int.(String.length v > 31) then error (View_name_too_long v)
+      else
+        let rec check_char i =
+          if Compare.Int.(i < 0) then ok v
+          else if Script_ir_annot.is_allowed_char v.[i] then check_char (i - 1)
+          else error (Bad_view_name loc)
+        in
+        Gas.consume ctxt (Typecheck_costs.check_printable v) >>? fun ctxt ->
+        record_trace
+          (Invalid_syntactic_constant
+             ( loc,
+               strip_locations expr,
+               "string [a-zA-Z0-9_.%@] and the maximum string length of 31 \
+                characters" ))
+          ( check_char (String.length v - 1) >>? fun v ->
+            Script_string.of_string v >|? fun s -> (s, ctxt) )
+  | expr -> error @@ Invalid_kind (location expr, [String_kind], kind expr)
+
 and parse_toplevel :
-    legacy:bool ->
-    Script.expr ->
-    (Script.node * Script.node * Script.node * field_annot option) tzresult =
- fun ~legacy toplevel ->
+    context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
+ fun ctxt ~legacy toplevel ->
   record_trace (Ill_typed_contract (toplevel, []))
   @@
   match root toplevel with
@@ -5449,9 +5597,9 @@ and parse_toplevel :
   | Bytes (loc, _) -> error (Invalid_kind (loc, [Seq_kind], Bytes_kind))
   | Prim (loc, _, _, _) -> error (Invalid_kind (loc, [Seq_kind], Prim_kind))
   | Seq (_, fields) -> (
-      let rec find_fields p s c fields =
+      let rec find_fields ctxt p s c views fields =
         match fields with
-        | [] -> ok (p, s, c)
+        | [] -> ok (ctxt, (p, s, c, views))
         | Int (loc, _) :: _ -> error (Invalid_kind (loc, [Prim_kind], Int_kind))
         | String (loc, _) :: _ ->
             error (Invalid_kind (loc, [Prim_kind], String_kind))
@@ -5460,29 +5608,48 @@ and parse_toplevel :
         | Seq (loc, _) :: _ -> error (Invalid_kind (loc, [Prim_kind], Seq_kind))
         | Prim (loc, K_parameter, [arg], annot) :: rest -> (
             match p with
-            | None -> find_fields (Some (arg, loc, annot)) s c rest
+            | None -> find_fields ctxt (Some (arg, loc, annot)) s c views rest
             | Some _ -> error (Duplicate_field (loc, K_parameter)))
         | Prim (loc, K_storage, [arg], annot) :: rest -> (
             match s with
-            | None -> find_fields p (Some (arg, loc, annot)) c rest
+            | None -> find_fields ctxt p (Some (arg, loc, annot)) c views rest
             | Some _ -> error (Duplicate_field (loc, K_storage)))
         | Prim (loc, K_code, [arg], annot) :: rest -> (
             match c with
-            | None -> find_fields p s (Some (arg, loc, annot)) rest
+            | None -> find_fields ctxt p s (Some (arg, loc, annot)) views rest
             | Some _ -> error (Duplicate_field (loc, K_code)))
         | Prim (loc, ((K_parameter | K_storage | K_code) as name), args, _) :: _
           ->
             error (Invalid_arity (loc, name, 1, List.length args))
+        | Prim (loc, K_view, [name; input_ty; output_ty; view_code], _) :: rest
+          ->
+            parse_view_name ctxt name >>? fun (str, ctxt) ->
+            Gas.consume
+              ctxt
+              (Michelson_v1_gas.Cost_of.Interpreter.view_update str views)
+            >>? fun ctxt ->
+            if SMap.mem str views then error (Duplicated_view_name loc)
+            else
+              let views' =
+                SMap.add str {input_ty; output_ty; view_code} views
+              in
+              find_fields ctxt p s c views' rest
+        | Prim (loc, K_view, args, _) :: _ ->
+            error (Invalid_arity (loc, K_view, 4, List.length args))
         | Prim (loc, name, _, _) :: _ ->
-            let allowed = [K_parameter; K_storage; K_code] in
+            let allowed = [K_parameter; K_storage; K_code; K_view] in
             error (Invalid_primitive (loc, allowed, name))
       in
-      find_fields None None None fields >>? function
-      | (None, _, _) -> error (Missing_field K_parameter)
-      | (Some _, None, _) -> error (Missing_field K_storage)
-      | (Some _, Some _, None) -> error (Missing_field K_code)
-      | (Some (p, ploc, pannot), Some (s, sloc, sannot), Some (c, cloc, carrot))
-        ->
+      find_fields ctxt None None None SMap.empty fields
+      >>? fun (ctxt, toplevel) ->
+      match toplevel with
+      | (None, _, _, _) -> error (Missing_field K_parameter)
+      | (Some _, None, _, _) -> error (Missing_field K_storage)
+      | (Some _, Some _, None, _) -> error (Missing_field K_code)
+      | ( Some (p, ploc, pannot),
+          Some (s, sloc, sannot),
+          Some (c, cloc, carrot),
+          views ) ->
           let maybe_root_name =
             (* root name can be attached to either the parameter
                  primitive or the toplevel constructor *)
@@ -5498,21 +5665,21 @@ and parse_toplevel :
                     ok (p, [], pannot)
                 | _ -> ok (p, pannot, None))
           in
-          if legacy then
-            (* legacy semantics ignores spurious annotations *)
-            let (p, root_name) =
-              match maybe_root_name with
-              | Ok (p, _, root_name) -> (p, root_name)
-              | Error _ -> (p, None)
-            in
-            ok (p, s, c, root_name)
+          (if legacy then
+           (* legacy semantics ignores spurious annotations *)
+           match maybe_root_name with
+           | Ok (p, _, root_name) -> ok (p, root_name)
+           | Error _ -> ok (p, None)
           else
             (* only one field annot is allowed to set the root entrypoint name *)
             maybe_root_name >>? fun (p, pannot, root_name) ->
             Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
             Script_ir_annot.error_unexpected_annot cloc carrot >>? fun () ->
-            Script_ir_annot.error_unexpected_annot sloc sannot >>? fun () ->
-            ok (p, s, c, root_name))
+            Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
+            (p, root_name))
+          >|? fun (arg_type, root_name) ->
+          ({code_field = c; arg_type; root_name; views; storage_type = s}, ctxt)
+      )
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is
@@ -5564,9 +5731,9 @@ let parse_contract_for_script :
           Lwt.return
             ( Script.force_decode_in_context ctxt code >>? fun (code, ctxt) ->
               (* can only fail because of gas *)
-              match parse_toplevel ~legacy:true code with
+              match parse_toplevel ctxt ~legacy:true code with
               | Error _ -> error (Invalid_contract (loc, contract))
-              | Ok (arg_type, _, _, root_name) -> (
+              | Ok ({arg_type; root_name; _}, ctxt) -> (
                   match
                     parse_parameter_ty ctxt ~stack_depth:0 ~legacy:true arg_type
                   with
@@ -5599,8 +5766,8 @@ let parse_code :
     (ex_code * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~code ->
   Script.force_decode_in_context ctxt code >>?= fun (code, ctxt) ->
-  parse_toplevel ~legacy code
-  >>?= fun (arg_type, storage_type, code_field, root_name) ->
+  parse_toplevel ctxt ~legacy code
+  >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
   let arg_type_loc = location arg_type in
   record_trace
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
@@ -5659,7 +5826,7 @@ let parse_code :
        ret_type_full
        code_field)
   >|=? fun (code, ctxt) ->
-  (Ex_code {code; arg_type; storage_type; root_name}, ctxt)
+  (Ex_code {code; arg_type; storage_type; views; root_name}, ctxt)
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -5695,7 +5862,7 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     (ex_script * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~allow_forged_in_storage {code; storage} ->
   parse_code ~legacy ctxt ?type_logger ~code
-  >>=? fun (Ex_code {code; arg_type; storage_type; root_name}, ctxt) ->
+  >>=? fun (Ex_code {code; arg_type; storage_type; views; root_name}, ctxt) ->
   parse_storage
     ?type_logger
     ctxt
@@ -5704,14 +5871,14 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     storage_type
     ~storage
   >|=? fun (storage, ctxt) ->
-  (Ex_script {code; arg_type; storage; storage_type; root_name}, ctxt)
+  (Ex_script {code; arg_type; storage; storage_type; views; root_name}, ctxt)
 
 let typecheck_code :
     legacy:bool -> context -> Script.expr -> (type_map * context) tzresult Lwt.t
     =
  fun ~legacy ctxt code ->
-  parse_toplevel ~legacy code
-  >>?= fun (arg_type, storage_type, code_field, root_name) ->
+  parse_toplevel ctxt ~legacy code
+  >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
   let type_map = ref [] in
   let arg_type_loc = location arg_type in
   record_trace
@@ -5771,7 +5938,17 @@ let typecheck_code :
       ret_type_full
       code_field
   in
-  trace (Ill_typed_contract (code, !type_map)) result >|=? fun (Lam _, ctxt) ->
+  trace (Ill_typed_contract (code, !type_map)) result >>=? fun (Lam _, ctxt) ->
+  let views_result =
+    typecheck_views
+      ctxt
+      ~type_logger:(fun loc bef aft ->
+        type_map := (loc, (bef, aft)) :: !type_map)
+      ~legacy
+      storage_type
+      views
+  in
+  trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
   (!type_map, ctxt)
 
 module Entrypoints_map = Map.Make (String)
@@ -6076,8 +6253,8 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
   | (Int _ | String _ | Bytes _) as atom -> return (atom, ctxt)
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
-let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
-    =
+let unparse_script ctxt mode
+    {code; arg_type; storage; storage_type; root_name; views} =
   let (Lam (_, original_code)) = code in
   unparse_code ctxt ~stack_depth:0 mode original_code >>=? fun (code, ctxt) ->
   unparse_data ctxt ~stack_depth:0 mode storage_type storage
@@ -6087,6 +6264,20 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
       unparse_ty ctxt storage_type >>? fun (storage_type, ctxt) ->
       let arg_type = add_field_annot root_name None arg_type in
       let open Micheline in
+      let view name {input_ty; output_ty; view_code} views =
+        Prim
+          ( -1,
+            K_view,
+            [
+              String (-1, Script_string.to_string name);
+              input_ty;
+              output_ty;
+              view_code;
+            ],
+            [] )
+        :: views
+      in
+      let views = SMap.fold view views [] |> List.rev in
       let code =
         Seq
           ( -1,
@@ -6094,7 +6285,8 @@ let unparse_script ctxt mode {code; arg_type; storage; storage_type; root_name}
               Prim (-1, K_parameter, [arg_type], []);
               Prim (-1, K_storage, [storage_type], []);
               Prim (-1, K_code, [code], []);
-            ] )
+            ]
+            @ views )
       in
       Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>? fun ctxt ->
       Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>? fun ctxt ->
