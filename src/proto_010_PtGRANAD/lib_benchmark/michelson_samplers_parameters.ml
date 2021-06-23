@@ -40,14 +40,16 @@ let encoding =
   let open Data_encoding in
   let range = Base_samplers.range_encoding in
   conv
-    (fun { int_size;
+    (fun {
+           int_size;
            string_size;
            bytes_size;
            stack_size;
            type_depth;
            list_size;
            set_size;
-           map_size } ->
+           map_size;
+         } ->
       ( int_size,
         string_size,
         bytes_size,

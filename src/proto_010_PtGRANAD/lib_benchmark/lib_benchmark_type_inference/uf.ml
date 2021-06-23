@@ -57,10 +57,8 @@ module UF : S = struct
 
         let value_to_string (x : value) =
           match x with
-          | T {rank} ->
-              Printf.sprintf "[%d]" rank
-          | Ptr k ->
-              Printf.sprintf "ptr(%d)" k
+          | T {rank} -> Printf.sprintf "[%d]" rank
+          | Ptr k -> Printf.sprintf "ptr(%d)" k
       end)
 
   module M = Monads.Make_state_monad (S)
@@ -71,17 +69,15 @@ module UF : S = struct
 
   let rec get_root (k : key) (acc : key list) =
     let open M in
-    get k
-    >>= function
+    get k >>= function
     | None ->
         let msg = Printf.sprintf "UF.get_root: invalid key %d" k in
         Stdlib.failwith msg
     | Some (T {rank}) ->
         let ptr_to_root = Ptr k in
-        iter_list (fun key -> set key ptr_to_root) acc
-        >>= fun () -> return (k, rank)
-    | Some (Ptr k') ->
-        get_root k' (k :: acc)
+        iter_list (fun key -> set key ptr_to_root) acc >>= fun () ->
+        return (k, rank)
+    | Some (Ptr k') -> get_root k' (k :: acc)
 
   let find (k : key) =
     let open M in
@@ -89,16 +85,15 @@ module UF : S = struct
 
   let union k1 k2 =
     let open M in
-    get_root k1 []
-    >>= fun (k1, rank1) ->
-    get_root k2 []
-    >>= fun (k2, rank2) ->
+    get_root k1 [] >>= fun (k1, rank1) ->
+    get_root k2 [] >>= fun (k2, rank2) ->
     if k1 = k2 then return k1
     else if rank1 < rank2 then set k1 (Ptr k2) >>= fun () -> return k2
     else if rank1 > rank2 then set k2 (Ptr k1) >>= fun () -> return k1
     else
       let new_root = T {rank = rank1 + 1} in
-      set k2 (Ptr k1) >>= fun () -> set k1 new_root >>= fun () -> return k1
+      set k2 (Ptr k1) >>= fun () ->
+      set k1 new_root >>= fun () -> return k1
 
   let show s = (S.to_string s, s)
 end

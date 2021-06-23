@@ -62,7 +62,7 @@ let size_based_model t_kind code_or_data =
   Model.make
     ~conv:(function
       | Translator_workload.Typechecker_workload {micheline_size; _} -> (
-        match micheline_size with
-        | {traversal; int_bytes; string_bytes} ->
-            (traversal, (int_bytes, (string_bytes, ()))) ))
+          match micheline_size with
+          | {traversal; int_bytes; string_bytes} ->
+              (traversal, (int_bytes, (string_bytes, ())))))
     ~model:(size_full t_kind code_or_data)

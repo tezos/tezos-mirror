@@ -95,12 +95,7 @@ let () = Format.eprintf "Testing completion@.%!"
 let complete term =
   Format.eprintf "term: %a@." Mikhailsky.pp term ;
   let ((bef, aft), state) = Inference.infer_with_state term in
-  Format.eprintf
-    "Inferred type: %a => %a@."
-    Type.Stack.pp
-    bef
-    Type.Stack.pp
-    aft ;
+  Format.eprintf "Inferred type: %a => %a@." Type.Stack.pp bef Type.Stack.pp aft ;
   let (term, (bef', aft'), _state) =
     Autocomp.complete_code state term rng_state
   in

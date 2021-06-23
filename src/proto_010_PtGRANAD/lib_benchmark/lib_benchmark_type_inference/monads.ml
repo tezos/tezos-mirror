@@ -78,8 +78,6 @@ module Make_state_monad (X : Stores.S) :
 
   let rec iter_list (f : 'a -> unit t) (l : 'a list) =
     match l with
-    | [] ->
-        return ()
-    | elt :: tl ->
-        f elt >>= fun () -> iter_list f tl
+    | [] -> return ()
+    | elt :: tl -> f elt >>= fun () -> iter_list f tl
 end

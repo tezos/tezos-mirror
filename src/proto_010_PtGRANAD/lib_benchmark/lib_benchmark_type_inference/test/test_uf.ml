@@ -31,49 +31,30 @@ module UF = Uf.UF
 
 let test =
   let open UF.M in
-  UF.add 0
-  >>= fun () ->
-  UF.add 1
-  >>= fun () ->
-  UF.add 2
-  >>= fun () ->
-  UF.add 3
-  >>= fun () ->
-  UF.add 4
-  >>= fun () ->
-  UF.find 0
-  >>= fun v0_repr ->
-  UF.find 1
-  >>= fun v1_repr ->
+  UF.add 0 >>= fun () ->
+  UF.add 1 >>= fun () ->
+  UF.add 2 >>= fun () ->
+  UF.add 3 >>= fun () ->
+  UF.add 4 >>= fun () ->
+  UF.find 0 >>= fun v0_repr ->
+  UF.find 1 >>= fun v1_repr ->
   assert (v0_repr <> v1_repr) ;
-  UF.union 0 1
-  >>= fun _ ->
-  UF.find 0
-  >>= fun v0_repr ->
-  UF.find 1
-  >>= fun v1_repr ->
-  UF.find 2
-  >>= fun v2_repr ->
+  UF.union 0 1 >>= fun _ ->
+  UF.find 0 >>= fun v0_repr ->
+  UF.find 1 >>= fun v1_repr ->
+  UF.find 2 >>= fun v2_repr ->
   assert (v0_repr = v1_repr) ;
   assert (v0_repr <> v2_repr) ;
-  UF.union 2 3
-  >>= fun _ ->
-  UF.union 0 3
-  >>= fun _ ->
-  UF.find 1
-  >>= fun v1_repr ->
-  UF.find 2
-  >>= fun v2_repr ->
-  UF.find 3
-  >>= fun v3_repr ->
-  UF.find 4
-  >>= fun v4_repr ->
+  UF.union 2 3 >>= fun _ ->
+  UF.union 0 3 >>= fun _ ->
+  UF.find 1 >>= fun v1_repr ->
+  UF.find 2 >>= fun v2_repr ->
+  UF.find 3 >>= fun v3_repr ->
+  UF.find 4 >>= fun v4_repr ->
   assert (v1_repr = v2_repr) ;
-  UF.union 4 4
-  >>= fun _ ->
+  UF.union 4 4 >>= fun _ ->
   assert (v3_repr <> v4_repr) ;
-  UF.show
-  >>= fun s ->
+  UF.show >>= fun s ->
   Printf.printf "UF state:%s\n" s ;
   return ()
 

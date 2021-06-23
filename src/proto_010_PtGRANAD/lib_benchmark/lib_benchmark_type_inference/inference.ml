@@ -42,23 +42,16 @@ type comparability = Comparable | Not_comparable | Unconstrained
 
 let pp_comparability fmtr (cmp : comparability) =
   match cmp with
-  | Comparable ->
-      Format.fprintf fmtr "Comparable"
-  | Not_comparable ->
-      Format.fprintf fmtr "Not_comparable"
-  | Unconstrained ->
-      Format.fprintf fmtr "Unconstrained"
+  | Comparable -> Format.fprintf fmtr "Comparable"
+  | Not_comparable -> Format.fprintf fmtr "Not_comparable"
+  | Unconstrained -> Format.fprintf fmtr "Unconstrained"
 
 let sup_comparability (c1 : comparability) (c2 : comparability) =
   match (c1, c2) with
-  | (Unconstrained, c) | (c, Unconstrained) ->
-      Some c
-  | (Comparable, Comparable) ->
-      Some Comparable
-  | (Not_comparable, Not_comparable) ->
-      Some Not_comparable
-  | (Comparable, Not_comparable) | (Not_comparable, Comparable) ->
-      None
+  | (Unconstrained, c) | (c, Unconstrained) -> Some c
+  | (Comparable, Comparable) -> Some Comparable
+  | (Not_comparable, Not_comparable) -> Some Not_comparable
+  | (Comparable, Not_comparable) | (Not_comparable, Comparable) -> None
 
 type michelson_type =
   | Base_type of {repr : Type.Base.t option; comparable : comparability}
@@ -72,10 +65,8 @@ let michelson_type_to_string (x : michelson_type) =
       Format.asprintf "?::[%a]" pp_comparability comparable
   | Base_type {repr = Some ty; comparable} ->
       Format.asprintf "%a::[%a]" Type.Base.pp ty pp_comparability comparable
-  | Stack_type None ->
-      "<?>"
-  | Stack_type (Some sty) ->
-      Format.asprintf "%a" Type.Stack.pp sty
+  | Stack_type None -> "<?>"
+  | Stack_type (Some sty) -> Format.asprintf "%a" Type.Stack.pp sty
 
 (* ------------------------------------------------------------------------- *)
 (* Typechecking errors *)
@@ -159,18 +150,15 @@ let pp_inference_error fmtr (err : inference_error) =
       let path = Mikhailsky.Path.to_string path in
       let node = Mikhailsky.to_string node in
       Format.fprintf fmtr "Ill formed arithmetic: %s at path %s" node path
-  | Cyclic_stack_type ->
-      Format.fprintf fmtr "Cyclic stack type"
-  | Cyclic_base_type ->
-      Format.fprintf fmtr "Cyclic base type"
+  | Cyclic_stack_type -> Format.fprintf fmtr "Cyclic stack type"
+  | Cyclic_base_type -> Format.fprintf fmtr "Cyclic base type"
   | Invalid_ast (msg_opt, path, node) -> (
       let path = Mikhailsky.Path.to_string path in
       let node = Mikhailsky.to_string node in
       match msg_opt with
-      | None ->
-          Format.fprintf fmtr "Invalid ast: %s at path %s" node path
+      | None -> Format.fprintf fmtr "Invalid ast: %s at path %s" node path
       | Some msg ->
-          Format.fprintf fmtr "Invalid ast: %s at path %s (%s)" node path msg )
+          Format.fprintf fmtr "Invalid ast: %s at path %s (%s)" node path msg)
 
 exception Ill_typed_script of inference_error
 
@@ -188,8 +176,7 @@ let () =
       match exn with
       | Ill_typed_script error ->
           Some (Format.asprintf "%a" pp_inference_error error)
-      | _ ->
-          None)
+      | _ -> None)
 
 (* ------------------------------------------------------------------------- *)
 
@@ -295,14 +282,12 @@ module M = struct
   let set_repr k v = repr_lift (Repr_sm.set k v) [@@inline]
 
   let get_repr_exn k =
-    repr_lift (Repr_sm.get k)
-    >>= function
-    | None -> Stdlib.failwith "get_repr_exn" | Some res -> return res
+    repr_lift (Repr_sm.get k) >>= function
+    | None -> Stdlib.failwith "get_repr_exn"
+    | Some res -> return res
     [@@inline]
 
-  let set_instr_annot k v =
-    annot_instr_lift (Annot_instr_sm.set k v)
-    [@@inline]
+  let set_instr_annot k v = annot_instr_lift (Annot_instr_sm.set k v) [@@inline]
 
   let get_instr_annot k = annot_instr_lift (Annot_instr_sm.get k) [@@inline]
 
@@ -324,24 +309,17 @@ let rec instantiate (encountered : S.t) (stack_ty : Type.Stack.t) :
   else
     let encountered = S.add stack_ty.tag encountered in
     match stack_ty.node with
-    | Empty_t ->
-        return stack_ty
+    | Empty_t -> return stack_ty
     | Stack_var_t x -> (
-        uf_lift (UF.find x)
-        >>= fun root ->
-        get_repr_exn root
-        >>= function
-        | Stack_type None ->
-            return (Type.stack_var root)
-        | Stack_type (Some ty) ->
-            instantiate encountered ty
-        | _ ->
-            assert false )
+        uf_lift (UF.find x) >>= fun root ->
+        get_repr_exn root >>= function
+        | Stack_type None -> return (Type.stack_var root)
+        | Stack_type (Some ty) -> instantiate encountered ty
+        | _ -> assert false)
     | Item_t (head, tail) ->
-        instantiate_base S.empty head
-        >>= fun head ->
-        instantiate encountered tail
-        >>= fun tail -> return (Type.item head tail)
+        instantiate_base S.empty head >>= fun head ->
+        instantiate encountered tail >>= fun tail ->
+        return (Type.item head tail)
 
 and instantiate_base (encountered : S.t) (ty : Type.Base.t) : Type.Base.t M.t =
   let open Type.Base in
@@ -350,16 +328,8 @@ and instantiate_base (encountered : S.t) (ty : Type.Base.t) : Type.Base.t M.t =
   else
     let encountered = S.add ty.tag encountered in
     match ty.node with
-    | Unit_t
-    | Int_t
-    | Nat_t
-    | Bool_t
-    | String_t
-    | Bytes_t
-    | Key_hash_t
-    | Key_t
-    | Timestamp_t
-    | Mutez_t ->
+    | Unit_t | Int_t | Nat_t | Bool_t | String_t | Bytes_t | Key_hash_t | Key_t
+    | Timestamp_t | Mutez_t ->
         return ty
     | Option_t ty ->
         instantiate_base encountered ty >>= fun ty -> return (Type.option ty)
@@ -368,36 +338,27 @@ and instantiate_base (encountered : S.t) (ty : Type.Base.t) : Type.Base.t M.t =
     | Set_t ty ->
         instantiate_base encountered ty >>= fun ty -> return (Type.set ty)
     | Map_t (kty, vty) ->
-        instantiate_base encountered kty
-        >>= fun kty ->
-        instantiate_base encountered vty
-        >>= fun vty -> return (Type.map kty vty)
+        instantiate_base encountered kty >>= fun kty ->
+        instantiate_base encountered vty >>= fun vty ->
+        return (Type.map kty vty)
     | Pair_t (lty, rty) ->
-        instantiate_base encountered lty
-        >>= fun lty ->
-        instantiate_base encountered rty
-        >>= fun rty -> return (Type.pair lty rty)
+        instantiate_base encountered lty >>= fun lty ->
+        instantiate_base encountered rty >>= fun rty ->
+        return (Type.pair lty rty)
     | Union_t (lty, rty) ->
-        instantiate_base encountered lty
-        >>= fun lty ->
-        instantiate_base encountered rty
-        >>= fun rty -> return (Type.union lty rty)
+        instantiate_base encountered lty >>= fun lty ->
+        instantiate_base encountered rty >>= fun rty ->
+        return (Type.union lty rty)
     | Lambda_t (dom, range) ->
-        instantiate_base encountered dom
-        >>= fun dom ->
-        instantiate_base encountered range
-        >>= fun range -> return (Type.lambda dom range)
+        instantiate_base encountered dom >>= fun dom ->
+        instantiate_base encountered range >>= fun range ->
+        return (Type.lambda dom range)
     | Var_t x -> (
-        uf_lift (UF.find x)
-        >>= fun root ->
-        get_repr_exn root
-        >>= function
-        | Base_type {repr = None; _} ->
-            return (Type.var root)
-        | Base_type {repr = Some ty; _} ->
-            instantiate_base encountered ty
-        | _ ->
-            assert false )
+        uf_lift (UF.find x) >>= fun root ->
+        get_repr_exn root >>= function
+        | Base_type {repr = None; _} -> return (Type.var root)
+        | Base_type {repr = Some ty; _} -> instantiate_base encountered ty
+        | _ -> assert false)
 
 let instantiate_base base_ty = instantiate_base S.empty base_ty
 
@@ -407,62 +368,46 @@ let rec unify (x : Type.Stack.t) (y : Type.Stack.t) : unit M.t =
   let open Type.Stack in
   let open M in
   let unify_single_stack v x =
-    ( match Type.Stack.vars x with
-    | None ->
-        return ()
+    (match Type.Stack.vars x with
+    | None -> return ()
     | Some v' ->
-        if v = v' then raise (Ill_typed_script Cyclic_stack_type)
-        else return () )
+        if v = v' then raise (Ill_typed_script Cyclic_stack_type) else return ())
     >>= fun () ->
-    M.uf_lift (UF.find v)
-    >>= fun root ->
-    get_repr_exn root
-    >>= fun repr ->
+    M.uf_lift (UF.find v) >>= fun root ->
+    get_repr_exn root >>= fun repr ->
     merge_reprs (Stack_type (Some x)) repr >>= fun repr -> set_repr root repr
   in
   if x.tag = y.tag then return ()
   else
     match (x.node, y.node) with
-    | (Empty_t, Empty_t) ->
-        return ()
+    | (Empty_t, Empty_t) -> return ()
     | (Stack_var_t x, Stack_var_t y) ->
-        M.uf_lift (UF.find x)
-        >>= fun root_x ->
-        M.uf_lift (UF.find y)
-        >>= fun root_y ->
-        get_repr_exn root_x
-        >>= fun repr_x ->
-        get_repr_exn root_y
-        >>= fun repr_y ->
-        M.uf_lift (UF.union x y)
-        >>= fun root ->
+        M.uf_lift (UF.find x) >>= fun root_x ->
+        M.uf_lift (UF.find y) >>= fun root_y ->
+        get_repr_exn root_x >>= fun repr_x ->
+        get_repr_exn root_y >>= fun repr_y ->
+        M.uf_lift (UF.union x y) >>= fun root ->
         merge_reprs repr_x repr_y >>= fun repr -> set_repr root repr
-    | (Stack_var_t v, _) ->
-        unify_single_stack v y
-    | (_, Stack_var_t v) ->
-        unify_single_stack v x
+    | (Stack_var_t v, _) -> unify_single_stack v y
+    | (_, Stack_var_t v) -> unify_single_stack v x
     | (Item_t (ty1, tail1), Item_t (ty2, tail2)) ->
-        unify_base ty1 ty2
-        >>= fun () -> unify tail1 tail2 >>= fun () -> return ()
-    | _ ->
-        raise (Ill_typed_script (Stack_types_incompatible (x, y)))
+        unify_base ty1 ty2 >>= fun () ->
+        unify tail1 tail2 >>= fun () -> return ()
+    | _ -> raise (Ill_typed_script (Stack_types_incompatible (x, y)))
 
 and unify_base (x : Type.Base.t) (y : Type.Base.t) : unit M.t =
   let open Type.Base in
   let open M in
   let unify_single_var v x =
-    ( if List.mem v (Type.Base.vars x) then
-      raise (Ill_typed_script Cyclic_base_type)
-    else return () )
+    (if List.mem v (Type.Base.vars x) then
+     raise (Ill_typed_script Cyclic_base_type)
+    else return ())
     >>= fun () ->
-    M.uf_lift (UF.find v)
-    >>= fun root ->
-    get_repr_exn root
-    >>= fun repr ->
-    get_comparability x
-    >>= fun comparable ->
-    merge_reprs (Base_type {repr = Some x; comparable}) repr
-    >>= fun repr -> set_repr root repr
+    M.uf_lift (UF.find v) >>= fun root ->
+    get_repr_exn root >>= fun repr ->
+    get_comparability x >>= fun comparable ->
+    merge_reprs (Base_type {repr = Some x; comparable}) repr >>= fun repr ->
+    set_repr root repr
   in
   if x.tag = y.tag then return ()
   else
@@ -478,12 +423,9 @@ and unify_base (x : Type.Base.t) (y : Type.Base.t) : unit M.t =
     | (Mutez_t, Mutez_t)
     | (Key_t, Key_t) ->
         return ()
-    | (Option_t x, Option_t y) ->
-        unify_base x y
-    | (List_t x, List_t y) ->
-        unify_base x y
-    | (Set_t x, Set_t y) ->
-        unify_base x y
+    | (Option_t x, Option_t y) -> unify_base x y
+    | (List_t x, List_t y) -> unify_base x y
+    | (Set_t x, Set_t y) -> unify_base x y
     | (Map_t (kx, vx), Map_t (ky, vy)) ->
         unify_base kx ky >>= fun () -> unify_base vx vy
     | (Pair_t (x, x'), Pair_t (y, y')) ->
@@ -493,26 +435,18 @@ and unify_base (x : Type.Base.t) (y : Type.Base.t) : unit M.t =
     | (Lambda_t (x, x'), Lambda_t (y, y')) ->
         unify_base x y >>= fun () -> unify_base x' y'
     | (Var_t x, Var_t y) ->
-        M.uf_lift (UF.find x)
-        >>= fun root_x ->
-        M.uf_lift (UF.find y)
-        >>= fun root_y ->
-        get_repr_exn root_x
-        >>= fun repr_x ->
-        get_repr_exn root_y
-        >>= fun repr_y ->
-        M.uf_lift (UF.union x y)
-        >>= fun root ->
+        M.uf_lift (UF.find x) >>= fun root_x ->
+        M.uf_lift (UF.find y) >>= fun root_y ->
+        get_repr_exn root_x >>= fun repr_x ->
+        get_repr_exn root_y >>= fun repr_y ->
+        M.uf_lift (UF.union x y) >>= fun root ->
         merge_reprs repr_x repr_y >>= fun repr -> set_repr root repr
-    | (Var_t v, _) ->
-        unify_single_var v y
-    | (_, Var_t v) ->
-        unify_single_var v x
+    | (Var_t v, _) -> unify_single_var v y
+    | (_, Var_t v) -> unify_single_var v x
     | _ ->
-        instantiate_base x
-        >>= fun x ->
-        instantiate_base y
-        >>= fun y -> raise (Ill_typed_script (Base_types_incompatible (x, y)))
+        instantiate_base x >>= fun x ->
+        instantiate_base y >>= fun y ->
+        raise (Ill_typed_script (Base_types_incompatible (x, y)))
 
 and merge_reprs (repr1 : michelson_type) (repr2 : michelson_type) :
     michelson_type M.t =
@@ -534,24 +468,20 @@ and merge_reprs (repr1 : michelson_type) (repr2 : michelson_type) :
                (Unsatisfiable_comparability_constraint
                   (Comparability_error_types (repr1, repr2))))
       | Some comparable -> (
-        match (opt1, opt2) with
-        | (None, None) ->
-            return (Base_type {repr = None; comparable})
-        | ((Some ty as repr), None) ->
-            assert_comparability comparable ty
-            >>= fun () -> return (Base_type {repr; comparable})
-        | (None, (Some ty as repr)) ->
-            assert_comparability comparable ty
-            >>= fun () -> return (Base_type {repr; comparable})
-        | (Some ty1, Some ty2) ->
-            unify_base ty1 ty2
-            >>= fun () ->
-            assert_comparability comparable ty1
-            >>= fun () ->
-            assert_comparability comparable ty2
-            >>= fun () -> return (Base_type {repr = opt1; comparable}) ) )
-  | _ ->
-      assert false
+          match (opt1, opt2) with
+          | (None, None) -> return (Base_type {repr = None; comparable})
+          | ((Some ty as repr), None) ->
+              assert_comparability comparable ty >>= fun () ->
+              return (Base_type {repr; comparable})
+          | (None, (Some ty as repr)) ->
+              assert_comparability comparable ty >>= fun () ->
+              return (Base_type {repr; comparable})
+          | (Some ty1, Some ty2) ->
+              unify_base ty1 ty2 >>= fun () ->
+              assert_comparability comparable ty1 >>= fun () ->
+              assert_comparability comparable ty2 >>= fun () ->
+              return (Base_type {repr = opt1; comparable})))
+  | _ -> assert false
 
 and assert_comparability comparable ty =
   assert_comparability_aux comparable ty []
@@ -564,122 +494,88 @@ and assert_comparability_aux lower_bound (ty : Type.Base.t)
     let encountered = ty.tag :: encountered in
     match ty.node with
     | Var_t v -> (
-        uf_lift (UF.find v)
-        >>= fun root ->
-        get_repr_exn root
-        >>= fun repr ->
+        uf_lift (UF.find v) >>= fun root ->
+        get_repr_exn root >>= fun repr ->
         match repr with
         | Base_type {repr = None; comparable} -> (
-          match sup_comparability comparable lower_bound with
-          | None ->
-              unsatisfiable_comparability ty comparable lower_bound
-          | Some comparable ->
-              set_repr root (Base_type {repr = None; comparable}) )
+            match sup_comparability comparable lower_bound with
+            | None -> unsatisfiable_comparability ty comparable lower_bound
+            | Some comparable ->
+                set_repr root (Base_type {repr = None; comparable}))
         | Base_type {repr = Some ty; comparable} -> (
-          match sup_comparability comparable lower_bound with
-          | None ->
-              unsatisfiable_comparability ty comparable lower_bound
-          | Some comparable ->
-              assert_comparability_aux lower_bound ty encountered
-              >>= fun () ->
-              set_repr root (Base_type {repr = Some ty; comparable}) )
-        | Stack_type _ ->
-            assert false )
+            match sup_comparability comparable lower_bound with
+            | None -> unsatisfiable_comparability ty comparable lower_bound
+            | Some comparable ->
+                assert_comparability_aux lower_bound ty encountered
+                >>= fun () ->
+                set_repr root (Base_type {repr = Some ty; comparable}))
+        | Stack_type _ -> assert false)
     | List_t _ | Set_t _ | Map_t _ | Lambda_t _ | Key_t -> (
-      match lower_bound with
-      | Unconstrained | Not_comparable ->
-          return ()
-      | Comparable ->
-          unsatisfiable_comparability ty Unconstrained lower_bound )
-    | Unit_t
-    | Int_t
-    | Nat_t
-    | Bool_t
-    | String_t
-    | Bytes_t
-    | Key_hash_t
-    | Timestamp_t
-    | Mutez_t ->
+        match lower_bound with
+        | Unconstrained | Not_comparable -> return ()
+        | Comparable -> unsatisfiable_comparability ty Unconstrained lower_bound
+        )
+    | Unit_t | Int_t | Nat_t | Bool_t | String_t | Bytes_t | Key_hash_t
+    | Timestamp_t | Mutez_t ->
         (* if not (le_comparability lower_bound Comparable) then
          *   unsatisfiable_comparability ty Comparable lower_bound
          * else *)
         return ()
     | Option_t ty -> (
-      match lower_bound with
-      | Comparable ->
-          assert_comparability_aux Comparable ty encountered
-      | Not_comparable | Unconstrained ->
-          return () )
+        match lower_bound with
+        | Comparable -> assert_comparability_aux Comparable ty encountered
+        | Not_comparable | Unconstrained -> return ())
     | Pair_t (l, r) -> (
-      match lower_bound with
-      | Comparable ->
-          assert_comparability_aux Comparable l encountered
-          >>= fun () -> assert_comparability_aux Comparable r encountered
-      | Unconstrained | Not_comparable ->
-          return () )
+        match lower_bound with
+        | Comparable ->
+            assert_comparability_aux Comparable l encountered >>= fun () ->
+            assert_comparability_aux Comparable r encountered
+        | Unconstrained | Not_comparable -> return ())
     | Union_t (l, r) -> (
-      match lower_bound with
-      | Comparable ->
-          assert_comparability_aux Comparable l encountered
-          >>= fun () -> assert_comparability_aux Comparable r encountered
-      | Unconstrained | Not_comparable ->
-          return () )
+        match lower_bound with
+        | Comparable ->
+            assert_comparability_aux Comparable l encountered >>= fun () ->
+            assert_comparability_aux Comparable r encountered
+        | Unconstrained | Not_comparable -> return ())
 
 and get_comparability (ty : Type.Base.t) : comparability M.t =
   let open M in
   match ty.node with
   | Var_t v -> (
-      get_repr_exn v
-      >>= fun repr ->
+      get_repr_exn v >>= fun repr ->
       match repr with
-      | Stack_type _ ->
-          assert false
-      | Base_type {comparable; _} ->
-          return comparable )
-  | Unit_t
-  | Int_t
-  | Nat_t
-  | Bool_t
-  | String_t
-  | Bytes_t
-  | Key_hash_t
-  | Timestamp_t
-  | Mutez_t ->
+      | Stack_type _ -> assert false
+      | Base_type {comparable; _} -> return comparable)
+  | Unit_t | Int_t | Nat_t | Bool_t | String_t | Bytes_t | Key_hash_t
+  | Timestamp_t | Mutez_t ->
       return Comparable
-  | List_t _ | Set_t _ | Map_t _ | Lambda_t _ | Key_t ->
-      return Not_comparable
-  | Option_t ty ->
-      get_comparability ty
+  | List_t _ | Set_t _ | Map_t _ | Lambda_t _ | Key_t -> return Not_comparable
+  | Option_t ty -> get_comparability ty
   | Union_t (lt, rt) | Pair_t (lt, rt) -> (
-      get_comparability lt
-      >>= fun lc ->
-      get_comparability rt
-      >>= fun rc ->
+      get_comparability lt >>= fun lc ->
+      get_comparability rt >>= fun rc ->
       match (lc, rc) with
-      | (Comparable, Comparable) ->
-          return Comparable
-      | _ ->
-          return Unconstrained )
+      | (Comparable, Comparable) -> return Comparable
+      | _ -> return Unconstrained)
 
 let fresh =
   let x = ref ~-1 in
-  fun () -> incr x ; !x
+  fun () ->
+    incr x ;
+    !x
 
 let exists_stack : unit -> Type.Stack.t M.t =
   let open M in
   fun () ->
     let fresh = fresh () in
-    uf_lift (UF.add fresh)
-    >>= fun () ->
-    set_repr fresh (Stack_type None)
-    >>= fun () -> return (Type.stack_var fresh)
+    uf_lift (UF.add fresh) >>= fun () ->
+    set_repr fresh (Stack_type None) >>= fun () -> return (Type.stack_var fresh)
 
 let exists : unit -> Type.Base.t M.t =
   let open M in
   fun () ->
     let fresh = fresh () in
-    uf_lift (UF.add fresh)
-    >>= fun () ->
+    uf_lift (UF.add fresh) >>= fun () ->
     set_repr fresh (Base_type {repr = None; comparable = Unconstrained})
     >>= fun () -> return (Type.var fresh)
 
@@ -687,8 +583,7 @@ let exists_cmp : unit -> Type.Base.t M.t =
   let open M in
   fun () ->
     let fresh = fresh () in
-    uf_lift (UF.add fresh)
-    >>= fun () ->
+    uf_lift (UF.add fresh) >>= fun () ->
     set_repr fresh (Base_type {repr = None; comparable = Comparable})
     >>= fun () -> return (Type.var fresh)
 
@@ -699,8 +594,7 @@ let parse_uint30 n : int =
   | Micheline.Int (_, n')
     when Compare.Z.(Z.zero <= n') && Compare.Z.(n' <= Z.of_int max_uint30) ->
       Z.to_int n'
-  | _ ->
-      assert false
+  | _ -> assert false
 
 (* encodes the per-instruction relationship between input and output types
    of binary arithmetic operations. *)
@@ -711,8 +605,7 @@ let arith_type (instr : Mikhailsky_prim.prim) (ty1 : Type.Base.t)
   | ((I_ADD | I_MUL), Int_t, Nat_t)
   | ((I_ADD | I_MUL), Nat_t, Int_t) ->
       Some Type.int
-  | ((I_ADD | I_MUL), Nat_t, Nat_t) ->
-      Some Type.nat
+  | ((I_ADD | I_MUL), Nat_t, Nat_t) -> Some Type.nat
   | (I_SUB, Int_t, Int_t)
   | (I_SUB, Int_t, Nat_t)
   | (I_SUB, Nat_t, Int_t)
@@ -735,27 +628,21 @@ let arith_type (instr : Mikhailsky_prim.prim) (ty1 : Type.Base.t)
   | (I_MUL, Mutez_t, Nat_t)
   | (I_MUL, Nat_t, Mutez_t) ->
       Some Type.mutez
-  | (I_EDIV, Mutez_t, Nat_t) ->
-      Some Type.(option (pair mutez mutez))
-  | (I_EDIV, Mutez_t, Mutez_t) ->
-      Some Type.(option (pair nat mutez))
-  | _ ->
-      None
+  | (I_EDIV, Mutez_t, Nat_t) -> Some Type.(option (pair mutez mutez))
+  | (I_EDIV, Mutez_t, Mutez_t) -> Some Type.(option (pair nat mutez))
+  | _ -> None
 
-let rec generate_constraints (path : Mikhailsky.Path.t)
-    (node : Mikhailsky.node) (bef : Type.Stack.t) (aft : Type.Stack.t) :
-    unit M.t =
+let rec generate_constraints (path : Mikhailsky.Path.t) (node : Mikhailsky.node)
+    (bef : Type.Stack.t) (aft : Type.Stack.t) : unit M.t =
   let open M in
-  set_instr_annot path {bef; aft}
-  >>= fun () ->
+  set_instr_annot path {bef; aft} >>= fun () ->
   match node with
   | Int (_, _) ->
       assert false (* Ints should always be guarded by annotations *)
   | String (_, _) | Bytes (_, _) ->
       raise (Ill_typed_script Expected_micheline_prim)
   (* Hole *)
-  | Prim (_, I_Hole, [], _) ->
-      return ()
+  | Prim (_, I_Hole, [], _) -> return ()
   (* Stack ops - simple cases *)
   | Prim (_loc, I_DROP, [], _annot) ->
       exists () >>= fun top -> unify bef (Type.item top aft)
@@ -763,21 +650,16 @@ let rec generate_constraints (path : Mikhailsky.Path.t)
       let n = parse_uint30 n in
       generate_constraints_dropn n bef aft
   | Prim (_loc, I_DUP, [], _annot) ->
-      exists ()
-      >>= fun top ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item top rest)
-      >>= fun () -> unify aft Type.(item top (item top rest))
+      exists () >>= fun top ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item top rest) >>= fun () ->
+      unify aft Type.(item top (item top rest))
   | Prim (_loc, I_SWAP, [], _annot) ->
-      exists ()
-      >>= fun a ->
-      exists ()
-      >>= fun b ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item a (item b rest))
-      >>= fun () -> unify aft Type.(item b (item a rest))
+      exists () >>= fun a ->
+      exists () >>= fun b ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item a (item b rest)) >>= fun () ->
+      unify aft Type.(item b (item a rest))
   | Prim (_loc, I_PUSH, [t; d], _annot) ->
       let ty =
         Mikhailsky.parse_ty
@@ -790,19 +672,13 @@ let rec generate_constraints (path : Mikhailsky.Path.t)
       >>= fun () ->
       (* assert_data_has_ground_type (Mikhailsky.Path.at_index 1 path) d ty >>= fun () -> *)
       unify aft Type.(item ty bef)
-  | Prim (_loc, I_UNIT, [], _annot) ->
-      unify aft Type.(item unit bef)
+  | Prim (_loc, I_UNIT, [], _annot) -> unify aft Type.(item unit bef)
   | Prim (_loc, I_DIP, [code], _annot) ->
-      exists ()
-      >>= fun top ->
-      exists_stack ()
-      >>= fun bef_rest ->
-      exists_stack ()
-      >>= fun aft_rest ->
-      unify bef Type.(item top bef_rest)
-      >>= fun () ->
-      unify aft Type.(item top aft_rest)
-      >>= fun () ->
+      exists () >>= fun top ->
+      exists_stack () >>= fun bef_rest ->
+      exists_stack () >>= fun aft_rest ->
+      unify bef Type.(item top bef_rest) >>= fun () ->
+      unify aft Type.(item top aft_rest) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
         code
@@ -811,12 +687,10 @@ let rec generate_constraints (path : Mikhailsky.Path.t)
   (* TODO: DIGn, etc *)
   (* Option-related instructions *)
   | Prim (_, I_SOME, [], _) ->
-      exists ()
-      >>= fun top ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item top rest)
-      >>= fun () -> unify aft Type.(item (option top) rest)
+      exists () >>= fun top ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item top rest) >>= fun () ->
+      unify aft Type.(item (option top) rest)
   | Prim (_, I_NONE, [t], _) ->
       let ty =
         Mikhailsky.parse_ty
@@ -827,12 +701,9 @@ let rec generate_constraints (path : Mikhailsky.Path.t)
       in
       unify aft Type.(item (option ty) bef)
   | Prim (_, I_IF_NONE, [bt; bf], _) ->
-      exists ()
-      >>= fun a ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item (option a) rest)
-      >>= fun () ->
+      exists () >>= fun a ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item (option a) rest) >>= fun () ->
       generate_constraints (Mikhailsky.Path.at_index 0 path) bt rest aft
       >>= fun () ->
       generate_constraints
@@ -842,23 +713,19 @@ let rec generate_constraints (path : Mikhailsky.Path.t)
         aft
   (* bool-based control flow *)
   | Prim (_, I_IF, [bt; bf], _) ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item bool rest)
-      >>= fun () ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item bool rest) >>= fun () ->
       generate_constraints (Mikhailsky.Path.at_index 0 path) bt rest aft
       >>= fun () ->
       generate_constraints (Mikhailsky.Path.at_index 1 path) bf rest aft
   | Prim (_, I_LOOP, [body], _) ->
-      unify bef Type.(item bool aft)
-      >>= fun () ->
+      unify bef Type.(item bool aft) >>= fun () ->
       generate_constraints (Mikhailsky.Path.at_index 0 path) body aft bef
   (* Boolean binops *)
   | Prim (_, I_AND, [], _) | Prim (_, I_OR, [], _) | Prim (_, I_XOR, [], _) ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item bool (item bool rest))
-      >>= fun () -> unify aft Type.(item bool rest)
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item bool (item bool rest)) >>= fun () ->
+      unify aft Type.(item bool rest)
   (* Arithmetic *)
   | Prim (_, ((I_ADD | I_SUB | I_MUL | I_EDIV) as instr), [ty1; ty2], _) -> (
       let ty1 =
@@ -879,238 +746,173 @@ let rec generate_constraints (path : Mikhailsky.Path.t)
       | None ->
           raise (Ill_typed_script (Badly_typed_arithmetic (instr, ty1, ty2)))
       | Some ret ->
-          exists_stack ()
-          >>= fun rest ->
-          unify bef Type.(item ty1 (item ty2 rest))
-          >>= fun () -> unify aft Type.(item ret rest) )
+          exists_stack () >>= fun rest ->
+          unify bef Type.(item ty1 (item ty2 rest)) >>= fun () ->
+          unify aft Type.(item ret rest))
   | Prim (_, (I_ADD | I_SUB | I_MUL | I_EDIV), _, _) ->
       raise (Ill_typed_script (Ill_formed_arithmetic (path, node)))
   | Prim (_, I_COMPARE, [], _) ->
-      exists_cmp ()
-      >>= fun a ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item a (item a rest))
-      >>= fun () -> unify aft Type.(item int rest)
+      exists_cmp () >>= fun a ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item a (item a rest)) >>= fun () ->
+      unify aft Type.(item int rest)
   | Prim (_, I_ABS, [], _) ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item int rest)
-      >>= fun () -> unify aft Type.(item nat rest)
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item int rest) >>= fun () ->
+      unify aft Type.(item nat rest)
   | Prim (_, I_GT, [], _) ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item int rest)
-      >>= fun () -> unify aft Type.(item bool rest)
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item int rest) >>= fun () ->
+      unify aft Type.(item bool rest)
   (* Strings/bytes *)
   | Prim (_, I_CONCAT, [], _) ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item string (item string rest))
-      >>= fun () -> unify aft Type.(item string rest)
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item string (item string rest)) >>= fun () ->
+      unify aft Type.(item string rest)
   | Prim (_, I_SIZE_STRING, [], _) ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item string rest)
-      >>= fun () -> unify aft Type.(item nat rest)
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item string rest) >>= fun () ->
+      unify aft Type.(item nat rest)
   | Prim (_, I_SIZE_BYTES, [], _) ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item bytes rest)
-      >>= fun () -> unify aft Type.(item nat rest)
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item bytes rest) >>= fun () ->
+      unify aft Type.(item nat rest)
   (* Crypto *)
   | Prim (_, I_SHA256, [], _)
   | Prim (_, I_SHA512, [], _)
   | Prim (_, I_BLAKE2B, [], _) ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item bytes rest)
-      >>= fun () -> unify aft Type.(item bytes rest)
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item bytes rest) >>= fun () ->
+      unify aft Type.(item bytes rest)
   | Prim (_, I_HASH_KEY, [], _) ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item key rest)
-      >>= fun () -> unify aft Type.(item key_hash rest)
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item key rest) >>= fun () ->
+      unify aft Type.(item key_hash rest)
   (* sets *)
   | Prim (_, I_EMPTY_SET, [], _) ->
       exists_cmp () >>= fun cmpty -> unify aft Type.(item (set cmpty) bef)
   | Prim (_, I_UPDATE_SET, [], _) ->
-      exists_cmp ()
-      >>= fun cty ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item cty (item bool (item (set cty) rest)))
-      >>= fun () -> unify aft Type.(item (set cty) rest)
+      exists_cmp () >>= fun cty ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item cty (item bool (item (set cty) rest))) >>= fun () ->
+      unify aft Type.(item (set cty) rest)
   | Prim (_, I_SIZE_SET, [], _) ->
-      exists_cmp ()
-      >>= fun cmpty ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item (set cmpty) rest)
-      >>= fun () -> unify aft Type.(item nat rest)
+      exists_cmp () >>= fun cmpty ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item (set cmpty) rest) >>= fun () ->
+      unify aft Type.(item nat rest)
   | Prim (_, I_ITER_SET, [code], _) ->
-      exists_cmp ()
-      >>= fun cmpty ->
-      unify bef Type.(item (set cmpty) aft)
-      >>= fun () ->
+      exists_cmp () >>= fun cmpty ->
+      unify bef Type.(item (set cmpty) aft) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
         code
         Type.(item cmpty aft)
         aft
   | Prim (_, I_MEM_SET, [], _) ->
-      exists_cmp ()
-      >>= fun cmpty ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item cmpty (item (set cmpty) rest))
-      >>= fun () -> unify aft Type.(item bool rest)
+      exists_cmp () >>= fun cmpty ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item cmpty (item (set cmpty) rest)) >>= fun () ->
+      unify aft Type.(item bool rest)
   (* maps *)
   | Prim (_, I_EMPTY_MAP, [], _) ->
-      exists_cmp ()
-      >>= fun kty ->
+      exists_cmp () >>= fun kty ->
       exists () >>= fun vty -> unify aft Type.(item (map kty vty) bef)
   | Prim (_, I_UPDATE_MAP, [], _) ->
-      exists_cmp ()
-      >>= fun kty ->
-      exists ()
-      >>= fun vty ->
-      exists_stack ()
-      >>= fun rest ->
+      exists_cmp () >>= fun kty ->
+      exists () >>= fun vty ->
+      exists_stack () >>= fun rest ->
       unify bef Type.(item kty (item (option vty) (item (map kty vty) rest)))
       >>= fun () -> unify aft Type.(item (map kty vty) rest)
   | Prim (_, I_SIZE_MAP, [], _) ->
-      exists_cmp ()
-      >>= fun kty ->
-      exists ()
-      >>= fun vty ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item (map kty vty) rest)
-      >>= fun () -> unify aft Type.(item nat rest)
+      exists_cmp () >>= fun kty ->
+      exists () >>= fun vty ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item (map kty vty) rest) >>= fun () ->
+      unify aft Type.(item nat rest)
   | Prim (_, I_ITER_MAP, [code], _) ->
-      exists_cmp ()
-      >>= fun kty ->
-      exists ()
-      >>= fun vty ->
-      unify bef Type.(item (map kty vty) aft)
-      >>= fun () ->
+      exists_cmp () >>= fun kty ->
+      exists () >>= fun vty ->
+      unify bef Type.(item (map kty vty) aft) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
         code
         Type.(item (pair kty vty) aft)
         aft
   | Prim (_, I_MAP_MAP, [code], _) ->
-      exists_cmp ()
-      >>= fun kty ->
-      exists ()
-      >>= fun vty1 ->
-      exists ()
-      >>= fun vty2 ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item (map kty vty1) rest)
-      >>= fun () ->
-      unify aft Type.(item (map kty vty2) rest)
-      >>= fun () ->
+      exists_cmp () >>= fun kty ->
+      exists () >>= fun vty1 ->
+      exists () >>= fun vty2 ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item (map kty vty1) rest) >>= fun () ->
+      unify aft Type.(item (map kty vty2) rest) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
         code
         Type.(item (pair kty vty1) rest)
         Type.(item vty2 rest)
   | Prim (_, I_MEM_MAP, [], _) ->
-      exists_cmp ()
-      >>= fun kty ->
-      exists ()
-      >>= fun vty ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item kty (item (map kty vty) rest))
-      >>= fun () -> unify aft Type.(item bool rest)
+      exists_cmp () >>= fun kty ->
+      exists () >>= fun vty ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item kty (item (map kty vty) rest)) >>= fun () ->
+      unify aft Type.(item bool rest)
   | Prim (_, I_GET_MAP, [], _) ->
-      exists_cmp ()
-      >>= fun kty ->
-      exists ()
-      >>= fun vty ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item kty (item (map kty vty) rest))
-      >>= fun () -> unify aft Type.(item (option vty) rest)
+      exists_cmp () >>= fun kty ->
+      exists () >>= fun vty ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item kty (item (map kty vty) rest)) >>= fun () ->
+      unify aft Type.(item (option vty) rest)
   (* Pairs *)
   | Prim (_, I_PAIR, [], _) ->
-      exists ()
-      >>= fun a ->
-      exists ()
-      >>= fun b ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item a (item b rest))
-      >>= fun () -> unify aft Type.(item (pair a b) rest)
+      exists () >>= fun a ->
+      exists () >>= fun b ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item a (item b rest)) >>= fun () ->
+      unify aft Type.(item (pair a b) rest)
   | Prim (_, I_CAR, [], _) ->
-      exists ()
-      >>= fun a ->
-      exists ()
-      >>= fun b ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item (pair a b) rest)
-      >>= fun () -> unify aft Type.(item a rest)
+      exists () >>= fun a ->
+      exists () >>= fun b ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item (pair a b) rest) >>= fun () ->
+      unify aft Type.(item a rest)
   | Prim (_, I_CDR, [], _) ->
-      exists ()
-      >>= fun a ->
-      exists ()
-      >>= fun b ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item (pair a b) rest)
-      >>= fun () -> unify aft Type.(item b rest)
+      exists () >>= fun a ->
+      exists () >>= fun b ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item (pair a b) rest) >>= fun () ->
+      unify aft Type.(item b rest)
   (* Unions *)
   | Prim (_, I_LEFT, [], _) ->
-      exists ()
-      >>= fun lt ->
-      exists ()
-      >>= fun rt ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef (Type.item lt rest)
-      >>= fun () ->
+      exists () >>= fun lt ->
+      exists () >>= fun rt ->
+      exists_stack () >>= fun rest ->
+      unify bef (Type.item lt rest) >>= fun () ->
       unify aft Type.(item (union lt rt) rest) >>= fun res -> return res
   | Prim (_, I_RIGHT, [], _) ->
-      exists ()
-      >>= fun lt ->
-      exists ()
-      >>= fun rt ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item rt rest)
-      >>= fun () -> unify aft Type.(item (union lt rt) rest)
+      exists () >>= fun lt ->
+      exists () >>= fun rt ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item rt rest) >>= fun () ->
+      unify aft Type.(item (union lt rt) rest)
   | Prim (_, (I_LEFT | I_RIGHT), _ :: _, _) ->
       invalid_ast ~msg:__LOC__ path node
   | Prim (_, I_LOOP_LEFT, [body], _) ->
-      exists ()
-      >>= fun l ->
-      exists ()
-      >>= fun r ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item (union l r) rest)
-      >>= fun () ->
-      unify aft Type.(item r rest)
-      >>= fun () ->
+      exists () >>= fun l ->
+      exists () >>= fun r ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item (union l r) rest) >>= fun () ->
+      unify aft Type.(item r rest) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
         body
         Type.(item l rest)
         bef
   | Prim (_, I_IF_LEFT, [bt; bf], _) ->
-      exists ()
-      >>= fun a ->
-      exists ()
-      >>= fun b ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item (union a b) rest)
-      >>= fun () ->
+      exists () >>= fun a ->
+      exists () >>= fun b ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item (union a b) rest) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
         bt
@@ -1124,77 +926,55 @@ let rec generate_constraints (path : Mikhailsky.Path.t)
         aft
   (* lambdas *)
   | Prim (_, I_LAMBDA, [code], _) ->
-      exists ()
-      >>= fun dom ->
-      exists ()
-      >>= fun range ->
-      unify aft Type.(item (lambda dom range) bef)
-      >>= fun () ->
+      exists () >>= fun dom ->
+      exists () >>= fun range ->
+      unify aft Type.(item (lambda dom range) bef) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
         code
         Type.(item dom empty)
         Type.(item range empty)
-  | Prim (_, I_LAMBDA, _, _) ->
-      invalid_ast ~msg:__LOC__ path node
+  | Prim (_, I_LAMBDA, _, _) -> invalid_ast ~msg:__LOC__ path node
   | Prim (_, I_APPLY, [], _) ->
-      exists ()
-      >>= fun a ->
-      exists ()
-      >>= fun b ->
-      exists ()
-      >>= fun ret ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item a (item (lambda (pair a b) ret) rest))
-      >>= fun () -> unify aft Type.(item (lambda b ret) rest)
+      exists () >>= fun a ->
+      exists () >>= fun b ->
+      exists () >>= fun ret ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item a (item (lambda (pair a b) ret) rest)) >>= fun () ->
+      unify aft Type.(item (lambda b ret) rest)
   | Prim (_, I_EXEC, [], _) ->
-      exists ()
-      >>= fun a ->
-      exists ()
-      >>= fun ret ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item a (item (lambda a ret) rest))
-      >>= fun () -> unify aft Type.(item ret rest)
+      exists () >>= fun a ->
+      exists () >>= fun ret ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item a (item (lambda a ret) rest)) >>= fun () ->
+      unify aft Type.(item ret rest)
   (* lists *)
   | Prim (_, I_NIL, [], _) ->
       exists () >>= fun a -> unify aft Type.(item (list a) bef)
   | Prim (_, I_CONS, [], _) ->
-      exists ()
-      >>= fun a ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item a (item (list a) rest))
-      >>= fun () -> unify aft Type.(item (list a) rest)
+      exists () >>= fun a ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item a (item (list a) rest)) >>= fun () ->
+      unify aft Type.(item (list a) rest)
   | Prim (_, I_SIZE_LIST, [], _) ->
-      exists ()
-      >>= fun ty ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item (list ty) rest)
-      >>= fun () -> unify aft Type.(item nat rest)
+      exists () >>= fun ty ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item (list ty) rest) >>= fun () ->
+      unify aft Type.(item nat rest)
   | Prim (_, I_ITER_LIST, [code], _) ->
-      exists ()
-      >>= fun ty ->
-      unify bef Type.(item (list ty) aft)
-      >>= fun () ->
+      exists () >>= fun ty ->
+      unify bef Type.(item (list ty) aft) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
         code
         Type.(item ty aft)
         aft
   | Prim (_, I_MAP_LIST, [code], _) ->
-      exists ()
-      >>= fun ty1 ->
-      exists ()
-      >>= fun ty2 ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item (list ty1) rest)
-      >>= fun () ->
-      unify aft Type.(item (list ty2) rest)
-      >>= fun () ->
+      exists () >>= fun ty1 ->
+      exists () >>= fun ty2 ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item (list ty1) rest) >>= fun () ->
+      unify aft Type.(item (list ty2) rest) >>= fun () ->
       generate_constraints
         (Mikhailsky.Path.at_index 0 path)
         code
@@ -1202,137 +982,96 @@ let rec generate_constraints (path : Mikhailsky.Path.t)
         Type.(item ty2 rest)
   (* pack/unpack*)
   | Prim (_, I_PACK, [], _) ->
-      exists ()
-      >>= fun ty ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item ty rest)
-      >>= fun () -> unify aft Type.(item bytes rest)
+      exists () >>= fun ty ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item ty rest) >>= fun () ->
+      unify aft Type.(item bytes rest)
   | Prim (_, I_UNPACK, [], _) ->
-      exists ()
-      >>= fun ty ->
-      exists_stack ()
-      >>= fun rest ->
-      unify bef Type.(item bytes rest)
-      >>= fun () -> unify aft Type.(item (option ty) rest)
+      exists () >>= fun ty ->
+      exists_stack () >>= fun rest ->
+      unify bef Type.(item bytes rest) >>= fun () ->
+      unify aft Type.(item (option ty) rest)
   (* Others *)
-  | Seq (_, []) ->
-      unify bef aft
+  | Seq (_, []) -> unify bef aft
   | Seq (_, [single]) ->
       generate_constraints (Mikhailsky.Path.at_index 0 path) single bef aft
-  | Seq (_, instrs) ->
-      generate_constraints_seq path 0 instrs bef aft
-  | _ ->
-      raise (Ill_typed_script (Unhandled_micheline (path, node)))
+  | Seq (_, instrs) -> generate_constraints_seq path 0 instrs bef aft
+  | _ -> raise (Ill_typed_script (Unhandled_micheline (path, node)))
 
 and generate_constraints_seq path index instrs bef aft =
   let open M in
   match instrs with
-  | [] ->
-      assert false
+  | [] -> assert false
   | [single] ->
       generate_constraints (Mikhailsky.Path.at_index index path) single bef aft
   | hd :: tl ->
-      exists_stack ()
-      >>= fun stack_ty ->
-      generate_constraints
-        (Mikhailsky.Path.at_index index path)
-        hd
-        bef
-        stack_ty
+      exists_stack () >>= fun stack_ty ->
+      generate_constraints (Mikhailsky.Path.at_index index path) hd bef stack_ty
       >>= fun () -> generate_constraints_seq path (index + 1) tl stack_ty aft
 
 and generate_constraints_data (path : Mikhailsky.Path.t)
     (node : Mikhailsky.node) (ty : Type.Base.t) : unit M.t =
   let open M in
-  set_data_annot path ty
-  >>= fun () ->
+  set_data_annot path ty >>= fun () ->
   match node with
-  | Prim (_, D_Hole, [], _) ->
-      return ()
-  | Prim (_, D_Unit, [], _) ->
-      unify_base ty Type.unit
+  | Prim (_, D_Hole, [], _) -> return ()
+  | Prim (_, D_Unit, [], _) -> unify_base ty Type.unit
   | Prim (_, D_True, [], _) | Prim (_, D_False, [], _) ->
       unify_base ty Type.bool
-  | String _ ->
-      unify_base ty Type.string
-  | Bytes _ ->
-      unify_base ty Type.bytes
+  | String _ -> unify_base ty Type.string
+  | Bytes _ -> unify_base ty Type.bytes
   | Prim (_, D_Pair, [vl; vr], _) ->
-      exists ()
-      >>= fun lty ->
-      exists ()
-      >>= fun rty ->
+      exists () >>= fun lty ->
+      exists () >>= fun rty ->
       generate_constraints_data (Mikhailsky.Path.at_index 0 path) vl lty
       >>= fun () ->
       generate_constraints_data (Mikhailsky.Path.at_index 1 path) vr rty
       >>= fun () -> unify_base ty (Type.pair lty rty)
   | Prim (_, D_Left, [term], _) ->
-      exists ()
-      >>= fun lty ->
-      exists ()
-      >>= fun rty ->
+      exists () >>= fun lty ->
+      exists () >>= fun rty ->
       generate_constraints_data (Mikhailsky.Path.at_index 0 path) term lty
       >>= fun () -> unify_base ty (Type.union lty rty)
   | Prim (_, D_Right, [term], _) ->
-      exists ()
-      >>= fun lty ->
-      exists ()
-      >>= fun rty ->
+      exists () >>= fun lty ->
+      exists () >>= fun rty ->
       generate_constraints_data (Mikhailsky.Path.at_index 0 path) term rty
       >>= fun () -> unify_base ty (Type.union lty rty)
   | Prim (_, D_None, [], _) ->
       exists () >>= fun elt_ty -> unify_base ty (Type.option elt_ty)
   | Prim (_, D_Some, [v], _) ->
-      exists ()
-      >>= fun elt_ty ->
+      exists () >>= fun elt_ty ->
       generate_constraints_data (Mikhailsky.Path.at_index 0 path) v elt_ty
       >>= fun () -> unify_base ty (Type.option elt_ty)
-  | Prim (_, A_Int, [Int (_, _)], _) ->
-      unify_base ty Type.int
-  | Prim (_, A_Nat, [Int (_, _)], _) ->
-      unify_base ty Type.nat
-  | Prim (_, A_Timestamp, [Int (_, _)], _) ->
-      unify_base ty Type.timestamp
-  | Prim (_, A_Mutez, [Int (_, _)], _) ->
-      unify_base ty Type.mutez
-  | Prim (_, A_Key_hash, [Bytes (_, _)], _) ->
-      unify_base ty Type.key_hash
-  | Prim (_, A_Key, [Bytes (_, _)], _) ->
-      unify_base ty Type.key
+  | Prim (_, A_Int, [Int (_, _)], _) -> unify_base ty Type.int
+  | Prim (_, A_Nat, [Int (_, _)], _) -> unify_base ty Type.nat
+  | Prim (_, A_Timestamp, [Int (_, _)], _) -> unify_base ty Type.timestamp
+  | Prim (_, A_Mutez, [Int (_, _)], _) -> unify_base ty Type.mutez
+  | Prim (_, A_Key_hash, [Bytes (_, _)], _) -> unify_base ty Type.key_hash
+  | Prim (_, A_Key, [Bytes (_, _)], _) -> unify_base ty Type.key
   | Prim (_, A_List, [Seq (_, subterms)], _) ->
-      exists ()
-      >>= fun elt_ty ->
-      unify_base ty Type.(list elt_ty)
-      >>= fun () ->
+      exists () >>= fun elt_ty ->
+      unify_base ty Type.(list elt_ty) >>= fun () ->
       (* path' accounts for the fact that the Seq is hidden under an annot. *)
       let path' = Mikhailsky.Path.at_index 0 path in
       generate_constraints_data_list path' 0 subterms elt_ty
   | Prim (_, A_Set, [Seq (_, subterms)], _) ->
-      exists_cmp ()
-      >>= fun elt_ty ->
-      unify_base ty Type.(set elt_ty)
-      >>= fun () ->
+      exists_cmp () >>= fun elt_ty ->
+      unify_base ty Type.(set elt_ty) >>= fun () ->
       (* path' accounts for the fact that the Seq is hidden under an annot. *)
       let path' = Mikhailsky.Path.at_index 0 path in
       generate_constraints_data_set path' 0 subterms elt_ty
   | Prim (_, A_Map, [Seq (_, subterms)], _) ->
-      exists_cmp ()
-      >>= fun k_ty ->
-      exists ()
-      >>= fun v_ty ->
-      unify_base ty Type.(map k_ty v_ty)
-      >>= fun () ->
+      exists_cmp () >>= fun k_ty ->
+      exists () >>= fun v_ty ->
+      unify_base ty Type.(map k_ty v_ty) >>= fun () ->
       (* path' accounts for the fact that the Seq is hidden under an annot. *)
       let path' = Mikhailsky.Path.at_index 0 path in
       generate_constraints_data_map path' 0 subterms k_ty v_ty
   | Prim (_, A_Lambda, [(Seq (_, _) as node)], _) ->
-      exists ()
-      >>= fun dom ->
-      exists ()
-      >>= fun range ->
-      unify_base ty Type.(lambda dom range)
-      >>= fun () ->
+      exists () >>= fun dom ->
+      exists () >>= fun range ->
+      unify_base ty Type.(lambda dom range) >>= fun () ->
       let path' = Mikhailsky.Path.at_index 0 path in
       let bef = Type.(item dom empty) in
       let aft = Type.(item range empty) in
@@ -1350,60 +1089,51 @@ and generate_constraints_data (path : Mikhailsky.Path.t)
 and generate_constraints_data_list path index data ty =
   let open M in
   match data with
-  | [] ->
-      return ()
+  | [] -> return ()
   | hd :: tl ->
       let hd_path = Mikhailsky.Path.at_index index path in
-      generate_constraints_data hd_path hd ty
-      >>= fun () -> generate_constraints_data_list path (index + 1) tl ty
+      generate_constraints_data hd_path hd ty >>= fun () ->
+      generate_constraints_data_list path (index + 1) tl ty
 
 and generate_constraints_data_set path index data ty =
   let open M in
   match data with
-  | [] ->
-      return ()
+  | [] -> return ()
   | hd :: tl ->
       let hd_path = Mikhailsky.Path.at_index index path in
-      generate_constraints_data hd_path hd ty
-      >>= fun () -> generate_constraints_data_list path (index + 1) tl ty
+      generate_constraints_data hd_path hd ty >>= fun () ->
+      generate_constraints_data_list path (index + 1) tl ty
 
 and generate_constraints_data_map path index data k_ty v_ty =
   let open M in
   match data with
-  | [] ->
-      return ()
+  | [] -> return ()
   | elt :: tl -> (
       let elt_path = Mikhailsky.Path.at_index index path in
       match elt with
       | Prim (_, D_Elt, [k; v], _) ->
           let k_path = Mikhailsky.Path.at_index 0 elt_path in
-          generate_constraints_data k_path k k_ty
-          >>= fun () ->
+          generate_constraints_data k_path k k_ty >>= fun () ->
           let v_path = Mikhailsky.Path.at_index 1 elt_path in
-          generate_constraints_data v_path v v_ty
-          >>= fun () ->
+          generate_constraints_data v_path v v_ty >>= fun () ->
           generate_constraints_data_map path (index + 1) tl k_ty v_ty
-      | _ ->
-          invalid_ast ~msg:__LOC__ elt_path elt )
+      | _ -> invalid_ast ~msg:__LOC__ elt_path elt)
 
 and generate_constraints_dropn n bef aft =
   let open M in
   if n = 0 then unify bef aft
   else
-    exists ()
-    >>= fun top -> generate_constraints_dropn (n - 1) bef (Type.item top aft)
+    exists () >>= fun top ->
+    generate_constraints_dropn (n - 1) bef (Type.item top aft)
 
 let infer_with_state (node : Mikhailsky.node) :
     (Type.Stack.t * Type.Stack.t) * state =
   let open M in
-  ( exists_stack ()
-  >>= fun bef ->
-  exists_stack ()
-  >>= fun aft ->
-  generate_constraints Mikhailsky.Path.root node bef aft
-  >>= fun () ->
-  instantiate bef
-  >>= fun bef -> instantiate aft >>= fun aft -> return (bef, aft) )
+  ( exists_stack () >>= fun bef ->
+    exists_stack () >>= fun aft ->
+    generate_constraints Mikhailsky.Path.root node bef aft >>= fun () ->
+    instantiate bef >>= fun bef ->
+    instantiate aft >>= fun aft -> return (bef, aft) )
     (M.empty ())
 
 let infer (node : Mikhailsky.node) : Type.Stack.t * Type.Stack.t =
@@ -1411,10 +1141,9 @@ let infer (node : Mikhailsky.node) : Type.Stack.t * Type.Stack.t =
 
 let infer_data_with_state (node : Mikhailsky.node) : Type.Base.t * state =
   let open M in
-  ( exists ()
-  >>= fun ty ->
-  generate_constraints_data Mikhailsky.Path.root node ty
-  >>= fun () -> instantiate_base ty >>= fun ty -> return ty )
+  ( exists () >>= fun ty ->
+    generate_constraints_data Mikhailsky.Path.root node ty >>= fun () ->
+    instantiate_base ty >>= fun ty -> return ty )
     (M.empty ())
 
 let infer_data (node : Mikhailsky.node) : Type.Base.t =
