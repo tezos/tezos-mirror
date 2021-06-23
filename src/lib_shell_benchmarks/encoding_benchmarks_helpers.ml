@@ -59,9 +59,8 @@ end
 let fixed_size_shared :
     name:string ->
     generator:'a Base_samplers.sampler ->
-    make_bench:((unit -> 'a) ->
-               unit ->
-               unit Tezos_benchmark.Generator.benchmark) ->
+    make_bench:
+      ((unit -> 'a) -> unit -> unit Tezos_benchmark.Generator.benchmark) ->
     Tezos_benchmark.Benchmark.t =
  fun ~name ~generator ~make_bench ->
   let free_variable =
