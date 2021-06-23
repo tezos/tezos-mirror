@@ -788,10 +788,6 @@ module Onthefly : sig
   val add_directory_and_finalize :
     ?archive_prefix:string -> o -> dir_path:string -> unit Lwt.t
 
-  (* [get_raw_output_fd tar] returns the fd to write directly in the tar
-     file. It is no recommended to use it. *)
-  val get_raw_output_fd : o -> Lwt_unix.file_descr
-
   (* input utilities *)
 
   (* [open_out ~file] opens a tar archive as an input archive located at
@@ -800,9 +796,6 @@ module Onthefly : sig
 
   (* [close_in tar] closes an input tar archive. *)
   val close_in : i -> unit Lwt.t
-
-  (* [header_size] exposes the static size of a tar header *)
-  val header_size : int
 
   (* [list_files tar] returns the list of files contained in the
      [tar]. *)
@@ -1073,8 +1066,6 @@ end = struct
           ~filename:Filename.(concat archive_prefix filename))
       files
 
-  let get_raw_output_fd {fd; _} = fd
-
   type i = {
     mutable current_pos : Int64.t;
     mutable data_pos : Int64.t;
@@ -1129,8 +1120,6 @@ end = struct
         list_files t >>= fun files ->
         update_files t files ;
         Lwt.return files
-
-  let header_size = Header.length
 
   let get_file tar ~filename =
     get_files tar >>= fun files ->
