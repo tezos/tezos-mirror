@@ -83,7 +83,7 @@ let store_block =
     ~pp1:pp_block_descriptor
     ("block", block_descriptor_encoding)
 
-(* Notice*)
+(* Notice *)
 let fork_testchain =
   declare_4
     ~section
@@ -240,6 +240,18 @@ let recover_merge =
     ~name:"recovering_merge"
     ~msg:"recovering from an interrupted store merge"
     ()
+
+(* Warning *)
+let warning_incomplete_storage =
+  Internal_event.Simple.declare_1
+    ~level:Internal_event.Warning
+    ~section
+    ~name:"incomplete_storage"
+    ~msg:
+      "the storage is missing the commit information for protocol \
+       {protocol_level} - operation receipt verification for this protocol \
+       will be unavailable"
+    ("protocol_level", Data_encoding.int31)
 
 (* Error *)
 let merge_error =

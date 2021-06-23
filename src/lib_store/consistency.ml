@@ -580,6 +580,9 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
                   (* We have an incomplete context (full or rolling)
                      and thus not enough information to get the
                      activation. We ignore this protocol change. *)
+                  Store_events.(
+                    emit warning_incomplete_storage block_proto_level)
+                  >>= fun () ->
                   aux
                     ~prev_proto_level:(Some block_proto_level)
                     ~level:(Int32.succ level)
@@ -593,7 +596,10 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
                    | Ok tup ->
                        Lwt.return_some
                          (Protocol_levels.commit_info_of_tuple tup)
-                   | Error _ -> Lwt.return_none)
+                   | Error _ ->
+                       Store_events.(
+                         emit warning_incomplete_storage block_proto_level)
+                       >>= fun () -> Lwt.return_none)
                   >>= fun commit_info ->
                   let activation =
                     ( block_proto_level,
@@ -685,7 +691,8 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
                  (* We have an incomplete context (full or rolling)
                     and thus not enough information to get the
                     activation. We ignore this protocol change. *)
-                 return (pls, new_proto_level)
+                 Store_events.(emit warning_incomplete_storage new_proto_level)
+                 >>= fun () -> return (pls, new_proto_level)
              | Some context ->
                  Context.get_protocol context >>= fun protocol_hash ->
                  (Context.retrieve_commit_info
@@ -694,7 +701,10 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
                   >>= function
                   | Ok tup ->
                       Lwt.return_some (Protocol_levels.commit_info_of_tuple tup)
-                  | Error _ -> Lwt.return_none)
+                  | Error _ ->
+                      Store_events.(
+                        emit warning_incomplete_storage new_proto_level)
+                      >>= fun () -> Lwt.return_none)
                  >>= fun commit_info ->
                  let activation =
                    ( new_proto_level,
