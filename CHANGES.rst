@@ -22,6 +22,11 @@ Node
 
 -  Fixed wrong error message in case of p2p network address binding collision.
 
+-  Updated the output of the ``/stats/gc`` RPC entry point: it now also
+   reports the number of full major collections made by the OCaml
+   garbage collector. Because this changes the JSON schema of this
+   existing RPC entry point, it is a breaking change.
+
 Client
 ------
 
@@ -142,11 +147,6 @@ Node
 -  Added an RPC to run `TZIP-4
    views<https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`__
    offchain, accessible via ``../<block_id>/helpers/scripts/run_view``.
-
--  Updated the output of the ``/stats/gc`` RPC entry point: it now also
-   reports the number of full major collections made by the OCaml
-   garbage collector. Because this changes the JSON schema of this
-   existing RPC entry point, it is a breaking change.
 
 Client
 ------
