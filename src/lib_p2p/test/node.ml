@@ -231,7 +231,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
             trusted_points
           >>= fun _ ->
           P2p_welcome.create ~backlog:10 connect_handler ~addr port
-          >>= fun welcome ->
+          >>=? fun welcome ->
           P2p_welcome.activate welcome ;
           Event.(emit node_ready) port >>= fun () ->
           let node =

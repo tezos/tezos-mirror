@@ -75,7 +75,7 @@ let rec take n l =
   else if n = 0 then []
   else match l with [] -> [] | hd :: rest -> hd :: take (n - 1) rest
 
-let rex r = (r, Re.compile (Re.Perl.re r))
+let rex ?opts r = (r, Re.compile (Re.Perl.re ?opts r))
 
 let show_rex = fst
 

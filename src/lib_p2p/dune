@@ -5,10 +5,12 @@
             lwt-canceler
             ringo
             tezos-base
+            tezos-base.unix
             tezos-stdlib
             tezos-stdlib-unix
             tezos-p2p-services)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base_unix
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib
                    -open Tezos_p2p_services)))

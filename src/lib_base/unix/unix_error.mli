@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,38 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Welcome worker.
+(** An encoding for Unix errors *)
+val encoding : Unix.error Data_encoding.t
 
-    Accept incoming connections and add them to the pool.
-*)
+(**/**)
 
-(** Type discribing an opening failure for the
-   listening socket. *)
-type listening_socket_open_failure = {
-  reason : Unix.error;  (** The error we are re-raising *)
-  address : P2p_addr.t;  (** The interface we are trying to listen to *)
-  port : int;  (** The port we are trying to listen to *)
-}
+module Internal_for_tests : sig
+  (** [get_constructor_name unix_err] gives the name of the specific [unix_err]
+      error constructor.
 
-(** Type of an error in case where the listening
-    socket fails to open. *)
-type error += Failed_to_open_listening_socket of listening_socket_open_failure
+      Beware, it is not converting the given unix error to string.
+      It only gives a string representation of the error case.
 
-(** Type of a welcome worker. *)
-type t
-
-(** [create ?addr ~backlog pool port] returns a running welcome worker
-    adding connections into [pool] listening on [addr:port]. [backlog]
-    is passed to [Lwt_unix.listen]. *)
-val create :
-  ?addr:P2p_addr.t ->
-  backlog:int ->
-  ('msg, 'meta, 'meta_conn) P2p_connect_handler.t ->
-  P2p_addr.port ->
-  t tzresult Lwt.t
-
-(** [activate t] start the worker that will accept connections *)
-val activate : t -> unit
-
-(** [shutdown t] returns when [t] has completed shutdown. *)
-val shutdown : t -> unit Lwt.t
+      For instance, [get_constructor_name EACCES] evaluates in ["EACCES"]
+      and [get_constructor_name @@ EUNKNOWNERR 42] evaluates in ["EUNKNOWNERR"]. *)
+  val get_constructor_name : Unix.error -> string
+end

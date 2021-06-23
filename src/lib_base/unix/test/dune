@@ -1,0 +1,36 @@
+
+(executable
+ (name
+   test_unix_error
+ )
+ (libraries
+   tezos-base.unix
+   data-encoding
+   tezos-test-helpers
+   qcheck-alcotest
+ )
+ (flags (:standard
+          -open Tezos_base
+          -open Tezos_base_unix
+          -open Tezos_error_monad
+         )))
+
+(rule
+ (alias buildtest)
+ (deps
+   test_unix_error.exe
+ )
+ (action (progn)))
+
+
+(rule
+ (alias runtest_unix_error)
+ (action (run %{exe:test_unix_error.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-base)
+ (deps
+  (alias runtest_unix_error)
+ )
+ (action (progn)))

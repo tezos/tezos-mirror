@@ -159,15 +159,13 @@ let create_maintenance_worker limits pool connect_handler config triggers log =
     ~log
 
 let may_create_welcome_worker config limits connect_handler =
-  match config.listening_port with
-  | None -> Lwt.return_none
-  | Some port ->
-      P2p_welcome.create
-        ~backlog:limits.backlog
-        connect_handler
-        ?addr:config.listening_addr
-        port
-      >>= fun w -> Lwt.return_some w
+  config.listening_port
+  |> Option.map_es (fun port ->
+         P2p_welcome.create
+           ~backlog:limits.backlog
+           connect_handler
+           ?addr:config.listening_addr
+           port)
 
 type ('msg, 'peer_meta, 'conn_meta) connection =
   ('msg, 'peer_meta, 'conn_meta) P2p_conn.t
@@ -230,7 +228,7 @@ module Real = struct
     let maintenance =
       create_maintenance_worker limits pool connect_handler config triggers log
     in
-    may_create_welcome_worker config limits connect_handler >>= fun welcome ->
+    may_create_welcome_worker config limits connect_handler >>=? fun welcome ->
     return
       {
         config;
