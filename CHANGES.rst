@@ -199,8 +199,8 @@ Proxy server
    Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
    for further details.
 
-Version 9.3 (Not Available Yet)
-===============================
+Version 9.3
+===========
 
 -  Reintroduced the following RPCs in the Granada RPC plugin. These
    RPCs were already present in the Edo and Florence protocol plugin
@@ -216,6 +216,9 @@ Version 9.3 (Not Available Yet)
 
 -  Fixed a case where the node was unable to fetch an operation because
    a remote peer did not answer.
+
+-  Fixed various issues with the TLS layer that could in particular
+   cause some valid certificates to be refused from remote nodes.
 
 Version 9.2
 ===========
