@@ -640,12 +640,6 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     | None -> Lwt.return (err_missing_key from)
     | Some tree -> C.add_tree t to_ tree >|= ok
 
-  let list t k =
-    C.fold ~depth:(`Eq 1) t k ~init:[] ~f:(fun k t acc ->
-        match C.Tree.kind t with
-        | `Value -> Lwt.return (`Key k :: acc)
-        | `Tree -> Lwt.return (`Dir k :: acc))
-
   let remove t k = C.remove t (I.to_path k [])
 
   let description =
@@ -769,47 +763,6 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
     let description = description
   end
-
-  let resolve t prefix =
-    let rec loop i prefix = function
-      | [] when Compare.Int.(i = I.path_length) -> (
-          match I.of_path prefix with
-          | None -> assert false
-          | Some path -> Lwt.return [path])
-      | [] ->
-          list t prefix >>= fun prefixes ->
-          List.map_s
-            (function `Key prefix | `Dir prefix -> loop (i + 1) prefix [])
-            prefixes
-          >|= List.flatten
-      | [d] when Compare.Int.(i = I.path_length - 1) ->
-          if Compare.Int.(i >= I.path_length) then invalid_arg "IO.resolve" ;
-          list t prefix >>= fun prefixes ->
-          List.map_s
-            (function
-              | `Key prefix | `Dir prefix -> (
-                  match
-                    let ( >?? ) = Option.bind in
-                    List.last_opt prefix >?? fun last ->
-                    Misc.remove_prefix ~prefix:d last
-                  with
-                  | None -> Lwt.return_nil
-                  | Some _ -> loop (i + 1) prefix []))
-            prefixes
-          >|= List.flatten
-      | "" :: ds ->
-          list t prefix >>= fun prefixes ->
-          List.map_s
-            (function `Key prefix | `Dir prefix -> loop (i + 1) prefix ds)
-            prefixes
-          >|= List.flatten
-      | d :: ds -> (
-          if Compare.Int.(i >= I.path_length) then invalid_arg "IO.resolve" ;
-          C.mem_tree t (prefix @ [d]) >>= function
-          | true -> loop (i + 1) (prefix @ [d]) ds
-          | false -> Lwt.return_nil)
-    in
-    loop 0 [] prefix
 
   module Make_set (R : REGISTER) (N : NAME) = struct
     type t = C.t
