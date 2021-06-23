@@ -53,12 +53,11 @@ module Helpers = struct
 
   (* Initializes a context by setting random bytes for each key in the
      given [key_set]. *)
-  let random_contents rng_state base_dir index context key_set
-      commit_batch_size =
+  let random_contents rng_state base_dir index context key_set commit_batch_size
+      =
     Key_map.fold_lwt
       (fun path size (index, context, current_commit_batch_size) ->
-        Io_helpers.initialize_key rng_state context path size
-        >>= fun context ->
+        Io_helpers.initialize_key rng_state context path size >>= fun context ->
         if current_commit_batch_size < commit_batch_size then
           Lwt.return (index, context, current_commit_batch_size + 1)
         else
@@ -76,8 +75,7 @@ module Helpers = struct
       else
         let key = random_key rng_state ~card:key_card ~depth in
         match Key_map.does_not_collide key acc with
-        | `Key_exists | `Key_has_prefix | `Key_has_suffix ->
-            loop remaining acc
+        | `Key_exists | `Key_has_prefix | `Key_has_suffix -> loop remaining acc
         | `Key_does_not_collide ->
             let size = 1000 in
             let acc = Key_map.insert key size acc in
@@ -101,7 +99,7 @@ module Helpers = struct
     Lwt_main.run
       ( random_contents rng_state base_dir index context keys commit_batch_size
       >>= fun (context, index) ->
-      Io_helpers.commit_and_reload base_dir index context )
+        Io_helpers.commit_and_reload base_dir index context )
 end
 
 module Context_size_dependent_shared = struct
@@ -135,13 +133,15 @@ module Context_size_dependent_shared = struct
     let open Data_encoding in
     let int = int31 in
     conv
-      (fun { depth;
+      (fun {
+             depth;
              storage_chunk_bytes;
              storage_chunks;
              insertions;
              key_card;
              commit_batch_size;
-             temp_dir } ->
+             temp_dir;
+           } ->
         ( depth,
           storage_chunk_bytes,
           storage_chunks,
@@ -207,9 +207,11 @@ module Context_size_dependent_shared = struct
   let workload_to_vector = function
     | Random_context_random_access {depth; storage_bytes; context_size} ->
         let keys =
-          [ ("depth", float_of_int depth);
+          [
+            ("depth", float_of_int depth);
             ("storage_bytes", float_of_int storage_bytes);
-            ("context_size", float_of_int context_size) ]
+            ("context_size", float_of_int context_size);
+          ]
         in
         Sparse_vec.String.of_list keys
 
@@ -236,8 +238,8 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
   let name = "CONTEXT_SIZE_DEPENDENT_READ"
 
   let info =
-    "Benchmarking the read accesses with contexts of various sizes (with \
-     fixed storage size except for the accessed key)"
+    "Benchmarking the read accesses with contexts of various sizes (with fixed \
+     storage size except for the accessed key)"
 
   let tags = ["io"]
 
@@ -262,8 +264,7 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
         Lwt_main.run
           (Tezos_protocol_environment.Context.find context random_key)
       with
-      | Some _ ->
-          ()
+      | Some _ -> ()
       | None ->
           let s = String.concat "/" random_key in
           Format.eprintf "key %s not found@." s ;
@@ -292,11 +293,17 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_context.Context.close index
-          >>= fun () -> Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
+          ( Tezos_context.Context.close index >>= fun () ->
+            Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
       in
-      let result = try f context with _ -> finalizer () ; exit 1 in
-      finalizer () ; result
+      let result =
+        try f context
+        with _ ->
+          finalizer () ;
+          exit 1
+      in
+      finalizer () ;
+      result
     in
     Generator.With_context {workload; closure; with_context}
 
@@ -364,11 +371,17 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_context.Context.close index
-          >>= fun () -> Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
+          ( Tezos_context.Context.close index >>= fun () ->
+            Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
       in
-      let result = try f context with _ -> finalizer () ; exit 1 in
-      finalizer () ; result
+      let result =
+        try f context
+        with _ ->
+          finalizer () ;
+          exit 1
+      in
+      finalizer () ;
+      result
     in
     Generator.With_context {workload; closure; with_context}
 
@@ -397,7 +410,8 @@ module Irmin_pack_shared = struct
     let open Data_encoding in
     let int = int31 in
     conv
-      (fun { depth;
+      (fun {
+             depth;
              insertions;
              key_card;
              irmin_pack_max_width;
@@ -405,7 +419,8 @@ module Irmin_pack_shared = struct
              storage_chunks;
              default_storage_bytes;
              commit_batch_size;
-             temp_dir } ->
+             temp_dir;
+           } ->
         ( depth,
           insertions,
           key_card,
@@ -466,8 +481,7 @@ module Irmin_pack_shared = struct
     match Key_map.does_not_collide key keys with
     | `Key_exists | `Key_has_prefix | `Key_has_suffix ->
         sample_irmin_directory_key rng_state cfg keys
-    | `Key_does_not_collide ->
-        key
+    | `Key_does_not_collide -> key
 
   let irmin_pack_key i = "pack_" ^ string_of_int i
 
@@ -512,8 +526,7 @@ module Irmin_pack_read_bench : Benchmark.S = struct
         let acc = ref key_set in
         for index = 0 to Array.length directories - 1 do
           let key = directories.(index) in
-          if index = target_index then
-            acc := Key_map.insert key value_size !acc
+          if index = target_index then acc := Key_map.insert key value_size !acc
           else acc := Key_map.insert key cfg.default_storage_bytes !acc
         done ;
         !acc
@@ -537,10 +550,12 @@ module Irmin_pack_read_bench : Benchmark.S = struct
   let workload_to_vector = function
     | Irmin_pack_read {depth; irmin_width; storage_bytes; context_size} ->
         let keys =
-          [ ("depth", float_of_int depth);
+          [
+            ("depth", float_of_int depth);
             ("irmin_width", float_of_int irmin_width);
             ("storage_bytes", float_of_int storage_bytes);
-            ("context_size", float_of_int context_size) ]
+            ("context_size", float_of_int context_size);
+          ]
         in
         Sparse_vec.String.of_list keys
 
@@ -589,8 +604,7 @@ module Irmin_pack_read_bench : Benchmark.S = struct
       stats ;
     let closure context =
       match Lwt_main.run (Context.find context target_key) with
-      | Some _ ->
-          ()
+      | Some _ -> ()
       | None ->
           let s = String.concat "/" target_key in
           Format.eprintf "key %s not found@." s ;
@@ -618,11 +632,17 @@ module Irmin_pack_read_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_context.Context.close index
-          >>= fun () -> Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
+          ( Tezos_context.Context.close index >>= fun () ->
+            Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
       in
-      let result = try f context with _ -> finalizer () ; exit 1 in
-      finalizer () ; result
+      let result =
+        try f context
+        with _ ->
+          finalizer () ;
+          exit 1
+      in
+      finalizer () ;
+      result
     in
     Generator.With_context {workload; closure; with_context}
 
@@ -708,10 +728,12 @@ module Irmin_pack_write_bench : Benchmark.S = struct
     | Irmin_pack_write {keys_written; irmin_width; storage_bytes; context_size}
       ->
         let keys =
-          [ ("keys_written", float_of_int keys_written);
+          [
+            ("keys_written", float_of_int keys_written);
             ("irmin_width", float_of_int irmin_width);
             ("storage_bytes", float_of_int storage_bytes);
-            ("context_size", float_of_int context_size) ]
+            ("context_size", float_of_int context_size);
+          ]
         in
         Sparse_vec.String.of_list keys
 
@@ -782,11 +804,17 @@ module Irmin_pack_write_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_context.Context.close index
-          >>= fun () -> Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
+          ( Tezos_context.Context.close index >>= fun () ->
+            Tezos_stdlib_unix.Lwt_utils_unix.remove_dir base_dir )
       in
-      let result = try f context with _ -> finalizer () ; exit 1 in
-      finalizer () ; result
+      let result =
+        try f context
+        with _ ->
+          finalizer () ;
+          exit 1
+      in
+      finalizer () ;
+      result
     in
     let closure context =
       Lwt_main.run (Io_helpers.commit context >>= fun _ -> Lwt.return_unit)
@@ -823,10 +851,8 @@ module Read_random_key_bench : Benchmark.S = struct
   let config_encoding =
     let open Data_encoding in
     conv
-      (fun {existing_context; subdirectory} ->
-        (existing_context, subdirectory))
-      (fun (existing_context, subdirectory) ->
-        {existing_context; subdirectory})
+      (fun {existing_context; subdirectory} -> (existing_context, subdirectory))
+      (fun (existing_context, subdirectory) -> {existing_context; subdirectory})
       (obj2
          (req "existing_context" (tup2 string Context_hash.encoding))
          (req "subdirectory" (list string)))
@@ -850,8 +876,10 @@ module Read_random_key_bench : Benchmark.S = struct
   let workload_to_vector = function
     | Read_random_key {depth; storage_bytes} ->
         let keys =
-          [ ("depth", float_of_int depth);
-            ("storage_bytes", float_of_int storage_bytes) ]
+          [
+            ("depth", float_of_int depth);
+            ("storage_bytes", float_of_int storage_bytes);
+          ]
         in
         Sparse_vec.String.of_list keys
 
@@ -880,13 +908,18 @@ module Read_random_key_bench : Benchmark.S = struct
         Gc.compact () ;
         Lwt_main.run (Tezos_context.Context.close index)
       in
-      let result = try f context with _ -> finalizer () ; exit 1 in
-      finalizer () ; result
+      let result =
+        try f context
+        with _ ->
+          finalizer () ;
+          exit 1
+      in
+      finalizer () ;
+      result
     in
     let closure context =
       match Lwt_main.run (Context.find context key) with
-      | Some _ ->
-          ()
+      | Some _ -> ()
       | None ->
           let s = String.concat "/" key in
           Format.eprintf "key %s not found@." s ;
@@ -935,12 +968,14 @@ module Write_random_keys_bench : Benchmark.S = struct
     let open Data_encoding in
     let int = int31 in
     conv
-      (fun { existing_context;
+      (fun {
+             existing_context;
              storage_chunk_bytes;
              storage_chunks;
              max_written_keys;
              temp_dir;
-             subdirectory } ->
+             subdirectory;
+           } ->
         ( existing_context,
           storage_chunk_bytes,
           storage_chunks,
@@ -991,8 +1026,10 @@ module Write_random_keys_bench : Benchmark.S = struct
   let workload_to_vector = function
     | Write_random_keys {keys_written; storage_bytes} ->
         let keys =
-          [ ("keys_written", float_of_int keys_written);
-            ("storage_bytes", float_of_int storage_bytes) ]
+          [
+            ("keys_written", float_of_int keys_written);
+            ("storage_bytes", float_of_int storage_bytes);
+          ]
         in
         Sparse_vec.String.of_list keys
 
@@ -1035,9 +1072,7 @@ module Write_random_keys_bench : Benchmark.S = struct
         Format.asprintf "%s/%s_%d" temp_dir name (Random.int 65536)
       in
       Io_helpers.copy_rec source_base_dir target_base_dir ;
-      Format.eprintf
-        "Finished copying original context to %s@."
-        target_base_dir ;
+      Format.eprintf "Finished copying original context to %s@." target_base_dir ;
       let (context, index) =
         Io_helpers.load_context_from_disk target_base_dir context_hash
       in
@@ -1054,12 +1089,17 @@ module Write_random_keys_bench : Benchmark.S = struct
       let finalizer () =
         Gc.compact () ;
         Lwt_main.run
-          ( Tezos_context.Context.close index
-          >>= fun () ->
-          Tezos_stdlib_unix.Lwt_utils_unix.remove_dir target_base_dir )
+          ( Tezos_context.Context.close index >>= fun () ->
+            Tezos_stdlib_unix.Lwt_utils_unix.remove_dir target_base_dir )
       in
-      let result = try f context with _ -> finalizer () ; exit 1 in
-      finalizer () ; result
+      let result =
+        try f context
+        with _ ->
+          finalizer () ;
+          exit 1
+      in
+      finalizer () ;
+      result
     in
     let closure context =
       Lwt_main.run
