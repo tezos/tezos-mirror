@@ -142,7 +142,7 @@ struct
   open Tezos_protocol_environment_structs.V3.M
   module Pervasives = Stdlib
   module Compare = Compare
-  module List = List
+  module List = Tezos_error_monad.TzLwtreslib.List
   module Char = Char
   module Bytes = Bytes
   module Hex = Hex
@@ -173,7 +173,6 @@ struct
 
   module Z = Z
   module Lwt = Lwt
-  module Lwt_list = Lwt_list
   module Uri = Uri
 
   module Data_encoding = struct
@@ -589,7 +588,6 @@ struct
     include
       Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
         (Local_monad)
-    include Error_monad_traversors
 
     let make_trace_encoding e = TzTrace.encoding e
 

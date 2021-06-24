@@ -65,10 +65,10 @@
     [when_different_lengths] error should be composed with the other errors.)
 
     To obtain a different behaviour for sequential traversors, or to process
-    two lists in parallel, you can use {!combine} or any of the alternative that
-    handles the error differently: {!combine_drop}, {!combine_with_leftovers}.
-    Finally, the {!rev_combine} is provided to allow to avoid
-    multiple-reversing.
+    two lists in parallel, you can use {!combine} or any of the alternatives
+    that handles the error differently: {!combine_drop},
+    {!combine_with_leftovers}. Finally, the {!rev_combine} is provided to allow
+    to avoid multiple-reversing.
 
     {3 Special considerations}
 
@@ -78,7 +78,7 @@
     behaviour, it may be surprising enough that it requires mentioning here.
 
     Because they may return early, {!for_all2} and {!exists2} and all their
-    variants may return [Ok _] even tough the arguments have different lengths.
+    variants may return [Ok _] even though the arguments have different lengths.
 *)
 
 module type S = sig
@@ -91,13 +91,13 @@ module type S = sig
   (** [nil] is [[]] *)
   val nil : 'a list
 
-  (** [nil] is [Ok []] *)
+  (** [nil_e] is [Ok []] *)
   val nil_e : ('a list, 'trace) result
 
-  (** [nil] is [Lwt.return_nil] *)
+  (** [nil_s] is [Lwt.return_nil] *)
   val nil_s : 'a list Lwt.t
 
-  (** [nil] is [Lwt.return (Ok [])] *)
+  (** [nil_es] is [Lwt.return (Ok [])] *)
   val nil_es : ('a list, 'trace) result Lwt.t
 
   (** {3 Safe wrappers}
@@ -120,7 +120,7 @@ module type S = sig
   (** [nth xs n] is the [n]th element of the list or [None] if the list has
       fewer than [n] elements.
 
-      [nth xs 0 = tl xs] *)
+      [nth xs 0 = hd xs] *)
   val nth : 'a list -> int -> 'a option
 
   (** [nth_opt] is an alias for [nth] provided for backwards compatibility. *)
@@ -846,6 +846,10 @@ module type S = sig
   (** {3 compare / equal} *)
 
   val compare : ('a -> 'a -> int) -> 'a list -> 'a list -> int
+
+  val compare_lengths : 'a list -> 'a list -> int
+
+  val compare_length_with : 'a list -> int -> int
 
   val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 

@@ -87,7 +87,7 @@ let sign ?watermark sk ctxt (Contents_list contents) =
 
 let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     (packed_operations : packed_operation list) =
-  assert (List.length packed_operations > 0) ;
+  assert (match packed_operations with [] -> false | _ :: _ -> true) ;
   (* Hypothesis : each operation must have the same branch (is this really true?) *)
   let {Tezos_base.Operation.branch} =
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd packed_operations).shell

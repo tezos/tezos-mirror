@@ -345,8 +345,6 @@ module type Indexed_raw_context = sig
 
   val keys : context -> key list Lwt.t
 
-  val resolve : context -> string list -> key list Lwt.t
-
   val remove : context -> key -> context Lwt.t
 
   val copy : context -> from:key -> to_:key -> context tzresult Lwt.t

@@ -134,7 +134,7 @@ let freeze_rolls_for_cycle ctxt cycle =
   in
   Storage.Roll.Snapshot_for_cycle.update ctxt cycle selected_index
   >>=? fun ctxt ->
-  fold_left_s
+  List.fold_left_es
     (fun ctxt index ->
       if Compare.Int.(index = selected_index) then return ctxt
       else
@@ -437,7 +437,7 @@ let init ctxt = Storage.Roll.Next.init ctxt Roll_repr.first
 let init_first_cycles ctxt =
   let preserved = Constants_storage.preserved_cycles ctxt in
   (* Precompute rolls for cycle (0 --> preserved_cycles) *)
-  fold_left_s
+  List.fold_left_es
     (fun ctxt c ->
       let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
       Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0 >>=? fun ctxt ->

@@ -96,7 +96,7 @@ let test_rewards_retrieval () =
   let open Alpha_services.Delegate.Endorsing_rights in
   let rec find_block b =
     Context.get_endorsers (B b) >>=? fun endorsers ->
-    if List.length endorsers = endorsers_per_block then return b
+    if List.compare_length_with endorsers endorsers_per_block = 0 then return b
     else Block.bake b >>=? fun b -> find_block b
   in
   let balance_update delegate before after =

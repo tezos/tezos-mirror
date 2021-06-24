@@ -214,9 +214,11 @@ let register () =
       Delegate.list ctxt >>= fun delegates ->
       match q with
       | {active = true; inactive = false} ->
-          filter_s (fun pkh -> Delegate.deactivated ctxt pkh >|=? not) delegates
+          List.filter_es
+            (fun pkh -> Delegate.deactivated ctxt pkh >|=? not)
+            delegates
       | {active = false; inactive = true} ->
-          filter_s (fun pkh -> Delegate.deactivated ctxt pkh) delegates
+          List.filter_es (fun pkh -> Delegate.deactivated ctxt pkh) delegates
       | _ -> return delegates) ;
   register1 S.info (fun ctxt pkh () () ->
       Delegate.full_balance ctxt pkh >>=? fun balance ->
@@ -302,7 +304,7 @@ let requested_levels ~default ctxt cycles levels =
              (List.map (Level.from_raw ctxt) levels
               :: List.map (Level.levels_in_cycle ctxt) cycles))
       in
-      map
+      List.map_e
         (fun level ->
           let current_level = Level.current ctxt in
           if Level.(level <= current_level) then ok (level, None)
@@ -465,7 +467,7 @@ module Baking_rights = struct
         in
         match q.delegates with
         | [] ->
-            map_s (baking_priorities ctxt max_priority) levels
+            List.map_es (baking_priorities ctxt max_priority) levels
             >|=? fun rights ->
             let rights =
               if q.all then rights
@@ -473,14 +475,14 @@ module Baking_rights = struct
             in
             List.concat rights
         | _ :: _ as delegates ->
-            Lwt_list.filter_map_s
+            List.filter_map_s
               (fun delegate ->
                 Contract.get_manager_key ctxt delegate >>= function
                 | Ok pk -> Lwt.return (Some (pk, delegate))
                 | Error _ -> Lwt.return_none)
               delegates
             >>= fun delegates ->
-            map_s
+            List.map_es
               (fun level ->
                 baking_priorities_of_delegates
                   ctxt
@@ -579,7 +581,7 @@ module Endorsing_rights = struct
           q.cycles
           q.levels
         >>?= fun levels ->
-        map_s (endorsement_slots ctxt) levels >|=? fun rights ->
+        List.map_es (endorsement_slots ctxt) levels >|=? fun rights ->
         let rights = List.concat rights in
         match q.delegates with
         | [] -> rights

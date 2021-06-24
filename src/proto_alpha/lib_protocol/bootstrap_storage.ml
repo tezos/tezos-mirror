@@ -54,8 +54,8 @@ let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
     Operation_hash.hash_bytes [Bytes.of_string "Un festival de GADT."]
   in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
-  fold_left_s init_account ctxt accounts >>=? fun ctxt ->
-  fold_left_s (init_contract ~typecheck) ctxt contracts >>=? fun ctxt ->
+  List.fold_left_es init_account ctxt accounts >>=? fun ctxt ->
+  List.fold_left_es (init_contract ~typecheck) ctxt contracts >>=? fun ctxt ->
   (match no_reward_cycles with
   | None -> return ctxt
   | Some cycles ->
@@ -92,7 +92,7 @@ let init ctxt ~typecheck ?ramp_up_cycles ?no_reward_cycles accounts contracts =
             endorsement_security_deposit = Tez_repr.zero;
           })
       >>= fun ctxt ->
-      fold_left_s
+      List.fold_left_es
         (fun ctxt cycle ->
           Tez_repr.(block_step *? Int64.of_int cycle)
           >>?= fun block_security_deposit ->

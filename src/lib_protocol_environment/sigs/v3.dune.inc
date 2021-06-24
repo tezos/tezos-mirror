@@ -4,7 +4,6 @@
 
    ;; Part of OCaml stdlib 4.09.1
    v3/pervasives.mli
-   v3/list.mli
    v3/string.mli
    v3/char.mli
    v3/bytes.mli
@@ -16,7 +15,6 @@
    v3/hex.mli           ; 1.4.0
    v3/z.mli             ; 1.10
    v3/lwt.mli           ; 5.3.0
-   v3/lwt_list.mli
    v3/data_encoding.mli ; 0.2
 
    ;; Tezos extended stdlib revision 32f04ec483b8d9c62dd0957389eb5268d8b3a38d
@@ -27,6 +25,9 @@
    v3/option.mli
    v3/tzEndian.mli
    v3/bits.mli
+
+   ;; Part of Lwtreslib
+   v3/list.mli
 
    v3/RPC_arg.mli
    v3/RPC_path.mli

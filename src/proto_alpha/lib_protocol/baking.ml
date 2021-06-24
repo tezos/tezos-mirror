@@ -312,7 +312,7 @@ let baking_priorities c level =
   f 0
 
 let endorsement_rights ctxt level =
-  fold_right_s
+  List.fold_right_es
     (fun slot acc ->
       Roll.endorsement_rights_owner ctxt level ~slot >|=? fun pk ->
       let pkh = Signature.Public_key.hash pk in
@@ -346,11 +346,12 @@ let[@coq_axiom_with_reason "gadt"] check_endorsement_rights ctxt chain_id ~slot
         >>=? fun endorsements ->
         match Signature.Public_key_hash.Map.find_opt pkh endorsements with
         | None -> fail Unexpected_endorsement (* unexpected *)
-        | Some (_pk, slots, v) ->
+        | Some (_pk, (top_slot :: _ as slots), v) ->
             error_unless
-              Compare.Int.(slot = List.hd slots)
+              Compare.Int.(slot = top_slot)
               (Unexpected_endorsement_slot slot)
-            >>?= fun () -> return (pkh, slots, v))
+            >>?= fun () -> return (pkh, slots, v)
+        | Some (_pk, [], _) -> fail (Unexpected_endorsement_slot slot))
 
 let select_delegate delegate delegate_list max_priority =
   let rec loop acc l n =

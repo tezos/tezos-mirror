@@ -185,10 +185,19 @@ let cycle_eras_encoding =
       | Error _ -> raise Invalid_cycle_eras_exn)
     (Data_encoding.list cycle_era_encoding)
 
-let current_era cycle_eras = List.hd cycle_eras
+let current_era = function [] -> assert false | cycle_era :: _ -> cycle_era
 
 let root_level cycle_eras =
-  let first_era = List.hd (List.rev cycle_eras) in
+  let first_era = List.last_opt cycle_eras in
+  let first_era =
+    match first_era with
+    | Some first_era -> first_era
+    | None ->
+        (* {!create_cycle_eras} fails if the list is empty.
+           {!cycle_eras_encoding} uses {!create_cycle_eras} and so fails on empty
+           lists too. *)
+        assert false
+  in
   {
     level = first_era.first_level;
     level_position = 0l;

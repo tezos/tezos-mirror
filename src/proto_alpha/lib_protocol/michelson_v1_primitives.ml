@@ -523,8 +523,8 @@ let prims_of_strings expr =
           (Invalid_primitive_name (expr, loc))
           (prim_of_string prim)
         >>? fun prim ->
-        map convert args >|? fun args -> Prim (0, prim, args, annot)
-    | Seq (_, args) -> map convert args >|? fun args -> Seq (0, args)
+        List.map_e convert args >|? fun args -> Prim (0, prim, args, annot)
+    | Seq (_, args) -> List.map_e convert args >|? fun args -> Seq (0, args)
   in
   convert (root expr) >|? fun expr -> strip_locations expr
   [@@coq_axiom_with_reason

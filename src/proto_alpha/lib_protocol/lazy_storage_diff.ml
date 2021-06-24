@@ -122,7 +122,7 @@ module Big_map = struct
         (ctxt, Z.of_int size_diff)
 
   let apply_updates ctxt ~id updates =
-    fold_left_s
+    List.fold_left_es
       (fun (ctxt, size) update ->
         apply_update ctxt ~id update >|=? fun (ctxt, added_size) ->
         (ctxt, Z.add size added_size))
@@ -330,7 +330,7 @@ let encoding =
   def "lazy_storage_diff" @@ list item_encoding
 
 let apply ctxt diffs =
-  fold_left_s
+  List.fold_left_es
     (fun (ctxt, total_size) (Item (k, id, diff)) ->
       let ops = get_ops k in
       apply_diff ctxt ops ~id diff >|=? fun (ctxt, added_size) ->
@@ -357,7 +357,7 @@ let fresh :
  [@@coq_axiom_with_reason "gadt"]
 
 let init ctxt =
-  fold_left_s
+  List.fold_left_es
     (fun ctxt (_tag, Lazy_storage_kind.Ex_Kind k) ->
       let (module OPS) = get_ops k in
       OPS.Next.init ctxt)
@@ -367,7 +367,7 @@ let init ctxt =
 
 let cleanup_temporaries ctxt =
   Raw_context.map_temporary_lazy_storage_ids_s ctxt (fun temp_ids ->
-      Lwt_list.fold_left_s
+      List.fold_left_s
         (fun ctxt (_tag, Lazy_storage_kind.Ex_Kind k) ->
           let (module OPS) = get_ops k in
           Lazy_storage_kind.Temp_ids.fold_s k OPS.remove temp_ids ctxt)

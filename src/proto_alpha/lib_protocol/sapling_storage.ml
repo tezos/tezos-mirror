@@ -261,9 +261,9 @@ module Nullifiers = struct
      Not tail-recursive so we put a hard limit on the size of the
      list of nullifiers. *)
   let add ctx id nfs =
-    assert (Compare.Int.(List.length nfs <= 1000)) ;
+    assert (Compare.Int.(List.compare_length_with nfs 1000 <= 0)) ;
     size ctx id >>=? fun nf_start_pos ->
-    fold_right_s
+    List.fold_right_es
       (fun nf (ctx, pos, acc_size) ->
         Storage.Sapling.Nullifiers_hashed.init (ctx, id) nf
         >>=? fun (ctx, size) ->
@@ -403,7 +403,7 @@ let apply_diff ctx id diff =
     (ctx, id)
     (Int64.add cm_start_pos (Int64.of_int nb_commitments))
   >>=? fun ctx ->
-  fold_right_s
+  List.fold_right_es
     (fun (_cm, cp) (ctx, pos, acc_size) ->
       Ciphertexts.add ctx id cp pos >|=? fun (ctx, size) ->
       (ctx, Int64.succ pos, Z.add acc_size (Z.of_int size)))
@@ -480,5 +480,7 @@ let get_diff ctx id ?(offset_commitment = 0L) ?(offset_nullifier = 0L) () =
     Ciphertexts.get_from ctx id offset_commitment
     (* we don't count gas for RPCs *)
     >|=? fun (_ctx, ciphertexts) ->
-    let commitments_and_ciphertexts = List.combine commitments ciphertexts in
-    (root, Sapling_repr.{commitments_and_ciphertexts; nullifiers})
+    match List.combine ~when_different_lengths:() commitments ciphertexts with
+    | Error () -> failwith "Invalid argument."
+    | Ok commitments_and_ciphertexts ->
+        (root, Sapling_repr.{commitments_and_ciphertexts; nullifiers})

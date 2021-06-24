@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Misc
-
 type error +=
   | Unknown of {
       oldest : Cycle_repr.t;
@@ -85,7 +83,8 @@ let compute_for_cycle c ~revealed cycle =
       in
       Storage.Seed.For_cycle.get c previous_cycle >>=? fun prev_seed ->
       let seed = Seed_repr.deterministic_seed prev_seed in
-      fold_left_s combine (c, seed, []) levels >>=? fun (c, seed, unrevealed) ->
+      List.fold_left_es combine (c, seed, []) levels
+      >>=? fun (c, seed, unrevealed) ->
       Storage.Seed.For_cycle.init c cycle seed >|=? fun c -> (c, unrevealed)
 
 let for_cycle ctxt cycle =
@@ -111,14 +110,13 @@ let clear_cycle c cycle = Storage.Seed.For_cycle.remove_existing c cycle
 
 let init ctxt =
   let preserved = Constants_storage.preserved_cycles ctxt in
-  List.fold_left2
-    (fun ctxt c seed ->
-      ctxt >>=? fun ctxt ->
+  List.fold_left_es
+    (fun (c, ctxt) seed ->
       let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
-      Storage.Seed.For_cycle.init ctxt cycle seed)
-    (return ctxt)
-    (0 --> (preserved + 1))
+      Storage.Seed.For_cycle.init ctxt cycle seed >|=? fun ctxt -> (c + 1, ctxt))
+    (0, ctxt)
     (Seed_repr.initial_seeds (preserved + 2))
+  >|=? snd
 
 let cycle_end ctxt last_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
