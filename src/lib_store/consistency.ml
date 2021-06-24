@@ -227,7 +227,7 @@ let fix_head block_store genesis_block =
          blocks were truncated. The head is then chosen as the highest
          cemented block known. *)
       if
-        List.length cemented_block_files <> 0
+        cemented_block_files <> []
         && Block_hash.equal
              (Block_repr.hash genesis_block)
              (Block_repr.hash floating_head)
@@ -330,7 +330,8 @@ let fix_savepoint_and_caboose chain_dir block_store head =
                metadata exists, then the savepoint is the genesis. It
                is the case in archive mode and when the offset window
                includes the genesis. *)
-            if start_level = 0l then return_some 0l else aux (Some file) tl
+            if Compare.Int32.(start_level = 0l) then return_some 0l
+            else aux (Some file) tl
           else
             (* As metadata files are ordered and contiguous, we can
                stop and search for the lowest entry in that metadata
@@ -405,8 +406,9 @@ let fix_savepoint_and_caboose chain_dir block_store head =
       let sp =
         match lowest_floating_with_metadata with
         | Some lowest_floating_with_metadata ->
-            if lowest_floating_with_metadata < cemented_savepoint then
-              lowest_floating_with_metadata
+            if
+              Compare.Int32.(lowest_floating_with_metadata < cemented_savepoint)
+            then lowest_floating_with_metadata
             else cemented_savepoint
         | None -> cemented_savepoint
       in
@@ -501,18 +503,27 @@ let fix_checkpoint chain_dir block_store head =
       >>=? function
       | Some block -> (
           if
-            (* The lowest block with metadata is never higher thant current head. *)
-            Block_repr.level block = Block_repr.level head
+            (* The lowest block with metadata is never higher than
+               current head. *)
+            Compare.Int32.(Block_repr.level block = Block_repr.level head)
           then return head
           else
             match Block_repr.metadata block with
             | Some _metadata -> return block
             | None -> find_lbwm (Int32.succ block_level))
       | None ->
-          fail
-            (Corrupted_store
-               "No block with metadata found. At least the head must have \
-                metadata.")
+          (* If the head was reached and it has no metadata, the store
+             is broken *)
+          if Compare.Int32.(block_level = Block_repr.level head) then
+            fail
+              (Corrupted_store
+                 "No block with metadata found. At least the head must have \
+                  metadata")
+          else
+            (* Freshly imported rolling nodes may have deleted blocks
+               at a level higher that the lafl of the current
+               head. Continue. *)
+            find_lbwm (Int32.succ block_level)
     in
     find_lbwm head_lafl >>=? fun lbwm ->
     let checkpoint = (Block_repr.hash lbwm, Block_repr.level lbwm) in
@@ -522,14 +533,15 @@ let fix_checkpoint chain_dir block_store head =
   set_checkpoint head >>=? fun checkpoint ->
   Store_events.(emit fix_checkpoint checkpoint) >>= fun () -> return checkpoint
 
-(* [fix_protocol_levels context_index block_store genesis_header]
+(* [fix_protocol_levels context_index block_store genesis_header ~head]
    fixes protocol levels table by searching for all the protocol
    levels in the block store (cemented and floating). Fixing this
    table is possible in archive mode only.
    Assumptions:
    - block store is valid and available,
    - current head is valid and available. *)
-let fix_protocol_levels context_index block_store genesis genesis_header =
+let fix_protocol_levels context_index block_store genesis genesis_header ~head
+    ~savepoint =
   (* Search in the cemented store*)
   let cemented_block_store = Block_store.cemented_block_store block_store in
   let cemented_block_files =
@@ -543,7 +555,7 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
   let cycle_search cemented_block_store ~prev_proto_level ~cycle_start
       ~cycle_end:limit =
     let rec aux ~prev_proto_level ~level acc =
-      if level > limit then return acc
+      if Compare.Int32.(level > limit) then return acc
       else
         Cemented_block_store.get_cemented_block_by_level
           cemented_block_store
@@ -560,14 +572,17 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
               ~prev_proto_level:(Some block_proto_level)
               ~level:(Int32.succ level)
               acc
-        | Some ppl ->
-            if ppl <> block_proto_level then
+        | Some previous_proto_level ->
+            if Compare.Int.(previous_proto_level <> block_proto_level) then
               Context.checkout context_index (Block_repr.context block)
               >>= function
               | None ->
                   (* We have an incomplete context (full or rolling)
                      and thus not enough information to get the
                      activation. We ignore this protocol change. *)
+                  Store_events.(
+                    emit warning_incomplete_storage block_proto_level)
+                  >>= fun () ->
                   aux
                     ~prev_proto_level:(Some block_proto_level)
                     ~level:(Int32.succ level)
@@ -581,16 +596,25 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
                    | Ok tup ->
                        Lwt.return_some
                          (Protocol_levels.commit_info_of_tuple tup)
-                   | Error _ -> Lwt.return_none)
+                   | Error _ ->
+                       Store_events.(
+                         emit warning_incomplete_storage block_proto_level)
+                       >>= fun () -> Lwt.return_none)
                   >>= fun commit_info ->
                   let activation =
-                    ({
-                       block = (Block_repr.hash block, Block_repr.level block);
-                       protocol = protocol_hash;
-                       commit_info;
-                     }
-                      : Store_types.Protocol_levels.activation_block)
+                    ( block_proto_level,
+                      {
+                        Protocol_levels.block =
+                          (Block_repr.hash block, Block_repr.level block);
+                        protocol = protocol_hash;
+                        commit_info;
+                      } )
                   in
+                  Store_events.(
+                    emit
+                      restore_protocol_activation
+                      (block_proto_level, protocol_hash))
+                  >>= fun () ->
                   aux
                     ~prev_proto_level:(Some block_proto_level)
                     ~level:(Int32.succ level)
@@ -600,7 +624,8 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
     aux ~prev_proto_level ~level:cycle_start []
   in
   (* Return the list of protocol activation blocks by iterating
-     through the cemented store.*)
+     through the cemented store. The elements of the returned list are
+     assumed to be consecutive and sorted in descending order.*)
   let rec cemented_search prev_proto_level protocols = function
     | [] -> return protocols
     | cycle :: higher_cycles -> (
@@ -626,7 +651,8 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
               (Some block_proto_level)
               (activations @ protocols)
               higher_cycles
-        | Some ppl when ppl <> block_proto_level ->
+        | Some previous_proto_level
+          when Compare.Int.(previous_proto_level <> block_proto_level) ->
             (* At least one protocol transition occurs in this cycle *)
             cycle_search
               (Block_store.cemented_block_store block_store)
@@ -646,7 +672,7 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
   >>=? fun cemented_protocol_levels ->
   (match cemented_protocol_levels with
   | [] -> return 0
-  | {block = (_, block_level); _} :: _ ->
+  | (_, {block = (_, block_level); _}) :: _ ->
       Cemented_block_store.get_cemented_block_by_level
         ~read_metadata:false
         cemented_block_store
@@ -654,54 +680,56 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
       >|=? WithExceptions.Option.get ~loc:__LOC__
       >>=? fun block -> return (Block_repr.proto_level block))
   >>=? fun highest_cemented_proto_level ->
-  (* Search protocol activation in the floating stores *)
   let floating_stores = Block_store.floating_block_stores block_store in
+  (* Search protocol activation in the floating stores by iterating
+     over RO and RW. The elements of the returned list are assumed to
+     be consecutive and sorted in ascending order (as floating_stores
+     = [RO;RW]). *)
   ( List.map_es
       (Floating_block_store.fold_left_s
-         (fun (pls, prev_protocol_level) block ->
-           match prev_protocol_level with
-           | Some l when Block_repr.proto_level block <> l ->
-               let new_proto_level = Block_repr.proto_level block in
-               (Context.checkout context_index (Block_repr.context block)
-                >>= function
-                | None ->
-                    (* If the context associated to an activation
-                       block is not available, then we cannot infer
-                       the protocol table. It may be the case after
-                       importing a snapshot. *)
-                    fail
-                      (Corrupted_store
-                         "failed to restore the protocol levels: not enough \
-                          data.")
-                | Some context -> return context)
-               >>=? fun context ->
-               Context.get_protocol context >>= fun protocol_hash ->
-               (Context.retrieve_commit_info
-                  context_index
-                  (Block_repr.header block)
-                >>= function
-                | Ok tup ->
-                    Lwt.return_some (Protocol_levels.commit_info_of_tuple tup)
-                | Error _ -> Lwt.return_none)
-               >>= fun commit_info ->
-               let activation =
-                 ({
-                    block = (Block_repr.hash block, Block_repr.level block);
-                    protocol = protocol_hash;
-                    commit_info;
-                  }
-                   : Store_types.Protocol_levels.activation_block)
-               in
-               return (activation :: pls, Some new_proto_level)
-           | Some _ -> return (pls, prev_protocol_level)
-           | None -> return (pls, Some (Block_repr.proto_level block)))
-         ([], Some highest_cemented_proto_level))
+         (fun (pls, previous_protocol_level) block ->
+           let new_proto_level = Block_repr.proto_level block in
+           if Compare.Int.(new_proto_level <> previous_protocol_level) then
+             Context.checkout context_index (Block_repr.context block)
+             >>= function
+             | None ->
+                 (* We have an incomplete context (full or rolling)
+                    and thus not enough information to get the
+                    activation. We ignore this protocol change. *)
+                 Store_events.(emit warning_incomplete_storage new_proto_level)
+                 >>= fun () -> return (pls, new_proto_level)
+             | Some context ->
+                 Context.get_protocol context >>= fun protocol_hash ->
+                 (Context.retrieve_commit_info
+                    context_index
+                    (Block_repr.header block)
+                  >>= function
+                  | Ok tup ->
+                      Lwt.return_some (Protocol_levels.commit_info_of_tuple tup)
+                  | Error _ ->
+                      Store_events.(
+                        emit warning_incomplete_storage new_proto_level)
+                      >>= fun () -> Lwt.return_none)
+                 >>= fun commit_info ->
+                 let activation =
+                   ( new_proto_level,
+                     {
+                       Protocol_levels.block =
+                         (Block_repr.hash block, Block_repr.level block);
+                       protocol = protocol_hash;
+                       commit_info;
+                     } )
+                 in
+                 Store_events.(
+                   emit
+                     restore_protocol_activation
+                     (new_proto_level, protocol_hash))
+                 >>= fun () -> return (activation :: pls, new_proto_level)
+           else return (pls, previous_protocol_level))
+         ([], highest_cemented_proto_level))
       floating_stores
   >|=? fun v -> List.flatten (List.map fst v) )
-  (* Assumption: Floating protocol levels is ordered asc. as
-     floating_stores = [RO;RW] *)
-  >>=?
-  fun floating_protocol_levels ->
+  >>=? fun floating_protocol_levels ->
   (* Add the genesis protocol *)
   let protocol = genesis.Genesis.protocol in
   (Context.retrieve_commit_info context_index genesis_header >>= function
@@ -709,18 +737,77 @@ let fix_protocol_levels context_index block_store genesis genesis_header =
    | Error _ -> Lwt.return_none)
   >>= fun genesis_commit_info ->
   let genesis_protocol_level =
-    ({
-       block = (Block_header.hash genesis_header, genesis_header.shell.level);
-       protocol;
-       commit_info = genesis_commit_info;
-     }
-      : Store_types.Protocol_levels.activation_block)
+    ( 0,
+      {
+        Protocol_levels.block =
+          (Block_header.hash genesis_header, genesis_header.shell.level);
+        protocol;
+        commit_info = genesis_commit_info;
+      } )
   in
-  let protocol_levels =
+  (* [finalize_protocol_levels] aims to aggregate the protocol levels
+     found in the cemented and floating stores.*)
+  let finalize_protocol_levels genesis_protocol_level cemented_protocol_levels
+      floating_protocol_levels =
+    let all_found =
+      genesis_protocol_level
+      :: (List.rev cemented_protocol_levels @ floating_protocol_levels)
+    in
+    let corrupted_store head_proto_level head_hash =
+      fail
+        (Corrupted_store
+           (Format.asprintf
+              "Failed to find a valid activation block for protocol %d of the \
+               current head (%a)"
+              head_proto_level
+              Block_hash.pp
+              head_hash))
+    in
+    (* Make sure that the protocol of the current head is registered. If
+       not, set it to the savepoint. *)
+    let head_proto_level = Block_repr.proto_level head in
+    let head_hash = Block_repr.hash head in
+    if
+      not
+        (List.mem
+           ~equal:Compare.Int.equal
+           head_proto_level
+           (List.map fst all_found))
+    then
+      (Block_store.read_block
+         ~read_metadata:true
+         block_store
+         (Block_store.Block (fst savepoint, 0))
+       >>=? function
+       | None -> corrupted_store head_proto_level head_hash
+       | Some savepoint -> return savepoint)
+      >>=? fun savepoint ->
+      Context.checkout context_index (Block_repr.context savepoint) >>= function
+      | None -> corrupted_store head_proto_level head_hash
+      | Some context ->
+          Context.get_protocol context >>= fun protocol_hash ->
+          (Context.retrieve_commit_info
+             context_index
+             (Block_repr.header savepoint)
+           >>= function
+           | Ok tup -> return_some (Protocol_levels.commit_info_of_tuple tup)
+           | Error _ -> corrupted_store head_proto_level head_hash)
+          >>=? fun commit_info ->
+          let head_protocol_activation =
+            ( head_proto_level,
+              {
+                Protocol_levels.block = (head_hash, Block_repr.level head);
+                protocol = protocol_hash;
+                commit_info;
+              } )
+          in
+          return (all_found @ [head_protocol_activation])
+    else return all_found
+  in
+  finalize_protocol_levels
     genesis_protocol_level
-    :: (List.rev cemented_protocol_levels @ floating_protocol_levels)
-  in
-  return protocol_levels
+    cemented_protocol_levels
+    floating_protocol_levels
 
 (* [fix_chain_state ~chain_dir ~head ~cementing_highwatermark
    ~checkpoint ~savepoint ~caboose ~alternate_heads ~forked_chains
@@ -730,16 +817,16 @@ let fix_chain_state chain_dir ~head ~cementing_highwatermark ~checkpoint
     ~savepoint ~caboose ~alternate_heads ~forked_chains ~protocol_levels
     ~genesis ~genesis_context =
   (* By setting each stored data, we erase the previous content. *)
-  let rec init_protocol_table proto_level protocol_table = function
+  let rec init_protocol_table protocol_table = function
     | [] -> protocol_table
-    | hd :: tl ->
+    | (proto_level, proto_hash) :: tl ->
         let new_protocol_table =
-          Protocol_levels.add proto_level hd protocol_table
+          Protocol_levels.add proto_level proto_hash protocol_table
         in
-        init_protocol_table (proto_level + 1) new_protocol_table tl
+        init_protocol_table new_protocol_table tl
   in
   let protocol_table =
-    init_protocol_table 0 Protocol_levels.empty protocol_levels
+    init_protocol_table Protocol_levels.empty protocol_levels
   in
   Stored_data.write_file (Naming.protocol_levels_file chain_dir) protocol_table
   >>=? fun () ->
@@ -793,17 +880,20 @@ let fix_chain_config chain_dir block_store genesis caboose savepoint =
   (* If the infered offset equals the default offset value then we
      assume that "default" was the previous value. *)
   let offset =
-    if nb_cycles_metadata = History_mode.default_additional_cycles.offset then
-      None
+    if
+      Compare.Int.(
+        nb_cycles_metadata = History_mode.default_additional_cycles.offset)
+    then None
     else Some {History_mode.offset = nb_cycles_metadata}
   in
   let history_mode =
     (* Caboose is not genesis: we sure are in rolling*)
-    if fst caboose <> genesis.Genesis.block then History_mode.Rolling offset
+    if not (Block_hash.equal (fst caboose) genesis.Genesis.block) then
+      History_mode.Rolling offset
     else if
       (* Caboose is genesis and savepoint is not genesis: we can be in
          both rolling and full. We choose full as the less destructive. *)
-      fst savepoint <> genesis.block
+      not (Block_hash.equal (fst savepoint) genesis.block)
     then Full offset
     else if
       (* Caboose is genesis and savepoint is genesis and there are as
@@ -867,6 +957,8 @@ let fix_consistency chain_dir context_index genesis =
     block_store
     genesis
     (Block_repr.header genesis_block)
+    ~head
+    ~savepoint
   >>=? fun protocol_levels ->
   fix_chain_state
     chain_dir
