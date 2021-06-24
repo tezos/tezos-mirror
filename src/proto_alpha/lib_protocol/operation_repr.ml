@@ -192,19 +192,22 @@ let rec to_list = function
   | Contents_list (Single o) -> [Contents o]
   | Contents_list (Cons (o, os)) -> Contents o :: to_list (Contents_list os)
 
-let rec of_list = function
-  | [] -> assert false
-  | [Contents o] -> Contents_list (Single o)
+let rec of_list_e = function
+  | [] -> Error "Empty operation list"
+  | [Contents o] -> Ok (Contents_list (Single o))
   | Contents o :: os -> (
-      let (Contents_list os) = of_list os in
+      of_list_e os >>? fun (Contents_list os) ->
       match (o, os) with
       | (Manager_operation _, Single (Manager_operation _)) ->
-          Contents_list (Cons (o, os))
-      | (Manager_operation _, Cons _) -> Contents_list (Cons (o, os))
+          Ok (Contents_list (Cons (o, os)))
+      | (Manager_operation _, Cons _) -> Ok (Contents_list (Cons (o, os)))
       | _ ->
-          Pervasives.failwith
+          Error
             "Operation list of length > 1 should only contains manager \
              operations.")
+
+let of_list l =
+  match of_list_e l with Ok os -> os | Error s -> Pervasives.failwith s
 
 module Encoding = struct
   open Data_encoding
@@ -398,10 +401,8 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.endorsement contents_list -> _ = function
-      | Single o -> o
-    in
-    let of_list : Kind.endorsement contents -> _ = function o -> Single o in
+    let to_list : Kind.endorsement contents_list -> _ = fun (Single o) -> o in
+    let of_list : Kind.endorsement contents -> _ = fun o -> Single o in
     def "inlined.endorsement"
     @@ conv
          (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
@@ -641,7 +642,7 @@ module Encoding = struct
          ]
 
   let contents_list_encoding =
-    conv to_list of_list (Variable.list contents_encoding)
+    conv_with_guard to_list of_list_e (Variable.list contents_encoding)
 
   let optional_signature_encoding =
     conv

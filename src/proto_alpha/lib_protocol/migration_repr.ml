@@ -35,17 +35,16 @@ let origination_result_list_encoding =
   def "operation.alpha.origination_result"
   @@ list
        (conv
-          (function
-            | {
-                balance_updates;
-                originated_contracts;
-                storage_size;
-                paid_storage_size_diff;
-              } ->
-                ( balance_updates,
-                  originated_contracts,
-                  storage_size,
-                  paid_storage_size_diff ))
+          (fun {
+                 balance_updates;
+                 originated_contracts;
+                 storage_size;
+                 paid_storage_size_diff;
+               } ->
+            ( balance_updates,
+              originated_contracts,
+              storage_size,
+              paid_storage_size_diff ))
           (fun ( balance_updates,
                  originated_contracts,
                  storage_size,

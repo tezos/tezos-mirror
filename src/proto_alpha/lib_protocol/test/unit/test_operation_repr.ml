@@ -85,13 +85,13 @@ module Test_operation_repr = struct
     in
     match contents_list with
     | Contents_list (Cons (_, Single _)) -> return_unit
-    | Contents_list (Single _) | _ -> failwith "Unexpected value"
+    | _ -> failwith "Unexpected value"
 
   let test_of_list_empty_case () =
     try
       let _ = of_list [] in
       failwith "of_list of an empty list was expected to fail"
-    with Assert_failure _ -> return_unit
+    with Failure _ -> return_unit
 end
 
 let tests =

@@ -91,11 +91,11 @@ let balance_update_encoding =
                if Compare.Int64.(v < 0L) then
                  match Tez_repr.of_mutez (Int64.neg v) with
                  | Some v -> Debited v
-                 | None -> failwith "Qty.of_mutez"
+                 | None -> assert false (* [of_mutez z] is [None] iff [z < 0] *)
                else
                  match Tez_repr.of_mutez v with
                  | Some v -> Credited v
-                 | None -> failwith "Qty.of_mutez" )
+                 | None -> assert false (* same *) )
              int64))
 
 type update_origin = Block_application | Protocol_migration | Subsidy
