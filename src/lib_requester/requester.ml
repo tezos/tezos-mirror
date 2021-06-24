@@ -146,7 +146,7 @@ module type SCHEDULER = sig
   val shutdown : t -> unit Lwt.t
 end
 
-module type PRECHECK = sig
+module type PROBE = sig
   type key
 
   type param
@@ -155,7 +155,7 @@ module type PRECHECK = sig
 
   type value
 
-  val precheck : key -> param -> notified_value -> value option
+  val probe : key -> param -> notified_value -> value option
 end
 
 module type REQUEST = sig
@@ -404,25 +404,23 @@ module Make
     (Disk_table : DISK_TABLE with type key := Hash.t)
     (Memory_table : MEMORY_TABLE with type key := Hash.t)
     (Request : REQUEST with type key := Hash.t)
-    (Precheck : PRECHECK
-                  with type key := Hash.t
-                   and type value := Disk_table.value) :
+    (Probe : PROBE with type key := Hash.t and type value := Disk_table.value) :
   FULL_REQUESTER
     with type key = Hash.t
      and type value = Disk_table.value
-     and type param = Precheck.param
+     and type param = Probe.param
      and type request_param = Request.param
-     and type notified_value = Precheck.notified_value
+     and type notified_value = Probe.notified_value
      and type store = Disk_table.store = struct
   type key = Hash.t
 
   type value = Disk_table.value
 
-  type param = Precheck.param
+  type param = Probe.param
 
   type request_param = Request.param
 
-  type notified_value = Precheck.notified_value
+  type notified_value = Probe.notified_value
 
   type store = Disk_table.store
 
@@ -552,7 +550,7 @@ module Make
     | Some (Found v) -> return v
 
   let notify_when_pending s p k w param v =
-    match Precheck.precheck k param v with
+    match Probe.probe k param v with
     | None -> Scheduler.notify_invalid s.scheduler p k
     | Some v ->
         Scheduler.notify s.scheduler p k >>= fun () ->

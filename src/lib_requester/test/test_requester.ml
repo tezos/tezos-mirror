@@ -33,8 +33,8 @@
    
                   [Memory_table] and [Disk_table] are hash tables from string
                   to int.
-                  [Precheck] either accepts or reject notified values based on
-                  a boolean validation clue [Precheck.param], regardless of
+                  [Probe] either accepts or reject notified values based on
+                  a boolean validation clue [Probe.param], regardless of
                   the key.
                   [Request] simply logs the requests made to [Request.send],
                   and considers only a unique, statically defined, active peer.

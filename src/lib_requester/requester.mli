@@ -27,7 +27,7 @@
 
     This module defines a generic resource fetching service [Requester].
     It is parameterized by abstract services [Disk], [Request], [Memory_table]
-    and [Precheck].
+    and [Probe].
 
     It offers a key/value store interface. Values are looked up successively
     in [Memory_table.t], then in [Disk.store]. If not found, they are
@@ -46,7 +46,7 @@
     using [Requester.notify].
 
     Notified values are validated before being inserted in the requester,
-    using the [Precheck] module.
+    using the [Probe] module.
 
     The full resource fetching service is realized by the conjunction of
     two components. The requester component, defined by this library, and
@@ -96,7 +96,7 @@ module type REQUESTER = sig
       The key is first looked up in memory, then on disk. If not present and
       not already requested, it schedules a request, and blocks until
       the requester is notified with [notify]. [param] is used to validate the
-      notified value once it is received. (see also [PRECHECK] and [notify]).
+      notified value once it is received. (see also [PROBE] and [notify]).
 
       Requests are re-sent via a 1.5 exponential back-off, with initial
       delay set to [Request.initial_delay]. If the function
@@ -143,8 +143,8 @@ module type FULL_REQUESTER = sig
 
   (** [notify t peer k nv] notifies the requester that a value has been
       received for key [k], from peer [peer]. [nv] is a *notified value*. The
-      notified value is validated using [Precheck.precheck], and the
-      [param] provided at fetching time (see [PRECHECK]). If valid,
+      notified value is validated using [Probe.probe], and the
+      [param] provided at fetching time (see [PROBE]). If valid,
       the memory table is updated and all promises waiting on this key are
       resolved.
 
@@ -235,12 +235,12 @@ end
 
     At fetching time, the client gives a [param].
     At notification time, the client provides a [notified_value].
-    [precheck] tries to construct a [value] from [param] and [notified_value].
+    [probe] tries to construct a [value] from [param] and [notified_value].
 
-    If no validation is needed. [precheck] is defined as
+    If no validation is needed. [probe] is defined as
 
-    let precheck k () v -> Some v  *)
-module type PRECHECK = sig
+    let probe k () v -> Some v  *)
+module type PROBE = sig
   type key
 
   type param
@@ -249,7 +249,7 @@ module type PRECHECK = sig
 
   type value
 
-  val precheck : key -> param -> notified_value -> value option
+  val probe : key -> param -> notified_value -> value option
 end
 
 (** An input module of {!Make} *)
@@ -268,13 +268,11 @@ module Make
     (Disk_table : DISK_TABLE with type key := Hash.t)
     (Memory_table : MEMORY_TABLE with type key := Hash.t)
     (Request : REQUEST with type key := Hash.t)
-    (Precheck : PRECHECK
-                  with type key := Hash.t
-                   and type value := Disk_table.value) :
+    (Probe : PROBE with type key := Hash.t and type value := Disk_table.value) :
   FULL_REQUESTER
     with type key = Hash.t
      and type value = Disk_table.value
-     and type param = Precheck.param
+     and type param = Probe.param
      and type request_param = Request.param
-     and type notified_value = Precheck.notified_value
+     and type notified_value = Probe.notified_value
      and type store = Disk_table.store

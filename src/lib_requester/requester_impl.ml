@@ -66,10 +66,10 @@ module Memory_table (P : PARAMETERS) :
   let equal = ( = )
 end)
 
-(** An instance of [PRECHECK] that uses a [bool] parameter
+(** An instance of [PROBE] that uses a [bool] parameter
  *  to decide whether the check goes through or not *)
-module Simple_precheck (P : PARAMETERS) :
-  Requester.PRECHECK
+module Simple_probe (P : PARAMETERS) :
+  Requester.PROBE
     with type key = P.key
      and type param = bool
      and type notified_value = P.value
@@ -82,7 +82,7 @@ module Simple_precheck (P : PARAMETERS) :
 
   type value = P.value
 
-  let precheck (_ : key) (p : param) (nv : notified_value) =
+  let probe (_ : key) (p : param) (nv : notified_value) =
     if p then Some nv else None
 end
 
@@ -133,4 +133,4 @@ module Make_memory_full_requester
      and type notified_value = P.value
      and type store = Disk_memory_table(P).store =
   Requester.Make (H) (Disk_memory_table (P)) (Memory_table (P)) (R)
-    (Simple_precheck (P))
+    (Simple_probe (P))

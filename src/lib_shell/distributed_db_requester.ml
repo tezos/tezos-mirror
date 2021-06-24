@@ -63,16 +63,16 @@ module Make_raw
     (Disk_table : Requester.DISK_TABLE with type key := Hash.t)
     (Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
     (Request_message : REQUEST_MESSAGE with type hash := Hash.t)
-    (Precheck : Requester.PRECHECK
-                  with type key := Hash.t
-                   and type value := Disk_table.value) :
+    (Probe : Requester.PROBE
+               with type key := Hash.t
+                and type value := Disk_table.value) :
   EXTENDED_REQUESTER
     with type key = Hash.t
      and type value = Disk_table.value
      and type request_param = Request_message.param request_param
      and type store = Disk_table.store
-     and type param = Precheck.param
-     and type notified_value = Precheck.notified_value = struct
+     and type param = Probe.param
+     and type notified_value = Probe.notified_value = struct
   module Request = struct
     type param = Request_message.param request_param
 
@@ -101,7 +101,7 @@ module Make_raw
   end
 
   module Table =
-    Requester.Make (Hash) (Disk_table) (Memory_table) (Request) (Precheck)
+    Requester.Make (Hash) (Disk_table) (Memory_table) (Request) (Probe)
   include Table
 
   let state_of_t t =
@@ -148,7 +148,7 @@ module Raw_operation =
 
       type notified_value = Operation.t
 
-      let precheck _ _ v = Some v
+      let probe _ _ v = Some v
     end)
 
 module Block_header_storage = struct
@@ -183,7 +183,7 @@ module Raw_block_header =
 
       type notified_value = Block_header.t
 
-      let precheck _ _ v = Some v
+      let probe _ _ v = Some v
     end)
 
 module Operations_table = Hashtbl.MakeSeeded (struct
@@ -245,7 +245,7 @@ module Raw_operations = struct
 
         type notified_value = Operation.t list * Operation_list_list_hash.path
 
-        let precheck (_block, expected_ofs) expected_hash (ops, path) =
+        let probe (_block, expected_ofs) expected_hash (ops, path) =
           let (received_hash, received_ofs) =
             Operation_list_list_hash.check_path
               path
@@ -293,5 +293,5 @@ module Raw_protocol =
 
       type notified_value = Protocol.t
 
-      let precheck _ _ v = Some v
+      let probe _ _ v = Some v
     end)
