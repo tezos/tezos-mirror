@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "base-unix"
   "dune" { >= "2.0" }
-  "data-encoding" { >= "0.3" & < "0.4" }
+  "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-error-monad"
   "tezos-lwt-result-stdlib"
   "tezos-event-logging"
