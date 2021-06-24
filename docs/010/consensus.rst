@@ -1,14 +1,15 @@
 The consensus algorithm
 =======================
 
-This document provides a description of Emmy+, the Tezos
-proof-of-stake consensus algorithm, as implemented in the current
-protocol (namely `PsFLoren` on `mainnet`).
+This document provides a description of Emmy*, the Tezos
+:doc:`proof-of-stake<proof_of_stake>` consensus algorithm, as implemented in the Granada protocol.
 
 History
 -------
 
-Before Emmy+, there was Emmy, a Nakamoto-style consensus first described in
+Before Emmy*, there was Emmy+
+(introduced in this `blog post <https://blog.nomadic-labs.com/emmy-an-improved-consensus-algorithm.html>`_),
+and before Emmy+, there was Emmy, a Nakamoto-style consensus first described in
 2014, in the `Tezos whitepaper
 <https://whitepaper.io/document/376/tezos-whitepaper>`_:
 
@@ -27,22 +28,22 @@ recall that, being a Nakamoto-style consensus, Emmy provides *probabilistic*
 finality.
 
 
-Emmy+
+Emmy*
 -----
 
-Emmy+ is an improvement of Emmy which still guards against selfish baking but
-also achieves greater efficiency and stability.
+Emmy* improves Emmy+ in that it brings smaller block times and faster times to
+finality.
 
-.. _terminology:
-.. _terminology_009:
+
+.. _terminology_010:
 
 Terminology
 ~~~~~~~~~~~
 
 A *block* in the blockchain consists of a header and a list of operations. The
 header has a shell part (common to all protocols) and a
-protocol-specific part. In Emmy+, :ref:`the protocol-specific part of the
-header<emmyp_fitness_and_header_009>` contains, most notably, a timestamp, a
+protocol-specific part. In Emmy*, :ref:`the protocol-specific part of the
+header<emmyp_fitness_and_header_010>` contains, most notably, a timestamp, a
 priority (a natural number), and the endorsements for the block at the previous
 level. *Endorsements* are operations that can be seen as votes for a given
 block. Each block is signed.
@@ -53,7 +54,7 @@ each level, two lists of slots are being created: a (conceptually) infinite list
 of baking slots and a list of ``ENDORSERS_PER_BLOCK`` endorsing slots. The index
 of a baking slot is called a *priority*. Each slot is associated to a
 participant. A participant can appear several times in both lists. The selection
-of participants is at :ref:`random<emmyp_slot_selection_009>`, independently for
+of participants is at :ref:`random<emmyp_slot_selection_010>`, independently for
 each slot, and is stake based.
 
 An endorsement for a block at level :math:`\ell` is *valid* if it is signed by
@@ -66,16 +67,27 @@ contains.
 Minimal block delay function
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-At the heart of Emmy+, there is the minimal block delay function. This function
+At the heart of Emmy*, there is the minimal block delay function. This function
 serves to compute the minimal time between blocks depending on the current
-block's priority `p`, and its endorsing power `e`. Namely, Emmy+ defines the
+block's priority `p`, and its endorsing power `e`. Namely, Emmy* defines the
 minimal block delay function as follows:
 
-.. _delayplus:
-.. _delayplus_009:
+.. _delaystar_010:
 
 .. math::
-   delay+(p, e) = bd + dp \cdot p + de \cdot max(0, ie - e)
+   delay^*(p, e) = \begin{cases}
+   md & \text{ if } p = 0 \wedge w \geq \frac{3}{5} te\\
+   delay+(p, e) & \text{ otherwise}
+   \end{cases}
+
+where
+
+- :math:`md` stands for the minimal block delay,
+- :math:`te` stands for the "total endorsing power", and
+- :math:`delay^+(p, e)` is the minimal block delay function in Emmy+, namely:
+
+.. math::
+   delay^+(p, e) = bd + dp \cdot p + de \cdot max(0, ie - e)
 
 where
 
@@ -103,15 +115,15 @@ and the smaller the endorsing power, the longer it takes before the block is
 considered as valid. However, if the block has priority 0 and contains endorsements with endorsing
 power at least :math:`ie`, then there is no time penalty.
 
-Emmy+ abstractly
+Emmy* abstractly
 ~~~~~~~~~~~~~~~~
 
 We refer to someone trying to reach consensus by the generic notion of
-participant. Emmy+ can be described in an abstract manner as
+participant. Emmy* can be described in an abstract manner as
 follows:
 
 - A participant continuously observes blocks and endorsements.
-- A participant always adopts the :ref:`fittest<emmyp_fitness_and_header_009>`, that
+- A participant always adopts the :ref:`fittest<emmyp_fitness_and_header_010>`, that
   is, the longest (valid) chain it observes.
 - A participant that has at least an endorsement slot at level :math:`\ell`,
   emits an endorsement for the first block it observes at level
@@ -119,11 +131,11 @@ follows:
 - A participant produces a block as soon as it is allowed to, that is, as soon
   as it can produce a valid block (see the validity condition above).
 
-Emmy+ concretely
+Emmy* concretely
 ~~~~~~~~~~~~~~~~
 
 In Tezos, a participant is a :ref:`delegate<delegation>` that has at least one
-:ref:`roll<roll_pos_009>`, and is :ref:`active<active_delegate_009>`. For simplicity we
+:ref:`roll<roll_pos_010>`, and is :ref:`active<active_delegate_010>`. For simplicity we
 just refer to participants as delegates (and omit the "active" and "with rolls"
 attributes).  A delegate plays two roles:
 
@@ -132,21 +144,19 @@ attributes).  A delegate plays two roles:
   a block by **endorsing** that block.
 
 
-.. _emmyp_slot_selection:
-.. _emmyp_slot_selection_009:
+.. _emmyp_slot_selection_010:
 
 To these roles correspond the two types of actions mentioned above, baking and
 endorsing. As mentioned above, the baking and endorsing rights of a delegate are
 given by its baking, respectively endorsing slots, whose selection is described
-:ref:`here<rights_009>`. The mechanism behind baking slots is meant to ensure that
+:ref:`here<rights_010>`. The mechanism behind baking slots is meant to ensure that
 if the delegate whose turn is to bake is for some reason unable to bake, the
 next delegate in the list can step up and bake the block.
 
-.. _emmyp_fitness_and_header:
-.. _emmyp_fitness_and_header_009:
+.. _emmyp_fitness_and_header_010:
 
 There are two more notions which are defined abstractly at the level of the
-shell and concretized in Emmy+, the :ref:`fitness<Score>`, and the
+shell and concretized in Emmy*, the :ref:`fitness<Score>`, and the
 protocol-specific header:
 
 - the fitness of a block is 1 plus the fitness of the previous block;
@@ -156,9 +166,9 @@ protocol-specific header:
     headers (excluding the signature itself).
   - ``priority``: the position in the priority list of delegates
     at which the block was baked.
-  - ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_009>`, used to
+  - ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_010>`, used to
     generate entropy on the chain. Present in only one out of
-    ``BLOCKS_PER_COMMITMENT`` (see :ref:`Constants<ps_constants_009>`).
+    ``BLOCKS_PER_COMMITMENT`` (see :ref:`Constants<ps_constants_010>`).
   - ``proof_of_work_nonce``: a nonce used to pass a low-difficulty
     proof-of-work for the block, as a spam prevention measure.
 
@@ -188,7 +198,7 @@ endorsements, and respectively accusations (see below) on behalf of delegates.
 Economic Incentives
 ~~~~~~~~~~~~~~~~~~~
 
-In Emmy+, participation in consensus is rewarded and bad behavior is punished.
+In Emmy*, participation in consensus is rewarded and bad behavior is punished.
 
 Rewards
 ^^^^^^^
@@ -215,7 +225,6 @@ endorsement's endorsing power.  These reward formulas are as follows:
 
 where
 
-- :math:`te` (for total endorsing power) stands for ``ENDORSERS_PER_BLOCK``,
 - :math:`level\_rewards\_prio\_zero` and :math:`level\_rewards\_prio\_nonzero` are constants.
 
 The motivation behind this choice of design is given in the `Carthage blog post
@@ -270,6 +279,9 @@ values.
    * - Notation
      - Parameter name
      - Parameter value
+   * - :math:`md`
+     - ``MINIMAL_BLOCK_DELAY``
+     - 30 seconds
    * - :math:`bd`
      - ``TIME_BETWEEN_BLOCKS[0]``
      - 60 seconds
@@ -281,34 +293,47 @@ values.
      - 8 seconds
    * - :math:`ie`
      - ``INITIAL_ENDORSERS``
-     - 24
+     - 192
    * - :math:`te`
      - ``ENDORSERS_PER_BLOCK``
-     - 32
+     - 256
    * - :math:`\frac{level\_rewards\_prio\_zero}{te \cdot 2}`
      - ``BAKING_REWARD_PER_ENDORSEMENT[0]``
-     - 1.250ꜩ
+     - 0.078125 ꜩ
    * - :math:`\frac{level\_rewards\_prio\_nonzero}{te}`
      - ``BAKING_REWARD_PER_ENDORSEMENT[1]``
-     - 0.1875 ꜩ
+     - 0.011719 ꜩ
    * - :math:`endorsing\_reward(0,1)`
      - ``ENDORSEMENT_REWARD[0]``
-     - 1.250 ꜩ
+     - 0.078125 ꜩ
    * - :math:`endorsing\_reward(p,1)` for :math:`p \geq 1`
      - ``ENDORSEMENT_REWARD[1]``
-     - 0.833333 ꜩ
+     - 0.052083 ꜩ
    * -
      - ``BLOCK_SECURITY_DEPOSIT``
-     - 512 ꜩ
+     - 640 ꜩ
    * -
      - ``ENDORSEMENT_SECURITY_DEPOSIT``
-     - 64 ꜩ
+     - 2.5 ꜩ
 
-Since blocks are at least ``TIME_BETWEEN_BLOCKS[0]``, that is one minute apart,
-and since a cycle has ``BLOCKS_PER_CYCLE``, that is :ref:`4096
-blocks<ps_constants_009>`, a cycle lasts *at least* 2 days, 20 hours, and 16
+Since blocks are at least ``TIME_BETWEEN_BLOCKS[0]``, that is 30 seconds apart,
+and since a cycle has ``BLOCKS_PER_CYCLE``, that is :ref:`8192
+blocks<ps_constants_010>`, a cycle lasts *at least* 2 days, 20 hours, and 16
 minutes, and ``PRESERVED_CYCLES`` cycles, that is 5 cycles, last *at least* 14
 days, 5 hours, and 20 minutes.
+
+Given that ``MINIMAL_BLOCK_DELAY`` is 30 seconds, :ref:`the minimal block delay
+function<delaystar_010>` says that:
+
+- if the block is baked at priority 0 and it contains at least 60% of the
+  endorsements (namely, at least 153 endorsements) then the minimal delay is 30
+  seconds;
+- otherwise, the higher the priority and the fewer endorsements a block carries
+  with respect to the 192 endorsements threshold, the longer it takes before it
+  can be considered valid, where the delay of 60 seconds is incremented by 40
+  seconds with each missed priority and with 4 seconds with each missed
+  endorsement.
+
 
 The value for ``BAKING_REWARD_PER_ENDORSEMENT[0]`` is chosen such that the
 inflation from block rewards and endorsement rewards, which is given by
@@ -331,18 +356,5 @@ of the documentation for a discussion on (over-)delegation.
 Further External Resources
 --------------------------
 
-The following blog posts present the intuition behind Emmy+:
-
--  https://blog.nomadic-labs.com/emmy-an-improved-consensus-algorithm.html
--  https://blog.nomadic-labs.com/a-new-reward-formula-for-carthage.html.
-
-Emmy+ was further analyzed in:
-
--  https://blog.nomadic-labs.com/analysis-of-emmy.html
--  https://blog.nomadic-labs.com/on-defending-against-malicious-reorgs-in-tezos-proof-of-stake.html
--  https://blog.nomadic-labs.com/emmy-in-the-partial-synchrony-model.html
--  https://blog.nomadic-labs.com/the-case-of-mixed-forks-in-emmy.html
-
-A more high-level presentation of Emmy+ can be found in the
-`Tezos agora wiki entry
-<https://wiki.tezosagora.org/learn/baking/proofofstake/consensus>`_.
+- Emmy* `TZIP <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`_
+- Emmy* `analysis <https://blog.nomadic-labs.com/faster-finality-with-emmy.html>`_.

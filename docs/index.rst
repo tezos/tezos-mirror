@@ -158,6 +158,7 @@ in the :ref:`introduction <howtoget>`.
 
    010/michelson
    010/proof_of_stake
+   010/consensus
    010/sapling
    010/voting
    010/glossary
@@ -171,6 +172,7 @@ in the :ref:`introduction <howtoget>`.
 
    alpha/michelson
    alpha/proof_of_stake
+   alpha/consensus
    alpha/sapling
    alpha/voting
    alpha/glossary

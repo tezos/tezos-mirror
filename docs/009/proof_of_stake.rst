@@ -1,13 +1,10 @@
-.. _proof-of-stake:
-.. _proof-of-stake_009:
-
 Proof-of-stake
 ==============
 
 Overview
 --------
 
-:ref:`The consensus algorithm <consensus>` in Tezos is based on the
+:doc:`The consensus algorithm <consensus>` in Tezos is based on the
 *proof-of-stake* mechanism. Proof-of-stake means that participants
 in the consensus algorithm are chosen in function of their stake (the
 amount of tokens a participant has). The same mechanism is used in the
@@ -20,16 +17,14 @@ that may participate in consensus. Delegates' rights to participate are
 determined by a `follow-the-coin strategy
 <https://wiki.tezosagora.org/whitepaper#follow-the-coin-procedure>`_. This
 procedure is random, in that its result cannot be predicted too much in advance.
-The :ref:`randomness<random_seed>` is obtained from information already found on the
+The :ref:`randomness<random_seed_009>` is obtained from information already found on the
 blockchain. Thus, the procedure is also deterministic: delegates' rights are
 uniquely determined from the random element.
 
 Delegation
 ----------
 
-.. _active_delegate:
-
-A *delegate* is any :ref:`implicit account <Implicit account>` registered as
+A *delegate* is any :ref:`implicit account<Implicit account>` registered as
 such by emitting a delegate registration operation.
 
 Any :ref:`accounts <Account>` (implicit or originated) can specify a delegate
@@ -54,15 +49,15 @@ Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _active_delegate:
+.. _active_delegate_009:
 
 A delegate can be marked as either active or passive. A passive
-delegate cannot participate in :ref:`the consensus algorithm
-<consensus>`.
+delegate cannot participate in the consensus algorithm.
 
 A delegate is marked as active at its registration.
 
 A delegate becomes passive for cycle ``n`` when they
-fail to participate in :ref:`the consensus algorithm <consensus>` in
+fail to participate in the consensus algorithm in
 the past ``PRESERVED_CYCLES`` cycles, that is, in cycles ``n-1``,
 ``n-2``, ..., ``n - PRESERVED_CYCLES``.
 
@@ -76,6 +71,7 @@ too demanding of nodes to track assignments at such a granular level. Instead,
 Tezos works with *sets of tokens* which are called *rolls*.
 
 .. _roll_pos:
+.. _roll_pos_009:
 
 Rolls
 ^^^^^
@@ -105,6 +101,7 @@ malicious fork cannot easily change the specific rolls assigned to them, even if
 they control the underlying tokens and shuffle them around.
 
 .. _random_seed:
+.. _random_seed_009:
 
 Random seed
 ^^^^^^^^^^^
@@ -130,6 +127,7 @@ The seed for cycle ``n`` is obtained as follows: the seed of cycle ``n-1`` is
 hashed with a constant and then with each nonce revealed in cycle ``n-1``.
 
 .. _rights:
+.. _rights_009:
 
 Slot selection
 ^^^^^^^^^^^^^^
@@ -150,12 +148,13 @@ receives for that role. The slot owner is obtained by running a PRNG
 - the slot (a non-negative integer)
 
 Let `n` be the cycle the level belongs to.
-The seed of the PRNG is the :ref:`random seed <random_seed>` associated with cycle ``n-PRESERVED_CYCLES``.
+The seed of the PRNG is the :ref:`random seed <random_seed_009>` associated with cycle ``n-PRESERVED_CYCLES``.
 The PRNG first selects a snapshot from cycle ``n-PRESERVED_CYCLES-2`` and then it selects a roll in the selected snapshot.
 The slot owner is then the roll owner.
 
 
 .. _ps_constants:
+.. _ps_constants_009:
 
 Parameters
 ----------
