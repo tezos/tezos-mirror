@@ -38,60 +38,59 @@ module Test_operation_repr = struct
   open Operation_repr
 
   let test_of_list_single_case () =
-    let contents_list =
-      of_list
-        [
-          Contents
-            (Manager_operation
-               {
-                 fee = Obj.magic 0;
-                 operation = Obj.magic 0;
-                 gas_limit = Obj.magic 0;
-                 storage_limit = Obj.magic 0;
-                 counter = Obj.magic 0;
-                 source = Obj.magic 0;
-               });
-        ]
-    in
+    Environment.wrap_tzresult
+    @@ of_list
+         [
+           Contents
+             (Manager_operation
+                {
+                  fee = Obj.magic 0;
+                  operation = Obj.magic 0;
+                  gas_limit = Obj.magic 0;
+                  storage_limit = Obj.magic 0;
+                  counter = Obj.magic 0;
+                  source = Obj.magic 0;
+                });
+         ]
+    >>?= fun contents_list ->
     match contents_list with
     | Contents_list (Single _) -> return_unit
     | _ -> failwith "Unexpected value"
 
   let test_of_list_multiple_case () =
-    let contents_list =
-      of_list
-        [
-          Contents
-            (Manager_operation
-               {
-                 fee = Obj.magic 0;
-                 operation = Obj.magic 0;
-                 gas_limit = Obj.magic 0;
-                 storage_limit = Obj.magic 0;
-                 counter = Obj.magic 0;
-                 source = Obj.magic 0;
-               });
-          Contents
-            (Manager_operation
-               {
-                 fee = Obj.magic 0;
-                 operation = Obj.magic 0;
-                 gas_limit = Obj.magic 0;
-                 storage_limit = Obj.magic 0;
-                 counter = Obj.magic 0;
-                 source = Obj.magic 0;
-               });
-        ]
-    in
+    Environment.wrap_tzresult
+    @@ of_list
+         [
+           Contents
+             (Manager_operation
+                {
+                  fee = Obj.magic 0;
+                  operation = Obj.magic 0;
+                  gas_limit = Obj.magic 0;
+                  storage_limit = Obj.magic 0;
+                  counter = Obj.magic 0;
+                  source = Obj.magic 0;
+                });
+           Contents
+             (Manager_operation
+                {
+                  fee = Obj.magic 0;
+                  operation = Obj.magic 0;
+                  gas_limit = Obj.magic 0;
+                  storage_limit = Obj.magic 0;
+                  counter = Obj.magic 0;
+                  source = Obj.magic 0;
+                });
+         ]
+    >>?= fun contents_list ->
     match contents_list with
     | Contents_list (Cons (_, Single _)) -> return_unit
     | _ -> failwith "Unexpected value"
 
   let test_of_list_empty_case () =
-    try
-      let _ = of_list [] in
-      failwith "of_list of an empty list was expected to fail"
-    with Failure _ -> return_unit
+    match of_list [] with
+    | Ok _ -> failwith "of_list of an empty list was expected to fail"
+    | Error _ -> return_unit
 end
 
 let tests =

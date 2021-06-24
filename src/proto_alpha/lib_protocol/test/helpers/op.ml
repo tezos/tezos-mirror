@@ -134,7 +134,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
        in
        (Some (Contents reveal_op), Z.succ counter)
    | true -> (None, counter))
-  >|=? fun (manager_op, counter) ->
+  >>=? fun (manager_op, counter) ->
   (* Update counters and transform into a contents_list *)
   let operations =
     List.fold_left
@@ -168,8 +168,8 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
         | (preserved_prefix, preserved_suffix) ->
             preserved_prefix @ op :: preserved_suffix)
   in
-  let operations = Operation.of_list operations in
-  sign account.sk ctxt operations
+  Environment.wrap_tzresult @@ Operation.of_list operations
+  >>?= fun operations -> return @@ sign account.sk ctxt operations
 
 let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
     ?public_key ~source ctxt operation =

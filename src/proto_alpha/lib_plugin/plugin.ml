@@ -1712,12 +1712,8 @@ module RPC = struct
                        })
                   :: ops
             in
-            RPC_context.make_call0
-              S.operations
-              ctxt
-              block
-              ()
-              ({branch}, Operation.of_list ops)
+            Environment.wrap_tzresult @@ Operation.of_list ops >>?= fun ops ->
+            RPC_context.make_call0 S.operations ctxt block () ({branch}, ops)
 
       let reveal ctxt block ~branch ~source ~sourcePubKey ~counter ~fee () =
         operations

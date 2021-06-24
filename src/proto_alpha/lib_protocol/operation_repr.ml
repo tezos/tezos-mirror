@@ -192,11 +192,14 @@ let rec to_list = function
   | Contents_list (Single o) -> [Contents o]
   | Contents_list (Cons (o, os)) -> Contents o :: to_list (Contents_list os)
 
-let rec of_list_e = function
+(* This first version of of_list has the type (_, string) result expected by
+   the conv_with_guard combinator of Data_encoding. For a more conventional
+   return type see [of_list] below. *)
+let rec of_list_internal = function
   | [] -> Error "Empty operation list"
   | [Contents o] -> Ok (Contents_list (Single o))
   | Contents o :: os -> (
-      of_list_e os >>? fun (Contents_list os) ->
+      of_list_internal os >>? fun (Contents_list os) ->
       match (o, os) with
       | (Manager_operation _, Single (Manager_operation _)) ->
           Ok (Contents_list (Cons (o, os)))
@@ -206,8 +209,12 @@ let rec of_list_e = function
             "Operation list of length > 1 should only contains manager \
              operations.")
 
+type error += Contents_list_error of string (* `Permanent *)
+
 let of_list l =
-  match of_list_e l with Ok os -> os | Error s -> Pervasives.failwith s
+  match of_list_internal l with
+  | Ok contents -> Ok contents
+  | Error s -> error @@ Contents_list_error s
 
 module Encoding = struct
   open Data_encoding
@@ -642,7 +649,7 @@ module Encoding = struct
          ]
 
   let contents_list_encoding =
-    conv_with_guard to_list of_list_e (Variable.list contents_encoding)
+    conv_with_guard to_list of_list_internal (Variable.list contents_encoding)
 
   let optional_signature_encoding =
     conv
@@ -746,7 +753,24 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "The operation requires a signature")
     Data_encoding.unit
     (function Missing_signature -> Some () | _ -> None)
-    (fun () -> Missing_signature)
+    (fun () -> Missing_signature) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.contents_list_error"
+    ~title:"Invalid list of operation contents."
+    ~description:
+      "An operation contents list has an unexpected shape; it should be either \
+       a single operation or a non-empty list of manager operations"
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "An operation contents list has an unexpected shape; it should be \
+         either a single operation or a non-empty list of manager operations. \
+         %s"
+        s)
+    Data_encoding.(obj1 (req "message" string))
+    (function Contents_list_error s -> Some s | _ -> None)
+    (fun s -> Contents_list_error s)
 
 let check_signature (type kind) key chain_id
     ({shell; protocol_data} : kind operation) =
