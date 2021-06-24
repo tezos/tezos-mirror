@@ -184,6 +184,7 @@ in the :ref:`introduction <howtoget>`.
    developer/rpc
    developer/encodings
    developer/data_encoding
+   developer/gadt
    developer/error_monad
    developer/michelson_anti_patterns
    developer/entering_alpha
