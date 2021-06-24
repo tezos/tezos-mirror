@@ -9,7 +9,7 @@ dev-repo: "git+https://gitlab.com/nomadic-labs/tezos.git"
 license: "MIT"
 depends: [
   "conf-rust" {build}
-  "dune" {build & >= "1.7"}
+  "dune" {build & >= "2.0"}
   "hex"
   "ctypes"
   "ctypes-foreign"
