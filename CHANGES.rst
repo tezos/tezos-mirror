@@ -41,6 +41,14 @@ Protocol Compiler And Environment
 
 -  Added a new version of the protocol environment (V3).
 
+   -  Update some dependency libraries that have had releases since V2
+
+   -  Improve safety by removing access to some potentially dangerous functions
+      (functions that make assumptions about their input, functions that rely on
+      implicit comparison, etc.)
+
+   -  New features: Timelock
+
 Codec
 -----
 
