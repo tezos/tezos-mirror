@@ -684,6 +684,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           Lwt.return_unit
       | Error _ ->
           (* This may happen if the peer timed out for example. *)
+          Worker.log_event w (Operation_not_fetched oph) >>= fun () ->
           Lwt.return_unit
     in
     pv.fetching <- Operation_hash.Set.union to_fetch pv.fetching ;

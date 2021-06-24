@@ -73,10 +73,11 @@ let pp_mempool_count fmt
     refused
     unprocessed
 
-(* Matches events which contain an injection request.
+(** Matches events which contain an injection request.
    For example:
 
-     "event": {
+  {[
+    { "event": {
        "request": {
          "request": "inject",
          "operation": {
@@ -92,6 +93,7 @@ let pp_mempool_count fmt
      },
      "level": "notice"
    }
+  ]}
  *)
 let wait_for_injection node =
   let filter json =
@@ -104,10 +106,11 @@ let wait_for_injection node =
   let* _ = Node.wait_for node "node_prevalidator.v0" filter in
   return ()
 
-(* Matches events which contain an flush request.
+(** Matches events which contain an flush request.
    For example:
 
-     "event": {
+  {[
+    { "event": {
        "request": {
          "request": "flush",
          "block": "BLTv3VhCAVzMVxbXhTRqGf6M7oyxeeH2eBzdf9onbD9ULyFgo7d"
@@ -119,7 +122,9 @@ let wait_for_injection node =
        }
      },
      "level": "notice"
- *)
+    }
+  ]}
+*)
 let wait_for_flush node =
   let filter json =
     match
@@ -165,21 +170,42 @@ let sign_operation_bytes (signer : Constant.key) (msg : Bytes.t) =
   let sk = Signature.Secret_key.of_b58check_exn b58_secret_key in
   Signature.(sign ~watermark:Generic_operation sk msg)
 
-let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
-    ~counter ~signer ~client =
+let sign_operation ~signer op_str_hex =
+  let signature =
+    sign_operation_bytes signer (Hex.to_bytes (`Hex op_str_hex))
+  in
+  let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
+  signature
+
+let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
+    ~client =
   let op_json = operation_json ~fee ~gas_limit ~source ~destination ~counter in
   let op_json_branch = operation_json_branch ~branch op_json in
   let* op_hex =
     RPC.post_forge_operations ~data:(Ezjsonm.from_string op_json_branch) client
   in
-  let op_str_hex = JSON.as_string op_hex in
-  let signature =
-    sign_operation_bytes signer (Hex.to_bytes (`Hex op_str_hex))
-  in
-  let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
+  return (JSON.as_string op_hex)
+
+let inject_operation ~client op_str_hex signature =
   let signed_op = op_str_hex ^ signature in
   let* res = RPC.inject_operation ~data:(`String signed_op) client in
-  return (Some res)
+  return res
+
+let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
+    ~counter ~signer ~client =
+  let* op_str_hex =
+    forge_operation
+      ~branch
+      ~fee
+      ~gas_limit
+      ~source
+      ~destination
+      ~counter
+      ~client
+  in
+  let signature = sign_operation ~signer op_str_hex in
+  let* oph = inject_operation ~client op_str_hex signature in
+  return (Some oph)
 
 let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
     ~counter ~signer ~client ~node n =
@@ -206,30 +232,30 @@ let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
   in
   loop ([], counter + 1) n
 
-(* This test tries to manually inject some operations
+(** This test tries to manually inject some operations
 
    Scenario:
 
-   1. Node 1 activates a protocol
+   + Node 1 activates a protocol
 
-   2. Retrieve the counter and the branch for bootstrap1
+   + Retrieve the counter and the branch for bootstrap1
 
-   3. Forge and inject <n> operations in the node
+   + Forge and inject <n> operations in the node
 
-   4. Check that the operations are in the mempool
+   + Check that the operations are in the mempool
 
-   5. Bake an empty block
+   + Bake an empty block
 
-   6. Check that we did not lose any operations in the flush
+   + Check that we did not lose any operations in the flush
 
-   7. Inject an endorsement
+   + Inject an endorsement
 
-   8. Check that we have one more operation in the mempool and that
+   + Check that we have one more operation in the mempool and that
       the endorsement is applied
 
-   9. Bake an empty block
+   + Bake an empty block
 
-   8. Check that we did not lose any operations in the flush
+   + Check that we did not lose any operations in the flush
  *)
 
 let flush_mempool =
@@ -440,17 +466,17 @@ let check_batch_operations_are_in_applied_mempool ops oph n =
       (JSON.encode oph)
       n
 
-(* This test tries to run manually forged operations before injecting them
+(** This test tries to run manually forged operations before injecting them
 
    Scenario:
 
-   1. Node 1 activates a protocol
+   + Node 1 activates a protocol
 
-   2. Retrieve the counter and the branch for bootstrap1
+   + Retrieve the counter and the branch for bootstrap1
 
-   3. Forge, run and inject <n> operations in the node
+   + Forge, run and inject <n> operations in the node
 
-   4. Check that the batch is correctly injected
+   + Check that the batch is correctly injected
  *)
 let run_batched_operation =
   Protocol.register_test
@@ -525,19 +551,19 @@ let check_if_op_is_branch_refused ops oph =
           assert false)
   | _ -> Test.fail "Only one operation must be branch_refused1"
 
-(* This test checks that branch_refused endorsement are still propagated
+(** This test checks that branch_refused endorsement are still propagated
 
    Scenario:
 
-   1. 3 Nodes are chained connected and activate a protocol
+   + 3 Nodes are chained connected and activate a protocol
 
-   2. Disconnect node_1 from node_2 and bake on both node.
+   + Disconnect node_1 from node_2 and bake on both node.
 
-   3. Reconnect node_1 and node_2
+   + Reconnect node_1 and node_2
 
-   4. Endorse on node_1
+   + Endorse on node_1
 
-   5. Check that endorsement is applied on node_1 and refused on node_2 and node_3
+   + Check that endorsement is applied on node_1 and refused on node_2 and node_3
 *)
 let endorsement_flushed_branch_refused =
   Protocol.register_test
@@ -547,9 +573,9 @@ let endorsement_flushed_branch_refused =
   @@ fun protocol ->
   (* Step 1 *)
   (* 3 Nodes are started and we activate the protocol and wait the nodes to be synced *)
-  let* node_1 = Node.init [Bootstrap_threshold 0; Private_mode]
-  and* node_2 = Node.init [Bootstrap_threshold 0; Private_mode]
-  and* node_3 = Node.init [Bootstrap_threshold 0; Private_mode] in
+  let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
+  and* node_2 = Node.init [Synchronisation_threshold 0; Private_mode]
+  and* node_3 = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()
   and* client_2 = Client.init ~endpoint:(Node node_2) ()
   and* client_3 = Client.init ~endpoint:(Node node_3) () in
@@ -610,20 +636,20 @@ let check_empty_operation__ddb ddb =
       "Operation Ddb should be empty, contains : %d elements"
       op_db_length
 
-(* This test checks that pre-filtered operations are cleaned from the ddb
+(** This test checks that pre-filtered operations are cleaned from the ddb
 
    Scenario:
 
-   1. 3 Nodes are chained connected and activate a protocol
+   + 3 Nodes are chained connected and activate a protocol
 
-   2. Get the counter and the current branch
+   + Get the counter and the current branch
 
-   3. Forge operation, inject it and check injection on node_1
-      This operation is pre-filtered on node_2
+   + Forge operation, inject it and check injection on node_1
+     This operation is pre-filtered on node_2
 
-   4. Bake 1 block
+   + Bake 1 block
 
-   5. Get client_2 ddb and check that it contains no operation
+   + Get client_2 ddb and check that it contains no operation
 *)
 let forge_pre_filtered_operation =
   Protocol.register_test
@@ -633,8 +659,8 @@ let forge_pre_filtered_operation =
   @@ fun protocol ->
   (* Step 1 *)
   (* Two Nodes are started and we activate the protocol and wait the nodes to be synced *)
-  let* node_1 = Node.init [Bootstrap_threshold 0; Private_mode]
-  and* node_2 = Node.init [Bootstrap_threshold 0; Private_mode] in
+  let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
+  and* node_2 = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()
   and* client_2 = Client.init ~endpoint:(Node node_2) () in
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
@@ -675,8 +701,142 @@ let forge_pre_filtered_operation =
   Log.info "Operation Ddb of client_2 does not contain any operation" ;
   unit
 
+(** Matches events which contain a failed fetch.
+   For example:
+
+  {[
+    {  "event": {
+           "operation_not_fetched": "onuvmuCS5NqtJG65BJWqH44bzwiXLw4tVpfNqRQvkgorv5LoejA"
+       },
+       "level": "debug"
+    }
+  ]}
+*)
+let wait_for_failed_fetch node =
+  let filter json =
+    match
+      JSON.(json |=> 1 |-> "event" |-> "operation_not_fetched" |> as_string_opt)
+    with
+    | Some s -> Some s
+    | None -> None
+  in
+  let* _ = Node.wait_for node "node_prevalidator.v0" filter in
+  return ()
+
+let set_config_operations_timeout node timeout =
+  let chain_validator_config =
+    let open JSON in
+    Node.Config_file.read node |-> "shell" |-> "chain_validator"
+  in
+  let updated_shell_config =
+    JSON.annotate
+      ~origin:"shell"
+      (Ezjsonm.from_string
+         (Format.asprintf
+            {|{"prevalidator": { "operations_request_timeout" : %f },
+            "peer_validator" : { "new_head_request_timeout" : 5 },
+            "chain_validator": %s}|}
+            timeout
+            (JSON.encode chain_validator_config)))
+  in
+  Node.Config_file.update node (JSON.put ("shell", updated_shell_config))
+
+(** This test checks that failed fetched operations can be refetched successfully
+
+   Scenario:
+
+   + initialise two nodes and activate the protocol. The second node is initialise with specific configuration
+
+   + Get the counter and the current branch
+
+   + Forge operation and inject it in node_1, checks that the fetch fail in node_2
+
+   + Ensure that the injected operation is in node_1 mempool
+
+   + Ensure that the mempool of node_2 is empty
+
+   + Inject the previous operation in node_2
+
+   + Ensure that the operation is injected in node_2 mempool
+*)
+let refetch_failed_operation =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Fetch failed operation"
+    ~tags:["fetch"; "mempool"]
+  @@ fun protocol ->
+  (* Step 1 *)
+  (* initialise both nodes and activate protocol
+     node_2 uses specific configuration to force timeout in fetching *)
+  let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let node_2 = Node.create [Synchronisation_threshold 0; Private_mode] in
+  let* () = Node.config_init node_2 [] in
+  (* Set a low operations_request_timeout to force timeout at fetching *)
+  set_config_operations_timeout node_2 0.00001 ;
+  (* Run the node with the new config.
+     event_level is set to debug to catch fetching event at this level *)
+  let* () = Node.run ~event_level:"debug" node_2 [] in
+  let* client_1 = Client.init ~endpoint:(Node node_1) ()
+  and* client_2 = Client.init ~endpoint:(Node node_2) () in
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2
+  and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
+  let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
+  let* () = Client.activate_protocol ~protocol client_1 in
+  Log.info "Activated protocol." ;
+  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  Log.info "All nodes are at level %d." 1 ;
+  (* Step 2 *)
+  (* get counter and branches *)
+  let* counter =
+    RPC.Contracts.get_counter ~contract_id:Constant.bootstrap1.identity client_1
+  in
+  let counter = JSON.as_int counter in
+  let* branch = RPC.get_branch client_1 in
+  let branch = JSON.as_string branch in
+  (* Step 3 *)
+  (* Forge operation and inject it in node_1, checks that the fetch fail in node_2 *)
+  let* op_str_hex =
+    forge_operation
+      ~branch
+      ~fee:1000 (* Minimal fees to successfully apply the transfer *)
+      ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
+      ~source:Constant.bootstrap1.identity
+      ~destination:Constant.bootstrap2.identity
+      ~counter:(counter + 1)
+      ~client:client_1
+  in
+  let signature = sign_operation ~signer:Constant.bootstrap1 op_str_hex in
+  let failed_fetching_waiter = wait_for_failed_fetch node_2 in
+  let* oph = inject_operation ~client:client_1 op_str_hex signature in
+  let* () = failed_fetching_waiter in
+  (* Step 4 *)
+  (* Ensure that the injected operation is in node_1 mempool *)
+  let* mempool_node_1 = RPC.get_mempool_pending_operations client_1 in
+  check_operation_is_in_applied_mempool mempool_node_1 oph ;
+  (* Step 5 *)
+  (* Ensure that the mempool of node_2 is empty *)
+  let* mempool_count_after_failed_fetch =
+    RPC.get_mempool_pending_operations client_2
+  in
+  let count_failed_fetching = count_mempool mempool_count_after_failed_fetch in
+  if count_failed_fetching.total <> 0 then
+    Test.fail "The mempool of node 2 should be empty" ;
+  (* Step 6 *)
+  (* Inject the previous operation in node_2 *)
+  let* oph2 = inject_operation ~client:client_2 op_str_hex signature in
+  if oph <> oph2 then
+    Test.fail
+      "The operation injected in node_2 should be the same as the one injected \
+       in node_1" ;
+  (* Step 7 *)
+  (* Ensure that the operation is injected in node_2 mempool *)
+  let* mempool_inject_on_node_2 = RPC.get_mempool_pending_operations client_2 in
+  check_operation_is_in_applied_mempool mempool_inject_on_node_2 oph ;
+  unit
+
 let register ~protocols =
   flush_mempool ~protocols ;
   run_batched_operation ~protocols ;
   endorsement_flushed_branch_refused ~protocols ;
-  forge_pre_filtered_operation ~protocols
+  forge_pre_filtered_operation ~protocols ;
+  refetch_failed_operation ~protocols
