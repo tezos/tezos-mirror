@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "tezos-client-010-PtGRANAD" { with-test }
-  "dune" { >= "1.11" }
+  "dune" { >= "2.0" }
   "tezos-stdlib"
   "tezos-error-monad"
   "tezos-crypto"
