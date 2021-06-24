@@ -1341,7 +1341,30 @@ module Raw_exporter : EXPORTER = struct
     in
     (fresh_level_index, fresh_hash_index)
 
-  let write_cemented_block_indexes _t = Lwt.return_unit
+  let write_cemented_block_indexes t =
+    Lwt.catch
+      (fun () ->
+        Lwt_unix.unlink
+          Naming.(
+            file_path
+              (cemented_blocks_hash_lock_file
+                 (cemented_blocks_hash_index_dir
+                    (cemented_blocks_dir t.snapshot_tmp_dir)))))
+      (function
+        | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
+        | exn -> Lwt.fail exn)
+    >>= fun () ->
+    Lwt.catch
+      (fun () ->
+        Lwt_unix.unlink
+          Naming.(
+            file_path
+              (cemented_blocks_level_lock_file
+                 (cemented_blocks_level_index_dir
+                    (cemented_blocks_dir t.snapshot_tmp_dir)))))
+      (function
+        | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
+        | exn -> Lwt.fail exn)
 
   let filter_cemented_block_indexes t ~limit =
     let open Cemented_block_store in
@@ -1538,6 +1561,28 @@ module Tar_exporter : EXPORTER = struct
     (fresh_level_index, fresh_hash_index)
 
   let write_cemented_block_indexes t =
+    Lwt.catch
+      (fun () ->
+        Lwt_unix.unlink
+          Naming.(
+            file_path
+              (cemented_blocks_hash_lock_file
+                 (cemented_blocks_hash_index_dir t.snapshot_tmp_cemented_dir))))
+      (function
+        | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
+        | exn -> Lwt.fail exn)
+    >>= fun () ->
+    Lwt.catch
+      (fun () ->
+        Lwt_unix.unlink
+          Naming.(
+            file_path
+              (cemented_blocks_level_lock_file
+                 (cemented_blocks_level_index_dir t.snapshot_tmp_cemented_dir))))
+      (function
+        | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
+        | exn -> Lwt.fail exn)
+    >>= fun () ->
     Onthefly.add_directory_and_finalize
       ~archive_prefix:(Naming.dir_path t.snapshot_cemented_dir)
       t.tar
