@@ -610,6 +610,11 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
                         commit_info;
                       } )
                   in
+                  Store_events.(
+                    emit
+                      restore_protocol_activation
+                      (block_proto_level, protocol_hash))
+                  >>= fun () ->
                   aux
                     ~prev_proto_level:(Some block_proto_level)
                     ~level:(Int32.succ level)
@@ -715,7 +720,11 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
                        commit_info;
                      } )
                  in
-                 return (activation :: pls, new_proto_level)
+                 Store_events.(
+                   emit
+                     restore_protocol_activation
+                     (new_proto_level, protocol_hash))
+                 >>= fun () -> return (activation :: pls, new_proto_level)
            else return (pls, previous_protocol_level))
          ([], highest_cemented_proto_level))
       floating_stores
