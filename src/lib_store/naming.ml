@@ -138,7 +138,13 @@ let cemented_blocks_dir dir = mk_dir dir "cemented"
 
 let cemented_blocks_level_index_dir dir = mk_dir dir "level_index"
 
+let cemented_blocks_level_lock_file dir =
+  mk_file dir (Filename.concat "index" "lock")
+
 let cemented_blocks_hash_index_dir dir = mk_dir dir "hash_index"
+
+let cemented_blocks_hash_lock_file dir =
+  mk_file dir (Filename.concat "index" "lock")
 
 let cemented_blocks_file dir ~start_level ~end_level =
   mk_file dir (Printf.sprintf "%ld_%ld" start_level end_level)
