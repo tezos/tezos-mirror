@@ -1,5 +1,3 @@
-.. _gadt:
-
 Generalized Algebraic Data Types (GADTs)
 ========================================
 
