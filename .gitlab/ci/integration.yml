@@ -108,10 +108,11 @@ integration:sandboxes:daemons-upgrade:
 ############################################################
 
 # definition for the environment to run all integration tests
+# integration tests are run only on x86_64 architectures (for now)
 .integration_python_template:
   extends: .test_template
-  dependencies:
-    - build
+  needs:
+    - build_x86_64
   before_script:
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables

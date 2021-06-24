@@ -59,7 +59,7 @@ sanity_ci:
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
   stage: sanity_ci
-  needs: ["build"]
+  needs: ["build_x86_64"]
   before_script:
     - . ./scripts/version.sh
     - . $HOME/.venv/bin/activate

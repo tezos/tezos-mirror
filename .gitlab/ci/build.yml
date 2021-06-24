@@ -52,7 +52,7 @@
 build_arm64:
   extends:
     - .build
-    - .rules_template__extended_test_pipeline
+    - .rules_template__development_arm64
   variables:
     ARCH: "arm64"
   tags:
@@ -61,6 +61,5 @@ build_arm64:
 build_x86_64:
   extends:
     - .build
-    - .rules_template__extended_test_pipeline
   variables:
     ARCH: "x86_64"
