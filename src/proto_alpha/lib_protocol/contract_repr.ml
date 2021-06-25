@@ -163,9 +163,7 @@ let incr_origination_nonce nonce =
 let rpc_arg =
   let construct = to_b58check in
   let destruct hash =
-    match of_b58check hash with
-    | Error _ -> Error "Cannot parse contract id"
-    | Ok contract -> Ok contract
+    Result.map_error (fun _ -> "Cannot parse contract id") (of_b58check hash)
   in
   RPC_arg.make
     ~descr:"A contract identifier encoded in b58check."

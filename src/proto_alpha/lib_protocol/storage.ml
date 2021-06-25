@@ -547,9 +547,8 @@ module Sapling = struct
            let rpc_arg =
              let construct = Int64.to_string in
              let destruct hash =
-               match Int64.of_string_opt hash with
-               | None -> Error "Cannot parse node position"
-               | Some id -> Ok id
+               Int64.of_string_opt hash
+               |> Result.of_option ~error:"Cannot parse node position"
              in
              RPC_arg.make
                ~descr:"The position of a node in a sapling commitment tree"
@@ -592,9 +591,8 @@ module Sapling = struct
            let rpc_arg =
              let construct = Int64.to_string in
              let destruct hash =
-               match Int64.of_string_opt hash with
-               | None -> Error "Cannot parse ciphertext position"
-               | Some id -> Ok id
+               Int64.of_string_opt hash
+               |> Result.of_option ~error:"Cannot parse ciphertext position"
              in
              RPC_arg.make
                ~descr:"The position of a sapling ciphertext"
@@ -644,9 +642,8 @@ module Sapling = struct
            let rpc_arg =
              let construct = Int64.to_string in
              let destruct hash =
-               match Int64.of_string_opt hash with
-               | None -> Error "Cannot parse nullifier position"
-               | Some id -> Ok id
+               Int64.of_string_opt hash
+               |> Result.of_option ~error:"Cannot parse nullifier position"
              in
              RPC_arg.make
                ~descr:"A sapling nullifier position"
@@ -686,9 +683,8 @@ module Sapling = struct
 
            let of_string hexstring =
              let b = Hex.to_bytes (`Hex hexstring) in
-             match Data_encoding.Binary.of_bytes_opt encoding b with
-             | None -> Error "Cannot parse sapling nullifier"
-             | Some nf -> Ok nf
+             Data_encoding.Binary.of_bytes_opt encoding b
+             |> Result.of_option ~error:"Cannot parse sapling nullifier"
 
            let to_string nf =
              let b = Data_encoding.Binary.to_bytes_exn encoding nf in
@@ -710,8 +706,7 @@ module Sapling = struct
            let to_path c l = to_string c :: l
 
            let of_path = function
-             | [c] -> (
-                 match of_string c with Error _ -> None | Ok nf -> Some nf)
+             | [c] -> Result.to_option (of_string c)
              | _ -> None
          end))
 
@@ -734,9 +729,8 @@ module Sapling = struct
            let rpc_arg =
              let construct = Int32.to_string in
              let destruct hash =
-               match Int32.of_string_opt hash with
-               | None -> Error "Cannot parse nullifier position"
-               | Some id -> Ok id
+               Int32.of_string_opt hash
+               |> Result.of_option ~error:"Cannot parse nullifier position"
              in
              RPC_arg.make
                ~descr:"A sapling root"
