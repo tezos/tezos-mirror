@@ -120,7 +120,8 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   (* Accept and read message until the connection is closed. *)
   accept_n main_socket n >>=? fun conns ->
   let conns = List.map (P2p_io_scheduler.register sched) conns in
-  List.iter_p receive conns >>= fun () ->
+  List.iter_p receive (List.map P2p_io_scheduler.to_readable conns)
+  >>= fun () ->
   List.iter_ep P2p_io_scheduler.close conns >>=? fun () ->
   log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
   return_unit

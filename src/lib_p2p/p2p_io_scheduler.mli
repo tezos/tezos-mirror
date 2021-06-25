@@ -85,14 +85,19 @@ val mk_buffer : ?pos:int -> ?len:int -> bytes -> (buffer, tztrace) result
     starting at position [0]. *)
 val mk_buffer_safe : bytes -> buffer
 
-(** Like [read_now], but waits till [conn] read queue has at least one
-    element instead of failing. *)
-val read :
-  ?canceler:Lwt_canceler.t -> connection -> buffer -> int tzresult Lwt.t
+(** The input type of [read] and [read_full] below *)
+type readable
+
+(** Returns the [readable] of an abstract [connection] *)
+val to_readable : connection -> readable
+
+(** [read readable buffer] immediately reads data from [readable] if it
+ *  is readily available. Otherwise it waits for data to arrive. *)
+val read : ?canceler:Lwt_canceler.t -> readable -> buffer -> int tzresult Lwt.t
 
 (** Like [read], but blits exactly [len] bytes in [buf]. *)
 val read_full :
-  ?canceler:Lwt_canceler.t -> connection -> buffer -> unit tzresult Lwt.t
+  ?canceler:Lwt_canceler.t -> readable -> buffer -> unit tzresult Lwt.t
 
 (** [stat conn] is a snapshot of current bandwidth usage for
     [conn]. *)

@@ -213,7 +213,7 @@ module Low_level = struct
   let client ch sched addr port =
     let msg = Bytes.create (Bytes.length simple_msg) in
     raw_connect sched addr port >>= fun fd ->
-    P2p_io_scheduler.read_full fd @@ P2p_io_scheduler.mk_buffer_safe msg
+    P2p_io_scheduler.(read_full (to_readable fd) @@ mk_buffer_safe msg)
     >>=? fun () ->
     tzassert (Bytes.compare simple_msg msg = 0) __POS__ >>=? fun () ->
     sync ch >>=? fun () -> P2p_io_scheduler.close fd

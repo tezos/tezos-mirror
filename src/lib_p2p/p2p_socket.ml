@@ -346,7 +346,10 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
       version = announced_version;
     }
   >>=? fun sent_msg ->
-  Connection_message.read ~canceler scheduled_conn >>=? fun (msg, recv_msg) ->
+  Connection_message.read
+    ~canceler
+    (P2p_io_scheduler.to_readable scheduled_conn)
+  >>=? fun (msg, recv_msg) ->
   (* TODO: make the below bytes-to-string copy-conversion unnecessary.
      This requires making the consumer of the [recv_msg] value
      ([Crypto_box.generate_nonces]) able to work with strings directly. *)
@@ -382,7 +385,11 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
     cryptobox_data
     local_metadata
   >>=? fun () ->
-  Metadata.read ~canceler metadata_config scheduled_conn cryptobox_data
+  Metadata.read
+    ~canceler
+    metadata_config
+    (P2p_io_scheduler.to_readable scheduled_conn)
+    cryptobox_data
   >>=? fun remote_metadata ->
   let info =
     {
@@ -419,7 +426,7 @@ module Reader = struct
       | Await decode_next_buf ->
           Crypto.read_chunk
             ~canceler:st.canceler
-            st.conn.scheduled_conn
+            (P2p_io_scheduler.to_readable st.conn.scheduled_conn)
             st.conn.cryptobox_data
           >>=? fun buf ->
           Events.(emit read_event) (Bytes.length buf, st.conn.info.peer_id)
@@ -618,7 +625,11 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
   protect
     (fun () ->
       Ack.write ~canceler conn.scheduled_conn conn.cryptobox_data Ack
-      >>=? fun () -> Ack.read ~canceler conn.scheduled_conn conn.cryptobox_data)
+      >>=? fun () ->
+      Ack.read
+        ~canceler
+        (P2p_io_scheduler.to_readable conn.scheduled_conn)
+        conn.cryptobox_data)
     ~on_error:(fun err ->
       P2p_io_scheduler.close conn.scheduled_conn >>= fun _ ->
       match err with

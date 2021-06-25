@@ -456,18 +456,24 @@ end
 
 module WriteScheduler = Scheduler (WriteIO)
 
+type readable = {
+  read_buffer : Circular_buffer.t;
+  read_queue : Circular_buffer.data tzresult Lwt_pipe.t;
+  mutable partial_read : Circular_buffer.data option;
+}
+
 (* Type of a bidirectional scheduled connection *)
 type connection = {
   fd : P2p_fd.t;
   canceler : Lwt_canceler.t;
+  readable : readable;
   read_conn : ReadScheduler.connection;
-  read_buffer : Circular_buffer.t;
-  read_queue : Circular_buffer.data tzresult Lwt_pipe.t;
   write_conn : WriteScheduler.connection;
   write_queue : Bytes.t Lwt_pipe.t;
-  mutable partial_read : Circular_buffer.data option;
   remove_from_connection_table : unit -> unit;
 }
+
+let to_readable connection = connection.readable
 
 type t = {
   mutable closed : bool;
@@ -613,16 +619,15 @@ let register st fd =
             Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
             Lwt.return_unit
         | Ok () -> Lwt.return_unit) ;
+    let readable = {read_buffer; read_queue; partial_read = None} in
     let conn =
       {
         fd;
         canceler;
-        read_queue;
-        read_buffer;
+        readable;
         read_conn;
         write_queue;
         write_conn;
-        partial_read = None;
         remove_from_connection_table =
           (fun () -> P2p_fd.Table.remove st.connected fd);
       }
