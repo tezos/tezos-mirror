@@ -114,7 +114,7 @@ module Micheline_size = struct
   let of_annots acc annots =
     List.fold_left (fun acc s -> add_string acc s) acc annots
 
-  let rec of_nodes acc nodes more_nodes =
+  let[@coq_struct "nodes"] rec of_nodes acc nodes more_nodes =
     let open Micheline in
     match nodes with
     | [] -> (
@@ -269,7 +269,7 @@ let is_unit_parameter =
     ~fun_bytes:(fun b -> Compare.Bytes.equal b unit_bytes)
     ~fun_combine:(fun res _ -> res)
 
-let rec strip_annotations node =
+let[@coq_struct "node"] rec strip_annotations node =
   let open Micheline in
   match node with
   | (Int (_, _) | String (_, _) | Bytes (_, _)) as leaf -> leaf
@@ -277,7 +277,7 @@ let rec strip_annotations node =
       Prim (loc, name, List.map strip_annotations args, [])
   | Seq (loc, args) -> Seq (loc, List.map strip_annotations args)
 
-let rec micheline_nodes node acc k =
+let rec micheline_nodes_aux node acc k =
   match node with
   | Micheline.Int (_, _) -> k (acc + 1)
   | Micheline.String (_, _) -> k (acc + 1)
@@ -286,13 +286,14 @@ let rec micheline_nodes node acc k =
       micheline_nodes_list subterms (acc + 1) k
   | Micheline.Seq (_, subterms) -> micheline_nodes_list subterms (acc + 1) k
 
-and micheline_nodes_list subterms acc k =
+and[@coq_mutual_as_notation] [@coq_struct "subterms"] micheline_nodes_list
+    subterms acc k =
   match subterms with
   | [] -> k acc
   | n :: nodes ->
-      micheline_nodes_list nodes acc (fun acc -> micheline_nodes n acc k)
+      micheline_nodes_list nodes acc (fun acc -> micheline_nodes_aux n acc k)
 
-let micheline_nodes node = micheline_nodes node 0 (fun x -> x)
+let micheline_nodes node = micheline_nodes_aux node 0 (fun x -> x)
 
 let strip_locations_cost node =
   let nodes = micheline_nodes node in
