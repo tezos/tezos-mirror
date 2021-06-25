@@ -144,7 +144,7 @@ let originated_contracts
       ({origination_index = last; operation_hash = last_hash} as
       origination_nonce) =
   assert (Operation_hash.equal first_hash last_hash) ;
-  let rec contracts acc origination_index =
+  let[@coq_struct "origination_index"] rec contracts acc origination_index =
     if Compare.Int32.(origination_index < first) then acc
     else
       let origination_nonce = {origination_nonce with origination_index} in
