@@ -280,12 +280,11 @@ let finalize_block
       >>=? fun voting_period_info ->
       let level_info = Alpha_context.Level.current ctxt in
       let baker = Signature.Public_key_hash.zero in
-      Signature.Public_key_hash.Map.fold
+      Signature.Public_key_hash.Map.fold_es
         (fun delegate deposit ctxt ->
-          ctxt >>=? fun ctxt ->
           Alpha_context.Delegate.freeze_deposit ctxt delegate deposit)
         (Alpha_context.get_deposits ctxt)
-        (return ctxt)
+        ctxt
       >|=? fun ctxt ->
       let ctxt = Alpha_context.finalize ctxt in
       ( ctxt,

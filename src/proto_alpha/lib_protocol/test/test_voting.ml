@@ -275,7 +275,7 @@ let test_successful_vote num_delegates () =
        (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth rolls_p1 0)
        (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth rolls_p1 1)
    in
-   match Environment.Protocol_hash.(Map.find_opt zero ps) with
+   match Environment.Protocol_hash.(Map.find zero ps) with
    | Some v ->
        if v = weight then return_unit
        else failwith "%s - Wrong count %ld is not %ld" __LOC__ v weight
@@ -635,7 +635,7 @@ let test_multiple_identical_proposals_count_as_one () =
   >>=? fun proposer_rolls ->
   (* correctly count the double proposal for zero as one proposal *)
   let expected_weight_proposer = proposer_rolls in
-  match Environment.Protocol_hash.(Map.find_opt zero ps) with
+  match Environment.Protocol_hash.(Map.find zero ps) with
   | Some v ->
       if v = expected_weight_proposer then return_unit
       else

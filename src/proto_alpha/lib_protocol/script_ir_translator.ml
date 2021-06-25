@@ -433,7 +433,7 @@ let empty_map : type a b. a comparable_ty -> (a, b) map =
   end)
 
 let map_get : type key value. key -> (key, value) map -> value option =
- fun k (module Box) -> Box.OPS.find_opt k (fst Box.boxed)
+ fun k (module Box) -> Box.OPS.find k (fst Box.boxed)
 
 let map_update : type a b. a -> b option -> (a, b) map -> (a, b) map =
  fun k v (module Box) ->
@@ -6180,7 +6180,7 @@ let empty_big_map key_type value_type =
 
 let big_map_mem ctxt key {id; diff; key_type; _} =
   hash_comparable_data ctxt key_type key >>=? fun (key, ctxt) ->
-  match (Big_map_overlay.find_opt key diff.map, id) with
+  match (Big_map_overlay.find key diff.map, id) with
   | (None, None) -> return (false, ctxt)
   | (None, Some id) ->
       Alpha_context.Big_map.mem ctxt id key >|=? fun (ctxt, res) -> (res, ctxt)
@@ -6188,7 +6188,7 @@ let big_map_mem ctxt key {id; diff; key_type; _} =
   | (Some (_, Some _), _) -> return (true, ctxt)
 
 let big_map_get_by_hash ctxt key {id; diff; value_type; _} =
-  match (Big_map_overlay.find_opt key diff.map, id) with
+  match (Big_map_overlay.find key diff.map, id) with
   | (Some (_, x), _) -> return (x, ctxt)
   | (None, None) -> return (None, ctxt)
   | (None, Some id) -> (

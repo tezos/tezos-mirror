@@ -455,7 +455,7 @@ let frozen_balance_by_cycle ctxt delegate =
     ~init:map
     ~f:(fun cycle amount map ->
       let balance =
-        match Cycle_repr.Map.find_opt cycle map with
+        match Cycle_repr.Map.find cycle map with
         | None -> empty_frozen_balance
         | Some balance -> balance
       in
@@ -466,7 +466,7 @@ let frozen_balance_by_cycle ctxt delegate =
     ~init:map
     ~f:(fun cycle amount map ->
       let balance =
-        match Cycle_repr.Map.find_opt cycle map with
+        match Cycle_repr.Map.find cycle map with
         | None -> empty_frozen_balance
         | Some balance -> balance
       in

@@ -28,7 +28,10 @@
    v3/fallbackArray.mli
 
    ;; Part of Lwtreslib
+   v3/seq.mli
    v3/list.mli
+   v3/set.mli
+   v3/map.mli
 
    v3/RPC_arg.mli
    v3/RPC_path.mli
@@ -39,8 +42,6 @@
 
    v3/base58.mli
    v3/s.mli
-   v3/set.mli
-   v3/map.mli
    v3/blake2B.mli
    v3/bls12_381.mli
    v3/ed25519.mli

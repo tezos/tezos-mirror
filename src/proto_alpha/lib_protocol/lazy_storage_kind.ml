@@ -81,7 +81,7 @@ module type TitleWithId = sig
     module Temp : Temp_id with type t = private t
   end
 
-  module IdSet : S.SET with type elt = Id.t
+  module IdSet : Set.S with type elt = Id.t
 end
 
 module MakeId (Title : Title) : TitleWithId = struct

@@ -251,16 +251,15 @@ module Contract = struct
             Alpha_services.Delegate.frozen_balance_by_cycle rpc_ctxt ctxt pkh
             >>=? fun map ->
             Lwt.return
-            @@ Cycle.Map.fold
+            @@ Cycle.Map.fold_e
                  (fun _cycle {Delegate.deposit; fees; rewards} acc ->
-                   acc >>? fun acc ->
                    match kind with
                    | Deposit -> Test_tez.Tez.(acc +? deposit)
                    | Fees -> Test_tez.Tez.(acc +? fees)
                    | Rewards -> Test_tez.Tez.(acc +? rewards)
                    | _ -> assert false)
                  map
-                 (Ok Tez.zero))
+                 Tez.zero)
 
   let counter ctxt contract =
     match Contract.is_implicit contract with
