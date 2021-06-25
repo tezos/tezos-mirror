@@ -25,6 +25,7 @@
    v3/option.mli
    v3/tzEndian.mli
    v3/bits.mli
+   v3/fallbackArray.mli
 
    ;; Part of Lwtreslib
    v3/list.mli

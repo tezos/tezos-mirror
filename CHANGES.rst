@@ -47,7 +47,7 @@ Protocol Compiler And Environment
       (functions that make assumptions about their input, functions that rely on
       implicit comparison, etc.)
 
-   -  New features: Timelock
+   -  New features: Timelock, FallbackArray
 
 Codec
 -----
