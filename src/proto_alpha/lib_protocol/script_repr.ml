@@ -156,12 +156,12 @@ module Micheline_decoding = struct
      size of the Micheline term *)
   let micheline_size_dependent_cost =
     let traversal_cost = S.safe_int 60 in
-    let string__per_byte_cost = S.safe_int 10 in
-    let z__per_byte_cost = S.safe_int 10 in
+    let string_per_byte_cost = S.safe_int 10 in
+    let z_per_byte_cost = S.safe_int 10 in
     Micheline_size.make
       ~nodes:traversal_cost
-      ~string_bytes:string__per_byte_cost
-      ~z_bytes:z__per_byte_cost
+      ~string_bytes:string_per_byte_cost
+      ~z_bytes:z_per_byte_cost
 
   let bytes_dependent_cost = S.safe_int 20
 end
@@ -173,12 +173,12 @@ module Micheline_encoding = struct
      size of the Micheline term *)
   let micheline_size_dependent_cost =
     let traversal_cost = S.safe_int 100 in
-    let string__per_byte_cost = S.safe_int 10 in
-    let z__per_byte_cost = S.safe_int 25 in
+    let string_per_byte_cost = S.safe_int 10 in
+    let z_per_byte_cost = S.safe_int 25 in
     Micheline_size.make
       ~nodes:traversal_cost
-      ~string_bytes:string__per_byte_cost
-      ~z_bytes:z__per_byte_cost
+      ~string_bytes:string_per_byte_cost
+      ~z_bytes:z_per_byte_cost
 
   let bytes_dependent_cost = S.safe_int 33
 end
