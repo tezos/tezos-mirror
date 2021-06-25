@@ -390,14 +390,12 @@ module Encoding = struct
       }
         -> 'b case
 
-  let endorsement_encoding = obj1 (req "level" Raw_level_repr.encoding)
-
   let endorsement_case =
     Case
       {
         tag = 0;
         name = "endorsement";
-        encoding = endorsement_encoding;
+        encoding = obj1 (req "level" Raw_level_repr.encoding);
         select =
           (function Contents (Endorsement _ as op) -> Some op | _ -> None);
         proj = (fun (Endorsement {level}) -> level);
