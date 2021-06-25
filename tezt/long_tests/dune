@@ -3,10 +3,19 @@
  (libraries tezt
             tezt-tezos
             tezt-performance-regression
+            tezos-lwt-result-stdlib
             tezos-alpha-test-helpers
             tezos-micheline
             tezos-openapi
             tezos-protocol-alpha
             qcheck-core
+            tezos-time-measurement
+            data-encoding
             )
- (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base -open Tezt_performance_regression)))
+ (flags (:standard
+          -open Tezt
+          -open Tezt_tezos
+          -open Tezt.Base
+          -open Tezt_performance_regression
+          -open Tezos_lwt_result_stdlib
+         )))
