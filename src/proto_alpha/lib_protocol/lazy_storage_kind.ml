@@ -311,6 +311,7 @@ module IdSet = struct
     | (Big_map, {big_map; _}) -> Big_map.IdSet.mem id big_map
     | (Sapling_state, {sapling_state; _}) ->
         Sapling_state.IdSet.mem id sapling_state
+    [@@coq_axiom_with_reason "gadt"]
 
   let add (type i a u) (kind : (i, a, u) kind) (id : i) set =
     match (kind, set) with
@@ -320,6 +321,7 @@ module IdSet = struct
     | (Sapling_state, {sapling_state; _}) ->
         let sapling_state = Sapling_state.IdSet.add id sapling_state in
         {set with sapling_state}
+    [@@coq_axiom_with_reason "gadt"]
 
   let diff set1 set2 =
     let big_map = Big_map.IdSet.diff set1.big_map set2.big_map in
@@ -327,6 +329,7 @@ module IdSet = struct
       Sapling_state.IdSet.diff set1.sapling_state set2.sapling_state
     in
     {big_map; sapling_state}
+    [@@coq_axiom_with_reason "gadt"]
 
   let fold (type i a u) (kind : (i, a, u) kind) (f : i -> 'acc -> 'acc) set
       (acc : 'acc) =
@@ -334,10 +337,12 @@ module IdSet = struct
     | (Big_map, {big_map; _}) -> Big_map.IdSet.fold f big_map acc
     | (Sapling_state, {sapling_state; _}) ->
         Sapling_state.IdSet.fold f sapling_state acc
+    [@@coq_axiom_with_reason "gadt"]
 
   let fold_all f set acc =
     List.fold_left
       (fun acc (_, Ex_Kind kind) -> fold kind (f.f kind) set acc)
       acc
       all
+    [@@coq_axiom_with_reason "gadt"]
 end
