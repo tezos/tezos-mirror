@@ -366,15 +366,15 @@ let check_gas_limit_is_valid ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   else ok_unit
 
 let consume_gas_limit_in_block ctxt (limit : 'a Gas_limit_repr.Arith.t) =
+  let open Gas_limit_repr in
   check_gas_limit_is_valid ctxt limit >>? fun () ->
   let block_gas = block_gas_level ctxt in
-  let limit = Gas_limit_repr.Arith.fp limit in
-  if Gas_limit_repr.Arith.(limit > block_gas) then error Block_quota_exceeded
+  let limit = Arith.fp limit in
+  if Arith.(limit > block_gas) then error Block_quota_exceeded
   else
-    Ok
-      (update_remaining_block_gas
-         ctxt
-         (Gas_limit_repr.Arith.sub (block_gas_level ctxt) limit))
+    let level = Arith.sub (block_gas_level ctxt) limit in
+    let ctxt = update_remaining_block_gas ctxt level in
+    Ok ctxt
 
 let set_gas_limit ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
   let open Gas_limit_repr in

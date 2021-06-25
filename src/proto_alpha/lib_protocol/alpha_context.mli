@@ -173,87 +173,141 @@ module Cycle : sig
 end
 
 module Gas : sig
+  (** This module implements the gas subsystem of the context.
+
+     Gas reflects the computational cost of each operation to limit
+     the cost of operations and, by extension, the cost of blocks.
+
+     There are two gas quotas: one for operation and one for
+     block. For this reason, we maintain two gas levels -- one for
+     operations and another one for blocks -- that correspond to the
+     remaining amounts of gas, initialized with the quota
+     limits and decreased each time gas is consumed.
+
+  *)
+
   module Arith :
     Fixed_point_repr.Safe
       with type 'a t = Saturation_repr.may_saturate Saturation_repr.t
 
+  (** For maintenance operations or for testing, gas can be
+     [Unaccounted]. Otherwise, the computation is [Limited] by the
+     [remaining] gas in the context. *)
   type t = private Unaccounted | Limited of {remaining : Arith.fp}
 
   val encoding : t Data_encoding.encoding
 
   val pp : Format.formatter -> t -> unit
 
+  (** [check_limit_is_valid ctxt limit] checks that the given gas
+     [limit] is well-formed, i.e., it does not exceed the hard gas
+     limit per operation as defined in [ctxt] and it is positive. *)
+  val check_limit_is_valid : context -> 'a Arith.t -> unit tzresult
+
+  (** [set_limit ctxt limit] returns a context with a given
+     [limit] level of gas allocated for an operation. *)
+  val set_limit : context -> 'a Arith.t -> context
+
+  (** [set_unlimited] allows unlimited gas consumption. *)
+  val set_unlimited : context -> context
+
+  (** [remaining_operation_gas ctxt] returns the current gas level in
+     the context [ctxt] for the current operation. If gas is
+     [Unaccounted], an arbitrary value will be returned. *)
+  val remaining_operation_gas : context -> Arith.fp
+
+  (** [level ctxt] is the current gas level in [ctxt] for the current
+     operation. *)
+  val level : context -> t
+
+  (** [update_remaining_operation_gas ctxt remaining] sets the current
+     gas level for operations to [remaining]. *)
+  val update_remaining_operation_gas : context -> Arith.fp -> context
+
+  (** [gas_exhausted_error ctxt] raises an error indicating the gas
+      has been exhausted. *)
+  val gas_exhausted_error : context -> 'a tzresult
+
+  (** [consumed since until] is the operation gas level difference
+     between context [since] and context [until]. This function
+     returns [Arith.zero] if any of the two contexts allows for an
+     unlimited gas consumption. This function also returns
+     [Arith.zero] if [since] has less gas than [until]. *)
+  val consumed : since:context -> until:context -> Arith.fp
+
+  (** [block_level ctxt] returns the block gas level in context [ctxt]. *)
+  val block_level : context -> Arith.fp
+
+  (** Costs are computed using a saturating arithmetic. See
+     {!Saturation_repr}. *)
   type cost = Saturation_repr.may_saturate Saturation_repr.t
 
   val cost_encoding : cost Data_encoding.encoding
 
   val pp_cost : Format.formatter -> cost -> unit
 
-  type error += Block_quota_exceeded (* `Temporary *)
+  (** [consume ctxt cost] subtracts [cost] to the current operation
+     gas level in [ctxt]. This operation may fail with
+     [Operation_quota_exceeded] if the operation gas level would
+     go below zero. *)
+  val consume : context -> cost -> context tzresult
 
   type error += Operation_quota_exceeded (* `Temporary *)
 
-  type error += Gas_limit_too_high (* `Permanent *)
-
-  val free : cost
-
-  val atomic_step_cost : 'a Saturation_repr.t -> cost
-
-  val step_cost : 'a Saturation_repr.t -> cost
-
-  val alloc_cost : 'a Saturation_repr.t -> cost
-
-  val alloc_bytes_cost : int -> cost
-
-  val alloc_mbytes_cost : int -> cost
-
-  val read_bytes_cost : int -> cost
-
-  val write_bytes_cost : int -> cost
-
-  val ( *@ ) : 'a Saturation_repr.t -> cost -> cost
-
-  val ( +@ ) : cost -> cost -> cost
-
-  (** Checks that the given gas limit does not exceed the hard gas limit
-      per operation *)
-  val check_limit_is_valid : context -> 'a Arith.t -> unit tzresult
-
-  (** Consumes gas equal to the given operation gas limit in the current
-      block gas level of the context. May fail if not enough gas remains
-      in the block *)
+  (** [consume_limit_in_block ctxt limit] consumes [limit] in
+     the current block gas level of the context. This operation may
+     fail with error [Block_quota_exceeded] if not enough gas remains
+     in the block. This operation may also fail with
+     [Gas_limit_too_high] if [limit] is greater than the allowed
+     limit for operation gas level. *)
   val consume_limit_in_block : context -> 'a Arith.t -> context tzresult
 
-  (** Sets a limit to the consumable operation gas *)
-  val set_limit : context -> 'a Arith.t -> context
+  type error += Block_quota_exceeded (* `Temporary *)
 
-  (** Allows unlimited gas consumption *)
-  val set_unlimited : context -> context
+  type error += Gas_limit_too_high (* `Permanent *)
 
-  (** Consumes operation gas. May fail if not enough gas remains for the
-      operation *)
-  val consume : context -> cost -> context tzresult
+  (** The cost of free operation is [0]. *)
+  val free : cost
 
-  (** Returns the current gas counter. *)
-  val remaining_operation_gas : context -> Arith.fp
+  (** [atomic_step_cost x] corresponds to [x] milliunit of gas. *)
+  val atomic_step_cost : _ Saturation_repr.t -> cost
 
-  (** Update gas counter in the context. *)
-  val update_remaining_operation_gas : context -> Arith.fp -> context
+  (** [step_cost x] corresponds to [x] units of gas. *)
+  val step_cost : _ Saturation_repr.t -> cost
 
-  (** Triggers an error in case of gas exhaustion. *)
-  val gas_exhausted_error : context -> 'a tzresult
+  (** Cost of allocating qwords of storage.
+    [alloc_cost n] estimates the cost of allocating [n] qwords of storage. *)
+  val alloc_cost : _ Saturation_repr.t -> cost
 
-  (** Returns operation gas level *)
-  val level : context -> t
+  (** Cost of allocating bytes in the storage.
+    [alloc_bytes_cost b] estimates the cost of allocating [b] bytes of
+    storage. *)
+  val alloc_bytes_cost : int -> cost
 
-  (** Returns the operation gas level difference between two contexts.
-      Returns [Arith.zero] if any of the contexts are set to unlimited
-      gas *)
-  val consumed : since:context -> until:context -> Arith.fp
+  (** Cost of allocating bytes in the storage.
 
-  (** Returns block gas level *)
-  val block_level : context -> Arith.fp
+      [alloc_mbytes_cost b] estimates the cost of allocating [b] bytes of
+      storage and the cost of an header to describe these bytes. *)
+  val alloc_mbytes_cost : int -> cost
 
+  (** Cost of reading the storage.
+    [read_bytes_cost n] estimates the cost of reading [n] bytes of storage. *)
+  val read_bytes_cost : int -> cost
+
+  (** Cost of writing to storage.
+    [write_bytes_const n] estimates the cost of writing [n] bytes to the
+    storage. *)
+  val write_bytes_cost : int -> cost
+
+  (** Multiply a cost by a factor. Both arguments are saturated arithmetic values,
+    so no negative numbers are involved. *)
+  val ( *@ ) : _ Saturation_repr.t -> cost -> cost
+
+  (** Add two costs together. *)
+  val ( +@ ) : cost -> cost -> cost
+
+  (** [cost_of_repr] is an internal operation needed to inject costs
+     for Storage_costs into Gas.cost. *)
   val cost_of_repr : Gas_limit_repr.cost -> cost
 end
 
