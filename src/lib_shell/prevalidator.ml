@@ -584,6 +584,14 @@ module Make
       ~validation_state_after
       (op, receipt)
 
+  let set_mempool shell mempool =
+    shell.mempool <- mempool ;
+    let chain_store = Distributed_db.chain_store shell.parameters.chain_db in
+    Store.Chain.set_mempool
+      chain_store
+      ~head:(Store.Block.hash shell.predecessor)
+      shell.mempool
+
   module Proto_classificator = struct
     module Classificator = Classificator (Requester)
 
@@ -768,15 +776,7 @@ module Make
                 pending = remaining_pendings;
               }
             in
-            pv.shell.mempool <- our_mempool ;
-            let chain_store =
-              Distributed_db.chain_store pv.shell.parameters.chain_db
-            in
-            Store.Chain.set_mempool
-              chain_store
-              ~head:(Store.Block.hash pv.shell.predecessor)
-              pv.shell.mempool
-            >>= fun _res -> Lwt_main.yield ())
+            set_mempool pv.shell our_mempool >>= fun _res -> Lwt_main.yield ())
 
   (* This function fetches operations through the [distributed_db] and
      ensures that an operation is fetched at most once by adding
@@ -1136,12 +1136,11 @@ module Make
       pv.shell.live_blocks <- live_blocks ;
       pv.shell.live_operations <- live_operations ;
       pv.shell.timestamp <- timestamp_system ;
-      pv.shell.mempool <- {known_valid = []; pending = Operation_hash.Set.empty} ;
       pv.shell.pending <- pending ;
       Classification.clear pv.shell.classification ;
       pv.validation_state <- validation_state ;
       pv.operation_stream <- Lwt_watcher.create_input () ;
-      return_unit
+      set_mempool pv.shell Mempool.empty
 
     let on_advertise pv =
       match pv.advertisement with
@@ -1189,11 +1188,8 @@ module Make
       pv.shell.classification.in_mempool <- in_mempool_without_applied ;
       pv.shell.pending <- pending_with_applied ;
       (* The [validation_state] is reset to the chain head. *)
-      let chain_store =
-        Distributed_db.chain_store pv.shell.parameters.chain_db
-      in
       Prevalidation.create
-        chain_store
+        (Distributed_db.chain_store pv.shell.parameters.chain_db)
         ~predecessor:pv.shell.predecessor
         ~live_blocks:pv.shell.live_blocks
         ~live_operations:pv.shell.live_operations
@@ -1224,15 +1220,12 @@ module Make
         previously_applied
       >>= fun (new_validation_state, new_mempool) ->
       pv.validation_state <- Ok new_validation_state ;
-      pv.shell.mempool <-
+      set_mempool
+        pv.shell
         {
           known_valid = List.rev new_mempool.known_valid;
           pending = new_mempool.pending;
-        } ;
-      Store.Chain.set_mempool
-        chain_store
-        ~head:(Store.Block.hash pv.shell.predecessor)
-        pv.shell.mempool
+        }
 
     let remove_from_advertisement oph = function
       | `Pending mempool -> `Pending (Mempool.remove oph mempool)
@@ -1258,11 +1251,7 @@ module Make
           reclassify_applied_operations w pv)
         else (
           Classification.remove_not_applied oph_to_ban pv.shell.classification ;
-          pv.shell.mempool <- Mempool.remove oph_to_ban pv.shell.mempool ;
-          Store.Chain.set_mempool
-            (Distributed_db.chain_store pv.shell.parameters.chain_db)
-            ~head:(Store.Block.hash pv.shell.predecessor)
-            pv.shell.mempool)
+          set_mempool pv.shell (Mempool.remove oph_to_ban pv.shell.mempool))
       else (
         pv.shell.pending <-
           Operation_hash.Map.remove oph_to_ban pv.shell.pending ;
