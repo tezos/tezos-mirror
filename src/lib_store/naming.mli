@@ -137,8 +137,14 @@ val cemented_blocks_dir :
 val cemented_blocks_level_index_dir :
   [`Cemented_blocks_dir] directory -> [`Cemented_level_index_dir] directory
 
+val cemented_blocks_level_lock_file :
+  [`Cemented_level_index_dir] directory -> [`Cemented_level_lock_file] file
+
 val cemented_blocks_hash_index_dir :
   [`Cemented_blocks_dir] directory -> [`Cemented_hash_index_dir] directory
+
+val cemented_blocks_hash_lock_file :
+  [`Cemented_hash_index_dir] directory -> [`Cemented_hash_lock_file] file
 
 val cemented_blocks_file :
   [`Cemented_blocks_dir] directory ->
@@ -193,6 +199,10 @@ val snapshot_floating_blocks_file :
 val snapshot_metadata_file :
   [< `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
   [`Snapshot_metadata] file
+
+val snapshot_version_file :
+  [< `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
+  [`Snapshot_version] file
 
 val snapshot_protocol_levels_file :
   [< `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
