@@ -106,3 +106,29 @@ val of_option : error:'e -> 'a option -> ('a, 'e) result
 val to_list : ('a, 'e) result -> 'a list
 
 val to_seq : ('a, 'e) result -> 'a Stdlib.Seq.t
+
+(** [catch f] is [try Ok (f ()) with e -> Error e]: it is [Ok x] if [f ()]
+    evaluates to [x], and it is [Error e] if [f ()] raises [e].
+
+    See {!WithExceptions.S.Result.to_exn} for a converse function.
+
+    If [catch_only] is set, then only exceptions [e] such that [catch_only e]
+    is [true] are caught.
+
+    Whether [catch_only] is set or not, you cannot catch non-deterministic
+    runtime exceptions of OCaml such as {!Stack_overflow} and
+    {!Out_of_memory} nor system exceptions such as {!Unix.Unix_error}. *)
+val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> ('a, exn) result
+
+(** [catch_s] is [catch] but for Lwt promises. Specifically, [catch_s f]
+    returns a promise that resolves to [Ok x] if and when [f ()] resolves to
+    [x], or to [Error exc] if and when [f ()] is rejected with [exc].
+
+    If [catch_only] is set, then only exceptions [e] such that [catch_only e]
+    is [true] are caught.
+
+    Whether [catch_only] is set or not, you cannot catch non-deterministic
+    runtime exceptions of OCaml such as {!Stack_overflow} and
+    {!Out_of_memory} nor system exceptions such as {!Unix.Unix_error}. *)
+val catch_s :
+  ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> ('a, exn) result Lwt.t

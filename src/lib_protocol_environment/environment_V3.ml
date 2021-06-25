@@ -151,9 +151,47 @@ struct
   module Int64 = Int64
   module Buffer = Buffer
   module Format = Format
-  module Option = Tezos_error_monad.TzLwtreslib.Option
-  module Result = Tezos_error_monad.TzLwtreslib.Result
   module FallbackArray = FallbackArray
+
+  module Option = struct
+    include Tezos_error_monad.TzLwtreslib.Option
+
+    let catch ?(catch_only = fun _ -> true) f =
+      match f () with
+      | v -> Some v
+      | exception
+          (( Stack_overflow | Out_of_memory | Unix.Unix_error _
+           | UnixLabels.Unix_error _ | Sys_error _ ) as e) ->
+          raise e
+      | exception e -> if catch_only e then None else raise e
+
+    let catch_s ?(catch_only = fun _ -> true) f =
+      Lwt.try_bind f some_s (function
+          | ( Stack_overflow | Out_of_memory | Unix.Unix_error _
+            | UnixLabels.Unix_error _ | Sys_error _ ) as e ->
+              raise e
+          | e -> if catch_only e then none_s else raise e)
+  end
+
+  module Result = struct
+    include Tezos_error_monad.TzLwtreslib.Result
+
+    let catch ?(catch_only = fun _ -> true) f =
+      match f () with
+      | v -> Ok v
+      | exception
+          (( Stack_overflow | Out_of_memory | Unix.Unix_error _
+           | UnixLabels.Unix_error _ | Sys_error _ ) as e) ->
+          raise e
+      | exception e -> if catch_only e then Error e else raise e
+
+    let catch_s ?(catch_only = fun _ -> true) f =
+      Lwt.try_bind f Lwt.return_ok (function
+          | ( Stack_overflow | Out_of_memory | Unix.Unix_error _
+            | UnixLabels.Unix_error _ | Sys_error _ ) as e ->
+              raise e
+          | e -> if catch_only e then Lwt.return_error e else raise e)
+  end
 
   module Raw_hashes = struct
     let sha256 = Hacl.Hash.SHA256.digest
@@ -584,6 +622,8 @@ struct
     include
       Tezos_error_monad.Monad_ext_maker.Make (Error_core) (TzTrace)
         (Local_monad)
+
+    let trace_of_error e = TzTrace.make e
 
     let make_trace_encoding e = TzTrace.encoding e
 
