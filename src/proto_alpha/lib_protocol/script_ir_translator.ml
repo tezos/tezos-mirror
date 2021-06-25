@@ -2283,14 +2283,15 @@ let parse_nat ctxt = function
 
 let parse_mutez ctxt = function
   | Int (loc, v) as expr -> (
-      try
-        match Tez.of_mutez (Z.to_int64 v) with
-        | None -> raise Exit
-        | Some tez -> ok (tez, ctxt)
-      with _ ->
-        error
-        @@ Invalid_syntactic_constant
-             (loc, strip_locations expr, "a valid mutez amount"))
+      match
+        let open Option in
+        bind (catch (fun () -> Z.to_int64 v)) Tez.of_mutez
+      with
+      | Some tez -> Ok (tez, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               (loc, strip_locations expr, "a valid mutez amount"))
   | expr -> error @@ Invalid_kind (location expr, [Int_kind], kind expr)
 
 let parse_timestamp ctxt = function

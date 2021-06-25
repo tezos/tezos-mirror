@@ -31,14 +31,12 @@ let of_int64 = Z.of_int64
 
 let of_string x =
   match Time_repr.of_notation x with
-  | None -> ( try Some (Z.of_string x) with _ -> None)
+  | None -> Option.catch (fun () -> Z.of_string x)
   | Some time -> Some (of_int64 (Time_repr.to_seconds time))
 
 let to_notation x =
-  try
-    let notation = Time_repr.to_notation (Time.of_seconds (Z.to_int64 x)) in
-    if String.equal notation "out_of_range" then None else Some notation
-  with _ -> None
+  Option.catch (fun () ->
+      Time_repr.to_notation (Time.of_seconds (Z.to_int64 x)))
 
 let to_num_str = Z.to_string
 
