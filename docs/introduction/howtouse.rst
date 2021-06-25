@@ -19,7 +19,7 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-client``: a command-line client and basic wallet (see `Client`_);
 - ``tezos-admin-client``: administration tool for the node;
 - ``tezos-{baker,endorser,accuser}-*``: daemons to bake, endorse and
-  accuse on the Tezos network (see :ref:`howtorun`);
+  accuse on the Tezos network (see :doc:`howtorun`);
 - ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
