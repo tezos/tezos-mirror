@@ -28,7 +28,7 @@ type fp_tag (* Tag for fixed point computations *)
 type integral_tag (* Tag for integral computations *)
 
 module type Safe = sig
-  type 'a t
+  type 'a t [@@coq_phantom]
 
   type fp = fp_tag t
 
@@ -86,7 +86,9 @@ module type Safe = sig
 end
 
 module type Full = sig
-  include Safe
+  type 'a t [@@coq_phantom]
+
+  include Safe with type 'a t := 'a t
 
   val unsafe_fp : Z.t -> fp
 end
