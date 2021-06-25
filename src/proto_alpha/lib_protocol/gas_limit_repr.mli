@@ -67,8 +67,10 @@ val raw_consume : Arith.fp -> cost -> Arith.fp option
 (** The cost of free operation is [0]. *)
 val free : cost
 
+(** [atomic_step_cost x] corresponds to [x] milliunit of gas. *)
 val atomic_step_cost : _ Saturation_repr.t -> cost
 
+(** [step_cost x] corresponds to [x] units of gas. *)
 val step_cost : _ Saturation_repr.t -> cost
 
 (** Cost of allocating qwords of storage.
@@ -85,7 +87,7 @@ val alloc_bytes_cost : int -> cost
 (** Cost of allocating bytes in the storage.
 
     [alloc_mbytes_cost b] estimates the cost of allocating [b] bytes of
-    storage. *)
+    storage and the cost of a header to describe these bytes. *)
 val alloc_mbytes_cost : int -> cost
 
 (** Cost of reading the storage.
