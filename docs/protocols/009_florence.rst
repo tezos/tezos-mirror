@@ -86,7 +86,7 @@ sign arbitrary data securely, without fear of malicious injection into
 future protocols.
 
 - Solves issue:
-  :gl:`tezos#52`
+  :gl:`metastatedev/tezos#52`
 - MR:
   :gl:`tezos!2361`
 
