@@ -152,6 +152,7 @@ struct
   module Buffer = Buffer
   module Format = Format
   module Option = Tezos_error_monad.TzLwtreslib.Option
+  module Result = Tezos_error_monad.TzLwtreslib.Result
   module FallbackArray = FallbackArray
 
   module Raw_hashes = struct
