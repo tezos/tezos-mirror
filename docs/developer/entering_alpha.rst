@@ -18,7 +18,7 @@ implementation files, accompanied by a ``TEZOS_PROTOCOL`` file.
 The ``TEZOS_PROTOCOL`` structure
 --------------------------------
 
-If you look at this file in the repository, you will see that it is
+If you look at file ``TEZOS_PROTOCOL`` in the repository, you will see that it is
 composed of the hash of the sources, and the list of its modules, in
 linking order.
 
@@ -76,9 +76,16 @@ relying mostly on this coarse grained description, with a little bit of
 cherry-picking when you’re curious about how a specific invariant is
 enforced.
 
-The ``*_repr`` modules
-~~~~~~~~~~~~~~~~~~~~~~
+Hashes and storage description layer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This layer is implemented by module ``storage_description.ml`` and modules named ``*_hash`.
+It contains mainly Blake2b hash implementations specialized
+for various basic types of the protocol.
 
+The representation layer
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+This layer is implemented by modules named ``*_repr``.
 These modules abstract the values of the raw key-value context by using
 :ref:`Data_encoding<data_encoding>`.
 

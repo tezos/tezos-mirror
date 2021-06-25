@@ -7,7 +7,10 @@ usage="Usage:
 $ ./scripts/snapshot_alpha.sh <name>_<version_number>
 Packs the current proto_alpha directory in a new
 proto_<version_number>_<hash> directory with all the necessary
-renamings."
+renamings.
+
+<name> should be in lower case
+<version_number> should be three digits"
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 cd "$script_dir"/..
@@ -37,6 +40,8 @@ fi
 # this is equivalent to `cp src/proto_alpha/ src/proto_${version}` but only for versioned files
 mkdir /tmp/tezos_proto_snapshot
 git archive HEAD src/proto_alpha/ | tar -x -C /tmp/tezos_proto_snapshot
+# remove the README because it is specific to Alpha
+rm /tmp/tezos_proto_snapshot/src/proto_alpha/README.md
 mv /tmp/tezos_proto_snapshot/src/proto_alpha src/proto_${version}
 rm -rf /tmp/tezos_proto_snapshot
 
