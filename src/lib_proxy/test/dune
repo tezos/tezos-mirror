@@ -7,7 +7,6 @@
   tezos-stdlib-unix
   tezos-proxy
   tezos-test-services
-  crowbar
   tezos-test-helpers
   qcheck-alcotest
   alcotest-lwt)
