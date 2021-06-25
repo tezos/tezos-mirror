@@ -12,8 +12,9 @@ A blockchain is a linked list of **blocks**. In Tezos, blocks to be
 added to the blockchain are agreed upon through a proof-of-stake
 consensus mechanism. Proof-of-stake means that participants in the
 consensus algorithm are chosen in function of their stake. In Tezos, a
-participant needs to have a minimum stake of 8,000 ꜩ (which is
-called a **roll**). If one does not have enough stake to participate
+participant needs to have a minimum stake of one **roll** , which,
+according to the current **protocol constants**, corresponds to 8,000 ꜩ.
+If one does not have enough stake to participate
 on its own or does not want to set up the needed infrastructure, (s)he
 can use **delegation**. Therefore, in Tezos, participants in the
 consensus algorithm are called **delegates**. There are two roles a
@@ -54,6 +55,19 @@ mechanism:
 -  `Liquid Proof-of-Stake <https://medium.com/tezos/liquid-proof-of-stake-aec2f7ef1da7>`_
 
 Please note that these external resources may contain outdated information.
+
+.. _protocol_constants:
+.. _protocol_constants_009:
+
+Protocol constants
+------------------
+
+Protocols are parameterized by several parameters called *protocol constants*, which may vary from one protocol to another or from one network to another (for instance, test networks move faster).
+For instance, the number of tez constituting a roll is given by the constant named ``tokens_per_roll``.
+
+The list of protocol constants can be found in the API of the `Constants module <https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-alpha/Tezos_raw_protocol_alpha/Alpha_context/Constants/index.html>`__.
+
+The values of protocol constants can be found using a :ref:`specific RPC call <GET_..--block_id--context--constants>`, as shown in :ref:`this example <get_protocol_constants>`.
 
 Blocks
 ------

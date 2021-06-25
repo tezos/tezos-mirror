@@ -15,7 +15,7 @@ their own networks for various reasons. Networks differ in various ways:
 
 - they may run (or have run) different protocols;
 
-- protocols may run with different constants (for instance, test networks move faster);
+- protocols may run with different :ref:`constants <protocol_constants>` (for instance, test networks move faster);
 
 - they have different bootstrap peers (nodes that new nodes connect to initially);
 
