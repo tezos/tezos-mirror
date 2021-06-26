@@ -116,6 +116,20 @@ module type ENCODER = sig
   val rpc_arg : t RPC_arg.t
 end
 
+module type INDEXES_SET = sig
+  include Set.S
+
+  val random_elt : t -> elt
+
+  val encoding : t Data_encoding.t
+end
+
+module type INDEXES_MAP = sig
+  include Map.S
+
+  val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
+end
+
 module type INDEXES = sig
   type t
 
@@ -129,19 +143,9 @@ module type INDEXES = sig
 
   val path_length : int
 
-  module Set : sig
-    include Set.S with type elt = t
+  module Set : INDEXES_SET with type elt = t
 
-    val random_elt : t -> elt
-
-    val encoding : t Data_encoding.t
-  end
-
-  module Map : sig
-    include Map.S with type key = t
-
-    val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
-  end
+  module Map : INDEXES_MAP with type key = t
 end
 
 module type HASH = sig
