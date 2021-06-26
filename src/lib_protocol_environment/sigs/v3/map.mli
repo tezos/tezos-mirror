@@ -149,4 +149,4 @@ module type S = sig
 
 end
 
-module Make (Ord : sig type t val compare : t -> t -> int end) : S with type key = Ord.t
+module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t
