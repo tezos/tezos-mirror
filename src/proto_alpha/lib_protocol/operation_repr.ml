@@ -398,7 +398,7 @@ module Encoding = struct
         encoding = obj1 (req "level" Raw_level_repr.encoding);
         select =
           (function Contents (Endorsement _ as op) -> Some op | _ -> None);
-        proj = (fun (Endorsement {level}) -> level);
+        proj = (fun [@coq_match_with_default] (Endorsement {level}) -> level);
         inj = (fun level -> Endorsement {level});
       }
 
@@ -566,7 +566,8 @@ module Encoding = struct
         encoding = obj1 (req "arbitrary" Data_encoding.string);
         select =
           (function Contents (Failing_noop _ as op) -> Some op | _ -> None);
-        proj = (function Failing_noop message -> message);
+        proj =
+          (function[@coq_match_with_default] Failing_noop message -> message);
         inj = (function message -> Failing_noop message);
       }
 
@@ -578,11 +579,11 @@ module Encoding = struct
       (req "gas_limit" (check_size 10 Gas_limit_repr.Arith.n_integral_encoding))
       (req "storage_limit" (check_size 10 n))
 
-  let extract (type kind)
-      (Manager_operation
-         {source; fee; counter; gas_limit; storage_limit; operation = _} :
-        kind Kind.manager contents) =
-    (source, fee, counter, gas_limit, storage_limit)
+  let extract : type kind. kind Kind.manager contents -> _ =
+    function[@coq_match_with_default]
+    | Manager_operation
+        {source; fee; counter; gas_limit; storage_limit; operation = _} ->
+        (source, fee, counter, gas_limit, storage_limit)
 
   let rebuild (source, fee, counter, gas_limit, storage_limit) operation =
     Manager_operation
@@ -805,7 +806,7 @@ let hash_packed (o : packed_operation) =
   in
   Operation.hash {shell = o.shell; proto}
 
-type ('a, 'b) eq = Eq : ('a, 'a) eq
+type ('a, 'b) eq = Eq : ('a, 'a) eq [@@coq_force_gadt]
 
 let equal_manager_operation_kind :
     type a b. a manager_operation -> b manager_operation -> (a, b) eq option =
