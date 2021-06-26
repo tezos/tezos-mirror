@@ -57,7 +57,7 @@ let last_level_in_cycle ctxt c =
 
 let levels_in_cycle ctxt cycle =
   let first = first_level_in_cycle ctxt cycle in
-  let rec loop (n : Level_repr.t) acc =
+  let[@coq_struct "n"] rec loop (n : Level_repr.t) acc =
     if Cycle_repr.(n.cycle = first.cycle) then loop (succ ctxt n) (n :: acc)
     else acc
   in
@@ -73,7 +73,7 @@ let levels_in_current_cycle ctxt ?(offset = 0l) () =
 
 let levels_with_commitments_in_cycle ctxt c =
   let first = first_level_in_cycle ctxt c in
-  let rec loop (n : Level_repr.t) acc =
+  let[@coq_struct "n"] rec loop (n : Level_repr.t) acc =
     if Cycle_repr.(n.cycle = first.cycle) then
       if n.expected_commitment then loop (succ ctxt n) (n :: acc)
       else loop (succ ctxt n) acc
