@@ -25,28 +25,30 @@
 
 open Storage_functors
 
-module UInt16 = struct
-  type t = int
+module Encoding = struct
+  module UInt16 = struct
+    type t = int
 
-  let encoding = Data_encoding.uint16
-end
+    let encoding = Data_encoding.uint16
+  end
 
-module Int32 = struct
-  include Int32
+  module Int32 = struct
+    type t = Int32.t
 
-  let encoding = Data_encoding.int32
-end
+    let encoding = Data_encoding.int32
+  end
 
-module Int64 = struct
-  include Int64
+  module Int64 = struct
+    type t = Int64.t
 
-  let encoding = Data_encoding.int64
-end
+    let encoding = Data_encoding.int64
+  end
 
-module Z = struct
-  type t = Z.t
+  module Z = struct
+    type t = Z.t
 
-  let encoding = Data_encoding.z
+    let encoding = Data_encoding.z
+  end
 end
 
 module Int31_index : INDEX with type t = int = struct
@@ -83,7 +85,7 @@ module Block_priority =
     (struct
       let name = ["block_priority"]
     end)
-    (UInt16)
+    (Encoding.UInt16)
 
 (** Contracts handling *)
 
@@ -99,7 +101,7 @@ module Contract = struct
       (struct
         let name = ["global_counter"]
       end)
-      (Z)
+      (Encoding.Z)
 
   module Indexed_context =
     Make_indexed_subcontext
@@ -190,7 +192,7 @@ module Contract = struct
       (struct
         let name = ["counter"]
       end)
-      (Z)
+      (Encoding.Z)
 
   (* Consume gas for serialization and deserialization of expr in this
      module *)
@@ -273,14 +275,14 @@ module Contract = struct
       (struct
         let name = ["paid_bytes"]
       end)
-      (Z)
+      (Encoding.Z)
 
   module Used_storage_space =
     Indexed_context.Make_map
       (struct
         let name = ["used_bytes"]
       end)
-      (Z)
+      (Encoding.Z)
 
   module Roll_list =
     Indexed_context.Make_map
@@ -394,7 +396,7 @@ module Big_map = struct
       (struct
         let name = ["total_bytes"]
       end)
-      (Z)
+      (Encoding.Z)
 
   module Key_type =
     Indexed_context.Make_map
@@ -519,14 +521,14 @@ module Sapling = struct
       (struct
         let name = ["total_bytes"]
       end)
-      (Z)
+      (Encoding.Z)
 
   module Commitments_size =
     Make_single_data_storage (Registered) (Indexed_context.Raw_context)
       (struct
         let name = ["commitments_size"]
       end)
-      (Int64)
+      (Encoding.Int64)
 
   module Memo_size =
     Make_single_data_storage (Registered) (Indexed_context.Raw_context)
@@ -627,7 +629,7 @@ module Sapling = struct
       (struct
         let name = ["nullifiers_size"]
       end)
-      (Int64)
+      (Encoding.Int64)
 
   (* For sequential access when building a diff *)
   module Nullifiers_ordered =
@@ -761,7 +763,7 @@ module Sapling = struct
       (struct
         let name = ["roots_pos"]
       end)
-      (Int32)
+      (Encoding.Int32)
 
   module Roots_level =
     Make_single_data_storage (Registered) (Indexed_context.Raw_context)
@@ -825,7 +827,7 @@ module Cycle = struct
       (struct
         let name = ["roll_snapshot"]
       end)
-      (UInt16)
+      (Encoding.UInt16)
 
   type unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
@@ -1035,7 +1037,7 @@ module Vote = struct
       (struct
         let name = ["participation_ema"]
       end)
-      (Int32)
+      (Encoding.Int32)
 
   module Current_proposal =
     Make_single_data_storage (Registered) (Raw_context)
@@ -1049,7 +1051,7 @@ module Vote = struct
       (struct
         let name = ["listings_size"]
       end)
-      (Int32)
+      (Encoding.Int32)
 
   module Listings =
     Make_indexed_data_storage
@@ -1058,7 +1060,7 @@ module Vote = struct
            let name = ["listings"]
          end))
          (Make_index (Signature.Public_key_hash))
-         (Int32)
+         (Encoding.Int32)
 
   module Proposals =
     Make_data_set_storage
@@ -1078,7 +1080,7 @@ module Vote = struct
            let name = ["proposals_count"]
          end))
          (Make_index (Signature.Public_key_hash))
-         (UInt16)
+         (Encoding.UInt16)
 
   module Ballots =
     Make_indexed_data_storage
@@ -1238,7 +1240,7 @@ module Liquidity_baking = struct
       (struct
         let name = ["liquidity_baking_escape_ema"]
       end)
-      (Int32)
+      (Encoding.Int32)
 
   module Cpmm_address =
     Make_single_data_storage (Registered) (Raw_context)
