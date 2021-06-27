@@ -299,6 +299,14 @@ module Contract = struct
       (Tez_repr)
 end
 
+module type NEXT = sig
+  type id
+
+  val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+  val incr : Raw_context.t -> (Raw_context.t * id) tzresult Lwt.t
+end
+
 (** Big maps handling *)
 
 module Big_map = struct
@@ -310,8 +318,8 @@ module Big_map = struct
         let name = ["big_maps"]
       end)
 
-  module Next = struct
-    include
+  module Next : NEXT with type id := id = struct
+    module Storage =
       Make_single_data_storage (Registered) (Raw_context)
         (struct
           let name = ["next"]
@@ -319,22 +327,26 @@ module Big_map = struct
         (Lazy_storage_kind.Big_map.Id)
 
     let incr ctxt =
-      get ctxt >>=? fun i ->
-      update ctxt (Lazy_storage_kind.Big_map.Id.next i) >|=? fun ctxt ->
+      Storage.get ctxt >>=? fun i ->
+      Storage.update ctxt (Lazy_storage_kind.Big_map.Id.next i) >|=? fun ctxt ->
       (ctxt, i)
 
-    let init ctxt = init ctxt Lazy_storage_kind.Big_map.Id.init
+    let init ctxt = Storage.init ctxt Lazy_storage_kind.Big_map.Id.init
   end
 
-  module Index = struct
+  module Index :
+    Storage_description.INDEX with type t = Lazy_storage_kind.Big_map.Id.t =
+  struct
     (* After flat storage, just use module Index = Lazy_storage_kind.Big_map.Id *)
 
-    include Lazy_storage_kind.Big_map.Id
+    module Id = Lazy_storage_kind.Big_map.Id
 
-    let path_length = 6 + path_length
+    type t = Id.t
+
+    let path_length = 6 + Id.path_length
 
     let to_path c l =
-      let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+      let raw_key = Data_encoding.Binary.to_bytes_exn Id.encoding c in
       let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
       String.sub index_key 0 2
       ::
@@ -343,7 +355,7 @@ module Big_map = struct
       String.sub index_key 4 2
       ::
       String.sub index_key 6 2
-      :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: to_path c l
+      :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: Id.to_path c l
 
     let of_path = function
       | []
@@ -356,9 +368,11 @@ module Big_map = struct
       | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ ->
           None
       | index1 :: index2 :: index3 :: index4 :: index5 :: index6 :: tail ->
-          of_path tail
+          Id.of_path tail
           |> Option.map (fun c ->
-                 let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+                 let raw_key =
+                   Data_encoding.Binary.to_bytes_exn Id.encoding c
+                 in
                  let (`Hex index_key) =
                    Hex.of_bytes (Raw_hashes.blake2b raw_key)
                  in
@@ -369,6 +383,12 @@ module Big_map = struct
                  assert (Compare.String.(String.sub index_key 8 2 = index5)) ;
                  assert (Compare.String.(String.sub index_key 10 2 = index6)) ;
                  c)
+
+    let rpc_arg = Id.rpc_arg
+
+    let encoding = Id.encoding
+
+    let compare = Id.compare
   end
 
   module Indexed_context =
