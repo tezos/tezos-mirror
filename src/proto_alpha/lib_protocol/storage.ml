@@ -81,6 +81,16 @@ module Make_index (H : Storage_description.INDEX) :
   let args = Storage_description.One {rpc_arg; encoding; compare}
 end
 
+module type Simple_single_data_storage = sig
+  type value
+
+  val get : Raw_context.t -> value tzresult Lwt.t
+
+  val update : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
+
+  val init : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
+end
+
 module Block_priority =
   Make_single_data_storage (Registered) (Raw_context)
     (struct
@@ -441,7 +451,11 @@ module Big_map = struct
         let encoding = Script_repr.expr_encoding
       end)
 
-  module Contents = struct
+  module Contents :
+    Non_iterable_indexed_carbonated_data_storage_with_values
+      with type key = Script_expr_hash.t
+       and type value = Script_repr.expr
+       and type t := key = struct
     module I =
       Storage_functors.Make_indexed_carbonated_data_storage
         (Make_subcontext (Registered) (Indexed_context.Raw_context)
@@ -558,7 +572,11 @@ module Sapling = struct
       end)
       (Sapling_repr.Memo_size)
 
-  module Commitments =
+  module Commitments :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * id
+       and type key = int64
+       and type value = Sapling.Hash.t =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
@@ -602,7 +620,11 @@ module Sapling = struct
     Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
     >|= fun (ctx, _id) -> ctx
 
-  module Ciphertexts =
+  module Ciphertexts :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * id
+       and type key = int64
+       and type value = Sapling.Ciphertext.t =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
@@ -653,7 +675,11 @@ module Sapling = struct
       (Encoding.Int64)
 
   (* For sequential access when building a diff *)
-  module Nullifiers_ordered =
+  module Nullifiers_ordered :
+    Non_iterable_indexed_data_storage
+      with type t := Raw_context.t * id
+       and type key = int64
+       and type value = Sapling.Nullifier.t =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
@@ -740,7 +766,11 @@ module Sapling = struct
     Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_hashed"]
     >|= fun (ctx, _id) -> ctx
 
-  module Roots =
+  module Roots :
+    Non_iterable_indexed_data_storage
+      with type t := Raw_context.t * id
+       and type key = int32
+       and type value = Sapling.Hash.t =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct

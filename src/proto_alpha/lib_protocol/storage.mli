@@ -36,13 +36,17 @@
 
 open Storage_sigs
 
-module Block_priority : sig
-  val get : Raw_context.t -> int tzresult Lwt.t
+module type Simple_single_data_storage = sig
+  type value
 
-  val update : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
+  val get : Raw_context.t -> value tzresult Lwt.t
 
-  val init : Raw_context.t -> int -> Raw_context.t tzresult Lwt.t
+  val update : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
+
+  val init : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
 end
+
+module Block_priority : Simple_single_data_storage with type value = int
 
 module Roll : sig
   (** Storage from this submodule must only be accessed through the
@@ -112,13 +116,7 @@ module Contract : sig
   (** Storage from this submodule must only be accessed through the
       module `Contract`. *)
 
-  module Global_counter : sig
-    val get : Raw_context.t -> Z.t tzresult Lwt.t
-
-    val update : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
-
-    val init : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
-  end
+  module Global_counter : Simple_single_data_storage with type value = Z.t
 
   (** The domain of alive contracts *)
   val fold :
