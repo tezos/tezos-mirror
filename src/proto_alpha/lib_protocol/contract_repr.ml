@@ -49,11 +49,14 @@ let to_b58check = function
 
 let of_b58check s =
   match Base58.decode s with
-  | Some (Ed25519.Public_key_hash.Data h) -> ok (Implicit (Signature.Ed25519 h))
-  | Some (Secp256k1.Public_key_hash.Data h) ->
-      ok (Implicit (Signature.Secp256k1 h))
-  | Some (P256.Public_key_hash.Data h) -> ok (Implicit (Signature.P256 h))
-  | Some (Contract_hash.Data h) -> ok (Originated h)
+  | Some data -> (
+      match data with
+      | Ed25519.Public_key_hash.Data h -> ok (Implicit (Signature.Ed25519 h))
+      | Secp256k1.Public_key_hash.Data h ->
+          ok (Implicit (Signature.Secp256k1 h))
+      | P256.Public_key_hash.Data h -> ok (Implicit (Signature.P256 h))
+      | Contract_hash.Data h -> ok (Originated h)
+      | _ -> error (Invalid_contract_notation s))
   | _ -> error (Invalid_contract_notation s)
 
 let pp ppf = function
