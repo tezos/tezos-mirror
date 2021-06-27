@@ -109,6 +109,10 @@ module type VIEW = sig
     'a Lwt.t
 end
 
+module Kind = struct
+  type t = [`Value | `Tree]
+end
+
 module type TREE = sig
   (** [Tree] provides immutable, in-memory partial mirror of the
       context, with lazy reads and delayed writes. The trees are Merkle
@@ -137,7 +141,7 @@ module type TREE = sig
 
   (** [kind t] is [t]'s kind. It's either a tree node or a leaf
       value. *)
-  val kind : tree -> [`Value | `Tree]
+  val kind : tree -> Kind.t
 
   (** [to_value t] is an Lwt promise that resolves to [Some v] if [t]
       is a leaf tree and [None] otherwise. It is equivalent to [find t

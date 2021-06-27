@@ -988,6 +988,10 @@ struct
 
     module type VIEW = Environment_context.VIEW
 
+    module Kind = struct
+      type t = [`Value | `Tree]
+    end
+
     module type TREE = Environment_context.TREE
 
     let register_resolver = Base58.register_resolver
