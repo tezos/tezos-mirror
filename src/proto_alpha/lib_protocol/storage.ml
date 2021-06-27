@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Storage_functors
+open Storage_sigs
 
 module Encoding = struct
   module UInt16 = struct
@@ -505,7 +506,7 @@ module Sapling = struct
       end)
 
   module Next = struct
-    include
+    module Storage =
       Make_single_data_storage (Registered) (Raw_context)
         (struct
           let name = ["next"]
@@ -513,11 +514,11 @@ module Sapling = struct
         (Lazy_storage_kind.Sapling_state.Id)
 
     let incr ctxt =
-      get ctxt >>=? fun i ->
-      update ctxt (Lazy_storage_kind.Sapling_state.Id.next i) >|=? fun ctxt ->
-      (ctxt, i)
+      Storage.get ctxt >>=? fun i ->
+      Storage.update ctxt (Lazy_storage_kind.Sapling_state.Id.next i)
+      >|=? fun ctxt -> (ctxt, i)
 
-    let init ctxt = init ctxt Lazy_storage_kind.Sapling_state.Id.init
+    let init ctxt = Storage.init ctxt Lazy_storage_kind.Sapling_state.Id.init
   end
 
   module Index = Lazy_storage_kind.Sapling_state.Id
@@ -969,7 +970,8 @@ module Roll = struct
         let unwrap = Contract_repr.is_implicit
       end)
 
-  module Snapshoted_owner_index = struct
+  module Snapshoted_owner_index : INDEX with type t = Cycle_repr.t * int =
+  struct
     type t = Cycle_repr.t * int
 
     let path_length = Cycle_repr.Index.path_length + 1
@@ -1130,7 +1132,11 @@ module Seed = struct
     | Unrevealed of unrevealed_nonce
     | Revealed of Seed_repr.nonce
 
-  module Nonce = struct
+  module Nonce :
+    Non_iterable_indexed_data_storage
+      with type key := Level_repr.t
+       and type value := nonce_status
+       and type t := Raw_context.t = struct
     open Level_repr
 
     type context = Raw_context.t
