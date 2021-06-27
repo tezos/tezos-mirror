@@ -28,6 +28,9 @@
 
 (* Copy/paste of Environment_context_sigs.Context.S *)
 
+(** The tree depth of a fold. See the [fold] function for more information. *)
+type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
+
 module type VIEW = sig
   (** The type for context views. *)
   type t
@@ -103,7 +106,7 @@ module type VIEW = sig
       - [Gt d] folds over nodes and contents of depth strictly more than [d].
       - [Ge d] folds over nodes and contents of depth more than or equal to [d]. *)
   val fold :
-    ?depth:[`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int] ->
+    ?depth:depth ->
     t ->
     key ->
     init:'a ->
