@@ -423,6 +423,19 @@ module Vote : sig
        and type t := Raw_context.t
 end
 
+module type FOR_CYCLE = sig
+  val init :
+    Raw_context.t ->
+    Cycle_repr.t ->
+    Seed_repr.seed ->
+    Raw_context.t tzresult Lwt.t
+
+  val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
+
+  val remove_existing :
+    Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+end
+
 (** Seed *)
 
 module Seed : sig
@@ -446,18 +459,7 @@ module Seed : sig
        and type value := nonce_status
        and type t := Raw_context.t
 
-  module For_cycle : sig
-    val init :
-      Raw_context.t ->
-      Cycle_repr.t ->
-      Seed_repr.seed ->
-      Raw_context.t tzresult Lwt.t
-
-    val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
-
-    val remove_existing :
-      Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
-  end
+  module For_cycle : FOR_CYCLE
 end
 
 (** Commitments *)

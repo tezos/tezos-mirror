@@ -1118,6 +1118,19 @@ module Vote = struct
          end)
 end
 
+module type FOR_CYCLE = sig
+  val init :
+    Raw_context.t ->
+    Cycle_repr.t ->
+    Seed_repr.seed ->
+    Raw_context.t tzresult Lwt.t
+
+  val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
+
+  val remove_existing :
+    Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+end
+
 (** Seed *)
 
 module Seed = struct
@@ -1166,7 +1179,7 @@ module Seed = struct
       Cycle.Nonce.remove (ctxt, l.cycle) l.level
   end
 
-  module For_cycle = Cycle.Seed
+  module For_cycle : FOR_CYCLE = Cycle.Seed
 end
 
 (** Commitments *)
