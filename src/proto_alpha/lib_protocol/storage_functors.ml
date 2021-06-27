@@ -34,7 +34,15 @@ module Ghost = struct
   let ghost = true
 end
 
-module Make_encoder (V : VALUE) = struct
+module type ENCODER = sig
+  type t
+
+  val of_bytes : key:(unit -> string list) -> bytes -> t tzresult
+
+  val to_bytes : t -> bytes
+end
+
+module Make_encoder (V : VALUE) : ENCODER with type t := V.t = struct
   let of_bytes ~key b =
     match Data_encoding.Binary.of_bytes_opt V.encoding b with
     | None -> error (Raw_context.Storage_error (Corrupted_data (key ())))
