@@ -659,7 +659,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
   let pack = Storage_description.pack I.args
 
-  module Raw_context = struct
+  module Raw_context : Raw_context.T with type t = C.t I.ipath = struct
     type t = C.t I.ipath
 
     let to_key i k = I.to_path i k
@@ -771,7 +771,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let description = description
   end
 
-  module Make_set (R : REGISTER) (N : NAME) = struct
+  module Make_set (R : REGISTER) (N : NAME) :
+    Data_set_storage with type t = t and type elt = key = struct
     type t = C.t
 
     type context = t
@@ -821,7 +822,9 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       [@@coq_axiom_with_reason "stack overflow in Coq"]
   end
 
-  module Make_map (N : NAME) (V : VALUE) = struct
+  module Make_map (N : NAME) (V : VALUE) :
+    Indexed_data_storage with type t = t and type key = key and type value = V.t =
+  struct
     type t = C.t
 
     type context = t
@@ -909,7 +912,11 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       [@@coq_axiom_with_reason "stack overflow in Coq"]
   end
 
-  module Make_carbonated_map (N : NAME) (V : VALUE) = struct
+  module Make_carbonated_map (N : NAME) (V : VALUE) :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t = t
+       and type key = key
+       and type value = V.t = struct
     type t = C.t
 
     type context = t
@@ -1034,8 +1041,11 @@ end
 
 module Wrap_indexed_data_storage
     (C : Indexed_data_storage)
-    (K : WRAPPER with type key := C.key) =
-struct
+    (K : WRAPPER with type key := C.key) :
+  Indexed_data_storage
+    with type t = C.t
+     and type key = K.t
+     and type value = C.value = struct
   type t = C.t
 
   type context = C.t
