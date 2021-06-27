@@ -105,7 +105,7 @@ let clear_cycle ctxt cycle =
 
 let fold ctxt ~f init =
   Storage.Roll.Next.get ctxt >>=? fun last ->
-  let rec loop ctxt roll acc =
+  let[@coq_struct "roll"] rec loop ctxt roll acc =
     if Roll_repr.(roll = last) then return acc
     else
       Storage.Roll.Owner.find ctxt roll >>=? function
@@ -185,7 +185,7 @@ let count_rolls ctxt delegate =
   Storage.Roll.Delegate_roll_list.find ctxt delegate >>=? function
   | None -> return 0
   | Some head_roll ->
-      let rec loop acc roll =
+      let[@coq_struct "roll"] rec loop acc roll =
         Storage.Roll.Successor.find ctxt roll >>=? function
         | None -> return acc
         | Some next -> loop (succ acc) next
@@ -308,7 +308,7 @@ module Delegate = struct
     Tez_repr.(amount +? change) >>?= fun change ->
     Storage.Roll.Delegate_change.update ctxt delegate change >>=? fun ctxt ->
     delegate_pubkey ctxt delegate >>=? fun delegate_pk ->
-    let rec loop ctxt change =
+    let[@coq_struct "change"] rec loop ctxt change =
       if Tez_repr.(change < tokens_per_roll) then return ctxt
       else
         Tez_repr.(change -? tokens_per_roll) >>?= fun change ->
@@ -326,7 +326,7 @@ module Delegate = struct
 
   let remove_amount ctxt delegate amount =
     let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-    let rec loop ctxt change =
+    let[@coq_struct "change"] rec loop ctxt change =
       if Tez_repr.(amount <= change) then return (ctxt, change)
       else
         pop_roll_from_delegate ctxt delegate >>=? fun (_, ctxt) ->
@@ -356,7 +356,7 @@ module Delegate = struct
       (Contract_repr.implicit_contract delegate)
     >>= fun ctxt ->
     Storage.Active_delegates_with_rolls.remove ctxt delegate >>= fun ctxt ->
-    let rec loop ctxt change =
+    let[@coq_struct "change"] rec loop ctxt change =
       Storage.Roll.Delegate_roll_list.find ctxt delegate >>=? function
       | None -> return (ctxt, change)
       | Some _roll ->
@@ -406,7 +406,7 @@ module Delegate = struct
         (Contract_repr.implicit_contract delegate)
       >>= fun ctxt ->
       delegate_pubkey ctxt delegate >>=? fun delegate_pk ->
-      let rec loop ctxt change =
+      let[@coq_struct "change"] rec loop ctxt change =
         if Tez_repr.(change < tokens_per_roll) then return ctxt
         else
           Tez_repr.(change -? tokens_per_roll) >>?= fun change ->

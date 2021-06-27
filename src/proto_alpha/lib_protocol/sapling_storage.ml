@@ -147,7 +147,7 @@ end = struct
           pos = size tree /\
      Post: incremental tree /\
            to_list (insert tree height pos cms) = to_list t @ cms *)
-  let rec insert ctx id node height pos cms =
+  let[@coq_struct "height"] rec insert ctx id node height pos cms =
     assert_node node height ;
     assert_height height ;
     assert_pos pos height ;
@@ -176,7 +176,8 @@ end = struct
         Storage.Sapling.Commitments.add (ctx, id) node h
         >|=? fun (ctx, size, _existing) -> (ctx, size + size_children, h)
 
-  let rec fold_from_height ctx id node ~pos ~f ~acc height =
+  let[@coq_struct "height"] rec fold_from_height ctx id node ~pos ~f ~acc height
+      =
     assert_node node height ;
     assert_height height ;
     assert_pos pos height ;
@@ -276,7 +277,7 @@ module Nullifiers = struct
     (ctx, size)
 
   let get_from ctx id offset =
-    let rec aux acc pos =
+    let[@coq_struct "pos"] rec aux acc pos =
       Storage.Sapling.Nullifiers_ordered.find (ctx, id) pos >>=? function
       | None -> return @@ List.rev acc
       | Some c -> aux (c :: acc) (Int64.succ pos)
@@ -303,7 +304,7 @@ module Roots = struct
     Storage.Sapling.Roots.get (ctx, id) pos
 
   let init ctx id =
-    let rec aux ctx pos =
+    let[@coq_struct "pos"] rec aux ctx pos =
       if Compare.Int32.(pos < 0l) then return ctx
       else
         Storage.Sapling.Roots.init (ctx, id) pos Commitments.default_root
