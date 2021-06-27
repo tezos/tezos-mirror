@@ -347,8 +347,11 @@ end
 module Make_indexed_carbonated_data_storage_INTERNAL
     (C : Raw_context.T)
     (I : INDEX)
-    (V : VALUE) =
-struct
+    (V : VALUE) :
+  Non_iterable_indexed_carbonated_data_storage_INTERNAL
+    with type t = C.t
+     and type key = I.t
+     and type value = V.t = struct
   type t = C.t
 
   type context = t
@@ -529,19 +532,11 @@ module Make_indexed_carbonated_data_storage : functor
   (C : Raw_context.T)
   (I : INDEX)
   (V : VALUE)
-  -> sig
-  include
-    Non_iterable_indexed_carbonated_data_storage
-      with type t = C.t
-       and type key = I.t
-       and type value = V.t
-
-  val list_values :
-    ?offset:int ->
-    ?length:int ->
-    C.t ->
-    (Raw_context.t * V.t list) tzresult Lwt.t
-end =
+  ->
+  Non_iterable_indexed_carbonated_data_storage_with_values
+    with type t = C.t
+     and type key = I.t
+     and type value = V.t =
   Make_indexed_carbonated_data_storage_INTERNAL
 
 module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :

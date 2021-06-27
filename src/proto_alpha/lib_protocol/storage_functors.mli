@@ -84,20 +84,11 @@ module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
 module Make_indexed_carbonated_data_storage
     (C : Raw_context.T)
     (I : INDEX)
-    (V : VALUE) : sig
-  include
-    Non_iterable_indexed_carbonated_data_storage
-      with type t = C.t
-       and type key = I.t
-       and type value = V.t
-
-  (* HACK *)
-  val list_values :
-    ?offset:int ->
-    ?length:int ->
-    C.t ->
-    (Raw_context.t * V.t list) tzresult Lwt.t
-end
+    (V : VALUE) :
+  Non_iterable_indexed_carbonated_data_storage_with_values
+    with type t = C.t
+     and type key = I.t
+     and type value = V.t
 
 module Make_indexed_data_snapshotable_storage
     (C : Raw_context.T)
