@@ -156,12 +156,12 @@ include Compare.Make (struct
   let compare p p' = Compare.Int32.compare p.index p'.index
 end)
 
-let reset period ~start_position =
+let raw_reset period ~start_position =
   let index = Int32.succ period.index in
   let kind = Proposal in
   {index; kind; start_position}
 
-let succ period ~start_position =
+let raw_succ period ~start_position =
   let index = Int32.succ period.index in
   let kind = succ_kind period.kind in
   {index; kind; start_position}

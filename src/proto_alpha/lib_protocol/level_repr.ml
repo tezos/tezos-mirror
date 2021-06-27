@@ -244,7 +244,7 @@ let level_from_raw_with_era era ~first_level_in_alpha_family level =
   in
   {level; level_position; cycle; cycle_position; expected_commitment}
 
-let level_from_raw ~cycle_eras level =
+let level_from_raw_aux ~cycle_eras level =
   let first_level_in_alpha_family =
     match List.rev cycle_eras with
     | [] -> assert false
@@ -253,15 +253,15 @@ let level_from_raw ~cycle_eras level =
   let era = era_of_level ~cycle_eras level in
   level_from_raw_with_era era ~first_level_in_alpha_family level
 
-let from_raw ~cycle_eras ?offset l =
+let level_from_raw ~cycle_eras ?offset l =
   let l =
     match offset with
     | None -> l
     | Some o -> Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o))
   in
-  level_from_raw ~cycle_eras l
+  level_from_raw_aux ~cycle_eras l
 
-let first_level_in_cycle ~cycle_eras cycle =
+let first_level_in_cycle_from_eras ~cycle_eras cycle =
   let first_level_in_alpha_family =
     match List.rev cycle_eras with
     | [] -> assert false

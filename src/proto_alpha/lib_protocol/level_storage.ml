@@ -27,7 +27,7 @@ open Level_repr
 
 let from_raw c ?offset l =
   let cycle_eras = Raw_context.cycle_eras c in
-  Level_repr.from_raw ~cycle_eras ?offset l
+  Level_repr.level_from_raw ~cycle_eras ?offset l
 
 let root c = Raw_context.cycle_eras c |> Level_repr.root_level
 
@@ -48,7 +48,7 @@ let previous ctxt =
 
 let first_level_in_cycle ctxt cycle =
   let cycle_eras = Raw_context.cycle_eras ctxt in
-  Level_repr.first_level_in_cycle ~cycle_eras cycle
+  Level_repr.first_level_in_cycle_from_eras ~cycle_eras cycle
 
 let last_level_in_cycle ctxt c =
   match pred ctxt (first_level_in_cycle ctxt (Cycle_repr.succ c)) with

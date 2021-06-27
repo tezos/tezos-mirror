@@ -93,11 +93,12 @@ val root_level : cycle_eras -> level
 
 (** Returns the annotated level corresponding to a raw level and an
    offset. A positive offset corresponds to a higher level. *)
-val from_raw :
+val level_from_raw :
   cycle_eras:cycle_eras -> ?offset:int32 -> Raw_level_repr.t -> level
 
 (** Returns the first level of the given cycle. *)
-val first_level_in_cycle : cycle_eras:cycle_eras -> Cycle_repr.t -> level
+val first_level_in_cycle_from_eras :
+  cycle_eras:cycle_eras -> Cycle_repr.t -> level
 
 (** Returns true if the given level is the last of a cycle. *)
 val last_of_cycle : cycle_eras:cycle_eras -> level -> bool
