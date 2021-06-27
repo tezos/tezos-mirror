@@ -963,7 +963,12 @@ let list ctxt ?offset ?length k = Context.list (context ctxt) ?offset ?length k
 
 let fold ?depth ctxt k ~init ~f = Context.fold ?depth (context ctxt) k ~init ~f
 
-module Tree = struct
+module Tree :
+  Raw_context_intf.TREE
+    with type t := t
+     and type key := key
+     and type value := value
+     and type tree := tree = struct
   include Context.Tree
 
   let empty ctxt = Context.Tree.empty (context ctxt)
