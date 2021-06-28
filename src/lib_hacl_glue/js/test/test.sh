@@ -19,7 +19,7 @@ node --version
 yarn --version
 
 yarn
-yarn add @nomadic-labs/hacl-wasm
+yarn add hacl-wasm
 
 # here we run directly a test in js compiled with jsoo
 # instead of a mocha test

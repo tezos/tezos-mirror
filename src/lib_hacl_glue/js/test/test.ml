@@ -476,10 +476,8 @@ let main () =
 
 let[@ocaml.warning "-21"] () =
   let () = log_s "LOADING @nomadic-labs/tezos-hacl-glue" in
-  Js.Unsafe.eval_string
-    "global._HACL_loader = require('@nomadic-labs/hacl-wasm');" ;
+  Js.Unsafe.eval_string "global._HACL_loader = require('hacl-wasm');" ;
   let () = log_s "INITIALISING hacl-wasm" in
-  Js.Unsafe.eval_string "_HACL_loader.setMyPrint(() => { return; })" ;
   let init_promise =
     Js.Unsafe.eval_string "_HACL_loader.getInitializedHaclModule()"
   in
