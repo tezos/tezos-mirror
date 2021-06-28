@@ -179,7 +179,7 @@ let cycle_eras_encoding =
     (fun eras -> eras)
     (fun eras ->
       match create_cycle_eras eras with
-      | Ok _ as ok -> ok
+      | Ok eras -> Ok eras
       | Error _ -> Error "Invalid cycle eras")
     (Data_encoding.list cycle_era_encoding)
 
