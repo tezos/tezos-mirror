@@ -238,6 +238,7 @@ module Encoding = struct
           inj : 'a -> 'kind manager_operation;
         }
           -> 'kind case
+    [@@coq_force_gadt]
 
     let[@coq_axiom_with_reason "gadt"] reveal_case =
       MCase
