@@ -240,6 +240,19 @@ val run :
   argument list ->
   unit Lwt.t
 
+(** Spawn [tezos-node replay].
+
+    Same as [run] but for the [replay] command.
+    In particular it also supports events.
+    One key difference is that the node will eventually stop. *)
+val replay :
+  ?on_terminate:(Unix.process_status -> unit) ->
+  ?event_level:string ->
+  ?blocks:string list ->
+  t ->
+  argument list ->
+  unit Lwt.t
+
 (** {2 Events} *)
 
 (** Exception raised by [wait_for] functions if the node terminates before the event.
