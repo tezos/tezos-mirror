@@ -196,7 +196,7 @@ let rec to_list = function
    the conv_with_guard combinator of Data_encoding. For a more conventional
    return type see [of_list] below. *)
 let rec of_list_internal = function
-  | [] -> Error "Empty operation list"
+  | [] -> Error "Operation lists should not be empty."
   | [Contents o] -> Ok (Contents_list (Single o))
   | Contents o :: os -> (
       of_list_internal os >>? fun (Contents_list os) ->
@@ -764,9 +764,7 @@ let () =
     ~pp:(fun ppf s ->
       Format.fprintf
         ppf
-        "An operation contents list has an unexpected shape; it should be \
-         either a single operation or a non-empty list of manager operations. \
-         %s"
+        "An operation contents list has an unexpected shape: %s"
         s)
     Data_encoding.(obj1 (req "message" string))
     (function Contents_list_error s -> Some s | _ -> None)
