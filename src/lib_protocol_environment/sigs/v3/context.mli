@@ -178,4 +178,5 @@ val complete : t -> string -> string list Lwt.t
 
 val get_hash_version : t -> Context_hash.Version.t
 
-val set_hash_version : t -> Context_hash.Version.t -> t Lwt.t
+val set_hash_version :
+  t -> Context_hash.Version.t -> t Error_monad.shell_tzresult Lwt.t

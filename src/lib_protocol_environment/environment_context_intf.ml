@@ -61,7 +61,7 @@ module type S = sig
   val fork_test_chain :
     t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
 
-  val set_hash_version : t -> Context_hash.Version.t -> t Lwt.t
+  val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t
 
   val get_hash_version : t -> Context_hash.Version.t
 end

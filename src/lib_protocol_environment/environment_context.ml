@@ -249,7 +249,7 @@ module Context = struct
     Ops.get_hash_version ctxt
 
   let set_hash_version (Context ({ops = (module Ops); ctxt; _} as c)) v =
-    Ops.set_hash_version ctxt v >|= fun ctxt -> Context {c with ctxt}
+    Ops.set_hash_version ctxt v >|=? fun ctxt -> Context {c with ctxt}
 end
 
 module Register (C : CONTEXT) = struct

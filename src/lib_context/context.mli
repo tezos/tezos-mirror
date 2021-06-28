@@ -121,7 +121,8 @@ val get_hash_version : context -> Context_hash.Version.t
     of the whole context, which can be a long process.
     Returns an Error if the hash version is unsupported.
 *)
-val set_hash_version : context -> Context_hash.Version.t -> context Lwt.t
+val set_hash_version :
+  context -> Context_hash.Version.t -> context tzresult Lwt.t
 
 (** {2 Predefined Fields} *)
 

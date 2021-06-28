@@ -66,3 +66,5 @@ module Make_tree (DB : DB) : sig
 
   val shallow : DB.repo -> kinded_hash -> DB.tree
 end
+
+type error += Unsupported_context_hash_version of Context_hash.Version.t

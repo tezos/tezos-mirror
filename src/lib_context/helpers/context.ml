@@ -158,3 +158,23 @@ module Make_tree (Store : DB) = struct
       | `Node hash -> `Node (Hash.of_context_hash hash)
       | `Contents hash -> `Contents (Hash.of_context_hash hash, ()))
 end
+
+type error += Unsupported_context_hash_version of Context_hash.Version.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"context_hash.unsupported_version"
+    ~title:"Unsupported context hash version"
+    ~description:"Unsupported context hash version."
+    ~pp:(fun ppf version ->
+      Format.fprintf
+        ppf
+        "@[Context hash version %a is not supported.@,\
+         You might need to update the shell.@]"
+        Context_hash.Version.pp
+        version)
+    Data_encoding.(obj1 (req "version" Context_hash.Version.encoding))
+    (function
+      | Unsupported_context_hash_version version -> Some version | _ -> None)
+    (fun version -> Unsupported_context_hash_version version)
