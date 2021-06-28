@@ -112,6 +112,7 @@ type 'kind manager_operation_result =
       'kind successful_manager_operation_result * error trace option
   | Failed : 'kind Kind.manager * error trace -> 'kind manager_operation_result
   | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
+[@@coq_force_gadt]
 
 type packed_internal_operation_result =
   | Internal_operation_result :
@@ -375,7 +376,7 @@ module Manager_result = struct
         | Successful_manager_result (Delegation_result _ as op) -> Some op
         | _ -> None)
       ~kind:Kind.Delegation_manager_kind
-      ~proj:(function
+      ~proj:(function[@coq_match_with_default]
         | Delegation_result {consumed_gas} ->
             (Gas.Arith.ceil consumed_gas, consumed_gas))
       ~inj:(fun (consumed_gas, consumed_milligas) ->
@@ -482,7 +483,7 @@ type packed_contents_and_result =
       'kind Operation.contents * 'kind contents_result
       -> packed_contents_and_result
 
-type ('a, 'b) eq = Eq : ('a, 'a) eq
+type ('a, 'b) eq = Eq : ('a, 'a) eq [@@coq_force_gadt]
 
 let equal_manager_kind :
     type a b. a Kind.manager -> b Kind.manager -> (a, b) eq option =
