@@ -167,7 +167,7 @@ module Make_notifier (Proto : Tezos_protocol_environment.PROTOCOL) :
 end
 
 (** How to treat branch_refused, branch_delayed, and refused operations *)
-module type CLASSIFICATION_APPLIER = sig
+module type CLASSIFICATOR = sig
   type input
 
   val handle_branch_refused :
@@ -183,11 +183,11 @@ end
 (* For the moment we only use the function [clear_or_cancel] from
  * [Requester.REQUESTER], so we could take a smaller module as
  * input. However, in the future, we may want to extend
- * what [Applier] does and will then use more of [Requester.REQUESTER] *)
-module Classification_applier
+ * what [Classificator] does and will then use more of [Requester.REQUESTER] *)
+module Classificator
     (Requester : Requester.REQUESTER with type key = Operation_hash.t) :
-  CLASSIFICATION_APPLIER
-    with type input = Requester.t * Prevalidation.Classification.t = struct
+  CLASSIFICATOR with type input = Requester.t * Prevalidation.Classification.t =
+struct
   type input = Requester.t * Prevalidation.Classification.t
 
   let handle_branch_refused
@@ -564,26 +564,26 @@ module Make
       ~validation_state_after
       (op, receipt)
 
-  module Proto_classification_applier :
-    CLASSIFICATION_APPLIER with type input = types_state = struct
+  module Proto_classificator : CLASSIFICATOR with type input = types_state =
+  struct
     type input = types_state
 
-    module Classification_applier = Classification_applier (Requester)
+    module Classificator = Classificator (Requester)
 
     let handle_branch_refused pv op oph errors =
       let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
       Notifier.notify_operation pv.operation_stream `Branch_refused op ;
-      Classification_applier.handle_branch_refused input op oph errors
+      Classificator.handle_branch_refused input op oph errors
 
     let handle_branch_delayed pv op oph errors =
       let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
       Notifier.notify_operation pv.operation_stream `Branch_delayed op ;
-      Classification_applier.handle_branch_delayed input op oph errors
+      Classificator.handle_branch_delayed input op oph errors
 
     let handle_refused pv op oph errors =
       let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
       Notifier.notify_operation pv.operation_stream `Refused op ;
-      Classification_applier.handle_refused input op oph errors
+      Classificator.handle_refused input op oph errors
   end
 
   let handle_applied pv (op : Prevalidation.operation) =
@@ -596,7 +596,7 @@ module Make
   let classify_operation w pv validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        Proto_classification_applier.handle_refused pv op oph errors ;
+        Proto_classificator.handle_refused pv op oph errors ;
         Lwt.return (validation_state, mempool)
     | Ok op -> (
         Prevalidation.apply_operation validation_state op >>= function
@@ -624,21 +624,13 @@ module Make
                 oph ;
               Lwt.return (validation_state, mempool))
         | Branch_delayed errors ->
-            Proto_classification_applier.handle_branch_delayed
-              pv
-              op.raw
-              op.hash
-              errors ;
+            Proto_classificator.handle_branch_delayed pv op.raw op.hash errors ;
             Lwt.return (validation_state, mempool)
         | Branch_refused errors ->
-            Proto_classification_applier.handle_branch_refused
-              pv
-              op.raw
-              op.hash
-              errors ;
+            Proto_classificator.handle_branch_refused pv op.raw op.hash errors ;
             Lwt.return (validation_state, mempool)
         | Refused errors ->
-            Proto_classification_applier.handle_refused pv op.raw op.hash errors ;
+            Proto_classificator.handle_refused pv op.raw op.hash errors ;
             Lwt.return (validation_state, mempool)
         | Outdated ->
             Distributed_db.Operation.clear_or_cancel
@@ -693,7 +685,7 @@ module Make
            code since [Proto.begin_construction] cannot fail. *)
         Operation_hash.Map.iter
           (fun oph op ->
-            Proto_classification_applier.handle_branch_delayed pv op oph err)
+            Proto_classificator.handle_branch_delayed pv op oph err)
           pv.shell.pending ;
         pv.shell.pending <- Operation_hash.Map.empty ;
         Lwt.return_unit
@@ -982,7 +974,7 @@ module Make
         not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
       then (
         let error = [Exn (Failure "Unknown branch operation")] in
-        Proto_classification_applier.handle_branch_refused pv op oph error ;
+        Proto_classificator.handle_branch_refused pv op oph error ;
         may_propagate_unknown_branch_operation pv.validation_state op
         >>= function
         | true ->
