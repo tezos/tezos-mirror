@@ -234,10 +234,10 @@ let unshallow context =
               >|= fun _ -> ())
         children)
 
-let get_hash_version _c = Context_hash.Version.zero
+let get_hash_version _c = Context_hash.Version.of_int 0
 
 let set_hash_version c v =
-  if Context_hash.Version.( = ) Context_hash.Version.zero v then return c
+  if Context_hash.Version.(of_int 0 = v) then return c
   else fail (Tezos_context_helpers.Context.Unsupported_context_hash_version v)
 
 let raw_commit ~time ?(message = "") context =

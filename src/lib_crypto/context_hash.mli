@@ -34,12 +34,7 @@ module Version : sig
 
   val encoding : t Data_encoding.t
 
-  (** Version 0, the initial version. *)
-  val zero : t
-
-  (** Version 1, where large directories with more than 256 items
-      have optimized but incompatible hashes with version 0. *)
-  val one : t
+  val of_int : int -> t
 end
 
 type version = Version.t

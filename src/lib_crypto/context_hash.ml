@@ -50,9 +50,13 @@ module Version = struct
       ~description:"A version number for the context hash computation"
       uint16
 
-  let zero = 0
-
-  let one = 1
+  let of_int v =
+    if 0 <= v && v <= 0xffff then v
+    else
+      Format.kasprintf
+        Stdlib.failwith
+        "Context_hash.Version.of_int: hash version must be uint16 (got %d)"
+        v
 
   let () = Data_encoding.Registration.register ~pp encoding
 end

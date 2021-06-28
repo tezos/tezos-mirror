@@ -35,9 +35,7 @@ module Version : sig
 
   val encoding : t Data_encoding.t
 
-  val zero : t
-
-  val one : t
+  val of_int : int -> t
 end
 
 type version = Version.t
