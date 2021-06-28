@@ -48,7 +48,6 @@ type action =
   | Inject_block of {block_to_bake : block_to_bake; updated_state : state}
   | Inject_preendorsements of {
       preendorsements : (consensus_key_and_delegate * consensus_content) list;
-      updated_state : state;
     }
   | Inject_endorsements of {
       endorsements : (consensus_key_and_delegate * consensus_content) list;
@@ -56,6 +55,7 @@ type action =
     }
   | Update_to_level of level_update
   | Synchronize_round of round_update
+  | Watch_proposal
 
 and level_update = {
   new_level_proposal : proposal;
@@ -87,11 +87,9 @@ val inject_block :
   state tzresult Lwt.t
 
 val inject_preendorsements :
-  state_recorder:(new_state:state -> unit tzresult Lwt.t) ->
   state ->
   preendorsements:(consensus_key_and_delegate * consensus_content) list ->
-  updated_state:state ->
-  state tzresult Lwt.t
+  unit tzresult Lwt.t
 
 val sign_endorsements :
   state ->
@@ -103,7 +101,7 @@ val inject_endorsements :
   state ->
   endorsements:(consensus_key_and_delegate * consensus_content) list ->
   updated_state:state ->
-  state tzresult Lwt.t
+  unit tzresult Lwt.t
 
 val prepare_waiting_for_quorum :
   state -> int * (slot:Slot.t -> int) * Operation_worker.candidate

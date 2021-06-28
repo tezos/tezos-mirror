@@ -126,7 +126,6 @@ type action =
   | Inject_block of {block_to_bake : block_to_bake; updated_state : state}
   | Inject_preendorsements of {
       preendorsements : (consensus_key_and_delegate * consensus_content) list;
-      updated_state : state;
     }
   | Inject_endorsements of {
       endorsements : (consensus_key_and_delegate * consensus_content) list;
@@ -134,6 +133,7 @@ type action =
     }
   | Update_to_level of level_update
   | Synchronize_round of round_update
+  | Watch_proposal
 
 and level_update = {
   new_level_proposal : proposal;
@@ -158,6 +158,7 @@ let pp_action fmt = function
   | Inject_endorsements _ -> Format.fprintf fmt "inject endorsements"
   | Update_to_level _ -> Format.fprintf fmt "update to level"
   | Synchronize_round _ -> Format.fprintf fmt "synchronize round"
+  | Watch_proposal -> Format.fprintf fmt "watch proposal"
 
 let generate_seed_nonce_hash config delegate level =
   if level.Level.expected_commitment then
@@ -340,8 +341,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     emit block_injected (bh, signed_block_header.shell.level, round, delegate))
   >>= fun () -> return updated_state
 
-let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
-    =
+let inject_preendorsements state ~preendorsements =
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   (* N.b. signing a lot of operations may take some time *)
@@ -404,7 +404,6 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
           return_some (delegate, operation))
     preendorsements
   >>=? fun signed_operations ->
-  state_recorder ~new_state:updated_state >>=? fun () ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
     (fun (delegate, operation) ->
@@ -424,7 +423,6 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
           Events.(emit preendorsement_injected (oph, delegate)) >>= fun () ->
           return_unit))
     signed_operations
-  >>=? fun () -> return updated_state
 
 let sign_endorsements state endorsements =
   let cctxt = state.global_state.cctxt in
@@ -510,7 +508,6 @@ let inject_endorsements ~state_recorder state ~endorsements ~updated_state =
       Events.(emit endorsement_injected (oph, delegate)) >>= fun () ->
       return_unit)
     signed_operations
-  >>=? fun () -> return updated_state
 
 let prepare_waiting_for_quorum state =
   let consensus_threshold =
@@ -621,26 +618,23 @@ let rec perform_action ~state_recorder state (action : action) =
   | Do_nothing -> state_recorder ~new_state:state >>=? fun () -> return state
   | Inject_block {block_to_bake; updated_state} ->
       inject_block state ~state_recorder block_to_bake ~updated_state
-  | Inject_preendorsements {preendorsements; updated_state} ->
-      inject_preendorsements
-        ~state_recorder
-        state
-        ~preendorsements
-        ~updated_state
-      >>=? fun new_state ->
-      (* We wait for preendorsements to trigger the
-         [Prequorum_reached] event *)
-      start_waiting_for_preendorsement_quorum state >>= fun () ->
-      return new_state
+  | Inject_preendorsements {preendorsements} ->
+      inject_preendorsements state ~preendorsements >>=? fun () ->
+      perform_action ~state_recorder state Watch_proposal
   | Inject_endorsements {endorsements; updated_state} ->
       inject_endorsements ~state_recorder state ~endorsements ~updated_state
-      >>=? fun new_state ->
+      >>=? fun () ->
       (* We wait for endorsements to trigger the [Quorum_reached]
          event *)
-      start_waiting_for_endorsement_quorum state >>= fun () -> return new_state
+      start_waiting_for_endorsement_quorum updated_state >>= fun () ->
+      return updated_state
   | Update_to_level level_update ->
       update_to_level state level_update >>=? fun (new_state, new_action) ->
       perform_action ~state_recorder new_state new_action
   | Synchronize_round round_update ->
       synchronize_round state round_update >>=? fun (new_state, new_action) ->
       perform_action ~state_recorder new_state new_action
+  | Watch_proposal ->
+      (* We wait for preendorsements to trigger the
+           [Prequorum_reached] event *)
+      start_waiting_for_preendorsement_quorum state >>= fun () -> return state
