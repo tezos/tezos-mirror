@@ -53,11 +53,14 @@ module Acl : sig
       to deny/access access policies. *)
   type policy
 
-  (** Default ACL policy in case none is defined in configuration. For the sake
-      of backwards compatibility it allows access to all resources. This will
-      probably change in the future so that access to sensitive resources is
-      restricted. *)
+  (** Default ACL policy in case none is defined in configuration. It only
+      exposes such endpoints that are necessary for the node to allow clients to
+      make use of their Tez. It applies to all listening addresses except for
+      [localhost]. *)
   val default : t
+
+  (** An allow-all policy, default for [localhost] listening address. *)
+  val allow_all : t
 
   (** Add an ACL for given address into the policy. Overrides previously existing
       policy for that address if any. *)
@@ -92,4 +95,7 @@ module Acl : sig
 
   (** Returns string representation of a given matcher. Useful for testing. *)
   val matcher_to_string : matcher -> string
+
+  (** Returns the ACL type, either `Whitelist or `Blacklist. *)
+  val acl_type : t -> [`Whitelist | `Blacklist]
 end

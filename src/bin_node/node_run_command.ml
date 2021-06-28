@@ -368,8 +368,12 @@ let init_rpc (config : Node_config_file.t) node =
       Node_config_file.resolve_rpc_listening_addrs addr >>=? function
       | [] -> failwith "Cannot resolve listening address: %S" addr
       | addrs ->
+          let default =
+            let open RPC_server.Acl in
+            if addr = "localhost" then allow_all else default
+          in
           let acl =
-            Option.value ~default:RPC_server.Acl.default
+            Option.value ~default
             @@ RPC_server.Acl.find_policy config.rpc.acl addr
           in
           List.fold_right_es

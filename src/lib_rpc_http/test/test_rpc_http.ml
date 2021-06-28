@@ -276,6 +276,29 @@ let test_finding_policy =
         (Some (`Whitelist, ["/chains/**"]))
         "localhost:8732")
 
+let ensure_default_policy_parses =
+  let testable : [`Whitelist | `Blacklist] Alcotest.testable =
+    (module struct
+      type t = [`Whitelist | `Blacklist]
+
+      let equal = ( = )
+
+      let pp fmt t =
+        Format.pp_print_string
+          fmt
+          (match t with `Whitelist -> "WHITELIST" | `Blacklist -> "BLACKLIST")
+    end)
+  in
+  Alcotest.test_case
+    "make sure the default policy parses correctly and is a whitelist"
+    `Quick
+    (fun () ->
+      Alcotest.check'
+        testable
+        ~msg:"default ACL should be a Whitelist"
+        ~expected:`Whitelist
+        ~actual:RPC_server.Acl.(acl_type default))
+
 let () =
   let open Qcheck_helpers in
   Alcotest.run
@@ -283,4 +306,5 @@ let () =
     [
       ("qcheck", qcheck_wrap [test_codec_identity; check_find_policy]);
       ("find_policy_matching_rules", [test_finding_policy]);
+      ("ensure_default_policy_parses", [ensure_default_policy_parses]);
     ]
