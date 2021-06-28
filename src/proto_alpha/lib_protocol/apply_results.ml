@@ -890,20 +890,20 @@ let contents_result_list_encoding =
         Contents_result o :: to_list (Contents_result_list os)
   in
   let rec of_list = function
-    | [] -> Pervasives.failwith "cannot decode empty operation result"
-    | [Contents_result o] -> Contents_result_list (Single_result o)
+    | [] -> Error "cannot decode empty operation result"
+    | [Contents_result o] -> Ok (Contents_result_list (Single_result o))
     | Contents_result o :: os -> (
-        let (Contents_result_list os) = of_list os in
+        of_list os >>? fun (Contents_result_list os) ->
         match (o, os) with
         | ( Manager_operation_result _,
             Single_result (Manager_operation_result _) ) ->
-            Contents_result_list (Cons_result (o, os))
+            Ok (Contents_result_list (Cons_result (o, os)))
         | (Manager_operation_result _, Cons_result _) ->
-            Contents_result_list (Cons_result (o, os))
-        | _ -> Pervasives.failwith "cannot decode ill-formed operation result")
+            Ok (Contents_result_list (Cons_result (o, os)))
+        | _ -> Error "cannot decode ill-formed operation result")
   in
   def "operation.alpha.contents_list_result"
-  @@ conv to_list of_list (list contents_result_encoding)
+  @@ conv_with_guard to_list of_list (list contents_result_encoding)
 
 type 'kind contents_and_result_list =
   | Single_and_result :
@@ -928,21 +928,19 @@ let contents_and_result_list_encoding =
         Contents_and_result (op, res) :: to_list (Contents_and_result_list rest)
   in
   let rec of_list = function
-    | [] -> Pervasives.failwith "cannot decode empty combined operation result"
+    | [] -> Error "cannot decode empty combined operation result"
     | [Contents_and_result (op, res)] ->
-        Contents_and_result_list (Single_and_result (op, res))
+        Ok (Contents_and_result_list (Single_and_result (op, res)))
     | Contents_and_result (op, res) :: rest -> (
-        let (Contents_and_result_list rest) = of_list rest in
+        of_list rest >>? fun (Contents_and_result_list rest) ->
         match (op, rest) with
         | (Manager_operation _, Single_and_result (Manager_operation _, _)) ->
-            Contents_and_result_list (Cons_and_result (op, res, rest))
+            Ok (Contents_and_result_list (Cons_and_result (op, res, rest)))
         | (Manager_operation _, Cons_and_result (_, _, _)) ->
-            Contents_and_result_list (Cons_and_result (op, res, rest))
-        | _ ->
-            Pervasives.failwith
-              "cannot decode ill-formed combined operation result")
+            Ok (Contents_and_result_list (Cons_and_result (op, res, rest)))
+        | _ -> Error "cannot decode ill-formed combined operation result")
   in
-  conv to_list of_list (Variable.list contents_and_result_encoding)
+  conv_with_guard to_list of_list (Variable.list contents_and_result_encoding)
 
 type 'kind operation_metadata = {contents : 'kind contents_result_list}
 
@@ -1152,22 +1150,6 @@ let rec to_list = function
   | Contents_result_list (Single_result o) -> [Contents_result o]
   | Contents_result_list (Cons_result (o, os)) ->
       Contents_result o :: to_list (Contents_result_list os)
-
-let rec of_list = function
-  | [] -> assert false
-  | [Contents_result o] -> Contents_result_list (Single_result o)
-  | Contents_result o :: os -> (
-      let (Contents_result_list os) = of_list os in
-      match (o, os) with
-      | (Manager_operation_result _, Single_result (Manager_operation_result _))
-        ->
-          Contents_result_list (Cons_result (o, os))
-      | (Manager_operation_result _, Cons_result _) ->
-          Contents_result_list (Cons_result (o, os))
-      | _ ->
-          Pervasives.failwith
-            "Operation result list of length > 1 should only contains manager \
-             operations result.")
 
 let operation_data_and_metadata_encoding =
   def "operation.alpha.operation_with_metadata"

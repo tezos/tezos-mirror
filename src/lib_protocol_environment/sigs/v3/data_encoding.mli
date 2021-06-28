@@ -334,6 +334,16 @@ val def :
 val conv :
   ('a -> 'b) -> ('b -> 'a) -> ?schema:json_schema -> 'b encoding -> 'a encoding
 
+val conv_with_guard :
+  ('a -> 'b) ->
+  ('b -> ('a, string) result) ->
+  ?schema:json_schema ->
+  'b encoding ->
+  'a encoding
+
+val with_decoding_guard :
+  ('a -> (unit, string) result) -> 'a encoding -> 'a encoding
+
 val mu :
   string ->
   ?title:string ->

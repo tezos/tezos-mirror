@@ -174,15 +174,13 @@ let cycle_era_encoding =
              cycle era starting with first_level."
           int32))
 
-exception Invalid_cycle_eras_exn
-
 let cycle_eras_encoding =
-  Data_encoding.conv
+  Data_encoding.conv_with_guard
     (fun eras -> eras)
     (fun eras ->
       match create_cycle_eras eras with
-      | Ok res -> res
-      | Error _ -> raise Invalid_cycle_eras_exn)
+      | Ok _ as ok -> ok
+      | Error _ -> Error "Invalid cycle eras")
     (Data_encoding.list cycle_era_encoding)
 
 let current_era = function [] -> assert false | cycle_era :: _ -> cycle_era

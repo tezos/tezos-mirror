@@ -13,7 +13,7 @@ depends: [
   "hex"
   "ctypes"
   "ctypes-foreign"
-  "data-encoding" { >= "0.3" & < "0.4" }
+  "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-crypto"
   "tezos-stdlib"
   "tezos-error-monad"

@@ -192,19 +192,29 @@ let rec to_list = function
   | Contents_list (Single o) -> [Contents o]
   | Contents_list (Cons (o, os)) -> Contents o :: to_list (Contents_list os)
 
-let rec of_list = function
-  | [] -> assert false
-  | [Contents o] -> Contents_list (Single o)
+(* This first version of of_list has the type (_, string) result expected by
+   the conv_with_guard combinator of Data_encoding. For a more conventional
+   return type see [of_list] below. *)
+let rec of_list_internal = function
+  | [] -> Error "Operation lists should not be empty."
+  | [Contents o] -> Ok (Contents_list (Single o))
   | Contents o :: os -> (
-      let (Contents_list os) = of_list os in
+      of_list_internal os >>? fun (Contents_list os) ->
       match (o, os) with
       | (Manager_operation _, Single (Manager_operation _)) ->
-          Contents_list (Cons (o, os))
-      | (Manager_operation _, Cons _) -> Contents_list (Cons (o, os))
+          Ok (Contents_list (Cons (o, os)))
+      | (Manager_operation _, Cons _) -> Ok (Contents_list (Cons (o, os)))
       | _ ->
-          Pervasives.failwith
+          Error
             "Operation list of length > 1 should only contains manager \
              operations.")
+
+type error += Contents_list_error of string (* `Permanent *)
+
+let of_list l =
+  match of_list_internal l with
+  | Ok contents -> Ok contents
+  | Error s -> error @@ Contents_list_error s
 
 module Encoding = struct
   open Data_encoding
@@ -398,10 +408,8 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.endorsement contents_list -> _ = function
-      | Single o -> o
-    in
-    let of_list : Kind.endorsement contents -> _ = function o -> Single o in
+    let to_list : Kind.endorsement contents_list -> _ = fun (Single o) -> o in
+    let of_list : Kind.endorsement contents -> _ = fun o -> Single o in
     def "inlined.endorsement"
     @@ conv
          (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
@@ -641,7 +649,7 @@ module Encoding = struct
          ]
 
   let contents_list_encoding =
-    conv to_list of_list (Variable.list contents_encoding)
+    conv_with_guard to_list of_list_internal (Variable.list contents_encoding)
 
   let optional_signature_encoding =
     conv
@@ -745,7 +753,22 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "The operation requires a signature")
     Data_encoding.unit
     (function Missing_signature -> Some () | _ -> None)
-    (fun () -> Missing_signature)
+    (fun () -> Missing_signature) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.contents_list_error"
+    ~title:"Invalid list of operation contents."
+    ~description:
+      "An operation contents list has an unexpected shape; it should be either \
+       a single operation or a non-empty list of manager operations"
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "An operation contents list has an unexpected shape: %s"
+        s)
+    Data_encoding.(obj1 (req "message" string))
+    (function Contents_list_error s -> Some s | _ -> None)
+    (fun s -> Contents_list_error s)
 
 let check_signature (type kind) key chain_id
     ({shell; protocol_data} : kind operation) =

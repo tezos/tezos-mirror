@@ -188,7 +188,7 @@ type packed_contents = Contents : 'kind contents -> packed_contents
 type packed_contents_list =
   | Contents_list : 'kind contents_list -> packed_contents_list
 
-val of_list : packed_contents list -> packed_contents_list
+val of_list : packed_contents list -> packed_contents_list tzresult
 
 val to_list : packed_contents_list -> packed_contents list
 
