@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Commitments : sig
+module type COMMITMENTS = sig
   val init : Raw_context.t -> Storage.Sapling.id -> Raw_context.t Lwt.t
 
   val default_root : Sapling.Hash.t
@@ -45,7 +45,9 @@ module Commitments : sig
     Storage.Sapling.id ->
     int64 ->
     Sapling.Commitment.t list tzresult Lwt.t
-end = struct
+end
+
+module Commitments : COMMITMENTS = struct
   module H = Sapling.Hash
 
   (** Incremental Merkle Tree

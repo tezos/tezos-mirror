@@ -59,11 +59,7 @@ let () =
     (function Period_overflow -> Some () | _ -> None)
     (fun () -> Period_overflow)
 
-(* Internal module implementing natural numbers using int64. These are different
-   from usual (wrapping up) unsigned integers in that if one overflows the
-   representation bounds for int64 through [add] or [mul], a [None] value is
-   returned *)
-module Internal : sig
+module type INTERNAL = sig
   type t = private int64
 
   val create : int64 -> t option
@@ -83,7 +79,13 @@ module Internal : sig
   val pp : Format.formatter -> t -> unit
 
   include Compare.S with type t := t
-end = struct
+end
+
+(* Internal module implementing natural numbers using int64. These are different
+   from usual (wrapping up) unsigned integers in that if one overflows the
+   representation bounds for int64 through [add] or [mul], a [None] value is
+   returned *)
+module Internal : INTERNAL = struct
   type t = Int64.t
 
   let encoding = Data_encoding.int64
