@@ -58,8 +58,8 @@ Docker Images
 Miscellaneous
 -------------
 
-Version 10.0~rc1 (Not Available Yet)
-====================================
+Version 10.0~rc1
+================
 
 Node
 ----
