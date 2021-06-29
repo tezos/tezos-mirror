@@ -73,7 +73,7 @@ module Crypto = struct
     P2p_io_scheduler.write ?canceler fd payload
 
   let read_chunk ?canceler fd cryptobox_data =
-    let open P2p_io_scheduler in
+    let open P2p_buffer_reader in
     let header_buf = Bytes.create header_length in
     read_full ?canceler fd @@ mk_buffer_safe header_buf >>=? fun () ->
     let encrypted_length = TzEndian.get_uint16 header_buf 0 in
@@ -165,7 +165,7 @@ module Connection_message = struct
         return buf
 
   let read ~canceler fd =
-    let open P2p_io_scheduler in
+    let open P2p_buffer_reader in
     let header_buf = Bytes.create Crypto.header_length in
     read_full ~canceler fd @@ mk_buffer_safe header_buf >>=? fun () ->
     let len = TzEndian.get_uint16 header_buf 0 in
