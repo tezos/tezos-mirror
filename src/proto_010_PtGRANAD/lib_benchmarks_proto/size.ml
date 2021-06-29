@@ -187,8 +187,7 @@ let rec of_micheline (x : ('a, 'b) Micheline.node) =
       {traversal = 1; int_bytes = 0; string_bytes}
   | Micheline.Prim (_loc, _prim, subterms, _annot) ->
       node (List.map of_micheline subterms)
-  | Micheline.Seq (_loc, subterms) ->
-      node (List.map of_micheline subterms)
+  | Micheline.Seq (_loc, subterms) -> node (List.map of_micheline subterms)
 
 let of_encoded_value :
     type a. Alpha_context.t -> a Script_typed_ir.ty -> a -> micheline_size =
@@ -196,10 +195,8 @@ let of_encoded_value :
    let open Script_ir_translator in
    let script_res = Lwt_main.run (unparse_data ctxt Optimized ty v) in
    match script_res with
-   | Ok (node, _ctxt) ->
-       of_micheline node
-   | Error _ ->
-       Stdlib.failwith "sizeof: could not unparse"
+   | Ok (node, _ctxt) -> of_micheline node
+   | Error _ -> Stdlib.failwith "sizeof: could not unparse"
 
 (* ------------------------------------------------------------------------- *)
 (* Sapling-related *)
