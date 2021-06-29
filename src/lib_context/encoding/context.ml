@@ -26,7 +26,7 @@
 (* Irmin 1.4 uses int8 to store filename lengths.
 
    Irmin 2 use a variable-size encoding for strings; this is using int8
-   for strings of size stricly less than 128 (e.g. 2^7) which happen to
+   for strings of size strictly less than 128 (e.g. 2^7) which happen to
    be the case for all filenames ever produced by Irmin 1.4. *)
 module Path = Irmin.Path.String_list
 module Metadata = Irmin.Metadata.None
