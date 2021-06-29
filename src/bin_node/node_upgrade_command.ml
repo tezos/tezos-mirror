@@ -24,6 +24,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Invalid_directory of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"main.reconstruct.invalid_directory"
+    ~title:"Invalid directory"
+    ~description:"The data directory to upgrade cannot be found."
+    ~pp:(fun ppf path ->
+      Format.fprintf
+        ppf
+        "The data directory to upgrade cannot be found at %s"
+        path)
+    Data_encoding.(obj1 (req "path" string))
+    (function Invalid_directory path -> Some path | _ -> None)
+    (fun path -> Invalid_directory path)
+
 (** Main *)
 
 module Term = struct
@@ -44,7 +61,7 @@ module Term = struct
     let run =
       Internal_event_unix.init () >>= fun () ->
       match subcommand with
-      | Storage ->
+      | Storage -> (
           Node_config_file.read args.Node_shared_arg.config_file
           >>=? fun config ->
           (* Use the command-line argument data-dir if present: the
@@ -58,27 +75,34 @@ module Term = struct
                  running?"
                 data_dir)
             ~filename:(Node_data_version.lock_file data_dir)
-          @@ fun () ->
-          let genesis = config.blockchain_network.genesis in
-          if status then Node_data_version.upgrade_status data_dir
-          else
-            (match
-               (config.blockchain_network.genesis_parameters, sandbox_file)
-             with
-            | (None, None) -> return_none
-            | (Some parameters, None) ->
-                return_some (parameters.context_key, parameters.values)
-            | (_, Some filename) -> (
-                Lwt_utils_unix.Json.read_file filename >>= function
-                | Error _err ->
-                    fail (Node_run_command.Invalid_sandbox_file filename)
-                | Ok json -> return_some ("sandbox_parameter", json)))
-            >>=? fun sandbox_parameters ->
-            Node_data_version.upgrade_data_dir
-              ~data_dir
-              genesis
-              ~chain_name:config.blockchain_network.chain_name
-              ~sandbox_parameters
+            (fun () ->
+              let genesis = config.blockchain_network.genesis in
+              if status then Node_data_version.upgrade_status data_dir
+              else
+                (match
+                   (config.blockchain_network.genesis_parameters, sandbox_file)
+                 with
+                | (None, None) -> return_none
+                | (Some parameters, None) ->
+                    return_some (parameters.context_key, parameters.values)
+                | (_, Some filename) -> (
+                    Lwt_utils_unix.Json.read_file filename >>= function
+                    | Error _err ->
+                        fail (Node_run_command.Invalid_sandbox_file filename)
+                    | Ok json -> return_some ("sandbox_parameter", json)))
+                >>=? fun sandbox_parameters ->
+                Node_data_version.upgrade_data_dir
+                  ~data_dir
+                  genesis
+                  ~chain_name:config.blockchain_network.chain_name
+                  ~sandbox_parameters)
+          >>= function
+          | Error (Exn (Unix.Unix_error (Unix.ENOENT, _, _)) :: _) ->
+              (* The provided data directory to upgrade cannot be
+                 found. *)
+              fail (Invalid_directory data_dir)
+          | Ok v -> Lwt.return (Ok v)
+          | errs -> Lwt.return errs)
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () -> `Ok ()
