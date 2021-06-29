@@ -151,19 +151,13 @@ module type PROTOCOL = sig
   (** A functional state that is transmitted through the steps of a
      block validation sequence: it can be created by any of the
      [begin_x] functions below, and its final value is produced by
-     {!finalize_block}. It must retain the current state of the store
-     -- which can be extracted from the outside using
-     {!current_context} --, and it can also contain additional
-     information that must be remembered during the validation
-     process. Said extra content must however be immutable: validator
-     or baker implementations are allowed to pause, replay or
-     backtrack throughout validation steps. *)
+     {!finalize_block}. It must retain the current state of the store,
+     and it can also contain additional information that must be
+     remembered during the validation process. Said extra content must
+     however be immutable: validator or baker implementations are
+     allowed to pause, replay or backtrack throughout validation
+     steps. *)
   type validation_state
-
-  (** [current_contexts vs] accesses the context at the given
-     validation state [vs]. It allows for querying the context in
-     between validation steps. *)
-  val current_context : validation_state -> Context.t tzresult Lwt.t
 
   (** [begin_partial_application cid ctxt] checks that a block is
      well-formed in a given context. This function should run quickly,
