@@ -73,7 +73,7 @@ val raw_upgrade :
   Genesis.t ->
   unit tzresult Lwt.t
 
-(** [upgrade_0_0_4 ~data_dir genesis patch_context ~chain_name]
+(** [upgrade_0_0_4 ~data_dir ?patch_context ~chain_name genesis]
     upgrades a store located in [data_dir] base on v.0.0.4 to a
     v0.0.5. It outputs information regarding the necessary actions in
     order to cleanely complete the upgrade. Here this case, the user
