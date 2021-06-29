@@ -60,8 +60,7 @@ module Term = struct
           return_some (parameters.context_key, parameters.values)
       | (_, Some filename) -> (
           Lwt_utils_unix.Json.read_file filename >>= function
-          | Error _err ->
-              fail (Node_snapshot_command.Invalid_sandbox_file filename)
+          | Error _err -> fail (Node_run_command.Invalid_sandbox_file filename)
           | Ok json -> return_some ("sandbox_parameter", json)))
       >>=? fun sandbox_parameters ->
       Lwt_lock_file.try_with_lock
