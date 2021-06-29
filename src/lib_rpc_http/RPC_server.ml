@@ -38,7 +38,7 @@ module Acl = struct
 
   type policy = (endpoint * t) list
 
-  let default =
+  let secure =
     Deny_all
       {
         except =
@@ -96,6 +96,10 @@ module Acl = struct
       }
 
   let allow_all = Allow_all {except = []}
+
+  let default (address : P2p_addr.t) =
+    let open Ipaddr in
+    if V6.scope address = Interface then allow_all else secure
 
   let empty_policy = []
 
@@ -191,7 +195,7 @@ module Acl = struct
     let open Data_encoding in
     Json.construct policy_encoding policy |> Json.to_string
 
-  let find_policy policies address =
+  let find_policy policies (address, port) =
     let match_addr searched_port searched_addr (endpoint, acl) =
       let open P2p_point.Id in
       match (endpoint.addr = searched_addr, endpoint.port, searched_port) with
@@ -200,9 +204,12 @@ module Acl = struct
           Some acl
       | _ -> None
     in
-    match P2p_point.Id.parse_addr_port_id address with
+    List.find_map (match_addr port address) policies
+
+  let find_policy_by_domain_name policies hostname =
+    match P2p_point.Id.parse_addr_port_id hostname with
     | Error _ -> None
-    | Ok {addr; port; _} -> List.find_map (match_addr port addr) policies
+    | Ok {addr; port; _} -> find_policy policies (addr, port)
 
   let acl_type = function Allow_all _ -> `Blacklist | Deny_all _ -> `Whitelist
 end
