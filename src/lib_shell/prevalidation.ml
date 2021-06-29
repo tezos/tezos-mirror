@@ -25,6 +25,61 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Classification = struct
+  type 'a bounded_map = {
+    ring : Operation_hash.t Ringo.Ring.t;
+    mutable map : (Operation.t * error list) Operation_hash.Map.t;
+  }
+
+  (** [mk_empty_bounded_map ring_size] returns a {!bounded_map} whose ring
+    *  holds at mosts [ring_size] values. {!Invalid_argument} is raised
+    *  if [ring_size] is [0] or less. *)
+  let mk_empty_bounded_map ring_size =
+    {ring = Ringo.Ring.create ring_size; map = Operation_hash.Map.empty}
+
+  type t = {
+    refused : [`Refused] bounded_map;
+    branch_refused : [`Branch_refused] bounded_map;
+    branch_delayed : [`Branch_delayed] bounded_map;
+    mutable applied : (Operation_hash.t * Operation.t) list;
+    mutable in_mempool : Operation_hash.Set.t;
+  }
+
+  let mk_empty ring_size =
+    {
+      refused = mk_empty_bounded_map ring_size;
+      branch_refused = mk_empty_bounded_map ring_size;
+      branch_delayed = mk_empty_bounded_map ring_size;
+      in_mempool = Operation_hash.Set.empty;
+      applied = [];
+    }
+
+  let clear (classes : t) =
+    Ringo.Ring.clear classes.branch_refused.ring ;
+    classes.branch_refused.map <- Operation_hash.Map.empty ;
+    Ringo.Ring.clear classes.branch_delayed.ring ;
+    classes.branch_delayed.map <- Operation_hash.Map.empty ;
+    classes.applied <- [] ;
+    classes.in_mempool <- Operation_hash.Set.empty
+end
+
+module Requester :
+  Requester.REQUESTER
+    with type t = Distributed_db.chain_db
+     and type key = Operation_hash.t
+     and type value = Operation.t
+     and type param = unit = struct
+  type t = Distributed_db.chain_db
+
+  type key = Operation_hash.t
+
+  type value = Operation.t
+
+  type param = unit
+
+  include Distributed_db.Operation
+end
+
 open Validation_errors
 
 module type T = sig

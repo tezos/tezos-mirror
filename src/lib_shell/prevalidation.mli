@@ -29,6 +29,40 @@
     consistency. This module is stateless and creates and manipulates the
     prevalidation_state. *)
 
+(** Module containing types and functions to handle branch_refused,
+ *  branch_delayed, and refused operations *)
+module Classification : sig
+  type 'a bounded_map = {
+    ring : Operation_hash.t Ringo.Ring.t;
+    mutable map : (Operation.t * error list) Operation_hash.Map.t;
+  }
+
+  type t = {
+    refused : [`Refused] bounded_map;
+    branch_refused : [`Branch_refused] bounded_map;
+    branch_delayed : [`Branch_delayed] bounded_map;
+    mutable applied : (Operation_hash.t * Operation.t) list;
+    mutable in_mempool : Operation_hash.Set.t;
+  }
+
+  (** [mk_empty ring_size] returns an empty {!t} whose rings hold at
+   *  most [ring_size] values. {!Invalid_argument} is raised
+   *  if [ring_size] is [0] or less. *)
+  val mk_empty : int -> t
+
+  (** [clear classes] resets the state of all fields of [classes],
+    * except for [refused] *)
+  val clear : t -> unit
+end
+
+(** The requester used by [Prevalidator], backed by [Distributed_db]. *)
+module Requester :
+  Requester.REQUESTER
+    with type t = Distributed_db.chain_db
+     and type key = Operation_hash.t
+     and type value = Operation.t
+     and type param = unit
+
 module type T = sig
   module Proto : Tezos_protocol_environment.PROTOCOL
 
