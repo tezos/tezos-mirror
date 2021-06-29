@@ -139,13 +139,18 @@ end
 module type NOTIFIER = sig
   type operation_data
 
-  (** [notify_operation stream kind op] should be called when
-   *  [op] is about to be classified as [kind]. In practice [kind] is one
-   *  of [`Branch_refused], [`Branch_delayed], or [`Refused].
+  (** [maybe_notify_operation ?should_notify stream kind op] should be
+   *  called when [op] is about to be classified as [kind]. In practice
+   *  [kind] is one of [`Applied], [`Branch_delayed], [`Branch_refused],
+   *  or [`Refused]. If [should_notify] is [false], do nothing; its
+   *  default value is [true].
    *
-   *  [notify_operation] should be called exactly ONCE for a given stream
-   *  and operation. *)
-  val notify_operation :
+   *  Each classified operation should be notified exactly ONCE for a
+   *  given stream. The flag [should_notify] is used to avoid notifying
+   *  multiple times on the same operation, e.g. an operation that is
+   *  reclassified upon banning an applied operation. *)
+  val maybe_notify_operation :
+    ?should_notify:bool ->
     ('kind * Operation.shell_header * operation_data) Lwt_watcher.input ->
     'kind ->
     Operation.t ->
@@ -165,6 +170,10 @@ module Make_notifier (Proto : Tezos_protocol_environment.PROTOCOL) :
     | Error _ ->
         (* possible enhancement: https://gitlab.com/tezos/tezos/-/issues/1510 *)
         ()
+
+  let maybe_notify_operation ?(should_notify = true) operation_stream result op
+      =
+    if should_notify then notify_operation operation_stream result op
 end
 
 (** How to treat branch_refused, branch_delayed, and refused operations *)
@@ -575,39 +584,52 @@ module Make
       ~validation_state_after
       (op, receipt)
 
-  module Proto_classificator : CLASSIFICATOR with type input = types_state =
-  struct
-    type input = types_state
-
+  module Proto_classificator = struct
     module Classificator = Classificator (Requester)
 
-    let handle_branch_refused pv op oph errors =
+    let handle_branch_refused ?should_notify pv op oph errors =
       let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
-      Notifier.notify_operation pv.operation_stream `Branch_refused op ;
+      Notifier.maybe_notify_operation
+        ?should_notify
+        pv.operation_stream
+        `Branch_refused
+        op ;
       Classificator.handle_branch_refused input op oph errors
 
-    let handle_branch_delayed pv op oph errors =
+    let handle_branch_delayed ?should_notify pv op oph errors =
       let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
-      Notifier.notify_operation pv.operation_stream `Branch_delayed op ;
+      Notifier.maybe_notify_operation
+        ?should_notify
+        pv.operation_stream
+        `Branch_delayed
+        op ;
       Classificator.handle_branch_delayed input op oph errors
 
-    let handle_refused pv op oph errors =
+    let handle_refused ?should_notify pv op oph errors =
       let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
-      Notifier.notify_operation pv.operation_stream `Refused op ;
+      Notifier.maybe_notify_operation
+        ?should_notify
+        pv.operation_stream
+        `Refused
+        op ;
       Classificator.handle_refused input op oph errors
   end
 
-  let handle_applied pv (op : Prevalidation.operation) =
+  let handle_applied ?should_notify pv (op : Prevalidation.operation) =
     let classification = pv.shell.classification in
-    Notifier.notify_operation pv.operation_stream `Applied op.raw ;
+    Notifier.maybe_notify_operation
+      ?should_notify
+      pv.operation_stream
+      `Applied
+      op.raw ;
     classification.applied <- (op.hash, op.raw) :: classification.applied ;
     pv.shell.classification.in_mempool <-
       Operation_hash.Set.add op.hash pv.shell.classification.in_mempool
 
-  let classify_operation w pv validation_state mempool op oph =
+  let classify_operation ?should_notify w pv validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        Proto_classificator.handle_refused pv op oph errors ;
+        Proto_classificator.handle_refused ?should_notify pv op oph errors ;
         Lwt.return (validation_state, mempool)
     | Ok op -> (
         Prevalidation.apply_operation validation_state op >>= function
@@ -623,7 +645,7 @@ module Make
               receipt
             >>= fun accept ->
             if accept then (
-              handle_applied pv op ;
+              handle_applied ?should_notify pv op ;
               let new_mempool =
                 Mempool.
                   {mempool with known_valid = op.hash :: mempool.known_valid}
@@ -635,13 +657,28 @@ module Make
                 oph ;
               Lwt.return (validation_state, mempool))
         | Branch_delayed errors ->
-            Proto_classificator.handle_branch_delayed pv op.raw op.hash errors ;
+            Proto_classificator.handle_branch_delayed
+              ?should_notify
+              pv
+              op.raw
+              op.hash
+              errors ;
             Lwt.return (validation_state, mempool)
         | Branch_refused errors ->
-            Proto_classificator.handle_branch_refused pv op.raw op.hash errors ;
+            Proto_classificator.handle_branch_refused
+              ?should_notify
+              pv
+              op.raw
+              op.hash
+              errors ;
             Lwt.return (validation_state, mempool)
         | Refused errors ->
-            Proto_classificator.handle_refused pv op.raw op.hash errors ;
+            Proto_classificator.handle_refused
+              ?should_notify
+              pv
+              op.raw
+              op.hash
+              errors ;
             Lwt.return (validation_state, mempool)
         | Outdated ->
             Distributed_db.Operation.clear_or_cancel
@@ -1170,7 +1207,16 @@ module Make
       (* Previously applied operations are classified anew. *)
       let reclassify_operation (acc_validation_state, acc_mempool) (oph, op) =
         pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
-        classify_operation w pv acc_validation_state acc_mempool op oph
+        (* These operations should not be notified again: they have already
+           been notified when they were initially classified. *)
+        classify_operation
+          ~should_notify:false
+          w
+          pv
+          acc_validation_state
+          acc_mempool
+          op
+          oph
       in
       List.fold_left_s
         reclassify_operation
