@@ -65,14 +65,15 @@ val ensure_data_dir : ?bare:bool -> string -> unit tzresult Lwt.t
 
 (** Upgrade data directory from an older version.
 
-    [upgrade_data_dir dir genesis ~chain_name] checks if an upgrade of
-    the given data directory [dir] is available. If the data directory
-    is upgradable then the upgrade is performed. Otherwise, nothing is
-    done. *)
+    [upgrade_data_dir dir genesis ~chain_name ~sandbox_parameters]
+    checks if an upgrade of the given data directory [dir] is
+    available. If the data directory is upgradable then the upgrade is
+    performed. Otherwise, nothing is done. *)
 val upgrade_data_dir :
   data_dir:string ->
   Genesis.t ->
   chain_name:Distributed_db_version.Name.t ->
+  sandbox_parameters:(string * Data_encoding.json) option ->
   unit tzresult Lwt.t
 
 (** [store_dir dir] is a directory within [dir] that the node uses for

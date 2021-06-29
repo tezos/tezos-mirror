@@ -60,8 +60,10 @@ let data_version = "0.0.5"
 let upgradable_data_version =
   [
     ( "0.0.4",
-      fun ~data_dir genesis ~chain_name ->
-        let patch_context = Patch_context.patch_context genesis None in
+      fun ~data_dir genesis ~chain_name ~sandbox_parameters ->
+        let patch_context =
+          Patch_context.patch_context genesis sandbox_parameters
+        in
         Legacy.upgrade_0_0_4 ~data_dir ~patch_context ~chain_name genesis );
   ]
 
@@ -314,14 +316,14 @@ let check_data_dir_legacy_artifact data_dir =
   | true -> Events.(emit legacy_store_is_present) lmdb_store_artifact_path
   | false -> Lwt.return_unit
 
-let upgrade_data_dir ~data_dir genesis ~chain_name =
+let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
   ensure_data_dir false data_dir >>=? function
   | None ->
       Events.(emit dir_is_up_to_date ()) >>= fun () ->
       check_data_dir_legacy_artifact data_dir >>= fun () -> return_unit
   | Some (version, upgrade) -> (
       Events.(emit upgrading_node (version, data_version)) >>= fun () ->
-      upgrade ~data_dir genesis ~chain_name >>= function
+      upgrade ~data_dir genesis ~chain_name ~sandbox_parameters >>= function
       | Ok _success_message ->
           write_version_file data_dir >>=? fun () ->
           Events.(emit update_success ()) >>= fun () -> return_unit
