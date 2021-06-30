@@ -71,9 +71,13 @@ module S = struct
       ~output:Chain_id.encoding
       RPC_path.(path / "chain_id")
 
+  (* DEPRECATED: use `chains/<CHAIN_ID>/levels/{checkpoint, savepoint,
+     caboose, history_mode}` instead. *)
   let checkpoint =
     RPC_service.get_service
-      ~description:"The current checkpoint for this chain."
+      ~description:
+        "DEPRECATED: use `../levels/{checkpoint, savepoint, caboose, \
+         history_mode}` instead. The current checkpoint for this chain."
       ~query:RPC_query.empty
       ~output:checkpoint_encoding
       RPC_path.(path / "checkpoint")
