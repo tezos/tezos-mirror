@@ -47,6 +47,9 @@ let checkpoint_encoding =
     (req "caboose" int32)
     (req "history_mode" History_mode.encoding)
 
+let block_descriptor_encoding =
+  obj2 (req "block_hash" Block_hash.encoding) (req "level" int32)
+
 let invalid_block_encoding =
   conv
     (fun {hash; level; errors} -> (hash, level, errors))
@@ -100,6 +103,31 @@ module S = struct
       ~input:bootstrapped_flag_encoding
       ~output:unit
       path
+
+  module Levels = struct
+    let path = RPC_path.(path / "levels")
+
+    let checkpoint =
+      RPC_service.get_service
+        ~description:"The current checkpoint for this chain."
+        ~query:RPC_query.empty
+        ~output:block_descriptor_encoding
+        RPC_path.(path / "checkpoint")
+
+    let savepoint =
+      RPC_service.get_service
+        ~description:"The current savepoint for this chain."
+        ~query:RPC_query.empty
+        ~output:block_descriptor_encoding
+        RPC_path.(path / "savepoint")
+
+    let caboose =
+      RPC_service.get_service
+        ~description:"The current caboose for this chain."
+        ~query:RPC_query.empty
+        ~output:block_descriptor_encoding
+        RPC_path.(path / "caboose")
+  end
 
   module Blocks = struct
     let list_query =
@@ -194,6 +222,17 @@ let chain_id ctxt =
 
 let checkpoint ctxt ?(chain = `Main) () =
   make_call0 S.checkpoint ctxt chain () ()
+
+module Levels = struct
+  let checkpoint ctxt ?(chain = `Main) () =
+    make_call0 S.Levels.checkpoint ctxt chain () ()
+
+  let savepoint ctxt ?(chain = `Main) () =
+    make_call0 S.Levels.savepoint ctxt chain () ()
+
+  let caboose ctxt ?(chain = `Main) () =
+    make_call0 S.Levels.caboose ctxt chain () ()
+end
 
 module Blocks = struct
   let list ctxt =
