@@ -160,16 +160,33 @@ module Make (X : PARAMETERS) = struct
       one_shot_event_handlers = String_map.empty;
     }
 
-  let handle_raw_event daemon line =
-    let json = JSON.parse ~origin:("event from " ^ daemon.name) line in
+  (** Takes the given JSON full event of the following form
+      and evaluates in an event using [<name>] and
+      [<value>]:
+
+      {[{
+        "fd-sink-item.v0": {
+          [...]
+          "event": { <name>:<value> }
+        }
+      }]}
+
+      If the given JSON does not match the right structure,
+      and in particular if the value of the field ["event"]
+      is not a one-field object, the function evaluates in
+      None. *)
+  let get_event_from_full_event json =
     let event = JSON.(json |-> "fd-sink-item.v0" |-> "event") in
     match JSON.as_object_opt event with
-    | None | Some ([] | _ :: _ :: _) ->
-        (* Some events are not one-field objects. Ignore them for now. *)
-        ()
-    | Some [(name, value)] -> (
-        let raw_event = {name; value} in
-        (* Trigger persistent events. *)
+    | None | Some ([] | _ :: _ :: _) -> None
+    | Some [(name, value)] -> Some {name; value}
+
+  let handle_raw_event daemon line =
+    let json = JSON.parse ~origin:("event from " ^ daemon.name) line in
+    match get_event_from_full_event json with
+    | None -> ()
+    | Some (raw_event : event) -> (
+        let name = raw_event.name in
         List.iter
           (fun handler -> handler raw_event)
           daemon.persistent_event_handlers ;
@@ -187,7 +204,7 @@ module Make (X : PARAMETERS) = struct
                       daemon.one_shot_event_handlers
               | (Event_handler {filter; resolver} as head) :: tail ->
                   let acc =
-                    match filter value with
+                    match filter json with
                     | exception exn ->
                         (* We cannot have [async] promises raise exceptions other than
                            [Test.Failed], and events are handled with [async] so we
@@ -318,7 +335,7 @@ module Make (X : PARAMETERS) = struct
     Background.register event_loop_promise ;
     unit
 
-  let wait_for ?where daemon name filter =
+  let wait_for_full ?where daemon name filter =
     let (promise, resolver) = Lwt.task () in
     let current_events =
       String_map.find_opt name daemon.one_shot_event_handlers
@@ -335,6 +352,17 @@ module Make (X : PARAMETERS) = struct
         raise
           (Terminated_before_event {daemon = daemon.name; event = name; where})
     | Some x -> return x
+
+  let wait_for ?where daemon name filter =
+    let filter json =
+      let raw = get_event_from_full_event json in
+      (* If [json] does not match the correct JSON structure, it
+         will be filtered out, which will result in ignoring
+         the current event.
+         @see raw_event_from_event *)
+      Option.bind raw (fun {value; _} -> filter value)
+    in
+    wait_for_full ?where daemon name filter
 
   let on_event daemon handler =
     daemon.persistent_event_handlers <-
