@@ -26,26 +26,27 @@
 
 open Environment_context
 
-(* This module contains the real module signature that the Shell sees
-   from an economic protocol. There is actually only one signature to
-   avoid [if]-[then]-[else] expressions inside the shell.
+(* This module contains the real module signature of an economic
+   protocol that the Shell sees. There is actually only one signature
+   to avoid [if]-[then]-[else] expressions inside the Shell.
 
    When we change the module signature output of the environment, we
    need to implement a forward-compatible interface. This is done by
    upgrading the old interface to the new one.
 
-   The first change in this signature was introduced by the [V3] environment.
-   This is why we implement a functor from the initial environment [V0] to [V3]
-   directly because neither [V1] nor [V2] change the module signature output of
-   the environment.
+   The first change in this signature was introduced by the [V3]
+   environment. This is why we implement a functor from the initial
+   environment [V0] to [V3] directly because neither [V1] nor [V2]
+   change the module signature output of the environment.
 
-   All the equalities constraints are here for typing only. We use a destructive
-   substitution ([:=]) for types that are defined by the shell, or that are
-   common to all the economic protocol environments, and an equality-constraint
-   ([=]) for the types that are abstracted from the economic protocol.
+   All the equalities constraints are here for typing only. We use a
+   destructive substitution ([:=]) for types that are defined by the
+   shell, or that are common to all the economic protocol
+   environments, and an equality constraint ([=]) for the types that
+   are abstracted from the economic protocol.
 
-   [module type T] is the same signature as the last [Vx] environment
-   ([module type Vx_T]). *)
+   [module type T] defines the same signature as the last [Vx]
+   environment ([module type Vx_T]). *)
 module type T = sig
   (* Documentation for this interface may be found in
      module type [PROTOCOL] of [sigs/v3/updater.mli]. *)
