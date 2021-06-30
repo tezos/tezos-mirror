@@ -75,6 +75,34 @@ let test_mk_buffer_safe () =
         (mk_buffer ~pos ~len buf |> Result.is_ok))
     lengths
 
+let cancel_and_assert_success canceler =
+  Lwt_canceler.cancel canceler >|= function
+  | Ok _ -> ()
+  | Error _ -> assert false
+
+let easy_mk_readable ?maxlength ?fresh_buf_size ?size () =
+  let read_buffer = Circular_buffer.create ?maxlength ?fresh_buf_size () in
+  let read_queue = Lwt_pipe.create ?size () in
+  P2p_buffer_reader.mk_readable ~read_buffer ~read_queue
+
+let test_read_waits_for_data ?maxlength ?fresh_buf_size ?size () =
+  let readable = easy_mk_readable ?maxlength ?fresh_buf_size ?size () in
+  let buffer = P2p_buffer_reader.mk_buffer_safe @@ Bytes.create 16 in
+  let cancelled = ref false in
+  let canceler = Lwt_canceler.create () in
+  Lwt_canceler.on_cancel canceler (fun () ->
+      cancelled := true ;
+      Lwt.return_unit) ;
+  let schedule () : _ Lwt.t =
+    Lwt_unix.sleep 0.3 >>= fun () -> cancel_and_assert_success canceler
+  in
+  Lwt_main.run
+    (Lwt.async schedule ;
+     P2p_buffer_reader.read ~canceler readable buffer >>= fun res ->
+     assert (Result.is_error res) ;
+     Lwt.return_unit) ;
+  assert (!cancelled = true)
+
 let () =
   let mk_buffer_tests =
     [
@@ -96,4 +124,6 @@ let () =
       );
       ( "p2p.reader.mk_safe_buffer",
         [Alcotest.test_case "mk_safe_buffer" `Quick test_mk_buffer_safe] );
+      ( "p2p.reader.read",
+        [Alcotest.test_case "read" `Quick test_read_waits_for_data] );
     ]
