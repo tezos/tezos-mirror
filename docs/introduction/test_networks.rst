@@ -43,19 +43,9 @@ Granadanet
 Granadanet is a test network running the ``PtGRANAD`` protocol.
 Granadanet will run until Granadanet is rejected or replaced by another protocol on Mainnet.
 
-On Granadanet, the following constants differ from Mainnet:
-
-- ``preserved_cycles`` is 3 instead of 5;
-- ``blocks_per_cycle`` is 2048 instead of 4096;
-- ``blocks_per_voting_period`` is 1024 instead of 32768;
-- ``time_between_blocks`` is ``[ 30, 20 ]`` instead of ``[ 60, 40 ]``;
-- ``delay_per_missing_endorsement`` is 4 instead of 8.
-
-This results in a faster chain than Mainnet:
-
-- 2 blocks per minute;
-- a cycle should last about 17 hours;
-- a voting period lasts half a cycle and should thus last about 8 hours.
+On Granadanet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
 Florencenet
 ===========
@@ -69,20 +59,9 @@ Florencenet
 Florencenet is a test network running the ``PsFLoren`` protocol.
 Florencenet will run until Florence is replaced by another protocol on Mainnet.
 
-On Florencenet, the following constants differ from Mainnet:
-
-- ``preserved_cycles`` is 3 instead of 5;
-- ``blocks_per_cycle`` is 2048 instead of 4096;
-- ``blocks_per_voting_period`` is 1024 instead of 32768;
-- ``time_between_blocks`` is ``[ 30, 20 ]`` instead of ``[ 60, 40 ]``;
-- ``test_chain_duration`` is 0 instead of 1966080;
-- ``delay_per_missing_endorsement`` is 4 instead of 8.
-
-This results in a faster chain than Mainnet:
-
-- 2 blocks per minute;
-- a cycle should last about 17 hours;
-- a voting period lasts half a cycle and should thus last about 8 hours.
+On Florencenet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
 Future Networks
 ===============
