@@ -125,7 +125,7 @@ stages:
       when: never
     - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
-    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
     - if: '$CI_COMMIT_BRANCH =~ /doc/'
       when: always
@@ -141,7 +141,7 @@ stages:
       when: never
     - if: '$CI_COMMIT_BRANCH =~ /-release$/ && $CI_PROJECT_NAMESPACE == "tezos"'
       when: never
-    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "tezos"'
       when: always
     - if: '$CI_COMMIT_BRANCH =~ /opam/'
       when: always
