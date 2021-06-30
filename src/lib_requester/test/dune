@@ -1,5 +1,6 @@
-(executables
+(tests
  (names test_requester test_fuzzing_requester)
+ (package tezos-requester)
  (libraries tezos-base
             tezos-base.unix
             tezos-test-helpers
@@ -13,10 +14,6 @@
                    -open Tezos_stdlib
                    -open Tezos_requester)))
 
-(alias
-  (name buildtest)
-  (deps test_requester.exe test_fuzzing_requester.exe))
-
 (rule
  (alias runtest_requester)
  (action (run %{exe:test_requester.exe})))
@@ -24,9 +21,3 @@
 (rule
  (alias runtest_fuzzing_requester)
  (action (run %{exe:test_fuzzing_requester.exe})))
-
-(rule
- (alias runtest)
- (package tezos-requester)
- (deps (alias runtest_requester) (alias runtest_fuzzing_requester))
- (action (progn)))
