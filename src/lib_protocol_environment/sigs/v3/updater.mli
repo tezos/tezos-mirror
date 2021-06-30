@@ -245,9 +245,8 @@ module type PROTOCOL = sig
     Context.t -> Block_header.shell_header -> validation_result tzresult Lwt.t
 end
 
-(** [activate ctxt ph] activates an economic protocol, given by its
-   hash [ph], from a given context [ctxt]. This means that the context
-   used for the next block will use the input protocol (this is not an
-   immediate change). The protocol must have been previously compiled
-   successfully. *)
+(** [activate ctxt ph] activates an economic protocol (given by its
+   hash [ph]) from the context [ctxt]. The resulting context is still
+   a context for the current economic protocol, and the migration is
+   not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
