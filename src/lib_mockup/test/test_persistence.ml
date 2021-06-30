@@ -127,7 +127,7 @@ module Mock_protocol : Registration.PROTOCOL = struct
 
   let current_context _ = assert false
 
-  let compare_operations _ = assert false
+  let relative_position_within_block _ = assert false
 
   let acceptable_passes _ = assert false
 

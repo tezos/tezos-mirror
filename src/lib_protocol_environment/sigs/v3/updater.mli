@@ -126,9 +126,16 @@ module type PROTOCOL = sig
       and cannot be included at all. *)
   val acceptable_passes : operation -> int list
 
-  (** Basic ordering of operations. [compare_operations op1 op2] means
-      that [op1] should appear before [op2] in a block. *)
-  val compare_operations : operation -> operation -> int
+  (** {!relative_position_within_block} is intended for use with
+      {!List.sort} (and other sorting/ordering functions) to arrange a set of
+      operations into a sequence, the order of which is valid for the protocol.
+
+      This function does not provide a total ordering on the operations. E.g.,
+      [relative_position_within_block o1 o2 = 0] does NOT imply that [o1] is
+      equal to [o2] in any way.
+      Consequently, it {e MUST NOT} be used as a [compare] component of an
+      {!Stdlib.Map.OrderedType}. *)
+  val relative_position_within_block : operation -> operation -> int
 
   (** A functional state that is transmitted through the steps of a
       block validation sequence. It must retain the current state of

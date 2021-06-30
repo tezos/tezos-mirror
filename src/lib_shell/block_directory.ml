@@ -385,7 +385,7 @@ let build_raw_rpc_directory ~user_activated_upgrades
           (fun operations ->
             let operations =
               if q#sort_operations then
-                List.sort Next_proto.compare_operations operations
+                List.sort Next_proto.relative_position_within_block operations
               else operations
             in
             List.map

@@ -74,8 +74,6 @@ module type T = sig
     protocol_data : Proto.operation_data;
   }
 
-  val compare : operation -> operation -> int
-
   val parse : Operation.t -> operation tzresult
 
   (** [parse_unsafe bytes] parses [bytes] as operation data. Any error happening during parsing becomes {!Parse_error}.

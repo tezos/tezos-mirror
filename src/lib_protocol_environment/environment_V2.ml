@@ -902,7 +902,7 @@ struct
     let complete ctxt s = Base58.complete ctxt s
   end
 
-  module Lift (P : Updater.PROTOCOL) = struct
+  module LiftV2 (P : Updater.PROTOCOL) = struct
     include P
 
     let begin_partial_application ~chain_id ~ancestor_context
@@ -947,6 +947,10 @@ struct
     let finalize_block c = finalize_block c >|= wrap_tzresult
 
     let init c bh = init c bh >|= wrap_tzresult
+  end
+
+  module Lift (P : Updater.PROTOCOL) = struct
+    include Environment_protocol_T.V0toV3 (LiftV2 (P))
 
     let environment_version = Protocol.V2
   end
