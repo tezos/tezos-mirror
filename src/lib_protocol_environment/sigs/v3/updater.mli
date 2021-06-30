@@ -75,10 +75,10 @@ module type PROTOCOL = sig
      list denotes the number of validation passes. *)
   val validation_passes : quota list
 
-  (** The version-specific type of blocks. *)
+  (** The economic protocol-specific type of blocks. *)
   type block_header_data
 
-  (** Encoding for version-specific part of block headers.  *)
+  (** Encoding for economic protocol-specific part of block headers. *)
   val block_header_data_encoding : block_header_data Data_encoding.t
 
   (** A fully parsed block header. *)
@@ -87,22 +87,23 @@ module type PROTOCOL = sig
     protocol_data : block_header_data;
   }
 
-  (** Version-specific side information computed by the protocol
-     during the validation of a block. Should not include information
-     about the evaluation of operations which is handled separately by
-     {!operation_metadata}. To be used as an execution trace by tools
-     (client, indexer). Not necessary for validation. *)
+  (** Economic protocol-specific side information computed by the
+     protocol during the validation of a block. Should not include
+     information about the evaluation of operations which is handled
+     separately by {!operation_metadata}. To be used as an execution
+     trace by tools (client, indexer). Not necessary for
+     validation. *)
   type block_header_metadata
 
-  (** Encoding for version-specific block metadata. *)
+  (** Encoding for economic protocol-specific block metadata. *)
   val block_header_metadata_encoding : block_header_metadata Data_encoding.t
 
-  (** The version-specific type of operations. *)
+  (** The economic protocol-specific type of operations. *)
   type operation_data
 
-  (** Version-specific side information computed by the protocol
-      during the validation of each operation, to be used conjointly
-      with {!block_header_metadata}. *)
+  (** Economic protocol-specific side information computed by the
+     protocol during the validation of each operation, to be used
+     conjointly with {!block_header_metadata}. *)
   type operation_receipt
 
   (** A fully parsed operation. *)
@@ -111,10 +112,10 @@ module type PROTOCOL = sig
     protocol_data : operation_data;
   }
 
-  (** Encoding for version-specific operation data. *)
+  (** Encoding for economoic protocol-specific operation data. *)
   val operation_data_encoding : operation_data Data_encoding.t
 
-  (** Encoding for version-specific operation receipts. *)
+  (** Encoding for eonomic protocol-specific operation receipts. *)
   val operation_receipt_encoding : operation_receipt Data_encoding.t
 
   (** Encoding that mixes an operation data and its receipt. *)
@@ -244,9 +245,9 @@ module type PROTOCOL = sig
     Context.t -> Block_header.shell_header -> validation_result tzresult Lwt.t
 end
 
-(** [activate ctxt ph] activates an economic protocol version, given
-   by its hash [ph], from a given context [ctxt]. This means that the
-   context used for the next block will use the input protocol version
-   (this is not an immediate change). The protocol must have been
-   previously compiled successfully. *)
+(** [activate ctxt ph] activates an economic protocol, given by its
+   hash [ph], from a given context [ctxt]. This means that the context
+   used for the next block will use the input protocol (this is not an
+   immediate change). The protocol must have been previously compiled
+   successfully. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
