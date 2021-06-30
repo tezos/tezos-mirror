@@ -50,6 +50,17 @@ val checkpoint :
 
 module Mempool = Block_services.Empty.Mempool
 
+module Levels : sig
+  val checkpoint :
+    #simple -> ?chain:chain -> unit -> (Block_hash.t * int32) tzresult Lwt.t
+
+  val savepoint :
+    #simple -> ?chain:chain -> unit -> (Block_hash.t * int32) tzresult Lwt.t
+
+  val caboose :
+    #simple -> ?chain:chain -> unit -> (Block_hash.t * int32) tzresult Lwt.t
+end
+
 module Blocks : sig
   val list :
     #simple ->
@@ -108,6 +119,17 @@ module S : sig
 
   val force_bootstrapped :
     ([`PATCH], prefix, prefix, unit, bool, unit) RPC_service.t
+
+  module Levels : sig
+    val checkpoint :
+      ([`GET], prefix, prefix, unit, unit, Block_hash.t * int32) RPC_service.t
+
+    val savepoint :
+      ([`GET], prefix, prefix, unit, unit, Block_hash.t * int32) RPC_service.t
+
+    val caboose :
+      ([`GET], prefix, prefix, unit, unit, Block_hash.t * int32) RPC_service.t
+  end
 
   module Blocks : sig
     val path : (prefix, prefix) RPC_path.t
