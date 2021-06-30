@@ -41,5 +41,15 @@ module Network = struct
       RPC_path.(path / "network" / "user_activated_protocol_overrides")
 end
 
+let history_mode_encoding =
+  Data_encoding.(obj1 (req "history_mode" History_mode.encoding))
+
+let history_mode =
+  RPC_service.get_service
+    ~description:"Returns the history mode of the node's underlying storage."
+    ~query:RPC_query.empty
+    ~output:history_mode_encoding
+    RPC_path.(path / "history_mode")
+
 let user_activated_upgrades cctxt =
   RPC_context.make_call Network.user_activated_upgrades cctxt () () ()
