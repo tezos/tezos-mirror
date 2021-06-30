@@ -43,6 +43,10 @@ module Path : Irmin.Path.S with type step = string and type t = string list
 
 module Branch : Irmin.Branch.S with type t = string
 
+(* Note: [Irmin.Private] contains backend-specific modules and module types.
+   These are intended to be consumed by [lib_context] but not to appear in its
+   main public API. *)
+
 module Node : Irmin.Private.Node.Maker
 
 module Commit : Irmin.Private.Commit.Maker
