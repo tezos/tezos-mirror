@@ -119,8 +119,23 @@ type atomic_type_name =
   | `TBls12_381_g2
   | `TBls12_381_fr ]
 
+type non_atomic_type_name =
+  [ `TPair
+  | `TUnion
+  | `TLambda
+  | `TOption
+  | `TList
+  | `TSet
+  | `TMap
+  | `TBig_map
+  | `TContract
+  | `TTicket ]
+
 (* Ensure inclusion of atomic_type_name in type_name *)
 let (_ : atomic_type_name -> type_name) = fun x -> (x :> type_name)
+
+(* Ensure inclusion of non_atomic_type_name in type_name *)
+let (_ : non_atomic_type_name -> type_name) = fun x -> (x :> type_name)
 
 let all_atomic_type_names : atomic_type_name array =
   [|
@@ -142,6 +157,20 @@ let all_atomic_type_names : atomic_type_name array =
     `TBls12_381_g1;
     `TBls12_381_g2;
     `TBls12_381_fr;
+  |]
+
+let all_non_atomic_type_names : non_atomic_type_name array =
+  [|
+    `TPair;
+    `TUnion;
+    `TLambda;
+    `TOption;
+    `TList;
+    `TSet;
+    `TMap;
+    `TBig_map;
+    `TContract;
+    `TTicket;
   |]
 
 type comparable_type_name =
@@ -205,6 +234,13 @@ let all_comparable_atomic_type_names : 'a comparable_and_atomic array =
     `TAddress;
   |]
 
+type 'a comparable_and_non_atomic = 'a
+  constraint 'a = [< comparable_type_name]
+  constraint 'a = [< non_atomic_type_name]
+
+let all_comparable_non_atomic_type_names : 'a comparable_and_non_atomic array =
+  [|`TPair; `TUnion; `TOption|]
+
 (* Ensure inclusion of comparable_and_atomic in type_name *)
 let (_ : 'a comparable_and_atomic -> type_name) = fun x -> (x :> type_name)
 
@@ -212,10 +248,15 @@ let type_names_count = Array.length all_type_names
 
 let atomic_type_names_count = Array.length all_atomic_type_names
 
+let non_atomic_type_names_count = Array.length all_non_atomic_type_names
+
 let comparable_type_names_count = Array.length all_comparable_type_names
 
 let comparable_atomic_type_names_count =
   Array.length all_comparable_atomic_type_names
+
+let comparable_non_atomic_type_names_count =
+  Array.length all_comparable_non_atomic_type_names
 
 (* ------------------------------------------------------------------------- *)
 (* Uniform type name generators *)
@@ -232,6 +273,11 @@ let uniform_atomic_type_name : atomic_type_name sampler =
   let i = Random.State.int rng_state atomic_type_names_count in
   all_atomic_type_names.(i)
 
+let uniform_non_atomic_type_name : non_atomic_type_name sampler =
+ fun rng_state ->
+  let i = Random.State.int rng_state non_atomic_type_names_count in
+  all_non_atomic_type_names.(i)
+
 let uniform_comparable_type_name : comparable_type_name sampler =
  fun rng_state ->
   let i = Random.State.int rng_state comparable_type_names_count in
@@ -241,6 +287,12 @@ let uniform_comparable_atomic_type_name : 'a comparable_and_atomic sampler =
  fun rng_state ->
   let i = Random.State.int rng_state comparable_atomic_type_names_count in
   all_comparable_atomic_type_names.(i)
+
+let uniform_comparable_non_atomic_type_name :
+    'a comparable_and_non_atomic sampler =
+ fun rng_state ->
+  let i = Random.State.int rng_state comparable_non_atomic_type_names_count in
+  all_comparable_non_atomic_type_names.(i)
 
 (* ------------------------------------------------------------------------- *)
 (* Existentially packed typed value. *)
@@ -283,6 +335,9 @@ module type S = sig
 
     val m_comparable_type :
       max_depth:int -> Script_ir_translator.ex_comparable_ty sampler
+
+    val m_comparable_type_by_size :
+      size:int -> Script_ir_translator.ex_comparable_ty sampler
   end
 
   module rec Random_value : sig
@@ -478,6 +533,59 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
             | `TSignature -> return (Ex_comparable_ty (Signature_key None))
             | `TUnit -> return (Ex_comparable_ty (Unit_key None))
             | `TInt -> return (Ex_comparable_ty (Int_key None)))
+
+    let rec m_comparable_type_by_size ~size :
+        Script_ir_translator.ex_comparable_ty sampler =
+      let open M in
+      let open Script_ir_translator in
+      let atomic_case () =
+        let_star uniform_comparable_atomic_type_name (fun at_tn ->
+            return (comparable_type_of_comparable_atomic_type_name at_tn))
+      in
+      let option_case size =
+        let size = size - 1 in
+        let_star (m_comparable_type_by_size ~size) (fun (Ex_comparable_ty t) ->
+            return (Ex_comparable_ty (Option_key (t, None))))
+      in
+      let pair_case size =
+        let size = size - 1 in
+        let_star
+          (Base_samplers.sample_in_interval ~range:{min = 1; max = size - 1})
+          (fun size_left ->
+            let size_right = size - size_left in
+            let_star
+              (m_comparable_type_by_size ~size:size_left)
+              (fun (Ex_comparable_ty l) ->
+                let_star
+                  (m_comparable_type_by_size ~size:size_right)
+                  (fun (Ex_comparable_ty r) ->
+                    return
+                      (Ex_comparable_ty (Pair_key ((l, None), (r, None), None))))))
+      in
+      let union_case size =
+        let size = size - 1 in
+        let_star
+          (Base_samplers.sample_in_interval ~range:{min = 1; max = size - 1})
+          (fun size_left ->
+            let size_right = size - size_left in
+            let_star
+              (m_comparable_type_by_size ~size:size_left)
+              (fun (Ex_comparable_ty l) ->
+                let_star
+                  (m_comparable_type_by_size ~size:size_right)
+                  (fun (Ex_comparable_ty r) ->
+                    return
+                      (Ex_comparable_ty (Union_key ((l, None), (r, None), None))))))
+      in
+
+      if size <= 1 then atomic_case ()
+      else if size = 2 then option_case size
+      else
+        let_star uniform_comparable_non_atomic_type_name (fun cmp_tn ->
+            match cmp_tn with
+            | `TPair -> pair_case size
+            | `TUnion -> union_case size
+            | `TOption -> option_case size)
   end
 
   (* Type-directed generation of random values. *)
