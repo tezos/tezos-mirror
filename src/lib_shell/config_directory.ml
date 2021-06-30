@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let build_rpc_directory ~user_activated_upgrades
-    ~user_activated_protocol_overrides =
+    ~user_activated_protocol_overrides store =
   let register endpoint f directory =
     RPC_directory.register directory endpoint f
   in
@@ -34,3 +34,6 @@ let build_rpc_directory ~user_activated_upgrades
   |> register
        Config_services.Network.user_activated_protocol_overrides
        (fun () () () -> return user_activated_protocol_overrides)
+  |> register Config_services.history_mode (fun () () () ->
+         let chain_store = Store.main_chain_store store in
+         return (Store.Chain.history_mode chain_store))
