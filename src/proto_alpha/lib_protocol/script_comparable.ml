@@ -71,7 +71,7 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
     | (Union_key _, R _, L _) -> 1
     | (Union_key (_, (tr, _), _), R x, R y) ->
         (compare_comparable [@tailcall]) tr k x y
-    | (Option_key _, None, None) -> 0
+    | (Option_key _, None, None) -> (apply [@tailcall]) 0 k
     | (Option_key _, None, Some _) -> -1
     | (Option_key _, Some _, None) -> 1
     | (Option_key (t, _), Some x, Some y) ->
