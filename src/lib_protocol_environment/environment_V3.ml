@@ -612,13 +612,17 @@ struct
     let catch ?(catch_only = fun _ -> true) f =
       match f () with
       | v -> Ok v
-      | exception ((Stack_overflow | Out_of_memory | Unix.Unix_error _) as e) ->
+      | exception
+          (( Stack_overflow | Out_of_memory | Unix.Unix_error _
+           | UnixLabels.Unix_error _ | Sys_error _ ) as e) ->
           raise e
       | exception e -> if catch_only e then Error (error_of_exn e) else raise e
 
     let catch_s ?(catch_only = fun _ -> true) f =
       Lwt.try_bind f return (function
-          | (Stack_overflow | Out_of_memory | Unix.Unix_error _) as e -> raise e
+          | ( Stack_overflow | Out_of_memory | Unix.Unix_error _
+            | UnixLabels.Unix_error _ | Sys_error _ ) as e ->
+              raise e
           | e -> if catch_only e then fail (Exn e) else raise e)
   end
 

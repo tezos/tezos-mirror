@@ -181,7 +181,8 @@ val dont_wait :
 
     Whether [catch_only] is set or not, this function never catches
     non-deterministic runtime exceptions of OCaml such as {!Stack_overflow} and
-    {!Out_of_memory} nor system-exceptions such as {!Unix.Unix_error}. *)
+    {!Out_of_memory} nor system-exceptions such as {!Unix.Unix_error} and
+    {!Sys_error}. *)
 val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a tzresult
 
 (** [catch_s] is like [catch] but when [f] returns a promise. It is equivalent
@@ -198,7 +199,8 @@ Lwt.try_bind f
 
     Whether [catch_only] is set or not, this function never catches
     non-deterministic runtime exceptions of OCaml such as {!Stack_overflow} and
-    {!Out_of_memory} nor system-exceptions such as {!Unix.Unix_error}. *)
+    {!Out_of_memory} nor system-exceptions such as {!Unix.Unix_error} and
+    {!Sys_error}. *)
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a tzresult Lwt.t
 
