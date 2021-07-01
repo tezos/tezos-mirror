@@ -42,7 +42,6 @@ depends: [
   "tezos-client-011-PtHangzH-commands-registration"
 
   "tezos-baking-alpha-commands"
-  "tezos-baking-008-PtEdo2Zk-commands"
   "tezos-baking-009-PsFLoren-commands"
   "tezos-baking-010-PtGRANAD-commands"
   "tezos-baking-011-PtHangzH-commands"
