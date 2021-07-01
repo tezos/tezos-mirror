@@ -15,10 +15,10 @@ depends: [
   "tezos-009-PsFLoren-test-helpers" { with-test }
   "tezos-stdlib-unix" { with-test }
   "tezos-protocol-environment" { with-test }
-  "tezos-test-services" { with-test }
   "tezos-client-base" { with-test }
   "tezos-protocol-009-PsFLoren-parameters" { with-test }
   "tezos-shell-services" { with-test }
+  "tezos-base-test-helpers" { with-test }
 ]
 build: [
   [

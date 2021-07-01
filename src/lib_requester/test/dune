@@ -2,14 +2,15 @@
  (names test_requester)
  (libraries tezos-base
             tezos-base.unix
+            tezos-test-helpers
+            tezos-base-test-helpers
             tezos-stdlib-unix
             tezos-requester
-            tezos-test-services
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base_test_helpers
                    -open Tezos_stdlib
-                   -open Tezos_requester
-                   -open Tezos_test_services)))
+                   -open Tezos_requester)))
 
 (alias
   (name buildtest)

@@ -170,6 +170,6 @@ let test_minimal_valid_time () =
 
 let tests =
   [
-    Test_services.tztest "minimal time" `Quick test_minimal_time;
-    Test_services.tztest "minimal valid time" `Quick test_minimal_valid_time;
+    Tztest.tztest "minimal time" `Quick test_minimal_time;
+    Tztest.tztest "minimal valid time" `Quick test_minimal_valid_time;
   ]

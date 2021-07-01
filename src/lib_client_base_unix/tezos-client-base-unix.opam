@@ -20,7 +20,7 @@ depends: [
   "tezos-mockup-commands"
   "tezos-proxy"
   "lwt-exit"
-  "tezos-test-services" { with-test }
+  "tezos-base-test-helpers" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

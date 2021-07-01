@@ -187,6 +187,11 @@ opam:tezos-base:
   variables:
     package: tezos-base
 
+opam:tezos-base-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-base-test-helpers
+
 opam:tezos-benchmark:
   extends: .opam_template
   variables:
@@ -586,6 +591,11 @@ opam:tezos-event-logging:
   extends: .opam_template
   variables:
     package: tezos-event-logging
+
+opam:tezos-event-logging-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-event-logging-test-helpers
 
 opam:tezos-hacl-glue:
   extends: .opam_template
@@ -1076,11 +1086,6 @@ opam:tezos-test-helpers:
   extends: .opam_template
   variables:
     package: tezos-test-helpers
-
-opam:tezos-test-services:
-  extends: .opam_template
-  variables:
-    package: tezos-test-services
 
 opam:tezos-tooling:
   extends: .opam_template

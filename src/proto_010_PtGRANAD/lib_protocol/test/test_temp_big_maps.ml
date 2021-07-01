@@ -92,7 +92,7 @@ let tests =
        (fun param_left ->
          List.map
            (fun param_right ->
-             Test_services.tztest
+             Tztest.tztest
                (Printf.sprintf "temp_big_maps(%s, %s)" param_left param_right)
                `Quick
                (test_temp_big_maps_contract param_left param_right))

@@ -111,7 +111,7 @@ let test_monitor_block_gas_level = monitor 100 block_gas_level 10399990
 
 let test_monitor_block_gas_level' = monitor opg block_gas_level 10399990
 
-let quick (what, how) = Test_services.tztest what `Quick how
+let quick (what, how) = Tztest.tztest what `Quick how
 
 let tests =
   List.map

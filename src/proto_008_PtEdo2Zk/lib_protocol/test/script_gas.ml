@@ -123,7 +123,7 @@ let check_property () =
 
 let tests =
   [
-    Test_services.tztest
+    Tztest.tztest
       "Script_repr.minimal_deserialize_cost is a lower bound for full \
        deserialization cost"
       `Quick

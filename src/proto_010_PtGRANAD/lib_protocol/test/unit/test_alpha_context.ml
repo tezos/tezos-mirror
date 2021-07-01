@@ -108,21 +108,21 @@ end
 
 let tests =
   [
-    Test_services.tztest
+    Tztest.tztest
       "Script.force_bytes_in_context: checks if it serialises a simple \
        michelson expression"
       `Quick
       Test_Script.test_force_bytes_in_context;
-    Test_services.tztest
+    Tztest.tztest
       "Big_map.mem: failure case - must return false when starting with an \
        empty map"
       `Quick
       Test_Big_map.test_mem;
-    Test_services.tztest
+    Tztest.tztest
       "Big_map.get_opt: failure case - looking up key that doesn't exist"
       `Quick
       Test_Big_map.test_get_opt;
-    Test_services.tztest
+    Tztest.tztest
       "Big_map.exists: failure case - looking up big_map that doesn't exist"
       `Quick
       Test_Big_map.test_exists;

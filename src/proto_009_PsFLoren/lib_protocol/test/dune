@@ -10,7 +10,7 @@
             tezos-stdlib-unix
             tezos-client-base
             tezos-protocol-009-PsFLoren-parameters
-            tezos-test-services
+            tezos-base-test-helpers
             tezos-sapling
             astring)
  (flags (:standard -open Tezos_base__TzPervasives
@@ -19,7 +19,7 @@
                    -open Tezos_protocol_009_PsFLoren
                    -open Tezos_protocol_environment_009_PsFLoren
                    -open Tezos_009_PsFLoren_test_helpers
-                   -open Tezos_test_services)))
+                   -open Tezos_base_test_helpers)))
 
 (rule
  (alias buildtest)

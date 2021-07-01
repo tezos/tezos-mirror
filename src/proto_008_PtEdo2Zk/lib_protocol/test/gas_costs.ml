@@ -256,19 +256,19 @@ let check_costs_are_all_positive list () =
 
 let tests =
   [
-    Test_services.tztest
+    Tztest.tztest
       "Positivity of interpreter costs"
       `Quick
       (check_costs_are_all_positive all_interpreter_costs);
-    Test_services.tztest
+    Tztest.tztest
       "Positivity of typechecking costs"
       `Quick
       (check_costs_are_all_positive all_parsing_costs);
-    Test_services.tztest
+    Tztest.tztest
       "Positivity of unparsing costs"
       `Quick
       (check_costs_are_all_positive all_unparsing_costs);
-    Test_services.tztest
+    Tztest.tztest
       "Positivity of io costs"
       `Quick
       (check_cost_reprs_are_all_positive all_io_costs);

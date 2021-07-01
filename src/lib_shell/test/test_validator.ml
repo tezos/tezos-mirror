@@ -31,8 +31,6 @@
                   events are emitted.
 *)
 
-module Mock_sink = Test_services.Mock_sink
-
 (** [init_validator f] setups a mock validator, a mock block validator and
     mock chain and passes it them to the test function [f]. *)
 let init_validator
@@ -85,7 +83,7 @@ let init_validator
     necessary, initializing a mock p2p network, an empty chain state and a
     validator. It passes the validator to the test function [f] *)
 let wrap f _switch () =
-  Test_services.with_empty_mock_sink (fun _ ->
+  Tztest.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
           init_validator f test_dir _switch ()))
 

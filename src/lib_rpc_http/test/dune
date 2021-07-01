@@ -5,12 +5,10 @@
             tezos-base.unix
             tezos-stdlib-unix
             tezos-rpc-http-server
-            tezos-test-services
             tezos-test-helpers
             qcheck-alcotest
             alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
           -open Tezos_stdlib
           -open Lib_test
-          -open Tezos_rpc_http_server
-          -open Tezos_test_services)))
+          -open Tezos_rpc_http_server)))

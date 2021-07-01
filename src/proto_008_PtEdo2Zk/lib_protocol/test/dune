@@ -8,7 +8,7 @@
             tezos-stdlib-unix
             tezos-client-base
             tezos-protocol-008-PtEdo2Zk-parameters
-            tezos-test-services
+            tezos-base-test-helpers
             tezos-sapling)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
@@ -16,7 +16,7 @@
                    -open Tezos_protocol_008_PtEdo2Zk
                    -open Tezos_protocol_environment_008_PtEdo2Zk
                    -open Tezos_008_PtEdo2Zk_test_helpers
-                   -open Tezos_test_services)))
+                   -open Tezos_base_test_helpers)))
 
 (rule
  (alias buildtest)

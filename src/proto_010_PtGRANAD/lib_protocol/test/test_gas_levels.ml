@@ -439,7 +439,7 @@ let test_block_mixed_operations () =
   >>=? fun (_block, consumed_gas, gas_limit_total) ->
   check_consumed_gas consumed_gas gas_limit_total
 
-let quick (what, how) = Test_services.tztest what `Quick how
+let quick (what, how) = Tztest.tztest what `Quick how
 
 let tests =
   List.map

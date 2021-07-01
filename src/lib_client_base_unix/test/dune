@@ -1,9 +1,14 @@
 (executables
  (names test_mockup_wallet)
- (libraries tezos-mockup-commands tezos-client-base-unix tezos-test-services
-   alcotest alcotest-lwt)
+ (libraries tezos-mockup-commands
+            tezos-client-base-unix
+            tezos-base-test-helpers
+            alcotest
+            alcotest-lwt)
  (flags
-  (:standard -open Tezos_base__TzPervasives)))
+  (:standard
+    -open Tezos_base__TzPervasives
+    -open Tezos_base_test_helpers)))
 
 (rule
  (alias runtest_mockup_wallet)

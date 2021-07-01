@@ -135,11 +135,11 @@ let check_property prop () =
 
 let tests =
   [
-    Test_services.tztest
+    Tztest.tztest
       "Gas.free is a neutral element"
       `Quick
       (check_property (loop_check test_free_neutral 1000));
-    Test_services.tztest
+    Tztest.tztest
       "Gas.consume commutes"
       `Quick
       (check_property (loop_check test_consume_commutes 1000));

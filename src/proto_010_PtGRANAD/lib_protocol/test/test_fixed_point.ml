@@ -168,7 +168,7 @@ let fp_pp () =
 
 let tests =
   [
-    Test_services.tztest "Integral tests (3 decimals)" `Quick integral_tests;
-    Test_services.tztest "FP tests (3 decimals)" `Quick fp_nonzero;
-    Test_services.tztest "FP pp tests (3 decimals)" `Quick fp_pp;
+    Tztest.tztest "Integral tests (3 decimals)" `Quick integral_tests;
+    Tztest.tztest "FP tests (3 decimals)" `Quick fp_nonzero;
+    Tztest.tztest "FP pp tests (3 decimals)" `Quick fp_pp;
   ]

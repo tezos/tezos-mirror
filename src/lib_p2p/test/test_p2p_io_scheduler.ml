@@ -260,30 +260,30 @@ let wrap n f =
               Format.kasprintf Stdlib.failwith "%a" pp_print_error error ))
 
 let test_mk_buffer_1 () =
-  Test_services.assert_true
+  Lib_test.Assert.assert_true
     "[mk_buffer ?len:-1] fails"
     (Result.is_error @@ P2p_io_scheduler.mk_buffer ~len:(-1) @@ Bytes.create 8)
 
 let test_mk_buffer_2 () =
-  Test_services.assert_true
+  Lib_test.Assert.assert_true
     "[mk_buffer ?pos:-1] fails"
     (Result.is_error @@ P2p_io_scheduler.mk_buffer ~pos:(-1) @@ Bytes.create 8)
 
 let test_mk_buffer_3 () =
-  Test_services.assert_true
+  Lib_test.Assert.assert_true
     "[mk_buffer ?len ?pos buf] with (len + pos > (Bytes.length buf)) fails"
     (Result.is_error
     @@ P2p_io_scheduler.mk_buffer ~pos:14 ~len:3
     @@ Bytes.create 16)
 
 let test_mk_buffer_4 () =
-  Test_services.assert_true
+  Lib_test.Assert.assert_true
     "[mk_buffer Bytes.empty] succeeds"
     (Result.is_ok @@ P2p_io_scheduler.mk_buffer Bytes.empty)
 
 let test_mk_buffer_5 () =
   let len = 16 in
-  Test_services.assert_true
+  Lib_test.Assert.assert_true
     "[mk_buffer ?len=max ?pos:0] succeeds"
     (Result.is_ok @@ P2p_io_scheduler.mk_buffer ~len ~pos:0 @@ Bytes.create len)
 
@@ -298,7 +298,7 @@ let test_mk_buffer_safe () =
     (fun buf_len ->
       let safe_buffer = Bytes.create buf_len |> mk_buffer_safe in
       let (pos, len, buf) = Internal.destruct_buffer safe_buffer in
-      Test_services.assert_true
+      Lib_test.Assert.assert_true
         "Result.is_ok mk_buffer"
         (mk_buffer ~pos ~len buf |> Result.is_ok))
     lengths

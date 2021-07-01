@@ -240,15 +240,15 @@ let counter () =
 
 let tests =
   [
-    Test_services.tztest "balances_simple" `Quick balances_simple;
-    Test_services.tztest "balances_credit" `Quick balances_credit;
-    Test_services.tztest "balances_credit_fee" `Quick balances_credit_fee;
-    Test_services.tztest "balances_undelegatable" `Quick balances_undelegatable;
-    Test_services.tztest "pay_fee" `Quick pay_fee;
-    Test_services.tztest
+    Tztest.tztest "balances_simple" `Quick balances_simple;
+    Tztest.tztest "balances_credit" `Quick balances_credit;
+    Tztest.tztest "balances_credit_fee" `Quick balances_credit_fee;
+    Tztest.tztest "balances_undelegatable" `Quick balances_undelegatable;
+    Tztest.tztest "pay_fee" `Quick pay_fee;
+    Tztest.tztest
       "not enough tez in contract to pay fee"
       `Quick
       not_tez_in_contract_to_pay_fee;
-    Test_services.tztest "multiple originations" `Quick multiple_originations;
-    Test_services.tztest "counter" `Quick counter;
+    Tztest.tztest "multiple originations" `Quick multiple_originations;
+    Tztest.tztest "counter" `Quick counter;
   ]

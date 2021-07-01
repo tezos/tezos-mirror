@@ -252,7 +252,7 @@ let test_first_level_in_cycle () =
 
 let tests =
   [
-    Test_services.tztest "create_cycle_eras" `Quick test_create_cycle_eras;
-    Test_services.tztest "level_from_raw" `Quick test_level_from_raw;
-    Test_services.tztest "first_level_in_cycle" `Quick test_first_level_in_cycle;
+    Tztest.tztest "create_cycle_eras" `Quick test_create_cycle_eras;
+    Tztest.tztest "level_from_raw" `Quick test_level_from_raw;
+    Tztest.tztest "first_level_in_cycle" `Quick test_first_level_in_cycle;
   ]

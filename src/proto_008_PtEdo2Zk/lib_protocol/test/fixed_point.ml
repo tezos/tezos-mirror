@@ -212,14 +212,11 @@ let fp_pp () =
 
 let tests =
   [
-    Test_services.tztest "Integral tests (0 decimals)" `Quick (integral_tests 0);
-    Test_services.tztest "Integral tests (1 decimals)" `Quick (integral_tests 1);
-    Test_services.tztest
-      "Integral tests (10 decimals)"
-      `Quick
-      (integral_tests 10);
-    Test_services.tztest "FP tests (0 decimals)" `Quick fp_zero;
-    Test_services.tztest "FP tests (1 decimals)" `Quick (fp_nonzero 1);
-    Test_services.tztest "FP tests (3 decimals)" `Quick (fp_nonzero 3);
-    Test_services.tztest "FP pp tests (3 decimals)" `Quick fp_pp;
+    Tztest.tztest "Integral tests (0 decimals)" `Quick (integral_tests 0);
+    Tztest.tztest "Integral tests (1 decimals)" `Quick (integral_tests 1);
+    Tztest.tztest "Integral tests (10 decimals)" `Quick (integral_tests 10);
+    Tztest.tztest "FP tests (0 decimals)" `Quick fp_zero;
+    Tztest.tztest "FP tests (1 decimals)" `Quick (fp_nonzero 1);
+    Tztest.tztest "FP tests (3 decimals)" `Quick (fp_nonzero 3);
+    Tztest.tztest "FP pp tests (3 decimals)" `Quick fp_pp;
   ]

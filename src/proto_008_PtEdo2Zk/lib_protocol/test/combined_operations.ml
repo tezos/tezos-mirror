@@ -287,20 +287,20 @@ let wrong_signature_in_the_middle () =
 
 let tests =
   [
-    Test_services.tztest "multiple transfers" `Quick multiple_transfers;
-    Test_services.tztest
+    Tztest.tztest "multiple transfers" `Quick multiple_transfers;
+    Tztest.tztest
       "multiple originations and delegations"
       `Quick
       multiple_origination_and_delegation;
-    Test_services.tztest
+    Tztest.tztest
       "Failing operation in the middle"
       `Quick
       failing_operation_in_the_middle;
-    Test_services.tztest
+    Tztest.tztest
       "Failing operation in the middle (with fees)"
       `Quick
       failing_operation_in_the_middle_with_fees;
-    Test_services.tztest
+    Tztest.tztest
       "Failing operation (wrong manager in the middle of a pack)"
       `Quick
       wrong_signature_in_the_middle;

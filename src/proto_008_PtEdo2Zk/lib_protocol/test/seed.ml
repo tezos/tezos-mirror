@@ -231,12 +231,12 @@ let revelation_missing_and_late () =
 
 let tests =
   [
-    Test_services.tztest "no commitment" `Quick no_commitment;
-    Test_services.tztest
+    Tztest.tztest "no commitment" `Quick no_commitment;
+    Tztest.tztest
       "revelation_early_wrong_right_twice"
       `Quick
       revelation_early_wrong_right_twice;
-    Test_services.tztest
+    Tztest.tztest
       "revelation_missing_and_late"
       `Quick
       revelation_missing_and_late;

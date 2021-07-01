@@ -173,17 +173,17 @@ let encoding encoder () =
 
 let tests =
   [
-    Test_services.tztest "Addition" `Quick add;
-    Test_services.tztest "Subtraction" `Quick sub;
-    Test_services.tztest "Multiplication" `Quick mul;
-    Test_services.tztest "Multiplication (fast version)" `Quick mul_fast;
-    Test_services.tztest "Scale fast" `Quick scale_fast;
-    Test_services.tztest "Conversion from Z" `Quick of_z_opt;
-    Test_services.tztest
+    Tztest.tztest "Addition" `Quick add;
+    Tztest.tztest "Subtraction" `Quick sub;
+    Tztest.tztest "Multiplication" `Quick mul;
+    Tztest.tztest "Multiplication (fast version)" `Quick mul_fast;
+    Tztest.tztest "Scale fast" `Quick scale_fast;
+    Tztest.tztest "Conversion from Z" `Quick of_z_opt;
+    Tztest.tztest
       "Encoding through z"
       `Quick
       (encoding Saturation_repr.z_encoding);
-    Test_services.tztest
+    Tztest.tztest
       "Encoding through n"
       `Quick
       (encoding Saturation_repr.n_encoding);

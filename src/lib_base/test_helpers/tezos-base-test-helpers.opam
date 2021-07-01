@@ -8,11 +8,13 @@ license: "MIT"
 depends: [
   "dune" { >= "2.0" }
   "tezos-base"
+  "tezos-stdlib-unix"
+  "tezos-event-logging-test-helpers"
+  "alcotest"
   "alcotest-lwt" { >= "1.4.0" }
-  "tezos-stdlib-unix" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: Alcotest-based test services"
+synopsis: "Tezos: Tezos base test helpers"

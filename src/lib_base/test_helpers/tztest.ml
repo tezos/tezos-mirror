@@ -23,57 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [test_services_base] collects Alcotest testable definitions for base OCaml
-   types. *)
+open Tezos_event_logging_test_helpers
 
-include Alcotest
+(** [tztest] contains the definition of [tztest]: a wrapper for tests
+   cases running in the error monad. It also adds helpers for working
+   with the mock sink.  *)
 
-let exn = testable Fmt.exn ( = )
+(** Transform a function running in the error monad into an Alcotest, taking
+    care of failing the test if the function results is an error.
+    Note that the given function must still take care of test assertions. *)
+let tztest name speed f =
+  Alcotest_lwt.test_case name speed (fun _sw () ->
+      f () >>= function
+      | Ok () -> Lwt.return_unit
+      | Error err ->
+          Tezos_stdlib_unix.Internal_event_unix.close () >>= fun () ->
+          Format.printf "@\n%a@." pp_print_error err ;
+          Lwt.fail Alcotest.Test_error)
 
-let map (type a b) (f : b -> a) (t : a testable) : b testable =
-  let pp fmt v = pp t fmt (f v) in
-  let meq b1 b2 = equal t (f b1) (f b2) in
-  testable pp meq
+let mock_sink : Mock_sink.t Internal_event.sink_definition =
+  (module Mock_sink : Internal_event.SINK with type t = Mock_sink.t)
 
-let pair3 (type a b c) (t : (a * (b * c)) testable) : (a * b * c) testable =
-  let nest ((x, y, z) : a * b * c) : a * (b * c) = (x, (y, z)) in
-  map nest t
+(** [with_empty_mock_sink f] executes f after activating or clearing a Mock_sink
+    sink.
 
-let pair4 (type a b c d) (t : (a * (b * (c * d))) testable) :
-    (a * b * c * d) testable =
-  let nest ((x, y, z, w) : a * b * c * d) : a * (b * (c * d)) =
-    (x, (y, (z, w)))
-  in
-  map nest t
-
-let tuple3 ta tb tc : ('a * 'b * 'c) testable = pair3 (pair ta (pair tb tc))
-
-let tuple4 ta tb tc td : ('a * 'b * 'c * 'd) testable =
-  pair4 (pair ta (pair tb (pair tc td)))
-
-let assert_true str b = check bool str true b
-
-let assert_false str b = check bool str false b
-
-let impossible str = assert_true str false
-
-let lwt_assert_true str b = Lwt.return (assert_true str b)
-
-let lwt_assert_false str b = Lwt.return (assert_false str b)
-
-let lwt_check testable str a b = Lwt.return (Alcotest.check testable str a b)
-
-let lwt_impossible str = Lwt.return (impossible str)
-
-let lwt_fail str = Lwt.return (Alcotest.(check bool) str false true)
-
-let lwt_assert_catch (p : unit -> 'a Lwt.t) (e : exn) =
-  let catcher e' = Lwt.return (Alcotest.check exn "foo" e e') in
-  Lwt.catch p catcher >>= fun () ->
-  lwt_fail ("Expected an exception " ^ Printexc.to_string e)
-
-let contains (type a) (m : a testable) str (x : a) (ls : a list) : unit =
-  let (module M) = m in
-  let (module L) = list m in
-  if not @@ List.exists (M.equal x) ls then
-    failf "%s. Could not find %a in %a" str M.pp x L.pp ls
+    Sinks can only be registered and activated once, and not removed thereafter.
+*)
+let with_empty_mock_sink (f : unit -> unit Lwt.t) : unit Lwt.t =
+  if not (Mock_sink.is_activated ()) then (
+    Internal_event.All_sinks.register mock_sink ;
+    Internal_event.All_sinks.activate (Uri.of_string "mock-log://") >>= function
+    | Ok _ -> f ()
+    | Error errors ->
+        Format.printf
+          "Could not initialize mock sink:\n   %a\n"
+          pp_print_error
+          errors ;
+        Format.print_flush () ;
+        Lwt.return_unit)
+  else (
+    Mock_sink.clear_events () ;
+    f ())

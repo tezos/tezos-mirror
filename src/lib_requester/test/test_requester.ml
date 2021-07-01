@@ -40,6 +40,11 @@
                   and considers only a unique, statically defined, active peer.
 *)
 
+open Lib_test.Testable
+open Lib_test.Assert
+open Lib_test.Lwt_assert
+open Tztestable
+
 (** Setup mocks *)
 
 module Parameters :
@@ -77,10 +82,7 @@ let precheck_pass = true
 
 let precheck_fail = false
 
-(** [] extends [Test_services] with Requester-specific
-   Alcotest testable instantiations *)
-
-open Test_services
+(** Requester-specific Alcotest testable instantiations *)
 
 let testable_test_value : Parameters.value Alcotest.testable = Alcotest.int
 

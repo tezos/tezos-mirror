@@ -12,7 +12,9 @@
             tezos-stdlib-unix
             tezos-p2p
             tezos-p2p-services
-            tezos-test-services
+            tezos-test-helpers
+            tezos-base-test-helpers
+            tezos-event-logging-test-helpers
             alcotest-lwt
             astring)
  (flags (:standard -linkall
@@ -20,7 +22,8 @@
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib
                    -open Tezos_p2p
-                   -open Tezos_test_services
+                   -open Tezos_base_test_helpers
+                   -open Tezos_event_logging_test_helpers
                    -open Tezos_p2p_services)))
 
 (rule

@@ -1077,75 +1077,57 @@ end
 
 let tests =
   [
-    Test_services.tztest
+    Tztest.tztest
       "commitments_add_uncommitted"
       `Quick
       Raw_context_tests.commitments_add_uncommitted;
-    Test_services.tztest
-      "nullifier_double"
-      `Quick
-      Raw_context_tests.nullifier_double;
-    Test_services.tztest
-      "nullifier_test"
-      `Quick
-      Raw_context_tests.nullifier_test;
-    Test_services.tztest
-      "cm_cipher_test"
-      `Quick
-      Raw_context_tests.cm_cipher_test;
-    Test_services.tztest
+    Tztest.tztest "nullifier_double" `Quick Raw_context_tests.nullifier_double;
+    Tztest.tztest "nullifier_test" `Quick Raw_context_tests.nullifier_test;
+    Tztest.tztest "cm_cipher_test" `Quick Raw_context_tests.cm_cipher_test;
+    Tztest.tztest
       "list_insertion_test"
       `Quick
       Raw_context_tests.list_insertion_test;
-    Test_services.tztest "root" `Quick Raw_context_tests.root_test;
-    Test_services.tztest
+    Tztest.tztest "root" `Quick Raw_context_tests.root_test;
+    Tztest.tztest
       "test_get_memo_size"
       `Quick
       Raw_context_tests.test_get_memo_size;
-    Test_services.tztest
-      "test_verify_memo"
-      `Quick
-      Alpha_context_tests.test_verify_memo;
-    Test_services.tztest
+    Tztest.tztest "test_verify_memo" `Quick Alpha_context_tests.test_verify_memo;
+    Tztest.tztest
       "test_bench_phases"
       `Slow
       Alpha_context_tests.test_bench_phases;
-    Test_services.tztest
+    Tztest.tztest
       "test_bench_fold_over_same_token"
       `Slow
       Alpha_context_tests.test_bench_fold_over_same_token;
-    Test_services.tztest
+    Tztest.tztest
       "test_double_spend_same_input"
       `Quick
       Alpha_context_tests.test_double_spend_same_input;
-    Test_services.tztest
+    Tztest.tztest
       "test_verifyupdate_one_transaction"
       `Quick
       Alpha_context_tests.test_verifyupdate_one_transaction;
-    Test_services.tztest
+    Tztest.tztest
       "test_verifyupdate_two_transactions"
       `Quick
       Alpha_context_tests.test_verifyupdate_two_transactions;
-    Test_services.tztest
-      "test_shielded_tez"
-      `Quick
-      Interpreter_tests.test_shielded_tez;
-    Test_services.tztest
+    Tztest.tztest "test_shielded_tez" `Quick Interpreter_tests.test_shielded_tez;
+    Tztest.tztest
       "test use state from other contract and transact"
       `Quick
       Interpreter_tests.test_use_state_from_other_contract_and_transact;
-    Test_services.tztest
+    Tztest.tztest
       "Instruction PUSH sapling_state 0 should be forbidden"
       `Quick
       Interpreter_tests.test_push_sapling_state_should_be_forbidden;
-    Test_services.tztest
+    Tztest.tztest
       "test_transac_and_block"
       `Quick
       Interpreter_tests.test_transac_and_block;
-    Test_services.tztest "test_drop" `Quick Interpreter_tests.test_drop;
-    Test_services.tztest "test_double" `Quick Interpreter_tests.test_double;
-    Test_services.tztest
-      "test_state_as_arg"
-      `Quick
-      Interpreter_tests.test_state_as_arg;
+    Tztest.tztest "test_drop" `Quick Interpreter_tests.test_drop;
+    Tztest.tztest "test_double" `Quick Interpreter_tests.test_double;
+    Tztest.tztest "test_state_as_arg" `Quick Interpreter_tests.test_state_as_arg;
   ]
