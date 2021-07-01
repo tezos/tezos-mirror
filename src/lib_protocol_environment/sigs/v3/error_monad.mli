@@ -172,6 +172,38 @@ val dont_wait :
   (unit -> (unit, 'trace) result Lwt.t) ->
   unit
 
+(** [catch f] executes [f] within a try-with block and wraps exceptions within
+    a [tzresult]. [catch f] is equivalent to
+    [try Ok (f ()) with e -> Error (error_of_exn e)].
+
+    If [catch_only] is set, then only exceptions [e] such that [catch_only e] is
+    [true] are caught.
+
+    Whether [catch_only] is set or not, this function never catches
+    non-deterministic runtime exceptions of OCaml such as {!Stack_overflow} and
+    {!Out_of_memory} nor system-exceptions such as {!Unix.Unix_error} and
+    {!Sys_error}. *)
+val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a tzresult
+
+(** [catch_s] is like [catch] but when [f] returns a promise. It is equivalent
+    to
+
+{[
+Lwt.try_bind f
+  (fun v -> Lwt.return (Ok v))
+  (fun e -> Lwt.return (Error (error_of_exn e)))
+]}
+
+    If [catch_only] is set, then only exceptions [e] such that [catch_only e] is
+    [true] are caught.
+
+    Whether [catch_only] is set or not, this function never catches
+    non-deterministic runtime exceptions of OCaml such as {!Stack_overflow} and
+    {!Out_of_memory} nor system-exceptions such as {!Unix.Unix_error} and
+    {!Sys_error}. *)
+val catch_s :
+  ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a tzresult Lwt.t
+
 (* Synchronisation *)
 
 val join_e : (unit, 'err trace) result list -> (unit, 'err trace) result
