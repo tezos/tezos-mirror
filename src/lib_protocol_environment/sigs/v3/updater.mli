@@ -236,10 +236,13 @@ module type PROTOCOL = sig
     operation ->
     (validation_state * operation_receipt) tzresult Lwt.t
 
-  (** [finalize_block vs] implements the last validation step in a
-     block validation sequence. A successful call produces the context
-     that will be used as input for the validation of its successor
-     block candidates. *)
+  (** [finalize_block vs] finalizes the context resulting from the
+     application of the contents of the block being validated.
+
+      If there is no protocol migration, i.e., if the block being
+     applied is not the last block of the current economic protocol, the
+     resulting context can be used in the future as input for the
+     validation of its successor blocks. *)
   val finalize_block :
     validation_state ->
     (validation_result * block_header_metadata) tzresult Lwt.t
