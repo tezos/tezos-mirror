@@ -112,6 +112,28 @@ def client_regtest_scrubbed(
     deregister_converter_pre(utils.client_output_converter)
 
 
+@pytest.fixture(scope="function")
+def client_regtest_custom_scrubber(
+    client_regtest: ClientRegression, request
+) -> Iterator[Client]:
+    """One node with protocol alpha, regression test and custom scrubbing.
+
+    The custom scrubbing is configured by in direct parameterization. For
+    example, to replace all `foo` with `bar` and `baz` to `gaz`:
+
+    @pytest.mark.parametrize('client_regtest_custom_scrubber', [
+        [(r'foo', 'bar'), (r'baz', 'gaz')]
+    ], indirect=True)"""
+
+    def scrubber(string):
+        print(request.param)
+        return utils.suball(request.param, string)
+
+    register_converter_pre(scrubber)
+    yield client_regtest
+    deregister_converter_pre(scrubber)
+
+
 def pytest_collection_modifyitems(config, items):
     """Adapted from pytest-fixture-marker: adds the regression marker
     to all tests that use the regtest fixture.

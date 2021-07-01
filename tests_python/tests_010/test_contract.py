@@ -1531,13 +1531,24 @@ class TestSelfAddressTransfer:
 @pytest.mark.contract
 @pytest.mark.regression
 class TestScriptHashRegression:
-    @pytest.mark.parametrize("contract", all_contracts())
-    def test_contract_hash(self, client_regtest: Client, contract):
-        client = client_regtest
-        assert contract.endswith(
-            '.tz'
-        ), "test contract should have .tz extension"
-        client.hash_script([os.path.join(CONTRACT_PATH, contract)])
+    @pytest.mark.parametrize(
+        "client_regtest_custom_scrubber",
+        [[(re.escape(CONTRACT_PATH), '[CONTRACT_PATH]')]],
+        indirect=True,
+    )
+    def test_contract_hash(self, client_regtest_custom_scrubber: Client):
+        client = client_regtest_custom_scrubber
+        contracts = all_contracts()
+        contracts.sort()
+        for contract in contracts:
+            assert contract.endswith(
+                '.tz'
+            ), "test contract should have .tz extension"
+
+        client.hash_script(
+            [os.path.join(CONTRACT_PATH, contract) for contract in contracts],
+            display_names=True,
+        )
 
 
 @pytest.mark.contract

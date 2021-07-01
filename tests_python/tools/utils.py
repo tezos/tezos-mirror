@@ -2,7 +2,7 @@
 Assertions are retried to avoid using arbitrary time constants in test.
 """
 import datetime
-from typing import Any, List
+from typing import Any, List, Tuple, Pattern
 import hashlib
 import contextlib
 import json
@@ -494,6 +494,14 @@ def assert_typecheck_failure(
 ) -> None:
     with assert_run_failure(err):
         client.typecheck(script, file=file)
+
+
+def suball(replacements: List[Tuple[Pattern, str]], string: str) -> str:
+    """Apply all the replacements in `replacements`, in order, to `string`
+    using re.sub"""
+    for (pattern, replacement) in replacements:
+        string = re.sub(pattern, replacement, string)
+    return string
 
 
 def client_output_converter(pre):
