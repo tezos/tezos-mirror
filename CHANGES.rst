@@ -27,6 +27,19 @@ Node
    garbage collector. Because this changes the JSON schema of this
    existing RPC entry point, it is a breaking change.
 
+-  Added new RPCs to ban/unban operations locally:
+
+   -  POST ``/chains/<chain_id>/mempool/ban_operation``: Ban a given
+      operation hash. The operation is removed from the mempool, and
+      its effect is reverted if it was applied. It is also added to
+      the prevalidator's set of banned operations, to prevent it from
+      being fetched/processed/injected in the future.
+   -  POST ``/chains/<chain_id>/mempool/unban_operation``: Unban a given
+      operation hash, removing it from the prevalidator's set of banned
+      operations. Nothing happens if the operation was not banned.
+   -  POST ``/chains/<chain_id>/mempool/unban_all_operations``: Unban
+      all operations, i.e. clear the set of banned operations.
+
 Client
 ------
 
@@ -187,6 +200,10 @@ Client
 -  Added support for FA1.2 standard, allowing to interact with fungible
    assets contracts using the ``from fa1.2 contract ...`` commands, and
    support for running the view entrypoints offchain.
+
+-  Added admin commands ``ban operation <operation_hash>``,
+   ``unban operation <operation_hash>``, and ``unban all operations``
+   that call the corresponding RPCs.
 
 Baker / Endorser / Accuser
 --------------------------

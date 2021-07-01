@@ -68,6 +68,18 @@ let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") client =
   let path = ["chains"; chain; "mempool"; "pending_operations"] in
   Client.rpc ?endpoint ?hooks GET path client
 
+let mempool_ban_operation ?endpoint ?(chain = "main") ~data client =
+  let path = ["chains"; chain; "mempool"; "ban_operation"] in
+  Client.rpc ?endpoint ~data POST path client
+
+let mempool_unban_operation ?endpoint ?(chain = "main") ~data client =
+  let path = ["chains"; chain; "mempool"; "unban_operation"] in
+  Client.rpc ?endpoint ~data POST path client
+
+let mempool_unban_all_operations ?endpoint ?(chain = "main") client =
+  let path = ["chains"; chain; "mempool"; "unban_all_operations"] in
+  Client.rpc ?endpoint POST path client
+
 let preapply_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~data
     client =
   let path =

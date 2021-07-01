@@ -61,6 +61,26 @@ module Classification = struct
     classes.branch_delayed.map <- Operation_hash.Map.empty ;
     classes.applied <- [] ;
     classes.in_mempool <- Operation_hash.Set.empty
+
+  let is_in_mempool oph classes = Operation_hash.Set.mem oph classes.in_mempool
+
+  let is_applied oph classes =
+    List.exists (fun (h, _) -> Operation_hash.equal h oph) classes.applied
+
+  let remove_applied oph classes =
+    classes.applied <-
+      List.filter
+        (fun (h, _) -> not (Operation_hash.equal h oph))
+        classes.applied ;
+    classes.in_mempool <- Operation_hash.Set.remove oph classes.in_mempool
+
+  let remove_not_applied oph classes =
+    classes.refused.map <- Operation_hash.Map.remove oph classes.refused.map ;
+    classes.branch_refused.map <-
+      Operation_hash.Map.remove oph classes.branch_refused.map ;
+    classes.branch_delayed.map <-
+      Operation_hash.Map.remove oph classes.branch_delayed.map ;
+    classes.in_mempool <- Operation_hash.Set.remove oph classes.in_mempool
 end
 
 module Requester :

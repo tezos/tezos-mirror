@@ -378,8 +378,31 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
+    (** Call RPC GET /chains/[chain]/mempool/pending_operations *)
     val pending_operations : #simple -> ?chain:chain -> unit -> t tzresult Lwt.t
 
+    (** Call RPC POST /chains/[chain]/mempool/ban_operation *)
+    val ban_operation :
+      #simple ->
+      ?chain:chain ->
+      Operation_hash.t ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
+    (** Call RPC POST /chains/[chain]/mempool/unban_operation *)
+    val unban_operation :
+      #simple ->
+      ?chain:chain ->
+      Operation_hash.t ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
+    (** Call RPC POST /chains/[chain]/mempool/unban_all_operations *)
+    val unban_all_operations :
+      #simple ->
+      ?chain:chain ->
+      unit ->
+      unit Tezos_error_monad.Error_monad.tzresult Lwt.t
+
+    (** Call RPC GET /chains/[chain]/mempool/monitor_operations *)
     val monitor_operations :
       #streamed ->
       ?chain:chain ->
@@ -390,6 +413,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       unit ->
       (Next_proto.operation list Lwt_stream.t * stopper) tzresult Lwt.t
 
+    (** Call RPC POST /chains/[chain]/mempool/request_operations *)
     val request_operations :
       #simple -> ?chain:chain -> unit -> unit tzresult Lwt.t
   end
@@ -591,10 +615,26 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     module Mempool : sig
       val encoding : Mempool.t Data_encoding.t
 
+      (** Define RPC GET /chains/[chain]/mempool/pending_operations *)
       val pending_operations :
         ('a, 'b) RPC_path.t ->
         ([`GET], 'a, 'b, unit, unit, Mempool.t) RPC_service.t
 
+      (** Define RPC POST /chains/[chain]/mempool/ban_operation *)
+      val ban_operation :
+        ('a, 'b) RPC_path.t ->
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) RPC_service.t
+
+      (** Define RPC POST /chains/[chain]/mempool/unban_operation *)
+      val unban_operation :
+        ('a, 'b) RPC_path.t ->
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) RPC_service.t
+
+      (** Define RPC POST /chains/[chain]/mempool/unban_all_operations *)
+      val unban_all_operations :
+        ('a, 'b) RPC_path.t -> ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
+
+      (** Define RPC GET /chains/[chain]/mempool/monitor_operations *)
       val monitor_operations :
         ('a, 'b) RPC_path.t ->
         ( [`GET],
@@ -608,14 +648,17 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           Next_proto.operation list )
         RPC_service.t
 
+      (** Define RPC GET /chains/[chain]/mempool/filter *)
       val get_filter :
         ('a, 'b) RPC_path.t ->
         ([`GET], 'a, 'b, unit, unit, Data_encoding.json) RPC_service.t
 
+      (** Define RPC POST /chains/[chain]/mempool/filter *)
       val set_filter :
         ('a, 'b) RPC_path.t ->
         ([`POST], 'a, 'b, unit, Data_encoding.json, unit) RPC_service.t
 
+      (** Define RPC POST /chains/[chain]/mempool/request_operations *)
       val request_operations :
         ('a, 'b) RPC_path.t -> ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
     end
