@@ -537,41 +537,26 @@ let invalid_transfer_from_unactivated_account () =
 
 let tests =
   [
-    Test_services.tztest
-      "init with commitments"
-      `Quick
-      simple_init_with_commitments;
-    Test_services.tztest "single activation" `Quick single_activation;
-    Test_services.tztest "multi-activation one-by-one" `Quick multi_activation_1;
-    Test_services.tztest
-      "multi-activation all at a time"
-      `Quick
-      multi_activation_2;
-    Test_services.tztest
-      "activation and transfer"
-      `Quick
-      activation_and_transfer;
-    Test_services.tztest
+    Tztest.tztest "init with commitments" `Quick simple_init_with_commitments;
+    Tztest.tztest "single activation" `Quick single_activation;
+    Tztest.tztest "multi-activation one-by-one" `Quick multi_activation_1;
+    Tztest.tztest "multi-activation all at a time" `Quick multi_activation_2;
+    Tztest.tztest "activation and transfer" `Quick activation_and_transfer;
+    Tztest.tztest
       "transfer to unactivated account then activate"
       `Quick
       transfer_to_unactivated_then_activate;
-    Test_services.tztest
+    Tztest.tztest
       "invalid activation with no commitments"
       `Quick
       invalid_activation_with_no_commitments;
-    Test_services.tztest
+    Tztest.tztest
       "invalid activation with commitments"
       `Quick
       invalid_activation_inexistent_pkh;
-    Test_services.tztest
-      "invalid double activation"
-      `Quick
-      invalid_double_activation;
-    Test_services.tztest
-      "wrong activation code"
-      `Quick
-      invalid_activation_wrong_secret;
-    Test_services.tztest
+    Tztest.tztest "invalid double activation" `Quick invalid_double_activation;
+    Tztest.tztest "wrong activation code" `Quick invalid_activation_wrong_secret;
+    Tztest.tztest
       "invalid transfer from unactivated account"
       `Quick
       invalid_transfer_from_unactivated_account;

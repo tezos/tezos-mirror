@@ -136,12 +136,6 @@ let on_diffs f () =
 (* Marked Slow because they take 5 to 10 seconds and are unlikely to change *)
 let tests =
   [
-    Test_services.tztest
-      "conversion roundtrip"
-      `Slow
-      (on_diffs conversion_roundtrip);
-    Test_services.tztest
-      "encoding roundtrip"
-      `Slow
-      (on_diffs encoding_roundtrip);
+    Tztest.tztest "conversion roundtrip" `Slow (on_diffs conversion_roundtrip);
+    Tztest.tztest "encoding roundtrip" `Slow (on_diffs encoding_roundtrip);
   ]

@@ -376,134 +376,134 @@ let liquidity_baking_origination_no_tzBTC_mainnet_migration () =
 
 let tests =
   [
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking script hashes"
       `Quick
       liquidity_baking_origination;
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking cpmm is originated at the expected address"
       `Quick
       liquidity_baking_cpmm_address;
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking subsidy is correct"
       `Quick
       (liquidity_baking_subsidies 64);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking shuts off at sunset level when baking one block \
        longer"
       `Quick
       (liquidity_baking_sunset_level 1);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking shuts off at sunset level when baking two blocks \
        longer"
       `Quick
       (liquidity_baking_sunset_level 2);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking shuts off at sunset level when baking 100 blocks \
        longer"
       `Quick
       (liquidity_baking_sunset_level 100);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape hatch with 100% of bakers flagging when \
        baking one block longer"
       `Quick
       (liquidity_baking_escape_hatch_100 1);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape hatch with 100% of bakers flagging when \
        baking two blocks longer"
       `Quick
       (liquidity_baking_escape_hatch_100 2);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape hatch with 100% of bakers flagging when \
        baking 100 blocks longer"
       `Quick
       (liquidity_baking_escape_hatch_100 100);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape hatch with 80% of bakers flagging when \
        baking one block longer"
       `Quick
       (liquidity_baking_escape_hatch_80 1);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape hatch with 80% of bakers flagging when \
        baking two blocks longer"
       `Quick
       (liquidity_baking_escape_hatch_80 2);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape hatch with 80% of bakers flagging when \
        baking 100 blocks longer"
       `Quick
       (liquidity_baking_escape_hatch_80 100);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape hatch with 60% of bakers flagging when \
        baking one block longer"
       `Quick
       (liquidity_baking_escape_hatch_60 1);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape hatch with 60% of bakers flagging when \
        baking two blocks longer"
       `Quick
       (liquidity_baking_escape_hatch_60 2);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape hatch with 60% of bakers flagging when \
        baking 100 blocks longer"
       `Quick
       (liquidity_baking_escape_hatch_60 100);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking shuts off at sunset level with escape hatch at \
        50% and baking one block longer"
       `Quick
       (liquidity_baking_escape_hatch_50 1);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking shuts off at sunset level with escape hatch at \
        50% and baking two blocks longer"
       `Quick
       (liquidity_baking_escape_hatch_50 2);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking shuts off at sunset level with escape hatch at \
        50% and baking 100 blocks longer"
       `Quick
       (liquidity_baking_escape_hatch_50 100);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape ema in block metadata is zero with no \
        bakers flagging."
       `Quick
       liquidity_baking_escape_ema_zero;
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking escape ema is equal to the threshold after the \
        escape hatch has been activated"
       `Quick
       liquidity_baking_escape_ema_threshold;
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking storage is updated"
       `Quick
       (liquidity_baking_storage 64);
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking balance updates"
       `Quick
       liquidity_baking_balance_update;
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking CPMM address in storage matches address in the \
        origination result"
       `Quick
       liquidity_baking_origination_result_cpmm_address;
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking CPMM balance in origination result is 100 mutez"
       `Quick
       liquidity_baking_origination_result_cpmm_balance;
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking LQT contract is originated at expected address"
       `Quick
       liquidity_baking_origination_result_lqt_address;
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking LQT balance in origination result is 0 mutez"
       `Quick
       liquidity_baking_origination_result_lqt_balance;
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking originates three contracts when tzBTC does not \
        exist and level indicates we are not on mainnet"
       `Quick
       liquidity_baking_origination_test_migration;
-    Test_services.tztest
+    Tztest.tztest
       "test liquidity baking originates three contracts when tzBTC does not \
        exist and level indicates we might be on mainnet"
       `Quick

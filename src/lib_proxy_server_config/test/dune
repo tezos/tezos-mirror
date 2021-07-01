@@ -5,12 +5,11 @@
   tezos-base
   tezos-base.unix
   tezos-proxy-server-config
-  tezos-test-services
   tezos-test-helpers
   qcheck-alcotest
   alcotest-lwt)
  (flags
-  (:standard -open Tezos_base__TzPervasives -open Tezos_test_services)))
+  (:standard -open Tezos_base__TzPervasives)))
 
 (rule
  (alias runtest_proxy_server_config)

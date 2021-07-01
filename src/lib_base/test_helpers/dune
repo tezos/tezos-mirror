@@ -1,0 +1,11 @@
+(library
+ (name tezos_base_test_helpers)
+ (public_name tezos-base-test-helpers)
+ (libraries tezos-base
+            tezos-stdlib-unix
+            tezos-event-logging-test-helpers
+            alcotest
+            alcotest-lwt)
+ (flags
+  (:standard -linkall
+    -open Tezos_base__TzPervasives)))

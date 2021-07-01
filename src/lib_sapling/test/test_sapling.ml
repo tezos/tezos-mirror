@@ -1,5 +1,4 @@
 open Tezos_error_monad.Error_monad
-open Tezos_test_services
 module R = Rustzcash
 
 let test_get_memo_size () =
@@ -431,9 +430,9 @@ let tests =
     Alcotest_lwt.test_case_sync "test_get_memo_size" `Quick test_get_memo_size;
     Alcotest_lwt.test_case_sync "full_transaction" `Quick test_full_transaction;
     Alcotest_lwt.test_case_sync "proof_raw" `Quick test_proof_raw;
-    Test_services.tztest "forge" `Quick test_forge;
-    Test_services.tztest "simple_client" `Quick test_simple_client;
-    Test_services.tztest "anti-replay" `Quick test_replay;
+    Tztest.tztest "forge" `Quick test_forge;
+    Tztest.tztest "simple_client" `Quick test_simple_client;
+    Tztest.tztest "anti-replay" `Quick test_replay;
   ]
 
 let () = Alcotest_lwt.run "sapling" [("sapling", tests)] |> Lwt_main.run

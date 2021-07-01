@@ -33,11 +33,9 @@
 
 open Shell_test_helpers
 
-(** A [Alcotest_protocol_validator] extends [Test_services] with protocol
+(** A [Alcotest_protocol_validator] with protocol
     validator-specific testables and helpers *)
 module Alcotest_protocol_validator = struct
-  include Test_services
-
   module type HASHEQ = sig
     type t
 
@@ -49,7 +47,7 @@ module Alcotest_protocol_validator = struct
   (* type hasheq = *)
   (* let from_hasheq (module ) *)
 
-  let registered_protocol : Registered_protocol.t testable =
+  let registered_protocol : Registered_protocol.t Alcotest.testable =
     let open Registered_protocol in
     let eq (p1 : t) (p2 : t) : bool =
       let (module P1) = p1 in
@@ -60,7 +58,7 @@ module Alcotest_protocol_validator = struct
       let (module P) = p in
       Tezos_base.TzPervasives.Protocol_hash.pp fmt P.hash
     in
-    testable pp eq
+    Alcotest.testable pp eq
 end
 
 let section = Some (Internal_event.Section.make_sanitized ["node"; "validator"])
@@ -71,7 +69,7 @@ let filter = Some section
     necessary, initializing a mock p2p network, an empty chain state and a
     validator. It passes the validator to the test function [f]. *)
 let wrap f _switch () =
-  Test_services.with_empty_mock_sink (fun _ ->
+  Tztest.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
           init_chain test_dir >>= fun store ->
           init_mock_p2p Distributed_db_version.Name.zero >>= function
@@ -96,7 +94,8 @@ let test_pushing_validator_protocol vl _switch () =
   (* Let's validate a phony protocol *)
   let pt = Protocol.{expected_env = V0; components = []} in
   Protocol_validator.validate vl Protocol_hash.zero pt >>= fun res ->
-  Alcotest_protocol_validator.(check (tzresults registered_protocol))
+  Alcotest.(
+    check (Tztestable.tzresults Alcotest_protocol_validator.registered_protocol))
     "Compilation should fail."
     res
     (Error
@@ -104,7 +103,7 @@ let test_pushing_validator_protocol vl _switch () =
          Validation_errors.Invalid_protocol
            {hash = Protocol_hash.zero; error = Compilation_failed};
        ]) ;
-  Test_services.Mock_sink.(
+  Mock_sink.(
     assert_has_event
       "Should have a pushing_validation_request event"
       ?filter
@@ -123,11 +122,12 @@ let test_previously_validated_protocol vl _switch () =
   (* Let's request the re-validation of the genesis protocol *)
   let phony_pt = Protocol.{expected_env = V0; components = []} in
   Protocol_validator.validate vl genesis_protocol_hash phony_pt >>= fun res ->
-  Alcotest_protocol_validator.(check (tzresults registered_protocol))
+  Alcotest.check
+    (Tztestable.tzresults Alcotest_protocol_validator.registered_protocol)
     "Compilation should work."
     (Ok genesis_protocol)
     res ;
-  Test_services.Mock_sink.(
+  Mock_sink.(
     assert_has_event
       "Should have a previously_validated_protocol event"
       ?filter
@@ -150,7 +150,7 @@ let test_fetching_protocol vl _switch () =
     vl
     Protocol_hash.zero
   >>= fun _ ->
-  Test_services.Mock_sink.(
+  Mock_sink.(
     assert_has_event
       "Should have a fetching_protocol event"
       ?filter

@@ -106,7 +106,7 @@ let default_p2p_limits : P2p.limits =
 let default_p2p = Some (default_p2p, default_p2p_limits)
 
 let wrap f _switch () =
-  Test_services.with_empty_mock_sink (fun _ ->
+  Tztest.with_empty_mock_sink (fun _ ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun test_dir ->
           init_config f test_dir _switch ()))
 
@@ -141,9 +141,9 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
     None
   >>=?? fun n ->
   (* Start tests *)
-  let evs = Test_services.Mock_sink.get_events ?filter () in
+  let evs = Mock_sink.get_events ?filter () in
   Alcotest.(check int) "should have one event" 1 (List.length evs) ;
-  Test_services.Mock_sink.Pattern.(
+  Mock_sink.Pattern.(
     assert_event
       {
         level = Some Internal_event.Notice;
@@ -174,9 +174,9 @@ let node_initialization_events _sandbox_parameters config _switch () =
     None
   >>=?? fun n ->
   (* Start tests *)
-  let evs = Test_services.Mock_sink.get_events ?filter () in
+  let evs = Mock_sink.get_events ?filter () in
   Alcotest.(check int) "should have two events" 2 (List.length evs) ;
-  Test_services.Mock_sink.Pattern.(
+  Mock_sink.Pattern.(
     assert_event
       {
         level = Some Internal_event.Notice;
@@ -184,7 +184,7 @@ let node_initialization_events _sandbox_parameters config _switch () =
         name = "shell-node";
       })
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth evs 0) ;
-  Test_services.Mock_sink.Pattern.(
+  Mock_sink.Pattern.(
     assert_event
       {
         level = Some Internal_event.Notice;
@@ -213,8 +213,7 @@ let node_store_known_protocol_events _sandbox_parameters config _switch () =
     None
   >>=?? fun n ->
   (* Start tests *)
-  (* let evs = Test_services.Mock_sink.get_events ~filter () in *)
-  Test_services.Mock_sink.(
+  Mock_sink.(
     assert_has_event
       "Should have a store_protocol_incorrect_hash event"
       ?filter

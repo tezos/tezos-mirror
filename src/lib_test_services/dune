@@ -1,6 +1,0 @@
-(library
- (name tezos_test_services)
- (public_name tezos-test-services)
- (libraries tezos-base tezos-stdlib-unix alcotest-lwt)
- (flags
-  (:standard -linkall -open Tezos_base__TzPervasives)))

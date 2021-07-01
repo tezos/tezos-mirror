@@ -32,7 +32,6 @@
 
 open Tezos_mockup
 open Tezos_stdlib_unix
-open Tezos_test_services
 open Tezos_mockup_registration
 
 let base_dir_class_testable =
@@ -42,7 +41,7 @@ let check_base_dir s bd1 bd2 = Alcotest.check base_dir_class_testable s bd1 bd2
 
 (** [classify_base_dir] a non existing directory *)
 let test_classify_does_not_exist =
-  Test_services.tztest "Classify a non existing directory" `Quick (fun () ->
+  Tztest.tztest "Classify a non existing directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun base_dir ->
           Persistence.classify_base_dir
             (Filename.concat base_dir "non_existing_directory")
@@ -50,14 +49,14 @@ let test_classify_does_not_exist =
 
 (** [classify_base_dir] a file *)
 let test_classify_is_file =
-  Test_services.tztest "Classify a file" `Quick (fun () ->
+  Tztest.tztest "Classify a file" `Quick (fun () ->
       let tmp_file = Filename.temp_file "" "" in
       Persistence.classify_base_dir tmp_file
       >|=? check_base_dir "A file" Base_dir_is_file)
 
 (** [classify_base_dir] a mockup directory *)
 let test_classify_is_mockup =
-  Test_services.tztest "Classify a mockup directory" `Quick (fun () ->
+  Tztest.tztest "Classify a mockup directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun dirname ->
           let mockup_directory = (Files.get_mockup_directory ~dirname :> string)
           and mockup_file_name = Files.Context.get ~dirname in
@@ -68,7 +67,7 @@ let test_classify_is_mockup =
 
 (** [classify_base_dir] a non empty directory *)
 let test_classify_is_nonempty =
-  Test_services.tztest "Classify a non empty directory" `Quick (fun () ->
+  Tztest.tztest "Classify a non empty directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun temp_dir ->
           let _ = Filename.temp_file ~temp_dir "" "" in
           Persistence.classify_base_dir temp_dir
@@ -76,7 +75,7 @@ let test_classify_is_nonempty =
 
 (** [classify_base_dir] an empty directory *)
 let test_classify_is_empty =
-  Test_services.tztest "Classify an empty directory" `Quick (fun () ->
+  Tztest.tztest "Classify an empty directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun base_dir ->
           Persistence.classify_base_dir base_dir
           >|=? check_base_dir "An empty directory" Base_dir_is_empty))
@@ -206,7 +205,7 @@ let mock_printer () =
 
 (** [get_registered_mockup] fails when no environment was registered. *)
 let test_get_registered_mockup_no_env =
-  Test_services.tztest
+  Tztest.tztest
     "get_registered_mockup fails when no environment was registered"
     `Quick
     (fun () ->
@@ -228,7 +227,7 @@ let test_get_registered_mockup_no_env =
 
 (** [get_registered_mockup] fails if the requested protocol is not found. *)
 let test_get_registered_mockup_not_found =
-  Test_services.tztest
+  Tztest.tztest
     "get_registered_mockup fails if the requested protocol is not found"
     `Quick
     (fun () ->
@@ -265,7 +264,7 @@ let test_get_registered_mockup_not_found =
 
 (** [get_registered_mockup] returns Alpha if none is specified. *)
 let test_get_registered_mockup_take_alpha =
-  Test_services.tztest
+  Tztest.tztest
     "get_registered_mockup returns Alpha if none is specified"
     `Quick
     (fun () ->
@@ -297,7 +296,7 @@ let test_get_registered_mockup_take_alpha =
 
 (** [get_registered_mockup] returns the requested protocol. *)
 let test_get_registered_mockup_take_requested =
-  Test_services.tztest
+  Tztest.tztest
     "get_registered_mockup returns the requested protocol"
     `Quick
     (fun () ->

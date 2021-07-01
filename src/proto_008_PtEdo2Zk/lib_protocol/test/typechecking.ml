@@ -741,30 +741,21 @@ let test_optimal_comb () =
 
 let tests =
   [
-    Test_services.tztest
+    Tztest.tztest
       "test typecheck stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
-    Test_services.tztest
+    Tztest.tztest
       "test unparsing stack overflow error"
       `Quick
       test_typecheck_stack_overflow;
-    Test_services.tztest "test comb type parsing" `Quick test_parse_comb_type;
-    Test_services.tztest
-      "test comb type unparsing"
-      `Quick
-      test_unparse_comb_type;
-    Test_services.tztest
+    Tztest.tztest "test comb type parsing" `Quick test_parse_comb_type;
+    Tztest.tztest "test comb type unparsing" `Quick test_unparse_comb_type;
+    Tztest.tztest
       "test comb comparable type unparsing"
       `Quick
       test_unparse_comb_comparable_type;
-    Test_services.tztest "test comb data parsing" `Quick test_parse_comb_data;
-    Test_services.tztest
-      "test comb data unparsing"
-      `Quick
-      test_unparse_comb_data;
-    Test_services.tztest
-      "test optimal comb data unparsing"
-      `Quick
-      test_optimal_comb;
+    Tztest.tztest "test comb data parsing" `Quick test_parse_comb_data;
+    Tztest.tztest "test comb data unparsing" `Quick test_unparse_comb_data;
+    Tztest.tztest "test optimal comb data unparsing" `Quick test_optimal_comb;
   ]

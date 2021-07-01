@@ -648,53 +648,38 @@ let test_fitness_gap () =
 
 let tests =
   [
-    Test_services.tztest "Simple endorsement" `Quick test_simple_endorsement;
-    Test_services.tztest
-      "Unwrapped endorsement"
-      `Quick
-      test_unwrapped_endorsement;
-    Test_services.tztest
+    Tztest.tztest "Simple endorsement" `Quick test_simple_endorsement;
+    Tztest.tztest "Unwrapped endorsement" `Quick test_unwrapped_endorsement;
+    Tztest.tztest
       "Endorsement wrapped with invalid slot"
       `Quick
       test_bad_slot_wrapper;
-    Test_services.tztest
+    Tztest.tztest
       "Endorsement wrapped with slot -1"
       `Quick
       test_neg_slot_wrapper;
-    Test_services.tztest
+    Tztest.tztest
       "Endorsement wrapped with non-normalized slot"
       `Quick
       test_non_normalized_slot_wrapper;
-    Test_services.tztest "Maximum endorsement" `Quick test_max_endorsement;
-    Test_services.tztest
-      "Consistent priorities"
-      `Quick
-      test_consistent_priorities;
-    Test_services.tztest "Reward retrieval" `Quick test_reward_retrieval;
-    Test_services.tztest
+    Tztest.tztest "Maximum endorsement" `Quick test_max_endorsement;
+    Tztest.tztest "Consistent priorities" `Quick test_consistent_priorities;
+    Tztest.tztest "Reward retrieval" `Quick test_reward_retrieval;
+    Tztest.tztest
       "Reward retrieval two endorsers"
       `Quick
       test_reward_retrieval_two_endorsers;
-    Test_services.tztest
-      "Endorsement threshold"
-      `Quick
-      test_endorsement_threshold;
-    Test_services.tztest "Fitness gap" `Quick test_fitness_gap;
+    Tztest.tztest "Endorsement threshold" `Quick test_endorsement_threshold;
+    Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
     (* Fail scenarios *)
-    Test_services.tztest
+    Tztest.tztest
       "Wrong endorsement predecessor"
       `Quick
       test_wrong_endorsement_predecessor;
-    Test_services.tztest
+    Tztest.tztest
       "Invalid endorsement level"
       `Quick
       test_invalid_endorsement_level;
-    Test_services.tztest
-      "Duplicate endorsement"
-      `Quick
-      test_duplicate_endorsement;
-    Test_services.tztest
-      "Not enough for deposit"
-      `Quick
-      test_not_enough_for_deposit;
+    Tztest.tztest "Duplicate endorsement" `Quick test_duplicate_endorsement;
+    Tztest.tztest "Not enough for deposit" `Quick test_not_enough_for_deposit;
   ]

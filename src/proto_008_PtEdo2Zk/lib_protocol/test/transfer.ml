@@ -598,85 +598,82 @@ let random_multi_transactions () =
 let tests =
   [
     (* single transfer *)
-    Test_services.tztest "single transfer" `Quick block_with_a_single_transfer;
-    Test_services.tztest
+    Tztest.tztest "single transfer" `Quick block_with_a_single_transfer;
+    Tztest.tztest
       "single transfer with fee"
       `Quick
       block_with_a_single_transfer_with_fee;
     (* transfer zero tez *)
-    Test_services.tztest "single transfer zero tez" `Quick transfer_zero_tez;
-    Test_services.tztest
+    Tztest.tztest "single transfer zero tez" `Quick transfer_zero_tez;
+    Tztest.tztest
       "transfer zero tez from implicit contract"
       `Quick
       transfer_zero_implicit;
     (* transfer to originated contract *)
-    Test_services.tztest
+    Tztest.tztest
       "transfer to originated contract paying transaction fee"
       `Quick
       transfer_to_originate_with_fee;
     (* transfer by the balance of contract *)
-    Test_services.tztest
+    Tztest.tztest
       "transfer the amount from source contract balance"
       `Quick
       transfer_amount_of_contract_balance;
     (* transfer to itself *)
-    Test_services.tztest "transfers to itself" `Quick transfers_to_self;
+    Tztest.tztest "transfers to itself" `Quick transfers_to_self;
     (* missing operation *)
-    Test_services.tztest "missing transaction" `Quick missing_transaction;
+    Tztest.tztest "missing transaction" `Quick missing_transaction;
     (* transfer from/to implicit/originated contracts*)
-    Test_services.tztest
+    Tztest.tztest
       "transfer from an implicit to implicit contract "
       `Quick
       transfer_from_implicit_to_implicit_contract;
-    Test_services.tztest
+    Tztest.tztest
       "transfer from an implicit to an originated contract"
       `Quick
       transfer_from_implicit_to_originated_contract;
     (* Slow tests *)
-    Test_services.tztest
+    Tztest.tztest
       "block with multiple transfers"
       `Slow
       block_with_multiple_transfers;
     (* TODO increase the number of transaction times *)
-    Test_services.tztest
+    Tztest.tztest
       "block with multiple transfer paying fee"
       `Slow
       block_with_multiple_transfers_pay_fee;
-    Test_services.tztest
+    Tztest.tztest
       "block with multiple transfer without paying fee"
       `Slow
       block_with_multiple_transfers_with_without_fee;
     (* build the chain *)
-    Test_services.tztest "build a chain" `Quick build_a_chain;
+    Tztest.tztest "build a chain" `Quick build_a_chain;
     (* Erroneous *)
-    Test_services.tztest "empty implicit" `Quick empty_implicit;
-    Test_services.tztest
+    Tztest.tztest "empty implicit" `Quick empty_implicit;
+    Tztest.tztest
       "balance too low - transfer zero"
       `Quick
       (balance_too_low Tez.zero);
-    Test_services.tztest "balance too low" `Quick (balance_too_low Tez.one);
-    Test_services.tztest
+    Tztest.tztest "balance too low" `Quick (balance_too_low Tez.one);
+    Tztest.tztest
       "balance too low (max fee)"
       `Quick
       (balance_too_low Tez.max_tez);
-    Test_services.tztest
+    Tztest.tztest
       "balance too low with two transfers - transfer zero"
       `Quick
       (balance_too_low_two_transfers Tez.zero);
-    Test_services.tztest
+    Tztest.tztest
       "balance too low with two transfers"
       `Quick
       (balance_too_low_two_transfers Tez.one);
-    Test_services.tztest "invalid_counter" `Quick invalid_counter;
-    Test_services.tztest
+    Tztest.tztest "invalid_counter" `Quick invalid_counter;
+    Tztest.tztest
       "add the same operation twice"
       `Quick
       add_the_same_operation_twice;
-    Test_services.tztest "ownership sender" `Quick ownership_sender;
+    Tztest.tztest "ownership sender" `Quick ownership_sender;
     (* Random tests *)
-    Test_services.tztest "random transfer" `Quick random_transfer;
-    Test_services.tztest
-      "random multi transfer"
-      `Quick
-      random_multi_transactions;
+    Tztest.tztest "random transfer" `Quick random_transfer;
+    Tztest.tztest "random multi transfer" `Quick random_multi_transactions;
   ]

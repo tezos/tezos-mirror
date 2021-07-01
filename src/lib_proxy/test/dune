@@ -6,12 +6,13 @@
   tezos-base.unix
   tezos-stdlib-unix
   tezos-proxy
-  tezos-test-services
+  tezos-base-test-helpers
   tezos-test-helpers
   qcheck-alcotest
   alcotest-lwt)
  (flags
-  (:standard -open Tezos_base__TzPervasives -open Tezos_test_services)))
+  (:standard -open Tezos_base__TzPervasives
+             -open Tezos_base_test_helpers)))
 
 (rule
  (alias runtest_proxy)

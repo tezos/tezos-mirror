@@ -13,10 +13,10 @@ depends: [
   "tezos-008-PtEdo2Zk-test-helpers" { with-test }
   "tezos-stdlib-unix" { with-test }
   "tezos-protocol-environment" { with-test }
-  "tezos-test-services" { with-test }
   "tezos-client-base" { with-test }
   "tezos-protocol-008-PtEdo2Zk-parameters" { with-test }
   "tezos-shell-services" { with-test }
+  "tezos-base-test-helpers" { with-test }
 ]
 build: [
   [

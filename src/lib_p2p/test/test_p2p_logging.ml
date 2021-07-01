@@ -1,5 +1,3 @@
-open Test_services
-
 module type TEST = sig
   val name : string
 
@@ -319,7 +317,7 @@ let lwt_log_sink = Lwt_log_sink_unix.create_cfg ~rules:"* -> debug" ()
 let testcase (module T : TEST) =
   Alcotest_lwt.test_case T.name `Quick (fun _switch () ->
       Internal_event_unix.init ~lwt_log_sink () >>= fun () ->
-      Test_services.with_empty_mock_sink (fun () ->
+      Tztest.with_empty_mock_sink (fun () ->
           T.run () >>= function
           | Ok () -> Lwt.return_unit
           | Error error ->

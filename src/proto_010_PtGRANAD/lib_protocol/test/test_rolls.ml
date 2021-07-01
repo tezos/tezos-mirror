@@ -284,29 +284,23 @@ let test_delegation () =
 
 let tests =
   [
-    Test_services.tztest
-      "simple staking rights"
-      `Quick
-      test_simple_staking_rights;
-    Test_services.tztest
+    Tztest.tztest "simple staking rights" `Quick test_simple_staking_rights;
+    Tztest.tztest
       "simple staking rights after baking"
       `Quick
       test_simple_staking_rights_after_baking;
-    Test_services.tztest
-      "deactivation then bake"
-      `Quick
-      test_deactivation_then_bake;
-    Test_services.tztest
+    Tztest.tztest "deactivation then bake" `Quick test_deactivation_then_bake;
+    Tztest.tztest
       "deactivation then self delegation"
       `Quick
       test_deactivation_then_self_delegation;
-    Test_services.tztest
+    Tztest.tztest
       "deactivation then empty then self delegation"
       `Quick
       test_deactivation_then_empty_then_self_delegation;
-    Test_services.tztest
+    Tztest.tztest
       "deactivation then empty then self delegation then recredit"
       `Quick
       test_deactivation_then_empty_then_self_delegation_then_recredit;
-    Test_services.tztest "delegation" `Quick test_delegation;
+    Tztest.tztest "delegation" `Quick test_delegation;
   ]

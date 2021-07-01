@@ -553,25 +553,22 @@ let test_fitness_gap () =
 
 let tests =
   [
-    Test_services.tztest "Simple endorsement" `Quick simple_endorsement;
-    Test_services.tztest "Maximum endorsement" `Quick max_endorsement;
-    Test_services.tztest "Consistent priorities" `Quick consistent_priorities;
-    Test_services.tztest "Reward retrieval" `Quick reward_retrieval;
-    Test_services.tztest
+    Tztest.tztest "Simple endorsement" `Quick simple_endorsement;
+    Tztest.tztest "Maximum endorsement" `Quick max_endorsement;
+    Tztest.tztest "Consistent priorities" `Quick consistent_priorities;
+    Tztest.tztest "Reward retrieval" `Quick reward_retrieval;
+    Tztest.tztest
       "Reward retrieval two endorsers"
       `Quick
       reward_retrieval_two_endorsers;
-    Test_services.tztest "Endorsement threshold" `Quick endorsement_threshold;
-    Test_services.tztest "Fitness gap" `Quick test_fitness_gap;
+    Tztest.tztest "Endorsement threshold" `Quick endorsement_threshold;
+    Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
     (* Fail scenarios *)
-    Test_services.tztest
+    Tztest.tztest
       "Wrong endorsement predecessor"
       `Quick
       wrong_endorsement_predecessor;
-    Test_services.tztest
-      "Invalid endorsement level"
-      `Quick
-      invalid_endorsement_level;
-    Test_services.tztest "Duplicate endorsement" `Quick duplicate_endorsement;
-    Test_services.tztest "Not enough for deposit" `Quick not_enough_for_deposit;
+    Tztest.tztest "Invalid endorsement level" `Quick invalid_endorsement_level;
+    Tztest.tztest "Duplicate endorsement" `Quick duplicate_endorsement;
+    Tztest.tztest "Not enough for deposit" `Quick not_enough_for_deposit;
   ]

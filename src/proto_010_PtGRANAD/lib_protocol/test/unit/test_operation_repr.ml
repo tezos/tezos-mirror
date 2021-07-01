@@ -34,6 +34,8 @@
 *)
 open Protocol
 
+open Tztest
+
 module Test_operation_repr = struct
   open Operation_repr
 

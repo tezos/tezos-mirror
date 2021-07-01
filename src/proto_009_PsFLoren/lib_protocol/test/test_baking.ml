@@ -262,22 +262,22 @@ let test_voting_power_cache () =
 
 let tests =
   [
-    Test_services.tztest "cycle" `Quick test_cycle;
-    Test_services.tztest
+    Tztest.tztest "cycle" `Quick test_cycle;
+    Tztest.tztest
       "test rewards are correctly accounted for"
       `Slow
       test_rewards_retrieval;
-    Test_services.tztest
+    Tztest.tztest
       "test rewards formula for various input values"
       `Quick
       test_rewards_formulas;
-    Test_services.tztest
+    Tztest.tztest
       "check equivalence of rewards formulas"
       `Quick
       test_rewards_formulas_equivalence;
-    Test_services.tztest
+    Tztest.tztest
       "test_bake_n_cycles for 12 cycles"
       `Quick
       (test_bake_n_cycles 12);
-    Test_services.tztest "voting_power" `Quick test_voting_power_cache;
+    Tztest.tztest "voting_power" `Quick test_voting_power_cache;
   ]

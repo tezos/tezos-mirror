@@ -34,6 +34,8 @@
 *)
 open Protocol
 
+open Tztest
+
 module Test_tez_repr = struct
   (** Testing predefined units: zero, one_mutez etc *)
   let test_predefined_values () =

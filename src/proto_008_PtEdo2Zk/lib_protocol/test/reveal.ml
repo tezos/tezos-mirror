@@ -92,12 +92,9 @@ let not_enough_found_for_reveal () =
 
 let tests =
   [
-    Test_services.tztest "simple reveal" `Quick simple_reveal;
-    Test_services.tztest
-      "empty account on reveal"
-      `Quick
-      empty_account_on_reveal;
-    Test_services.tztest
+    Tztest.tztest "simple reveal" `Quick simple_reveal;
+    Tztest.tztest "empty account on reveal" `Quick empty_account_on_reveal;
+    Tztest.tztest
       "not enough found for reveal"
       `Quick
       not_enough_found_for_reveal;
