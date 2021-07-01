@@ -24,6 +24,7 @@
 # @camlspotter = Jun Furuse
 # @igarnier = Ilias Garnier
 # @klakplok = Benjamin Canou
+# @lthms = Thomas Letan
 # @mbouaziz = Mehdi Bouaziz
 # @murbard = Arthur B.
 # @NicVolanschi = Nic Volanschi
@@ -42,7 +43,7 @@
 # @vbotbol = vbot
 # @yrg = Yann Regis-Gianas
 #
-* @arvidnl @camlspotter @igarnier @klakplok @mbouaziz @murbard @NicVolanschi @paracetamolo @pirbo @pmetzger @rafoo_ @raphael-proust @romain.nl @Saroupille @Sir4ur0n @smelc @smondet @sventimir @tomjack @vbotbol @yrg
+* @arvidnl @camlspotter @igarnier @klakplok @lthms @mbouaziz @murbard @NicVolanschi @paracetamolo @pirbo @pmetzger @rafoo_ @raphael-proust @romain.nl @Saroupille @Sir4ur0n @smelc @smondet @sventimir @tomjack @vbotbol @yrg
 
 # CODEOWNERS Owners
 #
