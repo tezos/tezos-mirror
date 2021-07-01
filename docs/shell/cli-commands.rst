@@ -8,7 +8,6 @@ obtain similar pages using shell commands such as:
 
 ::
 
-   tezos-client -protocol ProtoALphaALph man -verbosity 3
    tezos-admin-client man -verbosity 3
 
 The rest of this page documents the protocol-independent tools.

@@ -61,6 +61,8 @@ node. In the last case, the above command generates a warning::
     Warning:
       Failed to acquire the protocol version from the node
 
+.. _tezos_client_protocol:
+
 To get the manual of a client command for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol``, e.g.::
 
     tezos-client --protocol ProtoALphaALph man transfer
