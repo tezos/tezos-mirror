@@ -25,11 +25,10 @@
 (*****************************************************************************)
 
 open Tezos_context_encoding.Context
-module AO = Irmin.Content_addressable (Irmin_mem.Append_only)
-module RW = Irmin_mem.Atomic_write
 module Store =
-  Irmin.Make_ext (AO) (RW) (Metadata) (Contents) (Path) (Branch) (Hash) (Node)
-    (Commit)
+  Irmin_pack_mem.Make (Node) (Commit) (Conf) (Metadata) (Contents) (Path)
+    (Branch)
+    (Hash)
 
 type t = Store.tree
 

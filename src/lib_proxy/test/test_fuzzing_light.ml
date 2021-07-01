@@ -141,7 +141,7 @@ let test_merkle_tree_to_irmin_tree_preserves_simple_tree =
        merkle_tree_to_simple_tree mtree"
     merkle_tree_arb
   @@ fun mtree ->
-  let repo = Lwt_main.run Store.Tree.make_repo in
+  let repo = Lwt_main.run (Store.Tree.make_repo ()) in
   let merkle_irmin_tree =
     Lwt_main.run @@ Merkle.merkle_tree_to_irmin_tree repo mtree |> get_ok
   in
@@ -190,7 +190,7 @@ let test_contains_merkle_tree =
      during the consensus phase, in which there should not be Data nodes
      (there should only be hashes). *)
   let mtree = remove_data_in_tree mtree in
-  let repo = Lwt_main.run Store.Tree.make_repo in
+  let repo = Lwt_main.run (Store.Tree.make_repo ()) in
   let irmin_tree =
     Lwt_main.run @@ Merkle.merkle_tree_to_irmin_tree repo mtree |> get_ok
   in
@@ -210,7 +210,7 @@ let test_union_irmin_empty =
        mtree"
     merkle_tree_arb
   @@ fun mtree ->
-  let repo = Lwt_main.run Store.Tree.make_repo in
+  let repo = Lwt_main.run (Store.Tree.make_repo ()) in
   let direct_tree =
     Lwt_main.run @@ Merkle.merkle_tree_to_irmin_tree repo mtree |> get_ok
   in
@@ -235,7 +235,7 @@ let test_union_translation =
        merkle_tree_to_irmin_tree mtree"
     merkle_tree_arb
   @@ fun mtree ->
-  let repo = Lwt_main.run Store.Tree.make_repo in
+  let repo = Lwt_main.run (Store.Tree.make_repo ()) in
   let direct_tree =
     Lwt_main.run @@ Merkle.merkle_tree_to_irmin_tree repo mtree |> get_ok
   in
@@ -286,7 +286,7 @@ let test_union_direct =
       (* trees are incompatible *)
       QCheck.assume_fail ()
   | Some merkle_union ->
-      let repo = Lwt_main.run Store.Tree.make_repo in
+      let repo = Lwt_main.run (Store.Tree.make_repo ()) in
       let irmin_union1 =
         Lwt_main.run
         @@ Merkle.union_irmin_tree_merkle_tree
@@ -322,7 +322,7 @@ let test_union_commutation =
       (* rule out incompatible trees *)
       QCheck.assume_fail ()
   | Some _ ->
-      let repo = Lwt_main.run Store.Tree.make_repo in
+      let repo = Lwt_main.run (Store.Tree.make_repo ()) in
       let union2 t1 t2 =
         let intermediate =
           Lwt_main.run
@@ -346,7 +346,7 @@ let test_union_merkle_empty =
     ~name:"union_irmin_tree_merkle_tree tree empty = tree"
     irmin_tree_arb
   @@ fun tree ->
-  let repo = Lwt_main.run Store.Tree.make_repo in
+  let repo = Lwt_main.run (Store.Tree.make_repo ()) in
   let res =
     Lwt_main.run
     @@ Merkle.union_irmin_tree_merkle_tree repo tree TzString.Map.empty
@@ -428,7 +428,7 @@ module HashStability = struct
       this will no be a problem once QCheck provides integrated shrinking. *)
   let tree_and_shallow_arb =
     let open QCheck in
-    let repo = Lwt_main.run Store.Tree.make_repo in
+    let repo = Lwt_main.run (Store.Tree.make_repo ()) in
     map_keep_input
       ~print:(Format.asprintf "%a" Store.Tree.pp)
       (fun tree -> Lwt_main.run (make_partial_shallow_tree repo tree))
@@ -703,7 +703,7 @@ module Consensus = struct
     in
     let module Consensus = Tezos_proxy.Light_consensus.Make (Light_proto) in
     let printer = mock_printer () in
-    let repo = Lwt_main.run Store.Tree.make_repo in
+    let repo = Lwt_main.run (Store.Tree.make_repo ()) in
     Internal.Merkle.merkle_tree_to_irmin_tree repo mtree >|= get_ok
     >>= fun tree ->
     let input : Tezos_proxy.Light_consensus.input =

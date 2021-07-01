@@ -52,7 +52,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
     let get_irmin () : irmin Lwt.t =
       match !irmin_ref with
       | None ->
-          Store.Tree.make_repo >>= fun repo ->
+          Store.Tree.make_repo () >>= fun repo ->
           let root = Store.Tree.empty Store.empty in
           let irmin = {repo; root} in
           irmin_ref := Some irmin ;

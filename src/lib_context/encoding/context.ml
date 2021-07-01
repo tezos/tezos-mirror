@@ -23,9 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Irmin 1.4 uses int8 to store filename lengths.
+
+   Irmin 2 use a variable-size encoding for strings; this is using int8
+   for strings of size strictly less than 128 (e.g. 2^7) which happen to
+   be the case for all filenames ever produced by Irmin 1.4. *)
 module Path = Irmin.Path.String_list
 module Metadata = Irmin.Metadata.None
 module Branch = Irmin.Branch.String
+module Info = Irmin.Info
+
+module Conf = struct
+  let entries = 32
+
+  let stable_hash = 256
+end
 
 module Hash : sig
   include Irmin.Hash.S
@@ -81,7 +93,14 @@ end = struct
   let hash = H.digesti_string
 end
 
-module Node = struct
+module Node
+    (Hash : Irmin.Hash.S) (Path : sig
+      type step
+
+      val step_t : step Irmin.Type.t
+    end)
+    (Metadata : Irmin.Metadata.S) =
+struct
   module M = Irmin.Private.Node.Make (Hash) (Path) (Metadata)
 
   (* [V1] is only used to compute preimage hashes. [assert false]
@@ -91,14 +110,7 @@ module Node = struct
   end = struct
     module Hash = Irmin.Hash.V1 (Hash)
 
-    type entry = string * M.value
-
-    (* Irmin 1.4 uses int8 to store filename lengths.
-
-       Irmin 2 use a variable-size encoding for strings; this is using int8
-       for strings of size stricly less than 128 (e.g. 2^7) which happen to
-       be the case for all filenames ever produced by Irmin 1.4. *)
-    let step_t = Irmin.Type.string
+    type entry = Path.step * M.value
 
     let metadata_t =
       let some = "\255\000\000\000\000\000\000\000" in
@@ -118,7 +130,7 @@ module Node = struct
       let open Irmin.Type in
       record "Tree.entry" (fun _ _ _ -> assert false)
       |+ field "kind" metadata_t metadata_of_entry
-      |+ field "name" step_t fst
+      |+ field "name" Path.step_t fst
       |+ field "hash" Hash.t hash_of_entry
       |> sealr
 
@@ -127,7 +139,9 @@ module Node = struct
 
     let pre_hash_entries = Irmin.Type.(unstage (pre_hash entries_t))
 
-    let compare_entry (x, _) (y, _) = String.compare x y
+    let compare_entry =
+      let compare_key = Irmin.Type.(unstage (compare Path.step_t)) in
+      fun (x, _) (y, _) -> compare_key x y
 
     let pre_hash t =
       M.list t |> List.fast_sort compare_entry |> pre_hash_entries
@@ -138,7 +152,7 @@ module Node = struct
   let t = Irmin.Type.(like t ~pre_hash:(stage @@ fun x -> V1.pre_hash x))
 end
 
-module Commit = struct
+module Commit (Hash : Irmin.Type.S) = struct
   module M = Irmin.Private.Commit.Make (Hash)
   module V1 = Irmin.Private.Commit.V1 (M)
   include M
