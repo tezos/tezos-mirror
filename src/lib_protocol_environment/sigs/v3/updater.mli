@@ -191,14 +191,28 @@ module type PROTOCOL = sig
     validation_state tzresult Lwt.t
 
   (** [begin_construction] initializes a validation context for
-     constructing a new block (as opposed to validating an existing
-     block). When the [protocol_data] argument is specified, it should
-     contain a 'prototype' of the protocol-specific part of a block
-     header, and the function should produce the exact same effect on
-     the context as the validation of a block containing an
-     "equivalent" (but complete) header. For instance, if the block
-     header usually includes a signature, the header provided to
-     {!begin_construction} should include a faked signature. *)
+     constructing a new block, as opposed to validating an existing
+     block.
+
+     This function can be used in two modes: with and without the
+     optional [protocol_data] argument. With the latter, it is used by
+     bakers to start the process for baking a new block. Without it,
+     is used by the Shell's prevalidator to construct a virtual block,
+     which carries the contents of the pre-applied operations of the
+     mempool.
+
+     When [protocol_data] is provided, it is not expected to be the
+     final value of the field of the same name in the {!block_header}
+     of the block eventually being baked. Instead, it is expected to
+     construct a protocol-specific, good enough, "prototype" of its
+     final value. For instance, if the economic protocol specifies
+     that its block headers include a signature, [protocol_data] must
+     include a (faked) signature.
+
+     Moreover, these prototypes should not be distinguishable after
+     the application of [begin_construction]: the function must
+     produce the exact same context regardless of being passed a
+     prototype, or an "equivalent-but-complete" header. *)
   val begin_construction :
     chain_id:Chain_id.t ->
     predecessor_context:Context.t ->
