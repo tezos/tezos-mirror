@@ -111,7 +111,7 @@ module Term = struct
   let reconstruct_index config_file data_dir output index_log_size =
     root config_file data_dir >>=? fun root ->
     index_dir_exists root output >>=? fun () ->
-    Context.Checks.Pack.Reconstruct_index.run ~root ~output ?index_log_size () ;
+    Context.Checks.Pack.Reconstruct_index.run ~root ~output ~index_log_size () ;
     return_unit
 
   let to_context_hash chain_store (hash : Block_hash.t) =
@@ -209,7 +209,7 @@ module Term = struct
   let index_log_size =
     let open Cmdliner.Arg in
     value
-    & opt (some int) None
+    & opt int 10_000_000
       @@ info
            ~doc:
              "Size of the index write-ahead log; option for reconstruct-index. \
