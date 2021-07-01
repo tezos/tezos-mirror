@@ -15,5 +15,6 @@
     tezos-stdlib-unix
     tezos-crypto
     tezos-base
+    tezos-rpc-http-server
     ))
 
