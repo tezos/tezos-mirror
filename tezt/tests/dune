@@ -4,5 +4,6 @@
             data-encoding
             tezos-base
             tezos-base.unix
-            tezos-stdlib-unix)
+            tezos-stdlib-unix
+            qcheck-core)
  (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base)))

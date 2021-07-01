@@ -104,6 +104,9 @@ val set_mode : mode -> t -> unit
     denotes [/chains/main/blocks/head]. *)
 type path = string list
 
+(** [string_of_path ["seg1"; "seg2"]] is ["/seg1/seg2"] *)
+val string_of_path : path -> string
+
 (** Query strings for RPCs.
 
     For instance, [["key1", "value1"; "key2", "value2"]]
