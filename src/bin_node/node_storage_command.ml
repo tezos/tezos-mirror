@@ -194,7 +194,7 @@ module Term = struct
     value
     & flag
       @@ info
-           ~doc:"Automatically repair issues; option for integrity-check"
+           ~doc:"Automatically repair issues; option for integrity-check."
            ["auto-repair"]
 
   let dest =
@@ -202,7 +202,7 @@ module Term = struct
     value
     & opt (some string) None
       @@ info
-           ~doc:"Path to the new index file; option for reconstruct-index"
+           ~doc:"Path to the new index file; option for reconstruct-index."
            ~docv:"DEST"
            ["output"; "o"]
 
@@ -223,7 +223,7 @@ module Term = struct
     value
     & opt (some string) None
       @@ info
-           ~doc:"Head; option for integrity-check-inodes"
+           ~doc:"Head; option for integrity-check-inodes."
            ~docv:"HEAD"
            ["head"; "h"]
 
