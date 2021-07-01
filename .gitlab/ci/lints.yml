@@ -13,6 +13,8 @@ misc_checks:
     - make -C tests_python typecheck
     # check the static-build patch applies cleanly
     - git apply packaging/build/static_libs.patch
+    # check that the hack-module patch applies cleanly
+    - git apply devtools/protocol-print/add-hack-module.patch
     # Ensure that all unit tests are restricted to their opam package
     # (change 'tezos-test-helpers' to one the most elementary packages of
     # the repo if you add "internal" dependencies to tezos-test-helpers)

@@ -1,21 +1,25 @@
-# print-fix
+# Debugging in protocol code
 
-## Why a patch
-
-This allows printing inside the protocol files for debugging purposes.
+To allow printing from within protocol code we expose a [patch](devtools/protocol-print/add-hack-module.patch).
 
 ## How to use
 
+Apply the patch with:
+
 ```sh
-# apply patch
-git apply /dev/patch.diff
+# Apply the patch
+git apply devtools/protocol-print/add-hack-module.patch
 
-
-# make 
+# Rebuild
 make
+```
 
-# now you can just print in any protocol file by using the command
-Hack.print "Hello World!" 
+You may now use the `Hack` module in protocol code, as in:
 
-
+```ocaml
+let () =
+  Hack.printf
+    "List is: [%a]@."
+    (Format.pp_print_list Format.pp_print_int)
+    [1; 2; 3]
 ```

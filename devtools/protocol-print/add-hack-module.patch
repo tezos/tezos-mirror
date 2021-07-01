@@ -1,0 +1,36 @@
+diff --git a/src/lib_protocol_environment/environment_V3.ml b/src/lib_protocol_environment/environment_V3.ml
+index e7d2f1496..3f4c51434 100644
+--- a/src/lib_protocol_environment/environment_V3.ml
++++ b/src/lib_protocol_environment/environment_V3.ml
+@@ -619,6 +619,11 @@ struct
+   module RPC_arg = RPC_arg
+   module RPC_path = RPC_path
+   module RPC_query = RPC_query
++
++  module Hack = struct
++    let printf = Format.printf
++  end
++
+   module RPC_service = RPC_service
+
+   module RPC_answer = struct
+diff --git a/src/lib_protocol_environment/sigs/v3.dune.inc b/src/lib_protocol_environment/sigs/v3.dune.inc
+index 55ff27a2f2..bebc1c17d5 100644
+--- a/src/lib_protocol_environment/sigs/v3.dune.inc
++++ b/src/lib_protocol_environment/sigs/v3.dune.inc
+@@ -25,6 +25,7 @@
+    v3/bits.mli
+    v3/equality_witness.mli
+    v3/fallbackArray.mli
++   v3/hack.mli
+ 
+    ;; Part of Error_monad/Lwtreslib
+    v3/error_monad.mli
+diff --git a/src/lib_protocol_environment/sigs/v3/hack.mli b/src/lib_protocol_environment/sigs/v3/hack.mli
+new file mode 100644
+index 000000000..625eeafbf
+--- /dev/null
++++ b/src/lib_protocol_environment/sigs/v3/hack.mli
+@@ -0,0 +1,1 @@
++val printf : ('a, Format.formatter, unit) format -> 'a
+--
