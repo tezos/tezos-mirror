@@ -224,6 +224,13 @@ Proxy server
    Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
    for further details.
 
+Version 9.4
+===========
+
+- Fixed an issue in the mempool that caused too many operations
+  referring to unknown blocks to be kept, resulting in the node
+  running out of memory.
+
 Version 9.3
 ===========
 
