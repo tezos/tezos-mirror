@@ -97,7 +97,7 @@ module Mempool = struct
       allow_script_failure = true;
     }
 
-  let get_manager_operation_gas_and_fee contents =
+  let get_manager_operation_gas_and_fee ?ctxt:_ contents =
     let open Operation in
     let l = to_list (Contents_list contents) in
     List.fold_left
@@ -143,7 +143,7 @@ module Mempool = struct
                 minimal_fees_for_size_in_nanotez))
         >= 0
 
-  let pre_filter config
+  let pre_filter config ?validation_state_before
       (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
     let bytes =
       (WithExceptions.Option.get ~loc:__LOC__
@@ -154,7 +154,19 @@ module Mempool = struct
     match contents with
     | Single (Endorsement _) -> false (* legacy format *)
     | Single (Failing_noop _) -> false
-    | Single (Endorsement_with_slot _) -> true
+    | Single
+        (Endorsement_with_slot
+          {
+            endorsement =
+              {protocol_data = {contents = Single (Endorsement {level}); _}; _};
+            _;
+          }) -> (
+        match validation_state_before with
+        | None -> true
+        | Some {ctxt; _} ->
+            let current_level = (Level.current ctxt).level in
+            let delta = Raw_level.diff current_level level in
+            Int32.abs delta <= 2l)
     | Single (Seed_nonce_revelation _) -> true
     | Single (Double_endorsement_evidence _) -> true
     | Single (Double_baking_evidence _) -> true

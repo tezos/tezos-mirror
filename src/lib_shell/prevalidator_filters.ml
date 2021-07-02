@@ -33,7 +33,11 @@ module type FILTER = sig
 
     val default_config : config
 
-    val pre_filter : config -> Proto.operation_data -> bool
+    val pre_filter :
+      config ->
+      ?validation_state_before:Proto.validation_state ->
+      Proto.operation_data ->
+      bool
 
     val post_filter :
       config ->
@@ -58,7 +62,7 @@ module No_filter (Proto : Registered_protocol.T) = struct
 
     let default_config = ()
 
-    let pre_filter _ _ = true
+    let pre_filter _ ?validation_state_before:_ _ = true
 
     let post_filter _ ~validation_state_before:_ ~validation_state_after:_ _ =
       Lwt.return_true
