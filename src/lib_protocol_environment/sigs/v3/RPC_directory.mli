@@ -53,14 +53,21 @@ type conflict =
 
 exception Conflict of step list * conflict
 
-(** Registering handler in service tree. *)
+(** Registering handler in service tree.
+
+    The [chunked] parameter controls whether the answer to the RPC is chunk
+    encoded (i.e., the serialisation is split and the caller receives the answer
+    in multiple chunks) or not. Defaults to [false]. Set to [true] for RPCs that
+    return potentially large collections (e.g., unbounded lists). *)
 val register :
+  chunked:bool ->
   'prefix directory ->
   ('meth, 'prefix, 'params, 'query, 'input, 'output) RPC_service.t ->
   ('params -> 'query -> 'input -> 'output tzresult Lwt.t) ->
   'prefix directory
 
 val opt_register :
+  chunked:bool ->
   'prefix directory ->
   ('meth, 'prefix, 'params, 'query, 'input, 'output) RPC_service.t ->
   ('params -> 'query -> 'input -> 'output option tzresult Lwt.t) ->
@@ -73,6 +80,7 @@ val gen_register :
   'prefix directory
 
 val lwt_register :
+  chunked:bool ->
   'prefix directory ->
   ('meth, 'prefix, 'params, 'query, 'input, 'output) RPC_service.t ->
   ('params -> 'query -> 'input -> 'output Lwt.t) ->
@@ -81,72 +89,84 @@ val lwt_register :
 (** Registering handler in service tree. Curryfied variant.  *)
 
 val register0 :
+  chunked:bool ->
   unit directory ->
   ('m, unit, unit, 'q, 'i, 'o) RPC_service.t ->
   ('q -> 'i -> 'o tzresult Lwt.t) ->
   unit directory
 
 val register1 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, unit * 'a, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
 val register2 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, (unit * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
 val register3 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
 val register4 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
 val register5 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
 val opt_register0 :
+  chunked:bool ->
   unit directory ->
   ('m, unit, unit, 'q, 'i, 'o) RPC_service.t ->
   ('q -> 'i -> 'o option tzresult Lwt.t) ->
   unit directory
 
 val opt_register1 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, unit * 'a, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
 val opt_register2 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, (unit * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
 val opt_register3 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
 val opt_register4 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
 val opt_register5 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
@@ -189,36 +209,42 @@ val gen_register5 :
   'prefix directory
 
 val lwt_register0 :
+  chunked:bool ->
   unit directory ->
   ('m, unit, unit, 'q, 'i, 'o) RPC_service.t ->
   ('q -> 'i -> 'o Lwt.t) ->
   unit directory
 
 val lwt_register1 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, unit * 'a, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
 val lwt_register2 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, (unit * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
 val lwt_register3 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
 val lwt_register4 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'q -> 'i -> 'o Lwt.t) ->
   'prefix directory
 
 val lwt_register5 :
+  chunked:bool ->
   'prefix directory ->
   ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q, 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o Lwt.t) ->

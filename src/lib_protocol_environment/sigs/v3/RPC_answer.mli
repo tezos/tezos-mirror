@@ -26,6 +26,7 @@
 (** Return type for service handler *)
 type 'o t =
   [ `Ok of 'o (* 200 *)
+  | `OkChunk of 'o (* 200 but send answer as chunked transfer encoding *)
   | `OkStream of 'o stream (* 200 *)
   | `Created of string option (* 201 *)
   | `No_content (* 204 *)
@@ -38,6 +39,14 @@ type 'o t =
 and 'a stream = {next : unit -> 'a option Lwt.t; shutdown : unit -> unit}
 
 val return : 'o -> 'o t Lwt.t
+
+(** [return_chunked] is identical to [return] but it indicates to the server
+    that the result might be long and that the serialisation should be done in
+    mutliple chunks.
+
+    You should use [return_chunked] when returning an (unbounded or potentially
+    large) list, array, map, or other such set. *)
+val return_chunked : 'o -> 'o t Lwt.t
 
 val return_stream : 'o stream -> 'o t Lwt.t
 

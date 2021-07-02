@@ -91,8 +91,10 @@ module S = struct
 end
 
 let register () =
-  let reg (service, f) = Services_registration.register1 service f in
-  reg S.get_diff
+  let reg ~chunked (service, f) =
+    Services_registration.register1 ~chunked service f
+  in
+  reg ~chunked:false S.get_diff
 
 let mk_call1 (service, _f) ctxt block id q =
   RPC_context.make_call1 service ctxt block id q ()

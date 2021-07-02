@@ -47,6 +47,7 @@ type rpc_context = {
 val rpc_init : Updater.rpc_context -> rpc_context Error_monad.tzresult Lwt.t
 
 val register0 :
+  chunked:bool ->
   ( [< RPC_service.meth],
     Updater.rpc_context,
     Updater.rpc_context,
@@ -58,11 +59,13 @@ val register0 :
   unit
 
 val register0_noctxt :
+  chunked:bool ->
   ([< RPC_service.meth], Updater.rpc_context, 'a, 'b, 'c, 'd) RPC_service.t ->
   ('b -> 'c -> 'd Error_monad.tzresult Lwt.t) ->
   unit
 
 val register1 :
+  chunked:bool ->
   ( [< RPC_service.meth],
     Updater.rpc_context,
     Updater.rpc_context * 'a,
@@ -74,6 +77,7 @@ val register1 :
   unit
 
 val register2 :
+  chunked:bool ->
   ( [< RPC_service.meth],
     Updater.rpc_context,
     (Updater.rpc_context * 'a) * 'b,
@@ -85,6 +89,7 @@ val register2 :
   unit
 
 val opt_register0 :
+  chunked:bool ->
   ( [< RPC_service.meth],
     Updater.rpc_context,
     Updater.rpc_context,
@@ -96,6 +101,7 @@ val opt_register0 :
   unit
 
 val opt_register1 :
+  chunked:bool ->
   ( [< RPC_service.meth],
     Updater.rpc_context,
     Updater.rpc_context * 'a,
@@ -107,6 +113,7 @@ val opt_register1 :
   unit
 
 val opt_register2 :
+  chunked:bool ->
   ( [< RPC_service.meth],
     Updater.rpc_context,
     (Updater.rpc_context * 'a) * 'b,

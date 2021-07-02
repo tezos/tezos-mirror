@@ -689,6 +689,7 @@ struct
   module RPC_answer = struct
     type 'o t =
       [ `Ok of 'o (* 200 *)
+      | `OkChunk of 'o (* 200 but with chunked transfer encoding *)
       | `OkStream of 'o stream (* 200 *)
       | `Created of string option (* 201 *)
       | `No_content (* 204 *)
@@ -720,7 +721,8 @@ struct
     let gen_register dir service handler =
       gen_register dir service (fun p q i ->
           handler p q i >>= function
-          | `Ok o -> RPC_answer.return_chunked o
+          | `Ok o -> RPC_answer.return o
+          | `OkChunk o -> RPC_answer.return_chunked o
           | `OkStream s -> RPC_answer.return_stream s
           | `Created s -> Lwt.return (`Created s)
           | `No_content -> Lwt.return `No_content
@@ -740,49 +742,61 @@ struct
               let e = Option.map (List.map (fun e -> Ecoproto_error e)) e in
               Lwt.return (`Error e))
 
-    let register dir service handler =
+    let register ~chunked dir service handler =
       gen_register dir service (fun p q i ->
           handler p q i >>= function
-          | Ok o -> RPC_answer.return o
+          | Ok o when chunked -> RPC_answer.return_chunked o
+          | Ok o (* otherwise *) -> RPC_answer.return o
           | Error e -> RPC_answer.fail e)
 
-    let opt_register dir service handler =
+    let opt_register ~chunked dir service handler =
       gen_register dir service (fun p q i ->
           handler p q i >>= function
-          | Ok (Some o) -> RPC_answer.return o
+          | Ok (Some o) when chunked -> RPC_answer.return_chunked o
+          | Ok (Some o) (* otherwise *) -> RPC_answer.return o
           | Ok None -> RPC_answer.not_found
           | Error e -> RPC_answer.fail e)
 
-    let lwt_register dir service handler =
+    let lwt_register ~chunked dir service handler =
       gen_register dir service (fun p q i ->
-          handler p q i >>= fun o -> RPC_answer.return o)
+          handler p q i >>= fun o ->
+          if chunked then RPC_answer.return_chunked o else RPC_answer.return o)
 
     open Curry
 
-    let register0 root s f = register root s (curry Z f)
+    let register0 ~chunked root s f = register ~chunked root s (curry Z f)
 
-    let register1 root s f = register root s (curry (S Z) f)
+    let register1 ~chunked root s f = register ~chunked root s (curry (S Z) f)
 
-    let register2 root s f = register root s (curry (S (S Z)) f)
+    let register2 ~chunked root s f =
+      register ~chunked root s (curry (S (S Z)) f)
 
-    let register3 root s f = register root s (curry (S (S (S Z))) f)
+    let register3 ~chunked root s f =
+      register ~chunked root s (curry (S (S (S Z))) f)
 
-    let register4 root s f = register root s (curry (S (S (S (S Z)))) f)
+    let register4 ~chunked root s f =
+      register ~chunked root s (curry (S (S (S (S Z)))) f)
 
-    let register5 root s f = register root s (curry (S (S (S (S (S Z))))) f)
+    let register5 ~chunked root s f =
+      register ~chunked root s (curry (S (S (S (S (S Z))))) f)
 
-    let opt_register0 root s f = opt_register root s (curry Z f)
+    let opt_register0 ~chunked root s f =
+      opt_register ~chunked root s (curry Z f)
 
-    let opt_register1 root s f = opt_register root s (curry (S Z) f)
+    let opt_register1 ~chunked root s f =
+      opt_register ~chunked root s (curry (S Z) f)
 
-    let opt_register2 root s f = opt_register root s (curry (S (S Z)) f)
+    let opt_register2 ~chunked root s f =
+      opt_register ~chunked root s (curry (S (S Z)) f)
 
-    let opt_register3 root s f = opt_register root s (curry (S (S (S Z))) f)
+    let opt_register3 ~chunked root s f =
+      opt_register ~chunked root s (curry (S (S (S Z))) f)
 
-    let opt_register4 root s f = opt_register root s (curry (S (S (S (S Z)))) f)
+    let opt_register4 ~chunked root s f =
+      opt_register ~chunked root s (curry (S (S (S (S Z)))) f)
 
-    let opt_register5 root s f =
-      opt_register root s (curry (S (S (S (S (S Z))))) f)
+    let opt_register5 ~chunked root s f =
+      opt_register ~chunked root s (curry (S (S (S (S (S Z))))) f)
 
     let gen_register0 root s f = gen_register root s (curry Z f)
 
@@ -797,18 +811,23 @@ struct
     let gen_register5 root s f =
       gen_register root s (curry (S (S (S (S (S Z))))) f)
 
-    let lwt_register0 root s f = lwt_register root s (curry Z f)
+    let lwt_register0 ~chunked root s f =
+      lwt_register ~chunked root s (curry Z f)
 
-    let lwt_register1 root s f = lwt_register root s (curry (S Z) f)
+    let lwt_register1 ~chunked root s f =
+      lwt_register ~chunked root s (curry (S Z) f)
 
-    let lwt_register2 root s f = lwt_register root s (curry (S (S Z)) f)
+    let lwt_register2 ~chunked root s f =
+      lwt_register ~chunked root s (curry (S (S Z)) f)
 
-    let lwt_register3 root s f = lwt_register root s (curry (S (S (S Z))) f)
+    let lwt_register3 ~chunked root s f =
+      lwt_register ~chunked root s (curry (S (S (S Z))) f)
 
-    let lwt_register4 root s f = lwt_register root s (curry (S (S (S (S Z)))) f)
+    let lwt_register4 ~chunked root s f =
+      lwt_register ~chunked root s (curry (S (S (S (S Z)))) f)
 
-    let lwt_register5 root s f =
-      lwt_register root s (curry (S (S (S (S (S Z))))) f)
+    let lwt_register5 ~chunked root s f =
+      lwt_register ~chunked root s (curry (S (S (S (S (S Z))))) f)
   end
 
   module RPC_context = struct

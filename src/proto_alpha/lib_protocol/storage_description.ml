@@ -292,13 +292,15 @@ let depth_query =
 let build_directory : type key. key t -> key RPC_directory.t =
  fun dir ->
   let rpc_dir = ref (RPC_directory.empty : key RPC_directory.t) in
-  let register : type ikey. (key, ikey) RPC_path.t -> ikey opt_handler -> unit =
-   fun path (Opt_handler {encoding; get}) ->
+  let register :
+      type ikey.
+      chunked:bool -> (key, ikey) RPC_path.t -> ikey opt_handler -> unit =
+   fun ~chunked path (Opt_handler {encoding; get}) ->
     let service =
       RPC_service.get_service ~query:depth_query ~output:encoding path
     in
     rpc_dir :=
-      RPC_directory.opt_register !rpc_dir service (fun k q () ->
+      RPC_directory.opt_register ~chunked !rpc_dir service (fun k q () ->
           get k (q.depth + 1))
   in
   let rec build_handler :
@@ -317,7 +319,7 @@ let build_directory : type key. key t -> key RPC_directory.t =
                 (fun k i -> if Compare.Int.(i < 0) then return_none else get k);
             }
         in
-        register path handler ;
+        register ~chunked:true path handler ;
         handler
     | NamedDir map ->
         let fields = StringMap.bindings map in
@@ -338,7 +340,7 @@ let build_directory : type key. key t -> key RPC_directory.t =
                   else handler.get k (i - 1) >>=? fun v -> return_some v);
             }
         in
-        register path handler ;
+        register ~chunked:true path handler ;
         handler
     | IndexedDir {arg; arg_encoding; list; subdir} ->
         let (Opt_handler handler) =
@@ -380,7 +382,7 @@ let build_directory : type key. key t -> key RPC_directory.t =
           Opt_handler
             {encoding = Data_encoding.(list (dynamic_size encoding)); get}
         in
-        register path handler ;
+        register ~chunked:true path handler ;
         handler
   in
   ignore (build_handler dir RPC_path.open_root : key opt_handler) ;

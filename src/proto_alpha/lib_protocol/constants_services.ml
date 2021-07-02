@@ -49,9 +49,9 @@ end
 
 let register () =
   let open Services_registration in
-  register0_noctxt S.errors (fun () () ->
+  register0_noctxt ~chunked:true S.errors (fun () () ->
       return Data_encoding.Json.(schema error_encoding)) ;
-  register0 S.all (fun ctxt () () ->
+  register0 ~chunked:false S.all (fun ctxt () () ->
       let open Constants in
       return {fixed; parametric = parametric ctxt})
 

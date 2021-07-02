@@ -106,18 +106,22 @@ end
 
 let register () =
   let open Services_registration in
-  register0 S.ballots (fun ctxt () () -> Vote.get_ballots ctxt) ;
-  register0 S.ballot_list (fun ctxt () () -> Vote.get_ballot_list ctxt >|= ok) ;
-  register0 S.current_period (fun ctxt () () ->
+  register0 ~chunked:false S.ballots (fun ctxt () () -> Vote.get_ballots ctxt) ;
+  register0 ~chunked:true S.ballot_list (fun ctxt () () ->
+      Vote.get_ballot_list ctxt >|= ok) ;
+  register0 ~chunked:false S.current_period (fun ctxt () () ->
       Voting_period.get_rpc_current_info ctxt) ;
-  register0 S.successor_period (fun ctxt () () ->
+  register0 ~chunked:false S.successor_period (fun ctxt () () ->
       Voting_period.get_rpc_succ_info ctxt) ;
-  register0 S.current_quorum (fun ctxt () () -> Vote.get_current_quorum ctxt) ;
-  register0 S.proposals (fun ctxt () () -> Vote.get_proposals ctxt) ;
-  register0 S.listings (fun ctxt () () -> Vote.get_listings ctxt >|= ok) ;
-  register0 S.current_proposal (fun ctxt () () ->
+  register0 ~chunked:false S.current_quorum (fun ctxt () () ->
+      Vote.get_current_quorum ctxt) ;
+  register0 ~chunked:true S.proposals (fun ctxt () () ->
+      Vote.get_proposals ctxt) ;
+  register0 ~chunked:true S.listings (fun ctxt () () ->
+      Vote.get_listings ctxt >|= ok) ;
+  register0 ~chunked:false S.current_proposal (fun ctxt () () ->
       Vote.find_current_proposal ctxt) ;
-  register0 S.total_voting_power (fun ctxt () () ->
+  register0 ~chunked:false S.total_voting_power (fun ctxt () () ->
       Vote.get_total_voting_power_free ctxt)
   [@@coq_axiom_with_reason
     "disabled because we would need to re-create the error e in order to have \
