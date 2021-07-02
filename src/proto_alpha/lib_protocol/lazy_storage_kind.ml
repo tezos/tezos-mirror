@@ -108,8 +108,7 @@ module MakeId (Title : Title) : TitleWithId = struct
     let rpc_arg =
       let construct = Z.to_string in
       let destruct hash =
-        Result.catch (fun () -> Z.of_string hash)
-        |> Result.map_error (fun _ -> rpc_arg_error)
+        Result.catch_f (fun () -> Z.of_string hash) (fun _ -> rpc_arg_error)
       in
       RPC_arg.make ~descr:description ~name ~construct ~destruct ()
 
