@@ -190,6 +190,7 @@ Proxy server
    Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
    for further details.
 
+
 Protocol Compiler And Environment
 ---------------------------------
 
@@ -202,8 +203,15 @@ Docker Images
 Miscellaneous
 -------------
 
-Version 9.3 (Not Available Yet)
-===============================
+Version 9.4
+===========
+
+- Fixed an issue in the mempool that caused too many operations
+  referring to unknown blocks to be kept, resulting in the node
+  running out of memory.
+
+Version 9.3
+===========
 
 -  Reintroduced the following RPCs in the Granada RPC plugin. These
    RPCs were already present in the Edo and Florence protocol plugin
