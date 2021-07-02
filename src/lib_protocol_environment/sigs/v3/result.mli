@@ -120,6 +120,18 @@ val to_seq : ('a, 'e) result -> 'a Stdlib.Seq.t
     {!Out_of_memory} nor system exceptions such as {!Unix.Unix_error}. *)
 val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> ('a, exn) result
 
+(** [catch_f f handler] is equivalent to [map_error (catch f) handler].
+    In other words, it catches exceptions in [f ()] and either returns the
+    value in an [Ok] or passes the exception to [handler] for the [Error].
+
+    [catch_only] has the same use as with [catch]. The same restriction on
+    catching non-deterministic runtime exceptions applies. *)
+val catch_f :
+  ?catch_only:(exn -> bool) ->
+  (unit -> 'a) ->
+  (exn -> 'error) ->
+  ('a, 'error) result
+
 (** [catch_s] is [catch] but for Lwt promises. Specifically, [catch_s f]
     returns a promise that resolves to [Ok x] if and when [f ()] resolves to
     [x], or to [Error exc] if and when [f ()] is rejected with [exc].
