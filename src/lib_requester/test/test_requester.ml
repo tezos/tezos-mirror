@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Requester
-    Invocation:   dune build @src/lib_requester/runtest
+    Invocation:   dune build @src/lib_requester/runtest_requester
     Subject:      Basic behaviors of the API for generic resource
                   fetching/requesting service. Instantiating the [Requester]
                   functor with simple mocks.
@@ -44,39 +44,7 @@ open Lib_test.Testable
 open Lib_test.Assert
 open Lib_test.Lwt_assert
 open Tztestable
-
-(** Setup mocks *)
-
-module Parameters :
-  Requester_impl.PARAMETERS with type key = string and type value = int = struct
-  type key = string
-
-  type value = int
-end
-
-module Hash : Requester.HASH with type t = Parameters.key = struct
-  type t = Parameters.key
-
-  let name = "test_with_key_string"
-
-  let encoding = Data_encoding.string
-
-  let pp = Format.pp_print_string
-end
-
-module Test_request = Requester_impl.Simple_request (Parameters)
-module Test_disk_table_hash = Requester_impl.Disk_memory_table (Parameters)
-module Test_Requester =
-  Requester_impl.Make_memory_full_requester (Hash) (Parameters) (Test_request)
-
-let init_full_requester_disk ?global_input () :
-    Test_Requester.t * Test_Requester.store =
-  let (st : Test_Requester.store) = Test_disk_table_hash.create 16 in
-  let requester = Test_Requester.create ?global_input () st in
-  (requester, st)
-
-let init_full_requester ?global_input () : Test_Requester.t =
-  fst (init_full_requester_disk ?global_input ())
+include Shared
 
 let precheck_pass = true
 
