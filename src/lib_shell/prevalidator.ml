@@ -571,9 +571,17 @@ module Make
         Lwt.return false
     | Ok protocol_data ->
         let op = {Filter.Proto.shell = op.shell; protocol_data} in
-        filter_config w pv >>= fun config ->
+        filter_config w pv.shell >>= fun config ->
+        let validation_state_before =
+          Option.map
+            Prevalidation.validation_state
+            (Option.of_result pv.validation_state)
+        in
         Lwt.return
-          (Filter.Mempool.pre_filter config op.Filter.Proto.protocol_data)
+          (Filter.Mempool.pre_filter
+             ?validation_state_before
+             config
+             op.Filter.Proto.protocol_data)
 
   let post_filter w pv ~validation_state_before ~validation_state_after op
       receipt =
@@ -1050,28 +1058,32 @@ module Make
     let on_arrived w (pv : state) oph op =
       if already_handled ~situation:Operation_encountered.Arrived w pv.shell oph
       then return_unit
-      else if
-        not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
-      then (
-        let error = [Exn (Failure "Unknown branch operation")] in
-        Proto_classificator.handle_branch_refused pv op oph error ;
-        may_propagate_unknown_branch_operation pv.validation_state op
-        >>= function
-        | true ->
-            let pending = Operation_hash.Set.singleton oph in
-            advertise w pv.shell {Mempool.empty with pending} ;
-            return_unit
-        | false ->
-            Distributed_db.Operation.clear_or_cancel
-              pv.shell.parameters.chain_db
-              oph ;
-            return_unit)
       else
-        pre_filter w pv.shell oph op >>= function
+        pre_filter w pv oph op >>= function
         | true ->
-            (* TODO: should this have an influence on the peer's score ? *)
-            pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
-            return_unit
+            if
+              not
+                (Block_hash.Set.mem
+                   op.Operation.shell.branch
+                   pv.shell.live_blocks)
+            then (
+              let error = [Exn (Failure "Unknown branch operation")] in
+              Proto_classificator.handle_branch_refused pv op oph error ;
+              may_propagate_unknown_branch_operation pv.validation_state op
+              >>= function
+              | true ->
+                  let pending = Operation_hash.Set.singleton oph in
+                  advertise w pv.shell {Mempool.empty with pending} ;
+                  return_unit
+              | false ->
+                  Distributed_db.Operation.clear_or_cancel
+                    pv.shell.parameters.chain_db
+                    oph ;
+                  return_unit)
+            else (
+              (* TODO: should this have an influence on the peer's score ? *)
+              pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
+              return_unit)
         | false ->
             Distributed_db.Operation.clear_or_cancel
               pv.shell.parameters.chain_db
