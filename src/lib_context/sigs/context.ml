@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The tree depth of a fold. See the [fold] function for more information. *)
+(** The tree depth of a fold. See the [View.fold] function for more
+    information. *)
 type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
 
 module type VIEW = sig

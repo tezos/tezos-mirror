@@ -771,6 +771,7 @@ val exists2_es :
     *)
 val combine_drop : 'a list -> 'b list -> ('a * 'b) list
 
+(** A type like [result] but which is symmetric *)
 type ('a, 'b) left_or_right_list = [`Left of 'a list | `Right of 'b list]
 
 (** [combine_with_leftovers ll lr] is a tuple [(combined, leftover)]
