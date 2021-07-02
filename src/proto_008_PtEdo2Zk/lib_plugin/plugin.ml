@@ -143,7 +143,7 @@ module Mempool = struct
                 minimal_fees_for_size_in_nanotez))
         >= 0
 
-  let pre_filter config
+  let pre_filter config ?validation_state_before:_
       (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
     let bytes =
       (WithExceptions.Option.get ~loc:__LOC__
