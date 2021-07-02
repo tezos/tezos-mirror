@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type Temp_id = sig
+module type TEMP_ID = sig
   type t
 
   val equal : t -> t -> bool
@@ -75,11 +75,9 @@ end
 module type TitleWithId = sig
   val title : string
 
-  module Id : sig
-    include ID
+  module Id : ID
 
-    module Temp : Temp_id with type t = private t
-  end
+  module Temp_id : TEMP_ID with type t = Id.t
 
   module IdSet : Set.S with type elt = Id.t
 end
@@ -124,20 +122,6 @@ module MakeId (Title : Title) : TitleWithId = struct
 
     let to_legacy_USE_ONLY_IN_Legacy_big_map_diff (z : t) : Z.t = z
 
-    module Temp = struct
-      type nonrec t = t
-
-      let equal = Z.equal
-
-      let init = Z.of_int ~-1
-
-      (* Remove me after Granada *)
-      let threshold_for_edo_florence_dangling_lazy_storage_cleanup =
-        Z.of_int ~-99
-
-      let next z = Z.sub z Z.one
-    end
-
     let is_temp z = Compare.Z.(z < Z.zero)
 
     let path_length = 1
@@ -147,6 +131,19 @@ module MakeId (Title : Title) : TitleWithId = struct
     let of_path = function
       | [] | _ :: _ :: _ -> None
       | [z] -> Some (Z.of_string z)
+  end
+
+  module Temp_id = struct
+    type t = Id.t
+
+    let equal = Z.equal
+
+    let init = Z.of_int ~-1
+
+    (* Remove me after Granada *)
+    let threshold_for_edo_florence_dangling_lazy_storage_cleanup = Z.of_int ~-99
+
+    let next z = Z.sub z Z.one
   end
 
   module IdSet = Set.Make (Id)
@@ -244,20 +241,20 @@ type ('i, 'a, 'u) kind = ('i, 'a, 'u) t
 
 module Temp_ids = struct
   type t = {
-    big_map : Big_map.Id.Temp.t;
-    sapling_state : Sapling_state.Id.Temp.t;
+    big_map : Big_map.Temp_id.t;
+    sapling_state : Sapling_state.Temp_id.t;
   }
 
   let init =
-    {big_map = Big_map.Id.Temp.init; sapling_state = Sapling_state.Id.Temp.init}
+    {big_map = Big_map.Temp_id.init; sapling_state = Sapling_state.Temp_id.init}
 
   (* Remove me after Granada *)
   let threshold_for_edo_florence_dangling_lazy_storage_cleanup =
     {
       big_map =
-        Big_map.Id.Temp.threshold_for_edo_florence_dangling_lazy_storage_cleanup;
+        Big_map.Temp_id.threshold_for_edo_florence_dangling_lazy_storage_cleanup;
       sapling_state =
-        Sapling_state.Id.Temp
+        Sapling_state.Temp_id
         .threshold_for_edo_florence_dangling_lazy_storage_cleanup;
     }
 
@@ -265,10 +262,10 @@ module Temp_ids = struct
    fun kind temp_ids ->
     match kind with
     | Big_map ->
-        let big_map = Big_map.Id.Temp.next temp_ids.big_map in
+        let big_map = Big_map.Temp_id.next temp_ids.big_map in
         ({temp_ids with big_map}, (temp_ids.big_map :> Big_map.Id.t))
     | Sapling_state ->
-        let sapling_state = Sapling_state.Id.Temp.next temp_ids.sapling_state in
+        let sapling_state = Sapling_state.Temp_id.next temp_ids.sapling_state in
         ( {temp_ids with sapling_state},
           (temp_ids.sapling_state :> Sapling_state.Id.t) )
    [@@coq_axiom_with_reason "gadt"]
@@ -277,7 +274,7 @@ module Temp_ids = struct
       type i a u.
       (i, a, u) kind -> ('acc -> i -> 'acc Lwt.t) -> t -> 'acc -> 'acc Lwt.t =
    fun kind f temp_ids acc ->
-    let helper (type j) (module Temp_id : Temp_id with type t = j) ~last f =
+    let helper (type j) (module Temp_id : TEMP_ID with type t = j) ~last f =
       let rec aux acc id =
         if Temp_id.equal id last then Lwt.return acc
         else f acc id >>= fun acc -> aux acc (Temp_id.next id)
@@ -287,12 +284,12 @@ module Temp_ids = struct
     match kind with
     | Big_map ->
         helper
-          (module Big_map.Id.Temp)
+          (module Big_map.Temp_id)
           ~last:temp_ids.big_map
           (fun acc temp_id -> f acc (temp_id :> i))
     | Sapling_state ->
         helper
-          (module Sapling_state.Id.Temp)
+          (module Sapling_state.Temp_id)
           ~last:temp_ids.sapling_state
           (fun acc temp_id -> f acc (temp_id :> i))
    [@@coq_axiom_with_reason "gadt"]
