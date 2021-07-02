@@ -158,9 +158,11 @@ relaxed or tightened by modifying the configuration file. It's
 worth noting that this default policy among other things disallows baking and
 endorsing by bakers and endorsers running on remote servers.
 
-The full list of exposed endpoints:
+This is the default ACL policy for the node (remember to replace
+``any.public.address`` with an IP address or a domain name that you'll be
+actually listening on):
 
-.. literalinclude:: default-acl.txt
+.. literalinclude:: default-acl.json
 
 The endpoints specifically required for baking can be found in
 ``vendors/flextesa-lib/tezos-node.ml``.

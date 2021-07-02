@@ -356,8 +356,7 @@ let pp_document ppf descriptions version =
       Format.fprintf ppf "%a@\n@\n" (Description.pp prefix) rpc_dir)
     descriptions
 
-let main node =
-  let required_version = Sys.argv.(1) in
+let make_index node required_version =
   let shell_dir = Node.build_rpc_directory node in
   let protocol_dirs =
     List.map
@@ -400,5 +399,23 @@ let main node =
   let ppf = Format.std_formatter in
   pp_document ppf [(name, intro, path, dir)] required_version ;
   return ()
+
+let make_default_acl _node =
+  let addr_of_string addr = P2p_point.Id.{addr; port = None; peer_id = None} in
+  let policy =
+    let open Tezos_rpc_http_server.RPC_server.Acl in
+    put_policy (addr_of_string "127.0.0.1", allow_all) empty_policy
+    |> put_policy (addr_of_string "any.public.address", secure)
+    |> Data_encoding.Json.construct policy_encoding
+  in
+  Data_encoding.Json.pp Format.std_formatter policy ;
+  return ()
+
+let main node =
+  let cmd = Sys.argv.(1) in
+  match cmd with
+  | "index" -> make_index node Sys.argv.(2)
+  | "acl" -> make_default_acl node
+  | _ -> raise (Invalid_argument cmd)
 
 let () = Lwt_main.run (Node_helpers.with_node main)
