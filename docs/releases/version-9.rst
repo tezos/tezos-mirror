@@ -1,6 +1,6 @@
 .. _version-9:
 
-Version 9.3
+Version 9.4
 ===========
 
 Version 9.0 contains a new version (V2) of the protocol environment,
@@ -27,23 +27,28 @@ Version 9.3 fixes some cases where ``MDB_MAP_FULL`` errors could occur
 and reintroduces more ``/normalized`` RPCs which were still missing
 from version 9.1.
 
+Version 9.4 fixes an issue in the mempool that caused too many
+operations referring to unknown blocks to be kept, resulting in the
+node running out of memory.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v9.3
+  git checkout v9.4
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v9.3`` Docker images of Tezos.
+If you are using Docker instead, use the ``v9.4`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 9.4 <../CHANGES.html#version-9-4>`_
 - `Version 9.3 <../CHANGES.html#version-9-3>`_
 - `Version 9.2 <../CHANGES.html#version-9-2>`_
 - `Version 9.1 <../CHANGES.html#version-9-1>`_
