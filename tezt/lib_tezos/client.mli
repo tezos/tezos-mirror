@@ -487,12 +487,16 @@ val init :
   unit ->
   t Lwt.t
 
-(** Set up a client and a node and activate a protocol.
+(** Set up a client and node(s) and activate a protocol.
 
     - Create a client with mode [Client], [Light], or [Proxy]
     - Import all secret keys listed in {!Constant.all_secret_keys}
     - Activate the given protocol
-    - Bake (unless [~bake:false] is passed) *)
+    - Bake (unless [~bake:false] is passed)
+
+    In addition to the client, returns the first created node
+    (if [`Light] is passed, a second node has been created, but it is
+    not exposed). *)
 val init_activate_bake :
   ?path:string ->
   ?admin_path:string ->
@@ -505,7 +509,7 @@ val init_activate_bake :
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->
-  t Lwt.t
+  (Node.t * t) Lwt.t
 
 (** Create a client with mode [Mockup] and run [create mockup].
 

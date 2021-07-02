@@ -725,11 +725,11 @@ let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
       in
       let* () = activate_protocol ?parameter_file ~protocol client in
       let* () = if bake then bake_for client else Lwt.return_unit in
-      return client
+      return (node, client)
   | `Light ->
-      let* (client, _, _) =
+      let* (client, node1, _) =
         init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
       in
       let* () = activate_protocol ?parameter_file ~protocol client in
       let* () = if bake then bake_for client else Lwt.return_unit in
-      return client
+      return (node1, client)
