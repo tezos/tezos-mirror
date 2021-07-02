@@ -1067,11 +1067,11 @@ module Make
                    op.Operation.shell.branch
                    pv.shell.live_blocks)
             then (
-              let error = [Exn (Failure "Unknown branch operation")] in
-              Proto_classificator.handle_branch_refused pv op oph error ;
               may_propagate_unknown_branch_operation pv.validation_state op
               >>= function
               | true ->
+                  let error = [Exn (Failure "Unknown branch operation")] in
+                  Proto_classificator.handle_branch_refused pv op oph error ;
                   let pending = Operation_hash.Set.singleton oph in
                   advertise w pv.shell {Mempool.empty with pending} ;
                   return_unit
