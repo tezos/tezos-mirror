@@ -28,8 +28,6 @@ type error += Non_private_sandbox of P2p_addr.t
 
 type error += RPC_Port_already_in_use of P2p_point.Id.t list
 
-type error += Failed_to_init_P2P
-
 type error += Invalid_sandbox_file of string
 
 let () =
@@ -65,20 +63,6 @@ let () =
     Data_encoding.(obj1 (req "addrlist" (list P2p_point.Id.encoding)))
     (function RPC_Port_already_in_use addrlist -> Some addrlist | _ -> None)
     (fun addrlist -> RPC_Port_already_in_use addrlist) ;
-  register_error_kind
-    `Permanent
-    ~id:"main.run.failed_to_init_p2p"
-    ~title:"Cannot start node: P2P initialization failed"
-    ~description:
-      "Tezos node could not be started because of a network problem while \
-       initializing P2P."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Tezos node could not be started because of a network problem.")
-    Data_encoding.(obj1 @@ req "error" @@ constant "Failed_to_init_P2P")
-    (function Failed_to_init_P2P -> Some () | _ -> None)
-    (fun () -> Failed_to_init_P2P) ;
   register_error_kind
     `Permanent
     ~id:"main.run.invalid_sandbox_file"
@@ -330,7 +314,6 @@ let init_node ?sandbox ?target ~identity ~singleprocess
     config.shell.prevalidator_limits
     config.shell.chain_validator_limits
     config.shell.history_mode
-  |> trace Failed_to_init_P2P
 
 (* Add default accepted CORS headers *)
 let sanitize_cors_headers ~default headers =

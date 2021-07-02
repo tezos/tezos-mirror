@@ -27,6 +27,40 @@
 open Lwt.Infix
 open Tezos_base
 
+type error += Non_recoverable_context
+
+type error += Failed_to_init_P2P
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"context.non_recoverable_context"
+    ~title:"Non recoverable context"
+    ~description:"Cannot recover from a corrupted context."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "@[The context may have been corrupted after crashing while writing \
+         data on disk. Its state appears to be non-recoverable. Import a \
+         snapshot or re-synchronize from an empty node data directory.@]")
+    Data_encoding.unit
+    (function Non_recoverable_context -> Some () | _ -> None)
+    (fun () -> Non_recoverable_context) ;
+  register_error_kind
+    `Permanent
+    ~id:"main.run.failed_to_init_p2p"
+    ~title:"Cannot start node: P2P initialization failed"
+    ~description:
+      "Tezos node could not be started because of a network problem while \
+       initializing P2P."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Tezos node could not be started because of a network problem.")
+    Data_encoding.(obj1 @@ req "error" @@ constant "Failed_to_init_P2P")
+    (function Failed_to_init_P2P -> Some () | _ -> None)
+    (fun () -> Failed_to_init_P2P)
+
 type t = {
   store : Store.t;
   distributed_db : Distributed_db.t;
@@ -73,7 +107,7 @@ let init_p2p chain_name p2p_params disable_mempool =
       P2p.create ~config ~limits peer_metadata_cfg conn_metadata_cfg message_cfg
       >>=? fun p2p ->
       Node_event.(emit p2p_event) "p2p_maintain_started" >>= fun () ->
-      return p2p
+      return p2p |> trace Failed_to_init_P2P
 
 type config = {
   genesis : Genesis.t;
@@ -177,24 +211,6 @@ let store_known_protocols store =
                     Node_event.(emit store_protocol_already_included)
                       protocol_hash)))
     embedded_protocols
-
-type error += Non_recoverable_context
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"context.non_recoverable_context"
-    ~title:"Non recoverable context"
-    ~description:"Cannot recover from a corrupted context."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "@[The context may have been corrupted after crashing while writing \
-         data on disk. Its state appears to be non-recoverable. Import a \
-         snapshot or re-synchronize from an empty node data directory.@]")
-    Data_encoding.unit
-    (function Non_recoverable_context -> Some () | _ -> None)
-    (fun () -> Non_recoverable_context)
 
 let check_context_consistency store =
   let main_chain_store = Store.main_chain_store store in
