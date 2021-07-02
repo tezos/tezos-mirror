@@ -134,6 +134,15 @@ val protect :
     *)
 val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a tzresult
 
+(** [catch_f f handler] is equivalent to [map_error (catch f) handler].
+    In other words, it catches exceptions in [f ()] and either returns the
+    value in an [Ok] or passes the exception to [handler] for the [Error].
+
+    [catch_only] has the same use as with [catch]. The same restriction on
+    catching non-deterministic runtime exceptions applies. *)
+val catch_f :
+  ?catch_only:(exn -> bool) -> (unit -> 'a) -> (exn -> error) -> 'a tzresult
+
 (** [catch_s] is like [catch] but when [f] returns a promise. It is equivalent
     to
 
