@@ -368,8 +368,16 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         let op = {Filter.Proto.shell = op.shell; protocol_data} in
         filter_config w pv
         >>= fun config ->
+        let validation_state_before =
+          Option.map
+            Prevalidation.validation_state
+            (Option.of_result pv.validation_state)
+        in
         Lwt.return
-          (Filter.Mempool.pre_filter config op.Filter.Proto.protocol_data)
+          (Filter.Mempool.pre_filter
+             ?validation_state_before
+             config
+             op.Filter.Proto.protocol_data)
 
   let post_filter w pv ~validation_state_before ~validation_state_after op
       receipt =
@@ -783,27 +791,30 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
     let on_operation_arrived w (pv : state) oph op =
       if already_handled pv oph then return_unit
-      else if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks)
-      then (
-        let error = [Exn (Failure "Unknown branch operation")] in
-        handle_branch_refused pv op oph error ;
-        may_propagate_unknown_branch_operation pv op
-        >>= function
-        | true ->
-            let pending = Operation_hash.Set.singleton oph in
-            advertise w pv {Mempool.empty with pending} ;
-            return_unit
-        | false ->
-            Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
-            return_unit )
       else
         pre_filter w pv oph op
         >>= function
         | true ->
-            (* TODO: should this have an influence on the peer's score ? *)
-            pv.pending <- Operation_hash.Map.add oph op pv.pending ;
-            return_unit
+            if
+              not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks)
+            then (
+              let error = [Exn (Failure "Unknown branch operation")] in
+              handle_branch_refused pv op oph error ;
+              may_propagate_unknown_branch_operation pv op
+              >>= function
+              | true ->
+                  let pending = Operation_hash.Set.singleton oph in
+                  advertise w pv {Mempool.empty with pending} ;
+                  return_unit
+              | false ->
+                  Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
+                  return_unit )
+            else (
+              (* TODO: should this have an influence on the peer's score ? *)
+              pv.pending <- Operation_hash.Map.add oph op pv.pending ;
+              return_unit )
         | false ->
+            Distributed_db.Operation.clear_or_cancel pv.chain_db oph ;
             return_unit
 
     let on_inject _w pv op =

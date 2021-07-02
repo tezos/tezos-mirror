@@ -34,7 +34,11 @@ module type FILTER = sig
 
     val default_config : config
 
-    val pre_filter : config -> Proto.operation_data -> bool
+    val pre_filter :
+      config ->
+      ?validation_state_before:Proto.validation_state ->
+      Proto.operation_data ->
+      bool
 
     val post_filter :
       config ->
