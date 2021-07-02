@@ -182,7 +182,7 @@ end
 
 (** The requester uses a generic scheduler to schedule its requests.
     The [Memory_table] must be shared between the scheduler and the requester
-    as it used to store both pending requests and found values. *)
+    as it is used to store both pending requests and found values. *)
 
 module Make_request_scheduler
     (Hash : HASH)
