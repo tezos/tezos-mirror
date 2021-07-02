@@ -798,11 +798,11 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             if
               not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks)
             then (
-              let error = [Exn (Failure "Unknown branch operation")] in
-              handle_branch_refused pv op oph error ;
               may_propagate_unknown_branch_operation pv op
               >>= function
               | true ->
+                  let error = [Exn (Failure "Unknown branch operation")] in
+                  handle_branch_refused pv op oph error ;
                   let pending = Operation_hash.Set.singleton oph in
                   advertise w pv {Mempool.empty with pending} ;
                   return_unit
