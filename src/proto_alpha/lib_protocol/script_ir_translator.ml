@@ -1967,7 +1967,8 @@ let parse_bool ctxt ~legacy = function
       error @@ Invalid_arity (loc, c, 0, List.length l)
   | expr -> error @@ unexpected expr [] Constant_namespace [D_True; D_False]
 
-let parse_string ctxt : Script.node -> _ = function
+let parse_string ctxt : Script.node -> (Script_string.t * context) tzresult =
+  function
   | String (loc, v) as expr ->
       Gas.consume ctxt (Typecheck_costs.check_printable v) >>? fun ctxt ->
       record_trace
@@ -1984,7 +1985,8 @@ let parse_int ctxt = function
   | Int (_, v) -> ok (Script_int.of_zint v, ctxt)
   | expr -> error @@ Invalid_kind (location expr, [Int_kind], kind expr)
 
-let parse_nat ctxt : Script.node -> _ = function
+let parse_nat ctxt :
+    Script.node -> (Script_int.n Script_int.num * context) tzresult = function
   | Int (loc, v) as expr -> (
       let v = Script_int.of_zint v in
       match Script_int.is_nat v with
@@ -1995,7 +1997,7 @@ let parse_nat ctxt : Script.node -> _ = function
                (loc, strip_locations expr, "a non-negative integer"))
   | expr -> error @@ Invalid_kind (location expr, [Int_kind], kind expr)
 
-let parse_mutez ctxt : Script.node -> _ = function
+let parse_mutez ctxt : Script.node -> (Tez.t * context) tzresult = function
   | Int (loc, v) as expr -> (
       match
         let open Option in
@@ -2008,7 +2010,8 @@ let parse_mutez ctxt : Script.node -> _ = function
                (loc, strip_locations expr, "a valid mutez amount"))
   | expr -> error @@ Invalid_kind (location expr, [Int_kind], kind expr)
 
-let parse_timestamp ctxt : Script.node -> _ = function
+let parse_timestamp ctxt :
+    Script.node -> (Script_timestamp.t * context) tzresult = function
   | Int (_, v) (* As unparsed with [Optimized] or out of bounds [Readable]. *)
     ->
       ok (Script_timestamp.of_zint v, ctxt)
@@ -2023,7 +2026,7 @@ let parse_timestamp ctxt : Script.node -> _ = function
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Int_kind], kind expr)
 
-let parse_key ctxt : Script.node -> _ = function
+let parse_key ctxt : Script.node -> (public_key * context) tzresult = function
   | Bytes (loc, bytes) as expr -> (
       (* As unparsed with [Optimized]. *)
       Gas.consume ctxt Typecheck_costs.public_key_optimized
@@ -2049,7 +2052,8 @@ let parse_key ctxt : Script.node -> _ = function
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-let parse_key_hash ctxt : Script.node -> _ = function
+let parse_key_hash ctxt : Script.node -> (public_key_hash * context) tzresult =
+  function
   | Bytes (loc, bytes) as expr -> (
       (* As unparsed with [Optimized]. *)
       Gas.consume ctxt Typecheck_costs.key_hash_optimized
@@ -2075,7 +2079,8 @@ let parse_key_hash ctxt : Script.node -> _ = function
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-let parse_signature ctxt : Script.node -> _ = function
+let parse_signature ctxt : Script.node -> (signature * context) tzresult =
+  function
   | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.signature_optimized >>? fun ctxt ->
       match Data_encoding.Binary.of_bytes_opt Signature.encoding bytes with
@@ -2095,7 +2100,8 @@ let parse_signature ctxt : Script.node -> _ = function
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-let parse_chain_id ctxt : Script.node -> _ = function
+let parse_chain_id ctxt : Script.node -> (Chain_id.t * context) tzresult =
+  function
   | Bytes (loc, bytes) as expr -> (
       Gas.consume ctxt Typecheck_costs.chain_id_optimized >>? fun ctxt ->
       match Data_encoding.Binary.of_bytes_opt Chain_id.encoding bytes with
@@ -2115,7 +2121,7 @@ let parse_chain_id ctxt : Script.node -> _ = function
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-let parse_address ctxt : Script.node -> _ = function
+let parse_address ctxt : Script.node -> (address * context) tzresult = function
   | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
       match
