@@ -596,6 +596,10 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
 
     val stack : ('a, 'b) Script_typed_ir.stack_ty -> ('a * 'b) sampler
   end = struct
+    let address rng_state =
+      ( Alpha_context.Contract.implicit_contract (Crypto_samplers.pkh rng_state),
+        "default" )
+
     let rec value : type a. a Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in
       fun typ ->
@@ -612,11 +616,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         | Key_t _ -> Crypto_samplers.pk
         | Timestamp_t _ -> Michelson_base.timestamp
         | Bool_t _ -> Michelson_base.bool
-        | Address_t _ ->
-            fun rng_state ->
-              ( Alpha_context.Contract.implicit_contract
-                  (Crypto_samplers.pkh rng_state),
-                "default" )
+        | Address_t _ -> address
         | Pair_t ((left_t, _, _), (right_t, _, _), _) ->
             M.(
               (* let* left_v = value left_t in
