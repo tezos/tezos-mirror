@@ -619,6 +619,10 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         let ep = Base_samplers.string ~size:{min = 1; max = 31} rng_state in
         (contract, ep)
 
+    let chain_id rng_state =
+      let bytes = Base_samplers.uniform_bytes ~nbytes:4 rng_state in
+      Data_encoding.Binary.of_bytes_exn Chain_id.encoding bytes
+
     let rec value : type a. a Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in
       fun typ ->
@@ -658,7 +662,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         | Contract_t (arg_ty, _) -> generate_contract arg_ty
         | Operation_t _ -> generate_operation
         | Big_map_t (key_ty, val_ty, _) -> generate_big_map key_ty val_ty
-        | Chain_id_t _ -> M.return Chain_id.zero
+        | Chain_id_t _ -> chain_id
         | Bls12_381_g1_t _ -> generate_bls12_381_g1
         | Bls12_381_g2_t _ -> generate_bls12_381_g2
         | Bls12_381_fr_t _ -> generate_bls12_381_fr
