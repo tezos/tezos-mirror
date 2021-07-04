@@ -218,6 +218,10 @@ let pack_comparable_data ty x =
     (assert_return
        Script_ir_translator.(pack_data ctxt (ty_of_comparable_ty ty) x))
 
+let unpack_comparable_data ty bytes =
+  let ty = Script_ir_translator.ty_of_comparable_ty ty in
+  fst (assert_return (Script_interpreter_defs.unpack ctxt ~ty ~bytes))
+
 let pp_comparable_ty fmt ty =
   Michelson_v1_printer.print_expr fmt (unparse_comparable_ty ty)
 
@@ -322,6 +326,30 @@ let test_transitivity =
       | (1, 1) -> qcheck_compare_comparable ~expected:1 ty x z
       | _ -> QCheck.assume_fail ())
 
+(* Test.
+ * Tests the round-trip property for PACK and UNPACK (modulo compare_comparable).
+ *)
+let test_pack_unpack =
+  QCheck.Test.make
+    ~count:
+      100_000
+      (* We run this test on many more cases than the default (100) because this
+         is a very important property. Packing and then unpacking happens each
+         time data is sent from a contract to another and also each time storage
+         is saved at the end of a smart contract call and restored at the next
+         call of the same contract. Also, injectivity of packing (which is a
+         direct consequence of this) is an important property for big maps
+         (because the keys are packed and then hashed). *)
+    ~name:"pack_unpack"
+    comparable_data_arbitrary
+    (fun (Ex_comparable_data (ty, x)) ->
+      let oty = Option_key (ty, None) in
+      qcheck_eq
+        ~cmp:(Script_comparable.compare_comparable oty)
+        ~pp:(pp_comparable_data oty)
+        (Some x)
+        (unpack_comparable_data ty (pack_comparable_data ty x)))
+
 let tests =
   Alcotest.run
     "Script_comparison"
@@ -331,4 +359,5 @@ let tests =
       ("reflexivity", qcheck_wrap [test_reflexivity]);
       ("symmetry", qcheck_wrap [test_symmetry]);
       ("transitivity", qcheck_wrap [test_transitivity]);
+      ("pack_unpack", qcheck_wrap [test_pack_unpack]);
     ]
