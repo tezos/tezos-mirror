@@ -597,8 +597,27 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
     val stack : ('a, 'b) Script_typed_ir.stack_ty -> ('a * 'b) sampler
   end = struct
     let address rng_state =
-      ( Alpha_context.Contract.implicit_contract (Crypto_samplers.pkh rng_state),
-        "default" )
+      if Michelson_base.bool rng_state then
+        ( Alpha_context.Contract.implicit_contract
+            (Crypto_samplers.pkh rng_state),
+          "default" )
+      else
+        (* For a description of the format, see
+           tezos-codec describe alpha.contract binary encoding *)
+        let bytes =
+          Bytes.cat
+            (Bytes.of_string "\001")
+            (Bytes.cat
+               (Base_samplers.uniform_bytes ~nbytes:20 rng_state)
+               (Bytes.of_string "\000"))
+        in
+        let contract =
+          Data_encoding.Binary.of_bytes_exn
+            Alpha_context.Contract.encoding
+            bytes
+        in
+        let ep = Base_samplers.string ~size:{min = 1; max = 31} rng_state in
+        (contract, ep)
 
     let rec value : type a. a Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in
