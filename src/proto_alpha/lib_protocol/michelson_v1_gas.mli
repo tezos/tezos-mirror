@@ -113,9 +113,9 @@ module Cost_of : sig
 
     val diff_timestamps : Script_timestamp.t -> Script_timestamp.t -> Gas.cost
 
-    val concat_string_pair : string -> string -> Gas.cost
+    val concat_string_pair : Script_string.t -> Script_string.t -> Gas.cost
 
-    val slice_string : string -> Gas.cost
+    val slice_string : Script_string.t -> Gas.cost
 
     val string_size : Gas.cost
 

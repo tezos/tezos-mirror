@@ -1033,10 +1033,12 @@ module Cost_of = struct
 
     let concat_string_pair s1 s2 =
       atomic_step_cost
-        (cost_N_IConcat_string_pair (String.length s1) (String.length s2))
+        (cost_N_IConcat_string_pair
+           (Script_string.length s1)
+           (Script_string.length s2))
 
     let slice_string s =
-      atomic_step_cost (cost_N_ISlice_string (String.length s))
+      atomic_step_cost (cost_N_ISlice_string (Script_string.length s))
 
     let string_size = atomic_step_cost cost_N_IString_size
 
@@ -1298,7 +1300,8 @@ module Cost_of = struct
     let compare_signature = atomic_step_cost (S.safe_int 92)
 
     let compare_string s1 s2 =
-      atomic_step_cost (cost_N_ICompare (String.length s1) (String.length s2))
+      atomic_step_cost
+        (cost_N_ICompare (Script_string.length s1) (Script_string.length s2))
 
     let compare_bytes b1 b2 =
       atomic_step_cost (cost_N_ICompare (Bytes.length b1) (Bytes.length b2))

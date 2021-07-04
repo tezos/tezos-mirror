@@ -23,6 +23,7 @@
         "Level_repr",
         "Seed_repr",
         "Voting_period_repr",
+        "Script_string_repr",
         "Script_int_repr",
         "Script_timestamp_repr",
         "Michelson_v1_primitives",

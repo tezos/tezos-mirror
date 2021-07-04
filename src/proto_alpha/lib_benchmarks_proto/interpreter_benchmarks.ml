@@ -1423,6 +1423,8 @@ module Registration_section = struct
   end
 
   module Strings = struct
+    open Alpha_context.Script_string
+
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IConcat_string
@@ -1434,7 +1436,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IConcat_string_pair
-        ~intercept_stack:("", ("", eos))
+        ~intercept_stack:(empty, (empty, eos))
         ~kinstr:
           (IConcat_string_pair
              (kinfo (string @$ string @$ bot), halt (string @$ bot)))
@@ -1448,7 +1450,7 @@ module Registration_section = struct
              (kinfo (nat @$ nat @$ string @$ bot), halt (option string @$ bot)))
         ~intercept_stack:
           (let z = Alpha_context.Script_int.zero_n in
-           (z, (z, ("", eos))))
+           (z, (z, (empty, eos))))
         ~stack_sampler:(fun cfg rng_state ->
           let (module Samplers) = make_default_samplers cfg.sampler in
           fun () ->
@@ -1457,7 +1459,7 @@ module Registration_section = struct
                 Script_typed_ir.(String_t None)
                 rng_state
             in
-            let len = nat_of_positive_int (String.length string) in
+            let len = nat_of_positive_int (length string) in
             (* worst case: offset = 0 *)
             (nat_of_positive_int 0, (len, (string, eos))))
         ()
@@ -2670,7 +2672,11 @@ module Registration_section = struct
               Samplers.Random_value.value (ticket string_cmp) rng_state
             in
             let ticket =
-              {ticket with contents = ""; amount = Script_int_repr.zero_n}
+              {
+                ticket with
+                contents = Alpha_context.Script_string.empty;
+                amount = Script_int_repr.zero_n;
+              }
             in
             Ex_stack_and_kinstr
               {stack = ((ticket, ticket), eos); kinstr = join_tickets_instr})

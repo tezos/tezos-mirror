@@ -57,7 +57,7 @@ type _ comparable_ty =
   | Int_key : type_annot option -> z num comparable_ty
   | Nat_key : type_annot option -> n num comparable_ty
   | Signature_key : type_annot option -> signature comparable_ty
-  | String_key : type_annot option -> string comparable_ty
+  | String_key : type_annot option -> Script_string.t comparable_ty
   | Bytes_key : type_annot option -> Bytes.t comparable_ty
   | Mutez_key : type_annot option -> Tez.t comparable_ty
   | Bool_key : type_annot option -> bool comparable_ty
@@ -415,17 +415,20 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      -------
   *)
   | IConcat_string :
-      (string boxed_list, 's) kinfo * (string, 's, 'r, 'f) kinstr
-      -> (string boxed_list, 's, 'r, 'f) kinstr
+      (Script_string.t boxed_list, 's) kinfo
+      * (Script_string.t, 's, 'r, 'f) kinstr
+      -> (Script_string.t boxed_list, 's, 'r, 'f) kinstr
   | IConcat_string_pair :
-      (string, string * 's) kinfo * (string, 's, 'r, 'f) kinstr
-      -> (string, string * 's, 'r, 'f) kinstr
+      (Script_string.t, Script_string.t * 's) kinfo
+      * (Script_string.t, 's, 'r, 'f) kinstr
+      -> (Script_string.t, Script_string.t * 's, 'r, 'f) kinstr
   | ISlice_string :
-      (n num, n num * (string * 's)) kinfo * (string option, 's, 'r, 'f) kinstr
-      -> (n num, n num * (string * 's), 'r, 'f) kinstr
+      (n num, n num * (Script_string.t * 's)) kinfo
+      * (Script_string.t option, 's, 'r, 'f) kinstr
+      -> (n num, n num * (Script_string.t * 's), 'r, 'f) kinstr
   | IString_size :
-      (string, 's) kinfo * (n num, 's, 'r, 'f) kinstr
-      -> (string, 's, 'r, 'f) kinstr
+      (Script_string.t, 's) kinfo * (n num, 's, 'r, 'f) kinstr
+      -> (Script_string.t, 's, 'r, 'f) kinstr
   (*
      Bytes
      -----
@@ -1106,7 +1109,7 @@ and 'ty ty =
   | Int_t : type_annot option -> z num ty
   | Nat_t : type_annot option -> n num ty
   | Signature_t : type_annot option -> signature ty
-  | String_t : type_annot option -> string ty
+  | String_t : type_annot option -> Script_string.t ty
   | Bytes_t : type_annot option -> bytes ty
   | Mutez_t : type_annot option -> Tez.t ty
   | Key_hash_t : type_annot option -> public_key_hash ty

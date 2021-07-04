@@ -73,6 +73,7 @@ end
 
 module Raw_level = Raw_level_repr
 module Cycle = Cycle_repr
+module Script_string = Script_string_repr
 module Script_int = Script_int_repr
 
 module Script_timestamp = struct

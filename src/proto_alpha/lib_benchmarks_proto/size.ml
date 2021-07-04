@@ -116,7 +116,7 @@ let unit : t = 1
 let integer (i : 'a Alpha_context.Script_int.num) : t =
   Z.numbits (Alpha_context.Script_int.to_zint i) / 8
 
-let string (s : string) : t = String.length s
+let string = Alpha_context.Script_string.length
 
 let bytes (b : Bytes.t) : t = Bytes.length b
 
@@ -138,7 +138,7 @@ let chain_id (_chain_id : Chain_id.t) : t = Chain_id.size
 
 let address (addr : Script_typed_ir.address) : t =
   let (_contract, entrypoint) = addr in
-  Signature.Public_key_hash.size + string entrypoint
+  Signature.Public_key_hash.size + String.length entrypoint
 
 let list (list : 'a Script_typed_ir.boxed_list) : t =
   list.Script_typed_ir.length
@@ -180,7 +180,7 @@ let rec of_micheline (x : ('a, 'b) Micheline.node) =
       let int_bytes = integer (Alpha_context.Script_int.of_zint z) in
       {traversal = 1; int_bytes; string_bytes = 0}
   | Micheline.String (_loc, s) ->
-      let string_bytes = string s in
+      let string_bytes = String.length s in
       {traversal = 1; int_bytes = 0; string_bytes}
   | Micheline.Bytes (_loc, b) ->
       let string_bytes = bytes b in

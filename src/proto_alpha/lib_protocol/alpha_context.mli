@@ -311,6 +311,8 @@ module Gas : sig
   val cost_of_repr : Gas_limit_repr.cost -> cost
 end
 
+module Script_string : module type of Script_string_repr
+
 module Script_int : module type of Script_int_repr
 
 module Script_timestamp : sig
