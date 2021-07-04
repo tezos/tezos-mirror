@@ -91,5 +91,6 @@ module type S = sig
 
   val size : int
 
+  (* By default, the algo is chosen randomly (uniformly) *)
   val algo : [`Algo of Signature.algo | `Default]
 end
