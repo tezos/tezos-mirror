@@ -491,6 +491,24 @@ let test_is_empty {idx; block2; _} =
             (Context.Tree.is_empty dir_a) ;
           Lwt.return_unit)
 
+(** Test that [get_hash_version succeeds] *)
+let test_get_version_hash {idx; block2; _} =
+  Context.checkout_exn idx block2 >|= fun ctxt ->
+  let _ = get_hash_version ctxt in
+  ()
+
+(** Test [set_hash_version] on values on which it goes into the error monad *)
+let test_set_version_hash_tzresult {idx; block2; _} =
+  List.iter_s
+    (fun wrong_version ->
+      Context.checkout_exn idx block2 >>= fun ctxt ->
+      set_hash_version ctxt @@ Context_hash.Version.of_int wrong_version
+      >|= function
+      | Ok _ -> Assert.fail_msg "set_hash_version should have returned Error _"
+      | Error _ -> ())
+    (* Only version 0 is supported atm *)
+    [1; 2; 256]
+
 (******************************************************************************)
 
 let tests : (string * (t -> unit Lwt.t)) list =
@@ -507,6 +525,8 @@ let tests : (string * (t -> unit Lwt.t)) list =
     ("raw", test_raw);
     ("dump", test_dump);
     ("encoding", test_encoding);
+    ("get_hash_version", test_get_version_hash);
+    ("set_hash_version_tzresult", test_set_version_hash_tzresult);
   ]
 
 let tests =
