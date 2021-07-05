@@ -29,6 +29,7 @@
     Invocation:   dune build @src/lib_crypto/runtest
     Subject:      Merkle tree
 *)
+module Alcotest = Alcotest_glue
 
 open Utils.Infix
 
@@ -63,7 +64,7 @@ end)
 
 (** [compare_list xs ys] returns true if [ys = xs @ tl], where [tl] is
     a (potentially empty) repetition of the last element of [xs];
-     
+
     e.g., [compare_list [1;2;3] [1;2;3]],
           [compare_list [1;2;3] [1;2;3;3;3]] both return true.
 *)
@@ -159,10 +160,13 @@ let test_path_examples _ =
 
 let tests =
   [
-    ("compute", `Quick, test_compute);
-    ("compute_examples", `Quick, test_compute_examples);
-    ("path", `Quick, test_path);
-    ("path_examples", `Quick, test_path_examples);
+    ( "merkle",
+      [
+        ("compute", `Quick, test_compute);
+        ("compute_examples", `Quick, test_compute_examples);
+        ("path", `Quick, test_path);
+        ("path_examples", `Quick, test_path_examples);
+      ] );
   ]
 
-let () = Alcotest.run "tezos-crypto" [("merkle", tests)]
+let tests_lwt = []
