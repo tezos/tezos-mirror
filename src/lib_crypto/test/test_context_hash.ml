@@ -33,6 +33,7 @@
 
 module Alcotest = Alcotest_glue
 
+(** Version.of_int should refuse integers that are not unsigned 16-bit. *)
 let test_version_of_int_validation () =
   let expect_invalid_argument i =
     try

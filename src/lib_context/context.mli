@@ -119,8 +119,7 @@ val get_hash_version : context -> Context_hash.Version.t
 
 (** Set the hash version used for the context.  It may recalculate the hashes
     of the whole context, which can be a long process.
-    Returns an Error if the hash version is unsupported.
-*)
+    Returns an [Error] if the hash version is unsupported. *)
 val set_hash_version :
   context -> Context_hash.Version.t -> context tzresult Lwt.t
 
