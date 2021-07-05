@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Dailambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,42 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Context_hash"
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Dependencies: src/lib_crypto/test/context_hash.ml
+    Subject:      On context hash
+*)
 
-      let title = "A hash of context"
+module Alcotest = Alcotest_glue
 
-      let b58check_prefix = Base58.Prefix.context_hash
+let test_version_of_int_validation () =
+  let expect_invalid_argument i =
+    try
+      let _ = Context_hash.Version.of_int i in
+      Alcotest.failf "%d can't be a hash version." i
+    with Invalid_argument _ -> ()
+  in
+  List.iter expect_invalid_argument [-1; 0x10000]
 
-      let size = None
-    end)
+let tests : unit Alcotest.test list =
+  [
+    ( "context_hash",
+      [
+        ( "Version.of_int input validation",
+          `Quick,
+          test_version_of_int_validation );
+      ] );
+  ]
 
-let () = Base58.check_encoded_prefix b58check_encoding "Co" 52
-
-module Version = struct
-  include Compare.Int
-
-  let pp = Format.pp_print_int
-
-  let encoding =
-    let open Data_encoding in
-    def
-      "context_hash_version"
-      ~description:"A version number for the context hash computation"
-      uint16
-
-  let of_int v =
-    if 0 <= v && v <= 0xffff then v
-    else
-      Format.kasprintf
-        Stdlib.invalid_arg
-        "Context_hash.Version.of_int: hash version must be uint16 (got %d)"
-        v
-
-  let () = Data_encoding.Registration.register ~pp encoding
-end
-
-type version = Version.t
+let tests_lwt = []
