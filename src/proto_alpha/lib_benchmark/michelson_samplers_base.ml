@@ -61,11 +61,7 @@ module Make_base (P : Michelson_samplers_parameters.S) : Base_S = struct
 
   let nat rng_state =
     let i = Base_samplers.nat ~size:P.parameters.int_size rng_state in
-    match
-      Alpha_context.Script_int.is_nat (Alpha_context.Script_int.of_zint i)
-    with
-    | None -> assert false
-    | Some n -> n
+    Alpha_context.Script_int.abs (Alpha_context.Script_int.of_zint i)
 
   (* We ought to do better *)
   let signature _rng_state = Signature.zero
