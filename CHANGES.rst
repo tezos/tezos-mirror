@@ -95,6 +95,24 @@ Node
 -  Fixed an issue when reconstructing a storage with missing block or
    operations metadata hashes.
 
+-  Fixed RPC GET ``/chains/<chain_id>/mempool/filter``, that did not
+   show fields of the filter configuration that were equal to their
+   default value: e.g. if the configuration was the default one, it
+   just returned ``{}``. Now displays all the fields by default. The
+   old behavior may be brought back by setting the new optional
+   parameter ``include_default`` to ``false``.
+
+-  Changed the behavior of RPC POST ``/chains/<chain_id>/mempool/filter``
+   when provided an input json that does not describe a valid filter
+   configuration. It used to revert the filter back to the default
+   configuration in that case, but now it leaves it unchanged. (Note:
+   if the input json is valid but does not provide all the fields of
+   the filter configuration, then any missing field is set back to its
+   default value, rather than left unchanged. This is the same
+   behavior as the previous version of the RPC.) As this behavior may
+   be confusing, the RPC now returns the new filter configuration of
+   the mempool.
+
 Client
 ------
 
