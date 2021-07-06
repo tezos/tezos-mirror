@@ -23,9 +23,9 @@ yml="${1:-$src_dir/.gitlab/ci/opam.yml}"
 
 missing=
 for opam in $opams; do
-    file=$(basename $opam)
+    file=$(basename "$opam")
     package=${file%.opam}
-    if ! grep -qe "opam:$package:\$" "$yml"; then
+    if ! grep -qe "opam:$package:\$" "$yml" -or ! grep -qe "opam-bin:$package:\$" "$yml"; then
         missing=yes
         echo "Missing test for package '$package'."
     fi
@@ -33,14 +33,14 @@ done
 
 tested=$(grep -e '^opam:tezos-.*:$' "$yml" | cut -d: -f3)
 for package in $tested; do
-    found=$(find "$src_dir/src" "$src_dir/vendors" -name $package.opam | wc -l 2>&1)
-    if [ $found != 1 ] ; then
+    found=$(find "$src_dir/src" "$src_dir/vendors" -name "$package.opam" | wc -l 2>&1)
+    if [ "$found" != 1 ] ; then
         missing=yes
         echo "Test for unknown package '$package'."
     fi
 done
 
-if ! [ -z "$missing" ]; then
+if [ -n "$missing" ]; then
     echo
     echo "You should update .gitlab/ci/opam.yml by running: ./scripts/update_opam_test.sh"
     echo
