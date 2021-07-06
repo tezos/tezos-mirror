@@ -105,9 +105,8 @@ When a delegator spends their tokens, the delegated balance of their delegate de
 If a delegate runs out of funds to deposit it won't be able to bake or
 endorse. Other than being a missed opportunity for them, this has also
 negative consequences on the network.
-Missing baking slots slows the network, as it is necessary to wait for one
-minute for the baker at priority 2 to bake, while missing endorsements
-reduce the fitness of the chain, making it more susceptible to forks.
+Missing baking or endorsing slots slows down the network, as it is necessary to wait some time for the baker at the next priority to bake, and also some other time for each missed endorsing slot.
+Besides, missed endorsements also makes the chain more susceptible to forks.
 Running out of funds can happen if a delegate is *over-delegated*,
 that is if the amount of rolls it was delegate is disproportionate
 with respect to its available funds.
