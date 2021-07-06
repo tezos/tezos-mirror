@@ -1,5 +1,3 @@
-.. _gadt:
-
 Generalized Algebraic Data Types (GADTs)
 ========================================
 
@@ -29,7 +27,7 @@ directly implemented as OCaml type checking, so that the correctness of the
 latter entails the correctness of the former.
 
 The (simplified) definition of Michelson expressions type is presented below
-(see the :src:`src/proto_alpha/lib_protocol/script_typed_ir.mli` module for the
+(see the :src:`src/proto_alpha/lib_protocol/script_typed_ir.ml` module for the
 actual definition):
 
 .. code-block:: ocaml

@@ -18,4 +18,4 @@ eval $(opam env)
 opam install depext
 opam depext tezos
 # [install tezos]
-opam install -y tezos
+opam install tezos

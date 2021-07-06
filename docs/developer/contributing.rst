@@ -39,7 +39,7 @@ website https://ocaml.org gives a few useful pointers for that. In
 particular, we use a lot of functors, and a few GADTs in the codebase,
 so you may want to make sure that you master these advanced concepts.
 For a more specific explanation of GADT usage in Tezos you can check out
-:ref:`gadt`.
+:doc:`gadt`.
 
 Then, if you don’t know much about the Lwt library, that’s what you want
 to learn next. This library is used extensively throughout the code base:

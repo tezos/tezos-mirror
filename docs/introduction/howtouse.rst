@@ -61,6 +61,8 @@ node. In the last case, the above command generates a warning::
     Warning:
       Failed to acquire the protocol version from the node
 
+.. _tezos_client_protocol:
+
 To get the manual of a client command for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol``, e.g.::
 
     tezos-client --protocol ProtoALphaALph man transfer
@@ -650,8 +652,7 @@ The behavior of the client can be configured using the following environment var
 - `TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER`: Setting this variable to "YES" (or: "yes", "Y", "y") disables the warning displayed by the client at startup when it is not launched on Mainnet.
 - `TEZOS_CLIENT_DIR`: This variable may be used to supply the client data directory (by default, ``~/.tezos-client``).
   Its value is overridden by option ``-d``.
-- `TEZOS_SIGNER_*`: These variables are used for connecting the client to a remote :ref:`signer <signer>`.
-  Its value is overwritten by option ``-d``.
+- `TEZOS_SIGNER_*`: These variables are used for connecting the client to a remote :ref:`signer <signer>` (see there for details).
 - `TEZOS_CLIENT_RPC_TIMEOUT_SECONDS`: This variable controls how long (in seconds, as an integer)
   the client will wait for a response from the node, for each of the two RPC calls made during startup.
   If this variable is not set, or otherwise cannot be parsed as a positive integer, a default value of ``10`` seconds is used for each call.
