@@ -78,7 +78,7 @@ echo "* Step 3: Compute the binary representations of the two Michelson scripts"
 
 serialize () {
   CONTRACT="$1"
-  $TEZOS_CLIENT convert script "$CONTRACT.tz" from michelson to binary > "$CONTRACT.bin"
+  $TEZOS_CLIENT convert script "$CONTRACT.tz" from michelson to binary --legacy > "$CONTRACT.bin"
 }
 
 serialize cpmm
