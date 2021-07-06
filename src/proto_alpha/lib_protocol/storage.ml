@@ -91,7 +91,7 @@ module type Simple_single_data_storage = sig
   val init : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
 end
 
-module Block_priority =
+module Block_priority : Simple_single_data_storage with type value = int =
   Make_single_data_storage (Registered) (Raw_context)
     (struct
       let name = ["block_priority"]
@@ -107,7 +107,7 @@ module Contract = struct
         let name = ["contracts"]
       end)
 
-  module Global_counter =
+  module Global_counter : Simple_single_data_storage with type value = Z.t =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
         let name = ["global_counter"]
