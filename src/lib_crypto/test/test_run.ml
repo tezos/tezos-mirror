@@ -46,4 +46,5 @@ runtest
     (module Test_pvss);
     (module Test_signature);
     (module Test_timelock);
+    (module Test_context_hash);
   ]

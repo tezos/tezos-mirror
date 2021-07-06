@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Dailambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,25 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Committed context hashes / IDs. *)
-include S.HASH
+(** Testing
+    -------
+    Component:    Crypto
+    Invocation:   dune build @src/lib_crypto/runtest
+    Dependencies: src/lib_crypto/test/context_hash.ml
+    Subject:      On context hash
+*)
 
-(** The module for representing the hash version of a context *)
-module Version : sig
-  (** The type for hash versions. *)
-  type t = private int
+module Alcotest = Alcotest_glue
 
-  include Compare.S with type t := t
+(** Version.of_int should refuse integers that are not unsigned 16-bit. *)
+let test_version_of_int_validation () =
+  let expect_invalid_argument i =
+    try
+      let _ = Context_hash.Version.of_int i in
+      Alcotest.failf "%d can't be a hash version." i
+    with Invalid_argument _ -> ()
+  in
+  List.iter expect_invalid_argument [-1; 0x10000]
 
-  (** [pp] is the pretty-printer for hash versions. *)
-  val pp : Format.formatter -> t -> unit
+let tests : unit Alcotest.test list =
+  [
+    ( "context_hash",
+      [
+        ( "Version.of_int input validation",
+          `Quick,
+          test_version_of_int_validation );
+      ] );
+  ]
 
-  (** [encoding] is the data encoding for hash versions. *)
-  val encoding : t Data_encoding.t
-
-  (** [of_int i] is the hash version equivalent to [i].
-      This function raises [Invalid_argument] if [i] is not an unsigned 16-bit integer. *)
-  val of_int : int -> t
-end
-
-type version = Version.t
+let tests_lwt = []

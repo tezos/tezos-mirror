@@ -77,6 +77,10 @@ module M = struct
   let get_protocol _ = assert false
 
   let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
+
+  let set_hash_version _ _ = assert false
+
+  let get_hash_version _ = assert false
 end
 
 open Tezos_protocol_environment

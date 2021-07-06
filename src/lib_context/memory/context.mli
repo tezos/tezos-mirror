@@ -35,3 +35,11 @@ val encoding : t Data_encoding.t
 val get_protocol : t -> Protocol_hash.t Lwt.t
 
 val add_protocol : t -> Protocol_hash.t -> t Lwt.t
+
+(** Get the hash version used for the context *)
+val get_hash_version : t -> Context_hash.Version.t
+
+(** Set the hash version used for the context.  It may recalculate the hashes
+    of the whole context, which can be a long process.
+    Returns an [Error] if the hash version is unsupported. *)
+val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t

@@ -150,6 +150,14 @@
                    -open Data_encoding))
  )
 
+(library
+ (name test_context_hash)
+ (modules test_context_hash)
+ (libraries test_crypto_tests)
+ (flags (:standard -open Tezos_stdlib
+                   -open Tezos_crypto))
+ )
+
 (tests
  (names test_run
         test_prop_signature_pk
@@ -168,6 +176,7 @@
             test_pvss
             test_signature
             test_timelock
+            test_context_hash
             bls12-381-unix
             tezos-hacl-glue-unix
             data-encoding

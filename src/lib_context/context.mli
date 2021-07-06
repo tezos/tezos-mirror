@@ -112,6 +112,17 @@ val set_head : index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
 
 val set_master : index -> Context_hash.t -> unit Lwt.t
 
+(** {2 Hash version} *)
+
+(** Get the hash version used for the context *)
+val get_hash_version : context -> Context_hash.Version.t
+
+(** Set the hash version used for the context.  It may recalculate the hashes
+    of the whole context, which can be a long process.
+    Returns an [Error] if the hash version is unsupported. *)
+val set_hash_version :
+  context -> Context_hash.Version.t -> context tzresult Lwt.t
+
 (** {2 Predefined Fields} *)
 
 val get_protocol : context -> Protocol_hash.t Lwt.t

@@ -35,6 +35,11 @@ module type TREE = sig
   include Tezos_context_sigs.Context.TREE
 end
 
+module type HASH_VERSION = sig
+  (** @inline *)
+  include Tezos_context_sigs.Context.HASH_VERSION
+end
+
 module type S = sig
   include VIEW with type key = string list and type value = bytes
 
@@ -55,4 +60,8 @@ module type S = sig
 
   val fork_test_chain :
     t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
+
+  val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t
+
+  val get_hash_version : t -> Context_hash.Version.t
 end

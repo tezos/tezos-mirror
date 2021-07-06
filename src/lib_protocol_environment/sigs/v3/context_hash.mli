@@ -25,3 +25,23 @@
 
 (** Committed context hashes / IDs. *)
 include S.HASH
+
+(** The module for representing the hash version of a context *)
+module Version : sig
+  (** The type for hash versions. *)
+  type t = private int
+
+  include Compare.S with type t := t
+
+  (** [pp] is the pretty-printer for hash versions. *)
+  val pp : Format.formatter -> t -> unit
+
+  (** [encoding] is the data encoding for hash versions. *)
+  val encoding : t Data_encoding.t
+
+  (** [of_int i] is the hash version equivalent to [i].
+      This function raises [Invalid_argument] if [i] is not an unsigned 16-bit integer. *)
+  val of_int : int -> t
+end
+
+type version = Version.t
