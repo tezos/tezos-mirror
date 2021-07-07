@@ -267,7 +267,7 @@ module type S = sig
 
     val signature : Tezos_crypto.Signature.t sampler
 
-    val string : string sampler
+    val string : Alpha_context.Script_string.t sampler
 
     val bytes : bytes sampler
 

@@ -59,6 +59,11 @@ let dummy_pk =
 
 let dummy_bytes = Bytes.of_string "dummy"
 
+let dummy_string =
+  match Alpha_context.Script_string.of_string "dummy" with
+  | Ok s -> s
+  | Error _ -> assert false
+
 let free = ["balance"; "bool"; "parsing_unit"; "unparsing_unit"]
 
 (* /!\ The compiler will only complain if costs are _removed_ /!\*)
@@ -98,8 +103,8 @@ let all_interpreter_costs =
     ("add_seconds_timestamp", add_seconds_timestamp forty_two dummy_timestamp);
     ("sub_timestamp_seconds", sub_timestamp_seconds dummy_timestamp forty_two);
     ("diff_timestamps", diff_timestamps dummy_timestamp dummy_timestamp);
-    ("concat_string_pair", concat_string_pair "dummy" "dummy");
-    ("slice_string", slice_string "dummy");
+    ("concat_string_pair", concat_string_pair dummy_string dummy_string);
+    ("slice_string", slice_string dummy_string);
     ("string_size", string_size);
     ("concat_bytes_pair", concat_bytes_pair dummy_bytes dummy_bytes);
     ("slice_bytes", slice_bytes dummy_bytes);

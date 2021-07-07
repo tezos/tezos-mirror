@@ -35,7 +35,7 @@ module type Base_S = sig
 
   val signature : Tezos_crypto.Signature.t sampler
 
-  val string : string sampler
+  val string : Alpha_context.Script_string.t sampler
 
   val bytes : bytes sampler
 
@@ -70,7 +70,15 @@ module Make_base (P : Michelson_samplers_parameters.S) : Base_S = struct
   (* We ought to do better *)
   let signature _rng_state = Signature.zero
 
-  let string = Base_samplers.string ~size:P.parameters.string_size
+  let string rng_state =
+    let s =
+      Base_samplers.readable_ascii_string
+        ~size:P.parameters.string_size
+        rng_state
+    in
+    match Protocol.Alpha_context.Script_string.of_string s with
+    | Ok s -> s
+    | Error _ -> assert false
 
   let bytes = Base_samplers.bytes ~size:P.parameters.bytes_size
 

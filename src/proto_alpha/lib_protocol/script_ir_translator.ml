@@ -320,7 +320,7 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
     | (Unit_key _, (), ()) -> (apply [@tailcall]) 0 k
     | (Never_key _, _, _) -> .
     | (Signature_key _, x, y) -> (apply [@tailcall]) (Signature.compare x y) k
-    | (String_key _, x, y) -> (apply [@tailcall]) (Compare.String.compare x y) k
+    | (String_key _, x, y) -> (apply [@tailcall]) (Script_string.compare x y) k
     | (Bool_key _, x, y) -> (apply [@tailcall]) (Compare.Bool.compare x y) k
     | (Mutez_key _, x, y) -> (apply [@tailcall]) (Tez.compare x y) k
     | (Key_hash_key _, x, y) ->
@@ -735,7 +735,7 @@ let unparse_int ctxt v = ok (Int (-1, Script_int.to_zint v), ctxt)
 
 let unparse_nat ctxt v = ok (Int (-1, Script_int.to_zint v), ctxt)
 
-let unparse_string ctxt s = ok (String (-1, s), ctxt)
+let unparse_string ctxt s = ok (String (-1, Script_string.to_string s), ctxt)
 
 let unparse_bytes ctxt s = ok (Bytes (-1, s), ctxt)
 
@@ -2256,18 +2256,10 @@ let parse_bool ctxt ~legacy = function
 let parse_string ctxt = function
   | String (loc, v) as expr ->
       Gas.consume ctxt (Typecheck_costs.check_printable v) >>? fun ctxt ->
-      let rec check_printable_ascii i =
-        if Compare.Int.(i < 0) then true
-        else
-          match v.[i] with
-          | '\n' | '\x20' .. '\x7E' -> check_printable_ascii (i - 1)
-          | _ -> false
-      in
-      if check_printable_ascii (String.length v - 1) then ok (v, ctxt)
-      else
-        error
-        @@ Invalid_syntactic_constant
-             (loc, strip_locations expr, "a printable ascii string")
+      record_trace
+        (Invalid_syntactic_constant
+           (loc, strip_locations expr, "a printable ascii string"))
+        (Script_string.of_string v >|? fun s -> (s, ctxt))
   | expr -> error @@ Invalid_kind (location expr, [String_kind], kind expr)
 
 let parse_bytes ctxt = function

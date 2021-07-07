@@ -643,34 +643,34 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | IConcat_string_pair (_, k) ->
           let x = accu in
           let (y, stack) = stack in
-          let s = String.concat "" [x; y] in
+          let s = Script_string.concat_pair x y in
           (step [@ocaml.tailcall]) g gas k ks s stack
       | IConcat_string (_, k) ->
           let ss = accu in
           (* The cost for this fold_left has been paid upfront *)
           let total_length =
             List.fold_left
-              (fun acc s -> S.add acc (S.safe_int (String.length s)))
+              (fun acc s -> S.add acc (S.safe_int (Script_string.length s)))
               S.zero
               ss.elements
           in
           consume' ctxt gas (Interp_costs.concat_string total_length)
           >>?= fun gas ->
-          let s = String.concat "" ss.elements in
+          let s = Script_string.concat ss.elements in
           (step [@ocaml.tailcall]) g gas k ks s stack
       | ISlice_string (_, k) ->
           let offset = accu and (length, (s, stack)) = stack in
-          let s_length = Z.of_int (String.length s) in
+          let s_length = Z.of_int (Script_string.length s) in
           let offset = Script_int.to_zint offset in
           let length = Script_int.to_zint length in
           if Compare.Z.(offset < s_length && Z.add offset length <= s_length)
           then
-            let s = String.sub s (Z.to_int offset) (Z.to_int length) in
+            let s = Script_string.sub s (Z.to_int offset) (Z.to_int length) in
             (step [@ocaml.tailcall]) g gas k ks (Some s) stack
           else (step [@ocaml.tailcall]) g gas k ks None stack
       | IString_size (_, k) ->
           let s = accu in
-          let result = Script_int.(abs (of_int (String.length s))) in
+          let result = Script_int.(abs (of_int (Script_string.length s))) in
           (step [@ocaml.tailcall]) g gas k ks result stack
       (* bytes operations *)
       | IConcat_bytes_pair (_, k) ->

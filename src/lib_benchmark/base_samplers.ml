@@ -76,13 +76,16 @@ let int ~size state =
 
 let uniform_readable_ascii state =
   (* Consult the ascii table for the meaning of this. *)
-  let i = Random.State.int state 93 in
-  Char.chr (33 + i)
+  let i = Random.State.int state 96 in
+  if i = 95 then '\n' else Char.chr (32 + i)
+
+let uniform_readable_ascii_string ~nbytes state =
+  String.init nbytes (fun _ -> uniform_readable_ascii state)
 
 let readable_ascii_string ~size state =
   if size.min < 0 then invalid_arg "Base_samplers.readable_ascii_string" ;
   let nbytes = sample_in_interval state ~range:size in
-  String.escaped (String.init nbytes (fun _ -> uniform_byte state))
+  uniform_readable_ascii_string ~nbytes state
 
 let string ~size state =
   if size.min < 0 then invalid_arg "Base_samplers.string" ;
