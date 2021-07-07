@@ -36,26 +36,7 @@
 module Arbitrary = struct
   open QCheck
   open RPC_server.Acl
-
-  let ipv4 =
-    let open QCheck in
-    map ~rev:Ipaddr.V4.to_int32 Ipaddr.V4.of_int32 int32
-    |> set_print Ipaddr.V4.to_string
-
-  let ipv6 =
-    let open QCheck in
-    map ~rev:Ipaddr.V6.to_int64 Ipaddr.V6.of_int64 (pair int64 int64)
-    |> set_print Ipaddr.V6.to_string
-
-  let addr_port_id =
-    let gen =
-      let open Gen in
-      let open P2p_point.Id in
-      let* addr = map Ipaddr.V4.to_string @@ gen ipv4
-      and* port = opt @@ gen Qcheck_helpers.uint16 in
-      pure {addr; port; peer_id = None}
-    in
-    make gen ~print:P2p_point.Id.addr_port_id_to_string
+  open Tz_arbitrary
 
   let meth_matcher : meth_matcher arbitrary =
     oneofl
@@ -287,7 +268,7 @@ let ensure_default_policy_parses =
   let open QCheck in
   Test.make
     ~name:"default policy parses and is of correct type"
-    Arbitrary.ipv6
+    Tz_arbitrary.ipv6
     (fun ip_addr ->
       let expected =
         let open Ipaddr.V6 in

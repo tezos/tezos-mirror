@@ -31,45 +31,7 @@
 *)
 
 open Lib_test.Qcheck_helpers
-
-let ipv4 =
-  let open QCheck in
-  map ~rev:Ipaddr.V4.to_int32 Ipaddr.V4.of_int32 int32
-  |> set_print Ipaddr.V4.to_string
-
-let ipv4_as_v6 =
-  let open QCheck in
-  map Ipaddr.v6_of_v4 ipv4 |> set_print Ipaddr.V6.to_string
-
-(* Do not test the all standard ipv6 *)
-let ipv6 =
-  let open QCheck in
-  map
-    ~rev:Ipaddr.V6.to_int32
-    (fun (a, b, c, d) -> Ipaddr.V6.of_int32 (a, b, c, d))
-    (quad int32 int32 int32 int32)
-  |> set_print Ipaddr.V6.to_string
-
-let port = uint16
-
-let port_opt = QCheck.option port
-
-(* could not craft a [p2p_identity QCheck.gen], we use instead a
-   constant [unit -> p2p_identity] which will be applied at each
-   testing points.  *)
-
-let peer_id =
-  QCheck.option QCheck.(map P2p_identity.generate_with_pow_target_0 unit)
-
-let ip = QCheck.choose [ipv4_as_v6; ipv6]
-
-let ipv4_as_v6_or_v6 = QCheck.choose [ipv4_as_v6; ipv6]
-
-let ipv4t = QCheck.triple ipv4 port_opt peer_id
-
-let ipv6t = QCheck.triple ipv6 port_opt peer_id
-
-let p2p_point_id_t = QCheck.pair ip port
+open Tezos_base_test_helpers.Tz_arbitrary
 
 (* To check the round trip property we change the printer for ipv4 and
    ipv6. Otherwise the printer returns an ipv4 printed as an ipv6. *)
