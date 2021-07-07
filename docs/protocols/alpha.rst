@@ -24,6 +24,18 @@ Tickets Strengthening
 
 - Add ticket-balance storage module. (MR :gl:`!3495`)
 
+Michelson
+---------
+
+- A new ``SUB_MUTEZ`` instruction has been added, it is similar to the
+  ``mutez`` case of the ``SUB`` instruction but its return type is
+  ``option mutez`` instead of ``mutez``. This allows subtracting
+  ``mutez`` values without failing in case of underflow.
+
+- The ``SUB`` instruction on type ``mutez`` is deprecated. It can be
+  replaced by ``SUB_MUTEZ; ASSERT_SOME`` (and ``SUB; DROP`` can be
+  replaced by ``ASSERT_CMPGE``).
+
 Bug Fixes
 ---------
 
