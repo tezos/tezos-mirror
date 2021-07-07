@@ -44,7 +44,6 @@ scripts/version.sh
 src/bin_client/bash-completion.sh
 src/bin_client/tezos-init-sandboxed-client.sh
 src/bin_node/tezos-sandboxed-node.sh
-src/lib_protocol_compiler/test/rejections.sh
 src/lib_shell/test/generate_locator_plot.sh
 src/openapi/generate.sh
 src/tooling/lint.sh
