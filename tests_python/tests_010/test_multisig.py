@@ -170,7 +170,7 @@ class TestMultisig:
             )
             utils.bake(client)
             expected_hash = (
-                'exprub9UzpxmhedNQnsv1J1DazWGJnj1dLhtG1fxkUoWSdFLBGLqJ4\n'
+                'exprub9UzpxmhedNQnsv1J1DazWGJnj1dLhtG1fxkUoWSdFLBGLqJ4'
             )
             assert expected_hash in client.run(
                 ['show', 'supported', 'multisig', 'hashes']

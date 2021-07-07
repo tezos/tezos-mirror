@@ -276,7 +276,7 @@ class Client:
 
     def get_script_hash(self, contract: str) -> str:
         params = ['get', 'contract', 'script', 'hash', 'for', contract]
-        return self.run(params)
+        return self.run(params).strip()
 
     def convert_script(self, inp: str, input_fmt: str, output_fmt: str) -> str:
         params = [
