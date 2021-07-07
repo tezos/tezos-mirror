@@ -19,12 +19,14 @@ available at https://tezos.gitlab.io/.
 
 ## The Tezos software
 
-This git repository contains:
+This repository hosts an implementation of Tezos software called **Octez**, including a node, a client, a baker, an endorser, an accuser, and other tools, distributed with the Tezos economic protocols of Mainnet for convenience.
+
+In more detail, this git repository contains:
 - the source code, in directory src/
 - tests (mainly system tests):
   * in a Python testing and execution framework, under tests_python/
   * in an OCaml system testing framework for Tezos called Tezt, under tezt/
-- the developer documentation of the Tezos softwarer, under docs/
+- the developer documentation of the Tezos software, under docs/
 - a few third-party libraries, adapted for Tezos, under vendors/
 
 The Tezos software may run either on the nodes of
@@ -37,7 +39,7 @@ online at https://tezos.gitlab.io/. This documentation is always in
 sync with the master branch which may however be slightly
 desynchronized with the code running on the live networks.
 
-The source code of Tezos is placed under the [MIT Open Source
+The source code of Octez is placed under the [MIT Open Source
 License](https://opensource.org/licenses/MIT).
 
 ## Contributing
