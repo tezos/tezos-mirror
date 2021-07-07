@@ -68,6 +68,7 @@ cp "${base_protocol_dirname}/"* "$with_external/"
 
 try_compile "$with_external/" # We check that we didn't break it with the `cp` :)
 
+chmod u+w "$with_external/main.ml"
 cat >> "$with_external/main.ml" <<EOF
 let _f =
   let module Hello = struct
@@ -105,6 +106,7 @@ EOF
 cat > "$with_weird_ends/closing.ml" <<EOF
 let x = 42
 EOF
+chmod u+w "$with_weird_ends/TEZOS_PROTOCOL"
 sed 's/"Main"/"Main", "Weird", "Closing"/' "$base_protocol" > "$with_weird_ends/TEZOS_PROTOCOL"
 
 { try_compile "$with_weird_ends/" && should_fail "with-weird-ends" ; } \
