@@ -1,3 +1,4 @@
+import csv
 import datetime
 import json
 import os
@@ -270,9 +271,26 @@ class Client:
             cmd += ['--gas', '%d' % gas]
         return client_output.RunScriptResult(self.run(cmd))
 
-    def hash_script(self, contract: str) -> str:
-        params = ['hash', 'script', contract]
-        return self.run(params)
+    def hash_script(
+        self,
+        contracts: List[str],
+        display_names: bool = False,
+        for_script: Optional[str] = None,
+    ) -> List[Tuple[str, Optional[str]]]:
+        params = ['hash', 'script']
+        if display_names:
+            params += ['--display-names']
+        if for_script is not None:
+            params += ['--for-script', for_script]
+        params += contracts
+        output = self.run(params)
+
+        lines = output.split("\n")[:-1]
+        delimiter = "," if for_script == 'csv' else "\t"
+        return [
+            (row[0], row[1] if display_names else None)
+            for row in csv.reader(lines, delimiter=delimiter)
+        ]
 
     def get_script_hash(self, contract: str) -> str:
         params = ['get', 'contract', 'script', 'hash', 'for', contract]

@@ -1529,7 +1529,7 @@ class TestScriptHashRegression:
         assert contract.endswith(
             '.tz'
         ), "test contract should have .tz extension"
-        client.hash_script(os.path.join(CONTRACT_PATH, contract))
+        client.hash_script([os.path.join(CONTRACT_PATH, contract)])
 
 
 @pytest.mark.contract
@@ -1546,7 +1546,7 @@ class TestScriptHashOrigination:
             amount=1000,
             contract_name='dummy_contract',
         )
-        hash1 = client.hash_script(script)
+        [(hash1, _)] = client.hash_script([script])
         hash2 = client.get_script_hash('dummy_contract')
         assert hash1 == hash2
 
@@ -1634,14 +1634,16 @@ class TestBadIndentation:
 
     BADLY_INDENTED = os.path.join(ILLTYPED_CONTRACT_PATH, 'badly_indented.tz')
 
-    SCRIPT_HASH = "exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL\n"
+    SCRIPT_HASH = "exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL"
 
     def test_bad_indentation_ill_typed(self, client):
         with utils.assert_run_failure('syntax error in program'):
             client.typecheck(self.BADLY_INDENTED)
 
     def test_bad_indentation_hash(self, client):
-        assert client.hash_script(self.BADLY_INDENTED) == self.SCRIPT_HASH
+        assert client.hash_script([self.BADLY_INDENTED]) == [
+            (self.SCRIPT_HASH, None)
+        ]
 
     def test_formatting(self, client, session):
         session['formatted_script'] = client.convert_script(
@@ -1649,9 +1651,9 @@ class TestBadIndentation:
         )
 
     def test_formatted_hash(self, client, session):
-        assert (
-            client.hash_script(session['formatted_script']) == self.SCRIPT_HASH
-        )
+        assert client.hash_script([session['formatted_script']]) == [
+            (self.SCRIPT_HASH, None)
+        ]
 
     def test_formatted_typechecks(self, client, session):
         client.typecheck(session['formatted_script'], file=False)
