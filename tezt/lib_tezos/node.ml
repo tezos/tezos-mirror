@@ -50,7 +50,7 @@ let make_argument = function
   | Connections x -> ["--connections"; string_of_int x]
   | Private_mode -> ["--private-mode"]
   | Peer x -> ["--peer"; x]
-  | No_bootstrap_peers -> ["--no-boostrap-peers"]
+  | No_bootstrap_peers -> ["--no-bootstrap-peers"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
