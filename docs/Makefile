@@ -100,10 +100,11 @@ $(DOCGENDIR)/rpc_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
-	@dune exec $(DOCGENDIR)/rpc_doc.exe "" > active/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe 010 > 010/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe alpha > alpha/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe shell > shell/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe index "" > active/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe index 010 > 010/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe index alpha > alpha/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe index shell > shell/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe acl > user/default-acl.json
 
 $(DOCGENDIR)/p2p_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/p2p_doc.exe

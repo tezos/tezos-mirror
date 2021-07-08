@@ -38,7 +38,68 @@ module Acl = struct
 
   type policy = (endpoint * t) list
 
-  let default = Allow_all {except = []}
+  let secure =
+    Deny_all
+      {
+        except =
+          List.map
+            parse
+            [
+              "GET /chains/*/blocks";
+              "GET /chains/*/blocks/*";
+              "GET /chains/*/blocks/*/context/**";
+              "GET /chains/*/blocks/*/hash";
+              "GET /chains/*/blocks/*/header";
+              "GET /chains/*/blocks/*/header/**";
+              "GET /chains/*/blocks/*/helpers/current_level";
+              "GET /chains/*/blocks/*/live_blocks";
+              "GET /chains/*/blocks/*/metadata";
+              "GET /chains/*/blocks/*/metadata_hash";
+              "GET /chains/*/blocks/*/minimal_valid_time";
+              "GET /chains/*/blocks/*/operation_hashes";
+              "GET /chains/*/blocks/*/operation_hashes/**";
+              "GET /chains/*/blocks/*/operation_metadata_hash";
+              "GET /chains/*/blocks/*/operations";
+              "GET /chains/*/blocks/*/operations/**";
+              "GET /chains/*/blocks/*/operations_metadata_hash";
+              "GET /chains/*/blocks/*/protocols";
+              "GET /chains/*/blocks/*/required_endorsements";
+              "GET /chains/*/blocks/*/votes/**";
+              "GET /chains/*/chain_id";
+              "GET /chains/*/checkpoint";
+              "GET /chains/*/invalid_blocks";
+              "GET /chains/*/invalid_blocks/*";
+              "GET /chains/*/is_bootstrapped";
+              "GET /chains/*/mempool/filter";
+              "GET /chains/*/mempool/monitor_operations";
+              "GET /chains/*/mempool/pending_operations";
+              "GET /config/network/user_activated_protocol_overrides";
+              "GET /config/network/user_activated_upgrades";
+              "GET /describe/**";
+              "GET /errors";
+              "GET /monitor/**";
+              "GET /network/greylist/ips";
+              "GET /network/greylist/peers";
+              "GET /network/self";
+              "GET /network/self";
+              "GET /network/stat";
+              "GET /network/version";
+              "GET /network/versions";
+              "GET /protocols";
+              "GET /protocols/*";
+              "GET /protocols/*/environment";
+              "GET /version";
+              "POST /chains/*/blocks/*/context/contracts/*/big_map_get";
+              "POST /chains/*/blocks/*/endorsing_power";
+              "POST /injection/operation";
+            ];
+      }
+
+  let allow_all = Allow_all {except = []}
+
+  let default (address : P2p_addr.t) =
+    let open Ipaddr in
+    if V6.scope address = Interface then allow_all else secure
 
   let empty_policy = []
 
@@ -134,7 +195,7 @@ module Acl = struct
     let open Data_encoding in
     Json.construct policy_encoding policy |> Json.to_string
 
-  let find_policy policies address =
+  let find_policy policies (address, port) =
     let match_addr searched_port searched_addr (endpoint, acl) =
       let open P2p_point.Id in
       match (endpoint.addr = searched_addr, endpoint.port, searched_port) with
@@ -143,7 +204,12 @@ module Acl = struct
           Some acl
       | _ -> None
     in
-    match P2p_point.Id.parse_addr_port_id address with
+    List.find_map (match_addr port address) policies
+
+  let find_policy_by_domain_name policies hostname =
+    match P2p_point.Id.parse_addr_port_id hostname with
     | Error _ -> None
-    | Ok {addr; port; _} -> List.find_map (match_addr port addr) policies
+    | Ok {addr; port; _} -> find_policy policies (addr, port)
+
+  let acl_type = function Allow_all _ -> `Blacklist | Deny_all _ -> `Whitelist
 end

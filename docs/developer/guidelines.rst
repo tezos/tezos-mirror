@@ -319,6 +319,35 @@ The ``Lwtreslib`` and the ``Error_monad`` libraries provide functions that can
 help you follow these guidelines. Notably, ``traces`` allow callers to
 contextualise the errors produced by its callees.
 
+RPC security
+------------
+
+During the development of the codebase a lot of RPC endpoints were created, some
+of which are responsible for delicate or computationally intense tasks like
+validating blocks or executing Michelson scripts. While some of them are
+necessary for the node's users to interact with the blockchain, others are there
+to expose API to processes responsible for baking and endorsing, for
+configuration or debugging purposes or to facilitate development of smart
+contracts.
+
+In order to mitigate risks related to exposing these endpoints, Access Control
+Lists (ACL for short) were introduced to limit the scope of API exposed to
+public networks (see also :ref:`configure_rpc`). While node administrators are
+free to configure these ACLs however they like, there is the default ACL
+hard-coded in ``src/lib_rpc_http/RPC_server.ml``, which lists all the endpoints
+that are **exposed by default**.
+
+When adding a new RPC endpoint, please consider whether or not there is a reason
+to call it over a public network. If the answer is yes, you should probably
+consider adding the new endpoint to the ACL. If there are also risks related to
+calling the endpoint by a potentially malicious user, they should be weighed
+when making the decision too. There are no simple answers here. Remember that
+all new endpoints are **blocked be default** unless explicitly added to the ACL.
+
+When changing an existing public RPC endpoint it is also important to consider,
+how does the change impact possible risks related to calling the endpoint.
+Should it be removed from the ACL?
+
 Coding conventions
 ------------------
 

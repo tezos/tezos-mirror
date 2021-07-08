@@ -94,10 +94,11 @@ RPC parameters
 RPC parameters allow to customize the :doc:`JSON/RPC interface <../developer/rpc>`, by defining for instance hosts to listen for RPC requests, or a certificate/key file necessary when TLS is used.
 
 Access to RPC endpoints can be restricted using an Access Control List. The
-default policy for now is to allow access to all paths, but this is not very
-safe and will likely change in the future. Such a list can be put in the
-configuration file. In the ``rpc`` object a key ``acl`` can be included,
-containing a list of policies for different listening addresses:
+default policy grants full access to clients connecting from local machine,
+but only allows *safe* endpoints if accessed remotely (see :ref:`default_acl`
+for details). A custom list can be put in the configuration file. In the ``rpc``
+object a key ``acl`` can be included, containing a list of policies for
+different listening addresses:
 
 .. code-block:: json
 
@@ -132,6 +133,39 @@ A ``**`` stands for any possible path suffix.
    rule on a specific port on a given host and another rule for all other ports
    on the same host, then more specific rules should always be written *first*
    Otherwise they'll be shadowed by the more general rule.
+
+.. _default_acl:
+
+Default ACL for RPC
+-------------------
+
+The default ACL for RPC depends on the listening address that the node is using.
+If the listening address resolves to the loopback network interface, then full
+access to all endpoints is granted. Note, that it does not matter, from which
+machine the client is really making his request, but only what the listening
+address is. This guarantees that insecure endpoints can only be accessed from
+``localhost``.
+
+If the listening address is a network address, then a more restrictive policy
+applies. Its main purpose is to protect nodes from attacks. These attacks can
+take two main forms:
+
+  - spamming the node with costly requests (denial of service attack)
+  - breaking the node by forcing it to perform a risky operation
+
+Thus all costly or risky endpoints are blocked by default. This can be
+relaxed or tightened by modifying the configuration file. It's
+worth noting that this default policy among other things disallows baking and
+endorsing by bakers and endorsers running on remote servers.
+
+This is the default ACL policy for the node (remember to replace
+``any.public.address`` with an IP address or a domain name that you'll be
+actually listening on):
+
+.. literalinclude:: default-acl.json
+
+The endpoints specifically required for baking can be found in
+``vendors/flextesa-lib/tezos-node.ml``.
 
 .. _configure_p2p:
 

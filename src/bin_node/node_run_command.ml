@@ -338,6 +338,12 @@ let launch_rpc_server ?acl (config : Node_config_file.t) node (addr, port) =
     | Some {cert; key} ->
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
   in
+  let acl =
+    let open RPC_server.Acl in
+    Option.either_f acl (fun () ->
+        find_policy config.rpc.acl (Ipaddr.V6.to_string addr, Some port))
+    |> Option.value ~default:(default addr)
+  in
   Event.(emit starting_rpc_server) (host, port, rpc_config.tls <> None)
   >>= fun () ->
   let cors_headers =
@@ -349,7 +355,7 @@ let launch_rpc_server ?acl (config : Node_config_file.t) node (addr, port) =
         ~host
         mode
         dir
-        ?acl
+        ~acl
         ~media_types:Media_type.all_media_types
         ~cors:
           {
@@ -372,12 +378,11 @@ let init_rpc (config : Node_config_file.t) node =
       | [] -> failwith "Cannot resolve listening address: %S" addr
       | addrs ->
           let acl =
-            Option.value ~default:RPC_server.Acl.default
-            @@ RPC_server.Acl.find_policy config.rpc.acl addr
+            RPC_server.Acl.find_policy_by_domain_name config.rpc.acl addr
           in
           List.fold_right_es
             (fun x a ->
-              launch_rpc_server ~acl config node x >>=? fun o -> return (o :: a))
+              launch_rpc_server ?acl config node x >>=? fun o -> return (o :: a))
             addrs
             acc)
     config.rpc.listen_addrs

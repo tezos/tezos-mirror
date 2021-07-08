@@ -53,11 +53,18 @@ module Acl : sig
       to deny/access access policies. *)
   type policy
 
-  (** Default ACL policy in case none is defined in configuration. For the sake
-      of backwards compatibility it allows access to all resources. This will
-      probably change in the future so that access to sensitive resources is
-      restricted. *)
-  val default : t
+  (** Default ACL policy in case none is defined in configuration. It only
+      exposes such endpoints that are necessary for the node to allow clients to
+      make use of their Tez. It applies to all listening addresses except for
+      [localhost] (see {!allow_all} for this address). *)
+  val secure : t
+
+  (** An allow-all policy, which is the default for the [localhost] listening address. *)
+  val allow_all : t
+
+  (** Selects default ACL based on listening address. Selects [allow_all] for
+      loopback addresses and [secure] for everything else. *)
+  val default : P2p_addr.t -> t
 
   (** Add an ACL for given address into the policy. Overrides previously existing
       policy for that address if any. *)
@@ -81,15 +88,22 @@ module Acl : sig
   (** [find_policy policy address] looks for the [address] within the [policy]
       and returns corresponding access control list.
 
-      An ACL is considered matching if its corresponding host-name part matches
-      the host-name part of the [address] and either:
+      An ACL is considered matching if its corresponding IP part matches the IP
+      part of the [address] and either:
       - its corresponding port also matches [address]'s port OR
       - its corresponding address does not mention any port at all.
 
       The first ACL whose corresponding address matches these criteria is
       returned. *)
-  val find_policy : policy -> string -> t option
+  val find_policy : policy -> string * int option -> t option
+
+  (** The same as [find_policy], but it accepts a string representing a domain
+      name address or an IP address (and optionally a port number). *)
+  val find_policy_by_domain_name : policy -> string -> t option
 
   (** Returns string representation of a given matcher. Useful for testing. *)
   val matcher_to_string : matcher -> string
+
+  (** Returns the ACL type, either `Whitelist or `Blacklist. *)
+  val acl_type : t -> [`Whitelist | `Blacklist]
 end

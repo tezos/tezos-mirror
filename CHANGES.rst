@@ -77,6 +77,20 @@ Version 10.0~rc1
 Node
 ----
 
+-  **Breaking change**:
+   Introduced Access Control Lists for RPC servers, which allow to restrict
+   access to selected RPC endpoints for different listening addresses. The
+   default Access Control List is quite restrictive. RPC endpoints that are
+   considered unsafe will now be blocked by default for all requests coming from
+   default Access Control List is quite restrictive. Requests from remote hosts
+   to unsafe RPC endpoints are now blocked by default.
+   Among other things, this breaks bakers and endorsers running
+   remotely. For processes operating on the same host as the node, nothing
+   changes. If necessary, the old behaviour can be restored by editing the
+   node's configuration file, but it is discouraged due to security concerns
+   of open unsafe endpoints on public networks. See Node Configuration section
+   of the Tezos documentation for details.
+
 -  Replaced the chain storage layer with a more efficient backend in
    terms of both performance and storage size.
 
@@ -152,10 +166,6 @@ Node
 
 -  Fixed a potential interleaving of distinct events written to a file
    descriptor sink simultaneously.
-
--  Introduced Access Control Lists for RPC servers, which allow to
-   restrict access to selected RPC endpoints for different listening
-   addresses.
 
 -  You can now control the verbosity of the logs of the context
    storage backend using the ``TEZOS_CONTEXT`` environment

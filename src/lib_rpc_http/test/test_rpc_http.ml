@@ -36,21 +36,7 @@
 module Arbitrary = struct
   open QCheck
   open RPC_server.Acl
-
-  let ipv4 =
-    let open QCheck in
-    map ~rev:Ipaddr.V4.to_int32 Ipaddr.V4.of_int32 int32
-    |> set_print Ipaddr.V4.to_string
-
-  let addr_port_id =
-    let gen =
-      let open Gen in
-      let open P2p_point.Id in
-      let* addr = map Ipaddr.V4.to_string @@ gen ipv4
-      and* port = opt @@ gen Qcheck_helpers.uint16 in
-      pure {addr; port; peer_id = None}
-    in
-    make gen ~print:P2p_point.Id.addr_port_id_to_string
+  open Tz_arbitrary
 
   let meth_matcher : meth_matcher arbitrary =
     oneofl
@@ -232,8 +218,10 @@ let check_find_policy =
     (fun {policy; searched_for; added_entry} ->
       let open RPC_server.Acl in
       let search_str = P2p_point.Id.addr_port_id_to_string searched_for in
-      let before = find_policy policy search_str in
-      let after = find_policy (put_policy added_entry policy) search_str in
+      let before = find_policy_by_domain_name policy search_str in
+      let after =
+        find_policy_by_domain_name (put_policy added_entry policy) search_str
+      in
       assert_results_satisfactory before after)
 
 let mk_acl ((tag, matchers) : [`Whitelist | `Blacklist] * string list) =
@@ -250,7 +238,7 @@ let check_acl_search (description : string)
     (Alcotest.option acl_testable)
     description
     (Option.map mk_acl expected)
-    (RPC_server.Acl.find_policy example_policy addr)
+    (RPC_server.Acl.find_policy_by_domain_name example_policy addr)
 
 let test_finding_policy =
   Alcotest.test_case "policy matching rules" `Quick (fun () ->
@@ -276,11 +264,67 @@ let test_finding_policy =
         (Some (`Whitelist, ["/chains/**"]))
         "localhost:8732")
 
+let ensure_default_policy_parses =
+  let open QCheck in
+  Test.make
+    ~name:"default policy parses and is of correct type"
+    Tz_arbitrary.ipv6
+    (fun ip_addr ->
+      let expected =
+        let open Ipaddr.V6 in
+        if scope ip_addr = Interface then `Blacklist else `Whitelist
+      in
+      RPC_server.Acl.(acl_type (default ip_addr) = expected))
+
+let ensure_unsafe_rpcs_blocked =
+  let known_unsafe_rpcs =
+    (* These are just examples. Do not rely on it being a complete list. *)
+    [
+      (`DELETE, ["chains"; "main"; "invalid_blocks"; "hash"]);
+      ( `GET,
+        [
+          "fetch_protocol"; "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
+        ] );
+      (`GET, ["network"; "peers"]);
+      (`GET, ["network"; "points"]);
+      (`GET, ["stats"; "gc"]);
+      (`GET, ["stats"; "memory"]);
+      (`GET, ["workers"; "block_validator"]);
+      (`GET, ["workers"; "chain_validators"]);
+      (`GET, ["workers"; "prevalidators"; "main"]);
+      (`PATCH, ["chains"; "main"]);
+      (`POST, ["chains"; "main"; "mempool"; "filter"]);
+      (`POST, ["chains"; "main"; "mempool"; "request_operations"]);
+      (`POST, ["injection"; "block"]);
+      (`POST, ["injection"; "protocol"]);
+    ]
+  in
+  Alcotest.test_case
+    "make sure the default policy blocks known particularly unsafe RPCs"
+    `Quick
+    (fun () ->
+      List.iter
+        (fun (meth, path) ->
+          Alcotest.check'
+            Alcotest.bool
+            ~msg:
+              (Format.sprintf
+                 "%s /%s should be blocked by default!"
+                 (Resto.string_of_meth meth)
+                 (String.concat "/" path))
+            ~expected:false
+            ~actual:RPC_server.Acl.(allowed ~meth ~path secure))
+        known_unsafe_rpcs)
+
 let () =
   let open Qcheck_helpers in
   Alcotest.run
     "tezos-rpc-http"
     [
-      ("qcheck", qcheck_wrap [test_codec_identity; check_find_policy]);
+      ( "qcheck",
+        qcheck_wrap
+          [test_codec_identity; check_find_policy; ensure_default_policy_parses]
+      );
       ("find_policy_matching_rules", [test_finding_policy]);
+      ("ensure_unsafe_rpcs_blocked", [ensure_unsafe_rpcs_blocked]);
     ]
