@@ -77,7 +77,7 @@ module type TitleWithId = sig
 
   module Id : ID
 
-  module Temp_id : TEMP_ID with type t = Id.t
+  module Temp_id : TEMP_ID with type t = private Id.t
 
   module IdSet : Set.S with type elt = Id.t
 end
