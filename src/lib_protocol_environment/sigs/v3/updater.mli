@@ -232,11 +232,3 @@ end
     version (this is not an immediate change). The version must have
     been previously compiled successfully. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
-
-(** Fork a test chain. The forked chain will use the current block
-    as genesis, and [protocol] as economic protocol. The chain will
-    be destroyed when a (successor) block will have a timestamp greater
-    than [expiration]. The protocol must have been previously compiled
-    successfully. *)
-val fork_test_chain :
-  Context.t -> protocol:Protocol_hash.t -> expiration:Time.t -> Context.t Lwt.t
