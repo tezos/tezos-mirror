@@ -1,5 +1,6 @@
 (library
  (name tezos_version)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-version)
  (libraries tezos-base)
  (flags (:standard -open Tezos_base__TzPervasives)))

@@ -1,5 +1,6 @@
 (library
  (name tezos_workers)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-workers)
  (libraries tezos-base
             tezos-stdlib-unix

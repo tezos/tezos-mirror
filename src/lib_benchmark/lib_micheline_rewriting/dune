@@ -1,5 +1,6 @@
 (library
  (name tezos_micheline_rewriting)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-micheline-rewriting)
  (libraries
   ;; External

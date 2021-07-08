@@ -310,6 +310,7 @@ include Tezos_raw_protocol_010_PtGRANAD.Main
 
 (library
  (name tezos_protocol_environment_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-010-PtGRANAD.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -317,6 +318,7 @@ include Tezos_raw_protocol_010_PtGRANAD.Main
 
 (library
  (name tezos_raw_protocol_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-010-PtGRANAD.raw)
  (libraries tezos_protocol_environment_010_PtGRANAD)
  (library_flags (:standard -linkall))
@@ -419,6 +421,7 @@ include Tezos_raw_protocol_010_PtGRANAD.Main
 
 (library
  (name tezos_protocol_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-010-PtGRANAD)
  (libraries
       tezos-protocol-environment
@@ -431,6 +434,7 @@ include Tezos_raw_protocol_010_PtGRANAD.Main
 
 (library
  (name tezos_protocol_010_PtGRANAD_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-010-PtGRANAD)
  (libraries
       tezos-protocol-environment
@@ -443,6 +447,7 @@ include Tezos_raw_protocol_010_PtGRANAD.Main
 
 (library
  (name tezos_embedded_protocol_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-010-PtGRANAD)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-010-PtGRANAD

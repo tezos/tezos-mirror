@@ -262,6 +262,7 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
 
 (library
  (name tezos_protocol_environment_004_Pt24m4xi)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-004-Pt24m4xi.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -269,6 +270,7 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
 
 (library
  (name tezos_raw_protocol_004_Pt24m4xi)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-004-Pt24m4xi.raw)
  (libraries tezos_protocol_environment_004_Pt24m4xi)
  (library_flags (:standard -linkall))
@@ -355,6 +357,7 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
 
 (library
  (name tezos_protocol_004_Pt24m4xi)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-004-Pt24m4xi)
  (libraries
       tezos-protocol-environment
@@ -367,6 +370,7 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
 
 (library
  (name tezos_protocol_004_Pt24m4xi_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-004-Pt24m4xi)
  (libraries
       tezos-protocol-environment
@@ -379,6 +383,7 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
 
 (library
  (name tezos_embedded_protocol_004_Pt24m4xi)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-004-Pt24m4xi)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-004-Pt24m4xi

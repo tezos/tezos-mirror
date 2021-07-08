@@ -1,5 +1,6 @@
 (library
  (name tezos_baking_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-010-PtGRANAD)
  (libraries tezos-base
             tezos-version
@@ -37,6 +38,7 @@
 
 (library
  (name tezos_baking_010_PtGRANAD_commands)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-010-PtGRANAD-commands)
  (libraries tezos-base
             tezos-protocol-010-PtGRANAD
@@ -60,6 +62,7 @@
 
 (library
  (name tezos_baking_010_PtGRANAD_commands_registration)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-010-PtGRANAD-commands.registration)
  (libraries tezos-base
             tezos-protocol-010-PtGRANAD

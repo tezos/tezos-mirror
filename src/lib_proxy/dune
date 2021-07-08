@@ -1,5 +1,6 @@
 (library
  (name tezos_proxy)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-proxy)
  (libraries
   ringo-lwt

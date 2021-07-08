@@ -310,6 +310,7 @@ include Tezos_raw_protocol_alpha.Main
 
 (library
  (name tezos_protocol_environment_alpha)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-alpha.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -317,6 +318,7 @@ include Tezos_raw_protocol_alpha.Main
 
 (library
  (name tezos_raw_protocol_alpha)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-alpha.raw)
  (libraries tezos_protocol_environment_alpha)
  (library_flags (:standard -linkall))
@@ -420,6 +422,7 @@ include Tezos_raw_protocol_alpha.Main
 
 (library
  (name tezos_protocol_alpha)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-alpha)
  (libraries
       tezos-protocol-environment
@@ -432,6 +435,7 @@ include Tezos_raw_protocol_alpha.Main
 
 (library
  (name tezos_protocol_alpha_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-alpha)
  (libraries
       tezos-protocol-environment
@@ -444,6 +448,7 @@ include Tezos_raw_protocol_alpha.Main
 
 (library
  (name tezos_embedded_protocol_alpha)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-alpha)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-alpha

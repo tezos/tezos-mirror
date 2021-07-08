@@ -1,5 +1,6 @@
 (library
  (name tezos_p2p_services)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-p2p-services)
  (libraries tezos-base )
  (flags (:standard -linkall

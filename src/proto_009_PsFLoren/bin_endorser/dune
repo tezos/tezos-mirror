@@ -1,5 +1,6 @@
 (executable
  (name main_endorser_009_PsFLoren)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-endorser-009-PsFLoren)
  (libraries tezos-client-base-unix
             tezos-client-commands

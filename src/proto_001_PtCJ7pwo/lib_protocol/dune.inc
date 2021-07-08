@@ -259,6 +259,7 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
 
 (library
  (name tezos_protocol_environment_001_PtCJ7pwo)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-001-PtCJ7pwo.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -266,6 +267,7 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
 
 (library
  (name tezos_raw_protocol_001_PtCJ7pwo)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-001-PtCJ7pwo.raw)
  (libraries tezos_protocol_environment_001_PtCJ7pwo)
  (library_flags (:standard -linkall))
@@ -351,6 +353,7 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
 
 (library
  (name tezos_protocol_001_PtCJ7pwo)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-001-PtCJ7pwo)
  (libraries
       tezos-protocol-environment
@@ -363,6 +366,7 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
 
 (library
  (name tezos_protocol_001_PtCJ7pwo_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-001-PtCJ7pwo)
  (libraries
       tezos-protocol-environment
@@ -375,6 +379,7 @@ include Tezos_raw_protocol_001_PtCJ7pwo.Main
 
 (library
  (name tezos_embedded_protocol_001_PtCJ7pwo)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-001-PtCJ7pwo)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-001-PtCJ7pwo

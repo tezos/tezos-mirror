@@ -1,5 +1,6 @@
 (library
  (name tezos_event_logging)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-event-logging)
  (flags (:standard -open Tezos_stdlib
                    -open Data_encoding

@@ -1,5 +1,6 @@
 (executable
  (name main_endorser_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-endorser-010-PtGRANAD)
  (libraries tezos-client-base-unix
             tezos-client-commands

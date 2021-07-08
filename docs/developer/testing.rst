@@ -343,35 +343,20 @@ project directory:
     make build-dev-deps
 
 The OCaml code should be instrumented in order to generate coverage data. This
-has to be specified in ``dune`` files (or ``dune.inc`` for protocols)
-on a per-package basis by adding the following line in the ``library``
-or ``executable`` stanza.
+is done by prepending
 
 ::
 
-    (preprocess (pps bisect_ppx -- --bisect-file /path/to/tezos.git/_coverage_output))))
+   COVERAGE_OPTIONS="--instrument-with bisect_ppx" BISECT_FILE=$(pwd)/_coverage_output/
 
-At the same time, it tells ``bisect_ppx`` to generate coverage data in the
-``_coverage_output`` directory.
-The convenience script ``./scripts/instrument_dune_bisect.sh`` does
-this automatically. For instance,
+to build and test commands. For example,
 
 ::
 
-    ./scripts/instrument_dune_bisect.sh src/lib_p2p/dune src/proto_alpha/lib_protocol/dune.inc
+   COVERAGE_OPTIONS="--instrument-with bisect_ppx" BISECT_FILE=$(pwd)/_coverage_output/ make
+   COVERAGE_OPTIONS="--instrument-with bisect_ppx" BISECT_FILE=$(pwd)/_coverage_output/ make test-coverage
 
-enables code coverage analysis for ``lib_p2p`` and ``proto_alpha``.
-To instrument all the code in ``src/``, use:
-
-::
-
-    ./scripts/instrument_dune_bisect.sh src/
-
-Then, compile the code using ``make``, ignoring warnings such as
-``.merlin generated is inaccurate.`` which
-`are expected <https://discuss.ocaml.org/t/ann-dune-1-10-0/3896/3>`_.
-Finally run any number of tests, and
-generate the HTML report from the coverage files using
+Generate the HTML report from the coverage files using
 
 ::
 
@@ -388,17 +373,12 @@ Clean up coverage data (output and report) with:
     make coverage-clean
 
 
-To reset the updated ``dune`` files, you may either use ``git``:
+To add a library or executable to the coverage report, add this to its ``dune``
+file:
 
 ::
 
-    git checkout -- src/lib_p2p/dune src/proto_alpha/lib_protocol/dune.inc
-
-or use the ``--remove`` option of the instrumentation script:
-
-::
-
-    ./scripts/instrument_dune_bisect.sh --remove src/
+   (instrumentation (backend bisect_ppx))
 
 
 Known issues
@@ -413,25 +393,6 @@ Known issues
        4410  *** invalid file: '_coverage_output/819770417.coverage' error: "unexpected end of file while reading magic number"
 
    In that case, either delete the problematic files or re-launch the tests and re-generate the report.
-
-2. Instrumented code doesn't compile on certain pattern-matching constructs
-   with ``bisect_ppx <= 2.5.0``
-
-   ::
-
-        File "src/proto_008_PtEdoTez/lib_protocol/script_ir_translator.ml", line 1074, characters 13-14:
-        1074 |   | Lambda_t _
-
-        Error: This pattern matches values of type $5 ty
-            but a pattern was expected which matches values of type 'a ty
-            The type constructor $5 would escape its scope
-
-    This issue is solved in the development version of ``bisect_ppx``. It can
-    be obtained with
-
-    ::
-
-        opam pin add bisect_ppx.2.5.0 --dev-repo --yes
 
 Executing tests through the GitLab CI
 -------------------------------------

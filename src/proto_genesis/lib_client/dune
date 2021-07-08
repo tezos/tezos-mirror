@@ -1,5 +1,6 @@
 (library
  (name tezos_client_genesis)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-genesis)
  (libraries tezos-base
             tezos-shell-services

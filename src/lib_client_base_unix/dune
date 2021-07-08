@@ -1,5 +1,6 @@
 (library
  (name tezos_client_base_unix)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-base-unix)
  (libraries tezos-base
             tezos-client-base

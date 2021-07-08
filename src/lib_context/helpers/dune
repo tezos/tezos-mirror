@@ -1,5 +1,6 @@
 (library
  (name tezos_context_helpers)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-context.helpers)
  (libraries tezos-base
             tezos-context.encoding

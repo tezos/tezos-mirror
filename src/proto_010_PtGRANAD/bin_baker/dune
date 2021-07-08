@@ -1,5 +1,6 @@
 (executable
  (name main_baker_010_PtGRANAD)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baker-010-PtGRANAD)
  (libraries tezos-client-base-unix
             tezos-client-commands

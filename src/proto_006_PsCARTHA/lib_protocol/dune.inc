@@ -265,6 +265,7 @@ include Tezos_raw_protocol_006_PsCARTHA.Main
 
 (library
  (name tezos_protocol_environment_006_PsCARTHA)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-006-PsCARTHA.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -272,6 +273,7 @@ include Tezos_raw_protocol_006_PsCARTHA.Main
 
 (library
  (name tezos_raw_protocol_006_PsCARTHA)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-006-PsCARTHA.raw)
  (libraries tezos_protocol_environment_006_PsCARTHA)
  (library_flags (:standard -linkall))
@@ -359,6 +361,7 @@ include Tezos_raw_protocol_006_PsCARTHA.Main
 
 (library
  (name tezos_protocol_006_PsCARTHA)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-006-PsCARTHA)
  (libraries
       tezos-protocol-environment
@@ -371,6 +374,7 @@ include Tezos_raw_protocol_006_PsCARTHA.Main
 
 (library
  (name tezos_protocol_006_PsCARTHA_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-006-PsCARTHA)
  (libraries
       tezos-protocol-environment
@@ -383,6 +387,7 @@ include Tezos_raw_protocol_006_PsCARTHA.Main
 
 (library
  (name tezos_embedded_protocol_006_PsCARTHA)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-006-PsCARTHA)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-006-PsCARTHA

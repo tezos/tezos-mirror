@@ -265,6 +265,7 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
 
 (library
  (name tezos_protocol_environment_005_PsBABY5H)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-005-PsBABY5H.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -272,6 +273,7 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
 
 (library
  (name tezos_raw_protocol_005_PsBABY5H)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-005-PsBABY5H.raw)
  (libraries tezos_protocol_environment_005_PsBABY5H)
  (library_flags (:standard -linkall))
@@ -359,6 +361,7 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
 
 (library
  (name tezos_protocol_005_PsBABY5H)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-005-PsBABY5H)
  (libraries
       tezos-protocol-environment
@@ -371,6 +374,7 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
 
 (library
  (name tezos_protocol_005_PsBABY5H_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-005-PsBABY5H)
  (libraries
       tezos-protocol-environment
@@ -383,6 +387,7 @@ include Tezos_raw_protocol_005_PsBABY5H.Main
 
 (library
  (name tezos_embedded_protocol_005_PsBABY5H)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-005-PsBABY5H)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-005-PsBABY5H

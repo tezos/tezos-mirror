@@ -31,7 +31,7 @@ all: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
-	@dune build \
+	@dune build $(COVERAGE_OPTIONS) \
 		src/bin_node/main.exe \
 		src/bin_validation/main_validator.exe \
 		src/bin_client/main_client.exe \
@@ -47,23 +47,23 @@ endif
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/mainnet-parameters.json) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/sandbox-parameters.json) \
 		$(foreach p, $(active_protocol_directories), src/proto_$(p)/lib_parameters/test-parameters.json)
-	@cp _build/default/src/bin_node/main.exe tezos-node
-	@cp _build/default/src/bin_validation/main_validator.exe tezos-validator
-	@cp _build/default/src/bin_client/main_client.exe tezos-client
-	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
-	@cp _build/default/src/bin_signer/main_signer.exe tezos-signer
-	@cp _build/default/src/bin_codec/codec.exe tezos-codec
-	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
-	@cp _build/default/src/bin_snoop/main_snoop.exe tezos-snoop
-	@cp _build/default/src/bin_proxy_server/main_proxy_server.exe tezos-proxy-server
+	@cp -f _build/default/src/bin_node/main.exe tezos-node
+	@cp -f _build/default/src/bin_validation/main_validator.exe tezos-validator
+	@cp -f _build/default/src/bin_client/main_client.exe tezos-client
+	@cp -f _build/default/src/bin_client/main_admin.exe tezos-admin-client
+	@cp -f _build/default/src/bin_signer/main_signer.exe tezos-signer
+	@cp -f _build/default/src/bin_codec/codec.exe tezos-codec
+	@cp -f _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
+	@cp -f _build/default/src/bin_snoop/main_snoop.exe tezos-snoop
+	@cp -f _build/default/src/bin_proxy_server/main_proxy_server.exe tezos-proxy-server
 	@for p in $(active_protocol_directories) ; do \
-	   cp _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
-	   cp _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
-	   cp _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
+	   cp -f _build/default/src/proto_$$p/bin_baker/main_baker_$$p.exe tezos-baker-`echo $$p | tr -- _ -` ; \
+	   cp -f _build/default/src/proto_$$p/bin_endorser/main_endorser_$$p.exe tezos-endorser-`echo $$p | tr -- _ -` ; \
+	   cp -f _build/default/src/proto_$$p/bin_accuser/main_accuser_$$p.exe tezos-accuser-`echo $$p | tr -- _ -` ; \
 	   mkdir -p src/proto_$$p/parameters ; \
-	   cp _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
-	   cp _build/default/src/proto_$$p/lib_parameters/test-parameters.json src/proto_$$p/parameters/test-parameters.json ; \
-	   cp _build/default/src/proto_$$p/lib_parameters/mainnet-parameters.json src/proto_$$p/parameters/mainnet-parameters.json ; \
+	   cp -f _build/default/src/proto_$$p/lib_parameters/sandbox-parameters.json src/proto_$$p/parameters/sandbox-parameters.json ; \
+	   cp -f _build/default/src/proto_$$p/lib_parameters/test-parameters.json src/proto_$$p/parameters/test-parameters.json ; \
+	   cp -f _build/default/src/proto_$$p/lib_parameters/mainnet-parameters.json src/proto_$$p/parameters/mainnet-parameters.json ; \
 	 done
 ifeq ($(MERLIN_INSTALLED),0) # only build tooling support if merlin is installed
 	@dune build @check
@@ -111,7 +111,7 @@ coverage-report-summary:
 .PHONY: build-sandbox
 build-sandbox:
 	@dune build src/bin_sandbox/main.exe
-	@cp _build/default/src/bin_sandbox/main.exe tezos-sandbox
+	@cp -f _build/default/src/bin_sandbox/main.exe tezos-sandbox
 
 .PHONY: build-test
 build-test: build-sandbox
@@ -119,12 +119,12 @@ build-test: build-sandbox
 
 .PHONY: test-protocol-compile
 test-protocol-compile:
-	@dune build @runtest_compile_protocol
-	@dune build @runtest_out_of_opam
+	@dune build $(COVERAGE_OPTIONS) @runtest_compile_protocol
+	@dune build $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
 .PHONY: test-unit
 test-unit:
-	@dune build @runtest
+	@dune build $(COVERAGE_OPTIONS) @runtest
 
 .PHONY: test-python
 test-python: all
@@ -136,13 +136,13 @@ test-flextesa:
 
 .PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
 test-tezt:
-	@dune exec tezt/tests/main.exe
+	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe
 test-tezt-i:
-	@dune exec tezt/tests/main.exe -- --info
+	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --info
 test-tezt-c:
-	@dune exec tezt/tests/main.exe -- --commands
+	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --commands
 test-tezt-v:
-	@dune exec tezt/tests/main.exe -- --verbose
+	@dune exec $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --verbose
 
 .PHONY: test-code
 test-code: test-protocol-compile test-unit test-flextesa test-python test-tezt

@@ -1,5 +1,6 @@
 (library
  (name tezos_client_sapling_alpha)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-client-sapling-alpha)
  (libraries tezos-base
             tezos-crypto

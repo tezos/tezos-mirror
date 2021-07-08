@@ -53,6 +53,7 @@ include Tezos_raw_protocol_%%LIB_VERSION%%.Main
 
 (library
  (name tezos_protocol_environment_%%LIB_VERSION%%)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-%%VERSION%%.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -60,6 +61,7 @@ include Tezos_raw_protocol_%%LIB_VERSION%%.Main
 
 (library
  (name tezos_raw_protocol_%%LIB_VERSION%%)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-%%VERSION%%.raw)
  (libraries tezos_protocol_environment_%%LIB_VERSION%%)
  (library_flags (:standard -linkall))
@@ -79,6 +81,7 @@ include Tezos_raw_protocol_%%LIB_VERSION%%.Main
 
 (library
  (name tezos_protocol_%%LIB_VERSION%%)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-%%VERSION%%)
  (libraries
       tezos-protocol-environment
@@ -91,6 +94,7 @@ include Tezos_raw_protocol_%%LIB_VERSION%%.Main
 
 (library
  (name tezos_protocol_%%LIB_VERSION%%_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-%%VERSION%%)
  (libraries
       tezos-protocol-environment
@@ -103,6 +107,7 @@ include Tezos_raw_protocol_%%LIB_VERSION%%.Main
 
 (library
  (name tezos_embedded_protocol_%%LIB_VERSION%%)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-%%VERSION%%)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-%%VERSION%%

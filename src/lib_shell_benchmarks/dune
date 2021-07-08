@@ -1,5 +1,6 @@
 (library
  (name tezos_shell_benchmarks)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-shell-benchmarks)
  (libraries
   tezos-base

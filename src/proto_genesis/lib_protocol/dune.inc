@@ -67,6 +67,7 @@ include Tezos_raw_protocol_genesis.Main
 
 (library
  (name tezos_protocol_environment_genesis)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-genesis.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -74,6 +75,7 @@ include Tezos_raw_protocol_genesis.Main
 
 (library
  (name tezos_raw_protocol_genesis)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-genesis.raw)
  (libraries tezos_protocol_environment_genesis)
  (library_flags (:standard -linkall))
@@ -95,6 +97,7 @@ include Tezos_raw_protocol_genesis.Main
 
 (library
  (name tezos_protocol_genesis)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-genesis)
  (libraries
       tezos-protocol-environment
@@ -107,6 +110,7 @@ include Tezos_raw_protocol_genesis.Main
 
 (library
  (name tezos_protocol_genesis_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-genesis)
  (libraries
       tezos-protocol-environment
@@ -119,6 +123,7 @@ include Tezos_raw_protocol_genesis.Main
 
 (library
  (name tezos_embedded_protocol_genesis)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-genesis)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-genesis

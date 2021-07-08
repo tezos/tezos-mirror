@@ -1,5 +1,6 @@
 (library
  (name tezos_008_PtEdo2Zk_test_helpers)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-008-PtEdo2Zk-test-helpers)
  (libraries alcotest-lwt
             tezos-base

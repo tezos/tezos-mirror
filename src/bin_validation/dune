@@ -1,5 +1,6 @@
 (library
  (name tezos_validator)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-validator)
  (libraries tezos-base
             tezos-base.unix
@@ -22,6 +23,7 @@
 
 (executable
  (name main_validator)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-validator)
  (package tezos-validator)
  (libraries tezos_validator)

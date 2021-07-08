@@ -12,6 +12,7 @@
 
 (library
  (name tezos_protocol_registerer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler.registerer)
  (libraries tezos-base
             tezos-protocol-environment-sigs)
@@ -21,6 +22,7 @@
 
 (library
  (name tezos_protocol_compiler)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler)
  (libraries tezos-base
             tezos-base.unix
@@ -38,6 +40,7 @@
 
 (library
  (name tezos_protocol_compiler_byte)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler.byte)
  (libraries tezos-base
             tezos-protocol-compiler
@@ -48,6 +51,7 @@
 
 (library
  (name tezos_protocol_compiler_native)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler.native)
  (libraries tezos-base
             tezos-protocol-compiler
@@ -58,6 +62,7 @@
 
 (executable
  (name main_byte)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler-byte)
  (modes native)
  (libraries tezos_protocol_compiler_byte)
@@ -66,6 +71,7 @@
 
 (executable
  (name main_native)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler)
  (modes native)
  (libraries tezos_protocol_compiler_native)
@@ -74,6 +80,7 @@
 
 (executable
  (name main_packer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-compiler.tezos-protocol-packer)
  (libraries tezos-base
             tezos-protocol-compiler
@@ -85,6 +92,7 @@
 
 (executable
  (name main_embedded_packer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-packer)
  (modes native)
  (libraries tezos-base

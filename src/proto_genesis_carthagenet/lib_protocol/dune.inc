@@ -67,6 +67,7 @@ include Tezos_raw_protocol_genesis_carthagenet.Main
 
 (library
  (name tezos_protocol_environment_genesis_carthagenet)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-genesis-carthagenet.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
@@ -74,6 +75,7 @@ include Tezos_raw_protocol_genesis_carthagenet.Main
 
 (library
  (name tezos_raw_protocol_genesis_carthagenet)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-genesis-carthagenet.raw)
  (libraries tezos_protocol_environment_genesis_carthagenet)
  (library_flags (:standard -linkall))
@@ -95,6 +97,7 @@ include Tezos_raw_protocol_genesis_carthagenet.Main
 
 (library
  (name tezos_protocol_genesis_carthagenet)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-genesis-carthagenet)
  (libraries
       tezos-protocol-environment
@@ -107,6 +110,7 @@ include Tezos_raw_protocol_genesis_carthagenet.Main
 
 (library
  (name tezos_protocol_genesis_carthagenet_functor)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-genesis-carthagenet)
  (libraries
       tezos-protocol-environment
@@ -119,6 +123,7 @@ include Tezos_raw_protocol_genesis_carthagenet.Main
 
 (library
  (name tezos_embedded_protocol_genesis_carthagenet)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-embedded-protocol-genesis-carthagenet)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-genesis-carthagenet

@@ -4,6 +4,7 @@
 
 (library
  (name tezos_protocol_environment_structs)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-environment-structs)
  (flags :standard)
  (libraries tezos-stdlib

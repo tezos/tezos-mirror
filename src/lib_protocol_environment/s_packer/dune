@@ -1,5 +1,6 @@
 (library
  (name tezos_protocol_environment_packer)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-environment-packer)
  (modules))
 

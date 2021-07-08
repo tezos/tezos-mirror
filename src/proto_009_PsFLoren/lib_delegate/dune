@@ -1,5 +1,6 @@
 (library
  (name tezos_baking_009_PsFLoren)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-009-PsFLoren)
  (libraries tezos-base
             tezos-version
@@ -34,6 +35,7 @@
 
 (library
  (name tezos_baking_009_PsFLoren_commands)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-009-PsFLoren-commands)
  (libraries tezos-base
             tezos-protocol-009-PsFLoren
@@ -57,6 +59,7 @@
 
 (library
  (name tezos_baking_009_PsFLoren_commands_registration)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-009-PsFLoren-commands.registration)
  (libraries tezos-base
             tezos-protocol-009-PsFLoren

@@ -1,5 +1,6 @@
 (library
  (name tezos_lwt_result_stdlib)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-lwt-result-stdlib)
  (libraries lwt
             tezos-lwt-result-stdlib.bare.sigs

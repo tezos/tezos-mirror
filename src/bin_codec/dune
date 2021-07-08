@@ -1,5 +1,6 @@
 (executables
  (names codec)
+ (instrumentation (backend bisect_ppx))
  (public_names tezos-codec)
  (package tezos-codec)
  (libraries data-encoding

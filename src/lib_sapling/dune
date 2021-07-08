@@ -5,6 +5,7 @@
 
 (library
  (name tezos_sapling)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-sapling)
  (libraries ctypes ctypes.foreign ctypes.stubs hex data-encoding tezos-crypto tezos-stdlib tezos-error-monad tezos-lwt-result-stdlib)
  (foreign_stubs

@@ -1,5 +1,6 @@
 (library
  (name tezos_stdlib_unix)
+ (instrumentation (backend bisect_ppx))
  (public_name tezos-stdlib-unix)
  (flags (:standard -open Tezos_error_monad
                    -open Tezos_error_monad.TzLwtreslib
