@@ -50,7 +50,7 @@ block. Each block is signed.
 Before being endorsed, blocks are baked. *Baking* is the action of producing and
 signing a block. Corresponding to these two actions of baking and endorsing, at
 each level, two lists of slots are being created: a (conceptually) infinite list
-of baking slots and a list of ``ENDORSERS_PER_BLOCK`` endorsing slots. The index
+of baking slots and a list of ``ENDORSERS_PER_BLOCK`` endorsing slots (the value of ``ENDORSERS_PER_BLOCK`` is one of the :ref:`parameters of the consensus protocol <cs_constants_009>`). The index
 of a baking slot is called a *priority*. Each slot is associated to a
 participant. A participant can appear several times in both lists. The selection
 of participants is at :ref:`random<emmyp_slot_selection_009>`, independently for
@@ -256,12 +256,15 @@ incident. Pragmatically, any baker who either double bakes or endorses in a
 given cycle should immediately stop both baking and endorsing for the rest of
 that cycle.
 
+.. _cs_constants_009:
+.. _cs_constants:
 
-Parameters
-~~~~~~~~~~
+Consensus protocol parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this section we map the above notation to their corresponding parameter
 values.
+Note that these parameters are part of the larger set of :ref:`protocol constants <protocol_constants_009>`.
 
 .. list-table:: Mapping
    :widths: 55 50 25
