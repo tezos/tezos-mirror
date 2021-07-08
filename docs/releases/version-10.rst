@@ -10,9 +10,9 @@ files, which contain the block history. This new storage layer
 provides a more efficient backend in terms of both performance and
 storage size. As a result, the block history maintained by a Mainnet
 node in full mode requires around 6GB of disk space, compared to more
-than 22GB before that. In archive mode, it drops from 56GB to 9GB. It
-also reduces by a factor of more than 2 the time needed to export and
-import snapshots.
+than 22GB before that. In archive mode, it drops from 30 to 60GB down
+to 9GB. It also reduces by a factor of more than 2 the time needed to
+export and import snapshots.
 
 This version also notably introduces an Access Control List (ACL) feature for RPCs,
 a new *light* mode for the client, and a new executable
