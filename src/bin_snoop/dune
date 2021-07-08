@@ -14,8 +14,7 @@
             str
             ocamlgraph
             pyml
-            pyml-plot
-            latex)
+            pyml-plot)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_stdlib_unix
                    -open Tezos_benchmark

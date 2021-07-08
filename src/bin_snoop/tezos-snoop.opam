@@ -17,7 +17,6 @@ depends: [
   "pyml"
   "pyml-plot"
   "ocamlgraph"
-  "latex"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

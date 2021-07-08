@@ -23,11 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Syntax
-
 (* Pretty printing of the generic syntax to latex *)
 
-let rec pp : Format.formatter -> t -> unit =
+let rec pp : Format.formatter -> Latex_syntax.t -> unit =
  fun fmtr text ->
   pp_preamble fmtr text.title ;
   Format.pp_print_list
@@ -76,7 +74,7 @@ and pp_conclusion fmtr =
      \\bibliographystyle{plain}\n\n\
      \\end{document}\n"
 
-and pp_section : Format.formatter -> section -> unit =
+and pp_section : Format.formatter -> Latex_syntax.section -> unit =
  fun fmtr section ->
   match section with
   | Section (name, contents) ->
@@ -87,7 +85,8 @@ and pp_section : Format.formatter -> section -> unit =
         fmtr
         contents
 
-and pp_section_content : Format.formatter -> section_content -> unit =
+and pp_section_content :
+    Format.formatter -> Latex_syntax.section_content -> unit =
  fun fmtr section_content ->
   match section_content with
   | Text text -> pp_text fmtr text
@@ -103,13 +102,13 @@ and pp_section_content : Format.formatter -> section_content -> unit =
       Format.fprintf fmtr "\\caption{%a}@." pp_text caption ;
       Format.fprintf fmtr "\\end{figure}@."
 
-and pp_image_size : Format.formatter -> image_size option -> unit =
+and pp_image_size : Format.formatter -> Latex_syntax.image_size option -> unit =
  fun fmtr image_size_opt ->
   match image_size_opt with
   | None -> Format.fprintf fmtr ""
   | Some (Width_cm i) -> Format.fprintf fmtr "[width=%dcm]" i
 
-and pp_text : Format.formatter -> text -> unit =
+and pp_text : Format.formatter -> Latex_syntax.text -> unit =
  fun fmtr text ->
   Format.pp_print_list
     ~pp_sep:(fun fmtr () -> Format.fprintf fmtr " ")
@@ -117,7 +116,7 @@ and pp_text : Format.formatter -> text -> unit =
     fmtr
     text
 
-and pp_blob : Format.formatter -> blob -> unit =
+and pp_blob : Format.formatter -> Latex_syntax.blob -> unit =
  fun fmtr blob ->
   match blob with
   | Text_blob (style, text) -> (
@@ -127,25 +126,27 @@ and pp_blob : Format.formatter -> blob -> unit =
       | Bold -> Format.fprintf fmtr "\\textbf{%s}" text)
   | Inline_math_blob text -> Format.fprintf fmtr "$%s$" text
 
-and pp_table : Format.formatter -> table -> unit =
+and pp_table : Format.formatter -> Latex_syntax.table -> unit =
  fun fmtr table ->
   match table with
   | (spec, rows) ->
-      let width = spec_width spec in
+      let width = Latex_syntax.spec_width spec in
       if
         not
           (List.for_all
              (fun row ->
-               match row_width row with None -> true | Some w -> w = width)
+               match Latex_syntax.row_width row with
+               | None -> true
+               | Some w -> w = width)
              rows)
-      then failwith "ill-formed table (bad width)" ;
+      then Stdlib.failwith "ill-formed table (bad width)" ;
       Format.fprintf fmtr "\\begin{center}@." ;
       Format.fprintf fmtr "\\begin{longtable}{%a}@." pp_table_spec spec ;
       Format.pp_print_list pp_row fmtr rows ;
       Format.fprintf fmtr "\\end{longtable}@." ;
       Format.fprintf fmtr "\\end{center}@."
 
-and pp_table_spec : Format.formatter -> table_spec -> unit =
+and pp_table_spec : Format.formatter -> Latex_syntax.table_spec -> unit =
  fun fmtr table_spec ->
   Format.pp_print_list
     ~pp_sep:(fun fmtr () -> Format.fprintf fmtr "")
@@ -153,7 +154,7 @@ and pp_table_spec : Format.formatter -> table_spec -> unit =
     fmtr
     table_spec
 
-and pp_spec : Format.formatter -> spec -> unit =
+and pp_spec : Format.formatter -> Latex_syntax.spec -> unit =
  fun fmtr spec ->
   match spec with
   | L -> Format.fprintf fmtr "l"
@@ -161,7 +162,7 @@ and pp_spec : Format.formatter -> spec -> unit =
   | R -> Format.fprintf fmtr "r"
   | Vbar -> Format.fprintf fmtr "|"
 
-and pp_row : Format.formatter -> row -> unit =
+and pp_row : Format.formatter -> Latex_syntax.row -> unit =
  fun fmtr row ->
   match row with
   | Row texts ->
@@ -173,7 +174,7 @@ and pp_row : Format.formatter -> row -> unit =
       Format.fprintf fmtr " \\\\@."
   | Hline -> Format.fprintf fmtr "\\hline@."
 
-and pp_cell_text : Format.formatter -> text -> unit =
+and pp_cell_text : Format.formatter -> Latex_syntax.text -> unit =
  fun fmtr text ->
   Format.pp_print_list
     ~pp_sep:(fun fmtr () -> Format.fprintf fmtr " ")
@@ -181,11 +182,11 @@ and pp_cell_text : Format.formatter -> text -> unit =
     fmtr
     text
 
-and pp_cell_blob : Format.formatter -> blob -> unit =
+and pp_cell_blob : Format.formatter -> Latex_syntax.blob -> unit =
  fun fmtr blob ->
   let blob =
     match blob with
-    | Text_blob (style, text) ->
+    | Latex_syntax.Text_blob (style, text) ->
         let chunks = String.split_on_char '\n' text in
         let text =
           match chunks with
@@ -194,7 +195,7 @@ and pp_cell_blob : Format.formatter -> blob -> unit =
               let s = String.concat " \\\\ " chunks in
               Format.asprintf "\\pbox{20cm}{%s}" s
         in
-        Text_blob (style, text)
+        Latex_syntax.Text_blob (style, text)
     | Inline_math_blob _ -> blob
   in
   pp_blob fmtr blob

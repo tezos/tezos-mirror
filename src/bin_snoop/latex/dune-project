@@ -1,3 +1,0 @@
-(lang dune 2.7)
-(name latzex)
-(formatting (enabled_for ocaml))
