@@ -190,7 +190,7 @@ Node
    ``TEZOS_CONTEXT`` instead (see previous item).
 
 -  Added an RPC to run `TZIP-4
-   views<https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`__
+   views <https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`__
    offchain, accessible via ``../<block_id>/helpers/scripts/run_view``.
 
 Client

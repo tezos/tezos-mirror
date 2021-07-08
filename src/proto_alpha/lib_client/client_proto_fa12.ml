@@ -93,9 +93,9 @@ let () =
     ~title:"The given contract does not implement the FA1.2 interface"
     ~description:
       "An FA1.2 command has referenced a smart contract whose script does not \
-       implement at least one FA1.2 entrypoint, or with an incompatible type. \n\
-       See \
-       https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md \
+       implement at least one FA1.2 entrypoint, or with an incompatible type. \
+       See TZIP-7 \
+       (https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md) \
        for documentation on FA1.2."
     ~pp:(fun ppf (name, ty) ->
       Format.fprintf
@@ -197,9 +197,9 @@ let () =
     ~title:"The allowance change is unsafe"
     ~description:
       "An FA1.2 non-zero allowance change failed because the current allowance \
-       is non-zero.\n\
-       More explanation on why such allowance change is unsafe, please look at \
-       https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md#approve."
+       is non-zero. For more explanation on why such allowance change is \
+       unsafe, please look at TZIP-7 \
+       (https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-7/tzip-7.md#approve)."
     ~pp:(fun ppf previous ->
       Format.fprintf
         ppf
