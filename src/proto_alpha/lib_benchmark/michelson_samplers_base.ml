@@ -61,14 +61,33 @@ module Make_base (P : Michelson_samplers_parameters.S) : Base_S = struct
 
   let nat rng_state =
     let i = Base_samplers.nat ~size:P.parameters.int_size rng_state in
-    match
-      Alpha_context.Script_int.is_nat (Alpha_context.Script_int.of_zint i)
-    with
-    | None -> assert false
-    | Some n -> n
+    Alpha_context.Script_int.abs (Alpha_context.Script_int.of_zint i)
 
-  (* We ought to do better *)
-  let signature _rng_state = Signature.zero
+  let signature rng_state =
+    let i = Random.State.int rng_state 4 in
+    match i with
+    | 0 -> (
+        let open Ed25519 in
+        let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
+        match of_bytes_opt bytes with
+        | None -> assert false
+        | Some s -> Signature.of_ed25519 s)
+    | 1 -> (
+        let open Secp256k1 in
+        let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
+        match of_bytes_opt bytes with
+        | None -> assert false
+        | Some s -> Signature.of_secp256k1 s)
+    | 2 -> (
+        let open P256 in
+        let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
+        match of_bytes_opt bytes with
+        | None -> assert false
+        | Some s -> Signature.of_p256 s)
+    | _ -> (
+        let open Signature in
+        let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
+        match of_bytes_opt bytes with None -> assert false | Some s -> s)
 
   let string rng_state =
     let s =

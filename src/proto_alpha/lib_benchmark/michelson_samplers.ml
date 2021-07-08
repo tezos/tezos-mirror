@@ -119,8 +119,23 @@ type atomic_type_name =
   | `TBls12_381_g2
   | `TBls12_381_fr ]
 
+type non_atomic_type_name =
+  [ `TPair
+  | `TUnion
+  | `TLambda
+  | `TOption
+  | `TList
+  | `TSet
+  | `TMap
+  | `TBig_map
+  | `TContract
+  | `TTicket ]
+
 (* Ensure inclusion of atomic_type_name in type_name *)
 let (_ : atomic_type_name -> type_name) = fun x -> (x :> type_name)
+
+(* Ensure inclusion of non_atomic_type_name in type_name *)
+let (_ : non_atomic_type_name -> type_name) = fun x -> (x :> type_name)
 
 let all_atomic_type_names : atomic_type_name array =
   [|
@@ -142,6 +157,20 @@ let all_atomic_type_names : atomic_type_name array =
     `TBls12_381_g1;
     `TBls12_381_g2;
     `TBls12_381_fr;
+  |]
+
+let all_non_atomic_type_names : non_atomic_type_name array =
+  [|
+    `TPair;
+    `TUnion;
+    `TLambda;
+    `TOption;
+    `TList;
+    `TSet;
+    `TMap;
+    `TBig_map;
+    `TContract;
+    `TTicket;
   |]
 
 type comparable_type_name =
@@ -205,6 +234,13 @@ let all_comparable_atomic_type_names : 'a comparable_and_atomic array =
     `TAddress;
   |]
 
+type 'a comparable_and_non_atomic = 'a
+  constraint 'a = [< comparable_type_name]
+  constraint 'a = [< non_atomic_type_name]
+
+let all_comparable_non_atomic_type_names : 'a comparable_and_non_atomic array =
+  [|`TPair; `TUnion; `TOption|]
+
 (* Ensure inclusion of comparable_and_atomic in type_name *)
 let (_ : 'a comparable_and_atomic -> type_name) = fun x -> (x :> type_name)
 
@@ -212,10 +248,15 @@ let type_names_count = Array.length all_type_names
 
 let atomic_type_names_count = Array.length all_atomic_type_names
 
+let non_atomic_type_names_count = Array.length all_non_atomic_type_names
+
 let comparable_type_names_count = Array.length all_comparable_type_names
 
 let comparable_atomic_type_names_count =
   Array.length all_comparable_atomic_type_names
+
+let comparable_non_atomic_type_names_count =
+  Array.length all_comparable_non_atomic_type_names
 
 (* ------------------------------------------------------------------------- *)
 (* Uniform type name generators *)
@@ -232,6 +273,11 @@ let uniform_atomic_type_name : atomic_type_name sampler =
   let i = Random.State.int rng_state atomic_type_names_count in
   all_atomic_type_names.(i)
 
+let uniform_non_atomic_type_name : non_atomic_type_name sampler =
+ fun rng_state ->
+  let i = Random.State.int rng_state non_atomic_type_names_count in
+  all_non_atomic_type_names.(i)
+
 let uniform_comparable_type_name : comparable_type_name sampler =
  fun rng_state ->
   let i = Random.State.int rng_state comparable_type_names_count in
@@ -241,6 +287,12 @@ let uniform_comparable_atomic_type_name : 'a comparable_and_atomic sampler =
  fun rng_state ->
   let i = Random.State.int rng_state comparable_atomic_type_names_count in
   all_comparable_atomic_type_names.(i)
+
+let uniform_comparable_non_atomic_type_name :
+    'a comparable_and_non_atomic sampler =
+ fun rng_state ->
+  let i = Random.State.int rng_state comparable_non_atomic_type_names_count in
+  all_comparable_non_atomic_type_names.(i)
 
 (* ------------------------------------------------------------------------- *)
 (* Existentially packed typed value. *)
@@ -283,6 +335,9 @@ module type S = sig
 
     val m_comparable_type :
       max_depth:int -> Script_ir_translator.ex_comparable_ty sampler
+
+    val m_comparable_type_by_size :
+      size:int -> Script_ir_translator.ex_comparable_ty sampler
   end
 
   module rec Random_value : sig
@@ -478,6 +533,59 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
             | `TSignature -> return (Ex_comparable_ty (Signature_key None))
             | `TUnit -> return (Ex_comparable_ty (Unit_key None))
             | `TInt -> return (Ex_comparable_ty (Int_key None)))
+
+    let rec m_comparable_type_by_size ~size :
+        Script_ir_translator.ex_comparable_ty sampler =
+      let open M in
+      let open Script_ir_translator in
+      let atomic_case () =
+        let_star uniform_comparable_atomic_type_name (fun at_tn ->
+            return (comparable_type_of_comparable_atomic_type_name at_tn))
+      in
+      let option_case size =
+        let size = size - 1 in
+        let_star (m_comparable_type_by_size ~size) (fun (Ex_comparable_ty t) ->
+            return (Ex_comparable_ty (Option_key (t, None))))
+      in
+      let pair_case size =
+        let size = size - 1 in
+        let_star
+          (Base_samplers.sample_in_interval ~range:{min = 1; max = size - 1})
+          (fun size_left ->
+            let size_right = size - size_left in
+            let_star
+              (m_comparable_type_by_size ~size:size_left)
+              (fun (Ex_comparable_ty l) ->
+                let_star
+                  (m_comparable_type_by_size ~size:size_right)
+                  (fun (Ex_comparable_ty r) ->
+                    return
+                      (Ex_comparable_ty (Pair_key ((l, None), (r, None), None))))))
+      in
+      let union_case size =
+        let size = size - 1 in
+        let_star
+          (Base_samplers.sample_in_interval ~range:{min = 1; max = size - 1})
+          (fun size_left ->
+            let size_right = size - size_left in
+            let_star
+              (m_comparable_type_by_size ~size:size_left)
+              (fun (Ex_comparable_ty l) ->
+                let_star
+                  (m_comparable_type_by_size ~size:size_right)
+                  (fun (Ex_comparable_ty r) ->
+                    return
+                      (Ex_comparable_ty (Union_key ((l, None), (r, None), None))))))
+      in
+
+      if size <= 1 then atomic_case ()
+      else if size = 2 then option_case size
+      else
+        let_star uniform_comparable_non_atomic_type_name (fun cmp_tn ->
+            match cmp_tn with
+            | `TPair -> pair_case size
+            | `TUnion -> union_case size
+            | `TOption -> option_case size)
   end
 
   (* Type-directed generation of random values. *)
@@ -488,6 +596,33 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
 
     val stack : ('a, 'b) Script_typed_ir.stack_ty -> ('a * 'b) sampler
   end = struct
+    let address rng_state =
+      if Michelson_base.bool rng_state then
+        ( Alpha_context.Contract.implicit_contract
+            (Crypto_samplers.pkh rng_state),
+          "default" )
+      else
+        (* For a description of the format, see
+           tezos-codec describe alpha.contract binary encoding *)
+        let bytes =
+          Bytes.cat
+            (Bytes.of_string "\001")
+            (Bytes.cat
+               (Base_samplers.uniform_bytes ~nbytes:20 rng_state)
+               (Bytes.of_string "\000"))
+        in
+        let contract =
+          Data_encoding.Binary.of_bytes_exn
+            Alpha_context.Contract.encoding
+            bytes
+        in
+        let ep = Base_samplers.string ~size:{min = 1; max = 31} rng_state in
+        (contract, ep)
+
+    let chain_id rng_state =
+      let bytes = Base_samplers.uniform_bytes ~nbytes:4 rng_state in
+      Data_encoding.Binary.of_bytes_exn Chain_id.encoding bytes
+
     let rec value : type a. a Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in
       fun typ ->
@@ -504,11 +639,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         | Key_t _ -> Crypto_samplers.pk
         | Timestamp_t _ -> Michelson_base.timestamp
         | Bool_t _ -> Michelson_base.bool
-        | Address_t _ ->
-            fun rng_state ->
-              ( Alpha_context.Contract.implicit_contract
-                  (Crypto_samplers.pkh rng_state),
-                "default" )
+        | Address_t _ -> address
         | Pair_t ((left_t, _, _), (right_t, _, _), _) ->
             M.(
               (* let* left_v = value left_t in
@@ -531,7 +662,7 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
         | Contract_t (arg_ty, _) -> generate_contract arg_ty
         | Operation_t _ -> generate_operation
         | Big_map_t (key_ty, val_ty, _) -> generate_big_map key_ty val_ty
-        | Chain_id_t _ -> M.return Chain_id.zero
+        | Chain_id_t _ -> chain_id
         | Bls12_381_g1_t _ -> generate_bls12_381_g1
         | Bls12_381_g2_t _ -> generate_bls12_381_g2
         | Bls12_381_fr_t _ -> generate_bls12_381_fr
