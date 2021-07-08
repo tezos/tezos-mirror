@@ -15,7 +15,8 @@ also reduces by a factor of more than 2 the time needed to export and
 import snapshots.
 
 This version also notably introduces an Access Control List (ACL) feature for RPCs,
-a new *light* mode for the client, and a new executable ``tezos-proxy-server``.
+a new *light* mode for the client, and a new executable
+:doc:`tezos-proxy-server<../user/proxy-server>`.
 See full `Changelog`_ for more details.
 
 Update Instructions
