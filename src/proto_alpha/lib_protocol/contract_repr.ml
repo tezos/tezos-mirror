@@ -57,7 +57,7 @@ let of_b58check s =
       | P256.Public_key_hash.Data h -> ok (Implicit (Signature.P256 h))
       | Contract_hash.Data h -> ok (Originated h)
       | _ -> error (Invalid_contract_notation s))
-  | _ -> error (Invalid_contract_notation s)
+  | None -> error (Invalid_contract_notation s)
 
 let pp ppf = function
   | Implicit pbk -> Signature.Public_key_hash.pp ppf pbk
