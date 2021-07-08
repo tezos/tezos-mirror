@@ -443,25 +443,21 @@ module Make (E : MENV) = struct
                | Ok result -> RPC_answer.return result
                | Error errs -> RPC_answer.fail errs)))
 
-  let equal_op (a_shell_header, a_operation_data)
-      (b_shell_header, b_operation_data) =
-    Block_hash.equal
-      a_shell_header.Operation.branch
-      b_shell_header.Operation.branch
-    && (* FIXME: the protocol should export equality/comparison functions for its
-          abstract types such as operation_data.
-
-
-          WARNING: the following expression causes an exception to be raised,
-          complaining about functional values
-          Stdlib.( = ) a_operation_data b_operation_data
-       *)
-    Stdlib.compare a_operation_data b_operation_data = 0
+  let hash_op (shell, proto) =
+    let proto =
+      Data_encoding.Binary.to_bytes_exn E.Protocol.operation_data_encoding proto
+    in
+    Operation.hash {shell; proto}
 
   let need_operation shell_header operation_data =
     Mempool.read () >>=? fun mempool_operations ->
     let op = (shell_header, operation_data) in
-    if List.mem ~equal:equal_op op mempool_operations then return_false
+    let op_hash = hash_op op in
+    if
+      List.exists
+        (fun op -> Operation_hash.equal op_hash (hash_op op))
+        mempool_operations
+    then return_false
     else
       let operations = op :: mempool_operations in
       begin_construction () >>=? fun validation_state ->

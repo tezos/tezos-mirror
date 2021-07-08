@@ -54,27 +54,6 @@ val rev_sub : 'a list -> int -> 'a list
 (** [sub l n] is [l] capped to max [n] elements *)
 val sub : 'a list -> int -> 'a list
 
-(** [merge_filter2 ~compare ~f l1 l2] merges two lists ordered by [compare]
-    and whose items can be merged with [f]. Item is discarded or kept whether
-    [f] returns [Some] or [None] *)
-val merge_filter2 :
-  ?finalize:('a list -> 'a list) ->
-  ?compare:('a -> 'a -> int) ->
-  ?f:('a option -> 'a option -> 'a option) ->
-  'a list ->
-  'a list ->
-  'a list
-
-(** [merge2 ~compare ~f l1 l2] merges two lists ordered by [compare] and
-    whose items can be merged with [f] *)
-val merge2 :
-  ?finalize:('a list -> 'a list) ->
-  ?compare:('a -> 'a -> int) ->
-  ?f:('a -> 'a -> 'a) ->
-  'a list ->
-  'a list ->
-  'a list
-
 (** [shuffle l] is a list that contains the same elements as [l] but in a random
     order. *)
 val shuffle : 'a list -> 'a list
