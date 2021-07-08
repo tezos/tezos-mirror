@@ -153,6 +153,10 @@ test-unit: test-nonproto-unit test-proto-unit
 test-python: all
 	@$(MAKE) -C tests_python all
 
+.PHONY: test-python-alpha
+test-python-alpha: all
+	@make -C tests_python alpha
+
 .PHONY: test-flextesa
 test-flextesa:
 	@$(MAKE) -f sandbox.Makefile
