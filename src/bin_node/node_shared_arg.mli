@@ -26,11 +26,18 @@
 
 type net_config
 
+(* NOTE: Some fields are not documented.
+ *       Please help complete it if you can. *)
+
+(** This record represents a collection of command line arguments given when
+    starting the node. *)
 type t = {
   disable_config_validation : bool;
   data_dir : string option;
-  config_file : string;
-  network : net_config option;
+      (** a directory where the node's configuration and state should be
+          stored *)
+  config_file : string;  (** the config.json file to use *)
+  network : net_config option;  (** the P2P network to connect to *)
   connections : int option;
   max_download_speed : int option;
   max_upload_speed : int option;
@@ -40,9 +47,13 @@ type t = {
   peers : string list;
   no_bootstrap_peers : bool;
   listen_addr : string option;
+      (** address to listen to connections from peers *)
   discovery_addr : string option;
   rpc_listen_addrs : string list;
+      (** a list of addresses to listen to RPC requests on *)
   private_mode : bool;
+      (** enables the private mode, see
+          https://tezos.gitlab.io/user/node-configuration.html#private-node *)
   disable_mempool : bool;
   enable_testchain : bool;
   cors_origins : string list;
@@ -53,6 +64,9 @@ type t = {
   history_mode : History_mode.t option;
   synchronisation_threshold : int option;
   latency : int option;
+  allow_all_rpc : P2p_point.Id.addr_port_id list;
+      (** a list of RPC listening addresses for which a full
+          access should be granted *)
 }
 
 module Term : sig

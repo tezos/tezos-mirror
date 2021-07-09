@@ -1249,7 +1249,7 @@ let to_string cfg =
 let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?expected_connections ?max_connections ?max_download_speed ?max_upload_speed
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
-    ?listen_addr ?discovery_addr ?(rpc_listen_addrs = [])
+    ?listen_addr ?discovery_addr ?(rpc_listen_addrs = []) ?(allow_all_rpc = [])
     ?(private_mode = false) ?(disable_mempool = false)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
@@ -1283,6 +1283,14 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       binary_chunks_size = Option.map (fun x -> x lsl 10) binary_chunks_size;
     }
   in
+  let acl =
+    (* Take addresses listed in allow_all_rpc and add each of them with allow_all
+       ACL to the policy. *)
+    List.fold_right
+      RPC_server.Acl.put_policy
+      (List.map (fun addr -> (addr, RPC_server.Acl.allow_all)) allow_all_rpc)
+      cfg.rpc.acl
+  in
   let p2p : p2p =
     {
       expected_pow = Option.value ~default:cfg.p2p.expected_pow expected_pow;
@@ -1302,7 +1310,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       cors_origins = unopt_list ~default:cfg.rpc.cors_origins cors_origins;
       cors_headers = unopt_list ~default:cfg.rpc.cors_headers cors_headers;
       tls = Option.either rpc_tls cfg.rpc.tls;
-      acl = cfg.rpc.acl;
+      acl;
     }
   and log : Lwt_log_sink_unix.cfg =
     {cfg.log with output = Option.value ~default:cfg.log.output log_output}

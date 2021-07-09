@@ -59,6 +59,7 @@ type t = {
   history_mode : History_mode.t option;
   synchronisation_threshold : int option;
   latency : int option;
+  allow_all_rpc : P2p_point.Id.addr_port_id list;
 }
 
 type error +=
@@ -137,7 +138,7 @@ let wrap data_dir config_file network connections max_download_speed
     discovery_addr peers no_bootstrap_peers bootstrap_threshold private_mode
     disable_mempool enable_testchain expected_pow rpc_listen_addrs rpc_tls
     cors_origins cors_headers log_output history_mode synchronisation_threshold
-    latency disable_config_validation =
+    latency disable_config_validation allow_all_rpc =
   let actual_data_dir =
     Option.value ~default:Node_config_file.default_data_dir data_dir
   in
@@ -176,6 +177,7 @@ let wrap data_dir config_file network connections max_download_speed
     history_mode;
     synchronisation_threshold;
     latency;
+    allow_all_rpc;
   }
 
 module Manpage = struct
@@ -535,6 +537,21 @@ module Term = struct
     Arg.(
       value & opt_all string [] & info ~docs ~doc ~docv:"HEADER" ["cors-header"])
 
+  let allow_all_rpc =
+    let addr_port_id str =
+      match P2p_point.Id.parse_addr_port_id str with
+      | Ok addr -> `Ok addr
+      | Error e -> `Error (P2p_point.Id.string_of_parsing_error e)
+    in
+    let doc =
+      "Apply allow-all policy to a given RPC listening address rather than the \
+       safe default."
+    in
+    Arg.(
+      value
+      & opt_all (addr_port_id, P2p_point.Id.pp_addr_port_id) []
+      & info ~docs ~doc ~docv:"ADDR:PORT" ["allow-all-rpc"])
+
   (* Args. *)
 
   let args =
@@ -546,6 +563,7 @@ module Term = struct
     $ enable_testchain $ expected_pow $ rpc_listen_addrs $ rpc_tls
     $ cors_origins $ cors_headers $ log_output $ history_mode
     $ synchronisation_threshold $ latency $ disable_config_validation
+    $ allow_all_rpc
 end
 
 let read_config_file args =
@@ -657,6 +675,7 @@ let read_and_patch_config_file ?(may_override_network = false)
     config_file = _;
     synchronisation_threshold;
     latency;
+    allow_all_rpc;
   } =
     args
   in
@@ -777,6 +796,7 @@ let read_and_patch_config_file ?(may_override_network = false)
     ?listen_addr
     ?discovery_addr
     ~rpc_listen_addrs
+    ~allow_all_rpc
     ~private_mode
     ~disable_mempool
     ~enable_testchain
