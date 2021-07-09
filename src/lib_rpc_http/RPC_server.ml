@@ -212,4 +212,19 @@ module Acl = struct
     | Ok {addr; port; _} -> find_policy policies (addr, port)
 
   let acl_type = function Allow_all _ -> `Blacklist | Deny_all _ -> `Whitelist
+
+  let rec resolve_domain_names = function
+    | [] -> Lwt.return []
+    | (endpoint, acl) :: remainder ->
+        let open P2p_point.Id in
+        let service = Option.fold ~none:"" ~some:Int.to_string endpoint.port in
+        Lwt_utils_unix.getaddrinfo ~node:endpoint.addr ~service ~passive:false
+        >|= List.map (fun (ip_addr, _) ->
+                ( {
+                    endpoint with
+                    addr = Format.asprintf "%a" Ipaddr.V6.pp ip_addr;
+                  },
+                  acl ))
+        >>= fun resolved ->
+        resolve_domain_names remainder >|= fun rem -> resolved @ rem
 end

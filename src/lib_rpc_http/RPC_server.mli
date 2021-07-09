@@ -106,4 +106,13 @@ module Acl : sig
 
   (** Returns the ACL type, either `Whitelist or `Blacklist. *)
   val acl_type : t -> [`Whitelist | `Blacklist]
+
+  (** Replace domain-name addresses in the policy with the IP addresses
+      they resolve to.
+
+      [resolve_domain_names p] returns a policy equivalent to [p] but with all
+      domain-name addresses resolved to IPs. This is useful to make it easier
+      to match them with listening addresses given to the server. *)
+
+  val resolve_domain_names : policy -> policy Lwt.t
 end

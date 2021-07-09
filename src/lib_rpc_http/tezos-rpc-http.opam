@@ -8,6 +8,7 @@ license: "MIT"
 depends: [
   "dune" { >= "2.0" }
   "tezos-base"
+  "tezos-stdlib-unix"
   "resto-directory" { >= "0.6" & < "0.7" }
   "resto-cohttp" { >= "0.6" & < "0.7" }
 ]

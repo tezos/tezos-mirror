@@ -36,11 +36,13 @@
  (instrumentation (backend bisect_ppx))
  (public_name tezos-rpc-http-server)
  (libraries tezos-base
+            tezos-stdlib-unix
             resto-cohttp-server
             resto-acl
             tezos-rpc-http)
  (modules RPC_server RPC_logging)
  (private_modules RPC_logging)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
                    -open Tezos_rpc
                    -open Tezos_rpc_http)))
