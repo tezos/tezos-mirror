@@ -127,6 +127,19 @@ character, which stands for any whole path segment (i.e. it's not allowed to mix
 with other characters in a path segment).
 A ``**`` stands for any possible path suffix.
 
+Additionally ``--allow-all-rpc`` CLI option to ``tezos-node`` can be used to
+simply allow all RPC endpoints on a given address. When passed to
+``tezos-node config`` command, this option modifies the ``config.json`` file,
+putting an appropriate ACL there. When passed to ``tezos-node run``, it
+overrides the settings of the ``config.json`` for this particular run, without
+modifying the file.
+
+.. danger::
+   Exposing all RPCs over the public network is extremely dangerous and
+   strongly advised against. It opens the door widely to DoS attacks
+   and allows anyone to manipulate the node's configuration, inject blocks
+   and in general harm the node's state.
+
 .. warning::
    Rules are always searched from the beginning of the list to the end and
    the first matching address is returned. Therefore if one wants to put one
