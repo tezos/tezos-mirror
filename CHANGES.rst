@@ -411,7 +411,7 @@ Node
    ``"hostname"``. This field can be used to identify the node when
    aggregating events from multiple nodes. Its default value is the
    hostname of the device the node is running on, and it can be
-   customized with environment variable ``TEZOS_NODE_HOSTNAME``.
+   customized with environment variable ``TEZOS_EVENT_HOSTNAME``.
 
 -  Fixed a bug that caused the lack of connection in private network
    with ``--connections`` set to 1.

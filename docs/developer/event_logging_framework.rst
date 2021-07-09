@@ -19,7 +19,7 @@ fields of the events are still evaluated every time, which is usually not an
 issue since they are evaluated anyway by the application code itself).
 
 See for instance
-:src:`bin_node/node_config_file.ml#L1055`:
+:src:`bin_node/node_config_file.ml` (search for the string "declare_"):
 
 -  one declares typed-record events with
    ``Internal_event.Simple.declare_<number-of-fields>``,
@@ -36,7 +36,8 @@ The most generic API for defining events ``Internal_event.Make`` gives full
 expressive power and structure while being 100% lazy.
 
 See for instance:
-:src:`proto_alpha/lib_delegate/client_baking_blocks.ml#L100`:
+:src:`proto_alpha/lib_delegate/client_baking_blocks.ml` (module
+``Block_seen_event``):
 
 -  one needs to call the functor
    ``module Event = Internal_event.Make(Definition)`` where
@@ -54,7 +55,7 @@ chosen URI-scheme should be unique.
 
 See for instance:
 
--  The (simplest) ``Lwt_log_sink``:
-   :src:`lib_event_logging/internal_event.ml$L1530`,
+-  The (simplest) module ``Lwt_log_sink``:
+   :src:`lib_event_logging/internal_event.ml`,
 -  or, the much more complex,
    :src:`lib_stdlib_unix/file_descriptor_sink.ml`.

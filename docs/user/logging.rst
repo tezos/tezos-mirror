@@ -4,8 +4,9 @@ Logging
 Logging features in Tezos allow to monitor its execution and be informed in real
 time about *events* of interest, such as errors, completion of certain steps,
 etc. This is why various software components emit *events* throughout the
-codebase, the logging framework dispatches them to an arbitrary number of
-(active) *sinks* which can filter print, store, or otherwise handle events.
+codebase (see :doc:`../developer/event_logging_framework`), the logging
+framework dispatches them to an arbitrary number of (active) *sinks* which can
+filter print, store, or otherwise handle events.
 
 Events have:
 
@@ -123,10 +124,18 @@ The format of the events is (usually minified):
 .. code:: json
 
    {"fd-sink-item.v0":
-     {"time_stamp": <float-seconds-since-epoch>,
+     {"hostname": <host-name>,
+      "time_stamp": <float-seconds-since-epoch>,
       "section":[ <list-of-strings> ],
       "event":
         <event-specific-json> } }
+
+
+Additionally, the ``"hostname"`` field can be customized with environment
+variable ``TEZOS_EVENT_HOSTNAME``; Its default value is the hostname of the
+device the node is running on.
+
+
 
 File-Tree Sink
 ~~~~~~~~~~~~~~
@@ -211,6 +220,10 @@ called; this should include *all* the regular ``tezos-*`` binaries.
       with ``rpc``,
    -  rules are ordered, i.e., the first pattern that matches, from left to
       right, fires the corresponding rule.
+
+- ``TEZOS_EVENT_HOSTNAME`` is used by the file-descriptor-sink to tweak the JSON
+   output (see above).
+
 
 .. _configure_node_logging:
 
