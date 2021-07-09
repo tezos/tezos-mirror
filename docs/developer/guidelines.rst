@@ -319,6 +319,8 @@ The ``Lwtreslib`` and the ``Error_monad`` libraries provide functions that can
 help you follow these guidelines. Notably, ``traces`` allow callers to
 contextualise the errors produced by its callees.
 
+.. _rpc_security:
+
 RPC security
 ------------
 
