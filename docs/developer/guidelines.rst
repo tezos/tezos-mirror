@@ -331,7 +331,7 @@ configuration or debugging purposes or to facilitate development of smart
 contracts.
 
 In order to mitigate risks related to exposing these endpoints, Access Control
-Lists (ACL for short) were introduced to limit the scope of API exposed to
+Lists (ACL for short) were introduced to limit the scope of the API exposed to
 public networks (see also :ref:`configure_rpc`). While node administrators are
 free to configure these ACLs however they like, there is the default ACL
 hard-coded in ``src/lib_rpc_http/RPC_server.ml``, which lists all the endpoints

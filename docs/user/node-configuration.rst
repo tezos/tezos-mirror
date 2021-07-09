@@ -140,9 +140,10 @@ Default ACL for RPC
 -------------------
 
 The default ACL for RPC depends on the listening address that the node is using.
+
 If the listening address resolves to the loopback network interface, then full
-access to all endpoints is granted. Note, that it does not matter, from which
-machine the client is really making his request, but only what the listening
+access to all endpoints is granted. Note that it does not matter from which
+machine the client is really making a request, but only what the listening
 address is. This guarantees that insecure endpoints can only be accessed from
 ``localhost``.
 
