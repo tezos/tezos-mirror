@@ -166,7 +166,7 @@ actually listening on):
 .. literalinclude:: default-acl.json
 
 The endpoints specifically required for baking can be found in
-``vendors/flextesa-lib/tezos-node.ml``.
+:src:`vendors/flextesa-lib/tezos_node.ml`.
 
 .. _configure_p2p:
 
