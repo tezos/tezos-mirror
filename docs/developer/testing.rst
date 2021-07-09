@@ -349,7 +349,7 @@ is done by prepending
 
    COVERAGE_OPTIONS="--instrument-with bisect_ppx" BISECT_FILE=$(pwd)/_coverage_output/
 
-to build and test commands. For example,
+to build and test commands run from the root of the project directory. For example,
 
 ::
 
@@ -373,12 +373,70 @@ Clean up coverage data (output and report) with:
     make coverage-clean
 
 
-To add a library or executable to the coverage report, add this to its ``dune``
-file:
+If calling ``dune`` directly, instrumentation is achieved by setting
+``BISECT_FILE`` environment variable to an existing directory and
+appending the flag ``--instrument-with``. Let's consider
+``lib_mockup`` as an example:
 
 ::
 
-   (instrumentation (backend bisect_ppx))
+   cd src/lib_mockup
+   mkdir -p _coverage_output/
+   BISECT_FILE=$(pwd)/_coverage_output/ dune build --instrument-with bisect_ppx
+
+Now, still in the ``src/lib_mockup`` directory, run test commands:
+
+::
+
+   BISECT_FILE=$(pwd)/_coverage_output/ dune test -f --instrument-with bisect_ppx
+
+In this folder, we do not have the ``make coverage-report``. However,
+this target is simply a shortcut to the ``bisect-ppx-report`` binary. This
+command must be run from the root of the project:
+
+::
+
+   cd ../../
+   bisect-ppx-report html -o _coverage_report_mockup --coverage-path src/lib_mockup/_coverage_output/
+
+The report will now be found in ``_coverage_report_mockup``.
+
+
+Enabling instrumentation for new libraries and executables
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+To ensure that all libraries and executables are included in the
+coverage report, the following field should be added to all ``library``
+and ``executable(s)`` stanzas in all ``dune`` files, e.g.:
+
+::
+
+ (library
+   (name ...)
+   (instrumentation
+     (backend bisect_ppx)))
+
+This enables the conditional instrumentation of the compilation unit
+through the ``--instrument-with bisect_ppx`` flag as described above.
+
+Exempted from this rule are the ``dune`` files that belong to tests,
+developer utilities and old protocols. In particular:
+
+ - benchmarks, e.g. ``src/lib_shell/bench/dune``
+ - bindings, e.g. ``src/lib_sapling/bindings/dune``
+ - test frameworks, e.g. ``src/bin_sandbox/dune``
+ - test packages, e.g. ``src/*/test/dune``
+ - old protocols, e.g. ``src/proto_00*/*/*dune``
+ - helper utilities, e.g.:
+
+   - ``src/openapi/dune``, (executable name ``openapi``)
+   - ``src/lib_client_base/gen/dune`` (executable name ``bip39_generator``)
+   - ``src/lib_protocol_compiler/dune`` (executable name ``replace``)
+   - ``src/proto_alpha/lib_parameters/dune`` (executable name ``gen``)
+   - ``src/proto_010_PtGRANAD/lib_parameters/dune`` (executable name ``gen``)
+   - ``src/lib_protocol_environment/s_packer/dune`` (executable name ``s_packer``)
+   - ``src/lib_store/legacy_store/dune`` (executable name ``legacy_store_builder``)
+
 
 
 Known issues
