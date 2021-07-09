@@ -9,7 +9,6 @@
    data-encoding
    qcheck-alcotest
    tezos-test-helpers
-   tezos-base-test-helpers
  )
  (flags (:standard
           -open Tezos_base
