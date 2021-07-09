@@ -159,7 +159,8 @@ relaxed or tightened by modifying the configuration file. It's
 worth noting that this default policy among other things disallows baking and
 endorsing by bakers and endorsers running on remote servers.
 
-This is the default ACL policy for the node (remember to replace
+The following is the default ACL policy for the node,
+hard-coded in :src:`src/lib_rpc_http/RPC_server.ml` (remember to replace
 ``any.public.address`` with an IP address or a domain name that you'll be
 actually listening on):
 
