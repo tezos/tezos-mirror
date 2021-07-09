@@ -219,6 +219,9 @@ Node
    views <https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`__
    offchain, accessible via ``../<block_id>/helpers/scripts/run_view``.
 
+- Added a CLI option ``--allow-all-rpc`` to enable full access to all RPC
+  endpoints on a given listening address.
+
 Client
 ------
 
