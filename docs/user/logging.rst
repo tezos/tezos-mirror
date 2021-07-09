@@ -169,13 +169,13 @@ output events of level at least ``Notice``.
 JSON Configuration Format
 -------------------------
 
-A configuration JSON blob, is an object with one field ``"activate"``
+A configuration JSON blob, is an object with one field ``"active_sinks"``
 which contains a list of URIs:
 
 .. code:: json
 
    {
-     "activate": [ <list-of-sink-URIs> ]
+     "active_sinks": [ <list-of-sink-URIs> ]
    }
 
 The URIs are discriminated among the sink implementations above using
@@ -258,7 +258,7 @@ events) this call adds a sink to suddenly start pretty-printing all
 ::
 
    tezos-client rpc post /config/logging with \
-     '{ "activate": [ "file-descriptor-path:///tmp/rpclogs?section-prefix=rpc:debug&format=pp&fresh=true" ] }'
+     '{ "active_sinks": [ "file-descriptor-path:///tmp/rpclogs?section-prefix=rpc:debug&format=pp&fresh=true" ] }'
 
 Client and Baking Daemons
 -------------------------
