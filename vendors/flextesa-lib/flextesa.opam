@@ -15,6 +15,7 @@ depends: [
   "fmt"
   "cohttp-lwt-unix"
   "tezos-base"
+  "tezos-rpc-http-server"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

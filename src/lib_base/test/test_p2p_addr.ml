@@ -31,7 +31,46 @@
 *)
 
 open Lib_test.Qcheck_helpers
-open Tezos_base_test_helpers.Tz_arbitrary
+
+(* Note, this is a duplicate of some functions from
+   Tezos_base_test_helpers.Tz_arbitrary. Unfortunately it's impossible to
+   reuse them, because that would introduce a cyclic dependency between
+   tezos-base-test-helpers and tezos-base packages, which opam would not
+   allow. *)
+module Arbitrary = struct
+  open QCheck
+
+  let port = uint16
+
+  let port_opt = QCheck.option port
+
+  (* could not craft a [p2p_identity QCheck.gen], we use instead a
+     constant [unit -> p2p_identity] which will be applied at each
+     testing points. *)
+
+  let peer_id =
+    QCheck.option QCheck.(map P2p_identity.generate_with_pow_target_0 unit)
+
+  let ipv4 =
+    map ~rev:Ipaddr.V4.to_int32 Ipaddr.V4.of_int32 int32
+    |> set_print Ipaddr.V4.to_string
+
+  let ipv6 =
+    map ~rev:Ipaddr.V6.to_int64 Ipaddr.V6.of_int64 (pair int64 int64)
+    |> set_print Ipaddr.V6.to_string
+
+  let ipv4t = QCheck.triple ipv4 port_opt peer_id
+
+  let ipv6t = QCheck.triple ipv6 port_opt peer_id
+
+  let ipv4_as_v6 =
+    let open QCheck in
+    map Ipaddr.v6_of_v4 ipv4 |> set_print Ipaddr.V6.to_string
+
+  let ip = QCheck.choose [ipv4_as_v6; ipv6]
+
+  let p2p_point_id_t = QCheck.pair ip port
+end
 
 (* To check the round trip property we change the printer for ipv4 and
    ipv6. Otherwise the printer returns an ipv4 printed as an ipv6. *)
@@ -47,7 +86,7 @@ let addr_port_id_v4 =
     (fun (ip, port, peer_id) ->
       let peer_id = Option.map (fun gen -> gen.P2p_identity.peer_id) peer_id in
       P2p_point.Id.{addr = Ipaddr.V4.to_string ip; port; peer_id})
-    ipv4t
+    Arbitrary.ipv4t
   |> QCheck.set_print (Format.asprintf "%a" pp_addr_port_id)
 
 let addr_port_id_v6 =
@@ -55,7 +94,7 @@ let addr_port_id_v6 =
     (fun (ip, port, peer_id) ->
       let peer_id = Option.map (fun gen -> gen.P2p_identity.peer_id) peer_id in
       P2p_point.Id.{addr = P2p_addr.to_string ip; port; peer_id})
-    ipv6t
+    Arbitrary.ipv6t
   |> QCheck.set_print (Format.asprintf "%a" pp_addr_port_id)
 
 let remove_brackets addr =
@@ -94,7 +133,10 @@ let ko_points = process_points "points.ko"
 
 let ip_to_string_from_string =
   let open QCheck in
-  Test.make ~name:"Base.P2p_addr.ip.to-string-from-string" ip (fun t ->
+  Test.make
+    ~name:"Base.P2p_addr.ip.to-string-from-string"
+    Arbitrary.ip
+    (fun t ->
       let open P2p_addr in
       let s = to_string t in
       match of_string_opt s with
@@ -170,7 +212,7 @@ let encode_decode =
   let open QCheck in
   Test.make
     ~name:"Base.P2p_point.id.encode-decode roundtrip"
-    p2p_point_id_t
+    Arbitrary.p2p_point_id_t
     (fun t ->
       let open P2p_point.Id in
       let b = Data_encoding.Binary.to_bytes_exn encoding t in
