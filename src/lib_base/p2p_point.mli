@@ -80,6 +80,8 @@ module Id : sig
 
   val addr_port_id_to_string : addr_port_id -> string
 
+  val pp_addr_port_id : Format.formatter -> addr_port_id -> unit
+
   val hash : t -> int
 end
 
