@@ -53,6 +53,9 @@ module type T = sig
 
   include Environment_protocol_T_V3.T
 
+  val set_log_message_consumer :
+    (Internal_event.level -> string -> unit) -> unit
+
   val environment_version : Protocol.env_version
 end
 

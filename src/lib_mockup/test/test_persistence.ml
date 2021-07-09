@@ -153,6 +153,8 @@ module Mock_protocol : Registration.PROTOCOL = struct
   let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
       ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
     assert false
+
+  let set_log_message_consumer _ = ()
 end
 
 module Mock_mockup : Registration.MOCKUP = struct
