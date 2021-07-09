@@ -128,7 +128,7 @@ with other characters in a path segment).
 A ``**`` stands for any possible path suffix.
 
 .. warning::
-   The policy is always searched from the beginning of the list to the end and
+   Rules are always searched from the beginning of the list to the end and
    the first matching address is returned. Therefore if one wants to put one
    rule on a specific port on a given host and another rule for all other ports
    on the same host, then more specific rules should always be written *first*
