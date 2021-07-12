@@ -33,6 +33,8 @@ through a delegation operation.
 
 Any account can change or revoke its delegate at any time. However, the change
 only becomes effective after ``PRESERVED_CYCLES + 2`` :ref:`cycles <Cycle>`.
+The value ``PRESERVED_CYCLES`` is a
+:ref:`protocol constant <protocol_constants_009>`.
 
 A delegate participates in consensus and in governance with a weight
 proportional with their delegated stake, which includes the balances of
@@ -153,11 +155,26 @@ The PRNG first selects a snapshot from cycle ``n-PRESERVED_CYCLES-2`` and then i
 The slot owner is then the roll owner.
 
 
+.. _protocol_constants:
+.. _protocol_constants_009:
+
+Protocol constants
+------------------
+
+Protocols are parameterized by several parameters called *protocol constants*, which may vary from one protocol to another or from one network to another (for instance, test networks move faster).
+An example of a parameter is the number of tez constituting a roll. This number is given by the constant named ``TOKENS_PER_ROLL``.
+
+The list of protocol constants can be found in the API of the `Constants module <https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-alpha/Tezos_raw_protocol_alpha/Alpha_context/Constants/index.html>`__.
+
+The values of protocol constants can be found using a :ref:`specific RPC call <GET_..--block_id--context--constants>`, as shown in :ref:`this example <get_protocol_constants>`.
+
+In particular, the protocol constants related to the proof-of-stake mechanism are detailed below.
+
 .. _ps_constants:
 .. _ps_constants_009:
 
-Parameters
-----------
+Proof-of-stake parameters
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. list-table::
    :widths: 55 25
