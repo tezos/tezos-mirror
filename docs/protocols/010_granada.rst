@@ -87,7 +87,7 @@ RPC changes
 
 - The RPC ``../<block_id>/required_endorsements`` has been removed. (MR :gl:`!2386`)
 
-- Replace `deposit` by `deposits` in `frozen_balance` RPC. (MR :gl:`!2751`)
+- Replace ``deposit`` by ``deposits`` in ``frozen_balance`` RPC. (MR :gl:`!2751`)
 
 - All the protocol-specific RPCs under the ``helpers`` path have been
   moved from the protocol to the `recently introduced <tezos!2446>`__ RPC
@@ -103,6 +103,7 @@ Metadata changes
 ----------------
 
 In block metadata, two new fields are added:
+
 - ``liquidity_baking_escape_ema`` representing the new value of the exponential moving average for the liquidity baking escape vote.
 - ``implicit_operations_results`` representing results of operations not explicitly appearing in the block, namely migration operations at protocol activation and the liquidity baking subsidy operation at each block.
 
@@ -118,17 +119,17 @@ Minor changes
 - Fix dangling temporary big maps preventing originating contracts with fresh big maps or passing fresh big maps to another contract.
   (MR :gl:`!2839`; Issue :gl:`#1154`)
 
-- Typing of `PAIR k` in Michelson no longer promotes `@` annotations
-  on the stack to `%` annotations in the result type. (MR :gl:`!2815`)
+- Typing of ``PAIR k`` in Michelson no longer promotes ``@`` annotations
+  on the stack to ``%`` annotations in the result type. (MR :gl:`!2815`)
 
 - Fix overconservative detection of overflows in Michelson mutez multiplication,
   and reported error trace when multiplication is overflowing. (MR :gl:`!2947`; Issues :gl:`#958` :gl:`#972`)
 
-- Fix handling of potential integer overflow in `Time_repr` addition. (MR :gl:`!2660`)
+- Fix handling of potential integer overflow in ``Time_repr`` addition. (MR :gl:`!2660`)
 
 - If gas remains for an operation after it gets executed, the remaining
   gas also gets consumed from the block allowance. (MR :gl:`!2880`)
 
-- Increased the max operation time to live (`max_op_ttl`) from 60 to 120. (MR :gl:`!2828`)
+- Increased the max operation time to live (``max_op_ttl``) from 60 to 120. (MR :gl:`!2828`)
 
 - Other internal refactorings or documentation. (MRs :gl:`!2559` :gl:`!2563` :gl:`!2593` :gl:`!2741` :gl:`!2808` :gl:`!2862` :gl:`!2897` :gl:`!2932` :gl:`!2995`)
