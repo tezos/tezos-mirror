@@ -604,24 +604,20 @@ module Make (P : Michelson_samplers_parameters.S) : S = struct
       else
         (* For a description of the format, see
            tezos-codec describe alpha.contract binary encoding *)
-        let bytes =
-          Bytes.cat
-            (Bytes.of_string "\001")
-            (Bytes.cat
-               (Base_samplers.uniform_bytes ~nbytes:20 rng_state)
-               (Bytes.of_string "\000"))
+        let string =
+          "\001" ^ Base_samplers.uniform_string ~nbytes:20 rng_state ^ "\000"
         in
         let contract =
-          Data_encoding.Binary.of_bytes_exn
+          Data_encoding.Binary.of_string_exn
             Alpha_context.Contract.encoding
-            bytes
+            string
         in
         let ep = Base_samplers.string ~size:{min = 1; max = 31} rng_state in
         (contract, ep)
 
     let chain_id rng_state =
-      let bytes = Base_samplers.uniform_bytes ~nbytes:4 rng_state in
-      Data_encoding.Binary.of_bytes_exn Chain_id.encoding bytes
+      let string = Base_samplers.uniform_string ~nbytes:4 rng_state in
+      Data_encoding.Binary.of_string_exn Chain_id.encoding string
 
     let rec value : type a. a Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in

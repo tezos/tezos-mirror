@@ -2586,11 +2586,7 @@ module Raw_importer : IMPORTER = struct
   let load_block_data t =
     let file = Naming.(snapshot_block_data_file t.snapshot_dir |> file_path) in
     Lwt_utils_unix.read_file file >>= fun block_data ->
-    match
-      Data_encoding.Binary.of_bytes_opt
-        block_data_encoding
-        (Bytes.of_string block_data)
-    with
+    match Data_encoding.Binary.of_string_opt block_data_encoding block_data with
     | Some block_data -> return block_data
     | None -> fail (Cannot_read {kind = `Block_data; path = file})
 
@@ -2872,7 +2868,7 @@ module Tar_importer : IMPORTER = struct
         let (_ofs, res) =
           Data_encoding.Binary.read_exn
             Protocol_levels.encoding
-            (Bytes.to_string bytes)
+            (Bytes.unsafe_to_string bytes)
             0
             (Bytes.length bytes)
         in

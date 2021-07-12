@@ -50,9 +50,12 @@ module Make_authenticated_request (T : Tag) : Authenticated_request = struct
     let tag = Bytes.make 1 '0' in
     TzEndian.set_int8 tag 0 T.tag ;
     Bytes.concat
-      (Bytes.of_string "")
+      Bytes.empty
       [
-        Bytes.of_string "\x04"; tag; Signature.Public_key_hash.to_bytes pkh; data;
+        Bytes.unsafe_of_string "\x04";
+        tag;
+        Signature.Public_key_hash.to_bytes pkh;
+        data;
       ]
 
   let encoding =
