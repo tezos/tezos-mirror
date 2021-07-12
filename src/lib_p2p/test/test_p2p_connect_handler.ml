@@ -58,17 +58,10 @@ let test_correct_incoming_connection_number =
         Ptime.Span.of_int_s 5 (* Don't wait too long when the test fails *);
     }
   in
-  let rec socket_accept_hanging_forever ?incoming_message_queue_size
-      ?outgoing_message_queue_size ?binary_chunks_size ~canceler auth_conn
-      encoding =
-    Lwt_unix.sleep 1. >>= fun () ->
-    socket_accept_hanging_forever
-      ?incoming_message_queue_size
-      ?outgoing_message_queue_size
-      ?binary_chunks_size
-      ~canceler
-      auth_conn
-      encoding
+  let socket_accept_hanging_forever ?incoming_message_queue_size:_
+      ?outgoing_message_queue_size:_ ?binary_chunks_size:_ ~canceler:_ _ _ =
+    let rec loop () = Lwt_unix.sleep 1. >>= fun () -> loop () in
+    loop ()
   in
   let dependencies =
     {dependencies with socket_accept = socket_accept_hanging_forever}
