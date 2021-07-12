@@ -114,7 +114,7 @@ In the balance updates of a block metadata, the new origin ``subsidy`` has been 
 Minor changes
 -------------
 
-- Realign voting periods with cycles. (MR :gl:`!2838`; Issue :gl:`#1151`)
+- Realign voting periods with cycles. This makes some RPCs related to voting periods to give bogus results for a few blocks; see details :ref:`below<010_bogus_rpcs>`. (MR :gl:`!2838`; Issue :gl:`#1151`)
 
 - Fix dangling temporary big maps preventing originating contracts with fresh big maps or passing fresh big maps to another contract.
   (MR :gl:`!2839`; Issue :gl:`#1154`)
@@ -133,3 +133,67 @@ Minor changes
 - Increased the max operation time to live (``max_op_ttl``) from 60 to 120. (MR :gl:`!2828`)
 
 - Other internal refactorings or documentation. (MRs :gl:`!2559` :gl:`!2563` :gl:`!2593` :gl:`!2741` :gl:`!2808` :gl:`!2862` :gl:`!2897` :gl:`!2932` :gl:`!2995`)
+
+.. _010_bogus_rpcs:
+
+Bogus RPC results
+-----------------
+
+.. warning::
+   To realign cycles and voting periods, the first voting period of Granada (voting period with index 53) is one block longer than the normal length, that is, it has 40961 blocks instead of 40960.
+
+During this period, the RPC ``../votes/current_period`` (and similarly ``../votes/successor_period`` and the ``voting_period_info`` field of ``../metadata``) gives the following erroneous results:
+
+- The start position of the voting period is 1589247 (not 1589248, as reported).
+- The position in the voting period is 1 higher than reported.
+
+In other words, the generic output for ``../<level>/votes/current_period`` (for ``1589249 <= level <= 1630208``) is and SHOULD BE::
+
+    {
+      "voting_period": {
+        "index": 53,
+        "kind": "proposal",
+        "start_position": 1589248       -- SHOULD BE 1589247
+      },
+      "position": <position>,           -- SHOULD BE <position + 1>
+      "remaining": <remaining>
+    }
+
+The output for ``../<level>/metadata`` has exactly the same errors.
+The output for ``../<level>/votes/successor_period`` has exactly the same errors, where this time ``1589248 <= level <= 1630207``.
+
+
+Moreover, for the first two blocks of this period, the results have a
+few additional errors, beyond the generic errors mentioned above.  For
+the right output for the first two blocks of Granada, see the
+corrections below.
+
+Output for ``../1589247/votes/current_period`` is and SHOULD BE::
+
+    {
+      "voting_period": {
+        "index": 53,                    -- SHOULD BE 52
+        "kind": "proposal",             -- SHOULD BE "adoption"
+        "start_position": 1589248       -- SHOULD BE 1568767
+      },
+      "position": -2,                   -- SHOULD BE 20479
+      "remaining": 40961                -- SHOULD BE 0
+    }
+
+The output for ``../1589247/metadata`` is correct.
+
+
+Output for ``../1589248/votes/current_period`` is and SHOULD BE::
+
+    {
+      "voting_period": {
+        "index": 52,                    -- SHOULD BE 53
+        "kind": "adoption",             -- SHOULD BE "proposal"
+        "start_position": 1548288       -- SHOULD BE 1589247
+      },
+      "position": 40959,                -- SHOULD BE 0
+      "remaining": 0                    -- SHOULD BE 40960
+    }
+
+The output for ``../1589248/metadata`` has exactly the same errors.
+The output for ``../1589247/votes/successor_period`` only contains the generic errors.
