@@ -208,7 +208,7 @@ module S = struct
       RPC_path.(path / "voting_power")
 end
 
-let begin_register () =
+let delegate_register () =
   let open Services_registration in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
       Delegate.list ctxt >>= fun delegates ->
@@ -689,7 +689,7 @@ module Minimal_valid_time = struct
 end
 
 let register () =
-  begin_register () ;
+  delegate_register () ;
   Baking_rights.register () ;
   Endorsing_rights.register () ;
   Endorsing_power.register () ;
