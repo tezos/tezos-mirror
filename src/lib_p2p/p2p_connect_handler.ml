@@ -721,11 +721,29 @@ module Internal_for_tests = struct
       (fun _ -> assert false)
       Data_encoding.unit
 
-  let create ?config ?pool ?log ?triggers ?io_sched ?announced_version
-      ?conn_meta_config ?message_config ?custom_p2p_versions ?encoding ?incoming
-      ?new_connection_hook ?answerer ?dependencies default_conn_meta
-      default_peer_meta : ('msg, 'peer_meta, 'conn_meta) t =
-    let config = Option.value config ~default:dumb_config in
+  let create ?(config = dumb_config) ?pool ?(log = fun _ -> ())
+      ?(triggers = P2p_trigger.create ())
+      ?(io_sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) ())
+      ?(announced_version = Network_version.Internal_for_tests.mock ())
+      ?(conn_meta_config =
+        P2p_params.
+          {
+            conn_meta_encoding = make_crashing_encoding ();
+            conn_meta_value = (fun () -> assert false);
+            private_node = (fun _ -> false);
+          })
+      ?(message_config =
+        P2p_params.
+          {
+            encoding = [];
+            chain_name = Distributed_db_version.Name.of_string "";
+            distributed_db_versions = [Distributed_db_version.zero];
+          }) ?(custom_p2p_versions = [P2p_version.zero])
+      ?(encoding = make_crashing_encoding ())
+      ?(incoming = P2p_point.Table.create ~random:true 53)
+      ?(new_connection_hook = [])
+      ?(answerer = lazy (P2p_protocol.create_private ())) ?dependencies
+      default_conn_meta default_peer_meta : ('msg, 'peer_meta, 'conn_meta) t =
     let pool =
       Option.value_f pool ~default:(fun () ->
           (* Extremely hackish but there aren't many legitimate implementations without asking for the encoding in arg.
@@ -734,51 +752,6 @@ module Internal_for_tests = struct
              a bit too ad hoc. *)
           let crashing_encoding = make_crashing_encoding () in
           P2p_pool.Internal_for_tests.create crashing_encoding default_peer_meta)
-    in
-    let log = Option.value log ~default:(fun _ -> ()) in
-    let triggers =
-      Option.value_f triggers ~default:(fun () -> P2p_trigger.create ())
-    in
-    let io_sched =
-      Option.value_f io_sched ~default:(fun () ->
-          P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) ())
-    in
-    let announced_version =
-      Option.value_f announced_version ~default:(fun () ->
-          Network_version.Internal_for_tests.mock ())
-    in
-    let conn_meta_config =
-      Option.value_f conn_meta_config ~default:(fun () ->
-          P2p_params.
-            {
-              conn_meta_encoding = make_crashing_encoding ();
-              conn_meta_value = (fun () -> assert false);
-              private_node = (fun _ -> false);
-            })
-    in
-    let message_config =
-      Option.value_f message_config ~default:(fun () ->
-          P2p_params.
-            {
-              encoding = [];
-              chain_name = Distributed_db_version.Name.of_string "";
-              distributed_db_versions = [Distributed_db_version.zero];
-            })
-    in
-    let custom_p2p_versions =
-      Option.value custom_p2p_versions ~default:[P2p_version.zero]
-    in
-    let encoding =
-      Option.value_f encoding ~default:(fun () -> make_crashing_encoding ())
-    in
-    let incoming =
-      Option.value_f incoming ~default:(fun () ->
-          P2p_point.Table.create ~random:true 53)
-    in
-    let new_connection_hook = Option.value new_connection_hook ~default:[] in
-    let answerer =
-      Option.value_f answerer ~default:(fun () ->
-          lazy (P2p_protocol.create_private ()))
     in
     let dependencies =
       Option.value ~default:(mock_dependencies default_conn_meta) dependencies
