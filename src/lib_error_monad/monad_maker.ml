@@ -143,11 +143,13 @@ module Make (Trace : Sig.TRACE) :
 
   let when_ cond f = if cond then f () else return_unit
 
-  let dont_wait exc_handler err_handler f =
-    Lwt_utils.dont_wait exc_handler (fun () ->
+  let dont_wait f err_handler exc_handler =
+    Lwt.dont_wait
+      (fun () ->
         f () >>= function
         | Ok () -> Lwt.return_unit
         | Error trace ->
             err_handler trace ;
             Lwt.return_unit)
+      exc_handler
 end

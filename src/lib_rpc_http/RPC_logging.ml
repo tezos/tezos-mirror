@@ -58,7 +58,7 @@ let emit level message =
 
 (** Wrap an lwt computation so that it can return without waiting until the promise
     is resolved. *)
-let wrap_lwt f a = Lwt_utils.dont_wait raise (fun () -> f a)
+let wrap_lwt f a = Lwt.dont_wait (fun () -> f a) raise
 
 (** Avoid calling emit, if sinks would ignore the message anyway. *)
 let if_level_appropriate_or_else ~level if_so if_not fmt =

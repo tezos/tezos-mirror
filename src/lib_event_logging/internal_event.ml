@@ -484,9 +484,10 @@ module Simple = struct
         Lwt.return_unit)
 
   let emit__dont_wait__use_with_care simple_event parameters =
-    Lwt_utils.dont_wait
-      (fun exc -> raise exc) (* emit never lets exceptions escape *)
+    Lwt.dont_wait
       (fun () -> emit simple_event parameters)
+      (fun exc -> raise exc)
+  (* emit never lets exceptions escape *)
 
   let make_section names =
     match names with

@@ -449,17 +449,17 @@ let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
   Chain_id.Table.iter
     (fun chain_id _chain_db ->
       Error_monad.dont_wait
-        (fun exc ->
-          Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+        (fun () ->
+          let meta = P2p.get_peer_metadata p2p gid in
+          Peer_metadata.incr meta (Sent_request Branch) ;
+          P2p.send p2p conn (Get_current_branch chain_id))
         (fun trace ->
           Format.eprintf
             "Uncaught error: %a\n%!"
             Error_monad.pp_print_error
             trace)
-        (fun () ->
-          let meta = P2p.get_peer_metadata p2p gid in
-          Peer_metadata.incr meta (Sent_request Branch) ;
-          P2p.send p2p conn (Get_current_branch chain_id)))
+        (fun exc ->
+          Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)))
     active_chains ;
   state.worker <-
     Lwt_utils.worker

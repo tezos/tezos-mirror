@@ -512,23 +512,15 @@ let accept t fd point =
     || P2p_pool.Points.banned t.pool point
   then
     Error_monad.dont_wait
-      (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+      (fun () -> P2p_fd.close fd)
       (fun trace ->
         Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace)
-      (fun () -> P2p_fd.close fd)
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
   else
     let canceler = Lwt_canceler.create () in
     P2p_point.Table.add t.incoming point canceler ;
-    Lwt_utils.dont_wait
-      (fun exc ->
-        P2p_point.Table.remove t.incoming point ;
-        P2p_pool.greylist_addr t.pool (fst point) ;
-        Format.eprintf
-          "Uncaught exception on incoming connection from %a: %s\n%!"
-          P2p_point.Id.pp
-          point
-          (Printexc.to_string exc))
+    Lwt.dont_wait
       (fun () ->
         with_timeout
           ~canceler
@@ -537,6 +529,14 @@ let accept t fd point =
         >>= fun _ ->
         P2p_point.Table.remove t.incoming point ;
         Lwt.return_unit)
+      (fun exc ->
+        P2p_point.Table.remove t.incoming point ;
+        P2p_pool.greylist_addr t.pool (fst point) ;
+        Format.eprintf
+          "Uncaught exception on incoming connection from %a: %s\n%!"
+          P2p_point.Id.pp
+          point
+          (Printexc.to_string exc))
 
 let fail_unless_disconnected_point point_info =
   match P2p_point_state.get point_info with

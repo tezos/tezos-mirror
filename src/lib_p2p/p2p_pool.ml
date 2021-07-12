@@ -139,9 +139,9 @@ let register_point ?trusted ?expected_peer_id pool ((addr, port) as point) =
   | Some point_info ->
       (match expected_peer_id with
       | Some peer_id ->
-          Lwt_utils.dont_wait
-            (fun _ -> ())
+          Lwt.dont_wait
             (fun () -> set_expected_peer_id pool point peer_id)
+            (fun _ -> ())
       | None -> ()) ;
       (match trusted with
       | Some true -> P2p_point_state.Info.set_trusted point_info

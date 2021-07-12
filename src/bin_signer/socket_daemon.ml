@@ -99,9 +99,7 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
   bind path >>=? fun fds ->
   let rec loop fd =
     Lwt_unix.accept fd >>= fun (cfd, _) ->
-    Lwt_utils.dont_wait
-      (fun exc ->
-        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
+    Lwt.dont_wait
       (fun () ->
         protect
           ~on_error:(function
@@ -116,14 +114,14 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
                   ~check_high_watermark
                   ~require_auth
                   cctxt
-                  cfd)
+                  cfd
+                >>= fun (_ : unit tzresult) -> Lwt.return_unit)
               (fun () ->
-                Lwt_utils_unix.safe_close cfd >>= function
-                | Error trace ->
-                    Format.eprintf "Uncaught error: %a\n%!" pp_print_error trace ;
-                    Lwt.return_unit
-                | Ok () -> Lwt.return_unit))
-        >>= fun _ -> Lwt.return_unit) ;
+                Lwt_utils_unix.safe_close cfd
+                >|= Result.iter_error
+                      (Format.eprintf "Uncaught error: %a\n%!" pp_print_error))))
+      (fun exc ->
+        Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
     loop fd
   in
   List.map_p loop fds >>= return
