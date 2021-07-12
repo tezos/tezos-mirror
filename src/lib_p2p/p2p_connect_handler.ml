@@ -711,6 +711,10 @@ module Internal_for_tests = struct
       listening_port;
     }
 
+  (** An encoding that typechecks for all types, but fails at runtime. This is a placeholder as most tests never go through
+      this encoding. Any test that requires it should provide a valid encoding in whatever mock needs it directly.
+
+      The use of [assert false] rather than raising an error is to let developers have the stack trace, in case of test failure. *)
   let make_crashing_encoding () : 'a Data_encoding.t =
     Data_encoding.conv
       (fun _ -> assert false)
