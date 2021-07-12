@@ -121,3 +121,5 @@ val data_parameter : (Michelson_v1_parser.parsed, full) Clic.parameter
 
 val unparsing_mode_arg :
   default:string -> (Script_ir_translator.unparsing_mode, full) Clic.arg
+
+val enforce_indentation_flag : (bool, full) Clic.arg

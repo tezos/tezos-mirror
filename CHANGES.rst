@@ -43,6 +43,14 @@ Node
 Client
 ------
 
+-  Disabled indentation checking by default in the ``tezos-client
+   convert script`` and ``tezos-client hash script`` commands. In
+   particular, ``tezos-client convert script <script> from Michelson
+   to Michelson`` can now be used as a Michelson script formatter. To
+   force the indentation check, the new ``--enforce-indentation``
+   command line switch can be used.
+
+
 Baker / Endorser / Accuser
 --------------------------
 
@@ -193,8 +201,9 @@ Client
    the nodes). This mode is akin to light clients and SPV clients:
    it uses Merkle proofs to make the light mode super safe.
 
--  Added commands to display the hash of Michelson scripts from files and
-   from addresses.
+-  Added commands to display the hash of Michelson script from files
+   (``tezos-client hash script``) and from addresses (``tezos-client
+   get contract script hash``).
 
 -  Added support for a new generic version of the multisig contract.
 

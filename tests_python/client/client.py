@@ -278,6 +278,18 @@ class Client:
         params = ['get', 'contract', 'script', 'hash', 'for', contract]
         return self.run(params)
 
+    def convert_script(self, inp: str, input_fmt: str, output_fmt: str) -> str:
+        params = [
+            'convert',
+            'script',
+            inp,
+            'from',
+            input_fmt,
+            'to',
+            output_fmt,
+        ]
+        return self.run(params)
+
     def gen_key(
         self, alias: str, args: List[str] = None, stdin: str = ""
     ) -> str:

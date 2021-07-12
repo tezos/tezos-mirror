@@ -1555,3 +1555,34 @@ class TestTZIP4View:
         )
 
         assert const_view_res.result == "5\n" and add_view_res.result == "4\n"
+
+
+@pytest.mark.contract
+@pytest.mark.incremental
+class TestBadIndentation:
+    """Tests for the "hash script" and "convert script" commands on
+    badly-indented scripts."""
+
+    BADLY_INDENTED = os.path.join(ILLTYPED_CONTRACT_PATH, 'badly_indented.tz')
+
+    SCRIPT_HASH = "exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL\n"
+
+    def test_bad_indentation_ill_typed(self, client):
+        with utils.assert_run_failure('syntax error in program'):
+            client.typecheck(self.BADLY_INDENTED)
+
+    def test_bad_indentation_hash(self, client):
+        assert client.hash_script(self.BADLY_INDENTED) == self.SCRIPT_HASH
+
+    def test_formatting(self, client, session):
+        session['formatted_script'] = client.convert_script(
+            self.BADLY_INDENTED, 'Michelson', 'Michelson'
+        )
+
+    def test_formatted_hash(self, client, session):
+        assert (
+            client.hash_script(session['formatted_script']) == self.SCRIPT_HASH
+        )
+
+    def test_formatted_typechecks(self, client, session):
+        client.typecheck(session['formatted_script'], file=False)
