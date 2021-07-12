@@ -117,8 +117,6 @@ type validation_state = {
     Apply_results.packed_successful_manager_operation_result list;
 }
 
-let current_context {ctxt; _} = return (Alpha_context.finalize ctxt).context
-
 let begin_partial_application ~chain_id ~ancestor_context:ctxt
     ~predecessor_timestamp ~predecessor_fitness
     (block_header : Alpha_context.Block_header.t) =

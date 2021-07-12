@@ -79,8 +79,6 @@ module type T = sig
 
   type validation_state
 
-  val current_context : validation_state -> context tzresult Lwt.t
-
   val begin_partial_application :
     chain_id:Chain_id.t ->
     ancestor_context:context ->

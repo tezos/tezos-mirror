@@ -984,8 +984,6 @@ struct
         ()
       >|= wrap_tzresult
 
-    let current_context c = current_context c >|= wrap_tzresult
-
     let apply_operation c o = apply_operation c o >|= wrap_tzresult
 
     let finalize_block c = finalize_block c >|= wrap_tzresult
