@@ -148,7 +148,9 @@ let main () =
   let template = Sys.argv.(1) in
   let destination = Sys.argv.(2) in
   let final_protocol_file = Sys.argv.(3) in
-  let version = try Sys.argv.(4) with _ -> guess_version () in
+  let version =
+    try Sys.argv.(4) with Invalid_argument _ -> guess_version ()
+  in
   let (hash, proto, check_hash) = read_proto destination final_protocol_file in
   process ~template ~destination proto version hash check_hash
 

@@ -71,8 +71,7 @@ module Raw = struct
       dk : Bytes.t;
     }
 
-    let of_bytes b =
-      try Some (R.to_zip32_expanded_spending_key b) with _ -> None
+    let of_bytes b = Option.catch (fun () -> R.to_zip32_expanded_spending_key b)
 
     let to_bytes = R.of_zip32_expanded_spending_key
 
@@ -206,7 +205,7 @@ module Raw = struct
 
     let to_bytes = R.of_zip32_full_viewing_key
 
-    let of_bytes b = try Some (R.to_zip32_full_viewing_key b) with _ -> None
+    let of_bytes b = Option.catch (fun () -> R.to_zip32_full_viewing_key b)
 
     let of_sk (sk : Spending_key.t) =
       Spending_key.
@@ -423,7 +422,7 @@ module Raw = struct
   module CV = struct
     type t = R.cv
 
-    let of_bytes b = try Some (R.to_cv b) with _ -> None
+    let of_bytes b = Option.catch (fun () -> R.to_cv b)
 
     let encoding =
       let open Data_encoding in

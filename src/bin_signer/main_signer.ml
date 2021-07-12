@@ -73,7 +73,7 @@ let magic_bytes_arg =
                   let b = int_of_string s in
                   if b < 0 || b > 255 then raise Exit else b)
                 (String.split ',' s))
-         with _ ->
+         with Failure _ | Exit | Invalid_argument _ ->
            failwith
              "Bad format for magic bytes, a series of numbers is expected, \
               separated by commas."))

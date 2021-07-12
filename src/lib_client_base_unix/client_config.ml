@@ -355,10 +355,9 @@ let wait_parameter () =
       match wait with
       | "no" | "none" -> return_none
       | _ -> (
-          try
-            let w = int_of_string wait in
-            if 0 <= w then return_some w else fail (Invalid_wait_arg wait)
-          with _ -> fail (Invalid_wait_arg wait)))
+          match int_of_string_opt wait with
+          | Some w when 0 <= w -> return_some w
+          | None | Some _ -> fail (Invalid_wait_arg wait)))
 
 let protocol_parameter () =
   parameter (fun _ arg ->

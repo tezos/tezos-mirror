@@ -142,11 +142,11 @@ let trim s =
 
 let print_desc ppf doc =
   let (short, long) =
-    try
-      let len = String.index doc '\n' in
-      ( String.sub doc 0 len,
-        Some (String.sub doc (len + 1) (String.length doc - len - 1)) )
-    with _ -> (doc, None)
+    match String.index_opt doc '\n' with
+    | None -> (doc, None)
+    | Some len ->
+        ( String.sub doc 0 len,
+          Some (String.sub doc (len + 1) (String.length doc - len - 1)) )
   in
   match long with
   | None -> Format.fprintf ppf "%s" short

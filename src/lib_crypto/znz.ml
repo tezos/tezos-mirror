@@ -119,7 +119,7 @@ module MakeZn
       ~prefix:B.b58_prefix
       ~length:32
       ~to_raw:to_bits
-      ~of_raw:(fun s -> try Some (of_bits_exn s) with _ -> None)
+      ~of_raw:(fun s -> Option.catch (fun () -> of_bits_exn s))
       ~wrap:(fun x -> Data x)
 
   include Helpers.MakeB58 (struct

@@ -348,21 +348,22 @@ module Ledger_uri = struct
   let int32_of_path_element_exn ~allow_weak x =
     let failf ppf = Printf.ksprintf Stdlib.failwith ppf in
     let len = String.length x in
-    match x.[len - 1] with
-    | exception _ -> failf "Empty path element"
-    | '\'' | 'h' -> (
-        let intpart = String.sub x 0 (len - 1) in
-        match Int32.of_string_opt intpart with
-        | Some i -> Bip32_path.hard i
-        | None -> failf "Path is not an integer: %S" intpart)
-    | _ when allow_weak -> (
-        match Int32.of_string_opt x with
-        | Some i -> i
-        | None -> failf "Path is not a non-hardened integer: %S" x)
-    | _ ->
-        failf
-          "Non-hardened paths are not allowed for this derivation scheme (%S)"
-          x
+    if len = 0 then failf "Empty path element"
+    else
+      match x.[len - 1] with
+      | '\'' | 'h' -> (
+          let intpart = String.sub x 0 (len - 1) in
+          match Int32.of_string_opt intpart with
+          | Some i -> Bip32_path.hard i
+          | None -> failf "Path is not an integer: %S" intpart)
+      | _ when allow_weak -> (
+          match Int32.of_string_opt x with
+          | Some i -> i
+          | None -> failf "Path is not a non-hardened integer: %S" x)
+      | _ ->
+          failf
+            "Non-hardened paths are not allowed for this derivation scheme (%S)"
+            x
 
   let parse_animals animals =
     match String.split '-' animals with
