@@ -2,6 +2,12 @@
 ; the alternative dependency mechanism of dune to implement optional
 ; dependencies.
 
+; build static executable with --profile static
+(env
+ (static (flags (:standard
+                  -ccopt -static
+                  -cclib "-lusb-1.0 -lhidapi-libusb -ludev"))))
+
 (executables
  (names main_client main_admin)
  (instrumentation (backend bisect_ppx))

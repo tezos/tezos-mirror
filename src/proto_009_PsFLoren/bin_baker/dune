@@ -1,3 +1,9 @@
+; build static executable with --profile static
+(env
+ (static (flags (:standard
+                  -ccopt -static
+                  -cclib "-lusb-1.0 -lhidapi-libusb -ludev"))))
+
 (executable
  (name main_baker_009_PsFLoren)
  (instrumentation (backend bisect_ppx))
