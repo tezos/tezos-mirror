@@ -104,49 +104,36 @@ let arb_tez_sizes =
   let open QCheck in
   map ~rev:Tez.to_mutez Tez.of_mutez_exn arb_ui64_sizes
 
+let test_coherent_mul =
+  QCheck.Test.make
+    ~name:"Tez.(*?) is coherent w.r.t. Z.(*)"
+    QCheck.(pair arb_tez_sizes arb_ui64_sizes)
+    (prop_binop64 Tez.( *? ) Z.( * ))
+
+let test_coherent_sub =
+  QCheck.Test.make
+    ~name:"Tez.(-?) is coherent w.r.t. Z.(-)"
+    QCheck.(pair arb_tez_sizes arb_tez_sizes)
+    (prop_binop Tez.( -? ) Z.( - ))
+
+let test_coherent_add =
+  QCheck.Test.make
+    ~name:"Tez.(+?) is coherent w.r.t. Z.(+)"
+    QCheck.(pair arb_tez_sizes arb_tez_sizes)
+    (prop_binop Tez.( +? ) Z.( + ))
+
+let test_coherent_div =
+  QCheck.Test.make
+    ~name:"Tez.(/?) is coherent w.r.t. Z.(/)"
+    QCheck.(pair arb_tez_sizes arb_ui64_sizes)
+    (fun (a, b) ->
+      QCheck.assume (b > 0L) ;
+      prop_binop64 Tez.( /? ) Z.( / ) (a, b))
+
+let tests =
+  [test_coherent_mul; test_coherent_sub; test_coherent_add; test_coherent_div]
+
 let () =
-  let open Sys in
-  let long_factor = 1000 in
-  let count = 100 in
-  QCheck_base_runner.run_tests_main
-    ~argv
-    [
-      (* Test.
-       * Tez_repr: test that Tez.( *? ) is coherent w.r.t. Z.( * )
-       *)
-      QCheck.Test.make
-        ~long_factor
-        ~count
-        ~name:"Tez_repr: test that Tez.(*?) is coherent w.r.t. Z.(*)"
-        QCheck.(pair arb_tez_sizes arb_ui64_sizes)
-        (prop_binop64 Tez.( *? ) Z.( * ));
-      (* Test.
-       * Tez_repr: test that Tez.(-?) is coherent w.r.t. Z.(-)
-       *)
-      QCheck.Test.make
-        ~long_factor
-        ~count
-        ~name:"Tez_repr: test that Tez.(-?) is coherent w.r.t. Z.(-)"
-        QCheck.(pair arb_tez_sizes arb_tez_sizes)
-        (prop_binop Tez.( -? ) Z.( - ));
-      (* Test.
-       * Tez_repr: test that Tez.(+?) is coherent w.r.t. Z.(+)
-       *)
-      QCheck.Test.make
-        ~long_factor
-        ~count
-        ~name:"Tez_repr: test that Tez.(+?) is coherent w.r.t. Z.(+)"
-        QCheck.(pair arb_tez_sizes arb_tez_sizes)
-        (prop_binop Tez.( +? ) Z.( + ));
-      (* Test.
-       * Tez_repr: test that Tez.(/?) is coherent w.r.t. Z.(/)
-       *)
-      QCheck.Test.make
-        ~long_factor
-        ~count
-        ~name:"Tez_repr: test that Tez.(/?) is coherent w.r.t. Z.(/)"
-        QCheck.(pair arb_tez_sizes arb_ui64_sizes)
-        (fun (a, b) ->
-          QCheck.assume (b > 0L) ;
-          prop_binop64 Tez.( /? ) Z.( / ) (a, b));
-    ]
+  Alcotest.run
+    "Tez_repr"
+    [("Tez_repr", Lib_test.Qcheck_helpers.qcheck_wrap tests)]
