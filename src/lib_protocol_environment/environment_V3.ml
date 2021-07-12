@@ -911,8 +911,6 @@ struct
 
     let activate = Context.set_protocol
 
-    let fork_test_chain = Context.fork_test_chain
-
     module type PROTOCOL =
       Environment_protocol_T_V3.T
         with type context := Context.t
