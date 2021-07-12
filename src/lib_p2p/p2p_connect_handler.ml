@@ -45,19 +45,18 @@ type config = {
 type ('msg, 'peer_meta, 'conn_meta) dependencies = {
   pool_greylist_peer :
     ('msg, 'peer_meta, 'conn_meta) P2p_pool.t -> P2p_peer.Id.t -> unit;
-  (* [P2p_pool.greylist_peer] *)
+      (** [P2p_pool.greylist_peer] *)
   peer_state_info_trusted :
     ( ('msg, 'peer_meta, 'conn_meta) P2p_conn.t,
       'peer_meta,
       'conn_meta )
     P2p_peer_state.Info.t ->
     bool;
-  (* [P2p_peer_state.Info.trusted] *)
+      (** [P2p_peer_state.Info.trusted] *)
   point_state_info_trusted :
     ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_point_state.Info.t -> bool;
-  (* [P2p_point_state.Info.trusted] *)
-  fd_connect : P2p_fd.t -> Unix.sockaddr -> unit Lwt.t;
-  (* [P2p_fd.connect] *)
+      (** [P2p_point_state.Info.trusted] *)
+  fd_connect : P2p_fd.t -> Unix.sockaddr -> unit Lwt.t;  (** [P2p_fd.connect] *)
   socket_authenticate :
     canceler:Lwt_canceler.t ->
     proof_of_work_target:Crypto_box.pow_target ->
@@ -72,7 +71,7 @@ type ('msg, 'peer_meta, 'conn_meta) dependencies = {
     * 'conn_meta P2p_socket.authenticated_connection)
     tzresult
     Lwt.t;
-  (* [P2p_socket.authenticate] *)
+      (** [P2p_socket.authenticate] *)
   socket_accept :
     ?incoming_message_queue_size:int ->
     ?outgoing_message_queue_size:int ->
@@ -81,7 +80,7 @@ type ('msg, 'peer_meta, 'conn_meta) dependencies = {
     'conn_meta P2p_socket.authenticated_connection ->
     'msg P2p_message.t Data_encoding.t ->
     ('msg P2p_message.t, 'conn_meta) P2p_socket.t tzresult Lwt.t;
-      (* [P2p_socket.accept] *)
+      (** [P2p_socket.accept] *)
 }
 
 type ('msg, 'peer_meta, 'conn_meta) t = {

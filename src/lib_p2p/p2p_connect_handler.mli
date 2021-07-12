@@ -141,12 +141,16 @@ module Internal_for_tests : sig
   type ('msg, 'peer, 'conn) dependencies = {
     pool_greylist_peer :
       ('msg, 'peer, 'conn) P2p_pool.t -> P2p_peer.Id.t -> unit;
+        (** [P2p_pool.greylist_peer] *)
     peer_state_info_trusted :
       (('msg, 'peer, 'conn) P2p_conn.t, 'peer, 'conn) P2p_peer_state.Info.t ->
       bool;
+        (** [P2p_peer_state.Info.trusted] *)
     point_state_info_trusted :
       ('msg, 'peer, 'conn) P2p_conn.t P2p_point_state.Info.t -> bool;
+        (** [P2p_point_state.Info.trusted] *)
     fd_connect : P2p_fd.t -> Unix.sockaddr -> unit Lwt.t;
+        (** [P2p_fd.connect] *)
     socket_authenticate :
       canceler:Lwt_canceler.t ->
       proof_of_work_target:Crypto_box.pow_target ->
@@ -160,6 +164,7 @@ module Internal_for_tests : sig
       ('conn P2p_connection.Info.t * 'conn P2p_socket.authenticated_connection)
       tzresult
       Lwt.t;
+        (** [P2p_socket.authenticate] *)
     socket_accept :
       ?incoming_message_queue_size:int ->
       ?outgoing_message_queue_size:int ->
@@ -168,6 +173,7 @@ module Internal_for_tests : sig
       'conn P2p_socket.authenticated_connection ->
       'msg P2p_message.t Data_encoding.t ->
       ('msg P2p_message.t, 'conn) P2p_socket.t tzresult Lwt.t;
+        (** [P2p_socket.accept] *)
   }
 
   (** [mock_dependencies conn] creates [dependencies] that do nothing. [conn] is necessary for the default return value of some functions.
