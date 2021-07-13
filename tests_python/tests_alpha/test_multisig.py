@@ -13,7 +13,7 @@ from typing import List
 import pytest
 from tools import utils, constants
 from client.client import Client
-from .contract_paths import MINI_SCENARIOS_CONTRACT_PATH
+from .contract_paths import MINI_SCENARIOS_CONTRACT_PATH, ATTIC_CONTRACT_PATH
 
 
 def get_keys(client):
@@ -594,3 +594,28 @@ class TestMultisig:
         assert_msig_storage_eq(client, new_storage, expected_storage)
         new_balance = client.get_balance(msig['handle'])
         assert new_balance == current_balance
+
+
+class TestUnsupportedMultisig:
+    """Verify that non-multisig contracts are rejected"""
+
+    def test_deploy_nonmultisig(self, client: Client):
+        contract = os.path.join(ATTIC_CONTRACT_PATH, 'id.tz')
+        client.originate(
+            'id',
+            0,
+            'bootstrap1',
+            contract,
+            args=['--burn-cap', '10.0', '--force', '--init', '""'],
+        )
+        utils.bake(client)
+
+        error_pattern = (
+            'The hash of this script is '
+            'exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL, '
+            'it was not found among in the list of known multisig '
+            'script hashes.'
+        )
+
+        with utils.assert_run_failure(error_pattern):
+            client.msig_transfer('id', 10, 'bootstrap2', 'bootstrap1', [])
