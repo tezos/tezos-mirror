@@ -49,7 +49,7 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION_NON_MIN} as stripper
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/tezos-* /home/tezos/bin/
-RUN strip /home/tezos/bin/tezos*
+RUN chmod +rw /home/tezos/bin/tezos* && strip /home/tezos/bin/tezos*
 
 
 FROM  ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as bare
