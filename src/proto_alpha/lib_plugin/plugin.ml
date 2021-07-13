@@ -425,43 +425,51 @@ module RPC = struct
     let patched_services =
       ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
 
-    let register0_fullctxt s f =
+    let register0_fullctxt ~chunked s f =
       patched_services :=
-        RPC_directory.register !patched_services s (fun ctxt q i ->
+        RPC_directory.register ~chunked !patched_services s (fun ctxt q i ->
             Services_registration.rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
 
-    let register0 s f = register0_fullctxt s (fun {context; _} -> f context)
+    let register0 ~chunked s f =
+      register0_fullctxt ~chunked s (fun {context; _} -> f context)
 
-    let register0_noctxt s f =
+    let register0_noctxt ~chunked s f =
       patched_services :=
-        RPC_directory.register !patched_services s (fun _ q i -> f q i)
+        RPC_directory.register ~chunked !patched_services s (fun _ q i -> f q i)
 
-    let opt_register0_fullctxt s f =
+    let opt_register0_fullctxt ~chunked s f =
       patched_services :=
-        RPC_directory.opt_register !patched_services s (fun ctxt q i ->
+        RPC_directory.opt_register ~chunked !patched_services s (fun ctxt q i ->
             Services_registration.rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
 
-    let opt_register0 s f =
-      opt_register0_fullctxt s (fun {context; _} -> f context)
+    let opt_register0 ~chunked s f =
+      opt_register0_fullctxt ~chunked s (fun {context; _} -> f context)
 
-    let register1_fullctxt s f =
-      patched_services :=
-        RPC_directory.register !patched_services s (fun (ctxt, arg) q i ->
-            Services_registration.rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
-
-    let register1 s f = register1_fullctxt s (fun {context; _} x -> f context x)
-
-    let register2_fullctxt s f =
+    let register1_fullctxt ~chunked s f =
       patched_services :=
         RPC_directory.register
+          ~chunked
+          !patched_services
+          s
+          (fun (ctxt, arg) q i ->
+            Services_registration.rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
+
+    let register1 ~chunked s f =
+      register1_fullctxt ~chunked s (fun {context; _} x -> f context x)
+
+    let register2_fullctxt ~chunked s f =
+      patched_services :=
+        RPC_directory.register
+          ~chunked
           !patched_services
           s
           (fun ((ctxt, arg1), arg2) q i ->
             Services_registration.rpc_init ctxt >>=? fun ctxt ->
             f ctxt arg1 arg2 q i)
 
-    let register2 s f =
-      register2_fullctxt s (fun {context; _} a1 a2 q i -> f context a1 a2 q i)
+    let register2 ~chunked s f =
+      register2_fullctxt ~chunked s (fun {context; _} a1 a2 q i ->
+          f context a1 a2 q i)
   end
 
   let unparsing_mode_encoding =
@@ -987,6 +995,7 @@ module RPC = struct
             Micheline.strip_locations ty_node )
       in
       Registration.register0
+        ~chunked:true
         S.run_code
         (fun
           ctxt
@@ -1040,6 +1049,7 @@ module RPC = struct
                      _;
                    } -> (storage, operations, lazy_storage_diff)) ;
       Registration.register0
+        ~chunked:true
         S.trace_code
         (fun
           ctxt
@@ -1096,6 +1106,7 @@ module RPC = struct
                      },
                      trace ) -> (storage, operations, trace, lazy_storage_diff)) ;
       Registration.register0
+        ~chunked:true
         S.run_view
         (fun
           ctxt
@@ -1163,6 +1174,7 @@ module RPC = struct
             viewer_contract
           >>?= fun parameter -> Lwt.return (Script_repr.force_decode parameter)) ;
       Registration.register0
+        ~chunked:false
         S.typecheck_code
         (fun ctxt () (expr, maybe_gas, legacy) ->
           let legacy = Option.value ~default:false legacy in
@@ -1174,6 +1186,7 @@ module RPC = struct
           Script_ir_translator.typecheck_code ~legacy ctxt expr
           >|=? fun (res, ctxt) -> (res, Gas.level ctxt)) ;
       Registration.register0
+        ~chunked:false
         S.typecheck_data
         (fun ctxt () (data, ty, maybe_gas, legacy) ->
           let legacy = Option.value ~default:false legacy in
@@ -1183,7 +1196,10 @@ module RPC = struct
             | Some gas -> Gas.set_limit ctxt gas
           in
           typecheck_data ~legacy ctxt (data, ty) >|=? fun ctxt -> Gas.level ctxt) ;
-      Registration.register0 S.pack_data (fun ctxt () (expr, typ, maybe_gas) ->
+      Registration.register0
+        ~chunked:true
+        S.pack_data
+        (fun ctxt () (expr, typ, maybe_gas) ->
           let open Script_ir_translator in
           let ctxt =
             match maybe_gas with
@@ -1202,6 +1218,7 @@ module RPC = struct
           Script_ir_translator.pack_data ctxt typ data >|=? fun (bytes, ctxt) ->
           (bytes, Gas.level ctxt)) ;
       Registration.register0
+        ~chunked:true
         S.normalize_data
         (fun ctxt () (expr, typ, unparsing_mode, legacy) ->
           let open Script_ir_translator in
@@ -1214,6 +1231,7 @@ module RPC = struct
           Script_ir_translator.unparse_data ctxt unparsing_mode typ data
           >|=? fun (normalized, _ctxt) -> Micheline.strip_locations normalized) ;
       Registration.register0
+        ~chunked:true
         S.normalize_script
         (fun ctxt () (script, unparsing_mode) ->
           let ctxt = Gas.set_unlimited ctxt in
@@ -1222,7 +1240,7 @@ module RPC = struct
             unparsing_mode
             (Micheline.root script)
           >|=? fun (normalized, _ctxt) -> Micheline.strip_locations normalized) ;
-      Registration.register0 S.normalize_type (fun ctxt () typ ->
+      Registration.register0 ~chunked:true S.normalize_type (fun ctxt () typ ->
           let open Script_ir_translator in
           let ctxt = Gas.set_unlimited ctxt in
           (* Unfortunately, Script_ir_translator.parse_any_ty is not exported *)
@@ -1238,6 +1256,7 @@ module RPC = struct
           let normalized = Unparse_types.unparse_ty typ in
           return @@ Micheline.strip_locations normalized) ;
       Registration.register0
+        ~chunked:true
         S.run_operation
         (fun
           ctxt
@@ -1349,10 +1368,14 @@ module RPC = struct
                 operation.protocol_data.contents
               >|=? fun (_ctxt, result) -> ret result) ;
       Registration.register0
+        ~chunked:true
         S.entrypoint_type
         (fun ctxt () (expr, entrypoint) ->
           script_entrypoint_type ctxt expr entrypoint) ;
-      Registration.register0 S.list_entrypoints (fun ctxt () expr ->
+      Registration.register0
+        ~chunked:true
+        S.list_entrypoints
+        (fun ctxt () expr ->
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = false in
           let open Script_ir_translator in
@@ -1498,6 +1521,7 @@ module RPC = struct
     let register () =
       (* Patched RPC: get_storage *)
       Registration.register1
+        ~chunked:true
         S.get_storage_normalized
         (fun ctxt contract () unparsing_mode ->
           Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
@@ -1518,6 +1542,7 @@ module RPC = struct
               >>?= fun (storage, _ctxt) -> return_some storage) ;
       (* Patched RPC: get_script *)
       Registration.register1
+        ~chunked:true
         S.get_script_normalized
         (fun ctxt contract () unparsing_mode ->
           Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
@@ -1576,6 +1601,7 @@ module RPC = struct
 
     let register () =
       Registration.register2
+        ~chunked:true
         S.big_map_get_normalized
         (fun ctxt id key () unparsing_mode ->
           let open Script_ir_translator in
@@ -1649,12 +1675,16 @@ module RPC = struct
     end
 
     let register () =
-      Registration.register0_noctxt S.operations (fun () (shell, proto) ->
+      Registration.register0_noctxt
+        ~chunked:true
+        S.operations
+        (fun () (shell, proto) ->
           return
             (Data_encoding.Binary.to_bytes_exn
                Operation.unsigned_encoding
                (shell, proto))) ;
       Registration.register0_noctxt
+        ~chunked:true
         S.protocol_data
         (fun
           ()
@@ -1873,7 +1903,10 @@ module RPC = struct
       | Some protocol_data -> protocol_data
 
     let register () =
-      Registration.register0 S.operations (fun _ctxt () (operations, check) ->
+      Registration.register0
+        ~chunked:true
+        S.operations
+        (fun _ctxt () (operations, check) ->
           List.map_es
             (fun raw ->
               parse_operation raw >>?= fun op ->
@@ -1884,7 +1917,7 @@ module RPC = struct
               | Some false | None -> return_unit)
               >|=? fun () -> op)
             operations) ;
-      Registration.register0_noctxt S.block (fun () raw_block ->
+      Registration.register0_noctxt ~chunked:false S.block (fun () raw_block ->
           return @@ parse_protocol_data raw_block.protocol_data)
 
     let operations ctxt block ?check operations =
@@ -1937,10 +1970,13 @@ module RPC = struct
     Parse.register () ;
     Contract.register () ;
     Big_map.register () ;
-    Registration.register0 S.current_level (fun ctxt q () ->
+    Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
         Level.from_raw ctxt ~offset:q.offset (Level.current ctxt).level
         |> return) ;
-    Registration.opt_register0 S.levels_in_current_cycle (fun ctxt q () ->
+    Registration.opt_register0
+      ~chunked:true
+      S.levels_in_current_cycle
+      (fun ctxt q () ->
         let rev_levels =
           Level.levels_in_current_cycle ctxt ~offset:q.offset ()
         in

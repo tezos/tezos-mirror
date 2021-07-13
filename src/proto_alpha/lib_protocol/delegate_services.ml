@@ -210,7 +210,7 @@ end
 
 let register () =
   let open Services_registration in
-  register0 S.list_delegate (fun ctxt q () ->
+  register0 ~chunked:true S.list_delegate (fun ctxt q () ->
       Delegate.list ctxt >>= fun delegates ->
       match q with
       | {active = true; inactive = false} ->
@@ -220,7 +220,7 @@ let register () =
       | {active = false; inactive = true} ->
           List.filter_es (fun pkh -> Delegate.deactivated ctxt pkh) delegates
       | _ -> return delegates) ;
-  register1 S.info (fun ctxt pkh () () ->
+  register1 ~chunked:false S.info (fun ctxt pkh () () ->
       Delegate.full_balance ctxt pkh >>=? fun balance ->
       Delegate.frozen_balance ctxt pkh >>=? fun frozen_balance ->
       Delegate.frozen_balance_by_cycle ctxt pkh
@@ -242,21 +242,23 @@ let register () =
         grace_period;
         voting_power;
       }) ;
-  register1 S.balance (fun ctxt pkh () () -> Delegate.full_balance ctxt pkh) ;
-  register1 S.frozen_balance (fun ctxt pkh () () ->
+  register1 ~chunked:false S.balance (fun ctxt pkh () () ->
+      Delegate.full_balance ctxt pkh) ;
+  register1 ~chunked:false S.frozen_balance (fun ctxt pkh () () ->
       Delegate.frozen_balance ctxt pkh) ;
-  register1 S.frozen_balance_by_cycle (fun ctxt pkh () () ->
+  register1 ~chunked:true S.frozen_balance_by_cycle (fun ctxt pkh () () ->
       Delegate.frozen_balance_by_cycle ctxt pkh >|= ok) ;
-  register1 S.staking_balance (fun ctxt pkh () () ->
+  register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
       Delegate.staking_balance ctxt pkh) ;
-  register1 S.delegated_contracts (fun ctxt pkh () () ->
+  register1 ~chunked:true S.delegated_contracts (fun ctxt pkh () () ->
       Delegate.delegated_contracts ctxt pkh >|= ok) ;
-  register1 S.delegated_balance (fun ctxt pkh () () ->
+  register1 ~chunked:false S.delegated_balance (fun ctxt pkh () () ->
       Delegate.delegated_balance ctxt pkh) ;
-  register1 S.deactivated (fun ctxt pkh () () -> Delegate.deactivated ctxt pkh) ;
-  register1 S.grace_period (fun ctxt pkh () () ->
+  register1 ~chunked:false S.deactivated (fun ctxt pkh () () ->
+      Delegate.deactivated ctxt pkh) ;
+  register1 ~chunked:false S.grace_period (fun ctxt pkh () () ->
       Delegate.grace_period ctxt pkh) ;
-  register1 S.voting_power (fun ctxt pkh () () ->
+  register1 ~chunked:false S.voting_power (fun ctxt pkh () () ->
       Vote.get_voting_power_free ctxt pkh)
 
 let list ctxt block ?(active = true) ?(inactive = false) () =
@@ -452,7 +454,7 @@ module Baking_rights = struct
 
   let register () =
     let open Services_registration in
-    register0 S.baking_rights (fun ctxt q () ->
+    register0 ~chunked:true S.baking_rights (fun ctxt q () ->
         requested_levels
           ~default:
             (Level.succ ctxt (Level.current ctxt), Some (Timestamp.current ctxt))
@@ -574,7 +576,7 @@ module Endorsing_rights = struct
 
   let register () =
     let open Services_registration in
-    register0 S.endorsing_rights (fun ctxt q () ->
+    register0 ~chunked:true S.endorsing_rights (fun ctxt q () ->
         requested_levels
           ~default:(Level.current ctxt, Some (Timestamp.current ctxt))
           ctxt
@@ -627,7 +629,7 @@ module Endorsing_power = struct
 
   let register () =
     let open Services_registration in
-    register0 S.endorsing_power (fun ctxt () (op, chain_id) ->
+    register0 ~chunked:false S.endorsing_power (fun ctxt () (op, chain_id) ->
         endorsing_power ctxt (op, chain_id))
 
   let get ctxt block op chain_id =
@@ -665,7 +667,10 @@ module Minimal_valid_time = struct
 
   let register () =
     let open Services_registration in
-    register0 S.minimal_valid_time (fun ctxt {priority; endorsing_power} () ->
+    register0
+      ~chunked:false
+      S.minimal_valid_time
+      (fun ctxt {priority; endorsing_power} () ->
         let predecessor_timestamp = Timestamp.predecessor ctxt in
         Lwt.return
         @@ minimal_valid_time

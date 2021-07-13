@@ -70,6 +70,9 @@ Protocol Compiler And Environment
 
    -  New features: Timelock, FallbackArray
 
+   -  New feature: chunked transfer encoded RPCs to allow RPCs with large
+      responses to be processed in chunks.
+
 Codec
 -----
 

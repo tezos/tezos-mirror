@@ -46,53 +46,67 @@ let rpc_init ({block_hash; block_header; context} : Updater.rpc_context) =
 let rpc_services =
   ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
 
-let register0_fullctxt s f =
+let register0_fullctxt ~chunked s f =
   rpc_services :=
-    RPC_directory.register !rpc_services s (fun ctxt q i ->
+    RPC_directory.register ~chunked !rpc_services s (fun ctxt q i ->
         rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
 
-let register0 s f = register0_fullctxt s (fun {context; _} -> f context)
+let register0 ~chunked s f =
+  register0_fullctxt ~chunked s (fun {context; _} -> f context)
 
-let register0_noctxt s f =
-  rpc_services := RPC_directory.register !rpc_services s (fun _ q i -> f q i)
-
-let register1_fullctxt s f =
+let register0_noctxt ~chunked s f =
   rpc_services :=
-    RPC_directory.register !rpc_services s (fun (ctxt, arg) q i ->
+    RPC_directory.register ~chunked !rpc_services s (fun _ q i -> f q i)
+
+let register1_fullctxt ~chunked s f =
+  rpc_services :=
+    RPC_directory.register ~chunked !rpc_services s (fun (ctxt, arg) q i ->
         rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
 
-let register1 s f = register1_fullctxt s (fun {context; _} x -> f context x)
+let register1 ~chunked s f =
+  register1_fullctxt ~chunked s (fun {context; _} x -> f context x)
 
-let register2_fullctxt s f =
+let register2_fullctxt ~chunked s f =
   rpc_services :=
-    RPC_directory.register !rpc_services s (fun ((ctxt, arg1), arg2) q i ->
+    RPC_directory.register
+      ~chunked
+      !rpc_services
+      s
+      (fun ((ctxt, arg1), arg2) q i ->
         rpc_init ctxt >>=? fun ctxt -> f ctxt arg1 arg2 q i)
 
-let register2 s f =
-  register2_fullctxt s (fun {context; _} a1 a2 q i -> f context a1 a2 q i)
+let register2 ~chunked s f =
+  register2_fullctxt ~chunked s (fun {context; _} a1 a2 q i ->
+      f context a1 a2 q i)
 
-let opt_register0_fullctxt s f =
+let opt_register0_fullctxt ~chunked s f =
   rpc_services :=
-    RPC_directory.opt_register !rpc_services s (fun ctxt q i ->
+    RPC_directory.opt_register ~chunked !rpc_services s (fun ctxt q i ->
         rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
 
-let opt_register0 s f = opt_register0_fullctxt s (fun {context; _} -> f context)
+let opt_register0 ~chunked s f =
+  opt_register0_fullctxt ~chunked s (fun {context; _} -> f context)
 
-let opt_register1_fullctxt s f =
+let opt_register1_fullctxt ~chunked s f =
   rpc_services :=
-    RPC_directory.opt_register !rpc_services s (fun (ctxt, arg) q i ->
+    RPC_directory.opt_register ~chunked !rpc_services s (fun (ctxt, arg) q i ->
         rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
 
-let opt_register1 s f =
-  opt_register1_fullctxt s (fun {context; _} x -> f context x)
+let opt_register1 ~chunked s f =
+  opt_register1_fullctxt ~chunked s (fun {context; _} x -> f context x)
 
-let opt_register2_fullctxt s f =
+let opt_register2_fullctxt ~chunked s f =
   rpc_services :=
-    RPC_directory.opt_register !rpc_services s (fun ((ctxt, arg1), arg2) q i ->
+    RPC_directory.opt_register
+      ~chunked
+      !rpc_services
+      s
+      (fun ((ctxt, arg1), arg2) q i ->
         rpc_init ctxt >>=? fun ctxt -> f ctxt arg1 arg2 q i)
 
-let opt_register2 s f =
-  opt_register2_fullctxt s (fun {context; _} a1 a2 q i -> f context a1 a2 q i)
+let opt_register2 ~chunked s f =
+  opt_register2_fullctxt ~chunked s (fun {context; _} a1 a2 q i ->
+      f context a1 a2 q i)
 
 let get_rpc_services () =
   let p =

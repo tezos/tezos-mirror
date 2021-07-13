@@ -43,7 +43,7 @@ module Seed = struct
 
   let () =
     let open Services_registration in
-    register0 S.seed (fun ctxt () () ->
+    register0 ~chunked:false S.seed (fun ctxt () () ->
         let l = Level.current ctxt in
         Seed.for_cycle ctxt l.cycle)
 
@@ -88,7 +88,7 @@ module Nonce = struct
 
   let register () =
     let open Services_registration in
-    register1 S.get (fun ctxt raw_level () () ->
+    register1 ~chunked:false S.get (fun ctxt raw_level () () ->
         let level = Level.from_raw ctxt raw_level in
         Nonce.get ctxt level >|= function
         | Ok (Revealed nonce) -> ok (Revealed nonce)
@@ -116,7 +116,7 @@ module Liquidity_baking = struct
 
   let register () =
     let open Services_registration in
-    register0 S.get_cpmm_address (fun ctxt () () ->
+    register0 ~chunked:false S.get_cpmm_address (fun ctxt () () ->
         Alpha_context.Liquidity_baking.get_cpmm_address ctxt)
 
   let get_cpmm_address ctxt block =
