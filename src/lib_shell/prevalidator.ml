@@ -202,43 +202,33 @@ struct
 
   let handle_branch_refused
       (requester, (classes : Prevalidation.Classification.t)) op oph errors =
-    Option.iter
-      (fun e ->
-        classes.branch_refused.map <-
-          Operation_hash.Map.remove e classes.branch_refused.map ;
-        Requester.clear_or_cancel requester oph ;
-        classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool)
-      (Ringo.Ring.add_and_return_erased classes.branch_refused.ring oph) ;
-    classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool ;
-    classes.branch_refused.map <-
-      Operation_hash.Map.add oph (op, errors) classes.branch_refused.map
+    let on_discarded_operation = Requester.clear_or_cancel requester in
+    Prevalidation.Classification.add
+      ~on_discarded_operation
+      (`Branch_refused errors)
+      oph
+      op
+      classes
 
   let handle_branch_delayed
       (requester, (classes : Prevalidation.Classification.t)) op oph errors =
-    Option.iter
-      (fun e ->
-        classes.branch_delayed.map <-
-          Operation_hash.Map.remove e classes.branch_delayed.map ;
-        Requester.clear_or_cancel requester oph ;
-        classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool)
-      (Ringo.Ring.add_and_return_erased classes.branch_delayed.ring oph) ;
-    classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool ;
-    classes.branch_delayed.map <-
-      Operation_hash.Map.add oph (op, errors) classes.branch_delayed.map
+    let on_discarded_operation = Requester.clear_or_cancel requester in
+    Prevalidation.Classification.add
+      ~on_discarded_operation
+      (`Branch_delayed errors)
+      oph
+      op
+      classes
 
   let handle_refused (requester, (classes : Prevalidation.Classification.t)) op
       oph errors =
-    Option.iter
-      (fun e ->
-        classes.refused.map <- Operation_hash.Map.remove e classes.refused.map ;
-        (* The line below is not necessary but just to be sure *)
-        Requester.clear_or_cancel requester oph ;
-        classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool)
-      (Ringo.Ring.add_and_return_erased classes.refused.ring oph) ;
-    classes.refused.map <-
-      Operation_hash.Map.add oph (op, errors) classes.refused.map ;
-    Requester.clear_or_cancel requester oph ;
-    classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool
+    let on_discarded_operation = Requester.clear_or_cancel requester in
+    Prevalidation.Classification.add
+      ~on_discarded_operation
+      (`Refused errors)
+      oph
+      op
+      classes
 end
 
 type t = (module T)

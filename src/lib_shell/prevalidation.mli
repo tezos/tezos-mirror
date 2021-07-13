@@ -32,15 +32,21 @@
 (** Module containing types and functions to handle branch_refused,
  *  branch_delayed, and refused operations *)
 module Classification : sig
-  type 'a bounded_map = {
+  type bounded_map = {
     ring : Operation_hash.t Ringo.Ring.t;
     mutable map : (Operation.t * error list) Operation_hash.Map.t;
   }
 
+  type classification =
+    [ `Refused of tztrace
+    | `Branch_refused of tztrace
+    | `Branch_delayed of tztrace
+    | `Applied ]
+
   type t = {
-    refused : [`Refused] bounded_map;
-    branch_refused : [`Branch_refused] bounded_map;
-    branch_delayed : [`Branch_delayed] bounded_map;
+    refused : bounded_map;
+    branch_refused : bounded_map;
+    branch_delayed : bounded_map;
     mutable applied : (Operation_hash.t * Operation.t) list;
     mutable in_mempool : Operation_hash.Set.t;
   }
@@ -69,6 +75,22 @@ module Classification : sig
   (** [remove_not_applied oph classes] removes operation of hash [oph]
       from all fields of [classes] except from [applied]. *)
   val remove_not_applied : Operation_hash.t -> t -> unit
+
+  (** [add ~on_discarded_operation class oph op classes] adds the
+     operation [op] with hash [oph] classified as [class] to the
+     classifier [classes]. The [on_discarded_operation] callback is
+     called for any operation discarded in this process. Currently, an
+     operation is discarded if the corresponding class field is full. In
+     that case, the new operation is added to the class, and the one
+     removed is discarded. An operation is also discarded when it is
+     classified as [Refused]. **)
+  val add :
+    on_discarded_operation:(Operation_hash.t -> unit) ->
+    classification ->
+    Operation_hash.t ->
+    Operation.t ->
+    t ->
+    unit
 end
 
 (** The requester used by [Prevalidator], backed by [Distributed_db]. *)
