@@ -1,10 +1,19 @@
 Using The Event Logging Framework
 ---------------------------------
 
-Developers of most Tezos modules should consider generating useful information
-for the :doc:`Logging subsystem <./user/logging>`. This is done by using the
-`tezos-event-logging` library to define and emit events, create sinks, and so
-on. This page shows how this can be done.
+Developers of most modules should consider generating useful information
+for the :doc:`Logging subsystem <./user/logging>`.
+
+In the Octez code base, logging is instrumented using an asynchronous event
+system, where log events are emitted in various part of the code and consumed by
+the so called sinks.  This is done by using the `tezos-event-logging` library.
+
+We use two levels of abstraction to define these events. Heavy events are
+defined using the most generic API and have the full expressive power and
+structure while being 100% lazy.  Simple events are record-like structures which
+are constructed on top of the generic event api, and are meant to be less
+verbose and more developer friendly.
+
 
 Adding Events
 ~~~~~~~~~~~~~
