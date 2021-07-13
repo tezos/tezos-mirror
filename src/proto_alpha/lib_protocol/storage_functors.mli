@@ -24,7 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos Protocol Implementation - Typed storage builders. *)
+(** Tezos Protocol Implementation - Typed storage builders.
+
+  @see [Make_subcontext]
+ *)
 
 open Storage_sigs
 
@@ -32,6 +35,9 @@ module Registered : REGISTER
 
 module Ghost : REGISTER
 
+(** Given a [Raw_context], return a new [Raw_context] that projects into
+    a given subtree. Similar to a {i functional lens}.
+ *)
 module Make_subcontext (_ : REGISTER) (C : Raw_context.T) (_ : NAME) :
   Raw_context.T with type t = C.t
 
@@ -41,6 +47,11 @@ module Make_single_data_storage
     (_ : NAME)
     (V : VALUE) : Single_data_storage with type t = C.t and type value = V.t
 
+(** A type that can be serialized as a [string list], and used
+    as a prefix in the typed datastore.
+
+    Useful to implement storage of maps and sets.
+ *)
 module type INDEX = sig
   type t
 
@@ -57,15 +68,19 @@ end
 
 module Pair (I1 : INDEX) (I2 : INDEX) : INDEX with type t = I1.t * I2.t
 
+(** Create storage for a compound type. *)
 module Make_data_set_storage (C : Raw_context.T) (I : INDEX) :
   Data_set_storage with type t = C.t and type elt = I.t
 
+(** Like [Make_data_set_storage], adding tracking of storage cost. *)
 module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :
   Carbonated_data_set_storage with type t = C.t and type elt = I.t
 
+(** This functor creates storage for types with a notion of an index. *)
 module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
   Indexed_data_storage with type t = C.t and type key = I.t and type value = V.t
 
+(** Like [Make_indexed_data_storage], adding tracking of storage cost. *)
 module Make_indexed_carbonated_data_storage
     (C : Raw_context.T)
     (I : INDEX)

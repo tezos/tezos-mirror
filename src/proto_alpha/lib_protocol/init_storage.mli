@@ -24,6 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Functions to setup storage. Used by [Alpha_context.prepare].
+
+    If you have defined a new type of storage, you should add relevant
+    setups here.
+  *)
+
 (* This is the genesis protocol: initialise the state *)
 val prepare_first_block :
   Context.t ->

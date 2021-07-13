@@ -23,10 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Result of applying an operation, can be used for experimenting
+(** Types representing results of applying an operation.
+
+    These are used internally by [Apply], and can be used for experimenting
     with protocol updates, by clients to print out a summary of the
     operation at pre-injection simulation and at confirmation time,
-    and by block explorers. *)
+    and by block explorers.
+ *)
 
 open Alpha_context
 

@@ -24,6 +24,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Functions for RPC service registration, using [Updater.rpc_context] and
+    [RPC_service.t] from the Protocol Environment.
+
+    This module is a frontend to a mutable service directory. The various
+    [register] functions update the directory as a side-effect.
+
+    The [get_rpc_services] function returns the resulting [RPC_context]. It is
+    parameterized by [Updater.rpc_context] which acts as the service prefix (in
+    practice meaning this type will be passed to each handler). Hence,
+    Protocol RPC services provide a {i read-only} view of the Ledger state.
+  *)
+
 open Alpha_context
 
 type rpc_context = {

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Representation of block headers. *)
+
 type contents = {
   priority : int;
   seed_nonce_hash : Nonce_hash.t option;

@@ -24,6 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module supports advancing the ledger state by applying [operation]s.
+
+    Each operation application takes and returns an [Alpha_context.t], representing
+    the old and new state, respectively.
+
+    The [Main] module provides wrappers for the functionality in this module,
+    satisfying the Protocol signature.
+ *)
+
 open Alpha_context
 open Apply_results
 
