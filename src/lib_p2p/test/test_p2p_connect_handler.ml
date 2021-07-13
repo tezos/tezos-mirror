@@ -40,7 +40,11 @@ let point_id : P2p_point.Id.t = (P2p_addr.of_string_exn "0.0.0.0", 0)
 
 let test_connect_destroy =
   tztest "Connect then destroy" `Quick @@ fun () ->
-  let t = P2p_connect_handler.Internal_for_tests.create ~dependencies () () in
+  let t =
+    P2p_connect_handler.Internal_for_tests.create
+      (`Make_default_pool ())
+      (`Dependencies dependencies)
+  in
   P2p_connect_handler.connect t point_id >>=? fun _conn ->
   P2p_connect_handler.destroy t >|= ok
 
@@ -70,10 +74,9 @@ let test_correct_incoming_connection_number =
   let t =
     P2p_connect_handler.Internal_for_tests.create
       ~config
-      ~dependencies
       ~incoming
-      ()
-      ()
+      (`Make_default_pool ())
+      (`Dependencies dependencies)
   in
   P2p_fd.socket PF_INET6 SOCK_STREAM 0 >>= fun fd ->
   Alcotest.(

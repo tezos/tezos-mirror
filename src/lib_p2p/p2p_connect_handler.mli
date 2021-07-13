@@ -188,7 +188,6 @@ module Internal_for_tests : sig
       All optional arguments allow overriding individually the parts that need customisation for each test. *)
   val create :
     ?config:config ->
-    ?pool:('msg, 'peer, 'conn) P2p_pool.t ->
     ?log:(P2p_connection.P2p_event.t -> unit) ->
     ?triggers:P2p_trigger.t ->
     ?io_sched:P2p_io_scheduler.t ->
@@ -201,8 +200,8 @@ module Internal_for_tests : sig
     ?new_connection_hook:
       (P2p_peer.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t -> unit) list ->
     ?answerer:'msg P2p_answerer.t Lazy.t ->
-    ?dependencies:('msg, 'peer, 'conn) dependencies ->
-    'conn ->
-    'peer ->
+    [< `Pool of ('msg, 'peer, 'conn) P2p_pool.t | `Make_default_pool of 'peer] ->
+    [< `Dependencies of ('msg, 'peer, 'conn) dependencies
+    | `Make_default_dependencies of 'conn ] ->
     ('msg, 'peer, 'conn) t
 end

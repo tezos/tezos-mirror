@@ -720,40 +720,47 @@ module Internal_for_tests = struct
       (fun _ -> assert false)
       Data_encoding.unit
 
-  let create ?(config = dumb_config) ?pool ?(log = fun _ -> ())
+  let conn_meta_config_default () =
+    P2p_params.
+      {
+        conn_meta_encoding = make_crashing_encoding ();
+        conn_meta_value = (fun () -> assert false);
+        private_node = (fun _ -> false);
+      }
+
+  let message_config_default () =
+    P2p_params.
+      {
+        encoding = [];
+        chain_name = Distributed_db_version.Name.of_string "";
+        distributed_db_versions = [Distributed_db_version.zero];
+      }
+
+  let create ?(config = dumb_config) ?(log = fun _ -> ())
       ?(triggers = P2p_trigger.create ())
       ?(io_sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) ())
       ?(announced_version = Network_version.Internal_for_tests.mock ())
-      ?(conn_meta_config =
-        P2p_params.
-          {
-            conn_meta_encoding = make_crashing_encoding ();
-            conn_meta_value = (fun () -> assert false);
-            private_node = (fun _ -> false);
-          })
-      ?(message_config =
-        P2p_params.
-          {
-            encoding = [];
-            chain_name = Distributed_db_version.Name.of_string "";
-            distributed_db_versions = [Distributed_db_version.zero];
-          }) ?(custom_p2p_versions = [P2p_version.zero])
+      ?(conn_meta_config = conn_meta_config_default ())
+      ?(message_config = message_config_default ())
+      ?(custom_p2p_versions = [P2p_version.zero])
       ?(encoding = make_crashing_encoding ())
       ?(incoming = P2p_point.Table.create ~random:true 53)
       ?(new_connection_hook = [])
-      ?(answerer = lazy (P2p_protocol.create_private ())) ?dependencies
-      default_conn_meta default_peer_meta : ('msg, 'peer_meta, 'conn_meta) t =
+      ?(answerer = lazy (P2p_protocol.create_private ())) pool dependencies :
+      ('msg, 'peer_meta, 'conn_meta) t =
     let pool =
-      Option.value_f pool ~default:(fun () ->
-          (* Extremely hackish but there aren't many legitimate implementations without asking for the encoding in arg.
-             An alternative is for [pool] to be a [(('msg, 'peer_meta, 'conn_meta) P2p_pool.t, 'peer Data_encoding.t) either]
-             and either create a mock [P2p_pool.t] by passing the encoding, or directly using the given pool, but this seems
-             a bit too ad hoc. *)
-          let crashing_encoding = make_crashing_encoding () in
-          P2p_pool.Internal_for_tests.create crashing_encoding default_peer_meta)
+      match pool with
+      | `Pool pool -> pool
+      | `Make_default_pool default_peer_meta ->
+          P2p_pool.Internal_for_tests.create
+            (make_crashing_encoding ())
+            default_peer_meta
     in
     let dependencies =
-      Option.value ~default:(mock_dependencies default_conn_meta) dependencies
+      match dependencies with
+      | `Dependencies dependencies -> dependencies
+      | `Make_default_dependencies default_conn_meta ->
+          mock_dependencies default_conn_meta
     in
     {
       config;
