@@ -637,6 +637,7 @@ SECOND_EXPLOSION = '''
 '''
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestGasBound:
     def test_write_contract(self, tmpdir, session: dict):
@@ -734,6 +735,7 @@ class TestGasBound:
             client.typecheck_data('{ "A" ; "B" ; "B" }', '(set string)')
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestChainId:
     def test_chain_id_opcode(self, client: Client, session: dict):
@@ -777,6 +779,7 @@ class TestChainId:
         utils.bake(client, 'bootstrap5')
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestBigMapToSelf:
     def test_big_map_to_self_origination(self, client: Client, session: dict):
@@ -792,6 +795,7 @@ class TestBigMapToSelf:
         utils.bake(client, 'bootstrap5')
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestNonRegression:
     """Test contract-related non-regressions"""
@@ -805,6 +809,7 @@ class TestNonRegression:
 
 
 @pytest.mark.contract
+@pytest.mark.incremental
 class TestMiniScenarios:
     """Test mini scenarios"""
 
@@ -1367,6 +1372,7 @@ code { CAR; UNPACK (lambda unit unit); NIL operation; PAIR}
 '''
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 class TestBadAnnotation:
     def test_write_contract_bad_annot(self, tmpdir, session: dict):
@@ -1416,6 +1422,7 @@ class TestOrderInTopLevelDoesNotMatter:
             client.typecheck(contract, file=False)
 
 
+@pytest.mark.incremental
 @pytest.mark.contract
 @pytest.mark.regression
 class TestSelfAddressTransfer:
