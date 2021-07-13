@@ -376,8 +376,10 @@ let show_address ?show_secret ~alias client =
           Test.fail "Cannot extract key from client_output: %s" client_output
       | Some hash -> hash
     in
-    let public_key = client_output =~* rex "Public key: ?(\\w*)" in
-    let secret_key = client_output =~* rex "Secret key: ?(\\w*)" in
+    let public_key = client_output =~* rex "Public Key: ?(\\w*)" in
+    let secret_key =
+      client_output =~* rex "Secret Key: ?(?:unencrypted:)?(\\w*)"
+    in
     {alias; public_key_hash; public_key; secret_key}
   in
   let* output =
