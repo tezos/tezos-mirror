@@ -1409,7 +1409,10 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_pa
     ~legacy
     ~allow_lazy_storage:false
     ~allow_operation:false
-    ~allow_contract:legacy
+    ~allow_contract:
+      legacy
+      (* type contract is forbidden in UNPACK because of
+         https://gitlab.com/tezos/tezos/-/issues/301 *)
     ~allow_ticket:false
 
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_parameter_ty
