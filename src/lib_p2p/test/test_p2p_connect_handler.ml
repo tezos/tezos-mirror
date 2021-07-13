@@ -94,7 +94,45 @@ let test_correct_incoming_connection_number =
       ~actual:(P2p_point.Table.length incoming)) ;
   return_unit
 
-let tests = [test_connect_destroy; test_correct_incoming_connection_number]
+let test_on_new_connection =
+  tztest "on_new_connection hook is triggered on new connection" `Quick
+  @@ fun () ->
+  let t =
+    P2p_connect_handler.Internal_for_tests.create
+      (`Make_default_pool ())
+      (`Dependencies dependencies)
+  in
+  let callbacks_nb = ref 0 in
+  P2p_connect_handler.on_new_connection t (fun _id _conn ->
+      callbacks_nb := !callbacks_nb + 1) ;
+  Alcotest.(
+    check'
+      int
+      ~msg:"Before any connection, on_new_connection is never called"
+      ~expected:0
+      ~actual:!callbacks_nb) ;
+  P2p_connect_handler.connect t point_id >>=? fun _conn ->
+  Alcotest.(
+    check'
+      int
+      ~msg:"After connect, on_new_connection called"
+      ~expected:1
+      ~actual:!callbacks_nb) ;
+  P2p_connect_handler.destroy t >|= fun () ->
+  Alcotest.(
+    check'
+      int
+      ~msg:"After destruction, no new call to on_new_connection"
+      ~expected:1
+      ~actual:!callbacks_nb) ;
+  ok ()
+
+let tests =
+  [
+    test_connect_destroy;
+    test_correct_incoming_connection_number;
+    test_on_new_connection;
+  ]
 
 let () =
   Alcotest_lwt.run "P2p_connect_handler" [("P2p_connect_handler", tests)]
