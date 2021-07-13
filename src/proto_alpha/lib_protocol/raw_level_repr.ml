@@ -75,7 +75,8 @@ let () =
     (function Unexpected_level l -> Some l | _ -> None)
     (fun l -> Unexpected_level l)
 
-let of_int32 l = try Ok (of_int32_exn l) with _ -> error (Unexpected_level l)
+let of_int32 l =
+  Error_monad.catch_f (fun () -> of_int32_exn l) (fun _ -> Unexpected_level l)
 
 module Index = struct
   type t = raw_level

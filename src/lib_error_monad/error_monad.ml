@@ -162,5 +162,9 @@ let cancel_with_exceptions canceler =
 let catch ?catch_only f =
   TzLwtreslib.Result.catch ?catch_only f |> Result.map_error error_of_exn
 
+let catch_f ?catch_only f exc_mapper =
+  TzLwtreslib.Result.catch ?catch_only f
+  |> Result.map_error (fun exc -> TzTrace.make (exc_mapper exc))
+
 let catch_s ?catch_only f =
   TzLwtreslib.Result.catch_s ?catch_only f >|= Result.map_error error_of_exn

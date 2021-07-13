@@ -250,9 +250,9 @@ let force_bytes_cost expr =
     expr
 
 let force_bytes expr =
-  match Data_encoding.force_bytes expr with
-  | bytes -> ok bytes
-  | exception _ -> error Lazy_script_decode
+  Error_monad.catch_f
+    (fun () -> Data_encoding.force_bytes expr)
+    (fun _ -> Lazy_script_decode)
 
 let unit =
   Micheline.strip_locations (Prim (0, Michelson_v1_primitives.D_Unit, [], []))

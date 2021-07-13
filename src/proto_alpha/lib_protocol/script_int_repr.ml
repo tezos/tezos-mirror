@@ -37,15 +37,15 @@ let zero_n = Z.zero
 
 let to_string x = Z.to_string x
 
-let of_string s = try Some (Z.of_string s) with _ -> None
+let of_string s = Option.catch (fun () -> Z.of_string s)
 
 let of_int32 n = Z.of_int64 @@ Int64.of_int32 n
 
-let to_int64 x = try Some (Z.to_int64 x) with _ -> None
+let to_int64 x = Option.catch (fun () -> Z.to_int64 x)
 
 let of_int64 n = Z.of_int64 n
 
-let to_int x = try Some (Z.to_int x) with _ -> None
+let to_int x = Option.catch (fun () -> Z.to_int x)
 
 let of_int n = Z.of_int n
 
@@ -59,11 +59,7 @@ let sub x y = Z.sub x y
 
 let mul x y = Z.mul x y
 
-let ediv x y =
-  try
-    let (q, r) = Z.ediv_rem x y in
-    Some (q, r)
-  with _ -> None
+let ediv x y = Option.catch (fun () -> Z.ediv_rem x y)
 
 let add_n = add
 

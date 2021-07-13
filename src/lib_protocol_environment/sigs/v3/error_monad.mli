@@ -110,6 +110,8 @@ val return_false : (bool, 'trace) result Lwt.t
 
 val error : 'err -> ('a, 'err trace) result
 
+val trace_of_error : 'err -> 'err trace
+
 val fail : 'err -> ('a, 'err trace) result Lwt.t
 
 val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
@@ -184,6 +186,15 @@ val dont_wait :
     {!Out_of_memory} nor system-exceptions such as {!Unix.Unix_error} and
     {!Sys_error}. *)
 val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a tzresult
+
+(** [catch_f f handler] is equivalent to [map_error (catch f) handler].
+    In other words, it catches exceptions in [f ()] and either returns the
+    value in an [Ok] or passes the exception to [handler] for the [Error].
+
+    [catch_only] has the same use as with [catch]. The same restriction on
+    catching non-deterministic runtime exceptions applies. *)
+val catch_f :
+  ?catch_only:(exn -> bool) -> (unit -> 'a) -> (exn -> error) -> 'a tzresult
 
 (** [catch_s] is like [catch] but when [f] returns a promise. It is equivalent
     to

@@ -227,7 +227,7 @@ module type S = sig
       resolves to [x]. Alternatively, it resolves to [None] if and when [f ()]
       is rejected.
 
-      You should only use [catch] when you truly do not care about
+      You should only use [catch_s] when you truly do not care about
       what exception may be raised during the evaluation of [f ()]. If you need
       to inspect the raised exception, or if you need to pass it along, consider
       {!Result.catch_s} instead.
