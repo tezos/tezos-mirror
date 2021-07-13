@@ -88,10 +88,10 @@ let () =
       Format.fprintf
         ppf
         "Not a supported multisig contract.@\n\
-         The hash of this script is 0x%a, it was not found among in the list \
-         of known multisig script hashes."
-        Hex.pp
-        (Script_expr_hash.to_bytes hash |> Hex.of_bytes))
+         The hash of this script is %a, it was not found among in the list of \
+         known multisig script hashes."
+        Script_expr_hash.pp
+        hash)
     Data_encoding.(obj1 (req "hash" Script_expr_hash.encoding))
     (function Not_a_supported_multisig_contract h -> Some h | _ -> None)
     (fun h -> Not_a_supported_multisig_contract h) ;
