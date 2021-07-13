@@ -128,11 +128,11 @@ test-unit:
 
 .PHONY: test-python
 test-python: all
-	@make -C tests_python all
+	@$(MAKE) -C tests_python all
 
 .PHONY: test-flextesa
 test-flextesa:
-	@make -f sandbox.Makefile
+	@$(MAKE) -f sandbox.Makefile
 
 .PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
 test-tezt:
@@ -173,7 +173,7 @@ check-linting:
 	@dune build @fmt
 
 check-python-linting:
-	@make -C tests_python lint
+	@$(MAKE) -C tests_python lint
 
 .PHONY: fmt fmt-ocaml fmt-python
 fmt: fmt-ocaml fmt-python
@@ -182,7 +182,7 @@ fmt-ocaml:
 	@dune build @fmt --auto-promote
 
 fmt-python:
-	@make -C tests_python fmt
+	@$(MAKE) -C tests_python fmt
 
 .PHONY: build-deps
 build-deps:
