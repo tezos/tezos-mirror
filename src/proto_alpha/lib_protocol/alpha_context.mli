@@ -24,6 +24,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** An [Alpha_context.t] is an immutable snapshot of the ledger state at some block
+    height, preserving
+    {{:https://tezos.gitlab.io/developer/entering_alpha.html#the-big-abstraction-barrier-alpha-context}
+    type-safety and invariants} of the ledger state.
+
+    {2 Implementation}
+
+    [Alpha_context.t] is a wrapper over [Raw_context.t], which in turn is a
+    wrapper around [Context.t] from the Protocol Environment.
+
+    {2 Lifetime of an Alpha_context}
+
+    - Creation, using [prepare] or [prepare_first_block]
+
+    - Modification, using the operations defined in this signature
+
+    - Finalization, using [finalize]
+ *)
+
 module type BASIC_DATA = sig
   type t
 
@@ -1637,6 +1656,7 @@ module Migration : sig
   }
 end
 
+(** Create an [Alpha_context.t] from an untyped context (first block in the chain only). *)
 val prepare_first_block :
   Context.t ->
   typecheck:
@@ -1648,6 +1668,7 @@ val prepare_first_block :
   fitness:Fitness.t ->
   context tzresult Lwt.t
 
+(** Create an [Alpha_context.t] from an untyped context. *)
 val prepare :
   Context.t ->
   level:Int32.t ->
@@ -1658,6 +1679,8 @@ val prepare :
   tzresult
   Lwt.t
 
+(** Finalize an {{!t} [Alpha_context.t]}, producing a [validation_result].
+ *)
 val finalize : ?commit_message:string -> context -> Updater.validation_result
 
 val activate : context -> Protocol_hash.t -> context Lwt.t

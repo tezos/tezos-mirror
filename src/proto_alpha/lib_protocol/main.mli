@@ -23,7 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezos Protocol Implementation - Protocol Signature Instance *)
+(** Tezos Protocol Implementation - Protocol Signature Instance
+
+    This module is the  entrypoint to the protocol for shells and other
+    embedders.  This signature is an instance of
+    {{!Tezos_protocol_environment_sigs.V3.T.Updater.PROTOCOL} the
+    [Updater.PROTOCOL] signature} from the
+    {{:https://tezos.gitlab.io/shell/the_big_picture.html#the-economic-protocol-environment-and-compiler}
+    Protocol Environment}.
+
+    Each Protocol depends on a version of the Protocol Environment. For the
+    currently developed protocol, this is normally the latest version.  You can
+    see {{!Tezos_protocol_environment_sigs} the full list of versions here}.
+
+    For details on how Protocol and Environment interact, see
+    {{:https://tezos.gitlab.io/shell/the_big_picture.html} this overview}.
+ *)
 
 type validation_mode =
   | Application of {

@@ -24,6 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This declares Protocol RPC services.
+
+    Protocol RPC services are read-only, and support querying the state of the
+    ledger (including information such as existing contracts, delegation,
+    voting, and so on), at a given block height.
+
+    This is a mostly internal module used from [rpc_services] in [Main].
+ *)
+
 open Alpha_context
 
 module Seed : sig
