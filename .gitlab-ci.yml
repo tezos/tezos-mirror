@@ -47,7 +47,6 @@ stages:
   - build_release
   - publish_release
   - test_coverage
-  - publish_coverage
   - manual
 
 # Basic, specialised, minimal, orthogonal templates
