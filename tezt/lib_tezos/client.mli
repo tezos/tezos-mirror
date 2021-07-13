@@ -406,6 +406,25 @@ val spawn_originate_contract :
   t ->
   Process.t
 
+(** [stresstest ?endpoint ?tps souces transfers], calls
+ *  [tezos-client stresstest transfer using <sources> --transfers <transfers> --tps <tps>]. *)
+val stresstest :
+  ?endpoint:endpoint ->
+  ?tps:int ->
+  sources:string ->
+  transfers:int ->
+  t ->
+  unit Lwt.t
+
+(** Same as [stresstest], but do not wait for the process to exit. *)
+val spawn_stresstest :
+  ?endpoint:endpoint ->
+  ?tps:int ->
+  sources:string ->
+  transfers:int ->
+  t ->
+  Process.t
+
 (** Run [tezos-client hash data .. of type ...]
 
     Given that the output of [tezos-client] is:

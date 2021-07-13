@@ -561,6 +561,25 @@ let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
         client_output
   | Some hash -> return hash
 
+let spawn_stresstest ?endpoint ?tps ~sources ~transfers client =
+  let tps_arg =
+    Option.map (fun (tps : int) -> ["--tps"; Int.to_string tps]) tps
+    |> Option.value ~default:[]
+  in
+  spawn_command ?endpoint client
+  @@ [
+       "stresstest";
+       "transfer";
+       "using";
+       sources;
+       "--transfers";
+       Int.to_string transfers;
+     ]
+  @ tps_arg
+
+let stresstest ?endpoint ?tps ~sources ~transfers client =
+  spawn_stresstest ?endpoint ?tps ~sources ~transfers client |> Process.check
+
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
   spawn_command ?hooks client cmd
