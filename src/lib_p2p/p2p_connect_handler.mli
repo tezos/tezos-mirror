@@ -184,8 +184,12 @@ module Internal_for_tests : sig
       only override the fields your test relies one. *)
   val dumb_config : config
 
-  (** [create conn peer] creates a [P2p_connect_handler.t] value with minimal work.
-      All optional arguments allow overriding individually the parts that need customisation for each test. *)
+  (** [create pool dependencies] creates a [P2p_connect_handler.t] value with minimal work.
+      All optional arguments allow overriding individually the parts that need customisation for each test.
+
+      - [pool] is either a full-fledged {!P2p_pool.t} or the bare minimum to build one
+      - [dependencies] is similarly either the full set of dependencies (can be built/modified with {!mock_dependencies}) or the bare minimum to build them
+  *)
   val create :
     ?config:config ->
     ?log:(P2p_connection.P2p_event.t -> unit) ->
