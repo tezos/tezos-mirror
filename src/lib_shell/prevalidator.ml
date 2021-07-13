@@ -396,6 +396,7 @@ module Make
 
   let name = (Arg.chain_id, Proto.hash)
 
+  module Classification = Prevalidation.Classification
   module Prevalidation = Prevalidation.Make (Protocol)
 
   type types_state = {
@@ -628,9 +629,13 @@ module Make
       pv.operation_stream
       `Applied
       op.raw ;
-    classification.applied <- (op.hash, op.raw) :: classification.applied ;
-    pv.shell.classification.in_mempool <-
-      Operation_hash.Set.add op.hash pv.shell.classification.in_mempool
+    let on_discarded_operation _ = () in
+    Classification.add
+      ~on_discarded_operation
+      `Applied
+      op.hash
+      op.raw
+      classification
 
   let classify_operation ?should_notify w pv validation_state mempool op oph =
     match Prevalidation.parse op with
