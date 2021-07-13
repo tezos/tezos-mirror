@@ -480,9 +480,6 @@ type multisig_contract_description = {
                        (list operation)). *)
 }
 
-let script_hash_of_hex_string s =
-  Script_expr_hash.of_bytes_exn @@ Hex.to_bytes @@ `Hex s
-
 (* List of known multisig contracts hashes with their kinds *)
 let known_multisig_contracts : multisig_contract_description list =
   [
@@ -502,8 +499,8 @@ let known_multisig_contracts : multisig_contract_description list =
          functionally equivalent to the third version but uses the [DUP 2]
          instruction introduced in Edo instead of the macro for [DIG 2; DUP; DUG 3]. *)
       hash =
-        script_hash_of_hex_string
-          "b5e40b8f2f4a7a3d3f0af6d8fc7715c0fbc191c737faf721769c501169cbc756";
+        Script_expr_hash.of_b58check_exn
+          "exprutz4BVGJ3Qms6qjmqvUF8sEk27H1cfqhRT17qpTdhEs5hEjbWm";
       requires_chain_id = true;
       main_entrypoint = None;
       generic = false;
@@ -513,8 +510,8 @@ let known_multisig_contracts : multisig_contract_description list =
          functionally equivalent to the second version but uses the [DIP 2]
          instruction introduced in Babylon instead of the [DIIP] macro. *)
       hash =
-        script_hash_of_hex_string
-          "a59ea55f38e1bcdde29e72a7f3608faf4314165d07083383efadfcf023e4c1e2";
+        Script_expr_hash.of_b58check_exn
+          "exprumpS39YZd26Cn4kyKUK5ezTR3at838iGWg7i6uETv8enDeAnfb";
       requires_chain_id = true;
       main_entrypoint = None;
       generic = false;
@@ -525,8 +522,8 @@ let known_multisig_contracts : multisig_contract_description list =
          only difference with the first version is that the chain id is part of
          the data to sign. *)
       hash =
-        script_hash_of_hex_string
-          "36cf0b376c2d0e21f0ed42b2974fedaafdcafb9b7f8eb9254ef811b37cb46d94";
+        Script_expr_hash.of_b58check_exn
+          "exprtw1v4KvQN414oEXdGuA1U3eQizuCdS8cipx8QGK8TbNLRwc3qL";
       requires_chain_id = true;
       main_entrypoint = None;
       generic = false;
@@ -539,8 +536,8 @@ let known_multisig_contracts : multisig_contract_description list =
          main chain. The script has been fixed during the activation of the
          Babylon protocol. *)
       hash =
-        script_hash_of_hex_string
-          "475e37a6386d0b85890eb446db1faad67f85fc814724ad07473cac8c0a124b31";
+        Script_expr_hash.of_b58check_exn
+          "expru4Ju9kf6MQ216FxUEsb9P6j8UhkPtsFcYP8r9XhQSRb47FZGfM";
       requires_chain_id = false;
       main_entrypoint = None;
       generic = false;
