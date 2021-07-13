@@ -192,9 +192,7 @@ won't miss any opportunity we should have around ~3kꜩ for deposits,
 on the other hand, the expected returns will probably be around ~10ꜩ per cycle.
 
 After ``preserved_cycles``, not only does the delegate take back control of
-its frozen deposits, but it also receives the rewards for its hard work
-which amount to 16ꜩ to bake a block and ``2ꜩ / <block_priority>`` for
-endorsing a block.
+its frozen deposits, but it also receives its rewards for baking and endorsing.
 Additionally, a baker also receives the fees of the operations it
 included in its blocks.
 While fees are unfrozen after ``preserved_cycles`` like deposits and
