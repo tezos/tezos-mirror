@@ -498,32 +498,26 @@ Other (including Flextesa)
   this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_, and ``gitlab-runner``,
   introduced in the :ref:`next section <executing_gitlab_ci_locally>`.
 
-Launching tests manually and measuring coverage in the CI
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Measuring test coverage in the CI
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Another way to run the tests is to trigger manually the job
-``test_coverage`` in stage ``test_coverage``, from the Gitlab CI web interface.
-This job simply runs ``dune build @runtest`` in the project directory,
-followed by ``make all`` in the directory ``tests_python``. This is slower
-than the previous method, and it is not run by default.
+To measure test coverage in the CI, trigger the jobs ``test_coverage[...]`` in
+stage ``test_coverage`` These jobs can either be triggered manually
+from the Gitlab CI web interface, or by pushing a branch whose name
+contains ``coverage``.  These jobs build Octez with coverage
+instrumentation, and then run respectively:
 
-The role of having this extra testing stage is twofold.
+ - ``make test-unit``, executing all unit, integration and property-based tests
+ - ``make test-python-alpha``, executing the Python system tests for
+   protocol Alpha. We restrict to protocol Alpha to avoid CI timeouts.
+ - ``make test-tezt-timeout``, executing the full set of Tezt tests with a
+   timeout of 30 minutes per test case.
 
-- It can be launched locally in a container environment (see next section),
-- it can be used to generate a code coverage report, from the CI.
+Finally the coverage reports are generated: one for
+unit tests, one for the Python system tests and one for the Tezt suite.
 
-The coverage report artefact can be downloaded or browsed from the CI page upon completion
-of ``test_coverage``. It can also be published on a publicly available webpage
-linked to the gitlab repository. This is done by triggering manually
-the ``pages`` job in the ``publish_coverage`` stage, from the Gitlab CI
-web interface.
-
-Up to a few minutes after the ``pages`` job is completed, the report is
-published at the URL indicated in the log of the ``pages`` job. The actual URL
-depends on the names of the GitLab account and project which triggered
-the pipeline, as well as on the pipeline number. Examples:
-``https://nomadic-labs.gitlab.io/tezos/105822404/``,
-``https://tezos.gitlab.io/tezos/1234822404/``.
+The resulting coverage reports are stored as artifacts that can be
+downloaded or browsed from the CI page upon completion of the job.
 
 .. _executing_gitlab_ci_locally:
 
