@@ -5320,23 +5320,27 @@ let parse_contract_for_script :
     entrypoint:string ->
     (context * arg typed_contract option) tzresult Lwt.t =
  fun ctxt loc arg contract ~entrypoint ->
-  match (Contract.is_implicit contract, entrypoint) with
-  | (Some _, "default") ->
-      (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-      Lwt.return
-        (match ty_eq ctxt loc arg (Unit_t None) with
-        | Ok (Eq, ctxt) ->
-            let contract : arg typed_contract = (arg, (contract, entrypoint)) in
-            ok (ctxt, Some contract)
-        | Error _ ->
-            Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
-            ok (ctxt, None))
-  | (Some _, _) ->
-      Lwt.return
-        ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle >|? fun ctxt ->
-          (* An implicit account on any other entrypoint is not a valid contract. *)
-          (ctxt, None) )
-  | (None, _) -> (
+  match Contract.is_implicit contract with
+  | Some _ -> (
+      match entrypoint with
+      | "default" ->
+          (* An implicit account on the "default" entrypoint always exists and has type unit. *)
+          Lwt.return
+            (match ty_eq ctxt loc arg (Unit_t None) with
+            | Ok (Eq, ctxt) ->
+                let contract : arg typed_contract =
+                  (arg, (contract, entrypoint))
+                in
+                ok (ctxt, Some contract)
+            | Error _ ->
+                Gas.consume ctxt Typecheck_costs.parse_instr_cycle
+                >>? fun ctxt -> ok (ctxt, None))
+      | _ ->
+          Lwt.return
+            ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle >|? fun ctxt ->
+              (* An implicit account on any other entrypoint is not a valid contract. *)
+              (ctxt, None) ))
+  | None -> (
       (* Originated account *)
       trace (Invalid_contract (loc, contract))
       @@ Contract.get_script_code ctxt contract
