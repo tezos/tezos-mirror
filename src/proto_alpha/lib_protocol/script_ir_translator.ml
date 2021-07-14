@@ -5320,7 +5320,6 @@ let parse_contract_for_script :
     entrypoint:string ->
     (context * arg typed_contract option) tzresult Lwt.t =
  fun ctxt loc arg contract ~entrypoint ->
-  Gas.consume ctxt Typecheck_costs.contract_exists >>?= fun ctxt ->
   match (Contract.is_implicit contract, entrypoint) with
   | (Some _, "default") ->
       (* An implicit account on the "default" entrypoint always exists and has type unit. *)
@@ -5339,6 +5338,8 @@ let parse_contract_for_script :
           (ctxt, None) )
   | (None, _) -> (
       (* Originated account *)
+      Gas.consume ctxt Typecheck_costs.contract_exists
+      >>?= fun ctxt ->
       Contract.exists ctxt contract >>=? function
       | false -> return (ctxt, None)
       | true -> (
