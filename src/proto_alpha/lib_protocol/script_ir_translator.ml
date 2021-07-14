@@ -5188,46 +5188,51 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
     entrypoint:string ->
     (context * arg typed_contract) tzresult Lwt.t =
  fun ~stack_depth ~legacy ctxt loc arg contract ~entrypoint ->
-  Gas.consume ctxt Typecheck_costs.contract_exists >>?= fun ctxt ->
-  Contract.exists ctxt contract >>=? function
-  | false -> fail (Invalid_contract (loc, contract))
-  | true -> (
-      trace (Invalid_contract (loc, contract))
-      @@ Contract.get_script_code ctxt contract
-      >>=? fun (ctxt, code) ->
-      Lwt.return
-      @@
-      match code with
-      | None -> (
-          ty_eq ctxt loc arg (Unit_t None) >>? fun (Eq, ctxt) ->
-          match entrypoint with
-          | "default" ->
+  match Contract.is_implicit contract with
+  | Some _ -> (
+      match entrypoint with
+      | "default" ->
+          (* An implicit account on the "default" entrypoint always exists and has type unit. *)
+          Lwt.return
+            ( ty_eq ctxt loc arg (Unit_t None) >|? fun (Eq, ctxt) ->
               let contract : arg typed_contract =
                 (arg, (contract, entrypoint))
               in
-              ok (ctxt, contract)
-          | entrypoint -> error (No_such_entrypoint entrypoint))
+              (ctxt, contract) )
+      | _ -> fail (No_such_entrypoint entrypoint))
+  | None -> (
+      (* Originated account *)
+      trace (Invalid_contract (loc, contract))
+      @@ Contract.get_script_code ctxt contract
+      >>=? fun (ctxt, code) ->
+      match code with
+      | None -> fail (Invalid_contract (loc, contract))
       | Some code ->
-          Script.force_decode_in_context ctxt code >>? fun (code, ctxt) ->
-          parse_toplevel ~legacy:true code
-          >>? fun (arg_type, _, _, root_name) ->
-          parse_parameter_ty
-            ctxt
-            ~stack_depth:(stack_depth + 1)
-            ~legacy:true
-            arg_type
-          >>? fun (Ex_ty targ, ctxt) ->
-          find_entrypoint_for_type
-            ~legacy
-            ~full:targ
-            ~expected:arg
-            ~root_name
-            entrypoint
-            ctxt
-            loc
-          >|? fun (ctxt, entrypoint, arg) ->
-          let contract : arg typed_contract = (arg, (contract, entrypoint)) in
-          (ctxt, contract))
+          Lwt.return
+            ( Script.force_decode_in_context ctxt code >>? fun (code, ctxt) ->
+              (* can only fail because of gas *)
+              parse_toplevel ~legacy:true code
+              >>? fun (arg_type, _, _, root_name) ->
+              parse_parameter_ty
+                ctxt
+                ~stack_depth:(stack_depth + 1)
+                ~legacy:true
+                arg_type
+              >>? fun (Ex_ty targ, ctxt) ->
+              (* we don't check targ size here because it's a legacy contract code *)
+              find_entrypoint_for_type
+                ~legacy
+                ~full:targ
+                ~expected:arg
+                ~root_name
+                entrypoint
+                ctxt
+                loc
+              >|? fun (ctxt, entrypoint, arg) ->
+              let contract : arg typed_contract =
+                (arg, (contract, entrypoint))
+              in
+              (ctxt, contract) ))
 
 and parse_toplevel :
     legacy:bool ->
