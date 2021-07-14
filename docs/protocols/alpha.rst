@@ -24,6 +24,11 @@ New Environment Version (V3)
 This protocol requires a different protocol environment than Granada.
 It requires protocol environment V3, compared to V2 for Granada.
 
+Bug fixes
+---------
+
+- A bug in Michelson comparison function has been fixed (MR :gl:`!3237`)
+
 Minor changes
 -------------
 
