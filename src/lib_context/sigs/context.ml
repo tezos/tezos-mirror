@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The tree depth of a fold. See the [View.fold] function for more
+    information. *)
+type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
+
 module type VIEW = sig
   (** The type for context views. *)
   type t
@@ -98,12 +102,16 @@ module type VIEW = sig
       - [Gt d] folds over nodes and contents of depth strictly more than [d].
       - [Ge d] folds over nodes and contents of depth more than or equal to [d]. *)
   val fold :
-    ?depth:[`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int] ->
+    ?depth:depth ->
     t ->
     key ->
     init:'a ->
     f:(key -> tree -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
+end
+
+module Kind = struct
+  type t = [`Value | `Tree]
 end
 
 module type TREE = sig
@@ -134,7 +142,7 @@ module type TREE = sig
 
   (** [kind t] is [t]'s kind. It's either a tree node or a leaf
       value. *)
-  val kind : tree -> [`Value | `Tree]
+  val kind : tree -> Kind.t
 
   (** [to_value t] is an Lwt promise that resolves to [Some v] if [t]
       is a leaf tree and [None] otherwise. It is equivalent to [find t

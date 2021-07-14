@@ -27,7 +27,7 @@ open Level_repr
 
 let from_raw c ?offset l =
   let cycle_eras = Raw_context.cycle_eras c in
-  Level_repr.from_raw ~cycle_eras ?offset l
+  Level_repr.level_from_raw ~cycle_eras ?offset l
 
 let root c = Raw_context.cycle_eras c |> Level_repr.root_level
 
@@ -48,7 +48,7 @@ let previous ctxt =
 
 let first_level_in_cycle ctxt cycle =
   let cycle_eras = Raw_context.cycle_eras ctxt in
-  Level_repr.first_level_in_cycle ~cycle_eras cycle
+  Level_repr.first_level_in_cycle_from_eras ~cycle_eras cycle
 
 let last_level_in_cycle ctxt c =
   match pred ctxt (first_level_in_cycle ctxt (Cycle_repr.succ c)) with
@@ -57,7 +57,7 @@ let last_level_in_cycle ctxt c =
 
 let levels_in_cycle ctxt cycle =
   let first = first_level_in_cycle ctxt cycle in
-  let rec loop (n : Level_repr.t) acc =
+  let[@coq_struct "n"] rec loop (n : Level_repr.t) acc =
     if Cycle_repr.(n.cycle = first.cycle) then loop (succ ctxt n) (n :: acc)
     else acc
   in
@@ -73,7 +73,7 @@ let levels_in_current_cycle ctxt ?(offset = 0l) () =
 
 let levels_with_commitments_in_cycle ctxt c =
   let first = first_level_in_cycle ctxt c in
-  let rec loop (n : Level_repr.t) acc =
+  let[@coq_struct "n"] rec loop (n : Level_repr.t) acc =
     if Cycle_repr.(n.cycle = first.cycle) then
       if n.expected_commitment then loop (succ ctxt n) (n :: acc)
       else loop (succ ctxt n) acc

@@ -185,7 +185,19 @@ module Contract = struct
 end
 
 module Big_map = struct
-  include Lazy_storage_kind.Big_map
+  module Big_map = Lazy_storage_kind.Big_map
+
+  module Id = struct
+    type t = Big_map.Id.t
+
+    let encoding = Big_map.Id.encoding
+
+    let rpc_arg = Big_map.Id.rpc_arg
+
+    let parse_z = Big_map.Id.parse_z
+
+    let unparse_to_z = Big_map.Id.unparse_to_z
+  end
 
   let fresh ~temporary c = Lazy_storage.fresh Big_map ~temporary c
 
@@ -203,15 +215,45 @@ module Big_map = struct
     | None -> return (c, None)
     | Some kt ->
         Storage.Big_map.Value_type.get c id >|=? fun kv -> (c, Some (kt, kv))
+
+  type update = Big_map.update = {
+    key : Script_repr.expr;
+    key_hash : Script_expr_hash.t;
+    value : Script_repr.expr option;
+  }
+
+  type updates = Big_map.updates
+
+  type alloc = Big_map.alloc = {
+    key_type : Script_repr.expr;
+    value_type : Script_repr.expr;
+  }
 end
 
 module Sapling = struct
-  include Lazy_storage_kind.Sapling_state
+  module Sapling_state = Lazy_storage_kind.Sapling_state
+
+  module Id = struct
+    type t = Sapling_state.Id.t
+
+    let encoding = Sapling_state.Id.encoding
+
+    let rpc_arg = Sapling_state.Id.rpc_arg
+
+    let parse_z = Sapling_state.Id.parse_z
+
+    let unparse_to_z = Sapling_state.Id.unparse_to_z
+  end
+
   include Sapling_repr
   include Sapling_storage
   include Sapling_validator
 
   let fresh ~temporary c = Lazy_storage.fresh Sapling_state ~temporary c
+
+  type updates = Sapling_state.updates
+
+  type alloc = Sapling_state.alloc = {memo_size : Sapling_repr.Memo_size.t}
 end
 
 module Receipt = Receipt_repr

@@ -36,12 +36,12 @@ type diff_query = {
 
 module S = struct
   module Args = struct
-    type ('query, 'output) t = {
+    type ('query_type, 'output_type) t = {
       name : string;
       description : string;
-      query : 'query RPC_query.t;
-      output : 'output Data_encoding.t;
-      f : context -> Sapling.Id.t -> 'query -> 'output tzresult Lwt.t;
+      query : 'query_type RPC_query.t;
+      output : 'output_type Data_encoding.t;
+      f : context -> Sapling.Id.t -> 'query_type -> 'output_type tzresult Lwt.t;
     }
 
     let get_diff_query : diff_query RPC_query.t =

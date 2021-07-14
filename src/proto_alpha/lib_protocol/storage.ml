@@ -24,29 +24,32 @@
 (*****************************************************************************)
 
 open Storage_functors
+open Storage_sigs
 
-module UInt16 = struct
-  type t = int
+module Encoding = struct
+  module UInt16 = struct
+    type t = int
 
-  let encoding = Data_encoding.uint16
-end
+    let encoding = Data_encoding.uint16
+  end
 
-module Int32 = struct
-  include Int32
+  module Int32 = struct
+    type t = Int32.t
 
-  let encoding = Data_encoding.int32
-end
+    let encoding = Data_encoding.int32
+  end
 
-module Int64 = struct
-  include Int64
+  module Int64 = struct
+    type t = Int64.t
 
-  let encoding = Data_encoding.int64
-end
+    let encoding = Data_encoding.int64
+  end
 
-module Z = struct
-  type t = Z.t
+  module Z = struct
+    type t = Z.t
 
-  let encoding = Data_encoding.z
+    let encoding = Data_encoding.z
+  end
 end
 
 module Int31_index : INDEX with type t = int = struct
@@ -78,12 +81,22 @@ module Make_index (H : Storage_description.INDEX) :
   let args = Storage_description.One {rpc_arg; encoding; compare}
 end
 
-module Block_priority =
+module type Simple_single_data_storage = sig
+  type value
+
+  val get : Raw_context.t -> value tzresult Lwt.t
+
+  val update : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
+
+  val init : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
+end
+
+module Block_priority : Simple_single_data_storage with type value = int =
   Make_single_data_storage (Registered) (Raw_context)
     (struct
       let name = ["block_priority"]
     end)
-    (UInt16)
+    (Encoding.UInt16)
 
 (** Contracts handling *)
 
@@ -94,12 +107,12 @@ module Contract = struct
         let name = ["contracts"]
       end)
 
-  module Global_counter =
+  module Global_counter : Simple_single_data_storage with type value = Z.t =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
         let name = ["global_counter"]
       end)
-      (Z)
+      (Encoding.Z)
 
   module Indexed_context =
     Make_indexed_subcontext
@@ -190,7 +203,7 @@ module Contract = struct
       (struct
         let name = ["counter"]
       end)
-      (Z)
+      (Encoding.Z)
 
   (* Consume gas for serialization and deserialization of expr in this
      module *)
@@ -273,14 +286,14 @@ module Contract = struct
       (struct
         let name = ["paid_bytes"]
       end)
-      (Z)
+      (Encoding.Z)
 
   module Used_storage_space =
     Indexed_context.Make_map
       (struct
         let name = ["used_bytes"]
       end)
-      (Z)
+      (Encoding.Z)
 
   module Roll_list =
     Indexed_context.Make_map
@@ -297,6 +310,14 @@ module Contract = struct
       (Tez_repr)
 end
 
+module type NEXT = sig
+  type id
+
+  val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+  val incr : Raw_context.t -> (Raw_context.t * id) tzresult Lwt.t
+end
+
 (** Big maps handling *)
 
 module Big_map = struct
@@ -308,8 +329,8 @@ module Big_map = struct
         let name = ["big_maps"]
       end)
 
-  module Next = struct
-    include
+  module Next : NEXT with type id := id = struct
+    module Storage =
       Make_single_data_storage (Registered) (Raw_context)
         (struct
           let name = ["next"]
@@ -317,22 +338,26 @@ module Big_map = struct
         (Lazy_storage_kind.Big_map.Id)
 
     let incr ctxt =
-      get ctxt >>=? fun i ->
-      update ctxt (Lazy_storage_kind.Big_map.Id.next i) >|=? fun ctxt ->
+      Storage.get ctxt >>=? fun i ->
+      Storage.update ctxt (Lazy_storage_kind.Big_map.Id.next i) >|=? fun ctxt ->
       (ctxt, i)
 
-    let init ctxt = init ctxt Lazy_storage_kind.Big_map.Id.init
+    let init ctxt = Storage.init ctxt Lazy_storage_kind.Big_map.Id.init
   end
 
-  module Index = struct
+  module Index :
+    Storage_description.INDEX with type t = Lazy_storage_kind.Big_map.Id.t =
+  struct
     (* After flat storage, just use module Index = Lazy_storage_kind.Big_map.Id *)
 
-    include Lazy_storage_kind.Big_map.Id
+    module Id = Lazy_storage_kind.Big_map.Id
 
-    let path_length = 6 + path_length
+    type t = Id.t
+
+    let path_length = 6 + Id.path_length
 
     let to_path c l =
-      let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+      let raw_key = Data_encoding.Binary.to_bytes_exn Id.encoding c in
       let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
       String.sub index_key 0 2
       ::
@@ -341,7 +366,7 @@ module Big_map = struct
       String.sub index_key 4 2
       ::
       String.sub index_key 6 2
-      :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: to_path c l
+      :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: Id.to_path c l
 
     let of_path = function
       | []
@@ -354,9 +379,11 @@ module Big_map = struct
       | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ ->
           None
       | index1 :: index2 :: index3 :: index4 :: index5 :: index6 :: tail ->
-          of_path tail
+          Id.of_path tail
           |> Option.map (fun c ->
-                 let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+                 let raw_key =
+                   Data_encoding.Binary.to_bytes_exn Id.encoding c
+                 in
                  let (`Hex index_key) =
                    Hex.of_bytes (Raw_hashes.blake2b raw_key)
                  in
@@ -367,6 +394,12 @@ module Big_map = struct
                  assert (Compare.String.(String.sub index_key 8 2 = index5)) ;
                  assert (Compare.String.(String.sub index_key 10 2 = index6)) ;
                  c)
+
+    let rpc_arg = Id.rpc_arg
+
+    let encoding = Id.encoding
+
+    let compare = Id.compare
   end
 
   module Indexed_context =
@@ -394,7 +427,7 @@ module Big_map = struct
       (struct
         let name = ["total_bytes"]
       end)
-      (Z)
+      (Encoding.Z)
 
   module Key_type =
     Indexed_context.Make_map
@@ -418,7 +451,11 @@ module Big_map = struct
         let encoding = Script_repr.expr_encoding
       end)
 
-  module Contents = struct
+  module Contents :
+    Non_iterable_indexed_carbonated_data_storage_with_values
+      with type key = Script_expr_hash.t
+       and type value = Script_repr.expr
+       and type t := key = struct
     module I =
       Storage_functors.Make_indexed_carbonated_data_storage
         (Make_subcontext (Registered) (Indexed_context.Raw_context)
@@ -483,7 +520,7 @@ module Sapling = struct
       end)
 
   module Next = struct
-    include
+    module Storage =
       Make_single_data_storage (Registered) (Raw_context)
         (struct
           let name = ["next"]
@@ -491,11 +528,11 @@ module Sapling = struct
         (Lazy_storage_kind.Sapling_state.Id)
 
     let incr ctxt =
-      get ctxt >>=? fun i ->
-      update ctxt (Lazy_storage_kind.Sapling_state.Id.next i) >|=? fun ctxt ->
-      (ctxt, i)
+      Storage.get ctxt >>=? fun i ->
+      Storage.update ctxt (Lazy_storage_kind.Sapling_state.Id.next i)
+      >|=? fun ctxt -> (ctxt, i)
 
-    let init ctxt = init ctxt Lazy_storage_kind.Sapling_state.Id.init
+    let init ctxt = Storage.init ctxt Lazy_storage_kind.Sapling_state.Id.init
   end
 
   module Index = Lazy_storage_kind.Sapling_state.Id
@@ -519,14 +556,14 @@ module Sapling = struct
       (struct
         let name = ["total_bytes"]
       end)
-      (Z)
+      (Encoding.Z)
 
   module Commitments_size =
     Make_single_data_storage (Registered) (Indexed_context.Raw_context)
       (struct
         let name = ["commitments_size"]
       end)
-      (Int64)
+      (Encoding.Int64)
 
   module Memo_size =
     Make_single_data_storage (Registered) (Indexed_context.Raw_context)
@@ -535,7 +572,11 @@ module Sapling = struct
       end)
       (Sapling_repr.Memo_size)
 
-  module Commitments =
+  module Commitments :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * id
+       and type key = int64
+       and type value = Sapling.Hash.t =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
@@ -579,7 +620,11 @@ module Sapling = struct
     Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
     >|= fun (ctx, _id) -> ctx
 
-  module Ciphertexts =
+  module Ciphertexts :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * id
+       and type key = int64
+       and type value = Sapling.Ciphertext.t =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
@@ -627,10 +672,14 @@ module Sapling = struct
       (struct
         let name = ["nullifiers_size"]
       end)
-      (Int64)
+      (Encoding.Int64)
 
   (* For sequential access when building a diff *)
-  module Nullifiers_ordered =
+  module Nullifiers_ordered :
+    Non_iterable_indexed_data_storage
+      with type t := Raw_context.t * id
+       and type key = int64
+       and type value = Sapling.Nullifier.t =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
@@ -717,7 +766,11 @@ module Sapling = struct
     Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_hashed"]
     >|= fun (ctx, _id) -> ctx
 
-  module Roots =
+  module Roots :
+    Non_iterable_indexed_data_storage
+      with type t := Raw_context.t * id
+       and type key = int32
+       and type value = Sapling.Hash.t =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
@@ -761,7 +814,7 @@ module Sapling = struct
       (struct
         let name = ["roots_pos"]
       end)
-      (Int32)
+      (Encoding.Int32)
 
   module Roots_level =
     Make_single_data_storage (Registered) (Indexed_context.Raw_context)
@@ -825,7 +878,7 @@ module Cycle = struct
       (struct
         let name = ["roll_snapshot"]
       end)
-      (UInt16)
+      (Encoding.UInt16)
 
   type unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
@@ -947,7 +1000,8 @@ module Roll = struct
         let unwrap = Contract_repr.is_implicit
       end)
 
-  module Snapshoted_owner_index = struct
+  module Snapshoted_owner_index : INDEX with type t = Cycle_repr.t * int =
+  struct
     type t = Cycle_repr.t * int
 
     let path_length = Cycle_repr.Index.path_length + 1
@@ -1035,7 +1089,7 @@ module Vote = struct
       (struct
         let name = ["participation_ema"]
       end)
-      (Int32)
+      (Encoding.Int32)
 
   module Current_proposal =
     Make_single_data_storage (Registered) (Raw_context)
@@ -1049,7 +1103,7 @@ module Vote = struct
       (struct
         let name = ["listings_size"]
       end)
-      (Int32)
+      (Encoding.Int32)
 
   module Listings =
     Make_indexed_data_storage
@@ -1058,7 +1112,7 @@ module Vote = struct
            let name = ["listings"]
          end))
          (Make_index (Signature.Public_key_hash))
-         (Int32)
+         (Encoding.Int32)
 
   module Proposals =
     Make_data_set_storage
@@ -1078,7 +1132,7 @@ module Vote = struct
            let name = ["proposals_count"]
          end))
          (Make_index (Signature.Public_key_hash))
-         (UInt16)
+         (Encoding.UInt16)
 
   module Ballots =
     Make_indexed_data_storage
@@ -1092,6 +1146,19 @@ module Vote = struct
 
            let encoding = Vote_repr.ballot_encoding
          end)
+end
+
+module type FOR_CYCLE = sig
+  val init :
+    Raw_context.t ->
+    Cycle_repr.t ->
+    Seed_repr.seed ->
+    Raw_context.t tzresult Lwt.t
+
+  val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
+
+  val remove_existing :
+    Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 end
 
 (** Seed *)
@@ -1108,7 +1175,11 @@ module Seed = struct
     | Unrevealed of unrevealed_nonce
     | Revealed of Seed_repr.nonce
 
-  module Nonce = struct
+  module Nonce :
+    Non_iterable_indexed_data_storage
+      with type key := Level_repr.t
+       and type value := nonce_status
+       and type t := Raw_context.t = struct
     open Level_repr
 
     type context = Raw_context.t
@@ -1138,7 +1209,7 @@ module Seed = struct
       Cycle.Nonce.remove (ctxt, l.cycle) l.level
   end
 
-  module For_cycle = Cycle.Seed
+  module For_cycle : FOR_CYCLE = Cycle.Seed
 end
 
 (** Commitments *)
@@ -1238,7 +1309,7 @@ module Liquidity_baking = struct
       (struct
         let name = ["liquidity_baking_escape_ema"]
       end)
-      (Int32)
+      (Encoding.Int32)
 
   module Cpmm_address =
     Make_single_data_storage (Registered) (Raw_context)

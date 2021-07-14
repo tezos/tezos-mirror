@@ -59,11 +59,7 @@ let () =
     (function Period_overflow -> Some () | _ -> None)
     (fun () -> Period_overflow)
 
-(* Internal module implementing natural numbers using int64. These are different
-   from usual (wrapping up) unsigned integers in that if one overflows the
-   representation bounds for int64 through [add] or [mul], a [None] value is
-   returned *)
-module Internal : sig
+module type INTERNAL = sig
   type t = private int64
 
   val create : int64 -> t option
@@ -72,9 +68,9 @@ module Internal : sig
 
   val one : t
 
-  val mul : t -> t -> t option
+  val mult_ : t -> t -> t option
 
-  val add : t -> t -> t option
+  val add_ : t -> t -> t option
 
   val encoding : t Data_encoding.t
 
@@ -83,7 +79,13 @@ module Internal : sig
   val pp : Format.formatter -> t -> unit
 
   include Compare.S with type t := t
-end = struct
+end
+
+(* Internal module implementing natural numbers using int64. These are different
+   from usual (wrapping up) unsigned integers in that if one overflows the
+   representation bounds for int64 through [add] or [mul], a [None] value is
+   returned *)
+module Internal : INTERNAL = struct
   type t = Int64.t
 
   let encoding = Data_encoding.int64
@@ -100,19 +102,19 @@ end = struct
 
   let create t = if t >= zero then Some t else None
 
-  (* The create function is not used in the [mul] and [add] below to not add
+  (* The create function is not used in the [mul_] and [add_] below to not add
       extra Some | None pattern matching to handle since the overflow checks are
       generic and apply as well to negative as positive integers .
 
-     To handle overflows, both [add] and [mul] return option types. [None] is
+     To handle overflows, both [add_] and [mult_] return option types. [None] is
       returned on detected overflow, [Some value] when everything went well. *)
-  let mul a b =
+  let mult_ a b =
     if a <> zero then
       let res = Int64.mul a b in
       if Int64.div res a <> b then None else Some res
     else Some zero
 
-  let add a b =
+  let add_ a b =
     let res = Int64.add a b in
     if res < a || res < b then None else Some res
 end
@@ -137,12 +139,12 @@ let mult i p =
   match Internal.create (Int64.of_int32 i) with
   | None -> error Invalid_arg
   | Some iper -> (
-      match Internal.mul iper p with
+      match Internal.mult_ iper p with
       | None -> error Period_overflow
       | Some res -> ok res)
 
 let add p1 p2 =
-  match Internal.add p1 p2 with
+  match Internal.add_ p1 p2 with
   | None -> error Period_overflow
   | Some res -> ok res
 

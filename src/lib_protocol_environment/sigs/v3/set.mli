@@ -128,4 +128,4 @@ module type S = sig
     (unit, 'error Error_monad.trace) result Lwt.t
 end
 
-module Make (Ord : sig type t val compare : t -> t -> int end) : S with type elt = Ord.t
+module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t

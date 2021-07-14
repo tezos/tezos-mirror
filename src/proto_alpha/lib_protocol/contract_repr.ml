@@ -49,12 +49,15 @@ let to_b58check = function
 
 let of_b58check s =
   match Base58.decode s with
-  | Some (Ed25519.Public_key_hash.Data h) -> ok (Implicit (Signature.Ed25519 h))
-  | Some (Secp256k1.Public_key_hash.Data h) ->
-      ok (Implicit (Signature.Secp256k1 h))
-  | Some (P256.Public_key_hash.Data h) -> ok (Implicit (Signature.P256 h))
-  | Some (Contract_hash.Data h) -> ok (Originated h)
-  | _ -> error (Invalid_contract_notation s)
+  | Some data -> (
+      match data with
+      | Ed25519.Public_key_hash.Data h -> ok (Implicit (Signature.Ed25519 h))
+      | Secp256k1.Public_key_hash.Data h ->
+          ok (Implicit (Signature.Secp256k1 h))
+      | P256.Public_key_hash.Data h -> ok (Implicit (Signature.P256 h))
+      | Contract_hash.Data h -> ok (Originated h)
+      | _ -> error (Invalid_contract_notation s))
+  | None -> error (Invalid_contract_notation s)
 
 let pp ppf = function
   | Implicit pbk -> Signature.Public_key_hash.pp ppf pbk
@@ -144,7 +147,7 @@ let originated_contracts
       ({origination_index = last; operation_hash = last_hash} as
       origination_nonce) =
   assert (Operation_hash.equal first_hash last_hash) ;
-  let rec contracts acc origination_index =
+  let[@coq_struct "origination_index"] rec contracts acc origination_index =
     if Compare.Int32.(origination_index < first) then acc
     else
       let origination_nonce = {origination_nonce with origination_index} in

@@ -34,7 +34,15 @@ module Ghost = struct
   let ghost = true
 end
 
-module Make_encoder (V : VALUE) = struct
+module type ENCODER = sig
+  type t
+
+  val of_bytes : key:(unit -> string list) -> bytes -> t tzresult
+
+  val to_bytes : t -> bytes
+end
+
+module Make_encoder (V : VALUE) : ENCODER with type t := V.t = struct
   let of_bytes ~key b =
     match Data_encoding.Binary.of_bytes_opt V.encoding b with
     | None -> error (Raw_context.Storage_error (Corrupted_data (key ())))
@@ -174,6 +182,7 @@ struct
       ~get:find
       (register_named_subcontext description N.name)
       V.encoding
+    [@@coq_axiom_with_reason "stack overflow in Coq"]
 end
 
 module type INDEX = sig
@@ -249,6 +258,7 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX) :
          C.description
          I.args)
       Data_encoding.bool
+    [@@coq_axiom_with_reason "stack overflow in Coq"]
 end
 
 module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
@@ -329,6 +339,7 @@ struct
          C.description
          I.args)
       V.encoding
+    [@@coq_axiom_with_reason "stack overflow in Coq"]
 end
 
 (* Internal-use-only version of {!Make_indexed_carbonated_data_storage} to
@@ -336,8 +347,11 @@ end
 module Make_indexed_carbonated_data_storage_INTERNAL
     (C : Raw_context.T)
     (I : INDEX)
-    (V : VALUE) =
-struct
+    (V : VALUE) :
+  Non_iterable_indexed_carbonated_data_storage_INTERNAL
+    with type t = C.t
+     and type key = I.t
+     and type value = V.t = struct
   type t = C.t
 
   type context = t
@@ -511,25 +525,18 @@ struct
          C.description
          I.args)
       V.encoding
+    [@@coq_axiom_with_reason "stack overflow in Coq"]
 end
 
 module Make_indexed_carbonated_data_storage : functor
   (C : Raw_context.T)
   (I : INDEX)
   (V : VALUE)
-  -> sig
-  include
-    Non_iterable_indexed_carbonated_data_storage
-      with type t = C.t
-       and type key = I.t
-       and type value = V.t
-
-  val list_values :
-    ?offset:int ->
-    ?length:int ->
-    C.t ->
-    (Raw_context.t * V.t list) tzresult Lwt.t
-end =
+  ->
+  Non_iterable_indexed_carbonated_data_storage_with_values
+    with type t = C.t
+     and type key = I.t
+     and type value = V.t =
   Make_indexed_carbonated_data_storage_INTERNAL
 
 module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :
@@ -652,7 +659,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
   let pack = Storage_description.pack I.args
 
-  module Raw_context = struct
+  module Raw_context : Raw_context.T with type t = C.t I.ipath = struct
     type t = C.t I.ipath
 
     let to_key i k = I.to_path i k
@@ -764,7 +771,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let description = description
   end
 
-  module Make_set (R : REGISTER) (N : NAME) = struct
+  module Make_set (R : REGISTER) (N : NAME) :
+    Data_set_storage with type t = t and type elt = key = struct
     type t = C.t
 
     type context = t
@@ -811,9 +819,12 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           mem c k >>= function true -> return_some true | false -> return_none)
         (register_named_subcontext description N.name)
         Data_encoding.bool
+      [@@coq_axiom_with_reason "stack overflow in Coq"]
   end
 
-  module Make_map (N : NAME) (V : VALUE) = struct
+  module Make_map (N : NAME) (V : VALUE) :
+    Indexed_data_storage with type t = t and type key = key and type value = V.t =
+  struct
     type t = C.t
 
     type context = t
@@ -898,9 +909,14 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           find c k)
         (register_named_subcontext Raw_context.description N.name)
         V.encoding
+      [@@coq_axiom_with_reason "stack overflow in Coq"]
   end
 
-  module Make_carbonated_map (N : NAME) (V : VALUE) = struct
+  module Make_carbonated_map (N : NAME) (V : VALUE) :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t = t
+       and type key = key
+       and type value = V.t = struct
     type t = C.t
 
     type context = t
@@ -1009,6 +1025,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           find c k >|=? fun (_, v) -> v)
         (register_named_subcontext Raw_context.description N.name)
         V.encoding
+      [@@coq_axiom_with_reason "stack overflow in Coq"]
   end
 end
 
@@ -1024,8 +1041,11 @@ end
 
 module Wrap_indexed_data_storage
     (C : Indexed_data_storage)
-    (K : WRAPPER with type key := C.key) =
-struct
+    (K : WRAPPER with type key := C.key) :
+  Indexed_data_storage
+    with type t = C.t
+     and type key = K.t
+     and type value = C.value = struct
   type t = C.t
 
   type context = C.t

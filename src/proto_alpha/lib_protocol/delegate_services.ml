@@ -93,7 +93,7 @@ let info_encoding =
        (req "voting_power" int32))
 
 module S = struct
-  let path = RPC_path.(open_root / "context" / "delegates")
+  let raw_path = RPC_path.(open_root / "context" / "delegates")
 
   open Data_encoding
 
@@ -111,9 +111,9 @@ module S = struct
       ~description:"Lists all registered delegates."
       ~query:list_query
       ~output:(list Signature.Public_key_hash.encoding)
-      path
+      raw_path
 
-  let path = RPC_path.(path /: Signature.Public_key_hash.rpc_arg)
+  let path = RPC_path.(raw_path /: Signature.Public_key_hash.rpc_arg)
 
   let info =
     RPC_service.get_service
@@ -208,7 +208,7 @@ module S = struct
       RPC_path.(path / "voting_power")
 end
 
-let register () =
+let delegate_register () =
   let open Services_registration in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
       Delegate.list ctxt >>= fun delegates ->
@@ -689,7 +689,7 @@ module Minimal_valid_time = struct
 end
 
 let register () =
-  register () ;
+  delegate_register () ;
   Baking_rights.register () ;
   Endorsing_rights.register () ;
   Endorsing_power.register () ;

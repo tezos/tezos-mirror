@@ -833,15 +833,16 @@ module type S = sig
       *)
   val combine_drop : 'a list -> 'b list -> ('a * 'b) list
 
+  (** A type like [result] but which is symmetric *)
+  type ('a, 'b) left_or_right_list = [`Left of 'a list | `Right of 'b list]
+
   (** [combine_with_leftovers ll lr] is a tuple [(combined, leftover)]
       where [combined] is [combine_drop ll lr]
       and [leftover] is either [`Left lsuffix] or [`Right rsuffix] depending on
       which of [ll] or [lr] is longer. [leftover] is [None] if the two lists
       have the same length. *)
   val combine_with_leftovers :
-    'a list ->
-    'b list ->
-    ('a * 'b) list * [`Left of 'a list | `Right of 'b list] option
+    'a list -> 'b list -> ('a * 'b) list * ('a, 'b) left_or_right_list option
 
   (** {3 compare / equal} *)
 

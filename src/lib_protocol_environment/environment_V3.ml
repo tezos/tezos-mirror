@@ -984,7 +984,13 @@ struct
   module Context = struct
     include Context
 
+    type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
+
     module type VIEW = Environment_context.VIEW
+
+    module Kind = struct
+      type t = [`Value | `Tree]
+    end
 
     module type TREE = Environment_context.TREE
 

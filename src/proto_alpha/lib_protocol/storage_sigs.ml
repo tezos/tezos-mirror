@@ -214,6 +214,24 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
 end
 [@@coq_precise_signature]
 
+module type Non_iterable_indexed_carbonated_data_storage_with_values = sig
+  include Non_iterable_indexed_carbonated_data_storage
+
+  (* HACK *)
+  val list_values :
+    ?offset:int ->
+    ?length:int ->
+    t ->
+    (Raw_context.t * value list) tzresult Lwt.t
+end
+
+module type Non_iterable_indexed_carbonated_data_storage_INTERNAL = sig
+  include Non_iterable_indexed_carbonated_data_storage_with_values
+
+  val fold_keys_unaccounted :
+    context -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+end
+
 (** The generic signature of indexed data accessors (a set of values
     of the same type indexed by keys of the same form in the
     hierarchical (key x value) database). *)

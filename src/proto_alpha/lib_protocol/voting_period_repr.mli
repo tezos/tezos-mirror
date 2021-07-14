@@ -65,16 +65,16 @@ val pp_info : Format.formatter -> info -> unit
 
 val pp_kind : Format.formatter -> kind -> unit
 
-(** [reset period ~start_position] increment the index by one and set the kind
-    to Proposal which is the period kind that start the voting
+(** [raw_reset period ~start_position] increment the index by one and set the
+    kind to Proposal which is the period kind that start the voting
     process. [start_position] is the level at wich this voting_period started.
 *)
-val reset : t -> start_position:Int32.t -> t
+val raw_reset : t -> start_position:Int32.t -> t
 
-(** [succ period ~start_position] increment the index by one and set the kind to
-    its successor. [start_position] is the level at which this voting_period
-    started. *)
-val succ : t -> start_position:Int32.t -> t
+(** [raw_succ period ~start_position] increment the index by one and set the
+    kind to its successor. [start_position] is the level at which this
+    voting_period started. *)
+val raw_succ : t -> start_position:Int32.t -> t
 
 val position_since : Level_repr.t -> t -> Int32.t
 

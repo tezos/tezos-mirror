@@ -945,6 +945,7 @@ and ('arg, 'ret) lambda =
   | Lam :
       ('arg, end_of_stack, 'ret, end_of_stack) kdescr * Script.node
       -> ('arg, 'ret) lambda
+[@@coq_force_gadt]
 
 and 'arg typed_contract = 'arg ty * address
 
@@ -1236,6 +1237,7 @@ and ('value, 'before, 'after) comb_set_gadt_witness =
   | Comb_set_plus_two :
       ('value, 'before, 'after) comb_set_gadt_witness
       -> ('value, 'a * 'before, 'a * 'after) comb_set_gadt_witness
+[@@coq_force_gadt]
 
 (*
 

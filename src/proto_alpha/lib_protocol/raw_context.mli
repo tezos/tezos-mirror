@@ -151,7 +151,7 @@ type error += Undefined_operation_nonce (* `Permanent *)
 
 val init_origination_nonce : t -> Operation_hash.t -> t
 
-val origination_nonce : t -> Contract_repr.origination_nonce tzresult
+val get_origination_nonce : t -> Contract_repr.origination_nonce tzresult
 
 val increment_origination_nonce :
   t -> (t * Contract_repr.origination_nonce) tzresult

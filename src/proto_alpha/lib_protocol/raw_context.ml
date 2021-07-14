@@ -172,7 +172,7 @@ let[@inline] update_allowed_endorsements ctxt allowed_endorsements =
 let[@inline] update_rewards ctxt rewards =
   update_back ctxt {ctxt.back with rewards}
 
-let[@inline] update_storage_space_to_pay ctxt storage_space_to_pay =
+let[@inline] raw_update_storage_space_to_pay ctxt storage_space_to_pay =
   update_back ctxt {ctxt.back with storage_space_to_pay}
 
 let[@inline] update_allocated_contracts ctxt allocated_contracts =
@@ -328,7 +328,7 @@ let increment_origination_nonce ctxt =
       let ctxt = update_origination_nonce ctxt origination_nonce in
       ok (ctxt, cur_origination_nonce)
 
-let origination_nonce ctxt =
+let get_origination_nonce ctxt =
   match origination_nonce ctxt with
   | None -> error Undefined_operation_nonce
   | Some origination_nonce -> ok origination_nonce
@@ -403,14 +403,14 @@ let init_storage_space_to_pay ctxt =
   match storage_space_to_pay ctxt with
   | Some _ -> assert false
   | None ->
-      let ctxt = update_storage_space_to_pay ctxt (Some Z.zero) in
+      let ctxt = raw_update_storage_space_to_pay ctxt (Some Z.zero) in
       update_allocated_contracts ctxt (Some 0)
 
 let clear_storage_space_to_pay ctxt =
   match (storage_space_to_pay ctxt, allocated_contracts ctxt) with
   | (None, _) | (_, None) -> assert false
   | (Some storage_space_to_pay, Some allocated_contracts) ->
-      let ctxt = update_storage_space_to_pay ctxt None in
+      let ctxt = raw_update_storage_space_to_pay ctxt None in
       let ctxt = update_allocated_contracts ctxt None in
       (ctxt, storage_space_to_pay, allocated_contracts)
 
@@ -418,7 +418,7 @@ let update_storage_space_to_pay ctxt n =
   match storage_space_to_pay ctxt with
   | None -> assert false
   | Some storage_space_to_pay ->
-      update_storage_space_to_pay ctxt (Some (Z.add n storage_space_to_pay))
+      raw_update_storage_space_to_pay ctxt (Some (Z.add n storage_space_to_pay))
 
 let update_allocated_contracts_count ctxt =
   match allocated_contracts ctxt with
@@ -672,7 +672,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~fitness ctxt =
   get_constants ctxt >>=? fun constants ->
   get_cycle_eras ctxt >|=? fun cycle_eras ->
   check_cycle_eras cycle_eras constants ;
-  let level = Level_repr.from_raw ~cycle_eras level in
+  let level = Level_repr.level_from_raw ~cycle_eras level in
   {
     remaining_operation_gas = Gas_limit_repr.Arith.zero;
     back =
@@ -963,7 +963,12 @@ let list ctxt ?offset ?length k = Context.list (context ctxt) ?offset ?length k
 
 let fold ?depth ctxt k ~init ~f = Context.fold ?depth (context ctxt) k ~init ~f
 
-module Tree = struct
+module Tree :
+  Raw_context_intf.TREE
+    with type t := t
+     and type key := key
+     and type value := value
+     and type tree := tree = struct
   include Context.Tree
 
   let empty ctxt = Context.Tree.empty (context ctxt)

@@ -56,7 +56,8 @@ and 'key description =
     }
       -> 'key description
 
-let rec pp : type a. Format.formatter -> a t -> unit =
+let[@coq_struct "function_parameter"] rec pp :
+    type a. Format.formatter -> a t -> unit =
  fun ppf {dir; _} ->
   match dir with
   | Empty -> Format.fprintf ppf "Empty"
@@ -71,7 +72,8 @@ let rec pp : type a. Format.formatter -> a t -> unit =
       let name = Format.asprintf "<%s>" (RPC_arg.descr arg).name in
       pp_item ppf (name, subdir)
 
-and pp_item : type a. Format.formatter -> string * a t -> unit =
+and[@coq_mutual_as_notation] pp_item :
+    type a. Format.formatter -> string * a t -> unit =
  fun ppf (name, desc) -> Format.fprintf ppf "@[<hv 2>%s@ %a@]" name pp desc
 
 let pp_rev_path ppf path =

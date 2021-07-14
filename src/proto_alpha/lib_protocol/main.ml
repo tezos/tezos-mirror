@@ -352,7 +352,7 @@ let relative_position_within_block op1 op2 =
   let open Alpha_context in
   let (Operation_data op1) = op1.protocol_data in
   let (Operation_data op2) = op2.protocol_data in
-  match (op1.contents, op2.contents) with
+  match[@coq_match_with_default] (op1.contents, op2.contents) with
   | (Single (Endorsement _), Single (Endorsement _)) -> 0
   | (_, Single (Endorsement _)) -> 1
   | (Single (Endorsement _), _) -> -1

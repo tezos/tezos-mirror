@@ -933,6 +933,8 @@ let combine ~when_different_lengths xs ys =
 let rev_combine ~when_different_lengths xs ys =
   rev_map2 ~when_different_lengths (fun x y -> (x, y)) xs ys
 
+type ('a, 'b) left_or_right_list = [`Left of 'a list | `Right of 'b list]
+
 let combine_with_leftovers xs ys =
   let rec aux rev_combined xs ys =
     match (xs, ys) with

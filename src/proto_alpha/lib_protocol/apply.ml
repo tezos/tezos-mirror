@@ -731,7 +731,7 @@ let apply_manager_operation_content :
 type success_or_failure = Success of context | Failure
 
 let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
-  let rec apply ctxt applied worklist =
+  let[@coq_struct "ctxt"] rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
     | Internal_operation ({source; operation; nonce} as op) :: rest -> (
@@ -771,8 +771,15 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
 
 let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
     : context tzresult Lwt.t =
-  let (Manager_operation
-        {source; fee; counter; operation; gas_limit; storage_limit}) =
+  let[@coq_match_with_default] (Manager_operation
+                                 {
+                                   source;
+                                   fee;
+                                   counter;
+                                   operation;
+                                   gas_limit;
+                                   storage_limit;
+                                 }) =
     op
   in
   Gas.consume_limit_in_block ctxt gas_limit >>?= fun ctxt ->
@@ -808,7 +815,14 @@ let apply_manager_contents (type kind) ctxt mode chain_id
     * kind manager_operation_result
     * packed_internal_operation_result list)
     Lwt.t =
-  let (Manager_operation {source; operation; gas_limit; storage_limit; _}) =
+  let[@coq_match_with_default] (Manager_operation
+                                 {
+                                   source;
+                                   operation;
+                                   gas_limit;
+                                   storage_limit;
+                                   _;
+                                 }) =
     op
   in
   (* We do not expose the internal scaling to the users. Instead, we multiply
@@ -866,7 +880,7 @@ let rec mark_skipped :
     Level.t ->
     kind Kind.manager contents_list ->
     kind Kind.manager contents_result_list =
- fun ~baker level -> function
+ fun ~baker level -> function[@coq_match_with_default]
   | Single (Manager_operation {source; fee; operation; _}) ->
       let source = Contract.implicit_contract source in
       Single_result
@@ -902,7 +916,7 @@ let rec precheck_manager_contents_list :
     Alpha_context.t -> kind Kind.manager contents_list -> context tzresult Lwt.t
     =
  fun ctxt contents_list ->
-  match contents_list with
+  match[@coq_match_with_default] contents_list with
   | Single (Manager_operation _ as op) -> precheck_manager_contents ctxt op
   | Cons ((Manager_operation _ as op), rest) ->
       precheck_manager_contents ctxt op >>=? fun ctxt ->
@@ -931,7 +945,7 @@ let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
       (Signature.public_key_hash * Signature.public_key option) option ->
       (Signature.public_key_hash * Signature.public_key option) tzresult =
    fun contents_list manager ->
-    let source (type kind) = function
+    let source (type kind) = function[@coq_match_with_default]
       | (Manager_operation {source; operation = Reveal key; _} :
           kind Kind.manager contents) ->
           (source, Some key)
@@ -960,7 +974,7 @@ let rec apply_manager_contents_list_rec :
     (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
  fun ctxt mode baker chain_id contents_list ->
   let level = Level.current ctxt in
-  match contents_list with
+  match[@coq_match_with_default] contents_list with
   | Single (Manager_operation {source; fee; _} as op) ->
       let source = Contract.implicit_contract source in
       apply_manager_contents ctxt mode chain_id op
@@ -1074,7 +1088,7 @@ let apply_manager_contents_list ctxt mode baker chain_id contents_list =
 let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
     (operation : kind operation) (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
-  match contents_list with
+  match[@coq_match_with_default] contents_list with
   | Single
       (Endorsement_with_slot
         {

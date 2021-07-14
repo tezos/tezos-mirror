@@ -185,7 +185,7 @@ let minimal_time_fastpath_case minimal_block_delay pred_timestamp =
 (* The function implements the slow-path case in [minimal_time]. (See
    [minimal_valid_time] for the definition of the slow-path.) *)
 let minimal_time_slowpath_case time_between_blocks priority pred_timestamp =
-  let rec cumsum_time_between_blocks acc durations p =
+  let[@coq_struct "durations"] rec cumsum_time_between_blocks acc durations p =
     if Compare.Int32.( <= ) p 0l then ok acc
     else
       match durations with

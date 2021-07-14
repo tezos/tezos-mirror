@@ -208,6 +208,7 @@ module Gas : sig
   module Arith :
     Fixed_point_repr.Safe
       with type 'a t = Saturation_repr.may_saturate Saturation_repr.t
+  [@@coq_plain_module]
 
   (** For maintenance operations or for testing, gas can be
      [Unaccounted]. Otherwise, the computation is [Limited] by the

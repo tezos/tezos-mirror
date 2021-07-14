@@ -88,7 +88,7 @@ let of_string s =
 
 let pp ppf amount =
   let mult_int = 1_000_000L in
-  let rec left ppf amount =
+  let[@coq_struct "amount"] rec left ppf amount =
     let (d, r) = (Int64.(div amount 1000L), Int64.(rem amount 1000L)) in
     if d > 0L then Format.fprintf ppf "%a%03Ld" left d r
     else Format.fprintf ppf "%Ld" r

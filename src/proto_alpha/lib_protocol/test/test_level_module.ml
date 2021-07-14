@@ -194,7 +194,7 @@ let test_level_from_raw () =
           Level_repr.create_cycle_eras cycle_eras |> Environment.wrap_tzresult
           >>?= fun cycle_eras ->
           let level_from_raw =
-            Protocol.Level_repr.from_raw ~cycle_eras raw_level
+            Protocol.Level_repr.level_from_raw ~cycle_eras raw_level
           in
           Assert.equal_int
             ~loc:__LOC__
@@ -242,7 +242,9 @@ let test_first_level_in_cycle () =
     Level_repr.create_cycle_eras cycle_eras |> Environment.wrap_tzresult
     >>?= fun cycle_eras ->
     let input_cycle = Cycle_repr.of_int32_exn input_cycle in
-    let level_res = Level_repr.first_level_in_cycle ~cycle_eras input_cycle in
+    let level_res =
+      Level_repr.first_level_in_cycle_from_eras ~cycle_eras input_cycle
+    in
     Assert.equal_int
       ~loc:__LOC__
       (Int32.to_int (Raw_level_repr.to_int32 level_res.level))

@@ -106,11 +106,12 @@ let common ctxt =
 
 let reset ctxt =
   common ctxt >>=? fun (ctxt, current_period, start_position) ->
-  Voting_period_repr.reset current_period ~start_position |> set_current ctxt
+  Voting_period_repr.raw_reset current_period ~start_position
+  |> set_current ctxt
 
 let succ ctxt =
   common ctxt >>=? fun (ctxt, current_period, start_position) ->
-  Voting_period_repr.succ current_period ~start_position |> set_current ctxt
+  Voting_period_repr.raw_succ current_period ~start_position |> set_current ctxt
 
 let get_current_kind ctxt = get_current ctxt >|=? fun {kind; _} -> kind
 

@@ -54,4 +54,4 @@ let activation_code_of_hex h =
     invalid_arg "Blinded_public_key_hash.activation_code_of_hex" ;
   Hex.to_bytes (`Hex h)
 
-module Index = H
+module Index : Storage_description.INDEX with type t = t = H
