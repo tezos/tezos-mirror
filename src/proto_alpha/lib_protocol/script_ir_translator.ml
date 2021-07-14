@@ -5338,58 +5338,45 @@ let parse_contract_for_script :
           (ctxt, None) )
   | (None, _) -> (
       (* Originated account *)
-      Gas.consume ctxt Typecheck_costs.contract_exists
-      >>?= fun ctxt ->
-      Contract.exists ctxt contract >>=? function
-      | false -> return (ctxt, None)
-      | true -> (
-          trace (Invalid_contract (loc, contract))
-          @@ Contract.get_script_code ctxt contract
-          >>=? fun (ctxt, code) ->
-          match code with
-          | None ->
-              (* Since protocol 005, we have the invariant that all originated accounts have code *)
-              assert false
-          | Some code ->
-              Lwt.return
-                ( Script.force_decode_in_context ctxt code
-                >>? fun (code, ctxt) ->
-                  (* can only fail because of gas *)
-                  match parse_toplevel ~legacy:true code with
+      trace (Invalid_contract (loc, contract))
+      @@ Contract.get_script_code ctxt contract
+      >>=? fun (ctxt, code) ->
+      match code with
+      | None -> return (ctxt, None)
+      | Some code ->
+          Lwt.return
+            ( Script.force_decode_in_context ctxt code >>? fun (code, ctxt) ->
+              (* can only fail because of gas *)
+              match parse_toplevel ~legacy:true code with
+              | Error _ -> error (Invalid_contract (loc, contract))
+              | Ok (arg_type, _, _, root_name) -> (
+                  match
+                    parse_parameter_ty ctxt ~stack_depth:0 ~legacy:true arg_type
+                  with
                   | Error _ -> error (Invalid_contract (loc, contract))
-                  | Ok (arg_type, _, _, root_name) -> (
+                  | Ok (Ex_ty targ, ctxt) -> (
+                      (* we don't check targ size here because it's a legacy contract code *)
                       match
-                        parse_parameter_ty
+                        find_entrypoint_for_type
+                          ~legacy:false
+                          ~full:targ
+                          ~expected:arg
+                          ~root_name
+                          entrypoint
                           ctxt
-                          ~stack_depth:0
-                          ~legacy:true
-                          arg_type
+                          loc
+                        >|? fun (ctxt, entrypoint, arg) ->
+                        let contract : arg typed_contract =
+                          (arg, (contract, entrypoint))
+                        in
+                        (ctxt, Some contract)
                       with
-                      | Error _ -> error (Invalid_contract (loc, contract))
-                      | Ok (Ex_ty targ, ctxt) -> (
-                          (* we don't check targ size here because it's a legacy contract code *)
-                          let res =
-                            find_entrypoint_for_type
-                              ~legacy:false
-                              ~full:targ
-                              ~expected:arg
-                              ~root_name
-                              entrypoint
-                              ctxt
-                              loc
-                            >|? fun (ctxt, entrypoint, arg) ->
-                            let contract : arg typed_contract =
-                              (arg, (contract, entrypoint))
-                            in
-                            (ctxt, Some contract)
-                          in
-                          match res with
-                          | Ok res -> ok res
-                          | Error _ ->
-                              (* overapproximation by checking if targ = targ,
-                                                             can only fail because of gas *)
-                              merge_types ~legacy:false ctxt loc targ targ
-                              >|? fun (Eq, _, ctxt) -> (ctxt, None))) )))
+                      | Ok res -> ok res
+                      | Error _ ->
+                          (* overapproximation by checking if targ = targ,
+                                                         can only fail because of gas *)
+                          merge_types ~legacy:false ctxt loc targ targ
+                          >|? fun (Eq, _, ctxt) -> (ctxt, None))) ))
 
 let parse_code :
     ?type_logger:type_logger ->
