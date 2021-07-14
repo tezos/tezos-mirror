@@ -186,7 +186,7 @@ let commands () =
         >>= fun () -> return_unit);
     command
       ~group:binary_description
-      ~desc:"Describe unsigned block header"
+      ~desc:"Describe unsigned operation"
       no_options
       (fixed ["describe"; "unsigned"; "operation"])
       (fun () (cctxt : Alpha_client_context.full) ->
