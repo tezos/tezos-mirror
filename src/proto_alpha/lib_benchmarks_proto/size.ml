@@ -144,15 +144,11 @@ let list (list : 'a Script_typed_ir.boxed_list) : t =
   list.Script_typed_ir.length
 
 let set (set : 'a Script_typed_ir.set) : t =
-  let res =
-    Alpha_context.Script_int.to_int (Script_ir_translator.set_size set)
-  in
+  let res = Alpha_context.Script_int.to_int (Script_set.size set) in
   match res with None -> assert false | Some x -> x
 
 let map (map : ('a, 'b) Script_typed_ir.map) : t =
-  let res =
-    Alpha_context.Script_int.to_int (Script_ir_translator.map_size map)
-  in
+  let res = Alpha_context.Script_int.to_int (Script_map.size map) in
   match res with None -> assert false | Some x -> x
 
 let timestamp (tstamp : Alpha_context.Script_timestamp.t) : t =

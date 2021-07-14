@@ -27,4 +27,5 @@ It requires protocol environment V3, compared to V2 for Granada.
 Minor changes
 -------------
 
-- Other internal refactorings or documentation. (MRs :gl:`!2021` :gl:`!2984` :gl:`!3042` :gl:`!3049` :gl:`!3088`)
+- Other internal refactorings or documentation. (MRs :gl:`!2021` :gl:`!2984`
+  :gl:`!3042` :gl:`!3049` :gl:`!3088` :gl:`!3075`)

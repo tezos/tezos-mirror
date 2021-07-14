@@ -33,11 +33,6 @@ open Script_typed_ir
 module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
 module Unparse_costs = Michelson_v1_gas.Cost_of.Unparsing
 
-type ex_comparable_ty =
-  | Ex_comparable_ty : 'a comparable_ty -> ex_comparable_ty
-
-type ex_ty = Ex_ty : 'a ty -> ex_ty
-
 type ex_stack_ty = Ex_stack_ty : ('a, 's) stack_ty -> ex_stack_ty
 
 (*
@@ -123,124 +118,6 @@ let add_dip ty annot prev =
       Dip (Item_t (ty, Item_t (Unit_t None, Bot_t, None), annot), prev)
   | Dip (stack, _) -> Dip (Item_t (ty, stack, annot), prev)
 
-(* ---- Type size accounting ------------------------------------------------*)
-
-(**
-  [deduce_comparable_type_size ~remaining ty] returns [remaining] minus the size of type [ty].
-  It is guaranteed to not grow the stack by more than [remaining] non-tail calls.
-*)
-let rec deduce_comparable_type_size :
-    type t. remaining:int -> t comparable_ty -> int =
- fun ~remaining ty ->
-  if Compare.Int.(remaining < 0) then remaining
-  else
-    match ty with
-    | Unit_key _ | Never_key _ | Int_key _ | Nat_key _ | Signature_key _
-    | String_key _ | Bytes_key _ | Mutez_key _ | Bool_key _ | Key_hash_key _
-    | Key_key _ | Timestamp_key _ | Chain_id_key _ | Address_key _ ->
-        remaining - 1
-    | Pair_key ((t1, _), (t2, _), _) ->
-        let remaining = remaining - 1 in
-        let remaining = deduce_comparable_type_size ~remaining t1 in
-        deduce_comparable_type_size ~remaining t2
-    | Union_key ((t1, _), (t2, _), _) ->
-        let remaining = remaining - 1 in
-        let remaining = deduce_comparable_type_size ~remaining t1 in
-        deduce_comparable_type_size ~remaining t2
-    | Option_key (t, _) ->
-        let remaining = remaining - 1 in
-        deduce_comparable_type_size ~remaining t
-
-(**
-  [deduce_type_size ~remaining ty] returns [remaining] minus the size of type [ty].
-  It is guaranteed to not grow the stack by more than [remaining] non-tail calls.
-*)
-let rec deduce_type_size : type t. remaining:int -> t ty -> int =
- fun ~remaining ty ->
-  match ty with
-  | Unit_t _ | Int_t _ | Nat_t _ | Signature_t _ | Bytes_t _ | String_t _
-  | Mutez_t _ | Key_hash_t _ | Key_t _ | Timestamp_t _ | Address_t _ | Bool_t _
-  | Operation_t _ | Chain_id_t _ | Never_t _ | Bls12_381_g1_t _
-  | Bls12_381_g2_t _ | Bls12_381_fr_t _ | Sapling_transaction_t _
-  | Sapling_state_t _ ->
-      remaining - 1
-  | Pair_t ((l, _, _), (r, _, _), _) ->
-      let remaining = remaining - 1 in
-      let remaining = deduce_type_size ~remaining l in
-      deduce_type_size ~remaining r
-  | Union_t ((l, _), (r, _), _) ->
-      let remaining = remaining - 1 in
-      let remaining = deduce_type_size ~remaining l in
-      deduce_type_size ~remaining r
-  | Lambda_t (arg, ret, _) ->
-      let remaining = remaining - 1 in
-      let remaining = deduce_type_size ~remaining arg in
-      deduce_type_size ~remaining ret
-  | Option_t (t, _) ->
-      let remaining = remaining - 1 in
-      deduce_type_size ~remaining t
-  | List_t (t, _) ->
-      let remaining = remaining - 1 in
-      deduce_type_size ~remaining t
-  | Ticket_t (t, _) ->
-      let remaining = remaining - 1 in
-      deduce_comparable_type_size ~remaining t
-  | Set_t (k, _) ->
-      let remaining = remaining - 1 in
-      deduce_comparable_type_size ~remaining k
-  | Map_t (k, v, _) ->
-      let remaining = remaining - 1 in
-      let remaining = deduce_comparable_type_size ~remaining k in
-      deduce_type_size ~remaining v
-  | Big_map_t (k, v, _) ->
-      let remaining = remaining - 1 in
-      let remaining = deduce_comparable_type_size ~remaining k in
-      deduce_type_size ~remaining v
-  | Contract_t (arg, _) ->
-      let remaining = remaining - 1 in
-      deduce_type_size ~remaining arg
-
-let check_type_size ~loc ~maximum_type_size ty =
-  if Compare.Int.(deduce_type_size ~remaining:maximum_type_size ty >= 0) then
-    ok_unit
-  else error (Type_too_large (loc, maximum_type_size))
-
-let rec check_type_size_of_stack_head :
-    type a s.
-    loc:Script.location ->
-    maximum_type_size:int ->
-    (a, s) stack_ty ->
-    up_to:int ->
-    unit tzresult =
- fun ~loc ~maximum_type_size stack ~up_to ->
-  if Compare.Int.(up_to <= 0) then ok_unit
-  else
-    match stack with
-    | Bot_t -> ok_unit
-    | Item_t (head, tail, _annot) ->
-        check_type_size ~loc ~maximum_type_size head >>? fun () ->
-        (check_type_size_of_stack_head [@tailcall])
-          ~loc
-          ~maximum_type_size
-          tail
-          ~up_to:(up_to - 1)
-
-let check_comparable_type_size ~legacy ctxt ~loc ty =
-  if legacy then ok_unit
-  else
-    let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
-    if
-      Compare.Int.(
-        deduce_comparable_type_size ~remaining:maximum_type_size ty >= 0)
-    then ok_unit
-    else error (Type_too_large (loc, maximum_type_size))
-
-let check_type_size ~legacy ctxt ~loc ty =
-  if legacy then ok_unit
-  else
-    let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
-    check_type_size ~loc ~maximum_type_size ty
-
 (* ---- Error helpers -------------------------------------------------------*)
 
 let location = function
@@ -289,181 +166,6 @@ let check_kind kinds expr =
   else
     let loc = location expr in
     error (Invalid_kind (loc, kinds, kind))
-
-(* ---- Lists, Sets and Maps ----------------------------------------------- *)
-
-let list_empty : 'a Script_typed_ir.boxed_list =
-  let open Script_typed_ir in
-  {elements = []; length = 0}
-
-let list_cons :
-    'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list =
- fun elt l ->
-  let open Script_typed_ir in
-  {length = 1 + l.length; elements = elt :: l.elements}
-
-let compare_address (x, ex) (y, ey) =
-  let lres = Contract.compare x y in
-  if Compare.Int.(lres = 0) then Compare.String.compare ex ey else lres
-
-type compare_comparable_cont =
-  | Compare_comparable :
-      'a comparable_ty * 'a * 'a * compare_comparable_cont
-      -> compare_comparable_cont
-  | Compare_comparable_return : compare_comparable_cont
-
-let compare_comparable : type a. a comparable_ty -> a -> a -> int =
-  let rec compare_comparable :
-      type a. a comparable_ty -> compare_comparable_cont -> a -> a -> int =
-   fun kind k x y ->
-    match (kind, x, y) with
-    | (Unit_key _, (), ()) -> (apply [@tailcall]) 0 k
-    | (Never_key _, _, _) -> .
-    | (Signature_key _, x, y) -> (apply [@tailcall]) (Signature.compare x y) k
-    | (String_key _, x, y) -> (apply [@tailcall]) (Script_string.compare x y) k
-    | (Bool_key _, x, y) -> (apply [@tailcall]) (Compare.Bool.compare x y) k
-    | (Mutez_key _, x, y) -> (apply [@tailcall]) (Tez.compare x y) k
-    | (Key_hash_key _, x, y) ->
-        (apply [@tailcall]) (Signature.Public_key_hash.compare x y) k
-    | (Key_key _, x, y) ->
-        (apply [@tailcall]) (Signature.Public_key.compare x y) k
-    | (Int_key _, x, y) -> (apply [@tailcall]) (Script_int.compare x y) k
-    | (Nat_key _, x, y) -> (apply [@tailcall]) (Script_int.compare x y) k
-    | (Timestamp_key _, x, y) ->
-        (apply [@tailcall]) (Script_timestamp.compare x y) k
-    | (Address_key _, x, y) -> (apply [@tailcall]) (compare_address x y) k
-    | (Bytes_key _, x, y) -> (apply [@tailcall]) (Compare.Bytes.compare x y) k
-    | (Chain_id_key _, x, y) -> (apply [@tailcall]) (Chain_id.compare x y) k
-    | (Pair_key ((tl, _), (tr, _), _), (lx, rx), (ly, ry)) ->
-        (compare_comparable [@tailcall])
-          tl
-          (Compare_comparable (tr, rx, ry, k))
-          lx
-          ly
-    | (Union_key ((tl, _), _, _), L x, L y) ->
-        (compare_comparable [@tailcall]) tl k x y
-    | (Union_key _, L _, R _) -> -1
-    | (Union_key _, R _, L _) -> 1
-    | (Union_key (_, (tr, _), _), R x, R y) ->
-        (compare_comparable [@tailcall]) tr k x y
-    | (Option_key _, None, None) -> 0
-    | (Option_key _, None, Some _) -> -1
-    | (Option_key _, Some _, None) -> 1
-    | (Option_key (t, _), Some x, Some y) ->
-        (compare_comparable [@tailcall]) t k x y
-  and apply ret k =
-    match (ret, k) with
-    | (0, Compare_comparable (ty, x, y, k)) ->
-        (compare_comparable [@tailcall]) ty k x y
-    | (0, Compare_comparable_return) -> 0
-    | (ret, _) ->
-        (* ret <> 0, we perform an early exit *)
-        if Compare.Int.(ret > 0) then 1 else -1
-  in
-  fun t -> compare_comparable t Compare_comparable_return
-  [@@coq_axiom_with_reason "non top-level mutually recursive function"]
-
-let empty_set : type a. a comparable_ty -> a set =
- fun ty ->
-  let module OPS = Set.Make (struct
-    type t = a
-
-    let compare = compare_comparable ty
-  end) in
-  (module struct
-    type elt = a
-
-    let elt_ty = ty
-
-    module OPS = OPS
-
-    let boxed = OPS.empty
-
-    let size = 0
-  end)
-
-let set_update : type a. a -> bool -> a set -> a set =
- fun v b (module Box) ->
-  (module struct
-    type elt = a
-
-    let elt_ty = Box.elt_ty
-
-    module OPS = Box.OPS
-
-    let boxed =
-      if b then Box.OPS.add v Box.boxed else Box.OPS.remove v Box.boxed
-
-    let size =
-      let mem = Box.OPS.mem v Box.boxed in
-      if mem then if b then Box.size else Box.size - 1
-      else if b then Box.size + 1
-      else Box.size
-  end)
-
-let set_mem : type elt. elt -> elt set -> bool =
- fun v (module Box) -> Box.OPS.mem v Box.boxed
-
-let set_fold : type elt acc. (elt -> acc -> acc) -> elt set -> acc -> acc =
- fun f (module Box) -> Box.OPS.fold f Box.boxed
-
-let set_size : type elt. elt set -> Script_int.n Script_int.num =
- fun (module Box) -> Script_int.(abs (of_int Box.size))
-
-let map_key_ty : type a b. (a, b) map -> a comparable_ty =
- fun (module Box) -> Box.key_ty
-
-let empty_map : type a b. a comparable_ty -> (a, b) map =
- fun ty ->
-  let module OPS = Map.Make (struct
-    type t = a
-
-    let compare = compare_comparable ty
-  end) in
-  (module struct
-    type key = a
-
-    type value = b
-
-    let key_ty = ty
-
-    module OPS = OPS
-
-    let boxed = (OPS.empty, 0)
-  end)
-
-let map_get : type key value. key -> (key, value) map -> value option =
- fun k (module Box) -> Box.OPS.find k (fst Box.boxed)
-
-let map_update : type a b. a -> b option -> (a, b) map -> (a, b) map =
- fun k v (module Box) ->
-  (module struct
-    type key = a
-
-    type value = b
-
-    let key_ty = Box.key_ty
-
-    module OPS = Box.OPS
-
-    let boxed =
-      let (map, size) = Box.boxed in
-      let contains = Box.OPS.mem k map in
-      match v with
-      | Some v -> (Box.OPS.add k v map, size + if contains then 0 else 1)
-      | None -> (Box.OPS.remove k map, size - if contains then 1 else 0)
-  end)
-
-let map_mem : type key value. key -> (key, value) map -> bool =
- fun k (module Box) -> Box.OPS.mem k (fst Box.boxed)
-
-let map_fold :
-    type key value acc.
-    (key -> value -> acc -> acc) -> (key, value) map -> acc -> acc =
- fun f (module Box) -> Box.OPS.fold f (fst Box.boxed)
-
-let map_size : type key value. (key, value) map -> Script_int.n Script_int.num =
- fun (module Box) -> Script_int.(abs (of_int (snd Box.boxed)))
 
 (* ---- Unparsing (Typed IR -> Untyped expressions) of types -----------------*)
 
@@ -1420,6 +1122,9 @@ let parse_memo_size (n : (location, _) Micheline.node) :
           @@ Invalid_syntactic_constant (location n, strip_locations n, msg))
   | _ -> error @@ Invalid_kind (location n, [Int_kind], kind n)
 
+type ex_comparable_ty =
+  | Ex_comparable_ty : 'a comparable_ty -> ex_comparable_ty
+
 let rec parse_comparable_ty :
     stack_depth:int ->
     context ->
@@ -1548,6 +1253,8 @@ let rec parse_comparable_ty :
                T_signature;
                T_key;
              ]
+
+type ex_ty = Ex_ty : 'a ty -> ex_ty
 
 let rec parse_packable_ty :
     context ->
@@ -2644,7 +2351,9 @@ let rec parse_data :
                          value
                          k)
                     >>? fun ctxt ->
-                    let c = compare_comparable key_type value k in
+                    let c =
+                      Script_comparable.compare_comparable key_type value k
+                    in
                     if Compare.Int.(0 <= c) then
                       if Compare.Int.(0 = c) then
                         error (Duplicate_map_keys (loc, strip_locations expr))
@@ -2657,13 +2366,14 @@ let rec parse_data :
                   ctxt
                   (Michelson_v1_gas.Cost_of.Interpreter.map_update k map)
                 >|? fun ctxt ->
-                (Some k, map_update k (Some (item_wrapper v)) map, ctxt) )
+                (Some k, Script_map.update k (Some (item_wrapper v)) map, ctxt)
+              )
         | Prim (loc, D_Elt, l, _) ->
             fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
         | Prim (loc, name, _, _) ->
             fail @@ Invalid_primitive (loc, [D_Elt], name)
         | Int _ | String _ | Bytes _ | Seq _ -> fail_parse_data ())
-      (None, empty_map key_type, ctxt)
+      (None, Script_map.empty key_type, ctxt)
       items
     |> traced
     >|=? fun (_, items, ctxt) -> (items, ctxt)
@@ -2691,7 +2401,9 @@ let rec parse_data :
                          last_key
                          k)
                     >>? fun ctxt ->
-                    let c = compare_comparable key_type last_key k in
+                    let c =
+                      Script_comparable.compare_comparable key_type last_key k
+                    in
                     if Compare.Int.(0 <= c) then
                       if Compare.Int.(0 = c) then
                         error (Duplicate_map_keys (loc, strip_locations expr))
@@ -2810,9 +2522,9 @@ let rec parse_data :
       @@ List.fold_right_es
            (fun v (rest, ctxt) ->
              non_terminal_recursion ?type_logger ctxt ~legacy t v
-             >|=? fun (v, ctxt) -> (list_cons v rest, ctxt))
+             >|=? fun (v, ctxt) -> (Script_list.cons v rest, ctxt))
            items
-           (list_empty, ctxt)
+           (Script_list.empty, ctxt)
   | (List_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Tickets *)
@@ -2835,7 +2547,7 @@ let rec parse_data :
                        ctxt
                        (Michelson_v1_gas.Cost_of.Interpreter.compare t value v)
                      >>? fun ctxt ->
-                     let c = compare_comparable t value v in
+                     let c = Script_comparable.compare_comparable t value v in
                      if Compare.Int.(0 <= c) then
                        if Compare.Int.(0 = c) then
                          error
@@ -2849,8 +2561,8 @@ let rec parse_data :
                  Gas.consume
                    ctxt
                    (Michelson_v1_gas.Cost_of.Interpreter.set_update v set)
-                 >|? fun ctxt -> (Some v, set_update v true set, ctxt) ))
-           (None, empty_set t, ctxt)
+                 >|? fun ctxt -> (Some v, Script_set.update v true set, ctxt) ))
+           (None, Script_set.empty t, ctxt)
            vs
       >|=? fun (_, set, ctxt) -> (set, ctxt)
   | (Set_t _, expr) ->
@@ -3072,7 +2784,7 @@ and parse_instr :
     match judgement with
     | Typed {loc; aft; _} ->
         let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
-        check_type_size_of_stack_head
+        Script_type_size.check_type_size_of_stack_head
           ~loc
           ~maximum_type_size
           aft
@@ -3263,7 +2975,7 @@ and parse_instr :
       parse_var_annot loc annot >>?= fun annot ->
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
-      check_type_size ~legacy ctxt ~loc t >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ctxt ~loc t >>?= fun () ->
       parse_data
         ?type_logger
         ~stack_depth:(stack_depth + 1)
@@ -4211,10 +3923,10 @@ and parse_instr :
   | (Prim (loc, I_LAMBDA, [arg; ret; code], annot), stack) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy arg
       >>?= fun (Ex_ty arg, ctxt) ->
-      check_type_size ~legacy ctxt ~loc arg >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ctxt ~loc arg >>?= fun () ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ret
       >>?= fun (Ex_ty ret, ctxt) ->
-      check_type_size ~legacy ctxt ~loc ret >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ctxt ~loc ret >>?= fun () ->
       check_kind [Seq_kind] code >>?= fun () ->
       parse_var_annot loc annot >>?= fun annot ->
       parse_returning
@@ -4896,7 +4608,7 @@ and parse_instr :
            ~legacy
            arg_type)
       >>?= fun (Ex_ty arg_type, ctxt) ->
-      check_type_size ~legacy ctxt ~loc arg_type >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ctxt ~loc arg_type >>?= fun () ->
       (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
       >>?= fun () ->
       record_trace
@@ -4907,7 +4619,8 @@ and parse_instr :
            ~legacy
            storage_type)
       >>?= fun (Ex_ty storage_type, ctxt) ->
-      check_type_size ~legacy ctxt ~loc storage_type >>?= fun () ->
+      Script_type_size.check_type_size ~legacy ctxt ~loc storage_type
+      >>?= fun () ->
       let arg_annot =
         default_annot
           (type_to_var_annot (name_of_ty arg_type))
@@ -5677,7 +5390,8 @@ let parse_code :
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
     (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_ty arg_type, ctxt) ->
-  check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type >>?= fun () ->
+  Script_type_size.check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type
+  >>?= fun () ->
   (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
   >>?= fun () ->
   let storage_type_loc = location storage_type in
@@ -5685,7 +5399,12 @@ let parse_code :
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
-  check_type_size ~legacy ctxt ~loc:storage_type_loc storage_type >>?= fun () ->
+  Script_type_size.check_type_size
+    ~legacy
+    ctxt
+    ~loc:storage_type_loc
+    storage_type
+  >>?= fun () ->
   let arg_annot =
     default_annot
       (type_to_var_annot (name_of_ty arg_type))
@@ -5783,7 +5502,8 @@ let typecheck_code :
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
     (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_ty arg_type, ctxt) ->
-  check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type >>?= fun () ->
+  Script_type_size.check_type_size ~legacy ctxt ~loc:arg_type_loc arg_type
+  >>?= fun () ->
   (if legacy then ok_unit else well_formed_entrypoints ~root_name arg_type)
   >>?= fun () ->
   let storage_type_loc = location storage_type in
@@ -5791,7 +5511,12 @@ let typecheck_code :
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
   >>?= fun (Ex_ty storage_type, ctxt) ->
-  check_type_size ~legacy ctxt ~loc:storage_type_loc storage_type >>?= fun () ->
+  Script_type_size.check_type_size
+    ~legacy
+    ctxt
+    ~loc:storage_type_loc
+    storage_type
+  >>?= fun () ->
   let arg_annot =
     default_annot
       (type_to_var_annot (name_of_ty arg_type))
@@ -5973,10 +5698,10 @@ let rec unparse_data :
           unparse_comparable_data ctxt mode t item >|=? fun (item, ctxt) ->
           (item :: l, ctxt))
         ([], ctxt)
-        (set_fold (fun e acc -> e :: acc) set [])
+        (Script_set.fold (fun e acc -> e :: acc) set [])
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Map_t (kt, vt, _), map) ->
-      let items = map_fold (fun k v acc -> (k, v) :: acc) map [] in
+      let items = Script_map.fold (fun k v acc -> (k, v) :: acc) map [] in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
   | (Big_map_t (_kt, _vt, _), {id = Some id; diff = {size; _}; _})
@@ -5992,7 +5717,9 @@ let rec unparse_data :
            so we don't bother carbonating this sort operation
            precisely. Also, the sort uses a reverse compare because
            [unparse_items] will reverse the result. *)
-        List.sort (fun (a, _) (b, _) -> compare_comparable kt b a) items
+        List.sort
+          (fun (a, _) (b, _) -> Script_comparable.compare_comparable kt b a)
+          items
       in
       let vt = Option_t (vt, None) in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
@@ -6013,7 +5740,9 @@ let rec unparse_data :
       in
       let items =
         (* See note above. *)
-        List.sort (fun (a, _) (b, _) -> compare_comparable kt b a) items
+        List.sort
+          (fun (a, _) (b, _) -> Script_comparable.compare_comparable kt b a)
+          items
       in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (-1, items), ctxt)
@@ -6441,8 +6170,8 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
           (fun (ctxt, l, ids_to_copy, acc) x ->
             aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
             >|=? fun (ctxt, x, ids_to_copy, acc) ->
-            (ctxt, list_cons x l, ids_to_copy, acc))
-          (ctxt, list_empty, ids_to_copy, acc)
+            (ctxt, Script_list.cons x l, ids_to_copy, acc))
+          (ctxt, Script_list.empty, ids_to_copy, acc)
           l.elements
         >|=? fun (ctxt, l, ids_to_copy, acc) ->
         let reversed = {length = l.length; elements = List.rev l.elements} in
@@ -6538,7 +6267,7 @@ let rec fold_lazy_storage :
         (ok (Fold_lazy_storage.Ok init, ctxt))
         l.elements
   | (Map_f has_lazy_storage, Map_t (_, ty, _), m) ->
-      map_fold
+      Script_map.fold
         (fun _
              v
              (acc : (('acc, error) Fold_lazy_storage.result * context) tzresult) ->
