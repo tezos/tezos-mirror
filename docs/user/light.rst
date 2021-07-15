@@ -3,13 +3,13 @@
 Light mode
 ----------
 
-The ``tezos-client`` described
-:ref:`here <howtouse_tezos_client>` forwards all RPCs to a node.
+The ``tezos-client`` described in
+:ref:`its own tutorial <howtouse_tezos_client>` forwards all RPCs to a node.
 This page describes the *light* mode, a mode where the client
 performs protocol RPCs locally; like the :ref:`proxy mode<proxy-mode>`.
 However, contrary to the proxy mode, the light mode provides
-a high-level of security. For that it obtains data from multiple
-(hopefully unrelated) endpoints and make sure all endpoints send
+a high level of security. For that it obtains data from multiple
+(hopefully unrelated) endpoints and makes sure all endpoints send
 the same data, by using *Merkle proofs*. Such proofs make very hard
 for unrelated endpoints to craft fake data.
 
@@ -35,8 +35,8 @@ The ``sources.json`` file contains:
 
 * The list of endpoints to contact for retrieving data, as a list of URIs in the ``uris`` field.
   Because ``--sources`` must be the sole source of truth for incoming data, it
-  supersedes ``--endpoint``. This is enforced by checking that the URI
-  passed to ``--endpoint`` also appears in the ``uris`` field of the file
+  must be a superset of ``--endpoint``. This is enforced by checking that the URI
+  passed to ``--endpoint`` (if any) also appears in the ``uris`` field of the file
   passed to ``--sources``. Therefore, it is recommended to use the first
   member of the ``uris`` field as the value of ``--endpoint``.
 * An optional ``min_agreement`` field, which must be a float from ``0.0`` (excluded) to ``1.0`` (included).
@@ -81,6 +81,7 @@ start a sandboxed node:
 
     $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
       # This node listens to p2p events on localhost:19731
+      # RPC server of the node is reachable at localhost:18731
 
 
 Leave that terminal running. In a second terminal, start another node:
@@ -89,6 +90,7 @@ Leave that terminal running. In a second terminal, start another node:
 
     $ ./src/bin_node/tezos-sandboxed-node.sh 2 --connections 1
       # This node listens to p2p events on localhost:19732
+      # RPC server of the node is reachable at localhost:18732
 
 Leave that terminal running. In a third terminal, prepare the appropriate
 environment for using the light client (from now on, all commands happen
@@ -104,14 +106,6 @@ Then upgrade the node to protocol alpha:
 
     $ tezos-activate-alpha  # Triggers output in terminal of first node
     $ tezos-client bake for bootstrap1  # Triggers output in terminal of first node
-
-Now, connect the two nodes together:
-
-::
-
-    $ tezos-admin-client --endpoint localhost:19731 connect address 127.0.0.1:19732
-      # This triggers many lines of output in the second node's terminal,
-      # as it catches up with the first node
 
 To avoid warnings being printed in upcoming commands (optional):
 
@@ -131,7 +125,7 @@ You're now ready to use the light client. For example, bake a block:
 
 ::
 
-    $ tezos-client --mode light --sources sources.json bake for bootstrap1
+    $ tezos-client --endpoint http://localhost:18731 --mode light --sources sources.json bake for bootstrap1
     protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
     Apr  8 16:42:24.202 - alpha.baking.forge: found 0 valid operations (0 refused) for timestamp 2021-04-08T14:42:24.000-00:00 (fitness 01::0000000000000004)
     Injected block BMAHozsNCos2
@@ -153,7 +147,7 @@ keystrokes and the ``protocol of light mode unspecified`` warning:
 
 ::
 
-    $ alias light-client="tezos-client --mode light --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --sources sources.json"
+    $ alias light-client="tezos-client --endpoint http://localhost:18731 --mode light --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --sources sources.json"
 
 And then bake a new block:
 
