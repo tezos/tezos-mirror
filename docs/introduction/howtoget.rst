@@ -43,6 +43,10 @@ compiling the sources in the official Tezos
 repository is more secure than installing OPAM packages from a repository that
 is not under Tezos control. In particular, compiling from sources enforces a fixed set of dependencies; when compiling via OPAM, this set of dependencies may change, which may or may not be compatible with your security practices.
 
+All our installation scenarios are tested daily, including by automated means, to ensure that they are correct and up to date.
+These tests are performed by applying scenarios in several standard environements, from scratch.
+However, if you encounter problems when performing one of the installation scenarios in your own environment, you may want to take a look at :doc:`get_troubleshooting`.
+
 .. _getting_static_binaries:
 
 Getting static binaries
@@ -189,6 +193,7 @@ developed in the future.
     If you build the binaries by using the following instructions inside a
     Docker container, you have to give extended privileges to this container,
     by passing option ``--privileged`` to the ``docker run`` command.
+
 
 Install OPAM
 ~~~~~~~~~~~~
@@ -433,7 +438,6 @@ command instead:
 
    * As a last resort, removing the ``_opam`` folder (as part of a ``git
      clean -dxf`` for example) allows to restart in a fresh environment.
-
 
 Compile
 ~~~~~~~
