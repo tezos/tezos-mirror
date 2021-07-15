@@ -1887,25 +1887,19 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
 let find_entrypoint_for_type (type full exp) ~legacy ~(full : full ty)
     ~(expected : exp ty) ~root_name entrypoint ctxt loc :
     (context * (string * exp ty) tzresult) tzresult =
-  match (entrypoint, root_name) with
-  | ("default", Some (Field_annot "root")) -> (
-      match find_entrypoint full ~root_name entrypoint with
-      | Error _ as err -> ok (ctxt, err)
-      | Ok (_, Ex_ty ty) -> (
-          merge_types ~legacy ctxt loc ty expected >>? fun (eq_ty, ctxt) ->
+  match find_entrypoint full ~root_name entrypoint with
+  | Error _ as err -> ok (ctxt, err)
+  | Ok (_, Ex_ty ty) -> (
+      merge_types ~legacy ctxt loc ty expected >>? fun (eq_ty, ctxt) ->
+      match (entrypoint, root_name) with
+      | ("default", Some (Field_annot "root")) -> (
           match eq_ty with
           | Ok (Eq, ty) -> ok (ctxt, ok ("default", (ty : exp ty)))
           | Error _ ->
               merge_types ~legacy ctxt loc full expected
               >|? fun (eq_full, ctxt) ->
-              (ctxt, eq_full >|? fun (Eq, full) -> ("root", (full : exp ty)))))
-  | _ -> (
-      match find_entrypoint full ~root_name entrypoint with
-      | Error _ as err -> ok (ctxt, err)
-      | Ok (_, Ex_ty ty) ->
-          merge_types ~legacy ctxt loc ty expected >|? fun (eq_ty, ctxt) ->
-          (ctxt, eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
-  [@@coq_axiom_with_reason "cast on err"]
+              (ctxt, eq_full >|? fun (Eq, full) -> ("root", (full : exp ty))))
+      | _ -> ok (ctxt, eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
 
 module Entrypoints = Set.Make (String)
 
