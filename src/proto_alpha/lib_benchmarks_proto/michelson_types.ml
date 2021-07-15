@@ -32,89 +32,90 @@ let ( @$ ) x y = Item_t (x, y, None)
 
 let bot = Bot_t
 
-let unit = Unit_t None
+let unit = Unit_t {annot = None}
 
-let unit_cmp = Unit_key None
+let unit_cmp = Unit_key {annot = None}
 
-let int_cmp = Int_key None
+let int_cmp = Int_key {annot = None}
 
-let string_cmp = String_key None
+let string_cmp = String_key {annot = None}
 
 (* the type of integers *)
-let int = Int_t None
+let int = Int_t {annot = None}
 
 (* the type of naturals *)
-let nat = Nat_t None
+let nat = Nat_t {annot = None}
 
 (* the type of strings *)
-let string = String_t None
+let string = String_t {annot = None}
 
 (* the type of bytes *)
-let bytes = Bytes_t None
+let bytes = Bytes_t {annot = None}
 
 (* the type of booleans *)
-let bool = Bool_t None
+let bool = Bool_t {annot = None}
 
 (* the type of mutez *)
-let mutez = Mutez_t None
+let mutez = Mutez_t {annot = None}
 
 (* the type of public key *)
-let public_key = Key_t None
+let public_key = Key_t {annot = None}
 
 (* the type of key hashes *)
-let key_hash = Key_hash_t None
+let key_hash = Key_hash_t {annot = None}
 
 (* the type of signatures *)
-let signature = Signature_t None
+let signature = Signature_t {annot = None}
 
 (* the type of addresses *)
-let address = Address_t None
+let address = Address_t {annot = None}
 
 (* the type of chain ids *)
-let chain_id = Chain_id_t None
+let chain_id = Chain_id_t {annot = None}
 
 (* the type of timestamps *)
-let timestamp = Timestamp_t None
+let timestamp = Timestamp_t {annot = None}
 
 (* list type constructor *)
-let list x = List_t (x, None)
+let list x = List_t (x, {annot = None})
 
 (* option type constructor *)
-let option x = Option_t (x, None)
+let option x = Option_t (x, {annot = None})
 
 (* map type constructor*)
-let map k v = Map_t (k, v, None)
+let map k v = Map_t (k, v, {annot = None})
 
 (* map type constructor*)
-let big_map k v = Big_map_t (k, v, None)
+let big_map k v = Big_map_t (k, v, {annot = None})
 
 (* set type constructor*)
-let set k = Set_t (k, None)
+let set k = Set_t (k, {annot = None})
 
 (* pair type constructor*)
-let pair k1 k2 = Pair_t ((k1, None, None), (k2, None, None), None)
+let pair k1 k2 = Pair_t ((k1, None, None), (k2, None, None), {annot = None})
 
 (* union type constructor*)
-let union k1 k2 = Union_t ((k1, None), (k2, None), None)
+let union k1 k2 = Union_t ((k1, None), (k2, None), {annot = None})
 
-let lambda x y = Lambda_t (x, y, None)
+let lambda x y = Lambda_t (x, y, {annot = None})
 
-let contract arg_ty = Contract_t (arg_ty, None)
+let contract arg_ty = Contract_t (arg_ty, {annot = None})
 
-let operation = Operation_t None
+let operation = Operation_t {annot = None}
 
-let sapling_state memo_size = Sapling_state_t (memo_size, None)
+let sapling_state memo_size = Sapling_state_t (memo_size, {annot = None})
 
-let sapling_transaction memo_size = Sapling_transaction_t (memo_size, None)
+let sapling_transaction memo_size =
+  Sapling_transaction_t (memo_size, {annot = None})
 
-let bls12_381_g1 = Bls12_381_g1_t None
+let bls12_381_g1 = Bls12_381_g1_t {annot = None}
 
-let bls12_381_g2 = Bls12_381_g2_t None
+let bls12_381_g2 = Bls12_381_g2_t {annot = None}
 
-let bls12_381_fr = Bls12_381_fr_t None
+let bls12_381_fr = Bls12_381_fr_t {annot = None}
 
-let ticket ty = Ticket_t (ty, None)
+let ticket ty = Ticket_t (ty, {annot = None})
 
-let chest_key = Chest_key_t None
+let chest_key = Chest_key_t {annot = None}
 
-let chest = Chest_t None
+let chest = Chest_t {annot = None}

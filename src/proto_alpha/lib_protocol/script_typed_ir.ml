@@ -51,32 +51,36 @@ type empty_cell = EmptyCell
 
 type end_of_stack = empty_cell * empty_cell
 
+type ty_metadata = {annot : type_annot option}
+
 type _ comparable_ty =
-  | Unit_key : type_annot option -> unit comparable_ty
-  | Never_key : type_annot option -> never comparable_ty
-  | Int_key : type_annot option -> z num comparable_ty
-  | Nat_key : type_annot option -> n num comparable_ty
-  | Signature_key : type_annot option -> signature comparable_ty
-  | String_key : type_annot option -> Script_string.t comparable_ty
-  | Bytes_key : type_annot option -> Bytes.t comparable_ty
-  | Mutez_key : type_annot option -> Tez.t comparable_ty
-  | Bool_key : type_annot option -> bool comparable_ty
-  | Key_hash_key : type_annot option -> public_key_hash comparable_ty
-  | Key_key : type_annot option -> public_key comparable_ty
-  | Timestamp_key : type_annot option -> Script_timestamp.t comparable_ty
-  | Chain_id_key : type_annot option -> Chain_id.t comparable_ty
-  | Address_key : type_annot option -> address comparable_ty
+  | Unit_key : ty_metadata -> unit comparable_ty
+  | Never_key : ty_metadata -> never comparable_ty
+  | Int_key : ty_metadata -> z num comparable_ty
+  | Nat_key : ty_metadata -> n num comparable_ty
+  | Signature_key : ty_metadata -> signature comparable_ty
+  | String_key : ty_metadata -> Script_string.t comparable_ty
+  | Bytes_key : ty_metadata -> Bytes.t comparable_ty
+  | Mutez_key : ty_metadata -> Tez.t comparable_ty
+  | Bool_key : ty_metadata -> bool comparable_ty
+  | Key_hash_key : ty_metadata -> public_key_hash comparable_ty
+  | Key_key : ty_metadata -> public_key comparable_ty
+  | Timestamp_key : ty_metadata -> Script_timestamp.t comparable_ty
+  | Chain_id_key : ty_metadata -> Chain_id.t comparable_ty
+  | Address_key : ty_metadata -> address comparable_ty
   | Pair_key :
       ('a comparable_ty * field_annot option)
       * ('b comparable_ty * field_annot option)
-      * type_annot option
+      * ty_metadata
       -> ('a, 'b) pair comparable_ty
   | Union_key :
       ('a comparable_ty * field_annot option)
       * ('b comparable_ty * field_annot option)
-      * type_annot option
+      * ty_metadata
       -> ('a, 'b) union comparable_ty
-  | Option_key : 'v comparable_ty * type_annot option -> 'v option comparable_ty
+  | Option_key : 'v comparable_ty * ty_metadata -> 'v option comparable_ty
+
+let unit_key ~annot = Unit_key {annot}
 
 module type Boxed_set = sig
   type elt
@@ -1130,52 +1134,46 @@ and logger = {
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 and 'ty ty =
-  | Unit_t : type_annot option -> unit ty
-  | Int_t : type_annot option -> z num ty
-  | Nat_t : type_annot option -> n num ty
-  | Signature_t : type_annot option -> signature ty
-  | String_t : type_annot option -> Script_string.t ty
-  | Bytes_t : type_annot option -> bytes ty
-  | Mutez_t : type_annot option -> Tez.t ty
-  | Key_hash_t : type_annot option -> public_key_hash ty
-  | Key_t : type_annot option -> public_key ty
-  | Timestamp_t : type_annot option -> Script_timestamp.t ty
-  | Address_t : type_annot option -> address ty
-  | Bool_t : type_annot option -> bool ty
+  | Unit_t : ty_metadata -> unit ty
+  | Int_t : ty_metadata -> z num ty
+  | Nat_t : ty_metadata -> n num ty
+  | Signature_t : ty_metadata -> signature ty
+  | String_t : ty_metadata -> Script_string.t ty
+  | Bytes_t : ty_metadata -> bytes ty
+  | Mutez_t : ty_metadata -> Tez.t ty
+  | Key_hash_t : ty_metadata -> public_key_hash ty
+  | Key_t : ty_metadata -> public_key ty
+  | Timestamp_t : ty_metadata -> Script_timestamp.t ty
+  | Address_t : ty_metadata -> address ty
+  | Bool_t : ty_metadata -> bool ty
   | Pair_t :
       ('a ty * field_annot option * var_annot option)
       * ('b ty * field_annot option * var_annot option)
-      * type_annot option
+      * ty_metadata
       -> ('a, 'b) pair ty
   | Union_t :
-      ('a ty * field_annot option)
-      * ('b ty * field_annot option)
-      * type_annot option
+      ('a ty * field_annot option) * ('b ty * field_annot option) * ty_metadata
       -> ('a, 'b) union ty
-  | Lambda_t : 'arg ty * 'ret ty * type_annot option -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * type_annot option -> 'v option ty
-  | List_t : 'v ty * type_annot option -> 'v boxed_list ty
-  | Set_t : 'v comparable_ty * type_annot option -> 'v set ty
-  | Map_t : 'k comparable_ty * 'v ty * type_annot option -> ('k, 'v) map ty
-  | Big_map_t :
-      'k comparable_ty * 'v ty * type_annot option
-      -> ('k, 'v) big_map ty
-  | Contract_t : 'arg ty * type_annot option -> 'arg typed_contract ty
+  | Lambda_t : 'arg ty * 'ret ty * ty_metadata -> ('arg, 'ret) lambda ty
+  | Option_t : 'v ty * ty_metadata -> 'v option ty
+  | List_t : 'v ty * ty_metadata -> 'v boxed_list ty
+  | Set_t : 'v comparable_ty * ty_metadata -> 'v set ty
+  | Map_t : 'k comparable_ty * 'v ty * ty_metadata -> ('k, 'v) map ty
+  | Big_map_t : 'k comparable_ty * 'v ty * ty_metadata -> ('k, 'v) big_map ty
+  | Contract_t : 'arg ty * ty_metadata -> 'arg typed_contract ty
   | Sapling_transaction_t :
-      Sapling.Memo_size.t * type_annot option
+      Sapling.Memo_size.t * ty_metadata
       -> Sapling.transaction ty
-  | Sapling_state_t :
-      Sapling.Memo_size.t * type_annot option
-      -> Sapling.state ty
-  | Operation_t : type_annot option -> operation ty
-  | Chain_id_t : type_annot option -> Chain_id.t ty
-  | Never_t : type_annot option -> never ty
-  | Bls12_381_g1_t : type_annot option -> Bls12_381.G1.t ty
-  | Bls12_381_g2_t : type_annot option -> Bls12_381.G2.t ty
-  | Bls12_381_fr_t : type_annot option -> Bls12_381.Fr.t ty
-  | Ticket_t : 'a comparable_ty * type_annot option -> 'a ticket ty
-  | Chest_key_t : type_annot option -> Timelock.chest_key ty
-  | Chest_t : type_annot option -> Timelock.chest ty
+  | Sapling_state_t : Sapling.Memo_size.t * ty_metadata -> Sapling.state ty
+  | Operation_t : ty_metadata -> operation ty
+  | Chain_id_t : ty_metadata -> Chain_id.t ty
+  | Never_t : ty_metadata -> never ty
+  | Bls12_381_g1_t : ty_metadata -> Bls12_381.G1.t ty
+  | Bls12_381_g2_t : ty_metadata -> Bls12_381.G2.t ty
+  | Bls12_381_fr_t : ty_metadata -> Bls12_381.Fr.t ty
+  | Ticket_t : 'a comparable_ty * ty_metadata -> 'a ticket ty
+  | Chest_key_t : ty_metadata -> Timelock.chest_key ty
+  | Chest_t : ty_metadata -> Timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
   | Item_t :
@@ -1643,3 +1641,5 @@ let kinstr_rewritek :
   | IHalt kinfo -> IHalt kinfo
   | ILog (kinfo, event, logger, k) -> ILog (kinfo, event, logger, k)
   | IOpen_chest (kinfo, k) -> IOpen_chest (kinfo, f.apply k)
+
+let unit_t ~annot = Unit_t {annot}

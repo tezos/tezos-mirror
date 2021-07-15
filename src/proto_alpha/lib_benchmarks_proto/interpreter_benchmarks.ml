@@ -1317,7 +1317,9 @@ module Registration_section = struct
           (Lwt_main.run
              ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
                let big_map =
-                 Script_ir_translator.empty_big_map int_cmp (Unit_t None)
+                 Script_ir_translator.empty_big_map
+                   int_cmp
+                   (Unit_t {annot = None})
                in
                Script_map.fold
                  (fun k v acc ->
@@ -1455,7 +1457,7 @@ module Registration_section = struct
           fun () ->
             let string =
               Samplers.Random_value.value
-                Script_typed_ir.(String_t None)
+                Script_typed_ir.(String_t {annot = None})
                 rng_state
             in
             let len = nat_of_positive_int (length string) in
@@ -1503,7 +1505,7 @@ module Registration_section = struct
           fun () ->
             let bytes =
               Samplers.Random_value.value
-                Script_typed_ir.(Bytes_t None)
+                Script_typed_ir.(Bytes_t {annot = None})
                 rng_state
             in
             let len = nat_of_positive_int (Bytes.length bytes) in
@@ -2212,7 +2214,7 @@ module Registration_section = struct
               if for_intercept then Environment.Bytes.empty
               else
                 Samplers.Random_value.value
-                  Script_typed_ir.(Bytes_t None)
+                  Script_typed_ir.(Bytes_t {annot = None})
                   rng_state
             in
             let signed_message = Signature.sign sk unsigned_message in
