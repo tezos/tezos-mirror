@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Costlang
-open Latex
 module Hashtbl = Stdlib.Hashtbl
 
 (* Automatic report generation. *)
@@ -179,19 +178,19 @@ let splice sep list =
 (* let verb x = L.verbatim_inline (L.text x) *)
 
 let normal_text s =
-  let open Syntax in
+  let open Latex_syntax in
   Text_blob (Normal, s)
 
 let emph_text s =
-  let open Syntax in
+  let open Latex_syntax in
   Text_blob (Emph, s)
 
 let bold_text s =
-  let open Syntax in
+  let open Latex_syntax in
   Text_blob (Bold, s)
 
 let maths s =
-  let open Syntax in
+  let open Latex_syntax in
   Inline_math_blob s
 
 let benchmark_options_table (bench_opts : Measure.options) =
@@ -220,7 +219,7 @@ let benchmark_options_table (bench_opts : Measure.options) =
     | None -> normal_text "none"
     | Some i -> normal_text (Printf.sprintf "cpu %d" i)
   in
-  let open Syntax in
+  let open Latex_syntax in
   let rows =
     [
       Hline;
@@ -245,34 +244,36 @@ let inferred_params_table (solution : Inference.solution) =
           let spec_data =
             (* we do not actually care about the content of the column_names,
                 just matching things one-to-one for equal length. *)
-            List.rev_map (fun _ -> Syntax.L) column_names
+            List.rev_map (fun _ -> Latex_syntax.L) column_names
           in
-          let spec = splice Syntax.Vbar spec_data in
+          let spec = splice Latex_syntax.Vbar spec_data in
           let hdr =
-            Syntax.Row (List.map (fun x -> [normal_text x]) column_names)
+            Latex_syntax.Row (List.map (fun x -> [normal_text x]) column_names)
           in
           let data =
             List.map
-              (fun l -> Syntax.Row (List.map (fun x -> [maths x]) l))
+              (fun l -> Latex_syntax.Row (List.map (fun x -> [maths x]) l))
               lines
           in
-          let rows = Syntax.Hline :: hdr :: data @ [Syntax.Hline] in
+          let rows = Latex_syntax.Hline :: hdr :: data @ [Latex_syntax.Hline] in
           Some (spec, rows))
 
 let overrides_table (overrides : float Free_variable.Map.t) =
   if Free_variable.Map.is_empty overrides then None
   else
-    let spec = Syntax.[Vbar; L; Vbar; L; Vbar] in
-    let hdr = Syntax.(Row [[normal_text "var"]; [normal_text "value (ns)"]]) in
+    let spec = Latex_syntax.[Vbar; L; Vbar; L; Vbar] in
+    let hdr =
+      Latex_syntax.(Row [[normal_text "var"]; [normal_text "value (ns)"]])
+    in
     let data =
       Free_variable.Map.fold
         (fun var value acc ->
           let var = Format.asprintf "%a" Free_variable.pp var in
-          Syntax.Row [[maths var]; [maths (string_of_float value)]] :: acc)
+          Latex_syntax.Row [[maths var]; [maths (string_of_float value)]] :: acc)
         overrides
         []
     in
-    let rows = Syntax.Hline :: hdr :: data @ [Syntax.Hline] in
+    let rows = Latex_syntax.Hline :: hdr :: data @ [Latex_syntax.Hline] in
     Some (spec, rows)
 
 module Int_set = Set.Make (Int)
@@ -290,7 +291,7 @@ let pp_vec =
 
 let workloads_table (type c t) ((module Bench) : (c, t) Benchmark.poly)
     (workload_data : t Measure.workload_data) =
-  let open Syntax in
+  let open Latex_syntax in
   let table = Hashtbl.create 41 in
   List.iter
     (fun {Measure.workload; qty} ->
@@ -315,7 +316,7 @@ let workloads_table (type c t) ((module Bench) : (c, t) Benchmark.poly)
   Some ([Vbar; L; Vbar; L; Vbar], splice Hline rows)
 
 let model_table (type c t) ((module Bench) : (c, t) Benchmark.poly) =
-  let open Syntax in
+  let open Latex_syntax in
   let rows =
     List.filter_map
       (fun (model_name, model) ->
@@ -333,11 +334,11 @@ let model_table (type c t) ((module Bench) : (c, t) Benchmark.poly) =
 
 let report ~(measure : Measure.packed_measurement)
     ~(solution : Inference.solution) ~(figs_file : string option)
-    ~(overrides_map : float Free_variable.Map.t) ~short : Syntax.section =
+    ~(overrides_map : float Free_variable.Map.t) ~short : Latex_syntax.section =
   let (Measure.Measurement ((module Bench), measurement)) = measure in
   let {Measure.bench_opts; workload_data; date = _} = measurement in
   (* let pp_step_model = model (module Pp) in *)
-  let open Syntax in
+  let open Latex_syntax in
   let preamble : section_content =
     let text = Format.asprintf "Results for benchmark %s." Bench.name in
     Text [normal_text text; normal_text "Options used:"]
@@ -396,9 +397,9 @@ let report ~(measure : Measure.packed_measurement)
   in
   Section (Bench.name, sections @ figure)
 
-type t = Syntax.t
+type t = Latex_syntax.t
 
-let create_empty ~name = Syntax.{title = name; sections = []}
+let create_empty ~name = Latex_syntax.{title = name; sections = []}
 
 let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
     ~(problem : Inference.problem) ~(solution : Inference.solution)
@@ -411,11 +412,11 @@ let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
     else None
   in
   let section = report ~measure ~solution ~figs_file ~overrides_map ~short in
-  let open Syntax in
+  let open Latex_syntax in
   {document with sections = document.sections @ [section]}
 
 (* backend-specific functions *)
 
 let to_latex document =
-  let document = Syntax.map_string escape_underscore document in
+  let document = Latex_syntax.map_string escape_underscore document in
   Format.asprintf "%a" Latex_pp.pp document

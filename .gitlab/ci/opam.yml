@@ -47,11 +47,6 @@ opam:hacl-star-raw-empty:
   variables:
     package: hacl-star-raw-empty
 
-opam:latex:
-  extends: .opam_template
-  variables:
-    package: latex
-
 opam:ledgerwallet:
   extends: .opam_template
   variables:
