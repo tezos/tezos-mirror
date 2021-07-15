@@ -12,6 +12,9 @@ The second way allows to participate more actively in the protocol, by baking bl
 
 To learn more about the protocol refer to :doc:`this page <../active/proof_of_stake>`.
 
+No matter how you decide to run Tezos, your node must have an accurate time source and be properly synchronized to it, e.g. by configuring an NTP daemon.
+This is especially important for bakers, as baking nodes desynchronized from the correct time of day have caused operational problems in the past by "baking in the future".
+
 .. _delegating_coins:
 
 Delegating your coins
