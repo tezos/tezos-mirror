@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Script_typed_ir
 
 module Config = struct
   type config = {
@@ -843,22 +844,22 @@ let () = Registration_helpers.register (module Merge_types)
 (* A dummy type generator, sampling linear terms of a given size. *)
 let rec dummy_type_generator depth =
   let open Script_ir_translator in
-  if depth = 0 then Ex_ty (Unit_t {annot = None})
+  if depth = 0 then Ex_ty (unit_t ~annot:None)
   else
     match dummy_type_generator (depth - 1) with
-    | Ex_ty something -> Ex_ty (List_t (something, {annot = None}))
+    | Ex_ty something -> Ex_ty (list_t something ~annot:None)
 
 (* Generate combs; the size of a comb of depth d should be
    d * 2 + 1. *)
 let rec dummy_comparable_type_generator depth =
   let open Script_ir_translator in
   let open Script_typed_ir in
-  if depth = 0 then Ex_comparable_ty (Unit_key {annot = None})
+  if depth = 0 then Ex_comparable_ty (unit_key ~annot:None)
   else
     match dummy_comparable_type_generator (depth - 1) with
     | Ex_comparable_ty r ->
-        let l = Unit_key {annot = None} in
-        Ex_comparable_ty (Pair_key ((l, None), (r, None), {annot = None}))
+        let l = unit_key ~annot:None in
+        Ex_comparable_ty (pair_key (l, None) (r, None) ~annot:None)
 
 module Parse_type_shared = struct
   type config = {max_size : int}

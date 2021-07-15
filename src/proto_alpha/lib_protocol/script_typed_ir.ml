@@ -1716,7 +1716,7 @@ let big_map_t l r ~annot = Big_map_t (l, r, {annot})
 
 let contract_t t ~annot = Contract_t (t, {annot})
 
-let sapling_transaction ~memo_size ~annot =
+let sapling_transaction_t ~memo_size ~annot =
   Sapling_transaction_t (memo_size, {annot})
 
 let sapling_state_t ~memo_size ~annot = Sapling_state_t (memo_size, {annot})
@@ -1734,3 +1734,7 @@ let bls12_381_g2_t ~annot = Bls12_381_g2_t {annot}
 let bls12_381_fr_t ~annot = Bls12_381_fr_t {annot}
 
 let ticket_t t ~annot = Ticket_t (t, {annot})
+
+let chest_key_t ~annot = Chest_key_t {annot}
+
+let chest_t ~annot = Chest_t {annot}

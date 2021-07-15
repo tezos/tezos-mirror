@@ -43,14 +43,14 @@ let forty_two_n = Alpha_context.Script_int.abs forty_two
 
 let dummy_set =
   let open Script_set in
-  update forty_two true (empty Script_typed_ir.(Int_key {annot = None}))
+  update forty_two true (empty Script_typed_ir.(int_key ~annot:None))
 
 let dummy_map =
   let open Script_map in
   update
     forty_two
     (Some forty_two)
-    (empty Script_typed_ir.(Int_key {annot = None}))
+    (empty Script_typed_ir.(int_key ~annot:None))
 
 let dummy_timestamp = Alpha_context.Script_timestamp.of_zint (Z.of_int 42)
 
@@ -150,7 +150,7 @@ let all_interpreter_costs =
     ("dropn", dropn 42);
     ("neq", neq);
     ( "compare",
-      compare Script_typed_ir.(Int_key {annot = None}) forty_two forty_two );
+      compare Script_typed_ir.(int_key ~annot:None) forty_two forty_two );
     ( "concat_string_precheck",
       concat_string_precheck Script_list.(cons "42" empty) );
     ("concat_string", concat_string (S.safe_int 42));

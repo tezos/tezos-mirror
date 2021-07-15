@@ -218,7 +218,7 @@ module Storage = struct
     get_alpha_context ctxt >>=? fun ctxt ->
     Script_ir_translator.hash_data
       ctxt
-      Script_typed_ir.(Address_t {annot = None})
+      Script_typed_ir.(address_t ~annot:None)
       owner
     >|= Environment.wrap_tzresult
     >>=? fun (address_hash, ctxt) ->
