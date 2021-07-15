@@ -322,7 +322,7 @@ Install Rust
 ~~~~~~~~~~~~
 
 Compiling Tezos requires the Rust compiler,
-version 1.44.0, and the Cargo package manager to be installed. If you
+version 1.52.0, and the Cargo package manager to be installed. If you
 have `rustup <https://rustup.rs/>`_ installed, it should work without
 any additional steps on your side. You can use `rustup
 <https://rustup.rs/>`_ to install both. If you do not have ``rustup``,
