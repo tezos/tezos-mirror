@@ -55,3 +55,10 @@ sanity_ci:
     - . $HOME/.venv/bin/activate
   script:
     - src/tooling/lint.sh --check-gitlab-ci-yml
+
+docker-hadolint:
+  image: hadolint/hadolint:latest-debian
+  stage: sanity_ci
+  script:
+    - hadolint build.Dockerfile
+    - hadolint Dockerfile
