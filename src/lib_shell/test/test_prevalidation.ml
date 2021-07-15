@@ -159,16 +159,44 @@ let test_in_mempool_leak f (nb_ops : int) (_ : unit) =
       (actual_in_mempool_size <= max_table_size)
       true)
 
+(** Check that right after doing a classify operations,
+ *  the memory table contains the concerned operation. This got
+ *  broken in the past: it was being cleared right away when the ring was full.
+ *  This could be exploited to create a memory leak in {!Distributed_db}. *)
+let test_db_do_not_clear_right_away f (nb_ops : int) (_ : unit) =
+  let requester = init_full_requester () in
+  let max_table_size = 32 in
+  assert (nb_ops >= max_table_size) ;
+  let classes = Classification.mk_empty max_table_size in
+  let handle i =
+    let op = mk_operation i in
+    let oph = Operation.hash op in
+    Format.printf "Injecting op: %a\n" Operation_hash.pp oph ;
+    let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
+    assert injected ;
+    f (requester, classes) op oph [] ;
+    Alcotest.(
+      check
+        bool
+        (Format.asprintf
+           "requester memory contains most recent classified operation (%a)"
+           Operation_hash.pp
+           oph)
+        (Option.is_some @@ Lwt_main.run @@ Test_Requester.read_opt requester oph)
+        true)
+  in
+  List.iter handle (1 -- nb_ops)
+
 let () =
-  let nb_ops = [512; 1024; 2048] in
+  let nb_ops = [64; 128] in
   let handle_refused_pair = (Classificator.handle_refused, "handle_refused") in
-  let applier_funs =
+  let handle_branch_pairs =
     [
       (Classificator.handle_branch_refused, "handle_branch_refused");
       (Classificator.handle_branch_delayed, "handle_branch_delayed");
-      handle_refused_pair;
     ]
   in
+  let applier_funs = handle_branch_pairs @ [handle_refused_pair] in
   let mk_test_cases ~test (applier_fun, applier_fun_str) =
     List.map
       (fun nb_ops ->
@@ -184,6 +212,12 @@ let () =
   let in_mempool_leak_test =
     mk_test_cases ~test:test_in_mempool_leak handle_refused_pair
   in
+  let ddb_clearing_tests =
+    List.map
+      (mk_test_cases ~test:test_db_do_not_clear_right_away)
+      handle_branch_pairs
+    |> List.concat
+  in
   Alcotest.run
     "Prevalidation"
     [
@@ -196,4 +230,5 @@ let () =
         ] );
       ("Ddb leaks", all_ddb_leak_tests);
       ("Mempool Leaks", in_mempool_leak_test);
+      ("Ddb clearing", ddb_clearing_tests);
     ]
