@@ -891,16 +891,33 @@ let merge_memo_sizes ms1 ms2 =
   if Sapling.Memo_size.equal ms1 ms2 then ok ms1
   else error (Inconsistent_memo_sizes (ms1, ms2))
 
+type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
+
+let default_merge_type_error ctxt ty1 ty2 =
+  serialize_ty_for_error ctxt ty1 >>? fun (ty1, ctxt) ->
+  serialize_ty_for_error ctxt ty2 >|? fun (ty2, ctxt) ->
+  (Inconsistent_types (ty1, ty2), ctxt)
+
+type error += Inconsistent_types_fast
+
+let fast_merge_type_error ctxt _ty1 _ty2 = ok (Inconsistent_types_fast, ctxt)
+
+let merge_type_error ~merge_type_error_flag =
+  match merge_type_error_flag with
+  | Default_merge_type_error -> default_merge_type_error
+  | Fast_merge_type_error -> fast_merge_type_error
+
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
     type a b.
     legacy:bool ->
+    merge_type_error_flag:merge_type_error_flag ->
     context ->
     Script.location ->
     a ty ->
     b ty ->
     (((a ty, b ty) eq * a ty) tzresult * context) tzresult =
- fun ~legacy ctxt loc ty1 ty2 ->
+ fun ~legacy ~merge_type_error_flag ctxt loc ty1 ty2 ->
   let merge_type_annot tn1 tn2 =
     merge_type_annot ~legacy tn1 tn2
     |> record_inconsistent_type_annotations ctxt loc ty1 ty2
@@ -1053,9 +1070,8 @@ let merge_types :
               (Eq, Sapling_transaction_t (ms, tname)) ),
             ctxt )
     | (_, _) ->
-        serialize_ty_for_error ctxt ty1 >>? fun (ty1, ctxt) ->
-        serialize_ty_for_error ctxt ty2 >|? fun (ty2, ctxt) ->
-        (error (Inconsistent_types (ty1, ty2)), ctxt)
+        merge_type_error ~merge_type_error_flag ctxt ty1 ty2
+        >|? fun (err, ctxt) -> (error err, ctxt)
   in
   help ctxt ty1 ty2
  [@@coq_axiom_with_reason "non-top-level mutual recursion"]
@@ -1073,7 +1089,14 @@ let ty_eq :
     tb ty ->
     ((ta ty, tb ty) eq * context) tzresult =
  fun ~legacy ctxt loc ta tb ->
-  merge_types ~legacy ctxt loc ta tb >>? fun (eq_ty, ctxt) ->
+  merge_types
+    ~merge_type_error_flag:Default_merge_type_error
+    ~legacy
+    ctxt
+    loc
+    ta
+    tb
+  >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
 (* Same as merge_comparable_types and merge_types but for stacks.
@@ -1102,7 +1125,13 @@ let merge_stacks :
     match (stack1, stack2) with
     | (Bot_t, Bot_t) -> ok (Eq, Bot_t, ctxt)
     | (Item_t (ty1, rest1, annot1), Item_t (ty2, rest2, annot2)) ->
-        merge_types ~legacy ctxt loc ty1 ty2
+        merge_types
+          ~merge_type_error_flag:Default_merge_type_error
+          ~legacy
+          ctxt
+          loc
+          ty1
+          ty2
         |> record_trace (Bad_stack_item lvl)
         >>? fun (eq_ty, ctxt) ->
         eq_ty >>? fun (Eq, ty) ->
@@ -1884,19 +1913,20 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
             | "default" -> ok ((fun e -> e), Ex_ty full)
             | _ -> error (No_such_entrypoint entrypoint)))
 
-let find_entrypoint_for_type (type full exp) ~legacy ~(full : full ty)
-    ~(expected : exp ty) ~root_name entrypoint ctxt loc :
+let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
+    ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint ctxt loc :
     (context * (string * exp ty) tzresult) tzresult =
   match find_entrypoint full ~root_name entrypoint with
   | Error _ as err -> ok (ctxt, err)
   | Ok (_, Ex_ty ty) -> (
-      merge_types ~legacy ctxt loc ty expected >>? fun (eq_ty, ctxt) ->
+      merge_types ~legacy ~merge_type_error_flag ctxt loc ty expected
+      >>? fun (eq_ty, ctxt) ->
       match (entrypoint, root_name) with
       | ("default", Some (Field_annot "root")) -> (
           match eq_ty with
           | Ok (Eq, ty) -> ok (ctxt, ok ("default", (ty : exp ty)))
           | Error _ ->
-              merge_types ~legacy ctxt loc full expected
+              merge_types ~legacy ~merge_type_error_flag ctxt loc full expected
               >|? fun (eq_full, ctxt) ->
               (ctxt, eq_full >|? fun (Eq, full) -> ("root", (full : exp ty))))
       | _ -> ok (ctxt, eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
@@ -2816,7 +2846,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         Bad_stack (loc, name, m, stack_ty))
     @@ record_trace
          (Bad_stack_item n)
-         ( merge_types ~legacy ctxt loc exp got >>? fun (eq_ty, ctxt) ->
+         ( merge_types
+             ~legacy
+             ~merge_type_error_flag:Default_merge_type_error
+             ctxt
+             loc
+             exp
+             got
+         >>? fun (eq_ty, ctxt) ->
            eq_ty >|? fun (Eq, ty) -> ((Eq : (a, b) eq), (ty : a ty), ctxt) )
   in
   let log_stack ctxt loc stack_ty aft =
@@ -5026,7 +5063,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           rest,
           _ ) ) -> (
       parse_var_annot loc annot >>?= fun annot ->
-      merge_types ~legacy ctxt loc ty_a ty_b >>?= fun (eq_ty, ctxt) ->
+      merge_types
+        ~legacy
+        ~merge_type_error_flag:Default_merge_type_error
+        ctxt
+        loc
+        ty_a
+        ty_b
+      >>?= fun (eq_ty, ctxt) ->
       eq_ty >>?= fun (Eq, ty) ->
       match ty with
       | Ticket_t (contents_ty, _) ->
@@ -5277,6 +5321,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
               (* we don't check targ size here because it's a legacy contract code *)
               find_entrypoint_for_type
                 ~legacy
+                ~merge_type_error_flag:Default_merge_type_error
                 ~full:targ
                 ~expected:arg
                 ~root_name
@@ -5387,7 +5432,13 @@ let parse_contract_for_script :
       | "default" ->
           (* An implicit account on the "default" entrypoint always exists and has type unit. *)
           Lwt.return
-            ( merge_types ~legacy:true ctxt loc arg (Unit_t None)
+            ( merge_types
+                ~legacy:true
+                ~merge_type_error_flag:Fast_merge_type_error
+                ctxt
+                loc
+                arg
+                (Unit_t None)
             >|? fun (eq_ty, ctxt) ->
               match eq_ty with
               | Ok (Eq, _ty) ->
@@ -5423,6 +5474,7 @@ let parse_contract_for_script :
                       (* we don't check targ size here because it's a legacy contract code *)
                       find_entrypoint_for_type
                         ~legacy:false
+                        ~merge_type_error_flag:Fast_merge_type_error
                         ~full:targ
                         ~expected:arg
                         ~root_name
