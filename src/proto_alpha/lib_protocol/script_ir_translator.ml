@@ -5387,17 +5387,15 @@ let parse_contract_for_script :
       | "default" ->
           (* An implicit account on the "default" entrypoint always exists and has type unit. *)
           Lwt.return
-            (match ty_eq ~legacy:true ctxt loc arg (Unit_t None) with
-            | Ok (Eq, ctxt) ->
-                let contract : arg typed_contract =
-                  (arg, (contract, entrypoint))
-                in
-                ok (ctxt, Some contract)
-            | Error _ ->
-                (* The gas for the ty_eq above is Typecheck_costs.parse_instr_cycle
-                   because we are comparing with (Unit_t _) *)
-                Gas.consume ctxt Typecheck_costs.parse_instr_cycle
-                >>? fun ctxt -> ok (ctxt, None))
+            ( merge_types ~legacy:true ctxt loc arg (Unit_t None)
+            >|? fun (eq_ty, ctxt) ->
+              match eq_ty with
+              | Ok (Eq, _ty) ->
+                  let contract : arg typed_contract =
+                    (arg, (contract, entrypoint))
+                  in
+                  (ctxt, Some contract)
+              | Error _ -> (ctxt, None) )
       | _ ->
           Lwt.return
             ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle >|? fun ctxt ->
