@@ -197,6 +197,7 @@ in the :ref:`introduction <howtoget>`.
    developer/flextesa
    developer/python_testing_framework
    developer/tezt
+   developer/unit_testing_legacy_code
    developer/proposal_testing
    developer/profiling
    developer/snoop
