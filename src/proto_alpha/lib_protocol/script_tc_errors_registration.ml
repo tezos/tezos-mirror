@@ -558,6 +558,17 @@ let () =
     (function
       | Comparable_type_expected (loc, ty) -> Some (loc, ty) | _ -> None)
     (fun (loc, ty) -> Comparable_type_expected (loc, ty)) ;
+  (* Inconsistent type sizes *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.inconsistent_type_sizes"
+    ~title:"Inconsistent type sizes"
+    ~description:
+      "Two types were expected to be equal but they have different sizes."
+    (obj2 (req "first_type_size" int31) (req "other_type_size" int31))
+    (function
+      | Inconsistent_type_sizes (tya, tyb) -> Some (tya, tyb) | _ -> None)
+    (fun (tya, tyb) -> Inconsistent_type_sizes (tya, tyb)) ;
   (* Inconsistent types *)
   register_error_kind
     `Permanent

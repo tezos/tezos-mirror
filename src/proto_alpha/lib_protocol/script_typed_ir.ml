@@ -51,7 +51,7 @@ type empty_cell = EmptyCell
 
 type end_of_stack = empty_cell * empty_cell
 
-type ty_metadata = {annot : type_annot option}
+type ty_metadata = {annot : type_annot option; size : int}
 
 type _ comparable_ty =
   | Unit_key : ty_metadata -> unit comparable_ty
@@ -80,39 +80,70 @@ type _ comparable_ty =
       -> ('a, 'b) union comparable_ty
   | Option_key : 'v comparable_ty * ty_metadata -> 'v option comparable_ty
 
-let unit_key ~annot = Unit_key {annot}
+let comparable_ty_metadata : type a. a comparable_ty -> ty_metadata = function
+  | Unit_key meta
+  | Never_key meta
+  | Int_key meta
+  | Nat_key meta
+  | Signature_key meta
+  | String_key meta
+  | Bytes_key meta
+  | Mutez_key meta
+  | Bool_key meta
+  | Key_hash_key meta
+  | Key_key meta
+  | Timestamp_key meta
+  | Chain_id_key meta
+  | Address_key meta
+  | Pair_key (_, _, meta)
+  | Union_key (_, _, meta)
+  | Option_key (_, meta) ->
+      meta
 
-let never_key ~annot = Never_key {annot}
+let comparable_ty_size t = (comparable_ty_metadata t).size
 
-let int_key ~annot = Int_key {annot}
+let unit_key ~annot = Unit_key {annot; size = 1}
 
-let nat_key ~annot = Nat_key {annot}
+let never_key ~annot = Never_key {annot; size = 1}
 
-let signature_key ~annot = Signature_key {annot}
+let int_key ~annot = Int_key {annot; size = 1}
 
-let string_key ~annot = String_key {annot}
+let nat_key ~annot = Nat_key {annot; size = 1}
 
-let bytes_key ~annot = Bytes_key {annot}
+let signature_key ~annot = Signature_key {annot; size = 1}
 
-let mutez_key ~annot = Mutez_key {annot}
+let string_key ~annot = String_key {annot; size = 1}
 
-let bool_key ~annot = Bool_key {annot}
+let bytes_key ~annot = Bytes_key {annot; size = 1}
 
-let key_hash_key ~annot = Key_hash_key {annot}
+let mutez_key ~annot = Mutez_key {annot; size = 1}
 
-let key_key ~annot = Key_key {annot}
+let bool_key ~annot = Bool_key {annot; size = 1}
 
-let timestamp_key ~annot = Timestamp_key {annot}
+let key_hash_key ~annot = Key_hash_key {annot; size = 1}
 
-let chain_id_key ~annot = Chain_id_key {annot}
+let key_key ~annot = Key_key {annot; size = 1}
 
-let address_key ~annot = Address_key {annot}
+let timestamp_key ~annot = Timestamp_key {annot; size = 1}
 
-let pair_key l r ~annot = Pair_key (l, r, {annot})
+let chain_id_key ~annot = Chain_id_key {annot; size = 1}
 
-let union_key l r ~annot = Union_key (l, r, {annot})
+let address_key ~annot = Address_key {annot; size = 1}
 
-let option_key t ~annot = Option_key (t, {annot})
+let pair_key (l, fannot_l) (r, fannot_r) ~annot =
+  Pair_key
+    ( (l, fannot_l),
+      (r, fannot_r),
+      {annot; size = 1 + comparable_ty_size l + comparable_ty_size r} )
+
+let union_key (l, fannot_l) (r, fannot_r) ~annot =
+  Union_key
+    ( (l, fannot_l),
+      (r, fannot_r),
+      {annot; size = 1 + comparable_ty_size l + comparable_ty_size r} )
+
+let option_key t ~annot =
+  Option_key (t, {annot; size = 1 + comparable_ty_size t})
 
 module type Boxed_set = sig
   type elt
@@ -1674,67 +1705,114 @@ let kinstr_rewritek :
   | ILog (kinfo, event, logger, k) -> ILog (kinfo, event, logger, k)
   | IOpen_chest (kinfo, k) -> IOpen_chest (kinfo, f.apply k)
 
-let unit_t ~annot = Unit_t {annot}
+let ty_metadata : type a. a ty -> ty_metadata = function
+  | Unit_t meta
+  | Never_t meta
+  | Int_t meta
+  | Nat_t meta
+  | Signature_t meta
+  | String_t meta
+  | Bytes_t meta
+  | Mutez_t meta
+  | Bool_t meta
+  | Key_hash_t meta
+  | Key_t meta
+  | Timestamp_t meta
+  | Chain_id_t meta
+  | Address_t meta
+  | Pair_t (_, _, meta)
+  | Union_t (_, _, meta)
+  | Option_t (_, meta)
+  | Lambda_t (_, _, meta)
+  | List_t (_, meta)
+  | Set_t (_, meta)
+  | Map_t (_, _, meta)
+  | Big_map_t (_, _, meta)
+  | Ticket_t (_, meta)
+  | Contract_t (_, meta)
+  | Sapling_transaction_t (_, meta)
+  | Sapling_state_t (_, meta)
+  | Operation_t meta
+  | Bls12_381_g1_t meta
+  | Bls12_381_g2_t meta
+  | Bls12_381_fr_t meta
+  | Chest_t meta
+  | Chest_key_t meta ->
+      meta
 
-let int_t ~annot = Int_t {annot}
+let ty_size t = (ty_metadata t).size
 
-let nat_t ~annot = Nat_t {annot}
+let unit_t ~annot = Unit_t {annot; size = 1}
 
-let signature_t ~annot = Signature_t {annot}
+let int_t ~annot = Int_t {annot; size = 1}
 
-let string_t ~annot = String_t {annot}
+let nat_t ~annot = Nat_t {annot; size = 1}
 
-let bytes_t ~annot = Bytes_t {annot}
+let signature_t ~annot = Signature_t {annot; size = 1}
 
-let mutez_t ~annot = Mutez_t {annot}
+let string_t ~annot = String_t {annot; size = 1}
 
-let key_hash_t ~annot = Key_hash_t {annot}
+let bytes_t ~annot = Bytes_t {annot; size = 1}
 
-let key_t ~annot = Key_t {annot}
+let mutez_t ~annot = Mutez_t {annot; size = 1}
 
-let timestamp_t ~annot = Timestamp_t {annot}
+let key_hash_t ~annot = Key_hash_t {annot; size = 1}
 
-let address_t ~annot = Address_t {annot}
+let key_t ~annot = Key_t {annot; size = 1}
 
-let bool_t ~annot = Bool_t {annot}
+let timestamp_t ~annot = Timestamp_t {annot; size = 1}
 
-let pair_t l r ~annot = Pair_t (l, r, {annot})
+let address_t ~annot = Address_t {annot; size = 1}
 
-let union_t l r ~annot = Union_t (l, r, {annot})
+let bool_t ~annot = Bool_t {annot; size = 1}
 
-let lambda_t l r ~annot = Lambda_t (l, r, {annot})
+let pair_t (l, fannot_l, vannot_l) (r, fannot_r, vannot_r) ~annot =
+  Pair_t
+    ( (l, fannot_l, vannot_l),
+      (r, fannot_r, vannot_r),
+      {annot; size = 1 + ty_size l + ty_size r} )
 
-let option_t t ~annot = Option_t (t, {annot})
+let union_t (l, fannot_l) (r, fannot_r) ~annot =
+  Union_t
+    ((l, fannot_l), (r, fannot_r), {annot; size = 1 + ty_size l + ty_size r})
 
-let list_t t ~annot = List_t (t, {annot})
+let lambda_t l r ~annot =
+  Lambda_t (l, r, {annot; size = 1 + ty_size l + ty_size r})
 
-let set_t t ~annot = Set_t (t, {annot})
+let option_t t ~annot = Option_t (t, {annot; size = 1 + ty_size t})
 
-let map_t l r ~annot = Map_t (l, r, {annot})
+let list_t t ~annot = List_t (t, {annot; size = 1 + ty_size t})
 
-let big_map_t l r ~annot = Big_map_t (l, r, {annot})
+let set_t t ~annot = Set_t (t, {annot; size = 1 + comparable_ty_size t})
 
-let contract_t t ~annot = Contract_t (t, {annot})
+let map_t l r ~annot =
+  Map_t (l, r, {annot; size = 1 + comparable_ty_size l + ty_size r})
+
+let big_map_t l r ~annot =
+  Big_map_t (l, r, {annot; size = 1 + comparable_ty_size l + ty_size r})
+
+let contract_t t ~annot = Contract_t (t, {annot; size = 1 + ty_size t})
 
 let sapling_transaction_t ~memo_size ~annot =
-  Sapling_transaction_t (memo_size, {annot})
+  Sapling_transaction_t (memo_size, {annot; size = 1})
 
-let sapling_state_t ~memo_size ~annot = Sapling_state_t (memo_size, {annot})
+let sapling_state_t ~memo_size ~annot =
+  Sapling_state_t (memo_size, {annot; size = 1})
 
-let operation_t ~annot = Operation_t {annot}
+let operation_t ~annot = Operation_t {annot; size = 1}
 
-let chain_id_t ~annot = Chain_id_t {annot}
+let chain_id_t ~annot = Chain_id_t {annot; size = 1}
 
-let never_t ~annot = Never_t {annot}
+let never_t ~annot = Never_t {annot; size = 1}
 
-let bls12_381_g1_t ~annot = Bls12_381_g1_t {annot}
+let bls12_381_g1_t ~annot = Bls12_381_g1_t {annot; size = 1}
 
-let bls12_381_g2_t ~annot = Bls12_381_g2_t {annot}
+let bls12_381_g2_t ~annot = Bls12_381_g2_t {annot; size = 1}
 
-let bls12_381_fr_t ~annot = Bls12_381_fr_t {annot}
+let bls12_381_fr_t ~annot = Bls12_381_fr_t {annot; size = 1}
 
-let ticket_t t ~annot = Ticket_t (t, {annot})
+let ticket_t t ~annot = Ticket_t (t, {annot; size = 1 + comparable_ty_size t})
 
-let chest_key_t ~annot = Chest_key_t {annot}
+let chest_key_t ~annot = Chest_key_t {annot; size = 1}
 
-let chest_t ~annot = Chest_t {annot}
+let chest_t ~annot = Chest_t {annot; size = 1}

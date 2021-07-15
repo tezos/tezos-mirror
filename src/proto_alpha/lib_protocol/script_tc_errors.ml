@@ -156,6 +156,8 @@ type error += Invalid_big_map of Script.location * Big_map.Id.t
 
 type error += Comparable_type_expected : Script.location * Script.expr -> error
 
+type error += Inconsistent_type_sizes : int * int -> error
+
 type error += Inconsistent_types : Script.expr * Script.expr -> error
 
 type error +=

@@ -849,7 +849,11 @@ let serialize_ty_for_error_carbonated t =
 let merge_type_metadata :
     legacy:bool -> ty_metadata -> ty_metadata -> ty_metadata tzresult =
  fun ~legacy meta_a meta_b ->
-  merge_type_annot ~legacy meta_a.annot meta_b.annot >|? fun annot -> {annot}
+  if Compare.Int.(meta_a.size <> meta_b.size) then
+    error @@ Inconsistent_type_sizes (meta_a.size, meta_b.size)
+  else
+    merge_type_annot ~legacy meta_a.annot meta_b.annot >|? fun annot ->
+    {annot; size = meta_a.size}
 
 (* Takes two compable types and simultaneously merge their annotations and
    check that they represent the same type.
@@ -5344,10 +5348,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         loc
         instr
         (Item_t
-           ( Union_t
-               ( (Bytes_t {annot = None}, None),
-                 (Bool_t {annot = None}, None),
-                 {annot = None} ),
+           ( union_t
+               (bytes_t ~annot:None, None)
+               (bool_t ~annot:None, None)
+               ~annot:None,
              rest,
              None ))
   (* Primitive parsing errors *)

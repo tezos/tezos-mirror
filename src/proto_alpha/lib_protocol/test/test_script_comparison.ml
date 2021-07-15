@@ -343,7 +343,7 @@ let test_pack_unpack =
     ~name:"pack_unpack"
     comparable_data_arbitrary
     (fun (Ex_comparable_data (ty, x)) ->
-      let oty = Option_key (ty, {annot = None}) in
+      let oty = option_key ty ~annot:None in
       qcheck_eq
         ~cmp:(Script_comparable.compare_comparable oty)
         ~pp:(pp_comparable_data oty)
