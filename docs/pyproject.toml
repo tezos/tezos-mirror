@@ -11,7 +11,7 @@ homepage = "https://gitlab.com/tezos/tezos"
 keywords = ["tezos"]
 
 [tool.poetry.dependencies]
-python = "~3.8"
+python = "~3.9"
 sphinx = "*"
 sphinx-rtd-theme = "0.4.3"
 recommonmark = "*"

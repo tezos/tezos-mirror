@@ -36,7 +36,7 @@ Installation
 Prerequisites:
 
 - The Tezos binaries :ref:`compiled from sources <build_from_sources>`
-- `python 3.8.5`. It is recommended to use `pyenv
+- `python 3.9.5`. It is recommended to use `pyenv
   <https://github.com/pyenv/pyenv>`_ to manage the python versions.
   If you want to use ``pyenv``:
 
@@ -45,11 +45,11 @@ Prerequisites:
     has been executed first during the shell session, by adding this line to an
     environment script sourced automatically.
 
-  * You can use then ``pyenv install 3.8.5`` followed by:
+  * You can use then ``pyenv install 3.9.5`` followed by:
 
-    + ``pyenv local 3.8.5`` to use ``python 3.8.5`` only in the current directory (and its subdirectories, unless redefined)
-    + ``pyenv global 3.8.5`` to set the python version to ``3.8.5`` globally
-    + ``pyenv shell 3.8.5`` to use ``python 3.8.5`` only in the current shell
+    + ``pyenv local 3.9.5`` to use ``python 3.9.5`` only in the current directory (and its subdirectories, unless redefined)
+    + ``pyenv global 3.9.5`` to set the python version to ``3.9.5`` globally
+    + ``pyenv shell 3.9.5`` to use ``python 3.9.5`` only in the current shell
 
 - `poetry <https://python-poetry.org/>`_ to manage the python dependencies and
   run the tests in a sandboxed python environment. Follow the `installation instructions <https://python-poetry.org/docs/#installation>`__.
@@ -64,9 +64,9 @@ Summing up, a typical installation proceeds as follows::
   # 2. install pyenv
   # 3. restart shell, to ensure "pyenv init -" has been evaluated
   # 4. then:
-  pyenv install 3.8.5
+  pyenv install 3.9.5
   cd tests_python/
-  pyenv local 3.8.5
+  pyenv local 3.9.5
   poetry install
 
 Examples of test executions:
