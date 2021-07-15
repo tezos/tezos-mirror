@@ -59,6 +59,11 @@ functions. Seeing protocols as plug-ins, it means that the code only
 called primitives from the plug-in API. It is a form of statically
 enforced sandboxing.
 
+Note that the economic protocol on the chain is subject to an amendment
+procedure. On-chain operations can be used to switch from one protocol to
+another. The procedure is described in more details in :doc:`the protocol's
+voting procedure documentation<../active/voting>`.
+
 Finally, the RPC layer (in yellow on the right in the picture) is an
 important part of the node. It is how the client, third-party
 applications and daemons can interact with the node and introspect its
