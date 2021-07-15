@@ -82,6 +82,38 @@ type _ comparable_ty =
 
 let unit_key ~annot = Unit_key {annot}
 
+let never_key ~annot = Never_key {annot}
+
+let int_key ~annot = Int_key {annot}
+
+let nat_key ~annot = Nat_key {annot}
+
+let signature_key ~annot = Signature_key {annot}
+
+let string_key ~annot = String_key {annot}
+
+let bytes_key ~annot = Bytes_key {annot}
+
+let mutez_key ~annot = Mutez_key {annot}
+
+let bool_key ~annot = Bool_key {annot}
+
+let key_hash_key ~annot = Key_hash_key {annot}
+
+let key_key ~annot = Key_key {annot}
+
+let timestamp_key ~annot = Timestamp_key {annot}
+
+let chain_id_key ~annot = Chain_id_key {annot}
+
+let address_key ~annot = Address_key {annot}
+
+let pair_key l r ~annot = Pair_key (l, r, {annot})
+
+let union_key l r ~annot = Union_key (l, r, {annot})
+
+let option_key t ~annot = Option_key (t, {annot})
+
 module type Boxed_set = sig
   type elt
 
@@ -1643,3 +1675,62 @@ let kinstr_rewritek :
   | IOpen_chest (kinfo, k) -> IOpen_chest (kinfo, f.apply k)
 
 let unit_t ~annot = Unit_t {annot}
+
+let int_t ~annot = Int_t {annot}
+
+let nat_t ~annot = Nat_t {annot}
+
+let signature_t ~annot = Signature_t {annot}
+
+let string_t ~annot = String_t {annot}
+
+let bytes_t ~annot = Bytes_t {annot}
+
+let mutez_t ~annot = Mutez_t {annot}
+
+let key_hash_t ~annot = Key_hash_t {annot}
+
+let key_t ~annot = Key_t {annot}
+
+let timestamp_t ~annot = Timestamp_t {annot}
+
+let address_t ~annot = Address_t {annot}
+
+let bool_t ~annot = Bool_t {annot}
+
+let pair_t l r ~annot = Pair_t (l, r, {annot})
+
+let union_t l r ~annot = Union_t (l, r, {annot})
+
+let lambda_t l r ~annot = Lambda_t (l, r, {annot})
+
+let option_t t ~annot = Option_t (t, {annot})
+
+let list_t t ~annot = List_t (t, {annot})
+
+let set_t t ~annot = Set_t (t, {annot})
+
+let map_t l r ~annot = Map_t (l, r, {annot})
+
+let big_map_t l r ~annot = Big_map_t (l, r, {annot})
+
+let contract_t t ~annot = Contract_t (t, {annot})
+
+let sapling_transaction ~memo_size ~annot =
+  Sapling_transaction_t (memo_size, {annot})
+
+let sapling_state_t ~memo_size ~annot = Sapling_state_t (memo_size, {annot})
+
+let operation_t ~annot = Operation_t {annot}
+
+let chain_id_t ~annot = Chain_id_t {annot}
+
+let never_t ~annot = Never_t {annot}
+
+let bls12_381_g1_t ~annot = Bls12_381_g1_t {annot}
+
+let bls12_381_g2_t ~annot = Bls12_381_g2_t {annot}
+
+let bls12_381_fr_t ~annot = Bls12_381_fr_t {annot}
+
+let ticket_t t ~annot = Ticket_t (t, {annot})
