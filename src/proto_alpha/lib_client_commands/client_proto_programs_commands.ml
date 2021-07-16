@@ -358,6 +358,7 @@ let commands () =
           ~block:cctxt#block
           ~gas:original_gas
           ~legacy
+          ~show_types
           program
         >>= fun res ->
         print_typecheck_result
@@ -785,6 +786,7 @@ let commands () =
                ~chain:cctxt#chain
                ~block:cctxt#block
                ~legacy
+               ~show_types:true
                program
              >>= function
              | Error _ as res ->

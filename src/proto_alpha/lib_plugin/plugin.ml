@@ -979,10 +979,11 @@ module RPC = struct
           ~description:"Typecheck a piece of code in the current context"
           ~query:RPC_query.empty
           ~input:
-            (obj3
+            (obj4
                (req "program" Script.expr_encoding)
                (opt "gas" Gas.Arith.z_integral_encoding)
-               (opt "legacy" bool))
+               (opt "legacy" bool)
+               (opt "show_types" bool))
           ~output:
             (obj2
                (req "type_map" Script_tc_errors_registration.type_map_enc)
@@ -1801,14 +1802,15 @@ module RPC = struct
       Registration.register0
         ~chunked:false
         S.typecheck_code
-        (fun ctxt () (expr, maybe_gas, legacy) ->
+        (fun ctxt () (expr, maybe_gas, legacy, show_types) ->
           let legacy = Option.value ~default:false legacy in
+          let show_types = Option.value ~default:true show_types in
           let ctxt =
             match maybe_gas with
             | None -> Gas.set_unlimited ctxt
             | Some gas -> Gas.set_limit ctxt gas
           in
-          Script_ir_translator.typecheck_code ~legacy ctxt expr
+          Script_ir_translator.typecheck_code ~legacy ~show_types ctxt expr
           >|=? fun (res, ctxt) -> (res, Gas.level ctxt)) ;
       Registration.register0
         ~chunked:false
@@ -2013,8 +2015,13 @@ module RPC = struct
           now,
           level )
 
-    let typecheck_code ?gas ?legacy ~script ctxt block =
-      RPC_context.make_call0 S.typecheck_code ctxt block () (script, gas, legacy)
+    let typecheck_code ?gas ?legacy ~script ?show_types ctxt block =
+      RPC_context.make_call0
+        S.typecheck_code
+        ctxt
+        block
+        ()
+        (script, gas, legacy, show_types)
 
     let script_size ?gas ?legacy ~script ~storage ctxt block =
       RPC_context.make_call0

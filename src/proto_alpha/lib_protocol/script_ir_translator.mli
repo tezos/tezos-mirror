@@ -400,8 +400,17 @@ val add_field_annot :
   ('loc, 'prim) Micheline.node ->
   ('loc, 'prim) Micheline.node
 
+(** High-level function to typecheck a Michelson script. This function is not
+    used for validating operations but only for the [typecheck_code] RPC.
+
+    If [show_types] is set to [true], details of the typechecking are returned
+    in the [type_map], otherwise the returned [type_map] is empty. *)
 val typecheck_code :
-  legacy:bool -> context -> Script.expr -> (type_map * context) tzresult Lwt.t
+  legacy:bool ->
+  show_types:bool ->
+  context ->
+  Script.expr ->
+  (type_map * context) tzresult Lwt.t
 
 val serialize_ty_for_error : 'a Script_typed_ir.ty -> Script.expr
 
