@@ -18,12 +18,16 @@ if [ "$(git rev-parse HEAD)" != "$libusb_commit" ]; then
 fi
 autoreconf -fvi && ./configure && make && sudo make install
 
+cd ../
+
 git clone --single-branch --branch hidapi-0.9.0 https://github.com/libusb/hidapi.git --depth 1
+mv hidapi-configure.ac.patch hidapi
 cd hidapi
 if [ "$(git rev-parse HEAD)" != "$hidapi_commit" ]; then
     echo "Unexpected hidapi sources"
     exit 1
 fi
+git apply hidapi-configure.ac.patch
 autoreconf -fvi && ./bootstrap && ./configure && make && sudo make install
 
 rm -rf libusb hidapi
