@@ -26,16 +26,13 @@
 (* Input parameter parsing *)
 
 let verbose =
-  let (verbose, seed) =
-    match Sys.argv with
-    | [| _ ; seed |] -> (false, seed)
-    | [| _ ; "-v" ; seed |] | [| _ ; seed ; "-v" |] -> (true, seed)
-    | _ ->
-       Format.eprintf "Usage: %s <random seed> [-v]\n%!" Sys.argv.(0) ;
-       exit 1
-  in
-  Random.init (int_of_string seed);
-  verbose
+  if Array.length Sys.argv < 2 then (
+    Format.eprintf "Executable expects random seed on input\n%!" ;
+    exit 1)
+  else
+    (Random.init (int_of_string Sys.argv.(1)) ;
+     List.exists (( = ) "-v"))
+      (Array.to_list Sys.argv)
 
 (* ------------------------------------------------------------------------- *)
 (* Base sampler parameters *)
