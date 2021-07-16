@@ -25,11 +25,14 @@
 
 (* Input parameter parsing *)
 
-let _ =
+let verbose =
   if Array.length Sys.argv < 2 then (
     Format.eprintf "Executable expects random seed on input\n%!" ;
     exit 1)
-  else Random.init (int_of_string Sys.argv.(1))
+  else
+    (Random.init (int_of_string Sys.argv.(1)) ;
+     List.exists (( = ) "-v"))
+      (Array.to_list Sys.argv)
 
 (* ------------------------------------------------------------------------- *)
 (* Base sampler parameters *)
@@ -68,7 +71,7 @@ module Gen = Generators.Code (struct
 
   let target_size = 500
 
-  let verbosity = `Trace
+  let verbosity = if verbose then `Trace else `Silent
 end)
 
 let start = Unix.gettimeofday ()
@@ -88,7 +91,8 @@ let _ =
         Tezos_protocol_alpha.Protocol.Michelson_v1_primitives.string_of_prim
         michelson
     in
-    Format.eprintf "result %d/1000:@." i ;
-    Format.eprintf "type: %a => %a@." Type.Stack.pp bef Type.Stack.pp aft ;
-    Format.eprintf "%a@." Micheline_printer.print_expr printable
+    if verbose then (
+      Format.eprintf "result %d/1000:@." i ;
+      Format.eprintf "type: %a => %a@." Type.Stack.pp bef Type.Stack.pp aft ;
+      Format.eprintf "%a@." Micheline_printer.print_expr printable)
   done
