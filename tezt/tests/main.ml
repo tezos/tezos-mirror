@@ -60,6 +60,7 @@ let () =
      Client.bake_for which causes the default key to be a baking account key). *)
   Baking.register ~protocols:[Alpha] ;
   Mempool.register ~protocols:[Alpha] ;
+  Qcheck_rpc.register ~protocols:[Alpha] ;
   (* Tests that are protocol-independent.
      They do not take a protocol as a parameter and thus need to be registered only once. *)
   P2p.register_protocol_independent () ;
