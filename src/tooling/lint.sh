@@ -92,7 +92,7 @@ update_all_dot_ocamlformats () {
 
 check_scripts () {
     # Gather scripts
-    scripts=$(find "${source_directories[@]}" tests_python/ scripts/ -name "*.sh" -type f -print)
+    scripts=$(find "${source_directories[@]}" packaging/ tests_python/ scripts/ -name "*.sh" -type f -print)
     exit_code=0
 
     # Check scripts do not contain the tab character
