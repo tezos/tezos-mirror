@@ -20,7 +20,7 @@ autoreconf -fvi && ./configure && make && sudo make install
 
 git clone --single-branch --branch hidapi-0.9.0 https://github.com/libusb/hidapi.git --depth 1
 cd hidapi
-if [[ $(git rev-parse HEAD) != $hidapi_commit]]; then
+if [[ $(git rev-parse HEAD) != $hidapi_commit ]]; then
     echo "Unexpected hidapi sources"
     exit 1
 fi
