@@ -22,27 +22,40 @@ standard library changes (a function is added or removed, a type is
 changed), then we will be able to upgrade to the new OCaml while still
 remaining compatible with past protocols, by providing an adapter layer.
 
-Here is a quick description of each file in this environment:
+Here is a quick description of each file in this environment, all located under
+:src:`src/lib_protocol_environment/`:
 
--  Files ``array.mli``, ``buffer.mli``, ``bytes.mli``, ``format.mli``,
-   ``int32.mli``, ``int64.mli``, ``list.mli``, ``map.mli``,
-   ``pervasives.mli``, ``set.mli`` and ``string.mli`` are stripped down
-   interfaces to the OCaml standard library modules. The removed
-   elements are: effects on toplevel references or channels, unsafe
-   functions, functions that are known sources of bugs, and anything
-   deprecated.
--  As we removed polymorphic comparison operators, ``compare.mli``
-   implements monomorphic operators for standard OCaml and Tezos types.
-   An example use is ``Compare.Int.(3 = 4)`` instead of plain OCaml
-   ``(3 = 4)``.
--  Files ``lwt*`` is the stripped down interface to Lwt, of which we
-   removed any non deterministic functions, since we only use Lwt for
-   asynchronous access to the storage.
--  Files ``data_encoding.mli``, ``error_monad.mli``, ``mBytes.mli``,
-   ``hash.mli``, ``base58.mli``, ``blake2B.mli``, ``ed25519.mli``,
-   ``hex_encode.mli``, ``json.mli``, ``time.mli``, ``z.mli``,
-   ``micheline.mli`` and files ``RPC_*`` are stripped down versions of
-   the Tezos standard library.
--  Files ``tezos_data.mli``, ``context.mli``, ``fitness.mli`` and
-   ``updater.mli`` are interfaces to the shell’s data definitions and
-   storage accessors that are accessible to the protocol.
+-  Files in the ``sigs/vX/`` directories declare the interface that the
+   protocols can be compiled against. These interfaces are repeats of other
+   library interfaces with some unsafe functions removed. These interfaces are
+   frozen and cannot be changed: changing them can break previous protocols.
+   These files are assembled into a single interface file ``VX.mli`` by a helper
+   program located in ``s_packer/``.
+-  Special cases: the files ``context.mli``, ``fitness.mli``, and
+  ``updater.mli`` are interfaces that the protocol exposes to the shell.
+-  Files in the ``structs/vX/`` directory declare compatibility layers for old
+   protocol environments. E.g., ``structs/V0/error_monad_traversors.ml`` contain
+   the code of error-monad-compatible list traversers that used to be part of
+   the Error Monad at the time of the environment V0. These implementations are
+   meant to evolve alongside the ecosystem: when an incompatibility is
+   introduced in a library an implementation needs to be implemented or amended
+   in order to provide a backwards compatible overlay to the protocol. These
+   implementations are assembled into a single implementation file ``VX.ml`` by
+   a helper program located in ``s_packer/``.
+
+
+Environment versions
+====================
+
+The environment interfaces are frozen, providing forever an immutable interface
+to the protocol. And so when a protocol needs new functions, types, or values,
+this protocol must use a different environment. This is why the environments are
+versioned.
+
+A protocol's manifest (e.g., :src:`src/proto_alpha/lib_protocol/TEZOS_PROTOCOL`)
+includes a field named ``expected_env_version``. This field specifies the
+environment used to compile the protocol.
+
+Protocol environments can only ever increase in version. Specifically, from
+within a protocol P1 built on environment version X, the activation of a
+protocol P2 built on environment Y fails unless X ≤ Y.

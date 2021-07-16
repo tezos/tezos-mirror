@@ -53,6 +53,28 @@ that the stake of each delegate is computed at the beginning of each voting
 period, and if the delegate owns one roll or more, its stake in number of rolls is
 stored in a list called the `voting listings`.
 
+Following the adoption period the protocol is activated. After this step the
+blocks added to the chain are interpreted in the newly activated protocol. As a
+result gas costs (and other such details of operation inclusion) may differ.
+
+
+The Hash and the Protocol
+-------------------------
+
+Note that the voting procedure revolves around the hash of a protocol proposal
+whilst the activation revolves around the protocol itself. Consequently, if the
+protocol that the hash identifies is invalid, the activation step fails.
+
+A protocol is invalid if the code cannot be compiled (e.g., if the code is not
+valid source code), if the code uses functions not present in the
+:ref:`protocol environment <protocol_environment>`, or if it downgrades the
+:ref:`protocol environment <protocol_environment>` version.
+
+If the protocol is invalid and the activation fails, the chain becomes stuck.
+Thus, when voting, it is important to vote for hashes that designate a protocol
+with sources that are available and valid.
+
+
 Super-majority and Quorum
 -------------------------
 

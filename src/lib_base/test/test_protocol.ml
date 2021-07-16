@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,47 +23,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(* Testing
+   -------
+   Component:    Base, Protocol
+   Invocation:   dune build @src/lib_base/test/runtest_protocol
+   Subject:      Check the ordering of protocol versions
+*)
 
-and component = {
-  name : string;
-  interface : string option;
-  implementation : string;
-}
+let all_env_versions = Protocol.[V0; V1; V2; V3]
 
-and env_version = V0 | V1 | V2 | V3
+let env_v_eq_check () =
+  List.iter
+    (fun v -> assert (Protocol.compare_version v v = 0))
+    all_env_versions
 
-val component_encoding : component Data_encoding.t
+let env_v_lt_check () =
+  let rec check = function
+    | [] -> ()
+    | v :: vs ->
+        assert (List.for_all (fun w -> Protocol.compare_version v w < 0) vs) ;
+        check vs
+  in
+  check all_env_versions
 
-(** [compare_version va vb] is negative if [va] is a less recent version than
-    [vb], positive if [va] is a more recent version than [vb], zero if they are
-    the same version.
+let env_v_gt_check () =
+  let rec check = function
+    | [] -> ()
+    | v :: vs ->
+        assert (List.for_all (fun w -> Protocol.compare_version w v > 0) vs) ;
+        check vs
+  in
+  check all_env_versions
 
-    In less precise but more intuitive terms,
-    [compare_version va vb <op> 0] is the same truthness as [va <op> vb]
-    where [<op>] is any comparison operator.
+let env_v_comparison_checks =
+  let open Alcotest in
+  [
+    test_case "equal" `Quick env_v_eq_check;
+    test_case "less-than" `Quick env_v_lt_check;
+    test_case "greater-than" `Quick env_v_gt_check;
+  ]
 
-    E.g., [compare_version V0 V1 < 0] is [true]. *)
-val compare_version : env_version -> env_version -> int
-
-val env_version_encoding : env_version Data_encoding.t
-
-val pp_ocaml : Format.formatter -> t -> unit
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
-
-val of_bytes_exn : Bytes.t -> t
-
-val bounded_encoding : ?max_size:int -> unit -> t Data_encoding.t
-
-val module_name_of_env_version : env_version -> string
-
-module Meta : sig
-  type t = {
-    hash : Protocol_hash.t option;
-    expected_env_version : env_version option;
-    modules : string list;
-  }
-
-  val encoding : t Data_encoding.t
-end
+let () =
+  Alcotest.run
+    "Protocol"
+    [("environment-version-comparison", env_v_comparison_checks)]
