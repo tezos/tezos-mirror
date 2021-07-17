@@ -115,6 +115,8 @@ module Path : sig
   val dynamic : ?description:string -> schema:Schema.t -> string -> item
 
   type t = item list
+
+  val to_string : t -> string
 end
 
 module Endpoint : sig

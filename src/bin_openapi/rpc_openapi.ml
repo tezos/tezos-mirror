@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,32 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component: All
-   Invocation: dune exec tezt/long_tests/main.exe
-   Subject: This file is the entrypoint of all long Tezt tests. It dispatches to
-            other files. Long tests do not run on the CI but on a custom
-            architecture which is particularly suited for performance regression tests.
-*)
+open Tezos_openapi
 
-(* This module runs the tests implemented in all other modules of this directory.
-   Each module defines tests which are thematically related,
-   as functions to be called here. *)
-
-let () =
-  Long_test.update_grafana_dashboard
-    {
-      uid = "longtezts";
-      title = "Long Tezts";
-      description = "Measurements from tests in tezt/long_tests.";
-      panels = Prt_client.grafana_panels;
-    }
+let main () =
+  (* Parse command line arguments. *)
+  let (version, filename) =
+    if Array.length Sys.argv <> 3 then (
+      prerr_endline
+        "Usage: rpc_openapi <VERSION> <API.json>\n\n\
+         Version is the version of the API, to be put in the \"version\" field \
+         of the output.\n\n\
+         Multiple input files are not supported." ;
+      exit (if Array.length Sys.argv = 1 then 0 else 1))
+    else (Sys.argv.(1), Sys.argv.(2))
+  in
+  (* Parse input file and convert it. *)
+  Json.from_file filename |> Api.parse_tree |> Api.parse_services |> Api.flatten
+  |> Convert.convert_api version
+  |> Openapi.to_json |> Json.output
 
 let () =
-  (* Register your tests here. *)
-  (* This test depends on [Tezos_protocol_alpha.*] Tezos libraries *)
-  Qcheck_rpc.register () ;
-  Prt_client.register () ;
-  (* [Test.run] must be the last function to be called. *)
-  Test.run ()
+  Printexc.record_backtrace true ;
+  try main ()
+  with exn ->
+    Printexc.print_backtrace stderr ;
+    prerr_endline (Printexc.to_string exn) ;
+    exit 1

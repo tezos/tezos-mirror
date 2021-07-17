@@ -352,27 +352,3 @@ let convert_api version (endpoints : Api.service Api.endpoint list) : Openapi.t
     ~version
     ~definitions:(String_map.bindings (merge_env_list envs))
     endpoints
-
-let main () =
-  (* Parse command line arguments. *)
-  let (version, filename) =
-    if Array.length Sys.argv <> 3 then (
-      prerr_endline
-        "Usage: rpc_openapi <VERSION> <API.json>\n\n\
-         Version is the version of the API, to be put in the \"version\" field \
-         of the output.\n\n\
-         Multiple input files are not supported." ;
-      exit (if Array.length Sys.argv = 1 then 0 else 1))
-    else (Sys.argv.(1), Sys.argv.(2))
-  in
-  (* Parse input file and convert it. *)
-  Json.from_file filename |> Api.parse_tree |> Api.parse_services |> Api.flatten
-  |> convert_api version |> Openapi.to_json |> Json.output
-
-let () =
-  Printexc.record_backtrace true ;
-  try main ()
-  with exn ->
-    Printexc.print_backtrace stderr ;
-    prerr_endline (Printexc.to_string exn) ;
-    exit 1

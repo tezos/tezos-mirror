@@ -77,10 +77,10 @@ curl "http://localhost:$rpc_port/describe/chains/main/mempool?recurse=yes" > $me
 kill -9 "$node_pid"
 
 # Convert the RPC descriptions.
-dune exec src/openapi/rpc_openapi.exe -- $version $api_json > $openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- $version $api_json > $openapi_json
 echo "Generated OpenAPI specification: $openapi_json"
-dune exec src/openapi/rpc_openapi.exe -- $version $proto_api_json > $proto_openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- $version $proto_api_json > $proto_openapi_json
 echo "Generated OpenAPI specification: $proto_openapi_json"
-dune exec src/openapi/rpc_openapi.exe -- $version $mempool_api_json > $mempool_openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- $version $mempool_api_json > $mempool_openapi_json
 echo "Generated OpenAPI specification: $mempool_openapi_json"
 echo "You can now clean up with: rm -rf $tmp"

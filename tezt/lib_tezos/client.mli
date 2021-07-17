@@ -114,7 +114,10 @@ val string_of_path : path -> string
 type query_string = (string * string) list
 
 (** HTTP methods for RPCs. *)
-type meth = GET | PUT | POST | PATCH
+type meth = GET | PUT | POST | PATCH | DELETE
+
+(** A lowercase string of the method. *)
+val string_of_meth : meth -> string
 
 (** [rpc_path_query_to_string ["key1", "value1"; "key2", "value2")] ["seg1"; "seg2"]]
     returns [/seg1/seg2?key1=value1&key2=value2] where seg1, seg2, key1, key2,
