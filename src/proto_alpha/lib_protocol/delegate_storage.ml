@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -45,11 +46,12 @@ type error +=
   | Current_delegate (* `Temporary *)
   | Empty_delegate_account of Signature.Public_key_hash.t (* `Temporary *)
   | Balance_too_low_for_deposit of {
+      (* `Temporary *)
       delegate : Signature.Public_key_hash.t;
       deposit : Tez_repr.t;
       balance : Tez_repr.t;
     }
-
+  | Not_registered of Signature.Public_key_hash.t
 (* `Temporary *)
 
 let () =
@@ -129,7 +131,26 @@ let () =
           Some (delegate, balance, deposit)
       | _ -> None)
     (fun (delegate, balance, deposit) ->
-      Balance_too_low_for_deposit {delegate; balance; deposit})
+      Balance_too_low_for_deposit {delegate; balance; deposit}) ;
+  register_error_kind
+    `Temporary
+    ~id:"delegate.not_registered"
+    ~title:"Not a registered delegate"
+    ~description:
+      "The provided public key hash is not the address of a registered \
+       delegate."
+    ~pp:(fun ppf pkh ->
+      Format.fprintf
+        ppf
+        "The provided public key hash (%a) is not the address of a registered \
+         delegate. If you own this account and want to register it as a \
+         delegate, use a delegation operation to delegate the account to \
+         itself."
+        Signature.Public_key_hash.pp
+        pkh)
+    Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
+    (function Not_registered pkh -> Some pkh | _ -> None)
+    (fun pkh -> Not_registered pkh)
 
 let link c contract delegate =
   Storage.Contract.Balance.get c contract >>=? fun balance ->
@@ -538,3 +559,10 @@ let delegated_balance ctxt delegate =
 let fold = Storage.Delegates.fold
 
 let list = Storage.Delegates.elements
+
+(* The fact that this succeeds iff [registered ctxt pkh] returns true is an
+   invariant of the [set] function. *)
+let check_delegate ctxt pkh =
+  Storage.Delegates.mem ctxt pkh >>= function
+  | true -> return_unit
+  | false -> fail (Not_registered pkh)
