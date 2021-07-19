@@ -41,12 +41,12 @@
 (rule
  (alias runtest_p2p_socket)
  (locks /ports/49152-65535)
- (action (run %{exe:test_p2p_socket.exe} -v)))
+ (action (run %{exe:test_p2p_socket.exe})))
 
 (rule
  (alias runtest_p2p_pool)
  (locks /ports/49152-65535)
- (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5 -v)))
+ (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5)))
 
 (rule
  (alias runtest_p2p_io_scheduler)
@@ -60,13 +60,13 @@
 (rule
  (alias runtest_p2p_socket_ipv4)
  (locks /ports/49152-65535)
- (action (run %{exe:test_p2p_socket.exe} -v
+ (action (run %{exe:test_p2p_socket.exe}
               --addr "::ffff:127.0.0.1")))
 
 (rule
  (alias runtest_p2p_pool_ipv4)
  (locks /ports/49152-65535)
- (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5 -v
+ (action (run %{exe:test_p2p_pool.exe} --clients 10 --repeat 5
               --addr "::ffff:127.0.0.1")))
 
 (rule
@@ -81,11 +81,11 @@
 
 (rule
  (alias runtest_p2p_peerset)
- (action (run %{exe:test_p2p_peerset.exe} -v)))
+ (action (run %{exe:test_p2p_peerset.exe})))
 
 (rule
  (alias runtest_p2p_banned_peers)
- (action (run %{exe:test_p2p_banned_peers.exe} -v)))
+ (action (run %{exe:test_p2p_banned_peers.exe})))
 
 (rule
  (alias runtest_p2p_node)
