@@ -450,7 +450,7 @@ module All_sinks : sig
       scheme and calls {!configure}. *)
   val activate : Uri.t -> unit tzresult Lwt.t
 
-  (** Call [close] on all the sinks. *)
+  (** Call [close] on all the active sinks. *)
   val close : unit -> unit tzresult Lwt.t
 
   (** Display the state of registered/active sinks. *)

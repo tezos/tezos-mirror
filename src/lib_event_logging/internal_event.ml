@@ -305,9 +305,11 @@ module All_sinks = struct
       let module S = (val definition : SINK with type t = a) in
       S.close sink
     in
+    let sinks_to_close = !active in
+    active := [] ;
     List.iter_es
       (fun (Active {sink; definition; _}) -> close_one sink definition)
-      !active
+      sinks_to_close
 
   let handle def section v =
     let handle (type a) sink definition =
