@@ -319,6 +319,8 @@ The ``Lwtreslib`` and the ``Error_monad`` libraries provide functions that can
 help you follow these guidelines. Notably, ``traces`` allow callers to
 contextualise the errors produced by its callees.
 
+.. _rpc_security:
+
 RPC security
 ------------
 
@@ -331,11 +333,10 @@ configuration or debugging purposes or to facilitate development of smart
 contracts.
 
 In order to mitigate risks related to exposing these endpoints, Access Control
-Lists (ACL for short) were introduced to limit the scope of API exposed to
+Lists (ACL for short) were introduced to limit the scope of the API exposed to
 public networks (see also :ref:`configure_rpc`). While node administrators are
-free to configure these ACLs however they like, there is the default ACL
-hard-coded in ``src/lib_rpc_http/RPC_server.ml``, which lists all the endpoints
-that are **exposed by default**.
+free to configure these ACLs however they like, there is :ref:`the default ACL
+<default_acl>`, which lists all the endpoints that are **exposed by default**.
 
 When adding a new RPC endpoint, please consider whether or not there is a reason
 to call it over a public network. If the answer is yes, you should probably

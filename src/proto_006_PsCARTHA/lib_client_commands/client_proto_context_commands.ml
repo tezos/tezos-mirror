@@ -1079,7 +1079,7 @@ let commands network () =
           >>= fun () -> return_unit);
       command
         ~group:binary_description
-        ~desc:"Describe unsigned block header"
+        ~desc:"Describe unsigned operation"
         no_options
         (fixed ["describe"; "unsigned"; "operation"])
         (fun () (cctxt : Protocol_client_context.full) ->

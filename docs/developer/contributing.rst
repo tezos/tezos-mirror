@@ -174,6 +174,8 @@ While working on your branch to prepare a Merge Request, make sure you respect t
 -  If you add new functions to an interface, don’t forget to
    document the function in the interface (in the corresponding .mli file; or,
    if there is no .mli file, directly in the .ml file)
+-  If you add a new RPC endpoint or modify an existing one, be sure to take
+   into account the impact on :ref:`RPC security <rpc_security>`.
 -  If you modify the user API (e.g. add or change a configuration parameter or
    a command-line option), update the corresponding documentation. In
    particular, for configuration parameters of the Tezos node, update the node

@@ -12,6 +12,9 @@ The second way allows to participate more actively in the protocol, by baking bl
 
 To learn more about the protocol refer to :doc:`this page <../active/proof_of_stake>`.
 
+No matter how you decide to run Tezos, your node must have an accurate time source and be properly synchronized to it, e.g. by configuring an NTP daemon.
+This is especially important for bakers, as baking nodes desynchronized from the correct time of day have caused operational problems in the past by "baking in the future".
+
 .. _delegating_coins:
 
 Delegating your coins
@@ -105,9 +108,8 @@ When a delegator spends their tokens, the delegated balance of their delegate de
 If a delegate runs out of funds to deposit it won't be able to bake or
 endorse. Other than being a missed opportunity for them, this has also
 negative consequences on the network.
-Missing baking slots slows the network, as it is necessary to wait for one
-minute for the baker at priority 2 to bake, while missing endorsements
-reduce the fitness of the chain, making it more susceptible to forks.
+Missing baking or endorsing slots slows down the network, as it is necessary to wait some time for the baker at the next priority to bake, and also some other time for each missed endorsing slot.
+Besides, missed endorsements also makes the chain more susceptible to forks.
 Running out of funds can happen if a delegate is *over-delegated*,
 that is if the amount of rolls it was delegate is disproportionate
 with respect to its available funds.
@@ -193,9 +195,7 @@ won't miss any opportunity we should have around ~3kꜩ for deposits,
 on the other hand, the expected returns will probably be around ~10ꜩ per cycle.
 
 After ``preserved_cycles``, not only does the delegate take back control of
-its frozen deposits, but it also receives the rewards for its hard work
-which amount to 16ꜩ to bake a block and ``2ꜩ / <block_priority>`` for
-endorsing a block.
+its frozen deposits, but it also receives its rewards for baking and endorsing.
 Additionally, a baker also receives the fees of the operations it
 included in its blocks.
 While fees are unfrozen after ``preserved_cycles`` like deposits and

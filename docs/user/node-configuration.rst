@@ -128,7 +128,7 @@ with other characters in a path segment).
 A ``**`` stands for any possible path suffix.
 
 .. warning::
-   The policy is always searched from the beginning of the list to the end and
+   Rules are always searched from the beginning of the list to the end and
    the first matching address is returned. Therefore if one wants to put one
    rule on a specific port on a given host and another rule for all other ports
    on the same host, then more specific rules should always be written *first*
@@ -140,9 +140,10 @@ Default ACL for RPC
 -------------------
 
 The default ACL for RPC depends on the listening address that the node is using.
+
 If the listening address resolves to the loopback network interface, then full
-access to all endpoints is granted. Note, that it does not matter, from which
-machine the client is really making his request, but only what the listening
+access to all endpoints is granted. Note that it does not matter from which
+machine the client is really making a request, but only what the listening
 address is. This guarantees that insecure endpoints can only be accessed from
 ``localhost``.
 
@@ -158,14 +159,15 @@ relaxed or tightened by modifying the configuration file. It's
 worth noting that this default policy among other things disallows baking and
 endorsing by bakers and endorsers running on remote servers.
 
-This is the default ACL policy for the node (remember to replace
+The following is the default ACL policy for the node,
+hard-coded in :src:`src/lib_rpc_http/RPC_server.ml` (remember to replace
 ``any.public.address`` with an IP address or a domain name that you'll be
 actually listening on):
 
 .. literalinclude:: default-acl.json
 
 The endpoints specifically required for baking can be found in
-``vendors/flextesa-lib/tezos-node.ml``.
+:src:`vendors/flextesa-lib/tezos_node.ml`.
 
 .. _configure_p2p:
 

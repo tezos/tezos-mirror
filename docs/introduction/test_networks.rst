@@ -2,6 +2,7 @@
 
 .. _test-networks:
 
+=============
 Test Networks
 =============
 
@@ -23,7 +24,7 @@ a new test network is spawned. This also makes synchronization much
 faster than with a long-lived network.
 
 Get Free Funds
---------------
+==============
 
 Test networks have a list of built-in accounts with some funds.
 You can obtain the key to these accounts from a faucet to claim the funds.
@@ -31,7 +32,7 @@ All networks share the same faucet: https://faucet.tzalpha.net/.
 The keys obtained from this faucet can be used in all test networks.
 
 Granadanet
-----------
+==========
 
 - Built-in network alias: ``granadanet`` (see :ref:`builtin_networks`)
 
@@ -57,7 +58,7 @@ This results in a faster chain than Mainnet:
 - a voting period lasts half a cycle and should thus last about 8 hours.
 
 Florencenet
------------
+===========
 
 - Built-in network alias: ``florencenet`` (see :ref:`builtin_networks`)
 
@@ -84,7 +85,7 @@ This results in a faster chain than Mainnet:
 - a voting period lasts half a cycle and should thus last about 8 hours.
 
 Future Networks
----------------
+===============
 
 At some point, there will be a proposal for a successor to the current
 protocol (let's call this new protocol P). After P is injected, a new test network
