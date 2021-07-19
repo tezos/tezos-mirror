@@ -1,5 +1,12 @@
 #! /bin/sh
 
+## This script is not meant to be executed interactively. Instead it is meant to
+## be used in other scripts to provide common variables for version numbers and
+## hashes.
+##
+## Typical use:
+## . "$script_dir"/version.sh
+
 ## `ocaml-version` should be in sync with `README.rst` and
 ## `lib.protocol-compiler/tezos-protocol-compiler.opam`
 
