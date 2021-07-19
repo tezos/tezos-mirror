@@ -92,11 +92,6 @@
  (locks /ports/49152-65535)
  (action (run %{exe:test_p2p_node.exe})))
 
-; (rule
-;  (alias runtest_p2p_logging)
-;  (locks /ports/49152-65535)
-;  (action (run %{exe:test_p2p_logging.exe})))
-
 (rule
  (alias runtest)
  (package tezos-p2p)
@@ -106,6 +101,5 @@
        (alias runtest_p2p_peerset)
        (alias runtest_p2p_banned_peers)
        (alias runtest_p2p_node)
-      ;  (alias runtest_p2p_logging)
        )
  (action (progn)))
