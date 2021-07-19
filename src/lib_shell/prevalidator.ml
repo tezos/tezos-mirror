@@ -482,11 +482,17 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             Prevalidation.validation_state
             (Option.of_result pv.validation_state)
         in
-        Lwt.return
-          (Filter.Mempool.pre_filter
-             ?validation_state_before
-             config
-             op.Filter.Proto.protocol_data)
+        if
+          Filter.Mempool.pre_filter
+            ?validation_state_before
+            config
+            op.Filter.Proto.protocol_data
+        then Lwt.return_true
+        else (
+          Distributed_db.Operation.clear_or_cancel
+            pv.shell.parameters.chain_db
+            oph ;
+          Lwt.return_false)
 
   let post_filter w pv ~validation_state_before ~validation_state_after op
       receipt =
@@ -926,9 +932,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
               (* TODO: should this have an influence on the peer's score ? *)
               pv.pending <- Operation_hash.Map.add oph op pv.pending ;
               return_unit)
-        | false ->
-            Distributed_db.Operation.clear_or_cancel pv.parameters.chain_db oph ;
-            return_unit
+        | false -> return_unit
 
     let on_inject _w pv op =
       let oph = Operation.hash op in
@@ -977,6 +981,16 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
            (fun _key v _ -> Some v)
            (Preapply_result.operations (validation_result pv))
            pv.pending)
+      >>= fun pending ->
+      (* Could be implemented as Operation_hash.Map.filter_s which
+         does not exist for the moment. *)
+      Operation_hash.Map.fold_s
+        (fun oph op pending ->
+          pre_filter w pv oph op >>= function
+          | true -> Lwt.return (Operation_hash.Map.add oph op pending)
+          | false -> Lwt.return pending)
+        pending
+        Operation_hash.Map.empty
       >>= fun pending ->
       let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
       let timestamp = Time.System.to_protocol timestamp_system in

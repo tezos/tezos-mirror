@@ -278,6 +278,28 @@ Proxy server
    Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
    for further details.
 
+
+Version 9.7
+===========
+
+-  The mempool now filters out old consensus operations to avoid
+   reevaluating them again after flushing when the node receives a new
+   head.
+
+Version 9.6
+===========
+
+-  Increased the delay after which the endorser gives up on endorsing to
+   1200 seconds (previously 110 seconds), to prevent an issue where
+   blocks that arrived too late were not endorsed at all, causing the
+   next block to also be produced late.
+
+Version 9.5
+===========
+
+-  Fixed a bug that could result in a corrupted storage and in assert
+   failure errors.
+
 Version 9.4
 ===========
 
