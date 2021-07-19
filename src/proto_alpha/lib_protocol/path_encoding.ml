@@ -50,7 +50,8 @@ struct
 
   let of_path = function
     | [path] ->
-        (* XXX? fails if path is not hex? *)
-        H.of_bytes_opt (Hex.to_bytes (`Hex path))
+        Option.bind
+          (try Some (Hex.to_bytes (`Hex path)) with _ -> None)
+          H.of_bytes_opt
     | _ -> None
 end
