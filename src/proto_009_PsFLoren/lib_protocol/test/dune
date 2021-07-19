@@ -36,14 +36,14 @@
  (alias runtest_proto_009_PsFLoren)
  (deps (glob_files contracts/*))
  (package tezos-protocol-009-PsFLoren-tests)
- (action (run %{exe:main.exe} -v -q)))
+ (action (run %{exe:main.exe} -q)))
 
 ; runs both `Quick and `Slow tests
 (rule
  (alias runtest_slow)
  (deps (glob_files contracts/*))
  (package tezos-protocol-009-PsFLoren-tests)
- (action (run %{exe:main.exe} -v)))
+ (action (run %{exe:main.exe})))
 
 (rule
  (alias runtest_saturation_fuzzing)

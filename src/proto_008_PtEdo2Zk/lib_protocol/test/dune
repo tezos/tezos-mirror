@@ -33,14 +33,14 @@
  (alias runtest_proto_008_PtEdo2Zk)
  (deps (glob_files contracts/*))
  (package tezos-protocol-008-PtEdo2Zk-tests)
- (action (run %{exe:main.exe} -v -q)))
+ (action (run %{exe:main.exe} -q)))
 
 ; runs both `Quick and `Slow tests
 (rule
  (alias runtest_slow)
  (deps (glob_files contracts/*))
  (package tezos-protocol-008-PtEdo2Zk-tests)
- (action (run %{exe:main.exe} -v)))
+ (action (run %{exe:main.exe})))
 
 (rule
  (alias runtest)
