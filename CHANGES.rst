@@ -20,6 +20,10 @@ be documented here either.
 Node
 ----
 
+-  Better handling of mempool cache in the `distributed_db` which
+   should make the `distributed_db` RAM consumption strongly
+   correlated to the one of the mempool.
+
 -  Fixed wrong error message in case of p2p network address binding collision.
 
 -  Updated the output of the ``/stats/gc`` RPC entry point: it now also

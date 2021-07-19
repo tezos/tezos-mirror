@@ -11,6 +11,7 @@
             tezos-p2p
             tezos-p2p-services
             tezos-protocol-updater
+            tezos-requester
             tezos-shell
             tezos-shell-services
             tezos-embedded-protocol-demo-noops
@@ -38,6 +39,7 @@
  (alias buildtest)
  (deps test_shell.exe
        test_locator.exe
+       test_prevalidation.exe
        test_synchronisation_heuristic_fuzzy.exe)
  (action (progn)))
 
