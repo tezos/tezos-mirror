@@ -14,7 +14,9 @@ depends: [
   "tezos-protocol-alpha"
   "tezos-protocol-alpha-parameters"
   "tezos-client-alpha"
+  "tezos-test-helpers"
   "alcotest-lwt"
+  "qcheck-alcotest"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
