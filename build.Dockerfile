@@ -3,6 +3,7 @@ ARG BASE_IMAGE_VERSION
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION}
 # do not move the ARG below above the FROM or it gets erased
 ARG GIT_SHORTREF
+ARG GIT_DATETIME
 WORKDIR /home/tezos
 RUN mkdir -p /home/tezos/tezos/scripts
 COPY --chown=tezos:nogroup Makefile tezos
@@ -12,4 +13,5 @@ COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup src tezos/src
 COPY --chown=tezos:nogroup vendors tezos/vendors
 ENV GIT_SHORTREF=${GIT_SHORTREF}
+ENV GIT_DATETIME=${GIT_DATETIME}
 RUN opam exec -- make -C tezos all build-test
