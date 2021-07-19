@@ -17,7 +17,7 @@ let query ?env ~default cmd =
 
 let hash = query ~env:"GIT_SHORTREF" ~default:"unknown" "git show -s --pretty=format:%H"
 
-let date = query ~default:"not-available" "git show -s --pretty=format:%ci"
+let date = query ~env:"GIT_DATETIME" ~default:"not-available" "git show -s --pretty=format:%ci"
 
 let () =
   Format.printf
