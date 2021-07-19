@@ -363,7 +363,8 @@ and path_item =
 
 include Json_encoding
 
-let construct e v = construct (get_json e) v
+let construct ?include_default_fields e v =
+  construct ?include_default_fields (get_json e) v
 
 type jsonm_lexeme =
   [ `Null

@@ -24,3 +24,5 @@ v0.4:
 - remove unused `read_error` constructor: `Invalid_size`
 - check that `int31` is actually within `int31` bounds
 - add "slicing" feature to analyse binary encoded values
+- add a default argument to `Json.construct`: `?include_default_fields`,
+  which is simply passed on to `Json_encoding.construct`
