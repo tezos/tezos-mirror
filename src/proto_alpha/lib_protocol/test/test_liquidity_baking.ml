@@ -31,8 +31,23 @@
                   sunset shut off, and escape hatch shut off.
 *)
 
+open Liquidity_baking_machine
 open Protocol
 open Test_tez
+
+let generate_init_state () =
+  let cpmm_min_xtz_balance = 10_000_000L in
+  let cpmm_min_tzbtc_balance = 100_000 in
+  let accounts_balances =
+    [
+      {xtz = 1_000_000L; tzbtc = 1; liquidity = 100};
+      {xtz = 1_000L; tzbtc = 1000; liquidity = 100};
+      {xtz = 40_000_000L; tzbtc = 350000; liquidity = 300};
+    ]
+  in
+  ValidationMachine.build
+    {cpmm_min_xtz_balance; cpmm_min_tzbtc_balance; accounts_balances}
+  >>=? fun _ -> return_unit
 
 (* The script hash of
 
@@ -384,6 +399,7 @@ let tests =
       "test liquidity baking cpmm is originated at the expected address"
       `Quick
       liquidity_baking_cpmm_address;
+    Tztest.tztest "Init Context" `Quick generate_init_state;
     Tztest.tztest
       "test liquidity baking subsidy is correct"
       `Quick

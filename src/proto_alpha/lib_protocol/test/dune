@@ -1,5 +1,9 @@
 (executables
- (names main saturation_fuzzing test_gas_properties test_tez_repr)
+ (names main
+        saturation_fuzzing
+        test_gas_properties
+        test_tez_repr
+        liquidity_baking_pbt)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
@@ -58,7 +62,16 @@
  (action (run %{exe:test_tez_repr.exe})))
 
 (rule
+ (alias runtest_liquidity_baking_pbt)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{exe:liquidity_baking_pbt.exe})))
+
+(rule
  (alias runtest)
  (package tezos-protocol-alpha-tests)
- (deps (alias runtest_proto_alpha) (alias runtest_saturation_fuzzing) (alias runtest_test_tez_repr))
+ (deps
+  (alias runtest_proto_alpha)
+  (alias runtest_saturation_fuzzing)
+  (alias runtest_test_tez_repr)
+  (alias runtest_liquidity_baking_pbt))
  (action (progn)))
