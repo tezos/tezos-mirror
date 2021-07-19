@@ -35,6 +35,8 @@ end
 module Event : sig
   type update = Ignored_head | Branch_switch | Head_increment
 
+  val update_encoding : update Data_encoding.t
+
   type synchronisation_status =
     | Synchronised of {is_chain_stuck : bool}
     | Not_synchronised

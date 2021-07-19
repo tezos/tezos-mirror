@@ -103,6 +103,23 @@ module Event = struct
     | Bootstrap_active_peers_heads_time _ -> Internal_event.Debug
     | Request_failure _ -> Internal_event.Notice
 
+  let update_encoding =
+    let open Data_encoding in
+    def
+      "chain_update"
+      ~description:
+        "If 'ignored', the new validated block is ignored since the current \
+         head fitness is better. If 'branch', we have set our head to a new \
+         validated block which is not the direct successor of the previous \
+         head. If 'increment', the new validated head is the direct successor \
+         of the previous head."
+      (string_enum
+         [
+           ("ignored", Ignored_head);
+           ("branch", Branch_switch);
+           ("increment", Head_increment);
+         ])
+
   let sync_status_encoding =
     let open Data_encoding in
     def
@@ -132,14 +149,7 @@ module Event = struct
           (obj6
              (req "request" Request.encoding)
              (req "status" Worker_types.request_status_encoding)
-             (req
-                "outcome"
-                (string_enum
-                   [
-                     ("ignored", Ignored_head);
-                     ("branch", Branch_switch);
-                     ("increment", Head_increment);
-                   ]))
+             (req "outcome" update_encoding)
              (req "fitness" Fitness.encoding)
              (req "level" int32)
              (req "timestamp" Time.Protocol.encoding))

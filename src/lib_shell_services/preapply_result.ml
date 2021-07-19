@@ -76,7 +76,7 @@ let encoding error_encoding =
        (req "branch_refused" (list refused_encoding))
        (req "branch_delayed" (list refused_encoding)))
 
-let operations t =
+let operations t ~handle_branch_refused =
   let ops =
     List.fold_left
       (fun acc (h, op) -> Operation_hash.Map.add h op acc)
@@ -89,10 +89,9 @@ let operations t =
       t.branch_delayed
       ops
   in
-  let ops =
+  if handle_branch_refused then
     Operation_hash.Map.fold
       (fun h (op, _err) acc -> Operation_hash.Map.add h op acc)
       t.branch_refused
       ops
-  in
-  ops
+  else ops

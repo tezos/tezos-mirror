@@ -262,7 +262,9 @@ type t = (module T)
    the node changed its current head and every classified operation
    which are still live, i.e. anchored on a [live_block] becomes
    [`Pending] again. Classified operations which are not anchored on a
-   [live_block] are simply dropped.
+   [live_block] are simply dropped. A particular case when the new
+   head is incremental (i.e. there is not reorganisation), the
+   operations classified as [`Branch_refused] are not reevaluated.
 
      Everytime an operation is classified (except for [`Outdated]),
    this operation is recorded into the [operation_stream]. Such stream
@@ -962,7 +964,8 @@ module Make
       List.iter may_fetch_operation mempool.Mempool.known_valid ;
       Operation_hash.Set.iter may_fetch_operation mempool.Mempool.pending
 
-    let on_flush w pv new_predecessor new_live_blocks new_live_operations =
+    let on_flush w ~handle_branch_refused pv new_predecessor new_live_blocks
+        new_live_operations =
       let old_predecessor = pv.shell.predecessor in
       pv.shell.predecessor <- new_predecessor ;
       pv.shell.live_blocks <- new_live_blocks ;
@@ -992,10 +995,11 @@ module Make
         (Operation_hash.Map.union
            (fun _key v _ -> Some v)
            (Preapply_result.operations
+              ~handle_branch_refused
               (Classification.validation_result pv.shell.classification))
            pv.shell.pending)
       >>= fun pending ->
-      Classification.clear pv.shell.classification ;
+      Classification.clear pv.shell.classification ~handle_branch_refused ;
       (* Could be implemented as Operation_hash.Map.filter_s which
          does not exist for the moment. *)
       Operation_hash.Map.fold_s
@@ -1047,6 +1051,7 @@ module Make
              banned. *)
           on_flush
             w
+            ~handle_branch_refused:false
             pv
             pv.shell.predecessor
             pv.shell.live_blocks
@@ -1065,7 +1070,7 @@ module Make
      fun w request ->
       let pv = Worker.state w in
       (match request with
-      | Request.Flush (hash, live_blocks, live_operations) ->
+      | Request.Flush (hash, event, live_blocks, live_operations) ->
           on_advertise pv.shell ;
           (* TODO: rebase the advertisement instead *)
           let chain_store =
@@ -1073,7 +1078,13 @@ module Make
           in
           Store.Block.read_block chain_store hash
           >>=? fun block : r tzresult Lwt.t ->
-          on_flush w pv block live_blocks live_operations
+          let handle_branch_refused =
+            Chain_validator_worker_state.Event.(
+              match event with
+              | Head_increment | Ignored_head -> false
+              | Branch_switch -> true)
+          in
+          on_flush w ~handle_branch_refused pv block live_blocks live_operations
       | Request.Notify (peer, mempool) ->
           on_notify w pv.shell peer mempool ;
           return_unit
@@ -1254,12 +1265,12 @@ let shutdown (t : t) =
     ChainProto_registry.remove Prevalidator.name !chain_proto_registry ;
   Prevalidator.Worker.shutdown w
 
-let flush (t : t) head live_blocks live_operations =
+let flush (t : t) event head live_blocks live_operations =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.Queue.push_request_and_wait
     w
-    (Request.Flush (head, live_blocks, live_operations))
+    (Request.Flush (head, event, live_blocks, live_operations))
 
 let notify_operations (t : t) peer mempool =
   let module Prevalidator : T = (val t) in
@@ -1282,6 +1293,7 @@ let pending (t : t) =
   let pv = Prevalidator.Worker.state w in
   let ops =
     Preapply_result.operations
+      ~handle_branch_refused:true
       (Classification.validation_result pv.shell.classification)
   in
   Lwt.return ops

@@ -124,11 +124,12 @@ let qcheck_eq_false ~actual =
 let test_clear_empties_all =
   let open QCheck in
   Test.make
-    ~name:"[clear] empties everything except [refused]"
+    ~name:
+      "[clear ~handle_branch_refused:true] empties everything except [refused]"
     (make Generators.t_gen)
   @@ fun t ->
   let refused_before = t.refused |> Prevalidator_classification.map in
-  Prevalidator_classification.clear t ;
+  Prevalidator_classification.clear ~handle_branch_refused:true t ;
   let refused_after = t.refused |> Prevalidator_classification.map in
   let bounded_map_is_empty bounded_map =
     bounded_map |> Prevalidator_classification.map

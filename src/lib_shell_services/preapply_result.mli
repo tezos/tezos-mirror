@@ -38,8 +38,11 @@ type 'error t = {
  *  are initialized empty *)
 val empty : 'error t
 
-(** [operations t] returns all operations in [t] except refused ones. *)
-val operations : 'error t -> Operation.t Operation_hash.Map.t
+(** [operations t ~handle_branch_refused] returns all operations in [t] except
+    refused ones. Also, {!branch_refused} operations are only included
+    if [handle_branch_refused] is [true]. *)
+val operations :
+  'error t -> handle_branch_refused:bool -> Operation.t Operation_hash.Map.t
 
 (** [encoding err_enc t], where [err_enc] is the encoding for errors,
  *  returns an encoding for [t] *)

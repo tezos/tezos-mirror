@@ -354,8 +354,8 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
       set_prevalidator (Some prevalidator) ;
       Lwt.return_unit
 
-let may_flush_or_update_prevalidator parameters prevalidator chain_db ~prev
-    ~block =
+let may_flush_or_update_prevalidator parameters event prevalidator chain_db
+    ~prev ~block =
   match !prevalidator with
   | None -> return_unit
   | Some old_prevalidator ->
@@ -376,6 +376,7 @@ let may_flush_or_update_prevalidator parameters prevalidator chain_db ~prev
         >>= fun (live_blocks, live_operations) ->
         Prevalidator.flush
           old_prevalidator
+          event
           (Store.Block.hash block)
           live_blocks
           live_operations
@@ -412,21 +413,24 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
         broadcast_head w ~previous block >>= fun () ->
         may_update_protocol_level chain_store ~prev:previous ~block
         >>=? fun () ->
-        may_flush_or_update_prevalidator
-          nv.parameters
-          nv.prevalidator
-          nv.chain_db
-          ~prev:previous
-          ~block
-        >>=? fun () ->
         (if start_testchain then
          may_switch_test_chain w active_chains spawn_child block
         else Lwt.return_unit)
         >>= fun () ->
         Lwt_watcher.notify nv.new_head_input block ;
-        if Block_hash.equal head_hash block_header.shell.predecessor then
-          return Event.Head_increment
-        else return Event.Branch_switch
+        let event =
+          if Block_hash.equal head_hash block_header.shell.predecessor then
+            Event.Head_increment
+          else Event.Branch_switch
+        in
+        may_flush_or_update_prevalidator
+          nv.parameters
+          event
+          nv.prevalidator
+          nv.chain_db
+          ~prev:previous
+          ~block
+        >|=? fun () -> event
 
 let on_notify_branch w peer_id locator =
   let (block, _) = (locator : Block_locator.t :> _ * _) in
