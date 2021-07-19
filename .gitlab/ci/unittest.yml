@@ -93,6 +93,7 @@ unit:non-proto:
     - scripts/test_wrapper.sh src/lib_rpc_http rpc_http
     - scripts/test_wrapper.sh src/lib_sapling sapling
     - scripts/test_wrapper.sh src/lib_shell shell
+    - scripts/test_wrapper.sh src/lib_shell_services/test_helpers shell_services_test_helpers
     - scripts/test_wrapper.sh src/lib_signer_backends signer_backends
     - scripts/test_wrapper.sh src/lib_signer_backends/unix signer_backends_unix
     - scripts/test_wrapper.sh src/lib_stdlib stdlib

@@ -458,12 +458,13 @@ module Consensus = struct
   let mk_rogue_tree (mtree : Tezos_shell_services.Block_services.merkle_tree)
       (seed : int list) :
       (Tezos_shell_services.Block_services.merkle_tree, string) result =
+    let merkle_tree_eq = Tezos_shell_services.Block_services.merkle_tree_eq in
     let rec gen_rec ~rand attempts_left =
       if attempts_left = 0 then Error "mk_rogue_tree: giving up"
       else
         let gen = QCheck.(gen merkle_tree_arb) in
         let generated = QCheck.Gen.generate1 ~rand gen in
-        if mtree = generated then gen_rec ~rand (attempts_left - 1)
+        if merkle_tree_eq mtree generated then gen_rec ~rand (attempts_left - 1)
         else Ok generated
     in
     let rand = Random.State.make (Array.of_list seed) in

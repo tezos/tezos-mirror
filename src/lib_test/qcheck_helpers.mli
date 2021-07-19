@@ -31,6 +31,19 @@ val qcheck_wrap :
   QCheck.Test.t list ->
   unit Alcotest.test_case list
 
+(** [qcheck_eq_tests ~eq ~arb ~eq_name] returns
+ *  three tests of [eq]: reflexivity, symmetry, and transitivity.
+ *
+ *  [eq_name] should be the name of the function defining [eq].
+ *  For example, given an equality function defined as [let mytype_eq = ...],
+ *  call [qcheck_eq_tests mytype_eq arb "mytype_eq"]. [eq_name] is
+ *  only used for logging. *)
+val qcheck_eq_tests :
+  eq:('a -> 'a -> bool) ->
+  arb:'a QCheck.arbitrary ->
+  eq_name:string ->
+  QCheck.Test.t list
+
 (** [qcheck_eq pp cmp eq a b] evaluates whether [a] and [b] are equal, and if they
     are not, raises a failure and prints an error message.
     Equality is evaluated as follows:

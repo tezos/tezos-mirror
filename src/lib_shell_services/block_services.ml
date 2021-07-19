@@ -167,6 +167,13 @@ let operation_list_quota_encoding =
 
 type raw_context = Key of Bytes.t | Dir of raw_context TzString.Map.t | Cut
 
+let rec raw_context_eq rc1 rc2 =
+  match (rc1, rc2) with
+  | (Key bytes1, Key bytes2) -> Bytes.equal bytes1 bytes2
+  | (Dir dir1, Dir dir2) -> TzString.Map.(equal raw_context_eq dir1 dir2)
+  | (Cut, Cut) -> true
+  | _ -> false
+
 let rec pp_raw_context ppf = function
   | Cut -> Format.fprintf ppf "..."
   | Key v -> Hex.pp ppf (Hex.of_bytes v)
@@ -217,6 +224,16 @@ type merkle_node =
   | Continue of merkle_tree
 
 and merkle_tree = merkle_node TzString.Map.t
+
+let rec merkle_node_eq n1 n2 =
+  match (n1, n2) with
+  | (Hash (mhk1, s1), Hash (mhk2, s2)) -> mhk1 = mhk2 && String.equal s1 s2
+  | (Data rc1, Data rc2) -> raw_context_eq rc1 rc2
+  | (Continue mtree1, Continue mtree2) -> merkle_tree_eq mtree1 mtree2
+  | _ -> false
+
+and merkle_tree_eq mtree1 mtree2 =
+  TzString.Map.equal merkle_node_eq mtree1 mtree2
 
 type merkle_leaf_kind = Hole | Raw_context
 

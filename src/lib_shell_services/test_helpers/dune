@@ -3,7 +3,8 @@
  (public_name tezos-shell-services-test-helpers)
  (libraries tezos-base
             tezos-shell-services
-            tezos-test-helpers)
+            tezos-test-helpers
+            qcheck-core)
  (flags
   (:standard -linkall
     -open Tezos_base__TzPervasives)))

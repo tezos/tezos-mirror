@@ -10,6 +10,8 @@ depends: [
   "tezos-base"
   "tezos-shell-services"
   "tezos-test-helpers"
+  "qcheck-core"
+  "qcheck-alcotest" {with-test}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
