@@ -1057,6 +1057,11 @@ opam:tezos-shell-services:
   variables:
     package: tezos-shell-services
 
+opam:tezos-shell-services-test-helpers:
+  extends: .opam_template
+  variables:
+    package: tezos-shell-services-test-helpers
+
 opam:tezos-signer:
   extends: .opam_template
   variables:

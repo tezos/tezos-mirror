@@ -35,6 +35,8 @@ module Proxy_getter = Tezos_proxy.Proxy_getter
 module Tree = Proxy_getter.Internal.Tree
 open Lib_test.Qcheck_helpers
 
+open Tezos_shell_services_test_helpers.Shell_services_test_helpers
+
 let key_arb =
   (* Using small_list, otherwise the test takes considerably longer.
      This test is quite slow already *)
@@ -50,14 +52,13 @@ let tree_arb =
         | Tezos_proxy.Proxy.Value acc' -> (mk_tree [@ocaml.tailcall]) acc' tl)
   in
   let mk_tree acc sets = Lwt_main.run @@ mk_tree acc sets in
-  QCheck.(
-    map (mk_tree Tree.empty) (list (pair key_arb Light_lib.raw_context_arb)))
+  QCheck.(map (mk_tree Tree.empty) (list (pair key_arb raw_context_arb)))
 
 (** [Tree.set_leaf] then [Tree.get] should return the inserted data *)
 let test_set_leaf_get =
   QCheck.Test.make
     ~name:"Tree.get (Tree.set_leaf t k v) k = v"
-    QCheck.(triple tree_arb key_arb Light_lib.raw_context_arb)
+    QCheck.(triple tree_arb key_arb raw_context_arb)
   @@ fun (tree, key, value) ->
   let expected =
     Lwt_main.run @@ Proxy_getter.Internal.raw_context_to_tree value

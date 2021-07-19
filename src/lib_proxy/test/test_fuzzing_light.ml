@@ -39,70 +39,13 @@ module Merkle = Internal.Merkle
 module Store = Tezos_context_memory.Context
 open Lib_test.Qcheck_helpers
 
+open Tezos_shell_services_test_helpers.Shell_services_test_helpers
+
 (** [list1_arb arb] generates non-empty lists using [arb]. *)
 let list1_arb arb =
   QCheck.(
     list_of_size Gen.(1 -- 100) arb
     |> add_shrink_invariant (fun l -> List.length l > 0))
-
-let irmin_hash_arb = QCheck.oneofl ~print:Fun.id Light_lib.irmin_hashes
-
-let merkle_node_arb =
-  let open Tezos_shell_services.Block_services in
-  let module MapArb = MakeMapArb (TzString.Map) in
-  let open QCheck in
-  let open Gen in
-  let {gen = raw_context_gen; shrink = raw_context_shrink_opt; _} =
-    Light_lib.raw_context_arb
-  in
-  let {gen = irmin_hash_gen; _} = irmin_hash_arb in
-  let gen =
-    let max_depth_factor = 4 in
-    fix
-      (fun self current_depth_factor ->
-        frequency
-          [
-            ( max_depth_factor,
-              map
-                (fun (kind, hash) -> Hash (kind, hash))
-                (pair (oneofl [Contents; Node]) irmin_hash_gen) );
-            ( max_depth_factor,
-              map (fun raw_context -> Data raw_context) raw_context_gen );
-            ( current_depth_factor,
-              map
-                (fun merkle_node_map -> Continue merkle_node_map)
-                (MapArb.gen_of_size
-                   (0 -- 10)
-                   string
-                   (self (current_depth_factor / 2))) );
-          ])
-      max_depth_factor
-  in
-  let first_irmin_hash =
-    List.hd Light_lib.irmin_hashes |> function
-    | None -> assert false
-    | Some hash -> hash
-  in
-  let rec shrink =
-    let open Iter in
-    function
-    | Hash _ -> empty
-    | Data bigger_raw_context ->
-        shrink (Hash (Contents, first_irmin_hash))
-        <+> ( of_option_shrink raw_context_shrink_opt bigger_raw_context
-            >|= fun smaller_raw_context -> Data smaller_raw_context )
-    | Continue bigger_mnode ->
-        shrink (Hash (Contents, first_irmin_hash))
-        <+> shrink (Data Cut)
-        <+> ( MapArb.shrink ~key:Shrink.string ~value:shrink bigger_mnode
-            >|= fun smaller_mnode -> Continue smaller_mnode )
-  in
-  let print = Format.asprintf "%a" pp_merkle_node in
-  make ~print ~shrink gen
-
-let merkle_tree_arb =
-  let open MakeMapArb (TzString.Map) in
-  arb_of_size QCheck.Gen.(0 -- 10) QCheck.string merkle_node_arb
 
 let irmin_tree_arb =
   let module StringList = struct
