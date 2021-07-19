@@ -370,11 +370,12 @@ let test_delegates_alpha ?endpoint client =
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_deactivated
+    RPC.Delegates.spawn_get_deactivated
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
     RPC.Delegates.spawn_get_delegated_balance
@@ -385,25 +386,28 @@ let test_delegates_alpha ?endpoint client =
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_delegated_contracts
+    RPC.Delegates.spawn_get_delegated_contracts
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_frozen_balance
+    RPC.Delegates.spawn_get_frozen_balance
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_frozen_balance_by_cycle
+    RPC.Delegates.spawn_get_frozen_balance_by_cycle
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
     RPC.Delegates.spawn_get_grace_period
@@ -414,18 +418,20 @@ let test_delegates_alpha ?endpoint client =
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_staking_balance
+    RPC.Delegates.spawn_get_staking_balance
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_voting_power
+    RPC.Delegates.spawn_get_voting_power
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   unit
 
