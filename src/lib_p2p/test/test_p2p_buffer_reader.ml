@@ -65,14 +65,17 @@ let test_mk_buffer_safe () =
      until the chosen bound, which we set here to 128. The bound should
      be small, because a buffer of the given size is allocated. *)
   let lengths = Stdlib.List.init 128 Fun.id in
-  let open P2p_buffer_reader in
   List.iter
     (fun buf_len ->
-      let safe_buffer = Bytes.create buf_len |> mk_buffer_safe in
-      let (pos, len, buf) = Internal.destruct_buffer safe_buffer in
+      let safe_buffer =
+        Bytes.create buf_len |> P2p_buffer_reader.mk_buffer_safe
+      in
+      let (pos, len, buf) =
+        P2p_buffer_reader.Internal_for_tests.destruct_buffer safe_buffer
+      in
       Lib_test.Assert.assert_true
         "Result.is_ok mk_buffer"
-        (mk_buffer ~pos ~len buf |> Result.is_ok))
+        (P2p_buffer_reader.mk_buffer ~pos ~len buf |> Result.is_ok))
     lengths
 
 let cancel_and_assert_success canceler =

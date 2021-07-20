@@ -26,9 +26,9 @@
 type error +=
   | Invalid_read_request of {
       expected : string;
-      pos : int32;
-      len : int32;
-      buflen : int32;
+      pos : int64;
+      len : int64;
+      buflen : int64;
     }
 
 let () =
@@ -41,7 +41,7 @@ let () =
     ~pp:(fun fmt (expected, pos, len, buflen) ->
       Format.fprintf
         fmt
-        "%s should hold, but pos=%ld len=%ld buflen=%ld"
+        "%s should hold, but pos=%Ld len=%Ld buflen=%Ld"
         expected
         pos
         len
@@ -49,9 +49,9 @@ let () =
     Data_encoding.(
       obj4
         (req "expected" string)
-        (req "pos" int32)
-        (req "len" int32)
-        (req "buflen" int32))
+        (req "pos" int64)
+        (req "len" int64)
+        (req "buflen" int64))
     (function
       | Invalid_read_request {expected; pos; len; buflen} ->
           Some (expected, pos, len, buflen)
@@ -87,7 +87,7 @@ let mk_buffer ?pos ?len buf : (buffer, tztrace) result =
     if cond then ok ()
     else
       error
-        Int32.(
+        Int64.(
           Invalid_read_request
             {
               expected;
@@ -154,6 +154,6 @@ let read_full ?canceler conn buffer =
   in
   loop buffer
 
-module Internal = struct
+module Internal_for_tests = struct
   let destruct_buffer {pos; len; buf} = (pos, len, buf)
 end

@@ -56,8 +56,9 @@ val read : ?canceler:Lwt_canceler.t -> readable -> buffer -> int tzresult Lwt.t
 val read_full :
   ?canceler:Lwt_canceler.t -> readable -> buffer -> unit tzresult Lwt.t
 
-(** Module for testing only, do not use in production. *)
-module Internal : sig
+(**/**)
+
+module Internal_for_tests : sig
   (** [destruct_buffer buf] returns the [pos], [len], and [buf] values
         of the given {!buffer}. See {!mk_buffer}. *)
   val destruct_buffer : buffer -> int * int * Bytes.t
