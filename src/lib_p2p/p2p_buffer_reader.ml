@@ -68,17 +68,20 @@ type readable = {
 let mk_readable ~read_buffer ~read_queue =
   {read_buffer; read_queue; partial_read = None}
 
-(** Container to write bytes to when reading [len] bytes from a connection.
+(** Container to write bytes to when reading [len] bytes from a readable.
     Bytes read are written to [buf] starting at offset [pos].
-    Values of this type guarantee that [0 <= len], [0 <= pos], and
-    [pos + len <= (Bytes.length buf)].
+    Values of this type guarantee the invariants:
+
+    - [0 <= len]
+    - [0 <= pos]
+    - [pos + len <= (Bytes.length buf)]
 
     This is ensured by the smart constructor [mk_buffer] and
-    the type's implementation not being exposed. *)
+    the type being abstract. *)
 type buffer = {len : int; pos : int; buf : Bytes.t}
 
 (** [mk_buffer ?pos ?len buf] creates an instance of {!buffer},
-    making sure its invariant holds; or fails with [Invalid_read_request]. *)
+    making sure its invariants hold; or fails with [Invalid_read_request]. *)
 let mk_buffer ?pos ?len buf : (buffer, tztrace) result =
   let buflen = Bytes.length buf in
   let pos = Option.value ~default:0 pos in
@@ -111,16 +114,16 @@ let shift amount {pos; len; buf} =
 (* Copy [len] bytes from [data] starting at [pos] into [buf].
 
    If not all [data] is read, the remainder is put back in
-   [conn.partial_read] *)
-let read_from conn {pos = offset; len; buf} data =
+   [readable.partial_read] *)
+let read_from readable {pos = offset; len; buf} data =
   match data with
   | Ok data ->
       let read_len = min len (Circular_buffer.length data) in
       Option.iter
-        (fun data -> conn.partial_read <- Some data)
+        (fun data -> readable.partial_read <- Some data)
         (Circular_buffer.read
            data
-           conn.read_buffer
+           readable.read_buffer
            ~len:read_len
            ~into:buf
            ~offset) ;
@@ -128,26 +131,26 @@ let read_from conn {pos = offset; len; buf} data =
   | Error _ -> error P2p_errors.Connection_closed
 
 (* Read available data or wait for it. *)
-let read ?canceler conn buffer =
-  match conn.partial_read with
+let read ?canceler readable buffer =
+  match readable.partial_read with
   | Some msg ->
-      conn.partial_read <- None ;
-      Lwt.return (read_from conn buffer (Ok msg))
+      readable.partial_read <- None ;
+      Lwt.return (read_from readable buffer (Ok msg))
   | None ->
       Lwt.catch
         (fun () ->
-          protect ?canceler (fun () -> Lwt_pipe.pop conn.read_queue)
-          >|= read_from conn buffer)
+          protect ?canceler (fun () -> Lwt_pipe.pop readable.read_queue)
+          >|= read_from readable buffer)
         (fun _ -> fail P2p_errors.Connection_closed)
 
 (* fill [buf] with data *)
-let read_full ?canceler conn buffer =
+let read_full ?canceler readable buffer =
   let rec loop ({len; _} as buffer) =
     if len = 0 then return_unit
     else
-      read ?canceler conn buffer >>=? fun read_len ->
+      read ?canceler readable buffer >>=? fun read_len ->
       (* This is safe - even if the initial ~len is not a multiple of the
-         connection's pending bytes - because the low-level read function
+         readable's pending bytes - because the low-level read function
          [read_from] reads *at most* the requested number of bytes:
          it doesn't try to read more than available. *)
       shift read_len buffer >>?= loop
