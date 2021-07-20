@@ -620,6 +620,31 @@ module Baking_forge = struct
       ~level:Notice
       ~msg:"liquidity baking escape vote = {value}"
       ("value", Data_encoding.bool)
+
+  let per_block_vote_file_fail =
+    declare_1
+      ~section
+      ~name:"per_block_vote_file_error"
+      ~level:Notice
+      ~msg:"Error reading the block vote file: {errors}"
+      ~pp1:pp_print_error_first
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+
+  let liquidity_baking_escape =
+    declare_0
+      ~section
+      ~name:"liquidity_baking_continue"
+      ~level:Notice
+      ~msg:"Will vote to escape Liquidity Baking"
+      ()
+
+  let liquidity_baking_continue =
+    declare_0
+      ~section
+      ~name:"liquidity_baking_escape"
+      ~level:Notice
+      ~msg:"Will vote to continue Liquidity Baking"
+      ()
 end
 
 module Endorsement = struct
