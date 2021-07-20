@@ -23,20 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A container for classified operations *)
 type 'error t = {
-  applied : (Operation_hash.t * Operation.t) list;
+  applied : (Operation_hash.t * Operation.t) list;  (** Applied operations *)
   refused : (Operation.t * 'error list) Operation_hash.Map.t;
-  (* e.g. invalid signature *)
+      (** Refused operations, for example because of an invalid signature *)
   branch_refused : (Operation.t * 'error list) Operation_hash.Map.t;
-  (* e.g. insufficient balance *)
+      (** Branch refused operations, for example because of insufficient balance *)
   branch_delayed : (Operation.t * 'error list) Operation_hash.Map.t;
-      (* e.g. timestamp in the future *)
+      (** Branch delayed operations, for example because of a timestamp in the future *)
 }
 
+(** [empty t] returns an empty instance of {!t}: all collections
+ *  are initialized empty *)
 val empty : 'error t
 
+(** [map f t] maps [f] over the members of [t] (except [applied]),
+ *  returning a fresh value of type {!t}. *)
 val map : (Operation.t * 'a list -> Operation.t * 'b list) -> 'a t -> 'b t
 
+(** [operations t] returns all operations in [t] except refused ones. *)
 val operations : 'error t -> Operation.t Operation_hash.Map.t
 
+(** [encoding err_enc t], where [err_enc] is the encoding for errors,
+ *  returns an encoding for [t] *)
 val encoding : 'error list Data_encoding.t -> 'error t Data_encoding.t
