@@ -178,6 +178,10 @@ end
     of measurement named [measurement]. Only the [limit] most recent data points
     are considered in the statistics.
 
+    [tags] is a list of [(tag, value)] pairs.
+    If [tags] is specified, only data points that are tagged
+    with [tag] equal to [value] for all [tags] are returned.
+
     This returns [None] if:
     - InfluxDB is not configured;
     - the data points cannot be retrieved (in which case an alert is also emitted);
@@ -192,6 +196,7 @@ end
 val get_previous_stats :
   ?limit:int ->
   ?minimum_count:int ->
+  ?tags:(InfluxDB.tag * string) list ->
   InfluxDB.measurement ->
   InfluxDB.field ->
   'a Stats.t ->
@@ -203,9 +208,16 @@ val get_previous_stats :
     Those data points will be sent at the end of the current test.
     The order of the resulting list is unspecified.
 
+    [tags] is a list of [(tag, value)] pairs.
+    If [tags] is specified, only data points that are tagged
+    with [tag] equal to [value] for all [tags] are returned.
+
     @raise [Invalid_arg] if no test is currently running, or if it was not registered
     with [Long_test.register] or [Long_test.register_with_protocol]. *)
-val get_pending_data_points : InfluxDB.measurement -> InfluxDB.data_point list
+val get_pending_data_points :
+  ?tags:(InfluxDB.tag * string) list ->
+  InfluxDB.measurement ->
+  InfluxDB.data_point list
 
 (** {2 Regression Testing} *)
 
@@ -223,7 +235,13 @@ type check = Mean | Median
     The set of current data points is [data_points], which defaults to the
     current pending data points. Only data points for [measurement] are used,
     and only if they have a field [field] with a float value.
-    If this set is empty, the function returns immediately without doing anything.
+
+    [tags] is a list of [(tag, value)] pairs.
+    If [tags] is specified, only data points that are tagged
+    with [tag] equal to [value] for all [tags] are used.
+
+    If the set of data points to use is empty, the function
+    returns immediately without doing anything.
 
     The set of previous data points is obtained by querying InfluxDB.
     If InfluxDB is not configured, or if less than [minimum_previous_count]
@@ -254,6 +272,7 @@ val check_regression :
   ?check:check ->
   ?stddev:bool ->
   ?data_points:InfluxDB.data_point list ->
+  ?tags:(InfluxDB.tag * string) list ->
   InfluxDB.measurement ->
   InfluxDB.field ->
   unit Lwt.t

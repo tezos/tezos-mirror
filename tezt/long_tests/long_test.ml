@@ -453,9 +453,23 @@ module Stats = struct
     |> String.concat ", "
 end
 
-let get_previous_stats ?limit ?(minimum_count = 3) measurement field stats =
+let get_previous_stats ?limit ?(minimum_count = 3) ?(tags = []) measurement
+    field stats =
   let stats = Stats.(_2 count) stats in
   let select =
+    let where =
+      match tags with
+      | [] -> None
+      | head :: tail ->
+          let where_tag (tag, value) = InfluxDB.Tag (tag, EQ, value) in
+          let where =
+            List.fold_left
+              (fun acc tag -> InfluxDB.And (acc, where_tag tag))
+              (where_tag head)
+              tail
+          in
+          Some where
+    in
     InfluxDB.(
       select
         (List.map
@@ -465,6 +479,7 @@ let get_previous_stats ?limit ?(minimum_count = 3) measurement field stats =
           (Select
              (select
                 [Field field]
+                ?where
                 ~from:(Measurement measurement)
                 ~order_by:Time_desc
                 ?limit))
@@ -483,7 +498,16 @@ let get_previous_stats ?limit ?(minimum_count = 3) measurement field stats =
   in
   return (Option.join result)
 
-let get_pending_data_points measurement =
+let has_tags (tags : (InfluxDB.tag * string) list)
+    (data_point : InfluxDB.data_point) =
+  let has_tag (tag, expected_value) =
+    match List.assoc_opt tag data_point.tags with
+    | None -> false
+    | Some value -> String.equal value expected_value
+  in
+  List.for_all has_tag tags
+
+let get_pending_data_points ?(tags = []) measurement =
   match !current_test with
   | None ->
       invalid_arg
@@ -493,6 +517,7 @@ let get_pending_data_points measurement =
       test.data_points
       |> String_map.find_opt measurement
       |> Option.value ~default:[]
+      |> List.filter (has_tags tags)
 
 type check = Mean | Median
 
@@ -517,16 +542,16 @@ let median list =
   else invalid_arg "Long_test.median: empty list"
 
 let check_regression ?(previous_count = 10) ?(minimum_previous_count = 3)
-    ?(margin = 0.2) ?(check = Mean) ?(stddev = false) ?data_points measurement
-    field =
+    ?(margin = 0.2) ?(check = Mean) ?(stddev = false) ?data_points ?(tags = [])
+    measurement field =
   if !current_test = None then
     invalid_arg
       "Long_test.check_regression: not running a test registered with Long_test" ;
   let current_values =
     let data_points =
       match data_points with
-      | Some list -> list
-      | None -> get_pending_data_points measurement
+      | Some list -> List.filter (has_tags tags) list
+      | None -> get_pending_data_points ~tags measurement
     in
     let get_field (data_point : InfluxDB.data_point) =
       match
@@ -550,6 +575,7 @@ let check_regression ?(previous_count = 10) ?(minimum_previous_count = 3)
           get_previous_stats
             ~limit:previous_count
             ~minimum_count:minimum_previous_count
+            ~tags
             measurement
             field
             stats
