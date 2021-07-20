@@ -1357,50 +1357,32 @@ let check_file_exists file =
   else error (Block_vote_file_not_found file)
 
 let read_liquidity_baking_escape_vote ~per_block_vote_file =
-  lwt_log_notice
-    Tag.DSL.(
-      fun f ->
-        f "Reading per block vote file path: %s" -% s event per_block_vote_file)
-  >>= fun () ->
+  Events.(emit reading_per_block) per_block_vote_file >>= fun () ->
   check_file_exists per_block_vote_file >>?= fun () ->
   trace (Block_vote_file_invalid per_block_vote_file)
   @@ Lwt_utils_unix.Json.read_file per_block_vote_file
   >>=? fun votes_json ->
-  lwt_log_notice (fun f -> f "Per block vote file found.") >>= fun () ->
+  Events.(emit per_block_vote_file_notice) "found" >>= fun () ->
   trace (Block_vote_file_wrong_content per_block_vote_file)
   @@ Error_monad.protect (fun () ->
          return
          @@ Data_encoding.Json.destruct per_block_votes_encoding votes_json)
   >>=? fun votes ->
-  lwt_log_notice (fun f -> f "Per block vote file JSON decoded.") >>= fun () ->
+  Events.(emit per_block_vote_file_notice) "JSON decoded" >>= fun () ->
   traced_option_to_result
     ~error:
       (Block_vote_file_missing_liquidity_baking_escape_vote per_block_vote_file)
     votes.liquidity_baking_escape_vote
   >>?= fun liquidity_baking_escape_vote ->
-  let liquidity_baking_escape_vote_str =
-    string_of_bool liquidity_baking_escape_vote
-  in
-  lwt_log_notice (fun f -> f "Reading liquidity baking escape vote.")
-  >>= fun () ->
-  lwt_log_notice
-    Tag.DSL.(
-      fun f ->
-        f "Liquidity baking escape vote = %s"
-        -% s event liquidity_baking_escape_vote_str)
+  Events.(emit reading_liquidity_baking) () >>= fun () ->
+  Events.(emit liquidity_baking_escape_vote) liquidity_baking_escape_vote
   >>= fun () -> return liquidity_baking_escape_vote
 
 let read_liquidity_baking_escape_vote_no_fail ~per_block_vote_file =
   read_liquidity_baking_escape_vote ~per_block_vote_file >>= function
   | Ok vote -> Lwt.return vote
   | Error errs ->
-      lwt_log_error
-        Tag.DSL.(
-          fun f ->
-            f "Error reading the block vote file: %a"
-            -% t event "read_block_vote_file"
-            -% a errs_tag errs)
-      >>= fun () -> Lwt.return false
+      Events.(emit per_block_vote_file_fail) errs >>= fun () -> Lwt.return false
 
 (** [bake cctxt state] create a single block when woken up to do
     so. All the necessary information is available in the
@@ -1656,11 +1638,9 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ~some:(fun per_block_vote_file ->
       read_liquidity_baking_escape_vote ~per_block_vote_file
       >>=? fun liquidity_baking_escape_vote ->
-      lwt_log_notice (fun f ->
-          f
-            (if liquidity_baking_escape_vote then
-             "Will vote to escape Liquidity Baking"
-            else "Will vote to continue Liquidity Baking"))
+      (if liquidity_baking_escape_vote then
+       Events.(emit liquidity_baking_escape) ()
+      else Events.(emit liquidity_baking_continue) ())
       >>= fun () -> return_unit)
     per_block_vote_file
   >>=? fun () ->
