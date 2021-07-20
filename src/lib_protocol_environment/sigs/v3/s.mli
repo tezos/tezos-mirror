@@ -133,16 +133,6 @@ end
 module type INDEXES = sig
   type t
 
-  val to_path : t -> string list -> string list
-
-  val of_path : string list -> t option
-
-  val of_path_exn : string list -> t
-
-  val prefix_path : string -> string list
-
-  val path_length : int
-
   module Set : INDEXES_SET with type elt = t
 
   module Map : INDEXES_MAP with type key = t
