@@ -178,41 +178,18 @@ let rpc_arg =
 module Index = struct
   type t = contract
 
-  let path_length = 7
+  let path_length = 1
 
   let to_path c l =
     let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
     let (`Hex key) = Hex.of_bytes raw_key in
-    let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
-    String.sub index_key 0 2
-    ::
-    String.sub index_key 2 2
-    ::
-    String.sub index_key 4 2
-    ::
-    String.sub index_key 6 2
-    :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: key :: l
+    key :: l
 
   let of_path = function
-    | []
-    | [_]
-    | [_; _]
-    | [_; _; _]
-    | [_; _; _; _]
-    | [_; _; _; _; _]
-    | [_; _; _; _; _; _]
-    | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ ->
-        None
-    | [index1; index2; index3; index4; index5; index6; key] ->
+    | [key] ->
         let raw_key = Hex.to_bytes (`Hex key) in
-        let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
-        assert (Compare.String.(String.sub index_key 0 2 = index1)) ;
-        assert (Compare.String.(String.sub index_key 2 2 = index2)) ;
-        assert (Compare.String.(String.sub index_key 4 2 = index3)) ;
-        assert (Compare.String.(String.sub index_key 6 2 = index4)) ;
-        assert (Compare.String.(String.sub index_key 8 2 = index5)) ;
-        assert (Compare.String.(String.sub index_key 10 2 = index6)) ;
         Data_encoding.Binary.of_bytes_opt encoding raw_key
+    | _ -> None
 
   let rpc_arg = rpc_arg
 

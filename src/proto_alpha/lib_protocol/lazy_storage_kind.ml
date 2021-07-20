@@ -57,15 +57,11 @@ module type ID = sig
 
   val is_temp : t -> bool
 
-  val path_length : int
-
-  val to_path : t -> string list -> string list
-
-  val of_path : string list -> t option
-
   val of_legacy_USE_ONLY_IN_Legacy_big_map_diff : Z.t -> t
 
   val to_legacy_USE_ONLY_IN_Legacy_big_map_diff : t -> Z.t
+
+  include Path_encoding.S with type t := t
 end
 
 module type Title = sig

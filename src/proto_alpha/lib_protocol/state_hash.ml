@@ -25,7 +25,7 @@
 
 let random_state_hash = "\076\064\204" (* rng(53): never used... *)
 
-include
+module H =
   Blake2B.Make
     (Base58)
     (struct
@@ -37,5 +37,8 @@ include
 
       let size = None
     end)
+
+include H
+include Path_encoding.Make_hex (H)
 
 let () = Base58.check_encoded_prefix b58check_encoding "rng" 53

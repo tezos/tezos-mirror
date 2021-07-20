@@ -345,62 +345,7 @@ module Big_map = struct
     let init ctxt = Storage.init ctxt Lazy_storage_kind.Big_map.Id.init
   end
 
-  module Index :
-    Storage_description.INDEX with type t = Lazy_storage_kind.Big_map.Id.t =
-  struct
-    (* After flat storage, just use module Index = Lazy_storage_kind.Big_map.Id *)
-
-    module Id = Lazy_storage_kind.Big_map.Id
-
-    type t = Id.t
-
-    let path_length = 6 + Id.path_length
-
-    let to_path c l =
-      let raw_key = Data_encoding.Binary.to_bytes_exn Id.encoding c in
-      let (`Hex index_key) = Hex.of_bytes (Raw_hashes.blake2b raw_key) in
-      String.sub index_key 0 2
-      ::
-      String.sub index_key 2 2
-      ::
-      String.sub index_key 4 2
-      ::
-      String.sub index_key 6 2
-      :: String.sub index_key 8 2 :: String.sub index_key 10 2 :: Id.to_path c l
-
-    let of_path = function
-      | []
-      | [_]
-      | [_; _]
-      | [_; _; _]
-      | [_; _; _; _]
-      | [_; _; _; _; _]
-      | [_; _; _; _; _; _]
-      | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ ->
-          None
-      | index1 :: index2 :: index3 :: index4 :: index5 :: index6 :: tail ->
-          Id.of_path tail
-          |> Option.map (fun c ->
-                 let raw_key =
-                   Data_encoding.Binary.to_bytes_exn Id.encoding c
-                 in
-                 let (`Hex index_key) =
-                   Hex.of_bytes (Raw_hashes.blake2b raw_key)
-                 in
-                 assert (Compare.String.(String.sub index_key 0 2 = index1)) ;
-                 assert (Compare.String.(String.sub index_key 2 2 = index2)) ;
-                 assert (Compare.String.(String.sub index_key 4 2 = index3)) ;
-                 assert (Compare.String.(String.sub index_key 6 2 = index4)) ;
-                 assert (Compare.String.(String.sub index_key 8 2 = index5)) ;
-                 assert (Compare.String.(String.sub index_key 10 2 = index6)) ;
-                 c)
-
-    let rpc_arg = Id.rpc_arg
-
-    let encoding = Id.encoding
-
-    let compare = Id.compare
-  end
+  module Index = Lazy_storage_kind.Big_map.Id
 
   module Indexed_context =
     Make_indexed_subcontext
@@ -824,13 +769,65 @@ module Sapling = struct
       (Raw_level_repr)
 end
 
+module Public_key_hash = struct
+  open Signature
+  include Signature.Public_key_hash
+  module Path_Ed25519 = Path_encoding.Make_hex (Ed25519.Public_key_hash)
+  module Path_Secp256k1 = Path_encoding.Make_hex (Secp256k1.Public_key_hash)
+  module Path_P256 = Path_encoding.Make_hex (P256.Public_key_hash)
+
+  let to_path (key : public_key_hash) l =
+    match key with
+    | Ed25519 h -> (
+        match Path_Ed25519.to_path h l with
+        | [s] -> ["ed25519"; s]
+        | _ -> assert false)
+    | Secp256k1 h -> (
+        match Path_Secp256k1.to_path h l with
+        | [s] -> ["secp256k1"; s]
+        | _ -> assert false)
+    | P256 h -> (
+        match Path_P256.to_path h l with
+        | [s] -> ["p256"; s]
+        | _ -> assert false)
+
+  let of_path : _ -> public_key_hash option = function
+    | "ed25519" :: rest -> (
+        match Path_Ed25519.of_path rest with
+        | Some pkh -> Some (Ed25519 pkh)
+        | None -> None)
+    | "secp256k1" :: rest -> (
+        match Path_Secp256k1.of_path rest with
+        | Some pkh -> Some (Secp256k1 pkh)
+        | None -> None)
+    | "p256" :: rest -> (
+        match Path_P256.of_path rest with
+        | Some pkh -> Some (P256 pkh)
+        | None -> None)
+    | _ -> None
+
+  let path_length =
+    let l1 = Path_Ed25519.path_length
+    and l2 = Path_Secp256k1.path_length
+    and l3 = Path_P256.path_length in
+    assert (match (l1, l2, l3) with (1, 1, 1) -> true | _ -> false) ;
+    2
+end
+
+module Public_key_hash_index = Make_index (Public_key_hash)
+
+module Protocol_hash = struct
+  include Protocol_hash
+  include Path_encoding.Make_hex (Protocol_hash)
+end
+
 module Delegates =
   Make_data_set_storage
     (Make_subcontext (Registered) (Raw_context)
        (struct
          let name = ["delegates"]
        end))
-       (Make_index (Signature.Public_key_hash))
+       (Public_key_hash_index)
 
 module Active_delegates_with_rolls =
   Make_data_set_storage
@@ -838,7 +835,7 @@ module Active_delegates_with_rolls =
        (struct
          let name = ["active_delegates_with_rolls"]
        end))
-       (Make_index (Signature.Public_key_hash))
+       (Public_key_hash_index)
 
 module Delegates_with_frozen_balance_index =
   Make_indexed_subcontext
@@ -851,7 +848,7 @@ module Delegates_with_frozen_balance_index =
 module Delegates_with_frozen_balance =
   Make_data_set_storage
     (Delegates_with_frozen_balance_index.Raw_context)
-    (Make_index (Signature.Public_key_hash))
+    (Public_key_hash_index)
 
 (** Rolls *)
 
@@ -1111,8 +1108,8 @@ module Vote = struct
          (struct
            let name = ["listings"]
          end))
-         (Make_index (Signature.Public_key_hash))
-         (Encoding.Int32)
+         (Public_key_hash_index)
+      (Encoding.Int32)
 
   module Proposals =
     Make_data_set_storage
@@ -1120,10 +1117,7 @@ module Vote = struct
          (struct
            let name = ["proposals"]
          end))
-         (Pair
-            (Make_index
-               (Protocol_hash))
-               (Make_index (Signature.Public_key_hash)))
+         (Pair (Make_index (Protocol_hash)) (Public_key_hash_index))
 
   module Proposals_count =
     Make_indexed_data_storage
@@ -1131,8 +1125,8 @@ module Vote = struct
          (struct
            let name = ["proposals_count"]
          end))
-         (Make_index (Signature.Public_key_hash))
-         (Encoding.UInt16)
+         (Public_key_hash_index)
+      (Encoding.UInt16)
 
   module Ballots =
     Make_indexed_data_storage
@@ -1140,12 +1134,12 @@ module Vote = struct
          (struct
            let name = ["ballots"]
          end))
-         (Make_index (Signature.Public_key_hash))
-         (struct
-           type t = Vote_repr.ballot
+         (Public_key_hash_index)
+      (struct
+        type t = Vote_repr.ballot
 
-           let encoding = Vote_repr.ballot_encoding
-         end)
+        let encoding = Vote_repr.ballot_encoding
+      end)
 end
 
 module type FOR_CYCLE = sig

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 DaiLambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,23 +24,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* 32 *)
-let nonce_hash = "\069\220\169" (* nce(53) *)
+module type S = sig
+  type t
 
-module H =
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "cycle_nonce"
+  val to_path : t -> string list -> string list
 
-      let title = "A nonce hash"
+  val of_path : string list -> t option
 
-      let b58check_prefix = nonce_hash
+  val path_length : int
+end
 
-      let size = None
-    end)
+module Make_hex (H : sig
+  type t
 
-include H
-include Path_encoding.Make_hex (H)
+  val to_bytes : t -> bytes
 
-let () = Base58.check_encoded_prefix b58check_encoding "nce" 53
+  val of_bytes_opt : bytes -> t option
+end) =
+struct
+  let path_length = 1
+
+  let to_path t l =
+    let (`Hex key) = Hex.of_bytes (H.to_bytes t) in
+    key :: l
+
+  let of_path = function
+    | [path] ->
+        (* XXX? fails if path is not hex? *)
+        H.of_bytes_opt (Hex.to_bytes (`Hex path))
+    | _ -> None
+end

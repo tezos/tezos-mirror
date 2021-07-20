@@ -26,7 +26,7 @@
 (* 20 *)
 let contract_hash = "\002\090\121" (* KT1(36) *)
 
-include
+module H =
   Blake2B.Make
     (Base58)
     (struct
@@ -38,5 +38,8 @@ include
 
       let size = Some 20
     end)
+
+include H
+include Path_encoding.Make_hex (H)
 
 let () = Base58.check_encoded_prefix b58check_encoding "KT1" 36
