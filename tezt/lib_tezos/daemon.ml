@@ -206,9 +206,6 @@ module Make (X : PARAMETERS) = struct
                   let acc =
                     match filter json with
                     | exception exn ->
-                        (* We cannot have [async] promises raise exceptions other than
-                           [Test.Failed], and events are handled with [async] so we
-                           need to convert the exception. *)
                         Test.fail
                           "uncaught exception in filter for event %s of daemon \
                            %s: %s"
