@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Invalid_sandbox_file of string
-
 val cmd : unit Cmdliner.Term.t * Cmdliner.Term.info
 
 module Manpage : sig

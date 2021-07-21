@@ -570,23 +570,24 @@ let import_blocks legacy_chain_state chain_id chain_store cycle_length
   >>=? fun (new_checkpoint, new_savepoint, new_caboose) ->
   return (new_checkpoint, new_savepoint, new_caboose)
 
+let store_known_protocols legacy_store store =
+  Legacy_store.Protocol.Contents.bindings legacy_store >>= fun proto_list ->
+  List.iter_es
+    (fun (h, p) ->
+      Store.Protocol.store store h p >>= function
+      | Some expected_hash ->
+          fail_unless
+            (Protocol_hash.equal expected_hash h)
+            (Failed_to_convert_protocol h)
+      | None -> fail (Failed_to_convert_protocol h) >>=? fun () -> return_unit)
+    proto_list
+
 let import_protocols history_mode legacy_store legacy_chain_state store
     _chain_store chain_id =
   let legacy_chain_store = Legacy_store.Chain.get legacy_store chain_id in
   let legacy_chain_data = Legacy_store.Chain_data.get legacy_chain_store in
   match (history_mode : History_mode.t) with
-  | Archive | Full _ ->
-      Legacy_store.Protocol.Contents.bindings legacy_store >>= fun proto_list ->
-      List.iter_es
-        (fun (h, p) ->
-          Store.Protocol.store store h p >>= function
-          | Some expected_hash ->
-              fail_unless
-                (Protocol_hash.equal expected_hash h)
-                (Failed_to_convert_protocol h)
-          | None ->
-              fail (Failed_to_convert_protocol h) >>=? fun () -> return_unit)
-        proto_list
+  | Archive | Full _ -> store_known_protocols legacy_store store
   | Rolling _ ->
       Legacy_store.Chain_data.Current_head.read legacy_chain_data
       >>=? fun current_head_hash ->
@@ -669,30 +670,31 @@ let update_stored_data legacy_chain_store legacy_store new_store ~new_checkpoint
   Store.Unsafe.set_cementing_highwatermark chain_store cementing_highwatermark
   >>=? fun () -> Store.Unsafe.set_caboose chain_store new_caboose
 
+(* Returns the infered checkpoint of the chain or None if the current
+   head is set to genesis. *)
 let infer_checkpoint legacy_chain_state chain_id =
   (* When upgrading from a full or rolling node, the checkpoint may
      not be set on a "protocol defined checkpoint". We substitute it
      by using, as a checkpoint, the highest block between the
-     savepoint and the last allowed fork level of the current head. *)
+     savepoint and the last allowed fork level of the current
+     head. *)
   Legacy_state.Chain.store legacy_chain_state >>= fun legacy_store ->
   let legacy_chain_store = Legacy_store.Chain.get legacy_store chain_id in
   let legacy_chain_data = Legacy_store.Chain_data.get legacy_chain_store in
   Legacy_store.Chain_data.Current_head.read legacy_chain_data
   >>=? fun head_hash ->
   Legacy_state.Block.read legacy_chain_state head_hash >>=? fun head_contents ->
-  fail_when
-    (head_contents.header.shell.level = 0l)
-    (Failed_to_upgrade "Nothing to do")
-  >>=? fun () ->
-  Legacy_state.Block.last_allowed_fork_level head_contents >>=? fun lafl ->
-  Legacy_store.Chain_data.Save_point.read legacy_chain_data
-  >>=? fun (savepoint_level, savepoint_hash) ->
-  Legacy_state.Block.read legacy_chain_state savepoint_hash
-  >>=? fun savepoint ->
-  if Compare.Int32.(lafl > savepoint_level) then
-    read_i legacy_chain_state head_hash lafl >>=? fun lafl_header ->
-    return (lafl_header, lafl)
-  else return (Legacy_state.Block.header savepoint, savepoint_level)
+  if head_contents.header.shell.level = 0l then return_none
+  else
+    Legacy_state.Block.last_allowed_fork_level head_contents >>=? fun lafl ->
+    Legacy_store.Chain_data.Save_point.read legacy_chain_data
+    >>=? fun (savepoint_level, savepoint_hash) ->
+    Legacy_state.Block.read legacy_chain_state savepoint_hash
+    >>=? fun savepoint ->
+    if Compare.Int32.(lafl > savepoint_level) then
+      read_i legacy_chain_state head_hash lafl >>=? fun lafl_header ->
+      return_some (lafl_header, lafl)
+    else return_some (Legacy_state.Block.header savepoint, savepoint_level)
 
 let upgrade_cleaner data_dir ~upgraded_store =
   Event.(emit restoring_after_failure) data_dir >>= fun () ->
@@ -704,7 +706,13 @@ let raw_upgrade chain_name ~new_store ~legacy_state history_mode genesis =
   Legacy_state.Chain.store legacy_chain_state >>= fun legacy_store ->
   let legacy_chain_store = Legacy_store.Chain.get legacy_store chain_id in
   let cycle_length = Hardcoded.cycle_length ~chain_name in
-  infer_checkpoint legacy_chain_state chain_id >>=? fun checkpoint ->
+  (infer_checkpoint legacy_chain_state chain_id >>=? function
+   | None ->
+       Legacy_state.Block.read legacy_chain_state genesis.block
+       >>=? fun genesis_block ->
+       return (genesis_block.header, genesis_block.header.shell.level)
+   | Some checkpoint -> return checkpoint)
+  >>=? fun checkpoint ->
   let new_chain_store = Store.main_chain_store new_store in
   import_protocols
     history_mode

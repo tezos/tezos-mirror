@@ -10,6 +10,7 @@
             tezos-context
             tezos-legacy-store
             tezos-validation
+            tezos-protocol-updater
             lwt-watcher
             ringo-lwt
             camlzip
@@ -21,5 +22,6 @@
                    -open Tezos_context
                    -open Tezos_legacy_store
                    -open Tezos_validation
+                   -open Tezos_protocol_updater
                    -open Tezos_stdlib_unix
                    -open Tezos_stdlib)))
