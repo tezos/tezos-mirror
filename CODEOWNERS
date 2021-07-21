@@ -15,15 +15,20 @@
 # Insert code owner declarations here!
 # ************************************
 
+/src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
 /src/bin_proxy_server        @Sir4ur0n @smelc
 
+/src/lib_base                @raphael-proust
 /src/lib_context             @smelc
+/src/lib_error_monad         @raphael-proust
 /src/lib_mockup              @Sir4ur0n @smelc
 /src/lib_mockup_proxy        @Sir4ur0n @smelc
+/src/lib_protocol_environment @raphael-proust
 /src/lib_proxy               @Sir4ur0n @smelc
 /src/lib_proxy_server_config @Sir4ur0n @smelc
-/src/lib_rpc*                @smelc
+/src/lib_rpc*                @smelc @raphael-proust
+/src/lib_stdlib*             @raphael-proust
 /src/lib_test                @Sir4ur0n
 /src/lib_version             @romain.nl
 /src/lib_event_logging       @romain.nl
@@ -36,7 +41,7 @@
 
 /tezt                        @romain.nl @Sir4ur0n @smelc
 
-/.gitlab                     @romain.nl
+/.gitlab                     @romain.nl @raphael-proust
 
 # Merge Team
 #
