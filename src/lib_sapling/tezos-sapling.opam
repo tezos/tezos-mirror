@@ -13,6 +13,7 @@ depends: [
   "hex"
   "ctypes"
   "ctypes-foreign"
+  "integers"
   "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-crypto"
   "tezos-stdlib"
