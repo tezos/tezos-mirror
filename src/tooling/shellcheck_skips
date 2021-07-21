@@ -4,7 +4,6 @@ docs/introduction/install-bin-ubuntu.sh
 docs/introduction/install-opam-scratch.sh
 docs/introduction/install-opam.sh
 docs/introduction/use-docker-florencenet.sh
-packaging/build/build-libusb-and-hidapi.sh
 scripts/baker-version-stats.sh
 scripts/check_opam_test.sh
 scripts/ci/create_docker_image.build.sh
