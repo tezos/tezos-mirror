@@ -135,12 +135,13 @@ $(PROTO_TARGETS): %.test_proto:
 .PHONY: test-proto-unit
 test-proto-unit: $(PROTO_TARGETS)
 
-NONPROTO_LIBS := $(shell find src/ vendors/ -path src/proto_\* -prune -o -name test -type d -print | LC_COLLATE=C sort)
+# We do not run vendor tests because they are a no-op from dune
+NONPROTO_LIBS := $(shell find src/ -path src/proto_\* -prune -o -name test -type d -print | LC_COLLATE=C sort)
 NONPROTO_LIBS_NAMES := $(patsubst %/test,%,$(NONPROTO_LIBS))
 NONPROTO_TARGETS := $(addsuffix .test_nonproto,${NONPROTO_LIBS_NAMES})
 
 $(NONPROTO_TARGETS): %.test_nonproto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst vendors/%,%,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*))))
+	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*)))
 
 .PHONY: test-nonproto-unit
 test-nonproto-unit: $(NONPROTO_TARGETS)
