@@ -84,15 +84,26 @@ let check_node_synchronization_state =
         unit)
       nodes
   in
-  Log.info "Restarting the nodes..." ;
-  let* _ =
-    Lwt_list.iter_p (fun node -> Node.restart node []) (main_node :: nodes)
-  in
-  Log.info "Waiting for nodes to be synchronized." ;
+  Log.info "Terminating the nodes..." ;
   let* () =
+    Lwt_list.iter_p (fun node -> Node.terminate node) (main_node :: nodes)
+  in
+  (* We register the event before the node is restarted. Otherwise,
+     the test may be flaky since the event could be registered after
+     the event happend. *)
+  let event =
     Lwt_list.iter_p (fun node -> wait_for_sync node) (main_node :: nodes)
   in
-  unit
+  Log.info "Restarting the nodes..." ;
+  let* () =
+    Lwt_list.iter_p
+      (fun node ->
+        let* () = Node.run node [] in
+        Node.wait_for_ready node)
+      (main_node :: nodes)
+  in
+  Log.info "Waiting for nodes to be synchronized..." ;
+  event
 
 (* In order to check that the prevalidator is not alive, we cannot
    rely on events because it's indecidable, thus we query a RPC that
