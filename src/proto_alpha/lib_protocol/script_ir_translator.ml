@@ -754,17 +754,97 @@ let rec check_dupable_ty :
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
-let record_inconsistent ctxt ta tb =
-  record_trace_eval (fun () ->
-      serialize_ty_for_error ctxt ta >>? fun (ta, ctxt) ->
-      serialize_ty_for_error ctxt tb >|? fun (tb, _ctxt) ->
-      Inconsistent_types (ta, tb))
-
 let record_inconsistent_type_annotations ctxt loc ta tb =
   record_trace_eval (fun () ->
       serialize_ty_for_error ctxt ta >>? fun (ta, ctxt) ->
       serialize_ty_for_error ctxt tb >|? fun (tb, _ctxt) ->
       Inconsistent_type_annotations (loc, ta, tb))
+
+module type GAS_MONAD = sig
+  (* This monad combines:
+     - a state monad where the state is the context
+     - two levels of error monad to distinguish gas exhaustion from other errors
+
+     It is useful for backtracking on type checking errors without backtracking
+     the consumed gas.
+  *)
+  type 'a t
+
+  (* Alias of ['a t] to avoid confusion when the module is open *)
+  type 'a gas_monad = 'a t
+
+  (* monadic return operator of the gas monad *)
+  val return : 'a -> 'a t
+
+  (* Binding operator for the gas monad *)
+  val ( >>$ ) : 'a t -> ('a -> 'b t) -> 'b t
+
+  (* Mapping operator for the gas monad, [m >|$ f] is equivalent to
+     [m >>$ fun x -> return (f x)] *)
+  val ( >|$ ) : 'a t -> ('a -> 'b) -> 'b t
+
+  (* Variant of [( >>$ )] to bind uncarbonated functions *)
+  val ( >?$ ) : 'a t -> ('a -> 'b tzresult) -> 'b t
+
+  (* Another variant of [( >>$ )] that lets recover from inner errors *)
+  val ( >??$ ) : 'a t -> ('a tzresult -> 'b t) -> 'b t
+
+  (* gas-free embedding of tzresult values. [from_tzresult x] is equivalent to [return () >?$ fun () -> x] *)
+  val from_tzresult : 'a tzresult -> 'a t
+
+  (* Open the abstraction barrier to construct an 'a t from a function.
+     This must only be used on functions that can only fail because of gas
+     such as unparse_ty *)
+  val unsafe_embed : (context -> ('a * context) tzresult) -> 'a t
+
+  (* Gas consumption *)
+  val gas_consume : Gas.cost -> unit t
+
+  (* Escaping the gas monad *)
+  val run : context -> 'a t -> ('a tzresult * context) tzresult
+
+  (* re-export of [Error_monad.record_trace_eval] *)
+  val record_trace_eval : (unit -> error tzresult) -> 'a t -> 'a t
+
+  (* read the state of the state monad *)
+  val get_context : context t
+end
+
+module Gas_monad : GAS_MONAD = struct
+  (* The outer tzresult is for gas exhaustion only. The inner one is for all
+     other (non-gas) errors. *)
+  type 'a t = context -> ('a tzresult * context) tzresult
+
+  type 'a gas_monad = 'a t
+
+  let from_tzresult x ctxt = ok (x, ctxt)
+
+  let return x = from_tzresult (ok x)
+
+  let ( >>$ ) m f ctxt =
+    m ctxt >>? fun (x, ctxt) ->
+    match x with Ok y -> f y ctxt | Error _ as err -> from_tzresult err ctxt
+
+  let ( >|$ ) m f ctxt =
+    m ctxt >>? fun (x, ctxt) -> from_tzresult (x >|? f) ctxt
+
+  let ( >?$ ) m f = m >>$ fun x -> from_tzresult (f x)
+
+  let ( >??$ ) m f ctxt = m ctxt >>? fun (x, ctxt) -> f x ctxt
+
+  let unsafe_embed f ctxt = f ctxt >>? fun (x, ctxt) -> return x ctxt
+
+  let gas_consume cost ctxt = Gas.consume ctxt cost >>? return ()
+
+  let run ctxt x = x ctxt
+
+  let get_context ctxt = return ctxt ctxt
+
+  let record_trace_eval f x ctxt = record_trace_eval f (x ctxt)
+end
+
+let serialize_ty_for_error_carbonated t =
+  Gas_monad.unsafe_embed (fun ctxt -> serialize_ty_for_error ctxt t)
 
 (* Takes two compable types and simultaneously merge their annotations and
    check that they represent the same type.
@@ -784,94 +864,84 @@ let record_inconsistent_type_annotations ctxt loc ta tb =
 let rec merge_comparable_types :
     type ta tb.
     legacy:bool ->
-    context ->
     ta comparable_ty ->
     tb comparable_ty ->
-    (((ta comparable_ty, tb comparable_ty) eq * ta comparable_ty) tzresult
-    * context)
-    tzresult =
- fun ~legacy ctxt ta tb ->
-  Gas.consume ctxt Typecheck_costs.merge_cycle >>? fun ctxt ->
-  let return f eq annot_a annot_b :
-      (((ta comparable_ty, tb comparable_ty) eq * ta comparable_ty) tzresult
-      * context)
-      tzresult =
-    ok
-      ( (merge_type_annot ~legacy annot_a annot_b >|? fun annot -> (eq, f annot)),
-        ctxt )
-  in
-  match (ta, tb) with
-  | (Unit_key annot_a, Unit_key annot_b) ->
-      return (fun annot -> Unit_key annot) Eq annot_a annot_b
-  | (Never_key annot_a, Never_key annot_b) ->
-      return (fun annot -> Never_key annot) Eq annot_a annot_b
-  | (Int_key annot_a, Int_key annot_b) ->
-      return (fun annot -> Int_key annot) Eq annot_a annot_b
-  | (Nat_key annot_a, Nat_key annot_b) ->
-      return (fun annot -> Nat_key annot) Eq annot_a annot_b
-  | (Signature_key annot_a, Signature_key annot_b) ->
-      return (fun annot -> Signature_key annot) Eq annot_a annot_b
-  | (String_key annot_a, String_key annot_b) ->
-      return (fun annot -> String_key annot) Eq annot_a annot_b
-  | (Bytes_key annot_a, Bytes_key annot_b) ->
-      return (fun annot -> Bytes_key annot) Eq annot_a annot_b
-  | (Mutez_key annot_a, Mutez_key annot_b) ->
-      return (fun annot -> Mutez_key annot) Eq annot_a annot_b
-  | (Bool_key annot_a, Bool_key annot_b) ->
-      return (fun annot -> Bool_key annot) Eq annot_a annot_b
-  | (Key_hash_key annot_a, Key_hash_key annot_b) ->
-      return (fun annot -> Key_hash_key annot) Eq annot_a annot_b
-  | (Key_key annot_a, Key_key annot_b) ->
-      return (fun annot -> Key_key annot) Eq annot_a annot_b
-  | (Timestamp_key annot_a, Timestamp_key annot_b) ->
-      return (fun annot -> Timestamp_key annot) Eq annot_a annot_b
-  | (Chain_id_key annot_a, Chain_id_key annot_b) ->
-      return (fun annot -> Chain_id_key annot) Eq annot_a annot_b
-  | (Address_key annot_a, Address_key annot_b) ->
-      return (fun annot -> Address_key annot) Eq annot_a annot_b
-  | ( Pair_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
-      Pair_key ((left_b, annot_left_b), (right_b, annot_right_b), annot_b) ) ->
-      merge_comparable_types ~legacy ctxt left_a left_b
-      >>? fun (eq_left, ctxt) ->
-      merge_comparable_types ~legacy ctxt right_a right_b
-      >|? fun (eq_right, ctxt) ->
-      ( ( merge_type_annot ~legacy annot_a annot_b >>? fun annot ->
-          merge_field_annot ~legacy annot_left_a annot_left_b
-          >>? fun annot_left ->
-          merge_field_annot ~legacy annot_right_a annot_right_b
-          >>? fun annot_right ->
-          eq_left >>? fun (Eq, left) ->
-          eq_right >|? fun (Eq, right) ->
-          ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-            Pair_key ((left, annot_left), (right, annot_right), annot) ) ),
-        ctxt )
-  | ( Union_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
-      Union_key ((left_b, annot_left_b), (right_b, annot_right_b), annot_b) ) ->
-      merge_comparable_types ~legacy ctxt left_a left_b
-      >>? fun (eq_left, ctxt) ->
-      merge_comparable_types ~legacy ctxt right_a right_b
-      >|? fun (eq_right, ctxt) ->
-      ( ( merge_type_annot ~legacy annot_a annot_b >>? fun annot ->
-          merge_field_annot ~legacy annot_left_a annot_left_b
-          >>? fun annot_left ->
-          merge_field_annot ~legacy annot_right_a annot_right_b
-          >>? fun annot_right ->
-          eq_left >>? fun (Eq, left) ->
-          eq_right >|? fun (Eq, right) ->
-          ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-            Union_key ((left, annot_left), (right, annot_right), annot) ) ),
-        ctxt )
-  | (Option_key (ta, annot_a), Option_key (tb, annot_b)) ->
-      merge_comparable_types ~legacy ctxt ta tb >|? fun (eq_t, ctxt) ->
-      ( ( merge_type_annot ~legacy annot_a annot_b >>? fun annot ->
-          eq_t >|? fun (Eq, t) ->
-          ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, annot))
-        ),
-        ctxt )
-  | (_, _) ->
-      serialize_ty_for_error ctxt (ty_of_comparable_ty ta) >>? fun (ta, ctxt) ->
-      serialize_ty_for_error ctxt (ty_of_comparable_ty tb) >|? fun (tb, ctxt) ->
-      (error (Inconsistent_types (ta, tb)), ctxt)
+    ((ta comparable_ty, tb comparable_ty) eq * ta comparable_ty) Gas_monad.t =
+  let open Gas_monad in
+  fun ~legacy ta tb ->
+    gas_consume Typecheck_costs.merge_cycle >>$ fun () ->
+    let merge_type_annot ~legacy annot_a annot_b =
+      from_tzresult @@ merge_type_annot ~legacy annot_a annot_b
+    in
+    let merge_field_annot ~legacy annot_a annot_b =
+      from_tzresult @@ merge_field_annot ~legacy annot_a annot_b
+    in
+    let return f eq annot_a annot_b :
+        ((ta comparable_ty, tb comparable_ty) eq * ta comparable_ty) gas_monad =
+      merge_type_annot ~legacy annot_a annot_b >>$ fun annot ->
+      return (eq, f annot)
+    in
+    match (ta, tb) with
+    | (Unit_key annot_a, Unit_key annot_b) ->
+        return (fun annot -> Unit_key annot) Eq annot_a annot_b
+    | (Never_key annot_a, Never_key annot_b) ->
+        return (fun annot -> Never_key annot) Eq annot_a annot_b
+    | (Int_key annot_a, Int_key annot_b) ->
+        return (fun annot -> Int_key annot) Eq annot_a annot_b
+    | (Nat_key annot_a, Nat_key annot_b) ->
+        return (fun annot -> Nat_key annot) Eq annot_a annot_b
+    | (Signature_key annot_a, Signature_key annot_b) ->
+        return (fun annot -> Signature_key annot) Eq annot_a annot_b
+    | (String_key annot_a, String_key annot_b) ->
+        return (fun annot -> String_key annot) Eq annot_a annot_b
+    | (Bytes_key annot_a, Bytes_key annot_b) ->
+        return (fun annot -> Bytes_key annot) Eq annot_a annot_b
+    | (Mutez_key annot_a, Mutez_key annot_b) ->
+        return (fun annot -> Mutez_key annot) Eq annot_a annot_b
+    | (Bool_key annot_a, Bool_key annot_b) ->
+        return (fun annot -> Bool_key annot) Eq annot_a annot_b
+    | (Key_hash_key annot_a, Key_hash_key annot_b) ->
+        return (fun annot -> Key_hash_key annot) Eq annot_a annot_b
+    | (Key_key annot_a, Key_key annot_b) ->
+        return (fun annot -> Key_key annot) Eq annot_a annot_b
+    | (Timestamp_key annot_a, Timestamp_key annot_b) ->
+        return (fun annot -> Timestamp_key annot) Eq annot_a annot_b
+    | (Chain_id_key annot_a, Chain_id_key annot_b) ->
+        return (fun annot -> Chain_id_key annot) Eq annot_a annot_b
+    | (Address_key annot_a, Address_key annot_b) ->
+        return (fun annot -> Address_key annot) Eq annot_a annot_b
+    | ( Pair_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
+        Pair_key ((left_b, annot_left_b), (right_b, annot_right_b), annot_b) )
+      ->
+        merge_type_annot ~legacy annot_a annot_b >>$ fun annot ->
+        merge_field_annot ~legacy annot_left_a annot_left_b
+        >>$ fun annot_left ->
+        merge_field_annot ~legacy annot_right_a annot_right_b
+        >>$ fun annot_right ->
+        merge_comparable_types ~legacy left_a left_b >>$ fun (Eq, left) ->
+        merge_comparable_types ~legacy right_a right_b >|$ fun (Eq, right) ->
+        ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
+          Pair_key ((left, annot_left), (right, annot_right), annot) )
+    | ( Union_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
+        Union_key ((left_b, annot_left_b), (right_b, annot_right_b), annot_b) )
+      ->
+        merge_type_annot ~legacy annot_a annot_b >>$ fun annot ->
+        merge_field_annot ~legacy annot_left_a annot_left_b
+        >>$ fun annot_left ->
+        merge_field_annot ~legacy annot_right_a annot_right_b
+        >>$ fun annot_right ->
+        merge_comparable_types ~legacy left_a left_b >>$ fun (Eq, left) ->
+        merge_comparable_types ~legacy right_a right_b >|$ fun (Eq, right) ->
+        ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
+          Union_key ((left, annot_left), (right, annot_right), annot) )
+    | (Option_key (ta, annot_a), Option_key (tb, annot_b)) ->
+        merge_type_annot ~legacy annot_a annot_b >>$ fun annot ->
+        merge_comparable_types ~legacy ta tb >|$ fun (Eq, t) ->
+        ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, annot))
+    | (_, _) ->
+        serialize_ty_for_error_carbonated (ty_of_comparable_ty ta) >>$ fun ta ->
+        serialize_ty_for_error_carbonated (ty_of_comparable_ty tb) >?$ fun tb ->
+        error (Inconsistent_types (ta, tb))
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -884,7 +954,8 @@ let comparable_ty_eq :
     tb comparable_ty ->
     ((ta comparable_ty, tb comparable_ty) eq * context) tzresult =
  fun ctxt ta tb ->
-  merge_comparable_types ~legacy:true ctxt ta tb >>? fun (eq_ty, ctxt) ->
+  Gas_monad.run ctxt (merge_comparable_types ~legacy:true ta tb)
+  >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
 let merge_memo_sizes ms1 ms2 =
@@ -893,188 +964,163 @@ let merge_memo_sizes ms1 ms2 =
 
 type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
 
-let default_merge_type_error ctxt ty1 ty2 =
-  serialize_ty_for_error ctxt ty1 >>? fun (ty1, ctxt) ->
-  serialize_ty_for_error ctxt ty2 >|? fun (ty2, ctxt) ->
-  (Inconsistent_types (ty1, ty2), ctxt)
+let default_merge_type_error ty1 ty2 =
+  let open Gas_monad in
+  serialize_ty_for_error_carbonated ty1 >>$ fun ty1 ->
+  serialize_ty_for_error_carbonated ty2 >?$ fun ty2 ->
+  ok (Inconsistent_types (ty1, ty2))
 
 type error += Inconsistent_types_fast
 
-let fast_merge_type_error ctxt _ty1 _ty2 = ok (Inconsistent_types_fast, ctxt)
+let fast_merge_type_error _ty1 _ty2 = Gas_monad.return Inconsistent_types_fast
 
 let merge_type_error ~merge_type_error_flag =
   match merge_type_error_flag with
   | Default_merge_type_error -> default_merge_type_error
   | Fast_merge_type_error -> fast_merge_type_error
 
+let record_inconsistent_carbonated ctxt ta tb =
+  Gas_monad.record_trace_eval (fun () ->
+      serialize_ty_for_error ctxt ta >>? fun (ta, ctxt) ->
+      serialize_ty_for_error ctxt tb >|? fun (tb, _ctxt) ->
+      Inconsistent_types (ta, tb))
+
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
     type a b.
     legacy:bool ->
     merge_type_error_flag:merge_type_error_flag ->
-    context ->
     Script.location ->
     a ty ->
     b ty ->
-    (((a ty, b ty) eq * a ty) tzresult * context) tzresult =
- fun ~legacy ~merge_type_error_flag ctxt loc ty1 ty2 ->
-  let merge_type_annot tn1 tn2 =
-    merge_type_annot ~legacy tn1 tn2
-    |> record_inconsistent_type_annotations ctxt loc ty1 ty2
-  in
-  let rec help :
-      type ta tb.
-      context ->
-      ta ty ->
-      tb ty ->
-      (((ta ty, tb ty) eq * ta ty) tzresult * context) tzresult =
-   fun ctxt ty1 ty2 -> help0 ctxt ty1 ty2 |> record_inconsistent ctxt ty1 ty2
-  and help0 :
-      type ta tb.
-      context ->
-      ta ty ->
-      tb ty ->
-      (((ta ty, tb ty) eq * ta ty) tzresult * context) tzresult =
-   fun ctxt ty1 ty2 ->
-    Gas.consume ctxt Typecheck_costs.merge_cycle >>? fun ctxt ->
-    let return f eq annot_a annot_b :
-        (((ta ty, tb ty) eq * ta ty) tzresult * context) tzresult =
-      ok
-        ((merge_type_annot annot_a annot_b >|? fun annot -> (eq, f annot)), ctxt)
+    ((a ty, b ty) eq * a ty) Gas_monad.t =
+  let open Gas_monad in
+  fun ~legacy ~merge_type_error_flag loc ty1 ty2 ->
+    get_context >>$ fun initial_ctxt ->
+    let merge_type_annot tn1 tn2 =
+      from_tzresult
+        (merge_type_annot ~legacy tn1 tn2
+        |> record_inconsistent_type_annotations initial_ctxt loc ty1 ty2)
     in
-    match (ty1, ty2) with
-    | (Unit_t tn1, Unit_t tn2) -> return (fun tname -> Unit_t tname) Eq tn1 tn2
-    | (Int_t tn1, Int_t tn2) -> return (fun tname -> Int_t tname) Eq tn1 tn2
-    | (Nat_t tn1, Nat_t tn2) -> return (fun tname -> Nat_t tname) Eq tn1 tn2
-    | (Key_t tn1, Key_t tn2) -> return (fun tname -> Key_t tname) Eq tn1 tn2
-    | (Key_hash_t tn1, Key_hash_t tn2) ->
-        return (fun tname -> Key_hash_t tname) Eq tn1 tn2
-    | (String_t tn1, String_t tn2) ->
-        return (fun tname -> String_t tname) Eq tn1 tn2
-    | (Bytes_t tn1, Bytes_t tn2) ->
-        return (fun tname -> Bytes_t tname) Eq tn1 tn2
-    | (Signature_t tn1, Signature_t tn2) ->
-        return (fun tname -> Signature_t tname) Eq tn1 tn2
-    | (Mutez_t tn1, Mutez_t tn2) ->
-        return (fun tname -> Mutez_t tname) Eq tn1 tn2
-    | (Timestamp_t tn1, Timestamp_t tn2) ->
-        return (fun tname -> Timestamp_t tname) Eq tn1 tn2
-    | (Address_t tn1, Address_t tn2) ->
-        return (fun tname -> Address_t tname) Eq tn1 tn2
-    | (Bool_t tn1, Bool_t tn2) -> return (fun tname -> Bool_t tname) Eq tn1 tn2
-    | (Chain_id_t tn1, Chain_id_t tn2) ->
-        return (fun tname -> Chain_id_t tname) Eq tn1 tn2
-    | (Never_t tn1, Never_t tn2) ->
-        return (fun tname -> Never_t tname) Eq tn1 tn2
-    | (Operation_t tn1, Operation_t tn2) ->
-        return (fun tname -> Operation_t tname) Eq tn1 tn2
-    | (Bls12_381_g1_t tn1, Bls12_381_g1_t tn2) ->
-        return (fun tname -> Bls12_381_g1_t tname) Eq tn1 tn2
-    | (Bls12_381_g2_t tn1, Bls12_381_g2_t tn2) ->
-        return (fun tname -> Bls12_381_g2_t tname) Eq tn1 tn2
-    | (Bls12_381_fr_t tn1, Bls12_381_fr_t tn2) ->
-        return (fun tname -> Bls12_381_fr_t tname) Eq tn1 tn2
-    | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
-        merge_comparable_types ~legacy ctxt tal tbl >>? fun (eq_tk, ctxt) ->
-        help ctxt tar tbr >|? fun (eq_value, ctxt) ->
-        ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-            eq_tk >>? fun (Eq, tk) ->
-            eq_value >|? fun (Eq, value) ->
-            ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, tname)) ),
-          ctxt )
-    | (Big_map_t (tal, tar, tn1), Big_map_t (tbl, tbr, tn2)) ->
-        merge_comparable_types ~legacy ctxt tal tbl >>? fun (eq_tk, ctxt) ->
-        help ctxt tar tbr >|? fun (eq_value, ctxt) ->
-        ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-            eq_tk >>? fun (Eq, tk) ->
-            eq_value >|? fun (Eq, value) ->
-            ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, tname)) ),
-          ctxt )
-    | (Set_t (ea, tn1), Set_t (eb, tn2)) ->
-        merge_comparable_types ~legacy ctxt ea eb >|? fun (eq_e, ctxt) ->
-        ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-            eq_e >|? fun (Eq, e) -> ((Eq : (ta ty, tb ty) eq), Set_t (e, tname))
-          ),
-          ctxt )
-    | (Ticket_t (ea, tn1), Ticket_t (eb, tn2)) ->
-        merge_comparable_types ~legacy ctxt ea eb >|? fun (eq_e, ctxt) ->
-        ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-            eq_e >|? fun (Eq, e) ->
-            ((Eq : (ta ty, tb ty) eq), Ticket_t (e, tname)) ),
-          ctxt )
-    | ( Pair_t ((tal, l_field1, l_var1), (tar, r_field1, r_var1), tn1),
-        Pair_t ((tbl, l_field2, l_var2), (tbr, r_field2, r_var2), tn2) ) ->
-        help ctxt tal tbl >>? fun (eq_left_ty, ctxt) ->
-        help ctxt tar tbr >|? fun (eq_right_ty, ctxt) ->
-        ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-            merge_field_annot ~legacy l_field1 l_field2 >>? fun l_field ->
-            merge_field_annot ~legacy r_field1 r_field2 >>? fun r_field ->
-            let l_var = merge_var_annot l_var1 l_var2 in
-            let r_var = merge_var_annot r_var1 r_var2 in
-            eq_left_ty >>? fun (Eq, left_ty) ->
-            eq_right_ty >|? fun (Eq, right_ty) ->
-            ( (Eq : (ta ty, tb ty) eq),
-              Pair_t
-                ((left_ty, l_field, l_var), (right_ty, r_field, r_var), tname)
-            ) ),
-          ctxt )
-    | ( Union_t ((tal, tal_annot), (tar, tar_annot), tn1),
-        Union_t ((tbl, tbl_annot), (tbr, tbr_annot), tn2) ) ->
-        help ctxt tal tbl >>? fun (eq_left_ty, ctxt) ->
-        help ctxt tar tbr >|? fun (eq_right_ty, ctxt) ->
-        ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-            merge_field_annot ~legacy tal_annot tbl_annot >>? fun left_annot ->
-            merge_field_annot ~legacy tar_annot tbr_annot >>? fun right_annot ->
-            eq_left_ty >>? fun (Eq, left_ty) ->
-            eq_right_ty >|? fun (Eq, right_ty) ->
-            ( (Eq : (ta ty, tb ty) eq),
-              Union_t ((left_ty, left_annot), (right_ty, right_annot), tname) )
-          ),
-          ctxt )
-    | (Lambda_t (tal, tar, tn1), Lambda_t (tbl, tbr, tn2)) ->
-        help ctxt tal tbl >>? fun (eq_left_ty, ctxt) ->
-        help ctxt tar tbr >|? fun (eq_right_ty, ctxt) ->
-        ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-            eq_left_ty >>? fun (Eq, left_ty) ->
-            eq_right_ty >|? fun (Eq, right_ty) ->
-            ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, tname)) ),
-          ctxt )
-    | (Contract_t (tal, tn1), Contract_t (tbl, tn2)) ->
-        help ctxt tal tbl >|? fun (eq_arg_ty, ctxt) ->
-        ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-            eq_arg_ty >|? fun (Eq, arg_ty) ->
-            ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, tname)) ),
-          ctxt )
-    | (Option_t (tva, tn1), Option_t (tvb, tn2)) ->
-        help ctxt tva tvb >|? fun (eq_ty, ctxt) ->
-        ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-            eq_ty >|? fun (Eq, ty) ->
-            ((Eq : (ta ty, tb ty) eq), Option_t (ty, tname)) ),
-          ctxt )
-    | (List_t (tva, tn1), List_t (tvb, tn2)) ->
-        help ctxt tva tvb >|? fun (eq_ty, ctxt) ->
-        ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-            eq_ty >|? fun (Eq, ty) ->
-            ((Eq : (ta ty, tb ty) eq), List_t (ty, tname)) ),
-          ctxt )
-    | (Sapling_state_t (ms1, tn1), Sapling_state_t (ms2, tn2)) ->
-        ok
-          ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-              merge_memo_sizes ms1 ms2 >|? fun ms ->
-              (Eq, Sapling_state_t (ms, tname)) ),
-            ctxt )
-    | (Sapling_transaction_t (ms1, tn1), Sapling_transaction_t (ms2, tn2)) ->
-        ok
-          ( ( merge_type_annot tn1 tn2 >>? fun tname ->
-              merge_memo_sizes ms1 ms2 >|? fun ms ->
-              (Eq, Sapling_transaction_t (ms, tname)) ),
-            ctxt )
-    | (_, _) ->
-        merge_type_error ~merge_type_error_flag ctxt ty1 ty2
-        >|? fun (err, ctxt) -> (error err, ctxt)
-  in
-  help ctxt ty1 ty2
- [@@coq_axiom_with_reason "non-top-level mutual recursion"]
+    let merge_field_annot ~legacy tn1 tn2 =
+      from_tzresult (merge_field_annot ~legacy tn1 tn2)
+    in
+    let merge_memo_sizes ms1 ms2 = from_tzresult (merge_memo_sizes ms1 ms2) in
+    let rec help :
+        type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty) gas_monad =
+     fun ty1 ty2 ->
+      help0 ty1 ty2 |> record_inconsistent_carbonated initial_ctxt ty1 ty2
+    and help0 :
+        type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty) gas_monad =
+     fun ty1 ty2 ->
+      gas_consume Typecheck_costs.merge_cycle >>$ fun () ->
+      let return f eq annot_a annot_b : ((ta ty, tb ty) eq * ta ty) gas_monad =
+        merge_type_annot annot_a annot_b >>$ fun annot -> return (eq, f annot)
+      in
+      match (ty1, ty2) with
+      | (Unit_t tn1, Unit_t tn2) ->
+          return (fun tname -> Unit_t tname) Eq tn1 tn2
+      | (Int_t tn1, Int_t tn2) -> return (fun tname -> Int_t tname) Eq tn1 tn2
+      | (Nat_t tn1, Nat_t tn2) -> return (fun tname -> Nat_t tname) Eq tn1 tn2
+      | (Key_t tn1, Key_t tn2) -> return (fun tname -> Key_t tname) Eq tn1 tn2
+      | (Key_hash_t tn1, Key_hash_t tn2) ->
+          return (fun tname -> Key_hash_t tname) Eq tn1 tn2
+      | (String_t tn1, String_t tn2) ->
+          return (fun tname -> String_t tname) Eq tn1 tn2
+      | (Bytes_t tn1, Bytes_t tn2) ->
+          return (fun tname -> Bytes_t tname) Eq tn1 tn2
+      | (Signature_t tn1, Signature_t tn2) ->
+          return (fun tname -> Signature_t tname) Eq tn1 tn2
+      | (Mutez_t tn1, Mutez_t tn2) ->
+          return (fun tname -> Mutez_t tname) Eq tn1 tn2
+      | (Timestamp_t tn1, Timestamp_t tn2) ->
+          return (fun tname -> Timestamp_t tname) Eq tn1 tn2
+      | (Address_t tn1, Address_t tn2) ->
+          return (fun tname -> Address_t tname) Eq tn1 tn2
+      | (Bool_t tn1, Bool_t tn2) ->
+          return (fun tname -> Bool_t tname) Eq tn1 tn2
+      | (Chain_id_t tn1, Chain_id_t tn2) ->
+          return (fun tname -> Chain_id_t tname) Eq tn1 tn2
+      | (Never_t tn1, Never_t tn2) ->
+          return (fun tname -> Never_t tname) Eq tn1 tn2
+      | (Operation_t tn1, Operation_t tn2) ->
+          return (fun tname -> Operation_t tname) Eq tn1 tn2
+      | (Bls12_381_g1_t tn1, Bls12_381_g1_t tn2) ->
+          return (fun tname -> Bls12_381_g1_t tname) Eq tn1 tn2
+      | (Bls12_381_g2_t tn1, Bls12_381_g2_t tn2) ->
+          return (fun tname -> Bls12_381_g2_t tname) Eq tn1 tn2
+      | (Bls12_381_fr_t tn1, Bls12_381_fr_t tn2) ->
+          return (fun tname -> Bls12_381_fr_t tname) Eq tn1 tn2
+      | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          help tar tbr >>$ fun (Eq, value) ->
+          merge_comparable_types ~legacy tal tbl >|$ fun (Eq, tk) ->
+          ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, tname))
+      | (Big_map_t (tal, tar, tn1), Big_map_t (tbl, tbr, tn2)) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          help tar tbr >>$ fun (Eq, value) ->
+          merge_comparable_types ~legacy tal tbl >|$ fun (Eq, tk) ->
+          ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, tname))
+      | (Set_t (ea, tn1), Set_t (eb, tn2)) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          merge_comparable_types ~legacy ea eb >|$ fun (Eq, e) ->
+          ((Eq : (ta ty, tb ty) eq), Set_t (e, tname))
+      | (Ticket_t (ea, tn1), Ticket_t (eb, tn2)) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          merge_comparable_types ~legacy ea eb >|$ fun (Eq, e) ->
+          ((Eq : (ta ty, tb ty) eq), Ticket_t (e, tname))
+      | ( Pair_t ((tal, l_field1, l_var1), (tar, r_field1, r_var1), tn1),
+          Pair_t ((tbl, l_field2, l_var2), (tbr, r_field2, r_var2), tn2) ) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          merge_field_annot ~legacy l_field1 l_field2 >>$ fun l_field ->
+          merge_field_annot ~legacy r_field1 r_field2 >>$ fun r_field ->
+          let l_var = merge_var_annot l_var1 l_var2 in
+          let r_var = merge_var_annot r_var1 r_var2 in
+          help tal tbl >>$ fun (Eq, left_ty) ->
+          help tar tbr >|$ fun (Eq, right_ty) ->
+          ( (Eq : (ta ty, tb ty) eq),
+            Pair_t ((left_ty, l_field, l_var), (right_ty, r_field, r_var), tname)
+          )
+      | ( Union_t ((tal, tal_annot), (tar, tar_annot), tn1),
+          Union_t ((tbl, tbl_annot), (tbr, tbr_annot), tn2) ) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          merge_field_annot ~legacy tal_annot tbl_annot >>$ fun left_annot ->
+          merge_field_annot ~legacy tar_annot tbr_annot >>$ fun right_annot ->
+          help tal tbl >>$ fun (Eq, left_ty) ->
+          help tar tbr >|$ fun (Eq, right_ty) ->
+          ( (Eq : (ta ty, tb ty) eq),
+            Union_t ((left_ty, left_annot), (right_ty, right_annot), tname) )
+      | (Lambda_t (tal, tar, tn1), Lambda_t (tbl, tbr, tn2)) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          help tal tbl >>$ fun (Eq, left_ty) ->
+          help tar tbr >|$ fun (Eq, right_ty) ->
+          ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, tname))
+      | (Contract_t (tal, tn1), Contract_t (tbl, tn2)) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          help tal tbl >|$ fun (Eq, arg_ty) ->
+          ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, tname))
+      | (Option_t (tva, tn1), Option_t (tvb, tn2)) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          help tva tvb >|$ fun (Eq, ty) ->
+          ((Eq : (ta ty, tb ty) eq), Option_t (ty, tname))
+      | (List_t (tva, tn1), List_t (tvb, tn2)) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          help tva tvb >|$ fun (Eq, ty) ->
+          ((Eq : (ta ty, tb ty) eq), List_t (ty, tname))
+      | (Sapling_state_t (ms1, tn1), Sapling_state_t (ms2, tn2)) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          merge_memo_sizes ms1 ms2 >|$ fun ms ->
+          (Eq, Sapling_state_t (ms, tname))
+      | (Sapling_transaction_t (ms1, tn1), Sapling_transaction_t (ms2, tn2)) ->
+          merge_type_annot tn1 tn2 >>$ fun tname ->
+          merge_memo_sizes ms1 ms2 >|$ fun ms ->
+          (Eq, Sapling_transaction_t (ms, tname))
+      | (_, _) ->
+          merge_type_error ~merge_type_error_flag ty1 ty2 >?$ fun err ->
+          error err
+    in
+    help ty1 ty2
+  [@@coq_axiom_with_reason "non-top-level mutual recursion"]
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -1089,13 +1135,13 @@ let ty_eq :
     tb ty ->
     ((ta ty, tb ty) eq * context) tzresult =
  fun ~legacy ctxt loc ta tb ->
-  merge_types
-    ~merge_type_error_flag:Default_merge_type_error
-    ~legacy
-    ctxt
-    loc
-    ta
-    tb
+  Gas_monad.run ctxt
+  @@ merge_types
+       ~merge_type_error_flag:Default_merge_type_error
+       ~legacy
+       loc
+       ta
+       tb
   >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
@@ -1125,13 +1171,13 @@ let merge_stacks :
     match (stack1, stack2) with
     | (Bot_t, Bot_t) -> ok (Eq, Bot_t, ctxt)
     | (Item_t (ty1, rest1, annot1), Item_t (ty2, rest2, annot2)) ->
-        merge_types
-          ~merge_type_error_flag:Default_merge_type_error
-          ~legacy
-          ctxt
-          loc
-          ty1
-          ty2
+        Gas_monad.run ctxt
+        @@ merge_types
+             ~merge_type_error_flag:Default_merge_type_error
+             ~legacy
+             loc
+             ty1
+             ty2
         |> record_trace (Bad_stack_item lvl)
         >>? fun (eq_ty, ctxt) ->
         eq_ty >>? fun (Eq, ty) ->
@@ -1914,22 +1960,23 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
             | _ -> error (No_such_entrypoint entrypoint)))
 
 let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
-    ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint ctxt loc :
-    (context * (string * exp ty) tzresult) tzresult =
+    ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint loc :
+    (string * exp ty) Gas_monad.t =
+  let open Gas_monad in
   match find_entrypoint full ~root_name entrypoint with
-  | Error _ as err -> ok (ctxt, err)
+  | Error _ as err -> from_tzresult err
   | Ok (_, Ex_ty ty) -> (
-      merge_types ~legacy ~merge_type_error_flag ctxt loc ty expected
-      >>? fun (eq_ty, ctxt) ->
+      merge_types ~legacy ~merge_type_error_flag loc ty expected
+      >??$ fun eq_ty ->
       match (entrypoint, root_name) with
       | ("default", Some (Field_annot "root")) -> (
           match eq_ty with
-          | Ok (Eq, ty) -> ok (ctxt, ok ("default", (ty : exp ty)))
+          | Ok (Eq, ty) -> return ("default", (ty : exp ty))
           | Error _ ->
-              merge_types ~legacy ~merge_type_error_flag ctxt loc full expected
-              >|? fun (eq_full, ctxt) ->
-              (ctxt, eq_full >|? fun (Eq, full) -> ("root", (full : exp ty))))
-      | _ -> ok (ctxt, eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
+              merge_types ~legacy ~merge_type_error_flag loc full expected
+              >?$ fun (Eq, full) -> ok ("root", (full : exp ty)))
+      | _ ->
+          from_tzresult (eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
 
 module Entrypoints = Set.Make (String)
 
@@ -2846,13 +2893,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         Bad_stack (loc, name, m, stack_ty))
     @@ record_trace
          (Bad_stack_item n)
-         ( merge_types
-             ~legacy
-             ~merge_type_error_flag:Default_merge_type_error
-             ctxt
-             loc
-             exp
-             got
+         ( Gas_monad.run ctxt
+         @@ merge_types
+              ~legacy
+              ~merge_type_error_flag:Default_merge_type_error
+              loc
+              exp
+              got
          >>? fun (eq_ty, ctxt) ->
            eq_ty >|? fun (Eq, ty) -> ((Eq : (a, b) eq), (ty : a ty), ctxt) )
   in
@@ -5063,13 +5110,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           rest,
           _ ) ) -> (
       parse_var_annot loc annot >>?= fun annot ->
-      merge_types
-        ~legacy
-        ~merge_type_error_flag:Default_merge_type_error
-        ctxt
-        loc
-        ty_a
-        ty_b
+      Gas_monad.run ctxt
+      @@ merge_types
+           ~legacy
+           ~merge_type_error_flag:Default_merge_type_error
+           loc
+           ty_a
+           ty_b
       >>?= fun (eq_ty, ctxt) ->
       eq_ty >>?= fun (Eq, ty) ->
       match ty with
@@ -5319,16 +5366,16 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                 arg_type
               >>? fun (Ex_ty targ, ctxt) ->
               (* we don't check targ size here because it's a legacy contract code *)
-              find_entrypoint_for_type
-                ~legacy
-                ~merge_type_error_flag:Default_merge_type_error
-                ~full:targ
-                ~expected:arg
-                ~root_name
-                entrypoint
-                ctxt
-                loc
-              >>? fun (ctxt, entrypoint_arg) ->
+              Gas_monad.run ctxt
+              @@ find_entrypoint_for_type
+                   ~legacy
+                   ~merge_type_error_flag:Default_merge_type_error
+                   ~full:targ
+                   ~expected:arg
+                   ~root_name
+                   entrypoint
+                   loc
+              >>? fun (entrypoint_arg, ctxt) ->
               entrypoint_arg >|? fun (entrypoint, arg) ->
               let contract : arg typed_contract =
                 (arg, (contract, entrypoint))
@@ -5432,13 +5479,13 @@ let parse_contract_for_script :
       | "default" ->
           (* An implicit account on the "default" entrypoint always exists and has type unit. *)
           Lwt.return
-            ( merge_types
-                ~legacy:true
-                ~merge_type_error_flag:Fast_merge_type_error
-                ctxt
-                loc
-                arg
-                (Unit_t None)
+            ( Gas_monad.run ctxt
+            @@ merge_types
+                 ~legacy:true
+                 ~merge_type_error_flag:Fast_merge_type_error
+                 loc
+                 arg
+                 (Unit_t None)
             >|? fun (eq_ty, ctxt) ->
               match eq_ty with
               | Ok (Eq, _ty) ->
@@ -5472,16 +5519,16 @@ let parse_contract_for_script :
                   | Error _ -> error (Invalid_contract (loc, contract))
                   | Ok (Ex_ty targ, ctxt) -> (
                       (* we don't check targ size here because it's a legacy contract code *)
-                      find_entrypoint_for_type
-                        ~legacy:false
-                        ~merge_type_error_flag:Fast_merge_type_error
-                        ~full:targ
-                        ~expected:arg
-                        ~root_name
-                        entrypoint
-                        ctxt
-                        loc
-                      >|? fun (ctxt, entrypoint_arg) ->
+                      Gas_monad.run ctxt
+                      @@ find_entrypoint_for_type
+                           ~legacy:false
+                           ~merge_type_error_flag:Fast_merge_type_error
+                           ~full:targ
+                           ~expected:arg
+                           ~root_name
+                           entrypoint
+                           loc
+                      >|? fun (entrypoint_arg, ctxt) ->
                       match entrypoint_arg with
                       | Ok (entrypoint, arg) ->
                           let contract : arg typed_contract =
