@@ -151,18 +151,18 @@ end
 
 open Validation_errors
 
+type 'operation_data operation = {
+  hash : Operation_hash.t;
+  raw : Operation.t;
+  protocol_data : 'operation_data;
+}
+
 module type T = sig
   module Proto : Tezos_protocol_environment.PROTOCOL
 
   type t
 
-  type operation = private {
-    hash : Operation_hash.t;
-    raw : Operation.t;
-    protocol_data : Proto.operation_data;
-  }
-
-  val parse : Operation.t -> operation tzresult
+  val parse : Operation.t -> Proto.operation_data operation tzresult
 
   val parse_unsafe : bytes -> Proto.operation_data tzresult
 
@@ -183,10 +183,11 @@ module type T = sig
     | Refused of error list
     | Outdated
 
-  val apply_operation : t -> operation -> result Lwt.t
+  val apply_operation : t -> Proto.operation_data operation -> result Lwt.t
 
   type status = {
-    applied_operations : (operation * Proto.operation_receipt) list;
+    applied_operations :
+      (Proto.operation_data operation * Proto.operation_receipt) list;
     block_result : Tezos_protocol_environment.validation_result;
     block_metadata : Proto.block_header_metadata;
   }
@@ -211,15 +212,9 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
   T with module Proto = Proto = struct
   module Proto = Proto
 
-  type operation = {
-    hash : Operation_hash.t;
-    raw : Operation.t;
-    protocol_data : Proto.operation_data;
-  }
-
   type t = {
     state : Proto.validation_state;
-    applied : (operation * Proto.operation_receipt) list;
+    applied : (Proto.operation_data operation * Proto.operation_receipt) list;
     live_blocks : Block_hash.Set.t;
     live_operations : Operation_hash.Set.t;
   }
@@ -331,7 +326,8 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
           | `Temporary -> Branch_delayed errors)
 
   type status = {
-    applied_operations : (operation * Proto.operation_receipt) list;
+    applied_operations :
+      (Proto.operation_data operation * Proto.operation_receipt) list;
     block_result : Tezos_protocol_environment.validation_result;
     block_metadata : Proto.block_header_metadata;
   }

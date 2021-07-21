@@ -101,18 +101,24 @@ module Requester :
      and type value = Operation.t
      and type param = unit
 
+type 'operation_data operation = private {
+  hash : Operation_hash.t;  (** Hash of an operation. *)
+  raw : Operation.t;
+      (** Raw representation of an operation (from the point view of the
+     shell). *)
+  protocol_data : 'operation_data;
+      (** Economic protocol specific data of an operation. It is the
+     unserialized representation of [raw.protocol_data]. For
+     convenience, the type associated to this type may be [unit] if we
+     do not have deserialized the operation yet. *)
+}
+
 module type T = sig
   module Proto : Tezos_protocol_environment.PROTOCOL
 
   type t
 
-  type operation = private {
-    hash : Operation_hash.t;
-    raw : Operation.t;
-    protocol_data : Proto.operation_data;
-  }
-
-  val parse : Operation.t -> operation tzresult
+  val parse : Operation.t -> Proto.operation_data operation tzresult
 
   (** [parse_unsafe bytes] parses [bytes] as operation data. Any error happening during parsing becomes {!Parse_error}.
 
@@ -139,10 +145,11 @@ module type T = sig
     | Refused of error list
     | Outdated
 
-  val apply_operation : t -> operation -> result Lwt.t
+  val apply_operation : t -> Proto.operation_data operation -> result Lwt.t
 
   type status = {
-    applied_operations : (operation * Proto.operation_receipt) list;
+    applied_operations :
+      (Proto.operation_data operation * Proto.operation_receipt) list;
     block_result : Tezos_protocol_environment.validation_result;
     block_metadata : Proto.block_header_metadata;
   }

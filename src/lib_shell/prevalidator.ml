@@ -396,6 +396,8 @@ module Make
 
   let name = (Arg.chain_id, Proto.hash)
 
+  type 'operation_data operation = 'operation_data Prevalidation.operation
+
   module Classification = Prevalidation.Classification
   module Prevalidation = Prevalidation.Make (Protocol)
 
@@ -517,7 +519,7 @@ module Make
             Worker.Queue.push_request_now w Advertise ;
             Lwt.return_unit)
 
-  let is_endorsement (op : Prevalidation.operation) =
+  let is_endorsement (op : Proto.operation_data operation) =
     Proto.acceptable_passes
       {shell = op.raw.shell; protocol_data = op.protocol_data}
     = [0]
@@ -600,7 +602,7 @@ module Make
       Classificator.handle_refused input op oph errors
   end
 
-  let handle_applied ?should_notify pv (op : Prevalidation.operation) =
+  let handle_applied ?should_notify pv (op : Proto.operation_data operation) =
     let classification = pv.shell.classification in
     Notifier.maybe_notify_operation
       ?should_notify
