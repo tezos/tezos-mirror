@@ -2,7 +2,7 @@
  (names test test_legacy legacy_store_maker)
  (libraries tezos-base
             tezos-store
-	    tezos-legacy-store
+            tezos-legacy-store
             tezos-stdlib-unix
             tezos-embedded-protocol-demo-noops
             tezos-embedded-protocol-genesis

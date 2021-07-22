@@ -1,27 +1,13 @@
-(executables
+(tests
  (names test_encrypted)
  (libraries tezos-base
             tezos-base.unix
             tezos-signer-backends
             alcotest-lwt)
+ (package tezos-signer-backends)
  (flags (:standard -open Tezos_error_monad
                    -open Tezos_stdlib
                    -open Tezos_error_monad.TzLwtreslib
                    -open Tezos_crypto
                    -open Tezos_client_base
                    -open Tezos_signer_backends)))
-
-(rule
- (alias buildtest)
- (deps test_encrypted.exe)
- (action (progn)))
-
-(rule
- (alias runtest_signer_encrypted)
- (action (run %{exe:test_encrypted.exe})))
-
-(rule
- (alias runtest)
- (package tezos-signer-backends)
- (deps (alias runtest_signer_encrypted))
- (action (progn)))

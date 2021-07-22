@@ -14,8 +14,3 @@
                    -open Tezos_client_base
                    -open Tezos_protocol_000_Ps9mPmXa
                    -open Tezos_client_commands)))
-
-(rule
- (alias runtest_indent)
- (deps (glob_files *.ml{,i}))
- (action (run bash %{libexec:tezos-stdlib:test-ocp-indent.sh} %{deps})))

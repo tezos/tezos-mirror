@@ -14,21 +14,3 @@
  (flags
   (:standard -open Tezos_base__TzPervasives
              -open Tezos_base_test_helpers)))
-
-(rule
- (alias runtest_proxy)
- (action
-  (run %{exe:test_proxy.exe})))
-
-(rule
- (alias runtest_proxy_fuzzing)
- (action
-  (run %{exe:test_fuzzing_proxy_getter.exe})))
-
-(rule
- (alias runtest_light)
- (action (run %{exe:test_light.exe})))
-
-(rule
- (alias runtest_fuzzing_light)
- (action (run %{exe:test_fuzzing_light.exe})))

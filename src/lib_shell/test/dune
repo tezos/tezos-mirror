@@ -36,38 +36,21 @@
 
 
 (rule
- (alias buildtest)
- (deps test_shell.exe
-       test_locator.exe
-       test_prevalidation.exe
-       test_synchronisation_heuristic_fuzzy.exe)
- (action (progn)))
-
-(rule
- (alias runtest_shell)
+ (alias runtest)
  (action (run %{exe:test_shell.exe})))
 
 (rule
- (alias runtest_prevalidation)
+ (alias runtest)
  (action (run %{exe:test_prevalidation.exe})))
 
 (rule
- (alias runtest_locator)
+ (alias runtest)
  (action (run %{exe:test_locator.exe} --no-bench)))
 
 (rule
- (alias runtest_synchronisation)
+ (alias runtest)
  (action (run %{exe:test_synchronisation_heuristic_fuzzy.exe})))
 
 (rule
- (alias runbench_locator)
- (action (run %{exe:test_locator.exe})))
-
-(rule
  (alias runtest)
- (package tezos-shell)
- (deps (alias runtest_shell)
-       (alias runtest_locator)
-       (alias runtest_synchronisation)
-       (alias runtest_prevalidation))
- (action (progn)))
+ (action (run %{exe:test_locator.exe})))

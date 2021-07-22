@@ -1,27 +1,12 @@
-(executables
+(tests
  (names test_michelson_v1_macros)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-alpha
             tezos-client-alpha
             alcotest-lwt)
+ (package tezos-client-alpha)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_micheline
                    -open Tezos_client_alpha
                    -open Tezos_protocol_alpha)))
-
-
-(rule
-(alias buildtest)
-(deps test_michelson_v1_macros.exe)
-(action (progn)))
-
-(rule
-(alias runtest_michelson_v1_macros)
-(action (run %{exe:test_michelson_v1_macros.exe})))
-
-(rule
-(alias runtest)
-(package tezos-client-alpha)
-(deps (alias runtest_michelson_v1_macros))
-(action (progn)))

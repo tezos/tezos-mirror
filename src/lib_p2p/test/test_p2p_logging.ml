@@ -323,20 +323,17 @@ let testcase (module T : TEST) =
           | Error error ->
               Format.kasprintf Stdlib.failwith "%a" pp_print_error error))
 
-let main () =
-  Alcotest_lwt.run
-    ~argv:[|""|]
-    "tezos-p2p"
-    [
-      ( "p2p-logging.",
-        [
-          testcase (module Authentication);
-          testcase (module Nack);
-          testcase (module Read_and_write);
-          testcase (module P2p_net);
-        ] );
-    ]
-
 let () =
-  Sys.catch_break true ;
-  Lwt_main.run @@ Lwt.catch main (fun _ -> Lwt.return_unit)
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       ~argv:[|""|]
+       "tezos-p2p"
+       [
+         ( "p2p-logging",
+           [
+             testcase (module Authentication);
+             testcase (module Nack);
+             testcase (module Read_and_write);
+             testcase (module P2p_net);
+           ] );
+       ]

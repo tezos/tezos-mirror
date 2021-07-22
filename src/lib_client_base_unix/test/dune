@@ -1,23 +1,7 @@
-(executables
+(tests
  (names test_mockup_wallet)
- (libraries tezos-mockup-commands
-            tezos-client-base-unix
-            tezos-base-test-helpers
-            alcotest
-            alcotest-lwt)
- (flags
-  (:standard
-    -open Tezos_base__TzPervasives
-    -open Tezos_base_test_helpers)))
-
-(rule
- (alias runtest_mockup_wallet)
- (action
-  (run %{exe:test_mockup_wallet.exe})))
-
-(rule
- (alias runtest)
+ (libraries tezos-mockup-commands tezos-client-base-unix tezos-base-test-helpers
+   alcotest alcotest-lwt)
  (package tezos-client-base-unix)
- (deps
-  (alias runtest_mockup_wallet))
- (action (progn)))
+ (flags
+  (:standard -open Tezos_base__TzPervasives -open Tezos_base_test_helpers)))

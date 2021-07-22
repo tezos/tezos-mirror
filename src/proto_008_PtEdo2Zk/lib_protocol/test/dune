@@ -19,12 +19,6 @@
                    -open Tezos_base_test_helpers)))
 
 (rule
- (alias buildtest)
- (package tezos-protocol-008-PtEdo2Zk-tests)
- (deps main.exe)
- (action (progn)))
-
-(rule
  (copy %{lib:tezos-protocol-008-PtEdo2Zk-parameters:test-parameters.json}
        protocol_parameters.json))
 

@@ -7,17 +7,9 @@
             tezos-base-test-helpers
             tezos-stdlib-unix
             tezos-requester
-            alcotest-lwt
-            qcheck-alcotest)
+            qcheck-alcotest
+            alcotest-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_base_test_helpers
                    -open Tezos_stdlib
                    -open Tezos_requester)))
-
-(rule
- (alias runtest_requester)
- (action (run %{exe:test_requester.exe})))
-
-(rule
- (alias runtest_fuzzing_requester)
- (action (run %{exe:test_fuzzing_requester.exe})))
