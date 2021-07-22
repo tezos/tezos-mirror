@@ -923,6 +923,7 @@ module Make
                    op.Operation.shell.branch
                    pv.shell.live_blocks)
             then (
+              (* FIXME: Remove this for Tenderbake. *)
               may_propagate_unknown_branch_operation pv.validation_state op
               >>= function
               | true ->
