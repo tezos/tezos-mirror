@@ -1,6 +1,6 @@
 .. _version-10:
 
-Version 10.0~rc1
+Version 10.0~rc2
 ================
 
 **This release candidate changes the storage backend and requires specific care when updating.**
@@ -25,17 +25,18 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v10.0-rc1
+  git checkout v10.0-rc2
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v10.0-rc1`` Docker images of Tezos.
+If you are using Docker instead, use the ``v10.0-rc2`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 10.0~rc2 <../CHANGES.html#version-10-0-rc2>`_
 - `Version 10.0~rc1 <../CHANGES.html#version-10-0-rc1>`_
 
 Storage Upgrade

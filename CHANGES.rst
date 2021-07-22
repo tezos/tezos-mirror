@@ -44,9 +44,6 @@ Node
    -  POST ``/chains/<chain_id>/mempool/unban_all_operations``: Unban
       all operations, i.e. clear the set of banned operations.
 
-- Check that protocol migrations can only increase the protocol
-  environment version.
-
 Client
 ------
 
@@ -88,6 +85,31 @@ Docker Images
 
 Miscellaneous
 -------------
+
+Version 10.0~rc2
+================
+
+Node
+----
+
+-  Added a check to prevent protocol migrations that decrease the protocol
+   environment version.
+
+-  Old stores of nodes running Granadanet can now be upgraded to the new store format
+   introduced in 10.0~rc1. Before, this was only possible for Mainnet, Edonet and
+   Florencenet.
+
+-  Empty stores can now be migrated to the new store format too.
+
+-  Fixed a case where the context could become corrupted.
+
+-  Fixed a memory leak in the cache of the mempool. This issue could
+   also cause operations to not be propagated correctly in some cases.
+
+Docker Images
+-------------
+
+-  Running the node with the ``--version`` flag now correctly returns the commit date.
 
 Version 10.0~rc1
 ================
