@@ -481,9 +481,9 @@ module Make
      given stream. The flag [should_notify] is used to avoid notifying
      multiple times on the same operation, e.g. an operation that is
      reclassified upon banning an applied operation. *)
-  let handle ?(should_notify = true) pv op kind =
+  let handle ~notify pv op kind =
     match op with
-    | `Parsed (op : Proto.operation_data operation) when should_notify = true ->
+    | `Parsed (op : Proto.operation_data operation) when notify = true ->
         Lwt_watcher.notify
           pv.operation_stream
           (kind, op.raw.shell, op.protocol_data) ;
@@ -491,10 +491,10 @@ module Make
     | `Parsed {hash; raw; _} | `Unparsed (hash, raw) ->
         Classification.add kind hash raw pv.shell.classification
 
-  let classify_operation ?should_notify w pv validation_state mempool op oph =
+  let classify_operation ~notify w pv validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        handle ?should_notify pv (`Unparsed (oph, op)) (`Refused errors) ;
+        handle ~notify pv (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (validation_state, mempool)
     | Ok op -> (
         Prevalidation.apply_operation validation_state op >>= function
@@ -510,7 +510,7 @@ module Make
               receipt
             >>= fun accept ->
             if accept then (
-              handle ?should_notify pv (`Parsed op) `Applied ;
+              handle ~notify pv (`Parsed op) `Applied ;
               let new_mempool =
                 Mempool.
                   {mempool with known_valid = op.hash :: mempool.known_valid}
@@ -522,13 +522,13 @@ module Make
                 oph ;
               Lwt.return (validation_state, mempool))
         | Branch_delayed errors ->
-            handle ?should_notify pv (`Parsed op) (`Branch_delayed errors) ;
+            handle ~notify pv (`Parsed op) (`Branch_delayed errors) ;
             Lwt.return (validation_state, mempool)
         | Branch_refused errors ->
-            handle ?should_notify pv (`Parsed op) (`Branch_refused errors) ;
+            handle ~notify pv (`Parsed op) (`Branch_refused errors) ;
             Lwt.return (validation_state, mempool)
         | Refused errors ->
-            handle ?should_notify pv (`Parsed op) (`Refused errors) ;
+            handle ~notify pv (`Parsed op) (`Refused errors) ;
             Lwt.return (validation_state, mempool)
         | Outdated ->
             Distributed_db.Operation.clear_or_cancel
@@ -564,7 +564,14 @@ module Make
           Lwt.return_error (acc_validation_state, acc_mempool)
         else (
           pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
-          classify_operation w pv acc_validation_state acc_mempool op oph
+          classify_operation
+            ~notify:true
+            w
+            pv
+            acc_validation_state
+            acc_mempool
+            op
+            oph
           >|= fun (new_validation_state, new_mempool) ->
           ok (new_validation_state, new_mempool, limit - 1)))
       pv.shell.pending
@@ -582,7 +589,8 @@ module Make
         (* At the time this comment was written (26/05/21), this is dead
            code since [Proto.begin_construction] cannot fail. *)
         Operation_hash.Map.iter
-          (fun oph op -> handle pv (`Unparsed (oph, op)) (`Branch_delayed err))
+          (fun oph op ->
+            handle ~notify:true pv (`Unparsed (oph, op)) (`Branch_delayed err))
           pv.shell.pending ;
         pv.shell.pending <- Operation_hash.Map.empty ;
         Lwt.return_unit
@@ -918,7 +926,11 @@ module Make
               | true ->
                   let error = [Exn (Failure "Unknown branch operation")] in
                   (* FIXME: We have already parsed the operation. *)
-                  handle pv (`Unparsed (oph, op)) (`Branch_refused error) ;
+                  handle
+                    ~notify:true
+                    pv
+                    (`Unparsed (oph, op))
+                    (`Branch_refused error) ;
                   let pending = Operation_hash.Set.singleton oph in
                   advertise w pv.shell {Mempool.empty with pending} ;
                   return_unit
@@ -1078,7 +1090,7 @@ module Make
         (* These operations should not be notified again: they have already
            been notified when they were initially classified. *)
         classify_operation
-          ~should_notify:false
+          ~notify:false
           w
           pv
           acc_validation_state
