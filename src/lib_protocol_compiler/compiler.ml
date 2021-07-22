@@ -36,6 +36,8 @@ let () = Clflags.unsafe_string := false
 let preloaded_cmis : Persistent_env.Persistent_signature.t String.Hashtbl.t =
   String.Hashtbl.create ~random:true 42
 
+let default_load = !Persistent_env.Persistent_signature.load
+
 (* Set hook *)
 let () =
   Persistent_env.Persistent_signature.load :=

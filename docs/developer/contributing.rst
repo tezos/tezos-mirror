@@ -59,6 +59,8 @@ can have a look at the :ref:`software architecture
 give you the main components and their interactions, and links to the
 documentation for the various parts.
 
+You may also want to take a look to some :ref:`developer tools <dev_tools>` that can make protocol development more convenient.
+
 Now, that you're ready to delve into the code, it is time to know how
 contributions to the code are submitted, reviewed, and finally accepted into the master branch.
 
@@ -530,3 +532,11 @@ The code for the bot is at
 `smondet/merbocop <https://gitlab.com/smondet/merbocop>`__. It is of course
 work-in-progress and new warnings and comments will appear little by little.
 We welcome specific issues or contributions there too.
+
+.. dev_tools:
+
+Developer Tools
+~~~~~~~~~~~~~~~
+
+Somme tools to make protocol development more convenient can be found in the :src:`src/tooling/` folder.
+In particular, it contains ``tztop``, a REPL (interactive read-eval-print loop) based on ``utop``.
