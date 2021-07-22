@@ -20,8 +20,40 @@ be documented here either.
 Node
 ----
 
+-  Better handling of mempool cache in the `distributed_db` which
+   should make the `distributed_db` RAM consumption strongly
+   correlated to the one of the mempool.
+
+-  Fixed wrong error message in case of p2p network address binding collision.
+
+-  Updated the output of the ``/stats/gc`` RPC entry point: it now also
+   reports the number of full major collections made by the OCaml
+   garbage collector. Because this changes the JSON schema of this
+   existing RPC entry point, it is a breaking change.
+
+-  Added new RPCs to ban/unban operations locally:
+
+   -  POST ``/chains/<chain_id>/mempool/ban_operation``: Ban a given
+      operation hash. The operation is removed from the mempool, and
+      its effect is reverted if it was applied. It is also added to
+      the prevalidator's set of banned operations, to prevent it from
+      being fetched/processed/injected in the future.
+   -  POST ``/chains/<chain_id>/mempool/unban_operation``: Unban a given
+      operation hash, removing it from the prevalidator's set of banned
+      operations. Nothing happens if the operation was not banned.
+   -  POST ``/chains/<chain_id>/mempool/unban_all_operations``: Unban
+      all operations, i.e. clear the set of banned operations.
+
 Client
 ------
+
+-  Disabled indentation checking by default in the ``tezos-client
+   convert script`` and ``tezos-client hash script`` commands. In
+   particular, ``tezos-client convert script <script> from Michelson
+   to Michelson`` can now be used as a Michelson script formatter. To
+   force the indentation check, the new ``--enforce-indentation``
+   command line switch can be used.
+
 
 Baker / Endorser / Accuser
 --------------------------
@@ -32,6 +64,19 @@ Proxy server
 Protocol Compiler And Environment
 ---------------------------------
 
+-  Added a new version of the protocol environment (V3).
+
+   -  Update some dependency libraries that have had releases since V2
+
+   -  Improve safety by removing access to some potentially dangerous functions
+      (functions that make assumptions about their input, functions that rely on
+      implicit comparison, etc.)
+
+   -  New features: Timelock, FallbackArray
+
+   -  New feature: chunked transfer encoded RPCs to allow RPCs with large
+      responses to be processed in chunks.
+
 Codec
 -----
 
@@ -40,20 +85,51 @@ Docker Images
 
 Miscellaneous
 -------------
+
 Version 10.0~rc2
 ================
 
 Node
 ----
 
-- Check that protocol migrations can only increase the protocol
-  environment version.
+-  Added a check to prevent protocol migrations that decrease the protocol
+   environment version.
+
+-  Old stores of nodes running Granadanet can now be upgraded to the new store format
+   introduced in 10.0~rc1. Before, this was only possible for Mainnet, Edonet and
+   Florencenet.
+
+-  Empty stores can now be migrated to the new store format too.
+
+-  Fixed a case where the context could become corrupted.
+
+-  Fixed a memory leak in the cache of the mempool. This issue could
+   also cause operations to not be propagated correctly in some cases.
+
+Docker Images
+-------------
+
+-  Running the node with the ``--version`` flag now correctly returns the commit date.
 
 Version 10.0~rc1
 ================
 
 Node
 ----
+
+-  **Breaking change**:
+   Introduced Access Control Lists for RPC servers, which allow to restrict
+   access to selected RPC endpoints for different listening addresses. The
+   default Access Control List is quite restrictive. RPC endpoints that are
+   considered unsafe will now be blocked by default for all requests coming from
+   default Access Control List is quite restrictive. Requests from remote hosts
+   to unsafe RPC endpoints are now blocked by default.
+   Among other things, this breaks bakers and endorsers running
+   remotely. For processes operating on the same host as the node, nothing
+   changes. If necessary, the old behaviour can be restored by editing the
+   node's configuration file, but it is discouraged due to security concerns
+   of open unsafe endpoints on public networks. See Node Configuration section
+   of the Tezos documentation for details.
 
 -  Replaced the chain storage layer with a more efficient backend in
    terms of both performance and storage size.
@@ -103,8 +179,8 @@ Node
    for instance, to compute rewards payouts. The default number of extra
    preserved cycles is 5 (``5 + 5`` on mainnet).
 
--  Updated the behaviour of the history mode field in the node's
-   `config.json` configuration file. If the number of additional cycles
+-  Updated the semantics of the history mode configuration parameter/option
+   of the node in full and rolling modes. If the number of additional cycles
    is not explicitly specified, the default value is used. The default
    number of additional cycles to keep is set to 5.
 
@@ -131,10 +207,6 @@ Node
 -  Fixed a potential interleaving of distinct events written to a file
    descriptor sink simultaneously.
 
--  Introduced Access Control Lists for RPC servers, which allow to
-   restrict access to selected RPC endpoints for different listening
-   addresses.
-
 -  You can now control the verbosity of the logs of the context
    storage backend using the ``TEZOS_CONTEXT`` environment
    variable. Set it to ``v`` to display log messages with level "info"
@@ -144,7 +216,7 @@ Node
    ``TEZOS_CONTEXT`` instead (see previous item).
 
 -  Added an RPC to run `TZIP-4
-   views<https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`__
+   views <https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints>`__
    offchain, accessible via ``../<block_id>/helpers/scripts/run_view``.
 
 Client
@@ -161,8 +233,9 @@ Client
    the nodes). This mode is akin to light clients and SPV clients:
    it uses Merkle proofs to make the light mode super safe.
 
--  Added commands to display the hash of Michelson scripts from files and
-   from addresses.
+-  Added commands to display the hash of Michelson script from files
+   (``tezos-client hash script``) and from addresses (``tezos-client
+   get contract script hash``).
 
 -  Added support for a new generic version of the multisig contract.
 
@@ -170,7 +243,7 @@ Client
 
 -  ``hash data`` command now supports the optional ``--for-script [TSV|CSV]``.
 
--  Rename ``--block`` option of ``sign message`` command to ``--branch``.
+-  Renamed ``--block`` option of ``sign message`` command to ``--branch``.
 
 -  Commands using an encrypted key now fail after the user fails to give the correct
    password three times.
@@ -178,6 +251,13 @@ Client
 -  Added support for FA1.2 standard, allowing to interact with fungible
    assets contracts using the ``from fa1.2 contract ...`` commands, and
    support for running the view entrypoints offchain.
+
+-  Added admin commands ``ban operation <operation_hash>``,
+   ``unban operation <operation_hash>``, and ``unban all operations``
+   that call the corresponding RPCs.
+
+-  Added a ``--legacy`` flag to the ``convert script`` command. This flag permits to use the
+   legacy typechecking mode when the input of the command is typechecked.
 
 Baker / Endorser / Accuser
 --------------------------
@@ -197,19 +277,6 @@ Proxy server
 
    Please refer to the `online documentation <https://tezos.gitlab.io/user/proxy-server.html>`__
    for further details.
-
-
-Protocol Compiler And Environment
----------------------------------
-
-Codec
------
-
-Docker Images
--------------
-
-Miscellaneous
--------------
 
 Version 9.4
 ===========
@@ -232,6 +299,12 @@ Version 9.3
      (deprecated alias of ``../<block_id>/helpers/scripts/trace_code``)
 
 -  Increased the LMDB store mapsize limit to avoid ``MDB_MAP_FULL`` failures.
+
+-  Fixed a case where the node was unable to fetch an operation because
+   a remote peer did not answer.
+
+-  Fixed various issues with the TLS layer that could in particular
+   cause some valid certificates to be refused from remote nodes.
 
 Version 9.2
 ===========
