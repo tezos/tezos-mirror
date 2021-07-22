@@ -92,7 +92,8 @@ val remove_not_applied : Operation_hash.t -> t -> unit
    which was given by the function {create} when the value [classes]
    was created is called on each discarded operation. **)
 val add :
-  Prevalidator_operation.classification ->
+  notify:(unit -> unit) ->
+  classification ->
   Operation_hash.t ->
   Operation.t ->
   t ->

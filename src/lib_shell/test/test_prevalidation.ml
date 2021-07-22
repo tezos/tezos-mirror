@@ -208,17 +208,16 @@ let test_db_do_not_clear_right_away f (nb_ops : int) (_ : unit) =
 
 let () =
   let nb_ops = [64; 128] in
+  let notify () = () in
   let handle_refused_pair =
-    ( (fun tztrace -> Prevalidator_classification.add (`Refused tztrace)),
+    ( (fun tztrace -> Classification.add ~notify (`Refused tztrace)),
       "handle_refused" )
   in
   let handle_branch_pairs =
     [
-      ( (fun tztrace ->
-          Prevalidator_classification.add (`Branch_refused tztrace)),
+      ( (fun tztrace -> Classification.add ~notify (`Branch_refused tztrace)),
         "handle_branch_refused" );
-      ( (fun tztrace ->
-          Prevalidator_classification.add (`Branch_delayed tztrace)),
+      ( (fun tztrace -> Classification.add ~notify (`Branch_delayed tztrace)),
         "handle_branch_delayed" );
     ]
   in

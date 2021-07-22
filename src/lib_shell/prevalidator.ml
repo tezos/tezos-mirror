@@ -482,14 +482,16 @@ module Make
      multiple times on the same operation, e.g. an operation that is
      reclassified upon banning an applied operation. *)
   let handle ~notify pv op kind =
+    let notify () =
+      match op with
+      | `Parsed ({raw; protocol_data; _} : Proto.operation_data operation)
+        when notify = true ->
+          Lwt_watcher.notify pv.operation_stream (kind, raw.shell, protocol_data)
+      | _ -> ()
+    in
     match op with
-    | `Parsed (op : Proto.operation_data operation) when notify = true ->
-        Lwt_watcher.notify
-          pv.operation_stream
-          (kind, op.raw.shell, op.protocol_data) ;
-        Classification.add kind op.hash op.raw pv.shell.classification
     | `Parsed {hash; raw; _} | `Unparsed (hash, raw) ->
-        Classification.add kind hash raw pv.shell.classification
+        Classification.add ~notify kind hash raw pv.shell.classification
 
   let classify_operation ~notify w pv validation_state mempool op oph =
     match Prevalidation.parse op with
