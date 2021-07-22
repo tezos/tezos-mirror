@@ -135,47 +135,6 @@ module type ARG = sig
   val chain_id : Chain_id.t
 end
 
-(** Centralised operation stream for the RPCs *)
-module type NOTIFIER = sig
-  type operation_data
-
-  (** [maybe_notify_operation ?should_notify stream kind op] should be
-   *  called when [op] is about to be classified as [kind]. In practice
-   *  [kind] is one of [`Applied], [`Branch_delayed], [`Branch_refused],
-   *  or [`Refused]. If [should_notify] is [false], do nothing; its
-   *  default value is [true].
-   *
-   *  Each classified operation should be notified exactly ONCE for a
-   *  given stream. The flag [should_notify] is used to avoid notifying
-   *  multiple times on the same operation, e.g. an operation that is
-   *  reclassified upon banning an applied operation. *)
-  val maybe_notify_operation :
-    ?should_notify:bool ->
-    ('kind * Operation.shell_header * operation_data) Lwt_watcher.input ->
-    'kind ->
-    Operation.t ->
-    unit
-end
-
-module Make_notifier (Proto : Tezos_protocol_environment.PROTOCOL) :
-  NOTIFIER with type operation_data = Proto.operation_data = struct
-  type operation_data = Proto.operation_data
-
-  module Prevalidation = Prevalidation.Make (Proto)
-
-  let notify_operation operation_stream result {Operation.shell; proto} =
-    match Prevalidation.parse_unsafe proto with
-    | Ok protocol_data ->
-        Lwt_watcher.notify operation_stream (result, shell, protocol_data)
-    | Error _ ->
-        (* possible enhancement: https://gitlab.com/tezos/tezos/-/issues/1510 *)
-        ()
-
-  let maybe_notify_operation ?(should_notify = true) operation_stream result op
-      =
-    if should_notify then notify_operation operation_stream result op
-end
-
 type t = (module T)
 
 (* General description of the mempool:
@@ -317,7 +276,6 @@ type t = (module T)
 module Make
     (Filter : Prevalidator_filters.FILTER)
     (Arg : ARG)
-    (Notifier : NOTIFIER with type operation_data = Filter.Proto.operation_data)
     (Requester : Requester.REQUESTER
                    with type t := Distributed_db.chain_db
                     and type key := Operation_hash.t
@@ -519,43 +477,24 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
-  let handle_branch_refused ?should_notify pv op oph errors =
-    Notifier.maybe_notify_operation
-      ?should_notify
-      pv.operation_stream
-      (`Branch_refused errors)
-      op ;
-    Classification.add (`Branch_refused errors) oph op pv.shell.classification
-
-  let handle_branch_delayed ?should_notify pv op oph errors =
-    Notifier.maybe_notify_operation
-      ?should_notify
-      pv.operation_stream
-      (`Branch_delayed errors)
-      op ;
-    Classification.add (`Branch_delayed errors) oph op pv.shell.classification
-
-  let handle_refused ?should_notify pv op oph errors =
-    Notifier.maybe_notify_operation
-      ?should_notify
-      pv.operation_stream
-      (`Refused errors)
-      op ;
-    Classification.add (`Refused errors) oph op pv.shell.classification
-
-  let handle_applied ?should_notify pv (op : Proto.operation_data operation) =
-    let classification = pv.shell.classification in
-    Notifier.maybe_notify_operation
-      ?should_notify
-      pv.operation_stream
-      `Applied
-      op.raw ;
-    Classification.add `Applied op.hash op.raw classification
+  (* Each classified operation should be notified exactly ONCE for a
+     given stream. The flag [should_notify] is used to avoid notifying
+     multiple times on the same operation, e.g. an operation that is
+     reclassified upon banning an applied operation. *)
+  let handle ?(should_notify = true) pv op kind =
+    match op with
+    | `Parsed (op : Proto.operation_data operation) when should_notify = true ->
+        Lwt_watcher.notify
+          pv.operation_stream
+          (kind, op.raw.shell, op.protocol_data) ;
+        Classification.add kind op.hash op.raw pv.shell.classification
+    | `Parsed {hash; raw; _} | `Unparsed (hash, raw) ->
+        Classification.add kind hash raw pv.shell.classification
 
   let classify_operation ?should_notify w pv validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        handle_refused ?should_notify pv op oph errors ;
+        handle ?should_notify pv (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (validation_state, mempool)
     | Ok op -> (
         Prevalidation.apply_operation validation_state op >>= function
@@ -571,7 +510,7 @@ module Make
               receipt
             >>= fun accept ->
             if accept then (
-              handle_applied ?should_notify pv op ;
+              handle ?should_notify pv (`Parsed op) `Applied ;
               let new_mempool =
                 Mempool.
                   {mempool with known_valid = op.hash :: mempool.known_valid}
@@ -583,13 +522,13 @@ module Make
                 oph ;
               Lwt.return (validation_state, mempool))
         | Branch_delayed errors ->
-            handle_branch_delayed ?should_notify pv op.raw op.hash errors ;
+            handle ?should_notify pv (`Parsed op) (`Branch_delayed errors) ;
             Lwt.return (validation_state, mempool)
         | Branch_refused errors ->
-            handle_branch_refused ?should_notify pv op.raw op.hash errors ;
+            handle ?should_notify pv (`Parsed op) (`Branch_refused errors) ;
             Lwt.return (validation_state, mempool)
         | Refused errors ->
-            handle_refused ?should_notify pv op.raw op.hash errors ;
+            handle ?should_notify pv (`Parsed op) (`Refused errors) ;
             Lwt.return (validation_state, mempool)
         | Outdated ->
             Distributed_db.Operation.clear_or_cancel
@@ -643,7 +582,7 @@ module Make
         (* At the time this comment was written (26/05/21), this is dead
            code since [Proto.begin_construction] cannot fail. *)
         Operation_hash.Map.iter
-          (fun oph op -> handle_branch_delayed pv op oph err)
+          (fun oph op -> handle pv (`Unparsed (oph, op)) (`Branch_delayed err))
           pv.shell.pending ;
         pv.shell.pending <- Operation_hash.Map.empty ;
         Lwt.return_unit
@@ -978,7 +917,8 @@ module Make
               >>= function
               | true ->
                   let error = [Exn (Failure "Unknown branch operation")] in
-                  handle_branch_refused pv op oph error ;
+                  (* FIXME: We have already parsed the operation. *)
+                  handle pv (`Unparsed (oph, op)) (`Branch_refused error) ;
                   let pending = Operation_hash.Set.singleton oph in
                   advertise w pv.shell {Mempool.empty with pending} ;
                   return_unit
@@ -1355,7 +1295,6 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
     ChainProto_registry.find (chain_id, Filter.Proto.hash) !chain_proto_registry
   with
   | None ->
-      let module Notifier = Make_notifier (Filter.Proto) in
       let module Prevalidator =
         Make
           (Filter)
@@ -1366,7 +1305,6 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
 
             let chain_id = chain_id
           end)
-          (Notifier)
           (Distributed_db.Operation)
       in
       (* Checking initialization errors before giving a reference to dangerous
