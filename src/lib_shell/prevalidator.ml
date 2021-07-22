@@ -478,7 +478,9 @@ module Make
         (Worker.log_event w (Banned_operation_encountered (situation, oph))) ;
       true)
     else
-      Operation_hash.Map.mem oph shell.classification.refused.map
+      Operation_hash.Map.mem
+        oph
+        (Classification.map shell.classification.refused)
       || Operation_hash.Map.mem oph shell.pending
       || Operation_hash.Set.mem oph shell.fetching
       || Operation_hash.Set.mem oph shell.live_operations
@@ -487,8 +489,10 @@ module Make
   let validation_result (state : types_state) =
     {
       Preapply_result.applied = List.rev state.shell.classification.applied;
-      branch_delayed = state.shell.classification.branch_delayed.map;
-      branch_refused = state.shell.classification.branch_refused.map;
+      branch_delayed =
+        Classification.map state.shell.classification.branch_delayed;
+      branch_refused =
+        Classification.map state.shell.classification.branch_refused;
       refused = Operation_hash.Map.empty;
     }
 
@@ -876,14 +880,21 @@ module Make
              let filter f map =
                Operation_hash.Map.fold f map Operation_hash.Map.empty
              in
+
              let refused =
-               filter map_op_error pv.shell.classification.refused.map
+               filter
+                 map_op_error
+                 (Classification.map pv.shell.classification.refused)
              in
              let branch_refused =
-               filter map_op_error pv.shell.classification.branch_refused.map
+               filter
+                 map_op_error
+                 (Classification.map pv.shell.classification.branch_refused)
              in
              let branch_delayed =
-               filter map_op_error pv.shell.classification.branch_delayed.map
+               filter
+                 map_op_error
+                 (Classification.map pv.shell.classification.branch_delayed)
              in
              let unprocessed =
                Operation_hash.Map.fold
@@ -948,17 +959,23 @@ module Make
              in
              let refused =
                if params#refused then
-                 Operation_hash.Map.fold fold_op refused.map []
+                 Operation_hash.Map.fold fold_op (Classification.map refused) []
                else []
              in
              let branch_refused =
                if params#branch_refused then
-                 Operation_hash.Map.fold fold_op branch_refused.map []
+                 Operation_hash.Map.fold
+                   fold_op
+                   (Classification.map branch_refused)
+                   []
                else []
              in
              let branch_delayed =
                if params#branch_delayed then
-                 Operation_hash.Map.fold fold_op branch_delayed.map []
+                 Operation_hash.Map.fold
+                   fold_op
+                   (Classification.map branch_delayed)
+                   []
                else []
              in
              let current_mempool =

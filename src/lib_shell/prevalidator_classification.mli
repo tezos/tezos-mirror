@@ -29,10 +29,10 @@ type classification =
   | `Branch_refused of tztrace
   | `Refused of tztrace ]
 
-type bounded_map = {
-  ring : Operation_hash.t Ringo.Ring.t;
-  mutable map : (Operation.t * error list) Operation_hash.Map.t;
-}
+type bounded_map
+
+(** [map bounded_map] gets the underling map of the [bounded_map]. *)
+val map : bounded_map -> (Operation.t * tztrace) Operation_hash.Map.t
 
 type t = {
   refused : bounded_map;
@@ -77,7 +77,7 @@ val remove_not_applied : Operation_hash.t -> t -> unit
      classified as [Refused]. **)
 val add :
   on_discarded_operation:(Operation_hash.t -> unit) ->
-  classification ->
+  Prevalidator_operation.classification ->
   Operation_hash.t ->
   Operation.t ->
   t ->

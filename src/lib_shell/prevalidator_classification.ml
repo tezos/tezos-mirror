@@ -34,6 +34,8 @@ type bounded_map = {
   mutable map : (Operation.t * error list) Operation_hash.Map.t;
 }
 
+let map bounded_map = bounded_map.map
+
 (** [mk_empty_bounded_map ring_size] returns a {!bounded_map} whose ring
     *  holds at mosts [ring_size] values. {!Invalid_argument} is raised
     *  if [ring_size] is [0] or less. *)
