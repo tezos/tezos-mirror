@@ -704,28 +704,28 @@ if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 case $(basename "$0") in
     granadanet.sh)
         docker_base_dir="$HOME/.tezos-granadanet"
-        docker_image=tezos/tezos:v10.0-rc1
+        docker_image=tezos/tezos:v10.0-rc2
         docker_compose_base_name=granadanet
         default_port=9732
         network=granadanet
         ;;
     florencenet.sh)
         docker_base_dir="$HOME/.tezos-florencenet"
-        docker_image=tezos/tezos:v10.0-rc1
+        docker_image=tezos/tezos:v10.0-rc2
         docker_compose_base_name=florencenet
         default_port=9732
         network=florencenet
         ;;
     edo2net.sh)
         docker_base_dir="$HOME/.tezos-edo2net"
-        docker_image=tezos/tezos:v10.0-rc1
+        docker_image=tezos/tezos:v10.0-rc2
         docker_compose_base_name=edo2net
         default_port=9732
         network=edo2net
         ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
-        docker_image=tezos/tezos:v10.0-rc1
+        docker_image=tezos/tezos:v10.0-rc2
         docker_compose_base_name="mainnet"
         default_port=9732
         network=mainnet
