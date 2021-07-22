@@ -68,7 +68,7 @@ module Logger =
 
 type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
 
-module Classification = Prevalidation.Classification
+module Classification = Prevalidator_classification
 
 (** The type needed for the implementation of [Make] below, but
  *  which is independent from the protocol. *)
@@ -196,39 +196,32 @@ end
  * what [Classificator] does and will then use more of [Requester.REQUESTER] *)
 module Classificator
     (Requester : Requester.REQUESTER with type key = Operation_hash.t) :
-  CLASSIFICATOR with type input = Requester.t * Prevalidation.Classification.t =
-struct
-  type input = Requester.t * Prevalidation.Classification.t
+  CLASSIFICATOR with type input = Requester.t * Classification.t = struct
+  type input = Requester.t * Prevalidator_classification.t
 
-  let handle_branch_refused
-      (requester, (classes : Prevalidation.Classification.t)) op oph errors =
+  let handle_branch_refused (requester, (classes : Classification.t)) op oph
+      errors =
     let on_discarded_operation = Requester.clear_or_cancel requester in
-    Prevalidation.Classification.add
+    Classification.add
       ~on_discarded_operation
       (`Branch_refused errors)
       oph
       op
       classes
 
-  let handle_branch_delayed
-      (requester, (classes : Prevalidation.Classification.t)) op oph errors =
+  let handle_branch_delayed (requester, (classes : Classification.t)) op oph
+      errors =
     let on_discarded_operation = Requester.clear_or_cancel requester in
-    Prevalidation.Classification.add
+    Classification.add
       ~on_discarded_operation
       (`Branch_delayed errors)
       oph
       op
       classes
 
-  let handle_refused (requester, (classes : Prevalidation.Classification.t)) op
-      oph errors =
+  let handle_refused (requester, (classes : Classification.t)) op oph errors =
     let on_discarded_operation = Requester.clear_or_cancel requester in
-    Prevalidation.Classification.add
-      ~on_discarded_operation
-      (`Refused errors)
-      oph
-      op
-      classes
+    Classification.add ~on_discarded_operation (`Refused errors) oph op classes
 end
 
 type t = (module T)
@@ -398,7 +391,6 @@ module Make
 
   type 'operation_data operation = 'operation_data Prevalidation.operation
 
-  module Classification = Prevalidation.Classification
   module Prevalidation = Prevalidation.Make (Protocol)
 
   type types_state = {
@@ -1585,7 +1577,6 @@ module Internal_for_tests = struct
 
   module Classificator : functor
     (Requester : Requester.REQUESTER with type key = Operation_hash.t)
-    ->
-    CLASSIFICATOR with type input = Requester.t * Prevalidation.Classification.t =
+    -> CLASSIFICATOR with type input = Requester.t * Classification.t =
     Classificator
 end

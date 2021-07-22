@@ -51,7 +51,7 @@ let test_safe_decode () =
       true)
 
 open Tezos_requester
-module Classification = Prevalidation.Classification
+module Classification = Prevalidator_classification
 
 module Parameters :
   Requester_impl.PARAMETERS

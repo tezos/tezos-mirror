@@ -146,5 +146,5 @@ module Internal_for_tests : sig
   module Classificator : functor
     (Requester : Requester.REQUESTER with type key = Operation_hash.t)
     ->
-    CLASSIFICATOR with type input = Requester.t * Prevalidation.Classification.t
+    CLASSIFICATOR with type input = Requester.t * Prevalidator_classification.t
 end
