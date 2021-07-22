@@ -25,6 +25,8 @@
 
 type sources_config = {min_agreement : float; uris : Uri.t list}
 
+let sources_config_to_uris ({uris; _} : sources_config) = uris
+
 let default_agreement = 1.0
 
 let sources_encoding =

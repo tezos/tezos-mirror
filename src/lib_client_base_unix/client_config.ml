@@ -485,13 +485,17 @@ let endpoint_arg () =
       "HTTP(S) endpoint of the node RPC interface; e.g. 'http://localhost:8732'"
     (endpoint_parameter ())
 
+let example_light_mode_sources =
+  {|{"min_agreement": 1.0, "uris": ["http://localhost:8732", "https://localhost:8733"]}|}
+
 let sources_arg () =
   arg
     ~long:"sources"
     ~short:'s'
     ~placeholder:"path"
     ~doc:
-      {|path to JSON file containing sources for --mode light. Example file content: {"min_agreement": 1.0, "uris": ["http://localhost:8732", "https://localhost:8733"]}|}
+      ("path to JSON file containing sources for --mode light. Example file \
+        content: " ^ example_light_mode_sources)
     (sources_parameter ())
 
 let remote_signer_arg () =
@@ -882,6 +886,43 @@ let build_endpoint addr port tls =
   |> updatecomp Uri.with_port port
   |> updatecomp Uri.with_scheme scheme
 
+let light_mode_checks mode endpoint sources =
+  match (mode, sources) with
+  | (`Mode_client, None) | (`Mode_mockup, None) | (`Mode_proxy, None) ->
+      (* No --mode light, no --sources; good *)
+      return_unit
+  | (`Mode_client, Some _) | (`Mode_mockup, Some _) | (`Mode_proxy, Some _) ->
+      (* --sources without the light mode: wrong *)
+      failwith
+        "--sources is specified whereas mode is %s. --sources should only be \
+         used with --mode light."
+      @@ client_mode_to_string mode
+  | (`Mode_light, None) ->
+      (* --mode light without --sources: wrong *)
+      failwith
+        "--mode light requires passing --sources. Example --sources file: %s"
+        example_light_mode_sources
+  | (`Mode_light, Some sources) ->
+      let sources_uris = Tezos_proxy.Light.sources_config_to_uris sources in
+      if List.mem ~equal:Uri.equal endpoint sources_uris then return_unit
+      else
+        let uri_to_json_string uri =
+          Uri.to_string uri |> Printf.sprintf "\"%s\""
+        in
+        failwith
+          "Value of --endpoint is %a. Therefore, this URI MUST be in field \
+           'uris' of --sources (whose value is: [%s]). If you did not specify \
+           --endpoint, it is being defaulted; you may hereby specify \
+           --endpoint %a to fix this error."
+          Uri.pp
+          endpoint
+          (String.concat ", " @@ List.map uri_to_json_string sources_uris)
+          (* By the check done in Light.mk_sources_config, [sources_uris]
+             cannot be empty, but we don't rely on this here, by using
+             pp_print_option. *)
+          (Format.pp_print_option Uri.pp)
+          (List.hd sources_uris)
+
 let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options (global_options ()) ctx argv
   >>=? fun ( ( base_dir,
@@ -993,6 +1034,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
          "@{<warning>Warning:@}  the --addr --port --tls options are now \
           deprecated; use --endpoint instead\n" ;
        pp_print_flush err_formatter ()))) ;
+  light_mode_checks client_mode endpoint sources >>=? fun () ->
   Tezos_signer_backends_unix.Remote.read_base_uri_from_env ()
   >>=? fun remote_signer_env ->
   let remote_signer =

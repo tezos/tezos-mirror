@@ -57,6 +57,10 @@ type sources = private {
 val destruct_sources_config :
   Data_encoding.json -> (sources_config, string) result
 
+(** [sources_config_to_uris sources] returns the {!Uri}s contained
+ *  in [sources]. *)
+val sources_config_to_uris : sources_config -> Uri.t list
+
 (** [sources_config_to_sources f config] transforms the value [config]
     (which was obtained by parsing the CLI) into a value used
     by core algorithms of the light mode. *)
