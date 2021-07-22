@@ -8,9 +8,6 @@
   variables:
     DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: ""
-  before_script:
-    - mkdir ~/.docker || true
-    - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
   script:
     - TAG_NAME=$(echo "${CI_COMMIT_REF_NAME}" | tr -c -- '-._\n[:alnum:]' '_')
     - ./scripts/create_docker_image.sh
@@ -53,6 +50,8 @@ build_release:docker_amd64:
   tags:
     - safe_docker
   before_script:
+    - mkdir ~/.docker || true
+    - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
     - apk --no-cache --virtual add git
 
 build_release:docker_arm64:
@@ -64,6 +63,8 @@ build_release:docker_arm64:
   tags:
     - arm64
   before_script:
+    - mkdir ~/.docker || true
+    - echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json
     - apk --no-cache --virtual add git
 
 .build_static_binaries_template:
