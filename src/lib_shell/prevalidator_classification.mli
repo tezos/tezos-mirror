@@ -34,7 +34,13 @@ type bounded_map
 (** [map bounded_map] gets the underling map of the [bounded_map]. *)
 val map : bounded_map -> (Operation.t * tztrace) Operation_hash.Map.t
 
+type parameters = {
+  map_size_limit : int;
+  on_discarded_operation : Operation_hash.t -> unit;
+}
+
 type t = private {
+  parameters : parameters;
   refused : bounded_map;
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
@@ -42,10 +48,14 @@ type t = private {
   mutable in_mempool : Operation_hash.Set.t;
 }
 
-(** [mk_empty ring_size] returns an empty {!t} whose rings hold at
-   *  most [ring_size] values. {!Invalid_argument} is raised
-   *  if [ring_size] is [0] or less. *)
-val mk_empty : int -> t
+(** [create parameters] returns an empty {!t} whose bounded maps hold
+   at most [parameters.map_size_limit] values. The
+   [on_discarded_operation] is called when a new operation is added
+   and an old one is discarded because the limit was reached.
+
+   {!Invalid_argument} is raised if [ring_size] is [0] or less.
+   *)
+val create : parameters -> t
 
 (** [clear classes] resets the state of all fields of [classes],
     * except for [refused] *)
@@ -72,15 +82,16 @@ val remove_applied :
 val remove_not_applied : Operation_hash.t -> t -> unit
 
 (** [add ~on_discarded_operation class oph op classes] adds the
-     operation [op] with hash [oph] classified as [class] to the
-     classifier [classes]. The [on_discarded_operation] callback is
-     called for any operation discarded in this process. Currently, an
-     operation is discarded if the corresponding class field is full. In
-     that case, the new operation is added to the class, and the one
-     removed is discarded. An operation is also discarded when it is
-     classified as [Refused]. **)
+   operation [op] with hash [oph] classified as [class] to the
+   classifier [classes]. The [on_discarded_operation] callback is
+   called for any operation discarded in this process. Currently, an
+   operation is discarded if the corresponding class field is full. In
+   that case, the new operation is added to the class, and the one
+   removed is discarded. An operation is also discarded when it is
+   classified as [Refused]. The callback [on_discarded_operation]
+   which was given by the function {create} when the value [classes]
+   was created is called on each discarded operation. **)
 val add :
-  on_discarded_operation:(Operation_hash.t -> unit) ->
   Prevalidator_operation.classification ->
   Operation_hash.t ->
   Operation.t ->

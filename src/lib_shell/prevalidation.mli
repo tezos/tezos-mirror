@@ -29,14 +29,6 @@
     consistency. This module is stateless and creates and manipulates the
     prevalidation_state. *)
 
-(** The requester used by [Prevalidator], backed by [Distributed_db]. *)
-module Requester :
-  Requester.REQUESTER
-    with type t = Distributed_db.chain_db
-     and type key = Operation_hash.t
-     and type value = Operation.t
-     and type param = unit
-
 type 'operation_data operation = private {
   hash : Operation_hash.t;  (** Hash of an operation. *)
   raw : Operation.t;

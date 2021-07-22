@@ -176,54 +176,6 @@ module Make_notifier (Proto : Tezos_protocol_environment.PROTOCOL) :
     if should_notify then notify_operation operation_stream result op
 end
 
-(** How to treat branch_refused, branch_delayed, and refused operations *)
-module type CLASSIFICATOR = sig
-  type input
-
-  val handle_branch_refused :
-    input -> Operation.t -> Operation_hash.t -> error list -> unit
-
-  val handle_branch_delayed :
-    input -> Operation.t -> Operation_hash.t -> error list -> unit
-
-  val handle_refused :
-    input -> Operation.t -> Operation_hash.t -> error list -> unit
-end
-
-(* For the moment we only use the function [clear_or_cancel] from
- * [Requester.REQUESTER], so we could take a smaller module as
- * input. However, in the future, we may want to extend
- * what [Classificator] does and will then use more of [Requester.REQUESTER] *)
-module Classificator
-    (Requester : Requester.REQUESTER with type key = Operation_hash.t) :
-  CLASSIFICATOR with type input = Requester.t * Classification.t = struct
-  type input = Requester.t * Prevalidator_classification.t
-
-  let handle_branch_refused (requester, (classes : Classification.t)) op oph
-      errors =
-    let on_discarded_operation = Requester.clear_or_cancel requester in
-    Classification.add
-      ~on_discarded_operation
-      (`Branch_refused errors)
-      oph
-      op
-      classes
-
-  let handle_branch_delayed (requester, (classes : Classification.t)) op oph
-      errors =
-    let on_discarded_operation = Requester.clear_or_cancel requester in
-    Classification.add
-      ~on_discarded_operation
-      (`Branch_delayed errors)
-      oph
-      op
-      classes
-
-  let handle_refused (requester, (classes : Classification.t)) op oph errors =
-    let on_discarded_operation = Requester.clear_or_cancel requester in
-    Classification.add ~on_discarded_operation (`Refused errors) oph op classes
-end
-
 type t = (module T)
 
 (* General description of the mempool:
@@ -367,10 +319,10 @@ module Make
     (Arg : ARG)
     (Notifier : NOTIFIER with type operation_data = Filter.Proto.operation_data)
     (Requester : Requester.REQUESTER
-                   with type t = Distributed_db.chain_db
-                    and type key = Operation_hash.t
-                    and type value = Operation.t
-                    and type param = unit) : T = struct
+                   with type t := Distributed_db.chain_db
+                    and type key := Operation_hash.t
+                    and type value := Operation.t
+                    and type param := unit) : T = struct
   module Filter = Filter
   module Proto = Filter.Proto
 
@@ -567,36 +519,29 @@ module Make
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
-  module Proto_classificator = struct
-    module Classificator = Classificator (Requester)
+  let handle_branch_refused ?should_notify pv op oph errors =
+    Notifier.maybe_notify_operation
+      ?should_notify
+      pv.operation_stream
+      `Branch_refused
+      op ;
+    Classification.add (`Branch_refused errors) oph op pv.shell.classification
 
-    let handle_branch_refused ?should_notify pv op oph errors =
-      let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
-      Notifier.maybe_notify_operation
-        ?should_notify
-        pv.operation_stream
-        `Branch_refused
-        op ;
-      Classificator.handle_branch_refused input op oph errors
+  let handle_branch_delayed ?should_notify pv op oph errors =
+    Notifier.maybe_notify_operation
+      ?should_notify
+      pv.operation_stream
+      `Branch_delayed
+      op ;
+    Classification.add (`Branch_delayed errors) oph op pv.shell.classification
 
-    let handle_branch_delayed ?should_notify pv op oph errors =
-      let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
-      Notifier.maybe_notify_operation
-        ?should_notify
-        pv.operation_stream
-        `Branch_delayed
-        op ;
-      Classificator.handle_branch_delayed input op oph errors
-
-    let handle_refused ?should_notify pv op oph errors =
-      let input = (pv.shell.parameters.chain_db, pv.shell.classification) in
-      Notifier.maybe_notify_operation
-        ?should_notify
-        pv.operation_stream
-        `Refused
-        op ;
-      Classificator.handle_refused input op oph errors
-  end
+  let handle_refused ?should_notify pv op oph errors =
+    Notifier.maybe_notify_operation
+      ?should_notify
+      pv.operation_stream
+      `Refused
+      op ;
+    Classification.add (`Refused errors) oph op pv.shell.classification
 
   let handle_applied ?should_notify pv (op : Proto.operation_data operation) =
     let classification = pv.shell.classification in
@@ -605,18 +550,12 @@ module Make
       pv.operation_stream
       `Applied
       op.raw ;
-    let on_discarded_operation _ = () in
-    Classification.add
-      ~on_discarded_operation
-      `Applied
-      op.hash
-      op.raw
-      classification
+    Classification.add `Applied op.hash op.raw classification
 
   let classify_operation ?should_notify w pv validation_state mempool op oph =
     match Prevalidation.parse op with
     | Error errors ->
-        Proto_classificator.handle_refused ?should_notify pv op oph errors ;
+        handle_refused ?should_notify pv op oph errors ;
         Lwt.return (validation_state, mempool)
     | Ok op -> (
         Prevalidation.apply_operation validation_state op >>= function
@@ -644,28 +583,13 @@ module Make
                 oph ;
               Lwt.return (validation_state, mempool))
         | Branch_delayed errors ->
-            Proto_classificator.handle_branch_delayed
-              ?should_notify
-              pv
-              op.raw
-              op.hash
-              errors ;
+            handle_branch_delayed ?should_notify pv op.raw op.hash errors ;
             Lwt.return (validation_state, mempool)
         | Branch_refused errors ->
-            Proto_classificator.handle_branch_refused
-              ?should_notify
-              pv
-              op.raw
-              op.hash
-              errors ;
+            handle_branch_refused ?should_notify pv op.raw op.hash errors ;
             Lwt.return (validation_state, mempool)
         | Refused errors ->
-            Proto_classificator.handle_refused
-              ?should_notify
-              pv
-              op.raw
-              op.hash
-              errors ;
+            handle_refused ?should_notify pv op.raw op.hash errors ;
             Lwt.return (validation_state, mempool)
         | Outdated ->
             Distributed_db.Operation.clear_or_cancel
@@ -719,8 +643,7 @@ module Make
         (* At the time this comment was written (26/05/21), this is dead
            code since [Proto.begin_construction] cannot fail. *)
         Operation_hash.Map.iter
-          (fun oph op ->
-            Proto_classificator.handle_branch_delayed pv op oph err)
+          (fun oph op -> handle_branch_delayed pv op oph err)
           pv.shell.pending ;
         pv.shell.pending <- Operation_hash.Map.empty ;
         Lwt.return_unit
@@ -1055,7 +978,7 @@ module Make
               >>= function
               | true ->
                   let error = [Exn (Failure "Unknown branch operation")] in
-                  Proto_classificator.handle_branch_refused pv op oph error ;
+                  handle_branch_refused pv op oph error ;
                   let pending = Operation_hash.Set.singleton oph in
                   advertise w pv.shell {Mempool.empty with pending} ;
                   return_unit
@@ -1326,10 +1249,15 @@ module Make
           Operation_hash.Set.empty
           mempool.known_valid
       in
-      let parameters = {limits; chain_db} in
-      let classification =
-        Classification.mk_empty limits.max_refused_operations
+      let classification_parameters =
+        Classification.
+          {
+            map_size_limit = limits.max_refused_operations;
+            on_discarded_operation = Requester.clear_or_cancel chain_db;
+          }
       in
+      let classification = Classification.create classification_parameters in
+      let parameters = {limits; chain_db} in
       let shell =
         {
           classification;
@@ -1439,7 +1367,7 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
             let chain_id = chain_id
           end)
           (Notifier)
-          (Prevalidation.Requester)
+          (Distributed_db.Operation)
       in
       (* Checking initialization errors before giving a reference to dangerous
        * `worker` value to caller. *)
@@ -1584,12 +1512,3 @@ let rpc_directory : t option RPC_directory.t =
               let pv_rpc_dir = Lazy.force pv.rpc_directory in
               Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir)
           ))
-
-module Internal_for_tests = struct
-  module type CLASSIFICATOR = CLASSIFICATOR
-
-  module Classificator : functor
-    (Requester : Requester.REQUESTER with type key = Operation_hash.t)
-    -> CLASSIFICATOR with type input = Requester.t * Classification.t =
-    Classificator
-end

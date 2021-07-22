@@ -42,7 +42,13 @@ let map bounded_map = bounded_map.map
 let mk_empty_bounded_map ring_size =
   {ring = Ringo.Ring.create ring_size; map = Operation_hash.Map.empty}
 
+type parameters = {
+  map_size_limit : int;
+  on_discarded_operation : Operation_hash.t -> unit;
+}
+
 type t = {
+  parameters : parameters;
   refused : bounded_map;
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
@@ -50,11 +56,12 @@ type t = {
   mutable in_mempool : Operation_hash.Set.t;
 }
 
-let mk_empty ring_size =
+let create parameters =
   {
-    refused = mk_empty_bounded_map ring_size;
-    branch_refused = mk_empty_bounded_map ring_size;
-    branch_delayed = mk_empty_bounded_map ring_size;
+    parameters;
+    refused = mk_empty_bounded_map parameters.map_size_limit;
+    branch_refused = mk_empty_bounded_map parameters.map_size_limit;
+    branch_delayed = mk_empty_bounded_map parameters.map_size_limit;
     in_mempool = Operation_hash.Set.empty;
     applied = [];
   }
@@ -123,7 +130,7 @@ let handle_applied oph op classes =
     3. Add the operation to the underlying map.
 
     4. Add the operation to the [in_mempool] set. *)
-let handle_error ~on_discarded_operation oph op classification classes =
+let handle_error oph op classification classes =
   let (bounded_map, tztrace) =
     match classification with
     | `Branch_refused tztrace -> (classes.branch_refused, tztrace)
@@ -133,16 +140,16 @@ let handle_error ~on_discarded_operation oph op classification classes =
   Ringo.Ring.add_and_return_erased bounded_map.ring oph
   |> Option.iter (fun e ->
          bounded_map.map <- Operation_hash.Map.remove e bounded_map.map ;
-         on_discarded_operation e ;
+         classes.parameters.on_discarded_operation e ;
          classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool) ;
   (match classification with
-  | `Refused _ -> on_discarded_operation oph
+  | `Refused _ -> classes.parameters.on_discarded_operation oph
   | _ -> ()) ;
   bounded_map.map <- Operation_hash.Map.add oph (op, tztrace) bounded_map.map ;
   classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool
 
-let add ~on_discarded_operation classification oph op classes =
+let add classification oph op classes =
   match classification with
   | `Applied -> handle_applied oph op classes
   | (`Branch_refused _ | `Branch_delayed _ | `Refused _) as classification ->
-      handle_error ~on_discarded_operation oph op classification classes
+      handle_error oph op classification classes

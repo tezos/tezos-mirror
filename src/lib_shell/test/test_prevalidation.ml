@@ -76,8 +76,6 @@ module Test_request = Requester_impl.Simple_request (Parameters)
 module Test_disk_table = Requester_impl.Disk_memory_table (Parameters)
 module Test_Requester =
   Requester_impl.Make_memory_full_requester (Hash) (Parameters) (Test_request)
-module Classificator =
-  Prevalidator.Internal_for_tests.Classificator (Test_Requester)
 
 let init_full_requester_disk ?global_input () :
     Test_Requester.t * Test_Requester.store =
@@ -110,13 +108,20 @@ let test_db_leak f (nb_ops : int) (_ : unit) =
   let requester = init_full_requester () in
   let max_table_size = 32 in
   assert (nb_ops >= max_table_size) ;
-  let classes = Classification.mk_empty max_table_size in
+  let parameters =
+    Classification.
+      {
+        map_size_limit = max_table_size;
+        on_discarded_operation = Test_Requester.clear_or_cancel requester;
+      }
+  in
+  let classes = Classification.create parameters in
   let handle i =
     let op = mk_operation i in
     let oph = Operation.hash op in
     let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
     assert injected ;
-    f (requester, classes) op oph []
+    f [] oph op classes
   in
   List.iter handle (1 -- nb_ops) ;
   let actual_table_size = Test_Requester.memory_table_length requester in
@@ -139,13 +144,20 @@ let test_in_mempool_leak f (nb_ops : int) (_ : unit) =
   let requester = init_full_requester () in
   let max_table_size = 32 in
   assert (nb_ops >= max_table_size) ;
-  let classes = Classification.mk_empty max_table_size in
+  let parameters =
+    Classification.
+      {
+        map_size_limit = max_table_size;
+        on_discarded_operation = Test_Requester.clear_or_cancel requester;
+      }
+  in
+  let classes = Classification.create parameters in
   let handle i =
     let op = mk_operation i in
     let oph = Operation.hash op in
     let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
     assert injected ;
-    f (requester, classes) op oph []
+    f [] oph op classes
   in
   List.iter handle (1 -- nb_ops) ;
   let actual_in_mempool_size = Operation_hash.Set.cardinal classes.in_mempool in
@@ -167,14 +179,21 @@ let test_db_do_not_clear_right_away f (nb_ops : int) (_ : unit) =
   let requester = init_full_requester () in
   let max_table_size = 32 in
   assert (nb_ops >= max_table_size) ;
-  let classes = Classification.mk_empty max_table_size in
+  let parameters =
+    Classification.
+      {
+        map_size_limit = max_table_size;
+        on_discarded_operation = Test_Requester.clear_or_cancel requester;
+      }
+  in
+  let classes = Classification.create parameters in
   let handle i =
     let op = mk_operation i in
     let oph = Operation.hash op in
     Format.printf "Injecting op: %a\n" Operation_hash.pp oph ;
     let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
     assert injected ;
-    f (requester, classes) op oph [] ;
+    f [] oph op classes ;
     Alcotest.(
       check
         bool
@@ -189,11 +208,18 @@ let test_db_do_not_clear_right_away f (nb_ops : int) (_ : unit) =
 
 let () =
   let nb_ops = [64; 128] in
-  let handle_refused_pair = (Classificator.handle_refused, "handle_refused") in
+  let handle_refused_pair =
+    ( (fun tztrace -> Prevalidator_classification.add (`Refused tztrace)),
+      "handle_refused" )
+  in
   let handle_branch_pairs =
     [
-      (Classificator.handle_branch_refused, "handle_branch_refused");
-      (Classificator.handle_branch_delayed, "handle_branch_delayed");
+      ( (fun tztrace ->
+          Prevalidator_classification.add (`Branch_refused tztrace)),
+        "handle_branch_refused" );
+      ( (fun tztrace ->
+          Prevalidator_classification.add (`Branch_delayed tztrace)),
+        "handle_branch_delayed" );
     ]
   in
   let applier_funs = handle_branch_pairs @ [handle_refused_pair] in
