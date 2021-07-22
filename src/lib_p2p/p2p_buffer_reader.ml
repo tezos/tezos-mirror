@@ -27,7 +27,7 @@ type error +=
   | Invalid_read_request of {
       expected : string;
       pos : int64;
-      len : int64;
+      length_to_copy : int64;
       buflen : int64;
     }
 
@@ -38,26 +38,26 @@ let () =
     ~title:"Read request is erroneously specified"
     ~description:
       "When about to read incoming data, read parameters are erroneous"
-    ~pp:(fun fmt (expected, pos, len, buflen) ->
+    ~pp:(fun fmt (expected, pos, length_to_copy, buflen) ->
       Format.fprintf
         fmt
-        "%s should hold, but pos=%Ld len=%Ld buflen=%Ld"
+        "%s should hold, but pos=%Ld length_to_copy=%Ld buflen=%Ld"
         expected
         pos
-        len
+        length_to_copy
         buflen)
     Data_encoding.(
       obj4
         (req "expected" string)
         (req "pos" int64)
-        (req "len" int64)
+        (req "length_to_copy" int64)
         (req "buflen" int64))
     (function
-      | Invalid_read_request {expected; pos; len; buflen} ->
-          Some (expected, pos, len, buflen)
+      | Invalid_read_request {expected; pos; length_to_copy; buflen} ->
+          Some (expected, pos, length_to_copy, buflen)
       | _ -> None)
-    (fun (expected, pos, len, buflen) ->
-      Invalid_read_request {expected; pos; len; buflen})
+    (fun (expected, pos, length_to_copy, buflen) ->
+      Invalid_read_request {expected; pos; length_to_copy; buflen})
 
 type readable = {
   read_buffer : Circular_buffer.t;
@@ -68,24 +68,22 @@ type readable = {
 let mk_readable ~read_buffer ~read_queue =
   {read_buffer; read_queue; partial_read = None}
 
-(** Container to write bytes to when reading [len] bytes from a readable.
+(** Container to write bytes to when reading [length_to_copy] bytes from a readable.
     Bytes read are written to [buf] starting at offset [pos].
     Values of this type guarantee the invariants:
 
-    - [0 <= len]
+    - [0 <= length_to_copy]
     - [0 <= pos]
-    - [pos + len <= (Bytes.length buf)]
+    - [pos + length_to_copy <= (Bytes.length buf)]
 
     This is ensured by the smart constructor [mk_buffer] and
     the type being abstract. *)
-type buffer = {len : int; pos : int; buf : Bytes.t}
+type buffer = {length_to_copy : int; pos : int; buf : Bytes.t}
 
-(** [mk_buffer ?pos ?len buf] creates an instance of {!buffer},
-    making sure its invariants hold; or fails with [Invalid_read_request]. *)
-let mk_buffer ?pos ?len buf : (buffer, tztrace) result =
+let mk_buffer ?pos ?length_to_copy buf : (buffer, tztrace) result =
   let buflen = Bytes.length buf in
   let pos = Option.value ~default:0 pos in
-  let len = Option.value ~default:(buflen - pos) len in
+  let length_to_copy = Option.value ~default:(buflen - pos) length_to_copy in
   let check cond ~expected =
     if cond then ok ()
     else
@@ -95,30 +93,33 @@ let mk_buffer ?pos ?len buf : (buffer, tztrace) result =
             {
               expected;
               pos = of_int pos;
-              len = of_int pos;
+              length_to_copy = of_int pos;
               buflen = of_int buflen;
             })
   in
-  check (0 <= len) ~expected:"0 <= len" >>? fun () ->
+  check (0 <= length_to_copy) ~expected:"0 <= length_to_copy" >>? fun () ->
   check (0 <= pos) ~expected:"0 <= pos" >>? fun () ->
-  check (pos + len <= buflen) ~expected:"pos + len <= buflen" >>? fun () ->
-  Ok {len; pos; buf}
+  check
+    (pos + length_to_copy <= buflen)
+    ~expected:"pos + length_to_copy <= buflen"
+  >>? fun () -> Ok {length_to_copy; pos; buf}
 
-let mk_buffer_safe buf : buffer = {len = Bytes.length buf; pos = 0; buf}
+let mk_buffer_safe buf : buffer =
+  {length_to_copy = Bytes.length buf; pos = 0; buf}
 
-(** [shift amount buffer] returns a variant of buffer whose next read
-    will write to [buffer.buf] [amount] cells to the right. *)
-let shift amount {pos; len; buf} =
-  mk_buffer ~pos:(pos + amount) ~len:(len - amount) buf
+(** [shift amount buffer] returns a variant of [buffer] with its [pos] shifted
+    [amount] cells to the right and [length_to_copy] adapted accordingly. *)
+let shift amount {pos; length_to_copy; buf} =
+  mk_buffer ~pos:(pos + amount) ~length_to_copy:(length_to_copy - amount) buf
 
-(* Copy [len] bytes from [data] starting at [pos] into [buf].
+(** Copy [length_to_copy] bytes from [data] starting at [pos] into [buf].
 
    If not all [data] is read, the remainder is put back in
    [readable.partial_read] *)
-let read_from readable {pos = offset; len; buf} data =
+let read_from readable {pos = offset; length_to_copy; buf} data =
   match data with
   | Ok data ->
-      let read_len = min len (Circular_buffer.length data) in
+      let read_len = min length_to_copy (Circular_buffer.length data) in
       Option.iter
         (fun data -> readable.partial_read <- Some data)
         (Circular_buffer.read
@@ -130,7 +131,6 @@ let read_from readable {pos = offset; len; buf} data =
       Ok read_len
   | Error _ -> error P2p_errors.Connection_closed
 
-(* Read available data or wait for it. *)
 let read ?canceler readable buffer =
   match readable.partial_read with
   | Some msg ->
@@ -143,20 +143,19 @@ let read ?canceler readable buffer =
           >|= read_from readable buffer)
         (fun _ -> fail P2p_errors.Connection_closed)
 
-(* fill [buf] with data *)
 let read_full ?canceler readable buffer =
-  let rec loop ({len; _} as buffer) =
-    if len = 0 then return_unit
+  let rec loop ({length_to_copy; _} as buffer) =
+    if length_to_copy = 0 then return_unit
     else
       read ?canceler readable buffer >>=? fun read_len ->
-      (* This is safe - even if the initial ~len is not a multiple of the
-         readable's pending bytes - because the low-level read function
-         [read_from] reads *at most* the requested number of bytes:
-         it doesn't try to read more than available. *)
+      (* This is safe - even if the initial [length_to_copy] is not a multiple of the
+         readable's pending bytes - because [read] reads *at most*
+         the requested number of bytes: it doesn't try to read more
+         than available. *)
       shift read_len buffer >>?= loop
   in
   loop buffer
 
 module Internal_for_tests = struct
-  let destruct_buffer {pos; len; buf} = (pos, len, buf)
+  let destruct_buffer {pos; length_to_copy; buf} = (pos, length_to_copy, buf)
 end

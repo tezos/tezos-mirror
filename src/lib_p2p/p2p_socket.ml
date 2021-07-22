@@ -175,7 +175,8 @@ module Connection_message = struct
     (* This call to [mk_buffer] is safe (it can't [Error] out)
        but we cannot use [mk_buffer_safe], because we need to specify
        ~len and ~pos. *)
-    mk_buffer ~len ~pos buf >>?= read_full ~canceler fd >>=? fun () ->
+    mk_buffer ~length_to_copy:len ~pos buf >>?= read_full ~canceler fd
+    >>=? fun () ->
     let buf = Bytes.unsafe_to_string buf in
     match Data_encoding.Binary.read encoding buf pos len with
     | Error re -> fail (P2p_errors.Decoding_error re)

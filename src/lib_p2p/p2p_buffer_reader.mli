@@ -26,8 +26,6 @@
 (** This module takes care of reading data from a {!readable} into a {!buffer}.
 
     Its purpose is to take care - via those abstract types - of the tedious tracking of byte positions and lengths when copying data around, as well as ensuring invariants for safety of call sites, e.g. "do not read too much" or "wait if no data is readable right now".
-
-    In this module, "length" means "length to copy into the buffer", not "the actual length of the buffer".
 *)
 
 (** A data source. Reading functions read data {i from} it. *)
@@ -45,18 +43,21 @@ val mk_readable :
   read_queue:Circular_buffer.data tzresult Lwt_pipe.t ->
   readable
 
-(** [mk_buffer ?pos ?len bytes] creates a {!buffer} for copying [len] bytes into [bytes] starting at position [pos].
+(** [mk_buffer ?pos ?length_to_copy bytes] creates a {!buffer} for copying [length_to_copy] bytes into [bytes] starting at position [pos].
 
     - [pos] defaults to [0].
-    - [len] defaults to [Bytes.length buf - pos].
+    - [length_to_copy] defaults to [Bytes.length buf - pos].
 
-    If you neither specify [pos] nor [len], prefer using {!mk_buffer_safe} which cannot fail.
+    If you neither specify [pos] nor [length_to_copy], prefer using {!mk_buffer_safe} which cannot fail.
+
+    If invalid values are passed, fails with [Invalid_read_request].
 *)
-val mk_buffer : ?pos:int -> ?len:int -> bytes -> (buffer, tztrace) result
+val mk_buffer :
+  ?pos:int -> ?length_to_copy:int -> bytes -> (buffer, tztrace) result
 
 (** [mk_buffer_safe bytes] creates a {!buffer} that uses the entirety of [bytes].
 
-    Simpler equivalent to [mk_buffer ?pos:None ?len:None bytes] as the result is not wrapped in a {!result}.
+    Simpler equivalent to [mk_buffer ?pos:None ?length_to_copy:None bytes] as the result is not wrapped in a {!result}.
 *)
 val mk_buffer_safe : bytes -> buffer
 
@@ -70,9 +71,9 @@ val mk_buffer_safe : bytes -> buffer
 
     Invariants:
 
-    - The returned number of bytes is lower than or equal to the current length of [buffer].
-    - If the next [readable] segment is smaller than the current length of [buffer] then only this segment is copied into [buffer] (i.e. the [buffer] length after [read] may or may not be [0])
-    - If the next [readable] segment is bigger than the current length of [buffer] then the unused data of that segment is kept for the next read (i.e. [readable] does not lose data).
+    - The returned number of bytes is lower than or equal to the current value of [buffer.length_to_copy].
+    - If the next [readable] segment is smaller than the current value of [buffer.length_to_copy] then only this segment is copied into [buffer] (i.e. after [read], [buffer.length_to_copy] may or may not be [0])
+    - If the next [readable] segment is bigger than the current value of [buffer.length_to_copy] then the unused data of that segment is kept for the next read (i.e. [readable] does not lose data).
 *)
 val read : ?canceler:Lwt_canceler.t -> readable -> buffer -> int tzresult Lwt.t
 
@@ -83,7 +84,7 @@ val read : ?canceler:Lwt_canceler.t -> readable -> buffer -> int tzresult Lwt.t
 
     Invariants:
 
-    - The [buffer] length after [read_full] is guaranteed to be [0] (i.e. it is useless to read into [buffer] afterwards).
+    - [buffer.length_to_copy] after [read_full] is guaranteed to be [0] (i.e. it is useless to read into [buffer] afterwards).
     - If the last read segment of [readable] is bigger than the remaining length of [buffer] then the unused data of that segment is kept for the next read (i.e. [readable] does not lose data).
 *)
 val read_full :
@@ -92,7 +93,7 @@ val read_full :
 (**/**)
 
 module Internal_for_tests : sig
-  (** [destruct_buffer buf] returns the [pos], [len], and [buf] values
+  (** [destruct_buffer buf] returns the [pos], [length_to_copy], and [buf] values
       of the given {!buffer}. See {!mk_buffer}. *)
   val destruct_buffer : buffer -> int * int * Bytes.t
 end
