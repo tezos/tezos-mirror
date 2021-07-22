@@ -96,6 +96,10 @@ val get_mode : t -> mode
     a new client from scratch. *)
 val set_mode : mode -> t -> unit
 
+(** Write the [--sources] file used by the light mode. *)
+val write_sources_file :
+  min_agreement:float -> uris:string list -> t -> unit Lwt.t
+
 (** {2 RPC calls} *)
 
 (** Paths for RPCs.

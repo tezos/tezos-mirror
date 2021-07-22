@@ -709,6 +709,19 @@ let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode ?constants
   set_mode Mockup client ;
   return client
 
+let write_sources_file ~min_agreement ~uris client =
+  (* Create a services.json file in the base directory with correctly
+     JSONified data *)
+  Lwt_io.with_file ~mode:Lwt_io.Output (sources_file client) (fun oc ->
+      let obj =
+        `O
+          [
+            ("min_agreement", `Float min_agreement);
+            ("uris", `A (List.map (fun s -> `String s) uris));
+          ]
+      in
+      Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
+
 let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
     ?(nodes_args = []) () =
   let filter_node_arg = function
@@ -731,26 +744,14 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
       ?base_dir
       (Light (min_agreement, List.map (fun n -> Node n) nodes))
   in
-  (* Create a services.json file in the base directory with correctly
-     JSONified data *)
   let* () =
-    Lwt_io.with_file ~mode:Lwt_io.Output (sources_file client) (fun oc ->
-        let obj =
-          `O
-            [
-              ("min_agreement", `Float min_agreement);
-              ( "uris",
-                `A
-                  (List.map
-                     (fun node ->
-                       `String
-                         (Printf.sprintf
-                            "http://localhost:%d"
-                            (Node.rpc_port node)))
-                     nodes) );
-            ]
-        in
-        Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string obj)
+    write_sources_file
+      ~min_agreement
+      ~uris:
+        (List.map
+           (fun node -> sf "http://localhost:%d" (Node.rpc_port node))
+           nodes)
+      client
   in
   let json = JSON.parse_file (sources_file client) in
   Log.info "%s" @@ JSON.encode json ;

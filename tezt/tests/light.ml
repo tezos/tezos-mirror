@@ -66,6 +66,30 @@ let init_light ~protocol =
   assert (Client.get_mode client |> is_light_mode) ;
   return (node0, client)
 
+let test_no_endpoint () =
+  Test.register
+    ~__FILE__
+    ~title:"mode light no endpoint"
+    ~tags:["client"; "light"; "cli"]
+  @@ fun () ->
+  let min_agreement = 1.0 in
+  let uris = List.map (fun port -> sf "http://localhost:%d" port) [666; 667] in
+  let endpoints =
+    (* As the client should fail before contacting the node, we don't need
+       to start a node in this test. Hence we pass an empty list of endpoints
+       when creating the client below. *)
+    []
+  in
+  let client = Client.create_with_mode (Light (min_agreement, endpoints)) in
+  let* () = Client.write_sources_file ~min_agreement ~uris client in
+  let process = RPC.Contracts.spawn_get_all (* ?endpoint omitted *) client in
+  let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
+  let regexp =
+    rex "Value of --endpoint is .*. If you did not specify --endpoint, .*"
+  in
+  Check.((stderr =~ regexp) ~error_msg:"expected value =~ %R, got %L") ;
+  unit
+
 let do_transfer ?(amount = Tez.one) ?(giver = Constant.bootstrap1.alias)
     ?(receiver = Constant.bootstrap2.alias) client =
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
@@ -228,6 +252,8 @@ let test_compare_light =
     ]
   in
   check_equivalence ~tz_log protocol alt_mode clients
+
+let register_protocol_independent () = test_no_endpoint ()
 
 let register ~protocols =
   test_transfer ~protocols ;
