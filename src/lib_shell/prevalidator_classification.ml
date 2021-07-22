@@ -72,10 +72,29 @@ let is_in_mempool oph classes = Operation_hash.Set.mem oph classes.in_mempool
 let is_applied oph classes =
   List.exists (fun (h, _) -> Operation_hash.equal h oph) classes.applied
 
-let remove_applied oph classes =
-  classes.applied <-
-    List.filter (fun (h, _) -> not (Operation_hash.equal h oph)) classes.applied ;
-  classes.in_mempool <- Operation_hash.Set.remove oph classes.in_mempool
+let remove_applied to_remove classes =
+  if not (is_applied to_remove classes) then None
+  else
+    (* At first sight, all the op classified before [oph] are still
+       valid and their classification won't change. However, in
+       practice we don't have the [Context.t] associated to this
+       prefix and so we just remove all the applied operations. *)
+    let to_reclassify =
+      List.fold_left
+        (fun to_reclassify (oph, op) ->
+          if Operation_hash.(oph <> to_remove) then
+            ( Operation_hash.Set.add oph (fst to_reclassify),
+              Operation_hash.Map.add oph op (snd to_reclassify) )
+          else to_reclassify)
+        (Operation_hash.Set.empty, Operation_hash.Map.empty)
+        classes.applied
+    in
+    classes.in_mempool <-
+      Operation_hash.Set.diff
+        classes.in_mempool
+        (Operation_hash.Set.add to_remove (fst to_reclassify)) ;
+    classes.applied <- [] ;
+    Some (snd to_reclassify)
 
 let remove_not_applied oph classes =
   classes.refused.map <- Operation_hash.Map.remove oph classes.refused.map ;

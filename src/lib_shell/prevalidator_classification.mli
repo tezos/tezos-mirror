@@ -34,7 +34,7 @@ type bounded_map
 (** [map bounded_map] gets the underling map of the [bounded_map]. *)
 val map : bounded_map -> (Operation.t * tztrace) Operation_hash.Map.t
 
-type t = {
+type t = private {
   refused : bounded_map;
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
@@ -59,9 +59,13 @@ val is_in_mempool : Operation_hash.t -> t -> bool
       in field [applied] of [classes]. *)
 val is_applied : Operation_hash.t -> t -> bool
 
-(** [remove_applied oph classes] removes operation of hash [oph]
-      from fields [applied] and [in_mempool] of [classes]. *)
-val remove_applied : Operation_hash.t -> t -> unit
+(** [remove_applied oph classes] removes operation of hash [oph] from
+   fields [applied] and [in_mempool] of [classes]. The operations
+   which were applied but not the one removed are sent back to the
+   caller as a map. Consequently, the order in which these operations
+   were applied might be lost. *)
+val remove_applied :
+  Operation_hash.t -> t -> Operation.t Operation_hash.Map.t option
 
 (** [remove_not_applied oph classes] removes operation of hash [oph]
       from all fields of [classes] except from [applied]. *)

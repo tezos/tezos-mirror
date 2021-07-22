@@ -1167,40 +1167,35 @@ module Make
             pv.predecessor
 
     (** Recomputes the [validation_state] by replaying the list of
-        [applied] operations.
+       [applied] operations.
 
-        This should be called when the list of [applied] operations
-        is modified in a way that is not easily transmitted to the
-        [validation_state], and/or might make this list invalid.
-        E.g. a banned operation has been removed from this list, but
-        we could not simply revert its effect on the state; moreover
-        operations that were initially applied after the banned
-        operation might no longer be classified as [`Applied].
+        This should be called when the list of [applied] operations is
+       modified in a way that is not easily transmitted to the
+       [validation_state], and/or might make this list invalid.
+       E.g. a banned operation has been removed from this list, but we
+       could not simply revert its effect on the state; moreover
+       operations that were initially applied after the banned
+       operation might no longer be classified as [`Applied].
 
-        Applied operations are removed from fields [applied] and
-        [in_mempool], and sent back to [pending]. The [validation_state]
-        is reset to the chain head, and the field [mempool.known_valid]
-        is cleared. Previously applied operations are then classified
-        anew, in the order they were initially applied. *)
-    let reclassify_applied_operations w pv =
+       [to_reclassify] which are operations applied but reseted by
+       [Classification.remove_applied] are sent back to [pending],
+       except the one banned of course. The [validation_state] is
+       reset to the chain head, and the field [mempool.known_valid] is
+       cleared. Previously applied operations are then classified
+       anew, the order might be a bit different from the one in which
+       they were applied. *)
+    let reclassify_applied_operations w pv to_reclassify =
       (* List of previously applied operations, in the order they should
          be reclassified (since [applied] operations are stored in reverse
          order of application: cf "General description of the mempool"
          comment). *)
-      let previously_applied = List.rev pv.shell.classification.applied in
-      (* Previously applied operations are removed from [applied] and
-         [in_mempool], and added instead to [pending]. *)
-      pv.shell.classification.applied <- [] ;
-      let (in_mempool_without_applied, pending_with_applied) =
-        List.fold_left
-          (fun (in_mempool, pending) (oph, op) ->
-            ( Operation_hash.Set.remove oph in_mempool,
-              Operation_hash.Map.add oph op pending ))
-          (pv.shell.classification.in_mempool, pv.shell.pending)
-          previously_applied
+      let pending =
+        Operation_hash.Map.union
+          (fun _ v _ -> Some v)
+          pv.shell.pending
+          to_reclassify
       in
-      pv.shell.classification.in_mempool <- in_mempool_without_applied ;
-      pv.shell.pending <- pending_with_applied ;
+      pv.shell.pending <- pending ;
       (* The [validation_state] is reset to the chain head. *)
       Prevalidation.create
         (Distributed_db.chain_store pv.shell.parameters.chain_db)
@@ -1215,7 +1210,7 @@ module Make
         Mempool.{known_valid = []; pending = pv.shell.mempool.pending}
       in
       (* Previously applied operations are classified anew. *)
-      let reclassify_operation (acc_validation_state, acc_mempool) (oph, op) =
+      let reclassify_operation oph op (acc_validation_state, acc_mempool) =
         pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
         (* These operations should not be notified again: they have already
            been notified when they were initially classified. *)
@@ -1228,10 +1223,10 @@ module Make
           op
           oph
       in
-      List.fold_left_s
+      Operation_hash.Map.fold_s
         reclassify_operation
+        to_reclassify
         (validation_state, mempool)
-        previously_applied
       >>= fun (new_validation_state, new_mempool) ->
       pv.validation_state <- Ok new_validation_state ;
       set_mempool
@@ -1254,18 +1249,19 @@ module Make
       pv.shell.banned_operations <-
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
       if Classification.is_in_mempool oph_to_ban pv.shell.classification then
-        if Classification.is_applied oph_to_ban pv.shell.classification then (
-          Classification.remove_applied oph_to_ban pv.shell.classification ;
-          (* To revert the effect of the banned operation's application on the
-             [validation_state], we have to reset it to the chain head and
-             reclassify the other applied operations.
-             Note: [oph_to_ban] has not been removed from
-             [pv.shell.mempool.known_valid], because
-             {!reclassify_applied_operations} will empty it anyway. *)
-          reclassify_applied_operations w pv)
-        else (
-          Classification.remove_not_applied oph_to_ban pv.shell.classification ;
-          set_mempool pv.shell (Mempool.remove oph_to_ban pv.shell.mempool))
+        (* To revert the effect of the banned operation's application on the
+           [validation_state], we have to reset it to the chain head and
+           reclassify the other applied operations.
+           Note: [oph_to_ban] has not been removed from
+           [pv.shell.mempool.known_valid], because
+           {!reclassify_applied_operations} will empty it anyway. *)
+        match
+          Classification.remove_applied oph_to_ban pv.shell.classification
+        with
+        | None ->
+            Classification.remove_not_applied oph_to_ban pv.shell.classification ;
+            set_mempool pv.shell (Mempool.remove oph_to_ban pv.shell.mempool)
+        | Some to_reclassify -> reclassify_applied_operations w pv to_reclassify
       else (
         pv.shell.pending <-
           Operation_hash.Map.remove oph_to_ban pv.shell.pending ;

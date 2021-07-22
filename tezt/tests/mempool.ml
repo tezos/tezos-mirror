@@ -1061,11 +1061,16 @@ let get_and_log_applied client =
   return ophs
 
 (** Boolean indicating whether two lists of operation hashes (strings)
-    are equal (returns [false] if they have different lengths, instead of
-    raising [invalid_arg] as using [List.for_all2] directly would do). *)
+   are equal (returns [false] if they have different lengths, instead
+   of raising [invalid_arg] as using [List.for_all2] directly would
+   do). We use a naive way to check both lists are equal because
+   1. performances for small lists does not matter and 2. the mempool
+   does not specify how operations previously applied will be applied
+   again after banning one operation. *)
 let oph_list_equal l1 l2 =
   Int.equal (List.length l1) (List.length l2)
-  && List.for_all2 String.equal l1 l2
+  && List.for_all (fun x -> List.mem x l2) l1
+  && List.for_all (fun x -> List.mem x l1) l2
 
 (** Gets the list of hashes of the mempool's applied operations,
     and asserts that it is equal to the given list [expected_ophs]. *)
