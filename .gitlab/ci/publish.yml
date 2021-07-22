@@ -52,6 +52,8 @@ build_release:docker_amd64:
   stage: build_release
   tags:
     - safe_docker
+  before_script:
+    - apk --no-cache --virtual add git
 
 build_release:docker_arm64:
   extends: .build_docker_release_template
@@ -61,6 +63,8 @@ build_release:docker_arm64:
   stage: build_release
   tags:
     - arm64
+  before_script:
+    - apk --no-cache --virtual add git
 
 .build_static_binaries_template:
   extends:
