@@ -220,10 +220,10 @@ val ( >= ) : 'a -> 'a -> 'a typ -> error_msg:string -> unit
 
 (** Check that a string matches a regular expression.
 
-    Example: [Check.((value =~ rex) int ~error_msg:"expected value =~ %R, got %L")] *)
+    Example: [Check.((value =~ rex) ~error_msg:"expected value =~ %R, got %L")] *)
 val ( =~ ) : string -> rex -> error_msg:string -> unit
 
 (** Check that a string does not match a regular expression.
 
-    Example: [Check.((value =~! rex) int ~error_msg:"expected value =~! %R, got %L")] *)
+    Example: [Check.((value =~! rex) ~error_msg:"expected value =~! %R, got %L")] *)
 val ( =~! ) : string -> rex -> error_msg:string -> unit
