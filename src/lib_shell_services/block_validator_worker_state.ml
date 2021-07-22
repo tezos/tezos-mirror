@@ -148,11 +148,3 @@ module Event = struct
     | Validating_block block ->
         Format.fprintf ppf "validating block %a" Block_hash.pp block
 end
-
-module Worker_state = struct
-  type view = unit
-
-  let encoding = Data_encoding.empty
-
-  let pp _ppf _view = ()
-end

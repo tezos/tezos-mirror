@@ -299,27 +299,6 @@ module Event = struct
           errs
 end
 
-module Worker_state = struct
-  type view = {active_peers : P2p_peer.Id.t list; bootstrapped : bool}
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {bootstrapped; active_peers} -> (bootstrapped, active_peers))
-      (fun (bootstrapped, active_peers) -> {bootstrapped; active_peers})
-      (obj2
-         (req "bootstrapped" bool)
-         (req "active_peers" (list P2p_peer.Id.encoding)))
-
-  let pp ppf {bootstrapped; active_peers} =
-    Format.fprintf
-      ppf
-      "@[<v 0>Network is%s bootstrapped.@,@[<v 2>Active peers:%a@]@]"
-      (if bootstrapped then "" else " not yet")
-      (fun ppf -> List.iter (Format.fprintf ppf "@,- %a" P2p_peer.Id.pp))
-      active_peers
-end
-
 module Distributed_db_state = struct
   type table_scheduler = {table_length : int; scheduler_length : int}
 

@@ -95,7 +95,7 @@ module Peer_validators : sig
     (P2p_peer.Id.t
     * Worker_types.worker_status
     * Worker_types.worker_information
-    * Peer_validator_worker_state.Worker_state.pipeline_length)
+    * Peer_validator_worker_state.pipeline_length)
     list
     tzresult
     Lwt.t
@@ -116,7 +116,7 @@ module Peer_validators : sig
         (P2p_peer.Id.t
         * Worker_types.worker_status
         * Worker_types.worker_information
-        * Peer_validator_worker_state.Worker_state.pipeline_length)
+        * Peer_validator_worker_state.pipeline_length)
         list )
       RPC_service.t
 

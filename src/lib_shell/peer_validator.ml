@@ -66,8 +66,6 @@ type limits = {
 }
 
 module Types = struct
-  include Worker_state
-
   type parameters = {
     chain_db : Distributed_db.chain_db;
     block_validator : Block_validator.t;
@@ -88,14 +86,6 @@ module Types = struct
   let pipeline_length = function
     | None -> Bootstrap_pipeline.length_zero
     | Some p -> Bootstrap_pipeline.length p
-
-  let view (state : state) _ : view =
-    let {pipeline; last_validated_head; last_advertised_head; _} = state in
-    {
-      pipeline_length = pipeline_length pipeline;
-      last_validated_head = Block_header.hash last_validated_head;
-      last_advertised_head = Block_header.hash last_advertised_head;
-    }
 end
 
 module Logger =

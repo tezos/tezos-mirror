@@ -65,5 +65,4 @@ val current_request :
 val last_events :
   t -> (Internal_event.level * Peer_validator_worker_state.Event.t list) list
 
-val pipeline_length :
-  t -> Peer_validator_worker_state.Worker_state.pipeline_length
+val pipeline_length : t -> Peer_validator_worker_state.pipeline_length

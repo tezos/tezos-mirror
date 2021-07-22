@@ -64,21 +64,6 @@ module Event : sig
   val pp : Format.formatter -> t -> unit
 end
 
-module Worker_state : sig
-  type pipeline_length = {
-    fetched_header_length : int;
-    fetched_block_length : int;
-  }
+type pipeline_length = {fetched_header_length : int; fetched_block_length : int}
 
-  val pipeline_length_encoding : pipeline_length Data_encoding.encoding
-
-  type view = {
-    pipeline_length : pipeline_length;
-    mutable last_validated_head : Block_hash.t;
-    mutable last_advertised_head : Block_hash.t;
-  }
-
-  val encoding : view Data_encoding.encoding
-
-  val pp : Format.formatter -> view -> unit
-end
+val pipeline_length_encoding : pipeline_length Data_encoding.encoding

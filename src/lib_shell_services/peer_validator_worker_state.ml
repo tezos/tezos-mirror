@@ -368,53 +368,15 @@ module Event = struct
           errors
 end
 
-module Worker_state = struct
-  type pipeline_length = {
-    fetched_header_length : int;
-    fetched_block_length : int;
-  }
+type pipeline_length = {fetched_header_length : int; fetched_block_length : int}
 
-  let pipeline_length_encoding =
-    let open Data_encoding in
-    conv
-      (function
-        | {fetched_header_length; fetched_block_length} ->
-            (fetched_header_length, fetched_block_length))
-      (function
-        | (fetched_header_length, fetched_block_length) ->
-            {fetched_header_length; fetched_block_length})
-      (obj2 (req "fetched_headers" int31) (req "fetched_blocks" int31))
-
-  type view = {
-    pipeline_length : pipeline_length;
-    mutable last_validated_head : Block_hash.t;
-    mutable last_advertised_head : Block_hash.t;
-  }
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (function
-        | {pipeline_length; last_validated_head; last_advertised_head} ->
-            (pipeline_length, last_validated_head, last_advertised_head))
-      (function
-        | (pipeline_length, last_validated_head, last_advertised_head) ->
-            {pipeline_length; last_validated_head; last_advertised_head})
-      (obj3
-         (req "pipelines" pipeline_length_encoding)
-         (req "last_validated_head" Block_hash.encoding)
-         (req "last_advertised_head" Block_hash.encoding))
-
-  let pp ppf state =
-    Format.fprintf
-      ppf
-      "Pipeline_length: %d - %d @,\
-       Last validated head: %a@,\
-       Last advertised head: %a@]"
-      state.pipeline_length.fetched_header_length
-      state.pipeline_length.fetched_block_length
-      Block_hash.pp
-      state.last_validated_head
-      Block_hash.pp
-      state.last_advertised_head
-end
+let pipeline_length_encoding =
+  let open Data_encoding in
+  conv
+    (function
+      | {fetched_header_length; fetched_block_length} ->
+          (fetched_header_length, fetched_block_length))
+    (function
+      | (fetched_header_length, fetched_block_length) ->
+          {fetched_header_length; fetched_block_length})
+    (obj2 (req "fetched_headers" int31) (req "fetched_blocks" int31))

@@ -54,11 +54,3 @@ module Event : sig
 
   val pp : Format.formatter -> t -> unit
 end
-
-module Worker_state : sig
-  type view = unit
-
-  val encoding : view Data_encoding.encoding
-
-  val pp : Format.formatter -> view -> unit
-end

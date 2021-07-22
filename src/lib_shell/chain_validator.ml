@@ -63,8 +63,6 @@ type limits = {
 }
 
 module Types = struct
-  include Worker_state
-
   type parameters = {
     parent : Name.t option;
     (* inherit bootstrap status from parent chain validator *)
@@ -102,14 +100,6 @@ module Types = struct
     active_peers :
       (Peer_validator.t, Error_monad.tztrace) P2p_peer.Error_table.t;
   }
-
-  let view (state : state) _ : view =
-    let {bootstrapped; active_peers; _} = state in
-    {
-      bootstrapped;
-      active_peers =
-        P2p_peer.Error_table.fold_keys (fun id l -> id :: l) active_peers [];
-    }
 end
 
 module Logger =

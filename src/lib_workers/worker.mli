@@ -219,9 +219,6 @@ module type T = sig
 
   val information : _ t -> Worker_types.worker_information
 
-  (** Introspect the state of a worker. *)
-  val view : _ t -> Types.view
-
   (** Lists the running workers in this group. *)
   val list : 'a table -> (Name.t * 'a t) list
 
