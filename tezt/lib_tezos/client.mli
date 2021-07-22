@@ -525,8 +525,8 @@ val init_mockup :
   unit ->
   t Lwt.t
 
-(** Create a client with mode [Light]. In addition to the client, the list
-    of nodes is returned, as it is created by this call; and
+(** Create a client with mode [Light]. In addition to the client, created
+    nodes are returned, as they are created by this call; and
     the light mode needs tight interaction with the nodes. The [nodes_args]
     argument allows to configure the created nodes, but note
     that arguments [Node.Connections] and [Node.Synchronisation_threshold]
@@ -540,4 +540,4 @@ val init_light :
   ?min_agreement:float ->
   ?nodes_args:Node.argument list ->
   unit ->
-  (t * Node.t list) Lwt.t
+  (t * Node.t * Node.t) Lwt.t

@@ -655,11 +655,9 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
     List.filter_map filter_node_arg nodes_args
     @ Node.[Connections 1; Synchronisation_threshold 0]
   in
-  let* nodes =
-    let* node1 = Node.init ~name:"node1" nodes_args
-    and* node2 = Node.init ~name:"node2" nodes_args in
-    return [node1; node2]
-  in
+  let* node1 = Node.init ~name:"node1" nodes_args
+  and* node2 = Node.init ~name:"node2" nodes_args in
+  let nodes = [node1; node2] in
   let client =
     create_with_mode
       ?path
@@ -705,7 +703,7 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
       (fun peer -> Admin.connect_address ~peer client)
       (List.tl nodes)
   in
-  return (client, nodes)
+  return (client, node1, node2)
 
 let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
@@ -729,7 +727,7 @@ let init_activate_bake ?path ?admin_path ?name ?color ?base_dir
       let* () = if bake then bake_for client else Lwt.return_unit in
       return client
   | `Light ->
-      let* (client, _) =
+      let* (client, _, _) =
         init_light ?path ?admin_path ?name ?color ?base_dir ~nodes_args ()
       in
       let* () = activate_protocol ?parameter_file ~protocol client in
